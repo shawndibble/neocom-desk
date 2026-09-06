@@ -230,7 +230,7 @@ function MakeOrBuyMarker({ advice, remaining }: { advice: MakeOrBuy; remaining: 
   const planetary = building && advice.method === 'planetary';
   const Glyph = building ? BUILD_GLYPH[advice.method] : Icon.Buy;
   return (
-    <Tooltip content={label}>
+    <Tooltip content={label} openOnTap>
       <span
         role="img"
         aria-label={label}
@@ -467,7 +467,7 @@ export function MaterialsTable({
              * fixed width against a fixed right edge pins both. That is what
              * the reserved slot used to buy, so it is gone.
              */
-            <span className="inline-flex items-center justify-start gap-1 sm:flex-row-reverse">
+            <span className="flex flex-col items-start gap-0.5 sm:items-end">
               <SourcingInput
                 value={state.unitPrice ?? undefined}
                 label={t('industry.priceFor', { material: name })}
@@ -476,16 +476,20 @@ export function MaterialsTable({
                 parse={parsePrice}
                 onCommit={(overridePrice) => onSourcingChange(material.typeID, { overridePrice })}
               />
-              <span className={cx('text-[0.6875rem]', tag.tone)}>{tag.text}</span>
-              {overridden && (
-                <IconButton
-                  size="sm"
-                  variant="plain"
-                  icon={<Icon.Revert size={Icon.ICON_SIZE.sm} />}
-                  label={t('industry.resetPriceFor', { material: name })}
-                  onClick={() => onSourcingChange(material.typeID, { overridePrice: undefined })}
-                />
-              )}
+              {/* Under the field, not beside it: the source tag is a caption
+                  on the number, and beside it the column outgrew the table. */}
+              <span className="inline-flex items-center gap-1">
+                <span className={cx('text-[0.6875rem]', tag.tone)}>{tag.text}</span>
+                {overridden && (
+                  <IconButton
+                    size="sm"
+                    variant="plain"
+                    icon={<Icon.Revert size={Icon.ICON_SIZE.sm} />}
+                    label={t('industry.resetPriceFor', { material: name })}
+                    onClick={() => onSourcingChange(material.typeID, { overridePrice: undefined })}
+                  />
+                )}
+              </span>
             </span>
           );
         },
@@ -519,7 +523,7 @@ export function MaterialsTable({
                 {state.lineCost === null ? t('common.unknown') : formatIsk(state.lineCost)}
               </span>
               {owned > 0 && (
-                <span className="text-[0.6875rem] text-text-dim">
+                <span className="text-[0.6875rem] whitespace-nowrap text-text-dim">
                   {state.fullyOwned
                     ? t('industry.sourcingAllOwned', { owned: owned.toLocaleString() })
                     : state.unitPrice !== null

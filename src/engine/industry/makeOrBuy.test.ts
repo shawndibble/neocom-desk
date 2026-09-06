@@ -19,7 +19,7 @@ const ctx: MakeOrBuyContext = {
   security: 'highsec',
   systemCostIndex: 0.05,
   adjustedPrices: { 34: 4 },
-  hubPrices: { 34: 5 },
+  materialPrices: { 34: 5 },
   skills: {},
 };
 
@@ -82,7 +82,7 @@ describe('makeOrBuy', () => {
   });
 
   it('recommends buying when the job costs more than the hub asks', () => {
-    const dear = { ...ctx, hubPrices: { 34: 500 } };
+    const dear = { ...ctx, materialPrices: { 34: 500 } };
     const result = makeOrBuy(line(), manufacturing, dear);
     expect(result?.verdict).toBe('buy');
     // 60 x 500 = 30,000 + fee, against 12 x 100 of hub price.
@@ -90,7 +90,7 @@ describe('makeOrBuy', () => {
   });
 
   it('is null when one of the recipe inputs has no hub price', () => {
-    expect(makeOrBuy(line(), manufacturing, { ...ctx, hubPrices: {} })).toBeNull();
+    expect(makeOrBuy(line(), manufacturing, { ...ctx, materialPrices: {} })).toBeNull();
   });
 
   it('compares against an override price when the plan carries one', () => {
@@ -158,7 +158,7 @@ describe('makeOrBuy', () => {
     });
 
     it('is null when an input has no hub price', () => {
-      expect(makeOrBuy(line(), reaction, { ...ctx, hubPrices: {} })).toBeNull();
+      expect(makeOrBuy(line(), reaction, { ...ctx, materialPrices: {} })).toBeNull();
     });
   });
 
@@ -168,7 +168,7 @@ describe('makeOrBuy', () => {
       outputQuantity: 20,
       inputs: [{ typeID: 2073, quantity: 3000 }],
     };
-    const piCtx: MakeOrBuyContext = { ...ctx, hubPrices: { 2073: 0.5 } };
+    const piCtx: MakeOrBuyContext = { ...ctx, materialPrices: { 2073: 0.5 } };
 
     it('prices a schematic at its inputs, with no job fee', () => {
       // 3000 x 0.5 = 1500 per cycle, 20 units out: 75 each.

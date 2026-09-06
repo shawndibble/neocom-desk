@@ -12,6 +12,12 @@ import {
 } from '@/components/ui';
 import type { DataTableColumn } from '@/components/ui';
 import type { BuildResult } from '@/engine/industry/types';
+import {
+  compareUseOrSell,
+  type LiquidationBasis,
+  type OwnedStockSale,
+  type OwnedStockSaleLine,
+} from '@/engine/industry/ownedStockSale';
 import { marketItemUrl } from '@/engine/market/urlState';
 import { formatDuration } from '@/lib/duration';
 import { formatIsk } from '@/lib/isk';
@@ -26,6 +32,8 @@ interface CostRowProps {
   /** `'negative'`/`'positive'` render the value in the `isk-neg`/`isk-pos` tone, e.g. for
    * deductions like Sales Tax/Broker Fee, or a Profit row that can go either way. */
   tone?: 'negative' | 'positive';
+  /** Makes the row's tooltip trigger open the calculation breakdown on click. */
+  onTooltipClick?: () => void;
 }
 
 /** One row of the Costs stack: label (+ optional tooltip) left, value right. */
@@ -36,6 +44,7 @@ function CostRow({
   emphasized = false,
   indented = false,
   tone,
+  onTooltipClick,
 }: CostRowProps) {
   const { t } = useTranslation();
   const toneClass =
@@ -52,7 +61,14 @@ function CostRow({
     >
       <span className="flex items-center gap-1.5 font-semibold tracking-widest text-text-dim uppercase">
         {label}
-        {tooltip && <InfoTooltip label={t('common.aboutLabel', { label })} content={tooltip} />}
+        {tooltip && (
+          <InfoTooltip
+            label={t('common.aboutLabel', { label })}
+            content={tooltip}
+            onClick={onTooltipClick}
+            {...(onTooltipClick ? { 'aria-haspopup': 'dialog' as const } : {})}
+          />
+        )}
       </span>
       <span className={`font-medium tabular-nums ${emphasized ? 'text-sm' : ''} ${toneClass}`}>
         {value}
@@ -89,11 +105,22 @@ interface ResultsSummaryProps {
   productQuantity: number | null;
   /** Short solar-system name the build's cost index applies to (UX-REVIEW #6/#8: makes the trade-hub <-> build-system coupling explicit in the label). */
   costIndexSystemName: string;
+  /** Opens the Calculation Breakdown the hero owns — the break-even and owned-sale "?"s are doors into it. */
+  onOpenBreakdown: () => void;
+  /**
+   * What the materials the player already owns would fetch if sold instead of
+   * consumed, quoted on both liquidation bases. Null while there is no result
+   * or no market snapshot to quote against; a plan that owns nothing still
+   * yields both totals, at zero, and the section hides itself.
+   */
+  ownedSale: { instant: OwnedStockSale; order: OwnedStockSale } | null;
+  /** Resolves a material typeID to its name, for the per-material sale rows. */
+  nameFor: (typeID: number) => string;
 }
 
 /**
- * Job fee breakdown, cost, profit, margin, ISK/hour, and the build-vs-buy
- * verdict. Gated on `pricesReady`: without it there is nothing honest to
+ * Job fee breakdown, cost, revenue, profit, margin, ISK/hour and break-even —
+ * the working behind the verdicts `PlanVerdictHero` states. Gated on `pricesReady`: without it there is nothing honest to
  * show (job cost needs live adjusted prices + system cost index, neither of
  * which are cached locally) — materials + time stay visible in the sibling
  * panel regardless.
@@ -108,12 +135,17 @@ export function ResultsSummary({
   productUnitPrice,
   productQuantity,
   costIndexSystemName,
+  onOpenBreakdown,
+  ownedSale,
+  nameFor,
 }: ResultsSummaryProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   const [jobFeeExpanded, setJobFeeExpanded] = useState(false);
   const [profitView, setProfitView] = useState<'net' | 'gross'>('net');
+  const [saleBasis, setSaleBasis] = useState<LiquidationBasis>('instant');
+  const [saleLinesExpanded, setSaleLinesExpanded] = useState(false);
 
   const revenueColumns = useMemo<DataTableColumn<RevenueRow>[]>(
     () => [
@@ -143,6 +175,34 @@ export function ResultsSummary({
     [t]
   );
 
+  const saleColumns = useMemo<DataTableColumn<OwnedStockSaleLine>[]>(
+    () => [
+      { id: 'material', header: t('industry.material'), render: (row) => nameFor(row.typeID) },
+      {
+        id: 'owned',
+        header: t('industry.useOrSell.ownedUnits'),
+        align: 'right',
+        className: 'tabular-nums',
+        render: (row) => row.quantity.toLocaleString(),
+      },
+      {
+        id: 'unitPrice',
+        header: t('industry.unitPrice'),
+        align: 'right',
+        className: 'tabular-nums',
+        render: (row) => formatIsk(row.unitPrice),
+      },
+      {
+        id: 'net',
+        header: t('industry.useOrSell.netColumn'),
+        align: 'right',
+        className: 'tabular-nums',
+        render: (row) => formatIsk(row.net),
+      },
+    ],
+    [t, nameFor]
+  );
+
   if (pricesLoading) {
     return (
       <div className="flex justify-center py-6">
@@ -161,7 +221,9 @@ export function ResultsSummary({
     );
   }
 
-  const hasVerdict = result.recommendation !== 'unknown';
+  // Always the net profit, never `displayProfit`: selling the materials pays
+  // sales tax too, so both sides of this comparison have to be after fees.
+  const useOrSell = ownedSale ? compareUseOrSell(result.profit, ownedSale[saleBasis]) : null;
   const displayProfit = profitView === 'gross' ? result.grossProfit : result.profit;
   const displayMargin = profitView === 'gross' ? result.grossMargin : result.marginPct;
   const displayIskPerHour = profitView === 'gross' ? result.grossIskPerHour : result.iskPerHour;
@@ -313,60 +375,94 @@ export function ResultsSummary({
         </div>
       )}
 
-      <div className="space-y-1">
-        <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-          {t('industry.acquisitionVerdictLabel')}
-        </p>
-        {hasVerdict ? (
-          <p
-            className={`text-sm font-semibold ${
-              result.recommendation === 'build' ? 'text-success' : 'text-warning'
-            }`}
-          >
-            {result.recommendation === 'build'
-              ? t('industry.verdictBuild', {
-                  amount: formatIsk((result.buyCost ?? 0) - result.totalCost),
-                })
-              : t('industry.verdictBuy', {
-                  amount: formatIsk(result.totalCost - (result.buyCost ?? 0)),
-                })}
-          </p>
-        ) : (
-          <p className="text-xs text-text-dim">{t('industry.verdictUnknown')}</p>
-        )}
-      </div>
+      {result.breakEvenPrice !== null && (
+        <div className="divide-y divide-line rounded-xs border border-line">
+          <CostRow
+            label={t('industry.breakEvenPrice')}
+            value={formatIsk(result.breakEvenPrice)}
+            tooltip={t('industry.breakEvenPriceTooltip')}
+            onTooltipClick={onOpenBreakdown}
+          />
+          {productUnitPrice !== null && (
+            <CostRow label={t('industry.currentMarketPrice')} value={formatIsk(productUnitPrice)} />
+          )}
+        </div>
+      )}
 
-      <div className="space-y-1">
-        <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-          {t('industry.saleProfitabilityLabel')}
-        </p>
-        {displayProfit !== null ? (
-          <p
-            className={`text-sm font-semibold ${displayProfit >= 0 ? 'text-success' : 'text-warning'}`}
-          >
-            {displayProfit >= 0
-              ? t('industry.saleProfitabilityProfit', { amount: formatIsk(displayProfit) })
-              : t('industry.saleProfitabilityLoss', { amount: formatIsk(Math.abs(displayProfit)) })}
+      {/* `ownedUnits` is the same on either basis — it counts stock, not prices. */}
+      {ownedSale && ownedSale.instant.ownedUnits > 0 && (
+        <div className="space-y-1">
+          <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+            {t('industry.useOrSell.label')}
           </p>
-        ) : (
-          <p className="text-xs text-text-dim">{t('industry.saleProfitabilityUnknown')}</p>
-        )}
-        {result.breakEvenPrice !== null && (
+          <p className="text-xs text-text-dim">{t('industry.useOrSell.intro')}</p>
+          <div
+            role="group"
+            aria-label={t('industry.useOrSell.basisLabel')}
+            className="flex gap-1.5"
+          >
+            <FilterChip
+              label={t('industry.useOrSell.basisInstant')}
+              selected={saleBasis === 'instant'}
+              onToggle={() => setSaleBasis('instant')}
+            />
+            <FilterChip
+              label={t('industry.useOrSell.basisOrder')}
+              selected={saleBasis === 'order'}
+              onToggle={() => setSaleBasis('order')}
+            />
+          </div>
           <div className="divide-y divide-line rounded-xs border border-line">
             <CostRow
-              label={t('industry.breakEvenPrice')}
-              value={formatIsk(result.breakEvenPrice)}
-              tooltip={t('industry.breakEvenPriceTooltip')}
+              label={t('industry.useOrSell.sellNet')}
+              value={formatIsk(ownedSale[saleBasis].net)}
+              tooltip={t('industry.useOrSell.sellNetTooltip')}
+              onTooltipClick={onOpenBreakdown}
             />
-            {productUnitPrice !== null && (
+            {result.profit !== null && (
               <CostRow
-                label={t('industry.currentMarketPrice')}
-                value={formatIsk(productUnitPrice)}
+                label={t('industry.useOrSell.buildProfit')}
+                value={formatIsk(result.profit)}
+                tooltip={t('industry.useOrSell.buildProfitTooltip')}
+                tone={result.profit >= 0 ? 'positive' : 'negative'}
               />
             )}
           </div>
-        )}
-      </div>
+          {useOrSell === null ? (
+            <p className="text-xs text-text-dim">{t('industry.useOrSell.unknown')}</p>
+          ) : (
+            <p
+              className={`text-sm font-semibold ${
+                useOrSell.verdict === 'build' ? 'text-success' : 'text-warning'
+              }`}
+            >
+              {useOrSell.verdict === 'build'
+                ? t('industry.useOrSell.verdictBuild', { amount: formatIsk(useOrSell.advantage) })
+                : t('industry.useOrSell.verdictSell', {
+                    amount: formatIsk(Math.abs(useOrSell.advantage)),
+                  })}
+            </p>
+          )}
+          {ownedSale[saleBasis].lines.length > 0 && (
+            <Disclosure
+              label={t('industry.useOrSell.perMaterial')}
+              trailing={formatIsk(ownedSale[saleBasis].net)}
+              expanded={saleLinesExpanded}
+              onToggle={() => setSaleLinesExpanded((expanded) => !expanded)}
+            >
+              <div className="overflow-x-auto">
+                <DataTable
+                  columns={saleColumns}
+                  rows={ownedSale[saleBasis].lines}
+                  rowKey={(row) => row.typeID}
+                  label={t('industry.useOrSell.perMaterial')}
+                  density="compact"
+                />
+              </div>
+            </Disclosure>
+          )}
+        </div>
+      )}
     </div>
   );
 }

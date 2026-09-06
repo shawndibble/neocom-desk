@@ -13,6 +13,7 @@ import {
   secondsRemaining,
   activityI18nKey,
   contextMenuTypeId,
+  summarizeJobs,
 } from './jobs';
 
 const CHAR_ID = 91;
@@ -225,5 +226,33 @@ describe('contextMenuTypeId', () => {
 
   it('falls back to the blueprint itself for research/copying/invention jobs (no product)', () => {
     expect(contextMenuTypeId({ blueprint_type_id: 638, product_type_id: undefined })).toBe(638);
+  });
+});
+
+describe('summarizeJobs', () => {
+  const NOW = Date.parse('2026-08-29T11:00:00Z');
+
+  it('counts running and done jobs and names the soonest unfinished one', () => {
+    const summary = summarizeJobs(
+      [
+        job({ job_id: 1, end_date: '2026-08-29T13:00:00Z' }),
+        job({ job_id: 2, end_date: '2026-08-29T10:30:00Z' }),
+        job({ job_id: 3, end_date: '2026-08-29T11:20:00Z' }),
+      ],
+      NOW
+    );
+    expect(summary.running).toBe(2);
+    expect(summary.done).toBe(1);
+    expect(summary.next?.job.job_id).toBe(3);
+    expect(summary.next?.seconds).toBe(20 * 60);
+  });
+
+  it('has no "next" when every job is done', () => {
+    const summary = summarizeJobs([job({ end_date: '2026-08-29T10:00:00Z' })], NOW);
+    expect(summary).toEqual({ running: 0, done: 1, next: null });
+  });
+
+  it('is empty for no jobs', () => {
+    expect(summarizeJobs([], NOW)).toEqual({ running: 0, done: 0, next: null });
   });
 });

@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import '@/i18n';
 import { DataAgeBadge } from './DataAgeBadge';
+import { formatTimestamp } from '@/lib/timestamp';
 
 const NOW = new Date('2026-08-29T12:00:00Z');
 
@@ -46,7 +47,7 @@ describe('DataAgeBadge', () => {
   it('says nothing beyond the timestamp when no note is given', () => {
     const date = new Date(NOW.getTime() - 5 * 60_000);
     render(<DataAgeBadge date={date} />);
-    expect(screen.getByText('5m ago')).toHaveAttribute('title', date.toLocaleString());
+    expect(screen.getByText('5m ago')).toHaveAttribute('title', formatTimestamp(date));
   });
 
   /**
@@ -76,7 +77,7 @@ describe('DataAgeBadge', () => {
       const { container } = render(<DataAgeBadge date={date} dotOnly />);
       const title = container.querySelector('time')?.getAttribute('title');
       expect(title).toContain('5m ago');
-      expect(title).toContain(date.toLocaleString());
+      expect(title).toContain(formatTimestamp(date));
     });
 
     it('still appends a view’s own refresh-cadence note to the tooltip', () => {

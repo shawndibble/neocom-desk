@@ -27,6 +27,7 @@ import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { IssuerLink } from './IssuerLink';
 import { typeIconUrl } from '@/lib/eveImages';
 import { formatIsk } from '@/lib/isk';
+import { formatTimestamp } from '@/lib/timestamp';
 import type { Contract, ContractItem } from '@/esi/endpoints';
 
 export interface ContractDetailModalProps {
@@ -176,22 +177,22 @@ export function ContractDetailModal({
             )}
 
             <dt className="text-text-dim uppercase">{t('contracts.detailDateIssued')}</dt>
-            <dd>{new Date(contract.date_issued).toLocaleString()}</dd>
+            <dd>{formatTimestamp(new Date(contract.date_issued))}</dd>
 
             <dt className="text-text-dim uppercase">{t('contracts.detailDateExpired')}</dt>
-            <dd>{new Date(contract.date_expired).toLocaleString()}</dd>
+            <dd>{formatTimestamp(new Date(contract.date_expired))}</dd>
 
             {contract.date_accepted && (
               <>
                 <dt className="text-text-dim uppercase">{t('contracts.detailDateAccepted')}</dt>
-                <dd>{new Date(contract.date_accepted).toLocaleString()}</dd>
+                <dd>{formatTimestamp(new Date(contract.date_accepted))}</dd>
               </>
             )}
 
             {contract.date_completed && (
               <>
                 <dt className="text-text-dim uppercase">{t('contracts.detailDateCompleted')}</dt>
-                <dd>{new Date(contract.date_completed).toLocaleString()}</dd>
+                <dd>{formatTimestamp(new Date(contract.date_completed))}</dd>
               </>
             )}
 

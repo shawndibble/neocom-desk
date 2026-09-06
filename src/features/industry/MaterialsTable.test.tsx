@@ -95,9 +95,9 @@ const ownedInput = (material: string) =>
 const priceInput = (material: string) =>
   screen.getByRole('textbox', { name: `Price for ${material}` });
 const revertButton = (material: string) =>
-  screen.getByRole('button', { name: `Reset ${material} to the hub price` });
+  screen.getByRole('button', { name: `Reset ${material} to the market price` });
 const queryRevertButton = (material: string) =>
-  screen.queryByRole('button', { name: `Reset ${material} to the hub price` });
+  screen.queryByRole('button', { name: `Reset ${material} to the market price` });
 const valueOf = (input: HTMLElement) => (input as HTMLInputElement).value;
 
 async function setField(input: HTMLElement, value: string) {
@@ -185,7 +185,7 @@ describe('MaterialsTable sourcing', () => {
     expect(tritanium.getByText('Override')).toBeTruthy();
   });
 
-  it('clearing an override price reverts the row to the hub price', async () => {
+  it('clearing an override price reverts the row to the market price', async () => {
     const onChange = vi.fn();
     render(<Harness initial={{ 34: { overridePrice: 7 } }} onChange={onChange} />);
     expect(within(row('Tritanium')).getByText('7,000')).toBeTruthy();
@@ -281,10 +281,12 @@ describe('MaterialsTable stacked card', () => {
       'items-start',
       'sm:items-end'
     );
-    // The price cell reaches the same right edge by mirroring rather than by
-    // `justify-end` — see the alignment test below — so what matters here is
-    // that it starts at the gutter on the card like everything else.
-    expect(tritanium.getByText('Hub').parentElement).toHaveClass('justify-start');
+    // The price cell stacks field over source tag; the column starts at the
+    // gutter on the card and hugs the right edge from sm up like the rest.
+    expect(tritanium.getByText('Hub').parentElement?.parentElement).toHaveClass(
+      'items-start',
+      'sm:items-end'
+    );
   });
 
   it('left-aligns the digits inside a sourcing field below sm, so they sit in the value column too', () => {
@@ -386,7 +388,7 @@ describe('MaterialsTable number mask', () => {
     render(<Harness hubPrices={BIG_PRICES} onChange={vi.fn()} />);
 
     const cell = priceInput('Tritanium').parentElement;
-    expect(cell).toHaveClass('sm:flex-row-reverse');
+    expect(cell).toHaveClass('flex-col', 'sm:items-end');
     expect(cell?.firstElementChild).toBe(priceInput('Tritanium'));
 
     // And it holds once a row grows a revert button: the field is a fixed
@@ -408,7 +410,7 @@ describe('MaterialsTable number mask', () => {
 });
 
 describe('MaterialsTable price field', () => {
-  it('reverts to the hub price from the button, which is only there once a row is overridden', async () => {
+  it('reverts to the market price from the button, which is only there once a row is overridden', async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
     render(<Harness onChange={onChange} />);

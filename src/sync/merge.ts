@@ -14,10 +14,13 @@
 import type {
   BuildPlanRecord,
   PlanBooster,
+  PlanetRichnessRecord,
+  ProductionOrderWatchRecord,
+  ProductionRunRecord,
+  ProductionSaleLinkRecord,
   QuickbarRecord,
   SkillPlanRecord,
   StationPinRecord,
-  PlanetRichnessRecord,
   PayeeRecord,
   MiningTaxAssignmentRecord,
   WhatIfImplantSelection,
@@ -69,6 +72,15 @@ export type RemotePayeeDoc = PayeeRecord & RemoteDoc;
 
 /** Remote Firestore doc at /characters/{uid}/miningTaxAssignments/{id} (issue #523). */
 export type RemoteMiningTaxAssignmentDoc = MiningTaxAssignmentRecord & RemoteDoc;
+
+/** Remote Firestore doc at /characters/{uid}/productionRuns/{id} (issue #525). */
+export type RemoteProductionRunDoc = ProductionRunRecord & RemoteDoc;
+
+/** Remote Firestore doc at /characters/{uid}/productionSaleLinks/{id} (issue #525). */
+export type RemoteProductionSaleLinkDoc = ProductionSaleLinkRecord & RemoteDoc;
+
+/** Remote Firestore doc at /characters/{uid}/productionOrderWatches/{id} (issue #525). */
+export type RemoteProductionOrderWatchDoc = ProductionOrderWatchRecord & RemoteDoc;
 
 /** Locally recorded deletion awaiting propagation to the remote store. */
 export interface LocalTombstone {

@@ -20,10 +20,12 @@ export interface MarketSnapshot {
   /** Lowest sell at the hub, materials + product. Missing key = unpriceable at this hub. */
   hubPrices: HubPrices;
   /**
-   * Highest buy at the hub, same type IDs as `hubPrices`. Unused by Build
-   * Plan (buying materials is always priced at `hubPrices`, the sell side);
-   * the LP store's "instant-sell to buy orders" revenue basis is what reads
-   * this (`src/features/loyalty/offerRows.ts`'s `revenueHubPrices`).
+   * Highest buy at the hub, same type IDs as `hubPrices`. Read by a Build Plan
+   * whose material price basis is `'buy'` (see `priceBasis.ts`) and by the LP
+   * store's "instant-sell to buy orders" revenue basis
+   * (`src/features/loyalty/offerRows.ts`'s `revenueHubPrices`). Both sides
+   * come out of the one aggregate below, so choosing between them is never a
+   * reason to fetch again.
    */
   hubBuyPrices: HubPrices;
   /** Global adjusted prices (job-cost EIV). Null when the live ESI call failed. */

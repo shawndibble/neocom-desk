@@ -34,9 +34,15 @@ here — they go one per file in `docs/context/decisions/`.
   and `placeRemaps` expect. Distinct from the _effective_ values ESI reports,
   which fold in implants and any cerebral accelerator on top.
 - **Booster**: Cerebral accelerator; user toggles it on manually with an expiry date for training-time math. Stored on the Skill Plan and synced with it, like What-If Implants above (round 33).
-- **Build Location**: The search at the head of a Build Plan's Location & market group, over the stations and structures the Character can dock at. Picking one fills facility, **Build System** and security band in a single edit and is not remembered — the line under the box always reads the plan's own values, and "Override" unfolds the fields behind it.
+- **Build Location**: The search at the head of a Build Plan's Location & market group, over the stations and structures the Character can dock at. Picking one fills facility, **Build System** and security band in a single edit, and the plan remembers which place it was so the box can still name it after a reload. That name is a label only — every number reads the plan's own values, and any edit that moves the job elsewhere drops it. "Override" unfolds the fields behind the box.
 - **Build Plan**: An industry plan for one blueprint or reaction formula: materials needed, costs, fees/taxes, time, and two independent verdicts — an **Acquisition Verdict** and a **Sale Profitability** read (see round 15). Covers manufacturing and reactions (issue #460); invention and research/copying are still out of scope (`.out-of-scope/`). Which activity a plan runs is derived from the picked blueprint/formula's own `activity`, never a separate field on the record.
 - **Build System**: The solar system a Build Plan's job runs in, named on the plan. Sets the **Cost Index** the job fee is charged at _and_ the security band the rig bonus reads — both follow from the system, so neither is a separate field. Materials are still priced at the plan's trade hub. Empty means "the hub's own system", which is how every plan behaved before the field existed.
+- **Calculation Breakdown**: The modal behind a Build Plan's results that
+  restates every figure on screen as a rule plus that rule with the plan's own
+  live values substituted in — price bases, Material cost, Job Fee, revenue,
+  fees, profit, break-even, and why an **Acquisition Verdict** and a **Sale
+  Profitability** read differ off one hub price. The deep layer under the
+  per-row tooltips, which stay one-liners.
 - **Character**: One EVE Online character. The unit of login (EVE SSO) and of API data. App supports many Characters side by side from day one.
 - **Character Not Training**: Fires when a Character's skill queue shows no
   active training (the head entry has no live `finish_date`) — whether from
@@ -85,7 +91,7 @@ here — they go one per file in `docs/context/decisions/`.
 - **Detected Accelerator** — a cerebral accelerator inferred from a base sheet
   that is over budget, by the size of the excess. Prefilled into the Booster
   control; not a separate mechanism.
-- **Editable Data**: Data created inside the app (Skill Plans, Build Plans, settings). Synced across devices. Everything else is API-derived and re-pulled per device.
+- **Editable Data**: Data created inside the app (Skill Plans, Build Plans, Production Runs, settings). Synced across devices. Everything else is API-derived and re-pulled per device.
 - **EIV (Estimated Item Value)**: The SCC's reference price for the materials
   a manufacturing job consumes, at ME0 quantities. Used only to size the
   **Job Fee** — it is not what the materials actually cost to buy.
@@ -160,6 +166,13 @@ here — they go one per file in `docs/context/decisions/`.
   qualifies — wormhole, Abyssal and the unreachable dev regions never do — and
   the test is not whether the region has an NPC station: 31 nullsec regions have
   none and still carry busy player-structure markets.
+- **Material Price Basis**: Which side of a Build Plan's **Trade Hub** order
+  book its materials are costed at — sell orders (what they cost to buy right
+  now) or buy orders (what they cost if you place orders and wait). Stored per
+  plan; absent reads as sell. Materials only: the product is always valued at
+  the hub's lowest sell, because an **Acquisition Verdict** asks what buying it
+  outright costs. A material the chosen side cannot price is unpriceable, never
+  quietly re-quoted at the other side.
 - **Mining Ledger Entry**: One row of the Moon Mining Tax ledger, derived (not
   stored) from ESI's personal mining ledger: every moon-goo row for one
   (character, EVE/UTC date, solar system), summed per ore type. This is also
@@ -229,6 +242,40 @@ default tax %, optional moon/system tag}`. The moon/system tag lets the UI
   the most urgent entry that depends on it — the plan's banded view and the
   optimizer's "suggest full reorder" both key off this effective value, not
   each entry's own raw setting.
+- **Plan Setup**: The folded block of a Build Plan's inputs — runs, ME/TE, build location, facility, rig, tax, trade hub, material price basis — read as a row of chips until "Edit setup" opens the controls. The same fields as before; only their default visibility changed (see docs/context/decisions, 2026-09-06 verdict-first).
+- **Production Log**: The cross-plan, cross-item realized-profit rollup
+  (issue #525) — every **Production Run** the character has logged,
+  regardless of which Build Plan it came from, grouped by item. Distinct
+  from the per-Build-Plan "Production Runs" panel on a Build Plan's own
+  detail view, which is scoped to one plan's own runs; Production Log is the
+  account-wide picture, including a per-run table (not just the by-item
+  rollup) so a pilot can see which individual runs still need a sale linked,
+  and a From/To date-range filter. Lives on `/industry`'s "Records" tab (a
+  peer of the "Build Plans" tab, not a separate route or an always-visible
+  panel). The per-run table names no Build Plan — a run outlives its plan
+  (below) — so clicking a row jumps back to that run's own plan only when it
+  still exists, and does nothing otherwise. It carries the same "Sold" split
+  button (Link Past Sale / Watch Open Order / Manual Sale) the per-plan panel
+  does, so a run can be linked to a sale without leaving Records.
+- **Production Run**: A manual, pilot-entered snapshot of one production
+  batch off a **Build Plan** — materials cost, job fee, and quantity as they
+  stood at logging time, overridable at creation and never re-derived
+  afterward (issue #525). Distinct from a Build Plan's own live `BuildResult`,
+  which is a forward _estimate_ that moves with the market on every render; a
+  Production Run holds still so realized profit can be measured against what
+  was actually paid. This locking is also why deleting the Build Plan a run
+  was logged under does not delete the run: the accounting record must
+  outlive the plan, exactly so reusing or deleting that plan later (a
+  blueprint's market price drifts, ME/TE changes) can never retroactively
+  change a profit figure already booked. Deliberately correct-by-construction
+  rather than reconstructed from ESI wallet history (see the decisions folder
+  for why automated FIFO matching was rejected) — the pilot links what
+  actually sold via "Link Past Sale" (a picker over cached wallet
+  transactions), "Watch Open Order" (tracks one of the pilot's own open sell
+  orders' `volume_remain` directly), or a "Manual / Private Sale" entry for a
+  disposal ESI has no record of at all. Each linked sale or watched order is
+  its own synced record, never a field on the run itself, so two devices
+  linking different sales to the same run can never collide.
 - **Projection**: The set of rows a device uploads describing every Scheduled
   Push that becomes due inside the Projection Horizon — one row per
   occurrence, carrying its **Occurrence Key**, its `fireAt`, and its
@@ -310,6 +357,18 @@ default tax %, optional moon/system tag}`. The moon/system tag lets the UI
   while `/skillqueue` carries `training_start_sp`, `level_end_sp` and the
   window the level trains across — enough to interpolate the true figure,
   which is what the in-game queue itself displays.
+- **Use-or-Sell Check**: A Build Plan's third read, alongside the
+  **Acquisition Verdict** and **Sale Profitability**: is the stock the player
+  already owns worth more sold than consumed? Compares the plan's profit
+  (which counts owned units as free) against what those units would net if
+  liquidated, on a chosen **Liquidation Basis**. Only exists when something is
+  owned; no verdict at all when an owned material has no price on that side.
+- **Verdict Hero**: The first panel of a Build Plan: net profit as one large figure, the margin / ISK-hour / duration / break-even line under it, and the Acquisition Verdict, Sale Profitability and Use-or-Sell Check as three labelled pills. It owns the Calculation Breakdown; the "Costs & revenue" ledger beside the materials holds the working.
+- **Liquidation Basis**: How owned materials would be turned into ISK in the
+  **Use-or-Sell Check** — `instant` (fill the hub's standing buy orders: sales
+  tax only, since filling an order lists nothing) or `order` (list your own
+  stack at the hub's sell price: sales tax plus broker fee, 100 ISK minimum per
+  stack). Independent of a plan's material price basis, which is about buying.
 - **Variations**: The selected item's Tech I/II/Faction/Storyline/Officer
   variation group, shown as a sortable table (Name, Tier, Sell, Buy) beside
   it for price comparison; falls back to its Market Group siblings when it

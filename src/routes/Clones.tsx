@@ -28,6 +28,7 @@ import type { CachedResult } from '@/esi/cache';
 import type { CharacterClones, JumpClone } from '@/esi/endpoints';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { formatDuration } from '@/lib/duration';
+import { formatTimestamp } from '@/lib/timestamp';
 import { cloneJumpCooldown, INFOMORPH_SYNCHRONIZING_SKILL_ID } from '@/engine/cloneJump';
 
 /** Stable identity, so the fallback doesn't invalidate the column memo every render. */
@@ -255,7 +256,7 @@ export function Clones() {
               {lastStationChangeDate && (
                 <span className="text-text-dim">
                   {t('clones.lastStationChange', {
-                    date: new Date(lastStationChangeDate).toLocaleString(),
+                    date: formatTimestamp(new Date(lastStationChangeDate)),
                   })}
                 </span>
               )}
@@ -265,7 +266,7 @@ export function Clones() {
                 value={
                   cooldown.onCooldown && cooldown.readyAt
                     ? t('clones.cooldownOnCooldownValue', {
-                        date: cooldown.readyAt.toLocaleString(),
+                        date: formatTimestamp(cooldown.readyAt),
                         duration: formatDuration((cooldown.readyAt.getTime() - loadedAt) / 1000),
                       })
                     : t('clones.cooldownReadyValue')

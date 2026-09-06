@@ -46,7 +46,7 @@ function expand(
   buildHere: number[],
   options: {
     recipes?: Record<number, MaterialRecipe>;
-    hubPrices?: Record<number, number>;
+    materialPrices?: Record<number, number>;
     sourcing?: Record<number, { ownedQuantity?: number }>;
   } = {}
 ) {
@@ -55,7 +55,7 @@ function expand(
     materials: lines,
     buildHere,
     recipeFor: (typeID) => recipes[typeID] ?? null,
-    hubPrices: options.hubPrices ?? {},
+    materialPrices: options.materialPrices ?? {},
     sourcing: options.sourcing,
     ctx: CTX,
   });
@@ -83,7 +83,7 @@ describe('expandBuildPlan', () => {
 
   it('prices the swapped-in inputs against the hub, like any other material', () => {
     const expanded = expand(materials([{ typeID: SEAL, quantity: 150 }]), [SEAL], {
-      hubPrices: { [FIBRE]: 20 },
+      materialPrices: { [FIBRE]: 20 },
     });
 
     expect(expanded.materials[0].lineCost).toBe(10_000);
@@ -92,7 +92,7 @@ describe('expandBuildPlan', () => {
 
   it('nets a swapped-in input against stock the plan already records for it', () => {
     const expanded = expand(materials([{ typeID: SEAL, quantity: 150 }]), [SEAL], {
-      hubPrices: { [FIBRE]: 20 },
+      materialPrices: { [FIBRE]: 20 },
       sourcing: { [FIBRE]: { ownedQuantity: 200 } },
     });
 
@@ -109,7 +109,7 @@ describe('expandBuildPlan', () => {
 
   it('charges the sub-job installation fee separately from the materials', () => {
     const expanded = expand(materials([{ typeID: SEAL, quantity: 150 }]), [SEAL], {
-      hubPrices: { [FIBRE]: 20 },
+      materialPrices: { [FIBRE]: 20 },
     });
 
     expect(expanded.subBuildFees).toBe(expanded.subBuilds.get(SEAL)?.jobFee.total);

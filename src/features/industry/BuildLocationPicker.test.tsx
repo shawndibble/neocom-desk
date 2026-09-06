@@ -42,20 +42,31 @@ beforeEach(() => {
   searchBuildLocations.mockResolvedValue([AZBEL]);
 });
 
-function renderPicker(onPick = vi.fn()) {
-  render(
-    <BuildLocationPicker
-      summary="NPC station · Jita · Highsec"
-      onPick={onPick}
-      activity="manufacturing"
-    >
-      <label>
-        Facility
-        <input />
-      </label>
-    </BuildLocationPicker>
-  );
-  return onPick;
+/**
+ * The picker with a `selectedLabel` the caller can change later — a plan
+ * rewriting its own location is what several of these assert.
+ */
+function renderPicker(onPick = vi.fn(), selectedLabel: string | null = null) {
+  function Wrapper({ label }: { label: string | null }) {
+    return (
+      <BuildLocationPicker
+        summary="NPC station · Jita · Highsec"
+        selectedLabel={label}
+        onPick={onPick}
+        activity="manufacturing"
+      >
+        <label>
+          Facility
+          <input />
+        </label>
+      </BuildLocationPicker>
+    );
+  }
+  const view = render(<Wrapper label={selectedLabel} />);
+  return {
+    onPick,
+    rerender: (label: string | null) => view.rerender(<Wrapper label={label} />),
+  };
 }
 
 const searchBox = () => screen.getByLabelText('Build location');
@@ -145,16 +156,57 @@ describe('BuildLocationPicker', () => {
     );
   });
 
-  it('hands over every field in one call, and clears itself', async () => {
+  it("names the plan's own picked location, so a reload does not blank the box", async () => {
+    renderPicker(vi.fn(), 'K2-18 R&D');
+
+    await waitFor(() => expect((searchBox() as HTMLInputElement).value).toBe('K2-18 R&D'));
+  });
+
+  it('lets typing replace the shown location, then shows the plan again once a pick lands', async () => {
     const user = userEvent.setup();
-    const onPick = renderPicker();
+    renderPicker(vi.fn(), 'Jita IV - Moon 4');
+
+    await user.clear(searchBox());
+    await user.type(searchBox(), 'K2-18');
+    expect((searchBox() as HTMLInputElement).value).toBe('K2-18');
+
+    await user.click(await screen.findByRole('option', { name: /K2-18 R&D/ }));
+
+    // The place that was chosen, not the fragment typed to find it. This
+    // parent never writes the pick back, so what shows is the picker's own
+    // hold — the plan's older name takes over once one lands.
+    expect((searchBox() as HTMLInputElement).value).toBe('K2-18 R&D');
+  });
+
+  it('lets go of the pick the moment the plan says it is somewhere else', async () => {
+    // A manual facility or build-system edit clears the plan's stored
+    // location; the box must follow it rather than keep naming the structure
+    // the job no longer runs in.
+    const user = userEvent.setup();
+    const { rerender } = renderPicker(vi.fn(), 'Jita IV - Moon 4');
+
+    await user.type(searchBox(), 'K2-18');
+    await user.click(await screen.findByRole('option', { name: /K2-18 R&D/ }));
+    expect((searchBox() as HTMLInputElement).value).toBe('K2-18 R&D');
+
+    rerender(null);
+
+    expect((searchBox() as HTMLInputElement).value).toBe('');
+  });
+
+  it('hands over every field in one call, and names the pick while the plan catches up', async () => {
+    // The parent's write is a Dexie round-trip, so the box states the chosen
+    // place itself for that gap rather than falling back to the plan's older
+    // one — and the result list closes either way.
+    const user = userEvent.setup();
+    const { onPick } = renderPicker();
 
     await user.type(searchBox(), 'K2-18');
     await user.click(await screen.findByRole('option', { name: /K2-18 R&D/ }));
 
     expect(onPick).toHaveBeenCalledExactlyOnceWith(AZBEL);
-    expect((searchBox() as HTMLInputElement).value).toBe('');
-    expect(screen.queryByText('K2-18 R&D')).toBeNull();
+    expect((searchBox() as HTMLInputElement).value).toBe('K2-18 R&D');
+    expect(screen.queryByRole('option')).toBeNull();
   });
 
   it('is a combobox with one tab stop: results are not individually reachable by Tab', async () => {
@@ -197,7 +249,7 @@ describe('BuildLocationPicker', () => {
 
   it('picks the highlighted option on Enter', async () => {
     const user = userEvent.setup();
-    const onPick = renderPicker();
+    const { onPick } = renderPicker();
 
     await user.type(searchBox(), 'K2-18');
     await screen.findByRole('option', { name: /K2-18 R&D/ });
@@ -205,7 +257,8 @@ describe('BuildLocationPicker', () => {
     await user.keyboard('{ArrowDown}{Enter}');
 
     expect(onPick).toHaveBeenCalledExactlyOnceWith(AZBEL);
-    expect((searchBox() as HTMLInputElement).value).toBe('');
+    // Same as a click: the box names the pick rather than the typed fragment.
+    expect((searchBox() as HTMLInputElement).value).toBe('K2-18 R&D');
   });
 
   it('closes the list on Escape without clearing the typed query', async () => {
@@ -220,6 +273,20 @@ describe('BuildLocationPicker', () => {
     expect(screen.queryByRole('option')).toBeNull();
     expect(searchBox()).toHaveAttribute('aria-expanded', 'false');
     expect((searchBox() as HTMLInputElement).value).toBe('K2-18');
+  });
+
+  it('gives the box back to the plan when the search is abandoned', async () => {
+    // Escape keeps the typed text while the pilot is still in the field, but
+    // walking away from an unpicked fragment must not leave it standing where
+    // the plan's own location belongs.
+    const user = userEvent.setup();
+    renderPicker(vi.fn(), 'Jita IV - Moon 4');
+
+    await user.clear(searchBox());
+    await user.type(searchBox(), 'K2-18');
+    await user.tab();
+
+    expect((searchBox() as HTMLInputElement).value).toBe('Jita IV - Moon 4');
   });
 
   it('announces the result count for a screen reader', async () => {

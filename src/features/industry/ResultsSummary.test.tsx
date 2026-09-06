@@ -1,10 +1,31 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import '@/i18n';
 import type { BuildResult } from '@/engine/industry/types';
 import { ResultsSummary } from './ResultsSummary';
+import { ownedStockSale } from '@/engine/industry/ownedStockSale';
+import type { MaterialCostLine } from '@/engine/industry/types';
+
+/** One material the plan needs 100 of and the player already holds all 100 of. */
+const OWNED_MATERIALS: MaterialCostLine[] = [
+  {
+    typeID: 34,
+    baseQuantity: 100,
+    quantity: 100,
+    ownedQuantity: 100,
+    remainingQuantity: 0,
+    unitPrice: 1_000,
+    lineCost: 0,
+    unpriced: false,
+  },
+];
+
+const OWNED_SALE = {
+  instant: ownedStockSale(OWNED_MATERIALS, { 34: 1_000 }, 'instant', {}),
+  order: ownedStockSale(OWNED_MATERIALS, { 34: 1_200 }, 'order', {}),
+};
 
 const RESULT: BuildResult = {
   materials: [],
@@ -46,6 +67,9 @@ function renderSummary(overrides: Partial<Parameters<typeof ResultsSummary>[0]> 
               productUnitPrice={100000}
               productQuantity={10}
               costIndexSystemName="Jita"
+              onOpenBreakdown={vi.fn()}
+              ownedSale={null}
+              nameFor={(typeID) => (typeID === 34 ? 'Tritanium' : `Type ${typeID}`)}
               {...overrides}
             />
           }
@@ -171,39 +195,15 @@ describe('ResultsSummary: Costs stack (#116)', () => {
   it('leaves the Profit and Verdict rows unchanged from current behavior', () => {
     renderSummary();
     expect(screen.getByText('Profit')).toBeInTheDocument();
-    expect(screen.getByText('BUILD saves 435 ISK')).toBeInTheDocument();
   });
 });
 
 describe('ResultsSummary: split Acquisition Verdict / Sale Profitability, break-even price (#119)', () => {
-  it('labels the Acquisition Verdict and Sale Profitability statements separately', () => {
-    renderSummary();
-    expect(screen.getByText('Acquisition Verdict')).toBeInTheDocument();
-    expect(screen.getByText('Sale Profitability')).toBeInTheDocument();
-  });
-
-  it('states Sale Profitability from the net profit by default, distinct from the Acquisition Verdict', () => {
-    renderSummary();
-    expect(screen.getByText('BUILD saves 435 ISK')).toBeInTheDocument();
-    expect(screen.getByText('Selling profits 435 ISK')).toBeInTheDocument();
-  });
-
-  it('flips Sale Profitability to a loss statement when the toggled figure is negative, independent of the Acquisition Verdict', async () => {
-    renderSummary({
-      result: { ...RESULT, profit: -50, grossProfit: 460 },
-    });
-    expect(screen.getByText('BUILD saves 435 ISK')).toBeInTheDocument();
-    expect(screen.getByText('Selling loses 50 ISK')).toBeInTheDocument();
-  });
-
-  it('tracks Sale Profitability to the Gross/Net toggle', async () => {
-    renderSummary({
-      result: { ...RESULT, profit: -50, grossProfit: 460 },
-    });
-    expect(screen.getByText('Selling loses 50 ISK')).toBeInTheDocument();
-
-    await userEvent.click(screen.getByRole('button', { name: 'Gross' }));
-    expect(screen.getByText('Selling profits 460 ISK')).toBeInTheDocument();
+  it('opens the calculation breakdown when the break-even "?" is clicked', async () => {
+    const onOpenBreakdown = vi.fn();
+    renderSummary({ onOpenBreakdown });
+    await userEvent.click(screen.getByRole('button', { name: /about break-even price/i }));
+    expect(onOpenBreakdown).toHaveBeenCalledTimes(1);
   });
 
   it('shows a net break-even price next to Sale Profitability, unaffected by the Gross/Net toggle', async () => {
@@ -219,7 +219,7 @@ describe('ResultsSummary: split Acquisition Verdict / Sale Profitability, break-
     expect(screen.getByText('Current market price').closest('div')).toHaveTextContent('100,000');
   });
 
-  it('shows Sale Profitability and Acquisition Verdict unknown states independently when unpriced', () => {
+  it('hides the break-even price when unpriced', () => {
     renderSummary({
       result: {
         ...RESULT,
@@ -241,12 +241,6 @@ describe('ResultsSummary: split Acquisition Verdict / Sale Profitability, break-
       productUnitPrice: null,
     });
 
-    expect(
-      screen.getByText('Not enough price data for a build-vs-buy verdict.')
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText('Not enough price data to judge sale profitability.')
-    ).toBeInTheDocument();
     expect(screen.queryByText('Break-even price')).not.toBeInTheDocument();
   });
 });
@@ -390,5 +384,54 @@ describe('ResultsSummary: unpriced-product Market link (#409)', () => {
       screen.queryByRole('button', { name: /Rifter has no hub sell price/ })
     ).not.toBeInTheDocument();
     expect(screen.getByText(/Rifter has no hub sell price/)).toBeInTheDocument();
+  });
+});
+
+describe('ResultsSummary: use or sell the owned materials', () => {
+  it('stays hidden when the player owns none of the materials', () => {
+    renderSummary();
+    expect(screen.queryByText(/use or sell your materials/i)).toBeNull();
+  });
+
+  it('compares selling the owned stock against building with it, and switches basis', async () => {
+    renderSummary({ ownedSale: OWNED_SALE });
+
+    expect(screen.getByText(/use or sell your materials/i)).toBeTruthy();
+    // Sell now: 100 x 1,000 gross, less 7.5% sales tax, no broker fee.
+    // Shown twice: the totals row and the collapsed per-material disclosure.
+    expect(screen.getAllByText('92,500').length).toBeGreaterThan(0);
+    // The stock is worth far more than the 435 ISK the build nets.
+    expect(screen.getByText(/SELL — selling your materials beats building/i)).toBeTruthy();
+
+    await userEvent.click(screen.getByRole('button', { name: /sell order/i }));
+    // Sell order: 100 x 1,200 gross, less 7.5% sales tax and 3% broker fee.
+    expect(screen.getAllByText('107,400').length).toBeGreaterThan(0);
+  });
+
+  it('breaks the sale down per material behind a disclosure', async () => {
+    renderSummary({ ownedSale: OWNED_SALE });
+    await userEvent.click(screen.getByRole('button', { name: /per material/i }));
+
+    expect(screen.getByRole('cell', { name: 'Tritanium' })).toBeTruthy();
+    expect(screen.getByRole('cell', { name: '100' })).toBeTruthy();
+  });
+
+  it('calls it for building when the build out-earns the stock', () => {
+    renderSummary({
+      ownedSale: OWNED_SALE,
+      result: { ...RESULT, profit: 500_000 },
+    });
+
+    expect(screen.getByText(/BUILD — using your materials beats selling them/i)).toBeTruthy();
+  });
+
+  it('gives no verdict when an owned material has no price on the chosen side', () => {
+    const unpriced = {
+      instant: ownedStockSale(OWNED_MATERIALS, {}, 'instant', {}),
+      order: ownedStockSale(OWNED_MATERIALS, {}, 'order', {}),
+    };
+    renderSummary({ ownedSale: unpriced });
+
+    expect(screen.getByText(/not enough price data to compare/i)).toBeTruthy();
   });
 });

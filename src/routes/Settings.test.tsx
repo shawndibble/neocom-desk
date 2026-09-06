@@ -18,6 +18,7 @@ import {
   NOTIFICATION_PERMISSION_PROMPT_KEY,
 } from '@/features/notifications/permission';
 import { App } from '@/app/App';
+import { formatTimestamp } from '@/lib/timestamp';
 
 vi.mock('virtual:pwa-register/react', () => ({
   useRegisterSW: () => ({
@@ -185,7 +186,7 @@ describe('Settings', () => {
     // failed in CI while passing locally.
     const table = await screen.findByRole('table', { name: /activity log/i });
     expect(
-      await within(table).findByText(new Date(timestamp).toLocaleString())
+      await within(table).findByText(formatTimestamp(new Date(timestamp)))
     ).toBeInTheDocument();
   });
 
@@ -280,7 +281,7 @@ describe('Settings', () => {
     // Header row plus exactly one data row — the superseded success and the
     // failure both collapse into it, not two rows.
     expect(rows).toHaveLength(2);
-    expect(within(table).getByTitle(new Date(2_000).toLocaleString())).toBeInTheDocument();
+    expect(within(table).getByTitle(formatTimestamp(new Date(2_000)))).toBeInTheDocument();
   });
 });
 

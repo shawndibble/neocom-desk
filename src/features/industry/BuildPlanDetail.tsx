@@ -2,11 +2,13 @@ import { useEffect, useMemo, useState, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
+  CollapsiblePanel,
   DataAgeBadge,
   EmptyState,
   IconButton,
   InfoTooltip,
   Panel,
+  StatChip,
   Select,
   SelectContent,
   SelectItem,
@@ -15,10 +17,12 @@ import {
   TextInput,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
-import { FACILITY_PRESETS, industryActivityOf } from '@/engine/industry/types';
+import { FACILITY_PRESETS, SKILL_IDS, industryActivityOf } from '@/engine/industry/types';
 import { makeOrBuy, type MakeOrBuy, type MaterialRecipe } from '@/engine/industry/makeOrBuy';
+import { ownedStockSale } from '@/engine/industry/ownedStockSale';
 import type {
   FacilityKind,
+  MaterialPriceBasis,
   MaterialSourcing,
   RigLevel,
   SkillLevels,
@@ -33,6 +37,7 @@ import { findOwnedBlueprint } from './data';
 import { computeBuildPlan } from './computeBuildPlan';
 import { buildPlanTypeIds, materialRecipe } from './recipes';
 import { loadMarketSnapshot, type MarketSnapshot } from './marketData';
+import { materialPriceBasisOf, materialPricesFor } from './priceBasis';
 import { formatDuration } from '@/lib/duration';
 import { downloadCsv } from '@/lib/downloadCsv';
 import { writeToClipboard } from '@/lib/clipboard';
@@ -51,8 +56,12 @@ import {
 import { useDetectedOwnedStock } from './useDetectedOwnedStock';
 import { OwnedStockScopeControl } from './OwnedStockScopeControl';
 import { ResultsSummary } from './ResultsSummary';
+import { PlanVerdictHero } from './PlanVerdictHero';
+import { useIsDesktop } from '@/lib/useIsDesktop';
+import { ProductionRunsPanel } from './ProductionRunsPanel';
 import { BuildSystemInput } from './BuildSystemInput';
 import { BuildLocationPicker } from './BuildLocationPicker';
+import { buildLocationLabel } from './buildLocationLabel';
 import { buildLocationPatch } from './buildLocationPatch';
 import { useDerivedSecurityBand } from './useDerivedSecurityBand';
 
@@ -69,13 +78,27 @@ export type PlanPatch = Partial<
     | 'hubId'
     | 'buildSystemId'
     | 'buildSystemName'
+    | 'buildLocationId'
+    | 'buildLocationName'
     | 'facilityTaxPct'
+    | 'materialPriceBasis'
     | 'ownedStockScope'
     | 'buildHere'
   >
 >;
 
-/** One material's sourcing edit, for the bulk "use all detected" action. */
+/**
+ * The half of a patch that drops the plan's remembered location. Spread by
+ * every control that can move the job away from the place the search picked:
+ * a Raitaru still named in the box while the plan says NPC station is a label
+ * lying about the plan.
+ */
+const clearedBuildLocation = {
+  buildLocationId: undefined,
+  buildLocationName: undefined,
+} satisfies PlanPatch;
+
+/** One material's sourcing edit, for the bulk "use all" action. */
 export interface SourcingPatchEntry {
   typeID: number;
   patch: MaterialSourcing;
@@ -192,6 +215,16 @@ export function BuildPlanDetail({
    * uses, in the one form a toolbar IconButton has: its own icon and label.
    */
   const [copyState, setCopyState] = useState<'copied' | 'failed' | null>(null);
+  // Verdict-first layout: the inputs fold behind a chip summary, the ledger
+  // follows the viewport (open where there is room beside the materials,
+  // folded on a phone until asked), and the one Calculation Breakdown is
+  // owned here so the hero's button and the ledger's "?"s open the same modal.
+  const [setupOpen, setSetupOpen] = useState(false);
+  const isDesktop = useIsDesktop();
+  const [costsOpen, setCostsOpen] = useState<boolean | null>(null);
+  const costsExpanded = costsOpen ?? isDesktop;
+  const [breakdownOpen, setBreakdownOpen] = useState(false);
+  const [logRequest, setLogRequest] = useState(0);
   // Reset to loading the instant a new fetch is due (hub/typeIds/manual
   // refresh), in the same commit rather than the effect's next tick — same
   // derived-and-cleared-during-render shape as PlanEditor's stale-result
@@ -203,6 +236,19 @@ export function BuildPlanDetail({
     plan.buildSystemId !== undefined && plan.buildSystemName !== undefined
       ? { id: plan.buildSystemId, name: plan.buildSystemName }
       : null;
+  // What the search box says the plan is pointed at — through the same helper
+  // the picker's result rows use, so the wording cannot change as a pick's
+  // write lands. Null for a plan that was never pointed at a place.
+  const buildLocationName =
+    plan.buildLocationId === undefined
+      ? null
+      : buildLocationLabel(
+          plan.buildLocationName ?? null,
+          plan.facility,
+          buildSystem?.name ?? hub.systemName,
+          t
+        );
+
   // The band is derived, not typed, so it is reconciled here rather than only
   // on edit — otherwise a plan saved before the Security field went away keeps
   // a band nothing can correct, and still drives the rig multiplier.
@@ -272,6 +318,18 @@ export function BuildPlanDetail({
     [detectedStock, scopedStock, characterNames, locationNames, incompleteCharacters, t]
   );
 
+  /**
+   * The one map every "what does this material cost to buy" on the plan reads
+   * — its own cost lines, its sub-build inputs and its make-or-buy verdicts,
+   * so a single plan never mixes the two sides of the book. Both sides come
+   * from the snapshot already in hand, which is why the basis is deliberately
+   * absent from `snapshotKey` above: toggling it must re-compute, not refetch.
+   */
+  const materialPrices = useMemo(
+    () => materialPricesFor(snapshot, plan.materialPriceBasis),
+    [snapshot, plan.materialPriceBasis]
+  );
+
   const { result, error } = useMemo(() => {
     if (!blueprint) return { result: null, error: t('industry.blueprintMissing') };
     return computeBuildPlan({
@@ -280,9 +338,25 @@ export function BuildPlanDetail({
       systemCostIndex: snapshot?.systemCostIndex ?? 0,
       adjustedPrices: snapshot?.adjustedPrices ?? {},
       hubPrices: snapshot?.hubPrices ?? {},
+      materialPrices,
       skills,
     });
-  }, [plan, blueprint, snapshot, skills, t]);
+  }, [plan, blueprint, snapshot, materialPrices, skills, t]);
+
+  /**
+   * Both liquidation bases at once, so the Use-or-sell toggle switches between
+   * two numbers already in hand rather than re-deriving one per click. Sell-now
+   * reads the buy side of the book (what a standing order pays today), sell-order
+   * the sell side (what listing your own stack asks) — deliberately independent
+   * of the plan's *material* price basis, which is about buying, not selling.
+   */
+  const ownedSale = useMemo(() => {
+    if (!result || !snapshot) return null;
+    return {
+      instant: ownedStockSale(result.materials, snapshot.hubBuyPrices, 'instant', skills),
+      order: ownedStockSale(result.materials, snapshot.hubPrices, 'order', skills),
+    };
+  }, [result, snapshot, skills]);
 
   const pricesReady =
     snapshot !== null && snapshot.adjustedPrices !== null && snapshot.systemCostIndex !== null;
@@ -326,7 +400,7 @@ export function BuildPlanDetail({
     [recipeFor]
   );
 
-  // "Use all detected" fills only rows with nothing typed in them: a
+  // "Use all" fills only rows with nothing typed in them: a
   // hand-entered value, including a deliberate 0, is never clobbered by a bulk
   // action. The per-row action is the one that overwrites — clicking it on that
   // row means it.
@@ -372,10 +446,10 @@ export function BuildPlanDetail({
       ...facilityContext,
       systemCostIndex: snapshot.systemCostIndex,
       adjustedPrices: snapshot.adjustedPrices,
-      hubPrices: snapshot.hubPrices,
+      materialPrices,
       skills,
     };
-  }, [facilityContext, snapshot, skills]);
+  }, [facilityContext, snapshot, materialPrices, skills]);
 
   /**
    * Make-or-buy verdict per material (CONTEXT.md round 29), computed once for
@@ -402,7 +476,7 @@ export function BuildPlanDetail({
         materials: result?.materials ?? [],
         buildHere: plan.buildHere ?? [],
         recipeFor,
-        hubPrices: snapshot?.hubPrices ?? {},
+        materialPrices,
         sourcing: plan.materialSourcing,
         ctx: {
           ...facilityContext,
@@ -411,7 +485,16 @@ export function BuildPlanDetail({
           skills,
         },
       }),
-    [result, plan.buildHere, plan.materialSourcing, facilityContext, recipeFor, snapshot, skills]
+    [
+      result,
+      plan.buildHere,
+      plan.materialSourcing,
+      facilityContext,
+      recipeFor,
+      snapshot,
+      materialPrices,
+      skills,
+    ]
   );
 
   const visibleMaterials = useMemo(
@@ -469,6 +552,11 @@ export function BuildPlanDetail({
   if (!entry || !blueprint) {
     return <EmptyState title={t('industry.blueprintMissing')} className="py-8" />;
   }
+
+  // Units produced by the job (per-run product quantity x runs); null when
+  // the blueprint has no product. Shared by the Results panel and the
+  // Production Runs panel's "Log Production" default below.
+  const productQuantity = blueprint.products[0] ? blueprint.products[0].quantity * plan.runs : null;
 
   function update(patch: PlanPatch) {
     onUpdate(patch);
@@ -559,317 +647,447 @@ export function BuildPlanDetail({
     );
   }
 
+  const productUnitPrice =
+    entry.productTypeID !== null ? (snapshot?.hubPrices[entry.productTypeID] ?? null) : null;
+
+  const breakdownContext = {
+    hubName: hub.systemName,
+    materialPriceBasis: materialPriceBasisOf(plan.materialPriceBasis),
+    me: plan.me,
+    isReaction: activity === 'reaction',
+    accountingLevel: skills[SKILL_IDS.accounting] ?? 0,
+    brokerRelationsLevel: skills[SKILL_IDS.brokerRelations] ?? 0,
+    systemCostIndex: snapshot?.systemCostIndex ?? null,
+    costIndexSystemName: buildSystem?.name ?? hub.systemName,
+    productName: entry.productName,
+    productQuantity: blueprint.products[0] ? blueprint.products[0].quantity * plan.runs : null,
+    productUnitPrice:
+      entry.productTypeID !== null ? (snapshot?.hubPrices[entry.productTypeID] ?? null) : null,
+  };
+
+  const chip = (label: string, value: string) => (
+    <StatChip key={label} label={label} value={value} />
+  );
+  const setupChips = [
+    chip(t('industry.runs'), plan.runs.toLocaleString()),
+    ...(activity === 'manufacturing'
+      ? [
+          chip(t('industry.setupChipMe'), `${plan.me}%`),
+          chip(t('industry.setupChipTe'), `${plan.te}%`),
+        ]
+      : []),
+    // The place the pilot picked, by the name they picked it under; the
+    // facility · system · band triple only when no place was picked.
+    chip(
+      t('industry.buildLocation'),
+      buildLocationName ??
+        `${facilityPreset.name} · ${buildSystem?.name ?? hub.systemName} · ${t(`industry.${plan.security}`)}`
+    ),
+    ...(facilityPreset.structure
+      ? [
+          chip(
+            t('industry.setupChipRig'),
+            plan.rigLevel === 'none'
+              ? t('industry.rigNone')
+              : plan.rigLevel === 't1'
+                ? t('industry.rigT1')
+                : t('industry.rigT2')
+          ),
+          chip(t('industry.setupChipTax'), `${plan.facilityTaxPct ?? 0}%`),
+        ]
+      : []),
+    chip(t('industry.tradeHub'), hub.systemName),
+    chip(
+      t('industry.materialPriceBasis'),
+      materialPriceBasisOf(plan.materialPriceBasis) === 'buy'
+        ? t('industry.materialPriceBasisBuy')
+        : t('industry.materialPriceBasisSell')
+    ),
+  ];
+
   return (
     <div className="space-y-4">
-      <Panel title={entry.productName}>
-        <div className="space-y-4">
-          <div>
-            <h3 className="border-b border-line pb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-              {t('industry.groupBlueprint')}
-            </h3>
-            <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-3">
-              <label className="flex flex-col gap-1 text-xs">
-                {t('industry.runs')}
-                <SourcingInput
-                  value={plan.runs}
-                  label={t('industry.runs')}
-                  inputMode="numeric"
-                  widthClassName="w-full"
-                  // Blank/garbage reverts to the last committed value rather than
-                  // snapping to the minimum — clearing the box to retype "10" as
-                  // "100" must not overwrite it with 1 mid-edit.
-                  parse={(raw) => parseOrKeep(plan.runs, raw, (n) => Math.max(1, Math.round(n)))}
-                  onCommit={(runs) => update({ runs })}
-                />
-              </label>
+      {result && !error && (
+        <PlanVerdictHero
+          result={result}
+          pricesReady={pricesReady}
+          pricesLoading={pricesLoading}
+          productName={entry.productName}
+          runs={plan.runs}
+          ownedSale={ownedSale}
+          breakdown={breakdownContext}
+          breakdownOpen={breakdownOpen}
+          onBreakdownOpenChange={setBreakdownOpen}
+          onLogProduction={() => setLogRequest((n) => n + 1)}
+          logProductionDisabled={entry.productTypeID === null}
+        />
+      )}
 
-              {/*
+      <Panel
+        title={t('industry.setup')}
+        actions={
+          <Button size="sm" aria-expanded={setupOpen} onClick={() => setSetupOpen((open) => !open)}>
+            {setupOpen ? (
+              <Icon.Done size={Icon.ICON_SIZE.sm} aria-hidden="true" />
+            ) : (
+              <Icon.Rename size={Icon.ICON_SIZE.sm} aria-hidden="true" />
+            )}
+            {setupOpen ? t('industry.setupDone') : t('industry.setupEdit')}
+          </Button>
+        }
+      >
+        {setupOpen ? (
+          <div className="space-y-4">
+            <div>
+              <h3 className="border-b border-line pb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                {t('industry.groupBlueprint')}
+              </h3>
+              <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                <label className="flex flex-col gap-1 text-xs">
+                  {t('industry.runs')}
+                  <SourcingInput
+                    value={plan.runs}
+                    label={t('industry.runs')}
+                    inputMode="numeric"
+                    widthClassName="w-full"
+                    // Blank/garbage reverts to the last committed value rather than
+                    // snapping to the minimum — clearing the box to retype "10" as
+                    // "100" must not overwrite it with 1 mid-edit.
+                    parse={(raw) => parseOrKeep(plan.runs, raw, (n) => Math.max(1, Math.round(n)))}
+                    onCommit={(runs) => update({ runs })}
+                  />
+                </label>
+
+                {/*
                 Reaction formulas carry no material/time efficiency — the SDE
                 has no research activity for any of them (issue #460), so
                 they always run at 0/0 and the fields have nothing to edit.
               */}
-              {activity === 'manufacturing' && (
-                <>
-                  <div className="flex flex-col gap-1 text-xs">
-                    <span className="flex items-center gap-1">
-                      <label htmlFor="build-plan-me">{t('industry.me')}</label>
-                      <InfoTooltip
-                        label={t('industry.meTooltipLabel')}
-                        content={t('industry.meTooltip')}
-                      />
-                    </span>
-                    <SourcingInput
-                      id="build-plan-me"
-                      value={plan.me}
-                      label={t('industry.me')}
-                      inputMode="numeric"
-                      widthClassName="w-full"
-                      parse={(raw) => parseOrKeep(plan.me, raw, (n) => clampInt(n, 0, 10))}
-                      onCommit={(me) => update({ me })}
-                    />
-                    {ownedMatch && (
-                      <span className="text-[0.6875rem] text-text-dim">
-                        {t('industry.ownedHint', {
-                          me: ownedMatch.material_efficiency,
-                          te: ownedMatch.time_efficiency,
-                        })}
+                {activity === 'manufacturing' && (
+                  <>
+                    <div className="flex flex-col gap-1 text-xs">
+                      <span className="flex items-center gap-1">
+                        <label htmlFor="build-plan-me">{t('industry.me')}</label>
+                        <InfoTooltip
+                          label={t('industry.meTooltipLabel')}
+                          content={t('industry.meTooltip')}
+                        />
                       </span>
-                    )}
-                  </div>
-
-                  <div className="flex flex-col gap-1 text-xs">
-                    <span className="flex items-center gap-1">
-                      <label htmlFor="build-plan-te">{t('industry.te')}</label>
-                      <InfoTooltip
-                        label={t('industry.teTooltipLabel')}
-                        content={t('industry.teTooltip')}
+                      <SourcingInput
+                        id="build-plan-me"
+                        value={plan.me}
+                        label={t('industry.me')}
+                        inputMode="numeric"
+                        widthClassName="w-full"
+                        parse={(raw) => parseOrKeep(plan.me, raw, (n) => clampInt(n, 0, 10))}
+                        onCommit={(me) => update({ me })}
                       />
-                    </span>
-                    <SourcingInput
-                      id="build-plan-te"
-                      value={plan.te}
-                      label={t('industry.te')}
-                      inputMode="numeric"
-                      widthClassName="w-full"
-                      parse={(raw) => parseOrKeep(plan.te, raw, (n) => clampInt(n, 0, 20))}
-                      onCommit={(te) => update({ te })}
-                    />
-                  </div>
-                </>
-              )}
+                      {ownedMatch && (
+                        <span className="text-[0.6875rem] text-text-dim">
+                          {t('industry.ownedHint', {
+                            me: ownedMatch.material_efficiency,
+                            te: ownedMatch.time_efficiency,
+                          })}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex flex-col gap-1 text-xs">
+                      <span className="flex items-center gap-1">
+                        <label htmlFor="build-plan-te">{t('industry.te')}</label>
+                        <InfoTooltip
+                          label={t('industry.teTooltipLabel')}
+                          content={t('industry.teTooltip')}
+                        />
+                      </span>
+                      <SourcingInput
+                        id="build-plan-te"
+                        value={plan.te}
+                        label={t('industry.te')}
+                        inputMode="numeric"
+                        widthClassName="w-full"
+                        parse={(raw) => parseOrKeep(plan.te, raw, (n) => clampInt(n, 0, 20))}
+                        onCommit={(te) => update({ te })}
+                      />
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
-          </div>
 
-          <div>
-            <h3 className="border-b border-line pb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-              {t('industry.groupLocationMarket')}
-            </h3>
-            <div className="mt-2 flex flex-col gap-3">
-              <BuildLocationPicker
-                activity={activity}
-                summary={t('industry.buildLocationSummary', {
-                  facility: facilityPreset.name,
-                  system: buildSystem?.name ?? hub.systemName,
-                  security: t(`industry.${plan.security}`),
-                })}
-                onPick={(option) => update(buildLocationPatch(option))}
-              >
-                <label className="flex flex-col gap-1 text-xs">
-                  {t('industry.facility')}
-                  <Select
-                    value={plan.facility}
-                    onValueChange={(value) => {
-                      const facility = value as FacilityKind;
-                      const structure = FACILITY_PRESETS[facility].structure;
-                      update(
-                        structure
-                          ? { facility }
-                          : { facility, rigLevel: 'none', facilityTaxPct: undefined }
-                      );
-                    }}
-                  >
-                    <SelectTrigger aria-label={t('industry.facility')}>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {/* Only facilities that can actually run this plan's
-                          activity — an Athanor can't manufacture, a Raitaru
-                          can't react (issue #460). */}
-                      {Object.values(FACILITY_PRESETS)
-                        .filter((f) => f.activity === activity)
-                        .map((f) => (
-                          <SelectItem key={f.kind} value={f.kind}>
-                            {f.name}
-                          </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
-                </label>
-
-                <BuildSystemInput
-                  systemName={buildSystem?.name}
-                  hubSystemName={hub.systemName}
-                  securityLabel={t(`industry.${plan.security}`)}
-                  onChange={(system) =>
-                    update({
-                      buildSystemId: system?.id,
-                      buildSystemName: system?.name,
-                      // The band follows the system, so naming one settles the
-                      // rig multiplier too. An unreachable ESI leaves the plan
-                      // with the band it had rather than a guessed one.
-                      ...(system === null
-                        ? { security: hub.security }
-                        : system.security !== null
-                          ? { security: system.security }
-                          : {}),
-                    })
-                  }
-                />
-              </BuildLocationPicker>
-
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                {/* Only a player structure has rig slots or an owner-set tax, so an
-                    NPC station shows neither rather than showing them dead. Both
-                    are already cleared on the plan when the facility changes. */}
-                {facilityPreset.structure && (
+            <div>
+              <h3 className="border-b border-line pb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                {t('industry.groupLocationMarket')}
+              </h3>
+              <div className="mt-2 flex flex-col gap-3">
+                <BuildLocationPicker
+                  activity={activity}
+                  summary={t('industry.buildLocationSummary', {
+                    facility: facilityPreset.name,
+                    system: buildSystem?.name ?? hub.systemName,
+                    security: t(`industry.${plan.security}`),
+                  })}
+                  selectedLabel={buildLocationName}
+                  onPick={(option) => update(buildLocationPatch(option))}
+                >
                   <label className="flex flex-col gap-1 text-xs">
-                    {t('industry.rigLevel')}
+                    {t('industry.facility')}
                     <Select
-                      value={plan.rigLevel}
-                      onValueChange={(value) => update({ rigLevel: value as RigLevel })}
+                      value={plan.facility}
+                      onValueChange={(value) => {
+                        const facility = value as FacilityKind;
+                        const structure = FACILITY_PRESETS[facility].structure;
+                        update({
+                          facility,
+                          ...clearedBuildLocation,
+                          ...(structure ? {} : { rigLevel: 'none', facilityTaxPct: undefined }),
+                        });
+                      }}
                     >
-                      <SelectTrigger aria-label={t('industry.rigLevel')}>
+                      <SelectTrigger aria-label={t('industry.facility')}>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="none">{t('industry.rigNone')}</SelectItem>
-                        <SelectItem value="t1">{t('industry.rigT1')}</SelectItem>
-                        <SelectItem value="t2">{t('industry.rigT2')}</SelectItem>
+                        {/* Only facilities that can actually run this plan's
+                          activity — an Athanor can't manufacture, a Raitaru
+                          can't react (issue #460). */}
+                        {Object.values(FACILITY_PRESETS)
+                          .filter((f) => f.activity === activity)
+                          .map((f) => (
+                            <SelectItem key={f.kind} value={f.kind}>
+                              {f.name}
+                            </SelectItem>
+                          ))}
                       </SelectContent>
                     </Select>
                   </label>
-                )}
 
-                {facilityPreset.structure && (
+                  <BuildSystemInput
+                    systemName={buildSystem?.name}
+                    hubSystemName={hub.systemName}
+                    securityLabel={t(`industry.${plan.security}`)}
+                    onChange={(system) =>
+                      update({
+                        buildSystemId: system?.id,
+                        buildSystemName: system?.name,
+                        ...clearedBuildLocation,
+                        // The band follows the system, so naming one settles the
+                        // rig multiplier too. An unreachable ESI leaves the plan
+                        // with the band it had rather than a guessed one.
+                        ...(system === null
+                          ? { security: hub.security }
+                          : system.security !== null
+                            ? { security: system.security }
+                            : {}),
+                      })
+                    }
+                  />
+                </BuildLocationPicker>
+
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                  {/* Only a player structure has rig slots or an owner-set tax, so an
+                    NPC station shows neither rather than showing them dead. Both
+                    are already cleared on the plan when the facility changes. */}
+                  {facilityPreset.structure && (
+                    <label className="flex flex-col gap-1 text-xs">
+                      {t('industry.rigLevel')}
+                      <Select
+                        value={plan.rigLevel}
+                        onValueChange={(value) => update({ rigLevel: value as RigLevel })}
+                      >
+                        <SelectTrigger aria-label={t('industry.rigLevel')}>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">{t('industry.rigNone')}</SelectItem>
+                          <SelectItem value="t1">{t('industry.rigT1')}</SelectItem>
+                          <SelectItem value="t2">{t('industry.rigT2')}</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </label>
+                  )}
+
+                  {facilityPreset.structure && (
+                    <div className="flex flex-col gap-1 text-xs">
+                      <span className="flex items-center gap-1">
+                        <label htmlFor="build-plan-facility-tax">{t('industry.facilityTax')}</label>
+                        <InfoTooltip
+                          label={t('industry.facilityTaxTooltipLabel')}
+                          content={t('industry.facilityTaxTooltip')}
+                        />
+                      </span>
+                      <TextInput
+                        id="build-plan-facility-tax"
+                        type="number"
+                        min={0}
+                        max={100}
+                        step={0.1}
+                        value={plan.facilityTaxPct ?? 0}
+                        onChange={(e) =>
+                          update({ facilityTaxPct: Math.max(0, Number(e.target.value) || 0) })
+                        }
+                      />
+                    </div>
+                  )}
+
+                  <label className="flex flex-col gap-1 text-xs">
+                    {t('industry.tradeHub')}
+                    <Select
+                      value={plan.hubId}
+                      onValueChange={(value) =>
+                        update({ hubId: value as BuildPlanRecord['hubId'] })
+                      }
+                    >
+                      <SelectTrigger aria-label={t('industry.tradeHub')}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {TRADE_HUBS.map((h) => (
+                          <SelectItem key={h.id} value={h.id}>
+                            {h.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </label>
+
+                  {/* Sits under Trade hub because it names a side of that hub's
+                    order book, not a separate place. Materials only — the
+                    product stays on lowest sell, which is what buying it
+                    outright costs (CONTEXT.md, Acquisition Verdict). */}
                   <div className="flex flex-col gap-1 text-xs">
                     <span className="flex items-center gap-1">
-                      <label htmlFor="build-plan-facility-tax">{t('industry.facilityTax')}</label>
+                      <label htmlFor="build-plan-material-price-basis">
+                        {t('industry.materialPriceBasis')}
+                      </label>
                       <InfoTooltip
-                        label={t('industry.facilityTaxTooltipLabel')}
-                        content={t('industry.facilityTaxTooltip')}
+                        label={t('industry.materialPriceBasisTooltipLabel')}
+                        content={t('industry.materialPriceBasisTooltip')}
                       />
                     </span>
-                    <TextInput
-                      id="build-plan-facility-tax"
-                      type="number"
-                      min={0}
-                      max={100}
-                      step={0.1}
-                      value={plan.facilityTaxPct ?? 0}
-                      onChange={(e) =>
-                        update({ facilityTaxPct: Math.max(0, Number(e.target.value) || 0) })
+                    <Select
+                      value={materialPriceBasisOf(plan.materialPriceBasis)}
+                      onValueChange={(value) =>
+                        update({ materialPriceBasis: value as MaterialPriceBasis })
                       }
-                    />
+                    >
+                      <SelectTrigger
+                        id="build-plan-material-price-basis"
+                        aria-label={t('industry.materialPriceBasis')}
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="sell">{t('industry.materialPriceBasisSell')}</SelectItem>
+                        <SelectItem value="buy">{t('industry.materialPriceBasisBuy')}</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
-                )}
-
-                <label className="flex flex-col gap-1 text-xs">
-                  {t('industry.tradeHub')}
-                  <Select
-                    value={plan.hubId}
-                    onValueChange={(value) => update({ hubId: value as BuildPlanRecord['hubId'] })}
-                  >
-                    <SelectTrigger aria-label={t('industry.tradeHub')}>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {TRADE_HUBS.map((h) => (
-                        <SelectItem key={h.id} value={h.id}>
-                          {h.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </label>
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        ) : (
+          <div className="flex flex-wrap gap-1.5">{setupChips}</div>
+        )}
       </Panel>
 
-      <Panel
-        title={t('industry.materials')}
-        actions={
-          // `flex-wrap` because this is the one converted toolbar that needs a
-          // saved build plan to reach, so it is the one I could not screenshot
-          // at 390px. Five items — badge, three controls, duration — beside the
-          // panel title, since the shopping-list copy joined the row; if they
-          // ever do run out of room, wrapping inside the (min-height, not
-          // fixed) header beats clipping.
-          <span className="flex flex-wrap items-center gap-2 text-[0.6875rem] text-text-dim">
-            {fetchedAt && <DataAgeBadge date={fetchedAt} />}
-            {bulkDetectedPatches.length > 0 && (
-              <Button size="sm" onClick={() => onSourcingChangeMany(bulkDetectedPatches)}>
-                {t('industry.useAllDetected')}
-              </Button>
-            )}
-            {/*
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_20rem] xl:items-start">
+        <Panel
+          title={t('industry.materials')}
+          actions={
+            // `flex-wrap` because this is the one converted toolbar that needs a
+            // saved build plan to reach, so it is the one I could not screenshot
+            // at 390px. Five items — badge, three controls, duration — beside the
+            // panel title, since the shopping-list copy joined the row; if they
+            // ever do run out of room, wrapping inside the (min-height, not
+            // fixed) header beats clipping.
+            <span className="flex flex-wrap items-center gap-2 text-[0.6875rem] text-text-dim">
+              {fetchedAt && <DataAgeBadge date={fetchedAt} />}
+              {/*
               Gated on there being a remainder to order, not on the table
               having rows: a plan whose every material is already owned still
               renders a full table, and the list it would copy is empty.
             */}
-            <IconButton
-              size="sm"
-              icon={
-                copyState === 'copied' ? (
-                  <Icon.Done />
-                ) : copyState === 'failed' ? (
-                  <Icon.Warn />
-                ) : (
-                  <Icon.CopyToClipboard />
-                )
-              }
-              // Both outcomes change the glyph as well as the tone, so neither
-              // is carried by colour alone (docs/DESIGN.md §7).
-              tone={copyState === 'failed' ? 'danger' : 'default'}
-              label={
-                copyState === 'copied'
-                  ? t('industry.copyShoppingListDone')
-                  : copyState === 'failed'
-                    ? t('industry.copyShoppingListFailed')
-                    : t('industry.copyShoppingList')
-              }
-              onClick={() => void copyShoppingList()}
-              disabled={!!error || !result || !hasShoppingList(expanded.materials)}
-            />
-            <IconButton
-              size="sm"
-              icon={<Icon.Download />}
-              label={t('industry.exportCsvMaterials')}
-              onClick={exportMaterialsCsv}
-              disabled={!!error || !result || expanded.materials.length === 0}
-            />
-            <IconButton
-              size="sm"
-              icon={<Icon.Refresh />}
-              label={t('industry.refresh')}
-              onClick={() => setRefreshTick((v) => v + 1)}
-            />
-            {result && <span className="tabular-nums">{formatDuration(result.seconds)}</span>}
-          </span>
-        }
-      >
-        {error || !result ? (
-          <p className="text-xs text-danger">{error ?? t('industry.computeError')}</p>
-        ) : (
-          <>
-            {/*
+              <IconButton
+                size="sm"
+                icon={
+                  copyState === 'copied' ? (
+                    <Icon.Done />
+                  ) : copyState === 'failed' ? (
+                    <Icon.Warn />
+                  ) : (
+                    <Icon.CopyToClipboard />
+                  )
+                }
+                // Both outcomes change the glyph as well as the tone, so neither
+                // is carried by colour alone (docs/DESIGN.md §7).
+                tone={copyState === 'failed' ? 'danger' : 'default'}
+                label={
+                  copyState === 'copied'
+                    ? t('industry.copyShoppingListDone')
+                    : copyState === 'failed'
+                      ? t('industry.copyShoppingListFailed')
+                      : t('industry.copyShoppingList')
+                }
+                onClick={() => void copyShoppingList()}
+                disabled={!!error || !result || !hasShoppingList(expanded.materials)}
+              />
+              <IconButton
+                size="sm"
+                icon={<Icon.Download />}
+                label={t('industry.exportCsvMaterials')}
+                onClick={exportMaterialsCsv}
+                disabled={!!error || !result || expanded.materials.length === 0}
+              />
+              <IconButton
+                size="sm"
+                icon={<Icon.Refresh />}
+                label={t('industry.refresh')}
+                onClick={() => setRefreshTick((v) => v + 1)}
+              />
+              {result && <span className="tabular-nums">{formatDuration(result.seconds)}</span>}
+            </span>
+          }
+        >
+          {error || !result ? (
+            <p className="text-xs text-danger">{error ?? t('industry.computeError')}</p>
+          ) : (
+            <>
+              {/*
               Lives here, not in the settings block above: it governs one number
               in one column of the table below it — the owned quantity "use
               detected" offers — and nothing else on the plan. Beside Facility
               and Trade hub it read as another thing about where the job runs.
             */}
-            <div className="mb-3 flex flex-col gap-2">
-              <OwnedStockScopeControl
-                scope={plan.ownedStockScope}
-                detectedStock={detectedStock}
+              <div className="mb-3 flex flex-col gap-2">
+                <OwnedStockScopeControl
+                  scope={plan.ownedStockScope}
+                  detectedStock={detectedStock}
+                  detection={detection}
+                  onChange={(ownedStockScope) => update({ ownedStockScope })}
+                  action={
+                    bulkDetectedPatches.length > 0 && (
+                      <Button size="sm" onClick={() => onSourcingChangeMany(bulkDetectedPatches)}>
+                        {t('industry.useAllOwned')}
+                      </Button>
+                    )
+                  }
+                />
+              </div>
+              <MaterialsTable
+                materials={visibleMaterials}
+                nameFor={(typeID) => nameForType(catalog, typeID)}
+                sourcing={plan.materialSourcing}
+                pricesReady={pricesReady}
+                onSourcingChange={onSourcingChange}
                 detection={detection}
-                onChange={(ownedStockScope) => update({ ownedStockScope })}
+                rowContextMenu={materialContextMenu}
+                makeOrBuy={materialAdvice}
+                canBuildHere={canBuildHere}
+                onToggleBuildHere={toggleBuildHere}
               />
-            </div>
-            <MaterialsTable
-              materials={visibleMaterials}
-              nameFor={(typeID) => nameForType(catalog, typeID)}
-              sourcing={plan.materialSourcing}
-              pricesReady={pricesReady}
-              onSourcingChange={onSourcingChange}
-              detection={detection}
-              rowContextMenu={materialContextMenu}
-              makeOrBuy={materialAdvice}
-              canBuildHere={canBuildHere}
-              onToggleBuildHere={toggleBuildHere}
-            />
-            {/*
+              {/*
               Two totals, never one rewritten in place. The materials above are
               what the expanded plan buys; the plan's own material cost is what
               it would have cost to buy the lot. Showing only the new number
@@ -878,43 +1096,79 @@ export function BuildPlanDetail({
               as written, because a sub-build changes what you shop for, not
               what the parent job installs or sells.
             */}
-            {expanded.subBuilds.size > 0 && (
-              <p className="mt-3 border-t border-line pt-2 text-[0.6875rem] text-text-dim">
-                {t('industry.subBuildSummary', {
-                  count: expanded.subBuilds.size,
-                  materials: formatIsk(expanded.materialCost),
-                  fees: formatIsk(expanded.subBuildFees),
-                  total: formatIsk(expanded.materialCost + expanded.subBuildFees),
-                  planned: formatIsk(result.materialCost),
-                })}{' '}
-                {t('industry.subBuildTimeNote', { time: formatDuration(subBuildSeconds) })}
-              </p>
-            )}
-          </>
-        )}
-      </Panel>
-
-      {result && !error && (
-        <Panel title={t('industry.results')}>
-          <ResultsSummary
-            result={result}
-            pricesReady={pricesReady}
-            pricesLoading={pricesLoading}
-            systemCostIndex={snapshot?.systemCostIndex ?? null}
-            productName={entry.productName}
-            productTypeID={entry.productTypeID}
-            productUnitPrice={
-              entry.productTypeID !== null
-                ? (snapshot?.hubPrices[entry.productTypeID] ?? null)
-                : null
-            }
-            productQuantity={
-              blueprint.products[0] ? blueprint.products[0].quantity * plan.runs : null
-            }
-            costIndexSystemName={buildSystem?.name ?? hub.systemName}
-          />
+              {expanded.subBuilds.size > 0 && (
+                <p className="mt-3 border-t border-line pt-2 text-[0.6875rem] text-text-dim">
+                  {t('industry.subBuildSummary', {
+                    count: expanded.subBuilds.size,
+                    materials: formatIsk(expanded.materialCost),
+                    fees: formatIsk(expanded.subBuildFees),
+                    total: formatIsk(expanded.materialCost + expanded.subBuildFees),
+                    planned: formatIsk(result.materialCost),
+                  })}{' '}
+                  {t('industry.subBuildTimeNote', { time: formatDuration(subBuildSeconds) })}
+                </p>
+              )}
+            </>
+          )}
         </Panel>
-      )}
+
+        {result && !error && (
+          <CollapsiblePanel
+            title={t('industry.costsAndRevenue')}
+            meta={
+              pricesReady && (
+                <span className="text-xs tabular-nums text-text-dim">
+                  {formatIsk(result.totalCost)}
+                </span>
+              )
+            }
+            expanded={costsExpanded}
+            onToggle={() => setCostsOpen(!costsExpanded)}
+            labels={{ show: t('industry.showDetails'), hide: t('industry.hideDetails') }}
+            actions={
+              <IconButton
+                size="sm"
+                icon={<Icon.Info />}
+                label={t('industry.breakdownTrigger')}
+                onClick={() => setBreakdownOpen(true)}
+              />
+            }
+          >
+            <ResultsSummary
+              result={result}
+              pricesReady={pricesReady}
+              pricesLoading={pricesLoading}
+              systemCostIndex={snapshot?.systemCostIndex ?? null}
+              productName={entry.productName}
+              productTypeID={entry.productTypeID}
+              productUnitPrice={productUnitPrice}
+              productQuantity={productQuantity}
+              costIndexSystemName={buildSystem?.name ?? hub.systemName}
+              ownedSale={ownedSale}
+              nameFor={(typeID) => nameForType(catalog, typeID)}
+              onOpenBreakdown={() => setBreakdownOpen(true)}
+            />
+          </CollapsiblePanel>
+        )}
+      </div>
+
+      <ProductionRunsPanel
+        characterId={plan.characterId}
+        buildPlanId={plan.id}
+        defaults={
+          result
+            ? {
+                quantity: productQuantity ?? 0,
+                materialCost: result.materialCost,
+                jobFee: result.jobFee.total,
+              }
+            : null
+        }
+        productTypeID={entry.productTypeID}
+        productName={entry.productName}
+        skills={skills}
+        logRequest={logRequest}
+      />
     </div>
   );
 }

@@ -42,6 +42,7 @@ import {
 } from '@/features/corp/wallet';
 import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
+import { formatTimestamp } from '@/lib/timestamp';
 import { downloadCsv } from '@/lib/downloadCsv';
 import { walletJournalCsvColumns } from '@/features/character/walletJournalCsv';
 import {
@@ -648,7 +649,7 @@ export function Wallet() {
         id: 'date',
         header: t('wallet.date'),
         className: 'whitespace-nowrap text-text-dim',
-        render: (entry) => new Date(entry.date).toLocaleString(),
+        render: (entry) => formatTimestamp(new Date(entry.date)),
         sortValue: (entry) => entry.date,
       },
       {

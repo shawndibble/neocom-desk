@@ -1,4 +1,5 @@
 export { Panel } from './Panel';
+export { CollapsiblePanel } from './CollapsiblePanel';
 export { PageHeader } from './PageHeader';
 export { Button } from './Button';
 export type { ButtonVariant, ButtonSize } from './Button';

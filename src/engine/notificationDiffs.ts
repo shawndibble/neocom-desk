@@ -546,6 +546,13 @@ export interface WalletJournalEntrySnapshot {
   amount: number | null;
   /** The Character's current wallet-change threshold, in ISK, as it stood when this poll ran — see `StructureFuelEntrySnapshot`. */
   thresholdIsk: number;
+  /**
+   * The journal entry's own `date`, in epoch ms. Carried so the fire can be
+   * dated by when the ISK moved rather than by the poll that noticed it — a
+   * device catching up after days away would otherwise stamp every entry it
+   * finds with the moment it looked (`engine/occurrenceKey.occurrenceFiredAt`).
+   */
+  dateMs: number;
 }
 
 export interface WalletSnapshot {
@@ -557,6 +564,10 @@ export interface WalletNotificationFire {
   eventId: 'walletBalanceChanged';
   characterId: number;
   amount: number | null;
+  /** The journal entry this fired for — the fire's Occurrence Key (`engine/occurrenceKey.ts`). */
+  journalEntryId: number;
+  /** When the ISK moved, epoch ms — the feed row's `firedAt`. */
+  dateMs: number;
 }
 
 /**
@@ -577,12 +588,11 @@ export interface WalletNotificationFire {
  * treatment `diffCorpWalletThreshold` gives a null-amount journal entry.
  *
  * Sorted oldest-new-entry-first rather than left in ESI's own order (the
- * journal comes back newest-first): the delivery loop stamps each fire's
- * feed entry with `Date.now()` as it's recorded, in this array's order, and
- * the feed then sorts newest-`firedAt`-first — so whichever entry is pushed
- * last here is the one that lands on top. Recording oldest first keeps that
- * outcome matching real chronology when more than one entry arrives in the
- * same poll.
+ * journal comes back newest-first), so the delivery loop records them in
+ * chronological order. Each fire now carries the entry's own `dateMs`, which
+ * is what the feed row is dated by, so this ordering no longer decides which
+ * row lands on top — it still decides the order the browser toasts are
+ * raised in.
  */
 export function diffWalletBalanceChanged(
   characterId: number,
@@ -595,7 +605,13 @@ export function diffWalletBalanceChanged(
     .filter((entry) => entry.id > maxPrevId)
     .filter((entry) => entry.amount !== null && Math.abs(entry.amount) >= entry.thresholdIsk)
     .sort((a, b) => a.id - b.id)
-    .map((entry) => ({ eventId: 'walletBalanceChanged', characterId, amount: entry.amount }));
+    .map((entry) => ({
+      eventId: 'walletBalanceChanged' as const,
+      characterId,
+      amount: entry.amount,
+      journalEntryId: entry.id,
+      dateMs: entry.dateMs,
+    }));
 }
 
 export interface MarketOrderEntrySnapshot {

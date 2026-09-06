@@ -252,4 +252,53 @@ describe('buildVsBuy', () => {
     // EIV 7_400: gross 370, scc 296, tax 0.25% = 18.5 -> 684.5
     expect(r.jobFee.total).toBeCloseTo(684.5, 6);
   });
+  describe('materialPrices', () => {
+    it('prices materials off the given map while the product keeps its hub sell price', () => {
+      const r = buildVsBuy({
+        ...baseInputs,
+        runs: 1,
+        me: 0,
+        te: 0,
+        // Buy-order side: cheaper materials, same product.
+        materialPrices: { 34: 4, 35: 90 },
+      });
+
+      // Quantities are the facility-adjusted ones; only the unit prices move.
+      const [tritanium, pyerite] = r.materials;
+      expect(r.materials.map((m) => m.unitPrice)).toEqual([4, 90]);
+      expect(r.materialCost).toBeCloseTo(tritanium.quantity * 4 + pyerite.quantity * 90, 6);
+      // Acquisition Verdict still compares against buying the product
+      // outright, which pays the hub's lowest sell.
+      expect(r.revenue).toBeCloseTo(100_000, 6);
+      expect(r.unpriceable).toBe(false);
+    });
+
+    it('defaults to hubPrices when no material map is given', () => {
+      const withOut = buildVsBuy({ ...baseInputs, runs: 1, me: 0, te: 0 });
+      const withSame = buildVsBuy({
+        ...baseInputs,
+        runs: 1,
+        me: 0,
+        te: 0,
+        materialPrices: baseInputs.hubPrices,
+      });
+      expect(withSame.materialCost).toBeCloseTo(withOut.materialCost, 6);
+    });
+
+    it('flags a material the map cannot price, even when the hub sell map can', () => {
+      const r = buildVsBuy({
+        ...baseInputs,
+        runs: 1,
+        me: 0,
+        te: 0,
+        // 35 has no buy order at the hub.
+        materialPrices: { 34: 4 },
+      });
+
+      expect(r.unpricedMaterials).toEqual([35]);
+      expect(r.unpriceable).toBe(true);
+      expect(r.recommendation).toBe('unknown');
+      expect(r.profit).toBeNull();
+    });
+  });
 });

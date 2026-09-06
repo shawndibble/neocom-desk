@@ -35,6 +35,7 @@ import type { CachedResult } from '@/esi/cache';
 import { resolveNames } from '@/features/character/names';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { formatIsk } from '@/lib/isk';
+import { formatTimestamp } from '@/lib/timestamp';
 import { downloadCsv } from '@/lib/downloadCsv';
 import { contractsCsvColumns } from '@/features/character/contractsCsv';
 import type { Contract } from '@/esi/endpoints';
@@ -204,7 +205,7 @@ export function Contracts() {
         render: (contract) => {
           const label = t(CONTRACT_STATUS_KEY[contract.status]);
           return isStale(contract) ? (
-            <Tooltip content={t('contracts.staleTooltip')}>
+            <Tooltip content={t('contracts.staleTooltip')} openOnTap>
               <span>{label}</span>
             </Tooltip>
           ) : (
@@ -242,7 +243,7 @@ export function Contracts() {
         header: t('contracts.expires'),
         className: 'whitespace-nowrap text-text-dim',
         sortValue: (contract) => new Date(contract.date_expired).getTime(),
-        render: (contract) => new Date(contract.date_expired).toLocaleString(),
+        render: (contract) => formatTimestamp(new Date(contract.date_expired)),
       },
     ],
     [t, issuerNames]

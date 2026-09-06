@@ -1,8 +1,9 @@
 // Remote-data purge for a removed Character (parity plan §5.7 item 3): the
 // delete counterpart to planSync's push/pull, for every piece of Editable
 // Data (CONTEXT.md) a Character owns — plans, buildPlans, quickbars,
-// stationPins, planetRichness, payees, miningTaxAssignments, settings,
-// notificationFeed under /characters/{uid}.
+// stationPins, planetRichness, settings, notificationFeed, productionRuns,
+// productionSaleLinks, productionOrderWatches, payees, miningTaxAssignments
+// under /characters/{uid}.
 //
 // Firestore rules grant `delete` uid-only, unlike `get`/`update`, which also
 // require an ownerHash match (see firestore.rules) — the same rule that lets
@@ -37,6 +38,9 @@ const REMOTE_COLLECTIONS = [
   'miningTaxAssignments',
   'settings',
   'notificationFeed',
+  'productionRuns',
+  'productionSaleLinks',
+  'productionOrderWatches',
 ] as const;
 
 /** Marker prefix in `db.settings`. Device-local; mirrors `esi/cachePurge.ts`. */

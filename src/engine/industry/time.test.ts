@@ -13,6 +13,11 @@ const raitaruT1Hi: FacilityContext = {
   rig: 't1',
   security: 'highsec',
 };
+const athanor: FacilityContext = {
+  facility: FACILITY_PRESETS.athanor,
+  rig: 'none',
+  security: 'highsec',
+};
 const noSkills: SkillLevels = {};
 
 describe('timeModifier', () => {
@@ -65,6 +70,40 @@ describe('timeModifier', () => {
     expect(() => timeModifier(-2, noSkills, npc)).toThrow(RangeError);
     expect(() => timeModifier(22, noSkills, npc)).toThrow(RangeError);
     expect(() => timeModifier(0, { [SKILL_IDS.industry]: 6 }, npc)).toThrow(RangeError);
+  });
+
+  it('ignores Industry and Advanced Industry under a reaction facility', () => {
+    // Neither skill reduces reaction job time (issue #513); an unfitted
+    // Athanor has no structure time bonus either, so the modifier is 1.
+    const skills: SkillLevels = { [SKILL_IDS.industry]: 5, [SKILL_IDS.advancedIndustry]: 5 };
+    expect(timeModifier(0, skills, athanor)).toBe(1);
+  });
+
+  it('applies Reactions at 4%/level under a reaction facility', () => {
+    expect(timeModifier(0, { [SKILL_IDS.reactions]: 5 }, athanor)).toBeCloseTo(0.8, 12);
+    expect(timeModifier(0, { [SKILL_IDS.reactions]: 3 }, athanor)).toBeCloseTo(0.88, 12);
+  });
+
+  it('ignores Reactions under a manufacturing facility', () => {
+    expect(timeModifier(0, { [SKILL_IDS.reactions]: 5 }, npc)).toBe(1);
+  });
+
+  it('stacks Reactions with the reaction facility and reactor rig terms', () => {
+    // Tatara -25% (0.75) * T2 TE rig 24% * 1.1 nullsec = 26.4% (0.736)
+    // * Reactions V (0.8).
+    const tataraT2Null: FacilityContext = {
+      facility: FACILITY_PRESETS.tatara,
+      rig: 't2',
+      security: 'nullsec',
+    };
+    expect(timeModifier(0, { [SKILL_IDS.reactions]: 5 }, tataraT2Null)).toBeCloseTo(
+      0.75 * 0.736 * 0.8,
+      12
+    );
+  });
+
+  it('still range-checks the skill it reads under a reaction facility', () => {
+    expect(() => timeModifier(0, { [SKILL_IDS.reactions]: 6 }, athanor)).toThrow(RangeError);
   });
 });
 

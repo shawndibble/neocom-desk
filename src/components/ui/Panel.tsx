@@ -10,6 +10,12 @@ interface PanelProps {
    * a panel-wide action parked on the far right.
    */
   leading?: ReactNode;
+  /**
+   * Sits to the right of the title, in the same left-hand group: a one-line
+   * read of what the panel holds (a count, a total, a countdown), so a
+   * collapsed panel still says something without opening it.
+   */
+  meta?: ReactNode;
   children: ReactNode;
   /** Set false for flush content like tables. */
   padded?: boolean;
@@ -46,7 +52,7 @@ interface PanelProps {
  * own, defeats it).
  */
 export const Panel = forwardRef<HTMLElement, PanelProps>(function Panel(
-  { title, actions, leading, children, padded = true, fill = false, className = '', style },
+  { title, actions, leading, meta, children, padded = true, fill = false, className = '', style },
   ref
 ) {
   const contentClassName = [padded ? 'p-3' : '', fill ? 'flex min-h-0 flex-1 flex-col' : '']
@@ -58,7 +64,7 @@ export const Panel = forwardRef<HTMLElement, PanelProps>(function Panel(
       className={`rounded-xs border border-line bg-panel/85 backdrop-blur-sm ${className}`}
       style={style}
     >
-      {(title || actions || leading) && (
+      {(title || actions || leading || meta) && (
         // A `leading` control carries its own tap padding, so the header's
         // own left inset would read as a double gap — drop it and let the
         // control sit against the edge, the way `Assets`' breadcrumb bar does.
@@ -72,6 +78,7 @@ export const Panel = forwardRef<HTMLElement, PanelProps>(function Panel(
                 {title}
               </h2>
             )}
+            {meta}
           </div>
           {actions && <div className="flex items-center gap-1">{actions}</div>}
         </header>

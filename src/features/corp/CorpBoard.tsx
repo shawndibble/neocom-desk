@@ -132,7 +132,7 @@ function Countdown({ item }: { item: CorpBoardItem }) {
       // A real `<button>` rather than a styled span: `Tooltip` reveals on hover
       // *or focus*, and the caveat is the part of this row a keyboard user most
       // needs to reach.
-      <Tooltip content={t('corp.board.underCacheWindowHint')}>
+      <Tooltip content={t('corp.board.underCacheWindowHint')} openOnTap>
         <button
           type="button"
           className={`${base} ${tone} cursor-help text-left underline decoration-dotted focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent`}

@@ -12,6 +12,7 @@ import { loadCalendarEvent } from '@/features/character/calendar';
 import { stripEveMarkup } from '@/features/skills/typeDisplay';
 import { buildIcsFile, googleCalendarUrl, type CalendarExportEvent } from '@/lib/calendarExport';
 import { downloadTextFile } from '@/lib/download';
+import { formatCalendarTimestamp } from '@/lib/timestamp';
 import type { CachedResult } from '@/esi/cache';
 import type { CalendarEventDetail, CalendarEventSummary } from '@/esi/endpoints';
 
@@ -61,7 +62,7 @@ export function EventDetailModal({ characterId, event, onClose }: EventDetailMod
       ) : (
         <div className="space-y-2 text-xs">
           <p className="text-text-dim">
-            {new Date(detail.data.date).toLocaleString()} ·{' '}
+            {formatCalendarTimestamp(new Date(detail.data.date))} ·{' '}
             {t('calendar.importance', { value: detail.data.importance })}
           </p>
           <p className="whitespace-pre-wrap text-text-dim">{stripEveMarkup(detail.data.text)}</p>

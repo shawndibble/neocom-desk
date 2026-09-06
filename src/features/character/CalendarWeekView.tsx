@@ -3,6 +3,7 @@ import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Panel } from '@/components/ui';
 import { buildWeekDays, groupByDayKey, weekdayLabels } from '@/lib/calendarGrid';
+import { formatTimeOfDay } from '@/lib/timestamp';
 import { RESPONSE_BORDER_TONE } from './calendarResponseTone';
 import { EventContextMenu } from './EventContextMenu';
 import type { CalendarEventSummary } from '@/esi/endpoints';
@@ -76,11 +77,7 @@ export function CalendarWeekView({
                   onClick={() => onSelectEvent(event)}
                   className={`block w-full truncate rounded-xs border-l-2 bg-panel-2/60 px-1.5 py-0.5 text-left text-[0.6875rem] transition-colors hover:bg-panel-2 ${RESPONSE_BORDER_TONE[event.event_response]}`}
                 >
-                  {new Date(event.event_date).toLocaleTimeString([], {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}{' '}
-                  {event.title}
+                  {formatTimeOfDay(new Date(event.event_date))} {event.title}
                 </button>
               </EventContextMenu>
             ))}
