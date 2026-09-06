@@ -555,6 +555,109 @@ describe('AdvisorPanel', () => {
     expect(screen.queryByText(/pins are fed/)).not.toBeInTheDocument();
   });
 
+  it('says what two colonies could make together that neither makes alone', async () => {
+    // The reported operation in miniature. Ashab III refines Microorganisms
+    // into Bacteria; Ashab IV refines Aqueous Liquids into Water. Neither
+    // planet can extract the other's P0, so both cards say "keep selling raw"
+    // — and together they make Test Cultures.
+    const WATER_SCHEMATIC = 121;
+    const BACTERIA_SCHEMATIC = 131;
+    const AQUEOUS_LIQUIDS = 2268;
+    const MICROORGANISMS = 2073;
+    const WATER = 3645;
+    const BACTERIA = 2393;
+    const TEST_CULTURES = 2319;
+    const waterColony = { ...colony(40_000_003, 'barren'), planet_id: 40_000_003 };
+    loadCharacterPlanets.mockResolvedValue({
+      cached: {
+        data: [colony(40_000_001, 'temperate'), waterColony],
+        fetchedAt: new Date(),
+        fromCache: false,
+      },
+      needsReauth: false,
+    });
+    loadSystemPlanetIds.mockResolvedValue([40_000_001, 40_000_003]);
+    loadPlanetInfo.mockImplementation(async (planetId: number) =>
+      planetId === 40_000_003 ? { name: 'Ashab IV', typeId: 2016 } : (PLANET_INFO[planetId] ?? null)
+    );
+    // Both colonies sized to feed a real factory: a 20,000-a-cycle program
+    // sustains 16,026 P0/hr off the decay curve, which keeps 2.67 of three
+    // Basic pins fed and so makes 107 P1/hr — enough for two Advanced
+    // factories at 40 + 40.
+    const refinery = (schematicId: number, productTypeId: number) => ({
+      links: [],
+      routes: [],
+      pins: [
+        {
+          ...extractorPin(1),
+          extractor_details: {
+            ...(extractorPin(1).extractor_details as NonNullable<PlanetPin['extractor_details']>),
+            qty_per_cycle: 20_000,
+            product_type_id: productTypeId,
+          },
+        },
+        ...Array.from({ length: 3 }, (_, i) => ({
+          pin_id: i + 2,
+          type_id: BASIC,
+          latitude: 0,
+          longitude: 0,
+          factory_details: { schematic_id: schematicId },
+        })),
+        { pin_id: 9, type_id: LAUNCHPAD, latitude: 0, longitude: 0 },
+      ],
+    });
+    loadAllColonyDetails.mockResolvedValue(
+      new Map([
+        [
+          40_000_001,
+          {
+            cached: {
+              data: refinery(BACTERIA_SCHEMATIC, MICROORGANISMS),
+              fetchedAt: new Date(),
+              fromCache: false,
+            },
+          },
+        ],
+        [
+          40_000_003,
+          {
+            cached: {
+              data: refinery(WATER_SCHEMATIC, AQUEOUS_LIQUIDS),
+              fetchedAt: new Date(),
+              fromCache: false,
+            },
+          },
+        ],
+      ])
+    );
+    loadPlanPrices.mockResolvedValue({
+      prices: {
+        [MICROORGANISMS]: 12,
+        [AQUEOUS_LIQUIDS]: 12,
+        [WATER]: 513.9,
+        [BACTERIA]: 490,
+        [TEST_CULTURES]: 10_000,
+      },
+      unpriced: [],
+      failed: false,
+      fetchedAt: new Date(),
+    });
+    renderPanel();
+
+    expect(await screen.findByText(/making Test Cultures/)).toBeInTheDocument();
+    // The route is the work: an opportunity with no shipping named is not
+    // actionable.
+    expect(screen.getByText(/Route .* of (Water|Bacteria) from Ashab/)).toBeInTheDocument();
+  });
+
+  it('says nothing about a network when there is only one colony to work with', async () => {
+    // One colony is the per-planet question, and its own card already answers
+    // it. A panel headed "Together" over a single planet is noise.
+    renderPanel();
+    await screen.findByText('Ashab III');
+    expect(screen.queryByText('Together')).not.toBeInTheDocument();
+  });
+
   it('does not tell a pilot whose skills never loaded to abandon a colony', async () => {
     // `planetSlots(null)` is one slot and `assumed`. Read as fact it tells a
     // pilot at Interplanetary Consolidation V — five free slots — to abandon a

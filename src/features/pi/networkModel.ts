@@ -1,0 +1,73 @@
+/**
+ * The Advisor's colony set, in the terms `engine/pi/network.ts` takes
+ * (ADR 0012).
+ *
+ * The engine is pure and knows nothing about ESI: it wants each colony's
+ * measured output, its free CPU/Powergrid and what a link there costs. This
+ * is where a `PlanetAdvice[]` becomes that, and the one place it happens.
+ */
+
+import type { PiData } from '@/sde/types';
+import { planNetwork, type NetworkColony, type NetworkPlan } from '@/engine/pi/network';
+import type { PlanetAdvice } from './advisorModel';
+import { colonyFactoryBalance, colonyOutputPerHour } from './factoryBalanceModel';
+
+export interface NetworkModelInput {
+  advice: readonly PlanetAdvice[];
+  pi: PiData;
+  prices: Readonly<Record<number, number>>;
+  taxRate: number;
+}
+
+/**
+ * Every built colony on screen, measured.
+ *
+ * A colony whose detail never loaded is left out rather than entered as a
+ * colony with no output: an unread colony is not an empty one, and counting it
+ * as empty would route material past a planet that is already consuming it.
+ * A colony whose links could not be priced is left out for the same reason the
+ * card refuses it a headroom figure — there is no honest `spare` for it.
+ */
+export function networkColonies(input: NetworkModelInput): NetworkColony[] {
+  const colonies: NetworkColony[] = [];
+  for (const entry of input.advice) {
+    if (entry.kind !== 'built') continue;
+    const { colony } = entry;
+    if (!colony.detailLoaded) continue;
+    if (colony.linkCount > 0 && colony.pinLoad.linkLoad === null) continue;
+
+    const balance = colonyFactoryBalance(colony, input.pi);
+    colonies.push({
+      planetId: entry.planetId,
+      outputPerHour: colonyOutputPerHour(balance, input.pi),
+      spare: {
+        cpu: Math.max(0, colony.budget.cpu - colony.pinLoad.load.cpu),
+        powergrid: Math.max(0, colony.budget.powergrid - colony.pinLoad.load.powergrid),
+      },
+      newLinkCost: colony.pinLoad.newLinkLoad,
+    });
+  }
+  return colonies;
+}
+
+/**
+ * What this system's colonies could make together.
+ *
+ * Null when there is nothing to say — fewer than two measurable colonies, so
+ * there is no "together" to answer about. A panel is worth rendering only when
+ * it has a colony set; one colony is the per-planet question, already on its
+ * own card.
+ */
+export function colonyNetwork(input: NetworkModelInput): NetworkPlan | null {
+  const colonies = networkColonies(input);
+  if (colonies.length < 2) return null;
+  return planNetwork(
+    {
+      colonies,
+      infrastructure: input.pi.infrastructure,
+      prices: input.prices,
+      taxRate: input.taxRate,
+    },
+    input.pi
+  );
+}

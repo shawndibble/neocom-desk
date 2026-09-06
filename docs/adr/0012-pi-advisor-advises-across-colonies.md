@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed (2026-09-06). Extends ADR 0011; supersedes none of it.
+Accepted (2026-09-06). Extends ADR 0011; supersedes none of it.
 
 ## Context
 

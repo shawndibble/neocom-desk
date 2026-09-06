@@ -68,3 +68,33 @@ export function surplusLoad(balance: readonly FactoryBalance[], pi: PiData): Pin
   }
   return pinsLoad(counts, pi.infrastructure, { extractorHeads: 0 });
 }
+
+/**
+ * What this colony actually puts out an hour, by product typeID.
+ *
+ * The *fed* rate, not the built one: eight Basic factories on an extractor
+ * that feeds three and a half make what three and a half make, and a network
+ * plan sized off the built count would route material that does not exist.
+ * `feedablePins` is fractional on purpose here — a colony making 141.34
+ * Bacteria an hour is a supply figure, not a pin count.
+ *
+ * A line whose inputs arrive from off the planet is taken at its built pin
+ * count. Its supply is not measurable here by construction, and the pilot who
+ * set up those routes is feeding it; assuming otherwise would erase a working
+ * P2 colony from the network it is already part of.
+ */
+export function colonyOutputPerHour(
+  balance: readonly FactoryBalance[],
+  pi: PiData
+): Map<number, number> {
+  const out = new Map<number, number>();
+  for (const line of balance) {
+    const schematic = pi.schematics[String(line.typeId)];
+    if (!schematic || schematic.cycleTime <= 0) continue;
+    const perPin = (schematic.quantity * 3_600) / schematic.cycleTime;
+    const pins = line.status === 'measured' ? Math.min(line.pins, line.feedablePins) : line.pins;
+    if (pins <= 0) continue;
+    out.set(line.typeId, (out.get(line.typeId) ?? 0) + perPin * pins);
+  }
+  return out;
+}

@@ -91,7 +91,9 @@ import { plannableTypeIds } from './products';
 import { systemAdvice, type PlanetAdvice, type SystemPlanet } from './advisorModel';
 import { colonyStopTierAdvice } from './stopTierModel';
 import { colonyFactoryBalance, surplusLoad } from './factoryBalanceModel';
+import { colonyNetwork } from './networkModel';
 import type { FactoryBalance } from '@/engine/pi/factoryBalance';
+import type { NetworkPlan } from '@/engine/pi/network';
 import {
   colonySpaceFor,
   customsRatePercent,
@@ -244,6 +246,116 @@ function UnfedFactories({
             })}
       </p>
     </div>
+  );
+}
+
+/**
+ * What this system's colonies could make between them (ADR 0012).
+ *
+ * The per-planet cards each answer for one planet, which is why a four-colony
+ * operation making four different P1s reads "keep selling raw" four times:
+ * `localChainTargets` gates on one planet's own P0 closure and no one of them
+ * reaches a P2. This is the answer they cannot give, and it sits above them
+ * rather than on any one card because it is about the set.
+ */
+function NetworkPanel({
+  plan,
+  planetNames,
+  taxRate,
+}: {
+  plan: NetworkPlan;
+  planetNames: ReadonlyMap<number, string>;
+  taxRate: number;
+}) {
+  const { t } = useTranslation();
+  const nameOfPlanet = (planetId: number) =>
+    planetNames.get(planetId) ?? t('piAdvisor.systemLabel', { id: planetId });
+  const total = plan.opportunities.reduce((sum, line) => sum + line.marginPerHour, 0);
+
+  return (
+    <Panel title={t('piAdvisor.networkTitle')}>
+      <p className="text-xs text-text-dim">{t('piAdvisor.networkHint')}</p>
+
+      {plan.opportunities.length === 0 ? (
+        <p className="mt-2 text-xs text-text-dim">{t('piAdvisor.networkNothing')}</p>
+      ) : (
+        <ul className="mt-2 space-y-2">
+          {plan.opportunities.map((line) => (
+            <li key={line.typeId} className="space-y-0.5">
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <span>
+                  {t('piAdvisor.networkOpportunity', {
+                    factories: line.factories,
+                    facility: t(`piAdvisor.pinKind.${line.facility}`),
+                    host: nameOfPlanet(line.hostPlanetId),
+                    name: line.name,
+                  })}
+                </span>
+                <span className="tabular-nums text-accent">
+                  {t('piAdvisor.networkValue', { isk: formatIsk(line.marginPerHour) })}
+                </span>
+              </div>
+              {/* The routes are the work: an opportunity a pilot cannot see the
+                  shipping for is not actionable. */}
+              <ul className="text-[0.6875rem] text-text-dim">
+                {line.inputs.map((input) => (
+                  <li key={input.typeId}>
+                    {input.local
+                      ? t('piAdvisor.networkRouteLocal', { name: input.name })
+                      : t('piAdvisor.networkRouteImport', {
+                          units: Math.round(input.unitsPerHour).toLocaleString(),
+                          name: input.name,
+                          from: nameOfPlanet(input.fromPlanetId),
+                        })}
+                  </li>
+                ))}
+              </ul>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {plan.opportunities.length > 0 && (
+        <p className="mt-2 border-t border-line pt-2 text-xs text-text-dim">
+          {t('piAdvisor.networkTotal', {
+            isk: formatIsk(total),
+            hub: DEFAULT_TRADE_HUB.systemName,
+            percent: customsRatePercent(taxRate),
+          })}{' '}
+          {plan.opportunities.length > 1 ? t('piAdvisor.networkGreedy') : ''}
+        </p>
+      )}
+
+      {plan.unallocated.length > 0 && (
+        <p className="text-[0.6875rem] text-text-dim">
+          {t('piAdvisor.networkLeftover', {
+            list: plan.unallocated
+              .map((line) =>
+                t('piAdvisor.networkLeftoverItem', {
+                  units: Math.round(line.unitsPerHour).toLocaleString(),
+                  name: line.name,
+                })
+              )
+              .join(', '),
+          })}
+        </p>
+      )}
+
+      {/* Never silently dropped: "you need more powergrid for this" is the
+          actionable half, and silence reads as "there is nothing here". */}
+      {plan.blocked.length > 0 && (
+        <ul className="mt-1 text-[0.6875rem] text-text-dim">
+          {plan.blocked.map((line) => (
+            <li key={line.typeId}>
+              {t('piAdvisor.networkBlocked', {
+                name: line.name,
+                reason: t(`piAdvisor.networkBlockedReason.${line.reason}`),
+              })}
+            </li>
+          ))}
+        </ul>
+      )}
+    </Panel>
   );
 }
 
@@ -1160,6 +1272,19 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
   }
 
   const builtCount = advice.filter((entry) => entry.kind === 'built').length;
+  // What these colonies could do together — the answer no single card can
+  // give, because each one is about its own planet.
+  const network = colonyNetwork({
+    advice,
+    pi: snapshot.pi,
+    prices: snapshot.prices,
+    taxRate: activeSystem.customsRate,
+  });
+  const planetNames = new Map(
+    advice
+      .filter((entry) => entry.name !== null)
+      .map((entry) => [entry.planetId, entry.name as string])
+  );
   const colonisable = advice.filter(
     (entry) => entry.kind === 'built' || entry.kind === 'unbuilt'
   ).length;
@@ -1264,6 +1389,10 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
           </div>
         </div>
       </Panel>
+
+      {network && (
+        <NetworkPanel plan={network} planetNames={planetNames} taxRate={activeSystem.customsRate} />
+      )}
 
       {advice.length === 0 ? (
         <EmptyState title={t('piAdvisor.noPlanetsTitle')} hint={t('piAdvisor.noPlanetsHint')} />
