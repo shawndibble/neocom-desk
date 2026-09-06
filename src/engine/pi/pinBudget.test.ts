@@ -686,4 +686,52 @@ describe('spareCapacity', () => {
       spareCapacity({ cpu: 0, powergrid: 0 }, LEVEL_4, FREE_BASIC_INFRASTRUCTURE)
     ).toThrowError(/basic/);
   });
+
+  it('charges the link a new pin needs, which can be the difference between one and none', () => {
+    // A reported colony (Efa V, Command Center level 4): 8,089 tf / 16,552 MW
+    // drawn of 21,315 / 17,000, leaving 448 MW. A High-Tech plant is 400 MW,
+    // so the headroom line offered one — but nothing on a planet is reachable
+    // without a link, and that colony's own twelve links average 54.3 MW. The
+    // plant plus its link is 454.3 MW and does not fit, which is exactly what
+    // the pilot found when they tried to place it.
+    const used = { cpu: 8_089, powergrid: 16_552 };
+    const link = { cpu: 74.1, powergrid: 54.3 };
+
+    const free = spareCapacity(used, LEVEL_4, FIXTURE_INFRASTRUCTURE);
+    expect(free.highTech).toBe(1);
+
+    const linked = spareCapacity(used, LEVEL_4, FIXTURE_INFRASTRUCTURE, { newLinkCost: link });
+    expect(linked.highTech).toBe(0);
+  });
+
+  it('charges one link per pin, not one for the batch', () => {
+    // Two more factories are two more links. Charging a single link for the
+    // whole row would overstate the second one and every one after it.
+    const spare = spareCapacity(
+      { cpu: 6_620, powergrid: 14_800 },
+      LEVEL_4,
+      FIXTURE_INFRASTRUCTURE,
+      {
+        newLinkCost: { cpu: 100, powergrid: 300 },
+      }
+    );
+    // 2,200 MW left. A basic factory and its link is 1,100 MW, so two fit
+    // (2,200) where two unlinked ones left 600 MW spare.
+    expect(spare.basic).toBe(2);
+    // An advanced factory is 700 + 300 = 1,000 MW: two, down from three.
+    expect(spare.advanced).toBe(2);
+    // A High-Tech plant is 400 + 300 = 700 MW: three, down from five.
+    expect(spare.highTech).toBe(3);
+  });
+
+  it('charges no link when the caller has no measured one to charge', () => {
+    // A colony with no links has no distance to price, and a guess here would
+    // be the same invented number `linksLoad` refuses to return. Omitting the
+    // option must therefore mean "unpriced", not "free by default" — the
+    // caller decides which, and says so on screen.
+    const used = { cpu: 6_620, powergrid: 14_800 };
+    expect(spareCapacity(used, LEVEL_4, FIXTURE_INFRASTRUCTURE, {})).toEqual(
+      spareCapacity(used, LEVEL_4, FIXTURE_INFRASTRUCTURE)
+    );
+  });
 });

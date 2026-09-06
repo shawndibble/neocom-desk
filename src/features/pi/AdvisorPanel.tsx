@@ -75,6 +75,12 @@ import {
 import { loadTypeNames } from '@/features/character/typeNames';
 import { loadCharacterPlanets, loadAllColonyDetails } from './data';
 import { loadCommandCenterUpgrades, maxColonyBudget, type MaxColonyBudget } from './colonyBudget';
+import {
+  loadInterplanetaryConsolidation,
+  planetSlots,
+  PLANET_SLOTS_MAX,
+  type PlanetSlots,
+} from './planetSlots';
 import { loadPlanetInfo, loadSchematicName } from './names';
 import { plannableTypeIds } from './products';
 import { systemAdvice, type PlanetAdvice, type SystemPlanet } from './advisorModel';
@@ -149,6 +155,19 @@ interface Snapshot {
   planetsBySystem: Map<number, SystemPlanet[]>;
   /** The most any colony here could supply, for unbuilt planets and the header. Built cards use their own. */
   ceiling: MaxColonyBudget;
+  /**
+   * How many colonies this character may run at once, from their
+   * Interplanetary Consolidation. The Advisor used to carry no such figure at
+   * all, and its "N / M planets" chip — which counts colonisable planets in
+   * the system on screen — got read as one.
+   */
+  slots: PlanetSlots;
+  /**
+   * Colonies this character has, across every system. The cap is per
+   * character, so counting only the system on screen would tell a pilot with
+   * colonies in three systems they had slots they do not.
+   */
+  colonyCount: number;
   /** True when the planets read came back 403 — a missing scope, not an empty colony list. */
   needsReauth: boolean;
   schematicNames: Map<number, string>;
@@ -170,18 +189,22 @@ interface Snapshot {
 
 async function loadAdvisorSnapshot(characterId: number): Promise<Snapshot> {
   const nowMs = Date.now();
-  const [pi, planetRadiusRaw, { cached, needsReauth }, ccLevel, customsSkill] = await Promise.all([
-    loadPi(),
-    // Its own payload, and a big one, so a failure here must not take the tab
-    // down: an unresolved radius leaves that colony's link cost unknown, which
-    // the card already knows how to say.
-    loadPiPlanetRadius().catch(() => ({}) as Record<string, number>),
-    loadCharacterPlanets(characterId),
-    loadCommandCenterUpgrades(characterId, nowMs),
-    // Null is a real answer — no skill data at all — and stays distinct from a
-    // trained zero, so `customsRateSource` can say which it is.
-    loadCustomsCodeExpertise(characterId, nowMs).catch(() => null),
-  ]);
+  const [pi, planetRadiusRaw, { cached, needsReauth }, ccLevel, customsSkill, consolidation] =
+    await Promise.all([
+      loadPi(),
+      // Its own payload, and a big one, so a failure here must not take the tab
+      // down: an unresolved radius leaves that colony's link cost unknown, which
+      // the card already knows how to say.
+      loadPiPlanetRadius().catch(() => ({}) as Record<string, number>),
+      loadCharacterPlanets(characterId),
+      loadCommandCenterUpgrades(characterId, nowMs),
+      // Null is a real answer — no skill data at all — and stays distinct from a
+      // trained zero, so `customsRateSource` can say which it is.
+      loadCustomsCodeExpertise(characterId, nowMs).catch(() => null),
+      // Same null-is-an-answer rule: a pilot whose /skills never loaded is not
+      // a pilot with one colony, and `planetSlots` keeps the two apart.
+      loadInterplanetaryConsolidation(characterId, nowMs).catch(() => null),
+    ]);
   const colonies = cached?.data ?? [];
 
   const bySystem = new Map<number, CharacterPlanet[]>();
@@ -305,6 +328,10 @@ async function loadAdvisorSnapshot(characterId: number): Promise<Snapshot> {
     details: flatDetails,
     planetsBySystem,
     ceiling: maxColonyBudget(ccLevel, pi),
+    slots: planetSlots(consolidation),
+    // Every colony, not `bySystem.get(activeSystem)`: the cap is on the
+    // character.
+    colonyCount: colonies.length,
     needsReauth,
     schematicNames,
     typeNames,
@@ -486,6 +513,7 @@ function BuiltCard({
   typeNames,
   prices,
   taxRate,
+  ceiling,
 }: {
   advice: Extract<PlanetAdvice, { kind: 'built' }>;
   pi: PiData;
@@ -493,6 +521,8 @@ function BuiltCard({
   typeNames: ReadonlyMap<number, string>;
   prices: Readonly<Record<number, number>>;
   taxRate: number;
+  /** The pilot's Command Center Upgrades ceiling, for spotting a colony behind it. */
+  ceiling: MaxColonyBudget;
 }) {
   const { t } = useTranslation();
   const { colony } = advice;
@@ -500,14 +530,22 @@ function BuiltCard({
   // not the pilot's skill ceiling, which would overstate the headroom of
   // every colony not upgraded to it.
   const budget: PinLoad = colony.budget;
+  // A new pin is not reachable without a new link, and a link's cost is
+  // distance-based — so the only honest price for one the colony has not built
+  // is what its own links cost on average. Null when there is none to average,
+  // which the card says rather than charging zero.
+  const newLinkCost = colony.pinLoad.meanLinkLoad;
   const headroom = useMemo(
     () =>
       spareCapacity(colony.pinLoad.load, budget, pi.infrastructure, {
         headsPerExtractor: HEADROOM_EXTRACTOR_HEADS,
+        ...(newLinkCost ? { newLinkCost } : {}),
       }),
-    [colony.pinLoad.load, budget, pi.infrastructure]
+    [colony.pinLoad.load, budget, pi.infrastructure, newLinkCost]
   );
   const room = HEADROOM_KINDS.filter((kind) => (headroom[kind] ?? 0) > 0);
+  const freeCpu = Math.max(0, budget.cpu - colony.pinLoad.load.cpu);
+  const freePowergrid = Math.max(0, budget.powergrid - colony.pinLoad.load.powergrid);
 
   return (
     <PlanetCard planetId={advice.planetId} name={advice.name} planetType={advice.planetType}>
@@ -605,22 +643,66 @@ function BuiltCard({
               {t('piAdvisor.roomUnknownRadius', { count: colony.linkCount })}
             </p>
           ) : (
-            <CardLine label={t('piAdvisor.roomForLabel')}>
-              {room.length === 0 ? (
-                <span className="text-text-dim">{t('piAdvisor.roomForNothing')}</span>
-              ) : (
-                <span className="text-text-dim">
-                  {room
-                    .map((kind) =>
-                      t('piAdvisor.roomForItem', {
-                        count: headroom[kind],
-                        pin: t(`piAdvisor.pinKind.${kind}`),
-                      })
-                    )
-                    .join(' · ')}
-                </span>
-              )}
-            </CardLine>
+            <>
+              <CardLine label={t('piAdvisor.roomForLabel')}>
+                {room.length === 0 ? (
+                  <span className="text-text-dim">{t('piAdvisor.roomForNothing')}</span>
+                ) : (
+                  <span className="text-text-dim">
+                    {room
+                      .map((kind) =>
+                        t('piAdvisor.roomForItem', {
+                          count: headroom[kind],
+                          pin: t(`piAdvisor.pinKind.${kind}`),
+                        })
+                      )
+                      .join(' · ')}
+                  </span>
+                )}
+              </CardLine>
+              {/*
+                The counts above are independent per kind — what the leftover
+                budget holds if you spend it all on that one thing — and a
+                pilot who read the joined list as a shopping list placed the
+                first factory and found the colony full. The counts were
+                right; only this sentence was missing. The remainder they came
+                out of goes with it, so the arithmetic is checkable here rather
+                than only in the engine.
+              */}
+              <p className="text-[0.6875rem] text-text-dim">
+                {room.length > 1 ? `${t('piAdvisor.roomForAnyOne')} ` : ''}
+                {t('piAdvisor.roomForFree', {
+                  cpu: Math.round(freeCpu).toLocaleString(),
+                  powergrid: Math.round(freePowergrid).toLocaleString(),
+                })}
+              </p>
+              <p className="text-[0.6875rem] text-text-dim">
+                {newLinkCost
+                  ? t('piAdvisor.roomForLinkCharged', {
+                      cpu: Math.round(newLinkCost.cpu).toLocaleString(),
+                      powergrid: Math.round(newLinkCost.powergrid).toLocaleString(),
+                    })
+                  : t('piAdvisor.roomForLinkUnmeasured')}
+              </p>
+            </>
+          )}
+
+          {/*
+            Powergrid is what binds nearly every colony, and on a pilot whose
+            skill has outrun their Command Centers there is a whole level of it
+            sitting behind an ISK purchase. Only ever said off a *trained*
+            ceiling: pushing an upgrade at a pilot on an assumed level 0 would
+            be advice derived from missing data.
+          */}
+          {!ceiling.assumed && colony.upgradeLevel < ceiling.level && (
+            <p className="text-[0.6875rem] text-accent">
+              {t('piAdvisor.upgradeAvailable', {
+                level: colony.upgradeLevel,
+                max: ceiling.level,
+                cpu: Math.round(ceiling.budget.cpu - budget.cpu).toLocaleString(),
+                powergrid: Math.round(ceiling.budget.powergrid - budget.powergrid).toLocaleString(),
+              })}
+            </p>
           )}
         </div>
 
@@ -636,14 +718,23 @@ function UnbuiltCard({
   rate,
   prices,
   onOrderChange,
+  slots,
+  colonyCount,
 }: {
   advice: Extract<PlanetAdvice, { kind: 'unbuilt' }>;
   order: readonly number[];
   rate: AssumedRate;
   prices: Readonly<Record<number, number>>;
   onOrderChange: (planetId: number, order: number[]) => void;
+  slots: PlanetSlots;
+  colonyCount: number;
 }) {
   const { t } = useTranslation();
+  // What this planet could yield is worth naming either way — the ranker
+  // still takes input, and the pilot may be deciding which colony to move.
+  // But a card that says "could extract" to someone with nowhere to put a
+  // Command Center is advice they cannot act on until they say so.
+  const noSlotFree = colonyCount >= slots.slots;
   const localResources = advice.localResources.map((resource) => resource.typeID);
   const nameByType = new Map(advice.localResources.map((r) => [r.typeID, r.name]));
 
@@ -656,6 +747,18 @@ function UnbuiltCard({
   return (
     <PlanetCard planetId={advice.planetId} name={advice.name} planetType={advice.planetType} dashed>
       <>
+        {noSlotFree && (
+          <p className="text-xs text-warning">
+            {slots.slots >= PLANET_SLOTS_MAX
+              ? t('piAdvisor.noSlotFreeMax', { total: slots.slots })
+              : t('piAdvisor.noSlotFree', {
+                  used: colonyCount,
+                  total: slots.slots,
+                  level: slots.slots,
+                })}
+          </p>
+        )}
+
         <CardLine label={t('piAdvisor.couldExtractLabel')}>
           <span className="text-text-dim">
             {advice.localResources.map((resource) => resource.name).join(', ')}
@@ -869,6 +972,16 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
     ? t('piAdvisor.ccUpgradesAssumed', { numbers: ceilingNumbers })
     : ceilingNumbers;
 
+  // Same two readings as the ceiling above: a trained level is a fact, an
+  // untrained assumption is not, and only the first may be shown bare.
+  const slotsNumbers = t('piAdvisor.slotsValue', {
+    used: snapshot.colonyCount,
+    total: snapshot.slots.slots,
+  });
+  const slotsChipValue = snapshot.slots.assumed
+    ? t('piAdvisor.slotsAssumed', { value: slotsNumbers })
+    : slotsNumbers;
+
   return (
     <div className="space-y-3">
       <Panel title={t('piAdvisor.controlsTitle')}>
@@ -907,6 +1020,30 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
             <StatChip
               label={t('piAdvisor.colonised')}
               value={t('piAdvisor.colonisedValue', { built: builtCount, total: colonisable })}
+              tooltip={t('piAdvisor.colonisedTooltip')}
+            />
+            {/*
+              The chip above counts planets in *this system*; this one counts
+              the character's colony allowance, which is what the one above
+              was being read as. They are next to each other on purpose —
+              seeing "1 / 2 planets" beside "4 / 5 used" is what makes the
+              difference obvious.
+            */}
+            <StatChip
+              label={t('piAdvisor.slots')}
+              value={slotsChipValue}
+              tooltip={
+                snapshot.slots.assumed
+                  ? t('piAdvisor.slotsAssumedTooltip')
+                  : t('piAdvisor.slotsTooltip')
+              }
+              tone={
+                snapshot.slots.assumed
+                  ? 'warning'
+                  : snapshot.colonyCount >= snapshot.slots.slots
+                    ? 'accent'
+                    : undefined
+              }
             />
             {/* Derived, so it says so: a derived number that does not reads as measured. */}
             <StatChip
@@ -937,6 +1074,7 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
                 typeNames={snapshot.typeNames}
                 prices={snapshot.prices}
                 taxRate={activeSystem.customsRate}
+                ceiling={snapshot.ceiling}
               />
             ) : entry.kind === 'unbuilt' ? (
               <UnbuiltCard
@@ -946,6 +1084,8 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
                 rate={assumedRate}
                 prices={snapshot.prices}
                 onOrderChange={handleOrderChange}
+                slots={snapshot.slots}
+                colonyCount={snapshot.colonyCount}
               />
             ) : entry.kind === 'unknown-type' ? (
               <UnknownTypeCard key={entry.planetId} advice={entry} />

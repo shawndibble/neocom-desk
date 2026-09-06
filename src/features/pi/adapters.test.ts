@@ -363,4 +363,52 @@ describe('colonyPinLoad', () => {
     expect(result.extractorHeads).toBe(0);
     expect(result.load).toEqual({ cpu: 400, powergrid: 2_600 });
   });
+
+  describe('meanLinkLoad', () => {
+    // Three pins on one equator, 0.1 rad apart on a 1,000 km planet: 100 km a
+    // hop, so each link is 15 + 0.2 x 100 = 35 tf and 10 + 0.15 x 100 = 25 MW.
+    const equator = (pinId: number, typeId: number, longitude: number) =>
+      pin(pinId, typeId, { latitude: Math.PI / 2, longitude });
+    const spread = [equator(1, 2256, 0), equator(2, 2481, 0.1), equator(3, 2481, 0.2)];
+    const chain = [
+      { source_pin_id: 1, destination_pin_id: 2, link_level: 0 },
+      { source_pin_id: 2, destination_pin_id: 3, link_level: 0 },
+    ];
+
+    it('is what one of this colony’s own links costs, for pricing a link it has not built', () => {
+      // A pin that does not exist yet has no place on the planet and so no
+      // distance to price, but it will need a link all the same. This colony's
+      // own links are the only measurement of what one here costs.
+      const result = colonyPinLoad(spread, pi, chain, 1_000);
+      expect(result.linkLoad?.cpu).toBeCloseTo(70, 6);
+      expect(result.linkLoad?.powergrid).toBeCloseTo(50, 6);
+      expect(result.meanLinkLoad?.cpu).toBeCloseTo(35, 6);
+      expect(result.meanLinkLoad?.powergrid).toBeCloseTo(25, 6);
+    });
+
+    it('averages over the links it could price, not over the ones ESI listed', () => {
+      // A link to a pin outside the pin list is skipped rather than guessed
+      // at, and it must be skipped by the divisor too — dividing a two-link
+      // total by three would quote a link cheaper than any link on the planet.
+      const dangling = [...chain, { source_pin_id: 3, destination_pin_id: 99, link_level: 0 }];
+      const result = colonyPinLoad(spread, pi, dangling, 1_000);
+      expect(result.linkCount).toBe(3);
+      expect(result.meanLinkLoad?.cpu).toBeCloseTo(35, 6);
+    });
+
+    it('is null on a colony with no link to measure, rather than a free one', () => {
+      // Zero links is not "links are free here" — it is a colony with nothing
+      // to average, and the caller has to say so rather than quote a pin at
+      // its unlinked price.
+      const result = colonyPinLoad(spread, pi, [], 1_000);
+      expect(result.linkLoad).toEqual({ cpu: 0, powergrid: 0 });
+      expect(result.meanLinkLoad).toBeNull();
+    });
+
+    it('is null when the planet’s radius never resolved, like the total it comes from', () => {
+      const result = colonyPinLoad(spread, pi, chain, null);
+      expect(result.linkLoad).toBeNull();
+      expect(result.meanLinkLoad).toBeNull();
+    });
+  });
 });

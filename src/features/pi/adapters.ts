@@ -139,6 +139,23 @@ export interface ColonyPinLoad {
    * showing headroom must say so rather than treat links as free (#440).
    */
   linkLoad: PinLoad | null;
+  /**
+   * What *one* of this colony's links costs, averaged over the ones that could
+   * be priced — the price of a link the colony has not built yet.
+   *
+   * A pin that does not exist has no place on the planet, so the distance term
+   * `linkCost.ts` needs cannot be computed for it; but it will need a link all
+   * the same, and quoting it at its unlinked price promises room that is not
+   * there. This colony's own links are the only measurement of what a link
+   * *here* costs, and a planet's links are the one cost that varies by two
+   * orders of magnitude between colonies, so a shared constant would be worse
+   * than useless.
+   *
+   * Null on a colony with no priceable link, which is not the same as a colony
+   * whose links are free: there is simply nothing to average, and a caller
+   * must say "unpriced" rather than charge zero.
+   */
+  meanLinkLoad: PinLoad | null;
   /** How many links the colony has, whether or not they could be costed. */
   linkCount: number;
   /**
@@ -212,6 +229,15 @@ export function colonyPinLoad(
       ? linksLoad(geometry, planetRadiusKm, pi.infrastructure.link)
       : null;
 
+  // Divided by the links that were actually priced, never by `links.length`:
+  // a link whose far end is not in the pin list contributes nothing to the
+  // total above, and counting it in the divisor would quote a mean cheaper
+  // than any link on the planet.
+  const meanLinkLoad =
+    linkLoad !== null && geometry.length > 0
+      ? { cpu: linkLoad.cpu / geometry.length, powergrid: linkLoad.powergrid / geometry.length }
+      : null;
+
   return {
     counts,
     extractorHeads,
@@ -219,6 +245,7 @@ export function colonyPinLoad(
       ? { cpu: pinLoad.cpu + linkLoad.cpu, powergrid: pinLoad.powergrid + linkLoad.powergrid }
       : pinLoad,
     linkLoad,
+    meanLinkLoad,
     linkCount: links.length,
     unknownTypeIds,
   };

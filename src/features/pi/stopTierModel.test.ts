@@ -41,6 +41,7 @@ function colony(overrides: Partial<BuiltColonyAdvice> = {}): BuiltColonyAdvice {
       extractorHeads: 8,
       load: { cpu: 5_320, powergrid: 12_600 },
       linkLoad: { cpu: 415, powergrid: 300 },
+      meanLinkLoad: { cpu: 415 / 3, powergrid: 100 },
       linkCount: 3,
       unknownTypeIds: [],
     },

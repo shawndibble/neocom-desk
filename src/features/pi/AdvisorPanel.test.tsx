@@ -41,6 +41,7 @@ const loadSchematicName = vi.fn();
 const loadTypeNames = vi.fn();
 const loadSystemSecurity = vi.fn();
 const loadCustomsCodeExpertise = vi.fn();
+const loadInterplanetaryConsolidation = vi.fn();
 
 const loadPiPlanetRadius = vi.fn<() => Promise<Record<string, number>>>();
 vi.mock('@/sde/loadSde', () => ({
@@ -66,6 +67,11 @@ vi.mock('./data', () => ({
 vi.mock('./colonyBudget', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./colonyBudget')>()),
   loadCommandCenterUpgrades: (...args: unknown[]) => loadCommandCenterUpgrades(...args),
+}));
+
+vi.mock('./planetSlots', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./planetSlots')>()),
+  loadInterplanetaryConsolidation: (...args: unknown[]) => loadInterplanetaryConsolidation(...args),
 }));
 
 vi.mock('@/features/character/systemSecurity', () => ({
@@ -161,10 +167,14 @@ beforeEach(() => {
     loadTypeNames,
     loadSystemSecurity,
     loadCustomsCodeExpertise,
+    loadInterplanetaryConsolidation,
     loadPlanPrices,
   ]) {
     mock.mockReset();
   }
+  // Level IV — five colonies — so the default fixture has slots to spare and
+  // only the tests that care about the cap have to say so.
+  loadInterplanetaryConsolidation.mockResolvedValue(4);
   loadPlanPrices.mockResolvedValue({
     prices: { [BASE_METALS]: 12 },
     unpriced: [],
@@ -298,6 +308,148 @@ describe('AdvisorPanel', () => {
     const room = await screen.findByText(/1x extractor/);
     expect(room).toHaveTextContent('13x basic factory');
     expect(room).toHaveTextContent('15x advanced factory');
+  });
+
+  it('says the headroom counts are alternatives rather than a list to build together', async () => {
+    // The reported bug. A pilot read "1x basic factory · 1x advanced factory ·
+    // 2x high-tech plant · 1x storage · 1x launchpad" as five things they
+    // could add, placed the basic factory, and found the colony full. Every
+    // count was right; the sentence was not, and the engine's own docstring
+    // has always said these are alternatives.
+    renderPanel();
+    await screen.findByText(/1x extractor/);
+    expect(screen.getByText(/Any one of those, not all of them/)).toBeInTheDocument();
+    // And the remainder those counts came out of, so the arithmetic is
+    // checkable on the card instead of only in the engine.
+    expect(screen.getByText(/16,675 tf and 10,700 MW free/)).toBeInTheDocument();
+  });
+
+  it('charges a new pin for the link it will need, not just for the pin', async () => {
+    // Efa V in miniature: 448 MW free and a 400 MW High-Tech plant offered,
+    // which could not be placed because the link it needed was 54 MW. Here
+    // the same omission is worth one basic factory — 14 unlinked, 13 once the
+    // 20.9 MW link this colony's own geometry prices is charged with it.
+    loadAllColonyDetails.mockResolvedValue(
+      new Map([
+        [
+          40_000_001,
+          {
+            cached: {
+              data: {
+                links: [{ source_pin_id: 1, destination_pin_id: 2, link_level: 0 }],
+                routes: [],
+                pins: [
+                  {
+                    ...extractorPin(1),
+                    latitude: 1.5826666355133057,
+                    longitude: 5.977088451385498,
+                  },
+                  {
+                    pin_id: 2,
+                    type_id: BASIC,
+                    latitude: 1.5946428775787354,
+                    longitude: 5.978272914886475,
+                    factory_details: { schematic_id: REACTIVE_METALS_SCHEMATIC },
+                  },
+                ],
+              },
+              fetchedAt: new Date(),
+              fromCache: false,
+            },
+          },
+        ],
+      ])
+    );
+    renderPanel();
+
+    const room = await screen.findByText(/x basic factory/);
+    expect(room).toHaveTextContent('13x basic factory');
+    expect(room).not.toHaveTextContent('14x basic factory');
+    expect(
+      screen.getByText(/pays for the link a new pin needs.*30 tf \/ 21 MW/)
+    ).toBeInTheDocument();
+  });
+
+  it('calls the counts ceilings when the colony has no link to price one from', async () => {
+    // Zero links is not "links are free here". The counts are still the best
+    // answer available, and the card owes the reader the caveat rather than a
+    // silently optimistic number.
+    renderPanel();
+    await screen.findByText(/1x extractor/);
+    expect(screen.getByText(/These are ceilings/)).toBeInTheDocument();
+  });
+
+  it('counts the colony slots the pilot’s skill actually allows', async () => {
+    // The header's "1 / 2 planets" is about this system. The pilot's own cap
+    // is Interplanetary Consolidation, and it was nowhere on this tab — a
+    // pilot at level IV read the system figure as their allowance.
+    loadInterplanetaryConsolidation.mockResolvedValue(4);
+    renderPanel();
+    expect(await screen.findByText('1 / 5 used')).toBeInTheDocument();
+  });
+
+  it('counts colonies in every system against the cap, not just the one on screen', async () => {
+    // The cap is per character. A pilot showing one system while running
+    // colonies in three has one slot free, not four.
+    loadInterplanetaryConsolidation.mockResolvedValue(4);
+    loadCharacterPlanets.mockResolvedValue({
+      cached: {
+        data: [
+          colony(40_000_001, 'temperate'),
+          { ...colony(40_000_003, 'barren'), solar_system_id: 30_002_188 },
+          { ...colony(40_000_004, 'barren'), solar_system_id: 30_002_189 },
+          { ...colony(40_000_005, 'barren'), solar_system_id: 30_002_190 },
+        ],
+        fetchedAt: new Date(),
+        fromCache: false,
+      },
+      needsReauth: false,
+    });
+    renderPanel();
+    expect(await screen.findByText('4 / 5 used')).toBeInTheDocument();
+  });
+
+  it('does not present an assumed colony cap as a fact', async () => {
+    // Same rule the Command Center ceiling follows: a pilot whose /skills
+    // never loaded is not a pilot with one colony.
+    loadInterplanetaryConsolidation.mockResolvedValue(null);
+    renderPanel();
+    expect(await screen.findByText(/1 \/ 1 used \(assumed\)/)).toBeInTheDocument();
+  });
+
+  it('tells an unbuilt planet it has no slot to be built in', async () => {
+    // Naming resources for a planet the pilot cannot colonise is advice they
+    // cannot take. Ashab II is the unbuilt card in this fixture.
+    loadInterplanetaryConsolidation.mockResolvedValue(0);
+    renderPanel();
+    const card = (await screen.findByText('Ashab II')).closest('div')?.parentElement as HTMLElement;
+    expect(within(card).getByText(/No colony slot free/)).toBeInTheDocument();
+  });
+
+  it('says nothing about slots on an unbuilt planet while one is free', async () => {
+    loadInterplanetaryConsolidation.mockResolvedValue(4);
+    renderPanel();
+    const card = (await screen.findByText('Ashab II')).closest('div')?.parentElement as HTMLElement;
+    expect(within(card).queryByText(/No colony slot free/)).not.toBeInTheDocument();
+  });
+
+  it('points out a Command Center the pilot’s skill could already upgrade', async () => {
+    // The colony is at upgrade_level 4 and the pilot's Command Center
+    // Upgrades is V. Powergrid is what binds every one of these colonies, and
+    // 2,000 MW of it is sitting behind an ISK purchase the tab never mentioned.
+    renderPanel();
+    const card = (await screen.findByText('Ashab III')).closest('div')
+      ?.parentElement as HTMLElement;
+    expect(within(card).getByText(/level 4.*allows 5/)).toBeInTheDocument();
+    expect(within(card).getByText(/4,100 tf and 2,000 MW/)).toBeInTheDocument();
+  });
+
+  it('does not push an upgrade off a skill level it had to assume', async () => {
+    loadCommandCenterUpgrades.mockResolvedValue(null);
+    renderPanel();
+    const card = (await screen.findByText('Ashab III')).closest('div')
+      ?.parentElement as HTMLElement;
+    expect(within(card).queryByText(/allows/)).not.toBeInTheDocument();
   });
 
   it('charges for links, and still states headroom (#440)', async () => {
