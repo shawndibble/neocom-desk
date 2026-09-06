@@ -920,24 +920,22 @@ export function BuildPlanDetail({
         </Panel>
       )}
 
-      <Panel title={t('industry.productionRuns')}>
-        <ProductionRunsPanel
-          characterId={plan.characterId}
-          buildPlanId={plan.id}
-          defaults={
-            result
-              ? {
-                  quantity: productQuantity ?? 0,
-                  materialCost: result.materialCost,
-                  jobFee: result.jobFee.total,
-                }
-              : null
-          }
-          productTypeID={entry.productTypeID}
-          productName={entry.productName}
-          skills={skills}
-        />
-      </Panel>
+      <ProductionRunsPanel
+        characterId={plan.characterId}
+        buildPlanId={plan.id}
+        defaults={
+          result
+            ? {
+                quantity: productQuantity ?? 0,
+                materialCost: result.materialCost,
+                jobFee: result.jobFee.total,
+              }
+            : null
+        }
+        productTypeID={entry.productTypeID}
+        productName={entry.productName}
+        skills={skills}
+      />
     </div>
   );
 }

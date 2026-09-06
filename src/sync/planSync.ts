@@ -782,7 +782,9 @@ const productionSaleLinkSpec: CollectionSpec<
     id: r.id,
     characterId: r.characterId,
     runId: r.runId,
-    transactionId: r.transactionId,
+    // Firestore rejects undefined values, so a manual entry's absent
+    // transactionId is omitted rather than sent as null.
+    ...(r.transactionId !== undefined ? { transactionId: r.transactionId } : {}),
     quantity: r.quantity,
     unitPrice: r.unitPrice,
     linkedAt: r.linkedAt,
@@ -794,7 +796,7 @@ const productionSaleLinkSpec: CollectionSpec<
     id: r.id,
     characterId: r.characterId,
     runId: r.runId,
-    transactionId: r.transactionId,
+    ...(r.transactionId !== undefined ? { transactionId: r.transactionId } : {}),
     quantity: r.quantity,
     unitPrice: r.unitPrice,
     linkedAt: r.linkedAt,

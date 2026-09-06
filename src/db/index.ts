@@ -385,13 +385,22 @@ export interface ProductionRunRecord {
  * documents, and the deterministic id makes the same sale linked twice on
  * two devices collide into one document rather than double-count. Mirrors
  * the Notification Feed's Occurrence Key precedent (CONTEXT.md).
+ *
+ * `transactionId` is absent for a "Manual / Private Sale" entry — a sale the
+ * pilot recorded by hand for a disposal ESI has no record of at all (gifted,
+ * sold in a private deal, reprocessed and sold as something else). Its id is
+ * `${characterId}:manual:${crypto.randomUUID()}` instead of a deterministic
+ * transaction id, since there is no natural ESI id to key uniqueness off —
+ * a manual entry has no cross-device double-count risk to begin with, since
+ * nothing else could ever independently produce the same one.
  */
 export interface ProductionSaleLinkRecord {
-  /** Always `${characterId}:txn:${transactionId}` — see the type doc above. */
+  /** `${characterId}:txn:${transactionId}` for a linked sale, `${characterId}:manual:${uuid}` for a manual one. */
   id: string;
   characterId: number;
   runId: string;
-  transactionId: number;
+  /** Absent for a manual entry — see the type doc above. */
+  transactionId?: number;
   quantity: number;
   unitPrice: number;
   /** Epoch ms the pilot linked this sale. */

@@ -98,6 +98,29 @@ _Recorded 2026-09-05 · issue #525._
   would be worse than a slightly noisier tombstone list — and would
   permanently corrupt "already linked" checks, since the deterministic id
   would still exist there was nothing to clean it up.
+- **A third linking mechanism, "Manual / Private Sale," was added after initial
+  review feedback.** Not every disposal has an ESI record at all — a gift, a
+  private out-of-market deal, an item reprocessed and sold as something else.
+  `ProductionSaleLinkRecord.transactionId` became optional
+  (`src/db/index.ts`) rather than adding a fourth table: a manual entry is a
+  sale line exactly like a linked wallet transaction in every way that
+  matters to `realizedProfit` (quantity, unit price, no assumed broker fee),
+  it just has no ESI natural id to key uniqueness off. Its id is
+  `${characterId}:manual:${crypto.randomUUID()}` — there is no cross-device
+  double-count risk to structurally prevent here, since nothing else could
+  ever independently produce the same manual entry the way two devices could
+  both discover the same real transaction.
+- **"Attach to Contract" is deferred to a follow-up ticket, not built in this
+  slice.** `features/character/contracts.ts` already caches the character's
+  contract list, but an item-exchange contract's _contents_ are fetched
+  lazily per contract, on demand, only when its own detail modal opens
+  (`contractItems.ts`) — there is no cheap way to filter "which contracts sold
+  this product" without fetching every finished contract's items individually,
+  unlike the flat, already-loaded lists "Link Past Sale" and "Watch Open
+  Order" filter over. Wiring that up well (a picker with its own progressive
+  fetch/filter, likely with its own local cache of "items already checked
+  per contract") is a real feature in its own right, not a small addition to
+  this one.
 - **"Link Past Sale" and "Watch Open Order" are not mutually exclusive against
   the same real-world sale — accepted, not solved.** The uniqueness scheme
   above (a transaction/order id can only ever back one link/watch record)
@@ -110,7 +133,9 @@ _Recorded 2026-09-05 · issue #525._
   this way. Solving it would need real order-to-transaction correlation ESI
   does not expose cleanly; flagged as a follow-up rather than blocking this
   slice, the same way the wallet-window aging gap above is accepted rather
-  than mitigated.
+  than mitigated. A manual entry carries the same risk against either
+  mechanism, for the same reason — it is the pilot's own attestation, not a
+  system that can cross-check itself.
 - **Out of scope, unchanged from the original triage draft:** corp-owned jobs
   / corp wallet divisions (no character/division dimension on a linked sale —
   a real gap for multi-character or corp setups, flagged but not solved), and

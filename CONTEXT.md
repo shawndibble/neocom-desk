@@ -211,11 +211,12 @@ here — they go one per file in `docs/context/decisions/`.
   was actually paid. Deliberately correct-by-construction rather than
   reconstructed from ESI wallet history (see the decisions folder for why
   automated FIFO matching was rejected) — the pilot links what actually sold
-  via "Link Past Sale" (a picker over cached wallet transactions) or "Watch
+  via "Link Past Sale" (a picker over cached wallet transactions), "Watch
   Open Order" (tracks one of the pilot's own open sell orders'
-  `volume_remain` directly). Each linked sale or watched order is its own
-  synced record, never a field on the run itself, so two devices linking
-  different sales to the same run can never collide.
+  `volume_remain` directly), or a "Manual / Private Sale" entry for a
+  disposal ESI has no record of at all. Each linked sale or watched order is
+  its own synced record, never a field on the run itself, so two devices
+  linking different sales to the same run can never collide.
 - **Projection**: The set of rows a device uploads describing every Scheduled
   Push that becomes due inside the Projection Horizon — one row per
   occurrence, carrying its **Occurrence Key**, its `fireAt`, and its
