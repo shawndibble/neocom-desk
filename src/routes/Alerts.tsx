@@ -37,7 +37,7 @@ import {
 } from '@/components/ui';
 import { BOARD_SEVERITIES, type BoardSeverity } from '@/engine/severity';
 import { AlertGroupRow } from '@/features/notifications/AlertGroupRow';
-import { groupAlertsByType } from '@/features/notifications/alertGroups';
+import { alertGroupLabel, groupAlertsByType } from '@/features/notifications/alertGroups';
 import {
   EMPTY_ALERTS_FILTER,
   activeAlertsFilterCount,
@@ -47,8 +47,6 @@ import {
 } from '@/features/notifications/alertsFilter';
 import { readFeed, dismissFeedEntries } from '@/features/notifications/feed';
 import { isEntryMutedInFeed } from '@/features/notifications/feedSelection';
-import { eveTypeLabel } from '@/features/notifications/eveTypeLabel';
-import { NOTIFICATION_EVENTS } from '@/features/notifications/events';
 import {
   hydrateNotificationPreferences,
   isFeedChannelEnabled,
@@ -56,8 +54,6 @@ import {
   useNotificationPreferences,
 } from '@/features/notifications/preferences';
 import { refreshAppBadge } from '@/features/notifications/appBadge';
-
-const EVENT_LABEL_KEY = new Map(NOTIFICATION_EVENTS.map((event) => [event.id, event.labelKey]));
 
 /**
  * Which severities get their own chip.
@@ -118,12 +114,7 @@ export function Alerts() {
     );
     return groupAlertsByType(live).map((group) => ({
       ...group,
-      label:
-        group.target.kind === 'eveType'
-          ? eveTypeLabel(t, group.target.type)
-          : t(EVENT_LABEL_KEY.get(group.target.eventId) ?? '', {
-              defaultValue: group.target.eventId,
-            }),
+      label: alertGroupLabel(t, group.target),
       // Muted only when it is muted for every Character it fired for: a type
       // silenced on one alt is still live here for the others, and dimming the
       // whole row would misreport that.

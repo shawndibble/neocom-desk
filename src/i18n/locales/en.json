@@ -942,7 +942,8 @@
       "jobSubject_one": "{{name}} ×{{count}}",
       "jobSubject_other": "{{name}} ×{{count}}",
       "unknownProduct": "Unnamed job",
-      "checking": "Checking…"
+      "checking": "Checking…",
+      "reauth": "Log in again to see this."
     }
   },
   "alerts": {

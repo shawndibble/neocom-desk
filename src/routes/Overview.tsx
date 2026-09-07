@@ -41,12 +41,10 @@ import { CharacterHeader } from '@/features/character/CharacterHeader';
 import { OverviewSubNav } from '@/features/character/OverviewSubNav';
 import { buildOpenOrderRows } from '@/features/market/openOrdersModel';
 import { loadOpenOrdersSnapshot } from '@/features/market/openOrdersPageSnapshot';
-import { groupAlertsByType } from '@/features/notifications/alertGroups';
+import { alertGroupLabel, groupAlertsByType } from '@/features/notifications/alertGroups';
 import type { DisplayAlertGroup } from '@/features/notifications/alertsFilter';
 import { readFeed, dismissFeedEntries } from '@/features/notifications/feed';
 import { visibleFeedEntries } from '@/features/notifications/feedSelection';
-import { eveTypeLabel } from '@/features/notifications/eveTypeLabel';
-import { NOTIFICATION_EVENTS } from '@/features/notifications/events';
 import { useNotificationPreferences } from '@/features/notifications/preferences';
 import { SummaryStrip } from '@/features/overview/SummaryStrip';
 import {
@@ -65,8 +63,6 @@ import type { BoardSeverity } from '@/engine/severity';
 import { isJobDone } from '@/features/industry/jobs';
 import type { CharacterSkills, SkillQueueEntry } from '@/esi/endpoints';
 import { sortQueueEntries, selectActiveEntryFromSorted, selectQueueDepth } from './overviewQueue';
-
-const EVENT_LABEL_KEY = new Map(NOTIFICATION_EVENTS.map((event) => [event.id, event.labelKey]));
 
 /** Stable identity, so the industry card does not re-render on every parent render before its load lands. */
 const EMPTY_NAMES: ReadonlyMap<number, string> = new Map();
@@ -184,12 +180,7 @@ export function Overview() {
     () =>
       groupAlertsByType(visibleAlerts).map((group) => ({
         ...group,
-        label:
-          group.target.kind === 'eveType'
-            ? eveTypeLabel(t, group.target.type)
-            : t(EVENT_LABEL_KEY.get(group.target.eventId) ?? '', {
-                defaultValue: group.target.eventId,
-              }),
+        label: alertGroupLabel(t, group.target),
         // Everything here passed `visibleFeedEntries`, so nothing in it is
         // muted. Muted types are reachable on the Alerts page, which is where
         // un-muting one has to happen.
@@ -355,6 +346,7 @@ export function Overview() {
           <IndustryCard
             jobs={industryJobs}
             productNames={industrySnapshot.data?.productNames ?? EMPTY_NAMES}
+            needsReauth={industrySnapshot.data?.needsReauth ?? false}
             nowMs={now}
           />
         </div>

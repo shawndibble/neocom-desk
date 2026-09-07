@@ -21,7 +21,8 @@
 import type { NotificationFeedRecord } from '@/db';
 import { compareSeverity, type BoardSeverity } from '@/engine/severity';
 import { entryChannelTarget, type EntryChannelTarget } from './feedSelection';
-import type { NotificationEventId } from './events';
+import { eveTypeLabel } from './eveTypeLabel';
+import { NOTIFICATION_EVENTS, type NotificationEventId } from './events';
 
 export interface AlertTypeGroup {
   /** Stable identity for a React key and for expand/collapse state. */
@@ -124,6 +125,30 @@ export function alertSeverity(target: EntryChannelTarget): BoardSeverity {
 function compareGroups(a: AlertTypeGroup, b: AlertTypeGroup): number {
   const bySeverity = compareSeverity(a.severity, b.severity);
   return bySeverity !== 0 ? bySeverity : b.newestFiredAt - a.newestFiredAt;
+}
+
+const EVENT_LABEL_KEY = new Map(NOTIFICATION_EVENTS.map((event) => [event.id, event.labelKey]));
+
+/**
+ * What to call a group, in the reader's language.
+ *
+ * Two catalogues, because a group is keyed on one of two namespaces: an EVE
+ * notification's own `type` (`notifications.eveTypeName.*`, with
+ * `humanizeEveType` underneath it) or an app event id
+ * (`settings.notifications.event.*`). Neither belongs inline at a call site —
+ * the board's alerts column and the Alerts page name the same groups, and two
+ * copies of this would eventually name them differently.
+ *
+ * Not a field on `AlertTypeGroup`: resolving it needs a translator, and the
+ * grouping itself is pure.
+ */
+export function alertGroupLabel(
+  t: (key: string, options: { defaultValue: string }) => string,
+  target: EntryChannelTarget
+): string {
+  if (target.kind === 'eveType') return eveTypeLabel(t, target.type);
+  const key = EVENT_LABEL_KEY.get(target.eventId);
+  return key === undefined ? target.eventId : t(key, { defaultValue: target.eventId });
 }
 
 export function groupAlertsByType(entries: readonly NotificationFeedRecord[]): AlertTypeGroup[] {

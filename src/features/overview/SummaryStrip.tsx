@@ -65,7 +65,7 @@ export function SummaryStrip({
           )}
         </Cell>
 
-        <Cell label={t('overview.wallet')}>
+        <Cell label={t('overview.wallet')} grow>
           {wallet === null ? (
             <Value muted>—</Value>
           ) : (
@@ -100,7 +100,11 @@ function Cell({
   grow?: boolean;
 }) {
   return (
-    <span className={`flex min-w-0 flex-col gap-0.5 ${grow ? 'flex-1' : ''}`}>
+    // `basis-40` is what makes the row wrap rather than crush: `flex-1` with
+    // `min-w-0` alone lets a cell shrink below its own content, which at phone
+    // width overlapped the three labels and clipped each value to a character.
+    // A floor means the third cell drops to its own line instead.
+    <span className={cx('flex min-w-0 basis-40 flex-col gap-0.5', grow && 'flex-1')}>
       <span className="text-[0.6875rem] tracking-widest text-text-dim uppercase">{label}</span>
       {children}
     </span>

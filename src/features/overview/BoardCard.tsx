@@ -30,11 +30,20 @@ export interface BoardCardProps {
 
 export function BoardCard({ title, meta, to, openLabel, children, footer }: BoardCardProps) {
   return (
-    // `h-full` plus the column flex is what gives cards in one grid row a
-    // common bottom edge — the grid stretches this Panel, and `mt-auto` on the
-    // footer takes up whatever slack the shorter card has. Two cards at
-    // different heights read as one of them having failed to load.
+    /*
+      Three things, and all three are load-bearing for one effect: cards in a
+      row sharing a bottom edge, with each one's footer on that edge.
+
+      `h-full` + `flex flex-col` stretch the section itself. `fill` is what
+      makes Panel's *content wrapper* a growing flex column rather than a plain
+      block — without it the wrapper keeps its natural height inside the
+      stretched section and `mt-auto` below has nothing to push against, which
+      leaves dead space under the footer of every card shorter than its
+      neighbour. And two cards at different heights read as one of them having
+      failed to load.
+    */
     <Panel
+      fill
       className="flex h-full flex-col"
       title={title}
       meta={meta}
@@ -65,8 +74,6 @@ export interface NumberTileProps {
   label: string;
   value: number | string;
   severity: BoardSeverity;
-  /** Opens the card's page; the tile is the whole hit area. */
-  to?: string;
 }
 
 /**
@@ -78,10 +85,10 @@ export interface NumberTileProps {
  * to look at. The severity only applies once there is something behind the
  * number.
  */
-export function NumberTile({ label, value, severity, to }: NumberTileProps) {
+export function NumberTile({ label, value, severity }: NumberTileProps) {
   const zero = value === 0 || value === '0';
-  const body = (
-    <>
+  return (
+    <span className="flex min-w-0 flex-1 flex-col gap-0.5 rounded-xs border border-line bg-panel-2 px-2.5 py-2">
       {/* The digits take the tone too, not just the glyph beside them: the
           number is what is being read, and a coloured icon next to plain text
           reads as a bullet point rather than as a severity. */}
@@ -90,18 +97,7 @@ export function NumberTile({ label, value, severity, to }: NumberTileProps) {
         <span className={zero ? 'text-text' : SEVERITY_TONE[severity]}>{value}</span>
       </span>
       <span className="text-[0.6875rem] tracking-widest text-text-dim uppercase">{label}</span>
-    </>
-  );
-  const className =
-    'flex min-w-0 flex-1 flex-col gap-0.5 rounded-xs border border-line bg-panel-2 px-2.5 py-2';
-  if (to === undefined) return <span className={className}>{body}</span>;
-  return (
-    <Link
-      to={to}
-      className={`${className} hover:border-line-bright focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent`}
-    >
-      {body}
-    </Link>
+    </span>
   );
 }
 
@@ -115,7 +111,8 @@ export interface TriageRowProps {
   when: string;
   subject: string;
   detail?: string;
-  to?: string;
+  /** Where the row leads. Every row on this board goes somewhere; there is no read-only variant. */
+  to: string;
 }
 
 /**
@@ -125,33 +122,26 @@ export interface TriageRowProps {
  */
 export function TriageRow({ severity, when, subject, detail, to }: TriageRowProps) {
   const { t } = useTranslation();
-  const inner = (
-    <>
-      <span
-        className={`flex w-20 shrink-0 items-center gap-1.5 text-xs font-semibold tabular-nums ${SEVERITY_TONE[severity]}`}
-      >
-        <SeverityIcon severity={severity} />
-        {when}
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-xs">{subject}</span>
-        {detail && <span className="block truncate text-[0.6875rem] text-text-dim">{detail}</span>}
-      </span>
-    </>
-  );
   return (
     <li className="border-b border-line last:border-b-0">
-      {to === undefined ? (
-        <span className="flex min-h-11 items-center gap-2.5 px-3 py-1.5 md:min-h-9">{inner}</span>
-      ) : (
-        <Link
-          to={to}
-          aria-label={t('overview.board.rowLabel', { subject, when })}
-          className="flex min-h-11 items-center gap-2.5 px-3 py-1.5 hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent md:min-h-9"
+      <Link
+        to={to}
+        aria-label={t('overview.board.rowLabel', { subject, when })}
+        className="flex min-h-11 items-center gap-2.5 px-3 py-1.5 hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent md:min-h-9"
+      >
+        <span
+          className={`flex w-20 shrink-0 items-center gap-1.5 text-xs font-semibold tabular-nums ${SEVERITY_TONE[severity]}`}
         >
-          {inner}
-        </Link>
-      )}
+          <SeverityIcon severity={severity} />
+          {when}
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-xs">{subject}</span>
+          {detail && (
+            <span className="block truncate text-[0.6875rem] text-text-dim">{detail}</span>
+          )}
+        </span>
+      </Link>
     </li>
   );
 }

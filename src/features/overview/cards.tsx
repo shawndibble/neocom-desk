@@ -8,7 +8,7 @@
  */
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import { Panel, SeverityIcon } from '@/components/ui';
+import { Panel, SEVERITY_LABEL_KEY, SeverityIcon } from '@/components/ui';
 import { worstSeverity, type BoardSeverity } from '@/engine/severity';
 import { formatDuration } from '@/lib/duration';
 import { formatIskCompact } from '@/lib/isk';
@@ -113,12 +113,14 @@ export function MiningTaxCard({ data }: { data: MiningTaxBoardData | null }) {
       footer={
         data === null
           ? t('overview.board.checking')
-          : data.oldestUnpaidDays === null
-            ? t('overview.board.miningSettled')
-            : t('overview.board.miningFooter', {
-                count: data.payeeCount,
-                days: data.oldestUnpaidDays,
-              })
+          : data.needsReauth
+            ? t('overview.board.reauth')
+            : data.oldestUnpaidDays === null
+              ? t('overview.board.miningSettled')
+              : t('overview.board.miningFooter', {
+                  count: data.payeeCount,
+                  days: data.oldestUnpaidDays,
+                })
       }
     >
       <TileRow>
@@ -167,7 +169,11 @@ export function PlanetaryCard({ data }: { data: PlanetaryBoardData | null }) {
     >
       {batches.length === 0 ? (
         <CardEmpty>
-          {data === null ? t('overview.board.checking') : t('overview.board.planetaryEmpty')}
+          {data === null
+            ? t('overview.board.checking')
+            : data.needsReauth
+              ? t('overview.board.reauth')
+              : t('overview.board.planetaryEmpty')}
         </CardEmpty>
       ) : (
         <ul>
@@ -211,10 +217,13 @@ export function PlanetaryCard({ data }: { data: PlanetaryBoardData | null }) {
 export function IndustryCard({
   jobs,
   productNames,
+  needsReauth,
   nowMs,
 }: {
   jobs: readonly IndustryJob[];
   productNames: ReadonlyMap<number, string>;
+  /** A lapsed grant, not an idle character — an empty card must not conflate the two. */
+  needsReauth: boolean;
   nowMs: number;
 }) {
   const { t } = useTranslation();
@@ -243,7 +252,9 @@ export function IndustryCard({
       })}
     >
       {jobs.length === 0 ? (
-        <CardEmpty>{t('overview.board.industryEmpty')}</CardEmpty>
+        <CardEmpty>
+          {needsReauth ? t('overview.board.reauth') : t('overview.board.industryEmpty')}
+        </CardEmpty>
       ) : (
         <ul>
           {summary.done > 0 && (
@@ -317,6 +328,7 @@ export function AlertsColumn({
 
   return (
     <Panel
+      fill
       className="flex h-full flex-col"
       title={t('overview.board.alerts')}
       meta={
@@ -399,7 +411,7 @@ function SeverityWord({ severity }: { severity: BoardSeverity }) {
   return (
     <span className="flex items-center gap-1 text-[0.6875rem] tracking-widest uppercase">
       <SeverityIcon severity={severity} />
-      <span className="text-text-dim">{t(`corp.board.severity.${severity}`)}</span>
+      <span className="text-text-dim">{t(SEVERITY_LABEL_KEY[severity])}</span>
     </span>
   );
 }
