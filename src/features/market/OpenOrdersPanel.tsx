@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -274,7 +274,21 @@ export function OpenOrdersPanel() {
   const [structureByKey, setStructureByKey] = useState<Map<number, StructureCompetition>>(
     new Map()
   );
-  const [structureLoadingKeys, setStructureLoadingKeys] = useState<ReadonlySet<number>>(new Set());
+  /**
+   * Locations already attempted this mount (success or failure) — a REF, not
+   * state. The fetch is triggered by an effect keyed on `snapshot` (below),
+   * and `snapshot` gets a new reference on ANY unrelated ESI cache
+   * revalidating elsewhere in the app (`useRouteSnapshot`'s app-wide
+   * listener), not just this page's own poll. Gating retries with a state
+   * flag that the fetch's own failure path clears would re-arm on every one
+   * of those unrelated revalidations — an ACL-denied (403) structure never
+   * populates `structureByKey`, so that shape retries the same 403,
+   * unbounded, for as long as the modal stays open (issue #538 review). A
+   * ref can't itself trigger the effect that reads it, so an attempt, once
+   * made, stays made; only the modal's "Check deeper" button forces another
+   * by deleting its own entry first.
+   */
+  const structureAttemptedRef = useRef<Set<number>>(new Set());
   const [jumpsByPair, setJumpsByPair] = useState<Map<string, JumpsAwayResult>>(new Map());
   /**
    * The refine comparison, per opened order: the baked yield for its item
@@ -328,35 +342,26 @@ export function OpenOrdersPanel() {
   }
 
   /**
-   * Same on-open, left-uncached-on-failure pattern as `loadDeepIfNeeded`, for
-   * one player structure's market book. Keyed by locationId, not orderId —
-   * every order at that structure shares this one fetch, so opening a second
-   * order there never re-fetches it.
+   * One player structure's market book, keyed by locationId — every order
+   * parked there shares this one fetch. `loadStructureCompetition` never
+   * throws (a 403/network failure resolves to `null`), so unlike
+   * `loadDeepIfNeeded` there is nothing to `.catch`: the ref above is what
+   * stops a failure from being retried automatically.
+   *
+   * `useCallback` with an empty dep array is deliberate, not decorative: this
+   * is called from the effect below, and only a REFERENTIALLY STABLE
+   * function can sit outside that effect's own dependency array without
+   * eslint's exhaustive-deps rule (rightly) demanding it be re-run on every
+   * render. Everything it closes over (`setStructureByKey`, the ref) is
+   * already stable across renders, so the empty array costs nothing.
    */
-  function loadStructureIfNeeded(characterId: number, locationId: number): Promise<void> {
-    if (structureByKey.has(locationId) || structureLoadingKeys.has(locationId)) {
-      return Promise.resolve();
-    }
-    setStructureLoadingKeys((prev) => new Set(prev).add(locationId));
-    return loadStructureCompetition(characterId, locationId)
-      .then((result) => {
-        if (result) setStructureByKey((prev) => new Map(prev).set(locationId, result));
-      })
-      .catch(() => {
-        // Left uncached on failure so the next open/press retries.
-      })
-      .finally(() => {
-        setStructureLoadingKeys((prev) => {
-          const next = new Set(prev);
-          next.delete(locationId);
-          return next;
-        });
-      });
-  }
-
-  function ensureStructureChecked(characterId: number, locationId: number) {
-    void loadStructureIfNeeded(characterId, locationId);
-  }
+  const ensureStructureChecked = useCallback((characterId: number, locationId: number) => {
+    if (structureAttemptedRef.current.has(locationId)) return;
+    structureAttemptedRef.current.add(locationId);
+    void loadStructureCompetition(characterId, locationId).then((result) => {
+      if (result) setStructureByKey((prev) => new Map(prev).set(locationId, result));
+    });
+  }, []);
 
   /**
    * Price history for the modal's "sells out in" chip — fetched on demand,
@@ -557,35 +562,18 @@ export function OpenOrdersPanel() {
    * "Check deeper" button may already be hidden by then, since `deep` can
    * have resolved independently in the meantime).
    *
-   * Inlined rather than calling `ensureStructureChecked` (used by
-   * `onCheckDeeper`'s manual retry instead), and every `setState` deferred
-   * into a microtask: react-hooks's set-state-in-effect rule rejects a
-   * synchronous `setState` in an effect body, even one guarding a fetch —
-   * same reason the jumps effect above only ever sets state from a `.then()`.
+   * `snapshot` changes on ANY unrelated ESI cache revalidating elsewhere in
+   * the app, not just this page's own poll (`useRouteSnapshot`'s app-wide
+   * listener) — so this effect fires far more often than "this row's data
+   * changed." That's fine: `ensureStructureChecked`'s ref-gate makes every
+   * re-fire after the first a no-op, which is what stops a permanently
+   * ACL-denied structure from being retried forever.
    */
   useEffect(() => {
     if (!detailRow || !snapshot?.stationsLoaded) return;
     if (detailRow.stationName !== null) return;
-    const { characterId, locationId } = detailRow;
-    void Promise.resolve().then(() => {
-      if (structureByKey.has(locationId) || structureLoadingKeys.has(locationId)) return;
-      setStructureLoadingKeys((prev) => new Set(prev).add(locationId));
-      void loadStructureCompetition(characterId, locationId)
-        .then((result) => {
-          if (result) setStructureByKey((prev) => new Map(prev).set(locationId, result));
-        })
-        .catch(() => {
-          // Left uncached on failure so the next refresh/press retries.
-        })
-        .finally(() => {
-          setStructureLoadingKeys((prev) => {
-            const next = new Set(prev);
-            next.delete(locationId);
-            return next;
-          });
-        });
-    });
-  }, [detailRow, snapshot, structureByKey, structureLoadingKeys]);
+    ensureStructureChecked(detailRow.characterId, detailRow.locationId);
+  }, [detailRow, snapshot, ensureStructureChecked]);
 
   if (!hydrated) {
     return (
@@ -1177,6 +1165,9 @@ export function OpenOrdersPanel() {
           onCheckDeeper={() => {
             ensureDeepChecked(detailRow.regionId, detailRow.typeId);
             if (detailRow.stationName === null && snapshot.stationsLoaded) {
+              // Manual retry forces a new attempt past the ref-gate, unlike
+              // the automatic effect above.
+              structureAttemptedRef.current.delete(detailRow.locationId);
               ensureStructureChecked(detailRow.characterId, detailRow.locationId);
             }
           }}
