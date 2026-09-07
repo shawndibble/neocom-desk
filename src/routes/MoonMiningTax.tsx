@@ -37,7 +37,7 @@ import {
   type GroupMember,
 } from '@/features/miningTax/groupRows';
 import { resolveRowNames } from '@/features/miningTax/names';
-import { loadJitaUnitPrices } from '@/features/miningTax/pricing';
+import { loadUnitPrices } from '@/features/miningTax/pricing';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { SecurityValue } from '@/features/character/assetBrowserRows';
 import {
@@ -117,7 +117,7 @@ async function loadSnapshot(_characterId: number, signal: RouteSnapshotSignal): 
     unclassifiedTypeNames,
   ] = await Promise.all([
     resolveRowNames(result.rows),
-    loadJitaUnitPrices(result.rows.flatMap((row) => row.entry.oreLines.map((line) => line.typeId))),
+    loadUnitPrices(result.rows.flatMap((row) => row.entry.oreLines.map((line) => line.typeId))),
     loadTypeNames(unclassifiedTypeIds),
   ]);
   const typeNames = new Map([...rowTypeNames, ...unclassifiedTypeNames]);

@@ -15,7 +15,7 @@ import { computeAssignmentValue } from '@/engine/miningTax/valuation';
 import { linesOwnedBy } from '@/engine/miningTax/ownership';
 import { planSplit } from '@/engine/miningTax/split';
 import type { MiningLedgerEntry } from '@/engine/miningTax/types';
-import { loadJitaUnitPrices } from './pricing';
+import { loadUnitPrices } from './pricing';
 
 export function loadAssignments(characterId: number): Promise<MiningTaxAssignmentRecord[]> {
   return db.miningTaxAssignments.where('characterId').equals(characterId).toArray();
@@ -341,7 +341,7 @@ export async function resolveNeedsReview(
   siblings: readonly MiningTaxAssignmentRecord[]
 ): Promise<void> {
   const relevantFresh = linesOwnedBy(freshEntry.oreLines, siblings, assignment.id);
-  const { prices } = await loadJitaUnitPrices(relevantFresh.map((line) => line.typeId));
+  const { prices } = await loadUnitPrices(relevantFresh.map((line) => line.typeId));
   const { estimatedValue, taxOwed } = computeAssignmentValue(
     relevantFresh,
     prices,

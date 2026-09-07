@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { loadJitaUnitPrices } from './pricing';
+import { loadUnitPrices } from './pricing';
 
 const ZEOLITES = 45490;
 const COMPRESSED_ZEOLITES = 62463;
@@ -16,13 +16,13 @@ beforeEach(() => {
   sdeMock.loadCompressedOreTypeIds.mockResolvedValue({ [ZEOLITES]: COMPRESSED_ZEOLITES });
 });
 
-describe('loadJitaUnitPrices', () => {
+describe('loadUnitPrices', () => {
   it('prices a raw type via its Compressed counterpart, keyed back to the raw typeId', async () => {
     pricesMock.getHubPrices.mockResolvedValue(
       new Map([[COMPRESSED_ZEOLITES, { sellMin: 1444, buyMax: 1343, sellVolume: 0, buyVolume: 0 }]])
     );
 
-    const { prices } = await loadJitaUnitPrices([ZEOLITES]);
+    const { prices } = await loadUnitPrices([ZEOLITES]);
 
     expect(pricesMock.getHubPrices).toHaveBeenCalledWith(expect.anything(), [COMPRESSED_ZEOLITES]);
     expect(prices.get(ZEOLITES)).toBe(1343);
@@ -33,7 +33,7 @@ describe('loadJitaUnitPrices', () => {
       new Map([[COMPRESSED_ZEOLITES, { sellMin: 1444, buyMax: 1343, sellVolume: 0, buyVolume: 0 }]])
     );
 
-    const { prices } = await loadJitaUnitPrices([ZEOLITES]);
+    const { prices } = await loadUnitPrices([ZEOLITES]);
 
     expect(prices.get(ZEOLITES)).not.toBe(1444);
   });
@@ -43,7 +43,7 @@ describe('loadJitaUnitPrices', () => {
       new Map([[VELDSPAR, { sellMin: 10, buyMax: 6, sellVolume: 0, buyVolume: 0 }]])
     );
 
-    const { prices } = await loadJitaUnitPrices([VELDSPAR]);
+    const { prices } = await loadUnitPrices([VELDSPAR]);
 
     expect(pricesMock.getHubPrices).toHaveBeenCalledWith(expect.anything(), [VELDSPAR]);
     expect(prices.get(VELDSPAR)).toBe(6);
@@ -52,7 +52,7 @@ describe('loadJitaUnitPrices', () => {
   it('is 0 for a type with no buy orders, not undefined', async () => {
     pricesMock.getHubPrices.mockResolvedValue(new Map());
 
-    const { prices } = await loadJitaUnitPrices([VELDSPAR]);
+    const { prices } = await loadUnitPrices([VELDSPAR]);
 
     expect(prices.get(VELDSPAR)).toBe(0);
   });
@@ -60,7 +60,7 @@ describe('loadJitaUnitPrices', () => {
   it('reports a type with no buy orders as unpriced, keyed by the raw typeId', async () => {
     pricesMock.getHubPrices.mockResolvedValue(new Map());
 
-    const { unpriced } = await loadJitaUnitPrices([VELDSPAR]);
+    const { unpriced } = await loadUnitPrices([VELDSPAR]);
 
     // The 0 above is what keeps the totals arithmetic working; this set is
     // what stops it being read as "this ore is worth nothing".
@@ -72,7 +72,7 @@ describe('loadJitaUnitPrices', () => {
       new Map([[COMPRESSED_ZEOLITES, { sellMin: 1444, buyMax: 1343, sellVolume: 0, buyVolume: 0 }]])
     );
 
-    const { unpriced } = await loadJitaUnitPrices([ZEOLITES]);
+    const { unpriced } = await loadUnitPrices([ZEOLITES]);
 
     expect(unpriced.size).toBe(0);
   });
@@ -82,13 +82,13 @@ describe('loadJitaUnitPrices', () => {
       new Map([[VELDSPAR, { sellMin: 10, buyMax: 0, sellVolume: 0, buyVolume: 0 }]])
     );
 
-    const { unpriced } = await loadJitaUnitPrices([VELDSPAR]);
+    const { unpriced } = await loadUnitPrices([VELDSPAR]);
 
     expect([...unpriced]).toEqual([VELDSPAR]);
   });
 
   it('is empty for an empty input, without calling the hub or the SDE', async () => {
-    const { prices, unpriced } = await loadJitaUnitPrices([]);
+    const { prices, unpriced } = await loadUnitPrices([]);
 
     expect(prices.size).toBe(0);
     expect(unpriced.size).toBe(0);
@@ -106,7 +106,7 @@ describe('loadJitaUnitPrices', () => {
       new Map([[COMPRESSED_ZEOLITES, { sellMin: 1444, buyMax: 1343, sellVolume: 0, buyVolume: 0 }]])
     );
 
-    const { prices } = await loadJitaUnitPrices([ZEOLITES, SYLVITE]);
+    const { prices } = await loadUnitPrices([ZEOLITES, SYLVITE]);
 
     expect(pricesMock.getHubPrices).toHaveBeenCalledWith(expect.anything(), [COMPRESSED_ZEOLITES]);
     expect(prices.get(ZEOLITES)).toBe(1343);

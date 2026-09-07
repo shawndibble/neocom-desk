@@ -19,7 +19,7 @@ const syncMock = vi.hoisted(() => ({
 }));
 vi.mock('@/sync', () => syncMock);
 
-const pricingMock = vi.hoisted(() => ({ loadJitaUnitPrices: vi.fn() }));
+const pricingMock = vi.hoisted(() => ({ loadUnitPrices: vi.fn() }));
 vi.mock('./pricing', () => pricingMock);
 
 const CHAR_A = 1;
@@ -29,7 +29,7 @@ const TYPE_B = 45491;
 beforeEach(async () => {
   vi.clearAllMocks();
   await db.miningTaxAssignments.clear();
-  pricingMock.loadJitaUnitPrices.mockResolvedValue({
+  pricingMock.loadUnitPrices.mockResolvedValue({
     prices: new Map([
       [TYPE_A, 10],
       [TYPE_B, 4],
@@ -60,7 +60,7 @@ describe('createAssignment', () => {
     expect(syncMock.scheduleSync).toHaveBeenCalledWith(CHAR_A);
     // No internal price lookup — the Assign dialog already resolved (and
     // possibly corrected) the value before calling this.
-    expect(pricingMock.loadJitaUnitPrices).not.toHaveBeenCalled();
+    expect(pricingMock.loadUnitPrices).not.toHaveBeenCalled();
   });
 
   it('stores a pilot-corrected value verbatim, even when it disagrees with the Jita price', async () => {

@@ -16,6 +16,8 @@ export interface PayeeInput {
   name: string;
   defaultTaxPct: number;
   systemId?: number;
+  /** Absent means Jita — the basis every Payee was priced at before this was settable. */
+  hubId?: string;
 }
 
 export async function createPayee(characterId: number, input: PayeeInput): Promise<PayeeRecord> {
@@ -25,6 +27,7 @@ export async function createPayee(characterId: number, input: PayeeInput): Promi
     name: input.name,
     defaultTaxPct: input.defaultTaxPct,
     ...(input.systemId !== undefined ? { systemId: input.systemId } : {}),
+    ...(input.hubId !== undefined ? { hubId: input.hubId } : {}),
     updatedAt: Date.now(),
   };
   await db.payees.put(record);
@@ -38,6 +41,7 @@ export async function updatePayee(payee: PayeeRecord, input: PayeeInput): Promis
     name: input.name,
     defaultTaxPct: input.defaultTaxPct,
     ...(input.systemId !== undefined ? { systemId: input.systemId } : { systemId: undefined }),
+    ...(input.hubId !== undefined ? { hubId: input.hubId } : { hubId: undefined }),
     updatedAt: Date.now(),
   };
   // Firestore rejects `undefined` fields; an explicit removal must drop the
@@ -45,6 +49,10 @@ export async function updatePayee(payee: PayeeRecord, input: PayeeInput): Promis
   // `toRemoteDoc`'s `!== undefined` check would then happily (and wrongly)
   // treat as "no change to push".
   if (input.systemId === undefined) delete updated.systemId;
+  // Same reason as `systemId` above: Firestore rejects an `undefined` field,
+  // and `toRemoteDoc`'s `!== undefined` check would read a written `undefined`
+  // as "no change to push", so clearing the hub has to drop the key entirely.
+  if (input.hubId === undefined) delete updated.hubId;
   await db.payees.put(updated);
   scheduleSync(payee.characterId);
   return updated;
