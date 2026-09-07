@@ -18,6 +18,7 @@ export type CsvSurface =
   | 'wallet-journal'
   | 'corp-wallet-journal'
   | 'wallet-transactions'
+  | 'corp-wallet-transactions'
   | 'assets'
   | 'contracts'
   | 'orders-open'

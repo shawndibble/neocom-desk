@@ -1,9 +1,10 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   DataAgeBadge,
   DataTable,
+  DateRangeFields,
   EmptyState,
   FilterBar,
   FilterField,
@@ -19,8 +20,6 @@ import {
   SelectValue,
   Spinner,
   Tabs,
-  TextInput,
-  useFilterSurface,
   type DataTableColumn,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
@@ -38,9 +37,16 @@ import { walletDivisions, type WalletDivision } from '@/features/corp/divisions'
 import {
   loadCorporationDivisions,
   loadCorporationWalletJournal,
+  loadCorporationWalletTransactions,
   loadCorporationWallets,
 } from '@/features/corp/wallet';
-import { cx } from '@/lib/cx';
+import { CorpTransactionsPanel } from '@/features/corp/CorpTransactionsPanel';
+import { loadTypeNames } from '@/features/character/typeNames';
+import {
+  EMPTY_WALLET_TRANSACTION_FILTER,
+  filterWalletTransactions,
+  type WalletTransactionFilter,
+} from '@/features/character/walletTransactionFilter';
 import { formatIsk } from '@/lib/isk';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
@@ -57,6 +63,7 @@ import type {
   CharacterLoyaltyPoints,
   CorporationDivisions,
   CorporationWalletDivision,
+  CorporationWalletTransaction,
   WalletJournalEntry,
 } from '@/esi/endpoints';
 
@@ -78,66 +85,6 @@ interface JournalFilterBarProps {
  * here, and the empty string reads to it as "nothing selected".
  */
 const ALL_REF_TYPES = '__all';
-
-/**
- * The journal's From/To pair, kept on one line in the mobile sheet.
- *
- * A visible `<label>` rather than a `FilterField`: a date input reads as
- * nothing without its caption, so this one is wanted in the row as well as in
- * the sheet, where `FilterField`'s caption is sheet-only. Its own component
- * because `useFilterSurface` is a hook — `FilterBar` calls its `children`
- * during its own render, so a bare fragment there would read the default
- * surface rather than the sheet's.
- *
- * Inline, the wrapper is `display: contents`, so the two labels stay direct
- * items of the toolbar row and keep the widths they had before this existed.
- * In the sheet it becomes a real row and the two fields split it, which is
- * what stops a range reading as two unrelated filters stacked apart.
- */
-function JournalDateRange({
-  draft,
-  setDraft,
-}: {
-  draft: WalletJournalFilter;
-  setDraft: (next: WalletJournalFilter) => void;
-}) {
-  const { t } = useTranslation();
-  const sheet = useFilterSurface() === 'sheet';
-  const labelClassName = cx(
-    'flex items-center gap-1 text-xs text-text-dim',
-    sheet && 'min-w-0 flex-1'
-  );
-  const fieldClassName = sheet ? 'w-full min-w-0' : 'w-36';
-  return (
-    <div className={sheet ? 'flex w-full items-center gap-2' : 'contents'}>
-      <label className={labelClassName}>
-        {t('wallet.dateFromLabel')}
-        <TextInput
-          type="date"
-          className={fieldClassName}
-          value={draft.startDate ?? ''}
-          onChange={(event) =>
-            setDraft({
-              ...draft,
-              startDate: event.target.value === '' ? null : event.target.value,
-            })
-          }
-        />
-      </label>
-      <label className={labelClassName}>
-        {t('wallet.dateToLabel')}
-        <TextInput
-          type="date"
-          className={fieldClassName}
-          value={draft.endDate ?? ''}
-          onChange={(event) =>
-            setDraft({ ...draft, endDate: event.target.value === '' ? null : event.target.value })
-          }
-        />
-      </label>
-    </div>
-  );
-}
 
 function JournalFilterBar({ filter, onChange, refTypeOptions }: JournalFilterBarProps) {
   const { t } = useTranslation();
@@ -178,7 +125,14 @@ function JournalFilterBar({ filter, onChange, refTypeOptions }: JournalFilterBar
               </SelectContent>
             </Select>
           </FilterField>
-          <JournalDateRange draft={draft} setDraft={setDraft} />
+          <DateRangeFields
+            from={draft.startDate}
+            to={draft.endDate}
+            onFromChange={(value) => setDraft({ ...draft, startDate: value })}
+            onToChange={(value) => setDraft({ ...draft, endDate: value })}
+            fromLabel={t('wallet.dateFromLabel')}
+            toLabel={t('wallet.dateToLabel')}
+          />
         </>
       )}
     </FilterBar>
@@ -236,6 +190,8 @@ function useJournalFilterResult(
 const NO_NAMES: ReadonlyMap<number, string> = new Map();
 /** Stable identity, so a missing journal doesn't invalidate its dependent memos every render. */
 const EMPTY_JOURNAL: readonly WalletJournalEntry[] = [];
+/** Same, for the corp transactions tab. */
+const EMPTY_TRANSACTIONS: readonly CorporationWalletTransaction[] = [];
 
 interface Snapshot {
   balanceResult: CachedResult<number> | null;
@@ -293,6 +249,40 @@ async function loadCorpBalances(
     loadCorporationDivisions(characterId, corporationId),
   ]);
   return { walletsResult, divisionsResult };
+}
+
+/**
+ * The three tabs, of which `transactions` exists only for a corporation wallet
+ * (issue #570) — the character's fills live on Market's own Transactions tab.
+ */
+export type WalletTab = 'balance' | 'journal' | 'transactions';
+
+/**
+ * One division's fills, plus the names for the item ids in them.
+ *
+ * Resolved here rather than in the panel because it is a network read: the
+ * table's item column and the filter's own text match both spell a `type_id`
+ * through the same `nameFor`, so an unresolved id reads as `Type #99999` in
+ * both places instead of quietly dropping out of a search.
+ */
+interface CorpTransactionsSnapshot {
+  transactionsResult: StatusResult<CorporationWalletTransaction[]>;
+  typeNames: Map<number, string>;
+}
+
+async function loadCorpTransactions(
+  characterId: number,
+  corporationId: number,
+  division: number
+): Promise<CorpTransactionsSnapshot> {
+  const transactionsResult = await loadCorporationWalletTransactions(
+    characterId,
+    corporationId,
+    division
+  );
+  const typeIds = [...new Set((transactionsResult.cached?.data ?? []).map((txn) => txn.type_id))];
+  const typeNames = await loadTypeNames(typeIds);
+  return { transactionsResult, typeNames };
 }
 
 interface CorpWalletViewProps {
@@ -442,9 +432,17 @@ function CorpWalletView({
   );
 }
 
-/** Parses the `?tab=` deep link; anything unrecognized lands on Balance rather than erroring. */
-function walletTabFromParam(param: string | null): 'balance' | 'journal' {
-  return param === 'journal' ? 'journal' : 'balance';
+/**
+ * Parses the `?tab=` deep link; anything unrecognized lands on Balance rather
+ * than erroring. `transactions` is corp-only, and the render below sends it
+ * back to Balance for a personal wallet rather than rejecting it here — the
+ * owner is not known at parse time, and a `?owner=corporation&tab=transactions`
+ * link is exactly what the corp view wants to honour.
+ */
+function walletTabFromParam(param: string | null): WalletTab {
+  if (param === 'journal') return 'journal';
+  if (param === 'transactions') return 'transactions';
+  return 'balance';
 }
 
 /**
@@ -496,9 +494,7 @@ export function Wallet() {
   // opening tab; read once on mount, same as the `Tabs` control's own local
   // state below — an invalid or missing value falls back to Balance.
   const [searchParams] = useSearchParams();
-  const [tab, setTab] = useState<'balance' | 'journal'>(() =>
-    walletTabFromParam(searchParams.get('tab'))
-  );
+  const [tab, setTab] = useState<WalletTab>(() => walletTabFromParam(searchParams.get('tab')));
 
   const {
     owner,
@@ -508,6 +504,12 @@ export function Wallet() {
   } = useCorpOwner('canReadWallet', walletOwnerFromParam(searchParams.get('owner')));
   const showingCorp =
     owner === 'corporation' && corporationId !== null && activeCharacterId !== null;
+
+  // Transactions is a corporation-only tab, so a personal wallet lands on
+  // Balance instead of on a tab whose entry is not even in the list. Derived
+  // rather than effect-synced, the same way `effectiveDivision` below is: an
+  // effect would render one frame of a tab that has no panel.
+  const walletTab: WalletTab = tab === 'transactions' && !showingCorp ? 'balance' : tab;
 
   // Nothing is fetched until the switch is flipped; the key carries the
   // corporation, so a corp change resets rather than relabelling its rows.
@@ -555,14 +557,15 @@ export function Wallet() {
     : null;
   const [visitedJournalKey, setVisitedJournalKey] = useState<string | null>(null);
   if (
-    tab === 'journal' &&
+    walletTab === 'journal' &&
     corpJournalBaseKey !== null &&
     visitedJournalKey !== corpJournalBaseKey
   ) {
     setVisitedJournalKey(corpJournalBaseKey);
   }
   const corpJournal = useCorpSnapshot<StatusResult<WalletJournalEntry[]> | null>(
-    corpJournalBaseKey !== null && (tab === 'journal' || visitedJournalKey === corpJournalBaseKey)
+    corpJournalBaseKey !== null &&
+      (walletTab === 'journal' || visitedJournalKey === corpJournalBaseKey)
       ? corpJournalBaseKey
       : null,
     async () =>
@@ -572,6 +575,35 @@ export function Wallet() {
     { name: 'wallet:corp-journal', characterId: activeCharacterId }
   );
 
+  // Same opt-in shape as the journal beside it, and for the same two reasons:
+  // one cursor walk per division is a real cost on a rate-limited corp
+  // endpoint, so nothing is fetched until the tab is opened — and once it has
+  // been opened for this division, `visitedTransactionsKey` keeps the key
+  // alive so a tab toggle doesn't walk the cursor again (issue #413's fix,
+  // applied to the new tab).
+  const corpTransactionsBaseKey = showingCorp
+    ? `${activeCharacterId}:${corporationId}:${effectiveDivision}`
+    : null;
+  const [visitedTransactionsKey, setVisitedTransactionsKey] = useState<string | null>(null);
+  if (
+    walletTab === 'transactions' &&
+    corpTransactionsBaseKey !== null &&
+    visitedTransactionsKey !== corpTransactionsBaseKey
+  ) {
+    setVisitedTransactionsKey(corpTransactionsBaseKey);
+  }
+  const corpTransactions = useCorpSnapshot<CorpTransactionsSnapshot | null>(
+    corpTransactionsBaseKey !== null &&
+      (walletTab === 'transactions' || visitedTransactionsKey === corpTransactionsBaseKey)
+      ? corpTransactionsBaseKey
+      : null,
+    async () =>
+      activeCharacterId === null || corporationId === null
+        ? null
+        : loadCorpTransactions(activeCharacterId, corporationId, effectiveDivision),
+    { name: 'wallet:corp-transactions', characterId: activeCharacterId }
+  );
+
   const divisionLabel = (entry: WalletDivision) =>
     entry.name ?? t('wallet.corpDivisionFallback', { division: entry.division });
 
@@ -579,6 +611,7 @@ export function Wallet() {
   const handleCorpRefresh = () => {
     corpBalances.refresh();
     corpJournal.refresh();
+    corpTransactions.refresh();
   };
 
   // A manual Refresh that still falls back to cache is a more alarming case
@@ -720,6 +753,32 @@ export function Wallet() {
   }
   const { filteredJournal, refTypeOptions } = useJournalFilterResult(journal, journalFilter);
 
+  const corpTransactionsResult = corpTransactions.data?.transactionsResult.cached ?? null;
+  const corpTransactionRows = corpTransactionsResult?.data ?? EMPTY_TRANSACTIONS;
+  const corpTypeNames = corpTransactions.data?.typeNames ?? NO_NAMES;
+  // The one spelling of an item id on this tab: the table's column, the CSV
+  // and the search all go through it, so what is drawn is what is searched.
+  const nameForType = useCallback(
+    (typeId: number) => corpTypeNames.get(typeId) ?? `Type #${typeId}`,
+    [corpTypeNames]
+  );
+
+  // Per-visit, and reset on a division switch for the same reason the
+  // journal's filter is: the rows change wholesale, and a date range left over
+  // from another division reads as "this division traded nothing".
+  const [transactionFilter, setTransactionFilter] = useState<WalletTransactionFilter>(
+    EMPTY_WALLET_TRANSACTION_FILTER
+  );
+  const [lastTransactionScope, setLastTransactionScope] = useState(effectiveDivision);
+  if (lastTransactionScope !== effectiveDivision) {
+    setLastTransactionScope(effectiveDivision);
+    setTransactionFilter(EMPTY_WALLET_TRANSACTION_FILTER);
+  }
+  const filteredTransactions = useMemo(
+    () => filterWalletTransactions(corpTransactionRows, transactionFilter, nameForType),
+    [corpTransactionRows, transactionFilter, nameForType]
+  );
+
   if (!hydrated) {
     return (
       <div className="flex justify-center py-16">
@@ -739,7 +798,11 @@ export function Wallet() {
               icon={<Icon.Refresh />}
               label={t('wallet.refresh')}
               onClick={showingCorp ? handleCorpRefresh : refresh}
-              disabled={showingCorp ? corpBalances.loading || corpJournal.loading : loading}
+              disabled={
+                showingCorp
+                  ? corpBalances.loading || corpJournal.loading || corpTransactions.loading
+                  : loading
+              }
             />
           </>
         }
@@ -780,42 +843,73 @@ export function Wallet() {
         </div>
       )}
 
+      {/*
+        Transactions is listed only for a corporation wallet: the character's
+        fills are Market's tab, and an entry that switched pages would not be a
+        tab. Personal keeps exactly the two it had.
+      */}
       <Tabs
         label={t('wallet.title')}
-        value={tab}
-        onChange={(id) => setTab(id as typeof tab)}
-        tabs={[
-          { id: 'balance', label: t('wallet.balanceTab') },
-          { id: 'journal', label: t('wallet.journalTab') },
-        ]}
+        value={walletTab}
+        onChange={(id) => setTab(id as WalletTab)}
+        tabs={
+          showingCorp
+            ? [
+                { id: 'balance', label: t('wallet.balanceTab') },
+                { id: 'journal', label: t('wallet.journalTab') },
+                { id: 'transactions', label: t('wallet.transactionsTab') },
+              ]
+            : [
+                { id: 'balance', label: t('wallet.balanceTab') },
+                { id: 'journal', label: t('wallet.journalTab') },
+              ]
+        }
       />
 
       {showingCorp ? (
-        <CorpWalletView
-          tab={tab}
-          balances={corpBalances.data}
-          balancesLoading={corpBalances.loading && corpBalances.data === null}
-          journalResult={corpJournalResult}
-          journal={corpJournalEntries}
-          journalLoading={corpJournal.loading && corpJournal.data === null}
-          journalColumns={journalColumns}
-          journalFilter={journalFilter}
-          onJournalFilterChange={setJournalFilter}
-          division={selectedDivision}
-          divisionLabel={divisionLabel}
-          offlineTitleKey={
-            corpBalances.refreshCount > 0 || corpJournal.refreshCount > 0
-              ? 'common.refreshFailedTitle'
-              : 'common.offlineTitle'
-          }
-        />
+        walletTab === 'transactions' ? (
+          <CorpTransactionsPanel
+            transactionsResult={corpTransactionsResult}
+            transactions={corpTransactionRows}
+            filteredTransactions={filteredTransactions}
+            loading={corpTransactions.loading && corpTransactions.data === null}
+            filter={transactionFilter}
+            onFilterChange={setTransactionFilter}
+            nameFor={nameForType}
+            divisionQualifier={selectedDivision ? divisionLabel(selectedDivision) : undefined}
+            offlineTitleKey={
+              corpTransactions.refreshCount > 0
+                ? 'common.refreshFailedTitle'
+                : 'common.offlineTitle'
+            }
+          />
+        ) : (
+          <CorpWalletView
+            tab={walletTab}
+            balances={corpBalances.data}
+            balancesLoading={corpBalances.loading && corpBalances.data === null}
+            journalResult={corpJournalResult}
+            journal={corpJournalEntries}
+            journalLoading={corpJournal.loading && corpJournal.data === null}
+            journalColumns={journalColumns}
+            journalFilter={journalFilter}
+            onJournalFilterChange={setJournalFilter}
+            division={selectedDivision}
+            divisionLabel={divisionLabel}
+            offlineTitleKey={
+              corpBalances.refreshCount > 0 || corpJournal.refreshCount > 0
+                ? 'common.refreshFailedTitle'
+                : 'common.offlineTitle'
+            }
+          />
+        )
       ) : loading && !data ? (
         <div className="flex justify-center py-16">
           <Spinner label={t('common.loading')} />
         </div>
       ) : error ? (
         <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
-      ) : tab === 'balance' ? (
+      ) : walletTab === 'balance' ? (
         <div className="space-y-4">
           <Panel
             title={t('wallet.balanceTab')}

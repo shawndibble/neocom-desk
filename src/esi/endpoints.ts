@@ -13,6 +13,7 @@ import { esiFetch, recordEsiActivity, outcomeForError } from './client';
 import type { EsiResult } from './client';
 import { fetchAllPagesStatus } from './paginated';
 import type { PaginatedResult, TruncatableResult } from './paginated';
+import type { EsiEndpointId } from './registry';
 
 /** Options a caller may tune per request (conditional GET, cancellation). */
 export interface EndpointOptions {
@@ -320,7 +321,16 @@ export function getCharacterWalletJournal(
 
 // --- GET /characters/{character_id}/wallet/transactions (esi-wallet.read_character_wallet.v1) ---
 
-export interface WalletTransaction {
+/**
+ * Everything a wallet transaction carries on both sides of the API.
+ *
+ * The corporation endpoint returns exactly these nine fields and the character
+ * endpoint adds one, per ESI's own schema — checked, not assumed, the same way
+ * `CorporationAsset` was. Split out so `transactionTotal`, the CSV columns and
+ * the filter serve both without a copy, and so the corp type cannot silently
+ * gain a field ESI does not send.
+ */
+export interface WalletTransactionCommon {
   transaction_id: number;
   date: string;
   location_id: number;
@@ -329,8 +339,12 @@ export interface WalletTransaction {
   quantity: number;
   client_id: number;
   is_buy: boolean;
-  is_personal: boolean;
   journal_ref_id: number;
+}
+
+export interface WalletTransaction extends WalletTransactionCommon {
+  /** Character wallets only: whether the trade was on the character's own behalf. */
+  is_personal: boolean;
 }
 
 /**
@@ -341,16 +355,25 @@ export interface WalletTransaction {
 const MAX_TRANSACTION_PAGES = 5;
 
 /**
- * Cursored, not X-Pages, so `fetchAllPagesStatus`'s own once-per-read
- * activity logging doesn't apply here — this loop does the same thing
- * itself: `endpointId` withheld from the per-page `esiFetch` calls, one
+ * Walks a `from_id` transaction cursor to the page cap.
+ *
+ * Cursored, not X-Pages, so `fetchAllPagesStatus`'s own once-per-read activity
+ * logging doesn't apply here — this loop does the same thing itself:
+ * `endpointId` withheld from the per-page `esiFetch` calls, one
  * `recordEsiActivity` for the whole cursor walk (issue #32).
+ *
+ * Shared by the character and corporation transaction reads (issue #570): the
+ * two paths differ only in the URL and the activity id, and a second copy of
+ * this loop would be a second place for the exclusive-cursor subtlety below to
+ * be got wrong.
  */
-export async function getCharacterWalletTransactions(
+async function fetchTransactionCursor<T extends WalletTransactionCommon>(
+  path: string,
+  endpointId: EsiEndpointId,
   characterId: number,
-  options: Omit<EndpointOptions, 'etag'> = {}
-): Promise<TruncatableResult<WalletTransaction>> {
-  const items: WalletTransaction[] = [];
+  options: Omit<EndpointOptions, 'etag'>
+): Promise<TruncatableResult<T>> {
+  const items: T[] = [];
   let fromId: number | undefined;
   // The cap is a deliberate product limit, but the user still has to be told
   // when it bit. Using every call *and* getting data on the last one is the
@@ -359,14 +382,11 @@ export async function getCharacterWalletTransactions(
   let truncated = false;
   try {
     for (let page = 0; page < MAX_TRANSACTION_PAGES; page += 1) {
-      const result = await esiFetch<WalletTransaction[]>(
-        `/characters/${characterId}/wallet/transactions`,
-        {
-          ...options,
-          characterId,
-          query: fromId === undefined ? undefined : { from_id: fromId },
-        }
-      );
+      const result = await esiFetch<T[]>(path, {
+        ...options,
+        characterId,
+        query: fromId === undefined ? undefined : { from_id: fromId },
+      });
       const page_ = result.data ?? [];
       if (page_.length === 0) break;
       items.push(...page_);
@@ -377,11 +397,23 @@ export async function getCharacterWalletTransactions(
     }
   } catch (err) {
     if (err instanceof Error && err.name === 'AbortError') throw err;
-    recordEsiActivity('getCharacterWalletTransactions', characterId, outcomeForError(err));
+    recordEsiActivity(endpointId, characterId, outcomeForError(err));
     throw err;
   }
-  recordEsiActivity('getCharacterWalletTransactions', characterId, 'success');
+  recordEsiActivity(endpointId, characterId, 'success');
   return { items, truncated };
+}
+
+export function getCharacterWalletTransactions(
+  characterId: number,
+  options: Omit<EndpointOptions, 'etag'> = {}
+): Promise<TruncatableResult<WalletTransaction>> {
+  return fetchTransactionCursor<WalletTransaction>(
+    `/characters/${characterId}/wallet/transactions`,
+    'getCharacterWalletTransactions',
+    characterId,
+    options
+  );
 }
 
 // --- GET /characters/{character_id}/assets (esi-assets.read_assets.v1) ---
@@ -1547,6 +1579,39 @@ export function getCorporationWalletJournal(
     }
   );
 }
+
+// --- GET /corporations/{corporation_id}/wallets/{division}/transactions (esi-wallet.read_corporation_wallets.v1) ---
+
+/**
+ * One division's market fills (issue #570).
+ *
+ * Same scope and the same `['Accountant', 'Junior_Accountant']` role gate as
+ * the journal beside it, so registering this added nothing to the consent
+ * screen and invalidated no existing corp login.
+ *
+ * Cursored via `from_id` like the character read, *not* X-Pages like the corp
+ * journal — the two corp wallet endpoints paginate differently, so this one
+ * walks the cursor and reports `truncated` when the page cap bit.
+ *
+ * `CorporationWalletTransaction` rather than `WalletTransaction`: ESI omits
+ * `is_personal` here, which is meaningless for a corporation.
+ */
+export function getCorporationWalletTransactions(
+  characterId: number,
+  corporationId: number,
+  division: number,
+  options: Omit<EndpointOptions, 'etag'> = {}
+): Promise<TruncatableResult<CorporationWalletTransaction>> {
+  return fetchTransactionCursor<CorporationWalletTransaction>(
+    `/corporations/${corporationId}/wallets/${division}/transactions`,
+    'getCorporationWalletTransactions',
+    characterId,
+    options
+  );
+}
+
+/** ESI returns the shared nine fields here and nothing else. */
+export type CorporationWalletTransaction = WalletTransactionCommon;
 
 // --- GET /corporations/{corporation_id}/divisions (esi-corporations.read_divisions.v1) ---
 
