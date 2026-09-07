@@ -18,6 +18,11 @@ interface FilterChipProps {
    * An addition rather than an `aria-label` override on purpose: WCAG 2.5.3
    * wants the visible word to survive inside the accessible name, and a label
    * override is the usual way that gets broken.
+   *
+   * Optional, so a `count` can still ship without one — but a bare figure in an
+   * accessible name says "Corp, 2" and never what the 2 counts, so a new
+   * `count` should pass this. The chips that predate it (Contacts, CorpRoster,
+   * Open Orders) do not yet, and are worth a follow-up.
    */
   countLabel?: string;
   className?: string;
@@ -40,6 +45,7 @@ export function FilterChip({
   className = '',
   size = 'sm',
 }: FilterChipProps) {
+  const hasGloss = countLabel !== undefined;
   return (
     <button
       type="button"
@@ -64,11 +70,11 @@ export function FilterChip({
               whitespace-only children, so it costs nothing visually. Scoped to
               the `countLabel` case so a plain match count's name is exactly
               what it has always been. */}
-          {countLabel !== undefined && ' '}
-          <span aria-hidden={countLabel !== undefined} className="font-medium tabular-nums">
+          {hasGloss && ' '}
+          <span aria-hidden={hasGloss} className="font-medium tabular-nums">
             {count}
           </span>
-          {countLabel !== undefined && <span className="sr-only">{countLabel}</span>}
+          {hasGloss && <span className="sr-only">{countLabel}</span>}
         </>
       )}
     </button>

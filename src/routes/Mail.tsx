@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -33,6 +33,8 @@ import {
 import { stripEveMarkup } from '@/features/skills/typeDisplay';
 import { useMailFolders } from '@/features/character/mailFolderPref';
 import { cx } from '@/lib/cx';
+import { useTimeZone } from '@/lib/timeFormat';
+import { formatDateOnly, formatTimestamp } from '@/lib/timestamp';
 import {
   buildLabelTabMap,
   capHeadersForDisplay,
@@ -147,25 +149,20 @@ export function Mail() {
   // forgetting it put you back on All, which hid nothing. A folder filter
   // whose whole point is "stop showing me Sent" has not granted the request
   // if it forgets by the next reload.
-  const storedFolders = useMailFolders((state) => state.value);
-  const setStoredFolders = useMailFolders((state) => state.setValue);
+  // An array all the way through, not a Set at the point of use: Dexie stores
+  // plain structured-cloneable values, so the stored shape is an array either
+  // way, and at four possible members a linear scan beats the two hooks it
+  // takes to keep a memoised Set's identity stable.
+  const folders = useMailFolders((state) => state.value);
+  const setFolders = useMailFolders((state) => state.setValue);
   const hydrateFolders = useMailFolders((state) => state.hydrate);
   useEffect(() => {
     void hydrateFolders();
   }, [hydrateFolders]);
-  // A Set at the point of use, an array on disk: Dexie stores plain
-  // structured-cloneable values, and a Set only round-trips as one by accident
-  // of the driver. Memoised so `visibleHeaders` below keeps its identity.
-  const folders = useMemo(() => new Set(storedFolders), [storedFolders]);
-  const setFolders = useCallback(
-    (next: ReadonlySet<MailTab>) => void setStoredFolders([...next]),
-    [setStoredFolders]
-  );
   function toggleFolder(folder: MailTab) {
-    const next = new Set(folders);
-    if (next.has(folder)) next.delete(folder);
-    else next.add(folder);
-    setFolders(next);
+    void setFolders(
+      folders.includes(folder) ? folders.filter((f) => f !== folder) : [...folders, folder]
+    );
   }
 
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -231,6 +228,9 @@ export function Mail() {
   // the grid's own `lg:` breakpoint so the JS-driven visibility and the CSS
   // layout switch at the same width.
   const isDesktop = useIsDesktop();
+  // The pilot's Local/EVE-time preference, the same way Contracts,
+  // Notifications and Clones thread it into their own timestamps.
+  const timeZone = useTimeZone();
   const [bodyScrollerRef, bodyMaxHeight] = useViewportBoundedHeight(VIEWPORT_BOUNDED_BOTTOM_GAP_PX);
 
   const headersResult = data?.headersResult ?? null;
@@ -257,7 +257,7 @@ export function Mail() {
   const visibleHeaders = useMemo(
     () =>
       headers.filter((h) => {
-        if (!folders.has(resolveMailTab(h.labels, labelTabById))) return false;
+        if (!folders.includes(resolveMailTab(h.labels, labelTabById))) return false;
         const isRead = h.is_read || locallyReadIds.has(h.mail_id);
         if (hideRead && isRead) return false;
         const senderName = h.from === undefined ? undefined : names.get(h.from);
@@ -273,6 +273,13 @@ export function Mail() {
     () => capHeadersForDisplay(visibleHeaders),
     [visibleHeaders]
   );
+
+  // The list pane's three states, named once here rather than as a pair of
+  // nested ternaries in the middle of the JSX — "empty because nothing matched"
+  // and "empty because no folder is on" want different copy and only one of
+  // them offers a way out.
+  const listState =
+    visibleHeaders.length > 0 ? 'rows' : folders.length === 0 ? 'no-folders' : 'no-matches';
 
   const selectedHeader = headers.find((h) => h.mail_id === selectedId) ?? null;
 
@@ -414,7 +421,7 @@ export function Mail() {
                     // re-read something, and Sent reports zero unread forever.
                     count={unread > 0 ? unread : undefined}
                     countLabel={unread > 0 ? t('mail.unreadCount', { count: unread }) : undefined}
-                    selected={folders.has(folder)}
+                    selected={folders.includes(folder)}
                     onToggle={() => toggleFolder(folder)}
                   />
                 );
@@ -442,30 +449,28 @@ export function Mail() {
 
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-[22rem_1fr] lg:items-start xl:grid-cols-[24rem_1fr]">
             <Panel padded={false} className={isDesktop || selectedId === null ? '' : 'hidden'}>
-              {visibleHeaders.length === 0 ? (
-                folders.size === 0 ? (
-                  // Deselecting every folder is allowed rather than refused —
-                  // a chip that visibly ignores a press is worse than an empty
-                  // list that explains itself and hands back the way out. The
-                  // chip row above sits outside this branch, so the control
-                  // that undoes it never disappears along with the rows.
-                  <EmptyState
-                    title={t('mail.noFoldersTitle')}
-                    hint={t('mail.noFoldersHint')}
-                    className="py-6"
-                    action={
-                      <Button size="sm" onClick={() => setFolders(new Set(MAIL_TABS))}>
-                        {t('mail.showAllFolders')}
-                      </Button>
-                    }
-                  />
-                ) : (
-                  <EmptyState
-                    title={t('mail.noMatchesTitle')}
-                    hint={t('mail.noMatchesHint')}
-                    className="py-6"
-                  />
-                )
+              {listState === 'no-folders' ? (
+                // Deselecting every folder is allowed rather than refused — a
+                // chip that visibly ignores a press is worse than an empty list
+                // that explains itself and hands back the way out. The chip row
+                // above sits outside this branch, so the control that undoes it
+                // never disappears along with the rows.
+                <EmptyState
+                  title={t('mail.noFoldersTitle')}
+                  hint={t('mail.noFoldersHint')}
+                  className="py-6"
+                  action={
+                    <Button size="sm" onClick={() => void setFolders(MAIL_TABS)}>
+                      {t('mail.showAllFolders')}
+                    </Button>
+                  }
+                />
+              ) : listState === 'no-matches' ? (
+                <EmptyState
+                  title={t('mail.noMatchesTitle')}
+                  hint={t('mail.noMatchesHint')}
+                  className="py-6"
+                />
               ) : (
                 // Flat cap, not viewport-relative: the "load more" button
                 // renders below this list in the same column, so sizing the
@@ -549,7 +554,7 @@ export function Mail() {
                                 // shipped with: DESIGN.md §1 restricts faint to
                                 // decoration, and a received date is content.
                                 <span className="ml-auto shrink-0 tabular-nums">
-                                  {new Date(header.timestamp).toLocaleDateString()}
+                                  {formatDateOnly(new Date(header.timestamp), timeZone)}
                                 </span>
                               )}
                             </span>
@@ -596,7 +601,7 @@ export function Mail() {
               meta={
                 selectedHeader?.timestamp ? (
                   <span className="text-xs text-text-dim tabular-nums">
-                    {new Date(selectedHeader.timestamp).toLocaleString()}
+                    {formatTimestamp(new Date(selectedHeader.timestamp), timeZone)}
                   </span>
                 ) : undefined
               }

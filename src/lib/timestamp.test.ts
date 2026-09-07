@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { formatCalendarTimestamp, formatTimeOfDay, formatTimestamp } from './timestamp';
+import {
+  formatCalendarTimestamp,
+  formatDateOnly,
+  formatTimeOfDay,
+  formatTimestamp,
+} from './timestamp';
 
 /**
  * Expectations are built from `Intl` rather than hardcoded ("Sep 6"), so the
@@ -58,5 +63,24 @@ describe('formatTimeOfDay', () => {
       SAMPLE.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
     );
     expect(formatTimeOfDay(SAMPLE)).not.toMatch(SECONDS);
+  });
+});
+
+describe('formatDateOnly', () => {
+  it('renders the calendar date with no time at all', () => {
+    expect(formatDateOnly(SAMPLE)).toBe(
+      SAMPLE.toLocaleDateString(undefined, {
+        year: 'numeric',
+        month: 'numeric',
+        day: 'numeric',
+      })
+    );
+    expect(formatDateOnly(SAMPLE)).not.toMatch(/\d{1,2}:\d{2}/);
+  });
+
+  it('honours an explicit time zone, so a late-UTC instant can fall on another day', () => {
+    // 2026-09-06T23:30Z is already the 7th in Tokyo and still the 6th in UTC.
+    const lateUtc = new Date('2026-09-06T23:30:00.000Z');
+    expect(formatDateOnly(lateUtc, 'UTC')).not.toBe(formatDateOnly(lateUtc, 'Asia/Tokyo'));
   });
 });

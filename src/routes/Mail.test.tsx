@@ -545,14 +545,17 @@ describe('Mail', () => {
     );
 
     const user = userEvent.setup();
+    // Re-queried rather than held: the chip is a different element after a
+    // character switch and again after the remount below.
+    const sentChip = () =>
+      within(screen.getByRole('group', { name: 'Mail folders' })).getByRole('button', {
+        name: 'Sent',
+      });
+
     const view = render(<App />);
     await screen.findByText('Fleet up!');
-    const sentChip = within(screen.getByRole('group', { name: 'Mail folders' })).getByRole(
-      'button',
-      { name: 'Sent' }
-    );
-    await user.click(sentChip);
-    expect(sentChip).toHaveAttribute('aria-pressed', 'false');
+    await user.click(sentChip());
+    expect(sentChip()).toHaveAttribute('aria-pressed', 'false');
 
     // Device-wide, not per character (`mailFolderPref.ts`): switching pilots
     // does not hand back the folder this one just turned off.
@@ -560,13 +563,7 @@ describe('Mail', () => {
       await useActiveCharacter.getState().setActiveCharacter(CHAR_ID_2);
     });
     await screen.findByText('Second pilot mail');
-    await waitFor(() =>
-      expect(
-        within(screen.getByRole('group', { name: 'Mail folders' })).getByRole('button', {
-          name: 'Sent',
-        })
-      ).toHaveAttribute('aria-pressed', 'false')
-    );
+    await waitFor(() => expect(sentChip()).toHaveAttribute('aria-pressed', 'false'));
 
     // And it is on disk, not just in memory: a fresh store hydrating from
     // Dexie is what a real page reload does.
@@ -577,12 +574,6 @@ describe('Mail', () => {
     useMailFolders.setState({ value: DEFAULT_MAIL_FOLDERS, hydrated: false });
     render(<App />);
     await screen.findByText('Second pilot mail');
-    await waitFor(() =>
-      expect(
-        within(screen.getByRole('group', { name: 'Mail folders' })).getByRole('button', {
-          name: 'Sent',
-        })
-      ).toHaveAttribute('aria-pressed', 'false')
-    );
+    await waitFor(() => expect(sentChip()).toHaveAttribute('aria-pressed', 'false'));
   });
 });
