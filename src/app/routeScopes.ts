@@ -147,10 +147,11 @@ export const ROUTE_REQUIREMENTS = {
     endpoints: ['getCharacterMailHeaders', 'getCharacterMail', 'postUniverseNames'],
     strings: 'mail',
   },
-  '/calendar': {
-    endpoints: ['getCharacterCalendar', 'getCharacterCalendarEvent'],
-    strings: 'calendar',
-  },
+  // Multi-source page: the Calendar merges six clocks (calendar, skill queue,
+  // industry jobs, planets, contracts, orders) and each read fails on its own.
+  // A page gate on the calendar scope alone would blank five panels that still
+  // work; the filter menu names the sources that need a new login instead.
+  '/calendar': UNGATED,
   '/contracts': {
     endpoints: ['getCharacterContracts', 'postUniverseNames'],
     strings: 'contracts',

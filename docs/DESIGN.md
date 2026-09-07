@@ -336,6 +336,14 @@ Rules:
 - **Dark only.** No light theme. `color-scheme: dark` is set globally.
 - **No gradients, anywhere.** Flat fills only (`bg-accent/10`, `bg-panel-2`,
   …). Depth comes from the layering step below, not a fade.
+  - One exception, and it is not a fade: `.calendar-map-past`
+    (`styles/index.css`) draws a 45° hairline hatch with a
+    `repeating-linear-gradient`, because CSS has no other one-declaration way
+    to make a texture. The rule exists to keep depth coming from layering
+    rather than from soft colour ramps; a hatch has no ramp — every stop is
+    hard, and it reads as "not available", which no flat fill can say without
+    being mistaken for "empty". Reach for this only where a surface must look
+    unavailable rather than merely dim.
 - Layering: `bg` → `panel` → `panel-2`. Depth via background steps + hairlines,
   not shadows. Shadows only for popovers/menus (`shadow-lg shadow-black/50`).
 - One `primary` button per view; everything else `ghost`.

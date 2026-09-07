@@ -23,11 +23,12 @@ import {
   Tooltip,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
+import { SEVERITY_ICON, SEVERITY_LABEL, SEVERITY_TEXT } from '@/components/ui/severityTone';
 import { marketItemUrl } from '@/engine/market/urlState';
 import { writeToClipboard } from '@/lib/clipboard';
 import { formatDuration } from '@/lib/duration';
 import { structureStateLabel } from './boardSources';
-import type { CorpBoardItem, CorpBoardSeverity } from '@/engine/corp/board';
+import type { CorpBoardItem } from '@/engine/corp/board';
 
 /**
  * Severity to colour. Four levels, the same four `StatChip` and the rest of the
@@ -35,19 +36,6 @@ import type { CorpBoardItem, CorpBoardSeverity } from '@/engine/corp/board';
  * colour rather than `success`: a Fortizar with a month of fuel is not an
  * achievement, it is simply not today's problem.
  */
-const SEVERITY_TONE: Record<CorpBoardSeverity, string> = {
-  critical: 'text-danger',
-  warning: 'text-warning',
-  watch: 'text-accent',
-  clear: 'text-text-dim',
-};
-
-const SEVERITY_LABEL: Record<CorpBoardSeverity, string> = {
-  critical: 'corp.board.severity.critical',
-  warning: 'corp.board.severity.warning',
-  watch: 'corp.board.severity.watch',
-  clear: 'corp.board.severity.clear',
-};
 
 /**
  * Severity to shape (issue #419): colour alone is not a signal a colorblind
@@ -56,12 +44,6 @@ const SEVERITY_LABEL: Record<CorpBoardSeverity, string> = {
  * fifth glyph; the sr-only label beside each icon (`BoardRow` below) is what
  * actually names the severity for assistive tech — the icon is decorative.
  */
-const SEVERITY_ICON: Record<CorpBoardSeverity, typeof Icon.Warn> = {
-  critical: Icon.SeverityCritical,
-  warning: Icon.Warn,
-  watch: Icon.SeverityWatch,
-  clear: Icon.SeverityClear,
-};
 
 type Translate = ReturnType<typeof useTranslation>['t'];
 
@@ -100,7 +82,7 @@ function detailText(item: CorpBoardItem, t: Translate): string {
  */
 function Countdown({ item }: { item: CorpBoardItem }) {
   const { t } = useTranslation();
-  const tone = SEVERITY_TONE[item.severity];
+  const tone = SEVERITY_TEXT[item.severity];
   const SeverityIcon = SEVERITY_ICON[item.severity];
   // `flex items-center gap-1` puts the shape beside the countdown text inside
   // this same element — a fourth row child would reflow the 320px stack this

@@ -218,6 +218,26 @@
     appearance: none;
     margin: 0;
   }
+
+  /*
+   * A day the Calendar Map can never fill (`features/character/CalendarMap.tsx`).
+   *
+   * ESI's /calendar returns events from now only, so a past cell is not
+   * "empty today" — it is structurally incapable of holding anything. Dimming
+   * alone reads as "nothing on", which is the wrong conclusion and the exact
+   * one the old grid invited; a hatch reads as "not available" instead.
+   *
+   * A repeating gradient rather than an SVG or a border trick: Tailwind can
+   * express neither the 45-degree rule nor its 6px pitch, and this is one
+   * declaration against an asset request and a second file.
+   */
+  .calendar-map-past {
+    background-image: repeating-linear-gradient(
+      135deg,
+      transparent 0 6px,
+      color-mix(in srgb, var(--color-line) 55%, transparent) 6px 7px
+    );
+  }
 }
 
 @layer base {

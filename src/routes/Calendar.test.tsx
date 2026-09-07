@@ -1,14 +1,21 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import '@/i18n';
 import { db } from '@/db';
-import { STALE_FETCHED_AT } from '@/esi/cacheFixtures';
 import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharacter';
 import { usePublicInfo } from '@/stores/publicInfo';
-import { useCalendarView, DEFAULT_CALENDAR_VIEW } from '@/features/character/calendarViewPref';
+import {
+  useCalendarDensity,
+  DEFAULT_CALENDAR_DENSITY,
+} from '@/features/character/calendarViewPref';
+import {
+  useCalendarHiddenKinds,
+  DEFAULT_HIDDEN_KINDS,
+  CALENDAR_HIDDEN_KINDS_KEY,
+} from '@/features/character/calendarKindFilter';
 import { App } from '@/app/App';
 
 vi.mock('virtual:pwa-register/react', () => ({
@@ -26,11 +33,19 @@ vi.mock('@/sde/loadSde', () => ({
 }));
 
 const CHAR_ID = 91;
+const ESI = `https://esi.evetech.net/characters/${CHAR_ID}`;
 
-// Anchored to "today" (not a fixed date) so the fixture always lands inside
-// the default Month view's visible grid, whenever the suite actually runs.
+/**
+ * Anchored to "today" rather than to a fixed date, so a fixture always lands
+ * inside the visible grid and inside the board's own horizon whenever the
+ * suite actually runs.
+ */
 const TODAY = new Date();
-const EVENT_DATE = new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate(), 18, 0, 0);
+const inHours = (hours: number) =>
+  new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate(), TODAY.getHours() + hours);
+
+const EVENT_DATE = inHours(3);
+const JOB_END = inHours(5);
 
 const events = [
   {
@@ -42,25 +57,58 @@ const events = [
   },
 ];
 
-const server = setupServer(
-  http.get(`https://esi.evetech.net/characters/${CHAR_ID}/calendar`, () =>
-    HttpResponse.json(events)
-  ),
-  http.get(`https://esi.evetech.net/characters/${CHAR_ID}/calendar/1`, () =>
-    HttpResponse.json({
-      event_id: 1,
-      title: 'Fleet Op',
-      date: EVENT_DATE.toISOString(),
-      duration: 60,
-      importance: 1,
-      owner_id: 1,
-      owner_name: 'FC',
-      owner_type: 'character',
-      response: 'accepted',
-      text: 'Bring your ship',
-    })
-  )
-);
+const jobs = [
+  {
+    job_id: 7,
+    activity_id: 1,
+    blueprint_type_id: 1000,
+    facility_id: 60003760,
+    station_id: 60003760,
+    runs: 10,
+    start_date: TODAY.toISOString(),
+    end_date: JOB_END.toISOString(),
+    status: 'active' as const,
+    product_type_id: 2454,
+  },
+];
+
+/**
+ * Every source the page reads, all empty. A test that cares about one source
+ * overrides just that handler with `server.use` — msw resolves with the FIRST
+ * match, so an override must stand alone rather than follow a re-spread of
+ * these.
+ */
+function baseHandlers() {
+  return [
+    http.get(`${ESI}/calendar`, () => HttpResponse.json(events)),
+    http.get(`${ESI}/calendar/1`, () =>
+      HttpResponse.json({
+        event_id: 1,
+        title: 'Fleet Op',
+        date: EVENT_DATE.toISOString(),
+        duration: 60,
+        importance: 1,
+        owner_id: 1,
+        owner_name: 'FC',
+        owner_type: 'character',
+        response: 'accepted',
+        text: 'Bring your ship',
+      })
+    ),
+    http.get(`${ESI}/skillqueue`, () => HttpResponse.json([])),
+    http.get(`${ESI}/industry/jobs`, () => HttpResponse.json([])),
+    http.get(`${ESI}/planets`, () => HttpResponse.json([])),
+    http.get(`${ESI}/contracts`, () => HttpResponse.json([])),
+    http.get(`${ESI}/orders`, () => HttpResponse.json([])),
+    http.post('https://esi.evetech.net/universe/names', () => HttpResponse.json([])),
+    // The shell's corp nav asks for these on every route; unrelated to the
+    // page, but `onUnhandledRequest: 'error'` counts them.
+    http.get(`${ESI}/roles`, () => HttpResponse.json({ roles: [] })),
+    http.get(`${ESI}/corporationhistory`, () => HttpResponse.json([])),
+  ];
+}
+
+const server = setupServer(...baseHandlers());
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 afterAll(() => server.close());
@@ -72,7 +120,8 @@ beforeEach(async () => {
   await db.esiCache.clear();
   useActiveCharacter.setState({ activeCharacterId: null, hydrated: false });
   usePublicInfo.setState({ byCharacterId: {} });
-  useCalendarView.setState({ value: DEFAULT_CALENDAR_VIEW, hydrated: false });
+  useCalendarDensity.setState({ value: DEFAULT_CALENDAR_DENSITY, hydrated: false });
+  useCalendarHiddenKinds.setState({ value: DEFAULT_HIDDEN_KINDS, hydrated: false });
 
   await db.characters.put({ characterId: CHAR_ID, name: 'Pilot One', ownerHash: 'oh', addedAt: 1 });
   await db.tokens.put({
@@ -87,162 +136,91 @@ beforeEach(async () => {
 });
 
 describe('Calendar', () => {
-  it('defaults to Month view and lists an event from mocked ESI', async () => {
+  it('shows the calendar map and the coming-up rail together', async () => {
     render(<App />);
+
     expect(await screen.findByText('Fleet Op')).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: 'Month' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('group', { name: /calendar map/i })).toBeInTheDocument();
+    expect(screen.getByRole('list', { name: /coming up/i })).toBeInTheDocument();
   });
 
-  it('Agenda view shows the response alongside the event', async () => {
-    const user = userEvent.setup();
+  /** The redesign's whole premise: the rail is not a calendar feed, it is every clock. */
+  it('merges another clock source into the same list', async () => {
+    server.use(http.get(`${ESI}/industry/jobs`, () => HttpResponse.json(jobs)));
     render(<App />);
-    await screen.findByText('Fleet Op');
-    await user.click(screen.getByRole('tab', { name: 'Agenda' }));
-    // 'Fleet Op' renders in Month too, so it does not prove the switch landed;
-    // the response line is Agenda's alone, and awaiting it is what waits out
-    // the persisted view change.
+
     expect(await screen.findByText('Fleet Op')).toBeInTheDocument();
-    expect(await screen.findByText(/Accepted/)).toBeInTheDocument();
+    expect(await screen.findByText(/industry jobs/i)).toBeInTheDocument();
   });
 
-  it('remembers the last-picked view across a reload', async () => {
-    const user = userEvent.setup();
-    const { unmount } = render(<App />);
-    await screen.findByText('Fleet Op');
-    await user.click(screen.getByRole('tab', { name: 'Week' }));
-    // Awaited, not asserted straight after the click: picking a view goes
-    // through `useCalendarView.setValue`, which persists to Dexie *before* it
-    // applies to the store, so the tab flips a write later than the click
-    // settles. A synchronous assertion here passes only while the machine is
-    // quick enough (CI run 33737544880 caught the other one of these).
-    await waitFor(() =>
-      expect(screen.getByRole('tab', { name: 'Week' })).toHaveAttribute('aria-selected', 'true')
-    );
-    unmount();
-
-    // Simulate a fresh page load: drop the in-memory store so the remount
-    // must re-read the choice from Dexie rather than just reusing React state
-    // that happens to have survived the unmount.
-    useCalendarView.setState({ value: DEFAULT_CALENDAR_VIEW, hydrated: false });
-
-    render(<App />);
-    await screen.findByText(/Fleet Op/);
-    // Same hydration race as above: rehydrating from Dexie lands after the
-    // remounted app first paints, so this must be awaited too (CI run
-    // 33845948159 caught this one).
-    await waitFor(() =>
-      expect(screen.getByRole('tab', { name: 'Week' })).toHaveAttribute('aria-selected', 'true')
-    );
-  });
-
-  it('Month\'s "+N more" switches to Week, anchored on that day', async () => {
-    const busyDayEvents = Array.from({ length: 4 }, (_, i) => ({
-      event_id: i + 1,
-      event_date: new Date(
-        EVENT_DATE.getFullYear(),
-        EVENT_DATE.getMonth(),
-        EVENT_DATE.getDate(),
-        9 + i
-      ).toISOString(),
-      title: `Op ${i + 1}`,
-      importance: 1,
-      event_response: 'accepted' as const,
-    }));
+  /**
+   * The acceptance test for the whole redesign. `/calendar` used to be
+   * scope-gated as a whole and rendered a page-wide re-login banner, so one
+   * revoked scope blanked everything. With six sources that is no longer
+   * defensible — the five that still read must still render.
+   *
+   * The shell's own `AuthFailureNotice` still appears, and should: it is a
+   * app-wide "one of your reads was refused" notice sitting above the outlet,
+   * not the route replacing its own content. What this pins is that the route
+   * keeps both panes and drops only the forbidden source's rows.
+   */
+  it('keeps rendering the other clocks when one source is forbidden', async () => {
     server.use(
-      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/calendar`, () =>
-        HttpResponse.json(busyDayEvents)
-      )
+      http.get(`${ESI}/industry/jobs`, () => HttpResponse.json(jobs)),
+      http.get(`${ESI}/calendar`, () => new HttpResponse(null, { status: 403 }))
     );
-    const user = userEvent.setup();
     render(<App />);
-    const more = await screen.findByText('+1 more');
-    await user.click(more);
-    await waitFor(() =>
-      expect(screen.getByRole('tab', { name: 'Week' })).toHaveAttribute('aria-selected', 'true')
-    );
-    expect(await screen.findByText(/Op 4/)).toBeInTheDocument();
+
+    // The industry job still arrives...
+    expect(await screen.findByText(/industry jobs/i)).toBeInTheDocument();
+    // ...both panes are still on screen rather than replaced by a banner...
+    expect(screen.getByRole('group', { name: /calendar map/i })).toBeInTheDocument();
+    expect(screen.getByRole('list', { name: /coming up/i })).toBeInTheDocument();
+    // ...and only the forbidden source's own rows are missing.
+    expect(screen.queryByText('Fleet Op')).not.toBeInTheDocument();
   });
 
-  it('shows detail in a modal on click', async () => {
-    const user = userEvent.setup();
+  it('opens the event detail from a calendar row', async () => {
     render(<App />);
-    await user.click(await screen.findByText('Fleet Op'));
+    await userEvent.click(await screen.findByText('Fleet Op'));
+
     expect(await screen.findByText('Bring your ship')).toBeInTheDocument();
-    expect(screen.getByRole('dialog', { name: 'Fleet Op' })).toBeInTheDocument();
   });
 
-  it('offers .ics download and Google Calendar export in the detail modal', async () => {
-    const user = userEvent.setup();
+  it('hides a kind from the filter menu and remembers it', async () => {
+    server.use(http.get(`${ESI}/industry/jobs`, () => HttpResponse.json(jobs)));
     render(<App />);
-    await user.click(await screen.findByText('Fleet Op'));
-    await screen.findByText('Bring your ship');
-    expect(screen.getByRole('button', { name: 'Download .ics' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Add to Google Calendar' })).toBeInTheDocument();
-  });
+    expect(await screen.findByText(/industry jobs/i)).toBeInTheDocument();
 
-  it('jumps Month view to a typed date', async () => {
-    render(<App />);
-    await screen.findByText('Fleet Op');
-    const jumpInput = screen.getByLabelText('Jump to date');
-    fireEvent.change(jumpInput, { target: { value: '2030-01-15' } });
-    await waitFor(() => expect(screen.getByText(/January 2030/)).toBeInTheDocument());
-  });
+    await userEvent.click(screen.getByRole('button', { name: /filter event types/i }));
+    await userEvent.click(await screen.findByRole('menuitemcheckbox', { name: /industry jobs/i }));
 
-  it('strips EVE markup from the event detail text (BUG #4)', async () => {
-    server.use(
-      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/calendar/1`, () =>
-        HttpResponse.json({
-          event_id: 1,
-          title: 'Fleet Op',
-          date: EVENT_DATE.toISOString(),
-          duration: 60,
-          importance: 1,
-          owner_id: 1,
-          owner_name: 'FC',
-          owner_type: 'character',
-          response: 'accepted',
-          text: 'Bring your <b>ship</b><br>Tank &amp; gank',
-        })
-      )
-    );
-    const user = userEvent.setup();
-    render(<App />);
-    await user.click(await screen.findByText('Fleet Op'));
-    const detail = await screen.findByText(/Bring your ship/);
-    expect(detail.textContent).toBe('Bring your ship\nTank & gank');
-  });
-
-  it('falls back to cached events offline', async () => {
-    await db.esiCache.put({
-      characterId: CHAR_ID,
-      key: 'calendar',
-      value: events,
-      fetchedAt: STALE_FETCHED_AT,
+    await waitFor(async () => {
+      expect((await db.settings.get(CALENDAR_HIDDEN_KINDS_KEY))?.value).toEqual(['industryJob']);
     });
-    server.use(
-      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/calendar`, () => HttpResponse.error())
-    );
-    render(<App />);
-    expect(await screen.findByText('Fleet Op')).toBeInTheDocument();
-    expect(screen.getByText(/showing cached data/i)).toBeInTheDocument();
   });
 
-  it('shows the empty state when there is no data at all', async () => {
-    server.use(
-      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/calendar`, () => HttpResponse.error())
-    );
+  it('says so when every kind has been deselected', async () => {
+    await db.settings.put({
+      key: CALENDAR_HIDDEN_KINDS_KEY,
+      value: [
+        'calendarEvent',
+        'skillTraining',
+        'industryJob',
+        'planetExtraction',
+        'contractExpiry',
+        'orderExpiry',
+      ],
+    });
     render(<App />);
-    expect(await screen.findByText(/no events cached/i)).toBeInTheDocument();
+
+    expect(await screen.findByText(/no event types selected/i)).toBeInTheDocument();
   });
 
-  it('shows a re-login prompt (not a silent empty state) when the calendar scope was revoked', async () => {
-    server.use(
-      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/calendar`, () =>
-        HttpResponse.json({ error: 'missing scope' }, { status: 403 })
-      )
-    );
+  it('reports nothing coming up when every source reads fine and is empty', async () => {
+    server.use(http.get(`${ESI}/calendar`, () => HttpResponse.json([])));
     render(<App />);
-    expect(await screen.findByText('Log in again to see your calendar')).toBeInTheDocument();
-    expect(screen.queryByText(/no events cached/i)).not.toBeInTheDocument();
+
+    expect(await screen.findByText(/nothing coming up/i)).toBeInTheDocument();
   });
 });

@@ -16,6 +16,7 @@
 
 import {
   Broadcast,
+  CalendarBlank,
   ArrowClockwise,
   ArrowCounterClockwise,
   ArrowDown,
@@ -236,6 +237,8 @@ export const MailSent = withWeight(PaperPlaneRight);
 export const MailAlliance = withWeight(UsersFour);
 /** Jump clones and implants. */
 export const Clones = withWeight(Stack);
+/** A calendar event — the Coming Up rail's own kind. */
+export const CalendarEvent = withWeight(CalendarBlank);
 /** Contracts — courier, item exchange, auction. */
 export const Contracts = withWeight(FileText);
 /** Corporation-owned surfaces: ops board, wallet divisions, roster, corp assets. */

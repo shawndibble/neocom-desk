@@ -68,10 +68,29 @@ export function buildMonthGrid(monthAnchor: Date, today: Date = new Date()): Gri
   return Array.from({ length: 42 }, (_, i) => toGridDay(addDays(gridStart, i), monthAnchor, today));
 }
 
-/** 7 Monday-first days containing the anchor. */
-export function buildWeekDays(weekAnchor: Date, today: Date = new Date()): GridDay[] {
-  const gridStart = startOfWeek(weekAnchor);
-  return Array.from({ length: 7 }, (_, i) => toGridDay(addDays(gridStart, i), weekAnchor, today));
+/**
+ * 14 Monday-first days containing the anchor — the Calendar Map's Fortnight
+ * density.
+ *
+ * Its own builder rather than a span argument on `buildMonthGrid`: that one is
+ * a fixed 42 cells aligned to a month, and a caller asking for 14 wants two
+ * whole weeks around a date instead, which is a different question about a
+ * different anchor.
+ */
+export function buildFortnightDays(anchor: Date, today: Date = new Date()): GridDay[] {
+  const gridStart = startOfWeek(anchor);
+  return Array.from({ length: 14 }, (_, i) => toGridDay(addDays(gridStart, i), anchor, today));
+}
+
+/**
+ * `count` days running forward from `start` — the Day Ticker's window.
+ *
+ * Deliberately not week-aligned, unlike every other builder here: a phone
+ * reading "what is coming up" wants today in the first column, not up to six
+ * days of last week before it.
+ */
+export function buildDaysFrom(start: Date, count: number, today: Date = new Date()): GridDay[] {
+  return Array.from({ length: count }, (_, i) => toGridDay(addDays(start, i), start, today));
 }
 
 /** Monday..Sunday short weekday names, in the viewer's locale. */
@@ -86,52 +105,25 @@ export function formatMonthLabel(monthAnchor: Date): string {
   return new Intl.DateTimeFormat(undefined, { month: 'long', year: 'numeric' }).format(monthAnchor);
 }
 
-export function formatWeekLabel(weekAnchor: Date): string {
-  const start = startOfWeek(weekAnchor);
-  const end = addDays(start, 6);
+/**
+ * The 14-day span `buildFortnightDays` draws, as a label.
+ *
+ * Its own function because `formatWeekLabel` spans six days from the Monday
+ * and would print a seven-day range over a fourteen-day grid — a caption
+ * quietly disagreeing with the thing it captions.
+ */
+export function formatFortnightLabel(anchor: Date): string {
+  return formatSpanLabel(startOfWeek(anchor), 13);
+}
+
+/** Shared by the week and fortnight labels: a start date, and how many days after it. */
+function formatSpanLabel(start: Date, spanDays: number): string {
+  const end = addDays(start, spanDays);
   const dayFormatter = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' });
   const yearFormatter = new Intl.DateTimeFormat(undefined, { year: 'numeric' });
   const startLabel =
     start.getFullYear() === end.getFullYear()
-      ? new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' }).format(start)
+      ? dayFormatter.format(start)
       : `${dayFormatter.format(start)}, ${yearFormatter.format(start)}`;
   return `${startLabel} – ${dayFormatter.format(end)}, ${yearFormatter.format(end)}`;
-}
-
-const JUMP_DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
-
-/**
- * Parses a native `<input type="date">` value ("YYYY-MM-DD") as local
- * midnight, matching every other date in this module — never as a UTC
- * instant, which would shift the day in a timezone behind UTC. `null` for
- * anything the input contract doesn't actually produce (empty, malformed).
- */
-export function parseJumpDate(raw: string): Date | null {
-  const match = JUMP_DATE_PATTERN.exec(raw);
-  if (!match) return null;
-  const [, year, month, day] = match;
-  const date = new Date(Number(year), Number(month) - 1, Number(day));
-  // Rejects an out-of-range month/day the regex's fixed digit-width let
-  // through (e.g. "2026-13-40"): Date rolls those into the following
-  // month/year instead of throwing, so a round-trip check catches it.
-  if (date.getMonth() !== Number(month) - 1 || date.getDate() !== Number(day)) return null;
-  return date;
-}
-
-/** Buckets items by local day, each bucket sorted chronologically. */
-export function groupByDayKey<T>(
-  items: readonly T[],
-  getDate: (item: T) => Date
-): Map<string, T[]> {
-  const grouped = new Map<string, T[]>();
-  for (const item of items) {
-    const key = dayKey(getDate(item));
-    const bucket = grouped.get(key);
-    if (bucket) bucket.push(item);
-    else grouped.set(key, [item]);
-  }
-  for (const bucket of grouped.values()) {
-    bucket.sort((a, b) => getDate(a).getTime() - getDate(b).getTime());
-  }
-  return grouped;
 }

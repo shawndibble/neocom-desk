@@ -11,6 +11,8 @@
  * Pure like the rest of `src/engine` (CLAUDE.md): board items and `nowMs` in,
  * plain objects out.
  */
+import { DEADLINE_SEVERITIES } from '../severity';
+import { localMidnight } from '../localDay';
 import { CORP_BOARD_ITEM_KINDS, type CorpBoardItem, type CorpBoardItemKind } from './board';
 import type { CorpBoardSeverity } from './board';
 
@@ -32,7 +34,8 @@ const DAY_MS = 86_400_000;
  * Severity worst-first, which is also `severityForRemaining`'s own order. Used
  * to reduce a day's items to the one colour its bar carries.
  */
-const SEVERITY_RANK: readonly CorpBoardSeverity[] = ['critical', 'warning', 'watch', 'clear'];
+/** Worst-first, from the shared ladder — not a second literal to keep in step. */
+const SEVERITY_RANK: readonly CorpBoardSeverity[] = DEADLINE_SEVERITIES;
 
 export interface DeadlineDay {
   /** Local midnight this day starts at — the bar's identity and its label's source. */
@@ -54,21 +57,6 @@ export interface DueSoonCount {
    * the one that needs acting on first.
    */
   overdue: number;
-}
-
-/**
- * Local midnight beginning the day `ms` falls in.
- *
- * Local, not UTC, because the strip's labels are weekdays and calendar dates —
- * a manager reads "Tuesday", and a UTC bucket would put a Tuesday-evening
- * timer on Wednesday for anyone west of Greenwich. `Date`'s local getters are
- * the only way to ask this question, so the function is impure with respect to
- * the machine's zone and deliberately takes no zone argument: the caller's own
- * clock *is* the answer here.
- */
-function localMidnight(ms: number): number {
-  const date = new Date(ms);
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
 }
 
 /**

@@ -20,6 +20,7 @@ const PINNED = [
   'assetsItemSort',
   'assetsRoutePreference',
   'assetsStationSort',
+  'calendarHiddenKinds',
   'calendarView',
   'corp.assetsExpanded',
   'industryLastOpenedPlan',
