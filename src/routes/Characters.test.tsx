@@ -319,6 +319,44 @@ describe('Characters', () => {
     );
   });
 
+  it('floats a star inside its own group section rather than out of it', async () => {
+    // The star raises the card where it already lives: no top-level "Starred"
+    // section, so the grouping and the star never disagree about where a
+    // character is. Pilot Three leads Alts; Pilot One stays down in Ungrouped.
+    await db.characters.put({
+      characterId: 93,
+      name: 'Pilot Three',
+      ownerHash: 'oh-3',
+      addedAt: 3,
+    });
+    await useOverviewGroups.getState().setValue({
+      groups: [{ id: 'a', name: 'Alts', characterIds: [92, 93] }],
+      updatedAt: 1,
+    });
+    await useStarredCharacters.getState().setValue([93]);
+    renderCharacters();
+
+    const altsSection = (await screen.findByRole('heading', { name: 'Alts' })).closest(
+      'section'
+    ) as HTMLElement;
+    const ungroupedSection = screen
+      .getByRole('heading', { name: 'Ungrouped' })
+      .closest('section') as HTMLElement;
+
+    await waitFor(() => {
+      const inAlts = within(altsSection).getAllByRole('button', { name: /^Select /i });
+      expect(inAlts[0]).toHaveTextContent('Pilot Three');
+      expect(inAlts[1]).toHaveTextContent('Pilot Two');
+    });
+    // Still in its own section, not lifted into a starred one above it.
+    expect(
+      within(ungroupedSection).getByRole('button', { name: 'Select Pilot One' })
+    ).toBeVisible();
+    expect(
+      within(ungroupedSection).queryByRole('button', { name: 'Select Pilot Three' })
+    ).not.toBeInTheDocument();
+  });
+
   it('reads stars back from Dexie on load, not just within the session', async () => {
     // Seeded as a raw settings row with the store left unhydrated — the path a
     // reload actually takes. Seeding through `setValue` would apply the value
