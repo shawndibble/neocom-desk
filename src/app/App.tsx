@@ -1,5 +1,6 @@
 import { useEffect, type ReactElement } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { withSentryReactRouterV7Routing } from '@sentry/react';
 import { ErrorBoundary } from './ErrorBoundary';
 import { subscribeToEsiAuthFailures } from '@/stores/authFailure';
 import { subscribeToEsiActivity } from '@/stores/activityLog';
@@ -35,6 +36,7 @@ import { Contacts } from '@/routes/Contacts';
 import { EmploymentHistory } from '@/routes/EmploymentHistory';
 import { Settings } from '@/routes/Settings';
 import { Styleguide } from '@/routes/Styleguide';
+import { ErrorProbe } from '@/routes/ErrorProbe';
 import { Layout } from './Layout';
 import { ReloadPrompt } from './ReloadPrompt';
 import { WhatsNewPanel } from './WhatsNewPanel';
@@ -55,6 +57,14 @@ import { useTimeFormat } from '@/lib/timeFormat';
 // (tokenProvider.ts) so a dead refresh grant is reported centrally instead of
 // surfacing as an empty view in whichever feature happened to ask first.
 configureEsi({ getToken: (characterId) => getAccessTokenReportingFailures(characterId) });
+
+/**
+ * `<Routes>` with Sentry's route-pattern reporting layered on, so a navigation
+ * transaction is named `/skills/plans/:planId` rather than one distinct
+ * transaction per plan id. Wrapped once, at the top level only — a nested
+ * `<Routes>` must stay unwrapped. Inert unless `instrument.ts` found a DSN.
+ */
+const SentryRoutes = withSentryReactRouterV7Routing(Routes);
 
 // Vite's BASE_URL (set by `base` in vite.config.ts, currently '/').
 const BASENAME = import.meta.env.BASE_URL.replace(/\/$/, '') || '/';
@@ -100,11 +110,24 @@ const ROUTE_ELEMENTS = {
 // `Object.entries` widens the key back to `string`; the union is the point.
 const FEATURE_ROUTES = Object.entries(ROUTE_ELEMENTS) as [AppRoutePath, ReactElement][];
 
-/** Index gate: characters exist -> /characters, none -> /login. */
+/**
+ * Index gate: an active Character -> /overview, characters but none picked ->
+ * /characters, none at all -> /login.
+ *
+ * Overview is what the rail opens with and what a returning user came back
+ * for; the character list is a place you go to switch or add one, so landing
+ * there every time made every visit start with a step. Waits on the
+ * active-character store as well as the count — deciding before hydration
+ * resolves would send a returning user to /characters, which Overview's own
+ * guard would then have to send back.
+ */
 function Root() {
   const characterCount = useLiveQuery(() => db.characters.count());
-  if (characterCount === undefined) return <BootScreen />;
-  return <Navigate to={characterCount > 0 ? '/characters' : '/login'} replace />;
+  const hydrated = useActiveCharacter((state) => state.hydrated);
+  const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
+  if (characterCount === undefined || !hydrated) return <BootScreen />;
+  if (characterCount === 0) return <Navigate to="/login" replace />;
+  return <Navigate to={activeCharacterId === null ? '/characters' : '/overview'} replace />;
 }
 
 export function App() {
@@ -167,7 +190,7 @@ export function App() {
     <ErrorBoundary>
       <BrowserRouter basename={BASENAME}>
         <AuthFailureRedirect />
-        <Routes>
+        <SentryRoutes>
           <Route path="/" element={<Root />} />
           <Route path="/login" element={<Login />} />
           <Route path="/callback" element={<Callback />} />
@@ -184,8 +207,10 @@ export function App() {
             </Route>
           </Route>
           <Route path="/styleguide" element={<Styleguide />} />
+          {/* Undisclosed Sentry probe — see routes/ErrorProbe.tsx. */}
+          <Route path="/error" element={<ErrorProbe />} />
           <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+        </SentryRoutes>
         <ReloadPrompt />
         <WhatsNewPanel />
         <PublicInfoModal />

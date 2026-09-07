@@ -3,6 +3,7 @@ import { configDefaults } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
+import { sentryVitePlugin } from '@sentry/vite-plugin';
 import { fileURLToPath } from 'node:url';
 import { readFileSync } from 'node:fs';
 
@@ -55,8 +56,21 @@ const DOM_TS_TESTS = [
   'src/features/skills/planner/planXmlImport.test.ts',
 ];
 
+/**
+ * Source-map upload is opt-in on the token, which only the deploy job holds:
+ * a PR build, an agent worktree and `npm run build` on a laptop all skip it
+ * and behave exactly as before. Without the maps a production stack trace is
+ * minified rubbish, so the gate is on the credential, never on the intent.
+ *
+ * `hidden` emits the maps without the `//# sourceMappingURL=` comment, and
+ * `filesToDeleteAfterUpload` removes them once Sentry has them — `dist/` is
+ * published to GitHub Pages, so a `.map` left behind is a public one.
+ */
+const sentryAuthToken = process.env.SENTRY_AUTH_TOKEN;
+
 export default defineConfig({
   base: '/',
+  build: { sourcemap: sentryAuthToken ? 'hidden' : false },
   // Port pinned: the EVE SSO dev callback URL must match exactly, so the
   // port cannot be allowed to drift when 5173 happens to be busy.
   server: { port: 5173, strictPort: true },
@@ -106,6 +120,17 @@ export default defineConfig({
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
       },
     }),
+    ...(sentryAuthToken
+      ? [
+          sentryVitePlugin({
+            org: process.env.SENTRY_ORG,
+            project: process.env.SENTRY_PROJECT,
+            authToken: sentryAuthToken,
+            release: { name: `neocom-desk@${version}` },
+            sourcemaps: { filesToDeleteAfterUpload: ['dist/**/*.map'] },
+          }),
+        ]
+      : []),
   ],
   resolve: {
     alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },

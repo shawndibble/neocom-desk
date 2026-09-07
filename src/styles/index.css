@@ -52,6 +52,27 @@
  */
 @layer utilities {
   /*
+   * The tab bar's scroll frame (`components/ui/tabStyles.ts`).
+   *
+   * Tailwind can express the scrolling; it cannot express hiding the
+   * scrollbar, which is the whole reason this lives here. A native horizontal
+   * scrollbar is drawn in the bottom few pixels of its scroller — the exact
+   * pixels the bar's hairline baseline and the active tab's accent underline
+   * occupy — so on a narrow desktop window it would appear across the one
+   * part of the control that carries state. The tab cut off at the edge is
+   * the affordance instead, which is how a tab bar signals more on a phone
+   * anyway; `Tabs` also scrolls the selected tab into view, so a selection
+   * that changes without a click never lands off-screen.
+   */
+  .tab-scroller {
+    scrollbar-width: none;
+  }
+
+  .tab-scroller::-webkit-scrollbar {
+    display: none;
+  }
+
+  /*
    * Responsive collapse for `DataTable` (docs/DESIGN.md §4).
    *
    * Below `sm` a dense table cannot be a table: measured on a 390px viewport,

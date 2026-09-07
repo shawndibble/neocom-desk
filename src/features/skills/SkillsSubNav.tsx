@@ -6,6 +6,7 @@ import {
   tabItemClassName,
   tabItemIdleClassName,
   tabListClassName,
+  tabScrollerClassName,
 } from '@/components/ui/tabStyles';
 
 function subNavClass({ isActive }: { isActive: boolean }): string {
@@ -20,18 +21,20 @@ function subNavClass({ isActive }: { isActive: boolean }): string {
 export function SkillsSubNav() {
   const { t } = useTranslation();
   return (
-    <nav aria-label={t('nav.skills')} className={tabListClassName}>
-      {/* Plans leads: /skills redirects here (App.tsx), and a section that
-          opens on its second tab reads as broken. */}
-      <NavLink to="/skills/plans" className={subNavClass}>
-        {t('skills.plansTab')}
-      </NavLink>
-      <NavLink to="/skills/trained" className={subNavClass}>
-        {t('skills.trainedTab')}
-      </NavLink>
-      <NavLink to="/skills/compare" className={subNavClass}>
-        {t('skills.compareTab')}
-      </NavLink>
-    </nav>
+    <div className={tabScrollerClassName}>
+      <nav aria-label={t('nav.skills')} className={tabListClassName}>
+        {/* Plans leads: /skills redirects here (App.tsx), and a section that
+            opens on its second tab reads as broken. */}
+        <NavLink to="/skills/plans" className={subNavClass}>
+          {t('skills.plansTab')}
+        </NavLink>
+        <NavLink to="/skills/trained" className={subNavClass}>
+          {t('skills.trainedTab')}
+        </NavLink>
+        <NavLink to="/skills/compare" className={subNavClass}>
+          {t('skills.compareTab')}
+        </NavLink>
+      </nav>
+    </div>
   );
 }

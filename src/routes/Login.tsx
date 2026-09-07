@@ -33,6 +33,7 @@ import {
   tabItemClassName,
   tabItemIdleClassName,
   tabListClassName,
+  tabScrollerClassName,
 } from '@/components/ui/tabStyles';
 import { formatAge, HOUR_MS, MINUTE_MS } from '@/lib/age';
 import { formatIsk } from '@/lib/isk';
@@ -206,14 +207,18 @@ export function Login() {
             </div>
           </div>
 
-          <div className={`${tabListClassName} mt-3`}>
-            <span className={`${tabItemClassName} ${tabItemActiveClassName}`}>
-              {t('nav.overview')}
-            </span>
-            <span className={`${tabItemClassName} ${tabItemIdleClassName}`}>{t('nav.clones')}</span>
-            <span className={`${tabItemClassName} ${tabItemIdleClassName}`}>
-              {t('nav.employmentHistory')}
-            </span>
+          <div className={`${tabScrollerClassName} mt-3`}>
+            <div className={tabListClassName}>
+              <span className={`${tabItemClassName} ${tabItemActiveClassName}`}>
+                {t('nav.overview')}
+              </span>
+              <span className={`${tabItemClassName} ${tabItemIdleClassName}`}>
+                {t('nav.clones')}
+              </span>
+              <span className={`${tabItemClassName} ${tabItemIdleClassName}`}>
+                {t('nav.employmentHistory')}
+              </span>
+            </div>
           </div>
 
           <div className="mt-3 flex flex-col gap-2">
