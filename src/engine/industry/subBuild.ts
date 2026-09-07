@@ -1,25 +1,18 @@
 /**
- * One level of "build this material instead of buying it".
+ * Plans one job: "build this material instead of buying it".
  *
  * The make-or-buy marker already answers *whether* a material is worth
  * producing; this answers *what that would actually cost you to shop for*. It
  * sizes the sub-job the way EVE does — in runs, not units — and hands back the
- * inputs that job consumes, so a plan's shopping list can list the recipe's
- * ingredients in place of the thing they make.
+ * inputs that job consumes.
  *
- * One level only, deliberately. The tree under a battleship bottoms out in raw
- * planetary resources that no market sells, so a deeper expansion stops
- * producing a list anyone can paste into multibuy (docs/context/decisions).
+ * One level by itself, composed into arbitrary depth by
+ * `src/engine/industry/materialResolution.ts`, which calls this once per
+ * level and resolves each returned input the same way again (docs/context/
+ * decisions — depth used to stop here, before that generalization).
  *
- * Two orderings in here are load-bearing and easy to get backwards:
- *
- * - The job is sized against the material's *remaining* quantity, so units the
- *   plan already records as owned are never re-manufactured.
- * - Each sub-job rounds its own materials before anything is merged. EVE rounds
- *   material use once per job, so two jobs that each want 4.5 units of the same
- *   input cost 5 + 5, not 9. `mergeSubBuildMaterials` therefore sums quantities
- *   that are already rounded, and must never re-derive them from a combined
- *   run count.
+ * The job is sized against the material's *remaining* quantity, so units the
+ * plan already records as owned are never re-manufactured.
  */
 
 import type {
@@ -115,57 +108,4 @@ export function planSubBuild(
     // outside those bounds is bad data, not a reason to fail the table.
     return null;
   }
-}
-
-/**
- * The materials a plan actually has to acquire once some of them are being
- * built rather than bought: every expanded material drops out and its recipe's
- * inputs take its place, merged by type with everything else.
- *
- * Merging is what makes this worth doing — three components of a battleship
- * each consuming the same reinforced fibre become one line to order, not
- * three. Quantities are summed as the sub-jobs rounded them (see the module
- * comment); the ME0 `baseQuantity` is summed alongside so a merged row can
- * still show what ME saved.
- *
- * Order is the plan's own materials first, in their original order, then the
- * new inputs in the order the recipes introduced them — so expanding a row
- * never reshuffles the rows around it.
- */
-export function mergeSubBuildMaterials(
-  materials: readonly EffectiveMaterial[],
-  subBuilds: ReadonlyMap<number, SubBuild>
-): EffectiveMaterial[] {
-  const merged = new Map<number, EffectiveMaterial>();
-
-  const add = (material: EffectiveMaterial) => {
-    const existing = merged.get(material.typeID);
-    merged.set(
-      material.typeID,
-      existing
-        ? {
-            typeID: material.typeID,
-            baseQuantity: existing.baseQuantity + material.baseQuantity,
-            quantity: existing.quantity + material.quantity,
-          }
-        : { ...material }
-    );
-  };
-
-  for (const material of materials) {
-    if (!subBuilds.has(material.typeID)) add(material);
-  }
-  for (const material of materials) {
-    const sub = subBuilds.get(material.typeID);
-    if (sub) for (const input of sub.inputs) add(input);
-  }
-
-  return [...merged.values()];
-}
-
-/** Every sub-job's installation fee, added up. */
-export function subBuildFeeTotal(subBuilds: ReadonlyMap<number, SubBuild>): number {
-  let total = 0;
-  for (const sub of subBuilds.values()) total += sub.jobFee.total;
-  return total;
 }

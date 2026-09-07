@@ -383,7 +383,7 @@
     "buyInsteadFor": "Buy {{material}} instead of building it",
     "subBuildInput": "input to a material being built here",
     "subBuildRuns": "{{runs}} runs",
-    "subBuildSummary": "Building {{count}} material(s) here, at every level: {{materials}} of materials + {{fees}} of job fees = {{total}}, already reflected in the totals above.",
+    "subBuildSummary": "Building {{count}} material(s) here, at every level: {{total}}, already reflected in the totals above.",
     "subBuildSummaryComparison": "Buying them ready-made instead would cost {{planned}}.",
     "subBuildTimeNote": "The sub-jobs add {{time}} of job time before the main run can start.",
     "sourcingAllOwned": "all {{owned}} owned",

@@ -1,12 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { FACILITY_PRESETS } from '@/engine/industry/types';
-import type {
-  EffectiveMaterial,
-  IndustryBlueprint,
-  MaterialCostLine,
-} from '@/engine/industry/types';
+import type { IndustryBlueprint, MaterialCostLine } from '@/engine/industry/types';
 import { materialCostLines } from '@/engine/industry/sourcing';
-import { mergeSubBuildMaterials, planSubBuild, subBuildFeeTotal, type SubBuild } from './subBuild';
+import { planSubBuild } from './subBuild';
 
 const CTX = {
   facility: FACILITY_PRESETS.npcStation,
@@ -110,96 +106,5 @@ describe('planSubBuild', () => {
 
   it('refuses bad data rather than throwing, so one broken recipe cannot blank the table', () => {
     expect(planSubBuild(parent(57478, 150), recipe(), 99, CTX)).toBeNull();
-  });
-});
-
-describe('mergeSubBuildMaterials', () => {
-  const material = (typeID: number, quantity: number): EffectiveMaterial => ({
-    typeID,
-    baseQuantity: quantity,
-    quantity,
-  });
-
-  const sub = (typeID: number, inputs: EffectiveMaterial[]): SubBuild => ({
-    typeID,
-    runs: 1,
-    outputPerRun: 1,
-    unitsMade: 1,
-    needed: 1,
-    spare: 0,
-    me: 0,
-    seconds: 0,
-    inputs,
-    jobFee: { eiv: 0, grossCost: 0, sccSurcharge: 0, facilityTax: 0, total: 0 },
-  });
-
-  it('replaces an expanded material with what its recipe consumes', () => {
-    const merged = mergeSubBuildMaterials(
-      [material(57478, 150), material(34, 1000)],
-      new Map([[57478, sub(57478, [material(57457, 500)])]])
-    );
-
-    expect(merged).toEqual([material(34, 1000), material(57457, 500)]);
-  });
-
-  it('leaves every material alone when nothing is expanded', () => {
-    const materials = [material(57478, 150), material(34, 1000)];
-
-    expect(mergeSubBuildMaterials(materials, new Map())).toEqual(materials);
-  });
-
-  it('sums an input shared by two sub-builds after each job has rounded, never before', () => {
-    // Each job rounds 5 x 0.9 up to 5, so the pair costs 10. Summing first and
-    // rounding once would bill 9 — the error this ordering exists to avoid.
-    const merged = mergeSubBuildMaterials(
-      [material(1, 1), material(2, 1)],
-      new Map([
-        [1, sub(1, [material(57457, 5)])],
-        [2, sub(2, [material(57457, 5)])],
-      ])
-    );
-
-    expect(merged).toEqual([{ typeID: 57457, baseQuantity: 10, quantity: 10 }]);
-  });
-
-  it('folds an input into a material the plan already buys directly', () => {
-    const merged = mergeSubBuildMaterials(
-      [material(57478, 150), material(57457, 200)],
-      new Map([[57478, sub(57478, [material(57457, 500)])]])
-    );
-
-    expect(merged).toEqual([{ typeID: 57457, baseQuantity: 700, quantity: 700 }]);
-  });
-
-  it('keeps the plan’s own materials in their original order, with new inputs after them', () => {
-    const merged = mergeSubBuildMaterials(
-      [material(57478, 1), material(34, 1000), material(35, 500)],
-      new Map([[57478, sub(57478, [material(99, 1), material(98, 1)])]])
-    );
-
-    expect(merged.map((m) => m.typeID)).toEqual([34, 35, 99, 98]);
-  });
-});
-
-describe('subBuildFeeTotal', () => {
-  const fee = (total: number) => ({
-    eiv: 0,
-    grossCost: 0,
-    sccSurcharge: 0,
-    facilityTax: 0,
-    total,
-  });
-
-  it('adds up every sub-job installation fee', () => {
-    const subs = new Map<number, SubBuild>([
-      [1, { ...({} as SubBuild), jobFee: fee(100) }],
-      [2, { ...({} as SubBuild), jobFee: fee(250) }],
-    ]);
-
-    expect(subBuildFeeTotal(subs)).toBe(350);
-  });
-
-  it('is zero when nothing is expanded', () => {
-    expect(subBuildFeeTotal(new Map())).toBe(0);
   });
 });

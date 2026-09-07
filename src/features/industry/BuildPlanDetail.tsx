@@ -49,7 +49,6 @@ import {
   hasSubBuilds,
   materialTableRows,
   shoppingListMaterials,
-  subBuildFeeTotal,
   subBuildSeconds as computeSubBuildSeconds,
   type MaterialTableRow,
 } from './subBuildPlan';
@@ -378,27 +377,6 @@ export function BuildPlanDetail({
   }, [plan, blueprint, snapshot, materialPrices, skills, recipeFor, t]);
 
   /**
-   * What buying every material outright — nothing marked `buildHere` — would
-   * have cost, purely for the "buying it ready-made instead" comparison
-   * below. Never used for the plan's own totals or profit, which always use
-   * `result` above (priced exactly as the player configured it); computed
-   * only when there is a build choice to compare against, since it is a
-   * second full `buildVsBuy` pass.
-   */
-  const baselineResult = useMemo(() => {
-    if (!blueprint || !plan.buildHere || plan.buildHere.length === 0) return null;
-    return computeBuildPlan({
-      plan: { ...plan, buildHere: [] },
-      blueprint,
-      systemCostIndex: snapshot?.systemCostIndex ?? 0,
-      adjustedPrices: snapshot?.adjustedPrices ?? {},
-      hubPrices: snapshot?.hubPrices ?? {},
-      materialPrices,
-      skills,
-    }).result;
-  }, [plan, blueprint, snapshot, materialPrices, skills]);
-
-  /**
    * Both liquidation bases at once, so the Use-or-sell toggle switches between
    * two numbers already in hand rather than re-deriving one per click. Sell-now
    * reads the buy side of the book (what a standing order pays today), sell-order
@@ -489,7 +467,7 @@ export function BuildPlanDetail({
     [result]
   );
 
-  const anySubBuilds = result ? hasSubBuilds(result.materials) : false;
+  const anySubBuilds = useMemo(() => (result ? hasSubBuilds(result.materials) : false), [result]);
 
   /** Wall-clock every sub-job in the tree adds before the main run can even be installed. */
   const subBuildTimeSeconds = useMemo(
@@ -520,31 +498,39 @@ export function BuildPlanDetail({
     [result]
   );
 
-  /** Pure materials cost of every built branch (fees excluded), for the footnote's two-figure breakdown. */
-  const subBuildMaterialCost = useMemo(
-    () => shoppingListMaterials(builtTopLevel).reduce((sum, m) => sum + m.lineCost, 0),
+  /**
+   * What building the chosen material(s) actually costs — the sum of exactly
+   * the `lineCost`s `result.materialCost` already added for them, so this is
+   * never a second number that could drift from the totals above. Not split
+   * into materials/fees: a nested build's own fee is folded proportionally
+   * into its parent's `lineCost` whenever the job makes more than the parent
+   * needs (EVE sizes jobs in whole runs), so a separately-summed "fees"
+   * figure could disagree with what the split inside `lineCost` actually is.
+   */
+  const subBuildTotal = useMemo(
+    () => builtTopLevel.reduce((sum, material) => sum + material.lineCost, 0),
     [builtTopLevel]
   );
 
-  const subBuildFees = useMemo(() => subBuildFeeTotal(builtTopLevel), [builtTopLevel]);
-
   /**
-   * What buying the built material(s) outright would have cost, for the
-   * footnote's comparison — `null` when there is nothing to compare (nothing
-   * built) or when any of them genuinely isn't sold at this hub, rather than
-   * showing a number that quietly priced the unsold one as free (the bug
-   * this replaces).
+   * What buying the built material(s) outright would have cost instead, for
+   * the footnote's comparison — priced the same way a plain (unbuilt) row on
+   * this plan is, straight off `materialPrices`/an override, no second
+   * `buildVsBuy` pass. `null` when there is nothing to compare, or when any
+   * of them genuinely isn't sold at this hub, rather than showing a number
+   * that quietly priced the unsold one as free (the bug this replaces).
    */
   const buyInsteadTotal = useMemo(() => {
-    if (!baselineResult || builtTopLevel.length === 0) return null;
+    if (builtTopLevel.length === 0) return null;
     let total = 0;
     for (const material of builtTopLevel) {
-      const baseline = baselineResult.materials.find((m) => m.typeID === material.typeID);
-      if (!baseline || baseline.unpriced) return null;
-      total += baseline.lineCost;
+      const price =
+        plan.materialSourcing?.[material.typeID]?.overridePrice ?? materialPrices[material.typeID];
+      if (price === undefined) return null;
+      total += material.remainingQuantity * price;
     }
     return total;
-  }, [baselineResult, builtTopLevel]);
+  }, [builtTopLevel, plan.materialSourcing, materialPrices]);
 
   // The copy confirmation is a flash, not a state the panel keeps. Cleared by
   // an effect rather than a `setTimeout` inside the handler so unmounting mid-
@@ -1091,23 +1077,21 @@ export function BuildPlanDetail({
                 onToggleBuildHere={toggleBuildHere}
               />
               {/*
-              What building the chosen material(s) actually costs, broken into
-              materials and job fees — both already folded into the Results
-              panel's totals below, at whatever depth they were built to
-              (docs/context/decisions, since superseded: the two panels used
-              to disagree the moment a build was toggled). The "buying
-              instead" comparison only appears when every built material
-              genuinely has a hub price to compare against; silently pricing
-              an unsold item as free was the bug this replaces.
+              What building the chosen material(s) actually costs — already
+              folded into the Results panel's totals below, at whatever depth
+              they were built to (docs/context/decisions, since superseded:
+              the two panels used to disagree the moment a build was
+              toggled). The "buying instead" comparison only appears when
+              every built material genuinely has a hub price to compare
+              against; silently pricing an unsold item as free was the bug
+              this replaces.
             */}
               {anySubBuilds && (
                 <p className="mt-3 border-t border-line pt-2 text-[0.6875rem] text-text-dim">
                   {t('industry.subBuildSummary', {
                     count: visibleMaterials.filter((material) => material.subBuild !== undefined)
                       .length,
-                    materials: formatIsk(subBuildMaterialCost),
-                    fees: formatIsk(subBuildFees),
-                    total: formatIsk(subBuildMaterialCost + subBuildFees),
+                    total: formatIsk(subBuildTotal),
                   })}{' '}
                   {buyInsteadTotal !== null &&
                     t('industry.subBuildSummaryComparison', {
