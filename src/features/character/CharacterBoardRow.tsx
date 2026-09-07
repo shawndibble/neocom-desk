@@ -6,9 +6,16 @@
  * printed an absolute timestamp — so "is this soon?" was arithmetic the pilot
  * did in their head against a clock they had to remember was UTC.
  *
- * Every ordering and severity decision was already made in
- * `engine/character/board.ts`. Nothing here re-derives urgency; it only picks
- * the tone and the words for what the engine already decided.
+ * Every ordering decision was already made in `engine/character/board.ts`.
+ * Nothing here re-derives urgency; it only picks the words for what the engine
+ * already decided.
+ *
+ * **The colour on the countdown names the kind, not the urgency.** It used to
+ * be a severity tone, which meant the loudest thing on the row repeated what
+ * the countdown beside it already said in words — and said nothing at all
+ * about *what* was ending. The hue now matches the kind's dot in the Calendar
+ * Map, its segment in the Day Ticker and its swatch in the filter menu, so one
+ * glance down the rail sorts six kinds of clock apart.
  */
 import { useTranslation } from 'react-i18next';
 import type { CharacterBoardItem, CharacterBoardItemKind } from '@/engine/character/board';
@@ -18,7 +25,7 @@ import * as Icon from '@/components/ui/icons';
 import { RESPONSE_KEY, RESPONSE_TEXT_TONE } from './calendarResponseTone';
 import { EventContextMenu } from './EventContextMenu';
 import { KIND_LABEL } from './calendarKindLabels';
-import { SEVERITY_LABEL, SEVERITY_TEXT } from '@/components/ui/severityTone';
+import { KIND_TEXT } from '@/components/ui/kindTone';
 
 /** One glyph per kind, from the app's own vocabulary — the same icons those routes carry in the nav. */
 const KIND_ICON: Record<CharacterBoardItemKind, typeof Icon.Skills> = {
@@ -52,18 +59,22 @@ export function CharacterBoardRow({ item, onSelectEvent }: CharacterBoardRowProp
 
   const body = (
     <>
-      <KindIcon className="size-4 shrink-0 text-text-dim" aria-hidden="true" />
+      {/*
+        The glyph takes the kind's hue too, so the colour has a shape attached
+        to it at the start of every row rather than living only in the
+        countdown's four characters.
+      */}
+      <KindIcon className={`size-4 shrink-0 ${KIND_TEXT[item.kind]}`} aria-hidden="true" />
       <span className="min-w-0">
         <span className="flex items-center gap-2">
-          <span className={`text-xs font-semibold tabular-nums ${SEVERITY_TEXT[item.severity]}`}>
+          {/*
+            Colour is never the only signal (DESIGN.md §7) — and here it needs
+            no sr-only companion, because what the hue encodes is the kind, and
+            the kind is already written out in words on the row's third line.
+          */}
+          <span className={`text-xs font-semibold tabular-nums ${KIND_TEXT[item.kind]}`}>
             {countdown}
           </span>
-          {/*
-            Colour is never the only signal (DESIGN.md §7). The countdown text
-            carries the fact, and the severity word carries it again for a
-            screen reader, which cannot see the tone at all.
-          */}
-          <span className="sr-only">{t(SEVERITY_LABEL[item.severity])}</span>
           {item.important && (
             <span className="text-[0.6875rem] font-semibold tracking-widest text-text uppercase">
               {t('calendar.important')}

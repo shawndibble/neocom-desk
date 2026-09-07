@@ -45,8 +45,9 @@ here — they go one per file in `docs/context/decisions/`.
   per-row tooltips. Those stay short — a verdict line, the two numbers behind
   it, and what clicking does — never a panel.
 - **Calendar Map**: The `/calendar` grid, demoted from a container to a map —
-  each day cell carries its date, a count, and one severity dot per clock, and
-  nothing else. The detail lives in the **Coming Up Rail** beside it. Days
+  each day cell carries its date, a count, and one dot per **Clock Kind**
+  landing on it, and nothing else. The detail lives in the **Coming Up Rail**
+  beside it. Days
   before today are hatched and captioned rather than merely empty: ESI returns
   calendar events from now only and the cache replaces its row wholesale, so a
   past cell is structurally incapable of holding anything, which is a different
@@ -69,13 +70,22 @@ here — they go one per file in `docs/context/decisions/`.
   the _cause_ can never be distinguished; only this one unified symptom is
   detectable. Distinct from **Skill Level Complete**, which fires per
   finished queue entry while training continues.
+- **Clock Kind**: Which of the six sources a **Character Board Item** came
+  from. The `/calendar` page's one colour scale names this and nothing else —
+  a **nominal** palette (`--color-kind-*`, DESIGN.md §1), unlike every other
+  colour in the app, which encodes a magnitude or a status. Carried by the
+  rail's countdown and glyph, one dot per kind in the **Calendar Map**, a
+  segment in the **Day Ticker**, and a swatch in the filter menu, which is the
+  legend for the set. Never the only signal: the kind is always also named.
 - **Coming Up Rail**: The `/calendar` list beside the **Calendar Map**: every
   **Character Board Item** the pilot can read, deadline-ordered under relative
   day headings, each row carrying a countdown. The half of the page that
   answers "what happens next", where the map answers "what shape is the month".
-  Scoped to one day when a map cell is selected, and to the board's single
-  30-day horizon otherwise — one horizon, read by map, ticker and rail alike,
-  so a day cannot show a dot for something the rail declines to list.
+  Scoped to one day when a map cell is selected, and otherwise unbounded ahead
+  — the board has no forward horizon, because a cap makes the map's cells past
+  it look empty for a reason that is not about the pilot's data. Map, ticker
+  and rail all read the same board, so a day cannot show a dot for something
+  the rail declines to list.
 - **Compare**: A tab that puts the Quickbar's items side by side on best sell,
   best buy, spread and volume, under the same **Location Mode** as the order
   book beside it.
@@ -119,7 +129,8 @@ here — they go one per file in `docs/context/decisions/`.
   that is over budget, by the size of the excess. Prefilled into the Booster
   control; not a separate mechanism.
 - **Day Ticker**: The **Calendar Map** on a phone — one horizontally scrolled
-  row of day columns, each with its weekday, date, a severity bar and a count,
+  row of day columns, each with its weekday, date, a count and a bar segmented
+  by **Clock Kind**,
   in place of a 7x6 grid that would take the width the **Coming Up Rail** needs.
   The same day buckets the wide grid reads, sliced rather than re-bucketed, on
   the `CorpDeadlineStrip` precedent.

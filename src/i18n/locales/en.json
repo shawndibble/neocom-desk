@@ -1385,7 +1385,7 @@
       "today": "Today",
       "clearDay": "Show all days",
       "pastHint": "Hatched days are behind you: no new calendar event can land there, though anything overdue still shows.",
-      "dayWithLoad": "{{date}} — {{count}} due, most urgent {{severity}}",
+      "dayWithLoad": "{{date}} — {{count}} due: {{kinds}}",
       "dayEmpty": "{{date}} — nothing due"
     },
     "density": {

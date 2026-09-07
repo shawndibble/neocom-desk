@@ -1,11 +1,17 @@
 /**
  * Severity to tokens: fill, text tone, icon and the word for it.
  *
- * Both deadline boards render the same four-value ladder — the corp ops board
- * as rows and a strip, the character's Coming Up rail as rows, a map and a
- * ticker — and each had grown its own copy of these maps. Nine `Record`
- * literals over four keys is how one of them quietly ends up a shade off the
- * others, or keeps a tone the palette has since dropped.
+ * The corp ops board renders this four-value ladder as rows and as a strip,
+ * and each had grown its own copy of these maps. Several `Record` literals
+ * over four keys is how one of them quietly ends up a shade off the others, or
+ * keeps a tone the palette has since dropped.
+ *
+ * **This is a magnitude scale, and only corp paints it now.** The character's
+ * Coming Up rail used to as well; its colour names the *kind* of clock instead
+ * (`kindTone.ts`), because on a list that is already ordered by deadline and
+ * carries a countdown on every row, a severity tone was the third telling of
+ * one fact and the first telling of none. Keep the two apart: an ordinal scale
+ * and a nominal one are not interchangeable, however similar these maps look.
  *
  * The i18n keys stay in the `corp.board.severity.*` namespace they were born
  * in: the four words are the same four words, and a second set of English

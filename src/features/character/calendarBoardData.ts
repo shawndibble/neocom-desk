@@ -82,8 +82,9 @@ export interface CalendarBoardData {
    * Read here rather than at render for two reasons. It keeps the route pure —
    * a `Date.now()` inside a `useMemo` is a lint error and, more to the point, a
    * bug waiting for a re-render. And it guarantees the map, the ticker and the
-   * rail share one instant: a dot and the row it stands for must not land in
-   * different severity bands because they each asked the clock separately.
+   * rail share one instant: a dot and the row it stands for must not land on
+   * different days, or show countdowns a minute apart, because they each asked
+   * the clock separately.
    */
   loadedAtMs: number;
 }

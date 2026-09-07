@@ -13,26 +13,27 @@
  * argument wherever "today" is a question.
  */
 
-import type { DeadlineSeverity } from '../severity';
-import { DEADLINE_SEVERITIES } from '../severity';
 import type { CharacterBoardItem, CharacterBoardItemKind } from './board';
+import { CHARACTER_BOARD_ITEM_KINDS } from './board';
 import { localMidnight, nextLocalDay } from '../localDay';
 
 export { localMidnight };
 
-/** What one day of the map or the ticker draws: how many, and how bad. */
+/** What one day of the map or the ticker draws: how many, and what of. */
 export interface DayLoad {
   count: number;
-  /** The worst severity landing on that day — one bad item may not hide behind four calm ones. */
-  severity: DeadlineSeverity;
-}
-
-const SEVERITY_RANK = new Map<DeadlineSeverity, number>(
-  DEADLINE_SEVERITIES.map((severity, index) => [severity, index])
-);
-
-function worse(a: DeadlineSeverity, b: DeadlineSeverity): DeadlineSeverity {
-  return (SEVERITY_RANK.get(a) ?? 0) <= (SEVERITY_RANK.get(b) ?? 0) ? a : b;
+  /**
+   * Which kinds land on that day — **each once**, in
+   * `CHARACTER_BOARD_ITEM_KINDS` order.
+   *
+   * Deduplicated because the count beside it already carries magnitude: a day
+   * holding four skill completions is one fact about that day, and four
+   * identical dots would spend four times the ink saying it. Ordered by the
+   * board's own kind order rather than by when each first appeared, so two
+   * days holding the same kinds draw the same dots in the same places and the
+   * eye can compare a row of cells without re-reading each one.
+   */
+  kinds: CharacterBoardItemKind[];
 }
 
 /**
@@ -44,16 +45,23 @@ function worse(a: DeadlineSeverity, b: DeadlineSeverity): DeadlineSeverity {
  * days and look each one up.
  */
 export function countsByDay(items: readonly CharacterBoardItem[]): Map<number, DayLoad> {
-  const days = new Map<number, DayLoad>();
+  const seen = new Map<number, { count: number; kinds: Set<CharacterBoardItemKind> }>();
   for (const item of items) {
     const key = localMidnight(item.deadlineMs);
-    const existing = days.get(key);
+    const existing = seen.get(key);
     if (existing) {
       existing.count += 1;
-      existing.severity = worse(existing.severity, item.severity);
+      existing.kinds.add(item.kind);
     } else {
-      days.set(key, { count: 1, severity: item.severity });
+      seen.set(key, { count: 1, kinds: new Set([item.kind]) });
     }
+  }
+
+  const days = new Map<number, DayLoad>();
+  for (const [key, { count, kinds }] of seen) {
+    // Filtered rather than sorted: the canonical order is the source of truth,
+    // so the result cannot disagree with it even if a kind is added later.
+    days.set(key, { count, kinds: CHARACTER_BOARD_ITEM_KINDS.filter((kind) => kinds.has(kind)) });
   }
   return days;
 }
