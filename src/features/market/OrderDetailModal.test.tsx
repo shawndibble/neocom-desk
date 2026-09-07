@@ -649,11 +649,68 @@ describe('OrderDetailModal', () => {
       expect(screen.getByText('-30.00 / unit')).toBeInTheDocument();
     });
 
-    it('names hauling and reprocessing as not built rather than estimating them', () => {
+    it('names reprocessing as not built rather than estimating it', () => {
       renderModal({ row: UNDERCUT_ROW, stationChecked: true });
 
-      expect(screen.getByText('Haul to another trade hub')).toBeInTheDocument();
       expect(screen.getByText('Reprocess and sell the minerals')).toBeInTheDocument();
+    });
+
+    it('offers the hubs that bid more than the local exit, with the distance to each', () => {
+      renderModal({
+        row: UNDERCUT_ROW,
+        stationChecked: true,
+        hubs: [
+          {
+            hubId: 'amarr',
+            systemName: 'Amarr',
+            stationId: 60008494,
+            buyMax: 600,
+            jumps: { kind: 'known', jumps: 9 },
+          },
+          { hubId: 'rens', systemName: 'Rens', stationId: 60004588, buyMax: 400 },
+        ],
+      });
+
+      // UNDERCUT_ROW asks 500 with no local buy order, so Amarr's 600 bid is
+      // +100 a unit across its 10 remaining units; Rens bids under the ask.
+      expect(screen.getByText(/Amarr bids 600.00/)).toBeInTheDocument();
+      expect(screen.getByText('9 jumps')).toBeInTheDocument();
+      expect(screen.getByText('+100.00 / unit, 1,000.00 in all')).toBeInTheDocument();
+      expect(screen.queryByText(/Rens bids/)).not.toBeInTheDocument();
+    });
+
+    it('says so when no hub beats the local exit, and never claims that before the prices land', () => {
+      renderModal({
+        row: UNDERCUT_ROW,
+        stationChecked: true,
+        hubs: [{ hubId: 'rens', systemName: 'Rens', stationId: 60004588, buyMax: 400 }],
+      });
+      expect(
+        screen.getByText('No trade hub bids more than you can get where this stock sits.')
+      ).toBeInTheDocument();
+
+      cleanup();
+      renderModal({ row: UNDERCUT_ROW, stationChecked: true, hubs: undefined });
+      expect(screen.getByText('Checking the trade hubs…')).toBeInTheDocument();
+
+      cleanup();
+      renderModal({ row: UNDERCUT_ROW, stationChecked: true, hubs: undefined, hubsFailed: true });
+      expect(
+        screen.getByText('Could not read the trade hub prices. Reopen this order to try again.')
+      ).toBeInTheDocument();
+    });
+
+    it('keeps a hub row on an order with no floor, where every other exit is silent', () => {
+      renderModal({
+        row: { ...UNDERCUT_ROW, floor: null },
+        stationChecked: true,
+        hubs: [{ hubId: 'amarr', systemName: 'Amarr', stationId: 60008494, buyMax: 600 }],
+      });
+
+      expect(
+        screen.getByText('Link a build and we can work out what each way out is worth.')
+      ).toBeInTheDocument();
+      expect(screen.getByText(/Amarr bids 600.00/)).toBeInTheDocument();
     });
 
     it('ranks my price at my station from a complete book, and not from a truncated one', () => {

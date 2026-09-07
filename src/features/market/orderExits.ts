@@ -3,9 +3,11 @@
  * "is there a better exit?" in the detail modal.
  *
  * Every row is a real number this app can stand behind, or it is absent.
- * One exit the design asked for is deliberately NOT here: hauling to the
- * nearest trade hub, since no hub prices are loaded on this page. The modal
- * names it as not built rather than estimating it.
+ *
+ * Hauling is answered by `hubHaulGaps` rather than by an `OrderExit`: what a
+ * trade hub pays is knowable, what moving the stock there costs is not, so a
+ * hub is offered as a price and a distance to judge, never as a net the app
+ * pretends to have costed.
  *
  * Which fee applies is the whole point of the comparison, and the two
  * floors differ by exactly that:
@@ -20,6 +22,8 @@
  */
 import type { OpenOrderRow } from './openOrdersModel';
 import type { CompetingOrder } from '@/engine/market/undercut';
+import type { JumpsAwayResult } from '@/engine/jumpsAway';
+import type { TradeHub } from '@/market/hubs';
 import type { ReprocessingType } from '@/sde/types';
 import {
   reprocessingEfficiency,
@@ -142,4 +146,81 @@ export function orderExits({ row, competitors, reprocessing }: OrderExitsInput):
   }
 
   return exits;
+}
+
+/** One trade hub's standing offer for this item, as the modal has resolved it. */
+export interface HubBuyPrice {
+  hubId: TradeHub['id'];
+  /** Short system name, e.g. "Amarr" — what the row is labelled with. */
+  systemName: string;
+  stationId: number;
+  /** Best buy order AT the hub station, or null when the hub has none. */
+  buyMax: number | null;
+  /** Undefined until the route resolves, or when this order's own system is unknown (a player structure). */
+  jumps?: JumpsAwayResult;
+}
+
+export interface HubHaulGap {
+  hubId: TradeHub['id'];
+  systemName: string;
+  /** What the hub's best buy order pays a unit. */
+  price: number;
+  /** ISK a unit more than the best exit available here and now, before any hauling cost. */
+  overLocal: number;
+  /** `overLocal` across the stock still on the order. */
+  totalIsk: number;
+  /** Profit a unit against the fill floor, or null when no build is linked and there is no floor to beat. */
+  netPerUnit: number | null;
+  jumps?: JumpsAwayResult;
+}
+
+export interface HubHaulGapsInput {
+  row: OpenOrderRow;
+  hubs: readonly HubBuyPrice[];
+  /** The region order book, once fetched — the only source of buy orders. */
+  competitors?: readonly CompetingOrder[];
+}
+
+/**
+ * Trade hubs whose buy orders pay more for this stock than anything it can be
+ * sold into where it sits — "haul it there?", stated as a gap and a distance.
+ *
+ * Two things make this standable-behind under the rule the rest of the file
+ * follows. Fuzzwork is queried `?station={hub}`, so `buyMax` is an order AT
+ * the hub station, the same own-station restriction `bestLocalBuyPrice`
+ * applies here; and the number offered is a price gap, which needs no view of
+ * what a courier charges. The hauling cost is the player's to judge, and the
+ * modal says so.
+ *
+ * The comparison is against the best IMMEDIATE local exit — the best buy
+ * order at this station, or, when there is none, the price this order is
+ * already asking. Never against `hold`'s optimistic ask when a buy order
+ * exists: a hub that beats every real bid here is a real answer even if it
+ * sits under a listing that may never fill.
+ *
+ * Unlike every `OrderExit`, a gap survives a missing Order Floor: `netPerUnit`
+ * goes null and `overLocal` still stands, because a hub paying more than the
+ * local bid is true whether or not a build is linked.
+ */
+export function hubHaulGaps({ row, hubs, competitors }: HubHaulGapsInput): HubHaulGap[] {
+  if (row.isBuyOrder) return [];
+  const local = (competitors ? bestLocalBuyPrice(row, competitors) : null) ?? row.price;
+
+  return hubs
+    .filter((hub) => hub.stationId !== row.locationId)
+    .flatMap((hub) => {
+      if (hub.buyMax === null || hub.buyMax <= local) return [];
+      return [
+        {
+          hubId: hub.hubId,
+          systemName: hub.systemName,
+          price: hub.buyMax,
+          overLocal: hub.buyMax - local,
+          totalIsk: (hub.buyMax - local) * row.volumeRemain,
+          netPerUnit: row.floor ? hub.buyMax - row.floor.fill : null,
+          ...(hub.jumps ? { jumps: hub.jumps } : {}),
+        },
+      ];
+    })
+    .sort((a, b) => b.price - a.price);
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { orderExits } from './orderExits';
+import { orderExits, hubHaulGaps, type HubBuyPrice } from './orderExits';
 import type { OpenOrderRow } from './openOrdersModel';
 import type { CompetingOrder } from '@/engine/market/undercut';
 
@@ -154,5 +154,95 @@ describe('orderExits', () => {
     it('is absent until the refining data and prices have loaded', () => {
       expect(orderExits({ row: BASE_ROW }).map((e) => e.kind)).toEqual(['hold']);
     });
+  });
+});
+
+describe('hubHaulGaps', () => {
+  function hub(overrides: Partial<HubBuyPrice>): HubBuyPrice {
+    return {
+      hubId: 'amarr',
+      systemName: 'Amarr',
+      stationId: 60008494,
+      buyMax: 600,
+      jumps: { kind: 'known', jumps: 9 },
+      ...overrides,
+    };
+  }
+
+  it('offers only hubs that beat the best buy order at my own station', () => {
+    const gaps = hubHaulGaps({
+      row: BASE_ROW,
+      competitors: [buyOrder({ price: 550, locationId: BASE_ROW.locationId })],
+      hubs: [
+        hub({ hubId: 'amarr', systemName: 'Amarr', buyMax: 600 }),
+        hub({ hubId: 'rens', systemName: 'Rens', buyMax: 540 }),
+      ],
+    });
+
+    expect(gaps.map((g) => g.hubId)).toEqual(['amarr']);
+    expect(gaps[0]).toMatchObject({ price: 600, overLocal: 50, netPerUnit: 220 });
+  });
+
+  it('compares against my own asking price when no buy order sits at my station', () => {
+    const gaps = hubHaulGaps({
+      row: BASE_ROW,
+      hubs: [hub({ buyMax: 520 }), hub({ hubId: 'hek', systemName: 'Hek', buyMax: 480 })],
+    });
+
+    expect(gaps.map((g) => g.hubId)).toEqual(['amarr']);
+    expect(gaps[0].overLocal).toBe(20);
+  });
+
+  it('ranks the richest hub first and totals the gap across the stock still on the order', () => {
+    const gaps = hubHaulGaps({
+      row: BASE_ROW,
+      hubs: [
+        hub({ hubId: 'amarr', systemName: 'Amarr', buyMax: 600 }),
+        hub({ hubId: 'rens', systemName: 'Rens', buyMax: 700 }),
+      ],
+    });
+
+    expect(gaps.map((g) => g.hubId)).toEqual(['rens', 'amarr']);
+    expect(gaps[0].totalIsk).toBe(2000);
+  });
+
+  it('drops the hub the stock already sits in, which cannot be hauled to', () => {
+    const gaps = hubHaulGaps({
+      row: BASE_ROW,
+      hubs: [
+        hub({ hubId: 'jita', systemName: 'Jita', stationId: BASE_ROW.locationId, buyMax: 900 }),
+      ],
+    });
+
+    expect(gaps).toEqual([]);
+  });
+
+  it('keeps a hub whose price is known but whose distance is not', () => {
+    const gaps = hubHaulGaps({
+      row: BASE_ROW,
+      hubs: [hub({ buyMax: 600, jumps: undefined })],
+    });
+
+    expect(gaps).toHaveLength(1);
+    expect(gaps[0].jumps).toBeUndefined();
+  });
+
+  it('leaves net per unit unclaimed on an order with no floor, keeping the gap', () => {
+    const gaps = hubHaulGaps({
+      row: { ...BASE_ROW, floor: null },
+      hubs: [hub({ buyMax: 600 })],
+    });
+
+    expect(gaps[0]).toMatchObject({ overLocal: 100, netPerUnit: null });
+  });
+
+  it('offers nothing for a buy order, which holds no stock to move', () => {
+    expect(
+      hubHaulGaps({ row: { ...BASE_ROW, isBuyOrder: true }, hubs: [hub({ buyMax: 900 })] })
+    ).toEqual([]);
+  });
+
+  it('skips a hub Fuzzwork has no buy order for', () => {
+    expect(hubHaulGaps({ row: BASE_ROW, hubs: [hub({ buyMax: null })] })).toEqual([]);
   });
 });
