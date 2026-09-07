@@ -53,6 +53,23 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      # An absent token makes the Sentry plugin skip source-map upload in
+      # silence — the deploy stays green and production traces are minified,
+      # which looks identical to a healthy build until someone opens an issue
+      # and finds `chunk-4f2a.js:1:28471`. Say which way it went, in the log
+      # and in the run summary. Prints set/unset, never the value.
+      #
+      # Scaffolding: this exists to prove the first deploy really uploads, and
+      # can come out once a production issue has shown a readable stack trace.
+      - name: Report Sentry source-map credentials
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+        run: |
+          if [ -n "$SENTRY_AUTH_TOKEN" ]; then
+            echo "SENTRY_AUTH_TOKEN set - uploading source maps to ${{ vars.SENTRY_ORG }}/${{ vars.SENTRY_PROJECT }}"
+          else
+            echo "::warning::SENTRY_AUTH_TOKEN unset - skipping source-map upload; production stack traces will be minified"
+          fi
       - run: npm run build
         env:
           VITE_EVE_CLIENT_ID: ${{ vars.VITE_EVE_CLIENT_ID }}
