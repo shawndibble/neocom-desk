@@ -20,6 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
   Spinner,
+  Tooltip,
   type DataTableColumn,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
@@ -35,7 +36,7 @@ import type { NpcStationEntry } from '@/sde/marketTypes';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
 import { cx } from '@/lib/cx';
-import { formatIsk, formatIskCompact } from '@/lib/isk';
+import { formatIskAuto, formatIskCompact } from '@/lib/isk';
 import { TRADE_HUBS } from '@/market/hubs';
 import { downloadCsv } from '@/lib/downloadCsv';
 import { ordersCsvColumns } from '@/features/character/ordersCsv';
@@ -141,6 +142,12 @@ interface Snapshot {
 
 function itemKey(regionId: number, typeId: number): string {
   return `${regionId}:${typeId}`;
+}
+
+/** "Jita 4 - Moon 4 - Caldari Navy Assembly Plant" -> "Jita 4"; the full name still shows on hover. */
+function stationShortName(name: string): string {
+  const dashIndex = name.indexOf(' - ');
+  return dashIndex === -1 ? name : name.slice(0, dashIndex);
 }
 
 async function loadOpenOrdersSnapshot(
@@ -569,27 +576,9 @@ export function OpenOrdersPanel() {
       primary: true,
       sortValue: (row) => row.typeName,
       render: (row) => (
-        <span className="flex flex-col gap-0.5">
-          <span className="flex flex-wrap items-center gap-1">
-            <MarketItemLink typeId={row.typeId}>{row.typeName}</MarketItemLink>
-            {showCharacterStrip && <CharacterBadge characterName={row.characterName} t={t} />}
-          </span>
-          {/*
-            What the floor column is reading from, said on the row that owns
-            it. Without this an order with no linked build shows an em-dash
-            under "Never sell below" and nothing anywhere explains why — the
-            single most confusing thing on the page for a player who has not
-            linked any builds yet.
-          */}
-          {!row.isBuyOrder && (
-            <span className="text-[0.6875rem] text-text-dim">
-              {/*
-                Not the run's id: `ProductionRunRecord.id` is an opaque
-                storage key, and there is no user-facing run number to show.
-              */}
-              {row.costBasis ? t('market.orders.buildLinked') : t('market.orders.noBuildLinked')}
-            </span>
-          )}
+        <span className="flex flex-wrap items-center gap-1">
+          <MarketItemLink typeId={row.typeId}>{row.typeName}</MarketItemLink>
+          {showCharacterStrip && <CharacterBadge characterName={row.characterName} t={t} />}
         </span>
       ),
     },
@@ -599,7 +588,20 @@ export function OpenOrdersPanel() {
       className: 'text-text-dim',
       render: (row) => (
         <span className="flex flex-col gap-0.5">
-          <span>{row.stationName ?? t('market.unknownStructure')}</span>
+          <span>
+            {row.stationName === null ? (
+              t('market.unknownStructure')
+            ) : (
+              <Tooltip content={row.stationName}>
+                <span
+                  tabIndex={0}
+                  className="cursor-help underline decoration-dotted decoration-text-dim/50 underline-offset-2"
+                >
+                  {stationShortName(row.stationName)}
+                </span>
+              </Tooltip>
+            )}
+          </span>
           {/*
             Only ever claimed for a location this app actually resolved: an
             unresolved player structure is "not checked", not "off hub".
@@ -622,7 +624,7 @@ export function OpenOrdersPanel() {
       align: 'right',
       className: 'tabular-nums',
       sortValue: (row) => row.price,
-      render: (row) => formatIsk(row.price, 2),
+      render: (row) => formatIskAuto(row.price),
     },
     {
       id: 'problem',
@@ -643,7 +645,7 @@ export function OpenOrdersPanel() {
       align: 'right',
       className: 'tabular-nums',
       sortValue: (row) => row.floor?.relist,
-      render: (row) => (row.floor ? formatIsk(row.floor.relist, 2) : t('common.unknown')),
+      render: (row) => (row.floor ? formatIskAuto(row.floor.relist) : t('common.unknown')),
     },
     {
       id: 'remaining',
@@ -672,6 +674,11 @@ export function OpenOrdersPanel() {
     },
   ];
 
+  // No order carries a floor (nothing has a linked build), so the whole
+  // column would be a wall of dashes — dropped rather than shown empty.
+  const hasFloorData = allRows.some((row) => row.floor !== null);
+  const visibleColumns = columns.filter((column) => column.id !== 'floor' || hasFloorData);
+
   return (
     <Panel
       padded={false}
@@ -680,7 +687,7 @@ export function OpenOrdersPanel() {
           <IconButton
             size="sm"
             icon={<Icon.Refresh />}
-            label={t('orders.refresh')}
+            label={t('market.orders.refreshOrders')}
             onClick={refresh}
           />
           <IconButton
@@ -996,7 +1003,7 @@ export function OpenOrdersPanel() {
                           <IconButton
                             size="sm"
                             variant="plain"
-                            icon={<Icon.Route />}
+                            icon={<Icon.Refresh />}
                             label={t('market.orders.checkDeeper')}
                             onClick={() => checkGroupDeeper(group.rows)}
                           />
@@ -1025,7 +1032,7 @@ export function OpenOrdersPanel() {
                     )
                   ) : (
                     <DataTable
-                      columns={columns}
+                      columns={visibleColumns}
                       rows={group.rows}
                       rowKey={(row) => row.orderId}
                       label={`${groupTitle} · ${group.rows.length}`}

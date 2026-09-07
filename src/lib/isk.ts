@@ -37,6 +37,15 @@ export function formatIsk(value: number, decimals = 0): string {
 }
 
 /**
+ * ISK with cents only where they could matter — under 100 ISK, where a
+ * fraction is a real difference (a mineral priced at 4.99 vs 5.01). Above
+ * that the decimals are noise nobody reads on a six- or seven-figure price.
+ */
+export function formatIskAuto(value: number): string {
+  return formatIsk(value, Math.abs(value) > 100 ? 0 : 2);
+}
+
+/**
  * Grouped digits for an editable ISK field at rest — commas, and up to 2
  * decimal places only if the value actually has them (`1,234` vs `1,234.56`,
  * never a padded `1,234.00`). Distinct from `numberMask.ts`'s `maskNumber`,

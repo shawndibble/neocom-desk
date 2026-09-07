@@ -11,7 +11,9 @@
  */
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
-import { formatIsk } from '@/lib/isk';
+import { Tooltip } from '@/components/ui';
+import { cx } from '@/lib/cx';
+import { formatIskAuto } from '@/lib/isk';
 import { orderRowSummary } from './orderRowSummary';
 import type { OpenOrderRow } from './openOrdersModel';
 
@@ -28,12 +30,7 @@ export function OrderRowSummaryText({ row }: { row: OpenOrderRow }): ReactElemen
 
   switch (summary.kind) {
     case 'undercut': {
-      const parts = [
-        t(SCOPE_KEY[summary.scope], {
-          price: formatIsk(summary.rivalPrice, 2),
-          gap: formatIsk(summary.gapIsk, 2),
-        }),
-      ];
+      const parts = [t(SCOPE_KEY[summary.scope], { price: formatIskAuto(summary.rivalPrice) })];
       if (summary.sellersUnderMe !== null) {
         parts.push(t('market.orders.rowSummary.sellersUnderMe', { count: summary.sellersUnderMe }));
       }
@@ -43,7 +40,7 @@ export function OrderRowSummaryText({ row }: { row: OpenOrderRow }): ReactElemen
             summary.match.kind === 'profit'
               ? 'market.orders.rowSummary.matchProfit'
               : 'market.orders.rowSummary.matchLoss',
-            { amount: formatIsk(summary.match.amount, 2) }
+            { amount: formatIskAuto(summary.match.amount) }
           )
         );
       }
@@ -55,9 +52,24 @@ export function OrderRowSummaryText({ row }: { row: OpenOrderRow }): ReactElemen
           {summary.match && (
             <>
               {' · '}
-              <span className={summary.match.kind === 'loss' ? 'text-danger' : 'text-success'}>
-                {parts[parts.length - 1]}
-              </span>
+              <Tooltip
+                content={t('market.orders.rowSummary.matchTooltip', {
+                  rival: formatIskAuto(summary.rivalPrice),
+                  floor: row.floor ? formatIskAuto(row.floor.relist) : '',
+                })}
+              >
+                <span
+                  tabIndex={0}
+                  className={cx(
+                    'cursor-help underline decoration-dotted underline-offset-2',
+                    summary.match.kind === 'loss'
+                      ? 'text-danger decoration-danger/50'
+                      : 'text-success decoration-success/50'
+                  )}
+                >
+                  {parts[parts.length - 1]}
+                </span>
+              </Tooltip>
             </>
           )}
         </span>
@@ -67,7 +79,7 @@ export function OrderRowSummaryText({ row }: { row: OpenOrderRow }): ReactElemen
       return (
         <span className="text-xs text-danger">
           {t('market.orders.rowSummary.belowFloor', {
-            amount: formatIsk(summary.lossPerUnit, 2),
+            amount: formatIskAuto(summary.lossPerUnit),
           })}
         </span>
       );
@@ -88,8 +100,8 @@ export function OrderRowSummaryText({ row }: { row: OpenOrderRow }): ReactElemen
       return (
         <span className="text-xs text-text-dim">
           {t('market.orders.rowSummary.outbid', {
-            price: formatIsk(summary.rivalPrice, 2),
-            gap: formatIsk(summary.gapIsk, 2),
+            price: formatIskAuto(summary.rivalPrice),
+            gap: formatIskAuto(summary.gapIsk),
           })}
         </span>
       );
