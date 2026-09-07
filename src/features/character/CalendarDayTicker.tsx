@@ -15,7 +15,8 @@ import { useTranslation } from 'react-i18next';
 import type { DayLoad } from '@/engine/character/deadlines';
 import { localMidnight } from '@/engine/character/deadlines';
 import type { GridDay } from '@/lib/calendarGrid';
-import { SEVERITY_DOT, SEVERITY_LABEL } from './calendarSeverityTone';
+import { cx } from '@/lib/cx';
+import { SEVERITY_FILL, SEVERITY_LABEL } from '@/components/ui/severityTone';
 
 export interface CalendarDayTickerProps {
   days: readonly GridDay[];
@@ -68,13 +69,11 @@ export function CalendarDayTicker({
                 : t('calendar.map.dayEmpty', { date: fullDate.format(day.date) })
             }
             onClick={() => onSelectDay(isSelected ? null : dayStartMs)}
-            className={[
+            className={cx(
               'flex min-h-11 w-12 shrink-0 flex-col items-center gap-1 rounded-xs border px-1 py-1.5',
               isSelected ? 'border-accent-dim bg-accent/15' : 'border-transparent',
-              isPast ? 'calendar-map-past' : '',
-            ]
-              .filter(Boolean)
-              .join(' ')}
+              isPast ? 'calendar-map-past' : ''
+            )}
           >
             <span
               className={`text-[0.6875rem] font-semibold tracking-widest uppercase ${
@@ -93,7 +92,7 @@ export function CalendarDayTicker({
             {/* Reserved whether or not the day holds anything, so every column lines up. */}
             <span
               aria-hidden="true"
-              className={`h-0.5 w-6 rounded-full ${load ? SEVERITY_DOT[load.severity] : ''}`}
+              className={`h-0.5 w-6 rounded-full ${load ? SEVERITY_FILL[load.severity] : ''}`}
             />
             <span className="h-3.5 text-[0.6875rem] leading-3.5 text-text-dim tabular-nums">
               {load ? load.count : ''}

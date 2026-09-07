@@ -18,7 +18,7 @@ import * as Icon from '@/components/ui/icons';
 import { RESPONSE_KEY, RESPONSE_TEXT_TONE } from './calendarResponseTone';
 import { EventContextMenu } from './EventContextMenu';
 import { KIND_LABEL } from './calendarKindLabels';
-import { SEVERITY_LABEL, SEVERITY_TEXT } from './calendarSeverityTone';
+import { SEVERITY_LABEL, SEVERITY_TEXT } from '@/components/ui/severityTone';
 
 /** One glyph per kind, from the app's own vocabulary — the same icons those routes carry in the nav. */
 const KIND_ICON: Record<CharacterBoardItemKind, typeof Icon.Skills> = {

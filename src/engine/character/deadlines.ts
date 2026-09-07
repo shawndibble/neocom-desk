@@ -16,23 +16,9 @@
 import type { DeadlineSeverity } from '../severity';
 import { DEADLINE_SEVERITIES } from '../severity';
 import type { CharacterBoardItem, CharacterBoardItemKind } from './board';
+import { localMidnight, nextLocalDay } from '../localDay';
 
-/**
- * Days are **local calendar days, not rolling 24-hour windows** — the same
- * rule the corp Deadline Strip settled on. A pilot reading "Tuesday" means
- * their own Tuesday, so this reads the machine's zone deliberately and takes
- * no zone argument.
- *
- * Implemented by zeroing a `Date`'s clock fields rather than by subtracting a
- * modulus: a `ms % 86_400_000` is an hour wrong for half the year on either
- * side of a DST change, and the error is invisible until someone's event files
- * under the wrong heading.
- */
-export function localMidnight(ms: number): number {
-  const date = new Date(ms);
-  date.setHours(0, 0, 0, 0);
-  return date.getTime();
-}
+export { localMidnight };
 
 /** What one day of the map or the ticker draws: how many, and how bad. */
 export interface DayLoad {
@@ -106,9 +92,7 @@ export function groupByDay(items: readonly CharacterBoardItem[]): DayGroup[] {
 export function relativeDayFor(dayStartMs: number, nowMs: number): 'today' | 'tomorrow' | 'other' {
   const today = localMidnight(nowMs);
   if (dayStartMs === today) return 'today';
-  const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  return dayStartMs === tomorrow.getTime() ? 'tomorrow' : 'other';
+  return dayStartMs === nextLocalDay(today) ? 'tomorrow' : 'other';
 }
 
 /**

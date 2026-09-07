@@ -26,18 +26,8 @@ import type {
   SkillQueueEntry,
 } from '@/esi/endpoints';
 import { isActiveContractStatus } from '@/engine/contractStatus';
+import { parseInstant } from '@/engine/esiInstant';
 import type { BoardCalendarEventSource, BoardClockSource } from '@/engine/character/board';
-
-/**
- * `Date.parse` of an absent or unparseable ESI timestamp, as `null` rather
- * than `NaN` — see the module note above for why that distinction is
- * load-bearing.
- */
-function parseInstant(iso: string | undefined): number | null {
-  if (iso === undefined) return null;
-  const ms = Date.parse(iso);
-  return Number.isNaN(ms) ? null : ms;
-}
 
 const ROMAN = ['I', 'II', 'III', 'IV', 'V'] as const;
 
@@ -70,9 +60,9 @@ export function toCalendarEventSources(
  * Every queue entry that has a clock, not just the head.
  *
  * The head answers "what am I training"; the rest answer "what lands this
- * week", which is this page's question. Volume is handled where it belongs —
- * the route's horizon window drops the far-future tail, and the kind filter
- * turns the whole source off for someone who does not want it.
+ * week", which is this page's question. Volume is handled by the rail's day
+ * grouping and by the kind filter, which turns the whole source off for
+ * someone who does not want it.
  */
 export function toSkillTrainingSources(
   queue: readonly SkillQueueEntry[],

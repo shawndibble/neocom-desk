@@ -13,7 +13,7 @@ import {
 import * as Icon from '@/components/ui/icons';
 import { loadCalendarBoard } from '@/features/character/calendarBoardData';
 import { EventDetailModal } from '@/features/character/EventDetailModal';
-import { CalendarMap } from '@/features/character/CalendarMap';
+import { CalendarMap, CalendarPastHint } from '@/features/character/CalendarMap';
 import { CalendarDayTicker } from '@/features/character/CalendarDayTicker';
 import { ComingUpRail } from '@/features/character/ComingUpRail';
 import { CalendarKindFilterMenu } from '@/features/character/CalendarKindFilterMenu';
@@ -32,8 +32,10 @@ import {
   localMidnight,
 } from '@/engine/character/deadlines';
 import {
+  addDays,
   addMonths,
   addWeeks,
+  buildDaysFrom,
   buildFortnightDays,
   buildMonthGrid,
   formatFortnightLabel,
@@ -61,6 +63,9 @@ import { calendarCsvColumns } from '@/features/character/calendarCsv';
  * not blank five working clocks. The filter menu names the ones that need a
  * new login instead.
  */
+/** How many days the phone's Day Ticker scrolls through at a time. */
+const TICKER_DAYS = 14;
+
 export function Calendar() {
   const { t } = useTranslation();
   const { data, error, loading, hydrated, activeCharacterId, refresh } = useRouteSnapshot(
@@ -124,12 +129,24 @@ export function Calendar() {
     [visible, selectedDayMs]
   );
 
-  const days = useMemo(
-    () => (density === 'month' ? buildMonthGrid(anchor) : buildFortnightDays(anchor)),
-    [anchor, density]
-  );
+  /**
+   * The wide grid is week-aligned; the ticker is not.
+   *
+   * A month grid pushed into the ticker gives a phone six weeks of horizontal
+   * scroll beginning before today, which is the opposite of what the page is
+   * for. The ticker takes a rolling fortnight from the anchor instead, and the
+   * Month/Fortnight density stays a property of the grid that has densities.
+   */
+  const days = useMemo(() => {
+    // `nowMs`, not the builders' `new Date()` default: `isToday` and the
+    // `isPast` the cells derive from `nowMs` must answer to one clock, or a
+    // render straddling midnight can ring one day and hatch it at once.
+    const today = new Date(nowMs);
+    if (isNarrow) return buildDaysFrom(anchor, TICKER_DAYS, today);
+    return density === 'month' ? buildMonthGrid(anchor, today) : buildFortnightDays(anchor, today);
+  }, [anchor, density, isNarrow, nowMs]);
 
-  const events = useMemo(() => data?.events ?? [], [data]);
+  const events = data?.events ?? [];
   const selectedEvent = events.find((event) => event.event_id === selectedEventId) ?? null;
 
   function goToday() {
@@ -138,9 +155,10 @@ export function Calendar() {
   }
 
   function step(delta: number) {
-    setAnchor((current) =>
-      density === 'month' ? addMonths(current, delta) : addWeeks(current, delta)
-    );
+    setAnchor((current) => {
+      if (isNarrow) return addDays(current, delta * TICKER_DAYS);
+      return density === 'month' ? addMonths(current, delta) : addWeeks(current, delta);
+    });
   }
 
   if (!hydrated) {
@@ -172,15 +190,18 @@ export function Calendar() {
         label={density === 'month' ? t('calendar.nextMonth') : t('calendar.nextFortnight')}
         onClick={() => step(1)}
       />
-      <IconButton
-        size="sm"
-        icon={<Icon.Expanded />}
-        label={
-          density === 'month' ? t('calendar.density.toFortnight') : t('calendar.density.toMonth')
-        }
-        pressed={density === 'fortnight'}
-        onClick={() => void setDensity(density === 'month' ? 'fortnight' : 'month')}
-      />
+      {/* Density is a property of the grid; the ticker is always a rolling fortnight. */}
+      {!isNarrow && (
+        <IconButton
+          size="sm"
+          icon={<Icon.Expanded />}
+          label={
+            density === 'month' ? t('calendar.density.toFortnight') : t('calendar.density.toMonth')
+          }
+          pressed={density === 'fortnight'}
+          onClick={() => void setDensity(density === 'month' ? 'fortnight' : 'month')}
+        />
+      )}
     </div>
   );
 
@@ -259,7 +280,7 @@ export function Calendar() {
                   onSelectDay={setSelectedDayMs}
                 />
                 {/* The same caption the wide grid carries — the rule it teaches is not a desktop rule. */}
-                <p className="mt-2 text-xs text-text-dim">{t('calendar.map.pastHint')}</p>
+                <CalendarPastHint className="mt-2" />
               </Panel>
             ) : (
               <Panel

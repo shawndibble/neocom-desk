@@ -1,8 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  CHARACTER_BOARD_ITEM_KINDS,
   buildCharacterBoard,
-  readableKinds,
   type BoardCalendarEventSource,
   type BoardClockSource,
   type CharacterBoardSources,
@@ -53,23 +51,8 @@ describe('buildCharacterBoard', () => {
    * `readableKinds` may be asked which happened. Copied from the corp board's
    * own rule: "cannot read" and "nothing due" must never look alike.
    */
-  it('treats an absent source as unreadable and an empty one as read-fine', () => {
-    const sources = { calendarEvents: [], industryJobs: undefined };
-    expect(build(sources)).toEqual([]);
-    expect(readableKinds({ nowMs: NOW, ...sources })).toEqual(new Set(['calendarEvent']));
-  });
-
-  it('reports every kind that was read, even when all of them are empty', () => {
-    const kinds = readableKinds({
-      nowMs: NOW,
-      calendarEvents: [],
-      skillTraining: [],
-      industryJobs: [],
-      planetExtractions: [],
-      contractExpiries: [],
-      orderExpiries: [],
-    });
-    expect(kinds).toEqual(new Set(CHARACTER_BOARD_ITEM_KINDS));
+  it('treats an absent source and an empty one alike when building the list', () => {
+    expect(build({ calendarEvents: [], industryJobs: undefined })).toEqual([]);
   });
 
   /**

@@ -22,8 +22,9 @@ import { useTranslation } from 'react-i18next';
 import type { DayLoad } from '@/engine/character/deadlines';
 import { localMidnight } from '@/engine/character/deadlines';
 import { weekdayLabels, type GridDay } from '@/lib/calendarGrid';
+import { cx } from '@/lib/cx';
 
-import { SEVERITY_DOT, SEVERITY_LABEL } from './calendarSeverityTone';
+import { SEVERITY_FILL, SEVERITY_LABEL } from '@/components/ui/severityTone';
 
 /** Beyond this a cell shows a count instead of more dots — four dots is already a texture, not a number. */
 const MAX_DOTS = 4;
@@ -34,6 +35,18 @@ export interface CalendarMapProps {
   nowMs: number;
   selectedDayMs: number | null;
   onSelectDay: (dayStartMs: number | null) => void;
+}
+
+/**
+ * Why the hatched cells are hatched.
+ *
+ * Exported because the phone shows a Day Ticker rather than this grid and owes
+ * the reader the same sentence — two copies of the wording is one copy too
+ * many for a caption whose whole job is to be exact.
+ */
+export function CalendarPastHint({ className = '' }: { className?: string }) {
+  const { t } = useTranslation();
+  return <p className={cx('text-xs text-text-dim', className)}>{t('calendar.map.pastHint')}</p>;
 }
 
 export function CalendarMap({ days, loads, nowMs, selectedDayMs, onSelectDay }: CalendarMapProps) {
@@ -99,15 +112,13 @@ export function CalendarMap({ days, loads, nowMs, selectedDayMs, onSelectDay }: 
               // Disabling it would leave the pilot with a dead control and no
               // explanation, which is what the caption under the grid replaces.
               onClick={() => onSelectDay(isSelected ? null : dayStartMs)}
-              className={[
+              className={cx(
                 'flex min-h-20 flex-col border-b border-line p-1.5 text-left transition-colors',
                 isSelected ? 'bg-accent/15 ring-1 ring-accent-dim ring-inset' : 'hover:bg-panel-2',
                 day.isToday && !isSelected ? 'ring-1 ring-accent ring-inset' : '',
                 !day.inCurrentMonth ? 'bg-panel/40' : '',
-                isPast ? 'calendar-map-past' : '',
-              ]
-                .filter(Boolean)
-                .join(' ')}
+                isPast ? 'calendar-map-past' : ''
+              )}
             >
               <span className="flex items-baseline justify-between">
                 <span
@@ -131,7 +142,7 @@ export function CalendarMap({ days, loads, nowMs, selectedDayMs, onSelectDay }: 
                     <span
                       key={i}
                       aria-hidden="true"
-                      className={`size-1.5 rounded-full ${SEVERITY_DOT[load.severity]}`}
+                      className={`size-1.5 rounded-full ${SEVERITY_FILL[load.severity]}`}
                     />
                   ))}
                   {load.count > MAX_DOTS && (
@@ -145,7 +156,7 @@ export function CalendarMap({ days, loads, nowMs, selectedDayMs, onSelectDay }: 
           );
         })}
       </div>
-      <p className="px-3 py-2 text-xs text-text-dim">{t('calendar.map.pastHint')}</p>
+      <CalendarPastHint className="px-3 py-2" />
     </>
   );
 }

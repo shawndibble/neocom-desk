@@ -55,6 +55,39 @@ export function ComingUpRail({
     };
   }, [i18n.language, nowMs, t]);
 
+  /**
+   * Three states, and they are three different sentences.
+   *
+   * "You turned every kind off" is not "nothing is due", and neither is
+   * "nothing is due on the day you picked" — a reader who cannot tell them
+   * apart cannot tell a working filter from a broken page.
+   */
+  const content = noKindsSelected ? (
+    <EmptyState title={t('calendar.rail.noKinds')} hint={t('calendar.rail.noKindsHint')} />
+  ) : items.length > 0 ? (
+    <ul aria-label={t('calendar.rail.title')}>
+      {groups.map((group) => (
+        <li key={group.dayStartMs}>
+          <h3 className="sticky top-0 z-10 border-y border-line bg-panel-2 px-3 py-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+            {dayHeading(group.dayStartMs)}
+            <span className="float-right tabular-nums">{group.items.length}</span>
+          </h3>
+          <ul className="divide-y divide-line">
+            {group.items.map((item) => (
+              <li key={item.id}>
+                <CharacterBoardRow item={item} onSelectEvent={onSelectEvent} />
+              </li>
+            ))}
+          </ul>
+        </li>
+      ))}
+    </ul>
+  ) : selectedDayMs === null ? (
+    <EmptyState title={t('calendar.rail.empty')} hint={t('calendar.rail.emptyHint')} />
+  ) : (
+    <EmptyState title={t('calendar.rail.emptyForDay')} />
+  );
+
   return (
     <Panel
       padded={false}
@@ -77,34 +110,7 @@ export function ComingUpRail({
       }
       className="min-w-0 flex-1"
     >
-      {noKindsSelected ? (
-        // Deliberately distinct from "nothing due": the pilot turned every kind
-        // off, and a bare empty list would look like the page had broken.
-        <EmptyState title={t('calendar.rail.noKinds')} hint={t('calendar.rail.noKindsHint')} />
-      ) : items.length === 0 ? (
-        <EmptyState
-          title={selectedDayMs === null ? t('calendar.rail.empty') : t('calendar.rail.emptyForDay')}
-          hint={selectedDayMs === null ? t('calendar.rail.emptyHint') : undefined}
-        />
-      ) : (
-        <ul aria-label={t('calendar.rail.title')}>
-          {groups.map((group) => (
-            <li key={group.dayStartMs}>
-              <h3 className="sticky top-0 z-10 border-y border-line bg-panel-2 px-3 py-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                {dayHeading(group.dayStartMs)}
-                <span className="float-right tabular-nums">{group.items.length}</span>
-              </h3>
-              <ul className="divide-y divide-line">
-                {group.items.map((item) => (
-                  <li key={item.id}>
-                    <CharacterBoardRow item={item} onSelectEvent={onSelectEvent} />
-                  </li>
-                ))}
-              </ul>
-            </li>
-          ))}
-        </ul>
-      )}
+      {content}
     </Panel>
   );
 }

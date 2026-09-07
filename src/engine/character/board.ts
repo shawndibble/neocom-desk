@@ -98,9 +98,10 @@ export interface CharacterBoardItem extends BoardClockSource {
  * This is the whole reason the page can survive a revoked scope: a Character
  * without `esi-industry.read_character_jobs.v1` passes `industryJobs:
  * undefined` and the board simply has no jobs in it, while one whose jobs read
- * fine and has none passes `[]`. The two produce an identical list and a
- * different `readableKinds`, which is what lets the filter menu say "not
- * granted" where it would otherwise say a misleading zero.
+ * fine and has none passes `[]`. The two produce an identical list, and which
+ * happened is answered by the loader (`calendarBoardData.ts`) rather than here
+ * — it is what lets the filter menu say "not granted" or "unavailable" where
+ * it would otherwise say a misleading zero.
  */
 export interface CharacterBoardSources {
   /** The instant the board is rendered for. A parameter, never `Date.now()`. */
@@ -149,22 +150,6 @@ function toItem(
     response: isCalendarEvent(source) ? source.response : null,
     important: isCalendarEvent(source) ? source.important : false,
   };
-}
-
-/**
- * The kinds this load could actually read, empty or not.
- *
- * Separate from the board itself because the board cannot carry the
- * information: a kind with no rows looks identical whether it was read and
- * empty or never readable, and the difference is exactly what the filter menu
- * has to show.
- */
-export function readableKinds(sources: CharacterBoardSources): Set<CharacterBoardItemKind> {
-  const readable = new Set<CharacterBoardItemKind>();
-  for (const kind of CHARACTER_BOARD_ITEM_KINDS) {
-    if (sources[SOURCE_KEY[kind]] !== undefined) readable.add(kind);
-  }
-  return readable;
 }
 
 /**

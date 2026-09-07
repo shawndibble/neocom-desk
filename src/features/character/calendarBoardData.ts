@@ -29,7 +29,7 @@ import { loadTypeNames } from './typeNames';
 import { loadCharacterSkillQueueWithStatus } from '@/features/skills/data';
 import { loadCharacterIndustryJobs } from '@/features/industry/jobs';
 import { loadCharacterPlanets, readCachedColonyDetails } from '@/features/pi/data';
-import { loadPlanetName } from '@/features/pi/names';
+import { readCachedPlanetNames } from '@/features/pi/names';
 import {
   toCalendarEventSources,
   toContractExpirySources,
@@ -124,20 +124,24 @@ export async function loadCalendarBoard(characterId: number): Promise<CalendarBo
   const colonies: ColonyPins[] = [];
   if (planets && planets.length > 0) {
     const planetIds = planets.map((planet) => planet.planet_id);
+    // `readCachedPlanetNames`, not `loadPlanetName`: the latter is a
+    // `loadWithCache`, so a cache miss is one live `/universe/planets/{id}`
+    // per colony — exactly the fan-out the paragraph above refuses to spend on
+    // this page. An unnamed planet falls back to its id below.
     const [details, planetNames] = await Promise.all([
       readCachedColonyDetails(characterId, planetIds),
-      Promise.all(planetIds.map((planetId) => loadPlanetName(planetId))),
+      readCachedPlanetNames(planetIds),
     ]);
-    planets.forEach((planet, index) => {
+    for (const planet of planets) {
       const detail = details.get(planet.planet_id);
-      if (!detail) return;
+      if (!detail) continue;
       colonies.push({
-        // A planet ESI declines to name falls back to its id, which is at
+        // A planet ESI has not named for us falls back to its id, which is at
         // least something the pilot can search the client for.
-        planetName: planetNames[index] ?? `#${planet.planet_id}`,
+        planetName: planetNames.get(planet.planet_id) ?? `#${planet.planet_id}`,
         pins: detail.data.pins,
       });
-    });
+    }
   }
 
   // One name resolution for every id the board will show, rather than one per
@@ -149,39 +153,32 @@ export async function loadCalendarBoard(characterId: number): Promise<CalendarBo
   const names = await loadTypeNames([...typeIds]);
   const typeName = (typeId: number) => names.get(typeId) ?? `#${typeId}`;
 
-  // Kind paired with the rows it read, so "was this readable" and "what does
-  // it contribute" can never answer from two different places.
-  const KIND_SOURCES: [CharacterBoardItemKind, readonly unknown[] | undefined][] = [
-    ['calendarEvent', events],
-    ['skillTraining', queue],
-    ['industryJob', jobs],
-    ['planetExtraction', planets],
-    ['contractExpiry', contracts],
-    ['orderExpiry', orders],
-  ];
+  /**
+   * One row per kind, and every derived answer read off it.
+   *
+   * The five lists this replaced — the destructure, the `readRows` calls, the
+   * `noteReauth` calls, the `cached` array and the return object — each
+   * repeated the same six kinds in the same order, so adding a seventh clock
+   * meant editing six places and the compiler could only catch one of them.
+   * `satisfies` pins the set against the engine's own list instead.
+   */
+  const sources = [
+    { kind: 'calendarEvent', result: eventsResult, rows: events },
+    { kind: 'skillTraining', result: queueResult, rows: queue },
+    { kind: 'industryJob', result: jobsResult, rows: jobs },
+    { kind: 'planetExtraction', result: planetsResult, rows: planets },
+    { kind: 'contractExpiry', result: contractsResult, rows: contracts },
+    { kind: 'orderExpiry', result: ordersResult, rows: orders },
+  ] satisfies {
+    kind: CharacterBoardItemKind;
+    result: StatusResult<unknown[]>;
+    rows: readonly unknown[] | undefined;
+  }[];
 
-  const reauthKinds: CharacterBoardItemKind[] = [];
-  const noteReauth = (kind: CharacterBoardItemKind, result: StatusResult<unknown[]>) => {
-    if (result.needsReauth) reauthKinds.push(kind);
-  };
-  noteReauth('calendarEvent', eventsResult);
-  noteReauth('skillTraining', queueResult);
-  noteReauth('industryJob', jobsResult);
-  noteReauth('planetExtraction', planetsResult);
-  noteReauth('contractExpiry', contractsResult);
-  noteReauth('orderExpiry', ordersResult);
-
-  const read: (CachedResult<unknown> | null | undefined)[] = [
-    eventsResult.cached,
-    queueResult.cached,
-    jobsResult.cached,
-    planetsResult.cached,
-    contractsResult.cached,
-    ordersResult.cached,
-  ];
-  const fetchedAtMs = read
-    .filter((result): result is CachedResult<unknown> => Boolean(result))
-    .map((result) => result.fetchedAt.getTime());
+  const cached: CachedResult<unknown>[] = [];
+  for (const source of sources) {
+    if (source.result.cached) cached.push(source.result.cached);
+  }
 
   return {
     calendarEvents: events && toCalendarEventSources(events),
@@ -190,10 +187,13 @@ export async function loadCalendarBoard(characterId: number): Promise<CalendarBo
     planetExtractions: planets && toPlanetExtractionSources(colonies),
     contractExpiries: contracts && toContractExpirySources(contracts),
     orderExpiries: orders && toOrderExpirySources(orders, typeName),
-    readableKinds: KIND_SOURCES.filter(([, rows]) => rows !== undefined).map(([kind]) => kind),
-    reauthKinds,
-    oldestFetchedAt: fetchedAtMs.length > 0 ? new Date(Math.min(...fetchedAtMs)) : null,
-    fromCache: read.some((result) => result?.fromCache),
+    readableKinds: sources.filter((s) => s.rows !== undefined).map((s) => s.kind),
+    reauthKinds: sources.filter((s) => s.result.needsReauth).map((s) => s.kind),
+    oldestFetchedAt:
+      cached.length > 0
+        ? new Date(Math.min(...cached.map((result) => result.fetchedAt.getTime())))
+        : null,
+    fromCache: cached.some((result) => result.fromCache),
     events: [...(events ?? [])],
     loadedAtMs: Date.now(),
   };

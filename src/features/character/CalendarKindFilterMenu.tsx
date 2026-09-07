@@ -58,6 +58,18 @@ export function CalendarKindFilterMenu({
   const readable = new Set(readableKinds);
   const needsReauth = new Set(reauthKinds);
 
+  /**
+   * Three answers, in order of how much they explain: a scope to grant, a read
+   * that did not land, or a real count. "Not granted" and "none due" must never
+   * look alike — a confident 0 next to an endpoint the Character was never
+   * allowed to ask about is a lie about their data.
+   */
+  function countLabel(kind: CharacterBoardItemKind) {
+    if (needsReauth.has(kind)) return t('calendar.filter.notGranted');
+    if (!readable.has(kind)) return t('calendar.filter.unavailable');
+    return counts.get(kind) ?? 0;
+  }
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -85,17 +97,8 @@ export function CalendarKindFilterMenu({
             onCheckedChange={() => onToggle(kind)}
           >
             <span className="flex-1">{t(KIND_LABEL[kind])}</span>
-            {/*
-              "Not granted" and "none due" are different answers and must look
-              different — a confident 0 next to an endpoint this Character was
-              never allowed to ask about is a lie about their data.
-            */}
             <span className="ml-2 text-[0.6875rem] text-text-dim tabular-nums">
-              {needsReauth.has(kind)
-                ? t('calendar.filter.notGranted')
-                : !readable.has(kind)
-                  ? t('calendar.filter.unavailable')
-                  : (counts.get(kind) ?? 0)}
+              {countLabel(kind)}
             </span>
           </DropdownMenuCheckboxItem>
         ))}

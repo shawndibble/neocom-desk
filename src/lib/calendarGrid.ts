@@ -82,6 +82,17 @@ export function buildFortnightDays(anchor: Date, today: Date = new Date()): Grid
   return Array.from({ length: 14 }, (_, i) => toGridDay(addDays(gridStart, i), anchor, today));
 }
 
+/**
+ * `count` days running forward from `start` — the Day Ticker's window.
+ *
+ * Deliberately not week-aligned, unlike every other builder here: a phone
+ * reading "what is coming up" wants today in the first column, not up to six
+ * days of last week before it.
+ */
+export function buildDaysFrom(start: Date, count: number, today: Date = new Date()): GridDay[] {
+  return Array.from({ length: count }, (_, i) => toGridDay(addDays(start, i), start, today));
+}
+
 /** Monday..Sunday short weekday names, in the viewer's locale. */
 export function weekdayLabels(): string[] {
   const formatter = new Intl.DateTimeFormat(undefined, { weekday: 'short' });
@@ -116,10 +127,3 @@ function formatSpanLabel(start: Date, spanDays: number): string {
       : `${dayFormatter.format(start)}, ${yearFormatter.format(start)}`;
   return `${startLabel} – ${dayFormatter.format(end)}, ${yearFormatter.format(end)}`;
 }
-
-/**
- * Parses a native `<input type="date">` value ("YYYY-MM-DD") as local
- * midnight, matching every other date in this module — never as a UTC
- * instant, which would shift the day in a timezone behind UTC. `null` for
- * anything the input contract doesn't actually produce (empty, malformed).
- */
