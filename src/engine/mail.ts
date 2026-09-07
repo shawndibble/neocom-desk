@@ -144,3 +144,26 @@ export function capHeadersForDisplay<H>(
   if (headers.length <= cap) return { headers: [...headers], truncated: false };
   return { headers: headers.slice(0, cap), truncated: true };
 }
+
+/**
+ * The four System Label folders, in the order the filter row renders them.
+ * Inbox/Corp/Alliance lead because they are the folders mail *arrives* in;
+ * Sent trails as the one that holds only the pilot's own outgoing mail.
+ *
+ * Deliberately not `TAB_PRECEDENCE`'s order — that one resolves which single
+ * tag a multi-labelled header wears, which is a different question from which
+ * order a pilot scans the filters in.
+ */
+export const MAIL_TABS: readonly MailTab[] = ['inbox', 'corp', 'alliance', 'sent'];
+
+/**
+ * Validates a persisted folder selection (`parse` for `createLocalSetting`).
+ * An empty stored array is rejected rather than honoured, for the same reason
+ * `toggleMailFolder` refuses to produce one.
+ */
+export function parseMailFolders(raw: unknown): MailTab[] | null {
+  if (!Array.isArray(raw) || raw.length === 0) return null;
+  const isTab = (value: unknown): value is MailTab =>
+    typeof value === 'string' && (MAIL_TABS as readonly string[]).includes(value);
+  return raw.every(isTab) ? (raw as MailTab[]) : null;
+}

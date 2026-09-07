@@ -35,6 +35,7 @@ export const VIEW_PREFERENCE_KEYS: readonly string[] = [
   'corp.assetsExpanded',
   'industryLastOpenedPlan',
   'loyaltyStorePriceBasis',
+  'mailFolders',
   'marketLocationMode',
   'marketPriceHistoryRange',
   'miningTaxStatusFilter',

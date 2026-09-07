@@ -157,7 +157,12 @@ md:h-9`** — pointer users never get the 44px box, touch users never get the
   deliberate exception at a flat `h-7`: readouts, not targets.
 - Radius: **minimal**. `rounded-xs` (2px) for panels, buttons, chips, inputs.
   `rounded-full` only for avatars, dots, spinners. Never `rounded-md`+ on rectangles.
-- Borders: always 1px (`border`), never 2px.
+- Borders: always 1px (`border`), never 2px. The one exception is a **state
+  stripe** — the 2px edge that marks an active tab (`tabItemClassName`'s
+  `border-b-2`), a grouped order's severity (`OpenOrdersPanel`'s
+  `GROUP_ACCENT`) or the selected mail (`Mail.tsx`). Those are not the box's
+  border; they are a selection marker that happens to be drawn as one, and at
+  1px they disappear into the hairlines around them.
 
 ## 4. Component inventory
 

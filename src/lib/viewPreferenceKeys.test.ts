@@ -24,6 +24,7 @@ const PINNED = [
   'corp.assetsExpanded',
   'industryLastOpenedPlan',
   'loyaltyStorePriceBasis',
+  'mailFolders',
   'marketLocationMode',
   'marketPriceHistoryRange',
   'miningTaxStatusFilter',
