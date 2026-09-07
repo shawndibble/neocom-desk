@@ -431,7 +431,7 @@ describe('Wallet', () => {
         .getAllByDisplayValue('')
         .filter((el) => el.getAttribute('type') === 'date');
       expect(dates).toHaveLength(2);
-      // `JournalDateRange`'s wrapper becomes a real row here rather than the
+      // `DateRangeFields`' wrapper becomes a real row here rather than the
       // `display: contents` it carries inline — which is also the only proof
       // that `useFilterSurface` resolves to the sheet from inside the modal.
       const wrapper = dates[0]!.closest('div')!;
@@ -441,5 +441,147 @@ describe('Wallet', () => {
     } finally {
       restore();
     }
+  });
+  /**
+   * The corp Transactions tab (issue #570). Personal must not grow a third tab
+   * — the character's fills are Market's — and the corp one must fetch, draw
+   * and filter its division's own rows.
+   */
+  describe('corporation transactions', () => {
+    const CORPORATION_ID = 98000001;
+
+    const corpTransactions = [
+      {
+        transaction_id: 5001,
+        date: '2026-08-04T10:00:00Z',
+        location_id: 60003760,
+        type_id: 34,
+        unit_price: 5,
+        quantity: 1000,
+        client_id: 90000001,
+        is_buy: true,
+        journal_ref_id: 7001,
+      },
+      {
+        transaction_id: 5002,
+        date: '2026-08-05T10:00:00Z',
+        location_id: 60003760,
+        type_id: 35,
+        unit_price: 9,
+        quantity: 2000,
+        client_id: 90000002,
+        is_buy: false,
+        journal_ref_id: 7002,
+      },
+    ];
+
+    async function seedCorpCharacter() {
+      await db.characters.put({
+        characterId: CHAR_ID,
+        name: 'Pilot One',
+        ownerHash: 'oh',
+        addedAt: 1,
+        corporationId: CORPORATION_ID,
+      });
+      await db.tokens.put({
+        characterId: CHAR_ID,
+        accessToken: 'access-token',
+        refreshToken: 'refresh',
+        expiresAt: Date.now() + 3_600_000,
+        scopes: [
+          'esi-wallet.read_character_wallet.v1',
+          'esi-characters.read_loyalty.v1',
+          'esi-wallet.read_corporation_wallets.v1',
+          'esi-corporations.read_divisions.v1',
+        ],
+      });
+      server.use(
+        http.get(`https://esi.evetech.net/characters/${CHAR_ID}/roles`, () =>
+          HttpResponse.json({ roles: ['Accountant'] })
+        ),
+        http.get(`https://esi.evetech.net/corporations/${CORPORATION_ID}/wallets`, () =>
+          HttpResponse.json([{ division: 1, balance: 1_000_000 }])
+        ),
+        http.get(`https://esi.evetech.net/corporations/${CORPORATION_ID}/divisions`, () =>
+          HttpResponse.json({ wallet: [{ division: 1, name: 'Master Wallet' }] })
+        ),
+        http.get(
+          `https://esi.evetech.net/corporations/${CORPORATION_ID}/wallets/1/transactions`,
+          ({ request }) =>
+            // The cursor is exclusive, so a second call must come back empty or
+            // the walk would never stop.
+            new URL(request.url).searchParams.has('from_id')
+              ? HttpResponse.json([])
+              : HttpResponse.json(corpTransactions)
+        )
+      );
+    }
+
+    it('is not offered for a personal wallet', async () => {
+      render(<App />);
+      expect(await screen.findByRole('tab', { name: 'Journal' })).toBeInTheDocument();
+      expect(screen.queryByRole('tab', { name: 'Transactions' })).not.toBeInTheDocument();
+    });
+
+    it('lists a division’s fills, and filters them by side', async () => {
+      const user = userEvent.setup();
+      await seedCorpCharacter();
+
+      window.history.pushState({}, '', '/wallet?owner=corporation&tab=transactions');
+      render(<App />);
+
+      const table = await screen.findByRole('table', { name: 'Transactions' });
+      expect(await within(table).findByText('Tritanium')).toBeInTheDocument();
+      expect(within(table).getByText('Pyerite')).toBeInTheDocument();
+
+      await user.click(screen.getByRole('combobox', { name: 'Side' }));
+      await user.click(await screen.findByRole('option', { name: 'Sell' }));
+
+      expect(await within(table).findByText('Pyerite')).toBeInTheDocument();
+      expect(within(table).queryByText('Tritanium')).not.toBeInTheDocument();
+    });
+
+    /**
+     * The filter is per-visit view state, and "this division traded nothing"
+     * is what a filter left over from another owner or division looks like.
+     */
+    it('drops the filter when the owner switches away and back', async () => {
+      const user = userEvent.setup();
+      await seedCorpCharacter();
+
+      window.history.pushState({}, '', '/wallet?owner=corporation&tab=transactions');
+      render(<App />);
+
+      const search = await screen.findByPlaceholderText('Search item…');
+      await user.type(search, 'Megacyte');
+      expect(await screen.findByText('No transactions match this filter.')).toBeInTheDocument();
+
+      await user.click(screen.getByRole('button', { name: 'Personal' }));
+      // Scoped to the switch: the personal Balance tab it lands on also has a
+      // sortable "Corporation" column header in the loyalty table.
+      const ownerButton = (name: string) =>
+        screen.getAllByRole('button', { name }).find((el) => el.hasAttribute('aria-pressed'))!;
+      await user.click(ownerButton('Corporation'));
+
+      // Back on the corp side, the tab is offered again and its filter is empty.
+      await user.click(await screen.findByRole('tab', { name: 'Transactions' }));
+      const table = await screen.findByRole('table', { name: 'Transactions' });
+      expect(await within(table).findByText('Tritanium')).toBeInTheDocument();
+      expect(screen.getByPlaceholderText('Search item…')).toHaveValue('');
+    });
+
+    it('says so when the filter, not the division, is why the table is empty', async () => {
+      const user = userEvent.setup();
+      await seedCorpCharacter();
+
+      window.history.pushState({}, '', '/wallet?owner=corporation&tab=transactions');
+      render(<App />);
+
+      const search = await screen.findByPlaceholderText('Search item…');
+      await user.type(search, 'Megacyte');
+
+      expect(await screen.findByText('No transactions match this filter.')).toBeInTheDocument();
+      expect(screen.queryByText('No corp transactions cached')).not.toBeInTheDocument();
+    });
   });
 });

@@ -1,28 +1,31 @@
 /**
- * Fetch + cache layer for the corporation wallet (issue #298).
+ * Fetch + cache layer for the corporation wallet (issue #298, #570).
  *
- * Three reads, because ESI splits the corp wallet three ways: the divisions
- * and their balances, the names the corp gave those divisions, and one
- * journal per division — there is no all-divisions journal, and the seven are
- * separately role-gated in game.
+ * Four reads, because ESI splits the corp wallet four ways: the divisions and
+ * their balances, the names the corp gave those divisions, one journal per
+ * division, and one transaction list per division — there is no all-divisions
+ * read of either, and the seven divisions are separately role-gated in game.
  *
  * Every key goes through `corpRead.ts`'s corp-scoped wrapper (issue #293), and
- * the journal's key carries the division as well: without it the seven
+ * the two per-division keys carry the division as well: without it the seven
  * journals would overwrite each other in a single row and a division switch
  * would show the previous one's entries. A 403 is the in-game role gate, not a
  * re-login — see `corpAuthFailure.ts`.
  *
- * Note what is *not* here: ESI publishes a corp wallet *transactions* endpoint,
- * but #295 registered only the journal, and `esi/scopes.ts` derives everything
- * from `ESI_REGISTRY`. So the corp side of Wallet has no transactions tab, and
- * that is a registry fact rather than a layout choice.
+ * The two per-division reads paginate differently, which is ESI's doing rather
+ * than a choice here: the journal is X-Pages, the transactions are cursored on
+ * `from_id`. Both come back through `loadCorpPaginatedWithCacheStatus`, which
+ * only asks for a `TruncatableResult`, so `truncated` means the same thing to
+ * the view either way — "there is older history this list does not have".
  */
 import {
   getCorporationDivisions,
   getCorporationWalletJournal,
+  getCorporationWalletTransactions,
   getCorporationWallets,
   type CorporationDivisions,
   type CorporationWalletDivision,
+  type CorporationWalletTransaction,
   type WalletJournalEntry,
 } from '@/esi/endpoints';
 import type { StatusResult } from '@/esi/cache';
@@ -33,6 +36,8 @@ export const KEYS = {
   divisions: 'divisions',
   /** Per division — see the module note. */
   journal: (division: number) => `wallet:journal:${division}`,
+  /** Per division, for the same reason the journal's key is. */
+  transactions: (division: number) => `wallet:transactions:${division}`,
 } as const;
 
 /** The corporation's seven wallet divisions and their balances. */
@@ -69,5 +74,22 @@ export function loadCorporationWalletJournal(
 ): Promise<StatusResult<WalletJournalEntry[]>> {
   return loadCorpPaginatedWithCacheStatus(characterId, corporationId, KEYS.journal(division), () =>
     getCorporationWalletJournal(characterId, corporationId, division)
+  );
+}
+
+/**
+ * One division's market fills. `truncated` on the result means the cursor walk
+ * stopped at its page cap, so older history is missing.
+ */
+export function loadCorporationWalletTransactions(
+  characterId: number,
+  corporationId: number,
+  division: number
+): Promise<StatusResult<CorporationWalletTransaction[]>> {
+  return loadCorpPaginatedWithCacheStatus(
+    characterId,
+    corporationId,
+    KEYS.transactions(division),
+    () => getCorporationWalletTransactions(characterId, corporationId, division)
   );
 }

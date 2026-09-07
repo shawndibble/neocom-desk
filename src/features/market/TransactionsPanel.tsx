@@ -54,8 +54,10 @@ async function loadTransactionsSnapshot(
 
 /**
  * Market's Transactions tab: a character's recent buy/sell fills. Personal
- * only — ESI publishes a corp wallet transactions endpoint but the registry
- * (esi/registry.ts) registers only the journal for corp wallets.
+ * only, and now for a reason of its own rather than for want of an endpoint:
+ * the corporation's fills live on the corp side of `/wallet`, beside the corp
+ * journal they reconcile against (issue #570). This panel has no filter bar
+ * and that one does — matching them up is a separate call.
  */
 interface TransactionsPanelProps {
   /** Switches the History tab to its other view; the picker lives in this panel's header. */

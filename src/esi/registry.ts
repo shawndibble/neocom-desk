@@ -336,6 +336,17 @@ export const ESI_REGISTRY = {
     group: 'corp',
   },
   /**
+   * No new scope, and therefore no re-grant: ESI secures the corp wallet's
+   * transactions with the same `read_corporation_wallets` scope as the two
+   * entries above, already in the `corp` group and already claimed by
+   * `canReadWallet` (issue #570).
+   */
+  getCorporationWalletTransactions: {
+    route: '/corporations/{corporation_id}/wallets/{division}/transactions',
+    scope: 'esi-wallet.read_corporation_wallets.v1',
+    group: 'corp',
+  },
+  /**
    * A scope of its own, deliberately: without it the wallet and hangar
    * divisions render as "Division 3" rather than the names the corp gave them
    * ("SRP"), which is most of what makes a corp wallet readable.
