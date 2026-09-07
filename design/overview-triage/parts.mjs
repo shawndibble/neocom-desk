@@ -210,6 +210,68 @@ export function triageRow({
 </li>`;
 }
 
+/**
+ * A count, not a row. The answer to "I have 21 orders being undercut": one
+ * number you can act on, sized to be read across the room, that opens the page
+ * already filtered. Twenty-one rows of the same fact is not twenty-one facts.
+ *
+ * Severity tones the number (with its glyph beside it, never colour alone);
+ * the label stays `text-dim` so a row of tiles reads as one control strip.
+ */
+export function numberTile({ label, value, sev = 'clear', big = false }) {
+  const s = SEV[sev];
+  return `<span style="display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 2px; border: 1px solid ${C.line}; border-radius: 2px; background: ${C.panel2}; padding: 8px 10px;">
+  <span style="display: flex; align-items: center; gap: 5px; color: ${s.color};">
+    ${icon(s.glyph, big ? 18 : 16)}
+    <span style="font-size: ${big ? 24 : 20}px; line-height: ${big ? 28 : 24}px; font-weight: 600; font-variant-numeric: tabular-nums;">${value}</span>
+  </span>
+  <span style="${S.microDim} overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${label}</span>
+</span>`;
+}
+
+/** A row of `numberTile`s inside a card's padded body. */
+export function tileRow(tiles) {
+  return `<div style="display: flex; gap: 8px; padding: 12px;">${tiles.join('')}</div>`;
+}
+
+/**
+ * One cell of the summary strip. `hero` is the 30px tier DESIGN.md §2 reserves
+ * for hero numbers — used once, on the next deadline, which is the single thing
+ * the page is asked most often.
+ */
+export function stripCell({ label, value, tone = C.text, note = '', hero = false, grow = 1 }) {
+  return `<span style="display: flex; min-width: 0; flex: ${grow}; flex-direction: column; gap: 2px;">
+  <span style="${S.microDim}">${label}</span>
+  <span style="font-size: ${hero ? 30 : 16}px; line-height: ${hero ? 34 : 22}px; font-weight: ${hero ? 600 : 500}; font-variant-numeric: tabular-nums; color: ${tone}; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${value}</span>
+  ${note ? `<span style="font-size: 12px; line-height: 16px; color: ${C.dim}; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${note}</span>` : ''}
+</span>`;
+}
+
+/**
+ * A board card. The footer is pinned to the bottom (`margin-top: auto` inside a
+ * stretched flex column) so cards in a grid row share a bottom edge — the same
+ * call `routes/Overview.tsx` already makes in prose: "a pair of cards at
+ * different heights reads as one of them having failed to load".
+ */
+export function card({ title, meta = '', open = '', body, footer = '', touch = false }) {
+  return `<section style="${S.panel} display: flex; min-width: 0; flex-direction: column;">
+  ${panelHeader({
+    title,
+    meta,
+    actions: open
+      ? `<span style="display: inline-flex; align-items: center; gap: 4px; ${MICRO} color: ${C.accent};">${open}${icon('caret', 12)}</span>`
+      : '',
+    touch,
+  })}
+  ${body}
+  ${
+    footer
+      ? `<div style="margin-top: auto; border-top: 1px solid ${C.line}; padding: 8px 12px; ${S.microDim} font-variant-numeric: tabular-nums;">${footer}</div>`
+      : ''
+  }
+</section>`;
+}
+
 /** The desktop left rail (`Layout.tsx`), at its real 192px width. */
 export function rail(height) {
   const item = (label, active = false, locked = false) =>
