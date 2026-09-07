@@ -1,10 +1,11 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import type { PiData } from '@/sde/types';
+import { db } from '@/db';
 import { expandChain, type PiTier } from '@/engine/pi/chain';
 
 const pi = JSON.parse(
@@ -51,8 +52,15 @@ vi.mock('./customsRate', async (importOriginal) => ({
 }));
 
 const { PlanPanel } = await import('./PlanPanel');
+const { usePlanControls, DEFAULT_PI_PLAN_CONTROLS, PI_PLAN_CONTROLS_KEY } =
+  await import('./planControlsPref');
 
-beforeEach(() => {
+beforeEach(async () => {
+  await db.settings.clear();
+  // Module-scope store: reset so one test's hub or floor is not the next
+  // test's opening rail. Pre-hydrated, because the price effect is gated on
+  // hydration — leaving it unhydrated would keep `loadPlanPrices` uncalled.
+  usePlanControls.setState({ value: DEFAULT_PI_PLAN_CONTROLS, hydrated: true });
   loadPlanPrices.mockReset();
   loadPlanPrices.mockResolvedValue({
     prices: fullPrices,
@@ -68,8 +76,10 @@ beforeEach(() => {
 
 function renderPanel(typeId: number | null = BROADCAST_NODE) {
   const onTypeIdChange = vi.fn();
-  render(<PlanPanel characterId={91} typeId={typeId} onTypeIdChange={onTypeIdChange} />);
-  return { onTypeIdChange };
+  const { unmount } = render(
+    <PlanPanel characterId={91} typeId={typeId} onTypeIdChange={onTypeIdChange} />
+  );
+  return { onTypeIdChange, unmount };
 }
 
 /** The verdict's own panel, so a `getByText` can't wander into the rate table. */
@@ -345,5 +355,72 @@ describe('planet ceiling', () => {
       await screen.findByText(/depends on your Interplanetary Consolidation level/)
     ).toBeInTheDocument();
     expect(screen.queryByText(/You can run \d+ planets? at once/)).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * The panel is mounted through a ternary on the tab, so leaving the tab
+ * genuinely unmounts it. Before this, that put a pilot back on Jita, one
+ * planet, P1 every single visit — three answers that had not changed.
+ */
+describe('remembering the rail across an unmount', () => {
+  it('reopens on the hub, layout and floor last chosen', async () => {
+    const user = userEvent.setup();
+    const { unmount } = renderPanel();
+    await verdict();
+
+    await user.click(screen.getByRole('combobox', { name: 'Trade hub' }));
+    await user.click(await screen.findByRole('option', { name: 'Amarr' }));
+    await user.click(screen.getByRole('combobox', { name: 'Factory layout' }));
+    await user.click(await screen.findByRole('option', { name: 'One planet per tier' }));
+    await user.click(screen.getByRole('button', { name: 'Buy P2' }));
+    unmount();
+
+    // Forced back through Dexie rather than riding the module store surviving
+    // the unmount: without this the test would still pass if the write never
+    // landed, or landed under the wrong key.
+    usePlanControls.setState({ value: DEFAULT_PI_PLAN_CONTROLS, hydrated: false });
+    renderPanel();
+    await verdict();
+    expect(screen.getByRole('combobox', { name: 'Trade hub' })).toHaveTextContent('Amarr');
+    expect(screen.getByRole('combobox', { name: 'Factory layout' })).toHaveTextContent(
+      'One planet per tier'
+    );
+    expect(screen.getByRole('button', { name: 'Buy P2' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('writes all three under the one piPlanControls key', async () => {
+    const user = userEvent.setup();
+    renderPanel();
+    await verdict();
+
+    await user.click(screen.getByRole('combobox', { name: 'Trade hub' }));
+    await user.click(await screen.findByRole('option', { name: 'Amarr' }));
+
+    await waitFor(async () => {
+      expect((await db.settings.get(PI_PLAN_CONTROLS_KEY))?.value).toEqual({
+        ...DEFAULT_PI_PLAN_CONTROLS,
+        hubId: 'amarr',
+      });
+    });
+  });
+
+  /**
+   * The band clears the customs override on every change (an override carried
+   * across a band misprices it), so persisting the band would reinstate that
+   * carry one reload wide, with no visible edit to explain it.
+   */
+  it('does not remember the colony space band', async () => {
+    const user = userEvent.setup();
+    const { unmount } = renderPanel();
+    await verdict();
+
+    await user.click(screen.getByRole('combobox', { name: 'Colony space' }));
+    await user.click(await screen.findByRole('option', { name: 'Nullsec' }));
+    unmount();
+
+    renderPanel();
+    await verdict();
+    expect(screen.getByRole('combobox', { name: 'Colony space' })).toHaveTextContent('Highsec');
   });
 });

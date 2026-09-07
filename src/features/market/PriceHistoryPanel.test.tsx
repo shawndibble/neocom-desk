@@ -1,9 +1,15 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
+import { db } from '@/db';
 import { PriceHistoryPanel } from './PriceHistoryPanel';
 import { loadPriceHistory } from './priceHistory';
+import {
+  usePriceHistoryRange,
+  DEFAULT_PRICE_HISTORY_RANGE,
+  PRICE_HISTORY_RANGE_KEY,
+} from './priceHistoryRangePref';
 
 // Every fixed-date fixture below is well within 30 days of this, so the
 // panel's default range never has to change per test just to keep a point visible.
@@ -25,6 +31,13 @@ const mockedLoad = vi.mocked(loadPriceHistory);
 
 afterEach(() => {
   vi.clearAllMocks();
+});
+
+beforeEach(async () => {
+  await db.settings.clear();
+  // Module-scope store: without a reset, the range one test picks is the
+  // window the next one opens on.
+  usePriceHistoryRange.setState({ value: DEFAULT_PRICE_HISTORY_RANGE, hydrated: false });
 });
 
 describe('PriceHistoryPanel', () => {
@@ -109,5 +122,39 @@ describe('PriceHistoryPanel', () => {
     await user.click(screen.getByRole('combobox', { name: 'Range' }));
     await user.click(await screen.findByRole('option', { name: '7 days' }));
     expect(screen.getByTestId('chart')).toHaveTextContent('Tritanium: 1 points');
+  });
+
+  /**
+   * The panel is remounted per item, so before this a trader comparing a run
+   * of prices across several items re-picked their window on every one. The
+   * range slices points already fetched, so remembering it costs nothing.
+   */
+  it('opens the next item on the range last chosen, not back at 30 days', async () => {
+    const user = userEvent.setup();
+    mockedLoad.mockResolvedValue({
+      points: [
+        { date: '2026-07-20', average: 5, volume: 50 }, // within 30d, outside 7d
+        { date: '2026-08-04', average: 6, volume: 50 }, // within 7d
+      ],
+      fetchedAt: 1_000_000,
+    });
+    const { unmount } = render(
+      <PriceHistoryPanel regionId={10000002} typeId={34} itemName="Tritanium" now={FIXED_NOW} />
+    );
+    await waitFor(() => expect(screen.getByTestId('chart')).toBeInTheDocument());
+    await user.click(screen.getByRole('combobox', { name: 'Range' }));
+    await user.click(await screen.findByRole('option', { name: '7 days' }));
+    unmount();
+
+    usePriceHistoryRange.setState({ hydrated: false });
+    render(
+      <PriceHistoryPanel regionId={10000002} typeId={35} itemName="Pyerite" now={FIXED_NOW} />
+    );
+    await waitFor(() => expect(screen.getByTestId('chart')).toBeInTheDocument());
+    await waitFor(() => {
+      expect(screen.getByRole('combobox', { name: 'Range' })).toHaveTextContent('7 days');
+    });
+    expect(screen.getByTestId('chart')).toHaveTextContent('Pyerite: 1 points');
+    expect((await db.settings.get(PRICE_HISTORY_RANGE_KEY))?.value).toBe('7d');
   });
 });

@@ -64,6 +64,7 @@ import {
   resolveAssetPath,
 } from '@/engine/assetPath';
 import { useStationSort } from '@/features/character/stationSortPreference';
+import { useAssetSort, type AssetSortField } from '@/features/character/assetSortPreference';
 import {
   namesForSelection,
   selectAll,
@@ -187,8 +188,6 @@ function matchAssets(
   }
   return matches;
 }
-
-type AssetSortField = 'name' | 'value' | 'quantity';
 
 /** An `AssetMatch` with its estimated value precomputed once, rather than re-derived by every sort comparison. */
 interface ValuedAssetMatch {
@@ -583,7 +582,6 @@ export function Assets() {
   // every location into one sortable list rather than replacing the tree.
   const [allItemsView, setAllItemsView] = useState(false);
   const [minValueInput, setMinValueInput] = useState('');
-  const [sortField, setSortField] = useState<AssetSortField>('name');
   const flatModeActive = searchActive || allItemsView;
   const minValueThreshold = Number(minValueInput) > 0 ? Number(minValueInput) : 0;
 
@@ -808,6 +806,17 @@ export function Assets() {
   useEffect(() => {
     void hydrateStationSort();
   }, [hydrateStationSort]);
+
+  // The flat (search / All Items) list's own sort, remembered the same way the
+  // station list's is. Ungated on `hydrated`: this only reorders a list that is
+  // already in memory, so the worst a late hydrate does is re-sort it — there
+  // is no request to spend on the default first.
+  const sortField = useAssetSort((state) => state.value);
+  const hydrateAssetSort = useAssetSort((state) => state.hydrate);
+  const setSortField = useAssetSort((state) => state.setValue);
+  useEffect(() => {
+    void hydrateAssetSort();
+  }, [hydrateAssetSort]);
 
   const [jumpsAwayByKey, setJumpsAwayByKey] = useState<ReadonlyMap<string, JumpsAwayResult>>(
     new Map()
@@ -1547,7 +1556,7 @@ export function Assets() {
                     />
                     <Select
                       value={sortField}
-                      onValueChange={(value) => setSortField(value as AssetSortField)}
+                      onValueChange={(value) => void setSortField(value as AssetSortField)}
                     >
                       <SelectTrigger aria-label={t('assets.sort.label')} className="w-28">
                         <SelectValue />
