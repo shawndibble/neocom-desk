@@ -46,7 +46,7 @@ import {
   markAssignmentsPaid,
   resolveNeedsReview,
 } from '@/features/miningTax/assignments';
-import { loadTypeOverrides, tagAsIgnored, tagAsMoonOre } from '@/features/miningTax/typeOverrides';
+import { tagAsIgnored, tagAsMoonOre } from '@/features/miningTax/typeOverrides';
 import { TypeOverridesDialog } from '@/features/miningTax/TypeOverridesDialog';
 import { STATUS_TEXT_CLASS } from '@/features/miningTax/statusTone';
 import { computePayeeBalances, summarizeUnassigned } from '@/features/miningTax/balances';
@@ -157,22 +157,14 @@ export function MoonMiningTax() {
   const [statusFilter, setStatusFilter] =
     useState<ReadonlySet<MiningTaxRowStatus>>(DEFAULT_STATUSES);
   const [payeeManagerCharacterId, setPayeeManagerCharacterId] = useState<number | null>(null);
+  // Unconditional, deliberately. Hiding this behind "the pilot has at least
+  // one tag" reads tidier and reintroduces the shape of the bug it exists to
+  // fix: the check can only re-run when `data`'s identity changes, and a
+  // reload that *fails* after a successful tag leaves `data` on the retained
+  // snapshot — so the action would stay hidden while the error branch has
+  // already taken the banner away, stranding the pilot exactly as before. The
+  // dialog says so itself when there is nothing to show.
   const [oreTagsOpen, setOreTagsOpen] = useState(false);
-  // Whether the pilot has any manual ore tags at all. The header action is
-  // hidden without them — a recovery affordance for a rare data-correction
-  // workaround should not sit in the header of every ledger that never needed
-  // one. Re-read on every snapshot, so tagging from the banner reveals the way
-  // back in the same beat.
-  const [hasOreTags, setHasOreTags] = useState(false);
-  useEffect(() => {
-    let cancelled = false;
-    void loadTypeOverrides().then(({ moonOreTypeIds, ignoredTypeIds }) => {
-      if (!cancelled) setHasOreTags(moonOreTypeIds.length > 0 || ignoredTypeIds.length > 0);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [data]);
   // Row keys checked in the table's select column. Feeds all three bulk
   // actions (settle up / combine / dismiss), never just bulk-pay.
   const [selection, setSelection] = useState<ReadonlySet<string>>(new Set());
@@ -715,11 +707,7 @@ export function MoonMiningTax() {
                 {t('miningTax.managePayeesAction')}
               </Button>
             )}
-            {hasOreTags && (
-              <Button onClick={() => setOreTagsOpen(true)}>
-                {t('miningTax.reviewOreTagsAction')}
-              </Button>
-            )}
+            <Button onClick={() => setOreTagsOpen(true)}>{t('miningTax.oreTagsAction')}</Button>
             <IconButton
               icon={<Icon.Refresh />}
               label={t('miningTax.refresh')}

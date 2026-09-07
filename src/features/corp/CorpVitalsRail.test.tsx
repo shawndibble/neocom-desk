@@ -67,7 +67,12 @@ describe('CorpVitalsRail runway', () => {
     renderRail();
     // 10B / 10M/day. If this ever renders, the rail has been "fixed" into the
     // shape the ops-board scope decision explicitly rejected.
-    expect(screen.queryByText('1,000 days')).not.toBeInTheDocument();
+    //
+    // No thousands separator: `runwayDays_other` is a plain `{{count}}` and
+    // i18n/index.ts sets no `format`, so this renders "1000 days". Asserting
+    // "1,000 days" here would be a query that can never match — an assertion
+    // that passes just as happily after the bad change as before it.
+    expect(screen.queryByText('1000 days')).not.toBeInTheDocument();
   });
 
   it('still shows the all-divisions sum as the Total chip', () => {

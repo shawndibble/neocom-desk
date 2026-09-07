@@ -185,6 +185,15 @@ here — they go one per file in `docs/context/decisions/`.
   the hub's lowest sell, because an **Acquisition Verdict** asks what buying it
   outright costs. A material the chosen side cannot price is unpriceable, never
   quietly re-quoted at the other side.
+- **Manual Ore Tag**: A pilot's hand-classification of an ore type the
+  SDE-derived allowlists don't recognise, made from the Moon Mining Tax
+  ledger's "unclassified ore" banner. Two independent lists — "Tag as moon
+  ore" (group it into **Mining Ledger Entries** from now on) and "Ignore"
+  (treat it as ordinary ore/ice: stop flagging it, never group it). Device-
+  local and never synced: a stop-gap for the window between a CCP patch and
+  the next `npm run sde:build`, not Editable Data. Reversible from the
+  ledger's **Ore tags** dialog — an uncorrectable correction is worse than
+  the misclassification it fixes.
 - **Mining Ledger Entry**: One row of the Moon Mining Tax ledger, derived (not
   stored) from ESI's personal mining ledger: every moon-goo row for one
   (character, EVE/UTC date, solar system), summed per ore type. This is also

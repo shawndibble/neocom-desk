@@ -30,9 +30,16 @@ beforeEach(async () => {
   );
 });
 
-function renderDialog(onChanged = vi.fn()) {
-  render(<TypeOverridesDialog open onClose={vi.fn()} onChanged={onChanged} />);
-  return onChanged;
+function renderDialog() {
+  const onChanged = vi.fn();
+  const onClose = vi.fn();
+  render(<TypeOverridesDialog open onClose={onClose} onChanged={onChanged} />);
+  return { onChanged, onClose };
+}
+
+/** The Modal's own close button — the path `handleClose` hangs the refresh off. */
+function closeDialog() {
+  return userEvent.click(screen.getByRole('button', { name: 'Close' }));
 }
 
 describe('TypeOverridesDialog', () => {
@@ -54,17 +61,42 @@ describe('TypeOverridesDialog', () => {
     ).toBeInTheDocument();
   });
 
-  it('removes a moon-ore tag from Dexie and tells the route to refresh', async () => {
+  it('removes a moon-ore tag from Dexie', async () => {
     await tagAsMoonOre(CHROMITE);
-    const onChanged = renderDialog();
+    renderDialog();
 
     await userEvent.click(await screen.findByRole('button', { name: 'Remove the Chromite tag' }));
 
     await waitFor(async () => {
       expect(await loadManualMoonOreTypeIds()).toEqual([]);
     });
-    expect(onChanged).toHaveBeenCalled();
     expect(screen.queryByText('Chromite')).not.toBeInTheDocument();
+  });
+
+  it('refreshes the route once on close, not once per removal', async () => {
+    await tagAsMoonOre(CHROMITE);
+    await tagAsIgnored(VELDSPAR);
+    const { onChanged } = renderDialog();
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Remove the Chromite tag' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Remove the Veldspar tag' }));
+    // The route's snapshot is a paginated per-character read; two removals must
+    // not put it in front of the table twice.
+    expect(onChanged).not.toHaveBeenCalled();
+
+    await closeDialog();
+    expect(onChanged).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not refresh the route when nothing was removed', async () => {
+    await tagAsMoonOre(CHROMITE);
+    const { onChanged, onClose } = renderDialog();
+
+    await screen.findByText('Chromite');
+    await closeDialog();
+
+    expect(onChanged).not.toHaveBeenCalled();
+    expect(onClose).toHaveBeenCalled();
   });
 
   it('removing from one list never touches the other', async () => {
@@ -87,6 +119,16 @@ describe('TypeOverridesDialog', () => {
     renderDialog();
 
     expect(await screen.findByText(`#${CHROMITE}`)).toBeInTheDocument();
+  });
+
+  it('surfaces an error instead of spinning forever when the name lookup fails', async () => {
+    mockedLoadTypeNames.mockRejectedValue(new Error('offline'));
+    await tagAsMoonOre(CHROMITE);
+    renderDialog();
+
+    // A dialog whose whole job is recovering from a bad tag must not itself
+    // become a dead end.
+    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't load your ore tags.");
   });
 
   it('resolves both lists in one batched name lookup', async () => {
