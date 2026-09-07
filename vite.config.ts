@@ -87,6 +87,10 @@ const sentryAuthToken = process.env.SENTRY_AUTH_TOKEN;
 function spaFallbackHtml() {
   return {
     name: 'neocom-spa-fallback-html',
+    // Build only. `closeBundle` also fires when a dev server shuts down, where
+    // there is no `dist/` to copy and the throw would surface as a crash on
+    // Ctrl+C in a fresh worktree.
+    apply: 'build' as const,
     closeBundle() {
       copyFileSync('dist/index.html', 'dist/404.html');
     },
