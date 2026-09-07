@@ -39,11 +39,11 @@ import { useCorpAccess } from '@/features/corp/useCorpAccess';
 import { NotificationsPanel } from '@/features/notifications/NotificationsPanel';
 import { CorpAccessPanel } from '@/features/corp/CorpAccessPanel';
 import { db } from '@/db';
-
-const RIG_LEVEL_OPTIONS: readonly RigLevel[] = ['none', 't1', 't2'];
 import { ENDPOINT_ROUTES } from '@/esi/endpointRoutes';
 import { useActivityLog, type ActivityLogEntry } from '@/stores/activityLog';
 import type { ActivityOutcome } from '@/esi/activityLog';
+
+const RIG_LEVEL_OPTIONS: readonly RigLevel[] = ['none', 't1', 't2'];
 
 type SettingsTab = 'general' | 'notifications' | 'dataAge' | 'activity';
 
