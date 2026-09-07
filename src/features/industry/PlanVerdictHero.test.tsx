@@ -69,9 +69,17 @@ type HeroOverrides = Partial<
   Omit<Parameters<typeof PlanVerdictHero>[0], 'breakdownOpen' | 'onBreakdownOpenChange'>
 >;
 
-/** Owns `breakdownOpen` so the "How is this calculated?" button really opens the modal. */
-function Harness(overrides: HeroOverrides = {}) {
-  const [breakdownOpen, setBreakdownOpen] = useState(false);
+/**
+ * Owns `breakdownOpen`. The hero has no trigger of its own any more — the
+ * Costs & Revenue panel's header carries the only one, beside the figures the
+ * breakdown explains — so `openBreakdown` starts it open, which is the state
+ * that panel's button puts the hero in.
+ */
+function Harness({
+  openBreakdown = false,
+  ...overrides
+}: HeroOverrides & { openBreakdown?: boolean } = {}) {
+  const [breakdownOpen, setBreakdownOpen] = useState(openBreakdown);
   return (
     <PlanVerdictHero
       result={RESULT}
@@ -89,7 +97,7 @@ function Harness(overrides: HeroOverrides = {}) {
   );
 }
 
-function renderHero(overrides: HeroOverrides = {}) {
+function renderHero(overrides: HeroOverrides & { openBreakdown?: boolean } = {}) {
   return render(<Harness {...overrides} />);
 }
 
@@ -178,29 +186,26 @@ describe('PlanVerdictHero: Log Production', () => {
 
 describe('PlanVerdictHero: calculation breakdown', () => {
   it('opens a modal from the results and explains where material and product prices come from', async () => {
-    renderHero();
-    await userEvent.click(screen.getByRole('button', { name: 'Calculations?' }));
+    renderHero({ openBreakdown: true });
 
     const dialog = screen.getByRole('dialog');
-    expect(within(dialog).getByText(/lowest sell order/i)).toBeTruthy();
-    expect(within(dialog).getByText(/Ore, ice and gas are priced the same way/i)).toBeTruthy();
-    expect(within(dialog).getByText(/Units marked as owned cost 0 ISK/i)).toBeTruthy();
-    expect(within(dialog).getByText(/Rifter is always valued at Jita's lowest sell/i)).toBeTruthy();
+    expect(within(dialog).getByText(/Materials: Jita lowest sell/i)).toBeTruthy();
+    expect(within(dialog).getByText(/Ore, ice and gas: priced as themselves/i)).toBeTruthy();
+    expect(within(dialog).getByText(/Owned units: 0 ISK/i)).toBeTruthy();
+    expect(within(dialog).getByText(/Rifter: always Jita lowest sell/i)).toBeTruthy();
   });
 
   it("names the buy-order basis when that is the plan's basis", async () => {
-    renderHero({ breakdown: { ...BREAKDOWN, materialPriceBasis: 'buy' } });
-    await userEvent.click(screen.getByRole('button', { name: 'Calculations?' }));
+    renderHero({ breakdown: { ...BREAKDOWN, materialPriceBasis: 'buy' }, openBreakdown: true });
 
     const dialog = screen.getByRole('dialog');
-    expect(within(dialog).getByText(/highest buy order/i)).toBeTruthy();
+    expect(within(dialog).getByText(/Materials: Jita highest buy/i)).toBeTruthy();
     // The product never follows the materials onto the buy side.
-    expect(within(dialog).getByText(/Rifter is always valued at Jita's lowest sell/i)).toBeTruthy();
+    expect(within(dialog).getByText(/Rifter: always Jita lowest sell/i)).toBeTruthy();
   });
 
   it("quotes the plan's own figures rather than a generic formula", async () => {
-    renderHero();
-    await userEvent.click(screen.getByRole('button', { name: 'Calculations?' }));
+    renderHero({ openBreakdown: true });
 
     const dialog = screen.getByRole('dialog');
     // Total cost = materials 500 + job fee 65.
@@ -214,20 +219,18 @@ describe('PlanVerdictHero: calculation breakdown', () => {
   });
 
   it('explains the use-or-sell comparison and its two selling bases', async () => {
-    renderHero();
-    await userEvent.click(screen.getByRole('button', { name: 'Calculations?' }));
+    renderHero({ openBreakdown: true });
 
     const dialog = screen.getByRole('dialog');
-    expect(within(dialog).getByText(/Sell now fills the standing buy orders/i)).toBeTruthy();
-    expect(within(dialog).getByText(/no order on the chosen side gets no verdict/i)).toBeTruthy();
+    expect(within(dialog).getByText(/Sell now: fills standing buy orders/i)).toBeTruthy();
+    expect(within(dialog).getByText(/No order on the chosen side means no verdict/i)).toBeTruthy();
   });
 
   it('drops the material-efficiency wording for a reaction, which has none', async () => {
-    renderHero({ breakdown: { ...BREAKDOWN, isReaction: true } });
-    await userEvent.click(screen.getByRole('button', { name: 'Calculations?' }));
+    renderHero({ breakdown: { ...BREAKDOWN, isReaction: true }, openBreakdown: true });
 
     const dialog = screen.getByRole('dialog');
-    expect(within(dialog).getByText(/no material efficiency/i)).toBeTruthy();
+    expect(within(dialog).getByText(/Reactions have no ME/i)).toBeTruthy();
     expect(within(dialog).queryByText(/after ME 10/i)).toBeNull();
   });
 });

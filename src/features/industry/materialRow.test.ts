@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { materialCostLines } from '@/engine/industry/sourcing';
 import type { HubPrices, MaterialCostLine, MaterialSourcingMap } from '@/engine/industry/types';
-import { materialRowState } from './materialRow';
+import { buyPricedLine, materialRowState } from './materialRow';
 
 /** Built through the engine so a fixture can never claim a cost line the engine wouldn't produce. */
 function line(quantity: number, hubPrices: HubPrices, sourcing?: MaterialSourcingMap) {
@@ -82,5 +82,43 @@ describe('materialRowState', () => {
     const state = line(1000, { 34: 5 }, { 34: { ownedQuantity: 5000 } })();
     expect(state.fullyOwned).toBe(true);
     expect(state.lineCost).toBe(0);
+  });
+});
+
+describe('buyPricedLine', () => {
+  const material: MaterialCostLine = materialCostLines(
+    [{ typeID: 34, baseQuantity: 100, quantity: 100 }],
+    { 34: 5 }
+  )[0];
+
+  it('leaves a row that already has a purchase price alone', () => {
+    expect(buyPricedLine(material, undefined, { 34: 9 })).toBe(material);
+  });
+
+  it('gives a row being built the price it would have been bought at', () => {
+    // What `resolveMaterial` produces for a built material: no unit price,
+    // because it isn't bought at one.
+    const built: MaterialCostLine = { ...material, unitPrice: null, lineCost: 0 };
+
+    expect(buyPricedLine(built, undefined, { 34: 5 }).unitPrice).toBe(5);
+  });
+
+  it('prefers the plan’s own override to the hub price', () => {
+    const built: MaterialCostLine = { ...material, unitPrice: null, lineCost: 0 };
+
+    expect(buyPricedLine(built, { 34: { overridePrice: 7 } }, { 34: 5 }).unitPrice).toBe(7);
+  });
+
+  it('stays unpriced when the hub has no number and nothing was overridden', () => {
+    const built: MaterialCostLine = { ...material, unitPrice: null, lineCost: 0 };
+
+    expect(buyPricedLine(built, undefined, {}).unitPrice).toBeNull();
+  });
+
+  it('refuses a nonsense price rather than passing it on as a comparison', () => {
+    const built: MaterialCostLine = { ...material, unitPrice: null, lineCost: 0 };
+
+    expect(buyPricedLine(built, undefined, { 34: Number.NaN }).unitPrice).toBeNull();
+    expect(buyPricedLine(built, undefined, { 34: -1 }).unitPrice).toBeNull();
   });
 });

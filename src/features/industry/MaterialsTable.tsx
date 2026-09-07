@@ -11,7 +11,7 @@ import { materialRowState } from './materialRow';
 import { suggestedOwnedQuantity } from '@/engine/industry/ownedStock';
 import { OwnedStockHint } from './OwnedStockHint';
 import type { OwnedStockDetection } from './ownedStockDetection';
-import type { MaterialTableRow } from './subBuildPlan';
+import { buildRecipe, type MaterialTableRow } from './subBuildPlan';
 
 interface MaterialsTableProps {
   /** Engine cost lines — already resolved against the plan's sourcing overrides and hub prices. */
@@ -37,6 +37,12 @@ interface MaterialsTableProps {
   canBuildHere?: (typeID: number) => boolean;
   /** Turns one material's sub-build on or off. Omitted alongside `canBuildHere`. */
   onToggleBuildHere?: (typeID: number) => void;
+  /**
+   * Opens the "Build it" modal for a material being built here — the runs and
+   * ingredient list this flat table no longer nests under the row. Omitted
+   * where the caller has no modal to open, which simply drops the link.
+   */
+  onShowRecipe?: (typeID: number) => void;
 }
 
 /** Blank or garbage clears the field; anything real is kept as-is (the engine clamps). */
@@ -165,19 +171,31 @@ const BUILD_GLYPH: Record<MakeMethod, typeof Icon.Build> = {
  * materials column, so a row's tooltip and its control never say something
  * different about the same number.
  */
-function makeOrBuyLabel(advice: MakeOrBuy, remaining: number, t: Translate): string {
-  const building = advice.verdict === 'build';
+function makeOrBuyVerdict(advice: MakeOrBuy, t: Translate): string {
+  return t('industry.makeOrBuy.suggestion', {
+    verdict: t(`industry.makeOrBuy.${advice.verdict === 'build' ? 'actionBuild' : 'actionBuy'}`),
+  });
+}
+
+/**
+ * The reasoning under the verdict: the two unit prices the call turns on, and
+ * what the gap is worth. Deliberately terse fragments rather than sentences —
+ * this is read at a glance off a hover, where a paragraph is worse than a
+ * comparison. One string per method, not one per method-and-verdict: the
+ * verdict is the heading now, so the numbers no longer have to restate it.
+ */
+function makeOrBuyReason(advice: MakeOrBuy, remaining: number, t: Translate): string {
   const method =
     advice.method === 'manufacturing'
       ? 'Manufacturing'
       : advice.method === 'reaction'
         ? 'Reaction'
         : 'Planetary';
-  const sentences = [
+  const parts = [
     // Two decimals on the unit prices, unlike the whole-ISK columns beside
     // them: the verdict turns on the gap between these two numbers, and
     // rounding a 5.4-vs-5.6 call to "5 against 5" would make it unreadable.
-    t(`industry.makeOrBuy.${building ? 'build' : 'buy'}${method}`, {
+    t(`industry.makeOrBuy.reason${method}`, {
       make: formatIsk(advice.makeUnitPrice, 2),
       buy: formatIsk(advice.buyUnitPrice, 2),
       me: advice.me,
@@ -186,14 +204,64 @@ function makeOrBuyLabel(advice: MakeOrBuy, remaining: number, t: Translate): str
   // Nothing is riding on a fully owned row: there is no remainder to spend
   // the difference on either way.
   if (remaining > 0 && advice.savings > 0) {
-    sentences.push(
+    parts.push(
       t('industry.makeOrBuy.savings', {
         amount: formatIsk(advice.savings),
         quantity: remaining.toLocaleString(),
       })
     );
   }
-  return sentences.join(' ');
+  return parts.join(' ');
+}
+
+/** Plain text for an accessible name, which cannot take a node. */
+function makeOrBuyLabel(advice: MakeOrBuy, remaining: number, t: Translate): string {
+  return `${makeOrBuyVerdict(advice, t)}. ${makeOrBuyReason(advice, remaining, t)}`;
+}
+
+/**
+ * The advice as a tooltip bubble: the suggestion on its own line, bold, the
+ * reasoning under it, and — where the trigger is the toggle rather than the
+ * advisory glyph — what clicking will do.
+ *
+ * The suggestion leads because it is the only part a player needs every time
+ * — "which of these two should I be doing" — and it used to be inferable only
+ * from which of six phrasings the sentence happened to start with. Bold and
+ * on its own line, it survives a glance; the prices below it are there for
+ * when the answer is close enough to want checking.
+ *
+ * `action` is the row's *current* state inverted, never the suggestion: a row
+ * already being built is clicked to go back to buying, whatever the advice
+ * says. Keeping the two apart is the whole point of spelling the click out —
+ * "Suggestion: Build It" over "Click to Buy" is a row that is already right,
+ * which is exactly the case a single line of text used to render as a
+ * contradiction.
+ */
+function MakeOrBuyTooltip({
+  advice,
+  remaining,
+  action,
+}: {
+  /** Omitted where there is no verdict — an unpriced recipe input, or nothing that produces this. */
+  advice?: MakeOrBuy;
+  remaining: number;
+  /** What a click does. Omitted on the advice-only marker, which has nothing to click. */
+  action?: 'build' | 'buy';
+}) {
+  const { t } = useTranslation();
+  return (
+    <span className="flex flex-col gap-1">
+      {advice && (
+        <>
+          <span className="font-semibold">{makeOrBuyVerdict(advice, t)}</span>
+          <span>{makeOrBuyReason(advice, remaining, t)}</span>
+        </>
+      )}
+      {action && (
+        <span>{t(`industry.makeOrBuy.${action === 'build' ? 'clickBuild' : 'clickBuy'}`)}</span>
+      )}
+    </span>
+  );
 }
 
 /**
@@ -230,7 +298,7 @@ function MakeOrBuyMarker({ advice, remaining }: { advice: MakeOrBuy; remaining: 
   const planetary = building && advice.method === 'planetary';
   const Glyph = building ? BUILD_GLYPH[advice.method] : Icon.Buy;
   return (
-    <Tooltip content={label} openOnTap>
+    <Tooltip content={<MakeOrBuyTooltip advice={advice} remaining={remaining} />} openOnTap>
       <span
         role="img"
         aria-label={label}
@@ -284,6 +352,7 @@ export function MaterialsTable({
   makeOrBuy,
   canBuildHere,
   onToggleBuildHere,
+  onShowRecipe,
 }: MaterialsTableProps) {
   const { t } = useTranslation();
 
@@ -295,8 +364,8 @@ export function MaterialsTable({
         render: (material) => {
           const advice = makeOrBuy?.get(material.typeID);
           const name = nameFor(material.typeID);
-          const building = material.subBuild !== undefined;
-          // Offered at any depth: a recipe input a build introduced is
+          const building = material.subBuilds.length > 0;
+          // Offered on every row: a recipe input a build introduced is
           // exactly as buildable as the plan's own materials, which is what
           // lets a player keep drilling down as many levels as the recipe
           // tree actually has (docs/context/decisions).
@@ -311,57 +380,80 @@ export function MaterialsTable({
           // keyboard/screen-reader user from hearing a whole paragraph on
           // every Tab. `undefined` falls back to `label` (IconButton's own
           // rule), so a row with no advice still just shows the short action.
-          const tooltip = advice
-            ? `${actionLabel}. ${makeOrBuyLabel(advice, material.remainingQuantity, t)}`
-            : undefined;
+          // The bubble is the advice, not a restatement of the action: the
+          // glyph already shows what clicking does, and `label` (the
+          // accessible name) still says it in words. What a player cannot get
+          // from either is which way they *should* go — so the suggestion
+          // leads, and it now shows on a row already being built too, where it
+          // used to vanish and leave the bare action reading as a
+          // recommendation to undo the build (`buyPricedLine`).
+          //
+          // A row with no verdict still gets the click line rather than
+          // falling through to `label`: `makeOrBuy` also returns nothing when
+          // the recipe's own inputs are unpriced, and "Buy X instead of
+          // building it" alone was the exact sentence that read as advice.
+          const tooltip = toggle ? (
+            <MakeOrBuyTooltip
+              advice={advice}
+              remaining={material.remainingQuantity}
+              action={building ? 'buy' : 'build'}
+            />
+          ) : undefined;
           return (
-            // Indented one step per level it sits below the plan's own
-            // materials, `1rem` a level (the same offset the single-level
-            // indent used, `pl-4` on the app's `0.25rem` spacing scale —
-            // docs/DESIGN.md §3 — kept as an inline style since the depth is
-            // unbounded and Tailwind has no class for an arbitrary multiple).
-            // The offset alone reaches a sighted reader on a wide-enough
-            // screen; the sr-only label below is what a screen reader and a
-            // narrow stacked card get instead, since neither has a column
-            // edge to measure the offset against.
-            <span
-              className="inline-flex items-center gap-1.5"
-              style={material.depth > 0 ? { paddingLeft: `${material.depth}rem` } : undefined}
-            >
-              {material.depth > 0 && <span className="sr-only">{t('industry.subBuildInput')}</span>}
-              {toggle ? (
-                // The marker slot itself is the control on a material
-                // something here can produce — hammer to start building it,
-                // cart to go back to buying it, the same two glyphs and tones
-                // the advice-only marker uses for those two errands: the
-                // hammer is always `positive` (green) and the cart always the
-                // default dim, the same way regardless of which one this row
-                // currently shows — the tone rides with the glyph, not with
-                // the row's toggle state, so it stays a fixed "this action
-                // means build" / "this action means buy" cue rather than
-                // flipping meaning from row to row. There is nothing left to
-                // say in a second, separate icon once this one already reads
-                // as "switch this row to that": the plan's own context menu
-                // (`ItemContextMenu`'s "Add material components") reaches the
-                // identical toggle for a right-click or long-press.
-                <IconButton
-                  size="sm"
-                  variant="plain"
-                  tone={building ? 'default' : 'positive'}
-                  icon={
-                    building ? (
-                      <Icon.Buy size={Icon.ICON_SIZE.sm} />
-                    ) : (
-                      <Icon.Build size={Icon.ICON_SIZE.sm} />
-                    )
-                  }
-                  label={actionLabel}
-                  tooltip={tooltip}
-                  onClick={() => toggle(material.typeID)}
-                />
-              ) : (
-                advice && <MakeOrBuyMarker advice={advice} remaining={material.remainingQuantity} />
-              )}
+            // Flat — no indent, no depth. Every row is one material the plan
+            // needs, whether the plan's blueprint asked for it or a build
+            // deeper down did, and its quantity is the whole plan's
+            // (`subBuildPlan`). Which job introduced a quantity is the "Build
+            // it" modal's question, not a shape for this list to carry.
+            <span className="inline-flex items-center gap-1.5">
+              {/*
+                One fixed-width slot, always rendered, sized to the toggle
+                (`IconButton size="sm"` is `size-9 md:size-7`) — so every
+                material name in the column starts at the same x whether its
+                row carries the toggle button, the smaller advisory glyph, or
+                nothing at all. Without it the three cases were three
+                different left edges, and the leaf rows a build introduced sat
+                visibly left of the plan's own materials above them: a ragged
+                margin that read as an indent nobody meant.
+              */}
+              <span className="inline-flex w-9 shrink-0 items-center justify-center md:w-7">
+                {toggle ? (
+                  // The slot's occupant is the control itself on a material
+                  // something here can produce — hammer to start building it,
+                  // cart to go back to buying it, the same two glyphs and
+                  // tones the advice-only marker uses for those two errands:
+                  // the hammer is always `positive` (green) and the cart
+                  // always the default dim, the same way regardless of which
+                  // one this row currently shows — the tone rides with the
+                  // glyph, not with the row's toggle state, so it stays a
+                  // fixed "this action means build" / "this action means buy"
+                  // cue rather than flipping meaning from row to row. There is
+                  // nothing left to say in a second, separate icon once this
+                  // one already reads as "switch this row to that": the plan's
+                  // own context menu (`ItemContextMenu`'s "Add material
+                  // components") reaches the identical toggle for a
+                  // right-click or long-press.
+                  <IconButton
+                    size="sm"
+                    variant="plain"
+                    tone={building ? 'default' : 'positive'}
+                    icon={
+                      building ? (
+                        <Icon.Buy size={Icon.ICON_SIZE.sm} />
+                      ) : (
+                        <Icon.Build size={Icon.ICON_SIZE.sm} />
+                      )
+                    }
+                    label={actionLabel}
+                    tooltip={tooltip}
+                    onClick={() => toggle(material.typeID)}
+                  />
+                ) : (
+                  advice && (
+                    <MakeOrBuyMarker advice={advice} remaining={material.remainingQuantity} />
+                  )
+                )}
+              </span>
               {name}
             </span>
           );
@@ -372,15 +464,31 @@ export function MaterialsTable({
         header: t('industry.quantity'),
         align: 'right',
         className: 'tabular-nums',
-        render: (material) => material.quantity.toLocaleString(),
+        // The requirement, and — once the player says they own some — what is
+        // actually left to get. That subtraction is the number a shopping list
+        // is really made of, and doing it in your head down a column of six
+        // figures is exactly the arithmetic this table exists to save. Only
+        // shown when it differs from the quantity above it.
+        render: (material) => (
+          <span className="flex flex-col items-start sm:items-end">
+            <span>{material.quantity.toLocaleString()}</span>
+            {material.ownedQuantity > 0 && (
+              <span className="text-[0.6875rem] whitespace-nowrap text-text-dim">
+                {t('industry.needAfterOwned', {
+                  quantity: material.remainingQuantity.toLocaleString(),
+                })}
+              </span>
+            )}
+          </span>
+        ),
       },
       {
         id: 'owned',
         header: t('industry.ownedQuantity'),
         align: 'right',
         render: (material) => {
-          // Unfiltered — the breakdown popover always shows every placement,
-          // galaxy-wide, regardless of the plan's owned-stock scope.
+          // Whether anything is detected at all, galaxy-wide — the offer's
+          // own number is the scoped one below.
           const stock = detection?.stockFor(material.typeID);
           const owned = sourcing?.[material.typeID]?.ownedQuantity;
           // The offer respects the plan's owned-stock scope (issue #454): a
@@ -403,7 +511,6 @@ export function MaterialsTable({
               />
               {stock && detection && (
                 <OwnedStockHint
-                  stock={stock}
                   scopedQuantity={scopedQuantity}
                   detection={detection}
                   materialName={nameFor(material.typeID)}
@@ -425,40 +532,60 @@ export function MaterialsTable({
         header: t('industry.price'),
         align: 'right',
         render: (material) => {
-          // A material being produced has no purchase price to edit — it
-          // isn't bought at a unit price — but it still has a real per-unit
-          // cost: the rolled-up cost of the job that makes it, materials and
-          // every sub-job's fee included, however deep that job's own inputs
-          // go. Poisoned (a descendant neither owned, priced, nor itself
-          // buildable) shows as unpriced rather than a silently wrong number.
-          if (material.subBuild) {
-            const unitCost = material.subBuild.unitCost;
+          const name = nameFor(material.typeID);
+          // A material being produced has no purchase price at all — it is
+          // not bought at one — so this cell carries the row's *state* and the
+          // way into the job behind it instead: "Built", as the link that
+          // opens the recipe. That link used to sit after the material name
+          // while a rolled-up unit cost sat here, which spent two cells and a
+          // wrapped line per built row to say one thing. The unit cost itself
+          // is in the modal, next to the runs and inputs that explain it.
+          if (material.subBuilds.length > 0) {
             return (
               <span className="flex flex-col items-start gap-0.5 sm:items-end">
-                <span className="tabular-nums">
-                  {unitCost === null ? t('common.unknown') : formatIsk(unitCost, 2)}
-                </span>
-                <span
-                  className={cx(
-                    'text-[0.6875rem]',
-                    unitCost === null ? 'text-warning' : 'text-text-dim'
-                  )}
-                >
-                  {unitCost === null ? t('industry.unpriced') : t('industry.priceSourceBuilt')}
-                </span>
+                {onShowRecipe ? (
+                  <button
+                    type="button"
+                    // Named for its own row: a column of identical "Built"
+                    // links tells a screen-reader user nothing about which
+                    // material they are on. The visible word leads the
+                    // accessible name rather than being replaced by it.
+                    aria-label={t('industry.buildRecipe.actionFor', { material: name })}
+                    className="text-[0.6875rem] whitespace-nowrap text-accent uppercase hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                    onClick={() => onShowRecipe(material.typeID)}
+                  >
+                    {t('industry.priceSourceBuilt')}
+                  </button>
+                ) : (
+                  <span className="text-[0.6875rem] text-text-dim">
+                    {t('industry.priceSourceBuilt')}
+                  </span>
+                )}
+                {/* Kept even though the numbers went: "something under this
+                    has no price" is a warning about the plan's totals, not a
+                    price, and hiding it would quietly understate the cost. */}
+                {material.unpriced && (
+                  <span className="text-[0.6875rem] text-warning">{t('industry.unpriced')}</span>
+                )}
               </span>
             );
           }
           const state = materialRowState(material, sourcing, pricesReady);
           const overridden = state.priceSource === 'override';
-          const name = nameFor(material.typeID);
           // Nothing to price a fully owned material at, so a row with no
           // number is not a problem worth a warning — only a real remainder
           // is.
+          //
+          // No tag at all on a plain hub price: that is what every row is
+          // unless something says otherwise, so "Hub" repeated down a table
+          // this long was a word per row that ruled nothing out. The tags
+          // that survive are the exceptions — a price the player typed, a row
+          // that costs nothing because they own it, and a row the market has
+          // no number for.
           const tag = overridden
             ? { text: t('industry.priceSourceOverride'), tone: 'text-accent' }
             : state.unitPrice !== null
-              ? { text: t('industry.priceSourceHub'), tone: 'text-text-dim' }
+              ? null
               : state.fullyOwned
                 ? { text: t('industry.priceSourceOwned'), tone: 'text-text-dim' }
                 : { text: t('industry.unpriced'), tone: 'text-warning' };
@@ -493,19 +620,26 @@ export function MaterialsTable({
                 onCommit={(overridePrice) => onSourcingChange(material.typeID, { overridePrice })}
               />
               {/* Under the field, not beside it: the source tag is a caption
-                  on the number, and beside it the column outgrew the table. */}
-              <span className="inline-flex items-center gap-1">
-                <span className={cx('text-[0.6875rem]', tag.tone)}>{tag.text}</span>
-                {overridden && (
-                  <IconButton
-                    size="sm"
-                    variant="plain"
-                    icon={<Icon.Revert size={Icon.ICON_SIZE.sm} />}
-                    label={t('industry.resetPriceFor', { material: name })}
-                    onClick={() => onSourcingChange(material.typeID, { overridePrice: undefined })}
-                  />
-                )}
-              </span>
+                  on the number, and beside it the column outgrew the table.
+                  The whole line is dropped on an untagged row rather than left
+                  as an empty one, so a plain hub-priced row is a single line
+                  tall. */}
+              {(tag || overridden) && (
+                <span className="inline-flex items-center gap-1">
+                  {tag && <span className={cx('text-[0.6875rem]', tag.tone)}>{tag.text}</span>}
+                  {overridden && (
+                    <IconButton
+                      size="sm"
+                      variant="plain"
+                      icon={<Icon.Revert size={Icon.ICON_SIZE.sm} />}
+                      label={t('industry.resetPriceFor', { material: name })}
+                      onClick={() =>
+                        onSourcingChange(material.typeID, { overridePrice: undefined })
+                      }
+                    />
+                  )}
+                </span>
+              )}
             </span>
           );
         },
@@ -516,51 +650,26 @@ export function MaterialsTable({
         align: 'right',
         className: 'tabular-nums',
         render: (material) => {
-          // The rolled-up cost of building this material — materials plus
-          // every sub-job's fee, at whatever depth — is a real number now,
-          // not a placeholder: this is exactly what the row's own build
-          // choice changed, and it is already inside the plan's totals.
-          // Runs stays alongside it since the per-run yield and spare units
-          // it implies are already recoverable from the runs count and the
-          // indented inputs below, so a second line spelling them out is more
-          // to read without being more to know.
-          if (material.subBuild) {
-            const { runs } = material.subBuild;
-            return (
-              <span className="flex flex-col items-start sm:items-end">
-                <span>
-                  {material.unpriced ? t('common.unknown') : formatIsk(material.lineCost)}
-                </span>
-                <span className="text-[0.6875rem] whitespace-nowrap text-text-dim">
-                  {t('industry.subBuildRuns', { runs: runs.toLocaleString() })}
-                </span>
-              </span>
-            );
+          // A built row puts no purchase total here: its ingredients have
+          // rows of their own in this flat list, so a rolled-up figure would
+          // be counted twice by anyone reading down the column. Runs is the
+          // one number worth a glance — the job fee, the per-run yield and
+          // the spare units are all in the "Built" modal beside it, which is
+          // where a player goes when the runs count raises a question.
+          if (material.subBuilds.length > 0) {
+            const runs = buildRecipe(material)?.runs ?? 0;
+            return <span>{t('industry.subBuildRuns', { runs: runs.toLocaleString() })}</span>;
           }
+          // The total, and nothing else. What it is made of — units owned,
+          // units still to buy, the price they are bought at — is already in
+          // the three cells to the left of it, and restating it here put a
+          // second line under every part-owned row in a table long enough
+          // that the repeat cost more than it explained. "Need:" under the
+          // quantity is the one piece of that arithmetic worth keeping,
+          // because it is the only number not already on the row.
           const state = materialRowState(material, sourcing, pricesReady);
-          const owned = material.ownedQuantity;
           return (
-            <span className="flex flex-col items-start sm:items-end">
-              <span>
-                {state.lineCost === null ? t('common.unknown') : formatIsk(state.lineCost)}
-              </span>
-              {owned > 0 && (
-                <span className="text-[0.6875rem] whitespace-nowrap text-text-dim">
-                  {state.fullyOwned
-                    ? t('industry.sourcingAllOwned', { owned: owned.toLocaleString() })
-                    : state.unitPrice !== null
-                      ? t('industry.sourcingSplit', {
-                          owned: owned.toLocaleString(),
-                          bought: material.remainingQuantity.toLocaleString(),
-                          price: formatIsk(state.unitPrice),
-                        })
-                      : t('industry.sourcingSplitUnpriced', {
-                          owned: owned.toLocaleString(),
-                          bought: material.remainingQuantity.toLocaleString(),
-                        })}
-                </span>
-              )}
-            </span>
+            <span>{state.lineCost === null ? t('common.unknown') : formatIsk(state.lineCost)}</span>
           );
         },
       },
@@ -575,6 +684,7 @@ export function MaterialsTable({
       makeOrBuy,
       canBuildHere,
       onToggleBuildHere,
+      onShowRecipe,
     ]
   );
 

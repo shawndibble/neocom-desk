@@ -419,25 +419,41 @@ export function Industry() {
     if (activeCharacterId !== null) scheduleSync(activeCharacterId);
   }
 
-  async function handleUpdate(patch: PlanPatch) {
-    if (!selectedPlan) return;
-    await db.buildPlans.put({ ...selectedPlan, ...patch, updatedAt: Date.now() });
+  /**
+   * Merges a patch into the stored record inside a transaction, never into
+   * `selectedPlan` from this render's closure.
+   *
+   * A whole-record `put` built on a closure snapshot silently reverts every
+   * field the patch does not mention back to whatever they were when that
+   * snapshot was taken — which wiped `buildHere` (ten build choices at once)
+   * whenever an async write landed with a stale one in hand.
+   * `saveSourcingEdit` has always taken this path for exactly this reason.
+   *
+   * `touch` is the only thing separating the plan's two whole-field writers.
+   * A pilot edit bumps `updatedAt`; a correction the app made for itself —
+   * today, a security band brought back into line with the plan's build
+   * system — deliberately does not. Merely opening a plan is not editing it:
+   * bumping the timestamp would make the last plan *viewed* win the "default a
+   * new plan from the most recently updated one" rule (#456), and would churn
+   * every device's sync for a value the pilot never changed.
+   */
+  async function writePlanPatch(patch: PlanPatch, touch: boolean) {
+    const planId = selectedPlan?.id;
+    if (planId === undefined) return;
+    await db.transaction('rw', db.buildPlans, async () => {
+      const stored = await db.buildPlans.get(planId);
+      if (!stored) return;
+      await db.buildPlans.put({ ...stored, ...patch, ...(touch ? { updatedAt: Date.now() } : {}) });
+    });
     if (activeCharacterId !== null) scheduleSync(activeCharacterId);
   }
 
-  /**
-   * A correction the app made for itself — today, a security band brought back
-   * into line with the plan's build system.
-   *
-   * Deliberately does not touch `updatedAt`. Merely opening a plan is not
-   * editing it: bumping the timestamp would make the last plan *viewed* win
-   * the "default a new plan from the most recently updated one" rule (#456),
-   * and would churn every device's sync for a value the pilot never changed.
-   */
+  async function handleUpdate(patch: PlanPatch) {
+    await writePlanPatch(patch, true);
+  }
+
   async function handleDerivedFix(patch: PlanPatch) {
-    if (!selectedPlan) return;
-    await db.buildPlans.put({ ...selectedPlan, ...patch });
-    if (activeCharacterId !== null) scheduleSync(activeCharacterId);
+    await writePlanPatch(patch, false);
   }
 
   /**

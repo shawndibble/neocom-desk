@@ -43,9 +43,12 @@ import { downloadCsv } from '@/lib/downloadCsv';
 import { writeToClipboard } from '@/lib/clipboard';
 import { unmaskNumber } from '@/lib/numberMask';
 import { MaterialsTable, SourcingInput } from './MaterialsTable';
+import { BuildRecipeModal } from './BuildRecipeModal';
+import { buyPricedLine } from './materialRow';
 import { materialsCsvColumns } from './materialsCsv';
 import { hasShoppingList, shoppingListText } from './shoppingList';
 import {
+  buildRecipe,
   hasSubBuilds,
   materialTableRows,
   shoppingListMaterials,
@@ -53,6 +56,7 @@ import {
   type MaterialTableRow,
 } from './subBuildPlan';
 import { formatIsk } from '@/lib/isk';
+import { cx } from '@/lib/cx';
 import { bulkOwnedStockSuggestions, filterStockByScope } from '@/engine/industry/ownedStock';
 import {
   stockLocationLabel,
@@ -292,38 +296,6 @@ export function BuildPlanDetail({
     [ownedBlueprints, plan.blueprintTypeID]
   );
 
-  // Keyed off the blueprint, not the computed cost lines: detected stock does
-  // not depend on runs/ME/TE, and this array keys the detection memo.
-  const materialTypeIds = useMemo(
-    () => (blueprint ? blueprint.materials.map((m) => m.typeID) : []),
-    [blueprint]
-  );
-  const {
-    stock: detectedStock,
-    characterNames,
-    locationNames,
-    incompleteCharacters,
-  } = useDetectedOwnedStock(ownedStockSnapshot, materialTypeIds);
-
-  // Narrowed to the plan's owned-stock scope (issue #454); `detectedStock`
-  // itself stays the full, galaxy-wide picture the breakdown popover shows.
-  const scopedStock = useMemo(
-    () => filterStockByScope(detectedStock, plan.ownedStockScope),
-    [detectedStock, plan.ownedStockScope]
-  );
-
-  const detection = useMemo<OwnedStockDetection>(
-    () => ({
-      stockFor: (typeID) => detectedStock.get(typeID),
-      scopedQuantityFor: (typeID) => scopedStock.get(typeID)?.quantity ?? 0,
-      lowerBound: incompleteCharacters.length > 0,
-      incompleteCharacters,
-      characterNameFor: (characterId) => characterNames.get(characterId) ?? t('common.unknown'),
-      locationLabelFor: (placement) => stockLocationLabel(placement, locationNames, t),
-    }),
-    [detectedStock, scopedStock, characterNames, locationNames, incompleteCharacters, t]
-  );
-
   /**
    * The one map every "what does this material cost to buy" on the plan reads
    * — its own cost lines, its sub-build inputs and its make-or-buy verdicts,
@@ -394,18 +366,6 @@ export function BuildPlanDetail({
   const pricesReady =
     snapshot !== null && snapshot.adjustedPrices !== null && snapshot.systemCostIndex !== null;
 
-  // "Use all" fills only rows with nothing typed in them: a
-  // hand-entered value, including a deliberate 0, is never clobbered by a bulk
-  // action. The per-row action is the one that overwrites — clicking it on that
-  // row means it.
-  const bulkDetectedPatches = useMemo<SourcingPatchEntry[]>(
-    () =>
-      bulkOwnedStockSuggestions(result?.materials ?? [], plan.materialSourcing, scopedStock).map(
-        ({ typeID, ownedQuantity }) => ({ typeID, patch: { ownedQuantity } })
-      ),
-    [result, plan.materialSourcing, scopedStock]
-  );
-
   /**
    * The facility/rig/security/tax inputs every engine context on this plan
    * needs — the "where and how a job runs" half, which doesn't depend on
@@ -447,7 +407,7 @@ export function BuildPlanDetail({
    * The materials table's rows: `result.materials` is already the whole
    * resolved tree — `buildVsBuy` applies every `buildHere` choice itself, at
    * whatever depth (src/engine/industry/materialResolution) — so this only
-   * has to walk it into a flat, depth-tagged list. One computation, not two:
+   * has to flatten it to one row per material. One computation, not two:
    * before this, a separate expansion priced the table while the Results
    * panel above priced the plan as written, and the two could disagree the
    * moment a build was toggled (docs/context/decisions, since superseded).
@@ -456,6 +416,86 @@ export function BuildPlanDetail({
     () => (result ? materialTableRows(result.materials) : []),
     [result]
   );
+
+  // Every material on the table, not just the blueprint's own: a mineral a
+  // sub-build introduced is as ownable as anything else, and while this was
+  // the blueprint's material list a player with 10,714,573 Tritanium in the
+  // hangar was told they owned none of it the moment the Tritanium row came
+  // from a component's recipe rather than the ship's.
+  //
+  // Still keyed off content, not array identity. `detectOwnedStock` scans
+  // every Character's whole asset list — tens of thousands of rows — so it
+  // must not re-run on a runs/ME/TE keystroke, and `visibleMaterials` is a
+  // fresh array on each of those. The joined id list is the real dependency:
+  // it changes when a build is toggled (which does add and remove rows) and
+  // not when a number beside one is edited.
+  const materialTypeIdKey = useMemo(
+    () =>
+      [...new Set(visibleMaterials.map((material) => material.typeID))]
+        .sort((a, b) => a - b)
+        .join(','),
+    [visibleMaterials]
+  );
+  const materialTypeIds = useMemo(
+    () => (materialTypeIdKey === '' ? [] : materialTypeIdKey.split(',').map(Number)),
+    [materialTypeIdKey]
+  );
+  const {
+    stock: detectedStock,
+    characterNames,
+    locationNames,
+    incompleteCharacters,
+  } = useDetectedOwnedStock(ownedStockSnapshot, materialTypeIds);
+
+  // Narrowed to the plan's owned-stock scope (issue #454); `detectedStock`
+  // itself stays the full, galaxy-wide picture the breakdown popover shows.
+  const scopedStock = useMemo(
+    () => filterStockByScope(detectedStock, plan.ownedStockScope),
+    [detectedStock, plan.ownedStockScope]
+  );
+
+  const detection = useMemo<OwnedStockDetection>(
+    () => ({
+      stockFor: (typeID) => detectedStock.get(typeID),
+      scopedQuantityFor: (typeID) => scopedStock.get(typeID)?.quantity ?? 0,
+      lowerBound: incompleteCharacters.length > 0,
+      incompleteCharacters,
+      characterNameFor: (characterId) => characterNames.get(characterId) ?? t('common.unknown'),
+      locationLabelFor: (placement) => stockLocationLabel(placement, locationNames, t),
+    }),
+    [detectedStock, scopedStock, characterNames, locationNames, incompleteCharacters, t]
+  );
+
+  // "Use all" fills only rows with nothing typed in them: a
+  // hand-entered value, including a deliberate 0, is never clobbered by a bulk
+  // action. The per-row action is the one that overwrites — clicking it on that
+  // row means it.
+  //
+  // Over every row on the table, not the blueprint's own materials: the bulk
+  // action has to reach exactly what the per-row offers reach, or "use all"
+  // silently skips every mineral a sub-build introduced while the row beside
+  // it is still offering to apply one.
+  const bulkDetectedPatches = useMemo<SourcingPatchEntry[]>(
+    () =>
+      bulkOwnedStockSuggestions(visibleMaterials, plan.materialSourcing, scopedStock).map(
+        ({ typeID, ownedQuantity }) => ({ typeID, patch: { ownedQuantity } })
+      ),
+    [visibleMaterials, plan.materialSourcing, scopedStock]
+  );
+
+  /**
+   * The recipe behind whichever built row's "Build it" is open — the runs and
+   * ingredient list the flat table no longer nests (`subBuildPlan`). Held as
+   * a typeID rather than the recipe itself so a re-priced or re-toggled plan
+   * refreshes what the modal shows instead of freezing the numbers it opened
+   * with; a typeID that is no longer built simply resolves to `null`, which
+   * is also how the modal closes when its row stops being built underneath it.
+   */
+  const [recipeTypeId, setRecipeTypeId] = useState<number | null>(null);
+  const openRecipe = useMemo(() => {
+    const row = visibleMaterials.find((material) => material.typeID === recipeTypeId);
+    return row ? buildRecipe(row) : null;
+  }, [visibleMaterials, recipeTypeId]);
 
   /**
    * What the plan still has to shop for: every leaf of the resolved tree,
@@ -486,11 +526,19 @@ export function BuildPlanDetail({
     const verdicts = new Map<number, MakeOrBuy>();
     if (!makeOrBuyContext) return verdicts;
     for (const material of visibleMaterials) {
-      const verdict = makeOrBuy(material, recipeFor(material.typeID), makeOrBuyContext);
+      // Priced at what it would cost to buy even while it is being built
+      // (`buyPricedLine`) — the verdict compares against buying, so a built
+      // row's null unit price would silently withdraw the advice exactly
+      // when the player is acting on it.
+      const verdict = makeOrBuy(
+        buyPricedLine(material, plan.materialSourcing, materialPrices),
+        recipeFor(material.typeID),
+        makeOrBuyContext
+      );
       if (verdict) verdicts.set(material.typeID, verdict);
     }
     return verdicts;
-  }, [visibleMaterials, makeOrBuyContext, recipeFor]);
+  }, [visibleMaterials, makeOrBuyContext, recipeFor, plan.materialSourcing, materialPrices]);
 
   /** Top-level materials the player chose to build — what the sub-build footnote summarizes. */
   const builtTopLevel = useMemo(
@@ -524,10 +572,13 @@ export function BuildPlanDetail({
     if (builtTopLevel.length === 0) return null;
     let total = 0;
     for (const material of builtTopLevel) {
-      const price =
-        plan.materialSourcing?.[material.typeID]?.overridePrice ?? materialPrices[material.typeID];
-      if (price === undefined) return null;
-      total += material.remainingQuantity * price;
+      // Through `buyPricedLine`, the same ladder the make-or-buy advice uses,
+      // rather than a third hand-rolled `override ?? hub`: that one guarded
+      // only `undefined`, so a NaN or negative override reached this figure
+      // and was rendered as ISK. The helper range-checks.
+      const { unitPrice } = buyPricedLine(material, plan.materialSourcing, materialPrices);
+      if (unitPrice === null) return null;
+      total += material.remainingQuantity * unitPrice;
     }
     return total;
   }, [builtTopLevel, plan.materialSourcing, materialPrices]);
@@ -592,7 +643,7 @@ export function BuildPlanDetail({
         quickbarAvailable={quickbarAvailable}
         onShowInfo={onShowInfo}
         onToggleBuildHere={buildable ? () => toggleBuildHere(material.typeID) : undefined}
-        buildingHere={material.subBuild !== undefined}
+        buildingHere={material.subBuilds.length > 0}
       >
         {tr}
       </ItemContextMenu>
@@ -1075,6 +1126,13 @@ export function BuildPlanDetail({
                 makeOrBuy={materialAdvice}
                 canBuildHere={canBuildHere}
                 onToggleBuildHere={toggleBuildHere}
+                onShowRecipe={setRecipeTypeId}
+              />
+              <BuildRecipeModal
+                recipe={openRecipe}
+                onClose={() => setRecipeTypeId(null)}
+                nameFor={(typeID) => nameForType(catalog, typeID)}
+                onOpenRecipe={setRecipeTypeId}
               />
               {/*
               What building the chosen material(s) actually costs — already
@@ -1088,9 +1146,16 @@ export function BuildPlanDetail({
             */}
               {anySubBuilds && (
                 <p className="mt-3 border-t border-line pt-2 text-[0.6875rem] text-text-dim">
+                  {/*
+                    Counted over the plan's own materials, not over every
+                    built row in the flat table: `subBuildTotal` and the
+                    "buying them instead" comparison beside it are both
+                    top-level sums, and a count of a different set in the same
+                    sentence reads as a count of those. What the deeper jobs
+                    cost is inside the total already.
+                  */}
                   {t('industry.subBuildSummary', {
-                    count: visibleMaterials.filter((material) => material.subBuild !== undefined)
-                      .length,
+                    count: builtTopLevel.length,
                     total: formatIsk(subBuildTotal),
                   })}{' '}
                   {buyInsteadTotal !== null &&
@@ -1107,11 +1172,55 @@ export function BuildPlanDetail({
         {result && !error && (
           <CollapsiblePanel
             title={t('industry.costsAndRevenue')}
-            meta={
+            /*
+             * Folded, this panel is the whole verdict in three numbers: what
+             * the job costs, what it brings in, and the difference. In the
+             * body rather than beside the title — three figures crowd a title
+             * that already sits next to two header buttons, and wrapped under
+             * them. Total cost alone, which the header used to carry open or
+             * closed, answered half the question and repeated a number the
+             * open table states anyway.
+             */
+            collapsedSummary={
               pricesReady && (
-                <span className="text-xs tabular-nums text-text-dim">
-                  {formatIsk(result.totalCost)}
-                </span>
+                <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-xs">
+                  <dt className="text-text-dim">{t('industry.totalCost')}</dt>
+                  <dd className="text-right tabular-nums">{formatIsk(result.totalCost)}</dd>
+                  {result.revenue !== null && (
+                    <>
+                      <dt className="text-text-dim">{t('industry.revenue')}</dt>
+                      <dd className="text-right tabular-nums">{formatIsk(result.revenue)}</dd>
+                    </>
+                  )}
+                  {result.profit !== null && (
+                    <>
+                      {/*
+                        The rule is on the row itself rather than an element
+                        between the rows: a bare separator child of a `<dl>` is
+                        neither a term nor a definition, and a border-top on
+                        both cells of the last pair draws the same line across
+                        the full width without inventing one.
+
+                        Green or red on the figure, and it is the only coloured
+                        thing here: sign is what a reader is actually scanning
+                        for, and the `-` in front of it carries the same meaning
+                        for anyone who cannot see the difference
+                        (docs/DESIGN.md §7).
+                      */}
+                      <dt className="border-t border-line pt-1 text-text-dim">
+                        {t('industry.netProfit')}
+                      </dt>
+                      <dd
+                        className={cx(
+                          'border-t border-line pt-1 text-right tabular-nums',
+                          result.profit < 0 ? 'text-isk-neg' : 'text-isk-pos'
+                        )}
+                      >
+                        {formatIsk(result.profit)}
+                      </dd>
+                    </>
+                  )}
+                </dl>
               )
             }
             expanded={costsExpanded}

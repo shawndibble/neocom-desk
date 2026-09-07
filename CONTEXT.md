@@ -42,7 +42,8 @@ here — they go one per file in `docs/context/decisions/`.
   live values substituted in — price bases, Material cost, Job Fee, revenue,
   fees, profit, break-even, and why an **Acquisition Verdict** and a **Sale
   Profitability** read differ off one hub price. The deep layer under the
-  per-row tooltips, which stay one-liners.
+  per-row tooltips. Those stay short — a verdict line, the two numbers behind
+  it, and what clicking does — never a panel.
 - **Character**: One EVE Online character. The unit of login (EVE SSO) and of API data. App supports many Characters side by side from day one.
 - **Character Not Training**: Fires when a Character's skill queue shows no
   active training (the head entry has no live `finish_date`) — whether from

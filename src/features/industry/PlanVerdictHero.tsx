@@ -182,16 +182,14 @@ export function PlanVerdictHero({
           )}
         </div>
 
+        {/*
+          No breakdown button here. The Costs & Revenue panel carries the same
+          trigger on its own header, next to the figures the breakdown
+          explains — which is where a reader who wants it is already looking.
+          Two doors into one modal only made the hero's action row ambiguous
+          about which button was the primary one.
+        */}
         <div className="flex shrink-0 flex-wrap gap-2 xl:flex-col xl:items-end">
-          <Button
-            size="sm"
-            onClick={() => onBreakdownOpenChange(true)}
-            aria-haspopup="dialog"
-            aria-expanded={breakdownOpen}
-          >
-            <Icon.Info size={Icon.ICON_SIZE.sm} aria-hidden="true" />
-            {t('industry.breakdownTrigger')}
-          </Button>
           <Button
             size="sm"
             variant="primary"
