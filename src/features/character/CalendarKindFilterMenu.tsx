@@ -24,6 +24,7 @@ import { useTranslation } from 'react-i18next';
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent } from '@/components/ui';
 import { DropdownMenuTrigger } from '@/components/ui';
 import { IconButton } from '@/components/ui';
+import { controlHeightClassName } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
 import { CHARACTER_BOARD_ITEM_KINDS, type CharacterBoardItemKind } from '@/engine/character/board';
 import { KIND_LABEL } from './calendarKindLabels';
@@ -34,6 +35,12 @@ export interface CalendarKindFilterMenuProps {
   onShowAll: () => void;
   /** How many of each kind the board holds. A kind that read fine with none due is absent. */
   counts: Map<CharacterBoardItemKind, number>;
+  /**
+   * Kinds whose source was read at all. A kind that is readable and absent
+   * from `counts` genuinely has nothing due; one that is not readable has no
+   * answer to give, and must not borrow a zero from the first case.
+   */
+  readableKinds: readonly CharacterBoardItemKind[];
   /** Kinds whose read came back 401/403 — named as such rather than shown as a zero. */
   reauthKinds: readonly CharacterBoardItemKind[];
 }
@@ -43,10 +50,12 @@ export function CalendarKindFilterMenu({
   onToggle,
   onShowAll,
   counts,
+  readableKinds,
   reauthKinds,
 }: CalendarKindFilterMenuProps) {
   const { t } = useTranslation();
   const hiddenSet = new Set(hidden);
+  const readable = new Set(readableKinds);
   const needsReauth = new Set(reauthKinds);
 
   return (
@@ -82,15 +91,21 @@ export function CalendarKindFilterMenu({
               never allowed to ask about is a lie about their data.
             */}
             <span className="ml-2 text-[0.6875rem] text-text-dim tabular-nums">
-              {needsReauth.has(kind) ? t('calendar.filter.notGranted') : (counts.get(kind) ?? 0)}
+              {needsReauth.has(kind)
+                ? t('calendar.filter.notGranted')
+                : !readable.has(kind)
+                  ? t('calendar.filter.unavailable')
+                  : (counts.get(kind) ?? 0)}
             </span>
           </DropdownMenuCheckboxItem>
         ))}
+        {/* `controlHeightClassName.md` rather than ad-hoc padding: a touch
+            viewport gets 44px here like every other control (DESIGN.md §3). */}
         <button
           type="button"
           onClick={onShowAll}
           disabled={hidden.length === 0}
-          className="mt-1 w-full border-t border-line px-2 pt-2 pb-1 text-left text-[0.6875rem] font-semibold tracking-widest text-accent uppercase disabled:text-text-faint"
+          className={`mt-1 flex w-full items-center border-t border-line px-2 text-left text-[0.6875rem] font-semibold tracking-widest text-accent uppercase disabled:text-text-faint ${controlHeightClassName.md}`}
         >
           {t('calendar.filter.showAll')}
         </button>

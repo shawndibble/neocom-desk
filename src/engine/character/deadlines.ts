@@ -142,29 +142,3 @@ export function countsByKind(
   for (const item of items) counts.set(item.kind, (counts.get(item.kind) ?? 0) + 1);
   return counts;
 }
-
-/**
- * How far ahead the page looks, in days.
- *
- * **One horizon, read by every surface.** The map, the ticker and the rail all
- * filter through this same call, so a day cannot show a dot for something the
- * rail declines to list. Two spans — a 42-cell month grid beside a "next 30
- * days" list — is exactly the drift this constant exists to prevent.
- */
-export const BOARD_HORIZON_DAYS = 30;
-
-/**
- * Drops what falls beyond the horizon, and keeps everything already overdue.
- *
- * Overdue is not "past the horizon", it is the most urgent thing on the board:
- * a job finished and sitting undelivered still wants collecting, however long
- * it has sat. Only the future end is capped.
- */
-export function withinHorizon(
-  items: readonly CharacterBoardItem[],
-  nowMs: number,
-  days: number = BOARD_HORIZON_DAYS
-): CharacterBoardItem[] {
-  const until = nowMs + days * 86_400_000;
-  return items.filter((item) => item.deadlineMs <= until);
-}

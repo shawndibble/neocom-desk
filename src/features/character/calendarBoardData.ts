@@ -48,6 +48,16 @@ export interface CalendarBoardData {
   contractExpiries?: BoardClockSource[];
   orderExpiries?: BoardClockSource[];
   /**
+   * Kinds whose source was read at all — empty or not.
+   *
+   * Without this the filter menu cannot tell "read fine, nothing due" from
+   * "could not read", and falls through to a confident `0` next to a source
+   * that failed for any reason other than 401/403: a network drop, a 500, or
+   * a colony whose detail has never been cached. That zero is a lie about the
+   * pilot's data, and the scope decision forbids it in as many words.
+   */
+  readableKinds: CharacterBoardItemKind[];
+  /**
    * Kinds whose read came back 401/403. The filter menu names these as "log in
    * again" rather than as a zero, which is the whole reason the page no longer
    * gates wholesale on one scope.
@@ -139,6 +149,17 @@ export async function loadCalendarBoard(characterId: number): Promise<CalendarBo
   const names = await loadTypeNames([...typeIds]);
   const typeName = (typeId: number) => names.get(typeId) ?? `#${typeId}`;
 
+  // Kind paired with the rows it read, so "was this readable" and "what does
+  // it contribute" can never answer from two different places.
+  const KIND_SOURCES: [CharacterBoardItemKind, readonly unknown[] | undefined][] = [
+    ['calendarEvent', events],
+    ['skillTraining', queue],
+    ['industryJob', jobs],
+    ['planetExtraction', planets],
+    ['contractExpiry', contracts],
+    ['orderExpiry', orders],
+  ];
+
   const reauthKinds: CharacterBoardItemKind[] = [];
   const noteReauth = (kind: CharacterBoardItemKind, result: StatusResult<unknown[]>) => {
     if (result.needsReauth) reauthKinds.push(kind);
@@ -169,6 +190,7 @@ export async function loadCalendarBoard(characterId: number): Promise<CalendarBo
     planetExtractions: planets && toPlanetExtractionSources(colonies),
     contractExpiries: contracts && toContractExpirySources(contracts),
     orderExpiries: orders && toOrderExpirySources(orders, typeName),
+    readableKinds: KIND_SOURCES.filter(([, rows]) => rows !== undefined).map(([kind]) => kind),
     reauthKinds,
     oldestFetchedAt: fetchedAtMs.length > 0 ? new Date(Math.min(...fetchedAtMs)) : null,
     fromCache: read.some((result) => result?.fromCache),

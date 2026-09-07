@@ -12,17 +12,10 @@
  * narrow branch.
  */
 import { useTranslation } from 'react-i18next';
-import type { DeadlineSeverity } from '@/engine/severity';
 import type { DayLoad } from '@/engine/character/deadlines';
 import { localMidnight } from '@/engine/character/deadlines';
 import type { GridDay } from '@/lib/calendarGrid';
-
-const SEVERITY_BAR: Record<DeadlineSeverity, string> = {
-  critical: 'bg-danger',
-  warning: 'bg-warning',
-  watch: 'bg-accent',
-  clear: 'bg-text-dim',
-};
+import { SEVERITY_DOT, SEVERITY_LABEL } from './calendarSeverityTone';
 
 export interface CalendarDayTickerProps {
   days: readonly GridDay[];
@@ -41,6 +34,11 @@ export function CalendarDayTicker({
 }: CalendarDayTickerProps) {
   const { t, i18n } = useTranslation();
   const weekday = new Intl.DateTimeFormat(i18n.language, { weekday: 'short' });
+  const fullDate = new Intl.DateTimeFormat(i18n.language, {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+  });
   const todayMs = localMidnight(nowMs);
 
   return (
@@ -59,6 +57,16 @@ export function CalendarDayTicker({
             key={day.key}
             type="button"
             aria-pressed={isSelected}
+            /* The bar is colour and nothing else, so the name carries the word. */
+            aria-label={
+              load
+                ? t('calendar.map.dayWithLoad', {
+                    date: fullDate.format(day.date),
+                    count: load.count,
+                    severity: t(SEVERITY_LABEL[load.severity]),
+                  })
+                : t('calendar.map.dayEmpty', { date: fullDate.format(day.date) })
+            }
             onClick={() => onSelectDay(isSelected ? null : dayStartMs)}
             className={[
               'flex min-h-11 w-12 shrink-0 flex-col items-center gap-1 rounded-xs border px-1 py-1.5',
@@ -85,7 +93,7 @@ export function CalendarDayTicker({
             {/* Reserved whether or not the day holds anything, so every column lines up. */}
             <span
               aria-hidden="true"
-              className={`h-0.5 w-6 rounded-full ${load ? SEVERITY_BAR[load.severity] : ''}`}
+              className={`h-0.5 w-6 rounded-full ${load ? SEVERITY_DOT[load.severity] : ''}`}
             />
             <span className="h-3.5 text-[0.6875rem] leading-3.5 text-text-dim tabular-nums">
               {load ? load.count : ''}

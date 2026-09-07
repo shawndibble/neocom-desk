@@ -66,6 +66,6 @@ describe('EventDetailModal', () => {
       http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/calendar/1`, () => HttpResponse.error())
     );
     render(<EventDetailModal characterId={CHAR_ID} event={EVENT} onClose={() => {}} />);
-    expect(await screen.findByText('No events cached')).toBeInTheDocument();
+    expect(await screen.findByText('No event detail cached')).toBeInTheDocument();
   });
 });

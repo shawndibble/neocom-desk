@@ -25,7 +25,7 @@ import type {
   PlanetPin,
   SkillQueueEntry,
 } from '@/esi/endpoints';
-import { isActiveContractStatus } from './contracts';
+import { isActiveContractStatus } from '@/engine/contractStatus';
 import type { BoardCalendarEventSource, BoardClockSource } from '@/engine/character/board';
 
 /**

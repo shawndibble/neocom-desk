@@ -1317,8 +1317,6 @@
   "calendar": {
     "title": "Calendar",
     "refresh": "Refresh",
-    "emptyTitle": "No events cached",
-    "emptyHint": "Reconnect to fetch this character's calendar.",
     "importance": "Importance {{value}}",
     "responseAccepted": "Accepted",
     "responseDeclined": "Declined",
@@ -1370,14 +1368,17 @@
       "open": "Filter event types",
       "openWithCount": "Filter event types ({{count}} hidden)",
       "notGranted": "Not granted",
-      "showAll": "Show all types"
+      "showAll": "Show all types",
+      "unavailable": "Unavailable"
     },
     "map": {
       "title": "Calendar",
       "label": "Calendar map",
       "today": "Today",
       "clearDay": "Show all days",
-      "pastHint": "Earlier days stay empty — EVE only returns events from now on."
+      "pastHint": "Hatched days are behind you: no new calendar event can land there, though anything overdue still shows.",
+      "dayWithLoad": "{{date}} — {{count}} due, most urgent {{severity}}",
+      "dayEmpty": "{{date}} — nothing due"
     },
     "density": {
       "toMonth": "Show the whole month",
@@ -1392,11 +1393,13 @@
       "count_one": "{{count}} ahead",
       "count_other": "{{count}} ahead",
       "empty": "Nothing coming up",
-      "emptyHint": "Nothing due in the next 30 days.",
+      "emptyHint": "Nothing due from any of your clocks.",
       "emptyForDay": "Nothing due on this day",
       "noKinds": "No event types selected",
       "noKindsHint": "Pick at least one type from the filter to see what is coming up."
-    }
+    },
+    "sourcesNeedLogin": "Some sources need a new login: {{sources}}.",
+    "emptyTitle": "No event detail cached"
   },
   "clones": {
     "title": "Clones",

@@ -13,6 +13,7 @@
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { EmptyState, Panel } from '@/components/ui';
+import { controlHeightClassName } from '@/components/ui/controlStyles';
 import type { CharacterBoardItem } from '@/engine/character/board';
 import { groupByDay, relativeDayFor } from '@/engine/character/deadlines';
 import { CharacterBoardRow } from './CharacterBoardRow';
@@ -68,7 +69,7 @@ export function ComingUpRail({
           <button
             type="button"
             onClick={onClearDay}
-            className="text-[0.6875rem] font-semibold tracking-widest text-accent uppercase"
+            className={`inline-flex items-center px-2 text-[0.6875rem] font-semibold tracking-widest text-accent uppercase ${controlHeightClassName.sm}`}
           >
             {t('calendar.map.clearDay')}
           </button>

@@ -17,6 +17,7 @@ import { CalendarMap } from '@/features/character/CalendarMap';
 import { CalendarDayTicker } from '@/features/character/CalendarDayTicker';
 import { ComingUpRail } from '@/features/character/ComingUpRail';
 import { CalendarKindFilterMenu } from '@/features/character/CalendarKindFilterMenu';
+import { KIND_LABEL } from '@/features/character/calendarKindLabels';
 import { useCalendarDensity } from '@/features/character/calendarViewPref';
 import {
   useCalendarHiddenKinds,
@@ -29,15 +30,14 @@ import {
   countsByKind,
   filterByKinds,
   localMidnight,
-  withinHorizon,
 } from '@/engine/character/deadlines';
 import {
   addMonths,
   addWeeks,
   buildFortnightDays,
   buildMonthGrid,
+  formatFortnightLabel,
   formatMonthLabel,
-  formatWeekLabel,
 } from '@/lib/calendarGrid';
 import { useIsNarrow } from '@/lib/useIsNarrow';
 import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
@@ -96,13 +96,18 @@ export function Calendar() {
    */
   const nowMs = data?.loadedAtMs ?? 0;
 
-  const board = useMemo(() => {
-    if (!data) return [];
-    // One horizon, applied once and read by the map, the ticker and the rail
-    // alike — so a day cannot show a dot for something the rail declines to
-    // list.
-    return withinHorizon(buildCharacterBoard({ nowMs, ...data }), nowMs);
-  }, [data, nowMs]);
+  /**
+   * Everything, with no forward window.
+   *
+   * An earlier draft capped the board at 30 days so the rail stayed short.
+   * That reproduced forwards the exact failure this page was rebuilt to fix:
+   * paging the map past the cap showed empty cells that were empty because of
+   * us, not because nothing was due. Every source here is naturally bounded
+   * (ESI returns at most 50 calendar events and 50 queue entries; jobs,
+   * contracts and orders are all small), and the rail's day grouping is what
+   * makes a long list readable.
+   */
+  const board = useMemo(() => (data ? buildCharacterBoard({ nowMs, ...data }) : []), [data, nowMs]);
 
   const selected = useMemo(() => shownKinds(hiddenKinds), [hiddenKinds]);
   const visible = useMemo(() => filterByKinds(board, selected), [board, selected]);
@@ -147,11 +152,11 @@ export function Calendar() {
   }
   if (activeCharacterId === null) return <Navigate to="/characters" replace />;
 
-  const periodLabel = density === 'month' ? formatMonthLabel(anchor) : formatWeekLabel(anchor);
+  const periodLabel = density === 'month' ? formatMonthLabel(anchor) : formatFortnightLabel(anchor);
 
   const periodControls = (
     <div className="flex items-center gap-1.5">
-      <span className="text-xs font-semibold text-text-dim">{periodLabel}</span>
+      <span className="hidden text-xs font-semibold text-text-dim md:inline">{periodLabel}</span>
       <IconButton
         size="sm"
         icon={<Icon.Back />}
@@ -193,6 +198,7 @@ export function Calendar() {
               }
               onShowAll={() => void setHiddenKinds([])}
               counts={counts}
+              readableKinds={data?.readableKinds ?? []}
               reauthKinds={data?.reauthKinds ?? []}
             />
             <IconButton
@@ -222,16 +228,28 @@ export function Calendar() {
           {data?.fromCache && (
             <p className="text-[0.6875rem] text-warning uppercase">{t('common.offlineTitle')}</p>
           )}
+          {/*
+            The page no longer gates on one scope, so a refused source has to
+            announce itself somewhere the pilot will actually look. Naming the
+            sources in a line above the panes is that place — the filter menu
+            also marks them, but nobody opens a menu they have no reason to
+            open.
+          */}
+          {(data?.reauthKinds.length ?? 0) > 0 && (
+            <p className="text-xs text-warning">
+              {t('calendar.sourcesNeedLogin', {
+                sources: data?.reauthKinds.map((kind) => t(KIND_LABEL[kind])).join(', '),
+              })}
+            </p>
+          )}
           <div className="flex flex-col gap-3 md:flex-row md:items-start">
             {isNarrow ? (
               <Panel padded className="w-full">
-                <div className="mb-2 flex items-center justify-between gap-2">
+                <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                   <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
                     {periodLabel}
                   </span>
-                  <Button size="sm" onClick={goToday}>
-                    {t('calendar.map.today')}
-                  </Button>
+                  {periodControls}
                 </div>
                 <CalendarDayTicker
                   days={days}
@@ -240,6 +258,8 @@ export function Calendar() {
                   selectedDayMs={selectedDayMs}
                   onSelectDay={setSelectedDayMs}
                 />
+                {/* The same caption the wide grid carries — the rule it teaches is not a desktop rule. */}
+                <p className="mt-2 text-xs text-text-dim">{t('calendar.map.pastHint')}</p>
               </Panel>
             ) : (
               <Panel

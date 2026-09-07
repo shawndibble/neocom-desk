@@ -11,7 +11,6 @@
  * the tone and the words for what the engine already decided.
  */
 import { useTranslation } from 'react-i18next';
-import type { DeadlineSeverity } from '@/engine/severity';
 import type { CharacterBoardItem, CharacterBoardItemKind } from '@/engine/character/board';
 import { formatDuration } from '@/lib/duration';
 import { formatTimeOfDay } from '@/lib/timestamp';
@@ -19,20 +18,7 @@ import * as Icon from '@/components/ui/icons';
 import { RESPONSE_KEY, RESPONSE_TEXT_TONE } from './calendarResponseTone';
 import { EventContextMenu } from './EventContextMenu';
 import { KIND_LABEL } from './calendarKindLabels';
-
-const SEVERITY_TONE: Record<DeadlineSeverity, string> = {
-  critical: 'text-danger',
-  warning: 'text-warning',
-  watch: 'text-accent',
-  clear: 'text-text-dim',
-};
-
-const SEVERITY_LABEL: Record<DeadlineSeverity, string> = {
-  critical: 'corp.board.severity.critical',
-  warning: 'corp.board.severity.warning',
-  watch: 'corp.board.severity.watch',
-  clear: 'corp.board.severity.clear',
-};
+import { SEVERITY_LABEL, SEVERITY_TEXT } from './calendarSeverityTone';
 
 /** One glyph per kind, from the app's own vocabulary — the same icons those routes carry in the nav. */
 const KIND_ICON: Record<CharacterBoardItemKind, typeof Icon.Skills> = {
@@ -69,7 +55,7 @@ export function CharacterBoardRow({ item, onSelectEvent }: CharacterBoardRowProp
       <KindIcon className="size-4 shrink-0 text-text-dim" aria-hidden="true" />
       <span className="min-w-0">
         <span className="flex items-center gap-2">
-          <span className={`text-xs font-semibold tabular-nums ${SEVERITY_TONE[item.severity]}`}>
+          <span className={`text-xs font-semibold tabular-nums ${SEVERITY_TEXT[item.severity]}`}>
             {countdown}
           </span>
           {/*

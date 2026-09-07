@@ -224,8 +224,9 @@ export const Extraction = withWeight(Gauge);
 export const Social = withWeight(EnvelopeSimple);
 /** Jump clones and implants. */
 export const Clones = withWeight(Stack);
-/** Contracts — courier, item exchange, auction. */
+/** A calendar event — the Coming Up rail's own kind. */
 export const CalendarEvent = withWeight(CalendarBlank);
+/** Contracts — courier, item exchange, auction. */
 export const Contracts = withWeight(FileText);
 /** Corporation-owned surfaces: ops board, wallet divisions, roster, corp assets. */
 export const Corporation = withWeight(Buildings);

@@ -50,9 +50,27 @@ _Recorded 2026-09-07._
   keeps **Data Owner** device-local. Rules out a synced setting and rules out a
   single-select segmented control.
 
-- **Severity is the corp board's rule, not a second opinion.**
-  `severityForRemaining` in `engine/corp/board.ts` (24h critical, 3d warning,
-  7d watch, else clear) is what colours the map's dots, the ticker's bars and
-  the rail's countdowns. The character engine carries its own copy of the
-  thresholds rather than importing across the corp/character seam, and a test
-  pins them — so the two can only drift with a test going red, never silently.
+- **Severity is one shared ladder, not a copy per board.**
+  `severityForRemaining` (24h critical, 3d warning, 7d watch, else clear) moved
+  out of `engine/corp/board.ts` into `engine/severity.ts`, and both boards
+  import it. Duplicating the thresholds was the first plan — cheaper on paper,
+  since the corp type had five import sites — but the function itself turned out
+  to have no importer outside `engine/corp/`, so the extraction cost one moved
+  file and `CorpBoardSeverity` survives as an alias. It is also what the corp
+  board's own decision already required: "one `severityForRemaining` ladder,
+  called by every source". Two private copies would have satisfied the letter
+  of that and none of its point.
+
+- **The board has no forward horizon.** A 30-day window was drafted to keep the
+  rail short and removed before it shipped: paging the Calendar Map past the cap
+  showed empty cells that were empty _because of the cap_, which is precisely
+  the failure this page was rebuilt to fix, reproduced in the other direction.
+  Every source is naturally bounded — ESI returns at most 50 calendar events and
+  50 queue entries — and the rail's day grouping is what makes a long list
+  readable.
+
+- **Hatching a past day means "nothing new can land here", not "nothing is
+  here".** The `/calendar` feed cannot put an event in the past, but the five
+  other clocks can be overdue, and an industry job sitting `ready` since Tuesday
+  belongs on Tuesday. Past cells therefore still draw their count and dots, and
+  the caption says the narrower thing that is actually true.

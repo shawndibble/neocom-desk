@@ -140,7 +140,7 @@ describe('Calendar', () => {
     render(<App />);
 
     expect(await screen.findByText('Fleet Op')).toBeInTheDocument();
-    expect(screen.getByRole('grid', { name: /calendar map/i })).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: /calendar map/i })).toBeInTheDocument();
     expect(screen.getByRole('list', { name: /coming up/i })).toBeInTheDocument();
   });
 
@@ -174,7 +174,7 @@ describe('Calendar', () => {
     // The industry job still arrives...
     expect(await screen.findByText(/industry jobs/i)).toBeInTheDocument();
     // ...both panes are still on screen rather than replaced by a banner...
-    expect(screen.getByRole('grid', { name: /calendar map/i })).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: /calendar map/i })).toBeInTheDocument();
     expect(screen.getByRole('list', { name: /coming up/i })).toBeInTheDocument();
     // ...and only the forbidden source's own rows are missing.
     expect(screen.queryByText('Fleet Op')).not.toBeInTheDocument();
