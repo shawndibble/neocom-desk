@@ -27,7 +27,6 @@ import {
   panelHeader,
   rail,
   refreshButton,
-  statChip,
   subNav,
   triageRow,
 } from './parts.mjs';
@@ -743,11 +742,46 @@ const states = artboard({
 const canvas = {
   artboards: [
     { file: 'Main.dc.html', title: 'A · Action Queue — Desktop', x: 0, y: 0, w: 1440, h: 900 },
-    { file: 'ActionQueuePhone.dc.html', title: 'A · Action Queue — Phone', x: 0, y: 1060, w: 390, h: 844 },
-    { file: 'StationBoard.dc.html', title: 'B · Station Board — Desktop', x: 1560, y: 0, w: 1440, h: 900 },
-    { file: 'StationBoardPhone.dc.html', title: 'B · Station Board — Phone', x: 1560, y: 1060, w: 390, h: 844 },
-    { file: 'NextFortyEight.dc.html', title: 'C · Next 48 Hours — Desktop', x: 3120, y: 0, w: 1440, h: 900 },
-    { file: 'NextFortyEightPhone.dc.html', title: 'C · Next 48 Hours — Phone', x: 3120, y: 1060, w: 390, h: 844 },
+    {
+      file: 'ActionQueuePhone.dc.html',
+      title: 'A · Action Queue — Phone',
+      x: 0,
+      y: 1060,
+      w: 390,
+      h: 844,
+    },
+    {
+      file: 'StationBoard.dc.html',
+      title: 'B · Station Board — Desktop',
+      x: 1560,
+      y: 0,
+      w: 1440,
+      h: 900,
+    },
+    {
+      file: 'StationBoardPhone.dc.html',
+      title: 'B · Station Board — Phone',
+      x: 1560,
+      y: 1060,
+      w: 390,
+      h: 844,
+    },
+    {
+      file: 'NextFortyEight.dc.html',
+      title: 'C · Next 48 Hours — Desktop',
+      x: 3120,
+      y: 0,
+      w: 1440,
+      h: 900,
+    },
+    {
+      file: 'NextFortyEightPhone.dc.html',
+      title: 'C · Next 48 Hours — Phone',
+      x: 3120,
+      y: 1060,
+      w: 390,
+      h: 844,
+    },
     { file: 'States.dc.html', title: 'Shared states', x: 0, y: 2100, w: 1440, h: 450 },
   ],
   annotations: [
@@ -770,7 +804,7 @@ const canvas = {
       x: 1560,
       y: -300,
       w: 380,
-      text: 'B · STATION BOARD\n\nOne panel per domain, each showing only its exceptions. Same anatomy as the Corp ops board\'s Kind Cards.\n\nFor: already proven in this app, each domain answerable on its own, the summary strip carries the merged view.\n\nAgainst: six calm cards can hide one bad Tuesday between them — the exact problem the Corp Deadline Strip was added to fix.',
+      text: "B · STATION BOARD\n\nOne panel per domain, each showing only its exceptions. Same anatomy as the Corp ops board's Kind Cards.\n\nFor: already proven in this app, each domain answerable on its own, the summary strip carries the merged view.\n\nAgainst: six calm cards can hide one bad Tuesday between them — the exact problem the Corp Deadline Strip was added to fix.",
     },
     {
       id: 'concept-c',

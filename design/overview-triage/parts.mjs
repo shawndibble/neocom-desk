@@ -194,10 +194,7 @@ export function triageRow({
   const sub = narrow && short ? short.detail : detail;
   const width = touch ? 'width: 100%;' : compact ? 'width: 76px;' : 'width: 96px;';
   const countdown = `<span style="display: flex; ${width} flex-shrink: 0; align-items: center; gap: 4px; overflow: hidden; font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; color: ${s.color};">${icon(s.glyph, 16)}${when}</span>`;
-  const inlineDest =
-    narrow && !noDest
-      ? ` <span style="color: ${C.accent};">· ${dest}</span>`
-      : '';
+  const inlineDest = narrow && !noDest ? ` <span style="color: ${C.accent};">· ${dest}</span>` : '';
   const trailing = noDest
     ? `<span style="display: inline-flex; flex-shrink: 0; color: ${C.accent};">${icon('caret', 12)}</span>`
     : narrow
