@@ -7,7 +7,9 @@
  * buildRows exactly, so bandStarts keeps working unmodified against those).
  */
 import type { PlanEntry, ScheduledStep } from '@/engine/types';
+import { entrySlices } from './entrySlices';
 import { buildRows, type PlanRow } from './markers';
+import { entryId } from './reorder';
 
 export interface EntryQueueSummary {
   /** Sum of `seconds` across this entry's own (non-prereq) scheduled steps. */
@@ -43,57 +45,40 @@ export interface EntryQueueInfo {
 /**
  * Zip entries + entryBoundaries (from normalizePlanWithBoundaries, computed
  * over the catalog-known subset only) + scheduled into one lookup keyed by
- * skillTypeID. Entries unknown to the catalog consume no boundary and
+ * `entryId`. Entries unknown to the catalog consume no boundary and
  * contribute zero time, carrying the previous entry's cumulative forward
  * (matching computeQueue's own validEntries filtering).
+ *
+ * Keyed by `entryId`, not skillTypeID: a plan holds one entry per skill
+ * *level*, so "Mass Production IV" and "Mass Production V" are two rows with
+ * two different summaries, and a skill-keyed map would hand both rows
+ * whichever summary was written last.
  */
 export function summarizeEntryQueue(
   entries: readonly PlanEntry[],
   entryBoundaries: readonly number[],
   scheduled: readonly ScheduledStep[],
   isKnown: (skillTypeID: number) => boolean
-): Map<number, EntryQueueInfo> {
-  const result = new Map<number, EntryQueueInfo>();
-  let prevBoundary = 0;
-  let boundaryIndex = 0;
-  const carriedCumulative = () =>
-    prevBoundary > 0 ? scheduled[prevBoundary - 1].cumulativeSeconds : 0;
+): Map<string, EntryQueueInfo> {
+  const result = new Map<string, EntryQueueInfo>();
+  const slices = entrySlices(entries, entryBoundaries, scheduled, isKnown);
 
-  for (const entry of entries) {
-    if (!isKnown(entry.skillTypeID)) {
-      result.set(entry.skillTypeID, {
-        summary: {
-          seconds: 0,
-          cumulativeSeconds: carriedCumulative(),
-          steps: [],
-          stepIndices: [],
-        },
-        prereqRows: [],
-      });
-      continue;
-    }
+  entries.forEach((entry, i) => {
+    const { start, ownStart, end } = slices[i];
+    const carried = start > 0 ? scheduled[start - 1].cumulativeSeconds : 0;
+    const own = ownStart === -1 ? [] : scheduled.slice(ownStart, end);
+    const prereq = scheduled.slice(start, ownStart === -1 ? end : ownStart);
 
-    const boundary = entryBoundaries[boundaryIndex++];
-    const range = scheduled.slice(prevBoundary, boundary);
-    const ownStart = range.findIndex((s) => s.skillTypeID === entry.skillTypeID);
-    const own = ownStart === -1 ? [] : range.slice(ownStart);
-    const prereq = ownStart === -1 ? range : range.slice(0, ownStart);
-    const seconds = own.reduce((sum, s) => sum + s.seconds, 0);
-    const cumulativeSeconds =
-      range.length > 0 ? range[range.length - 1].cumulativeSeconds : carriedCumulative();
-    const ownOffset = prevBoundary + (ownStart === -1 ? range.length : ownStart);
-
-    result.set(entry.skillTypeID, {
+    result.set(entryId(entry), {
       summary: {
-        seconds,
-        cumulativeSeconds,
-        steps: [...own],
-        stepIndices: own.map((_, i) => ownOffset + i),
+        seconds: own.reduce((sum, s) => sum + s.seconds, 0),
+        cumulativeSeconds: end > start ? scheduled[end - 1].cumulativeSeconds : carried,
+        steps: own,
+        stepIndices: own.map((_, offset) => (ownStart === -1 ? 0 : ownStart) + offset),
       },
-      prereqRows: prereq.map((step, i) => ({ step, stepIndex: prevBoundary + i })),
+      prereqRows: prereq.map((step, offset) => ({ step, stepIndex: start + offset })),
     });
-    prevBoundary = boundary;
-  }
+  });
   return result;
 }
 
@@ -129,7 +114,7 @@ const EMPTY_SUMMARY: EntryQueueInfo = {
 export function buildMergedRows(
   entries: readonly PlanEntry[],
   markers: readonly number[] | undefined,
-  entryQueue: ReadonlyMap<number, EntryQueueInfo>,
+  entryQueue: ReadonlyMap<string, EntryQueueInfo>,
   precomputedRows?: readonly PlanRow[]
 ): MergedRow[] {
   const rows: MergedRow[] = [];
@@ -138,7 +123,7 @@ export function buildMergedRows(
       rows.push({ kind: 'marker', id: row.id, markerIndex: row.markerIndex });
       continue;
     }
-    const info = entryQueue.get(row.entry.skillTypeID) ?? EMPTY_SUMMARY;
+    const info = entryQueue.get(row.id) ?? EMPTY_SUMMARY;
     for (const p of info.prereqRows) {
       rows.push({
         kind: 'prereq',

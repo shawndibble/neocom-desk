@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, waitFor, within, fireEvent } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
@@ -744,10 +744,16 @@ describe('SkillPlans: /skills is stale until the character logs in', () => {
     // (#27) — wait for the row itself before checking its duration, so a
     // pre-recompute transient (with no rows/no "0m" either way) can't pass
     // this negative assertion for the wrong reason.
+    // One row per level (reorder.ts): "Gunnery III" on an untrained character
+    // is three rows, under one priority-band divider. The seeded plan is
+    // stored unsplit, so wait for the split write rather than catching the
+    // single row it renders first.
+    await waitFor(async () =>
+      expect(await within(panel).findAllByRole('listitem')).toHaveLength(4)
+    );
     const items = await within(panel).findAllByRole('listitem');
-    expect(items).toHaveLength(2);
-    // Not credited as trained: the entry row must show real, nonzero
-    // duration rather than the "0m" it would show if wrongly treated as done.
+    // Not credited as trained: the entry rows must show real, nonzero
+    // duration rather than the "0m" they would show if wrongly treated as done.
     expect(within(items[1]).queryByText('0m')).not.toBeInTheDocument();
   });
 });
@@ -833,7 +839,11 @@ describe('SkillPlans editor: import / export', () => {
     // occurrence of the skill's name in the row.
     expect(await within(entriesPanel).findByText(/^Gunnery\b/)).toBeInTheDocument();
     const stored = await db.skillPlans.get('plan-1');
+    // ESI sends one row per level trained, and that is now exactly the shape
+    // a plan keeps — the import no longer collapses them into one row.
     expect(stored?.entries).toEqual([
+      { skillTypeID: 1, targetLevel: 1 },
+      { skillTypeID: 1, targetLevel: 2 },
       { skillTypeID: 1, targetLevel: 3 },
       { skillTypeID: 3, targetLevel: 1 },
     ]);
@@ -970,51 +980,6 @@ describe('SkillPlans editor: optimize remaps', () => {
     expect(screen.queryByText('No meaningful savings')).not.toBeInTheDocument();
   });
 
-  it('carries an info tooltip on the Optimize remaps button explaining it evaluates the current order', async () => {
-    await db.skillPlans.add(
-      seedPlan({
-        entries: [
-          { skillTypeID: 1, targetLevel: 3 },
-          { skillTypeID: 3, targetLevel: 1 },
-        ],
-        remapCount: 1,
-      })
-    );
-    goToPlanEditor();
-    // This explanatory tooltip only wraps the `lg`+ full-text button (#224):
-    // below `lg` the icon-only button carries its own Tooltip (just the
-    // button's name, via IconButton) instead \u2014 jsdom's matchMedia never
-    // matches by default, so mock it to desktop.
-    const realMatchMedia = window.matchMedia;
-    window.matchMedia = (media: string) =>
-      ({
-        media,
-        matches: true,
-        onchange: null,
-        addEventListener: () => {},
-        removeEventListener: () => {},
-        addListener: () => {},
-        removeListener: () => {},
-        dispatchEvent: () => false,
-      }) as unknown as MediaQueryList;
-    try {
-      render(<App />);
-      await openPlanTools();
-
-      await screen.findByText('Your entries');
-      const button = screen.getByRole('button', { name: 'Optimize remaps' });
-      fireEvent.focus(button);
-      const tooltipId = button.getAttribute('aria-describedby');
-      const tooltip = document.getElementById(tooltipId!);
-
-      expect(tooltip).toHaveTextContent(
-        'Evaluates the plan\'s entries in their current order \u2014 it never reorders them. Grouping similar skills together first (e.g. with "Suggest reorder") tends to produce bigger savings.'
-      );
-    } finally {
-      window.matchMedia = realMatchMedia;
-    }
-  });
-
   it('clears the stale optimize result when an entry is removed, instead of crashing on an out-of-range segment index (BUG #1)', async () => {
     const user = userEvent.setup();
     await db.skillPlans.add(
@@ -1038,10 +1003,12 @@ describe('SkillPlans editor: optimize remaps', () => {
     // Remove enough entries to shrink the scheduled queue below the stale
     // segment's startIndex — must not throw, and must drop the stale panel
     // rather than render against the old (now out-of-range) schedule.
-    // Icon-only remove button (#112): accessible name is "Remove {skill}",
-    // not visible text — entries[0] is Gunnery. Removing now opens a confirm
-    // Modal (#408) rather than removing immediately.
-    await user.click(within(entriesPanel).getByRole('button', { name: 'Remove Gunnery' }));
+    // Icon-only remove button (#112): accessible name is "Remove {skill}
+    // {level}", not visible text. The level is part of the name because a
+    // plan holds one row per level, so "Gunnery III" alone would match three
+    // buttons. Removing opens a confirm Modal (#408) rather than removing
+    // immediately.
+    await user.click(within(entriesPanel).getByRole('button', { name: 'Remove Gunnery III' }));
     await user.click(screen.getByRole('button', { name: 'Remove' }));
 
     await waitFor(() => expect(screen.queryByText(/^Remapping saves/)).not.toBeInTheDocument());
@@ -1094,8 +1061,9 @@ describe('SkillPlans editor: remap markers', () => {
 
     await user.click(screen.getByRole('button', { name: 'Add remap marker' }));
     expect(await screen.findByText('Remap marker')).toBeInTheDocument();
-    // Appended after the last entry: position === entries.length.
-    await waitFor(async () => expect((await db.skillPlans.get('plan-1'))?.markers).toEqual([2]));
+    // Appended after the last entry: position === entries.length, which is 4
+    // once "Gunnery III" is held as its three per-level rows.
+    await waitFor(async () => expect((await db.skillPlans.get('plan-1'))?.markers).toEqual([4]));
     expect(scheduleSyncMock).toHaveBeenCalledWith(CHAR_ID);
 
     await user.click(screen.getByRole('button', { name: 'Remove marker' }));
@@ -1184,9 +1152,7 @@ describe('SkillPlans editor: remap markers', () => {
         'Every remap marker sits at the end of the plan, so nothing follows it to remap for — drag a marker in front of the skills it should speed up.'
       )
     ).toBeInTheDocument();
-    expect(await within(toolbar).findByRole('status')).toHaveTextContent(
-      'No marker splits the plan'
-    );
+    expect(await within(toolbar).findByText('No marker splits the plan')).toBeInTheDocument();
     expect(screen.queryByText(/^Remapping at these markers/)).not.toBeInTheDocument();
     expect(screen.queryByText('No meaningful savings')).not.toBeInTheDocument();
     // No segment list under the message: the only segment is the whole plan
@@ -1194,8 +1160,7 @@ describe('SkillPlans editor: remap markers', () => {
     expect(screen.queryByText(/^Segment 1/)).not.toBeInTheDocument();
   });
 
-  it('shows an inline confirmation beside the Optimize at my markers button (#222)', async () => {
-    const user = userEvent.setup();
+  it('states what the markers save without waiting for a click', async () => {
     await db.skillPlans.add(
       seedPlan({
         entries: [
@@ -1213,9 +1178,11 @@ describe('SkillPlans editor: remap markers', () => {
     const toolbar = screen
       .getByRole('button', { name: 'Optimize at my markers' })
       .closest('section')!;
-    await user.click(screen.getByRole('button', { name: 'Optimize at my markers' }));
 
-    expect(await within(toolbar).findByRole('status')).toHaveTextContent(/^Saves \d+[dhm]/);
+    // Standing, not a post-click toast: a plan carrying a remap line says
+    // what that line saves the moment it is opened. The button beside it
+    // opens the Modal that accepts the spread.
+    expect(await within(toolbar).findByText(/^Saves \d+[dhm]/)).toBeInTheDocument();
   });
 
   it('disables "Optimize at my markers" when the plan has no markers', async () => {
@@ -1440,7 +1407,11 @@ describe('SkillPlans editor: suggest reorder', () => {
     await user.click(screen.getByRole('button', { name: 'Accept' }));
 
     const stored = await db.skillPlans.get('plan-1');
+    // Gunnery's three levels stay together and in order; the reorder moves
+    // the other two skills around that block.
     expect(stored?.entries).toEqual([
+      { skillTypeID: 1, targetLevel: 1 },
+      { skillTypeID: 1, targetLevel: 2 },
       { skillTypeID: 1, targetLevel: 3 },
       { skillTypeID: 4, targetLevel: 1 },
       { skillTypeID: 3, targetLevel: 1 },
@@ -1592,8 +1563,16 @@ describe('SkillPlans editor: import from clipboard', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Apply' }));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
 
-    const stored = await db.skillPlans.get('plan-1');
-    expect(stored?.entries).toEqual([{ skillTypeID: 1, targetLevel: 3 }]);
+    // "Gunnery III" is applied as one entry and split into its per-level rows
+    // by a second write, so wait for the settled list rather than whichever
+    // of the two happens to be in Dexie first.
+    await waitFor(async () =>
+      expect((await db.skillPlans.get('plan-1'))?.entries).toEqual([
+        { skillTypeID: 1, targetLevel: 1 },
+        { skillTypeID: 1, targetLevel: 2 },
+        { skillTypeID: 1, targetLevel: 3 },
+      ])
+    );
   });
 
   it('previews and applies a pasted EFT fit, resolving required skills from ESI dogma_attributes', async () => {
@@ -1621,8 +1600,16 @@ describe('SkillPlans editor: import from clipboard', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(await screen.findByText('Added 1 skill(s)')).toBeInTheDocument();
 
-    const stored = await db.skillPlans.get('plan-1');
-    expect(stored?.entries).toEqual([{ skillTypeID: 1, targetLevel: 3 }]);
+    // "Gunnery III" is applied as one entry and split into its per-level rows
+    // by a second write, so wait for the settled list rather than whichever
+    // of the two happens to be in Dexie first.
+    await waitFor(async () =>
+      expect((await db.skillPlans.get('plan-1'))?.entries).toEqual([
+        { skillTypeID: 1, targetLevel: 1 },
+        { skillTypeID: 1, targetLevel: 2 },
+        { skillTypeID: 1, targetLevel: 3 },
+      ])
+    );
   });
 
   it('tags an already-trained skill in the preview and excludes it from the "Added N" count (UX-REVIEW #7)', async () => {

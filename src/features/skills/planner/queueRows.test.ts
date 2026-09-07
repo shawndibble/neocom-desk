@@ -21,7 +21,7 @@ describe('summarizeEntryQueue', () => {
   it('an entry with no prereqs owns its whole range, no prereq rows', () => {
     const scheduled = [step(1, 1, 100, 100)];
     const info = summarizeEntryQueue([entry(1)], [1], scheduled, alwaysKnown);
-    expect(info.get(1)).toEqual({
+    expect(info.get(entryId(entry(1)))).toEqual({
       summary: { seconds: 100, cumulativeSeconds: 100, steps: [scheduled[0]], stepIndices: [0] },
       prereqRows: [],
     });
@@ -30,7 +30,7 @@ describe('summarizeEntryQueue', () => {
   it('leading steps for a different skill in the range become prereq rows', () => {
     const scheduled = [step(9, 1, 50, 50), step(1, 1, 100, 150)];
     const info = summarizeEntryQueue([entry(1)], [2], scheduled, alwaysKnown);
-    expect(info.get(1)).toEqual({
+    expect(info.get(entryId(entry(1)))).toEqual({
       summary: { seconds: 100, cumulativeSeconds: 150, steps: [scheduled[1]], stepIndices: [1] },
       prereqRows: [{ step: scheduled[0], stepIndex: 0 }],
     });
@@ -39,7 +39,7 @@ describe('summarizeEntryQueue', () => {
   it('an entry spanning multiple levels of its own skill sums their seconds and uses the last cumulative', () => {
     const scheduled = [step(1, 1, 100, 100), step(1, 2, 200, 300), step(1, 3, 300, 600)];
     const info = summarizeEntryQueue([entry(1, 3)], [3], scheduled, alwaysKnown);
-    expect(info.get(1)).toEqual({
+    expect(info.get(entryId(entry(1, 3)))).toEqual({
       summary: { seconds: 600, cumulativeSeconds: 600, steps: scheduled, stepIndices: [0, 1, 2] },
       prereqRows: [],
     });
@@ -50,14 +50,14 @@ describe('summarizeEntryQueue', () => {
     // and V only, so the row must label itself IV–V and not I–V (#254).
     const scheduled = [step(1, 4, 400, 400), step(1, 5, 500, 900)];
     const info = summarizeEntryQueue([entry(1, 5)], [2], scheduled, alwaysKnown);
-    expect(info.get(1)?.summary.steps.map((s) => s.level)).toEqual([4, 5]);
+    expect(info.get(entryId(entry(1, 5)))?.summary.steps.map((s) => s.level)).toEqual([4, 5]);
   });
 
   it('an already-trained entry (empty range) carries the previous cumulative forward with zero seconds', () => {
     const scheduled = [step(1, 1, 100, 100)];
     // entry 1 owns steps[0:1], entry 2 (already trained) owns steps[1:1] (empty)
     const info = summarizeEntryQueue([entry(1), entry(2)], [1, 1], scheduled, alwaysKnown);
-    expect(info.get(2)).toEqual({
+    expect(info.get(entryId(entry(2)))).toEqual({
       summary: { seconds: 0, cumulativeSeconds: 100, steps: [], stepIndices: [] },
       prereqRows: [],
     });
@@ -66,7 +66,7 @@ describe('summarizeEntryQueue', () => {
   it('an already-trained entry as the very first entry carries zero cumulative, not a crash', () => {
     const scheduled: ScheduledStep[] = [];
     const info = summarizeEntryQueue([entry(1)], [0], scheduled, alwaysKnown);
-    expect(info.get(1)).toEqual({
+    expect(info.get(entryId(entry(1)))).toEqual({
       summary: { seconds: 0, cumulativeSeconds: 0, steps: [], stepIndices: [] },
       prereqRows: [],
     });
@@ -82,11 +82,11 @@ describe('summarizeEntryQueue', () => {
       step(2, 1, 10, 40),
     ];
     const info = summarizeEntryQueue([entry(1), entry(2)], [1, 4], scheduled, alwaysKnown);
-    expect(info.get(1)).toEqual({
+    expect(info.get(entryId(entry(1)))).toEqual({
       summary: { seconds: 10, cumulativeSeconds: 10, steps: [scheduled[0]], stepIndices: [0] },
       prereqRows: [],
     });
-    expect(info.get(2)).toEqual({
+    expect(info.get(entryId(entry(2)))).toEqual({
       summary: { seconds: 10, cumulativeSeconds: 40, steps: [scheduled[3]], stepIndices: [3] },
       prereqRows: [
         { step: scheduled[1], stepIndex: 1 },
@@ -100,11 +100,11 @@ describe('summarizeEntryQueue', () => {
     const isKnown = (skillTypeID: number) => skillTypeID !== 999;
     // entryBoundaries only covers the known entry (skillTypeID 1).
     const info = summarizeEntryQueue([entry(999), entry(1)], [1], scheduled, isKnown);
-    expect(info.get(999)).toEqual({
+    expect(info.get(entryId(entry(999)))).toEqual({
       summary: { seconds: 0, cumulativeSeconds: 0, steps: [], stepIndices: [] },
       prereqRows: [],
     });
-    expect(info.get(1)).toEqual({
+    expect(info.get(entryId(entry(1)))).toEqual({
       summary: { seconds: 100, cumulativeSeconds: 100, steps: [scheduled[0]], stepIndices: [0] },
       prereqRows: [],
     });
@@ -114,7 +114,7 @@ describe('summarizeEntryQueue', () => {
     const scheduled = [step(1, 1, 100, 100)];
     const isKnown = (skillTypeID: number) => skillTypeID !== 999;
     const info = summarizeEntryQueue([entry(1), entry(999)], [1], scheduled, isKnown);
-    expect(info.get(999)).toEqual({
+    expect(info.get(entryId(entry(999)))).toEqual({
       summary: { seconds: 0, cumulativeSeconds: 100, steps: [], stepIndices: [] },
       prereqRows: [],
     });

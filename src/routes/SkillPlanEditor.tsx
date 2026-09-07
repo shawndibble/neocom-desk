@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, Navigate, useParams } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -31,6 +31,7 @@ export function SkillPlanEditor() {
   const {
     catalog,
     trainedSkills,
+    trainedSkillsKnown,
     attributes,
     attributesResult,
     attributeBaseline,
@@ -55,6 +56,22 @@ export function SkillPlanEditor() {
     return { plan: (await db.skillPlans.get(planId)) ?? null };
   }, [planId]);
 
+  // Above the early returns, because it is a hook: React requires the same
+  // hook order on every render. Stable across renders on purpose — PlanEditor
+  // runs an effect keyed on `onUpdate`, and a fresh closure each render
+  // re-fires it on every keystroke in the tools pane.
+  const loadedPlan = planQuery?.plan ?? null;
+  const handleUpdate = useCallback(
+    async (patch: PlanPatch) => {
+      if (!loadedPlan) return;
+      await db.skillPlans.put({ ...loadedPlan, ...patch, updatedAt: Date.now() });
+      if (loadedPlan.characterId !== null && isSyncConfigured()) {
+        scheduleSync(loadedPlan.characterId);
+      }
+    },
+    [loadedPlan]
+  );
+
   if (!hydrated || planQuery === undefined) {
     return (
       <div className="flex justify-center py-16">
@@ -69,16 +86,6 @@ export function SkillPlanEditor() {
   // is the only page left to send the user back to.
   if (!plan || plan.characterId !== activeCharacterId) {
     return <Navigate to="/skills/plans" replace />;
-  }
-
-  function syncAfterEdit() {
-    if (activeCharacterId !== null && isSyncConfigured()) scheduleSync(activeCharacterId);
-  }
-
-  async function handleUpdate(patch: PlanPatch) {
-    if (!plan) return;
-    await db.skillPlans.put({ ...plan, ...patch, updatedAt: Date.now() });
-    syncAfterEdit();
   }
 
   return (
@@ -125,6 +132,7 @@ export function SkillPlanEditor() {
           plan={plan}
           catalog={catalog}
           trainedSkills={trainedSkills}
+          trainedSkillsKnown={trainedSkillsKnown}
           attributes={attributes}
           implants={implants}
           attributesResult={attributesResult}
@@ -138,7 +146,7 @@ export function SkillPlanEditor() {
             />
           }
           headerActionsContainer={headerActionsEl}
-          onUpdate={(patch) => void handleUpdate(patch)}
+          onUpdate={handleUpdate}
         />
       )}
     </div>

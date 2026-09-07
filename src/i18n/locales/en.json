@@ -136,8 +136,6 @@
     "searchPlaceholder": "Search skills…",
     "filterByGroup": "Filter by skill group",
     "level": "Level {{level}}",
-    "levelRange": "{{from}}–{{to}}",
-    "levelBreakdown": "Levels trained for {{name}}",
     "remapCount": "Remaps available",
     "remapCountTooltipLabel": "About remaps available",
     "remapCountTooltip": "How many free attribute remaps the optimizer may use (you get one per year in-game).",
@@ -145,7 +143,6 @@
     "exportClipboard": "Export to clipboard",
     "exportCopied": "Copied to clipboard",
     "optimizeRemaps": "Optimize remaps",
-    "optimizeRemapsTooltip": "Evaluates the plan's entries in their current order — it never reorders them. Grouping similar skills together first (e.g. with \"Suggest reorder\") tends to produce bigger savings.",
     "suggestReorder": "Suggest reorder",
     "remapSaves": "Remapping saves {{duration}}",
     "remapNoGain": "No remap improves this plan in its current order — keeping current attributes. Try \"Suggest reorder\" to group similar skills first, then optimize again.",
@@ -215,6 +212,7 @@
     "promotePrereq": "Add {{name}} to the plan",
     "prereqPromoted": "{{name}} is now a plan entry",
     "dropBlocked": "{{skill}} is a prerequisite of {{blocker}}, so it has to stay ahead of it. Nothing moved.",
+    "dropBlockedSameSkill": "{{skill}} {{level}} would have nothing left to train there — {{blockerLevel}} ahead of it already trains that level. Nothing moved.",
     "importError": "Couldn't import the skill queue: {{message}}",
     "addMarker": "Add remap marker",
     "markerAdded": "Marker added",
@@ -270,10 +268,7 @@
     "headerProjectedFinish": "Projected finish",
     "headerNoFinish": "—",
     "headerSavingsLabel": "Remap savings",
-    "headerSavingsNone": "None",
-    "headerBoosterLabel": "Booster assumed",
-    "headerBoosterValue": "+{{bonus}} until {{date}}",
-    "headerBoosterTooltip": "These times assume the booster you entered under Training, not one the game knows about. Until it expires they run faster than your in-game skill queue."
+    "headerSavingsNone": "None"
   },
   "skillCompare": {
     "pickCharacters": "Characters to compare",

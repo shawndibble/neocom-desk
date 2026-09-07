@@ -158,8 +158,18 @@ export function SkillPicker({
                     {ROMAN.map((roman, i) => {
                       const level = i + 1;
                       const trainedLevel = trainedSkills.get(skill.typeID)?.level ?? 0;
-                      const planLevel =
-                        planEntries.find((e) => e.skillTypeID === skill.typeID)?.targetLevel ?? 0;
+                      // The highest of this skill's rows, not the first one:
+                      // a plan holds one entry per level, so `find` reports
+                      // Gunnery I for a plan that trains I–V, and every level
+                      // above it would offer an "add" the plan already covers
+                      // and `upsertEntry` would discard.
+                      const planLevel = planEntries.reduce(
+                        (highest, e) =>
+                          e.skillTypeID === skill.typeID
+                            ? Math.max(highest, e.targetLevel)
+                            : highest,
+                        0
+                      );
                       const alreadyTrained = trainedLevel >= level;
                       const alreadyInPlan = !alreadyTrained && planLevel >= level;
                       const flagKey = alreadyTrained

@@ -119,6 +119,7 @@ function renderEditor(
           plan={plan}
           catalog={CATALOG}
           trainedSkills={NO_TRAINED}
+          trainedSkillsKnown
           attributes={ATTRIBUTES}
           implants={IMPLANTS}
           attributesResult={ATTRIBUTES_RESULT}
@@ -442,15 +443,16 @@ describe('PlanEditor tools pane', () => {
     await openTools(user);
 
     expect(screen.queryByRole('dialog')).toBeNull();
+    // Standing, before any click: a plan carrying a marker says what that
+    // marker saves without being asked. The Modal below is where the spread
+    // is accepted, not where the figure is first disclosed.
+    expect(within(sectionFor('Actions')).getByText(/^Saves/)).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Optimize at my markers' }));
 
     const dialog = screen.getByRole('dialog', { name: 'Optimize at my markers' });
     expect(within(dialog).getByText(/^Remapping saves/)).toBeInTheDocument();
     expect(within(dialog).getByText('Segment 1')).toBeInTheDocument();
-    // The beside-the-button confirmation (#222) still fires alongside the
-    // Modal, same as "Suggest reorder"'s toast + Modal pairing.
-    expect(within(sectionFor('Actions')).getByRole('status')).toHaveTextContent(/^Saves/);
 
     await user.click(within(dialog).getByRole('button', { name: 'Accept' }));
 
@@ -841,6 +843,7 @@ describe('PlanEditor prereq promotion', () => {
           plan={{ ...PLAN, entries: [{ skillTypeID: 40, targetLevel: 3 }] }}
           catalog={PREREQ_CATALOG}
           trainedSkills={NO_TRAINED}
+          trainedSkillsKnown
           attributes={ATTRIBUTES}
           implants={IMPLANTS}
           attributesResult={null}
@@ -1293,6 +1296,42 @@ describe('an attribute sheet nothing explains', () => {
   });
 });
 
+describe('splitting a plan into one row per level', () => {
+  const MULTI_LEVEL = { ...PLAN, entries: [{ skillTypeID: 10, targetLevel: 3 }], markers: [1] };
+
+  it('splits an entry that trains several levels, carrying its marker along', async () => {
+    const { onUpdate } = renderEditor(vi.fn(), { plan: MULTI_LEVEL });
+
+    await waitFor(() =>
+      expect(onUpdate).toHaveBeenCalledWith({
+        entries: [
+          { skillTypeID: 10, targetLevel: 1 },
+          { skillTypeID: 10, targetLevel: 2 },
+          { skillTypeID: 10, targetLevel: 3 },
+        ],
+        // Was "before entry 1"; the same entry now sits at position 3.
+        markers: [3],
+      })
+    );
+  });
+
+  it("rewrites nothing until the character's trained levels are actually known", async () => {
+    // The empty map is also what stands in before /skills has been read at
+    // all — on a fresh device, offline with no cache, or with an expired
+    // token. Splitting against it cuts rows for levels the character already
+    // has, and those rows train nothing, so no later split can remove them:
+    // a correct plan would be rewritten into a permanently wrong one without
+    // the user touching anything.
+    const { onUpdate } = renderEditor(vi.fn(), {
+      plan: MULTI_LEVEL,
+      trainedSkillsKnown: false,
+    });
+
+    await waitFor(() => expect(screen.getByText('Your entries')).toBeInTheDocument());
+    expect(onUpdate).not.toHaveBeenCalled();
+  });
+});
+
 describe('removing an entry requires confirmation (#408)', () => {
   it('does not remove the entry until the confirmation Modal is accepted', async () => {
     const user = userEvent.setup();
@@ -1302,7 +1341,7 @@ describe('removing an entry requires confirmation (#408)', () => {
     // Clicking Remove on the row only opens the Modal — the entry survives
     // until the Modal's own Remove button is clicked.
     expect(onUpdate).not.toHaveBeenCalled();
-    expect(screen.getByText(/remove "skill a" from this plan/i)).toBeInTheDocument();
+    expect(screen.getByText(/remove "skill a i+v?" from this plan/i)).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Remove' }));
 
@@ -1319,6 +1358,6 @@ describe('removing an entry requires confirmation (#408)', () => {
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
 
     expect(onUpdate).not.toHaveBeenCalled();
-    expect(screen.queryByText(/remove "skill a" from this plan/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/remove "skill a i+v?" from this plan/i)).not.toBeInTheDocument();
   });
 });

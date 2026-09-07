@@ -26,6 +26,16 @@ const DEFAULT_ATTRIBUTES: Attributes = {
 export interface PlanEditorData {
   catalog: SkillCatalog | null;
   trainedSkills: ReadonlyMap<number, TrainedSkill>;
+  /**
+   * Whether `trainedSkills` is ESI's answer rather than the empty map that
+   * stands in before /skills has ever been read (a fresh device, offline with
+   * no cache, or a 401 awaiting re-auth). An empty map is a legitimate answer
+   * for a brand-new character, so emptiness cannot be the test — and anything
+   * that would *rewrite the plan* against those levels has to know the
+   * difference. The catalog is no proxy: it ships in the bundle and loads
+   * whether or not ESI answered.
+   */
+  trainedSkillsKnown: boolean;
   /** Base attributes (implant bonuses removed) — what the scheduler costs against. */
   attributes: Attributes;
   /**
@@ -56,6 +66,7 @@ export interface PlanEditorData {
 export function usePlanEditorData(characterId: number | null): PlanEditorData {
   const [catalog, setCatalog] = useState<SkillCatalog | null>(null);
   const [trainedSkills, setTrainedSkills] = useState<ReadonlyMap<number, TrainedSkill>>(new Map());
+  const [trainedSkillsKnown, setTrainedSkillsKnown] = useState(false);
   const [attributes, setAttributes] = useState<Attributes>(DEFAULT_ATTRIBUTES);
   const [attributesResult, setAttributesResult] =
     useState<CachedResult<CharacterAttributes> | null>(null);
@@ -81,6 +92,7 @@ export function usePlanEditorData(characterId: number | null): PlanEditorData {
       // past-finish_date queue entries on top, or a plan gets normalized and
       // optimized against levels the character already trained past.
       setTrainedSkills(corrected.trained);
+      setTrainedSkillsKnown(corrected.skillsResult !== null);
       if (attrs?.data) {
         // An `impossible` sheet yields no baseline at all, so the scheduler
         // falls back to the same placeholder it uses when ESI cannot be read.
@@ -102,6 +114,7 @@ export function usePlanEditorData(characterId: number | null): PlanEditorData {
   return {
     catalog,
     trainedSkills,
+    trainedSkillsKnown,
     attributes,
     attributesResult,
     attributeBaseline,

@@ -10,29 +10,13 @@ interface PlanHeaderProps {
   projectedFinish: Date | null;
   /** null when the plan has no valid entries to optimize. */
   badge: OptimizationBadge | null;
-  /**
-   * The What-If Booster these totals were computed under, or null when they
-   * were not. A Booster is a hypothesis the user types into the tools pane,
-   * not something the game reports, and a large one knocks a third off every
-   * number in this strip — so the strip has to say so. `EntryList` already
-   * marks the individual rows a Booster speeds up; this says the same thing
-   * about the one figure a user actually compares against the in-game queue.
-   */
-  booster?: { bonus: number; expiresAt: Date } | null;
 }
 
 /**
- * Plan-at-a-glance header: total time, skill count, projected finish, a live
- * remap-savings badge, and — when one is assumed — the Booster the totals
- * were computed under.
+ * Plan-at-a-glance header: total time, skill count, projected finish, and a
+ * live remap-savings badge.
  */
-export function PlanHeader({
-  totalSeconds,
-  skillCount,
-  projectedFinish,
-  badge,
-  booster = null,
-}: PlanHeaderProps) {
+export function PlanHeader({ totalSeconds, skillCount, projectedFinish, badge }: PlanHeaderProps) {
   const { t } = useTranslation();
   const savingsSeconds = badge?.savingsSeconds ?? 0;
   const showsSavings = badge !== null && savingsSeconds >= MIN_MEANINGFUL_SAVINGS_SECONDS;
@@ -47,27 +31,9 @@ export function PlanHeader({
     // that there is no second sticky panel below needing this one's rendered
     // height; nothing here has to stay in sync with anything.
     <Panel title={t('plans.headerTitle')} className="lg:sticky lg:top-0 lg:z-10">
-      {/* A plain wrapping strip, like every other row of StatChips in the app.
-          This one used to hold `lg:flex-nowrap lg:overflow-x-auto` to stay a
-          single line beside the sidebar, but a fifth chip (the Booster) made
-          that a horizontal scroller at the narrow end of `lg` and crushed the
-          chips at the wide end. Whole chips moving to a second line reads
-          better than either. */}
+      {/* A plain wrapping strip, like every other row of StatChips in the app. */}
       <div className="flex flex-wrap gap-2">
         <StatChip label={t('plans.headerTrainingTime')} value={formatDuration(totalSeconds)} />
-        {booster && (
-          // Immediately after the total, because it is a caveat on that
-          // number rather than a statistic of its own.
-          <StatChip
-            label={t('plans.headerBoosterLabel')}
-            tone="warning"
-            tooltip={t('plans.headerBoosterTooltip')}
-            value={t('plans.headerBoosterValue', {
-              bonus: booster.bonus,
-              date: formatLocalDate(booster.expiresAt),
-            })}
-          />
-        )}
         <StatChip label={t('plans.headerSkillCount')} value={skillCount} />
         <StatChip
           label={t('plans.headerProjectedFinish')}
