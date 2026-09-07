@@ -26,13 +26,17 @@
  * — `src/engine` stays free of Dexie/fetch/DOM (and, since Cloud Functions
  * import this module directly per ADR 0010, free of `src/i18n`'s React
  * coupling too) — the caller resolves names at the feature-layer boundary
- * (ARCHITECTURE.md) and hands them in. For the same reason the six shared
- * events' English copy below is rendered from `notificationWording.ts`'s
- * `SHARED_NOTIFICATION_WORDING` rather than written out here a second time
- * — `src/i18n/index.ts` splices the same templates into
- * `notifications.fired.*` for `foregroundPoller.ts`'s `notificationText` to
- * render on the *live* path, so the two now read from one place instead of
- * being kept in sync by hand.
+ * (ARCHITECTURE.md) and hands them in. For the same reason the events that
+ * word a push exactly as the live path words it read their English copy
+ * from `notificationWording.ts`'s `SHARED_NOTIFICATION_WORDING` rather than
+ * writing it out here a second time — `src/i18n/index.ts` splices the same
+ * templates into `notifications.fired.*` for `foregroundPoller.ts`'s
+ * `notificationText` to render on the *live* path, so the two read from one
+ * place instead of being kept in sync by hand.
+ *
+ * The events `projectionWording` hedges are the exception, and necessarily
+ * so: their push copy makes a weaker claim than the live path's, so there
+ * is nothing to share, and their text is written inline below.
  *
  * 8 of the 17 Notification Events carry a timestamp fixed far enough in
  * advance to be worth projecting; the rest are inherently "as it happens"
@@ -97,20 +101,38 @@ export type ProjectableEventId = (typeof PROJECTABLE_EVENT_IDS)[number];
 export type ProjectionWording = 'assert' | 'hedge';
 
 /**
- * `structureFuelLow` hedges ("was due to run out") because a refuel
- * performed in game while the app is closed makes the alert plainly wrong
- * and the backend cannot check; every other projectable event rarely
- * changes once its timestamp is fixed, so it asserts.
+ * A Projection is a prediction nothing re-checks before it fires (ADR 0010:
+ * "the backend cannot verify a Projection before firing it"). An event
+ * hedges when an ordinary in-game action, taken while the app is closed,
+ * routinely falsifies that prediction before it lands.
+ *
+ * Three do. `structureFuelLow` is falsified by a refuel. Both planetary
+ * events are falsified by the move a pilot makes on every reset run —
+ * stopping an extractor program and installing a new one. That is not an
+ * edge case; it is the whole activity these two events exist to prompt, so
+ * a pilot who acts on the warning with the app closed is precisely the one
+ * who then gets told their programs expired.
+ *
+ * Everything else rarely changes once its timestamp is fixed — a queued
+ * skill, a started job, a scheduled calendar event — so it asserts.
+ *
+ * This governs the **push** path only. The Foreground Poller has genuinely
+ * observed what it reports, so its copy stays assertive
+ * (`notificationWording.ts`'s `SHARED_NOTIFICATION_WORDING`, spliced into
+ * `notifications.fired.*` by `src/i18n/index.ts`). That split is why the
+ * hedged text below is written inline here rather than through
+ * `renderShared` — `structureFuelLowText`'s precedent, now followed by
+ * three events instead of one.
  */
 export function projectionWording(eventId: ProjectableEventId): ProjectionWording {
   switch (eventId) {
     case 'structureFuelLow':
+    case 'planetaryExtractionDone':
+    case 'planetaryExtractorExpiring':
       return 'hedge';
     case 'skillLevelComplete':
     case 'characterNotTraining':
     case 'industryJobComplete':
-    case 'planetaryExtractionDone':
-    case 'planetaryExtractorExpiring':
     case 'calendarEventStarting':
     case 'eveNotification':
       return 'assert';
@@ -214,23 +236,36 @@ function industryJobCompleteText(characterName: string, itemName: string) {
   return renderShared('industryJobComplete', { character: characterName, item: itemName });
 }
 
+/**
+ * Hedged, unlike the live path's "has stopped": a pilot who restarted the
+ * programs in game before this fired never had an extraction stop at all.
+ *
+ * The **title** hedges too, which `structureFuelLowText` below does not. A
+ * push is often read as a single line on a lock screen, so the title is the
+ * whole claim there — "Extraction done" over a colony still running is the
+ * exact sentence this was reported for, and softening only the body leaves
+ * the wrong half showing.
+ */
 function planetaryExtractionDoneText(characterName: string, planetName: string) {
-  assertWording('planetaryExtractionDone', 'assert');
-  return renderShared('planetaryExtractionDone', { character: characterName, planet: planetName });
+  assertWording('planetaryExtractionDone', 'hedge');
+  return {
+    title: 'Extraction due to stop',
+    body: `${characterName}'s extraction on ${planetName} was due to stop.`,
+  };
 }
 
+/** Hedged for `planetaryExtractionDoneText`'s reason, title included. */
 function planetaryExtractorExpiringText(
   characterName: string,
   planetName: string,
   thresholdMs: number
 ) {
-  assertWording('planetaryExtractorExpiring', 'assert');
+  assertWording('planetaryExtractorExpiring', 'hedge');
   const hours = Math.round(thresholdMs / 3_600_000);
-  return renderShared('planetaryExtractorExpiring', {
-    character: characterName,
-    planet: planetName,
-    hours,
-  });
+  return {
+    title: 'Extractor due to expire',
+    body: `${characterName}'s extractor on ${planetName} was due to expire in under ${hours} hours.`,
+  };
 }
 
 function calendarEventStartingText(characterName: string) {
@@ -239,10 +274,15 @@ function calendarEventStartingText(characterName: string) {
 }
 
 /**
- * The one event that hedges (`projectionWording('structureFuelLow')` ===
- * `'hedge'`): "was due to run out" rather than "is low", because a refuel
- * performed in game while the app is closed makes the assertive phrasing
- * plainly wrong and the backend cannot check before the push goes out.
+ * Hedged for the same reason as the two planetary events above: "was due to
+ * run out" rather than "is low", because a refuel performed in game while
+ * the app is closed makes the assertive phrasing plainly wrong and nothing
+ * re-checks before the push goes out.
+ *
+ * Its title stays assertive where theirs do not — "Structure fuel low" is a
+ * standing condition a refuel resolves, not a moment this push claims to
+ * have witnessed, so it reads as stale rather than false. Changing it is a
+ * separate call about structure copy, not a consequence of this one.
  */
 function structureFuelLowText(characterName: string, structureName: string) {
   assertWording('structureFuelLow', 'hedge');

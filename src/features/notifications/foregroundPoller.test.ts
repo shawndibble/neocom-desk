@@ -286,6 +286,7 @@ function baseDeps(overrides: Partial<PollDependencies> & DomainOverrides = {}): 
     notify: vi.fn(async () => {}),
     recordToFeed: vi.fn(async () => {}),
     alreadyDelivered: vi.fn(async () => false),
+    retractFromFeed: vi.fn(async () => {}),
     uploadProjection: vi.fn(async () => {}),
     ...rest,
   };
@@ -591,6 +592,57 @@ describe('runForegroundPoll', () => {
       expiryTimeMs: 2000,
     });
     expect(character).toEqual(CHAR);
+  });
+
+  it('retracts feed rows for an extractor program restarted before it could expire', async () => {
+    // The reported defect: programs restarted in game with the app closed,
+    // and a Scheduled Push (fired without a re-check, ADR 0010) claiming they
+    // expired. The restarted program takes a new expiry and therefore a new
+    // Occurrence Key, so nothing in ordinary polling ever revisits the row
+    // that push left behind.
+    const OLD_EXPIRY = 2000;
+    let now = 1000;
+    let savedColonies: ColonyPollerState = {
+      [CHAR.characterId]: {
+        colonies: [{ planetId: 40000001, extractors: [{ pinId: 1, expiryTimeMs: OLD_EXPIRY }] }],
+        nowMs: now,
+      },
+    };
+    const retractFromFeed = vi.fn<PollDependencies['retractFromFeed']>(async () => {});
+    const deps = baseDeps({
+      now: () => now,
+      grantedScopes: async () => new Set([SKILLQUEUE_SCOPE, PLANETS_SCOPE]),
+      prevColonyState: async () => savedColonies,
+      saveColonyState: async (state) => {
+        savedColonies = state;
+      },
+      loadColonyExtractors: async () => [
+        {
+          planetId: 40000001,
+          extractors: [{ pinId: 1, expiryTimeMs: 900_000, installTimeMs: OLD_EXPIRY - 1 }],
+        },
+      ],
+      retractFromFeed,
+    });
+    now = 3000;
+    await runForegroundPoll(deps);
+    expect(retractFromFeed).toHaveBeenCalledTimes(1);
+    expect(retractFromFeed.mock.calls[0][0]).toContain(
+      `${CHAR.characterId}:planetaryExtractionDone:40000001:${OLD_EXPIRY}`
+    );
+  });
+
+  it('retracts nothing on a poll that disproved nothing', async () => {
+    const retractFromFeed = vi.fn<PollDependencies['retractFromFeed']>(async () => {});
+    const deps = baseDeps({
+      grantedScopes: async () => new Set([SKILLQUEUE_SCOPE, PLANETS_SCOPE]),
+      loadColonyExtractors: async () => [
+        { planetId: 40000001, extractors: [{ pinId: 1, expiryTimeMs: 900_000 }] },
+      ],
+      retractFromFeed,
+    });
+    await runForegroundPoll(deps);
+    expect(retractFromFeed).not.toHaveBeenCalled();
   });
 
   it('skips mail for a character with no granted scope', async () => {

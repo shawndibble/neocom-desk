@@ -35,7 +35,7 @@ import {
   isBrowserChannelEnabled,
   isFeedChannelEnabled,
 } from './preferences';
-import { recordFeedEntry, feedHasOccurrence } from './feed';
+import { recordFeedEntry, feedHasOccurrence, dismissFeedEntries } from './feed';
 import {
   isEventEnabledFor,
   isEveTypeAllowed,
@@ -115,6 +115,22 @@ export interface PollDependencies {
    */
   alreadyDelivered: (occurrenceKey: string) => Promise<boolean>;
   /**
+   * Clears Notification Feed rows for occurrences this poll proved never
+   * happened (`pollDomains.ts`'s `disproven`). A Scheduled Push fires
+   * without a re-check (ADR 0010), so a pilot who restarts an extractor
+   * program in game with the app closed is told it expired; the row that
+   * push wrote is keyed on the dead program's expiry, so no later poll ever
+   * writes over it.
+   *
+   * Dismissal rather than deletion, on `feed.dismissFeedEntry`'s reasoning:
+   * the feed syncs, and a deleted row leaves no tombstone for the other
+   * device to honour, so it would simply come back on the next pull. A
+   * dismissal is the one thing `mergeFeedRecord` carries across in both
+   * directions. Called with keys, not fires, because the row being addressed
+   * may have been written by another party entirely.
+   */
+  retractFromFeed: (occurrenceKeys: readonly string[]) => Promise<void>;
+  /**
    * This poll's Scheduled Push upload (issue #358, ADR 0010, CONTEXT.md round
    * 45): every Character updated this poll, mapped to its whole 72-hour
    * Projection window. Called once per poll — "every app open and every
@@ -181,6 +197,8 @@ interface CharacterUpdate {
   /** The snapshot this poll built per domain — absent for a domain it skipped. */
   snapshots: Map<DomainRun, unknown>;
   fires: AnyNotificationFire[];
+  /** Occurrence Keys this poll disproved — see `PollDependencies.retractFromFeed`. */
+  retractedKeys: string[];
   /** This poll's contribution to the Scheduled Push upload (issue #358) — see `PollDependencies.uploadProjection`. */
   projectionRows: ProjectionRow[];
 }
@@ -266,6 +284,7 @@ async function runForegroundPollOnce(deps: PollDependencies): Promise<void> {
     ]);
 
     const fires: AnyNotificationFire[] = [];
+    const retractedKeys: string[] = [];
     const snapshots = new Map<DomainRun, unknown>();
     const projectionRows: ProjectionRow[] = [];
 
@@ -281,14 +300,26 @@ async function runForegroundPollOnce(deps: PollDependencies): Promise<void> {
       if (rows === null) continue;
       const next = run.domain.toSnapshot(rows, deps.now());
       snapshots.set(run, next);
-      fires.push(
-        ...run.domain.diff(
-          character.characterId,
-          run.next[character.characterId],
-          next,
-          enabledEvents
-        )
-      );
+      const previous = run.next[character.characterId];
+      fires.push(...run.domain.diff(character.characterId, previous, next, enabledEvents));
+      // Unlike the diffs, not filtered per event: the row being retracted may
+      // have been written by Web Push or another device, for either of this
+      // domain's two events, so one enabled event's fetch retracts both.
+      //
+      // It still rides on the domain having been fetched at all (the
+      // `enabledEvents.size === 0` skip above, AC5), and that is the right
+      // bound rather than a gap: a character with both planetary events off
+      // on both channels has those rows hidden from the feed anyway
+      // (`feedSelection.isEntryVisible`), so there is nothing visible left to
+      // retract — and one with the scope revoked cannot prove anything about
+      // them either way.
+      if (run.domain.disproven) {
+        retractedKeys.push(
+          ...run.domain
+            .disproven(character.characterId, previous, next)
+            .map((fire) => occurrenceKey(fire, deps.now()))
+        );
+      }
       // Scheduled Push upload (issue #358): a Scheduled Push is the
       // closed-app analog of the *browser* channel specifically (it shows an
       // OS notification, same as `notify` below) — never gated on `feed`,
@@ -323,6 +354,7 @@ async function runForegroundPollOnce(deps: PollDependencies): Promise<void> {
         eveTypePrefs,
         snapshots,
         fires,
+        retractedKeys,
         projectionRows,
       });
     }
@@ -402,6 +434,15 @@ async function runForegroundPollOnce(deps: PollDependencies): Promise<void> {
       await deps.notify(group.fire, character, { title, body: group.body });
     }
   }
+
+  // A retraction cannot address a row this poll just wrote: a retracted key
+  // carries the *replaced* program's expiry and every key written above
+  // carries the live one, and `disprovenExtractorOccurrences` requires those
+  // to differ. That is the whole safety argument — running after the delivery
+  // loop does not add to it, since `mergeFeedRecord` takes the later
+  // `dismissedAt` and so a dismissal sticks whichever order the two land in.
+  const retractedKeys = updates.flatMap((update) => update.retractedKeys);
+  if (retractedKeys.length > 0) await deps.retractFromFeed(retractedKeys);
 
   await deps.uploadProjection(
     new Map(updates.map((update) => [update.characterId, update.projectionRows]))
@@ -699,6 +740,7 @@ export function liveDependencies(): PollDependencies {
     notify: sendBrowserNotification,
     recordToFeed: recordFeedNotification,
     alreadyDelivered: feedHasOccurrence,
+    retractFromFeed: dismissFeedEntries,
     uploadProjection: uploadProjectionRows,
   };
 }

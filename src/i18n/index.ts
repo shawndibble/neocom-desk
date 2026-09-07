@@ -4,10 +4,15 @@ import en from './locales/en.json';
 import { SHARED_NOTIFICATION_WORDING } from '@/engine/notificationWording';
 
 /**
- * `SHARED_NOTIFICATION_WORDING` is also read by `src/engine/projection.ts`
- * for Scheduled Push rows, which have no i18next runtime to render from
- * (ADR 0010) — it is the one place these six events' English wording lives,
- * spliced in here so `notifications.fired.*` no longer hand-duplicates it.
+ * The one place these six events' live English wording lives, spliced in here
+ * so `notifications.fired.*` no longer hand-duplicates it.
+ *
+ * Four of the six are also read by `src/engine/projection.ts` for Scheduled
+ * Push rows, which have no i18next runtime to render from (ADR 0010). The two
+ * planetary events are not: `projectionWording` hedges them on the push path
+ * (a reset run done in game falsifies the prediction before it fires) and
+ * `projection.ts` writes that copy inline, so only the live rendering below
+ * reads them. `index.test.ts` pins both halves of that split.
  */
 const translation = {
   ...en,
