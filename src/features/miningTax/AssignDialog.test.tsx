@@ -31,6 +31,13 @@ const PRICES: Record<string, ReadonlyMap<number, number>> = {
 };
 const pricesFor = (hubId: string | undefined) => PRICES[hubId ?? 'jita'] ?? PRICES.jita;
 
+/**
+ * Deliberately a claim about the Payee, not about the number above it: when
+ * editing, that number stays on the stored figure until cleared, so a
+ * "valued at X" reading would contradict the field it sits under.
+ */
+const HEK_HINT = "This Payee's ore is priced at Hek buy orders.";
+
 const row: MoonMiningTaxRow = {
   characterId: CHAR,
   characterName: 'Miner Alt',
@@ -102,14 +109,14 @@ describe('AssignDialog — the money path', () => {
     );
   });
 
-  it('shows the hub the figure came from only when it is not the default', () => {
+  it('names the Payee’s hub only when it is not the default', () => {
     renderDialog([payee()]);
-    expect(screen.getByText('Valued at Hek buy orders.')).toBeInTheDocument();
+    expect(screen.getByText(HEK_HINT)).toBeInTheDocument();
   });
 
   it('says nothing about the hub for a Payee priced at the default', () => {
     renderDialog([payee({ hubId: undefined })]);
-    expect(screen.queryByText(/Valued at .* buy orders\./)).not.toBeInTheDocument();
+    expect(screen.queryByText(/priced at .* buy orders./)).not.toBeInTheDocument();
   });
 
   it('re-prices when the pilot changes the Payee selection', async () => {
@@ -117,14 +124,14 @@ describe('AssignDialog — the money path', () => {
     renderDialog([payee(), jitaPayee]);
 
     // Opens auto-matched on the Hek Payee (its systemId matches the entry).
-    expect(screen.getByText('Valued at Hek buy orders.')).toBeInTheDocument();
+    expect(screen.getByText(HEK_HINT)).toBeInTheDocument();
     const estimated = screen.getByLabelText('Estimated value');
     expect(estimated).toHaveValue('40,000');
 
     await userEvent.click(screen.getByRole('combobox', { name: 'Payee' }));
     await userEvent.click(screen.getByRole('option', { name: 'Jita landlord' }));
 
-    expect(screen.queryByText('Valued at Hek buy orders.')).not.toBeInTheDocument();
+    expect(screen.queryByText(HEK_HINT)).not.toBeInTheDocument();
     expect(screen.getByLabelText('Estimated value')).toHaveValue('100,000');
   });
 

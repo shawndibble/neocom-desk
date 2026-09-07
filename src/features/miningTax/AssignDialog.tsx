@@ -406,7 +406,10 @@ export function AssignDialog({
           {/* Only for a Payee billing somewhere other than the default: at
               Jita this would be a line of standing noise, anywhere else it is
               the explanation for a figure that doesn't match the ledger's
-              own Value column. */}
+              own Value column. Deliberately a statement about the *Payee*,
+              not about the number above it: when editing, that number stays
+              on the stored figure until cleared, so "valued at X" would
+              contradict the field it sits under. */}
           {hub.id !== DEFAULT_TRADE_HUB.id && (
             <p className="text-[0.6875rem] text-text-dim">
               {t('miningTax.valuedAtHubHint', { hub: hub.systemName })}
