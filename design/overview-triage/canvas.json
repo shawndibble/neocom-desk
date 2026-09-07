@@ -2,7 +2,7 @@
   "artboards": [
     {
       "file": "Main.dc.html",
-      "title": "Reworked board — Desktop",
+      "title": "The board — Desktop",
       "x": 0,
       "y": 0,
       "w": 1440,
@@ -17,33 +17,33 @@
       "h": 900
     },
     {
-      "file": "AlertsRail.dc.html",
-      "title": "Alternate — alerts as a column",
+      "file": "QuietNight.dc.html",
+      "title": "Quiet night",
       "x": 3120,
       "y": 0,
       "w": 1440,
-      "h": 900
+      "h": 760
+    },
+    {
+      "file": "AlertsPage.dc.html",
+      "title": "Alerts — the feed’s new home",
+      "x": 0,
+      "y": 1060,
+      "w": 1440,
+      "h": 760
     },
     {
       "file": "BoardPhone.dc.html",
-      "title": "Reworked board — Phone",
-      "x": 0,
+      "title": "The board — Phone",
+      "x": 1560,
       "y": 1060,
       "w": 390,
       "h": 844
     },
     {
-      "file": "QuietNight.dc.html",
-      "title": "Quiet night",
-      "x": 520,
-      "y": 1060,
-      "w": 1440,
-      "h": 680
-    },
-    {
       "file": "Anatomy.dc.html",
       "title": "Card anatomy & rules",
-      "x": 2100,
+      "x": 2070,
       "y": 1060,
       "w": 1440,
       "h": 420
@@ -51,32 +51,25 @@
   ],
   "annotations": [
     {
-      "id": "rework",
+      "id": "round3",
       "x": 0,
-      "y": -340,
+      "y": -300,
       "w": 520,
-      "text": "ROUND 2 — what changed\n\nThe shape is settled (domain cards). The rule is new: NUMBERS where items are interchangeable, ROWS only where each item is its own thing. So the cards are deliberately different shapes.\n\n· Training — one line, in the strip and in its card\n· Open orders — three counts (undercut / outbid / relist), no rows. Below-floor keeps a footer line of its own\n· Mining tax — two counts: ISK unpaid, entries unassigned\n· Planetary — one row per BATCH sharing a timer, not per colony\n· Industry — real rows, kept as you liked it\n· Alerts — grouped by notification type, count first\n\nFixed: \"Owed to you\" was backwards — the ledger records what you owe your payees. It now reads \"You owe\".\n\nDropped: the 48-hour bar chart, the merged action queue, the decayed-colony row."
+      "text": "ROUND 3 — what changed\n\n· Alerts get the column. The card variant is gone (still in git history).\n\n· A zero is plain text now — no amber, no glyph. Nothing to look at is not a warning. See Quiet night.\n\n· \"You owe\" is off the strip: it printed the same ISK as the Mining tax card's own tile, two panels apart.\n\n· The rail gains an Alerts entry with an unread count — the feed had no way to be reached from anywhere but the dashboard."
     },
     {
-      "id": "heavy",
+      "id": "feed-question",
+      "x": 0,
+      "y": 1900,
+      "w": 560,
+      "text": "WHERE THE NOTIFICATIONS WENT\n\nToday the Notification Feed renders in exactly one place: inside routes/Overview.tsx. No page, no nav entry, and NOTIFICATION_FALLBACK_ROUTE is /overview — so a tapped push with no route of its own lands on the dashboard.\n\nSummarising it into a column would have stranded everything the column does not list. So the feed gets a page:\n\n· Every type, every Character on the device — the board is active-character-only, the feed never was\n· Search, character filter, severity and muted-type filters\n· Expand a type to see its individual fires, each with who it belongs to and its own dismiss\n· Mute a type or dismiss the whole group from the row — the controls NotificationContextMenu already offers\n· Links out to Settings for the per-event toggles, which stay where they are\n\nThe column on the board is the summary; this is the detail. That is the relationship every other card on the board has with its page — alerts were the only domain without one."
+    },
+    {
+      "id": "still-open",
       "x": 1560,
-      "y": -340,
-      "w": 380,
-      "text": "THE PROOF\n\nSame board, bad night: 137 undercut, 18 colonies with 6 expired, 341 alerts across 17 types, empty skill queue, two-day-old data.\n\nIdentical layout. Identical card heights. Nothing scrolled and nothing that mattered got pushed off — which is the thing the first round could not do."
-    },
-    {
-      "id": "fork",
-      "x": 3120,
-      "y": -340,
-      "w": 380,
-      "text": "THE ONE OPEN FORK\n\nAlerts are a different volume class from everything else. Two answers:\n\nMAIN — alerts take an ordinary card, show the worst three types, roll the rest into the footer. The board stays a board.\n\nTHIS — alerts get a column of their own, so a loud day never pushes the other cards around and you can dismiss in place.\n\nCosts a third of the width every day to solve a problem you have some days."
-    },
-    {
-      "id": "open-q",
-      "x": 520,
-      "y": 1740,
-      "w": 520,
-      "text": "STILL OPEN\n\n1. Multi-character. All of this is the active character. The alert feed is device-wide. Should the board span every pilot, or stay one at a time?\n\n2. Deep links. \"Undercut 21\" would open /market?section=orders — there is no route today that opens it pre-filtered to undercut, or that jumps to one colony. Worth adding?\n\n3. Does this replace Overview, or sit above it? The wallet panel, skill-queue panel and three count tiles are all gone.\n\n4. Is below-floor really a footer line, or does it deserve to be the fourth number?"
+      "y": 1940,
+      "w": 420,
+      "text": "STILL OPEN\n\n1. Multi-character. The board is the active pilot; the feed is device-wide. The \"your other characters\" line is a proposal, not a decision.\n\n2. Deep links. \"Undercut 21\" would open /market?section=orders — no route today opens it pre-filtered to undercut, or jumps to one colony.\n\n3. Does this replace Overview, or sit above it? The wallet panel, skill-queue panel and count tiles are all gone.\n\n4. Where does Alerts sit in the rail? Drawn directly under Overview; the Social group (mail, calendar, contacts) is the other candidate."
     }
   ],
   "launch": {

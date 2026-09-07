@@ -65,6 +65,15 @@ const P = {
   // Refresh — ArrowClockwise
   refresh:
     'M238,56v48a6,6,0,0,1-6,6H184a6,6,0,0,1,0-12h32.55l-30.38-27.8c-.06-.06-.12-.13-.19-.19a82,82,0,1,0-1.7,117.65,6,6,0,0,1,8.24,8.73A93.46,93.46,0,0,1,128,222h-1.28A94,94,0,1,1,194.37,61.4L226,90.35V56a6,6,0,1,1,12,0Z',
+  // Expanded — CaretDown
+  expanded:
+    'M212.24,100.24l-80,80a6,6,0,0,1-8.48,0l-80-80a6,6,0,0,1,8.48-8.48L128,167.51l75.76-75.75a6,6,0,0,1,8.48,8.48Z',
+  // Search — MagnifyingGlass
+  search:
+    'M228.24,219.76l-51.38-51.38a86.15,86.15,0,1,0-8.48,8.48l51.38,51.38a6,6,0,0,0,8.48-8.48ZM38,112a74,74,0,1,1,74,74A74.09,74.09,0,0,1,38,112Z',
+  // BrowserNotifyOff — BellSlash. Mutes a notification type from its own row.
+  bellOff:
+    'M52.44,36A6,6,0,0,0,43.56,44L61.31,63.56A77.45,77.45,0,0,0,50,104c0,35.74-8.42,63.2-14.08,72.94A14,14,0,0,0,48,198h42.5a38,38,0,0,0,75,0h18l20,22a6,6,0,0,0,8.88-8.08ZM128,218a26,26,0,0,1-25.29-20h50.58A26,26,0,0,1,128,218ZM48,186a1.9,1.9,0,0,1-1.7-1,2,2,0,0,1,0-2C53.86,170,62,139.69,62,104a65.63,65.63,0,0,1,7.78-31.12L172.62,186Zm165.29-8.62a5.88,5.88,0,0,1-2.2.42,6,6,0,0,1-5.58-3.81c-7.2-18.31-11.49-44.48-11.49-70A66,66,0,0,0,95.45,46.57a6,6,0,1,1-5.93-10.43A78,78,0,0,1,206,104c0,35.7,8.16,59.24,10.66,65.61A6,6,0,0,1,213.27,177.38Z',
   // Descend — CaretRight
   caret:
     'M180.24,132.24l-80,80a6,6,0,0,1-8.48-8.48L167.51,128,91.76,52.24a6,6,0,0,1,8.48-8.48l80,80A6,6,0,0,1,180.24,132.24Z',
@@ -219,10 +228,16 @@ export function triageRow({
  * the label stays `text-dim` so a row of tiles reads as one control strip.
  */
 export function numberTile({ label, value, sev = 'clear', big = false }) {
+  // Zero is not a warning. An amber triangle over "0 undercut" sends you to
+  // look at a page where there is nothing to do, which is the opposite of what
+  // this board is for — so a zero drops both the tone and the glyph and reads
+  // as ordinary text. The severity only applies once there is something behind
+  // the number.
+  const zero = value === 0 || value === '0';
   const s = SEV[sev];
   return `<span style="display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 2px; border: 1px solid ${C.line}; border-radius: 2px; background: ${C.panel2}; padding: 8px 10px;">
-  <span style="display: flex; align-items: center; gap: 5px; color: ${s.color};">
-    ${icon(s.glyph, big ? 18 : 16)}
+  <span style="display: flex; align-items: center; gap: 5px; color: ${zero ? C.text : s.color};">
+    ${zero ? '' : icon(s.glyph, big ? 18 : 16)}
     <span style="font-size: ${big ? 24 : 20}px; line-height: ${big ? 28 : 24}px; font-weight: 600; font-variant-numeric: tabular-nums;">${value}</span>
   </span>
   <span style="${S.microDim} overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${label}</span>
@@ -272,12 +287,24 @@ export function card({ title, meta = '', open = '', body, footer = '', touch = f
 </section>`;
 }
 
-/** The desktop left rail (`Layout.tsx`), at its real 192px width. */
-export function rail(height) {
-  const item = (label, active = false, locked = false) =>
+/**
+ * The desktop left rail (`Layout.tsx`), at its real 192px width.
+ *
+ * `alerts` adds the nav item the Notification Feed does not have today — the
+ * feed renders only inside `routes/Overview.tsx`, so it has no page of its own
+ * and no way to reach it from anywhere else in the app. Pass the unread count
+ * to draw it, `null` to leave the rail exactly as it ships now.
+ */
+export function rail(height, { alerts = null, alertsTone = C.dim, active = 'Overview' } = {}) {
+  const item = (label, active = false, locked = false, badge = null, badgeTone = C.dim) =>
     `<div style="display: flex; align-items: center; gap: 8px; border: 1px solid ${active ? C.lineBright : 'transparent'}; border-radius: 2px; padding: 8px 12px; ${MICRO} background: ${active ? C.panel2 : 'transparent'}; color: ${active ? C.accent : C.dim};">
   <span style="min-width: 0; overflow: hidden; text-overflow: ellipsis;">${label}</span>
   ${locked ? `<span style="margin-left: auto; width: 6px; height: 6px; flex-shrink: 0; border-radius: 999px; background: ${C.warning};"></span>` : ''}
+  ${
+    badge === null
+      ? ''
+      : `<span style="margin-left: auto; flex-shrink: 0; border-radius: 2px; background: ${C.panel2}; padding: 1px 5px; font-size: 10px; font-variant-numeric: tabular-nums; color: ${badgeTone};">${badge}</span>`
+  }
 </div>`;
   const group = (label) =>
     `<p style="margin: 12px 0 0; padding: 0 12px; font-size: 10px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: ${C.dim};">${label}</p>`;
@@ -287,7 +314,8 @@ export function rail(height) {
     <span style="flex: 1; ${MICRO} font-size: 12px;">Neocom Desk</span>
   </div>
   <nav style="display: flex; flex: 1; flex-direction: column; gap: 4px; overflow: hidden; padding: 8px;">
-    ${item('Overview', true)}
+    ${item('Overview', active === 'Overview')}
+    ${alerts === null ? '' : item('Alerts', active === 'Alerts', false, alerts, alertsTone)}
     ${item('Corp')}
     ${group('Progression')}
     ${item('Skills')}
