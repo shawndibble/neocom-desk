@@ -18,6 +18,7 @@ import {
   type MarketHistoryPoint,
   type PriceHistoryRange,
 } from '@/engine/market/priceHistory';
+import { usePriceHistoryRange } from './priceHistoryRangePref';
 
 /**
  * Dynamic import, not a static one: `PriceHistoryChart.tsx` statically
@@ -48,7 +49,18 @@ export function PriceHistoryPanel({ regionId, typeId, itemName, now }: PriceHist
   const { t } = useTranslation();
   const [points, setPoints] = useState<MarketHistoryPoint[] | null>(null);
   const [loading, setLoading] = useState(true);
-  const [range, setRange] = useState<PriceHistoryRange>('30d');
+  // The window a trader reads in is a habit, not a property of the item, and
+  // this panel remounts per item — so it comes from disk. Ungated on
+  // `hydrated`, and hydrated above the early returns below so a loading or
+  // empty item still settles it: `loadPriceHistory` fetches the full daily
+  // series either way and the range only slices it, so no range costs a
+  // request the default would not have spent.
+  const range = usePriceHistoryRange((state) => state.value);
+  const hydrateRange = usePriceHistoryRange((state) => state.hydrate);
+  const setRange = usePriceHistoryRange((state) => state.setValue);
+  useEffect(() => {
+    void hydrateRange();
+  }, [hydrateRange]);
   // Distinct from "no history": a thrown fetch failure (network/rate-limit/5xx)
   // is not the same fact as ESI genuinely having nothing for this item, and
   // folding the two into one EmptyState would misreport failures as data.
@@ -100,7 +112,7 @@ export function PriceHistoryPanel({ regionId, typeId, itemName, now }: PriceHist
     <RangedHistory
       points={points}
       range={range}
-      onRangeChange={setRange}
+      onRangeChange={(next) => void setRange(next)}
       itemName={itemName}
       now={now}
     />
