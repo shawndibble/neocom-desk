@@ -50,7 +50,24 @@ here — they go one per file in `docs/context/decisions/`.
   Profitability** read differ off one hub price. The deep layer under the
   per-row tooltips. Those stay short — a verdict line, the two numbers behind
   it, and what clicking does — never a panel.
+- **Calendar Map**: The `/calendar` grid, demoted from a container to a map —
+  each day cell carries its date, a count, and one dot per **Clock Kind**
+  landing on it, and nothing else. The detail lives in the **Coming Up Rail**
+  beside it. Days
+  before today are hatched and captioned rather than merely empty: ESI returns
+  calendar events from now only and the cache replaces its row wholesale, so a
+  past cell is structurally incapable of holding anything, which is a different
+  statement from "nothing on". Drawn at one of two densities — a month, or the
+  fortnight around today.
 - **Character**: One EVE Online character. The unit of login (EVE SSO) and of API data. App supports many Characters side by side from day one.
+- **Character Board Item**: One clock on the `/calendar` board, from any of six
+  sources — a calendar event, a skill-queue completion, an industry job
+  delivery, a PI extractor program end, a contract expiry or a market-order
+  expiry. The character-side counterpart of a **Corp Board Item**, and
+  deliberately the same shape: heterogeneous sources in, one deadline-ordered
+  list out, severity from time remaining alone. A source that could not be read
+  contributes nothing _and says so_; a source that read fine with nothing due
+  shows a zero — the two must never look alike.
 - **Character Not Training**: Fires when a Character's skill queue shows no
   active training (the head entry has no live `finish_date`) — whether from
   an empty queue or a stalled/alpha-incapable queue head. ESI exposes no
@@ -59,6 +76,22 @@ here — they go one per file in `docs/context/decisions/`.
   the _cause_ can never be distinguished; only this one unified symptom is
   detectable. Distinct from **Skill Level Complete**, which fires per
   finished queue entry while training continues.
+- **Clock Kind**: Which of the six sources a **Character Board Item** came
+  from. The `/calendar` page's one colour scale names this and nothing else —
+  a **nominal** palette (`--color-kind-*`, DESIGN.md §1), unlike every other
+  colour in the app, which encodes a magnitude or a status. Carried by the
+  rail's countdown and glyph, one dot per kind in the **Calendar Map**, a
+  segment in the **Day Ticker**, and a swatch in the filter menu, which is the
+  legend for the set. Never the only signal: the kind is always also named.
+- **Coming Up Rail**: The `/calendar` list beside the **Calendar Map**: every
+  **Character Board Item** the pilot can read, deadline-ordered under relative
+  day headings, each row carrying a countdown. The half of the page that
+  answers "what happens next", where the map answers "what shape is the month".
+  Scoped to one day when a map cell is selected, and otherwise unbounded ahead
+  — the board has no forward horizon, because a cap makes the map's cells past
+  it look empty for a reason that is not about the pilot's data. Map, ticker
+  and rail all read the same board, so a day cannot show a dot for something
+  the rail declines to list.
 - **Compare**: A tab that puts the Quickbar's items side by side on best sell,
   best buy, spread and volume, under the same **Location Mode** as the order
   book beside it.
@@ -101,6 +134,12 @@ here — they go one per file in `docs/context/decisions/`.
 - **Detected Accelerator** — a cerebral accelerator inferred from a base sheet
   that is over budget, by the size of the excess. Prefilled into the Booster
   control; not a separate mechanism.
+- **Day Ticker**: The **Calendar Map** on a phone — one horizontally scrolled
+  row of day columns, each with its weekday, date, a count and a bar segmented
+  by **Clock Kind**,
+  in place of a 7x6 grid that would take the width the **Coming Up Rail** needs.
+  The same day buckets the wide grid reads, sliced rather than re-bucketed, on
+  the `CorpDeadlineStrip` precedent.
 - **Deadline Strip**: The `/corp` overview's bar per local calendar day, each
   counting the Corp Board Items falling due on it and coloured by the worst
   Board Severity landing there. Exists to pay for what Kind Cards give up: four
@@ -439,9 +478,11 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   routing (e.g. "is this corp mail"), the app doesn't reimplement it.
   Distinct from a **Custom Label**: a character's own user-created EVE mail
   label, also returned by the same endpoint. Deferred in round 18; surfaced
-  as a filter chip row beneath the tab strip in round 22, then removed
-  again (see `docs/context/decisions/`, 2026-09-05) — the app does not
-  currently filter on it.
+  as its own filter chip row in round 22, then removed again (see
+  `docs/context/decisions/`, 2026-09-05) — the app does not currently filter
+  on it. The four System Labels are the Mail page's folder filter: a
+  multi-select toggle group, so any subset of them can be shown at once (see
+  `docs/context/decisions/`, 2026-09-07).
 - **Throughput** (planetary): a **second budget, independent of the Pin
   Budget** — whether the colony's links can carry the material flow and
   whether a buffer cycle fits in the Launchpad and Storage Facility. This, not

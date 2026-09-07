@@ -21,10 +21,10 @@
  * numbers.
  */
 import { useTranslation } from 'react-i18next';
-import { SEVERITY_STYLE } from '@/components/ui';
 import { useIsNarrow } from '@/lib/useIsNarrow';
 import type { DeadlineDay } from '@/engine/corp/deadlines';
-import type { CorpBoardSeverity } from '@/engine/corp/board';
+import { DEADLINE_SEVERITIES } from '@/engine/severity';
+import { SEVERITY_FILL, SEVERITY_LABEL } from '@/components/ui/severityTone';
 
 interface CorpDeadlineStripProps {
   /**
@@ -40,17 +40,6 @@ interface CorpDeadlineStripProps {
  * with in `CorpBoardRow.tsx`, as background utilities so the tokens stay the
  * single source.
  */
-const SEVERITY_FILL: Record<CorpBoardSeverity, string> = {
-  critical: 'bg-danger',
-  warning: 'bg-warning',
-  watch: 'bg-accent',
-  clear: 'bg-text-dim',
-};
-
-/* Names come from the shared ladder (`components/ui/severityTone.ts`) — this
-   strip's own copy predated the Overview board wanting the same four words. */
-
-const LEGEND_ORDER: readonly CorpBoardSeverity[] = ['critical', 'warning', 'watch', 'clear'];
 
 /**
  * How far ahead a phone looks (AC6).
@@ -92,7 +81,7 @@ export function CorpDeadlineStrip({ days: allDays }: CorpDeadlineStripProps) {
       t('corp.standing.strip.describeDay', {
         day: dayMonth.format(day.startMs),
         count: day.count,
-        severity: t(SEVERITY_STYLE[day.severity ?? 'clear'].labelKey),
+        severity: t(SEVERITY_LABEL[day.severity ?? 'clear']),
       })
     )
     .join('; ');
@@ -110,7 +99,7 @@ export function CorpDeadlineStrip({ days: allDays }: CorpDeadlineStripProps) {
           the card rows below, and this is where the bar colours get named.
         */}
         <div className="flex flex-wrap gap-x-3 gap-y-1">
-          {LEGEND_ORDER.map((severity) => (
+          {DEADLINE_SEVERITIES.map((severity) => (
             <span
               key={severity}
               className="inline-flex items-center gap-1.5 text-[0.6875rem] text-text-dim"
@@ -119,7 +108,7 @@ export function CorpDeadlineStrip({ days: allDays }: CorpDeadlineStripProps) {
                 aria-hidden="true"
                 className={`size-2 shrink-0 rounded-[1px] ${SEVERITY_FILL[severity]}`}
               />
-              {t(SEVERITY_STYLE[severity].labelKey)}
+              {t(SEVERITY_LABEL[severity])}
             </span>
           ))}
         </div>

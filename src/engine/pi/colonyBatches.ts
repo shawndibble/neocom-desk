@@ -14,7 +14,7 @@
  * Pure: no fetch/DOM/Dexie, and `nowMs` is always a parameter — the same
  * convention `colonyStatus.ts` follows.
  */
-import type { BoardSeverity } from '@/engine/severity';
+import type { DeadlineSeverity } from '@/engine/severity';
 import { colonyAttention, EXPIRING_SOON_WINDOW_MS } from './colonyStatus';
 import type { ColonyStatus } from './types';
 
@@ -52,7 +52,7 @@ export interface ColonyBatch<T> {
    * batch and must say so.
    */
   expiryMs: number | null;
-  severity: BoardSeverity;
+  severity: DeadlineSeverity;
   colonies: T[];
 }
 
@@ -67,7 +67,7 @@ function severityForRunning(
   status: ColonyStatus,
   nowMs: number,
   expiringSoonWindowMs: number
-): BoardSeverity {
+): DeadlineSeverity {
   switch (colonyAttention(status, nowMs, expiringSoonWindowMs)) {
     case 'idle':
       return 'critical';

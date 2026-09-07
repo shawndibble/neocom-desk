@@ -19,7 +19,7 @@
  * translator, and a group carries its `target` so the view can resolve one.
  */
 import type { NotificationFeedRecord } from '@/db';
-import { compareSeverity, type BoardSeverity } from '@/engine/severity';
+import { compareSeverity, type DeadlineSeverity } from '@/engine/severity';
 import { entryChannelTarget, type EntryChannelTarget } from './feedSelection';
 import { eveTypeLabel } from './eveTypeLabel';
 import { NOTIFICATION_EVENTS, type NotificationEventId } from './events';
@@ -28,7 +28,7 @@ export interface AlertTypeGroup {
   /** Stable identity for a React key and for expand/collapse state. */
   key: string;
   target: EntryChannelTarget;
-  severity: BoardSeverity;
+  severity: DeadlineSeverity;
   count: number;
   newestFiredAt: number;
   /** Every fire of this type, newest first. */
@@ -57,7 +57,7 @@ export function alertGroupKey(entry: Pick<NotificationFeedRecord, 'eventId' | 'e
  * see" is the one wrong answer. Everything here is opted *down* from watch,
  * or up.
  */
-const EVE_TYPE_SEVERITY: Readonly<Record<string, BoardSeverity>> = {
+const EVE_TYPE_SEVERITY: Readonly<Record<string, DeadlineSeverity>> = {
   // Something is being taken from you right now.
   StructureUnderAttack: 'critical',
   StructureLostShields: 'critical',
@@ -89,7 +89,7 @@ const EVE_TYPE_SEVERITY: Readonly<Record<string, BoardSeverity>> = {
   CorpAppNewMsg: 'watch',
 };
 
-const EVENT_SEVERITY: Readonly<Partial<Record<NotificationEventId, BoardSeverity>>> = {
+const EVENT_SEVERITY: Readonly<Partial<Record<NotificationEventId, DeadlineSeverity>>> = {
   // A standing fault: training stopped and nothing is replacing it.
   characterNotTraining: 'warning',
   structureFuelLow: 'warning',
@@ -111,7 +111,7 @@ const EVENT_SEVERITY: Readonly<Partial<Record<NotificationEventId, BoardSeverity
   walletBalanceChanged: 'clear',
 };
 
-export function alertSeverity(target: EntryChannelTarget): BoardSeverity {
+export function alertSeverity(target: EntryChannelTarget): DeadlineSeverity {
   return (
     (target.kind === 'eveType' ? EVE_TYPE_SEVERITY[target.type] : EVENT_SEVERITY[target.eventId]) ??
     'watch'

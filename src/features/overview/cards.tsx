@@ -8,8 +8,8 @@
  */
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import { Panel, SEVERITY_STYLE, SeverityIcon } from '@/components/ui';
-import type { BoardSeverity } from '@/engine/severity';
+import { Panel, SEVERITY_LABEL, SeverityIcon } from '@/components/ui';
+import type { DeadlineSeverity } from '@/engine/severity';
 import { formatDuration } from '@/lib/duration';
 import { formatIskCompact } from '@/lib/isk';
 import { formatAge } from '@/lib/age';
@@ -465,7 +465,7 @@ function AlertColumnRow({ group }: { group: DisplayAlertGroup }) {
  * the two border colours apart (DESIGN.md §7), and the word is shorter than
  * the tooltip explaining a dot would be.
  */
-function SeverityWord({ severity }: { severity: BoardSeverity | null }) {
+function SeverityWord({ severity }: { severity: DeadlineSeverity | null }) {
   const { t } = useTranslation();
   // Nothing at all while the card is still loading: a "Clear" verdict over a
   // footer reading "Checking…" is a claim the card cannot yet make.
@@ -473,7 +473,7 @@ function SeverityWord({ severity }: { severity: BoardSeverity | null }) {
   return (
     <span className="flex items-center gap-1 text-[0.6875rem] tracking-widest uppercase">
       <SeverityIcon severity={severity} />
-      <span className="text-text-dim">{t(SEVERITY_STYLE[severity].labelKey)}</span>
+      <span className="text-text-dim">{t(SEVERITY_LABEL[severity])}</span>
     </span>
   );
 }

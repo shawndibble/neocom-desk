@@ -30,7 +30,7 @@ import {
   FilterField,
   PageHeader,
   Panel,
-  SEVERITY_STYLE,
+  SEVERITY_LABEL,
   SearchInput,
   Select,
   SelectContent,
@@ -39,7 +39,7 @@ import {
   SelectValue,
   buttonClassName,
 } from '@/components/ui';
-import { BOARD_SEVERITIES, type BoardSeverity } from '@/engine/severity';
+import { DEADLINE_SEVERITIES, type DeadlineSeverity } from '@/engine/severity';
 import { AlertGroupRow } from '@/features/notifications/AlertGroupRow';
 import { alertGroupLabel, groupAlertsByType } from '@/features/notifications/alertGroups';
 import {
@@ -66,7 +66,7 @@ import { refreshAppBadge } from '@/features/notifications/appBadge';
  * and a chip selecting "almost everything" narrows nothing. Its rows are still
  * in the list — these chips are what you can filter *down* to.
  */
-const FILTERABLE_SEVERITIES: readonly BoardSeverity[] = BOARD_SEVERITIES.filter(
+const FILTERABLE_SEVERITIES: readonly DeadlineSeverity[] = DEADLINE_SEVERITIES.filter(
   (severity) => severity !== 'clear'
 );
 
@@ -135,7 +135,7 @@ export function Alerts() {
   const liveEntries = useMemo(() => liveGroups.flatMap((group) => group.entries), [liveGroups]);
 
   const severityCounts = useMemo(() => {
-    const counts = new Map<BoardSeverity, number>();
+    const counts = new Map<DeadlineSeverity, number>();
     for (const group of liveGroups) {
       counts.set(group.severity, (counts.get(group.severity) ?? 0) + group.count);
     }
@@ -238,13 +238,9 @@ export function Alerts() {
               </Select>
             </FilterField>
             {FILTERABLE_SEVERITIES.map((severity) => (
-              <FilterField
-                key={severity}
-                label={t(SEVERITY_STYLE[severity].labelKey)}
-                stretch={false}
-              >
+              <FilterField key={severity} label={t(SEVERITY_LABEL[severity])} stretch={false}>
                 <FilterChip
-                  label={t(SEVERITY_STYLE[severity].labelKey)}
+                  label={t(SEVERITY_LABEL[severity])}
                   count={severityCounts.get(severity) ?? 0}
                   selected={draft.severities.has(severity)}
                   onToggle={() =>

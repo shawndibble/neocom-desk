@@ -20,17 +20,7 @@ import type {
   BoardStructureSource,
 } from '@/engine/corp/board';
 import type { VitalsJournalEntry } from '@/engine/corp/vitals';
-
-/**
- * `Date.parse` of an absent or unparseable ESI timestamp, as `null` rather than
- * `NaN`. A `NaN` deadline would sort unpredictably and compare false against
- * every threshold, so it must not reach the engine at all.
- */
-function parseInstant(iso: string | undefined): number | null {
-  if (iso === undefined) return null;
-  const ms = Date.parse(iso);
-  return Number.isNaN(ms) ? null : ms;
-}
+import { parseInstant } from '@/engine/esiInstant';
 
 /**
  * A structure's display name.

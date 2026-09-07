@@ -14,13 +14,13 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import { DataAgeBadge, IconButton, SEVERITY_STYLE, SeverityIcon } from '@/components/ui';
+import { DataAgeBadge, IconButton, SEVERITY_TEXT, SeverityIcon } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
-import type { BoardSeverity } from '@/engine/severity';
+import type { DeadlineSeverity } from '@/engine/severity';
 import { cx } from '@/lib/cx';
 
 export interface SummaryStripProps {
-  deadline: { label: string; note: string; severity: BoardSeverity; to: string } | null;
+  deadline: { label: string; note: string; severity: DeadlineSeverity; to: string } | null;
   training: { label: string; note: string; to: string } | null;
   wallet: { label: string; to: string } | null;
   /**
@@ -59,7 +59,7 @@ export function SummaryStrip({
             <Value muted>{t('overview.board.noDeadline')}</Value>
           ) : (
             <Link to={deadline.to} className="min-w-0 hover:underline">
-              <Value className={`text-2xl ${SEVERITY_STYLE[deadline.severity].tone}`}>
+              <Value className={`text-2xl ${SEVERITY_TEXT[deadline.severity]}`}>
                 {deadline.label}
               </Value>
               <Note>{deadline.note}</Note>

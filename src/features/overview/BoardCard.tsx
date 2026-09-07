@@ -11,9 +11,9 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Panel, SEVERITY_STYLE, SeverityIcon } from '@/components/ui';
+import { Panel, SEVERITY_TEXT, SeverityIcon } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
-import type { BoardSeverity } from '@/engine/severity';
+import type { DeadlineSeverity } from '@/engine/severity';
 import type { AppRoutePath } from '@/app/routeScopes';
 
 export interface BoardCardProps {
@@ -83,7 +83,7 @@ export function BoardCard({
 export interface NumberTileProps {
   label: string;
   value: number | string;
-  severity: BoardSeverity;
+  severity: DeadlineSeverity;
 }
 
 /**
@@ -104,7 +104,7 @@ export function NumberTile({ label, value, severity }: NumberTileProps) {
           reads as a bullet point rather than as a severity. */}
       <span className="flex items-center gap-1.5 text-xl font-medium tabular-nums">
         {!zero && <SeverityIcon severity={severity} />}
-        <span className={zero ? 'text-text' : SEVERITY_STYLE[severity].tone}>{value}</span>
+        <span className={zero ? 'text-text' : SEVERITY_TEXT[severity]}>{value}</span>
       </span>
       <span className="text-[0.6875rem] tracking-widest text-text-dim uppercase">{label}</span>
     </span>
@@ -116,7 +116,7 @@ export function TileRow({ children }: { children: ReactNode }) {
 }
 
 export interface TriageRowProps {
-  severity: BoardSeverity;
+  severity: DeadlineSeverity;
   /** The left column: a countdown, "Ready", "Idle 6h" — whatever this row's clock says. */
   when: string;
   subject: string;
@@ -140,7 +140,7 @@ export function TriageRow({ severity, when, subject, detail, to }: TriageRowProp
         className="flex min-h-11 items-center gap-2.5 px-3 py-1.5 hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent md:min-h-9"
       >
         <span
-          className={`flex w-20 shrink-0 items-center gap-1.5 text-xs font-semibold tabular-nums ${SEVERITY_STYLE[severity].tone}`}
+          className={`flex w-20 shrink-0 items-center gap-1.5 text-xs font-semibold tabular-nums ${SEVERITY_TEXT[severity]}`}
         >
           <SeverityIcon severity={severity} />
           {when}

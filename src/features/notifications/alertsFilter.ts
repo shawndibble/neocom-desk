@@ -13,7 +13,7 @@
  *
  * Pure: no fetch/DOM/Dexie, no clock.
  */
-import type { BoardSeverity } from '@/engine/severity';
+import type { DeadlineSeverity } from '@/engine/severity';
 import type { AlertTypeGroup } from './alertGroups';
 
 /**
@@ -31,7 +31,7 @@ export interface AlertsFilter {
   /** null shows every Character on the device — what this page is for. */
   characterId: number | null;
   /** Empty means every severity. A set of all four would mean the same thing, but nothing writes that. */
-  severities: ReadonlySet<BoardSeverity>;
+  severities: ReadonlySet<DeadlineSeverity>;
   showMuted: boolean;
 }
 

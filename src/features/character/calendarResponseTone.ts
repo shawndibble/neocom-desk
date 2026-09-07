@@ -1,4 +1,4 @@
-/** Shared i18n key + color-tone lookup for an event's RSVP response, used by every Calendar view. */
+/** Shared i18n key + colour-tone lookup for an event's RSVP response, read by the Coming Up Rail's rows. */
 import type { CalendarEventSummary } from '@/esi/endpoints';
 
 export const RESPONSE_KEY: Record<CalendarEventSummary['event_response'], string> = {
@@ -13,11 +13,4 @@ export const RESPONSE_TEXT_TONE: Record<CalendarEventSummary['event_response'], 
   declined: 'text-danger',
   tentative: 'text-warning',
   not_responded: 'text-text-faint',
-};
-
-export const RESPONSE_BORDER_TONE: Record<CalendarEventSummary['event_response'], string> = {
-  accepted: 'border-success',
-  declined: 'border-danger',
-  tentative: 'border-warning',
-  not_responded: 'border-line-bright',
 };

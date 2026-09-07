@@ -11,7 +11,7 @@
  * read has not landed printing "Clear" beside a footer saying "Checking…" is
  * the same silence this board was rebuilt to remove.
  */
-import { worstSeverity, type BoardSeverity } from '@/engine/severity';
+import { worstSeverity, type DeadlineSeverity } from '@/engine/severity';
 import { isCompletingSoon, isJobDone } from '@/features/industry/jobs';
 import type { IndustryJob } from '@/esi/endpoints';
 import { openOrderProblemCounts } from '@/features/market/openOrdersModel';
@@ -25,9 +25,12 @@ import type { MiningTaxBoardData, PlanetaryBoardData } from './boardData';
  * unanswerable card to the bottom hides the one thing the reader could
  * actually fix — logging in again.
  */
-const UNREADABLE: BoardSeverity = 'warning';
+const UNREADABLE: DeadlineSeverity = 'warning';
 
-export function ordersSeverity(rows: readonly OpenOrderRow[], needsReauth: boolean): BoardSeverity {
+export function ordersSeverity(
+  rows: readonly OpenOrderRow[],
+  needsReauth: boolean
+): DeadlineSeverity {
   if (needsReauth) return UNREADABLE;
   const counts = openOrderProblemCounts(rows);
   if (counts.belowFloor > 0) return 'critical';
@@ -36,21 +39,21 @@ export function ordersSeverity(rows: readonly OpenOrderRow[], needsReauth: boole
   return counts.expiringOrStale > 0 ? 'watch' : 'clear';
 }
 
-export function miningTaxSeverity(data: MiningTaxBoardData | null): BoardSeverity | null {
+export function miningTaxSeverity(data: MiningTaxBoardData | null): DeadlineSeverity | null {
   if (data === null) return null;
   if (data.needsReauth) return UNREADABLE;
   if (data.unpaidIsk > 0) return 'warning';
   return data.unassignedCount > 0 ? 'watch' : 'clear';
 }
 
-export function planetarySeverity(data: PlanetaryBoardData | null): BoardSeverity | null {
+export function planetarySeverity(data: PlanetaryBoardData | null): DeadlineSeverity | null {
   if (data === null) return null;
   if (data.needsReauth) return UNREADABLE;
   return worstSeverity(data.batches.map((batch) => batch.severity));
 }
 
 /** A running job is never worse than `watch` — it is doing what it was told. Only a finished one waits on you. */
-export function jobSeverity(job: IndustryJob, nowMs: number): BoardSeverity {
+export function jobSeverity(job: IndustryJob, nowMs: number): DeadlineSeverity {
   return isCompletingSoon(job, nowMs) ? 'watch' : 'clear';
 }
 
@@ -58,7 +61,7 @@ export function industrySeverity(
   jobs: readonly IndustryJob[],
   needsReauth: boolean,
   nowMs: number
-): BoardSeverity {
+): DeadlineSeverity {
   if (needsReauth) return UNREADABLE;
   const severities = jobs
     .filter((job) => !isJobDone(job, nowMs))

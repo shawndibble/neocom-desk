@@ -66,7 +66,7 @@ import {
   ordersSeverity,
   planetarySeverity,
 } from '@/features/overview/boardSeverity';
-import { compareSeverity, type BoardSeverity } from '@/engine/severity';
+import { compareSeverity, type DeadlineSeverity } from '@/engine/severity';
 import { isJobDone } from '@/features/industry/jobs';
 import type { CharacterSkills, SkillQueueEntry } from '@/esi/endpoints';
 import { sortQueueEntries, selectActiveEntryFromSorted, selectQueueDepth } from './overviewQueue';
@@ -273,7 +273,7 @@ export function Overview() {
    * whichever card owns it. A fourth independent countdown here would be a
    * number the rest of the page could contradict.
    */
-  const deadlines: { at: number; note: string; severity: BoardSeverity; to: string }[] = [];
+  const deadlines: { at: number; note: string; severity: DeadlineSeverity; to: string }[] = [];
   const nextBatch = planetary?.batches.find((batch) => batch.kind === 'running');
   if (nextBatch?.expiryMs) {
     deadlines.push({

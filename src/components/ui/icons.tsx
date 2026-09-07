@@ -16,6 +16,7 @@
 
 import {
   Broadcast,
+  CalendarBlank,
   ArrowClockwise,
   ArrowCounterClockwise,
   ArrowDown,
@@ -56,6 +57,7 @@ import {
   LockKey,
   MagnifyingGlass,
   Moon,
+  PaperPlaneRight,
   Package,
   PencilSimple,
   Planet,
@@ -69,6 +71,8 @@ import {
   Stack,
   Star,
   Target,
+  Tray,
+  UsersFour,
   UsersThree,
   Wallet as WalletGlyph,
   Warning,
@@ -221,8 +225,20 @@ export const Planetary = withWeight(Planet);
 export const Extraction = withWeight(Gauge);
 /** Mail, calendar and contacts, grouped as one row. */
 export const Social = withWeight(EnvelopeSimple);
+/**
+ * The four System Label mail folders (CONTEXT.md), as the glyphs that let a
+ * mail row say which folder it is in without spending a hue on it — see
+ * `docs/context/decisions/` (Mail rows go two-line). Corp reuses
+ * `Corporation` below rather than taking a fifth glyph: it is the same
+ * organisation this app draws Buildings for everywhere else.
+ */
+export const MailInbox = withWeight(Tray);
+export const MailSent = withWeight(PaperPlaneRight);
+export const MailAlliance = withWeight(UsersFour);
 /** Jump clones and implants. */
 export const Clones = withWeight(Stack);
+/** A calendar event — the Coming Up rail's own kind. */
+export const CalendarEvent = withWeight(CalendarBlank);
 /** Contracts — courier, item exchange, auction. */
 export const Contracts = withWeight(FileText);
 /** Corporation-owned surfaces: ops board, wallet divisions, roster, corp assets. */

@@ -14,9 +14,8 @@ export function loadContracts(characterId: number): Promise<StatusResult<Contrac
   return loadPaginatedWithCacheStatus(characterId, KEY, () => getCharacterContracts(characterId));
 }
 
-/** A contract still open or being worked, as opposed to the character's full (mostly historical) contract history. */
-const ACTIVE_STATUSES = new Set<Contract['status']>(['outstanding', 'in_progress']);
-
-export function isActiveContractStatus(status: Contract['status']): boolean {
-  return ACTIVE_STATUSES.has(status);
-}
+// Re-exported rather than defined here: the predicate is pure and now lives
+// in `engine/contractStatus.ts`, so `calendarBoardSources.ts` can read it
+// without pulling this module's Dexie-backed loaders in with it. Existing
+// callers keep importing it from here.
+export { isActiveContractStatus } from '@/engine/contractStatus';

@@ -8,6 +8,7 @@ import { db } from '@/db';
 import { STALE_FETCHED_AT } from '@/esi/cacheFixtures';
 import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharacter';
 import { usePublicInfo } from '@/stores/publicInfo';
+import { DEFAULT_MAIL_FOLDERS, useMailFolders } from '@/features/character/mailFolderPref';
 import { App } from '@/app/App';
 
 vi.mock('virtual:pwa-register/react', () => ({
@@ -93,6 +94,9 @@ beforeEach(async () => {
   await db.esiCache.clear();
   useActiveCharacter.setState({ activeCharacterId: null, hydrated: false });
   usePublicInfo.setState({ byCharacterId: {} });
+  // Module-scoped store: without this the folder selection one test makes
+  // leaks into the next, and `hydrate` short-circuits on `hydrated`.
+  useMailFolders.setState({ value: DEFAULT_MAIL_FOLDERS, hydrated: false });
 
   await db.characters.put({ characterId: CHAR_ID, name: 'Pilot One', ownerHash: 'oh', addedAt: 1 });
   await db.tokens.put({
@@ -172,32 +176,115 @@ describe('Mail', () => {
     expect(screen.queryByText(/no mail cached/i)).not.toBeInTheDocument();
   });
 
-  it('shows an All/Inbox/Corp/Alliance/Sent tab bar with unread badges from /mail/labels', async () => {
+  it('shows an Inbox/Corp/Alliance/Sent toggle group, all on, with unread counts from /mail/labels', async () => {
     render(<App />);
-    const tablist = await screen.findByRole('tablist', { name: 'Mail folders' });
-    expect(tablist).toBeInTheDocument();
-    const allTab = tablist.querySelector('[data-tab-id="all"]') as HTMLElement;
-    expect(allTab).toHaveTextContent('3'); // total_unread_count
-    const corpTab = tablist.querySelector('[data-tab-id="corp"]') as HTMLElement;
-    expect(corpTab).toHaveTextContent('2');
-    const sentTab = tablist.querySelector('[data-tab-id="sent"]') as HTMLElement;
-    expect(sentTab).not.toHaveTextContent(/\d/);
+    const group = await screen.findByRole('group', { name: 'Mail folders' });
+    // No synthetic "All": every folder selected is what All used to mean.
+    expect(within(group).getAllByRole('button')).toHaveLength(4);
+    // The count reads as "2 unread" rather than a bare "2", and a folder with
+    // nothing unread carries no number at all — Sent reports zero forever, so
+    // dimming or badging it would be permanent noise.
+    for (const name of ['Inbox 1 unread', 'Corp 2 unread', 'Alliance', 'Sent']) {
+      expect(within(group).getByRole('button', { name })).toHaveAttribute('aria-pressed', 'true');
+    }
+    // The figure is still on screen for everyone else.
+    expect(within(group).getByRole('button', { name: /^Corp/ })).toHaveTextContent('2');
   });
 
-  it('filters the list to the selected tab, folding an uncategorized header into Inbox', async () => {
+  it('keeps several folders on at once, folding an uncategorized header into Inbox', async () => {
     const user = userEvent.setup();
     render(<App />);
-    await screen.findByText('Fleet up!');
-    expect(screen.getByText('Market report')).toBeInTheDocument();
+    await screen.findByText('Fleet up!'); // corp
+    expect(screen.getByText('Market report')).toBeInTheDocument(); // no labels -> inbox
 
-    const tablist = screen.getByRole('tablist', { name: 'Mail folders' });
-    await user.click(tablist.querySelector('[data-tab-id="corp"]') as HTMLElement);
+    const group = screen.getByRole('group', { name: 'Mail folders' });
+    const inbox = within(group).getByRole('button', { name: /^Inbox/ });
+
+    // Turning one folder off leaves every other folder on — the whole point of
+    // toggles over tabs.
+    await user.click(inbox);
+    expect(inbox).toHaveAttribute('aria-pressed', 'false');
     expect(screen.getByText('Fleet up!')).toBeInTheDocument();
     expect(screen.queryByText('Market report')).not.toBeInTheDocument();
 
-    await user.click(tablist.querySelector('[data-tab-id="inbox"]') as HTMLElement);
-    expect(screen.queryByText('Fleet up!')).not.toBeInTheDocument();
+    await user.click(inbox);
+    expect(inbox).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByText('Market report')).toBeInTheDocument();
+  });
+
+  it('explains an empty folder selection and offers the way back, keeping the chips on screen', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText('Fleet up!');
+    const group = screen.getByRole('group', { name: 'Mail folders' });
+    for (const chip of within(group).getAllByRole('button')) await user.click(chip);
+
+    expect(screen.getByText('No folders selected')).toBeInTheDocument();
+    expect(screen.queryByText('Fleet up!')).not.toBeInTheDocument();
+    // The controls that undo this must not vanish with the rows.
+    expect(within(group).getAllByRole('button')).toHaveLength(4);
+
+    await user.click(screen.getByRole('button', { name: 'Show all folders' }));
+    expect(await screen.findByText('Fleet up!')).toBeInTheDocument();
+  });
+
+  it('says no mail matched, not "no mail cached", when a filter empties the list', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText('Fleet up!');
+    await user.type(screen.getByRole('searchbox', { name: /search/i }), 'zzzznotamatch');
+    expect(await screen.findByText('No mail matches these filters')).toBeInTheDocument();
+    expect(screen.queryByText('No mail cached')).not.toBeInTheDocument();
+  });
+
+  it('gives a row its folder and unread state in words, not colour alone', async () => {
+    render(<App />);
+    await screen.findByText('Fleet up!');
+    // 'Fleet up!' is corp + unread; 'Market report' is inbox + read.
+    expect(screen.getByRole('button', { name: /Fleet up!.*Corp.*Unread/s })).toBeInTheDocument();
+    const read = screen.getByRole('button', { name: /Market report/s });
+    expect(read).toHaveAccessibleName(expect.stringContaining('Inbox'));
+    expect(read.textContent).not.toMatch(/Unread/);
+  });
+
+  it("shows a sent mail's recipient rather than the pilot's own name", async () => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/mail`, () =>
+        HttpResponse.json([
+          {
+            mail_id: 7,
+            from: 90000001,
+            subject: 'Contract terms',
+            timestamp: '2026-08-04T00:00:00Z',
+            is_read: true,
+            labels: [2], // Sent
+            recipients: [{ recipient_id: 90000003, recipient_type: 'character' }],
+          },
+          {
+            mail_id: 8,
+            from: 90000001,
+            subject: 'Fleet doctrine',
+            timestamp: '2026-08-05T00:00:00Z',
+            is_read: true,
+            labels: [2], // Sent
+            recipients: [
+              { recipient_id: 90000003, recipient_type: 'character' },
+              { recipient_id: 90000002, recipient_type: 'character' },
+            ],
+          },
+        ])
+      )
+    );
+    render(<App />);
+    const row = await screen.findByRole('button', { name: /Contract terms/s });
+    expect(row).toHaveTextContent('Corp Recruiter');
+    expect(row).not.toHaveTextContent('Fleet Commander');
+
+    // More than one recipient collapses to the first plus a count — a row has
+    // one line for them.
+    expect(screen.getByRole('button', { name: /Fleet doctrine/s })).toHaveTextContent(
+      'Corp Recruiter +1 more'
+    );
   });
 
   it('shows a resolved "To:" line in the reading pane', async () => {
@@ -230,7 +317,7 @@ describe('Mail', () => {
     render(<App />);
     await screen.findByText('Mail 0');
     const list = screen.getByText('Mail 0').closest('ul');
-    expect(list).toHaveClass('max-h-[32rem]', 'overflow-y-auto');
+    expect(list).toHaveClass('max-h-[36rem]', 'overflow-y-auto');
   });
 
   it('does not show a "load more" affordance when fewer than 50 mails are cached', async () => {
@@ -439,7 +526,7 @@ describe('Mail', () => {
     expect(await screen.findByText(/Mailing list/)).toBeInTheDocument();
   });
 
-  it('remembers the last-picked tab per character', async () => {
+  it('remembers the folder selection across a character switch and a reload', async () => {
     server.use(
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/mail`, () =>
         HttpResponse.json([...headers, { mail_id: 3, subject: 'Ore report', labels: [100] }])
@@ -458,26 +545,35 @@ describe('Mail', () => {
     );
 
     const user = userEvent.setup();
-    render(<App />);
-    await screen.findByText('Fleet up!');
-    const tablist = screen.getByRole('tablist', { name: 'Mail folders' });
-    await user.click(tablist.querySelector('[data-tab-id="corp"]') as HTMLElement);
-    expect(screen.queryByText('Market report')).not.toBeInTheDocument();
+    // Re-queried rather than held: the chip is a different element after a
+    // character switch and again after the remount below.
+    const sentChip = () =>
+      within(screen.getByRole('group', { name: 'Mail folders' })).getByRole('button', {
+        name: 'Sent',
+      });
 
+    const view = render(<App />);
+    await screen.findByText('Fleet up!');
+    await user.click(sentChip());
+    expect(sentChip()).toHaveAttribute('aria-pressed', 'false');
+
+    // Device-wide, not per character (`mailFolderPref.ts`): switching pilots
+    // does not hand back the folder this one just turned off.
     await act(async () => {
       await useActiveCharacter.getState().setActiveCharacter(CHAR_ID_2);
     });
     await screen.findByText('Second pilot mail');
-    expect(
-      screen.getByRole('tablist', { name: 'Mail folders' }).querySelector('[aria-selected="true"]')
-    ).toHaveAttribute('data-tab-id', 'all');
+    await waitFor(() => expect(sentChip()).toHaveAttribute('aria-pressed', 'false'));
 
-    await act(async () => {
-      await useActiveCharacter.getState().setActiveCharacter(CHAR_ID);
+    // And it is on disk, not just in memory: a fresh store hydrating from
+    // Dexie is what a real page reload does.
+    expect(await db.settings.get('mailFolders')).toMatchObject({
+      value: ['inbox', 'corp', 'alliance'],
     });
-    await screen.findByText('Fleet up!');
-    expect(
-      screen.getByRole('tablist', { name: 'Mail folders' }).querySelector('[aria-selected="true"]')
-    ).toHaveAttribute('data-tab-id', 'corp');
+    view.unmount();
+    useMailFolders.setState({ value: DEFAULT_MAIL_FOLDERS, hydrated: false });
+    render(<App />);
+    await screen.findByText('Second pilot mail');
+    await waitFor(() => expect(sentChip()).toHaveAttribute('aria-pressed', 'false'));
   });
 });

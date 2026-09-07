@@ -4,8 +4,10 @@ import {
   capHeadersForDisplay,
   mailSearchMatches,
   mergeMailHeaderPage,
+  parseMailFolders,
   resolveMailTab,
   unreadCountsByTab,
+  MAIL_FOLDERS,
 } from './mail';
 
 describe('buildLabelTabMap', () => {
@@ -183,5 +185,23 @@ describe('capHeadersForDisplay', () => {
   it('defaults to MAIL_HEADER_DISPLAY_CAP', () => {
     const headers = Array.from({ length: 10 }, (_, i) => ({ mail_id: i }));
     expect(capHeadersForDisplay(headers).truncated).toBe(false);
+  });
+});
+
+describe('MAIL_FOLDERS', () => {
+  it('lists the four System Label folders in display order', () => {
+    expect(MAIL_FOLDERS).toEqual(['inbox', 'corp', 'alliance', 'sent']);
+  });
+});
+
+describe('parseMailFolders', () => {
+  it('accepts a stored array of recognized folder names', () => {
+    expect(parseMailFolders(['inbox', 'corp', 'alliance'])).toEqual(['inbox', 'corp', 'alliance']);
+  });
+
+  it('rejects a non-array, an empty array, and an unrecognized member', () => {
+    expect(parseMailFolders('inbox')).toBeNull();
+    expect(parseMailFolders([])).toBeNull();
+    expect(parseMailFolders(['inbox', 'drafts'])).toBeNull();
   });
 });

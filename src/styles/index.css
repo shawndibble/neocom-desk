@@ -38,6 +38,20 @@
   --color-isk-pos: #4fd98a;
   --color-isk-neg: #ff8177;
 
+  /*
+   * Clock kinds — the app's one NOMINAL palette (DESIGN.md §1). Identity, not
+   * magnitude and not status: these say which part of the app a deadline came
+   * from. Every hue sits at least 20 ΔE from accent/success/warning/danger so
+   * none of them can be mistaken for a status tone, and all six clear AA on
+   * bg, panel and panel-2 because they colour countdown text, not just dots.
+   */
+  --color-kind-calendar-event: #7e9cfd;
+  --color-kind-skill-training: #d8beff;
+  --color-kind-industry-job: #e59a55;
+  --color-kind-planet-extraction: #6fdecd;
+  --color-kind-contract-expiry: #f2879f;
+  --color-kind-order-expiry: #c9d96a;
+
   /* Type — system stack approximating EVE's condensed sans */
   --font-sans: 'Segoe UI', Roboto, 'Helvetica Neue', Arial, ui-sans-serif, system-ui, sans-serif;
   --font-display: 'Segoe UI', Roboto, 'Helvetica Neue', Arial, ui-sans-serif, system-ui, sans-serif;
@@ -217,6 +231,26 @@
     -webkit-appearance: none;
     appearance: none;
     margin: 0;
+  }
+
+  /*
+   * A day the Calendar Map can never fill (`features/character/CalendarMap.tsx`).
+   *
+   * ESI's /calendar returns events from now only, so a past cell is not
+   * "empty today" — it is structurally incapable of holding anything. Dimming
+   * alone reads as "nothing on", which is the wrong conclusion and the exact
+   * one the old grid invited; a hatch reads as "not available" instead.
+   *
+   * A repeating gradient rather than an SVG or a border trick: Tailwind can
+   * express neither the 45-degree rule nor its 6px pitch, and this is one
+   * declaration against an asset request and a second file.
+   */
+  .calendar-map-past {
+    background-image: repeating-linear-gradient(
+      135deg,
+      transparent 0 6px,
+      color-mix(in srgb, var(--color-line) 55%, transparent) 6px 7px
+    );
   }
 }
 

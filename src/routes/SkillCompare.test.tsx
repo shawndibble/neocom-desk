@@ -238,11 +238,18 @@ describe('SkillCompare', () => {
         'Some characters in this comparison have been removed and are no longer shown.'
       )
     ).toBeInTheDocument();
+    // The table is awaited *before* the pressed state is read, as the tests
+    // above do. `picker()` waits only for the character buttons to exist —
+    // they arrive from a `useLiveQuery` that has nothing to do with which of
+    // them the saved comparison selected — so reading `aria-pressed`
+    // synchronously raced the selection being applied and failed under CI
+    // load. The table only renders once that selection is applied, which
+    // makes awaiting it the signal this assertion actually needs.
+    await screen.findByRole('table', { name: 'Skill comparison' });
     expect(within(await picker()).getByRole('button', { name: /Pilot One/ })).toHaveAttribute(
       'aria-pressed',
       'true'
     );
-    await screen.findByRole('table', { name: 'Skill comparison' });
   });
 
   it('shows an empty state instead of a bare table when nothing is cached for the selection', async () => {

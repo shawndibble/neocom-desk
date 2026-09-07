@@ -1,15 +1,59 @@
-import { describe, it, expect } from 'vitest';
-import { BOARD_SEVERITIES, compareSeverity, worstSeverity, type BoardSeverity } from './severity';
+import { describe, expect, it } from 'vitest';
+import {
+  DEADLINE_SEVERITIES,
+  compareSeverity,
+  severityForRemaining,
+  worstSeverity,
+  type DeadlineSeverity,
+} from './severity';
 
-describe('BOARD_SEVERITIES', () => {
-  it('is worst-first, so its index is the rank', () => {
-    expect(BOARD_SEVERITIES).toEqual(['critical', 'warning', 'watch', 'clear']);
+const HOUR = 3_600_000;
+const DAY = 86_400_000;
+
+describe('severityForRemaining', () => {
+  /**
+   * The boundaries, pinned exactly. This ladder is shared by the corp ops
+   * board and the character's Coming Up rail, and the whole reason it lives in
+   * one module is that a second copy could drift a threshold without anything
+   * going red. These four cases are that alarm.
+   */
+  it('places each threshold on the closed side of its band', () => {
+    expect(severityForRemaining(24 * HOUR)).toBe('critical');
+    expect(severityForRemaining(24 * HOUR + 1)).toBe('warning');
+    expect(severityForRemaining(3 * DAY)).toBe('warning');
+    expect(severityForRemaining(3 * DAY + 1)).toBe('watch');
+    expect(severityForRemaining(7 * DAY)).toBe('watch');
+    expect(severityForRemaining(7 * DAY + 1)).toBe('clear');
+  });
+
+  /**
+   * Overdue is the most urgent thing a board can hold, and it arrives as a
+   * negative rather than as a separate state — the caller keeps `remainingMs`
+   * unclamped so overdue items still order against each other.
+   */
+  it('treats an elapsed deadline as critical', () => {
+    expect(severityForRemaining(0)).toBe('critical');
+    expect(severityForRemaining(-1)).toBe('critical');
+    expect(severityForRemaining(-30 * DAY)).toBe('critical');
+  });
+
+  /**
+   * `null` is "there is a clock but we cannot read it" — a structure whose
+   * `fuel_expires` ESI drops once it runs dry. Not knowing is a caution, never
+   * an all-clear.
+   */
+  it('answers warning when there is no reading at all', () => {
+    expect(severityForRemaining(null)).toBe('warning');
+  });
+
+  it('orders the exported list worst-first', () => {
+    expect(DEADLINE_SEVERITIES).toEqual(['critical', 'warning', 'watch', 'clear']);
   });
 });
 
 describe('compareSeverity', () => {
   it('sorts worst first', () => {
-    const shuffled: BoardSeverity[] = ['clear', 'critical', 'watch', 'warning'];
+    const shuffled: DeadlineSeverity[] = ['clear', 'critical', 'watch', 'warning'];
     expect([...shuffled].sort(compareSeverity)).toEqual(['critical', 'warning', 'watch', 'clear']);
   });
 });
@@ -17,15 +61,13 @@ describe('compareSeverity', () => {
 describe('worstSeverity', () => {
   it('picks the worst of several', () => {
     expect(worstSeverity(['clear', 'warning', 'watch'])).toBe('warning');
-    expect(worstSeverity(['clear', 'clear'])).toBe('clear');
     expect(worstSeverity(['watch', 'critical'])).toBe('critical');
   });
 
   /*
-   * `clear`, not null: every caller here is choosing a tone for something it
-   * is already rendering, and an empty list means "nothing in it needs you"
-   * — which is exactly what `clear` says. A null would push the same decision
-   * out to every call site.
+   * `clear`, not null: every caller is choosing a tone for something it is
+   * already rendering, and an empty list means "nothing in it needs you" —
+   * which is exactly what `clear` says.
    */
   it('reads an empty list as clear', () => {
     expect(worstSeverity([])).toBe('clear');

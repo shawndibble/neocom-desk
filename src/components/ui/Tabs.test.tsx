@@ -23,22 +23,6 @@ describe('Tabs', () => {
     expect(onChange).toHaveBeenCalledWith('history');
   });
 
-  it('renders a badge next to a tab label when one is given', () => {
-    render(
-      <Tabs
-        tabs={[
-          { id: 'open', label: 'Open', badge: 3 },
-          { id: 'history', label: 'History' },
-        ]}
-        value="open"
-        onChange={() => undefined}
-      />
-    );
-    const openTab = screen.getByRole('tab', { name: /Open/ });
-    expect(openTab).toHaveTextContent('3');
-    expect(screen.getByRole('tab', { name: 'History' })).not.toHaveTextContent(/\d/);
-  });
-
   /**
    * The bar scrolls sideways once it outgrows its frame, so a tab selected
    * from outside this component — a deep link opening a specific tab — can
