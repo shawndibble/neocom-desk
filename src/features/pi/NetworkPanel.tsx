@@ -21,7 +21,7 @@
  * this panel is" paragraph moved into the title's tooltip.
  */
 import { useTranslation } from 'react-i18next';
-import { InfoTooltip, Panel } from '@/components/ui';
+import { InfoTooltip, Panel, Tooltip } from '@/components/ui';
 import { formatIsk } from '@/lib/isk';
 import type { TradeHub } from '@/market/hubs';
 import type { NetworkBlocker, NetworkPlan } from '@/engine/pi/network';
@@ -54,9 +54,6 @@ function ReachableByBuying({ plan }: { plan: NetworkPlan }) {
 /** The plan panel names no owners: it lists the set, not one pilot's card. */
 const EMPTY_OWNERS: ReadonlyMap<number, string> = new Map();
 
-/** Names shown per blocked reason before the rest collapse into "+N more". */
-const BLOCKED_NAMES_SHOWN = 5;
-
 /**
  * One bullet per blocked product reads as a wall once a hub is picked: most
  * of the schematics on a system-wide plan hit the same one or two reasons
@@ -78,10 +75,23 @@ function groupBlockers(
   return order.map((reason) => ({ reason, names: byReason.get(reason) ?? [] }));
 }
 
-function blockedNamesLabel(names: string[]): string {
-  if (names.length <= BLOCKED_NAMES_SHOWN) return names.join(', ');
-  const shown = names.slice(0, BLOCKED_NAMES_SHOWN).join(', ');
-  return `${shown} +${names.length - BLOCKED_NAMES_SHOWN} more`;
+/**
+ * The count itself, not a partial name list: "+18 more" still leaves the
+ * question of which 18. The dashed underline is the only hint this is a
+ * trigger — the tooltip carries every name in the group.
+ */
+function BlockedGroupCount({ names }: { names: string[] }) {
+  const { t } = useTranslation();
+  return (
+    <Tooltip content={names.join(', ')} openOnTap>
+      <button
+        type="button"
+        className="underline decoration-dashed decoration-text-dim underline-offset-2 hover:text-text"
+      >
+        {t('piAdvisor.networkBlockedCount', { count: names.length })}
+      </button>
+    </Tooltip>
+  );
 }
 
 export function NetworkPanel({
@@ -225,8 +235,8 @@ export function NetworkPanel({
             <ul className="space-y-0.5 text-[0.6875rem] text-text-dim">
               {groupBlockers(blockers).map(({ reason, names }) => (
                 <li key={reason}>
-                  {t('piAdvisor.networkBlocked', {
-                    name: blockedNamesLabel(names),
+                  <BlockedGroupCount names={names} />{' '}
+                  {t('piAdvisor.networkBlockedSuffix', {
                     reason: t(`piAdvisor.networkBlockedReason.${reason}`),
                   })}
                 </li>
