@@ -9,6 +9,7 @@
  */
 import type { IndustryBlueprint, QuantityEntry } from '@/engine/industry/types';
 import type { MaterialRecipe } from '@/engine/industry/makeOrBuy';
+import { MAX_SUB_BUILD_DEPTH } from '@/engine/industry/materialResolution';
 import type { CharacterBlueprint } from '@/esi/endpoints';
 import type { PiData } from '@/sde/types';
 import { toIndustryBlueprint, type BlueprintCatalog } from './blueprintCatalog';
@@ -93,27 +94,31 @@ export function recipeInputTypeIds(typeIDs: readonly number[], sources: RecipeCa
 
 /**
  * Every typeID a Build Plan's own price fetch needs: the blueprint's
- * materials, its product, and (via `recipeInputTypeIds`, applied twice) two
- * levels of their own recipe inputs. Shared by `BuildPlanDetail.tsx` (the
- * currently-open plan) and `useComparedBuildResults.ts` (issue #453 — every
- * compared plan needs this same widening against its own blueprint) so the
- * two never drift apart.
+ * materials, its product, and every recipe input reachable beneath them, at
+ * whatever depth. Shared by `BuildPlanDetail.tsx` (the currently-open plan)
+ * and `useComparedBuildResults.ts` (issue #453 — every compared plan needs
+ * this same widening against its own blueprint) so the two never drift apart.
  *
- * Two levels, not one. The first prices the materials table's own make-or-buy
- * marker — is this material worth building, given what its recipe costs in
- * inputs. Once the player acts on that and the plan expands a material into
- * its inputs (one level deep, docs/context/decisions), those inputs get the
- * same marker, and answering *that* verdict needs pricing for one level
- * further down still — an expanded row's own recipe inputs. Nothing goes
- * three levels deep: sub-builds themselves stop at one, so there is never a
- * make-or-buy question to answer beyond what two levels of widening prices.
+ * Walks the whole reachable tree rather than a fixed number of hops. A
+ * `buildHere` choice can now sit at any depth (docs/context/decisions, since
+ * the one-level cap this used to assume was lifted), and pricing each one's
+ * own recipe inputs — both for its make-or-buy marker and for the resolved
+ * cost `buildVsBuy` rolls up — needs a hub price at every level the tree
+ * actually reaches. `MAX_SUB_BUILD_DEPTH` bounds the walk purely as a safety
+ * valve against a pathological or self-referencing blueprint, matching the
+ * same bound the resolver itself uses — real recipe chains bottom out long
+ * before it.
  */
 export function buildPlanTypeIds(blueprint: IndustryBlueprint, sources: RecipeCatalog): number[] {
   const ids = new Set(blueprint.materials.map((m) => m.typeID));
   const product = blueprint.products[0];
   if (product) ids.add(product.typeID);
-  const firstLevel = recipeInputTypeIds([...ids], sources);
-  for (const id of firstLevel) ids.add(id);
-  for (const id of recipeInputTypeIds(firstLevel, sources)) ids.add(id);
+
+  let frontier = [...ids];
+  for (let depth = 0; depth < MAX_SUB_BUILD_DEPTH && frontier.length > 0; depth++) {
+    const next = recipeInputTypeIds(frontier, sources).filter((id) => !ids.has(id));
+    for (const id of next) ids.add(id);
+    frontier = next;
+  }
   return [...ids];
 }

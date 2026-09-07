@@ -669,15 +669,13 @@ describe('Industry: side-by-side Build Plan list + detail layout (#159)', () => 
     expect(detailPane).not.toHaveClass('hidden');
     expect(screen.queryByRole('button', { name: 'Back to build plans' })).not.toBeInTheDocument();
 
-    // The two panes are columns of one grid, each with its own scroller: the
-    // list's is the row list alone, so the heading and blueprint picker stay
-    // put; the detail's is `lg:`-gated so a phone doesn't nest a
-    // viewport-sized editor inside a scroll region, and is capped against
-    // the live viewport height rather than a flat constant (#237-class fix).
+    // The list pane keeps its own scroller (the row list alone, so the
+    // heading and blueprint picker stay put); the detail pane does not — it
+    // flows in normal page layout so the whole page scrolls together, with
+    // only the nav rail pinned (docs/context/decisions).
     expect(listPanel?.parentElement).toHaveClass('lg:grid-cols-[20rem_1fr]', 'lg:items-start');
     expect(screen.getByRole('list')).toHaveClass('max-h-[28rem]', 'overflow-y-auto');
-    expect(detailPane?.querySelector('div')).toHaveClass('lg:overflow-y-auto');
-    expect(detailPane?.querySelector('div')?.className).not.toMatch(/\bmax-h-/);
+    expect(detailPane?.querySelector('div')?.className ?? '').not.toMatch(/overflow-y-auto|max-h-/);
   });
 });
 describe('Industry: the plan you had open reopens', () => {

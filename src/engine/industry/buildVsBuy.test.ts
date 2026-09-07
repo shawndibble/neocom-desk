@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { buildVsBuy } from '@/engine/industry/buildVsBuy';
 import { FACILITY_PRESETS, SKILL_IDS } from '@/engine/industry/types';
 import type { IndustryBlueprint, IndustryInputs } from '@/engine/industry/types';
+import type { MaterialRecipe } from '@/engine/industry/makeOrBuy';
 
 const bp: IndustryBlueprint = {
   name: 'Widget',
@@ -299,6 +300,101 @@ describe('buildVsBuy', () => {
       expect(r.unpriceable).toBe(true);
       expect(r.recommendation).toBe('unknown');
       expect(r.profit).toBeNull();
+    });
+  });
+
+  describe('buildHere — sourcing a material by building it instead of buying it', () => {
+    const pyeriteBlueprint: IndustryBlueprint = {
+      name: 'Pyerite Reprocessing (stand-in blueprint)',
+      time: 60,
+      materials: [{ typeID: 36, quantity: 1 }], // some other mineral
+      products: [{ typeID: 35, quantity: 1 }],
+    };
+    const recipeFor =
+      (map: Record<number, MaterialRecipe>) =>
+      (typeID: number): MaterialRecipe | null =>
+        map[typeID] ?? null;
+
+    it('does nothing when buildHere/recipeFor are absent — unchanged from the baseline', () => {
+      const withExtras = buildVsBuy({
+        ...baseInputs,
+        buildHere: undefined,
+        recipeFor: undefined,
+      });
+      expect(withExtras).toEqual(buildVsBuy(baseInputs));
+    });
+
+    it('replaces a material’s market price with its rolled-up build cost, and the change reaches profit', () => {
+      const r = buildVsBuy({
+        ...baseInputs,
+        buildHere: [35],
+        recipeFor: recipeFor({
+          35: { method: 'manufacturing', blueprint: pyeriteBlueprint, me: 0 },
+        }),
+        materialPrices: { ...baseInputs.hubPrices, 36: 50 },
+      });
+      const baseline = buildVsBuy(baseInputs);
+
+      const pyerite = r.materials.find((m) => m.typeID === 35);
+      expect(pyerite?.subBuild).toBeDefined();
+      expect(pyerite?.unitPrice).toBeNull();
+      // The build choice actually moves materialCost/totalCost/profit — not a
+      // parallel number left beside an unchanged Results panel.
+      expect(r.materialCost).not.toBeCloseTo(baseline.materialCost, 0);
+      expect(r.totalCost).not.toBeCloseTo(baseline.totalCost, 0);
+      expect(r.profit).not.toBeNull();
+      expect(r.profit).not.toBeCloseTo(baseline.profit ?? 0, 0);
+    });
+
+    it('resolves profit for a material the hub does not sell at all, once it is marked to build', () => {
+      const withoutPrice = { ...baseInputs.hubPrices };
+      delete withoutPrice[35];
+      const inputsWithNoPrice = { ...baseInputs, hubPrices: withoutPrice };
+
+      const unbuilt = buildVsBuy(inputsWithNoPrice);
+      expect(unbuilt.unpriceable).toBe(true);
+      expect(unbuilt.profit).toBeNull();
+
+      const built = buildVsBuy({
+        ...inputsWithNoPrice,
+        buildHere: [35],
+        recipeFor: recipeFor({
+          35: { method: 'manufacturing', blueprint: pyeriteBlueprint, me: 0 },
+        }),
+        materialPrices: { ...inputsWithNoPrice.hubPrices, 36: 200 },
+      });
+      expect(built.unpriceable).toBe(false);
+      expect(built.profit).not.toBeNull();
+    });
+
+    it('still blocks profit when a built material bottoms out in something neither owned, priced, nor buildable', () => {
+      const r = buildVsBuy({
+        ...baseInputs,
+        buildHere: [35],
+        recipeFor: recipeFor({
+          35: { method: 'manufacturing', blueprint: pyeriteBlueprint, me: 0 },
+        }),
+        materialPrices: { 34: baseInputs.hubPrices[34] }, // 36 (Pyerite's own input) has no price anywhere
+      });
+      expect(r.unpriceable).toBe(true);
+      // The real culprit (36, Pyerite's own unpriced input), not Pyerite's own
+      // typeID standing in for it — a plan asking "what's blocking this"
+      // needs the actual leaf, however deep it sits.
+      expect(r.unpricedMaterials).toEqual([36]);
+      expect(r.profit).toBeNull();
+    });
+
+    it('leaves the job fee alone — only materialCost moves when a material is built', () => {
+      const baseline = buildVsBuy(baseInputs);
+      const r = buildVsBuy({
+        ...baseInputs,
+        buildHere: [35],
+        recipeFor: recipeFor({
+          35: { method: 'manufacturing', blueprint: pyeriteBlueprint, me: 0 },
+        }),
+      });
+      expect(r.jobFee).toEqual(baseline.jobFee);
+      expect(r.totalCost).toBeCloseTo(r.materialCost + r.jobFee.total, 6);
     });
   });
 });

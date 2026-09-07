@@ -451,25 +451,39 @@ describe('BuildPlanDetail sub-builds', () => {
     expect(within(pyerite as HTMLElement).getByText('1,250')).toBeInTheDocument();
   });
 
-  it('marks an expanded input with its own make-or-buy verdict, but offers no control for it', async () => {
-    // Pyerite has its own producer (`PYERITE_ENTRY`) and, unlike every other
-    // test here, a real hub price to judge it against — so once Tritanium's
-    // job pulls it onto the table, it should carry the same advisory glyph a
-    // plan's own material gets, without a second level of "build here".
-    loadMarketSnapshot.mockResolvedValueOnce({
-      hubPrices: { 35: 20, 36: 5 },
-      hubBuyPrices: {},
-      adjustedPrices: {},
-      systemCostIndex: 0.05,
-    });
+  it('offers the build control on an expanded input too, not just an advisory marker', async () => {
+    // Pyerite has its own producer (`PYERITE_ENTRY`): once Tritanium's job
+    // pulls it onto the table, it is exactly as buildable as anything else on
+    // the plan (docs/context/decisions, since the one-level cap was lifted).
     const user = userEvent.setup();
     render(<Harness plan={{ runs: 10 }} />);
 
     await user.click(buildButton());
-    const pyerite = (await screen.findByText('Pyerite')).closest('tr') as HTMLElement;
 
-    expect(within(pyerite).getByRole('img')).toHaveAccessibleName(/^Cheaper to (build|buy):/);
-    expect(within(pyerite).queryByRole('button', { name: /Build|Buy/ })).not.toBeInTheDocument();
+    expect(
+      await screen.findByRole('button', { name: 'Build Pyerite here instead of buying it' })
+    ).toBeInTheDocument();
+  });
+
+  it('keeps drilling down as many levels as the recipe tree actually has', async () => {
+    const user = userEvent.setup();
+    render(<Harness plan={{ runs: 10 }} />);
+
+    await user.click(buildButton());
+    await user.click(
+      await screen.findByRole('button', { name: 'Build Pyerite here instead of buying it' })
+    );
+
+    // 1250 Pyerite needed at 1 a run is 1250 runs, each eating 2 Mexallon.
+    const mexallon = (await screen.findByText('Mexallon')).closest('tr') as HTMLElement;
+    expect(within(mexallon).getByText('2,500')).toBeInTheDocument();
+    // Mexallon has no producer in this catalog, so the tree bottoms out here
+    // on its own rather than at an artificial depth limit.
+    expect(within(mexallon).queryByRole('button', { name: /Build|Buy/ })).not.toBeInTheDocument();
+
+    // Both jobs' costs are already inside the totals above — nothing here
+    // needs a second, separately-priced view of the same plan.
+    expect(screen.getByText(/Building 2 material\(s\) here, at every level/)).toBeInTheDocument();
   });
 
   it('puts the recipe inputs on the shopping list in place of what they make', async () => {
@@ -508,18 +522,6 @@ describe('BuildPlanDetail sub-builds', () => {
     await user.click(screen.getByRole('button', { name: 'Copy shopping list for multibuy' }));
 
     expect(writeText).toHaveBeenCalledWith('Tritanium\t1000');
-  });
-
-  it('never offers to expand an input a sub-build introduced — the feature is one level deep', async () => {
-    const user = userEvent.setup();
-    render(<Harness plan={{ runs: 10 }} />);
-
-    await user.click(buildButton());
-
-    // Pyerite has no producer in the catalog, but the guard that matters is
-    // that indented rows are never offered the control at all.
-    await screen.findByText('Pyerite');
-    expect(screen.queryByRole('button', { name: /Build Pyerite here/ })).toBeNull();
   });
 });
 

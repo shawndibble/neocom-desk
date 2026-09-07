@@ -45,7 +45,13 @@ import { unmaskNumber } from '@/lib/numberMask';
 import { MaterialsTable, SourcingInput } from './MaterialsTable';
 import { materialsCsvColumns } from './materialsCsv';
 import { hasShoppingList, shoppingListText } from './shoppingList';
-import { expandBuildPlan, subBuildTableRows, type MaterialTableRow } from './subBuildPlan';
+import {
+  hasSubBuilds,
+  materialTableRows,
+  shoppingListMaterials,
+  subBuildSeconds as computeSubBuildSeconds,
+  type MaterialTableRow,
+} from './subBuildPlan';
 import { formatIsk } from '@/lib/isk';
 import { bulkOwnedStockSuggestions, filterStockByScope } from '@/engine/industry/ownedStock';
 import {
@@ -330,6 +336,32 @@ export function BuildPlanDetail({
     [snapshot, plan.materialPriceBasis]
   );
 
+  /**
+   * What produces a material — general over any typeID a `buildHere` choice
+   * might reach, at any depth, not only the blueprint's own materials. Recipe
+   * lookup needs no live prices, so this is available even while the market
+   * snapshot is still loading, which is what keeps the build control present
+   * during a slow or unreachable price fetch.
+   */
+  const recipeFor = useMemo(
+    () =>
+      (typeID: number): MaterialRecipe | null =>
+        materialRecipe(typeID, { catalog, pi, ownedBlueprints }),
+    [catalog, pi, ownedBlueprints]
+  );
+
+  // The one place "can this be built here" is decided (manufacturing only,
+  // docs/context/decisions) — a future new method only needs to change this.
+  // General over depth: a recipe input introduced by one build is exactly as
+  // buildable as the plan's own materials, which is what lets a player keep
+  // drilling down as many levels as the recipe tree actually has.
+  const canBuildHere = useMemo(
+    () =>
+      (typeID: number): boolean =>
+        recipeFor(typeID)?.method === 'manufacturing',
+    [recipeFor]
+  );
+
   const { result, error } = useMemo(() => {
     if (!blueprint) return { result: null, error: t('industry.blueprintMissing') };
     return computeBuildPlan({
@@ -340,8 +372,9 @@ export function BuildPlanDetail({
       hubPrices: snapshot?.hubPrices ?? {},
       materialPrices,
       skills,
+      recipeFor,
     });
-  }, [plan, blueprint, snapshot, materialPrices, skills, t]);
+  }, [plan, blueprint, snapshot, materialPrices, skills, recipeFor, t]);
 
   /**
    * Both liquidation bases at once, so the Use-or-sell toggle switches between
@@ -360,45 +393,6 @@ export function BuildPlanDetail({
 
   const pricesReady =
     snapshot !== null && snapshot.adjustedPrices !== null && snapshot.systemCostIndex !== null;
-
-  /**
-   * What produces each material, memoized per type.
-   *
-   * Deliberately outside the `advice` memo below, which returns nothing until
-   * live prices land: a recipe's run count and input quantities need no prices
-   * at all, so gating the lookup on them would leave the "build this here"
-   * control missing whenever the market was slow or unreachable.
-   */
-  const recipes = useMemo(() => {
-    const byType = new Map<number, MaterialRecipe | null>();
-    for (const typeID of materialTypeIds) {
-      byType.set(typeID, materialRecipe(typeID, { catalog, pi, ownedBlueprints }));
-    }
-    return byType;
-  }, [materialTypeIds, catalog, pi, ownedBlueprints]);
-
-  // Built once for the blueprint's own materials, so a type outside that set —
-  // a recipe input an expansion swapped in — answers "nothing produces this".
-  // That is also what keeps the build control off indented rows.
-  const recipeFor = useMemo(
-    () =>
-      (typeID: number): MaterialRecipe | null =>
-        recipes.get(typeID) ?? null,
-    [recipes]
-  );
-
-  // The one place the *method* half of "can this be built here" is decided
-  // (manufacturing only, docs/context/decisions) — a future new method only
-  // needs to change this. The *depth* half (never on an indented row, which
-  // is what keeps the feature to one level) is each call site's own
-  // `!material.isSubInput` check, since this answers per typeID and cannot
-  // see whether a given row is one.
-  const canBuildHere = useMemo(
-    () =>
-      (typeID: number): boolean =>
-        recipeFor(typeID)?.method === 'manufacturing',
-    [recipeFor]
-  );
 
   // "Use all" fills only rows with nothing typed in them: a
   // hand-entered value, including a deliberate 0, is never clobbered by a bulk
@@ -431,12 +425,10 @@ export function BuildPlanDetail({
   );
 
   /**
-   * The pricing context every make-or-buy verdict on this plan needs — shared
-   * by `advice` and `subInputAdvice` below, so a plan's own materials and an
-   * expanded row's own inputs are always judged against identical numbers.
-   * Null until live prices land, for the same reason the results panel
-   * waits: without adjusted prices and a system cost index there is no job
-   * fee, and a fee-free quote would call almost everything worth building.
+   * The pricing context every make-or-buy verdict on this plan needs. Null
+   * until live prices land, for the same reason the results panel waits:
+   * without adjusted prices and a system cost index there is no job fee, and
+   * a fee-free quote would call almost everything worth building.
    */
   const makeOrBuyContext = useMemo(() => {
     if (!snapshot || snapshot.adjustedPrices === null || snapshot.systemCostIndex === null) {
@@ -452,92 +444,93 @@ export function BuildPlanDetail({
   }, [facilityContext, snapshot, materialPrices, skills]);
 
   /**
-   * Make-or-buy verdict per material (CONTEXT.md round 29), computed once for
-   * the table and the CSV export rather than per row render.
+   * The materials table's rows: `result.materials` is already the whole
+   * resolved tree — `buildVsBuy` applies every `buildHere` choice itself, at
+   * whatever depth (src/engine/industry/materialResolution) — so this only
+   * has to walk it into a flat, depth-tagged list. One computation, not two:
+   * before this, a separate expansion priced the table while the Results
+   * panel above priced the plan as written, and the two could disagree the
+   * moment a build was toggled (docs/context/decisions, since superseded).
    */
-  const advice = useMemo(() => {
+  const visibleMaterials = useMemo(
+    () => (result ? materialTableRows(result.materials) : []),
+    [result]
+  );
+
+  /**
+   * What the plan still has to shop for: every leaf of the resolved tree,
+   * merged by type. Feeds the shopping-list copy and the CSV export — never
+   * the table, which shows the full tree including what it's building.
+   */
+  const shoppingMaterials = useMemo(
+    () => (result ? shoppingListMaterials(result.materials) : []),
+    [result]
+  );
+
+  const anySubBuilds = useMemo(() => (result ? hasSubBuilds(result.materials) : false), [result]);
+
+  /** Wall-clock every sub-job in the tree adds before the main run can even be installed. */
+  const subBuildTimeSeconds = useMemo(
+    () => (result ? computeSubBuildSeconds(result.materials) : 0),
+    [result]
+  );
+
+  /**
+   * Make-or-buy verdict per material (CONTEXT.md round 29), computed once for
+   * the table and the CSV export rather than per row render. Covers every
+   * row regardless of depth: a recipe input a build introduced is exactly as
+   * eligible for advice — and for the build-here control itself — as one of
+   * the plan's own materials.
+   */
+  const materialAdvice = useMemo(() => {
     const verdicts = new Map<number, MakeOrBuy>();
-    if (!result || !makeOrBuyContext) return verdicts;
-    for (const material of result.materials) {
+    if (!makeOrBuyContext) return verdicts;
+    for (const material of visibleMaterials) {
       const verdict = makeOrBuy(material, recipeFor(material.typeID), makeOrBuyContext);
       if (verdict) verdicts.set(material.typeID, verdict);
     }
     return verdicts;
-  }, [result, makeOrBuyContext, recipeFor]);
+  }, [visibleMaterials, makeOrBuyContext, recipeFor]);
 
-  /**
-   * The plan with the player's chosen sub-builds applied: materials they asked
-   * to produce are replaced by what those jobs consume, merged and priced.
-   * Falls out to the plan untouched when nothing is expanded.
-   */
-  const expanded = useMemo(
-    () =>
-      expandBuildPlan({
-        materials: result?.materials ?? [],
-        buildHere: plan.buildHere ?? [],
-        recipeFor,
-        materialPrices,
-        sourcing: plan.materialSourcing,
-        ctx: {
-          ...facilityContext,
-          systemCostIndex: snapshot?.systemCostIndex ?? 0,
-          adjustedPrices: snapshot?.adjustedPrices ?? {},
-          skills,
-        },
-      }),
-    [
-      result,
-      plan.buildHere,
-      plan.materialSourcing,
-      facilityContext,
-      recipeFor,
-      snapshot,
-      materialPrices,
-      skills,
-    ]
-  );
-
-  const visibleMaterials = useMemo(
-    () => (result ? subBuildTableRows(result.materials, expanded) : []),
-    [result, expanded]
+  /** Top-level materials the player chose to build — what the sub-build footnote summarizes. */
+  const builtTopLevel = useMemo(
+    () => (result ? result.materials.filter((material) => material.subBuild !== undefined) : []),
+    [result]
   );
 
   /**
-   * Make-or-buy verdicts for the indented rows a build introduced — the same
-   * advice a plan's own materials get, computed separately from `advice`
-   * above rather than by widening `recipeFor`'s reach: that memo's whole job
-   * is to answer "nothing produces this" for a type outside the blueprint's
-   * own materials, which is what keeps the build-here control off an
-   * indented row (its doc comment). This one only ever feeds the
-   * informational marker — cart, hammer or planet, telling the player
-   * whether that recipe input is itself worth building, even though nothing
-   * here lets them act on it a second level down (docs/context/decisions).
+   * What building the chosen material(s) actually costs — the sum of exactly
+   * the `lineCost`s `result.materialCost` already added for them, so this is
+   * never a second number that could drift from the totals above. Not split
+   * into materials/fees: a nested build's own fee is folded proportionally
+   * into its parent's `lineCost` whenever the job makes more than the parent
+   * needs (EVE sizes jobs in whole runs), so a separately-summed "fees"
+   * figure could disagree with what the split inside `lineCost` actually is.
    */
-  const subInputAdvice = useMemo(() => {
-    const verdicts = new Map<number, MakeOrBuy>();
-    if (!makeOrBuyContext) return verdicts;
-    const own = new Set((result?.materials ?? []).map((material) => material.typeID));
-    for (const material of expanded.materials) {
-      if (own.has(material.typeID)) continue;
-      const recipe = materialRecipe(material.typeID, { catalog, pi, ownedBlueprints });
-      const verdict = makeOrBuy(material, recipe, makeOrBuyContext);
-      if (verdict) verdicts.set(material.typeID, verdict);
+  const subBuildTotal = useMemo(
+    () => builtTopLevel.reduce((sum, material) => sum + material.lineCost, 0),
+    [builtTopLevel]
+  );
+
+  /**
+   * What buying the built material(s) outright would have cost instead, for
+   * the footnote's comparison — priced the same way a plain (unbuilt) row on
+   * this plan is, straight off `materialPrices`/an override, no second
+   * `buildVsBuy` pass. `null` when there is nothing to compare, or when any
+   * of them genuinely isn't sold at this hub, rather than showing a number
+   * that quietly priced the unsold one as free (the bug this replaces).
+   */
+  const buyInsteadTotal = useMemo(() => {
+    if (builtTopLevel.length === 0) return null;
+    let total = 0;
+    for (const material of builtTopLevel) {
+      const price =
+        plan.materialSourcing?.[material.typeID]?.overridePrice ?? materialPrices[material.typeID];
+      if (price === undefined) return null;
+      total += material.remainingQuantity * price;
     }
-    return verdicts;
-  }, [expanded, result, makeOrBuyContext, catalog, pi, ownedBlueprints]);
-
-  /** `advice` plus `subInputAdvice`, so the table and the CSV export never disagree about which rows have a verdict. */
-  const materialAdvice = useMemo(
-    () => new Map([...advice, ...subInputAdvice]),
-    [advice, subInputAdvice]
-  );
-
-  /** Wall-clock the sub-jobs add before the main run can even be installed. */
-  const subBuildSeconds = useMemo(() => {
-    let seconds = 0;
-    for (const sub of expanded.subBuilds.values()) seconds += sub.seconds;
-    return seconds;
-  }, [expanded]);
+    return total;
+  }, [builtTopLevel, plan.materialSourcing, materialPrices]);
 
   // The copy confirmation is a flash, not a state the panel keeps. Cleared by
   // an effect rather than a `setTimeout` inside the handler so unmounting mid-
@@ -589,10 +582,7 @@ export function BuildPlanDetail({
    */
   function materialContextMenu(material: MaterialTableRow, tr: ReactElement) {
     const name = nameForType(catalog, material.typeID);
-    // Same one-level-deep rule the inline marker in `MaterialsTable` follows:
-    // never offered on a row that only exists because another build already
-    // introduced it (docs/context/decisions).
-    const buildable = !material.isSubInput && canBuildHere(material.typeID);
+    const buildable = canBuildHere(material.typeID);
     return (
       <ItemContextMenu
         typeId={material.typeID}
@@ -621,11 +611,10 @@ export function BuildPlanDetail({
   async function copyShoppingList() {
     if (!result) return;
     try {
-      // The expanded list, not the plan's own: a material being produced here
-      // is not something to order, and the recipe inputs that replaced it are.
-      await writeToClipboard(
-        shoppingListText(expanded.materials, (id) => nameForType(catalog, id))
-      );
+      // The flattened leaf list, not the plan's own: a material being
+      // produced here is not something to order, and the recipe inputs that
+      // replaced it are — however many levels down they sit.
+      await writeToClipboard(shoppingListText(shoppingMaterials, (id) => nameForType(catalog, id)));
       setCopyState('copied');
     } catch {
       setCopyState('failed');
@@ -636,7 +625,7 @@ export function BuildPlanDetail({
     if (!result) return;
     downloadCsv(
       'build-materials',
-      expanded.materials,
+      shoppingMaterials,
       materialsCsvColumns(
         t,
         (typeID) => nameForType(catalog, typeID),
@@ -1031,14 +1020,14 @@ export function BuildPlanDetail({
                       : t('industry.copyShoppingList')
                 }
                 onClick={() => void copyShoppingList()}
-                disabled={!!error || !result || !hasShoppingList(expanded.materials)}
+                disabled={!!error || !result || !hasShoppingList(shoppingMaterials)}
               />
               <IconButton
                 size="sm"
                 icon={<Icon.Download />}
                 label={t('industry.exportCsvMaterials')}
                 onClick={exportMaterialsCsv}
-                disabled={!!error || !result || expanded.materials.length === 0}
+                disabled={!!error || !result || shoppingMaterials.length === 0}
               />
               <IconButton
                 size="sm"
@@ -1088,24 +1077,27 @@ export function BuildPlanDetail({
                 onToggleBuildHere={toggleBuildHere}
               />
               {/*
-              Two totals, never one rewritten in place. The materials above are
-              what the expanded plan buys; the plan's own material cost is what
-              it would have cost to buy the lot. Showing only the new number
-              would hide the decision the player just made, and quietly
-              contradict the Results panel below — which still prices the plan
-              as written, because a sub-build changes what you shop for, not
-              what the parent job installs or sells.
+              What building the chosen material(s) actually costs — already
+              folded into the Results panel's totals below, at whatever depth
+              they were built to (docs/context/decisions, since superseded:
+              the two panels used to disagree the moment a build was
+              toggled). The "buying instead" comparison only appears when
+              every built material genuinely has a hub price to compare
+              against; silently pricing an unsold item as free was the bug
+              this replaces.
             */}
-              {expanded.subBuilds.size > 0 && (
+              {anySubBuilds && (
                 <p className="mt-3 border-t border-line pt-2 text-[0.6875rem] text-text-dim">
                   {t('industry.subBuildSummary', {
-                    count: expanded.subBuilds.size,
-                    materials: formatIsk(expanded.materialCost),
-                    fees: formatIsk(expanded.subBuildFees),
-                    total: formatIsk(expanded.materialCost + expanded.subBuildFees),
-                    planned: formatIsk(result.materialCost),
+                    count: visibleMaterials.filter((material) => material.subBuild !== undefined)
+                      .length,
+                    total: formatIsk(subBuildTotal),
                   })}{' '}
-                  {t('industry.subBuildTimeNote', { time: formatDuration(subBuildSeconds) })}
+                  {buyInsteadTotal !== null &&
+                    t('industry.subBuildSummaryComparison', {
+                      planned: formatIsk(buyInsteadTotal),
+                    })}{' '}
+                  {t('industry.subBuildTimeNote', { time: formatDuration(subBuildTimeSeconds) })}
                 </p>
               )}
             </>

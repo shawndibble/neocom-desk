@@ -1,153 +1,94 @@
 /**
- * Applies a Build Plan's chosen sub-builds to its materials: the rows the
- * player asked to build are replaced by what those jobs consume, and the
- * result is priced and sourced exactly like the plan's own materials.
+ * Turns a Build Plan's resolved materials — `buildVsBuy`'s own output, already
+ * recursive (src/engine/industry/materialResolution) — into what the UI
+ * needs: the materials table's indented rows, and the flat leaf list that is
+ * actually left to shop for.
  *
- * The plan side of `src/engine/industry/subBuild`, in the same relationship
- * `computeBuildPlan` has to `buildVsBuy` — it reads the record's fields and
- * takes the recipe lookup as a function, so nothing here knows about the
- * blueprint catalog or pi.json.
- *
- * Manufacturing only. A planetary material is left as a row to buy even when
- * the plan lists it: its inputs are grown on a colony over days, not installed
- * as a job, so swapping a market-listed commodity for planet goo would turn a
- * shopping list into something no market sells (docs/context/decisions).
+ * There is deliberately no second computation of cost here. Before this
+ * (docs/context/decisions/20260904-235527, since superseded), a plan's
+ * Results panel priced the plan as written while this module separately
+ * expanded one level of `buildHere` for the materials table alone — two
+ * numbers, one of them stale the moment a player toggled a build. Now
+ * `buildVsBuy` itself resolves every `buildHere` choice, at whatever depth,
+ * into `result.materials[].subBuild`; this module only walks that tree.
  */
 
-import type { HubPrices, MaterialCostLine, MaterialSourcingMap } from '@/engine/industry/types';
-import type { MaterialRecipe } from '@/engine/industry/makeOrBuy';
-import { materialCostLines } from '@/engine/industry/sourcing';
+import type { ResolvedMaterial } from '@/engine/industry/materialResolution';
 import {
-  mergeSubBuildMaterials,
-  planSubBuild,
-  subBuildFeeTotal,
-  type SubBuild,
-  type SubBuildContext,
-} from '@/engine/industry/subBuild';
+  resolvedSubBuildFeeTotal,
+  resolvedSubBuildSeconds,
+} from '@/engine/industry/materialResolution';
+import type { MaterialCostLine } from '@/engine/industry/types';
 
-export interface ExpandBuildPlanInput {
-  /** The plan's own cost lines, already netted against its owned stock. */
-  materials: readonly MaterialCostLine[];
-  /** Material typeIDs the player chose to build rather than buy. */
-  buildHere: readonly number[];
-  recipeFor: (typeID: number) => MaterialRecipe | null;
-  /** What a recipe input costs to buy — the plan's own material price basis. */
-  materialPrices: HubPrices;
-  sourcing: MaterialSourcingMap | undefined;
-  ctx: SubBuildContext;
-}
-
-export interface ExpandedBuildPlan {
-  /** Planned sub-jobs by the material each one produces. Empty when nothing expanded. */
-  subBuilds: Map<number, SubBuild>;
-  /** What the plan now has to acquire: unexpanded materials plus merged recipe inputs. */
-  materials: MaterialCostLine[];
-  /** Sum of those lines' costs — owned units free, unpriced ones excluded. */
-  materialCost: number;
-  /** Every sub-job's installation fee. A real cost of building rather than buying. */
-  subBuildFees: number;
-}
-
-/** One row of the materials table once sub-builds are in play. */
-export interface MaterialTableRow extends MaterialCostLine {
-  /**
-   * The job that will produce this material. Present only on a row the player
-   * chose to build: the row stays visible so the choice can be seen and undone,
-   * but it is no longer something to buy.
-   */
-  subBuild?: SubBuild;
-  /**
-   * True on a row that exists only because something above it is being built.
-   * Indented in the table — it is an input to a job, not a blueprint material.
-   */
-  isSubInput?: boolean;
+/** One row of the materials table: a resolved material plus how deep it sits in the build tree. */
+export interface MaterialTableRow extends ResolvedMaterial {
+  /** 0 for one of the plan's own materials; N for a recipe input N builds deep. */
+  depth: number;
 }
 
 /**
- * The materials table's rows: the plan's own materials in their original
- * order, each immediately followed by whatever its own sub-job introduced —
- * not every new input dumped at the bottom of the list. A player who just
- * chose to build a component wants its inputs next to it, not scrolled past
- * every other row on the plan to find them.
- *
- * An expanded material keeps its row rather than vanishing — it is still being
- * acquired, just by a job instead of a purchase, and a row that disappeared on
- * click would leave nothing to click again to undo it.
- *
- * A recipe input is listed once, not once per parent, because it is bought
- * once: three components that each consume the same fibre are one order. When
- * the plan already buys that input directly, the swapped-in units simply join
- * that existing row instead of starting an indented one. When two *built*
- * materials both consume it, the merged row is placed once, under whichever
- * of the two comes first in the plan's own order — showing it twice would
- * double-count a quantity that is already summed onto one line.
- *
- * An expanded row deliberately carries its own unmerged line rather than the
- * merged one. It is excluded from the merge — its quantity is what the job
- * produces, not something being bought — so reaching for the merged line here
- * would find nothing, or, if a later change ever let a material be both built
- * and an input to another build, would show it a quantity it is not making.
+ * Depth-first, each material immediately followed by its own recipe inputs
+ * when it is being built, before its next sibling — a player who just chose
+ * to build a component wants its inputs right under it, not scrolled past
+ * every other row on the plan to find them, and the same is true one level
+ * further down, however many levels a plan goes.
  */
-export function subBuildTableRows(
-  materials: readonly MaterialCostLine[],
-  expanded: ExpandedBuildPlan
+export function materialTableRows(
+  materials: readonly ResolvedMaterial[],
+  depth = 0
 ): MaterialTableRow[] {
-  const mergedByType = new Map(expanded.materials.map((m) => [m.typeID, m]));
-  const own = new Set(materials.map((m) => m.typeID));
-  const placed = new Set<number>();
-
   const rows: MaterialTableRow[] = [];
   for (const material of materials) {
-    const sub = expanded.subBuilds.get(material.typeID);
-    if (!sub) {
-      rows.push({ ...(mergedByType.get(material.typeID) ?? material) });
-      continue;
-    }
-    rows.push({ ...material, subBuild: sub });
-    for (const input of sub.inputs) {
-      if (own.has(input.typeID) || placed.has(input.typeID)) continue;
-      const merged = mergedByType.get(input.typeID);
-      if (!merged) continue;
-      rows.push({ ...merged, isSubInput: true });
-      placed.add(input.typeID);
-    }
+    rows.push({ ...material, depth });
+    if (material.subBuild) rows.push(...materialTableRows(material.subBuild.inputs, depth + 1));
   }
-
   return rows;
 }
 
-export function expandBuildPlan({
-  materials,
-  buildHere,
-  recipeFor,
-  materialPrices,
-  sourcing,
-  ctx,
-}: ExpandBuildPlanInput): ExpandedBuildPlan {
-  const subBuilds = new Map<number, SubBuild>();
-  const chosen = new Set(buildHere);
+/**
+ * What the plan still has to acquire on the open market: every leaf of the
+ * resolved tree that is not itself being built, merged by type — three
+ * branches that each need the same mineral are one line to order, not three.
+ * A built material never appears here itself; what it consumes does, however
+ * far down that reaches.
+ */
+export function shoppingListMaterials(materials: readonly ResolvedMaterial[]): MaterialCostLine[] {
+  const merged = new Map<number, MaterialCostLine>();
 
-  for (const material of materials) {
-    if (!chosen.has(material.typeID)) continue;
-    const recipe = recipeFor(material.typeID);
-    if (recipe?.method !== 'manufacturing') continue;
-    const sub = planSubBuild(material, recipe.blueprint, recipe.me, ctx);
-    if (sub) subBuilds.set(material.typeID, sub);
-  }
-
-  // Re-priced from scratch rather than patched: a merged input can be part
-  // bought directly and part swapped in, and only one pass over the combined
-  // quantity applies the owned-stock clamp to the total the plan really needs.
-  const merged = materialCostLines(
-    mergeSubBuildMaterials(materials, subBuilds),
-    materialPrices,
-    sourcing
-  );
-
-  return {
-    subBuilds,
-    materials: merged,
-    materialCost: merged.reduce((sum, { lineCost }) => sum + lineCost, 0),
-    subBuildFees: subBuildFeeTotal(subBuilds),
+  const visit = (list: readonly ResolvedMaterial[]) => {
+    for (const material of list) {
+      if (material.subBuild) {
+        visit(material.subBuild.inputs);
+        continue;
+      }
+      const existing = merged.get(material.typeID);
+      merged.set(
+        material.typeID,
+        existing
+          ? {
+              ...existing,
+              baseQuantity: existing.baseQuantity + material.baseQuantity,
+              quantity: existing.quantity + material.quantity,
+              ownedQuantity: existing.ownedQuantity + material.ownedQuantity,
+              remainingQuantity: existing.remainingQuantity + material.remainingQuantity,
+              lineCost: existing.lineCost + material.lineCost,
+              unpriced: existing.unpriced || material.unpriced,
+            }
+          : { ...material }
+      );
+    }
   };
+  visit(materials);
+  return [...merged.values()];
+}
+
+/** Every sub-job's own installation fee, added up across the whole resolved tree. */
+export const subBuildFeeTotal = resolvedSubBuildFeeTotal;
+
+/** Wall-clock every sub-job in the tree adds before the main run can even be installed. */
+export const subBuildSeconds = resolvedSubBuildSeconds;
+
+/** Whether any material on the plan is being built rather than bought. */
+export function hasSubBuilds(materials: readonly ResolvedMaterial[]): boolean {
+  return materials.some((material) => material.subBuild !== undefined);
 }

@@ -1,12 +1,19 @@
 import { describe, it, expect } from 'vitest';
 import { FACILITY_PRESETS } from '@/engine/industry/types';
-import type { IndustryBlueprint, MaterialCostLine } from '@/engine/industry/types';
+import type { IndustryBlueprint } from '@/engine/industry/types';
 import type { MaterialRecipe } from '@/engine/industry/makeOrBuy';
-import { materialCostLines } from '@/engine/industry/sourcing';
-import { expandBuildPlan, subBuildTableRows } from './subBuildPlan';
+import { resolveMaterial } from '@/engine/industry/materialResolution';
+import {
+  hasSubBuilds,
+  materialTableRows,
+  shoppingListMaterials,
+  subBuildFeeTotal,
+  subBuildSeconds,
+} from './subBuildPlan';
 
 const SEAL = 57478;
 const FIBRE = 57457;
+const RIVET = 57459;
 const TRITANIUM = 34;
 
 const CTX = {
@@ -25,24 +32,19 @@ const sealBlueprint: IndustryBlueprint = {
   products: [{ typeID: SEAL, quantity: 3 }],
 };
 
-const RECIPES: Record<number, MaterialRecipe> = {
-  [SEAL]: { method: 'manufacturing', blueprint: sealBlueprint, me: 0 },
+const rivetBlueprint: IndustryBlueprint = {
+  name: 'Rivet Blueprint',
+  time: 900,
+  materials: [{ typeID: FIBRE, quantity: 4 }],
+  products: [{ typeID: RIVET, quantity: 2 }],
 };
 
-/** Plan materials, built through the engine so their shape cannot drift. */
-function materials(
-  entries: readonly { typeID: number; quantity: number }[],
-  owned: Record<number, number> = {}
-): MaterialCostLine[] {
-  return materialCostLines(
-    entries.map(({ typeID, quantity }) => ({ typeID, baseQuantity: quantity, quantity })),
-    {},
-    Object.fromEntries(Object.entries(owned).map(([id, q]) => [id, { ownedQuantity: q }]))
-  );
+function recipeFor(map: Record<number, MaterialRecipe>) {
+  return (typeID: number): MaterialRecipe | null => map[typeID] ?? null;
 }
 
-function expand(
-  lines: MaterialCostLine[],
+function resolve(
+  entries: readonly { typeID: number; quantity: number }[],
   buildHere: number[],
   options: {
     recipes?: Record<number, MaterialRecipe>;
@@ -50,73 +52,153 @@ function expand(
     sourcing?: Record<number, { ownedQuantity?: number }>;
   } = {}
 ) {
-  const recipes = options.recipes ?? RECIPES;
-  return expandBuildPlan({
-    materials: lines,
-    buildHere,
-    recipeFor: (typeID) => recipes[typeID] ?? null,
-    materialPrices: options.materialPrices ?? {},
-    sourcing: options.sourcing,
-    ctx: CTX,
-  });
+  const recipes = options.recipes ?? {
+    [SEAL]: { method: 'manufacturing', blueprint: sealBlueprint, me: 0 },
+  };
+  const ownedPool = new Map<number, number>();
+  return entries.map((entry) =>
+    resolveMaterial(
+      { typeID: entry.typeID, baseQuantity: entry.quantity, quantity: entry.quantity },
+      {
+        buildHere: new Set(buildHere),
+        recipeFor: recipeFor(recipes),
+        materialPrices: options.materialPrices ?? {},
+        sourcing: options.sourcing,
+        ctx: CTX,
+        ownedPool,
+      }
+    )
+  );
 }
 
-describe('expandBuildPlan', () => {
-  it('leaves the plan exactly as it was when nothing is expanded', () => {
-    const lines = materials([{ typeID: SEAL, quantity: 150 }]);
+describe('materialTableRows', () => {
+  it('is the plain material list, at depth 0, when nothing is built', () => {
+    const resolved = resolve(
+      [
+        { typeID: SEAL, quantity: 150 },
+        { typeID: TRITANIUM, quantity: 1000 },
+      ],
+      []
+    );
 
-    const expanded = expand(lines, []);
+    const rows = materialTableRows(resolved);
 
-    expect(expanded.materials).toEqual(lines);
-    expect(expanded.subBuilds.size).toBe(0);
-    expect(expanded.subBuildFees).toBe(0);
+    expect(rows.map((r) => [r.typeID, r.depth])).toEqual([
+      [SEAL, 0],
+      [TRITANIUM, 0],
+    ]);
+    expect(rows.every((r) => !r.subBuild)).toBe(true);
   });
 
-  it('swaps an expanded material for the inputs its recipe consumes', () => {
-    const expanded = expand(materials([{ typeID: SEAL, quantity: 150 }]), [SEAL]);
+  it('follows a built material with its own recipe inputs, indented one level', () => {
+    const resolved = resolve(
+      [
+        { typeID: SEAL, quantity: 150 },
+        { typeID: TRITANIUM, quantity: 1000 },
+      ],
+      [SEAL],
+      { materialPrices: { [FIBRE]: 20 } }
+    );
 
-    // 150 seals at 3 a run is 50 runs, each eating 10 fibre.
-    expect(expanded.subBuilds.get(SEAL)?.runs).toBe(50);
-    expect(expanded.materials.map((m) => m.typeID)).toEqual([FIBRE]);
-    expect(expanded.materials[0].quantity).toBe(500);
+    const rows = materialTableRows(resolved);
+
+    expect(rows.map((r) => [r.typeID, r.depth])).toEqual([
+      [SEAL, 0],
+      [FIBRE, 1],
+      [TRITANIUM, 0],
+    ]);
+    expect(rows[0].subBuild?.runs).toBe(50);
   });
 
-  it('prices the swapped-in inputs against the hub, like any other material', () => {
-    const expanded = expand(materials([{ typeID: SEAL, quantity: 150 }]), [SEAL], {
+  it('indents a second level when a recipe input is itself built', () => {
+    const gearBlueprint: IndustryBlueprint = {
+      name: 'Gear Blueprint',
+      time: 300,
+      materials: [{ typeID: TRITANIUM, quantity: 2 }],
+      products: [{ typeID: FIBRE, quantity: 1 }],
+    };
+    const resolved = resolve([{ typeID: SEAL, quantity: 150 }], [SEAL, FIBRE], {
+      recipes: {
+        [SEAL]: { method: 'manufacturing', blueprint: sealBlueprint, me: 0 },
+        [FIBRE]: { method: 'manufacturing', blueprint: gearBlueprint, me: 0 },
+      },
+      materialPrices: { [TRITANIUM]: 5 },
+    });
+
+    const rows = materialTableRows(resolved);
+
+    expect(rows.map((r) => [r.typeID, r.depth])).toEqual([
+      [SEAL, 0],
+      [FIBRE, 1],
+      [TRITANIUM, 2],
+    ]);
+  });
+});
+
+describe('shoppingListMaterials', () => {
+  it('lists every material unchanged when nothing is built', () => {
+    const resolved = resolve(
+      [
+        { typeID: SEAL, quantity: 150 },
+        { typeID: TRITANIUM, quantity: 1000 },
+      ],
+      [],
+      { materialPrices: { [SEAL]: 1, [TRITANIUM]: 1 } }
+    );
+
+    const list = shoppingListMaterials(resolved);
+    expect(list.map((m) => m.typeID)).toEqual([SEAL, TRITANIUM]);
+  });
+
+  it('replaces a built material with what its recipe consumes', () => {
+    const resolved = resolve([{ typeID: SEAL, quantity: 150 }], [SEAL], {
       materialPrices: { [FIBRE]: 20 },
     });
 
-    expect(expanded.materials[0].lineCost).toBe(10_000);
-    expect(expanded.materialCost).toBe(10_000);
+    const list = shoppingListMaterials(resolved);
+    expect(list.map((m) => m.typeID)).toEqual([FIBRE]);
+    expect(list[0].quantity).toBe(500);
   });
 
-  it('nets a swapped-in input against stock the plan already records for it', () => {
-    const expanded = expand(materials([{ typeID: SEAL, quantity: 150 }]), [SEAL], {
-      materialPrices: { [FIBRE]: 20 },
-      sourcing: { [FIBRE]: { ownedQuantity: 200 } },
-    });
+  it('merges a recipe input shared by two different built materials into one line', () => {
+    const resolved = resolve(
+      [
+        { typeID: SEAL, quantity: 150 },
+        { typeID: RIVET, quantity: 20 },
+      ],
+      [SEAL, RIVET],
+      {
+        recipes: {
+          [SEAL]: { method: 'manufacturing', blueprint: sealBlueprint, me: 0 },
+          [RIVET]: { method: 'manufacturing', blueprint: rivetBlueprint, me: 0 },
+        },
+        materialPrices: { [FIBRE]: 20 },
+      }
+    );
 
-    expect(expanded.materials[0].remainingQuantity).toBe(300);
-    expect(expanded.materialCost).toBe(6_000);
+    const list = shoppingListMaterials(resolved);
+    // 50 seal runs x 10 fibre, plus 10 rivet runs x 4 fibre.
+    expect(list.map((m) => m.typeID)).toEqual([FIBRE]);
+    expect(list[0].quantity).toBe(540);
   });
 
-  it('sizes the sub-job against what is still needed, so owned parents are not rebuilt', () => {
-    const expanded = expand(materials([{ typeID: SEAL, quantity: 150 }], { [SEAL]: 60 }), [SEAL]);
+  it('folds a recipe input into the same material bought directly by the plan', () => {
+    const resolved = resolve(
+      [
+        { typeID: SEAL, quantity: 150 },
+        { typeID: FIBRE, quantity: 200 },
+      ],
+      [SEAL],
+      { materialPrices: { [FIBRE]: 20 } }
+    );
 
-    expect(expanded.subBuilds.get(SEAL)?.needed).toBe(90);
-    expect(expanded.subBuilds.get(SEAL)?.runs).toBe(30);
+    const list = shoppingListMaterials(resolved);
+    expect(list.map((m) => m.typeID)).toEqual([FIBRE]);
+    expect(list[0].quantity).toBe(700);
   });
 
-  it('charges the sub-job installation fee separately from the materials', () => {
-    const expanded = expand(materials([{ typeID: SEAL, quantity: 150 }]), [SEAL], {
-      materialPrices: { [FIBRE]: 20 },
-    });
-
-    expect(expanded.subBuildFees).toBe(expanded.subBuilds.get(SEAL)?.jobFee.total);
-  });
-
-  it('never expands a planetary material — a colony is not a job you can queue here', () => {
-    const expanded = expand(materials([{ typeID: SEAL, quantity: 150 }]), [SEAL], {
+  it('never lists a planetary material’s inputs — a colony is not a job you can queue', () => {
+    const resolved = resolve([{ typeID: SEAL, quantity: 150 }], [SEAL], {
       recipes: {
         [SEAL]: {
           method: 'planetary',
@@ -126,107 +208,51 @@ describe('expandBuildPlan', () => {
       },
     });
 
-    expect(expanded.subBuilds.size).toBe(0);
-    expect(expanded.materials.map((m) => m.typeID)).toEqual([SEAL]);
-  });
-
-  it('ignores a request to expand a material nothing produces', () => {
-    const expanded = expand(materials([{ typeID: TRITANIUM, quantity: 1000 }]), [TRITANIUM]);
-
-    expect(expanded.subBuilds.size).toBe(0);
-    expect(expanded.materials.map((m) => m.typeID)).toEqual([TRITANIUM]);
-  });
-
-  it('folds a recipe input into the same material bought directly by the parent plan', () => {
-    const expanded = expand(
-      materials([
-        { typeID: SEAL, quantity: 150 },
-        { typeID: FIBRE, quantity: 200 },
-      ]),
-      [SEAL]
-    );
-
-    expect(expanded.materials.map((m) => m.typeID)).toEqual([FIBRE]);
-    expect(expanded.materials[0].quantity).toBe(700);
+    const list = shoppingListMaterials(resolved);
+    expect(list.map((m) => m.typeID)).toEqual([SEAL]);
   });
 });
 
-describe('subBuildTableRows', () => {
-  it('is the plain material list when nothing is expanded', () => {
-    const lines = materials([
-      { typeID: SEAL, quantity: 150 },
-      { typeID: TRITANIUM, quantity: 1000 },
-    ]);
-
-    const rows = subBuildTableRows(lines, expand(lines, []));
-
-    expect(rows.map((r) => r.typeID)).toEqual([SEAL, TRITANIUM]);
-    expect(rows.every((r) => !r.subBuild && !r.isSubInput)).toBe(true);
+describe('subBuildFeeTotal / subBuildSeconds', () => {
+  it('is zero when nothing is built', () => {
+    const resolved = resolve([{ typeID: SEAL, quantity: 150 }], []);
+    expect(subBuildFeeTotal(resolved)).toBe(0);
+    expect(subBuildSeconds(resolved)).toBe(0);
   });
 
-  it('keeps an expanded material on screen, carrying the job that now produces it', () => {
-    const lines = materials([{ typeID: SEAL, quantity: 150 }]);
-
-    const rows = subBuildTableRows(lines, expand(lines, [SEAL]));
-
-    expect(rows[0].typeID).toBe(SEAL);
-    expect(rows[0].subBuild?.runs).toBe(50);
-  });
-
-  it('adds the recipe inputs directly under the material being built, marked as inputs', () => {
-    const lines = materials([
-      { typeID: SEAL, quantity: 150 },
-      { typeID: TRITANIUM, quantity: 1000 },
-    ]);
-
-    const rows = subBuildTableRows(lines, expand(lines, [SEAL]));
-
-    expect(rows.map((r) => r.typeID)).toEqual([SEAL, FIBRE, TRITANIUM]);
-    expect(rows[1].isSubInput).toBe(true);
-    expect(rows[1].quantity).toBe(500);
-  });
-
-  it('never indents an input the plan already buys — it joins that row instead', () => {
-    const lines = materials([
-      { typeID: SEAL, quantity: 150 },
-      { typeID: FIBRE, quantity: 200 },
-    ]);
-
-    const rows = subBuildTableRows(lines, expand(lines, [SEAL]));
-
-    expect(rows.map((r) => r.typeID)).toEqual([SEAL, FIBRE]);
-    expect(rows[1].isSubInput).toBeUndefined();
-    // 200 bought outright plus the 500 the seal job now needs.
-    expect(rows[1].quantity).toBe(700);
-  });
-
-  it('places an input two builds share once, under whichever of them comes first', () => {
-    const RIVET = 57459;
-    const rivetBlueprint: IndustryBlueprint = {
-      name: 'Rivet Blueprint',
-      time: 900,
-      materials: [{ typeID: FIBRE, quantity: 4 }],
-      products: [{ typeID: RIVET, quantity: 2 }],
+  it('adds up every level of the tree, not just the first', () => {
+    const gearBlueprint: IndustryBlueprint = {
+      name: 'Gear Blueprint',
+      time: 300,
+      materials: [{ typeID: TRITANIUM, quantity: 2 }],
+      products: [{ typeID: FIBRE, quantity: 1 }],
     };
-    const lines = materials([
-      { typeID: SEAL, quantity: 150 },
-      { typeID: RIVET, quantity: 20 },
-    ]);
+    const resolved = resolve([{ typeID: SEAL, quantity: 150 }], [SEAL, FIBRE], {
+      recipes: {
+        [SEAL]: { method: 'manufacturing', blueprint: sealBlueprint, me: 0 },
+        [FIBRE]: { method: 'manufacturing', blueprint: gearBlueprint, me: 0 },
+      },
+      materialPrices: { [TRITANIUM]: 5 },
+    });
 
-    const rows = subBuildTableRows(
-      lines,
-      expand(lines, [SEAL, RIVET], {
-        recipes: {
-          ...RECIPES,
-          [RIVET]: { method: 'manufacturing', blueprint: rivetBlueprint, me: 0 },
-        },
-      })
-    );
+    const sealFee = resolved[0].subBuild?.jobFee.total ?? 0;
+    const fibreRow = resolved[0].subBuild?.inputs.find((i) => i.typeID === FIBRE);
+    const fibreFee = fibreRow?.subBuild?.jobFee.total ?? 0;
+    expect(subBuildFeeTotal(resolved)).toBeCloseTo(sealFee + fibreFee, 6);
 
-    // 50 seal runs x 10 fibre, plus 10 rivet runs x 4 fibre — one merged row,
-    // not one under each parent.
-    expect(rows.map((r) => r.typeID)).toEqual([SEAL, FIBRE, RIVET]);
-    expect(rows[1].isSubInput).toBe(true);
-    expect(rows[1].quantity).toBe(540);
+    const sealSeconds = resolved[0].subBuild?.seconds ?? 0;
+    const fibreSeconds = fibreRow?.subBuild?.seconds ?? 0;
+    expect(subBuildSeconds(resolved)).toBeCloseTo(sealSeconds + fibreSeconds, 6);
+  });
+});
+
+describe('hasSubBuilds', () => {
+  it('is false when nothing is built and true once something is', () => {
+    expect(hasSubBuilds(resolve([{ typeID: SEAL, quantity: 150 }], []))).toBe(false);
+    expect(
+      hasSubBuilds(
+        resolve([{ typeID: SEAL, quantity: 150 }], [SEAL], { materialPrices: { [FIBRE]: 20 } })
+      )
+    ).toBe(true);
   });
 });

@@ -42,6 +42,8 @@
  */
 
 import type { EngineAsset } from '../assetTree';
+import type { MaterialRecipe } from './makeOrBuy';
+import type { ResolvedMaterial } from './materialResolution';
 
 export interface QuantityEntry {
   typeID: number;
@@ -302,6 +304,18 @@ export interface IndustryInputs {
   /** Per-material owned quantity / price override; absent = buy it all at the hub. */
   materialSourcing?: MaterialSourcingMap;
   skills: SkillLevels;
+  /**
+   * Material typeIDs the player chose to build rather than buy, at any depth
+   * — not only the blueprint's own materials. Absent = build nothing, the
+   * plan priced exactly as its own recipe lists it.
+   */
+  buildHere?: readonly number[];
+  /**
+   * What produces a material, for any typeID `buildHere` might name at any
+   * depth. Absent alongside `buildHere` — `buildVsBuy` never has to reach the
+   * blueprint catalog or pi.json itself.
+   */
+  recipeFor?: (typeID: number) => MaterialRecipe | null;
 }
 
 export interface JobFeeBreakdown {
@@ -372,13 +386,24 @@ export interface MaterialCostLine extends EffectiveMaterial {
 export type BuildRecommendation = 'build' | 'buy' | 'unknown';
 
 export interface BuildResult {
-  materials: MaterialCostLine[];
+  /**
+   * One line per blueprint material. A material in `buildHere` carries a
+   * `subBuild` (see `ResolvedMaterial`) instead of a plain hub price — its
+   * `lineCost` is then the rolled-up cost of the job that produces it,
+   * recursively, rather than a market price.
+   */
+  materials: ResolvedMaterial[];
   /** Job duration in seconds. */
   seconds: number;
   jobFee: JobFeeBreakdown;
-  /** Sum of the material line costs: owned units are free, unpriced ones excluded and flagged. */
+  /**
+   * Sum of the material line costs: owned units are free, a built material's
+   * line is its rolled-up build cost (materials + every sub-job's fee, all
+   * the way down), and a material neither owned, priced, nor built is
+   * excluded and flagged in `unpricedMaterials` instead of costed as free.
+   */
   materialCost: number;
-  /** materialCost + jobFee.total. */
+  /** materialCost + jobFee.total. Sub-job fees are already inside materialCost, via each built material's rolled-up cost — jobFee here is only this job's own. */
   totalCost: number;
   /** Cost of buying the product outright at the hub; null if unpriced. */
   buyCost: number | null;
@@ -405,7 +430,11 @@ export interface BuildResult {
    * Null only when the blueprint has no product (quantity <= 0).
    */
   breakEvenPrice: number | null;
-  /** Material typeIDs whose non-owned remainder has no override and no hub price. */
+  /**
+   * Material typeIDs whose non-owned remainder has no override and no hub
+   * price — the actual blocking leaves, at whatever depth they sit, never a
+   * built material's own typeID standing in for a descendant.
+   */
   unpricedMaterials: number[];
   /** True when any material remainder is unpriced, or the product lacks a hub price. */
   unpriceable: boolean;
