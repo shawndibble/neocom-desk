@@ -35,13 +35,12 @@ import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
 import { maxMarketOrders } from '@/engine/market/orderSlots';
 import { rememberSpSummary, getLastKnownSpSummary } from '@/stores/characterSp';
 import { loadWalletBalanceWithStatus } from '@/features/character/wallet';
-import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
+import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { formatDuration } from '@/lib/duration';
 import { formatIsk } from '@/lib/isk';
 import { CharacterHeader } from '@/features/character/CharacterHeader';
 import { OverviewSubNav } from '@/features/character/OverviewSubNav';
 import { buildOpenOrderRows } from '@/features/market/openOrdersModel';
-import { loadOpenOrdersSnapshot } from '@/features/market/openOrdersPageSnapshot';
 import { alertGroupLabel, groupAlertsByType } from '@/features/notifications/alertGroups';
 import type { DisplayAlertGroup } from '@/features/notifications/alertsFilter';
 import { readFeed, dismissFeedEntries } from '@/features/notifications/feed';
@@ -133,6 +132,22 @@ async function loadSkillsQueuePanel(characterId: number): Promise<SkillsQueuePan
   };
 }
 
+/**
+ * Deferred for the reason `boardData.ts` sets out: this route is what the app
+ * opens on, so its static imports are in the way of every first paint, and the
+ * Orders fetch layer reaches type names, corrected skills, the NPC station
+ * table, cost bases and the competition loaders for three counts.
+ *
+ * Declared at module scope, not inline, so `useRouteSnapshot` is handed one
+ * stable function — and it closes over nothing but its arguments, which is
+ * that hook's stated contract.
+ */
+function loadOrdersBoard(characterId: number, signal: RouteSnapshotSignal) {
+  return import('@/features/market/openOrdersPageSnapshot').then((m) =>
+    m.loadOpenOrdersSnapshot(characterId, signal)
+  );
+}
+
 /** The oldest of the board's own reads — a countdown is only as fresh as the fetch it was computed from. */
 function stalest(dates: readonly (Date | null | undefined)[]): Date | null {
   const known = dates.filter((date): date is Date => date instanceof Date);
@@ -153,7 +168,7 @@ export function Overview() {
   const skillsQueueSnapshot = useRouteSnapshot(loadSkillsQueuePanel, undefined, {
     cacheKey: 'overview:skill-queue',
   });
-  const ordersSnapshot = useRouteSnapshot(loadOpenOrdersSnapshot, undefined, {
+  const ordersSnapshot = useRouteSnapshot(loadOrdersBoard, undefined, {
     cacheKey: 'overview:orders',
   });
   const miningSnapshot = useRouteSnapshot(loadMiningTaxBoard, undefined, {
