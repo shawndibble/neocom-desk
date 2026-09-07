@@ -481,9 +481,41 @@ describe('BuildPlanDetail sub-builds', () => {
     // on its own rather than at an artificial depth limit.
     expect(within(mexallon).queryByRole('button', { name: /Build|Buy/ })).not.toBeInTheDocument();
 
-    // Both jobs' costs are already inside the totals above — nothing here
-    // needs a second, separately-priced view of the same plan.
-    expect(screen.getByText(/Building 2 material\(s\) here, at every level/)).toBeInTheDocument();
+    // Counted over the plan's own materials — only Tritanium is one of those.
+    // Pyerite's job is deeper down, and its cost is inside that same total.
+    expect(
+      screen.getByText(/Building 1 of this plan's own material\(s\) here/)
+    ).toBeInTheDocument();
+  });
+
+  it('lists a material once, wherever the build tree reached it', async () => {
+    const user = userEvent.setup();
+    render(<Harness plan={{ runs: 10 }} />);
+
+    await user.click(buildButton());
+    await user.click(
+      await screen.findByRole('button', { name: 'Build Pyerite here instead of buying it' })
+    );
+
+    // One row per material, whatever depth introduced it — the flat shopping
+    // list this table now is, rather than a branch of the resolved tree.
+    await screen.findByText('Mexallon');
+    for (const name of ['Tritanium', 'Pyerite', 'Mexallon']) {
+      expect(screen.getAllByText(name)).toHaveLength(1);
+    }
+  });
+
+  it('shows how to make a built material behind its own "Build it"', async () => {
+    const user = userEvent.setup();
+    render(<Harness plan={{ runs: 10 }} />);
+
+    await user.click(buildButton());
+    await user.click(await screen.findByRole('button', { name: 'Build it: Tritanium' }));
+
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText(/250 runs x 4 per run makes 1,000/)).toBeInTheDocument();
+    // The job's own ingredient quantity, which the flat row no longer nests.
+    expect(within(dialog).getByText('1,250')).toBeInTheDocument();
   });
 
   it('puts the recipe inputs on the shopping list in place of what they make', async () => {

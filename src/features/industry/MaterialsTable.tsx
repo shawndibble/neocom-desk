@@ -11,7 +11,7 @@ import { materialRowState } from './materialRow';
 import { suggestedOwnedQuantity } from '@/engine/industry/ownedStock';
 import { OwnedStockHint } from './OwnedStockHint';
 import type { OwnedStockDetection } from './ownedStockDetection';
-import type { MaterialTableRow } from './subBuildPlan';
+import { buildRecipe, type MaterialTableRow } from './subBuildPlan';
 
 interface MaterialsTableProps {
   /** Engine cost lines — already resolved against the plan's sourcing overrides and hub prices. */
@@ -37,6 +37,12 @@ interface MaterialsTableProps {
   canBuildHere?: (typeID: number) => boolean;
   /** Turns one material's sub-build on or off. Omitted alongside `canBuildHere`. */
   onToggleBuildHere?: (typeID: number) => void;
+  /**
+   * Opens the "Build it" modal for a material being built here — the runs and
+   * ingredient list this flat table no longer nests under the row. Omitted
+   * where the caller has no modal to open, which simply drops the link.
+   */
+  onShowRecipe?: (typeID: number) => void;
 }
 
 /** Blank or garbage clears the field; anything real is kept as-is (the engine clamps). */
@@ -284,6 +290,7 @@ export function MaterialsTable({
   makeOrBuy,
   canBuildHere,
   onToggleBuildHere,
+  onShowRecipe,
 }: MaterialsTableProps) {
   const { t } = useTranslation();
 
@@ -295,8 +302,8 @@ export function MaterialsTable({
         render: (material) => {
           const advice = makeOrBuy?.get(material.typeID);
           const name = nameFor(material.typeID);
-          const building = material.subBuild !== undefined;
-          // Offered at any depth: a recipe input a build introduced is
+          const building = material.subBuilds.length > 0;
+          // Offered on every row: a recipe input a build introduced is
           // exactly as buildable as the plan's own materials, which is what
           // lets a player keep drilling down as many levels as the recipe
           // tree actually has (docs/context/decisions).
@@ -315,20 +322,12 @@ export function MaterialsTable({
             ? `${actionLabel}. ${makeOrBuyLabel(advice, material.remainingQuantity, t)}`
             : undefined;
           return (
-            // Indented one step per level it sits below the plan's own
-            // materials, `1rem` a level (the same offset the single-level
-            // indent used, `pl-4` on the app's `0.25rem` spacing scale —
-            // docs/DESIGN.md §3 — kept as an inline style since the depth is
-            // unbounded and Tailwind has no class for an arbitrary multiple).
-            // The offset alone reaches a sighted reader on a wide-enough
-            // screen; the sr-only label below is what a screen reader and a
-            // narrow stacked card get instead, since neither has a column
-            // edge to measure the offset against.
-            <span
-              className="inline-flex items-center gap-1.5"
-              style={material.depth > 0 ? { paddingLeft: `${material.depth}rem` } : undefined}
-            >
-              {material.depth > 0 && <span className="sr-only">{t('industry.subBuildInput')}</span>}
+            // Flat — no indent, no depth. Every row is one material the plan
+            // needs, whether the plan's blueprint asked for it or a build
+            // deeper down did, and its quantity is the whole plan's
+            // (`subBuildPlan`). Which job introduced a quantity is the "Build
+            // it" modal's question, not a shape for this list to carry.
+            <span className="inline-flex items-center gap-1.5">
               {toggle ? (
                 // The marker slot itself is the control on a material
                 // something here can produce — hammer to start building it,
@@ -363,6 +362,35 @@ export function MaterialsTable({
                 advice && <MakeOrBuyMarker advice={advice} remaining={material.remainingQuantity} />
               )}
               {name}
+              {/*
+                Only on a row that is actually being built, and after the name
+                rather than in the icon slot before it: the slot already holds
+                the toggle that decides *whether* this is built, and this
+                answers the separate question of *how* — the runs and the
+                ingredient list the flat table no longer nests underneath.
+              */}
+              {building && onShowRecipe && (
+                <button
+                  type="button"
+                  // Named for the material it belongs to, since a column of
+                  // identical "Build it" links tells a screen-reader user
+                  // nothing about which row they are on. The visible label
+                  // leads the accessible name rather than being replaced by
+                  // it (WCAG 2.5.3), and it is an `aria-label` rather than an
+                  // `sr-only` span so the row's own name stays a single text
+                  // node for anything matching on it.
+                  aria-label={t('industry.buildRecipe.actionFor', { material: name })}
+                  // The app's inline text-action style (`OpenOrdersPanel`'s
+                  // show/hide healthy, `PublicInfoModal`'s cross-links), at
+                  // the caption size the rest of this table's secondary text
+                  // uses — not a `Button`, which is a box in a row that is
+                  // already dense with them.
+                  className="text-[0.6875rem] text-accent underline hover:text-text"
+                  onClick={() => onShowRecipe(material.typeID)}
+                >
+                  {t('industry.buildRecipe.action')}
+                </button>
+              )}
             </span>
           );
         },
@@ -431,8 +459,9 @@ export function MaterialsTable({
           // every sub-job's fee included, however deep that job's own inputs
           // go. Poisoned (a descendant neither owned, priced, nor itself
           // buildable) shows as unpriced rather than a silently wrong number.
-          if (material.subBuild) {
-            const unitCost = material.subBuild.unitCost;
+          const recipe = buildRecipe(material);
+          if (recipe) {
+            const unitCost = recipe.unitCost;
             return (
               <span className="flex flex-col items-start gap-0.5 sm:items-end">
                 <span className="tabular-nums">
@@ -516,23 +545,21 @@ export function MaterialsTable({
         align: 'right',
         className: 'tabular-nums',
         render: (material) => {
-          // The rolled-up cost of building this material — materials plus
-          // every sub-job's fee, at whatever depth — is a real number now,
-          // not a placeholder: this is exactly what the row's own build
-          // choice changed, and it is already inside the plan's totals.
-          // Runs stays alongside it since the per-run yield and spare units
-          // it implies are already recoverable from the runs count and the
-          // indented inputs below, so a second line spelling them out is more
-          // to read without being more to know.
-          if (material.subBuild) {
-            const { runs } = material.subBuild;
+          // A built row deliberately puts no purchase total in this column.
+          // What building it costs is its ingredients, and now that the table
+          // is flat those ingredients have their own rows in this same list —
+          // a rolled-up total here would be added twice by anyone reading
+          // down the column. The per-unit build cost is still in the price
+          // cell beside it (a rate, not a summand), and the installation fee
+          // is the one figure the ingredient rows do *not* already carry, so
+          // that is what goes here under the runs count.
+          const recipe = buildRecipe(material);
+          if (recipe) {
             return (
               <span className="flex flex-col items-start sm:items-end">
-                <span>
-                  {material.unpriced ? t('common.unknown') : formatIsk(material.lineCost)}
-                </span>
+                <span>{t('industry.subBuildRuns', { runs: recipe.runs.toLocaleString() })}</span>
                 <span className="text-[0.6875rem] whitespace-nowrap text-text-dim">
-                  {t('industry.subBuildRuns', { runs: runs.toLocaleString() })}
+                  {t('industry.subBuildJobFees', { fees: formatIsk(recipe.jobFees) })}
                 </span>
               </span>
             );
@@ -575,6 +602,7 @@ export function MaterialsTable({
       makeOrBuy,
       canBuildHere,
       onToggleBuildHere,
+      onShowRecipe,
     ]
   );
 

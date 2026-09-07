@@ -25,9 +25,9 @@ import { MaterialsTable } from './MaterialsTable';
 import type { MaterialTableRow } from './subBuildPlan';
 import type { OwnedStockDetection } from './ownedStockDetection';
 
-/** `MaterialsTable` needs a `depth` on every row; the table's own top-level rows are always depth 0. */
-function withDepth(materials: readonly MaterialCostLine[], depth = 0): MaterialTableRow[] {
-  return materials.map((material) => ({ ...material, depth }));
+/** `MaterialsTable` rows carry the jobs producing them; a plain cost line has none. */
+function asRows(materials: readonly MaterialCostLine[]): MaterialTableRow[] {
+  return materials.map((material) => ({ ...material, subBuilds: [] }));
 }
 
 // The row menu's PI action reads `pi.json` for itself; the real payload keeps
@@ -75,7 +75,7 @@ function Harness({
   const [sourcing, setSourcing] = useState<MaterialSourcingMap | undefined>(initial);
   return (
     <MaterialsTable
-      materials={withDepth(materialCostLines(MATERIALS, hubPrices, sourcing))}
+      materials={asRows(materialCostLines(MATERIALS, hubPrices, sourcing))}
       nameFor={nameFor}
       sourcing={sourcing}
       pricesReady={pricesReady}
@@ -467,7 +467,7 @@ const MENU_MATERIALS: readonly EffectiveMaterial[] = [
   { typeID: 34, baseQuantity: 100, quantity: 100 },
   { typeID: 9840, baseQuantity: 10, quantity: 10 },
 ];
-const MENU_LINES: readonly MaterialTableRow[] = withDepth(
+const MENU_LINES: readonly MaterialTableRow[] = asRows(
   materialCostLines(MENU_MATERIALS, { 34: 10 })
 );
 
@@ -865,7 +865,7 @@ describe('MaterialsTable make-or-buy marker', () => {
 
   it('drops the savings clause from a fully owned row — nothing is riding on it', () => {
     renderTable({
-      materials: withDepth(
+      materials: asRows(
         materialCostLines(MENU_MATERIALS, { 34: 10 }, { 9840: { ownedQuantity: 10 } })
       ),
       ...advise({ ...buildIt, savings: 0 }),
@@ -931,22 +931,20 @@ describe('MaterialsTable build-here control', () => {
     skills: {},
   };
 
-  /** A real resolved job, so the row renders the numbers the engine would give it. */
+  /** A real resolved job, flattened the way `materialTableRows` hands rows to the table. */
   function buildParts(line: MaterialTableRow): MaterialTableRow {
-    return {
-      ...resolveMaterial(
-        { typeID: line.typeID, baseQuantity: line.baseQuantity, quantity: line.quantity },
-        {
-          buildHere: new Set([9840]),
-          recipeFor: (typeID) =>
-            typeID === 9840 ? { method: 'manufacturing', blueprint: PARTS_BLUEPRINT, me: 0 } : null,
-          materialPrices: { 35: 10 },
-          sourcing: undefined,
-          ctx: RESOLVE_CTX,
-        }
-      ),
-      depth: line.depth,
-    };
+    const { subBuild, ...resolved } = resolveMaterial(
+      { typeID: line.typeID, baseQuantity: line.baseQuantity, quantity: line.quantity },
+      {
+        buildHere: new Set([9840]),
+        recipeFor: (typeID) =>
+          typeID === 9840 ? { method: 'manufacturing', blueprint: PARTS_BLUEPRINT, me: 0 } : null,
+        materialPrices: { 35: 10 },
+        sourcing: undefined,
+        ctx: RESOLVE_CTX,
+      }
+    );
+    return { ...resolved, subBuilds: subBuild ? [subBuild] : [] };
   }
 
   const buildable = (typeID: number) => typeID === 9840;
@@ -1055,44 +1053,67 @@ describe('MaterialsTable build-here control', () => {
     expect(tooltip).toHaveTextContent(/Worth 70 across the 10 units still to buy/);
   });
 
-  it('replaces a built material’s price with the job that produces it', () => {
+  it('replaces a built material’s price with what the job costs a unit', () => {
     renderTable({ materials: building(), canBuildHere: buildable, onToggleBuildHere: vi.fn() });
     const built = row('Mechanical Parts');
 
     // 10 needed at 4 a run is 3 runs; the per-run yield and spare units that
-    // implies are recoverable from the runs count and the indented inputs
-    // below, so they no longer get a line of their own.
+    // implies are recoverable from the runs count and the material's own row
+    // in the flat list, so they no longer get a line of their own.
     expect(within(built).getByText('3 runs')).toBeInTheDocument();
     expect(within(built).queryByText(/per run/)).not.toBeInTheDocument();
     expect(within(built).queryByText(/spare/)).not.toBeInTheDocument();
     expect(within(built).getByText('Built')).toBeInTheDocument();
-    // Nothing to price: the cost is the inputs below plus the job fee.
+    // Nothing to price: the cost is its inputs' own rows plus the job fee.
     expect(within(built).queryByLabelText(/^Price for/)).toBeNull();
   });
 
-  it('offers the build control at any depth, indented to show it is a recipe input', () => {
+  it('puts the job fee, not a purchase total, in a built row’s line total', () => {
+    renderTable({ materials: building(), canBuildHere: buildable, onToggleBuildHere: vi.fn() });
+
+    // The ingredients have rows of their own in this same flat list, so a
+    // rolled-up total here would be counted twice by anyone reading down the
+    // column. The fee is the one figure those rows do not already carry.
+    expect(within(row('Mechanical Parts')).getByText(/in fees$/)).toBeInTheDocument();
+  });
+
+  it('offers the build control on every row — nothing is indented as a sub-input', () => {
     const rows = [
       ...MENU_LINES,
-      {
-        ...materialCostLines([{ typeID: 35, baseQuantity: 15, quantity: 15 }], {})[0],
-        depth: 1,
-      },
+      ...asRows(materialCostLines([{ typeID: 35, baseQuantity: 15, quantity: 15 }], {})),
     ];
     renderTable({ materials: rows, canBuildHere: () => true, onToggleBuildHere: vi.fn() });
 
-    // The plan's own two materials, plus the indented input one level down —
-    // a recipe input a build introduced is exactly as buildable as anything
-    // else on the plan (docs/context/decisions).
+    // A recipe input a build introduced is exactly as buildable as anything
+    // else on the plan (docs/context/decisions), and reads as an ordinary
+    // row: the flat list has no depth left to show.
     expect(screen.getAllByRole('button', { name: /here instead of buying it$/ })).toHaveLength(3);
     const pyeriteControl = within(row('Pyerite')).getByRole('button', {
       name: 'Build Pyerite here instead of buying it',
     });
-    expect(pyeriteControl).toBeInTheDocument();
-    expect(pyeriteControl.closest('span')?.style.paddingLeft).toBe('1rem');
-    // The indent alone reaches a sighted reader on a wide-enough screen; a
-    // screen reader and a narrow stacked card get this instead.
-    expect(within(row('Pyerite')).getByText('input to a material being built here')).toHaveClass(
-      'sr-only'
+    expect(pyeriteControl.closest('span')?.style.paddingLeft).toBe('');
+    expect(screen.queryByText(/input to a material being built here/)).toBeNull();
+  });
+
+  it('links a built row to its recipe, and only a built row', () => {
+    const onShowRecipe = vi.fn();
+    renderTable({
+      materials: building(),
+      canBuildHere: buildable,
+      onToggleBuildHere: vi.fn(),
+      onShowRecipe,
+    });
+
+    expect(within(row('Tritanium')).queryByRole('button', { name: /Build it/ })).toBeNull();
+    fireEvent.click(
+      within(row('Mechanical Parts')).getByRole('button', { name: 'Build it: Mechanical Parts' })
     );
+    expect(onShowRecipe).toHaveBeenCalledWith(9840);
+  });
+
+  it('drops the link when the caller has no recipe modal to open', () => {
+    renderTable({ materials: building(), canBuildHere: buildable, onToggleBuildHere: vi.fn() });
+
+    expect(screen.queryByRole('button', { name: /Build it/ })).toBeNull();
   });
 });

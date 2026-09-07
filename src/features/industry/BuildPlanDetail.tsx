@@ -43,9 +43,11 @@ import { downloadCsv } from '@/lib/downloadCsv';
 import { writeToClipboard } from '@/lib/clipboard';
 import { unmaskNumber } from '@/lib/numberMask';
 import { MaterialsTable, SourcingInput } from './MaterialsTable';
+import { BuildRecipeModal } from './BuildRecipeModal';
 import { materialsCsvColumns } from './materialsCsv';
 import { hasShoppingList, shoppingListText } from './shoppingList';
 import {
+  buildRecipe,
   hasSubBuilds,
   materialTableRows,
   shoppingListMaterials,
@@ -447,7 +449,7 @@ export function BuildPlanDetail({
    * The materials table's rows: `result.materials` is already the whole
    * resolved tree — `buildVsBuy` applies every `buildHere` choice itself, at
    * whatever depth (src/engine/industry/materialResolution) — so this only
-   * has to walk it into a flat, depth-tagged list. One computation, not two:
+   * has to flatten it to one row per material. One computation, not two:
    * before this, a separate expansion priced the table while the Results
    * panel above priced the plan as written, and the two could disagree the
    * moment a build was toggled (docs/context/decisions, since superseded).
@@ -456,6 +458,20 @@ export function BuildPlanDetail({
     () => (result ? materialTableRows(result.materials) : []),
     [result]
   );
+
+  /**
+   * The recipe behind whichever built row's "Build it" is open — the runs and
+   * ingredient list the flat table no longer nests (`subBuildPlan`). Held as
+   * a typeID rather than the recipe itself so a re-priced or re-toggled plan
+   * refreshes what the modal shows instead of freezing the numbers it opened
+   * with; a typeID that is no longer built simply resolves to `null`, which
+   * is also how the modal closes when its row stops being built underneath it.
+   */
+  const [recipeTypeId, setRecipeTypeId] = useState<number | null>(null);
+  const openRecipe = useMemo(() => {
+    const row = visibleMaterials.find((material) => material.typeID === recipeTypeId);
+    return row ? buildRecipe(row) : null;
+  }, [visibleMaterials, recipeTypeId]);
 
   /**
    * What the plan still has to shop for: every leaf of the resolved tree,
@@ -592,7 +608,7 @@ export function BuildPlanDetail({
         quickbarAvailable={quickbarAvailable}
         onShowInfo={onShowInfo}
         onToggleBuildHere={buildable ? () => toggleBuildHere(material.typeID) : undefined}
-        buildingHere={material.subBuild !== undefined}
+        buildingHere={material.subBuilds.length > 0}
       >
         {tr}
       </ItemContextMenu>
@@ -1075,6 +1091,13 @@ export function BuildPlanDetail({
                 makeOrBuy={materialAdvice}
                 canBuildHere={canBuildHere}
                 onToggleBuildHere={toggleBuildHere}
+                onShowRecipe={setRecipeTypeId}
+              />
+              <BuildRecipeModal
+                recipe={openRecipe}
+                onClose={() => setRecipeTypeId(null)}
+                nameFor={(typeID) => nameForType(catalog, typeID)}
+                onOpenRecipe={setRecipeTypeId}
               />
               {/*
               What building the chosen material(s) actually costs — already
@@ -1088,9 +1111,16 @@ export function BuildPlanDetail({
             */}
               {anySubBuilds && (
                 <p className="mt-3 border-t border-line pt-2 text-[0.6875rem] text-text-dim">
+                  {/*
+                    Counted over the plan's own materials, not over every
+                    built row in the flat table: `subBuildTotal` and the
+                    "buying them instead" comparison beside it are both
+                    top-level sums, and a count of a different set in the same
+                    sentence reads as a count of those. What the deeper jobs
+                    cost is inside the total already.
+                  */}
                   {t('industry.subBuildSummary', {
-                    count: visibleMaterials.filter((material) => material.subBuild !== undefined)
-                      .length,
+                    count: builtTopLevel.length,
                     total: formatIsk(subBuildTotal),
                   })}{' '}
                   {buyInsteadTotal !== null &&
