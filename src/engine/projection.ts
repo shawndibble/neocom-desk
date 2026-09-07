@@ -70,15 +70,29 @@ import {
 const ROMAN = ['I', 'II', 'III', 'IV', 'V'] as const;
 const romanLevel = (level: number): string => ROMAN[level - 1] ?? String(level);
 
-export type ProjectableEventId =
-  | 'skillLevelComplete'
-  | 'characterNotTraining'
-  | 'industryJobComplete'
-  | 'planetaryExtractionDone'
-  | 'planetaryExtractorExpiring'
-  | 'calendarEventStarting'
-  | 'structureFuelLow'
-  | 'eveNotification';
+/**
+ * Every Notification Event a Projection can be built for — the ones whose
+ * occurrence has a knowable future timestamp, so the backend can schedule the
+ * push ahead of time and the alert arrives with the app closed. Everything
+ * else is only observable by polling, which needs the app open.
+ *
+ * The union below is derived from this array rather than written twice: it is
+ * the list Settings reads to mark which rows are genuinely push-delivered
+ * (`NotificationsPanel.tsx`), and a second hand-maintained copy is exactly the
+ * kind of drift that would put that badge on a row that cannot honour it.
+ */
+export const PROJECTABLE_EVENT_IDS = [
+  'skillLevelComplete',
+  'characterNotTraining',
+  'industryJobComplete',
+  'planetaryExtractionDone',
+  'planetaryExtractorExpiring',
+  'calendarEventStarting',
+  'structureFuelLow',
+  'eveNotification',
+] as const;
+
+export type ProjectableEventId = (typeof PROJECTABLE_EVENT_IDS)[number];
 
 export type ProjectionWording = 'assert' | 'hedge';
 

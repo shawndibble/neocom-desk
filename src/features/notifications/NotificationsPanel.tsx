@@ -40,6 +40,8 @@ import {
   SelectValue,
 } from '@/components/ui';
 import { SelectionCheckbox } from '@/features/character/SelectionCheckbox';
+import { ScheduledPush, ICON_SIZE } from '@/components/ui/icons';
+import { PROJECTABLE_EVENT_IDS } from '@/engine/projection';
 import { db } from '@/db';
 import {
   NOTIFICATION_EVENTS,
@@ -104,6 +106,23 @@ const EVENT_BY_ID = new Map(NOTIFICATION_EVENTS.map((event) => [event.id, event]
  * used to read "App" and "List", neither of which said what it delivered.
  */
 const CHANNEL_COLUMNS = 'grid shrink-0 grid-cols-[4.25rem_4.25rem] justify-items-center';
+
+/**
+ * Events whose whole row is delivered by Scheduled Push — the ones that carry
+ * the badge saying so.
+ *
+ * `PROJECTABLE_EVENT_IDS` is the projection engine's own list and the right
+ * source of truth, but `eveNotification` is on it for one sub-case only: a
+ * structure's reinforcement *exit* has a knowable future instant, and the
+ * other 25 types on that row do not. A badge there would tell someone who
+ * enabled `WarDeclared` that it reaches them with the app closed, which is
+ * false. So the row is excluded, and the reinforcement-timer fact stays where
+ * it already lives — in prose, not on an icon that means something else
+ * everywhere it appears.
+ */
+const PUSH_BADGED_EVENT_IDS: ReadonlySet<NotificationEventId> = new Set(
+  PROJECTABLE_EVENT_IDS.filter((id) => id !== 'eveNotification')
+);
 
 /**
  * Every corp event (issue #299) — used to attach the best-effort disclosure
@@ -491,8 +510,11 @@ export function NotificationsPanel() {
                             return (
                               <li key={eventId}>
                                 <div className="flex items-center justify-between gap-3 px-3 py-2 text-xs">
-                                  <span className={rowEnabled ? 'text-text' : 'text-text-faint'}>
-                                    {eventLabel}
+                                  <span className="flex min-w-0 items-center gap-1.5">
+                                    <span className={rowEnabled ? 'text-text' : 'text-text-faint'}>
+                                      {eventLabel}
+                                    </span>
+                                    {PUSH_BADGED_EVENT_IDS.has(eventId) && <ScheduledPushBadge />}
                                   </span>
                                   <div className={CHANNEL_COLUMNS}>
                                     {NOTIFICATION_CHANNELS.map((channel) => (
@@ -819,6 +841,27 @@ export function NotificationsPanel() {
         )}
       </div>
     </Panel>
+  );
+}
+
+/**
+ * The "arrives with the app closed" mark on a Scheduled Push event's row.
+ *
+ * `role="img"` plus `aria-label` rather than a focusable trigger (the
+ * `MaterialsTable` pattern, not the column captions' one): the meaning has to
+ * reach a screen reader, but there are seventeen rows per Character here and
+ * a tab stop on each would make the panel worse to keyboard through than the
+ * badge is worth.
+ */
+function ScheduledPushBadge() {
+  const { t } = useTranslation();
+  const label = t('settings.notifications.scheduledPushBadge');
+  return (
+    <Tooltip content={label} openOnTap>
+      <span role="img" aria-label={label} className="shrink-0 text-accent">
+        <ScheduledPush size={ICON_SIZE.sm} />
+      </span>
+    </Tooltip>
   );
 }
 
