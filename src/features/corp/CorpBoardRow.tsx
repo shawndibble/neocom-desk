@@ -20,48 +20,24 @@ import {
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuTrigger,
+  SEVERITY_LABEL_KEY,
+  SEVERITY_TONE,
+  SeverityIcon,
   Tooltip,
 } from '@/components/ui';
-import * as Icon from '@/components/ui/icons';
 import { marketItemUrl } from '@/engine/market/urlState';
 import { writeToClipboard } from '@/lib/clipboard';
 import { formatDuration } from '@/lib/duration';
 import { structureStateLabel } from './boardSources';
-import type { CorpBoardItem, CorpBoardSeverity } from '@/engine/corp/board';
+import type { CorpBoardItem } from '@/engine/corp/board';
 
-/**
- * Severity to colour. Four levels, the same four `StatChip` and the rest of the
- * app tone with (docs/DESIGN.md §6) — `clear` deliberately takes the dim text
- * colour rather than `success`: a Fortizar with a month of fuel is not an
- * achievement, it is simply not today's problem.
+/*
+ * Severity's tone, glyph and sr-only label all live in
+ * `components/ui/severityTone.ts` now. They were defined here first, back when
+ * the corp board was the only thing with a severity ladder; the Overview board
+ * tones its cards off the same four rungs, and two copies of "critical is
+ * danger and an octagon" is exactly the duplication that lets them drift.
  */
-const SEVERITY_TONE: Record<CorpBoardSeverity, string> = {
-  critical: 'text-danger',
-  warning: 'text-warning',
-  watch: 'text-accent',
-  clear: 'text-text-dim',
-};
-
-const SEVERITY_LABEL: Record<CorpBoardSeverity, string> = {
-  critical: 'corp.board.severity.critical',
-  warning: 'corp.board.severity.warning',
-  watch: 'corp.board.severity.watch',
-  clear: 'corp.board.severity.clear',
-};
-
-/**
- * Severity to shape (issue #419): colour alone is not a signal a colorblind
- * reader can use, and DESIGN.md §6/§7 say so outright ("color never the sole
- * signal"). `warning` reuses the app's existing `Warn` triangle rather than a
- * fifth glyph; the sr-only label beside each icon (`BoardRow` below) is what
- * actually names the severity for assistive tech — the icon is decorative.
- */
-const SEVERITY_ICON: Record<CorpBoardSeverity, typeof Icon.Warn> = {
-  critical: Icon.SeverityCritical,
-  warning: Icon.Warn,
-  watch: Icon.SeverityWatch,
-  clear: Icon.SeverityClear,
-};
 
 type Translate = ReturnType<typeof useTranslation>['t'];
 
@@ -101,7 +77,6 @@ function detailText(item: CorpBoardItem, t: Translate): string {
 function Countdown({ item }: { item: CorpBoardItem }) {
   const { t } = useTranslation();
   const tone = SEVERITY_TONE[item.severity];
-  const SeverityIcon = SEVERITY_ICON[item.severity];
   // `flex items-center gap-1` puts the shape beside the countdown text inside
   // this same element — a fourth row child would reflow the 320px stack this
   // element's own `w-full`/`sm:w-24` split is built for (issue #419).
@@ -109,7 +84,7 @@ function Countdown({ item }: { item: CorpBoardItem }) {
   // Decorative: the severity's *name* comes from `BoardRow`'s sr-only label,
   // not from this icon (DESIGN.md §5 — icon beside its own visible text is
   // aria-hidden, no separate label needed).
-  const icon = <SeverityIcon aria-hidden="true" size={Icon.ICON_SIZE.sm} className="shrink-0" />;
+  const icon = <SeverityIcon severity={item.severity} />;
 
   if (item.timing === 'untimed') {
     return (
@@ -237,7 +212,7 @@ export function CorpBoardRow({
           `sr-only` rather than a visible badge — a fifth element on every row
           would crowd the one thing the row exists to show.
         */}
-        <span className="sr-only">{t(SEVERITY_LABEL[item.severity])}</span>
+        <span className="sr-only">{t(SEVERITY_LABEL_KEY[item.severity])}</span>
       </li>
     </BoardRowMenu>
   );

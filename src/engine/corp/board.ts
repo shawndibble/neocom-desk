@@ -16,6 +16,8 @@
  * names get resolved — the engine ranks, it does not look anything up.
  */
 
+import type { BoardSeverity } from '@/engine/severity';
+
 /**
  * The kinds of clock the board merges, in the order that breaks a deadline tie.
  *
@@ -37,8 +39,13 @@ export type CorpBoardItemKind = (typeof CORP_BOARD_ITEM_KINDS)[number];
 /**
  * How urgent an item is. Derived from time remaining and nothing else — see
  * `severityForRemaining`.
+ *
+ * An alias of the app-wide ladder (`engine/severity.ts`), which this type used
+ * to define on its own. Kept as a name because "the corp board's severity" is
+ * what every reader here calls it, but there is only one ladder now — the
+ * Overview board tones its cards off the same four rungs.
  */
-export type CorpBoardSeverity = 'critical' | 'warning' | 'watch' | 'clear';
+export type CorpBoardSeverity = BoardSeverity;
 
 /**
  * What kind of clock an item has, which is also what its sort position means:
