@@ -8,6 +8,23 @@ interface FilterChipProps {
   onToggle: () => void;
   /** Optional match count, shown after the label. */
   count?: number;
+  /**
+   * Screen-reader gloss for `count`, e.g. "3 unread". It *replaces* the bare
+   * numeral in the accessible name — the digit is hidden from assistive tech
+   * and this is announced in its place — so the name reads "Inbox 3 unread"
+   * rather than the bare "Inbox 3" a naked figure gives, and not the doubled
+   * "Inbox 3 3 unread" that appending it would.
+   *
+   * An addition rather than an `aria-label` override on purpose: WCAG 2.5.3
+   * wants the visible word to survive inside the accessible name, and a label
+   * override is the usual way that gets broken.
+   *
+   * Optional, so a `count` can still ship without one — but a bare figure in an
+   * accessible name says "Corp, 2" and never what the 2 counts, so a new
+   * `count` should pass this. The chips that predate it (Contacts, CorpRoster,
+   * Open Orders) do not yet, and are worth a follow-up.
+   */
+  countLabel?: string;
   className?: string;
   /** `sm` (default) matches every existing toolbar; `md` lines up with a `SearchInput`/`NativeSelect` left at their own default size. */
   size?: ControlSize;
@@ -24,9 +41,11 @@ export function FilterChip({
   selected,
   onToggle,
   count,
+  countLabel,
   className = '',
   size = 'sm',
 }: FilterChipProps) {
+  const hasGloss = countLabel !== undefined;
   return (
     <button
       type="button"
@@ -42,7 +61,22 @@ export function FilterChip({
       )}
     >
       {label}
-      {count !== undefined && <span className="font-medium tabular-nums">{count}</span>}
+      {count !== undefined && (
+        <>
+          {/* A real space text node, and only when a gloss follows: a CSS gap
+              is not a word separator, and leading whitespace inside an element
+              is trimmed away by the accessible name algorithm — both leave the
+              name running together as "Corp2 unread". Flexbox drops
+              whitespace-only children, so it costs nothing visually. Scoped to
+              the `countLabel` case so a plain match count's name is exactly
+              what it has always been. */}
+          {hasGloss && ' '}
+          <span aria-hidden={hasGloss} className="font-medium tabular-nums">
+            {count}
+          </span>
+          {hasGloss && <span className="sr-only">{countLabel}</span>}
+        </>
+      )}
     </button>
   );
 }

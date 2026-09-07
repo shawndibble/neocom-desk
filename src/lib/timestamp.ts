@@ -37,6 +37,27 @@ export function formatTimestamp(date: Date, timeZone?: string): string {
   return date.toLocaleString(undefined, { ...TIMESTAMP_OPTIONS, timeZone });
 }
 
+const DATE_ONLY_OPTIONS: Intl.DateTimeFormatOptions = {
+  year: 'numeric',
+  month: 'numeric',
+  day: 'numeric',
+};
+
+/**
+ * The calendar date alone, for a row too narrow to carry a time — the Mail
+ * list, where the reading pane one panel over shows the full timestamp.
+ *
+ * Distinct from `localDate.ts`'s `formatLocalDate`, which pins `en-CA` to get
+ * a sortable `YYYY-MM-DD` and takes no `timeZone`: that one exists so two
+ * Skills Planner surfaces can never disagree by a day. This one renders in the
+ * viewer's locale and takes the Time format preference like its neighbours
+ * here, because which day an instant falls on depends on the zone you read it
+ * in.
+ */
+export function formatDateOnly(date: Date, timeZone?: string): string {
+  return date.toLocaleDateString(undefined, { ...DATE_ONLY_OPTIONS, timeZone });
+}
+
 const CALENDAR_OPTIONS: Intl.DateTimeFormatOptions = {
   month: 'short',
   day: 'numeric',

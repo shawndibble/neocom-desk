@@ -427,9 +427,11 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   routing (e.g. "is this corp mail"), the app doesn't reimplement it.
   Distinct from a **Custom Label**: a character's own user-created EVE mail
   label, also returned by the same endpoint. Deferred in round 18; surfaced
-  as a filter chip row beneath the tab strip in round 22, then removed
-  again (see `docs/context/decisions/`, 2026-09-05) — the app does not
-  currently filter on it.
+  as its own filter chip row in round 22, then removed again (see
+  `docs/context/decisions/`, 2026-09-05) — the app does not currently filter
+  on it. The four System Labels are the Mail page's folder filter: a
+  multi-select toggle group, so any subset of them can be shown at once (see
+  `docs/context/decisions/`, 2026-09-07).
 - **Throughput** (planetary): a **second budget, independent of the Pin
   Budget** — whether the colony's links can carry the material flow and
   whether a buffer cycle fits in the Launchpad and Storage Facility. This, not
