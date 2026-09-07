@@ -2476,6 +2476,11 @@
     "hint": "Reloading usually fixes this. Your Skill Plans and Build Plans are stored locally and are not affected.",
     "reload": "Reload"
   },
+  "notFound": {
+    "title": "Page not found",
+    "hint": "That address does not match anything in Neocom Desk. The link may be wrong, or it may have pointed at something that has since moved.",
+    "home": "Go to Neocom Desk"
+  },
   "settings": {
     "title": "Settings",
     "tabs": {

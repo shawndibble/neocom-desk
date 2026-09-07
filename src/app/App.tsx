@@ -37,6 +37,7 @@ import { EmploymentHistory } from '@/routes/EmploymentHistory';
 import { Settings } from '@/routes/Settings';
 import { Styleguide } from '@/routes/Styleguide';
 import { ErrorProbe } from '@/routes/ErrorProbe';
+import { NotFound } from '@/routes/NotFound';
 import { Layout } from './Layout';
 import { ReloadPrompt } from './ReloadPrompt';
 import { WhatsNewPanel } from './WhatsNewPanel';
@@ -209,7 +210,7 @@ export function App() {
           <Route path="/styleguide" element={<Styleguide />} />
           {/* Undisclosed Sentry probe — see routes/ErrorProbe.tsx. */}
           <Route path="/error" element={<ErrorProbe />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
+          <Route path="*" element={<NotFound />} />
         </SentryRoutes>
         <ReloadPrompt />
         <WhatsNewPanel />
