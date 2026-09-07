@@ -260,6 +260,18 @@ describe('Mail', () => {
             labels: [2], // Sent
             recipients: [{ recipient_id: 90000003, recipient_type: 'character' }],
           },
+          {
+            mail_id: 8,
+            from: 90000001,
+            subject: 'Fleet doctrine',
+            timestamp: '2026-08-05T00:00:00Z',
+            is_read: true,
+            labels: [2], // Sent
+            recipients: [
+              { recipient_id: 90000003, recipient_type: 'character' },
+              { recipient_id: 90000002, recipient_type: 'character' },
+            ],
+          },
         ])
       )
     );
@@ -267,6 +279,12 @@ describe('Mail', () => {
     const row = await screen.findByRole('button', { name: /Contract terms/s });
     expect(row).toHaveTextContent('Corp Recruiter');
     expect(row).not.toHaveTextContent('Fleet Commander');
+
+    // More than one recipient collapses to the first plus a count — a row has
+    // one line for them.
+    expect(screen.getByRole('button', { name: /Fleet doctrine/s })).toHaveTextContent(
+      'Corp Recruiter +1 more'
+    );
   });
 
   it('shows a resolved "To:" line in the reading pane', async () => {

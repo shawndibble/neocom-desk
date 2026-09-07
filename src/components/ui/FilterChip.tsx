@@ -57,12 +57,14 @@ export function FilterChip({
       {label}
       {count !== undefined && (
         <>
-          {/* A real space text node, not the flex `gap` and not a space inside
-              the span below: a CSS gap is not a word separator, and leading
-              whitespace inside an element is trimmed away by the accessible
-              name algorithm — both leave the name running together as
-              "Corp2 unread". Flexbox drops whitespace-only children, so this
-              costs nothing visually. */}{' '}
+          {/* A real space text node, and only when a gloss follows: a CSS gap
+              is not a word separator, and leading whitespace inside an element
+              is trimmed away by the accessible name algorithm — both leave the
+              name running together as "Corp2 unread". Flexbox drops
+              whitespace-only children, so it costs nothing visually. Scoped to
+              the `countLabel` case so a plain match count's name is exactly
+              what it has always been. */}
+          {countLabel !== undefined && ' '}
           <span aria-hidden={countLabel !== undefined} className="font-medium tabular-nums">
             {count}
           </span>
