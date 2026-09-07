@@ -1,0 +1,100 @@
+{
+  "artboards": [
+    {
+      "file": "Main.dc.html",
+      "title": "A · Action Queue — Desktop",
+      "x": 0,
+      "y": 0,
+      "w": 1440,
+      "h": 900
+    },
+    {
+      "file": "ActionQueuePhone.dc.html",
+      "title": "A · Action Queue — Phone",
+      "x": 0,
+      "y": 1060,
+      "w": 390,
+      "h": 844
+    },
+    {
+      "file": "StationBoard.dc.html",
+      "title": "B · Station Board — Desktop",
+      "x": 1560,
+      "y": 0,
+      "w": 1440,
+      "h": 900
+    },
+    {
+      "file": "StationBoardPhone.dc.html",
+      "title": "B · Station Board — Phone",
+      "x": 1560,
+      "y": 1060,
+      "w": 390,
+      "h": 844
+    },
+    {
+      "file": "NextFortyEight.dc.html",
+      "title": "C · Next 48 Hours — Desktop",
+      "x": 3120,
+      "y": 0,
+      "w": 1440,
+      "h": 900
+    },
+    {
+      "file": "NextFortyEightPhone.dc.html",
+      "title": "C · Next 48 Hours — Phone",
+      "x": 3120,
+      "y": 1060,
+      "w": 390,
+      "h": 844
+    },
+    {
+      "file": "States.dc.html",
+      "title": "Shared states",
+      "x": 0,
+      "y": 2100,
+      "w": 1440,
+      "h": 450
+    }
+  ],
+  "annotations": [
+    {
+      "id": "brief",
+      "x": 0,
+      "y": -300,
+      "w": 520,
+      "text": "Overview → a page that says what needs addressing.\n\nSame eleven attention items in all three, so the concepts differ on organising principle and nothing else. Every row names a destination; every signal below is one the codebase already computes.\n\nSources: colonyAttention (idle / expiring-soon / decayed) · OpenOrderRow.problem (belowFloor, outbid, expiringOrStale, undercut*) · isJobDone / isCompletingSoon · MiningTaxAssignmentStatus needs-review · selectQueueDepth · NotificationFeedRecord."
+    },
+    {
+      "id": "concept-a",
+      "x": 600,
+      "y": -300,
+      "w": 380,
+      "text": "A · ACTION QUEUE\n\nOne merged list, severity then clock. The ordering IS the page; domain is a tag, not a container.\n\nFor: never hides a bad hour, one place to work top-down, filters when you want one domain.\n\nAgainst: no per-domain sense of \"am I done with PI?\", and eleven rows of different kinds can read as noise."
+    },
+    {
+      "id": "concept-b",
+      "x": 1560,
+      "y": -300,
+      "w": 380,
+      "text": "B · STATION BOARD\n\nOne panel per domain, each showing only its exceptions. Same anatomy as the Corp ops board's Kind Cards.\n\nFor: already proven in this app, each domain answerable on its own, the summary strip carries the merged view.\n\nAgainst: six calm cards can hide one bad Tuesday between them — the exact problem the Corp Deadline Strip was added to fix."
+    },
+    {
+      "id": "concept-c",
+      "x": 3120,
+      "y": -300,
+      "w": 380,
+      "text": "C · NEXT 48 HOURS\n\nTime is the spine: a deadline strip, then buckets by when a thing lands, plus one honest panel for what has no clock.\n\nFor: best answer to \"what do I do this evening\"; the strip shows shape at a glance.\n\nAgainst: roughly half the work has no deadline (undercut orders, moon reviews, jobs already ready), so the \"No clock\" panel carries a lot."
+    },
+    {
+      "id": "open-q",
+      "x": 600,
+      "y": 1060,
+      "w": 380,
+      "text": "OPEN QUESTIONS\n\n1. Multi-character. Everything on Overview is active-character-only, but the notification feed is device-wide. A prompted with an \"other characters\" strip; B and C say nothing. Should the board span all your characters?\n\n2. Deep links. \"Orders\" goes to /market?section=orders, not to the one undercut order — no route exists for that today. Same for a single colony. Worth adding?\n\n3. Does this replace Overview, or sit above it? The wallet/queue/tile panels are gone from all three."
+    }
+  ],
+  "launch": {
+    "view": "canvas"
+  }
+}
