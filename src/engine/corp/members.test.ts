@@ -90,6 +90,27 @@ describe('memberStanding', () => {
     expect(standing.isDark).toBe(true);
   });
 
+  it('honours a corp that writes its inactivity policy in a different span', () => {
+    const seen = ago(45 * DAY);
+    // 45 days is dark to a 30-day corp and current to a 60-day one. Same
+    // member, same instant — only the policy differs.
+    expect(memberStanding(member({ logonMs: seen, logoffMs: seen }), NOW, 30).isDark).toBe(true);
+    expect(memberStanding(member({ logonMs: seen, logoffMs: seen }), NOW, 60).isDark).toBe(false);
+  });
+
+  it('measures a never-logged-in member against the same chosen span', () => {
+    const joined = member({ logonMs: null, logoffMs: null, startMs: ago(45 * DAY) });
+    expect(memberStanding(joined, NOW, 60).isDark).toBe(false);
+    expect(memberStanding(joined, NOW, 14).isDark).toBe(true);
+  });
+
+  it('defaults to DARK_AFTER_DAYS when no span is given', () => {
+    const seen = ago(DARK_AFTER_MS);
+    expect(memberStanding(member({ logonMs: seen, logoffMs: seen }), NOW)).toEqual(
+      memberStanding(member({ logonMs: seen, logoffMs: seen }), NOW, DARK_AFTER_DAYS)
+    );
+  });
+
   it('does not call a member who joined yesterday and has not logged in dark', () => {
     const standing = memberStanding(
       member({ logonMs: null, logoffMs: null, startMs: ago(DAY) }),

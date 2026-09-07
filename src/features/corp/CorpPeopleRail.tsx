@@ -21,15 +21,12 @@
  * Station Manager who is not a Director simply has no People rail: no error,
  * no empty state, nothing (CONTEXT.md round 35).
  */
+import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { Panel, StatChip, buttonClassName } from '@/components/ui';
-import {
-  DARK_AFTER_DAYS,
-  memberStanding,
-  type MemberActivity,
-  type RosterDiff,
-} from '@/engine/corp/members';
+import { memberStanding, type MemberActivity, type RosterDiff } from '@/engine/corp/members';
+import { useDarkThreshold } from './darkThreshold';
 
 interface CorpPeopleRailProps {
   /** Tracking rows, already adapted — `features/corp/members.ts`. */
@@ -49,10 +46,18 @@ interface CorpPeopleRailProps {
 
 export function CorpPeopleRail({ members, diff, nowMs }: CorpPeopleRailProps) {
   const { t } = useTranslation();
+  const darkAfterDays = useDarkThreshold((state) => state.value);
+  const hydrateDarkThreshold = useDarkThreshold((state) => state.hydrate);
+  useEffect(() => {
+    void hydrateDarkThreshold();
+  }, [hydrateDarkThreshold]);
 
   // `memberStanding` and its threshold, not a count of our own: this figure has
-  // to equal the one `CorpRosterStats` prints for the same roster.
-  const dark = members.filter((member) => memberStanding(member, nowMs).isDark).length;
+  // to equal the one `CorpRosterStats` prints for the same roster — which is
+  // why both read the same preference instead of one of them keeping 30.
+  const dark = members.filter(
+    (member) => memberStanding(member, nowMs, darkAfterDays).isDark
+  ).length;
 
   return (
     <Panel
@@ -73,10 +78,10 @@ export function CorpPeopleRail({ members, diff, nowMs }: CorpPeopleRailProps) {
         */}
         <StatChip label={t('corp.members.total')} value={members.length} />
         <StatChip
-          label={t('corp.members.dark', { days: DARK_AFTER_DAYS })}
+          label={t('corp.members.dark', { days: darkAfterDays })}
           value={dark}
           tone={dark > 0 ? 'warning' : 'default'}
-          tooltip={t('corp.members.darkHint', { days: DARK_AFTER_DAYS })}
+          tooltip={t('corp.members.darkHint', { days: darkAfterDays })}
         />
         {/*
           Shown at zero, unlike `CorpRosterSummary`, which hides an unchanged

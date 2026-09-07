@@ -1,6 +1,7 @@
-import { useCallback, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Navigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { useExpiringWindowHours, useExpiringWindowMs } from '@/features/pi/expiringWindow';
 import {
   Caret,
   DataAgeBadge,
@@ -351,6 +352,7 @@ function ExtractionCard({
   loadedAt,
 }: ExtractionCardProps) {
   const { t } = useTranslation();
+  const expiringWindowMs = useExpiringWindowMs();
   const productId = pin.extractor_details?.product_type_id;
   const productName =
     productId !== undefined
@@ -358,7 +360,7 @@ function ExtractionCard({
       : t('pi.unknownProduct');
 
   const expiryMs = extractorExpiryMs(pin);
-  const state = expiryMs === null ? null : extractorState(expiryMs, loadedAt);
+  const state = expiryMs === null ? null : extractorState(expiryMs, loadedAt, expiringWindowMs);
   const total = program ? programTotalYield(program) : 0;
   const banked = program && total > 0 ? yieldBankedBy(program, loadedAt) : null;
   const percent = banked === null ? null : Math.round((banked / total) * 100);
@@ -486,13 +488,14 @@ function ColonyRow({
   loadedAt,
 }: ColonyRowProps) {
   const { t } = useTranslation();
+  const expiringWindowMs = useExpiringWindowMs();
   // No cached detail at all, or an extractor pin the adapter had to drop for
   // missing data: either way, computing "healthy" from what's left would be
   // exactly the confident-wrong-number the staleness rule exists to avoid.
   const attention: EffectiveAttention =
     detail === null || hasUnverifiedExtractors(detail.pins)
       ? 'unknown'
-      : colonyAttention(status, loadedAt);
+      : colonyAttention(status, loadedAt, expiringWindowMs);
 
   // `detail` in the deps array, not `detail?.pins` — the latter is a fresh
   // array reference every render even when the underlying data hasn't
@@ -783,6 +786,14 @@ function parsePositiveInt(value: string | null): number | null {
  */
 export function PlanetaryIndustry() {
   const { t } = useTranslation();
+  // The pilot's own "expiring soon" lead time. Hydrated here, once, for the
+  // whole page: the leaf rows and cards below read the same store, and a
+  // hydrate per row would be a Dexie read per colony.
+  const expiringWindowMs = useExpiringWindowMs();
+  const hydrateExpiringWindow = useExpiringWindowHours((state) => state.hydrate);
+  useEffect(() => {
+    void hydrateExpiringWindow();
+  }, [hydrateExpiringWindow]);
   const [searchParams, setSearchParams] = useSearchParams();
   const { data, error, loading, hydrated, activeCharacterId, refresh } = useRouteSnapshot(
     loadPiSnapshot,
@@ -865,9 +876,10 @@ export function PlanetaryIndustry() {
       sortColoniesByAttention(
         planets,
         (planet) => statusByPlanet.get(planet.planet_id) ?? EMPTY_STATUS,
-        loadedAt
+        loadedAt,
+        expiringWindowMs
       ),
-    [planets, statusByPlanet, loadedAt]
+    [planets, statusByPlanet, loadedAt, expiringWindowMs]
   );
 
   // Alt colonies grouped by character, each group sorted worst-first the
@@ -895,9 +907,14 @@ export function PlanetaryIndustry() {
     return [...byCharacter.entries()].map(([characterId, group]) => ({
       characterId,
       characterName: group.characterName,
-      colonies: sortColoniesByAttention(group.colonies, (entry) => entry.status, loadedAt),
+      colonies: sortColoniesByAttention(
+        group.colonies,
+        (entry) => entry.status,
+        loadedAt,
+        expiringWindowMs
+      ),
     }));
-  }, [roster.colonies, loadedAt]);
+  }, [roster.colonies, loadedAt, expiringWindowMs]);
 
   // Every other Character with something the toggle would surface — a
   // colony row, or a reason it has none ("skipped"/"not loaded"/"no
