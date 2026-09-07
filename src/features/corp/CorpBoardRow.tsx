@@ -1,11 +1,12 @@
 /**
- * The corp ops board: one urgency-ordered list mixing every clock.
+ * One row of the corp ops board: its countdown, its subject, and its right-click
+ * menu.
  *
- * A list of cards rather than a table, at every width. The ordering is the
- * information — a manager reads down until they stop caring — and a table would
- * ask them to compare columns across five kinds of item that share almost no
- * fields. Below `sm` the same cards stack into one column with the countdown
- * still leading; nothing here has a horizontal scroll to lose.
+ * A row rather than a list. Until #566 this module also owned the flat,
+ * urgency-ordered list that was the whole overview; the Kind Cards render the
+ * same rows now, so what is left here is the row itself — and it stays one
+ * component precisely so the four cards cannot drift into four slightly
+ * different countdowns.
  *
  * Ranking, severity and the short-timer judgement all arrive decided from
  * `engine/corp/board.ts`. This file renders them and does no time arithmetic of
@@ -19,7 +20,6 @@ import {
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuTrigger,
-  EmptyState,
   Tooltip,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
@@ -206,7 +206,16 @@ function BoardRowMenu({
   );
 }
 
-function BoardRow({
+/**
+ * One board row, exported so the Kind Cards (issue #566) render exactly this
+ * and not an approximation of it.
+ *
+ * The countdown's four states, the short-timer refusal, the severity glyph and
+ * its screen-reader word all live in here, and a second copy of them in the
+ * cards is precisely how one surface ends up quietly printing a figure the
+ * other refuses to.
+ */
+export function CorpBoardRow({
   item,
   onShowInfo,
 }: {
@@ -231,33 +240,5 @@ function BoardRow({
         <span className="sr-only">{t(SEVERITY_LABEL[item.severity])}</span>
       </li>
     </BoardRowMenu>
-  );
-}
-
-interface CorpBoardProps {
-  items: readonly CorpBoardItem[];
-  onShowInfo: (typeId: number, itemName: string) => void;
-}
-
-/**
- * The caller renders this only for a Character who can read at least one of the
- * board's sources, which is what lets the empty state below mean one thing:
- * "read fine, nothing due". "Cannot read" is answered by not rendering the
- * board at all (`routes/Corp.tsx`), never by an empty state standing in for a
- * panel nobody was allowed to ask about.
- */
-export function CorpBoard({ items, onShowInfo }: CorpBoardProps) {
-  const { t } = useTranslation();
-
-  if (items.length === 0) {
-    return <EmptyState title={t('corp.board.empty')} hint={t('corp.board.emptyHint')} />;
-  }
-
-  return (
-    <ul className="divide-y divide-line">
-      {items.map((item) => (
-        <BoardRow key={item.id} item={item} onShowInfo={onShowInfo} />
-      ))}
-    </ul>
   );
 }

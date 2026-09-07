@@ -95,6 +95,10 @@ here — they go one per file in `docs/context/decisions/`.
 - **Detected Accelerator** — a cerebral accelerator inferred from a base sheet
   that is over budget, by the size of the excess. Prefilled into the Booster
   control; not a separate mechanism.
+- **Deadline Strip**: The `/corp` overview's bar per local calendar day, each
+  counting the Corp Board Items falling due on it and coloured by the worst
+  Board Severity landing there. Exists to pay for what Kind Cards give up: four
+  cards can each look calm while, between them, they hide one bad day.
 - **Editable Data**: Data created inside the app (Skill Plans, Build Plans, Production Runs, settings). Synced across devices. Everything else is API-derived and re-pulled per device.
 - **EIV (Estimated Item Value)**: The SCC's reference price for the materials
   a manufacturing job consumes, at ME0 quantities. Used only to size the
@@ -156,6 +160,10 @@ here — they go one per file in `docs/context/decisions/`.
 - **Job Fee**: The ISK ESI charges to install a manufacturing job, separate
   from material cost. Sized from EIV, the system's **Cost Index**, a fixed
   SCC surcharge, and the facility's tax.
+- **Kind Card**: One `/corp` overview panel per kind of Corp Board Item — Fuel,
+  Structure timers, Moon chunks, Industry jobs — showing that kind's most urgent
+  few and counting the rest. Fed by the one engine ranking, never a second one,
+  and gated on the Corp Capability that opens its own read.
 - **Location Mode**: The Market Browser's one location control, in one of two
   mutually exclusive modes — **Region** (every station in that region) or
   **Trade Hub** (that hub's region, filtered to the hub's station).
@@ -227,6 +235,10 @@ here — they go one per file in `docs/context/decisions/`.
   parties that cannot see each other's state. Distinct from the Notification
   Feed's row id, which round 20 minted randomly because nothing then needed
   two observers to agree.
+- **Offline Services**: The `/corp` overview's strip for the board's one untimed
+  kind. A structure service that is off is a standing fault with no instant, so
+  it has no place in a Kind Card's ordering or on the Deadline Strip, and it
+  gets a surface with no clock instead.
 - **Optimize Modes**: Skill Plan optimizer actions — "optimize now" (optimizer chooses remap placement, keeps order), "optimize at remap points" (user drags **Remap Markers** into the plan; optimizer computes the best attribute spread for each marker-delimited segment), "suggest full reorder" (attribute-grouped reorder honoring prerequisites; user accepts or rejects). Reorder never applies silently.
 - **Order Book**: The live buy and sell orders for one item in one Region, read
   from ESI. Rows, not a summary — each row is one order with its price,
@@ -388,6 +400,11 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   `scopesForGroup(group)` from the grouped ones, both from the same registry.
   `corp` is the only group today.
 - **Skill Plan**: An ordered list of skill-level entries a user intends to train. User-editable (drag and drop). Distinct from the in-game **Skill Queue**, which is the game's actual training queue.
+- **Standing (corp)**: The `/corp` overview's top panel: the figures a corp
+  manager acts on — clocks due inside a day, Runway, 30-day net — beside the
+  Deadline Strip. Degrades figure by figure on Corp Capability, so a Character
+  holding one source and not the other sees fewer figures rather than empty
+  ones.
 - **Starred Character**: A Character the user has pinned to the top of the
   Characters page. Device-local and never synced, for the same reason an
   **Account** grouping is — a star is a statement about the roster, not about

@@ -220,3 +220,69 @@ export function filterRosterRows<T extends RosterSearchFields>(
     )
   );
 }
+
+/** How many names each of the People panel's three lists prints. */
+export const PEOPLE_HIGHLIGHT_LIMIT = 3;
+
+/**
+ * The few members the People panel names, out of a roster that can run to
+ * thousands.
+ *
+ * A count answers "should I go look" and then leaves you nowhere to look — the
+ * `Dark 30d+` chip has always prompted the question "which three?" and had no
+ * answer on this page (#566). Naming a handful is what makes the panel worth
+ * the width it now has.
+ *
+ * Capped on purpose, and not only for layout: the names are resolved through
+ * `/universe/names`, so an uncapped list would turn a director's first visit
+ * into a chunked batch of a thousand ids to print three lines.
+ */
+export interface PeopleHighlights {
+  /** The longest-absent dark members, most absent first. */
+  dark: MemberActivity[];
+  /** Character ids that joined since this device last looked. */
+  joined: number[];
+  /** Character ids that left since this device last looked. */
+  left: number[];
+}
+
+export const NO_PEOPLE_HIGHLIGHTS: PeopleHighlights = { dark: [], joined: [], left: [] };
+
+export function peopleHighlights(
+  members: readonly MemberActivity[],
+  diff: RosterDiff | null,
+  nowMs: number,
+  limit: number = PEOPLE_HIGHLIGHT_LIMIT,
+  // Trailing, like `memberStanding`'s own: every caller that has a corporation's
+  // policy to hand passes it, and one that does not gets the default rather
+  // than a different question.
+  darkAfterDays: number = DARK_AFTER_DAYS
+): PeopleHighlights {
+  if (limit <= 0) return NO_PEOPLE_HIGHLIGHTS;
+
+  const dark = members
+    .map((member) => ({ member, standing: memberStanding(member, nowMs, darkAfterDays) }))
+    .filter((entry) => entry.standing.isDark)
+    // Longest-absent first. `darkForMs` is non-null for anyone `isDark`, so the
+    // fallback only satisfies the type — it can never order a real row.
+    .sort((a, b) => (b.standing.darkForMs ?? 0) - (a.standing.darkForMs ?? 0))
+    .slice(0, limit)
+    .map((entry) => entry.member);
+
+  return {
+    dark,
+    joined: diff === null ? [] : diff.joined.slice(0, limit),
+    left: diff === null ? [] : diff.left.slice(0, limit),
+  };
+}
+
+/** Every id `peopleHighlights` will need a name for, deduplicated. */
+export function peopleHighlightIds(highlights: PeopleHighlights): number[] {
+  return [
+    ...new Set([
+      ...highlights.dark.map((member) => member.characterId),
+      ...highlights.joined,
+      ...highlights.left,
+    ]),
+  ];
+}
