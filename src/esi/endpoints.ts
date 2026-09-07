@@ -664,6 +664,41 @@ export function getMarketOrders(
   });
 }
 
+// --- GET /markets/structures/{structure_id} (esi-markets.structure_markets.v1) ---
+
+export interface StructureMarketOrder {
+  duration: number;
+  is_buy_order: boolean;
+  issued: string;
+  location_id: number;
+  min_volume: number;
+  order_id: number;
+  price: number;
+  range: string;
+  type_id: number;
+  volume_remain: number;
+  volume_total: number;
+}
+
+/**
+ * Every buy/sell order for every item inside one player structure (issue
+ * #538) — unlike `getMarketOrders`, this cannot be filtered by `type_id`, so
+ * a caller wanting one item's competition must filter `items` itself. ACL
+ * per structure (ESI: 403 for anyone off the ACL, regardless of scope), and
+ * paginated (X-Pages); a busy trade tower can run to many pages.
+ */
+export function getStructureMarketOrders(
+  characterId: number,
+  structureId: number,
+  options: EndpointOptions = {}
+): Promise<PaginatedResult<StructureMarketOrder>> {
+  return fetchAllPagesStatus<StructureMarketOrder>(`/markets/structures/${structureId}`, {
+    ...options,
+    characterId,
+    endpointId: 'getStructureMarketOrders',
+  });
+}
+
 // --- GET /markets/{region_id}/history (public) ---
 
 export interface MarketHistoryEntry {

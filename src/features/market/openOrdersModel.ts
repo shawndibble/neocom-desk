@@ -61,6 +61,17 @@ import {
   type OrderProblemFacts,
 } from '@/engine/market/orderProblems';
 
+/**
+ * One order from a player structure's own market book (issue #538). Carries
+ * `typeId` because — unlike `CompetingOrder`, whose callers always fetch one
+ * region book per `type_id` already — the structure-markets endpoint returns
+ * every item at that location in one call, so this module must filter to
+ * the order's own type before it can be treated as a plain `CompetingOrder`.
+ */
+export interface StructureCompetitor extends CompetingOrder {
+  typeId: number;
+}
+
 /** What the cheap, always-on station check found. Aggregates give a price but no order count, so this tier can never claim how many units a rival holds. */
 export interface StationTier {
   /** Best rival price at my own station, or null when the station has no orders on my side. */
@@ -129,6 +140,17 @@ export interface BuildRowsInput {
   deepCompetition?: ReadonlyMap<
     number,
     { competitors: readonly CompetingOrder[]; truncated: boolean }
+  >;
+  /**
+   * Keyed locationId (issue #538): one structure's whole market book, fetched
+   * once and shared by every order/type parked there — unlike the region
+   * book, ESI's structure-markets endpoint cannot be filtered by `type_id`,
+   * so every entry carries its own `typeId` and `buildRow` filters to the
+   * one it needs before merging into `deepUndercut`.
+   */
+  structureCompetition?: ReadonlyMap<
+    number,
+    { competitors: readonly StructureCompetitor[]; truncated: boolean }
   >;
   /** Keyed locationId; a missing entry renders as a player structure. */
   stationNames?: ReadonlyMap<number, string>;
@@ -205,6 +227,7 @@ function buildRow(
     stationPrices,
     costBases,
     deepCompetition,
+    structureCompetition,
     stationNames,
     skillsByCharacter,
     now,
@@ -216,10 +239,20 @@ function buildRow(
   const station = buildStationTier(order.price, isBuyOrder, aggregate);
 
   const deepEntry = deepCompetition?.get(order.order_id) ?? null;
-  const deepUndercut = deepEntry
-    ? buildDeepUndercut(order, isBuyOrder, deepEntry.competitors)
-    : null;
-  const deepTruncated = deepEntry?.truncated ?? false;
+  const structureEntry = structureCompetition?.get(order.location_id) ?? null;
+  // The structure book holds every item at that location — filter to this
+  // order's own type before it can stand alongside a region `CompetingOrder`.
+  const structureCompetitors = structureEntry
+    ? structureEntry.competitors.filter((c) => c.typeId === order.type_id)
+    : [];
+  const deepUndercut =
+    deepEntry || structureEntry
+      ? buildDeepUndercut(order, isBuyOrder, [
+          ...(deepEntry?.competitors ?? []),
+          ...structureCompetitors,
+        ])
+      : null;
+  const deepTruncated = (deepEntry?.truncated ?? false) || (structureEntry?.truncated ?? false);
 
   // Deep check wins outright when it ran, even when it found nothing — it
   // saw the real order book, the station tier only saw one aggregated

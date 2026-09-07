@@ -48,8 +48,10 @@ import { loadOrderCostBases, type OrderCostBasis } from './orderCostBasis';
 import {
   loadStationBestPrices,
   loadRegionCompetition,
+  loadStructureCompetition,
   loadJumpsBetween,
   type RegionCompetition,
+  type StructureCompetition,
 } from './orderCompetition';
 import { loadPriceHistory, type PriceHistoryResult } from './priceHistory';
 import type { JumpsAwayResult } from '@/engine/jumpsAway';
@@ -262,6 +264,17 @@ export function OpenOrdersPanel() {
   );
   const [deepByKey, setDeepByKey] = useState<Map<string, RegionCompetition>>(new Map());
   const [deepLoadingKeys, setDeepLoadingKeys] = useState<ReadonlySet<string>>(new Set());
+  /**
+   * One player structure's market book (issue #538), keyed by locationId —
+   * every order parked at that structure, of any type or character, shares
+   * one fetch. Absent (not null) means "never attempted or still failing";
+   * `buildOpenOrderRows` and the detail modal both read that absence as
+   * "unavailable", same as an ungranted scope or an ACL denial.
+   */
+  const [structureByKey, setStructureByKey] = useState<Map<number, StructureCompetition>>(
+    new Map()
+  );
+  const [structureLoadingKeys, setStructureLoadingKeys] = useState<ReadonlySet<number>>(new Set());
   const [jumpsByPair, setJumpsByPair] = useState<Map<string, JumpsAwayResult>>(new Map());
   /**
    * The refine comparison, per opened order: the baked yield for its item
@@ -312,6 +325,37 @@ export function OpenOrdersPanel() {
 
   function ensureDeepChecked(regionId: number, typeId: number) {
     void loadDeepIfNeeded(regionId, typeId);
+  }
+
+  /**
+   * Same on-open, left-uncached-on-failure pattern as `loadDeepIfNeeded`, for
+   * one player structure's market book. Keyed by locationId, not orderId —
+   * every order at that structure shares this one fetch, so opening a second
+   * order there never re-fetches it.
+   */
+  function loadStructureIfNeeded(characterId: number, locationId: number): Promise<void> {
+    if (structureByKey.has(locationId) || structureLoadingKeys.has(locationId)) {
+      return Promise.resolve();
+    }
+    setStructureLoadingKeys((prev) => new Set(prev).add(locationId));
+    return loadStructureCompetition(characterId, locationId)
+      .then((result) => {
+        if (result) setStructureByKey((prev) => new Map(prev).set(locationId, result));
+      })
+      .catch(() => {
+        // Left uncached on failure so the next open/press retries.
+      })
+      .finally(() => {
+        setStructureLoadingKeys((prev) => {
+          const next = new Set(prev);
+          next.delete(locationId);
+          return next;
+        });
+      });
+  }
+
+  function ensureStructureChecked(characterId: number, locationId: number) {
+    void loadStructureIfNeeded(characterId, locationId);
   }
 
   /**
@@ -412,11 +456,12 @@ export function OpenOrdersPanel() {
       stationPrices: snapshot.stationPrices,
       costBases: snapshot.costBases,
       deepCompetition: deepCompetitionByOrderId,
+      structureCompetition: structureByKey,
       stationNames,
       skillsByCharacter: snapshot.skillsByCharacter,
       now: snapshot.now,
     });
-  }, [snapshot, deepCompetitionByOrderId, stationNames]);
+  }, [snapshot, deepCompetitionByOrderId, structureByKey, stationNames]);
 
   const problemCounts = useMemo(() => openOrderProblemCounts(allRows), [allRows]);
 
@@ -500,6 +545,48 @@ export function OpenOrdersPanel() {
     });
   }, [detailRow, snapshot, jumpsByPair]);
 
+  /**
+   * The currently open row's structure market book (issue #538), once its
+   * location is confirmed a player structure. An EFFECT, not a one-shot call
+   * from `openDetails`: the NPC-station lookup can still be loading (or have
+   * failed) the moment a row is clicked — `stationsLoaded` false at that
+   * instant — and only resolve afterward, on a later snapshot. Keying off
+   * `detailRow`/`snapshot` means this re-evaluates whenever either changes,
+   * including a background refresh landing while the modal stays open,
+   * rather than being stuck with nothing left to retry it (the region
+   * "Check deeper" button may already be hidden by then, since `deep` can
+   * have resolved independently in the meantime).
+   *
+   * Inlined rather than calling `ensureStructureChecked` (used by
+   * `onCheckDeeper`'s manual retry instead), and every `setState` deferred
+   * into a microtask: react-hooks's set-state-in-effect rule rejects a
+   * synchronous `setState` in an effect body, even one guarding a fetch —
+   * same reason the jumps effect above only ever sets state from a `.then()`.
+   */
+  useEffect(() => {
+    if (!detailRow || !snapshot?.stationsLoaded) return;
+    if (detailRow.stationName !== null) return;
+    const { characterId, locationId } = detailRow;
+    void Promise.resolve().then(() => {
+      if (structureByKey.has(locationId) || structureLoadingKeys.has(locationId)) return;
+      setStructureLoadingKeys((prev) => new Set(prev).add(locationId));
+      void loadStructureCompetition(characterId, locationId)
+        .then((result) => {
+          if (result) setStructureByKey((prev) => new Map(prev).set(locationId, result));
+        })
+        .catch(() => {
+          // Left uncached on failure so the next refresh/press retries.
+        })
+        .finally(() => {
+          setStructureLoadingKeys((prev) => {
+            const next = new Set(prev);
+            next.delete(locationId);
+            return next;
+          });
+        });
+    });
+  }, [detailRow, snapshot, structureByKey, structureLoadingKeys]);
+
   if (!hydrated) {
     return (
       <div className="flex justify-center py-16">
@@ -539,6 +626,9 @@ export function OpenOrdersPanel() {
     ensureDeepChecked(row.regionId, row.typeId);
     ensureHistoryLoaded(row.regionId, row.typeId);
     ensureReprocessingLoaded(row.locationId, row.typeId);
+    // The structure market fetch (issue #538) is NOT triggered here — see
+    // the effect below keyed off `detailRow`/`snapshot`, which also covers
+    // `stationsLoaded` resolving after this click.
   }
 
   /**
@@ -1067,6 +1157,7 @@ export function OpenOrdersPanel() {
             return jumpsByPair.get(`${mySystemId}:${rival.systemId}`);
           })()}
           stationNameFor={(locationId) => snapshot.npcStations.get(locationId)?.name ?? null}
+          structureMarket={structureByKey.get(detailRow.locationId) ?? null}
           reprocessing={((): ReprocessingInput | undefined => {
             const loaded = reprocessingByKey.get(
               stationPriceKey(detailRow.locationId, detailRow.typeId)
@@ -1083,7 +1174,12 @@ export function OpenOrdersPanel() {
               },
             };
           })()}
-          onCheckDeeper={() => ensureDeepChecked(detailRow.regionId, detailRow.typeId)}
+          onCheckDeeper={() => {
+            ensureDeepChecked(detailRow.regionId, detailRow.typeId);
+            if (detailRow.stationName === null && snapshot.stationsLoaded) {
+              ensureStructureChecked(detailRow.characterId, detailRow.locationId);
+            }
+          }}
           onClose={() => setDetailOrderId(null)}
         />
       )}

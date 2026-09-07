@@ -1,14 +1,17 @@
-import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
-import { ESI_BASE_URL } from '@/esi/client';
+import { ESI_BASE_URL, configureEsi } from '@/esi/client';
+import { onEsiAuthFailure } from '@/esi/authFailureSignal';
 import { FUZZWORK_AGGREGATES_URL } from '@/market/fuzzwork';
 import { ESI_FANOUT_CONCURRENCY } from '@/lib/concurrency';
 import type { RegionOrder } from '@/esi/endpoints';
+import { db } from '@/db';
 import { clearOrderBookCache } from './orderBook';
 import {
   loadStationBestPrices,
   loadRegionCompetition,
+  loadStructureCompetition,
   loadJumpsBetween,
   clearJumpsCache,
 } from './orderCompetition';
@@ -266,5 +269,103 @@ describe('loadJumpsBetween', () => {
     expect(first).toEqual({ kind: 'unknown', reason: 'noRoute' });
     expect(second).toEqual({ kind: 'known', jumps: 1 });
     expect(hits).toBe(2);
+  });
+});
+
+describe('loadStructureCompetition (issue #538)', () => {
+  const CHARACTER_ID = 42;
+  const STRUCTURE_ID = 1_035_466_617_946;
+
+  beforeEach(async () => {
+    configureEsi({ getToken: vi.fn(async () => 'tok') });
+    await db.esiCache.clear();
+  });
+  afterEach(() => {
+    configureEsi({ getToken: null });
+  });
+
+  it('fetches and maps the structure book, keyed per character', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/markets/structures/${STRUCTURE_ID}`, () =>
+        HttpResponse.json(
+          [
+            {
+              duration: 90,
+              is_buy_order: false,
+              issued: '2026-09-01T00:00:00Z',
+              location_id: STRUCTURE_ID,
+              min_volume: 1,
+              order_id: 5,
+              price: 950,
+              range: 'region',
+              type_id: 34,
+              volume_remain: 10,
+              volume_total: 10,
+            },
+          ],
+          { headers: { 'X-Pages': '1' } }
+        )
+      )
+    );
+
+    const result = await loadStructureCompetition(CHARACTER_ID, STRUCTURE_ID);
+
+    expect(result).toEqual({
+      competitors: [
+        {
+          orderId: 5,
+          typeId: 34,
+          price: 950,
+          locationId: STRUCTURE_ID,
+          systemId: 0,
+          volumeRemain: 10,
+          isBuyOrder: false,
+        },
+      ],
+      truncated: false,
+    });
+    expect(
+      (await db.esiCache.get([CHARACTER_ID, `structure-market:${STRUCTURE_ID}`]))?.value
+    ).toHaveLength(1);
+  });
+
+  it('returns null on a 403 (not on this structure’s ACL) WITHOUT signalling a re-auth failure', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/markets/structures/${STRUCTURE_ID}`, () =>
+        HttpResponse.json({ error: 'Forbidden' }, { status: 403 })
+      )
+    );
+    const authFailures: number[] = [];
+    const unsubscribe = onEsiAuthFailure((characterId) => authFailures.push(characterId));
+
+    const result = await loadStructureCompetition(CHARACTER_ID, STRUCTURE_ID);
+
+    unsubscribe();
+    expect(result).toBeNull();
+    expect(authFailures).toEqual([]);
+  });
+
+  it('returns null when unresolvable (offline + uncached)', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/markets/structures/${STRUCTURE_ID}`, () => HttpResponse.error())
+    );
+
+    const result = await loadStructureCompetition(CHARACTER_ID, STRUCTURE_ID);
+
+    expect(result).toBeNull();
+  });
+
+  it('reports truncated when the book shrank mid-pagination (a page 404s after X-Pages promised more)', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/markets/structures/${STRUCTURE_ID}`, ({ request }) => {
+        const page = new URL(request.url).searchParams.get('page');
+        if (page === '2') return HttpResponse.json({ error: 'Not found' }, { status: 404 });
+        return HttpResponse.json([], { headers: { 'X-Pages': '2' } });
+      })
+    );
+
+    const result = await loadStructureCompetition(CHARACTER_ID, STRUCTURE_ID);
+
+    expect(result?.truncated).toBe(true);
   });
 });
