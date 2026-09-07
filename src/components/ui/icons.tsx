@@ -16,6 +16,7 @@
 
 import {
   Broadcast,
+  CalendarBlank,
   ArrowClockwise,
   ArrowCounterClockwise,
   ArrowDown,
@@ -224,6 +225,7 @@ export const Social = withWeight(EnvelopeSimple);
 /** Jump clones and implants. */
 export const Clones = withWeight(Stack);
 /** Contracts — courier, item exchange, auction. */
+export const CalendarEvent = withWeight(CalendarBlank);
 export const Contracts = withWeight(FileText);
 /** Corporation-owned surfaces: ops board, wallet divisions, roster, corp assets. */
 export const Corporation = withWeight(Buildings);

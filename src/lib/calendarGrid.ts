@@ -74,6 +74,20 @@ export function buildWeekDays(weekAnchor: Date, today: Date = new Date()): GridD
   return Array.from({ length: 7 }, (_, i) => toGridDay(addDays(gridStart, i), weekAnchor, today));
 }
 
+/**
+ * 14 Monday-first days containing the anchor — the Calendar Map's Fortnight
+ * density.
+ *
+ * Its own builder rather than a span argument on `buildMonthGrid`: that one is
+ * a fixed 42 cells aligned to a month, and a caller asking for 14 wants two
+ * whole weeks around a date instead, which is a different question about a
+ * different anchor.
+ */
+export function buildFortnightDays(anchor: Date, today: Date = new Date()): GridDay[] {
+  const gridStart = startOfWeek(anchor);
+  return Array.from({ length: 14 }, (_, i) => toGridDay(addDays(gridStart, i), anchor, today));
+}
+
 /** Monday..Sunday short weekday names, in the viewer's locale. */
 export function weekdayLabels(): string[] {
   const formatter = new Intl.DateTimeFormat(undefined, { weekday: 'short' });

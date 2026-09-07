@@ -1324,36 +1324,79 @@
     "responseDeclined": "Declined",
     "responseTentative": "Tentative",
     "responseNotResponded": "Not responded",
-    "viewMonth": "Month",
-    "viewWeek": "Week",
-    "viewAgenda": "Agenda",
-    "viewSwitcherLabel": "Calendar view",
-    "today": "Today",
     "prevMonth": "Previous month",
     "nextMonth": "Next month",
-    "prevWeek": "Previous week",
-    "nextWeek": "Next week",
-    "moreEvents_one": "+{{count}} more",
-    "moreEvents_other": "+{{count}} more",
-    "monthGridLabel": "Month calendar grid",
-    "weekGridLabel": "Week calendar grid",
-    "agendaListLabel": "Upcoming events",
     "exportCsv": "Export CSV",
     "csvDate": "Date",
     "csvTitle": "Title",
     "csvResponse": "Response",
-    "jumpToDate": "Jump to date",
-    "noEventsThisMonth": "No events this month.",
-    "noEventsThisWeek": "No events this week.",
     "downloadIcs": "Download .ics",
     "addToGoogleCalendar": "Add to Google Calendar",
     "contextMenu": {
-      "copyEventId": "Copy event ID",
-      "addToMonthView": "Add to Month view"
+      "copyEventId": "Copy event ID"
     },
-    "reauthTitle": "Log in again to see your calendar",
-    "reauthHint": "Log in again to fetch this character's calendar.",
-    "reauthAction": "Log in again with EVE Online"
+    "important": "High",
+    "overdue": "Overdue",
+    "due": "in {{duration}}",
+    "prevFortnight": "Previous fortnight",
+    "nextFortnight": "Next fortnight",
+    "kind": {
+      "calendarEvent": "Calendar events",
+      "skillTraining": "Skill queue",
+      "industryJob": "Industry jobs",
+      "planetExtraction": "Planets",
+      "contractExpiry": "Contracts",
+      "orderExpiry": "Market orders"
+    },
+    "detail": {
+      "industryJob": {
+        "active": "in progress",
+        "ready": "ready to deliver"
+      },
+      "orderExpiry": {
+        "buy": "buy order",
+        "sell": "sell order"
+      },
+      "contractExpiry": {
+        "courier": "courier",
+        "item_exchange": "item exchange",
+        "auction": "auction",
+        "loan": "loan",
+        "unknown": "contract"
+      }
+    },
+    "filter": {
+      "title": "Event types",
+      "open": "Filter event types",
+      "openWithCount": "Filter event types ({{count}} hidden)",
+      "notGranted": "Not granted",
+      "showAll": "Show all types"
+    },
+    "map": {
+      "title": "Calendar",
+      "label": "Calendar map",
+      "today": "Today",
+      "clearDay": "Show all days",
+      "pastHint": "Earlier days stay empty — EVE only returns events from now on."
+    },
+    "density": {
+      "toMonth": "Show the whole month",
+      "toFortnight": "Show a fortnight"
+    },
+    "day": {
+      "today": "Today · {{date}}",
+      "tomorrow": "Tomorrow · {{date}}"
+    },
+    "rail": {
+      "title": "Coming up",
+      "count_one": "{{count}} ahead",
+      "count_other": "{{count}} ahead",
+      "empty": "Nothing coming up",
+      "emptyHint": "Nothing due in the next 30 days.",
+      "emptyForDay": "Nothing due on this day",
+      "noKinds": "No event types selected",
+      "noKindsHint": "Pick at least one type from the filter to see what is coming up."
+    }
   },
   "clones": {
     "title": "Clones",

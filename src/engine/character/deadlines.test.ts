@@ -7,6 +7,7 @@ import {
   groupByDay,
   localMidnight,
   relativeDayFor,
+  withinHorizon,
 } from './deadlines';
 
 /**
@@ -181,5 +182,34 @@ describe('countsByKind', () => {
     expect(counts.get('industryJob')).toBe(2);
     expect(counts.get('orderExpiry')).toBe(1);
     expect(counts.get('calendarEvent')).toBeUndefined();
+  });
+});
+
+describe('withinHorizon', () => {
+  const board = buildCharacterBoard({
+    nowMs: NOW,
+    industryJobs: [
+      clock('overdue', local(2026, 8, 1, 9)),
+      clock('soon', local(2026, 9, 9, 9)),
+      clock('edge', NOW + 30 * 86_400_000),
+      clock('beyond', NOW + 30 * 86_400_000 + 1),
+    ],
+  });
+
+  /**
+   * Overdue is not "outside the window" — a job finished and sitting
+   * undelivered is the most urgent thing the board holds, however long it has
+   * sat there. Only the future end is capped.
+   */
+  it('caps the future and keeps everything already overdue', () => {
+    expect(withinHorizon(board, NOW).map((item) => item.sourceId)).toEqual([
+      'overdue',
+      'soon',
+      'edge',
+    ]);
+  });
+
+  it('takes the horizon as an argument so one span can drive every surface', () => {
+    expect(withinHorizon(board, NOW, 1).map((item) => item.sourceId)).toEqual(['overdue']);
   });
 });
