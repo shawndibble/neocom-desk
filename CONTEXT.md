@@ -263,10 +263,14 @@ here — they go one per file in `docs/context/decisions/`.
   (`src/engine/market/orderSlots.ts`) and shown as the denominator of the
   Overview's Open orders tile.
 - **Payee**: Who the Moon Mining Tax ledger owes — user-managed `{name,
-default tax %, optional moon/system tag}`. The moon/system tag lets the UI
+default tax %, optional moon/system tag, optional Trade Hub}`. The
+  moon/system tag lets the UI
   auto-suggest (and pre-fill) the Payee and rate for a future Mining Ledger
   Entry from that system: "pick the moon, the corp, or the person, whichever
-  is memorable" (issue #523). Optionally also carries `entityId`, the EVE
+  is memorable" (issue #523). The Trade Hub is the order book this Payee's ore
+  is valued at (absent means Jita); it lives on the Payee rather than on the
+  device because the tax owed is a bill one player sends another, and it is
+  deliberately not the Market Browser's own hub preference. Optionally also carries `entityId`, the EVE
   character or corporation the ISK actually goes to — never asked for, since a
   Payee is a free-text label, but **learned** the first time a Made Payment to
   that recipient is confirmed as settling this Payee's entries, after which

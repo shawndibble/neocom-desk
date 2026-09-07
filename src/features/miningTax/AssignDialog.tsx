@@ -15,8 +15,10 @@ import { computeAssignmentValue } from '@/engine/miningTax/valuation';
 import { typeIconUrl } from '@/lib/eveImages';
 import { maskIsk } from '@/lib/isk';
 import { unmaskNumber } from '@/lib/numberMask';
+import { DEFAULT_TRADE_HUB } from '@/market/hubs';
 import { createAssignment, updateAssignment } from './assignments';
 import { updatePayee } from './payees';
+import { hubForPayee } from './pricing';
 import type { MoonMiningTaxRow } from './snapshot';
 
 interface AssignDialogProps {
@@ -26,8 +28,15 @@ interface AssignDialogProps {
   payees: readonly PayeeRecord[];
   systemName: string;
   typeNames: ReadonlyMap<number, string>;
-  /** Jita unit prices, already fetched by the parent route's snapshot load for every ore line across every row — a strict superset of what this dialog needs, so it reads this instead of re-fetching. */
-  unitPrices: ReadonlyMap<number, number>;
+  /**
+   * Unit prices at the trade hub a Payee bills at (`PayeeRecord.hubId`;
+   * `undefined` means the default, Jita). A lookup rather than one map,
+   * because *which* prices apply is decided by this dialog's own Payee
+   * selection: the pilot picking a different Payee re-values the same ore. The
+   * parent route's snapshot has already fetched every hub its Payees use for
+   * every ore line across every row, so this never re-fetches.
+   */
+  pricesFor: (hubId: string | undefined) => ReadonlyMap<number, number>;
   /** True while a sibling action (Mark as paid / Resolve / Undo) is in flight, so this form's own submit can't race it. */
   busy: boolean;
   onAssigned: () => void;
@@ -105,6 +114,11 @@ function IskField({ ariaLabel, computedDefault, override, onOverrideChange }: Is
  * correcting *from* a known tax-owed total. Clearing a field back to empty
  * returns both value fields to tracking their freshly computed defaults.
  *
+ * The ore is valued at the *selected* Payee's trade hub, re-derived on every
+ * render rather than fetched: picking a different Payee can change what the
+ * same ore is worth, because the hub belongs to the Payee (the figure is a
+ * bill one player sends another, not a local viewing preference).
+ *
  * "I already paid this" only shows up when creating: correcting an existing
  * record's fields never silently changes its paid/unpaid status (a dedicated
  * Mark as paid action does that, and only that).
@@ -115,7 +129,7 @@ export function AssignDialog({
   payees,
   systemName,
   typeNames,
-  unitPrices,
+  pricesFor,
   busy,
   onAssigned,
   onCancel,
@@ -167,16 +181,21 @@ export function AssignDialog({
     [oreLines, includedTypeIds]
   );
   const pctValue = Number(taxPct);
+  const selectedPayee = payees.find((p) => p.id === payeeId) ?? null;
+  // Before a Payee is picked there is no hub to bill against, so the preview
+  // shows the default one's figure — the same basis the row's Value column
+  // already used for still-unassigned ore.
+  const hub = hubForPayee(selectedPayee?.hubId);
   const computed = computeAssignmentValue(
     selectedLines,
-    unitPrices,
+    pricesFor(selectedPayee?.hubId),
     Number.isFinite(pctValue) ? pctValue : 0
   );
   const estimatedValue =
     estimatedValueOverride.trim() === ''
       ? computed.estimatedValue
       : (unmaskNumber(estimatedValueOverride) ?? NaN);
-  // Tracks the *current* estimated value and tax %, not the raw Jita
+  // Tracks the *current* estimated value and tax %, not the raw hub-priced
   // default — so an edit to either one keeps this field's display in sync
   // (the three fields are connected: taxOwed = estimatedValue * pct / 100).
   const taxOwed =
@@ -228,7 +247,6 @@ export function AssignDialog({
     }
   }
 
-  const selectedPayee = payees.find((p) => p.id === payeeId) ?? null;
   const offerRememberSystem =
     selectedPayee !== null && selectedPayee.systemId !== row.entry.solarSystemId;
 
@@ -241,6 +259,10 @@ export function AssignDialog({
           name: selectedPayee.name,
           defaultTaxPct: selectedPayee.defaultTaxPct,
           systemId: row.entry.solarSystemId,
+          // Carried through, not omitted: `updatePayee` deletes any field its
+          // input leaves out, so remembering a system would otherwise quietly
+          // move this Payee's billing back to Jita.
+          hubId: selectedPayee.hubId,
         });
       }
       if (assignment) {
@@ -381,6 +403,15 @@ export function AssignDialog({
             override={estimatedValueOverride}
             onOverrideChange={handleEstimatedValueChange}
           />
+          {/* Only for a Payee billing somewhere other than the default: at
+              Jita this would be a line of standing noise, anywhere else it is
+              the explanation for a figure that doesn't match the ledger's
+              own Value column. */}
+          {hub.id !== DEFAULT_TRADE_HUB.id && (
+            <p className="text-[0.6875rem] text-text-dim">
+              {t('miningTax.valuedAtHubHint', { hub: hub.systemName })}
+            </p>
+          )}
         </div>
 
         <div className="min-w-0 space-y-1 sm:flex-1">

@@ -21,7 +21,14 @@ interface RowDetailModalProps {
   systemSecurity: number | null | undefined;
   typeNames: ReadonlyMap<number, string>;
   payees: readonly PayeeRecord[];
+  /**
+   * Default-hub (Jita) prices, for this modal's own read-only valuation of an
+   * entry that has *no* Assignment and therefore no Payee to name a hub. The
+   * Assign form below values against a Payee instead — see `pricesFor`.
+   */
   unitPrices: ReadonlyMap<number, number>;
+  /** Prices at a given Payee's hub, forwarded to `AssignDialog`, which resolves its own from whichever Payee is selected. */
+  pricesFor: (hubId: string | undefined) => ReadonlyMap<number, number>;
   busy: boolean;
   /** A create or an edit through the Assign form both land here — refresh and close, same as every other action below. */
   onAssigned: () => void;
@@ -55,6 +62,7 @@ export function RowDetailModal({
   typeNames,
   payees,
   unitPrices,
+  pricesFor,
   busy,
   onAssigned,
   onDismiss,
@@ -168,7 +176,7 @@ export function RowDetailModal({
             payees={payees}
             systemName={systemName}
             typeNames={typeNames}
-            unitPrices={unitPrices}
+            pricesFor={pricesFor}
             busy={busy}
             onAssigned={onAssigned}
             onCancel={onClose}

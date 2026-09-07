@@ -73,3 +73,72 @@ export async function loadUnitPrices(
   }
   return { prices, unpriced };
 }
+
+/** One ledger's prices, at every hub its Payees actually bill against. */
+export interface HubUnitPrices {
+  /** Per-unit buy price by raw typeId, per hub id. Every loaded hub is priced for the *same* full type list — see `loadUnitPricesByHub`. */
+  byHub: ReadonlyMap<TradeHub['id'], ReadonlyMap<number, number>>;
+  /**
+   * Per hub, the raw typeIds that hub had no buy order for. Kept per hub
+   * rather than only as a union because "no buy orders" is a fact about one
+   * order book: Hek being thin on a moon ore says nothing about Jita, and a
+   * banner that blamed "the trade hub" for both would be wrong as soon as two
+   * Payees bill at different hubs.
+   */
+  unpricedByHub: ReadonlyMap<TradeHub['id'], ReadonlySet<number>>;
+  /** The union of `unpricedByHub` — "is there anything at all to warn about". */
+  unpriced: Set<number>;
+}
+
+const NO_PRICES: ReadonlyMap<number, number> = new Map();
+
+/**
+ * Prices at the hub `hubId` names, falling back to the default hub's map (and
+ * then to an empty one) when that hub was never loaded — an unknown or
+ * newly-typed hub id values ore at Jita rather than at nothing, matching
+ * `hubForPayee`.
+ */
+export function pricesAtHub(
+  byHub: ReadonlyMap<TradeHub['id'], ReadonlyMap<number, number>>,
+  hubId: string | undefined
+): ReadonlyMap<number, number> {
+  return byHub.get(hubForPayee(hubId).id) ?? byHub.get(DEFAULT_TRADE_HUB.id) ?? NO_PRICES;
+}
+
+/**
+ * Prices `typeIds` at each distinct hub in `hubIds` — the ledger's Payees'
+ * hubs — plus the default, which is always loaded: the ledger values its
+ * *unassigned* ore at Jita (no Payee, no hub) whether or not any Payee names
+ * one.
+ *
+ * Every hub is priced for the whole type list rather than only the types its
+ * own Payees have mined so far: an unassigned entry can be assigned to any
+ * Payee, and the Assign dialog re-prices live as the pilot changes that
+ * selection, so a per-hub narrowing would leave the preview blank for exactly
+ * the choice the pilot is making. One `getHubPrices` call per distinct hub —
+ * an all-Jita ledger (the common case) still makes exactly one.
+ */
+export async function loadUnitPricesByHub(
+  typeIds: readonly number[],
+  hubIds: Iterable<string | undefined>
+): Promise<HubUnitPrices> {
+  const hubs = new Map<TradeHub['id'], TradeHub>([[DEFAULT_TRADE_HUB.id, DEFAULT_TRADE_HUB]]);
+  for (const hubId of hubIds) {
+    const hub = hubForPayee(hubId);
+    hubs.set(hub.id, hub);
+  }
+
+  const loaded = await Promise.all(
+    [...hubs.values()].map(async (hub) => [hub.id, await loadUnitPrices(typeIds, hub)] as const)
+  );
+
+  const byHub = new Map<TradeHub['id'], ReadonlyMap<number, number>>();
+  const unpricedByHub = new Map<TradeHub['id'], ReadonlySet<number>>();
+  const unpriced = new Set<number>();
+  for (const [hubId, result] of loaded) {
+    byHub.set(hubId, result.prices);
+    unpricedByHub.set(hubId, result.unpriced);
+    for (const typeId of result.unpriced) unpriced.add(typeId);
+  }
+  return { byHub, unpricedByHub, unpriced };
+}
