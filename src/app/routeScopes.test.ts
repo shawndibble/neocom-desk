@@ -131,7 +131,7 @@ describe('every route must declare its scope requirement', () => {
     // Everything outside the gated area, listed deliberately: adding a path
     // here asserts the route needs no Character and no scope.
     const literalPaths = [...appSource.matchAll(/<Route\s+path="([^"]+)"/g)].map((m) => m[1]);
-    expect(literalPaths.sort()).toEqual(['*', '/', '/callback', '/login', '/styleguide']);
+    expect(literalPaths.sort()).toEqual(['*', '/', '/callback', '/error', '/login', '/styleguide']);
   });
 });
 
