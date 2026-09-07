@@ -40,8 +40,15 @@ export type ScopeRequirement = EsiScopeName | PublicAccess;
  * 35). Adding a group here is a product decision, not a mechanical one: the
  * default is the base grant, and a scope leaves it only when most users would
  * be consenting to something they will never exercise.
+ *
+ * `structureMarkets` (issue #538) exists because most Characters never list
+ * an order inside a player structure, so `esi-markets.structure_markets.v1`
+ * would cost everyone a consent-screen line for a check almost nobody's
+ * orders need. No settings surface requests this group yet — until one does,
+ * it stays grantable in principle but ungranted in practice, which degrades
+ * to the same "unavailable" row every ungranted Character already sees.
  */
-export const SCOPE_GROUPS = ['corp'] as const;
+export const SCOPE_GROUPS = ['corp', 'structureMarkets'] as const;
 export type ScopeGroup = (typeof SCOPE_GROUPS)[number];
 
 export interface EsiEndpointSpec {
@@ -281,6 +288,16 @@ export const ESI_REGISTRY = {
   getMarketHistory: {
     route: '/markets/{region_id}/history',
     scope: PUBLIC,
+  },
+
+  // Opt-in (issue #538): the region order book above never includes a player
+  // structure's own orders, so this is the only way to check one. ACL-gated
+  // per structure, same as `getUniverseStructure` — a 403 is a normal "not on
+  // this structure's ACL" outcome, never a reauth trigger.
+  getStructureMarketOrders: {
+    route: '/markets/structures/{structure_id}',
+    scope: 'esi-markets.structure_markets.v1',
+    group: 'structureMarkets',
   },
   getIndustrySystemCostIndices: {
     route: '/industry/systems',

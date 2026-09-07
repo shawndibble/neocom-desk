@@ -9,6 +9,7 @@ import {
   type OpenOrderRow,
   summariseOrderGroup,
   type CharacterSkills,
+  type StructureCompetitor,
 } from './openOrdersModel';
 import type { OpenOrdersSnapshot, CharacterOpenOrders } from './openOrdersData';
 import type { OrderCostBasis } from './orderCostBasis';
@@ -85,6 +86,13 @@ function deepEntry(
   competitors: readonly CompetingOrder[],
   truncated = false
 ): { competitors: readonly CompetingOrder[]; truncated: boolean } {
+  return { competitors, truncated };
+}
+
+function structureEntry(
+  competitors: readonly StructureCompetitor[],
+  truncated = false
+): { competitors: readonly StructureCompetitor[]; truncated: boolean } {
   return { competitors, truncated };
 }
 
@@ -423,6 +431,112 @@ describe('buildOpenOrderRows — worstScope and deep undercut', () => {
   it('is null (not an empty array outcome) when deepCompetition has no entry for this order at all', () => {
     const row = firstRow(baseInput({ deepCompetition: new Map() }));
     expect(row.deepUndercut).toBeNull();
+  });
+});
+
+describe('buildOpenOrderRows — structure market competition (issue #538)', () => {
+  it('folds a same-item rival from the structure order book into worstScope as station', () => {
+    const structureCompetition = new Map([
+      [
+        60003760,
+        structureEntry([
+          {
+            orderId: 2,
+            typeId: 100,
+            price: 950,
+            locationId: 60003760,
+            systemId: 30000142,
+            volumeRemain: 3,
+            isBuyOrder: false,
+          },
+        ]),
+      ],
+    ]);
+    const row = firstRow(baseInput({ structureCompetition }));
+    expect(row.worstScope).toBe('station');
+    expect(row.deepUndercut?.byScope.station?.price).toBe(950);
+  });
+
+  // The structure book returns every item at that location, not just mine —
+  // findUndercut itself does not filter by type (the region book is always
+  // pre-filtered to one type_id before it gets there), so this module must
+  // filter to `order.type_id` itself before merging structure competitors in.
+  it('drops a structure-book rival for a different item at the same location', () => {
+    const structureCompetition = new Map([
+      [
+        60003760,
+        structureEntry([
+          {
+            orderId: 2,
+            typeId: 100,
+            price: 1,
+            locationId: 60003760,
+            systemId: 30000142,
+            volumeRemain: 3,
+            isBuyOrder: false,
+          },
+        ]),
+      ],
+    ]);
+    const row = firstRow(
+      baseInput({
+        snapshot: makeSnapshot([makeEntry({ orders: [makeOrder({ type_id: 200 })] })]),
+        typeNames: new Map([[200, 'Pyerite']]),
+        structureCompetition,
+      })
+    );
+    expect(row.worstScope).toBeNull();
+  });
+
+  it('runs the deep check (non-null deepUndercut) from structure data alone, with no region fetch at all', () => {
+    const structureCompetition = new Map([[60003760, structureEntry([])]]);
+    const row = firstRow(baseInput({ structureCompetition }));
+    expect(row.deepUndercut).not.toBeNull();
+    expect(row.deepUndercut?.byScope.station).toBeNull();
+    expect(row.worstScope).toBeNull();
+  });
+
+  it('is null when structureCompetition has no entry for this order’s location at all', () => {
+    const row = firstRow(baseInput({ structureCompetition: new Map() }));
+    expect(row.deepUndercut).toBeNull();
+  });
+
+  it('merges structure and region rivals into one deep result, worst price wins', () => {
+    const deepCompetition = new Map([
+      [
+        1,
+        deepEntry([
+          {
+            orderId: 3,
+            price: 990,
+            locationId: 60003761,
+            systemId: 30000144,
+            volumeRemain: 1,
+            isBuyOrder: false,
+          },
+        ]),
+      ],
+    ]);
+    const structureCompetition = new Map([
+      [
+        60003760,
+        structureEntry([
+          {
+            orderId: 2,
+            typeId: 100,
+            price: 950,
+            locationId: 60003760,
+            systemId: 30000142,
+            volumeRemain: 3,
+            isBuyOrder: false,
+          },
+        ]),
+      ],
+    ]);
+    const row = firstRow(baseInput({ deepCompetition, structureCompetition }));
+    expect(row.worstScope).toBe('station');
+    expect(row.deepUndercut?.byScope.station?.price).toBe(950);
+    expect(row.deepUndercut?.byScope.region?.price).toBe(950);
   });
 });
 

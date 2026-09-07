@@ -266,6 +266,80 @@ describe('OrderDetailModal', () => {
     expect(regionRow).toHaveTextContent('Nobody cheaper here');
   });
 
+  it('shows a real rival for the station scope once the structure market has been fetched (issue #538)', () => {
+    const row: OpenOrderRow = {
+      ...BASE_ROW,
+      stationName: null,
+      problem: 'undercutStation',
+      problems: ['undercutStation'],
+      worstScope: 'station',
+      deepUndercut: {
+        worst: {
+          scope: 'station',
+          price: 480,
+          gapIsk: 20,
+          gapPct: 4,
+          volumeRemain: 7,
+          locationId: 60003760,
+          systemId: 0,
+          ordersBeatingMe: 1,
+          unitsBeatingMe: 7,
+        },
+        byScope: {
+          station: {
+            scope: 'station',
+            price: 480,
+            gapIsk: 20,
+            gapPct: 4,
+            volumeRemain: 7,
+            locationId: 60003760,
+            systemId: 0,
+            ordersBeatingMe: 1,
+            unitsBeatingMe: 7,
+          },
+        },
+      },
+    };
+    renderModal({
+      row,
+      structureMarket: { competitors: [], truncated: false },
+    });
+
+    const whoSection = screen.getByText('Who is cheaper, and where').closest('section')!;
+    const stationRow = within(whoSection).getByText('Station').closest('div');
+    // A real price, not the "unavailable" copy — that's the whole point of #538.
+    expect(stationRow).toHaveTextContent('480.00');
+    expect(stationRow).toHaveTextContent('4.0%');
+  });
+
+  it('says nobody is cheaper at the structure once fetched clean, still unavailable for system', () => {
+    const row: OpenOrderRow = {
+      ...BASE_ROW,
+      stationName: null,
+      deepUndercut: { worst: null, byScope: { station: null } },
+    };
+    renderModal({ row, structureMarket: { competitors: [], truncated: false } });
+
+    const whoSection = screen.getByText('Who is cheaper, and where').closest('section')!;
+    const stationRow = within(whoSection).getByText('Station').closest('div');
+    const systemRow = within(whoSection).getByText('System').closest('div');
+    expect(stationRow).toHaveTextContent('Nobody cheaper here');
+    expect(systemRow).toHaveTextContent("The market inside a player structure can't be read yet");
+  });
+
+  it('reads a clean-but-truncated structure book as "not checked", not "clear" (a partial book proves nothing)', () => {
+    const row: OpenOrderRow = {
+      ...BASE_ROW,
+      stationName: null,
+      deepUndercut: { worst: null, byScope: { station: null } },
+    };
+    renderModal({ row, structureMarket: { competitors: [], truncated: true } });
+
+    const whoSection = screen.getByText('Who is cheaper, and where').closest('section')!;
+    const stationRow = within(whoSection).getByText('Station').closest('div');
+    expect(stationRow).toHaveTextContent('Not checked yet');
+  });
+
   it('keeps the cost-basis card visible with no cost basis, and never shows a zero floor', () => {
     renderModal({ row: { ...BASE_ROW, costBasis: null, floor: null } });
 

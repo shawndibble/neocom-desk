@@ -1,7 +1,8 @@
 /**
  * ESI OAuth scopes for Neocom Desk v1. Read-only by design (see CONTEXT.md).
- * esi-markets.structure_markets.v1 deliberately excluded: v1 trade hubs are
- * NPC stations only, which need no scope.
+ * `esi-markets.structure_markets.v1` (issue #538) is opt-in only — behind the
+ * `structureMarkets` group, never the base grant — since checking a player
+ * structure's own market is a need almost nobody's orders have.
  *
  * Derived from `registry.ts`, never hand-maintained, so a scope is here only
  * because some endpoint asks for it. `e2e/support/fixtureData.ts` re-exports.

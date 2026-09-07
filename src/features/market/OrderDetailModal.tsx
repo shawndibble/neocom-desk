@@ -33,7 +33,7 @@ import type { UndercutRival, UndercutScope } from '@/engine/market/undercut';
 import { sellThrough, type SellThrough } from '@/engine/market/orderHealth';
 import { filterPriceHistoryRange } from '@/engine/market/priceHistory';
 import type { CharacterSkills, OpenOrderRow } from './openOrdersModel';
-import type { RegionCompetition } from './orderCompetition';
+import type { RegionCompetition, StructureCompetition } from './orderCompetition';
 import type { PriceHistoryResult } from './priceHistory';
 import { OrderProblemBadge } from './OrderProblemBadge';
 import { orderBadgeFor } from './orderBadgeKind';
@@ -71,6 +71,14 @@ export interface OrderDetailModalProps {
   reprocessing?: ReprocessingInput;
   /** Resolves a rival's location to a name, so the three scopes can be told apart when they quote the same seller. Returns null for a player structure. */
   stationNameFor: (locationId: number) => string | null;
+  /**
+   * This order's own structure's market book (issue #538), when this is a
+   * player structure and that book has been fetched. Null for every reason
+   * the station scope can't answer here: not a structure, no fetch attempted
+   * yet, the `structureMarkets` scope isn't granted, or this character isn't
+   * on the structure's ACL — all render as the same "unavailable" row.
+   */
+  structureMarket?: StructureCompetition | null;
   onCheckDeeper: () => void;
   onClose: () => void;
 }
@@ -114,6 +122,32 @@ function stationScopeState(
       },
     };
   }
+  return { kind: 'clear' };
+}
+
+/**
+ * The 'station' column for a player structure (issue #538): sourced from
+ * `row.deepUndercut.byScope.station`, which `openOrdersModel.ts` only
+ * populates once THIS structure's own book was actually fetched — never from
+ * `deepScopeState`, whose `deep.truncated` read is the REGION fetch's flag
+ * and would misattribute a structure-book truncation to the wrong fetch.
+ *
+ * 'unavailable' is the default and the failure mode alike: never fetched,
+ * the `structureMarkets` scope isn't granted, or this character isn't on the
+ * structure's ACL all leave `byScope.station` absent, and all read the same
+ * — there is no way, or reason, to tell them apart on the row.
+ */
+function structureStationScopeState(
+  row: OpenOrderRow,
+  structureMarket: StructureCompetition | null
+): ScopeState {
+  const byScope = row.deepUndercut?.byScope ?? {};
+  if (!('station' in byScope)) return { kind: 'unavailable' };
+  const rival = byScope.station;
+  if (rival) return { kind: 'rival', rival };
+  // A clean read from a TRUNCATED structure book is only proof of absence for
+  // the pages it actually saw — same reasoning as `deepScopeState` below.
+  if (structureMarket?.truncated) return { kind: 'notChecked' };
   return { kind: 'clear' };
 }
 
@@ -329,6 +363,7 @@ export function OrderDetailModal({
   regionJumps,
   reprocessing,
   stationNameFor,
+  structureMarket = null,
   onCheckDeeper,
   onClose,
 }: OrderDetailModalProps) {
@@ -340,7 +375,10 @@ export function OrderDetailModal({
       : 'known';
 
   const badge = orderBadgeFor(row);
-  const station = stationScopeState(row, stationChecked, location);
+  const station =
+    location === 'structure'
+      ? structureStationScopeState(row, structureMarket)
+      : stationScopeState(row, stationChecked, location);
   const system = deepScopeState('system', row, deep, location);
   const region = deepScopeState('region', row, deep, location);
 

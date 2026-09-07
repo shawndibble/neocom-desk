@@ -3,7 +3,7 @@
  * Market Orders page's undercut check (`engine/market/undercut.ts`'s
  * `CompetingOrder`/`UndercutScope`).
  *
- * Two tiers, deliberately asymmetric:
+ * Three tiers, deliberately asymmetric:
  *
  * - **Cheap tier — `loadStationBestPrices`.** A station's best sell/buy is
  *   one Fuzzwork aggregate lookup, batched across every station and item on
@@ -11,7 +11,9 @@
  *   fanned out at most `ESI_FANOUT_CONCURRENCY` requests at a time — this
  *   tier runs unprompted on every page load, so an unbounded `Promise.all`
  *   over every station on the page is not theoretical. Cheap enough to run
- *   for every order on every refresh, so it always runs.
+ *   for every order on every refresh, so it always runs. NPC stations only —
+ *   Fuzzwork aggregates public ESI market data, which never includes a
+ *   player structure's own orders.
  * - **Expensive tier — `loadRegionCompetition`.** Answering "who beats me in
  *   my SYSTEM" or "in my REGION" needs the whole region order book for that
  *   one item — there is no batched, per-station equivalent of that call.
@@ -19,6 +21,14 @@
  *   actually opened) rather than for the whole page eagerly. One call still
  *   answers all three `UndercutScope`s at once, because ESI's region order
  *   book carries both `location_id` AND `system_id` on every row.
+ * - **Structure tier — `loadStructureCompetition`** (issue #538). The region
+ *   book above never includes a player structure's own orders, so an order
+ *   parked there needs its own on-demand fetch of that ONE structure's whole
+ *   book (opt-in `structureMarkets` scope, ACL-gated per structure). Unlike
+ *   the other two tiers, this is per-CHARACTER — the same structure can be
+ *   visible to one of a player's characters and not another — so it goes
+ *   through `esi/cache.ts`'s per-character Dexie cache rather than the
+ *   session-lifetime in-memory map `getOrderBook` uses for public data.
  *
  * `loadRegionCompetition` wraps the EXISTING `getOrderBook` (300s TTL,
  * in-flight coalescing, ADR 0003) rather than adding a second cache layer —
@@ -26,11 +36,15 @@
  */
 import { fetchAggregates, type HubAggregate } from '@/market/fuzzwork';
 import { getOrderBook } from './orderBook';
-import { getRoute } from '@/esi/endpoints';
+import { getRoute, getStructureMarketOrders, type StructureMarketOrder } from '@/esi/endpoints';
+import { loadPaginatedWithCache } from '@/esi/cache';
+import { AuthError } from '@/auth/sso';
+import { EsiError } from '@/esi/client';
 import { jumpsAwayFromRoute, type JumpsAwayResult } from '@/engine/jumpsAway';
 import type { CompetingOrder } from '@/engine/market/undercut';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
 import { stationPriceKey } from './stationPriceKey';
+import type { StructureCompetitor } from './openOrdersModel';
 
 /**
  * Cheap tier: best sell/buy at a given station, batched across every station
@@ -100,6 +114,67 @@ export async function loadRegionCompetition(
     isBuyOrder: o.is_buy_order,
   }));
   return { competitors, fetchedAt, truncated };
+}
+
+export interface StructureCompetition {
+  competitors: StructureCompetitor[];
+  truncated: boolean;
+}
+
+/** ESI's own market-order cache window (same 300s the region book is held for, ADR 0003). */
+const STRUCTURE_MARKET_STALE_AFTER_MS = 300_000;
+
+function structureMarketCacheKey(structureId: number): string {
+  return `structure-market:${structureId}`;
+}
+
+/**
+ * Structure tier: one player structure's WHOLE market book, for one
+ * character. Returns null for every reason the row can't answer — the
+ * `structureMarkets` scope was never granted, this character isn't on the
+ * structure's ACL (403), or the request otherwise failed — the row only ever
+ * says "unavailable", never why.
+ *
+ * `detectAuthFailure` narrows to 401/`AuthError` only. `esi/cache.ts`'s
+ * default also treats a 403 as reauth-worthy (right for an endpoint whose
+ * 403 means "token is missing this scope"), but a structure's ACL denial is
+ * a normal, per-structure outcome — same reasoning `features/character/
+ * structures.ts`'s `loadStructure` already documents — and must never pin
+ * the app-wide reauth banner.
+ *
+ * `systemId` on every `StructureCompetitor` is a placeholder (0, never a real
+ * EVE system id): every entry here already shares `locationId` with the
+ * order it is compared against (it is that one structure's book), so it
+ * always wins the 'station' scope match before 'system' could ever be
+ * reached, and the Order Detail modal hard-codes 'system' as unavailable for
+ * a player structure regardless. Filling in a real system id would cost an
+ * extra ESI round trip for a value nothing ever reads.
+ */
+export async function loadStructureCompetition(
+  characterId: number,
+  structureId: number
+): Promise<StructureCompetition | null> {
+  const result = await loadPaginatedWithCache<StructureMarketOrder>(
+    characterId,
+    structureMarketCacheKey(structureId),
+    () => getStructureMarketOrders(characterId, structureId),
+    {
+      staleAfterMs: STRUCTURE_MARKET_STALE_AFTER_MS,
+      detectAuthFailure: (err) =>
+        err instanceof AuthError || (err instanceof EsiError && err.status === 401),
+    }
+  );
+  if (!result) return null;
+  const competitors: StructureCompetitor[] = result.data.map((o) => ({
+    orderId: o.order_id,
+    typeId: o.type_id,
+    price: o.price,
+    locationId: o.location_id,
+    systemId: 0,
+    volumeRemain: o.volume_remain,
+    isBuyOrder: o.is_buy_order,
+  }));
+  return { competitors, truncated: result.truncated };
 }
 
 function jumpsCacheKey(originSystemId: number, destinationSystemId: number): string {

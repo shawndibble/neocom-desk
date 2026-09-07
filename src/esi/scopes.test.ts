@@ -81,6 +81,12 @@ describe('scopesForGroup', () => {
     );
   });
 
+  it("lists exactly the structureMarkets group's scopes (issue #538)", () => {
+    expect([...scopesForGroup('structureMarkets')].sort()).toEqual(
+      ['esi-markets.structure_markets.v1'].sort()
+    );
+  });
+
   /**
    * Issue #327's first acceptance criterion, stated as its own case rather than
    * left implicit in the hand-written `SCOPES` list above: registering the corp
