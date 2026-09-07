@@ -376,6 +376,10 @@ describe('remembering the rail across an unmount', () => {
     await user.click(screen.getByRole('button', { name: 'Buy P2' }));
     unmount();
 
+    // Forced back through Dexie rather than riding the module store surviving
+    // the unmount: without this the test would still pass if the write never
+    // landed, or landed under the wrong key.
+    usePlanControls.setState({ value: DEFAULT_PI_PLAN_CONTROLS, hydrated: false });
     renderPanel();
     await verdict();
     expect(screen.getByRole('combobox', { name: 'Trade hub' })).toHaveTextContent('Amarr');
