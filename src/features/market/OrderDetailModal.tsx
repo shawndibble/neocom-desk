@@ -39,7 +39,7 @@ import { OrderProblemBadge } from './OrderProblemBadge';
 import { orderBadgeFor } from './orderBadgeKind';
 import { OrderRowSummaryText } from './OrderRowSummaryText';
 import { orderVerdict, type OrderVerdictKind } from './orderVerdict';
-import { orderExits, type ReprocessingInput } from './orderExits';
+import { orderExits, hubHaulGaps, type HubBuyPrice, type ReprocessingInput } from './orderExits';
 import { BASE_STATION_REPROCESSING_RATE } from '@/engine/industry/reprocessing';
 
 export interface OrderDetailModalProps {
@@ -69,6 +69,12 @@ export interface OrderDetailModalProps {
   regionJumps: JumpsAwayResult | undefined;
   /** The refine comparison, once its yield and material prices have loaded. Undefined keeps the row greyed as "not built for this item yet". */
   reprocessing?: ReprocessingInput;
+  /**
+   * What each trade hub pays for this item, once the aggregates land.
+   * Undefined until then — distinct from an empty list, which is the real
+   * answer that no hub bids at all.
+   */
+  hubs?: readonly HubBuyPrice[];
   /** Resolves a rival's location to a name, so the three scopes can be told apart when they quote the same seller. Returns null for a player structure. */
   stationNameFor: (locationId: number) => string | null;
   /**
@@ -362,6 +368,7 @@ export function OrderDetailModal({
   stationsLoaded,
   regionJumps,
   reprocessing,
+  hubs,
   stationNameFor,
   structureMarket = null,
   onCheckDeeper,
@@ -402,6 +409,7 @@ export function OrderDetailModal({
     region.kind === 'clear';
   const verdict = orderVerdict(row);
   const exits = orderExits({ row, competitors: deep?.competitors, reprocessing });
+  const haulGaps = hubHaulGaps({ row, hubs: hubs ?? [], competitors: deep?.competitors });
   const refine = exits.find((exit) => exit.kind === 'reprocess');
   const rank = stationRank(row, deep);
   const netIfSellsAsListed = row.floor ? row.price - row.floor.fill : null;
@@ -796,14 +804,47 @@ export function OrderDetailModal({
                 ))
               )}
               {/*
-                Named, not estimated: hauling needs hub prices this page does
-                not load. Saying it exists and is not built beats a number
-                nothing can back.
+                Hauling is a gap and a distance, never a net: what a hub pays
+                is knowable, what a courier charges is not. The rows survive a
+                missing Order Floor for the same reason — "Amarr bids more
+                than anyone here" needs no cost basis behind it.
               */}
-              <p className="flex items-baseline justify-between gap-3 text-text-faint">
-                <span>{t('market.orders.exitHaulNotBuilt')}</span>
-                <span className="shrink-0">{t('market.orders.exitNotBuilt')}</span>
-              </p>
+              {!row.isBuyOrder && (
+                <div className="border-t border-line pt-1.5">
+                  <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                    {t('market.orders.exitHaulTitle')}
+                  </p>
+                  {hubs === undefined ? (
+                    <p className="mt-1 text-text-dim">{t('market.orders.exitHaulLoading')}</p>
+                  ) : haulGaps.length === 0 ? (
+                    <p className="mt-1 text-text-dim">{t('market.orders.exitHaulNone')}</p>
+                  ) : (
+                    <>
+                      {haulGaps.map((gap) => (
+                        <p
+                          key={gap.hubId}
+                          className="mt-1 flex items-baseline justify-between gap-3"
+                        >
+                          <span className="text-text-dim">
+                            {t('market.orders.exitHaulHub', {
+                              hub: gap.systemName,
+                              price: formatIsk(gap.price, 2),
+                            })}{' '}
+                            <JumpsAwayText result={gap.jumps} t={t} />
+                          </span>
+                          <span className="shrink-0 tabular-nums text-success">
+                            {t('market.orders.exitHaulGap', {
+                              amount: formatIsk(gap.overLocal, 2),
+                              total: formatIsk(gap.totalIsk, 2),
+                            })}
+                          </span>
+                        </p>
+                      ))}
+                      <p className="mt-1 text-text-dim">{t('market.orders.exitHaulNote')}</p>
+                    </>
+                  )}
+                </div>
+              )}
               {!reprocessing && (
                 <p className="flex items-baseline justify-between gap-3 text-text-faint">
                   <span>{t('market.orders.exitReprocessNotBuilt')}</span>

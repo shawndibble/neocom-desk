@@ -77,6 +77,7 @@ import { ORDER_PROBLEMS, type OrderProblem } from '@/engine/market/orderProblems
 import { OrderProblemBadge } from './OrderProblemBadge';
 import { orderBadgeFor } from './orderBadgeKind';
 import { stationPriceKey } from './stationPriceKey';
+import type { HubBuyPrice } from './orderExits';
 import { OrderBadgeLegend } from './OrderBadgeLegend';
 import { OrderRowSummaryText } from './OrderRowSummaryText';
 import { OrderDetailModal } from './OrderDetailModal';
@@ -302,6 +303,17 @@ export function OpenOrdersPanel() {
   const [reprocessingLoadingKeys, setReprocessingLoadingKeys] = useState<ReadonlySet<string>>(
     new Set()
   );
+  /**
+   * What each trade hub bids for one item, keyed by type id alone: a hub's
+   * own buy orders do not change with where the player's stock happens to
+   * sit, unlike the refine prices above.
+   */
+  const [hubPricesByType, setHubPricesByType] = useState<
+    Map<number, Record<string, number | null>>
+  >(new Map());
+  const [hubPricesLoadingTypes, setHubPricesLoadingTypes] = useState<ReadonlySet<number>>(
+    new Set()
+  );
   const [historyByKey, setHistoryByKey] = useState<Map<string, PriceHistoryResult>>(new Map());
   const [historyLoadingKeys, setHistoryLoadingKeys] = useState<ReadonlySet<string>>(new Set());
 
@@ -434,6 +446,38 @@ export function OpenOrdersPanel() {
       });
   }
 
+  /**
+   * What every trade hub bids for the opened order's item, on the same
+   * on-open pattern as the refine comparison. Queried per hub STATION, not
+   * per region: a buy order elsewhere in the hub's region carries a range
+   * this app does not read and may not reach the hub at all, the same
+   * restriction `orderExits` applies to the player's own station.
+   */
+  function ensureHubPricesLoaded(typeId: number) {
+    if (hubPricesByType.has(typeId) || hubPricesLoadingTypes.has(typeId)) return;
+    setHubPricesLoadingTypes((prev) => new Set(prev).add(typeId));
+    void loadStationBestPrices(
+      TRADE_HUBS.map((hub) => ({ stationId: hub.stationId, typeIds: [typeId] }))
+    )
+      .then((prices) => {
+        const byHub: Record<string, number | null> = {};
+        for (const hub of TRADE_HUBS) {
+          byHub[hub.id] = prices.get(stationPriceKey(hub.stationId, typeId))?.buyMax ?? null;
+        }
+        setHubPricesByType((prev) => new Map(prev).set(typeId, byHub));
+      })
+      .catch(() => {
+        // Left uncached on failure so the next open retries.
+      })
+      .finally(() => {
+        setHubPricesLoadingTypes((prev) => {
+          const next = new Set(prev);
+          next.delete(typeId);
+          return next;
+        });
+      });
+  }
+
   const deepCompetitionByOrderId = useMemo(() => {
     const m = new Map<number, { competitors: readonly CompetingOrder[]; truncated: boolean }>();
     if (!snapshot) return m;
@@ -550,6 +594,23 @@ export function OpenOrdersPanel() {
     });
   }, [detailRow, snapshot, jumpsByPair]);
 
+  // Distance from the opened order to every trade hub. Routes only: a hub's
+  // price stands on its own where the origin system is unknown (a player
+  // structure), so the rows render with the distance blank rather than not
+  // at all.
+  useEffect(() => {
+    if (!detailRow || !snapshot) return;
+    const mySystemId = snapshot.npcStations.get(detailRow.locationId)?.systemId;
+    if (mySystemId === undefined) return;
+    for (const hub of TRADE_HUBS) {
+      const pairKey = `${mySystemId}:${hub.systemId}`;
+      if (jumpsByPair.has(pairKey)) continue;
+      void loadJumpsBetween(mySystemId, hub.systemId).then((result) => {
+        setJumpsByPair((prev) => new Map(prev).set(pairKey, result));
+      });
+    }
+  }, [detailRow, snapshot, jumpsByPair]);
+
   /**
    * The currently open row's structure market book (issue #538), once its
    * location is confirmed a player structure. An EFFECT, not a one-shot call
@@ -614,6 +675,7 @@ export function OpenOrdersPanel() {
     ensureDeepChecked(row.regionId, row.typeId);
     ensureHistoryLoaded(row.regionId, row.typeId);
     ensureReprocessingLoaded(row.locationId, row.typeId);
+    ensureHubPricesLoaded(row.typeId);
     // The structure market fetch (issue #538) is NOT triggered here — see
     // the effect below keyed off `detailRow`/`snapshot`, which also covers
     // `stationsLoaded` resolving after this click.
@@ -1161,6 +1223,21 @@ export function OpenOrdersPanel() {
                 specialisationLevel: skills.scrapmetalProcessingLevel,
               },
             };
+          })()}
+          hubs={((): readonly HubBuyPrice[] | undefined => {
+            const byHub = hubPricesByType.get(detailRow.typeId);
+            if (!byHub) return undefined;
+            const mySystemId = snapshot.npcStations.get(detailRow.locationId)?.systemId;
+            return TRADE_HUBS.map((hub) => ({
+              hubId: hub.id,
+              systemName: hub.systemName,
+              stationId: hub.stationId,
+              buyMax: byHub[hub.id] ?? null,
+              jumps:
+                mySystemId === undefined
+                  ? undefined
+                  : jumpsByPair.get(`${mySystemId}:${hub.systemId}`),
+            }));
           })()}
           onCheckDeeper={() => {
             ensureDeepChecked(detailRow.regionId, detailRow.typeId);
