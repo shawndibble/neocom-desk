@@ -1411,11 +1411,11 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
             </Select>
           </label>
           {/*
-            Its own switch rather than the Colonies panel's: that one is
-            ephemeral `useState` on another tab and answers "show me", where
-            this answers "plan with". Only offered when there is something to
-            plan with — a pilot with one Character should not be handed a
-            control that can do nothing.
+            Its own switch, under its own key, rather than the Colonies
+            panel's: that one sits on another tab and answers "show me", where
+            this answers "plan with" (see `altColoniesPref.ts`). Only offered
+            when there is something to plan with — a pilot with one Character
+            should not be handed a control that can do nothing.
           */}
           {snapshot.altAdvice.length > 0 && (
             <label className="mt-2 flex items-start gap-2 text-xs text-text">

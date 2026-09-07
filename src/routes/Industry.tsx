@@ -1,4 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  DEFAULT_FACILITY_DEFAULTS,
+  useFacilityDefaults,
+  type FacilityDefaults,
+} from '@/features/industry/facilityDefaults';
 import { Navigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -75,7 +80,8 @@ function newBuildPlan(
   characterId: number,
   entry: BlueprintCatalogEntry,
   owned: CharacterBlueprint | null,
-  defaultsFrom?: BuildPlanRecord | null
+  defaultsFrom?: BuildPlanRecord | null,
+  facilityDefaults: FacilityDefaults = DEFAULT_FACILITY_DEFAULTS
 ): BuildPlanRecord {
   // Unlike `IndustryBlueprint.activity` (optional, for pre-#460 engine test
   // literals), the SDE's own `BlueprintType.activity` is always set — no
@@ -83,6 +89,31 @@ function newBuildPlan(
   const activity = entry.blueprint.activity;
   const defaultsMatchActivity =
     defaultsFrom != null && FACILITY_PRESETS[defaultsFrom.facility].activity === activity;
+  // The pilot's own default, but only where it can host this activity — a
+  // refinery cannot manufacture and an NPC station cannot run a reaction, the
+  // same guard `fallbackFacility` exists for.
+  const preferred =
+    FACILITY_PRESETS[facilityDefaults.facility].activity === activity ? facilityDefaults : null;
+  /**
+   * Facility, rig level and owner-set tax move together, from one source.
+   *
+   * Taking the facility from one place and the rig from another produces a
+   * combination neither source ever held — an NPC station with T2 rigs fitted,
+   * which `normalizeFacilityDefaults` refuses to even store. It also made the
+   * pilot's configured rig and tax unreachable: any earlier plan, whatever its
+   * activity, supplied a `rigLevel` and won.
+   */
+  const facilityConfig: FacilityDefaults = defaultsMatchActivity
+    ? {
+        facility: defaultsFrom.facility,
+        rigLevel: defaultsFrom.rigLevel,
+        facilityTaxPct: defaultsFrom.facilityTaxPct ?? null,
+      }
+    : (preferred ?? {
+        facility: fallbackFacility(activity),
+        rigLevel: 'none',
+        facilityTaxPct: null,
+      });
   return {
     id: crypto.randomUUID(),
     characterId,
@@ -91,8 +122,8 @@ function newBuildPlan(
     runs: 1,
     me: owned?.material_efficiency ?? 0,
     te: owned?.time_efficiency ?? 0,
-    facility: defaultsMatchActivity ? defaultsFrom.facility : fallbackFacility(activity),
-    rigLevel: defaultsFrom?.rigLevel ?? 'none',
+    facility: facilityConfig.facility,
+    rigLevel: facilityConfig.rigLevel,
     security: defaultsFrom?.security ?? 'highsec',
     hubId: defaultsFrom?.hubId ?? DEFAULT_TRADE_HUB.id,
     // Carried like facility/rig/hub: a pilot who builds in one system builds
@@ -101,8 +132,8 @@ function newBuildPlan(
     ...(defaultsFrom?.buildSystemId !== undefined
       ? { buildSystemId: defaultsFrom.buildSystemId, buildSystemName: defaultsFrom.buildSystemName }
       : {}),
-    ...(defaultsFrom?.facilityTaxPct !== undefined
-      ? { facilityTaxPct: defaultsFrom.facilityTaxPct }
+    ...(facilityConfig.facilityTaxPct != null
+      ? { facilityTaxPct: facilityConfig.facilityTaxPct }
       : {}),
     // Carried like the hub it names a side of: a pilot who sources on buy
     // orders sources their next plan that way too.
@@ -135,6 +166,14 @@ function mostRecentlyUpdatedPlan(plans: BuildPlanRecord[] | undefined): BuildPla
 /** Build Plan manager: create (via blueprint search)/duplicate/delete/rename plans, edit the selected one. */
 export function Industry() {
   const { t } = useTranslation();
+  // Only consulted for a character's first plan, or one whose previous plan
+  // hosts a different activity — `newBuildPlan` carries everything forward
+  // from the most recent plan otherwise (issue #456).
+  const facilityDefaults = useFacilityDefaults((state) => state.value);
+  const hydrateFacilityDefaults = useFacilityDefaults((state) => state.hydrate);
+  useEffect(() => {
+    void hydrateFacilityDefaults();
+  }, [hydrateFacilityDefaults]);
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   const hydrated = useActiveCharacter((state) => state.hydrated);
   const [searchParams, setSearchParams] = useSearchParams();
@@ -241,12 +280,18 @@ export function Industry() {
     async (entry: BlueprintCatalogEntry): Promise<string | null> => {
       if (activeCharacterId === null) return null;
       const owned = findOwnedBlueprint(ownedBlueprints, entry.blueprintTypeID);
-      const plan = newBuildPlan(activeCharacterId, entry, owned, mostRecentlyUpdatedPlan(plans));
+      const plan = newBuildPlan(
+        activeCharacterId,
+        entry,
+        owned,
+        mostRecentlyUpdatedPlan(plans),
+        facilityDefaults
+      );
       await db.buildPlans.add(plan);
       scheduleSync(activeCharacterId);
       return plan.id;
     },
-    [activeCharacterId, ownedBlueprints, plans]
+    [activeCharacterId, ownedBlueprints, plans, facilityDefaults]
   );
 
   // The Market Browser's item context menu "jump to a Build Plan" action

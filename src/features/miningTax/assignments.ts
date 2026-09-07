@@ -1,8 +1,10 @@
 /**
  * Assignment CRUD for the Moon Mining Tax ledger (issue #523): links a Mining
  * Ledger Entry (or a split slice of its ore lines) to a Payee, snapshotting
- * tax % and Jita-priced ISK value **at assignment time** (invoice semantics —
- * see `engine/miningTax/valuation.ts`).
+ * tax % and the hub-priced ISK value **at assignment time** (invoice
+ * semantics — see `engine/miningTax/valuation.ts`). The hub is the Payee's own
+ * (`PayeeRecord.hubId`, Jita when it names none), since the figure is a bill
+ * one player sends another.
  */
 import {
   db,
@@ -15,7 +17,8 @@ import { computeAssignmentValue } from '@/engine/miningTax/valuation';
 import { linesOwnedBy } from '@/engine/miningTax/ownership';
 import { planSplit } from '@/engine/miningTax/split';
 import type { MiningLedgerEntry } from '@/engine/miningTax/types';
-import { loadJitaUnitPrices } from './pricing';
+import { loadPayees } from './payees';
+import { hubForPayee, loadUnitPrices } from './pricing';
 
 export function loadAssignments(characterId: number): Promise<MiningTaxAssignmentRecord[]> {
   return db.miningTaxAssignments.where('characterId').equals(characterId).toArray();
@@ -30,11 +33,11 @@ export interface AssignInput {
   /** The Payee's default, or the user's override in the Assign dialog. */
   taxPct: number;
   /**
-   * The Jita-priced default, or the pilot's own correction — the Assign
-   * dialog prefills both from `computeAssignmentValue` but leaves them
-   * editable, since a Jita price or a Payee's default rate can be wrong for
-   * a specific haul. Taken as given here rather than recomputed, so a
-   * pilot's edit is what actually gets persisted.
+   * The hub-priced default, or the pilot's own correction — the Assign
+   * dialog prefills both from `computeAssignmentValue` (at the chosen Payee's
+   * hub) but leaves them editable, since a hub price or a Payee's default rate
+   * can be wrong for a specific haul. Taken as given here rather than
+   * recomputed, so a pilot's edit is what actually gets persisted.
    */
   estimatedValue: number;
   taxOwed: number;
@@ -260,6 +263,20 @@ export interface SplitInput {
 }
 
 /**
+ * Per-unit prices for each side of a split. Two maps, not one: a split hands
+ * ore to a *different* Payee by construction, and two Payees can bill at two
+ * different trade hubs — pricing both sides from one book would misstate
+ * whichever bill it did not come from. They are the same map whenever the two
+ * Payees share a hub, which is the ordinary case.
+ */
+export interface SplitPrices {
+  /** The original Payee's hub — what the units staying put are worth. */
+  kept: ReadonlyMap<number, number>;
+  /** The second Payee's hub — what the moved units are worth. */
+  moved: ReadonlyMap<number, number>;
+}
+
+/**
  * Splits one assigned day by quantity between its Payee and a second one
  * (issue #523: two local-time sessions at two corps' moons land in one
  * EVE/UTC ledger entry). The moved units become a fresh Outstanding
@@ -267,21 +284,21 @@ export interface SplitInput {
  * the fact, and the paid figure stays with the kept side — and its remaining
  * units.
  *
- * Both sides are re-priced at `unitPrices` (the current Jita buy) rather
- * than apportioning the original's possibly hand-edited value: two
+ * Both sides are re-priced at the current buy orders of their own Payee's hub
+ * rather than apportioning the original's possibly hand-edited value: two
  * independently priced obligations is the same rule "join entries" chose.
  */
 export async function splitAssignment(
   original: MiningTaxAssignmentRecord,
   input: SplitInput,
-  unitPrices: ReadonlyMap<number, number>
+  prices: SplitPrices
 ): Promise<{ kept: MiningTaxAssignmentRecord; created: MiningTaxAssignmentRecord }> {
   const { kept: keptLines, moved: movedLines } = planSplit(original.oreLines, input.moves);
   if (movedLines.length === 0) throw new Error('Nothing to move');
   if (keptLines.length === 0) throw new Error('Cannot move every unit — unassign instead');
 
   const now = Date.now();
-  const keptValue = computeAssignmentValue(keptLines, unitPrices, original.taxPct);
+  const keptValue = computeAssignmentValue(keptLines, prices.kept, original.taxPct);
   const kept: MiningTaxAssignmentRecord = {
     ...original,
     oreLines: keptLines,
@@ -292,7 +309,7 @@ export async function splitAssignment(
   delete kept.collectsGrowth;
   if (input.collector === 'original') kept.collectsGrowth = true;
 
-  const createdValue = computeAssignmentValue(movedLines, unitPrices, input.taxPct);
+  const createdValue = computeAssignmentValue(movedLines, prices.moved, input.taxPct);
   const created: MiningTaxAssignmentRecord = {
     id: crypto.randomUUID(),
     characterId: original.characterId,
@@ -334,6 +351,12 @@ export async function deleteAssignment(assignment: MiningTaxAssignmentRecord): P
  * it re-snapshots to nothing) decides how much of the fresh entry it re-snapshots to: a sole Assignment
  * claims the whole entry, including any brand-new ore type; on a split entry
  * only the growth collector grows (`engine/miningTax/ownership.ts`).
+ *
+ * The re-price happens at this Assignment's *Payee's* hub, looked up here
+ * rather than passed in: every caller reaches this from a row action that has
+ * only the record, and a fresh invoice moment billed at some other hub's book
+ * would restate a bill the landlord never quoted. A dismissal (no Payee) and
+ * an Assignment whose Payee has since been deleted both fall back to Jita.
  */
 export async function resolveNeedsReview(
   assignment: MiningTaxAssignmentRecord,
@@ -341,7 +364,14 @@ export async function resolveNeedsReview(
   siblings: readonly MiningTaxAssignmentRecord[]
 ): Promise<void> {
   const relevantFresh = linesOwnedBy(freshEntry.oreLines, siblings, assignment.id);
-  const prices = await loadJitaUnitPrices(relevantFresh.map((line) => line.typeId));
+  const payee =
+    assignment.payeeId === undefined
+      ? undefined
+      : (await loadPayees(assignment.characterId)).find((p) => p.id === assignment.payeeId);
+  const { prices } = await loadUnitPrices(
+    relevantFresh.map((line) => line.typeId),
+    hubForPayee(payee?.hubId)
+  );
   const { estimatedValue, taxOwed } = computeAssignmentValue(
     relevantFresh,
     prices,

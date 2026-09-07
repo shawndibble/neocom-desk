@@ -18,20 +18,31 @@
  * ESI's ISO strings — `features/corp/members.ts` adapts at the boundary.
  */
 
+const DAY_MS = 86_400_000;
+
 /**
- * Days without a login after which a member is called dark.
+ * Default days without a login after which a member is called dark.
  *
  * Thirty because that is the span a corp's own inactivity policy is written in
  * — "no login in a month" is the sentence a recruiter or a director actually
  * says — and because a month is long enough to survive a holiday, which a
- * fortnight is not. One constant so the table's tone, the summary's count and
- * any later notification all agree on what dark means; a second opinion
- * anywhere else in the UI would be a bug on its face.
+ * fortnight is not.
+ *
+ * The *default*, not the rule: 14, 30, 60 and 90 are all real policies, and a
+ * director whose corp writes 60 got a chip that filtered to the wrong set and
+ * carried a wrong count, leaving them to sort and scan the roster by hand on
+ * every visit. `memberStanding` takes the span as an argument so the table's
+ * tone, the rail's count and the roster's filter still read one value — the
+ * point of a single constant was that the UI never holds two opinions at once,
+ * and passing one value from the view boundary keeps that true.
  */
 export const DARK_AFTER_DAYS = 30;
 
-/** `DARK_AFTER_DAYS` in milliseconds, the unit every span here is measured in. */
-export const DARK_AFTER_MS = DARK_AFTER_DAYS * 86_400_000;
+/**
+ * `DARK_AFTER_DAYS` in milliseconds. Kept for the tests, which express spans
+ * in it; no production caller reads it now that the span is a parameter.
+ */
+export const DARK_AFTER_MS = DARK_AFTER_DAYS * DAY_MS;
 
 /**
  * One member's activity, as the tracking read describes them.
@@ -101,7 +112,11 @@ function later(a: number | null, b: number | null): number | null {
  * of the dark count merely because they have no logon to subtract from would
  * hide exactly the recruit the page exists to surface.
  */
-export function memberStanding(member: MemberActivity, nowMs: number): MemberStanding {
+export function memberStanding(
+  member: MemberActivity,
+  nowMs: number,
+  darkAfterDays: number = DARK_AFTER_DAYS
+): MemberStanding {
   const lastSeenMs = later(member.logonMs, member.logoffMs);
   const since = lastSeenMs ?? member.startMs;
   const darkForMs = since === null ? null : nowMs - since;
@@ -110,7 +125,7 @@ export function memberStanding(member: MemberActivity, nowMs: number): MemberSta
     lastSeenMs,
     neverSeen: lastSeenMs === null,
     darkForMs,
-    isDark: darkForMs !== null && darkForMs >= DARK_AFTER_MS,
+    isDark: darkForMs !== null && darkForMs >= darkAfterDays * DAY_MS,
   };
 }
 

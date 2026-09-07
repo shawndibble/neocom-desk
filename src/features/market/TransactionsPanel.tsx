@@ -19,6 +19,7 @@ import { iskToneClass } from '@/features/character/format';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { formatIsk } from '@/lib/isk';
 import { formatTimestamp } from '@/lib/timestamp';
+import { useTimeZone } from '@/lib/timeFormat';
 import { downloadCsv } from '@/lib/downloadCsv';
 import {
   transactionTotal,
@@ -63,6 +64,7 @@ interface TransactionsPanelProps {
 
 export function TransactionsPanel({ onViewChange }: TransactionsPanelProps) {
   const { t } = useTranslation();
+  const timeZone = useTimeZone();
   const { data, error, loading, hydrated, activeCharacterId, refreshCount, refresh } =
     useRouteSnapshot(loadTransactionsSnapshot, undefined, { cacheKey: 'market:transactions' });
 
@@ -85,7 +87,7 @@ export function TransactionsPanel({ onViewChange }: TransactionsPanelProps) {
         id: 'date',
         header: t('wallet.date'),
         className: 'whitespace-nowrap text-text-dim',
-        render: (txn) => formatTimestamp(new Date(txn.date)),
+        render: (txn) => formatTimestamp(new Date(txn.date), timeZone),
       },
       {
         id: 'item',
@@ -126,7 +128,7 @@ export function TransactionsPanel({ onViewChange }: TransactionsPanelProps) {
         render: (txn) => formatIsk(transactionTotal(txn), 2),
       },
     ],
-    [t, typeNames]
+    [t, typeNames, timeZone]
   );
 
   if (!hydrated) {

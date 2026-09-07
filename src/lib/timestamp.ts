@@ -23,9 +23,18 @@ const TIMESTAMP_OPTIONS: Intl.DateTimeFormatOptions = {
   minute: '2-digit',
 };
 
-/** Local date and time, no seconds — the drop-in for a bare `toLocaleString()`. */
-export function formatTimestamp(date: Date): string {
-  return date.toLocaleString(undefined, TIMESTAMP_OPTIONS);
+/**
+ * Date and time, no seconds — the drop-in for a bare `toLocaleString()`.
+ *
+ * `timeZone` is the viewer's Time format preference (`lib/timeFormat.ts`),
+ * threaded in by the caller rather than read here: these stay pure functions
+ * of their arguments, and a component that renders a timestamp has to
+ * subscribe to the preference anyway or it would not re-render when the pilot
+ * changes it. Omitted means the host's own zone, which is the default and
+ * what every caller did before the preference existed.
+ */
+export function formatTimestamp(date: Date, timeZone?: string): string {
+  return date.toLocaleString(undefined, { ...TIMESTAMP_OPTIONS, timeZone });
 }
 
 const CALENDAR_OPTIONS: Intl.DateTimeFormatOptions = {
@@ -39,8 +48,8 @@ const CALENDAR_OPTIONS: Intl.DateTimeFormatOptions = {
  * Calendar event rows: month abbreviation, day, local time. No year — calendar
  * events are near-term, so the year is noise in a row that has to stay narrow.
  */
-export function formatCalendarTimestamp(date: Date): string {
-  return date.toLocaleString(undefined, CALENDAR_OPTIONS);
+export function formatCalendarTimestamp(date: Date, timeZone?: string): string {
+  return date.toLocaleString(undefined, { ...CALENDAR_OPTIONS, timeZone });
 }
 
 /**
@@ -51,6 +60,6 @@ export function formatCalendarTimestamp(date: Date): string {
 const TIME_OPTIONS: Intl.DateTimeFormatOptions = { hour: '2-digit', minute: '2-digit' };
 
 /** Time of day alone, for rows already grouped under a date column. */
-export function formatTimeOfDay(date: Date): string {
-  return date.toLocaleTimeString(undefined, TIME_OPTIONS);
+export function formatTimeOfDay(date: Date, timeZone?: string): string {
+  return date.toLocaleTimeString(undefined, { ...TIME_OPTIONS, timeZone });
 }

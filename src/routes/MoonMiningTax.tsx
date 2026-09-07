@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -21,6 +21,7 @@ import { beginEveLogin } from '@/app/loginFlow';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
+import type { TradeHub } from '@/market/hubs';
 import type { PayeeRecord } from '@/db';
 import { STATUS_LABEL_KEY, type MiningTaxRowStatus } from '@/engine/miningTax/rowStatus';
 import { computeAssignmentValue } from '@/engine/miningTax/valuation';
@@ -37,7 +38,7 @@ import {
   type GroupMember,
 } from '@/features/miningTax/groupRows';
 import { resolveRowNames } from '@/features/miningTax/names';
-import { loadJitaUnitPrices } from '@/features/miningTax/pricing';
+import { hubForPayee, loadUnitPricesByHub, pricesAtHub } from '@/features/miningTax/pricing';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { SecurityValue } from '@/features/character/assetBrowserRows';
 import {
@@ -47,6 +48,8 @@ import {
   resolveNeedsReview,
 } from '@/features/miningTax/assignments';
 import { tagAsIgnored, tagAsMoonOre } from '@/features/miningTax/typeOverrides';
+import { TypeOverridesDialog } from '@/features/miningTax/TypeOverridesDialog';
+import { useStatusFilter } from '@/features/miningTax/statusFilterPref';
 import { STATUS_TEXT_CLASS } from '@/features/miningTax/statusTone';
 import { computePayeeBalances, summarizeUnassigned } from '@/features/miningTax/balances';
 import {
@@ -77,8 +80,6 @@ const ALL_STATUSES: readonly MiningTaxRowStatus[] = [
   'paid',
   'dismissed',
 ];
-// Everything except Paid and Dismissed — both are "handled", opt-in to view (decision doc's Paid precedent).
-const DEFAULT_STATUSES = new Set<MiningTaxRowStatus>(['unassigned', 'needs-review', 'outstanding']);
 
 interface Snapshot {
   entries: MoonMiningTaxRow[];
@@ -91,7 +92,18 @@ interface Snapshot {
   systemNames: Map<number, string>;
   systemSecurity: Map<number, number>;
   typeNames: Map<number, string>;
-  unitPrices: Map<number, number>;
+  /**
+   * Default-hub (Jita) prices only, for the two valuations with no Payee to
+   * name a hub: an entry's still-unassigned residual, in the table's Value
+   * column and in Dismiss. Anything billed to a Payee reads `pricesByHub`.
+   */
+  unitPrices: ReadonlyMap<number, number>;
+  /** Prices at every hub this ledger's Payees bill at, plus the default. Resolved per Payee by `pricesFor`. */
+  pricesByHub: ReadonlyMap<TradeHub['id'], ReadonlyMap<number, number>>;
+  /** Per hub, the ore types that hub quoted no buy order for — their price entry is 0, which is not the same claim as "worthless". */
+  unpricedByHub: ReadonlyMap<TradeHub['id'], ReadonlySet<number>>;
+  /** Union of `unpricedByHub` — whether the banner has anything at all to say. */
+  unpricedTypeIds: Set<number>;
 }
 
 async function loadSnapshot(_characterId: number, signal: RouteSnapshotSignal): Promise<Snapshot> {
@@ -104,20 +116,42 @@ async function loadSnapshot(_characterId: number, signal: RouteSnapshotSignal): 
       systemSecurity: new Map(),
       typeNames: new Map(),
       unitPrices: new Map(),
+      pricesByHub: new Map(),
+      unpricedByHub: new Map(),
+      unpricedTypeIds: new Set(),
     };
   }
   const unclassifiedTypeIds = result.unclassified.flatMap((u) => u.typeIds);
+  // Every hub any Payee bills at, so a dialog can re-price live as the pilot
+  // changes which Payee an entry is assigned to. One fetch per *distinct*
+  // hub — an all-Jita ledger, the common case, still makes exactly one.
+  const payeeHubIds = [...result.payeesByCharacter.values()].flatMap((payees) =>
+    payees.map((payee) => payee.hubId)
+  );
   const [
     { systemNames, systemSecurity, typeNames: rowTypeNames },
-    unitPrices,
+    { byHub, unpricedByHub, unpriced: unpricedTypeIds },
     unclassifiedTypeNames,
   ] = await Promise.all([
     resolveRowNames(result.rows),
-    loadJitaUnitPrices(result.rows.flatMap((row) => row.entry.oreLines.map((line) => line.typeId))),
+    loadUnitPricesByHub(
+      result.rows.flatMap((row) => row.entry.oreLines.map((line) => line.typeId)),
+      payeeHubIds
+    ),
     loadTypeNames(unclassifiedTypeIds),
   ]);
   const typeNames = new Map([...rowTypeNames, ...unclassifiedTypeNames]);
-  return { ...result, entries: result.rows, systemNames, systemSecurity, typeNames, unitPrices };
+  return {
+    ...result,
+    entries: result.rows,
+    systemNames,
+    systemSecurity,
+    typeNames,
+    unitPrices: pricesAtHub(byHub, undefined),
+    pricesByHub: byHub,
+    unpricedByHub,
+    unpricedTypeIds,
+  };
 }
 
 /**
@@ -153,9 +187,28 @@ export function MoonMiningTax() {
 
   const [characterFilter, setCharacterFilter] = useState<ReadonlySet<number> | 'all'>('all');
   const [payeeFilter, setPayeeFilter] = useState<ReadonlySet<string> | 'all'>('all');
-  const [statusFilter, setStatusFilter] =
-    useState<ReadonlySet<MiningTaxRowStatus>>(DEFAULT_STATUSES);
+  // Remembered across visits (`statusFilterPref.ts`): this filter hides rows,
+  // so forgetting it silently drops whatever the pilot was working from.
+  const storedStatuses = useStatusFilter((state) => state.value);
+  const setStoredStatuses = useStatusFilter((state) => state.setValue);
+  const hydrateStatuses = useStatusFilter((state) => state.hydrate);
+  useEffect(() => {
+    void hydrateStatuses();
+  }, [hydrateStatuses]);
+  const statusFilter = useMemo(() => new Set(storedStatuses), [storedStatuses]);
+  const setStatusFilter = useCallback(
+    (next: ReadonlySet<MiningTaxRowStatus>) => void setStoredStatuses([...next]),
+    [setStoredStatuses]
+  );
   const [payeeManagerCharacterId, setPayeeManagerCharacterId] = useState<number | null>(null);
+  // Unconditional, deliberately. Hiding this behind "the pilot has at least
+  // one tag" reads tidier and reintroduces the shape of the bug it exists to
+  // fix: the check can only re-run when `data`'s identity changes, and a
+  // reload that *fails* after a successful tag leaves `data` on the retained
+  // snapshot — so the action would stay hidden while the error branch has
+  // already taken the banner away, stranding the pilot exactly as before. The
+  // dialog says so itself when there is nothing to show.
+  const [oreTagsOpen, setOreTagsOpen] = useState(false);
   // Row keys checked in the table's select column. Feeds all three bulk
   // actions (settle up / combine / dismiss), never just bulk-pay.
   const [selection, setSelection] = useState<ReadonlySet<string>>(new Set());
@@ -286,12 +339,15 @@ export function MoonMiningTax() {
   );
 
   function toggleStatus(status: MiningTaxRowStatus) {
-    setStatusFilter((previous) => {
-      const next = new Set(previous);
-      if (next.has(status)) next.delete(status);
-      else next.add(status);
-      return next;
-    });
+    const next = new Set(statusFilter);
+    if (next.has(status)) next.delete(status);
+    else next.add(status);
+    // Not an updater callback: the value now lives in a store rather than
+    // component state, and `statusFilter` is already the current one.
+    // Unselecting the last status is refused — an empty filter renders an
+    // empty table with nothing explaining it, and a stored empty array is
+    // rejected on read for the same reason.
+    if (next.size > 0) setStatusFilter(next);
   }
 
   function toggleCharacter(characterId: number) {
@@ -366,6 +422,17 @@ export function MoonMiningTax() {
       estimatedValue,
     });
     refresh();
+  }
+
+  /**
+   * The seam every value-computing dialog reads: prices at whichever hub a
+   * Payee bills at. A lookup rather than one map, because the dialogs are
+   * where the Payee is chosen — assigning to a different Payee, or splitting
+   * ore over to a second one, re-values the same ore against a different order
+   * book, and this is what lets that happen without another fetch.
+   */
+  function pricesFor(hubId: string | undefined): ReadonlyMap<number, number> {
+    return pricesAtHub(data?.pricesByHub ?? new Map(), hubId);
   }
 
   function payeeName(characterId: number, payeeId: string | undefined): string {
@@ -698,6 +765,7 @@ export function MoonMiningTax() {
                 {t('miningTax.managePayeesAction')}
               </Button>
             )}
+            <Button onClick={() => setOreTagsOpen(true)}>{t('miningTax.oreTagsAction')}</Button>
             <IconButton
               icon={<Icon.Refresh />}
               label={t('miningTax.refresh')}
@@ -744,6 +812,39 @@ export function MoonMiningTax() {
                   </li>
                 ))}
               </ul>
+            </div>
+          )}
+
+          {/*
+            An ore type the hub quoted no buy order for is valued at 0, which
+            renders exactly like a cheap ore and silently understates the bill.
+            Jita has orders for effectively every compressed ore, so this is
+            usually dead copy — it stops being dead the moment a Payee is
+            priced somewhere thinner. Named per hub rather than pooled: "no buy
+            orders" is a fact about one order book, and once two Payees bill at
+            two hubs, blaming both for one thin book would be wrong.
+          */}
+          {data && data.unpricedTypeIds.size > 0 && (
+            <div
+              role="alert"
+              className="space-y-1 rounded-xs border border-warning/60 bg-warning/10 p-2 text-xs"
+            >
+              <p className="font-semibold text-warning uppercase">{t('miningTax.unpricedTitle')}</p>
+              <ul className="space-y-0.5 text-text-dim">
+                {[...data.unpricedByHub]
+                  .filter(([, typeIds]) => typeIds.size > 0)
+                  .map(([hubId, typeIds]) => (
+                    <li key={hubId}>
+                      {t('miningTax.unpricedAtHub', {
+                        hub: hubForPayee(hubId).systemName,
+                        types: [...typeIds]
+                          .map((typeId) => data.typeNames.get(typeId) ?? `#${typeId}`)
+                          .join(', '),
+                      })}
+                    </li>
+                  ))}
+              </ul>
+              <p className="text-text-dim">{t('miningTax.unpricedHint')}</p>
             </div>
           )}
 
@@ -1021,6 +1122,14 @@ export function MoonMiningTax() {
         </>
       )}
 
+      {oreTagsOpen && (
+        <TypeOverridesDialog
+          open={oreTagsOpen}
+          onClose={() => setOreTagsOpen(false)}
+          onChanged={refresh}
+        />
+      )}
+
       {payeeManagerCharacterId !== null && (
         <PayeeManagerDialog
           open={payeeManagerCharacterId !== null}
@@ -1072,6 +1181,7 @@ export function MoonMiningTax() {
           typeNames={data.typeNames}
           payees={data.payeesByCharacter.get(detailTarget.row.characterId) ?? []}
           unitPrices={data.unitPrices}
+          pricesFor={pricesFor}
           busy={busy}
           onAssigned={handleAssignedFromDetail}
           onDismiss={() => void handleDismissFromDetail()}
@@ -1102,7 +1212,7 @@ export function MoonMiningTax() {
           systemName={systemName(splitTarget)}
           payees={data.payeesByCharacter.get(splitTarget.row.characterId) ?? []}
           typeNames={data.typeNames}
-          unitPrices={data.unitPrices}
+          pricesFor={pricesFor}
           busy={busy}
           onSplit={() => {
             setSplitTarget(null);
@@ -1127,7 +1237,7 @@ export function MoonMiningTax() {
           initialSelection={joinCandidateOverride ? 'all' : 'none'}
           payees={data.payeesByCharacter.get(joinTarget.row.characterId) ?? []}
           typeNames={data.typeNames}
-          unitPrices={data.unitPrices}
+          pricesFor={pricesFor}
           busy={busy}
           onJoined={handleJoined}
         />

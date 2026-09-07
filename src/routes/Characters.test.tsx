@@ -13,6 +13,11 @@ import {
   OVERVIEW_GROUPS_SETTING_KEY,
   useOverviewGroups,
 } from '@/features/character/overviewGroups';
+import {
+  NO_STARRED_CHARACTERS,
+  STARRED_CHARACTERS_SETTING_KEY,
+  useStarredCharacters,
+} from '@/features/character/starredCharacters';
 import { FONT_SCALE_KEY, useFontScale } from '@/lib/fontScale';
 import { Characters } from './Characters';
 
@@ -70,6 +75,7 @@ beforeEach(async () => {
   useActiveCharacter.setState({ activeCharacterId: null, hydrated: true });
   usePublicInfo.setState({ byCharacterId: {} });
   useOverviewGroups.setState({ value: { groups: [], updatedAt: 0 }, hydrated: false });
+  useStarredCharacters.setState({ value: NO_STARRED_CHARACTERS, hydrated: false });
   useFontScale.setState({ value: 1, hydrated: false });
   await db.characters.bulkPut([
     { characterId: 91, name: 'Pilot One', ownerHash: 'oh-1', addedAt: 1 },
@@ -267,6 +273,118 @@ describe('Characters', () => {
     await waitFor(() => expect(firstCardName()).toContain('Pilot One'));
   });
 
+  it('floats starred characters to the top without disturbing the sort under them', async () => {
+    // Three, so the assertion can tell "starred first" apart from "reversed":
+    // by name ascending the wall reads One, Three, Two — starring Two must
+    // lift only Two and leave One before Three exactly as the sort had them.
+    await db.characters.put({
+      characterId: 93,
+      name: 'Pilot Three',
+      ownerHash: 'oh-3',
+      addedAt: 3,
+    });
+    const user = userEvent.setup();
+    renderCharacters();
+    await screen.findByText('Pilot Three');
+
+    function cardOrder() {
+      return screen
+        .getAllByRole('button', { name: /^Select /i })
+        .map((button) => button.textContent ?? '');
+    }
+
+    // The name sort only takes hold once the async roster snapshot lands —
+    // before that the wall is in characterId order, which for these three
+    // happens to put Pilot One first too. Wait on the position that differs.
+    await waitFor(() => expect(cardOrder()[1]).toContain('Pilot Three'));
+    expect(cardOrder()[0]).toContain('Pilot One');
+
+    await user.click(screen.getByRole('button', { name: 'Star Pilot Two' }));
+
+    await waitFor(() => expect(cardOrder()[0]).toContain('Pilot Two'));
+    expect(cardOrder()[1]).toContain('Pilot One');
+    expect(cardOrder()[2]).toContain('Pilot Three');
+    await waitForSettingsValue(
+      STARRED_CHARACTERS_SETTING_KEY,
+      (value) => Array.isArray(value) && value.length === 1 && value[0] === 92
+    );
+
+    // The same control unstars, and says so — the accessible name carries the
+    // direction of the press, not just which card it sits on.
+    await user.click(screen.getByRole('button', { name: 'Unstar Pilot Two' }));
+    await waitFor(() => expect(cardOrder()[0]).toContain('Pilot One'));
+    await waitForSettingsValue(
+      STARRED_CHARACTERS_SETTING_KEY,
+      (value) => Array.isArray(value) && value.length === 0
+    );
+  });
+
+  it('floats a star inside its own group section rather than out of it', async () => {
+    // The star raises the card where it already lives: no top-level "Starred"
+    // section, so the grouping and the star never disagree about where a
+    // character is. Pilot Three leads Alts; Pilot One stays down in Ungrouped.
+    await db.characters.put({
+      characterId: 93,
+      name: 'Pilot Three',
+      ownerHash: 'oh-3',
+      addedAt: 3,
+    });
+    await useOverviewGroups.getState().setValue({
+      groups: [{ id: 'a', name: 'Alts', characterIds: [92, 93] }],
+      updatedAt: 1,
+    });
+    await useStarredCharacters.getState().setValue([93]);
+    renderCharacters();
+
+    const altsSection = (await screen.findByRole('heading', { name: 'Alts' })).closest(
+      'section'
+    ) as HTMLElement;
+    const ungroupedSection = screen
+      .getByRole('heading', { name: 'Ungrouped' })
+      .closest('section') as HTMLElement;
+
+    await waitFor(() => {
+      const inAlts = within(altsSection).getAllByRole('button', { name: /^Select /i });
+      expect(inAlts[0]).toHaveTextContent('Pilot Three');
+      expect(inAlts[1]).toHaveTextContent('Pilot Two');
+    });
+    // Still in its own section, not lifted into a starred one above it.
+    expect(
+      within(ungroupedSection).getByRole('button', { name: 'Select Pilot One' })
+    ).toBeVisible();
+    expect(
+      within(ungroupedSection).queryByRole('button', { name: 'Select Pilot Three' })
+    ).not.toBeInTheDocument();
+  });
+
+  it('reads stars back from Dexie on load, not just within the session', async () => {
+    // Seeded as a raw settings row with the store left unhydrated — the path a
+    // reload actually takes. Seeding through `setValue` would apply the value
+    // directly and never exercise `hydrate`.
+    await db.settings.put({ key: STARRED_CHARACTERS_SETTING_KEY, value: [92] });
+    renderCharacters();
+
+    expect(await screen.findByRole('button', { name: 'Unstar Pilot Two' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+    const names = screen.getAllByRole('button', { name: /^Select /i });
+    expect(names[0]).toHaveTextContent('Pilot Two');
+  });
+
+  it('falls back to nothing starred when the stored value is malformed', async () => {
+    await db.settings.put({ key: STARRED_CHARACTERS_SETTING_KEY, value: { '92': true } });
+    renderCharacters();
+
+    // The page renders, and every card is simply unstarred — a damaged row is
+    // not worth taking the roster down for.
+    expect(await screen.findByRole('button', { name: 'Star Pilot One' })).toHaveAttribute(
+      'aria-pressed',
+      'false'
+    );
+    expect(screen.getByRole('button', { name: 'Star Pilot Two' })).toBeInTheDocument();
+  });
+
   it('changes density via the shared font-scale mechanism, not a second one', async () => {
     const user = userEvent.setup();
     renderCharacters();
@@ -376,6 +494,36 @@ describe('Characters', () => {
       const groups = (value as { groups: { characterIds: number[] }[] }).groups;
       return groups[0]?.characterIds.length === 1 && groups[0].characterIds[0] === 91;
     });
+  });
+
+  it('drops a star once its character no longer exists', async () => {
+    // Reconciled against the roster rather than hooked onto the remove button:
+    // a Character can also leave this device as a sold Character, which never
+    // presses that button (removeCharacter.ts's header).
+    await useStarredCharacters.getState().setValue([91, 999]);
+    renderCharacters();
+    await screen.findByText('Pilot One');
+
+    await waitForSettingsValue(
+      STARRED_CHARACTERS_SETTING_KEY,
+      (value) => Array.isArray(value) && value.length === 1 && value[0] === 91
+    );
+  });
+
+  it('drops the star of a character removed from the wall', async () => {
+    await useStarredCharacters.getState().setValue([91]);
+    const user = userEvent.setup();
+    renderCharacters();
+    await screen.findByText('Pilot One');
+
+    await user.click(screen.getByRole('button', { name: 'Remove Pilot One' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Remove' });
+    await user.click(within(dialog).getByRole('button', { name: 'Remove' }));
+
+    await waitForSettingsValue(
+      STARRED_CHARACTERS_SETTING_KEY,
+      (value) => Array.isArray(value) && value.length === 0
+    );
   });
 });
 

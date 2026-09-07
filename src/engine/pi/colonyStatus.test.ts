@@ -43,6 +43,16 @@ describe('extractorState', () => {
     expect(extractorState(NOW - HOUR, NOW)).toBe('expired');
   });
 
+  it('takes the pilot’s own warning window when one is given', () => {
+    // 36h out: inside a 48h window, outside the default 24h one.
+    expect(extractorState(NOW + 36 * HOUR, NOW, 48 * HOUR)).toBe('expiring-soon');
+    expect(extractorState(NOW + 36 * HOUR, NOW)).toBe('active');
+  });
+
+  it('still reports expired regardless of how wide the window is', () => {
+    expect(extractorState(NOW - HOUR, NOW, 72 * HOUR)).toBe('expired');
+  });
+
   it('is deterministic under a fixed nowMs', () => {
     const a = extractorState(NOW + HOUR, NOW);
     const b = extractorState(NOW + HOUR, NOW);
@@ -94,6 +104,12 @@ describe('colonyAttention', () => {
     expect(colonyAttention({ idle: false, soonestExpiryMs: null }, NOW)).toBe('healthy');
     expect(colonyAttention({ idle: false, soonestExpiryMs: NOW + 48 * HOUR }, NOW)).toBe('healthy');
   });
+
+  it('takes the pilot’s own warning window when one is given', () => {
+    const status = { idle: false, soonestExpiryMs: NOW + 36 * HOUR };
+    expect(colonyAttention(status, NOW, 48 * HOUR)).toBe('expiring-soon');
+    expect(colonyAttention(status, NOW)).toBe('healthy');
+  });
 });
 
 describe('sortColoniesByAttention', () => {
@@ -117,6 +133,23 @@ describe('sortColoniesByAttention', () => {
     ];
     const sorted = sortColoniesByAttention(colonies, (c) => c.status, NOW);
     expect(sorted.map((c) => c.id)).toEqual(['idle', 'soon', 'decayed', 'healthy']);
+  });
+
+  it('re-ranks colonies when the pilot widens the warning window', () => {
+    const colonies = [
+      { id: 'decayed', status: { idle: false, soonestExpiryMs: NOW + 72 * HOUR, decayed: true } },
+      { id: 'thirtySix', status: { idle: false, soonestExpiryMs: NOW + 36 * HOUR } },
+    ];
+    // At 24h the 36-hour colony is merely healthy, so the decayed one outranks
+    // it. At 48h it becomes expiring-soon and jumps the queue — the window
+    // changes what the pilot sees first, which is why it earns a control.
+    expect(sortColoniesByAttention(colonies, (c) => c.status, NOW).map((c) => c.id)).toEqual([
+      'decayed',
+      'thirtySix',
+    ]);
+    expect(
+      sortColoniesByAttention(colonies, (c) => c.status, NOW, 48 * HOUR).map((c) => c.id)
+    ).toEqual(['thirtySix', 'decayed']);
   });
 });
 

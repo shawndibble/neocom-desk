@@ -51,6 +51,7 @@ import { getAccessTokenReportingFailures } from './tokenProvider';
 import type { AppRoutePath } from './routeScopes';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useFontScale } from '@/lib/fontScale';
+import { useTimeFormat } from '@/lib/timeFormat';
 
 // Wire authenticated ESI calls to stored tokens once, at module load. Wrapped
 // (tokenProvider.ts) so a dead refresh grant is reported centrally instead of
@@ -143,6 +144,19 @@ export function App() {
   useEffect(() => {
     void hydrateFontScale();
   }, [hydrateFontScale]);
+
+  // Same reasoning, one level up from any single view: the Time format
+  // preference is read by `DataAgeBadge` — which rides on nearly every
+  // ESI-backed page — plus fourteen more call sites across nine files
+  // (Contracts, Clones, Wallet, Market, Overview, PI, notifications, and
+  // the signed-out landing page's sample timestamps). Hydrating per consumer
+  // would be that many copies of this effect racing for the same Dexie row,
+  // and each would still paint its first frame on the default before the
+  // read landed. Once here, before any route mounts, covers them all.
+  const hydrateTimeFormat = useTimeFormat((state) => state.hydrate);
+  useEffect(() => {
+    void hydrateTimeFormat();
+  }, [hydrateTimeFormat]);
 
   // `esi` publishes auth failures; the store is subscribed here so `esi` keeps
   // no dependency on `src/stores` (docs/ARCHITECTURE.md §2).

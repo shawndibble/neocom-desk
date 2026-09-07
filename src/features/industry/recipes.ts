@@ -25,6 +25,20 @@ export interface RecipeCatalog {
 export interface RecipeSources extends RecipeCatalog {
   /** Sets the ME a hypothetical sub-job would run at. */
   ownedBlueprints: readonly CharacterBlueprint[];
+  /**
+   * ME to quote a sub-job at when the character owns no copy of its blueprint.
+   * Optional, defaulting to 0 — unresearched, which is what this was before it
+   * became settable, so an omitted value changes no existing number.
+   *
+   * An owned copy always wins: this fills the gap where there is nothing to
+   * read, it never overrides a real ME in either direction.
+   */
+  assumedMeForUnowned?: number;
+}
+
+/** ME is 0..10 in the engine, which range-checks it and throws outside that. */
+function clampMe(me: number): number {
+  return Math.min(10, Math.max(0, Math.round(me)));
 }
 
 /** What a recipe consumes, or null when nothing produces the type. Independent of ME, which changes quantities but never the input list. */
@@ -37,18 +51,24 @@ function recipeInputs(typeID: number, sources: RecipeCatalog): readonly Quantity
 
 /**
  * ME the sub-job is quoted at: the best copy the character actually owns,
- * else unresearched. Same rule as the ME field's "Owned" hint, so the number
+ * else the assumed ME. Same rule as the ME field's "Owned" hint, so the number
  * behind a row's verdict is one the page already shows somewhere.
+ *
+ * The unowned case used to be a hard 0, which quoted every recursive sub-build
+ * in a multi-level plan as unresearched with no way to say otherwise — the
+ * top-level plan's ME is an editable field, but an intermediate's was not
+ * reachable from anywhere, so a plan understated its own profitability at
+ * every level below the first and said nothing about it.
  */
-function ownedMaterialEfficiency(
+function materialEfficiencyFor(
   blueprintTypeID: number,
-  ownedBlueprints: readonly CharacterBlueprint[]
+  ownedBlueprints: readonly CharacterBlueprint[],
+  assumedMeForUnowned: number
 ): number {
   const owned = findOwnedBlueprint(ownedBlueprints, blueprintTypeID);
-  if (!owned) return 0;
-  // Clamped, not trusted: the engine range-checks ME and would throw on a
-  // value outside 0..10.
-  return Math.min(10, Math.max(0, Math.round(owned.material_efficiency)));
+  // Clamped, not trusted, on both paths: ESI can carry a nonsense ME and the
+  // assumed value arrives from a stored preference.
+  return clampMe(owned ? owned.material_efficiency : assumedMeForUnowned);
 }
 
 /** The recipe for one material, or null when nothing in the SDE produces it. */
@@ -64,7 +84,11 @@ export function materialRecipe(typeID: number, sources: RecipeSources): Material
     return {
       method: 'manufacturing',
       blueprint: toIndustryBlueprint(entry.blueprint),
-      me: ownedMaterialEfficiency(entry.blueprintTypeID, sources.ownedBlueprints),
+      me: materialEfficiencyFor(
+        entry.blueprintTypeID,
+        sources.ownedBlueprints,
+        sources.assumedMeForUnowned ?? 0
+      ),
     };
   }
   const schematic = sources.pi?.schematics[String(typeID)];

@@ -38,6 +38,7 @@ import {
 import { formatAge, HOUR_MS, MINUTE_MS } from '@/lib/age';
 import { formatIsk } from '@/lib/isk';
 import { formatTimestamp } from '@/lib/timestamp';
+import { useTimeZone } from '@/lib/timeFormat';
 
 const REPO_URL = 'https://github.com/shawndibble/neocom-desk';
 
@@ -125,6 +126,7 @@ const PREVIEW = {
 /** Landing page for signed-out users: what Neocom Desk does, and the EVE SSO login button. */
 export function Login() {
   const { t } = useTranslation();
+  const timeZone = useTimeZone();
   const [pending, setPending] = useState(false);
 
   // Wall-clock reads for illustrative "how fresh is this" values in the
@@ -132,9 +134,11 @@ export function Login() {
   // NotificationFeedPanel.tsx already accept for the real thing. Lazy
   // initializers run once on mount rather than every render.
   const [previewFetchedAt] = useState(() => new Date(Date.now() - 2 * MINUTE_MS));
-  const [previewFinishDate] = useState(() =>
-    formatTimestamp(new Date(Date.now() + 4 * HOUR_MS + 12 * MINUTE_MS))
-  );
+  // The `Date` is what's pinned at mount, not its rendered string: the clock
+  // read is the part that must not repeat, while the formatting has to rerun
+  // whenever the Time format preference changes — a string frozen in the
+  // initializer would keep the zone it was born in.
+  const [previewFinishAt] = useState(() => new Date(Date.now() + 4 * HOUR_MS + 12 * MINUTE_MS));
 
   // Bookmark/back-button case: a Character already exists, so the marketing
   // page is not the right thing to show — mirror App.tsx's root gate.
@@ -228,7 +232,7 @@ export function Login() {
               <p className="text-sm">
                 {t('overview.training', { name: PREVIEW.trainingSkill })}
                 <span className="ml-2 text-xs text-text-dim">
-                  {t('overview.finishes', { date: previewFinishDate })}
+                  {t('overview.finishes', { date: formatTimestamp(previewFinishAt, timeZone) })}
                 </span>
               </p>
             </Panel>
@@ -415,6 +419,7 @@ function PreviewNotification({
   ageMs: number;
 }) {
   const { t } = useTranslation();
+  const timeZone = useTimeZone();
   // eslint-disable-next-line react-hooks/purity -- illustrative fired-at stamp, same as previewFetchedAt above
   const firedAt = new Date(Date.now() - ageMs);
   return (
@@ -425,7 +430,7 @@ function PreviewNotification({
       </div>
       <time
         dateTime={firedAt.toISOString()}
-        title={formatTimestamp(firedAt)}
+        title={formatTimestamp(firedAt, timeZone)}
         className="shrink-0 pt-0.5 text-[0.6875rem] tabular-nums text-text-dim"
       >
         {formatAge(ageMs, t)}

@@ -142,6 +142,42 @@ describe('materialRecipe', () => {
     expect(recipe).toMatchObject({ me: 10 });
   });
 
+  it('quotes an unowned blueprint at the assumed ME', () => {
+    const recipe = materialRecipe(9840, {
+      catalog,
+      pi: PI,
+      ownedBlueprints: [],
+      assumedMeForUnowned: 10,
+    });
+    expect(recipe).toMatchObject({ me: 10 });
+  });
+
+  it('still prefers a copy the character owns over the assumed ME', () => {
+    // The point of the setting: it fills the gap where there is no owned copy
+    // to read, and never overrides a real one — in either direction.
+    const recipe = materialRecipe(9840, {
+      catalog,
+      pi: PI,
+      ownedBlueprints: [owned({ material_efficiency: 3 })],
+      assumedMeForUnowned: 10,
+    });
+    expect(recipe).toMatchObject({ me: 3 });
+  });
+
+  it('assumes ME 0 when the caller supplies none, exactly as before', () => {
+    expect(materialRecipe(9840, { catalog, pi: PI, ownedBlueprints: [] })).toMatchObject({ me: 0 });
+  });
+
+  it('clamps a nonsense assumed ME into the range the engine accepts', () => {
+    const recipe = materialRecipe(9840, {
+      catalog,
+      pi: PI,
+      ownedBlueprints: [],
+      assumedMeForUnowned: 99,
+    });
+    expect(recipe).toMatchObject({ me: 10 });
+  });
+
   it('returns the schematic for a planetary commodity', () => {
     expect(materialRecipe(2398, { catalog, pi: PI, ownedBlueprints: [] })).toEqual({
       method: 'planetary',

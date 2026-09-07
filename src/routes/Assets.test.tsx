@@ -10,6 +10,7 @@ import { clearMarketPriceCache } from '@/market/prices';
 import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharacter';
 import { usePublicInfo } from '@/stores/publicInfo';
 import { useCompareSet } from '@/features/market/compareSet';
+import { DEFAULT_ASSET_SORT, useAssetSort } from '@/features/character/assetSortPreference';
 import { configureClipboard } from '@/lib/clipboard';
 import { App } from '@/app/App';
 import type { TypeMap } from '@/sde/types';
@@ -131,6 +132,9 @@ beforeEach(async () => {
   useActiveCharacter.setState({ activeCharacterId: null, hydrated: false });
   usePublicInfo.setState({ byCharacterId: {} });
   useCompareSet.setState({ items: [] });
+  // Module-scope store, so a sort chosen by one test would otherwise be the
+  // starting order of the next one.
+  useAssetSort.setState({ value: DEFAULT_ASSET_SORT, hydrated: false });
 
   await db.characters.put({ characterId: CHAR_ID, name: 'Pilot One', ownerHash: 'oh', addedAt: 1 });
   await db.tokens.put({
@@ -843,6 +847,54 @@ describe('all items view, min-value filter, and sort (issue #414)', () => {
 
     const names = screen.getAllByText(/^(Tritanium|Pyerite)$/).map((el) => el.textContent);
     expect(names).toEqual(['Pyerite', 'Tritanium']);
+  });
+
+  /**
+   * Silent persistence, like the location list's own sort: the flat list is
+   * the same list every visit, and re-choosing "Value" on each one is the
+   * page forgetting something the user already told it. The min-value box
+   * beside it stays per-visit on purpose — see `assetSortPreference.ts`.
+   */
+  it('remembers the flat list sort across a remount', async () => {
+    const user = userEvent.setup();
+    const { unmount } = render(<App />);
+    await screen.findByText(JITA);
+    await user.click(screen.getByRole('button', { name: 'All items' }));
+    await screen.findByText('Tritanium');
+
+    await user.click(screen.getByLabelText('Sort'));
+    await user.click(await screen.findByRole('option', { name: 'Value' }));
+    unmount();
+
+    render(<App />);
+    await screen.findByText(JITA);
+    await user.click(screen.getByRole('button', { name: 'All items' }));
+    await screen.findByText('Tritanium');
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Sort')).toHaveTextContent('Value');
+    });
+    const names = screen.getAllByText(/^(Tritanium|Pyerite)$/).map((el) => el.textContent);
+    expect(names).toEqual(['Pyerite', 'Tritanium']);
+  });
+
+  it('does not remember the minimum-value threshold across a remount', async () => {
+    const user = userEvent.setup();
+    const { unmount } = render(<App />);
+    await screen.findByText(JITA);
+    await user.click(screen.getByRole('button', { name: 'All items' }));
+    await screen.findByText('Tritanium');
+
+    await user.type(screen.getByLabelText('Minimum value'), '10000');
+    await waitFor(() => expect(screen.queryByText('Tritanium')).not.toBeInTheDocument());
+    unmount();
+
+    render(<App />);
+    await screen.findByText(JITA);
+    await user.click(screen.getByRole('button', { name: 'All items' }));
+
+    expect(await screen.findByText('Tritanium')).toBeInTheDocument();
+    expect(screen.getByLabelText('Minimum value')).toHaveValue(null);
   });
 
   it('applies the same min-value filter and sort to active search results', async () => {

@@ -3,8 +3,11 @@ import { db } from '@/db';
 import {
   loadManualIgnoredTypeIds,
   loadManualMoonOreTypeIds,
+  loadTypeOverrides,
   tagAsIgnored,
   tagAsMoonOre,
+  untagIgnored,
+  untagMoonOre,
 } from './typeOverrides';
 
 beforeEach(async () => {
@@ -51,5 +54,62 @@ describe('tagAsIgnored', () => {
     await tagAsIgnored(888888);
     await tagAsIgnored(888888);
     expect(await loadManualIgnoredTypeIds()).toEqual([888888]);
+  });
+});
+
+describe('untagMoonOre', () => {
+  it('removes a typeId, returning it to unclassified', async () => {
+    await tagAsMoonOre(999999);
+    await untagMoonOre(999999);
+    expect(await loadManualMoonOreTypeIds()).toEqual([]);
+  });
+
+  it('leaves the other tagged ids alone', async () => {
+    await tagAsMoonOre(1);
+    await tagAsMoonOre(2);
+    await tagAsMoonOre(3);
+    await untagMoonOre(2);
+    expect(await loadManualMoonOreTypeIds()).toEqual([1, 3]);
+  });
+
+  it('never touches the ignored list', async () => {
+    await tagAsMoonOre(5);
+    await tagAsIgnored(5);
+    await untagMoonOre(5);
+    expect(await loadManualMoonOreTypeIds()).toEqual([]);
+    expect(await loadManualIgnoredTypeIds()).toEqual([5]);
+  });
+
+  it('is a no-op for a typeId that was never tagged', async () => {
+    await tagAsMoonOre(1);
+    await untagMoonOre(404);
+    expect(await loadManualMoonOreTypeIds()).toEqual([1]);
+  });
+
+  it('is a no-op when nothing has ever been tagged', async () => {
+    await untagMoonOre(404);
+    expect(await loadManualMoonOreTypeIds()).toEqual([]);
+  });
+});
+
+describe('untagIgnored', () => {
+  it('removes a typeId from its own list only', async () => {
+    await tagAsIgnored(888888);
+    await tagAsMoonOre(777777);
+    await untagIgnored(888888);
+    expect(await loadManualIgnoredTypeIds()).toEqual([]);
+    expect(await loadManualMoonOreTypeIds()).toEqual([777777]);
+  });
+});
+
+describe('loadTypeOverrides', () => {
+  it('reads both lists in one call', async () => {
+    await tagAsMoonOre(1);
+    await tagAsIgnored(2);
+    expect(await loadTypeOverrides()).toEqual({ moonOreTypeIds: [1], ignoredTypeIds: [2] });
+  });
+
+  it('reports empty lists rather than throwing when nothing is tagged', async () => {
+    expect(await loadTypeOverrides()).toEqual({ moonOreTypeIds: [], ignoredTypeIds: [] });
   });
 });

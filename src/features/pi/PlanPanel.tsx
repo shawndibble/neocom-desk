@@ -40,6 +40,7 @@ import { expandChain, type ChainLayout, type SourcingFloor } from '@/engine/pi/c
 import { loadPi } from '@/sde/loadSde';
 import type { PiData } from '@/sde/types';
 import { DEFAULT_TRADE_HUB, TRADE_HUBS, type TradeHub } from '@/market/hubs';
+import { CHAIN_LAYOUTS, usePlanControls, type PiPlanControls } from './planControlsPref';
 import {
   COLONY_SPACES,
   customsRateSource,
@@ -57,8 +58,6 @@ const HOURS_PER_DAY = 24;
 
 /** The spread the sensitivity table sweeps. The user's own rate is folded in beside them. */
 const SENSITIVITY_RATES = [0, 0.05, 0.1, 0.15, 0.2];
-
-const LAYOUTS: readonly ChainLayout[] = ['single-planet', 'planet-per-tier'];
 
 /** Stable identity so the cost memos don't re-run on every render before prices land. */
 const NO_PRICES: Readonly<Record<number, number>> = {};
@@ -112,13 +111,28 @@ export function PlanPanel({ characterId, typeId, onTypeIdChange }: PlanPanelProp
   const [loadFailed, setLoadFailed] = useState(false);
 
   const [perDayText, setPerDayText] = useState('10');
-  const [hubId, setHubId] = useState<TradeHub['id']>(DEFAULT_TRADE_HUB.id);
   const [space, setSpace] = useState<ColonySpace>('highsec');
   /** Null means "follow the band default", which is what lets the provenance line stay honest. */
   const [ratePercentText, setRatePercentText] = useState<string | null>(null);
-  const [layout, setLayout] = useState<ChainLayout>('single-planet');
-  const [floor, setFloor] = useState<SourcingFloor>('P1');
   const [extractionRateText, setExtractionRateText] = useState('');
+
+  /**
+   * Hub, layout and sourcing floor come from disk (`planControlsPref.ts`)
+   * rather than from `useState`: this panel unmounts on every tab switch, and
+   * these three are standing facts about how the pilot operates, not about the
+   * product on screen. The band, the customs override and the two rate fields
+   * stay local — see that module for why.
+   */
+  const { hubId, layout, floor } = usePlanControls((state) => state.value);
+  const controlsHydrated = usePlanControls((state) => state.hydrated);
+  const hydrateControls = usePlanControls((state) => state.hydrate);
+  useEffect(() => {
+    void hydrateControls();
+  }, [hydrateControls]);
+  const setControl = (patch: Partial<PiPlanControls>) => {
+    const state = usePlanControls.getState();
+    void state.setValue({ ...state.value, ...patch });
+  };
 
   /**
    * Prices, stamped with the request that produced them.
@@ -199,6 +213,11 @@ export function PlanPanel({ characterId, typeId, onTypeIdChange }: PlanPanelProp
 
   useEffect(() => {
     if (priceTypeIdsKey === '') return;
+    // Gated on hydration, as Market Browser gates its own hub-keyed loads: the
+    // stored hub is not known on the first tick, and asking for the whole
+    // chain's prices at Jita only to re-ask at Amarr a tick later is a market
+    // round-trip spent on an answer nobody will read.
+    if (!controlsHydrated) return;
     let cancelled = false;
     void (async () => {
       const ids = priceTypeIdsKey.split(',').map(Number);
@@ -209,7 +228,7 @@ export function PlanPanel({ characterId, typeId, onTypeIdChange }: PlanPanelProp
     return () => {
       cancelled = true;
     };
-  }, [priceTypeIdsKey, hub]);
+  }, [priceTypeIdsKey, hub, controlsHydrated]);
 
   const prices = priceState?.requestKey === priceRequestKey ? priceState.value : null;
 
@@ -340,7 +359,10 @@ export function PlanPanel({ characterId, typeId, onTypeIdChange }: PlanPanelProp
           </Field>
 
           <Field label={t('piPlan.hub')}>
-            <Select value={hubId} onValueChange={(value) => setHubId(value as TradeHub['id'])}>
+            <Select
+              value={hubId}
+              onValueChange={(value) => setControl({ hubId: value as TradeHub['id'] })}
+            >
               <SelectTrigger aria-label={t('piPlan.hub')} className="w-full">
                 <SelectValue />
               </SelectTrigger>
@@ -412,12 +434,15 @@ export function PlanPanel({ characterId, typeId, onTypeIdChange }: PlanPanelProp
           </Field>
 
           <Field label={t('piPlan.layout')} hint={t('piPlan.layoutHint')}>
-            <Select value={layout} onValueChange={(value) => setLayout(value as ChainLayout)}>
+            <Select
+              value={layout}
+              onValueChange={(value) => setControl({ layout: value as ChainLayout })}
+            >
               <SelectTrigger aria-label={t('piPlan.layout')} className="w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {LAYOUTS.map((candidate) => (
+                {CHAIN_LAYOUTS.map((candidate) => (
                   <SelectItem key={candidate} value={candidate}>
                     {t(`piPlan.layoutOption.${candidate}`)}
                   </SelectItem>
@@ -443,7 +468,7 @@ export function PlanPanel({ characterId, typeId, onTypeIdChange }: PlanPanelProp
                   key={candidate}
                   type="button"
                   aria-pressed={candidate === effectiveFloor}
-                  onClick={() => setFloor(candidate)}
+                  onClick={() => setControl({ floor: candidate })}
                   className={buttonClassName({
                     variant: candidate === effectiveFloor ? 'primary' : 'ghost',
                     size: 'md',

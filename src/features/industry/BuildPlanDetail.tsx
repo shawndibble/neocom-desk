@@ -64,6 +64,7 @@ import {
   type OwnedStockSnapshot,
 } from './ownedStockDetection';
 import { useDetectedOwnedStock } from './useDetectedOwnedStock';
+import { useAssumedMe } from './assumedMe';
 import { OwnedStockScopeControl } from './OwnedStockScopeControl';
 import { ResultsSummary } from './ResultsSummary';
 import { PlanVerdictHero } from './PlanVerdictHero';
@@ -209,6 +210,15 @@ export function BuildPlanDetail({
     return buildPlanTypeIds(blueprint, { catalog, pi });
   }, [blueprint, catalog, pi]);
 
+  // The ME every sub-build with no owned blueprint is quoted at. Hydrated
+  // here rather than read raw, so a pilot who set it sees their own figure
+  // instead of one frame of the default.
+  const assumedMe = useAssumedMe((state) => state.value);
+  const hydrateAssumedMe = useAssumedMe((state) => state.hydrate);
+  useEffect(() => {
+    void hydrateAssumedMe();
+  }, [hydrateAssumedMe]);
+
   const [snapshot, setSnapshot] = useState<MarketSnapshot | null>(null);
   const [fetchedAt, setFetchedAt] = useState<Date | null>(null);
   const [refreshTick, setRefreshTick] = useState(0);
@@ -318,8 +328,8 @@ export function BuildPlanDetail({
   const recipeFor = useMemo(
     () =>
       (typeID: number): MaterialRecipe | null =>
-        materialRecipe(typeID, { catalog, pi, ownedBlueprints }),
-    [catalog, pi, ownedBlueprints]
+        materialRecipe(typeID, { catalog, pi, ownedBlueprints, assumedMeForUnowned: assumedMe }),
+    [catalog, pi, ownedBlueprints, assumedMe]
   );
 
   // The one place "can this be built here" is decided (manufacturing only,

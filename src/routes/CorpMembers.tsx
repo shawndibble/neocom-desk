@@ -18,6 +18,7 @@
  * `useCorpRouteGate`'s, shared with `/corp` and `/corp/assets` — see that hook.
  */
 import { useEffect, useMemo, useState, type ReactElement } from 'react';
+import { useDarkThreshold } from '@/features/corp/darkThreshold';
 import { useTranslation } from 'react-i18next';
 import {
   DataAgeBadge,
@@ -137,6 +138,14 @@ async function loadMembersSnapshot(
 /** Mounted only once Corp Access is `ready` — see the `/corp` loader note. */
 function CorpMembersView() {
   const { t } = useTranslation();
+  // The corp's own inactivity policy. Feeds `memberStanding` here so the
+  // table's tone, the stat strip's count and the dark-only filter all narrow
+  // to the same set — the invariant the engine's single constant used to hold.
+  const darkAfterDays = useDarkThreshold((state) => state.value);
+  const hydrateDarkThreshold = useDarkThreshold((state) => state.hydrate);
+  useEffect(() => {
+    void hydrateDarkThreshold();
+  }, [hydrateDarkThreshold]);
   const snapshot = useRouteSnapshot<MembersSnapshot>(loadMembersSnapshot, undefined, {
     // Keeps the roster on screen during a manual refresh (issue #418).
     staleWhileRevalidate: true,
@@ -149,7 +158,7 @@ function CorpMembersView() {
     return data.members.map((member) => ({
       characterId: member.characterId,
       name: data.labels.characters.get(member.characterId) ?? null,
-      standing: memberStanding(member, data.loadedAt),
+      standing: memberStanding(member, data.loadedAt, darkAfterDays),
       shipTypeId: member.shipTypeId,
       shipName:
         member.shipTypeId === null ? null : (data.labels.ships.get(member.shipTypeId) ?? null),
@@ -158,7 +167,7 @@ function CorpMembersView() {
         member.locationId === null ? null : (data.labels.locations.get(member.locationId) ?? null),
       startMs: member.startMs,
     }));
-  }, [data]);
+  }, [data, darkAfterDays]);
 
   // Search + dark-only filter (issue #421, AC2/AC3): AND-composed, same
   // stacking rule as Mail's search-and-label filters (CONTEXT.md round 55).

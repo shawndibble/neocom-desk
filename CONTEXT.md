@@ -78,10 +78,13 @@ here — they go one per file in `docs/context/decisions/`.
 - **Cost Index**: A solar system's current manufacturing activity level
   (read live from ESI). Higher activity in a system drives its Job Fee up;
   distinct from EIV, which prices the materials rather than the system.
-- **Dark**: A member with no login for `DARK_AFTER_DAYS` (30) or more.
-  `engine/corp/members.ts` owns the threshold as a named constant; nothing in
-  the UI may hold a second opinion about what dark means. A member who joined
-  and has never logged in is counted from the day they joined, not excluded.
+- **Dark**: A member with no login for the corp's inactivity span or more —
+  the pilot's own setting (14/30/60/90 days), defaulting to
+  `DARK_AFTER_DAYS` (30). `engine/corp/members.ts` still owns the default and
+  takes the span as an argument; one value is threaded from the view boundary
+  so the table's tone, the rail's count and the roster's dark-only filter can
+  never hold a second opinion about what dark means. A member who joined and
+  has never logged in is counted from the day they joined, not excluded.
 - **Data Age**: Timestamp shown on every API-derived view; how old the cached data is. Refresh happens on app open + manual button only.
 - **Data Owner**: Whose rows a page's table is showing — `personal` or
   `corporation`. Selected per page by the Personal / Corporation switch,
@@ -185,6 +188,15 @@ here — they go one per file in `docs/context/decisions/`.
   the hub's lowest sell, because an **Acquisition Verdict** asks what buying it
   outright costs. A material the chosen side cannot price is unpriceable, never
   quietly re-quoted at the other side.
+- **Manual Ore Tag**: A pilot's hand-classification of an ore type the
+  SDE-derived allowlists don't recognise, made from the Moon Mining Tax
+  ledger's "unclassified ore" banner. Two independent lists — "Tag as moon
+  ore" (group it into **Mining Ledger Entries** from now on) and "Ignore"
+  (treat it as ordinary ore/ice: stop flagging it, never group it). Device-
+  local and never synced: a stop-gap for the window between a CCP patch and
+  the next `npm run sde:build`, not Editable Data. Reversible from the
+  ledger's **Ore tags** dialog — an uncorrectable correction is worse than
+  the misclassification it fixes.
 - **Mining Ledger Entry**: One row of the Moon Mining Tax ledger, derived (not
   stored) from ESI's personal mining ledger: every moon-goo row for one
   (character, EVE/UTC date, solar system), summed per ore type. This is also
@@ -254,10 +266,14 @@ here — they go one per file in `docs/context/decisions/`.
   (`src/engine/market/orderSlots.ts`) and shown as the denominator of the
   Overview's Open orders tile.
 - **Payee**: Who the Moon Mining Tax ledger owes — user-managed `{name,
-default tax %, optional moon/system tag}`. The moon/system tag lets the UI
+default tax %, optional moon/system tag, optional Trade Hub}`. The
+  moon/system tag lets the UI
   auto-suggest (and pre-fill) the Payee and rate for a future Mining Ledger
   Entry from that system: "pick the moon, the corp, or the person, whichever
-  is memorable" (issue #523). Optionally also carries `entityId`, the EVE
+  is memorable" (issue #523). The Trade Hub is the order book this Payee's ore
+  is valued at (absent means Jita); it lives on the Payee rather than on the
+  device because the tax owed is a bill one player sends another, and it is
+  deliberately not the Market Browser's own hub preference. Optionally also carries `entityId`, the EVE
   character or corporation the ISK actually goes to — never asked for, since a
   Payee is a free-text label, but **learned** the first time a Made Payment to
   that recipient is confirmed as settling this Payee's entries, after which
@@ -372,6 +388,16 @@ default tax %, optional moon/system tag}`. The moon/system tag lets the UI
   `scopesForGroup(group)` from the grouped ones, both from the same registry.
   `corp` is the only group today.
 - **Skill Plan**: An ordered list of skill-level entries a user intends to train. User-editable (drag and drop). Distinct from the in-game **Skill Queue**, which is the game's actual training queue.
+- **Starred Character**: A Character the user has pinned to the top of the
+  Characters page. Device-local and never synced, for the same reason an
+  **Account** grouping is — a star is a statement about the roster, not about
+  one Character, so no Character's sync scope owns it. Deliberately "starred",
+  not "pinned": **Pin** already means a planetary structure (and a **Station
+  Pin**), and this is neither. It floats a card within whichever group section
+  the Character is already in — it does not lift it out of its group — and it
+  layers on top of the chosen sort key rather than replacing it. User-created
+  content, not view state: nothing clears a star but the user, except a star
+  whose Character has left the device.
 - **Sustained Extraction Rate**: An extractor program's whole output averaged
   over its whole length, off CCP's decay curve. The one honest
   units-per-hour summary of a program that in fact yields a different amount

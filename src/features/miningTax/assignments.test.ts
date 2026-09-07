@@ -19,8 +19,13 @@ const syncMock = vi.hoisted(() => ({
 }));
 vi.mock('@/sync', () => syncMock);
 
-const pricingMock = vi.hoisted(() => ({ loadJitaUnitPrices: vi.fn() }));
-vi.mock('./pricing', () => pricingMock);
+// Only `loadUnitPrices` is stubbed: `hubForPayee` is pure hub lookup, and the
+// point of these tests is *which* hub the real resolver hands the fetch.
+const pricingMock = vi.hoisted(() => ({ loadUnitPrices: vi.fn() }));
+vi.mock('./pricing', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./pricing')>()),
+  loadUnitPrices: pricingMock.loadUnitPrices,
+}));
 
 const CHAR_A = 1;
 const TYPE_A = 45490;
@@ -29,12 +34,14 @@ const TYPE_B = 45491;
 beforeEach(async () => {
   vi.clearAllMocks();
   await db.miningTaxAssignments.clear();
-  pricingMock.loadJitaUnitPrices.mockResolvedValue(
-    new Map([
+  await db.payees.clear();
+  pricingMock.loadUnitPrices.mockResolvedValue({
+    prices: new Map([
       [TYPE_A, 10],
       [TYPE_B, 4],
-    ])
-  );
+    ]),
+    unpriced: new Set<number>(),
+  });
 });
 
 describe('createAssignment', () => {
@@ -59,7 +66,7 @@ describe('createAssignment', () => {
     expect(syncMock.scheduleSync).toHaveBeenCalledWith(CHAR_A);
     // No internal price lookup — the Assign dialog already resolved (and
     // possibly corrected) the value before calling this.
-    expect(pricingMock.loadJitaUnitPrices).not.toHaveBeenCalled();
+    expect(pricingMock.loadUnitPrices).not.toHaveBeenCalled();
   });
 
   it('stores a pilot-corrected value verbatim, even when it disagrees with the Jita price', async () => {
@@ -495,6 +502,73 @@ describe('resolveNeedsReview', () => {
     expect(updated?.taxOwed).toBe(150);
   });
 
+  it('re-prices at the Payee’s own trade hub, not always at Jita', async () => {
+    await db.payees.put({
+      id: 'p-hek',
+      characterId: CHAR_A,
+      name: 'Hek landlord',
+      defaultTaxPct: 10,
+      hubId: 'hek',
+      updatedAt: 1,
+    });
+    const assignment: MiningTaxAssignmentRecord = {
+      id: 'a3',
+      characterId: CHAR_A,
+      date: '2026-09-04',
+      solarSystemId: 1,
+      payeeId: 'p-hek',
+      oreLines: [{ typeId: TYPE_A, quantity: 100 }],
+      taxPct: 10,
+      estimatedValue: 1000,
+      taxOwed: 100,
+      status: 'needs-review',
+      reviewDiff: [{ typeId: TYPE_A, before: 100, after: 150 }],
+      updatedAt: 1,
+    };
+    await db.miningTaxAssignments.put(assignment);
+
+    await resolveNeedsReview(assignment, freshEntry, [assignment]);
+
+    // Accepting growth is a fresh invoice moment, and the invoice is still
+    // billed at the hub this Payee bills at — re-pricing at Jita would quietly
+    // restate the bill at a book the landlord never quoted.
+    expect(pricingMock.loadUnitPrices).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ id: 'hek' })
+    );
+  });
+
+  it('re-prices at Jita for a payee-less (dismissed) entry, and for a Payee that has been deleted', async () => {
+    const dismissed: MiningTaxAssignmentRecord = {
+      id: 'a4',
+      characterId: CHAR_A,
+      date: '2026-09-04',
+      solarSystemId: 1,
+      oreLines: [{ typeId: TYPE_A, quantity: 100 }],
+      taxPct: 0,
+      estimatedValue: 1000,
+      taxOwed: 0,
+      status: 'needs-review',
+      updatedAt: 1,
+    };
+    await db.miningTaxAssignments.put(dismissed);
+
+    await resolveNeedsReview(dismissed, freshEntry, [dismissed]);
+    expect(pricingMock.loadUnitPrices).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ id: 'jita' })
+    );
+
+    // A dangling payeeId (the Payee was deleted after the Assignment) resolves
+    // the same way rather than throwing partway through a re-snapshot.
+    pricingMock.loadUnitPrices.mockClear();
+    await resolveNeedsReview({ ...dismissed, payeeId: 'gone' }, freshEntry, [dismissed]);
+    expect(pricingMock.loadUnitPrices).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ id: 'jita' })
+    );
+  });
+
   it('reverts to outstanding (and clears paidAt) even when the assignment had been paid', async () => {
     const assignment: MiningTaxAssignmentRecord = {
       id: 'a2',
@@ -590,6 +664,8 @@ describe('splitAssignment', () => {
     [TYPE_A, 10],
     [TYPE_B, 4],
   ]);
+  /** Both Payees billing at the same hub — the ordinary case. The two-hub case has its own test below. */
+  const atOneHub = { kept: prices, moved: prices };
 
   async function seedOriginal(
     overrides: Partial<MiningTaxAssignmentRecord> = {}
@@ -626,7 +702,7 @@ describe('splitAssignment', () => {
         taxPct: 8,
         collector: 'original',
       },
-      prices
+      atOneHub
     );
 
     expect(kept.oreLines).toEqual([
@@ -664,7 +740,7 @@ describe('splitAssignment', () => {
         taxPct: 8,
         collector: 'new',
       },
-      prices
+      atOneHub
     );
 
     expect(kept.collectsGrowth).toBeUndefined();
@@ -678,7 +754,7 @@ describe('splitAssignment', () => {
     const { kept, created } = await splitAssignment(
       original,
       { moves: [{ typeId: TYPE_A, quantity: 10 }], payeeId: 'payee-2', taxPct: 8 },
-      prices
+      atOneHub
     );
     expect(kept.status).toBe('paid');
     expect(kept.paidAt).toBe(5);
@@ -691,7 +767,7 @@ describe('splitAssignment', () => {
       splitAssignment(
         original,
         { moves: [{ typeId: TYPE_A, quantity: 101 }], payeeId: 'payee-2', taxPct: 8 },
-        prices
+        atOneHub
       )
     ).rejects.toThrow();
     await expect(
@@ -705,11 +781,35 @@ describe('splitAssignment', () => {
           payeeId: 'payee-2',
           taxPct: 8,
         },
-        prices
+        atOneHub
       )
     ).rejects.toThrow();
     await expect(
-      splitAssignment(original, { moves: [], payeeId: 'payee-2', taxPct: 8 }, prices)
+      splitAssignment(original, { moves: [], payeeId: 'payee-2', taxPct: 8 }, atOneHub)
     ).rejects.toThrow();
+  });
+
+  it('values each side at its own Payee’s hub when the two bill at different ones', async () => {
+    const original = await seedOriginal();
+
+    const { kept, created } = await splitAssignment(
+      original,
+      { moves: [{ typeId: TYPE_A, quantity: 40 }], payeeId: 'payee-2', taxPct: 8 },
+      {
+        kept: prices,
+        // The second Payee bills at a thinner hub where this ore is worth half.
+        moved: new Map([
+          [TYPE_A, 5],
+          [TYPE_B, 2],
+        ]),
+      }
+    );
+
+    // A split hands ore to a *different* Payee by construction, so the two
+    // sides can sit at two different hubs — one blended price would misstate
+    // whichever bill it did not come from.
+    expect(kept.estimatedValue).toBe(60 * 10 + 50 * 4);
+    expect(created.estimatedValue).toBe(40 * 5);
+    expect(created.taxOwed).toBeCloseTo(40 * 5 * 0.08);
   });
 });

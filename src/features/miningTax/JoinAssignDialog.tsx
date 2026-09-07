@@ -38,7 +38,13 @@ interface JoinAssignDialogProps {
   initialSelection?: 'none' | 'all';
   payees: readonly PayeeRecord[];
   typeNames: ReadonlyMap<number, string>;
-  unitPrices: ReadonlyMap<number, number>;
+  /**
+   * Prices at a given Payee's trade hub. Resolved here rather than passed as
+   * one map, because the Payee a join settles on is decided *in* this dialog:
+   * either the terms an already-assigned member locks in, or the one the pilot
+   * picks below — and each Payee may bill at its own hub.
+   */
+  pricesFor: (hubId: string | undefined) => ReadonlyMap<number, number>;
   busy: boolean;
   onJoined: () => void;
 }
@@ -56,7 +62,7 @@ function candidateKey(candidate: JoinCandidate): string {
  * `flatten` were N-ary from the start).
  *
  * Deliberately no editable value fields here (unlike `AssignDialog`): once
- * two dates are joined each keeps its own independently Jita-priced value —
+ * two dates are joined each keeps its own independently hub-priced value —
  * a blended, hand-typed total across two different ledger entries has no
  * single obvious meaning. A correction after the fact goes through the
  * ordinary single-Assignment editor for that one member
@@ -76,7 +82,7 @@ export function JoinAssignDialog({
   initialSelection = 'none',
   payees,
   typeNames,
-  unitPrices,
+  pricesFor,
   busy,
   onJoined,
 }: JoinAssignDialogProps) {
@@ -144,7 +150,9 @@ export function JoinAssignDialog({
         [primary, ...selected].map(memberInput),
         effectivePayeeId,
         effectiveTaxPct,
-        unitPrices
+        // Every member of a join shares one Payee (that is the merge rule), so
+        // one hub prices the whole group — the Payee's, never the device's.
+        pricesFor(payees.find((p) => p.id === effectivePayeeId)?.hubId)
       );
       onJoined();
     } finally {

@@ -12,7 +12,20 @@
 import { hasYieldBaseline, pastEfficientWindow } from './extraction';
 import type { ColonyAttention, ColonyStatus, ExtractorProgram, ExtractorState } from './types';
 
-/** An extractor program is "expiring soon" inside this window before its expiry. */
+/**
+ * Default window before expiry inside which an extractor program is "expiring
+ * soon".
+ *
+ * The *default*, not the rule: every function here takes the window as a
+ * trailing argument so the pilot's own lead time can be threaded from the view.
+ * It governs more than a badge tone — `sortColoniesByAttention` ranks by it, so
+ * the window decides which colony a pilot sees first on opening the page.
+ *
+ * Deliberately still distinct from `notificationDiffs.ts`'s
+ * `EXTRACTOR_EXPIRY_WARNING_MS`, which is the lead time a *notification* fires
+ * at. A notification cadence is not a status colour, and the two stay free to
+ * diverge.
+ */
 export const EXPIRING_SOON_WINDOW_MS = 24 * 3_600_000;
 
 /**
@@ -37,9 +50,13 @@ export const EXPIRING_SOON_WINDOW_MS = 24 * 3_600_000;
  */
 export const EFFICIENT_WINDOW_FRACTION = 0.35;
 
-export function extractorState(expiryTimeMs: number, nowMs: number): ExtractorState {
+export function extractorState(
+  expiryTimeMs: number,
+  nowMs: number,
+  expiringSoonWindowMs: number = EXPIRING_SOON_WINDOW_MS
+): ExtractorState {
   if (nowMs >= expiryTimeMs) return 'expired';
-  if (expiryTimeMs - nowMs <= EXPIRING_SOON_WINDOW_MS) return 'expiring-soon';
+  if (expiryTimeMs - nowMs <= expiringSoonWindowMs) return 'expiring-soon';
   return 'active';
 }
 
@@ -67,9 +84,13 @@ export function colonyStatus(programs: readonly ExtractorProgram[], nowMs: numbe
   };
 }
 
-export function colonyAttention(status: ColonyStatus, nowMs: number): ColonyAttention {
+export function colonyAttention(
+  status: ColonyStatus,
+  nowMs: number,
+  expiringSoonWindowMs: number = EXPIRING_SOON_WINDOW_MS
+): ColonyAttention {
   if (status.idle) return 'idle';
-  if (status.soonestExpiryMs !== null && status.soonestExpiryMs - nowMs <= EXPIRING_SOON_WINDOW_MS)
+  if (status.soonestExpiryMs !== null && status.soonestExpiryMs - nowMs <= expiringSoonWindowMs)
     return 'expiring-soon';
   // `=== true` on purpose: an absent flag means "no program could be
   // projected", which is not the same claim as "not decayed".
@@ -96,13 +117,15 @@ const ATTENTION_RANK: Record<ColonyAttention, number> = {
 export function sortColoniesByAttention<T>(
   colonies: readonly T[],
   statusOf: (colony: T) => ColonyStatus,
-  nowMs: number
+  nowMs: number,
+  expiringSoonWindowMs: number = EXPIRING_SOON_WINDOW_MS
 ): T[] {
   return [...colonies].sort((a, b) => {
     const sa = statusOf(a);
     const sb = statusOf(b);
     const rankDiff =
-      ATTENTION_RANK[colonyAttention(sa, nowMs)] - ATTENTION_RANK[colonyAttention(sb, nowMs)];
+      ATTENTION_RANK[colonyAttention(sa, nowMs, expiringSoonWindowMs)] -
+      ATTENTION_RANK[colonyAttention(sb, nowMs, expiringSoonWindowMs)];
     if (rankDiff !== 0) return rankDiff;
     if (sa.soonestExpiryMs === null || sb.soonestExpiryMs === null) return 0;
     return sa.soonestExpiryMs - sb.soonestExpiryMs;

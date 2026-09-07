@@ -1,6 +1,7 @@
-import { useCallback, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Navigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { useExpiringWindowHours, useExpiringWindowMs } from '@/features/pi/expiringWindow';
 import {
   Caret,
   DataAgeBadge,
@@ -22,6 +23,7 @@ import { db } from '@/db';
 import { loadCharacterPlanets, loadAllColonyDetails } from '@/features/pi/data';
 import { PlanPanel } from '@/features/pi/PlanPanel';
 import { AdvisorPanel } from '@/features/pi/AdvisorPanel';
+import { useShowAltColonies } from '@/features/pi/showAltColoniesPref';
 import {
   loadPiRosterSnapshot,
   type PiRosterSnapshot,
@@ -61,6 +63,7 @@ import type { CachedResult, StatusResult } from '@/esi/cache';
 import type { CharacterPlanet, CharacterPlanetDetail, PlanetPin } from '@/esi/endpoints';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { formatTimestamp } from '@/lib/timestamp';
+import { useTimeZone } from '@/lib/timeFormat';
 import { formatDuration } from '@/lib/duration';
 
 const NO_NAMES: ReadonlyMap<number, string> = new Map();
@@ -351,6 +354,7 @@ function ExtractionCard({
   loadedAt,
 }: ExtractionCardProps) {
   const { t } = useTranslation();
+  const expiringWindowMs = useExpiringWindowMs();
   const productId = pin.extractor_details?.product_type_id;
   const productName =
     productId !== undefined
@@ -358,7 +362,7 @@ function ExtractionCard({
       : t('pi.unknownProduct');
 
   const expiryMs = extractorExpiryMs(pin);
-  const state = expiryMs === null ? null : extractorState(expiryMs, loadedAt);
+  const state = expiryMs === null ? null : extractorState(expiryMs, loadedAt, expiringWindowMs);
   const total = program ? programTotalYield(program) : 0;
   const banked = program && total > 0 ? yieldBankedBy(program, loadedAt) : null;
   const percent = banked === null ? null : Math.round((banked / total) * 100);
@@ -486,13 +490,17 @@ function ColonyRow({
   loadedAt,
 }: ColonyRowProps) {
   const { t } = useTranslation();
+  const expiringWindowMs = useExpiringWindowMs();
+  // `ColonyRow`, not the page: this is the component that renders the Last
+  // update stamp, and the page above it renders none of its own.
+  const timeZone = useTimeZone();
   // No cached detail at all, or an extractor pin the adapter had to drop for
   // missing data: either way, computing "healthy" from what's left would be
   // exactly the confident-wrong-number the staleness rule exists to avoid.
   const attention: EffectiveAttention =
     detail === null || hasUnverifiedExtractors(detail.pins)
       ? 'unknown'
-      : colonyAttention(status, loadedAt);
+      : colonyAttention(status, loadedAt, expiringWindowMs);
 
   // `detail` in the deps array, not `detail?.pins` — the latter is a fresh
   // array reference every render even when the underlying data hasn't
@@ -648,7 +656,7 @@ function ColonyRow({
             )}
             <StatChip
               label={t('pi.lastUpdate')}
-              value={formatTimestamp(new Date(planet.last_update))}
+              value={formatTimestamp(new Date(planet.last_update), timeZone)}
               tooltip={t('pi.lastUpdateTooltip')}
               className="ml-auto"
             />
@@ -783,6 +791,14 @@ function parsePositiveInt(value: string | null): number | null {
  */
 export function PlanetaryIndustry() {
   const { t } = useTranslation();
+  // The pilot's own "expiring soon" lead time. Hydrated here, once, for the
+  // whole page: the leaf rows and cards below read the same store, and a
+  // hydrate per row would be a Dexie read per colony.
+  const expiringWindowMs = useExpiringWindowMs();
+  const hydrateExpiringWindow = useExpiringWindowHours((state) => state.hydrate);
+  useEffect(() => {
+    void hydrateExpiringWindow();
+  }, [hydrateExpiringWindow]);
   const [searchParams, setSearchParams] = useSearchParams();
   const { data, error, loading, hydrated, activeCharacterId, refresh } = useRouteSnapshot(
     loadPiSnapshot,
@@ -803,8 +819,16 @@ export function PlanetaryIndustry() {
   }, []);
   // Off by default: appends every other Character's cache-only colonies
   // (features/pi/roster.ts) below the active Character's live ones, grouped
-  // by character.
-  const [showAltColonies, setShowAltColonies] = useState(false);
+  // by character. Remembered under its own key — see `showAltColoniesPref.ts` for
+  // why it is not the Advisor's. Ungated on `hydrated`: the roster loads
+  // unconditionally in `loadPiSnapshot`, so this only decides whether rows
+  // already in memory are rendered, and costs no request either way.
+  const showAltColonies = useShowAltColonies((state) => state.value);
+  const hydrateShowAltColonies = useShowAltColonies((state) => state.hydrate);
+  const setShowAltColonies = useShowAltColonies((state) => state.setValue);
+  useEffect(() => {
+    void hydrateShowAltColonies();
+  }, [hydrateShowAltColonies]);
 
   const tab: PiTab = parseTab(searchParams.get('tab'));
   const plannedTypeId = parsePositiveInt(searchParams.get('type'));
@@ -865,9 +889,10 @@ export function PlanetaryIndustry() {
       sortColoniesByAttention(
         planets,
         (planet) => statusByPlanet.get(planet.planet_id) ?? EMPTY_STATUS,
-        loadedAt
+        loadedAt,
+        expiringWindowMs
       ),
-    [planets, statusByPlanet, loadedAt]
+    [planets, statusByPlanet, loadedAt, expiringWindowMs]
   );
 
   // Alt colonies grouped by character, each group sorted worst-first the
@@ -895,9 +920,14 @@ export function PlanetaryIndustry() {
     return [...byCharacter.entries()].map(([characterId, group]) => ({
       characterId,
       characterName: group.characterName,
-      colonies: sortColoniesByAttention(group.colonies, (entry) => entry.status, loadedAt),
+      colonies: sortColoniesByAttention(
+        group.colonies,
+        (entry) => entry.status,
+        loadedAt,
+        expiringWindowMs
+      ),
     }));
-  }, [roster.colonies, loadedAt]);
+  }, [roster.colonies, loadedAt, expiringWindowMs]);
 
   // Every other Character with something the toggle would surface — a
   // colony row, or a reason it has none ("skipped"/"not loaded"/"no
@@ -1020,7 +1050,7 @@ export function PlanetaryIndustry() {
                     <FilterChip
                       label={t('pi.altColonies.toggleLabel')}
                       selected={showAltColonies}
-                      onToggle={() => setShowAltColonies((current) => !current)}
+                      onToggle={() => void setShowAltColonies(!showAltColonies)}
                       count={otherCharacterCount}
                     />
                   ) : undefined

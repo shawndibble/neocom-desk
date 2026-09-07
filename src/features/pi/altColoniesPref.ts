@@ -2,10 +2,12 @@
  * Device-local: should the Advisor plan across every authenticated Character's
  * colonies, not just the active one?
  *
- * The Colonies panel already has its own "Show alt colonies" switch, but that
- * one is ephemeral `useState` on a different tab and answers a different
- * question — *show me* versus *plan with*. Sharing it would couple two tabs
- * through the route and lose the choice on every reload.
+ * The Colonies panel has its own "Show alt colonies" switch, remembered under
+ * its own key (`showAltColoniesPref.ts`). It is deliberately not this one: it sits
+ * on a different tab and answers a different question — *show me* versus *plan
+ * with*. Sharing one key would couple the two tabs through the route, so that
+ * widening the view to see where an alt's colonies sit would quietly widen the
+ * Advisor's routing assumptions too.
  *
  * Off by default. Alt colonies come from `roster.ts`, which is cache-only: a
  * Character whose colonies have never been loaded contributes nothing, and

@@ -24,13 +24,13 @@ import {
 } from '@/components/ui';
 import { formatAge } from '@/lib/age';
 import {
-  DARK_AFTER_DAYS,
   DASH,
   isEmptyRosterDiff,
   label,
   type MemberStanding,
   type RosterDiff,
 } from '@/engine/corp/members';
+import { useDarkThreshold } from './darkThreshold';
 
 /** One member, joined to every name the page managed to resolve. */
 export interface RosterRow {
@@ -97,13 +97,17 @@ export function CorpRosterStats({
   onToggleDarkOnly: () => void;
 }) {
   const { t } = useTranslation();
+  // Label only — `rows` arrive with `standing` already computed against this
+  // same preference in CorpMembers.tsx, so the chip's text and the set it
+  // filters can never disagree.
+  const darkAfterDays = useDarkThreshold((state) => state.value);
   const dark = rows.filter((row) => row.standing.isDark).length;
   return (
     <div className="flex flex-wrap gap-2">
       <StatChip label={t('corp.members.total')} value={rows.length} />
-      <Tooltip content={t('corp.members.darkHint', { days: DARK_AFTER_DAYS })}>
+      <Tooltip content={t('corp.members.darkHint', { days: darkAfterDays })}>
         <FilterChip
-          label={t('corp.members.dark', { days: DARK_AFTER_DAYS })}
+          label={t('corp.members.dark', { days: darkAfterDays })}
           count={dark}
           selected={darkOnly}
           onToggle={onToggleDarkOnly}

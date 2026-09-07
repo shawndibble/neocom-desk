@@ -6,6 +6,7 @@ import '@/i18n';
 import { db } from '@/db';
 import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharacter';
 import { usePublicInfo } from '@/stores/publicInfo';
+import { DEFAULT_TIME_FORMAT, TIME_FORMAT_SETTING_KEY, useTimeFormat } from '@/lib/timeFormat';
 import { App } from './App';
 
 vi.mock('virtual:pwa-register/react', () => ({
@@ -34,6 +35,10 @@ beforeEach(async () => {
   await db.settings.clear();
   useActiveCharacter.setState({ activeCharacterId: null, hydrated: false });
   usePublicInfo.setState({ byCharacterId: {} });
+  // A module singleton: a leaked `hydrated: true` makes the next test's
+  // `hydrate()` early-return, so the assertion below would pass on a stale
+  // value rather than on a real Dexie read.
+  useTimeFormat.setState({ value: DEFAULT_TIME_FORMAT, hydrated: false });
   window.history.pushState({}, '', '/');
 });
 
@@ -43,6 +48,21 @@ describe('boot gate spinner (UX-REVIEW #1)', () => {
     expect(screen.getByText('Neocom Desk')).toBeInTheDocument();
     expect(screen.getByText('Loading…')).toBeInTheDocument();
     expect(screen.getByRole('status')).toBeInTheDocument();
+  });
+});
+
+/**
+ * The one link nothing else covers. Every surface test drives the preference
+ * by setting the store directly, so a dropped `hydrate()` here would leave
+ * the whole app stuck on the `'local'` default with a green suite. Rendered
+ * with no characters on purpose — that lands on `/login` and avoids the
+ * character prefetch, which this file's msw server would reject.
+ */
+describe('device-local preference hydration', () => {
+  it('hydrates the Time format preference from Dexie at app start', async () => {
+    await db.settings.put({ key: TIME_FORMAT_SETTING_KEY, value: 'eve' });
+    render(<App />);
+    await waitFor(() => expect(useTimeFormat.getState().value).toBe('eve'));
   });
 });
 

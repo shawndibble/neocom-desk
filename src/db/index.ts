@@ -387,6 +387,16 @@ export interface PayeeRecord {
   /** Solar system id this Payee collects on, for auto-match. Optional — a Payee need not be tied to one system. */
   systemId?: number;
   /**
+   * Trade hub whose buy orders value this Payee's ore. Optional — absent means
+   * Jita, which is what every Payee was priced at before this existed.
+   *
+   * On the Payee, not on the device, because this number is a bill one player
+   * sends another: a device-local pick would have two corpmates computing
+   * different amounts owed for the same ore. Stored here it syncs with the
+   * Payee, so both sides read the rate the landlord actually asked for.
+   */
+  hubId?: string;
+  /**
    * The EVE character or corporation id this Payee *is* — the recipient of the
    * ISK, so a donation or contract already sent can be matched back to what it
    * paid off (issue #540). Never asked for up front: a Payee is a free-text

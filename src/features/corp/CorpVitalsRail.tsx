@@ -24,6 +24,18 @@ import {
 } from '@/engine/corp/vitals';
 import type { WalletDivision } from './divisions';
 
+/**
+ * Runway under which the chip warns.
+ *
+ * Thirty by coincidence, not by derivation: it happens to equal
+ * `VITALS_WINDOW_DAYS`, but the two answer different questions — that one is
+ * the period every rate on this rail is measured over, this one is when a
+ * director should start worrying. Named so the next reader does not
+ * "helpfully" replace it with the import and couple a warning threshold to a
+ * measurement window, at which point retuning either silently moves the other.
+ */
+const RUNWAY_WARNING_DAYS = 30;
+
 interface CorpVitalsRailProps {
   /** Balances joined to the corporation's own names — `divisions.ts` (#298). */
   divisions: readonly WalletDivision[];
@@ -123,7 +135,7 @@ export function CorpVitalsRail({
                 ? t('corp.vitals.runwayUnknown')
                 : t('corp.vitals.runwayDays', { count: Math.floor(runway) })
             }
-            tone={runway !== null && runway < 30 ? 'warning' : 'default'}
+            tone={runway !== null && runway < RUNWAY_WARNING_DAYS ? 'warning' : 'default'}
           />
         </div>
       </div>
