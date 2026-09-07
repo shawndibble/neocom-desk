@@ -223,10 +223,13 @@ describe('Calendar', () => {
     expect(await screen.findByText('Fleet Op')).toBeInTheDocument();
     // A month of cells, which is what proves this is the grid and not the ticker.
     expect(dayCells().length).toBeGreaterThan(TICKER_DAYS);
-    expect(dayLabelsWithLoad()).toEqual(
-      expect.arrayContaining([expect.stringContaining('Calendar events')])
-    );
-    expect(dayLabelsWithLoad().join(' ')).not.toMatch(/\{\{|undefined/);
+    // Both seeded kinds, joined across days: the two fixtures are hours apart
+    // and may straddle midnight, so which cell each lands in is not the point
+    // — that every kind present is named is.
+    const labels = dayLabelsWithLoad().join(' ');
+    expect(labels).toContain('Calendar events');
+    expect(labels).toContain('Industry jobs');
+    expect(labels).not.toMatch(/\{\{|undefined/);
   });
 
   /**
@@ -244,10 +247,10 @@ describe('Calendar', () => {
     expect(await screen.findByText('Fleet Op')).toBeInTheDocument();
     // Exactly a fortnight of columns — the ticker, not the grid.
     expect(dayCells()).toHaveLength(TICKER_DAYS);
-    expect(dayLabelsWithLoad()).toEqual(
-      expect.arrayContaining([expect.stringContaining('Calendar events')])
-    );
-    expect(dayLabelsWithLoad().join(' ')).not.toMatch(/\{\{|undefined/);
+    const labels = dayLabelsWithLoad().join(' ');
+    expect(labels).toContain('Calendar events');
+    expect(labels).toContain('Industry jobs');
+    expect(labels).not.toMatch(/\{\{|undefined/);
   });
 
   /**
