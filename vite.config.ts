@@ -66,7 +66,10 @@ export default defineConfig({
       manifest: {
         name: 'Neocom Desk',
         short_name: 'Neocom',
-        description: 'EVE Online character, skill planning, and industry companion',
+        // Keep in step with `app.tagline` in src/i18n/locales/en.json — the
+        // login hero renders that key, and the two are the same sentence.
+        description:
+          'Skill plans, build margins, market orders, colonies and moon tax — every character you fly, in one browser tab.',
         theme_color: '#0d1117',
         background_color: '#0d1117',
         display: 'standalone',

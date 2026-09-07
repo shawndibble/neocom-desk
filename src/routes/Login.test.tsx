@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import '@/i18n';
@@ -46,6 +46,79 @@ describe('Login', () => {
       'href',
       'https://github.com/shawndibble/neocom-desk'
     );
+  });
+
+  it('leads with the questions the app answers', async () => {
+    renderLogin();
+    expect(
+      await screen.findByRole('heading', { name: /the questions it exists to answer/i })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: /which of my orders is quietly losing isk/i })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: /is this blueprint worth building today/i })
+    ).toBeInTheDocument();
+  });
+
+  // The catalog is the page's claim about what shipped, and it silently rotted
+  // once before: the eight rows it listed predated Moon Mining, Corporation,
+  // Notifications and the Open Orders worklist. Pin every group and row, so
+  // the next feature that lands without one fails a test rather than just
+  // leaving the page quietly out of date.
+  it('groups the feature catalog and names the surfaces that ship today', async () => {
+    renderLogin();
+    // Scoped to the catalog: "Clones" and "Market" also appear in the hero's
+    // preview panel, so an unscoped query matches two nodes.
+    const catalog = within(
+      await screen.findByRole('region', { name: /everything outside the client/i })
+    );
+
+    for (const group of ['Progression', 'Economy', 'Operations']) {
+      expect(catalog.getByRole('heading', { name: group })).toBeInTheDocument();
+    }
+    for (const feature of [
+      'Skills',
+      'Clones',
+      'Industry',
+      'Market',
+      'Market Orders',
+      'Wallet & LP',
+      'Assets',
+      'Planetary Industry',
+      'Moon Mining',
+      'Corporation',
+      'Notifications',
+      'Mail, Calendar & Contracts',
+    ]) {
+      expect(catalog.getByText(feature)).toBeInTheDocument();
+    }
+  });
+
+  it('answers the trust objections and enumerates the scopes it asks for', async () => {
+    renderLogin();
+    expect(
+      await screen.findByRole('heading', { name: /read-only, and it stays that way/i })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: /never writes to your account/i })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: /your token stays on this device/i })
+    ).toBeInTheDocument();
+
+    // The consent list is compliance copy, not a sales pitch: it has to name
+    // the base-grant scopes that are easiest to forget are in there.
+    const permissions = screen.getByText(/signing in grants read-only access/i);
+    for (const scope of [
+      'mining ledger',
+      'current location',
+      'corporation roles',
+      'blueprints',
+      'loyalty points',
+    ]) {
+      expect(permissions).toHaveTextContent(scope);
+    }
   });
 
   it('redirects to /characters when a Character already exists', async () => {

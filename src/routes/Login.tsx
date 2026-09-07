@@ -10,12 +10,21 @@ import { characterAvatarBoxClassName } from '@/components/ui/characterAvatarBox'
 import {
   Clones,
   Container,
+  Corporation,
   ICON_SIZE,
   Industry,
   Market,
+  MoonMining,
+  Notifications,
+  Offline,
+  OpenSource,
+  Orders,
   Planetary,
+  ReadOnly,
+  SignIn,
   Skills,
   Social,
+  TokenPrivacy,
   Wallet,
   type IconProps,
 } from '@/components/ui/icons';
@@ -29,15 +38,68 @@ import { formatAge, HOUR_MS, MINUTE_MS } from '@/lib/age';
 import { formatIsk } from '@/lib/isk';
 import { formatTimestamp } from '@/lib/timestamp';
 
-const FEATURES: { icon: ComponentType<IconProps>; key: string }[] = [
-  { icon: Skills, key: 'skills' },
-  { icon: Industry, key: 'industry' },
-  { icon: Market, key: 'market' },
-  { icon: Wallet, key: 'walletOrders' },
-  { icon: Container, key: 'assets' },
-  { icon: Planetary, key: 'planetary' },
-  { icon: Social, key: 'social' },
-  { icon: Clones, key: 'clones' },
+const REPO_URL = 'https://github.com/shawndibble/neocom-desk';
+
+/**
+ * The four questions the page leads with. Each one names a surface a signed-in
+ * pilot actually opens, so the claim under it can be checked against the app
+ * rather than admired — no benefit here is broader than what ships.
+ */
+const ANSWERS: { icon: ComponentType<IconProps>; key: string }[] = [
+  { icon: Orders, key: 'orders' },
+  { icon: Industry, key: 'build' },
+  { icon: Skills, key: 'training' },
+  { icon: MoonMining, key: 'moon' },
+];
+
+/**
+ * The feature catalog under the answers, grouped the way the app's own nav
+ * groups its routes (Progression / Economy / Operations) so the page and the
+ * signed-in shell describe the same product in the same order.
+ */
+const FEATURE_GROUPS: {
+  group: string;
+  items: { icon: ComponentType<IconProps>; key: string }[];
+}[] = [
+  {
+    group: 'progression',
+    items: [
+      { icon: Skills, key: 'skills' },
+      { icon: Clones, key: 'clones' },
+    ],
+  },
+  {
+    group: 'economy',
+    items: [
+      { icon: Industry, key: 'industry' },
+      { icon: Market, key: 'market' },
+      { icon: Orders, key: 'orders' },
+      { icon: Wallet, key: 'walletOrders' },
+      { icon: Container, key: 'assets' },
+      { icon: Planetary, key: 'planetary' },
+      { icon: MoonMining, key: 'miningTax' },
+    ],
+  },
+  {
+    group: 'operations',
+    items: [
+      { icon: Corporation, key: 'corp' },
+      { icon: Notifications, key: 'notifications' },
+      { icon: Social, key: 'social' },
+    ],
+  },
+];
+
+/**
+ * The objections a pilot weighs before handing an EVE SSO grant to a
+ * third-party site. Deliberately the last thing above the closing button —
+ * it is where the hesitation actually happens.
+ */
+const TRUST: { icon: ComponentType<IconProps>; key: string }[] = [
+  { icon: ReadOnly, key: 'readOnly' },
+  { icon: TokenPrivacy, key: 'token' },
+  { icon: Offline, key: 'offline' },
+  { icon: OpenSource, key: 'openSource' },
 ];
 
 /** Sample values for the hero preview only — never real character data. */
@@ -100,11 +162,8 @@ export function Login() {
           <p className="mt-4 max-w-md text-text-dim">{t('app.tagline')}</p>
           <div className="mt-7 flex flex-col items-start gap-3">
             <SsoButton pending={pending} onClick={onLogin} label={t('login.button')} />
-            <span className="text-[0.6875rem] text-text-faint">{t('login.trustLine')}</span>
+            <span className="text-xs text-text-dim">{t('login.trustLine')}</span>
           </div>
-          <p className="mt-6 max-w-md text-[0.6875rem] text-text-faint">
-            {t('login.permissionsHint')}
-          </p>
         </div>
 
         <div
@@ -187,41 +246,112 @@ export function Login() {
         </div>
       </section>
 
-      <section className="mx-auto max-w-6xl px-6 pb-16">
-        <h2 className="text-xl font-semibold">{t('login.featuresHeading')}</h2>
-        <div className="mt-6 border-t border-line">
-          {FEATURES.map(({ icon: Icon, key }) => (
-            <div key={key} className="flex flex-wrap items-center gap-4 border-b border-line py-4">
-              <Icon size={ICON_SIZE.lg} className="shrink-0 text-accent" />
-              <span className="w-44 shrink-0 text-sm font-semibold">
-                {t(`login.features.${key}.name`)}
-              </span>
-              <span className="flex-1 text-sm text-text-dim">
-                {t(`login.features.${key}.desc`)}
-              </span>
-              <span className="rounded-xs border border-line bg-panel-2 px-2 py-0.5 text-[0.6875rem] text-text-dim">
-                {t(`login.features.${key}.tag`)}
-              </span>
+      {/*
+        The three content sections below are named landmarks: on a page this
+        long, "skip to what it does" and "skip to what it asks for" are real
+        navigation, and the names double as the handle a test grabs a section
+        by — several labels here (Clones, Market) also appear in the preview
+        panel above, so an unscoped query would be ambiguous.
+      */}
+      <section aria-labelledby="login-answers-heading" className="border-t border-line">
+        <div className="mx-auto max-w-6xl px-6 py-14">
+          <h2 id="login-answers-heading" className="text-xl font-semibold">
+            {t('login.answersHeading')}
+          </h2>
+          <p className="mt-2 max-w-2xl text-sm text-text-dim">{t('login.answersLead')}</p>
+          <div className="mt-6 grid gap-3 md:grid-cols-2">
+            {ANSWERS.map(({ icon: Icon, key }) => (
+              // Untitled Panels: `Panel`'s own `title` is the uppercase
+              // micro-heading, and a question is the one heading on this page
+              // that has to read at body size to be worth asking.
+              <Panel key={key}>
+                <div className="flex items-start gap-3">
+                  <Icon size={ICON_SIZE.lg} className="mt-0.5 shrink-0 text-accent" />
+                  <h3 className="text-base font-semibold text-balance">
+                    {t(`login.answers.${key}.question`)}
+                  </h3>
+                </div>
+                <p className="mt-3 text-sm text-text-dim">{t(`login.answers.${key}.answer`)}</p>
+              </Panel>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section aria-labelledby="login-features-heading" className="border-t border-line">
+        <div className="mx-auto max-w-6xl px-6 py-14">
+          <h2 id="login-features-heading" className="text-xl font-semibold">
+            {t('login.featuresHeading')}
+          </h2>
+          {FEATURE_GROUPS.map(({ group, items }) => (
+            <div key={group} className="mt-6">
+              <h3 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                {t(`login.featureGroups.${group}`)}
+              </h3>
+              <div className="mt-2 border-t border-line">
+                {items.map(({ icon: Icon, key }) => (
+                  <div
+                    key={key}
+                    className="flex flex-wrap items-center gap-4 border-b border-line py-4"
+                  >
+                    <Icon size={ICON_SIZE.lg} className="shrink-0 text-accent" />
+                    <span className="w-44 shrink-0 text-sm font-semibold">
+                      {t(`login.features.${key}.name`)}
+                    </span>
+                    <span className="flex-1 basis-64 text-sm text-text-dim">
+                      {t(`login.features.${key}.desc`)}
+                    </span>
+                    <span className="rounded-xs border border-line bg-panel-2 px-2 py-0.5 text-[0.6875rem] text-text-dim">
+                      {t(`login.features.${key}.tag`)}
+                    </span>
+                  </div>
+                ))}
+              </div>
             </div>
           ))}
         </div>
       </section>
 
+      <section aria-labelledby="login-trust-heading" className="border-t border-line">
+        <div className="mx-auto max-w-6xl px-6 py-14">
+          <h2 id="login-trust-heading" className="text-xl font-semibold">
+            {t('login.trustHeading')}
+          </h2>
+          <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {TRUST.map(({ icon: Icon, key }) => (
+              <Panel key={key}>
+                <Icon size={ICON_SIZE.lg} className="text-accent" />
+                <h3 className="mt-3 text-sm font-semibold">{t(`login.trust.${key}.name`)}</h3>
+                <p className="mt-1 text-sm text-text-dim">{t(`login.trust.${key}.desc`)}</p>
+              </Panel>
+            ))}
+          </div>
+          {/*
+            The full scope enumeration sits here rather than beside the hero
+            button: it is what a hesitant reader wants *after* the trust
+            points and immediately before the closing CTA, and at hero size it
+            was a wall of 11px text nobody read.
+          */}
+          <p className="mt-6 max-w-4xl text-xs text-text-dim">{t('login.permissionsHint')}</p>
+        </div>
+      </section>
+
       <section className="border-t border-line px-6 py-14 text-center">
         <h2 className="text-2xl font-semibold">{t('login.bottomCtaHeading')}</h2>
+        <p className="mx-auto mt-3 max-w-lg text-sm text-text-dim">{t('login.bottomCtaBody')}</p>
         <div className="mt-6 flex justify-center">
           <SsoButton pending={pending} onClick={onLogin} label={t('login.button')} />
         </div>
       </section>
 
-      <footer className="flex flex-wrap justify-center gap-6 px-6 py-6 text-[0.75rem] text-text-faint">
+      <footer className="flex flex-wrap justify-center gap-6 px-6 py-6 text-xs text-text-dim">
         <span>{t('login.footerMultiChar')}</span>
         <span>{t('login.footerOffline')}</span>
         <a
-          href="https://github.com/shawndibble/neocom-desk"
+          href={REPO_URL}
           target="_blank"
           rel="noopener noreferrer"
-          className="hover:text-text-dim hover:underline"
+          className="hover:text-text hover:underline"
         >
           {t('login.footerOpenSource')}
         </a>
@@ -250,9 +380,7 @@ function SsoButton({
       {pending ? (
         <Spinner size="sm" label={t('common.loading')} />
       ) : (
-        <span aria-hidden="true" className="text-accent">
-          ▶
-        </span>
+        <SignIn aria-hidden="true" className="text-accent" />
       )}
       {label}
     </button>
