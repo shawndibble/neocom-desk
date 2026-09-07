@@ -16,10 +16,6 @@ import {
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { beginEveLogin } from '@/app/loginFlow';
 import { useIsDesktop } from '@/lib/useIsDesktop';
-import {
-  useViewportBoundedHeight,
-  VIEWPORT_BOUNDED_BOTTOM_GAP_PX,
-} from '@/lib/useViewportBoundedHeight';
 import { DEFAULT_TRADE_HUB } from '@/market/hubs';
 import { FACILITY_PRESETS } from '@/engine/industry/types';
 import type {
@@ -385,7 +381,6 @@ export function Industry() {
   const isDesktop = useIsDesktop();
   const detailVisible = isDesktop || selectedId !== null || comparing;
   const showBackControl = !isDesktop && (selectedId !== null || comparing);
-  const [scrollerRef, scrollerMaxHeight] = useViewportBoundedHeight(VIEWPORT_BOUNDED_BOTTOM_GAP_PX);
 
   if (!hydrated) {
     return (
@@ -589,15 +584,7 @@ export function Industry() {
                     {t('industry.backToList')}
                   </Button>
                 )}
-                <div
-                  ref={scrollerRef}
-                  className="space-y-4 lg:overflow-y-auto"
-                  style={
-                    isDesktop && scrollerMaxHeight !== null
-                      ? { maxHeight: scrollerMaxHeight }
-                      : undefined
-                  }
-                >
+                <div className="space-y-4">
                   {!detailVisible ? null : comparing ? (
                     comparePlans.length >= 2 ? (
                       <BuildPlanCompare
