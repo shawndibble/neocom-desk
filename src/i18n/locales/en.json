@@ -1,7 +1,7 @@
 {
   "app": {
     "name": "Neocom Desk",
-    "tagline": "EVE Online character, skill planning, and industry companion"
+    "tagline": "Skill plans, build margins, market orders, colonies and moon tax — every character you fly, in one browser tab."
   },
   "nav": {
     "characters": "Characters",
@@ -668,57 +668,122 @@
   },
   "login": {
     "button": "Log in with EVE Online",
-    "permissionsHint": "Grants read-only access to your skills, assets, wallet, mail, calendar, contracts, market orders, industry, clones, player structure names, planetary colonies, contacts, loyalty points and notifications. EVE's consent screen lists the planetary scope as \"manage your planetary installations\" — Neocom Desk only reads that data and never writes to it. Log in again after an update to pick up newly requested permissions.",
+    "permissionsHint": "Signing in grants read-only access to your skills and training queue, wallet, assets, blueprints, industry jobs, mining ledger, market orders, contracts, mail, calendar, contacts, clones and implants, planetary colonies, loyalty points, notifications, current location, corporation roles, and the player structures you can dock at — both their names and a search across them, which is how a build location is picked. EVE's consent screen lists the planetary scope as \"manage your planetary installations\" — Neocom Desk only reads that data and never writes to it. Corporation data is a separate grant, requested only if you open the corporation pages. Log in again after an update to pick up newly requested permissions.",
     "eyebrow": "Read-only · Free · Open source",
     "heading": "Command deck for every character you fly.",
-    "trustLine": "Refresh tokens never leave this device.",
+    "trustLine": "Read-only access. Your refresh token never leaves this device.",
     "previewLabel": "Example — signed-in view",
     "previewCharacterName": "Aurelia Vex",
     "previewCorp": "Deep Space Transport",
+    "answersHeading": "The questions it exists to answer",
+    "answersLead": "Not another dump of what the API returned — the number you were going to work out by hand, already worked out, for every character at once.",
+    "answers": {
+      "orders": {
+        "question": "Which of my orders is quietly losing ISK?",
+        "answer": "Open Orders is a worklist, not a list. Every order is filed under the worst thing wrong with it — undercut at your station, system or region, sitting under the price where relisting stops paying, or about to expire — worst first, across every character you fly. Open one and it prices the ways out: hold, match the station, dump into a standing buy order, or refine it and sell the materials, each net of the fee that exit actually pays, plus the hubs bidding more and how many jumps away they are."
+      },
+      "build": {
+        "question": "Is this blueprint worth building today?",
+        "answer": "A Build Plan costs the materials, job fee and taxes at live hub prices and answers two different questions instead of blurring them: is it cheaper than buying outright, and does it still profit once sales tax and broker fees come off. Sub-builds recurse into the same plan, owned stock is checked against what it would fetch if you sold it instead, and every figure on screen opens the rule it came from with your own values substituted in."
+      },
+      "training": {
+        "question": "What is this training plan really going to cost me?",
+        "answer": "Drag skills into a plan and it schedules against the character's real attributes, implants and queue. The optimizer places remaps for you — or at markers you drop yourself — and re-costs the plan under what-if implants and an accelerator before you spend anything. Put your characters side by side to see which of them should be training it."
+      },
+      "moon": {
+        "question": "Who owes what on the moon rental?",
+        "answer": "Your mining ledger becomes an invoice. Each day's ore in each system is assigned to a payee at a tax rate snapshotted on the spot, so a later price move never rewrites what was owed. If ESI reports more ore for a day you already assigned, it flags itself for review with the before and after. Then settle up against the donations and contracts you actually sent."
+      }
+    },
     "featuresHeading": "Everything outside the client",
+    "featureGroups": {
+      "progression": "Progression",
+      "economy": "Economy",
+      "operations": "Operations"
+    },
     "features": {
       "skills": {
         "name": "Skills",
-        "desc": "Drag-and-drop skill plans, remap & implant-aware optimizer, live in-game queue import.",
+        "desc": "Drag-and-drop skill plans, a remap-, implant- and accelerator-aware optimizer, live queue import, and a side-by-side character comparison.",
         "tag": "Planning"
+      },
+      "clones": {
+        "name": "Clones",
+        "desc": "Jump clones, fitted implants and the attributes your training time is actually running on.",
+        "tag": "Read-only"
       },
       "industry": {
         "name": "Industry",
-        "desc": "Build plans price out blueprints, materials, job fees and taxes against live trade-hub prices.",
+        "desc": "Build plans for manufacturing and reactions: materials, job fees, facility rigs and taxes at live hub prices, with a production log that tracks what each run really made.",
         "tag": "Manufacturing"
       },
       "market": {
         "name": "Market",
-        "desc": "Live order books across Jita, Amarr, Dodixie, Rens and Hek.",
-        "tag": "No login needed"
+        "desc": "Order books, spreads and variation comparison across Jita, Amarr, Dodixie, Rens and Hek. Built on public price data, so it works whatever you did or didn't grant.",
+        "tag": "No scope needed"
+      },
+      "orders": {
+        "name": "Market Orders",
+        "desc": "Your open orders grouped by what is wrong with them, with the relist floor, the undercut that caused it, and the better exits — for every character at once.",
+        "tag": "Trading"
       },
       "walletOrders": {
-        "name": "Wallet & Orders",
-        "desc": "Balance, transaction history and every open market order in one place.",
+        "name": "Wallet & LP",
+        "desc": "Balance, journal and transaction history, plus a loyalty store that ranks offers by what they are worth at your hub.",
         "tag": "Read-only"
       },
       "assets": {
         "name": "Assets",
-        "desc": "Every hangar, station and structure your characters hold, searchable.",
+        "desc": "Every hangar, station and structure your characters hold, searchable, with player structures resolved to real names.",
         "tag": "Read-only"
       },
       "planetary": {
         "name": "Planetary Industry",
-        "desc": "Colonies, extraction timers and factory chains at a glance.",
-        "tag": "Read-only"
+        "desc": "Colonies, extraction timers and idle warnings, plus a chain planner that fits pins against CPU and powergrid and prices the output at your hub.",
+        "tag": "Planning"
+      },
+      "miningTax": {
+        "name": "Moon Mining",
+        "desc": "The rental ledger: per-day, per-system ore assigned to payees, tax and ISK snapshotted at assignment, splits, settle-up and payment matching.",
+        "tag": "Ledger"
+      },
+      "corp": {
+        "name": "Corporation",
+        "desc": "Ops board, wallet divisions, corp industry jobs, division-grouped assets and a member roster that flags who has gone dark. Gated on your in-game roles.",
+        "tag": "Role-gated"
+      },
+      "notifications": {
+        "name": "Notifications",
+        "desc": "Per character, per event. Skills, industry jobs, extractors, calendar events and structure alarms carry a timestamp, so those arrive with the app closed; order fills, mail and contracts fire while it is open.",
+        "tag": "Push"
       },
       "social": {
-        "name": "Mail, Calendar & Contacts",
-        "desc": "Read your in-game mail, upcoming events and standings without logging in.",
-        "tag": "Read-only"
-      },
-      "clones": {
-        "name": "Clones",
-        "desc": "Jump clones and fitted implants for every character.",
+        "name": "Mail, Calendar & Contracts",
+        "desc": "In-game mail, upcoming events, contracts and standings, read without launching the client.",
         "tag": "Read-only"
       }
     },
+    "trustHeading": "Read-only, and it stays that way",
+    "trust": {
+      "readOnly": {
+        "name": "It never writes to your account",
+        "desc": "No order is placed, no mail is sent, no colony is touched. Every scope it asks for is a read."
+      },
+      "token": {
+        "name": "Your refresh token stays in this browser",
+        "desc": "It lives in this browser's own storage and nowhere else — never on a server, never in a log. Signing in to sync exchanges one short-lived access token and never the refresh token. Remove a character and it goes with it."
+      },
+      "offline": {
+        "name": "Works when the connection doesn't",
+        "desc": "Install it like an app. It keeps serving what it last fetched when ESI is down or you have no signal, and syncs your own plans across your devices."
+      },
+      "openSource": {
+        "name": "Free, and open to read",
+        "desc": "No account to create, no ads, no subscription, no paid tier. Read the source before you decide to trust it."
+      }
+    },
     "bottomCtaHeading": "Undock into your dashboard.",
+    "bottomCtaBody": "One EVE SSO login to start. Add as many characters as you fly — they all sit side by side.",
     "footerMultiChar": "Multi-character from day one",
     "footerOffline": "Offline-capable PWA",
     "footerOpenSource": "Free & open source"

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import '@/i18n';
@@ -9,6 +9,37 @@ import { assignLocation } from '@/app/navigation';
 import { Login } from './Login';
 
 vi.mock('@/app/navigation', () => ({ assignLocation: vi.fn() }));
+
+/**
+ * Every scope in the Base Grant, against the words `login.permissionsHint`
+ * discloses it with. Hand-maintained on purpose: only a person can decide how
+ * a new scope should be described to someone deciding whether to grant it.
+ * Two scopes may share a phrase where the disclosure honestly is the same
+ * (`read_clones`/`read_implants`), but a scope may never be absent.
+ */
+const BASE_GRANT_PHRASES: Record<string, string> = {
+  'esi-skills.read_skills.v1': 'skills and training queue',
+  'esi-skills.read_skillqueue.v1': 'skills and training queue',
+  'esi-clones.read_clones.v1': 'clones and implants',
+  'esi-clones.read_implants.v1': 'clones and implants',
+  'esi-universe.read_structures.v1': 'player structures you can dock at',
+  'esi-search.search_structures.v1': 'a search across them',
+  'esi-characters.read_blueprints.v1': 'blueprints',
+  'esi-wallet.read_character_wallet.v1': 'wallet',
+  'esi-assets.read_assets.v1': 'assets',
+  'esi-mail.read_mail.v1': 'mail',
+  'esi-calendar.read_calendar_events.v1': 'calendar',
+  'esi-characters.read_notifications.v1': 'notifications',
+  'esi-contracts.read_character_contracts.v1': 'contracts',
+  'esi-markets.read_character_orders.v1': 'market orders',
+  'esi-industry.read_character_jobs.v1': 'industry jobs',
+  'esi-industry.read_character_mining.v1': 'mining ledger',
+  'esi-characters.read_corporation_roles.v1': 'corporation roles',
+  'esi-planets.manage_planets.v1': 'planetary colonies',
+  'esi-characters.read_contacts.v1': 'contacts',
+  'esi-characters.read_loyalty.v1': 'loyalty points',
+  'esi-location.read_location.v1': 'current location',
+};
 
 function renderLogin() {
   return render(
@@ -46,6 +77,85 @@ describe('Login', () => {
       'href',
       'https://github.com/shawndibble/neocom-desk'
     );
+  });
+
+  it('leads with the questions the app answers', async () => {
+    renderLogin();
+    expect(
+      await screen.findByRole('heading', { name: /the questions it exists to answer/i })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: /which of my orders is quietly losing isk/i })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: /is this blueprint worth building today/i })
+    ).toBeInTheDocument();
+  });
+
+  // The catalog is the page's claim about what shipped, and it silently rotted
+  // once before: the eight rows it listed predated Moon Mining, Corporation,
+  // Notifications and the Open Orders worklist. This pins the rows that exist,
+  // so renaming or dropping one becomes a deliberate two-file edit instead of
+  // a silent drift. It deliberately does NOT catch the failure that caused the
+  // rot — a new route shipping with no row here still fails nothing, because
+  // nothing enumerates the app's routes and not every route earns a row. The
+  // consent list below is the half that *can* be derived, and is.
+  it('groups the feature catalog and names the surfaces that ship today', async () => {
+    renderLogin();
+    // Scoped to the catalog: "Clones" and "Market" also appear in the hero's
+    // preview panel, so an unscoped query matches two nodes.
+    const catalog = within(
+      await screen.findByRole('region', { name: /everything outside the client/i })
+    );
+
+    for (const group of ['Progression', 'Economy', 'Operations']) {
+      expect(catalog.getByRole('heading', { name: group })).toBeInTheDocument();
+    }
+    for (const feature of [
+      'Skills',
+      'Clones',
+      'Industry',
+      'Market',
+      'Market Orders',
+      'Wallet & LP',
+      'Assets',
+      'Planetary Industry',
+      'Moon Mining',
+      'Corporation',
+      'Notifications',
+      'Mail, Calendar & Contracts',
+    ]) {
+      expect(catalog.getByText(feature)).toBeInTheDocument();
+    }
+  });
+
+  it('answers the trust objections and enumerates the scopes it asks for', async () => {
+    renderLogin();
+    expect(
+      await screen.findByRole('heading', { name: /read-only, and it stays that way/i })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: /never writes to your account/i })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: /your refresh token stays in this browser/i })
+    ).toBeInTheDocument();
+
+    const permissions = screen.getByText(/signing in grants read-only access/i);
+    for (const phrase of new Set(Object.values(BASE_GRANT_PHRASES))) {
+      expect(permissions).toHaveTextContent(phrase);
+    }
+  });
+
+  // The guard that matters. Asserting today's phrases appear would only
+  // document the copy; this pins it to `esi/registry.ts`, which is where the
+  // Base Grant actually comes from. The prose had already fallen behind —
+  // it was silently omitting the mining ledger, blueprints, current location
+  // and corporation roles — and an incomplete consent disclosure is the worst
+  // defect this page can carry. Registering a new ungrouped endpoint now
+  // fails here until someone decides how to disclose its scope.
+  it('discloses every scope in the Base Grant, and nothing it no longer asks for', () => {
+    expect(new Set(Object.keys(BASE_GRANT_PHRASES))).toEqual(new Set(SCOPES));
   });
 
   it('redirects to /characters when a Character already exists', async () => {

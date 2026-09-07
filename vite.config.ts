@@ -11,6 +11,17 @@ const { version } = JSON.parse(
 ) as { version: string };
 
 /**
+ * The manifest description is the login hero's own subheading — one sentence,
+ * one source. Read out of the catalog rather than restated here: the two had
+ * already drifted once, the manifest still promising a "character, skill
+ * planning, and industry companion" long after market, planetary, moon mining
+ * and corp shipped.
+ */
+const { app: appStrings } = JSON.parse(
+  readFileSync(new URL('./src/i18n/locales/en.json', import.meta.url), 'utf-8')
+) as { app: { name: string; tagline: string } };
+
+/**
  * Plain `.test.ts` files that need a real `document`/`window` even though
  * nothing in them is `.tsx` — either `@testing-library/react`'s `renderHook`
  * (which mounts into a real `document`), or a browser global the module
@@ -64,9 +75,9 @@ export default defineConfig({
       filename: 'sw.ts',
       registerType: 'prompt',
       manifest: {
-        name: 'Neocom Desk',
+        name: appStrings.name,
         short_name: 'Neocom',
-        description: 'EVE Online character, skill planning, and industry companion',
+        description: appStrings.tagline,
         theme_color: '#0d1117',
         background_color: '#0d1117',
         display: 'standalone',

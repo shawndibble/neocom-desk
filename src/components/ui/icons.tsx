@@ -23,12 +23,14 @@ import {
   ArrowsLeftRight,
   Bell,
   BellSlash,
+  Buildings,
   CaretDoubleDown,
   CaretDoubleUp,
   CaretDown,
   CaretLeft,
   CaretRight,
   CaretUpDown,
+  CloudSlash,
   ChartLineUp,
   Check,
   CheckCircle,
@@ -48,14 +50,20 @@ import {
   Gauge,
   GraduationCap,
   Hammer,
+  Code,
   Info as InfoGlyph,
+  LockKey,
   MagnifyingGlass,
+  Moon,
   Package,
   PencilSimple,
   Planet,
   Plus,
   Queue,
+  Receipt,
+  ShieldCheck,
   ShoppingCart,
+  SignIn as SignInGlyph,
   Sliders,
   Stack,
   Star,
@@ -189,7 +197,7 @@ export const ExpandAll = withWeight(CaretDoubleDown);
 export const CollapseAll = withWeight(CaretDoubleUp);
 
 // The Login page's feature list (src/routes/Login.tsx) is the one caller for
-// the seven below — grouped here so a reader can see they're a set.
+// most of the section below — grouped here so a reader can see they're a set.
 /** Skill training and progression. */
 export const Skills = withWeight(GraduationCap);
 /** Manufacturing build plans. */
@@ -208,3 +216,25 @@ export const Social = withWeight(EnvelopeSimple);
 export const Clones = withWeight(Stack);
 /** Contracts — courier, item exchange, auction. */
 export const Contracts = withWeight(FileText);
+/** Corporation-owned surfaces: ops board, wallet divisions, roster, corp assets. */
+export const Corporation = withWeight(Buildings);
+/** The Moon Mining Tax ledger. Its own glyph, not the industry factory — this is rent, not production. */
+export const MoonMining = withWeight(Moon);
+/**
+ * The notification *feature* as a whole, as sold on the login page. Distinct
+ * from `BrowserNotifyOn`/`BrowserNotifyOff`, which are the two states of one
+ * row's toggle and must stay a pair.
+ */
+export const Notifications = withWeight(Bell);
+/** Works with no connection: the installed PWA serving what it last fetched. */
+export const Offline = withWeight(CloudSlash);
+/** A character's own open market orders, as distinct from `Market`'s general price lookup. */
+export const Orders = withWeight(Receipt);
+/** Read-only access — the app never writes to the player's account. */
+export const ReadOnly = withWeight(ShieldCheck);
+/** Credentials that stay on the device. */
+export const TokenPrivacy = withWeight(LockKey);
+/** The project's source being public. */
+export const OpenSource = withWeight(Code);
+/** Start the EVE SSO round trip. Replaces the `▶` dingbat the login button used to draw (DESIGN.md §5). */
+export const SignIn = withWeight(SignInGlyph);
