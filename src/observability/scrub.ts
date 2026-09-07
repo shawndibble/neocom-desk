@@ -59,6 +59,20 @@ export function scrubBreadcrumb(breadcrumb: Breadcrumb): Breadcrumb {
 }
 
 /**
+ * Span attributes are a flat bag of arbitrary keys, so this redacts every
+ * string value rather than guessing at the URL-bearing names. That is safe
+ * because `redactSecrets` only ever rewrites a `?`/`&`/`#`-prefixed parameter
+ * whose name is in `SECRET_PARAMS`; anything else is returned untouched.
+ */
+function redactAttributes<T extends Record<string, unknown>>(attributes: T): T {
+  const redacted: Record<string, unknown> = { ...attributes };
+  for (const [key, value] of Object.entries(redacted)) {
+    if (typeof value === 'string') redacted[key] = redactSecrets(value);
+  }
+  return redacted as T;
+}
+
+/**
  * `beforeSend`'s half. Generic over the event type because transactions need
  * this as much as errors do: the router integration names the span after the
  * route pattern, but `request.url` still carries the raw `/callback?code=…`.
@@ -68,8 +82,15 @@ export function scrubBreadcrumb(breadcrumb: Breadcrumb): Breadcrumb {
  * carrier.
  */
 export function scrubEvent<E extends SentryEvent>(event: E): E {
-  if (event.request?.url) {
-    event.request = { ...event.request, url: redactSecrets(event.request.url) };
+  if (event.request) {
+    // `headers` matters as much as `url` here: the SDK copies `document.referrer`
+    // into `Referer`, so a client-side navigation away from `/callback` carries
+    // the authorization code into the *next* event, whose own URL is innocent.
+    event.request = {
+      ...event.request,
+      ...(event.request.url ? { url: redactSecrets(event.request.url) } : {}),
+      ...(event.request.headers ? { headers: redactAttributes(event.request.headers) } : {}),
+    };
   }
   if (typeof event.transaction === 'string') event.transaction = redactSecrets(event.transaction);
   if (typeof event.message === 'string') event.message = redactSecrets(event.message);
@@ -82,5 +103,28 @@ export function scrubEvent<E extends SentryEvent>(event: E): E {
     };
   }
   if (event.breadcrumbs) event.breadcrumbs = event.breadcrumbs.map(scrubBreadcrumb);
+
+  // Transactions, which `event.request.url` alone does not cover: the browser
+  // timing spans (`browser.request`, `browser.connect`, …) each describe
+  // themselves with the whole URL, and both the root span and every child
+  // repeat it under the `url.full` attribute. Verified by watching a real
+  // envelope — the error event was already clean here while the transaction
+  // was still shipping the raw query string.
+  if (event.contexts?.trace?.data) {
+    event.contexts = {
+      ...event.contexts,
+      trace: { ...event.contexts.trace, data: redactAttributes(event.contexts.trace.data) },
+    };
+  }
+  if (event.spans) {
+    event.spans = event.spans.map((span) => ({
+      ...span,
+      ...(typeof span.description === 'string'
+        ? { description: redactSecrets(span.description) }
+        : {}),
+      ...(span.data ? { data: redactAttributes(span.data) } : {}),
+    }));
+  }
+
   return event;
 }

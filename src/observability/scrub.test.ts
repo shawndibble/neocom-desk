@@ -118,6 +118,70 @@ describe('scrubEvent', () => {
     expect(scrubbed.breadcrumbs?.[1]?.data?.url).toBe('https://x/?access_token=[redacted]');
   });
 
+  it('redacts request headers, where Referer repeats the whole URL', () => {
+    const event = {
+      request: {
+        url: 'https://neocomdesk.com/overview',
+        headers: {
+          Referer: 'https://neocomdesk.com/callback?code=abc&state=xyz',
+          'User-Agent': 'Mozilla/5.0',
+        },
+      },
+    } as unknown as ErrorEvent;
+
+    expect(scrubEvent(event).request?.headers).toEqual({
+      Referer: 'https://neocomdesk.com/callback?code=[redacted]&state=[redacted]',
+      'User-Agent': 'Mozilla/5.0',
+    });
+  });
+
+  it('redacts span descriptions and span data, which carry the full URL', () => {
+    // Shape taken from a real transaction envelope: browser.* timing spans
+    // describe themselves with the whole URL, and `url.full` repeats it.
+    const event = {
+      type: 'transaction',
+      spans: [
+        {
+          op: 'browser.request',
+          description: 'https://neocomdesk.com/callback?code=abc&state=xyz',
+          data: { 'url.full': 'https://neocomdesk.com/callback?code=abc', 'url.path': '/callback' },
+        },
+        { op: 'ui.render', data: { 'sentry.sample_rate': 1 } },
+      ],
+    } as unknown as ErrorEvent;
+
+    const scrubbed = scrubEvent(event);
+    expect(scrubbed.spans?.[0]?.description).toBe(
+      'https://neocomdesk.com/callback?code=[redacted]&state=[redacted]'
+    );
+    expect(scrubbed.spans?.[0]?.data).toEqual({
+      'url.full': 'https://neocomdesk.com/callback?code=[redacted]',
+      'url.path': '/callback',
+    });
+    // Non-string attributes survive untouched.
+    expect(scrubbed.spans?.[1]?.data).toEqual({ 'sentry.sample_rate': 1 });
+  });
+
+  it('redacts the root span attributes on contexts.trace', () => {
+    const event = {
+      type: 'transaction',
+      contexts: {
+        trace: {
+          op: 'pageload',
+          trace_id: 'abc',
+          data: { 'url.full': 'https://neocomdesk.com/callback?code=abc&state=xyz' },
+        },
+        os: { name: 'Windows' },
+      },
+    } as unknown as ErrorEvent;
+
+    const scrubbed = scrubEvent(event);
+    expect(scrubbed.contexts?.trace?.data).toEqual({
+      'url.full': 'https://neocomdesk.com/callback?code=[redacted]&state=[redacted]',
+    });
+    expect(scrubbed.contexts?.os).toEqual({ name: 'Windows' });
+  });
+
   it('survives an event with none of the optional fields present', () => {
     expect(() => scrubEvent({} as ErrorEvent)).not.toThrow();
   });
