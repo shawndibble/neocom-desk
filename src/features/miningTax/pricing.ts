@@ -16,10 +16,26 @@ import { getHubPrices } from '@/market/prices';
 import { DEFAULT_TRADE_HUB } from '@/market/hubs';
 import { loadCompressedOreTypeIds } from '@/sde/loadSde';
 
-/** Per-unit Jita buy price for each raw ore/ice typeId, priced via its Compressed counterpart when one exists; 0 for a type Fuzzwork has no buy orders for. */
-export async function loadJitaUnitPrices(typeIds: readonly number[]): Promise<Map<number, number>> {
+export interface UnitPrices {
+  /** Per-unit buy price by raw typeId. 0 for anything the hub could not price. */
+  prices: Map<number, number>;
+  /**
+   * Raw typeIds the hub had no buy order for.
+   *
+   * Reported separately rather than folded into `prices` as a `null`, which
+   * would ripple `number | null` through `engine/miningTax/valuation.ts` and
+   * every dialog that values a line. The 0 is what keeps the arithmetic
+   * working; this set is what stops a pilot reading it as "this ore is worth
+   * nothing" — a tax bill of 0 ISK that renders like any other is the failure
+   * mode a thin order book would otherwise cause silently.
+   */
+  unpriced: Set<number>;
+}
+
+/** Per-unit Jita buy price for each raw ore/ice typeId, priced via its Compressed counterpart when one exists. */
+export async function loadJitaUnitPrices(typeIds: readonly number[]): Promise<UnitPrices> {
   const unique = [...new Set(typeIds)];
-  if (unique.length === 0) return new Map();
+  if (unique.length === 0) return { prices: new Map(), unpriced: new Set() };
 
   const compressedByRaw = await loadCompressedOreTypeIds();
   const pricedTypeId = (typeId: number): number => compressedByRaw[String(typeId)] ?? typeId;
@@ -28,8 +44,14 @@ export async function loadJitaUnitPrices(typeIds: readonly number[]): Promise<Ma
   const aggregates = await getHubPrices(DEFAULT_TRADE_HUB, pricingTypeIds);
 
   const prices = new Map<number, number>();
+  const unpriced = new Set<number>();
   for (const typeId of unique) {
-    prices.set(typeId, aggregates.get(pricedTypeId(typeId))?.buyMax ?? 0);
+    const buyMax = aggregates.get(pricedTypeId(typeId))?.buyMax ?? 0;
+    prices.set(typeId, buyMax);
+    // A quoted zero counts as unpriced: an order book that bids nothing values
+    // the ore no better than one with no orders at all, and the pilot needs to
+    // know before sending the bill either way.
+    if (buyMax <= 0) unpriced.add(typeId);
   }
-  return prices;
+  return { prices, unpriced };
 }

@@ -1030,6 +1030,8 @@
     "unclassifiedHint": "One or more ore types in your mining ledger aren't recognized as moon ore or ordinary ore/ice. This can happen after a CCP patch — tag it below.",
     "tagAsMoonOre": "Tag as moon ore",
     "ignoreOreAction": "Ignore",
+    "unpricedTitle": "Some ore could not be priced",
+    "unpricedHint": "The trade hub has no buy orders for {{types}}, so those lines are valued at 0 ISK and the tax owed is understated. Price this payee at a busier hub, or settle those lines by hand.",
     "oreTagsAction": "Ore tags",
     "oreTagsTitle": "Manual ore tags",
     "oreTagsHint": "Ore types you tagged by hand from the unclassified banner. Remove a tag to send that ore back to unclassified — useful if you tagged one by mistake.",

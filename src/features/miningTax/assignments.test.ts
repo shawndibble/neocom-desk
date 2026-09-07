@@ -29,12 +29,13 @@ const TYPE_B = 45491;
 beforeEach(async () => {
   vi.clearAllMocks();
   await db.miningTaxAssignments.clear();
-  pricingMock.loadJitaUnitPrices.mockResolvedValue(
-    new Map([
+  pricingMock.loadJitaUnitPrices.mockResolvedValue({
+    prices: new Map([
       [TYPE_A, 10],
       [TYPE_B, 4],
-    ])
-  );
+    ]),
+    unpriced: new Set<number>(),
+  });
 });
 
 describe('createAssignment', () => {

@@ -341,7 +341,7 @@ export async function resolveNeedsReview(
   siblings: readonly MiningTaxAssignmentRecord[]
 ): Promise<void> {
   const relevantFresh = linesOwnedBy(freshEntry.oreLines, siblings, assignment.id);
-  const prices = await loadJitaUnitPrices(relevantFresh.map((line) => line.typeId));
+  const { prices } = await loadJitaUnitPrices(relevantFresh.map((line) => line.typeId));
   const { estimatedValue, taxOwed } = computeAssignmentValue(
     relevantFresh,
     prices,

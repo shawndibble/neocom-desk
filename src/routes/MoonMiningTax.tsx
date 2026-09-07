@@ -93,6 +93,8 @@ interface Snapshot {
   systemSecurity: Map<number, number>;
   typeNames: Map<number, string>;
   unitPrices: Map<number, number>;
+  /** Ore types the hub quoted no buy order for — their `unitPrices` entry is 0, which is not the same claim as "worthless". */
+  unpricedTypeIds: Set<number>;
 }
 
 async function loadSnapshot(_characterId: number, signal: RouteSnapshotSignal): Promise<Snapshot> {
@@ -105,12 +107,13 @@ async function loadSnapshot(_characterId: number, signal: RouteSnapshotSignal): 
       systemSecurity: new Map(),
       typeNames: new Map(),
       unitPrices: new Map(),
+      unpricedTypeIds: new Set(),
     };
   }
   const unclassifiedTypeIds = result.unclassified.flatMap((u) => u.typeIds);
   const [
     { systemNames, systemSecurity, typeNames: rowTypeNames },
-    unitPrices,
+    { prices: unitPrices, unpriced: unpricedTypeIds },
     unclassifiedTypeNames,
   ] = await Promise.all([
     resolveRowNames(result.rows),
@@ -118,7 +121,15 @@ async function loadSnapshot(_characterId: number, signal: RouteSnapshotSignal): 
     loadTypeNames(unclassifiedTypeIds),
   ]);
   const typeNames = new Map([...rowTypeNames, ...unclassifiedTypeNames]);
-  return { ...result, entries: result.rows, systemNames, systemSecurity, typeNames, unitPrices };
+  return {
+    ...result,
+    entries: result.rows,
+    systemNames,
+    systemSecurity,
+    typeNames,
+    unitPrices,
+    unpricedTypeIds,
+  };
 }
 
 /**
@@ -754,6 +765,29 @@ export function MoonMiningTax() {
                   </li>
                 ))}
               </ul>
+            </div>
+          )}
+
+          {/*
+            An ore type the hub quoted no buy order for is valued at 0, which
+            renders exactly like a cheap ore and silently understates the bill.
+            Jita has orders for effectively every compressed ore, so this is
+            usually dead copy — it stops being dead the moment a Payee is
+            priced somewhere thinner.
+          */}
+          {data && data.unpricedTypeIds.size > 0 && (
+            <div
+              role="alert"
+              className="space-y-1 rounded-xs border border-warning/60 bg-warning/10 p-2 text-xs"
+            >
+              <p className="font-semibold text-warning uppercase">{t('miningTax.unpricedTitle')}</p>
+              <p className="text-text-dim">
+                {t('miningTax.unpricedHint', {
+                  types: [...data.unpricedTypeIds]
+                    .map((typeId) => data.typeNames.get(typeId) ?? `#${typeId}`)
+                    .join(', '),
+                })}
+              </p>
             </div>
           )}
 
