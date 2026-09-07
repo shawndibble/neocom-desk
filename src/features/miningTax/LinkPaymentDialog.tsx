@@ -155,7 +155,7 @@ export function LinkPaymentDialog({
                     <span className="tabular-nums">
                       {payment.amount === null
                         ? t('miningTax.linkPaymentInKind')
-                        : `${formatIsk(payment.amount, 2)} ISK`}{' '}
+                        : `${formatIsk(payment.amount)} ISK`}{' '}
                       · {payment.date.slice(0, 10)}
                     </span>
                     <span className="truncate text-text-dim">
@@ -198,7 +198,7 @@ export function LinkPaymentDialog({
                           {showCharacter && ` · ${m.row.characterName}`}
                         </span>
                         <span className={cx('shrink-0 tabular-nums', !on && 'text-text-faint')}>
-                          {formatIsk(m.assignment.taxOwed, 2)} ISK
+                          {formatIsk(m.assignment.taxOwed)} ISK
                         </span>
                       </label>
                     </li>
@@ -235,7 +235,7 @@ export function LinkPaymentDialog({
                 })}
               </span>
               <span className="text-sm font-semibold tabular-nums">
-                {formatIsk(includedTotal, 2)} ISK
+                {formatIsk(includedTotal)} ISK
               </span>
             </div>
 
@@ -248,10 +248,10 @@ export function LinkPaymentDialog({
               >
                 {difference > 0
                   ? t('miningTax.linkPaymentOverpaid', {
-                      amount: `${formatIsk(difference, 2)} ISK`,
+                      amount: `${formatIsk(difference)} ISK`,
                     })
                   : t('miningTax.linkPaymentShort', {
-                      amount: `${formatIsk(-difference, 2)} ISK`,
+                      amount: `${formatIsk(-difference)} ISK`,
                     })}
               </p>
             )}

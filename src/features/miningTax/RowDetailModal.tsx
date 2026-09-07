@@ -104,7 +104,7 @@ export function RowDetailModal({
           <div className="flex flex-wrap gap-2">
             <StatChip
               label={t('miningTax.estimatedValueColumn')}
-              value={`${formatIsk(estimatedValue, 2)} ISK`}
+              value={`${formatIsk(estimatedValue)} ISK`}
             />
           </div>
         )}

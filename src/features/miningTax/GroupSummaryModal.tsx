@@ -75,7 +75,7 @@ export function GroupSummaryModal({
       <div className="space-y-3 text-sm">
         <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
           <span className="text-text-dim">{payeeDisplayName}</span>
-          <span className="text-lg font-medium tabular-nums">{formatIsk(totalTaxOwed, 2)} ISK</span>
+          <span className="text-lg font-medium tabular-nums">{formatIsk(totalTaxOwed)} ISK</span>
         </div>
 
         <ul className="space-y-2">
@@ -106,8 +106,8 @@ export function GroupSummaryModal({
               </ul>
               <div className="flex flex-wrap items-center justify-between gap-2 pt-1 text-xs text-text-dim">
                 <span>
-                  {formatIsk(member.assignment.estimatedValue, 2)} ISK ·{' '}
-                  {formatIsk(member.assignment.taxOwed, 2)} ISK {t('miningTax.taxOwedColumn')}
+                  {formatIsk(member.assignment.estimatedValue)} ISK ·{' '}
+                  {formatIsk(member.assignment.taxOwed)} ISK {t('miningTax.taxOwedColumn')}
                 </span>
                 <Button size="sm" onClick={() => onEditMember(member)}>
                   {t('miningTax.editMemberAction')}
@@ -118,7 +118,7 @@ export function GroupSummaryModal({
         </ul>
 
         <p className="text-[0.6875rem] text-text-dim">
-          {t('miningTax.groupTotalValueLabel', { value: `${formatIsk(totalValue, 2)} ISK` })}
+          {t('miningTax.groupTotalValueLabel', { value: `${formatIsk(totalValue)} ISK` })}
         </p>
 
         <div className="flex flex-wrap gap-2 pt-1">

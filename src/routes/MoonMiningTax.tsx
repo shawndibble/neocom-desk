@@ -639,7 +639,7 @@ export function MoonMiningTax() {
       header: t('miningTax.estimatedValueColumn'),
       align: 'right',
       className: 'whitespace-nowrap',
-      render: (dr) => `${formatIsk(estimatedValueOf(dr), 2)} ISK`,
+      render: (dr) => `${formatIsk(estimatedValueOf(dr))} ISK`,
       sortValue: (dr) => estimatedValueOf(dr),
     },
     {
@@ -647,7 +647,7 @@ export function MoonMiningTax() {
       header: t('miningTax.taxOwedColumn'),
       align: 'right',
       className: 'whitespace-nowrap',
-      render: (dr) => (dr.assignment ? `${formatIsk(taxOwedOf(dr), 2)} ISK` : '—'),
+      render: (dr) => (dr.assignment ? `${formatIsk(taxOwedOf(dr))} ISK` : '—'),
       sortValue: (dr) => (dr.assignment ? taxOwedOf(dr) : undefined),
     },
     {
@@ -791,7 +791,7 @@ export function MoonMiningTax() {
                 {t('miningTax.balancesLabel')} ·{' '}
                 {owedBalances.length > 0
                   ? t('miningTax.balancesAcross', {
-                      amount: formatIsk(owedTotal, 2),
+                      amount: formatIsk(owedTotal),
                       count: owedBalances.length,
                     })
                   : t('miningTax.balancesNothing')}

@@ -205,7 +205,7 @@ export function SettleUpDialog({ open, onClose, rows, systemNames, onPaid }: Set
                         {payeeNames.length > 1 && ` · ${r.payeeName}`}
                       </span>
                       <span className={cx('shrink-0 tabular-nums', !on && 'text-text-faint')}>
-                        {formatIsk(r.assignment.taxOwed, 2)} ISK
+                        {formatIsk(r.assignment.taxOwed)} ISK
                       </span>
                     </label>
                   </li>
@@ -218,7 +218,7 @@ export function SettleUpDialog({ open, onClose, rows, systemNames, onPaid }: Set
                 {' · '}
                 {t('miningTax.settleUpUntickHint')}
               </span>
-              <span className="text-sm font-semibold tabular-nums">{formatIsk(total, 2)} ISK</span>
+              <span className="text-sm font-semibold tabular-nums">{formatIsk(total)} ISK</span>
             </div>
             <div className="flex flex-wrap gap-2 pt-1">
               <Button
@@ -377,7 +377,7 @@ export function SettleUpDialog({ open, onClose, rows, systemNames, onPaid }: Set
                           />
                           <span className="flex min-w-0 flex-1 flex-col">
                             <span className="tabular-nums">
-                              {formatIsk(entry.amount ?? 0, 2)} ISK · {entry.date.slice(0, 10)}
+                              {formatIsk(entry.amount ?? 0)} ISK · {entry.date.slice(0, 10)}
                             </span>
                             <span className="truncate text-text-dim">
                               {humanizeRefType(entry.ref_type)}
@@ -400,7 +400,7 @@ export function SettleUpDialog({ open, onClose, rows, systemNames, onPaid }: Set
             <p className="text-xs">
               {t('miningTax.settleUpSummary', {
                 count: included.length,
-                amount: `${formatIsk(total, 2)} ISK`,
+                amount: `${formatIsk(total)} ISK`,
               })}
             </p>
             <div className="flex flex-wrap gap-2 pt-1">
