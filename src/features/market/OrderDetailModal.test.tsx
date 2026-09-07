@@ -121,7 +121,7 @@ describe('OrderDetailModal', () => {
     expect(screen.getByText('60d')).toBeInTheDocument();
   });
 
-  it('offers "Check system and region" when the deep check has not run, and hides it once loading', () => {
+  it('offers "Refresh system & region prices" when the deep check has not run, and hides it once loading', () => {
     const { rerender } = render(
       <MemoryRouter>
         <OrderDetailModal
@@ -140,7 +140,9 @@ describe('OrderDetailModal', () => {
         />
       </MemoryRouter>
     );
-    expect(screen.getByRole('button', { name: 'Check system and region' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Refresh system & region prices' })
+    ).toBeInTheDocument();
 
     rerender(
       <MemoryRouter>
@@ -161,7 +163,7 @@ describe('OrderDetailModal', () => {
       </MemoryRouter>
     );
     expect(
-      screen.queryByRole('button', { name: 'Check system and region' })
+      screen.queryByRole('button', { name: 'Refresh system & region prices' })
     ).not.toBeInTheDocument();
     expect(screen.getByText('Checking...')).toBeInTheDocument();
   });
@@ -169,7 +171,7 @@ describe('OrderDetailModal', () => {
   it('calls onCheckDeeper when the group-level deep-check button is pressed', async () => {
     const user = userEvent.setup();
     const { onCheckDeeper } = renderModal({ stationChecked: true });
-    await user.click(screen.getByRole('button', { name: 'Check system and region' }));
+    await user.click(screen.getByRole('button', { name: 'Refresh system & region prices' }));
     expect(onCheckDeeper).toHaveBeenCalledTimes(1);
   });
 
@@ -521,7 +523,7 @@ describe('OrderDetailModal', () => {
       // And the "check deeper" button must not come back — this is a
       // resolved (if partial) fetch, not the pre-fetch state.
       expect(
-        within(whoSection).queryByRole('button', { name: 'Check system and region' })
+        within(whoSection).queryByRole('button', { name: 'Refresh system & region prices' })
       ).not.toBeInTheDocument();
     });
 
@@ -625,11 +627,7 @@ describe('OrderDetailModal', () => {
     it('falls back to the badge advice when there is no floor to judge against', () => {
       renderModal({ row: UNDERCUT_ROW, stationChecked: true });
 
-      expect(
-        screen.getByText(
-          'Lower your price to win the sale, or leave it and wait for them to run out.'
-        )
-      ).toBeInTheDocument();
+      expect(screen.getByText('Lower price or wait out other sellers.')).toBeInTheDocument();
       expect(screen.queryByText('Do not chase this one')).not.toBeInTheDocument();
       // And the exits card says why it has nothing to offer.
       expect(

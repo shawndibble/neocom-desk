@@ -455,14 +455,12 @@ export function OrderDetailModal({
                 </p>
               </>
             ) : badge ? (
-              <>
-                <p className="mt-1.5 text-base font-semibold text-text">
-                  {t(`market.orders.badge.${badge.kind}Action`)}
-                </p>
-                <p className="mt-1 text-sm text-text-dim">
-                  {t(`market.orders.badge.${badge.kind}Help`)}
-                </p>
-              </>
+              // The badge's own "?" tooltip already carries the fuller
+              // explanation (OrderProblemBadge) — repeating it here as a
+              // second paragraph was the same sentence twice on one screen.
+              <p className="mt-1.5 text-base font-semibold text-text">
+                {t(`market.orders.badge.${badge.kind}Action`)}
+              </p>
             ) : (
               <p className="mt-1.5 text-sm text-text-dim">{t('market.orders.scopeNotChecked')}</p>
             )}

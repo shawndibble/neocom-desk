@@ -18,7 +18,7 @@ const TOUCH_LONG_PRESS_MS = 500;
 const TOUCH_MOVE_TOLERANCE_PX = 10;
 
 interface TooltipProps {
-  /** One-line plain-language tooltip content. */
+  /** One-line plain-language tooltip content. A literal `\n` renders as a line break (`whitespace-pre-line`), for a rare second line like a formula's numbers. */
   content: string;
   /** Single focusable trigger element (button, etc.) — tooltip reveals on hover or focus. */
   children: ReactElement<{ className?: string }>;
@@ -161,7 +161,7 @@ export function Tooltip({ content, children, openOnTap = false, className = '' }
           <TooltipPrimitive.Content
             sideOffset={4}
             collisionPadding={8}
-            className="pointer-events-none z-50 max-w-56 rounded-xs border border-line bg-panel p-2 text-[0.6875rem] font-normal text-text-dim normal-case shadow-lg shadow-black/50"
+            className="pointer-events-none z-50 max-w-56 rounded-xs border border-line bg-panel p-2 text-[0.6875rem] font-normal whitespace-pre-line text-text-dim normal-case shadow-lg shadow-black/50"
           >
             {content}
           </TooltipPrimitive.Content>

@@ -199,13 +199,6 @@ describe('OpenOrdersPanel', () => {
     // The below-floor row says the loss in ISK a unit, not only "-x%".
     const belowFloorGroup = await screen.findByTestId('order-group-belowFloor');
     expect(belowFloorGroup).toHaveTextContent(/Selling at this price loses .* a unit/);
-    // And its item cell says the floor has a build behind it.
-    expect(belowFloorGroup).toHaveTextContent('Linked to a build');
-
-    // The order with nothing linked says so where the empty floor column is.
-    const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: 'Show healthy orders' }));
-    expect(screen.getByTestId('order-group-healthy')).toHaveTextContent('No build linked');
   });
 
   it('folds a group away from its own header, keeping the summary on screen', async () => {
@@ -378,7 +371,7 @@ describe('OpenOrdersPanel', () => {
     ).toBeInTheDocument();
   });
 
-  it('shows the noCostBasis badge and no floor number for a sell order with nothing linked', async () => {
+  it('shows the noCostBasis badge and drops the floor column when nothing has one', async () => {
     const user = userEvent.setup();
     mockedLoadAll.mockResolvedValue(
       snapshot([
@@ -400,9 +393,63 @@ describe('OpenOrdersPanel', () => {
     const group = await screen.findByTestId('order-group-healthy');
     const row = within(group).getByRole('row', { name: /Pyerite/ });
     expect(within(row).getByText('No cost basis')).toBeInTheDocument();
-    // Floor column reads the shared "unknown" dash, never a zero.
-    const floorCell = row.querySelector('td[data-label="Never sell below"]');
-    expect(floorCell).toHaveTextContent('—');
+    // Not one order here has a floor, so the whole column is dropped rather
+    // than shown as a wall of dashes.
+    expect(screen.queryByText('Never sell below')).not.toBeInTheDocument();
+    expect(row.querySelector('td[data-label="Never sell below"]')).toBeNull();
+  });
+
+  it('keeps the floor column when at least one visible order has one', async () => {
+    mockedLoadAll.mockResolvedValue(
+      snapshot([
+        {
+          characterId: 1,
+          characterName: 'Alpha',
+          orders: [BELOW_FLOOR_ORDER, NO_COST_BASIS_ORDER],
+          fetchedAt: Date.now(),
+          fromCache: false,
+          needsReauth: false,
+        },
+      ])
+    );
+    mockedCostBases.mockResolvedValue(new Map([[101, costBasis(600)]]));
+
+    renderPanel();
+
+    const belowFloorGroup = await screen.findByTestId('order-group-belowFloor');
+    expect(within(belowFloorGroup).getByText('Never sell below')).toBeInTheDocument();
+  });
+
+  it('drops the floor column once a filter narrows the visible rows to ones with no floor, even though a filtered-out row still has one', async () => {
+    const user = userEvent.setup();
+    mockedLoadAll.mockResolvedValue(
+      snapshot([
+        {
+          characterId: 1,
+          characterName: 'Alpha',
+          orders: [BELOW_FLOOR_ORDER, NO_COST_BASIS_ORDER],
+          fetchedAt: Date.now(),
+          fromCache: false,
+          needsReauth: false,
+        },
+      ])
+    );
+    mockedCostBases.mockResolvedValue(new Map([[101, costBasis(600)]]));
+
+    renderPanel();
+    await screen.findByTestId('order-group-belowFloor');
+    await user.click(screen.getByRole('button', { name: 'Show healthy orders' }));
+    // Both groups' tables carry the column at this point.
+    expect(screen.getAllByText('Never sell below').length).toBeGreaterThan(0);
+
+    // Narrows the visible set to Pyerite (no floor) only — Tritanium (which
+    // has one) is filtered out, not just folded.
+    await user.type(screen.getByPlaceholderText('Search by item…'), 'Pyerite');
+
+    await waitFor(() =>
+      expect(screen.queryByTestId('order-group-belowFloor')).not.toBeInTheDocument()
+    );
+    expect(screen.queryByText('Never sell below')).not.toBeInTheDocument();
   });
 
   it("opens the detail modal from a row's Details button", async () => {
@@ -665,7 +712,9 @@ describe('OpenOrdersPanel', () => {
       const group = await screen.findByTestId('order-group-expiringOrStale');
       expect(group).toHaveTextContent(`· ${itemCount}`);
 
-      await user.click(within(group).getByRole('button', { name: 'Check system and region' }));
+      await user.click(
+        within(group).getByRole('button', { name: 'Refresh system & region prices' })
+      );
 
       expect(mockedRegionCompetition).toHaveBeenCalledTimes(ESI_FANOUT_CONCURRENCY);
     });
@@ -695,7 +744,9 @@ describe('OpenOrdersPanel', () => {
       expect(mockedRegionCompetition).toHaveBeenCalledTimes(1);
 
       const group = screen.getByTestId('order-group-belowFloor');
-      await user.click(within(group).getByRole('button', { name: 'Check system and region' }));
+      await user.click(
+        within(group).getByRole('button', { name: 'Refresh system & region prices' })
+      );
       // Still in flight from opening the row's own detail view — the group
       // check must not fire a second request for the same item.
       expect(mockedRegionCompetition).toHaveBeenCalledTimes(1);
