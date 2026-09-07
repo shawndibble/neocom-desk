@@ -34,3 +34,8 @@ _Recorded 2026-09-06._
   in a player structure has no system this app can route from, so the jump count
   is blank there while the price gap still stands. The price is the part that
   decides whether hauling is worth thinking about.
+- **A failed hub lookup says so; it never leaves "checking…" standing.** The
+  refine comparison can fail quietly because its consequence is a greyed row.
+  A sentence claiming a check is in progress when nothing is in flight is a
+  claim the section's own honesty rule would not allow, so the failure is
+  flagged and the next open of that order retries.

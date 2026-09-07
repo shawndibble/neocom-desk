@@ -75,6 +75,8 @@ export interface OrderDetailModalProps {
    * answer that no hub bids at all.
    */
   hubs?: readonly HubBuyPrice[];
+  /** The hub lookup failed. Says so, rather than leaving "checking…" standing forever. */
+  hubsFailed?: boolean;
   /** Resolves a rival's location to a name, so the three scopes can be told apart when they quote the same seller. Returns null for a player structure. */
   stationNameFor: (locationId: number) => string | null;
   /**
@@ -369,6 +371,7 @@ export function OrderDetailModal({
   regionJumps,
   reprocessing,
   hubs,
+  hubsFailed = false,
   stationNameFor,
   structureMarket = null,
   onCheckDeeper,
@@ -815,7 +818,13 @@ export function OrderDetailModal({
                     {t('market.orders.exitHaulTitle')}
                   </p>
                   {hubs === undefined ? (
-                    <p className="mt-1 text-text-dim">{t('market.orders.exitHaulLoading')}</p>
+                    <p className="mt-1 text-text-dim">
+                      {t(
+                        hubsFailed
+                          ? 'market.orders.exitHaulUnavailable'
+                          : 'market.orders.exitHaulLoading'
+                      )}
+                    </p>
                   ) : haulGaps.length === 0 ? (
                     <p className="mt-1 text-text-dim">{t('market.orders.exitHaulNone')}</p>
                   ) : (

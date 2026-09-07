@@ -692,6 +692,12 @@ describe('OrderDetailModal', () => {
       cleanup();
       renderModal({ row: UNDERCUT_ROW, stationChecked: true, hubs: undefined });
       expect(screen.getByText('Checking the trade hubs…')).toBeInTheDocument();
+
+      cleanup();
+      renderModal({ row: UNDERCUT_ROW, stationChecked: true, hubs: undefined, hubsFailed: true });
+      expect(
+        screen.getByText('Could not read the trade hub prices. Reopen this order to try again.')
+      ).toBeInTheDocument();
     });
 
     it('keeps a hub row on an order with no floor, where every other exit is silent', () => {

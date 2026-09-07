@@ -314,6 +314,16 @@ export function OpenOrdersPanel() {
   const [hubPricesLoadingTypes, setHubPricesLoadingTypes] = useState<ReadonlySet<number>>(
     new Set()
   );
+  /** Items whose hub lookup failed, so the modal says so rather than claiming it is still checking. */
+  const [hubPricesFailedTypes, setHubPricesFailedTypes] = useState<ReadonlySet<number>>(new Set());
+  /**
+   * Hub routes already asked for, held in a ref for the reason
+   * `structureAttemptedRef` explains: the effect below resolves FIVE pairs,
+   * and reading the `jumpsByPair` state it also writes would re-enter the
+   * effect four more times while the first pass is still in flight, asking
+   * for the same routes again.
+   */
+  const hubJumpsAttemptedRef = useRef<Set<string>>(new Set());
   const [historyByKey, setHistoryByKey] = useState<Map<string, PriceHistoryResult>>(new Map());
   const [historyLoadingKeys, setHistoryLoadingKeys] = useState<ReadonlySet<string>>(new Set());
 
@@ -456,6 +466,12 @@ export function OpenOrdersPanel() {
   function ensureHubPricesLoaded(typeId: number) {
     if (hubPricesByType.has(typeId) || hubPricesLoadingTypes.has(typeId)) return;
     setHubPricesLoadingTypes((prev) => new Set(prev).add(typeId));
+    setHubPricesFailedTypes((prev) => {
+      if (!prev.has(typeId)) return prev;
+      const next = new Set(prev);
+      next.delete(typeId);
+      return next;
+    });
     void loadStationBestPrices(
       TRADE_HUBS.map((hub) => ({ stationId: hub.stationId, typeIds: [typeId] }))
     )
@@ -467,7 +483,9 @@ export function OpenOrdersPanel() {
         setHubPricesByType((prev) => new Map(prev).set(typeId, byHub));
       })
       .catch(() => {
-        // Left uncached on failure so the next open retries.
+        // Left uncached so the next open retries, and flagged so the modal
+        // does not sit on "checking…" forever.
+        setHubPricesFailedTypes((prev) => new Set(prev).add(typeId));
       })
       .finally(() => {
         setHubPricesLoadingTypes((prev) => {
@@ -604,12 +622,13 @@ export function OpenOrdersPanel() {
     if (mySystemId === undefined) return;
     for (const hub of TRADE_HUBS) {
       const pairKey = `${mySystemId}:${hub.systemId}`;
-      if (jumpsByPair.has(pairKey)) continue;
+      if (hubJumpsAttemptedRef.current.has(pairKey)) continue;
+      hubJumpsAttemptedRef.current.add(pairKey);
       void loadJumpsBetween(mySystemId, hub.systemId).then((result) => {
         setJumpsByPair((prev) => new Map(prev).set(pairKey, result));
       });
     }
-  }, [detailRow, snapshot, jumpsByPair]);
+  }, [detailRow, snapshot]);
 
   /**
    * The currently open row's structure market book (issue #538), once its
@@ -1239,6 +1258,7 @@ export function OpenOrdersPanel() {
                   : jumpsByPair.get(`${mySystemId}:${hub.systemId}`),
             }));
           })()}
+          hubsFailed={hubPricesFailedTypes.has(detailRow.typeId)}
           onCheckDeeper={() => {
             ensureDeepChecked(detailRow.regionId, detailRow.typeId);
             if (detailRow.stationName === null && snapshot.stationsLoaded) {
