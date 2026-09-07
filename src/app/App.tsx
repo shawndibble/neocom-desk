@@ -1,5 +1,6 @@
 import { useEffect, type ReactElement } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { withSentryReactRouterV7Routing } from '@sentry/react';
 import { ErrorBoundary } from './ErrorBoundary';
 import { subscribeToEsiAuthFailures } from '@/stores/authFailure';
 import { subscribeToEsiActivity } from '@/stores/activityLog';
@@ -54,6 +55,14 @@ import { useFontScale } from '@/lib/fontScale';
 // (tokenProvider.ts) so a dead refresh grant is reported centrally instead of
 // surfacing as an empty view in whichever feature happened to ask first.
 configureEsi({ getToken: (characterId) => getAccessTokenReportingFailures(characterId) });
+
+/**
+ * `<Routes>` with Sentry's route-pattern reporting layered on, so a navigation
+ * transaction is named `/skills/plans/:planId` rather than one distinct
+ * transaction per plan id. Wrapped once, at the top level only — a nested
+ * `<Routes>` must stay unwrapped. Inert unless `instrument.ts` found a DSN.
+ */
+const SentryRoutes = withSentryReactRouterV7Routing(Routes);
 
 // Vite's BASE_URL (set by `base` in vite.config.ts, currently '/').
 const BASENAME = import.meta.env.BASE_URL.replace(/\/$/, '') || '/';
@@ -166,7 +175,7 @@ export function App() {
     <ErrorBoundary>
       <BrowserRouter basename={BASENAME}>
         <AuthFailureRedirect />
-        <Routes>
+        <SentryRoutes>
           <Route path="/" element={<Root />} />
           <Route path="/login" element={<Login />} />
           <Route path="/callback" element={<Callback />} />
@@ -184,7 +193,7 @@ export function App() {
           </Route>
           <Route path="/styleguide" element={<Styleguide />} />
           <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+        </SentryRoutes>
         <ReloadPrompt />
         <WhatsNewPanel />
         <PublicInfoModal />

@@ -41,7 +41,10 @@ function ErrorScreen() {
  * route sits behind one, so a broken IndexedDB would otherwise unmount the app.
  *
  * Never renders the error text: a message can carry data the user would not
- * expect on screen, and there is no sink to send it to (ADR 0001 — no backend).
+ * expect on screen. It is reported rather than shown — React 19 routes
+ * anything this boundary catches to the `onCaughtError` root hook, which
+ * `main.tsx` wires to Sentry. Capturing here as well would file every one of
+ * those errors twice.
  */
 export class ErrorBoundary extends Component<Props, State> {
   state: State = { failed: false };
