@@ -801,6 +801,8 @@
     "emptyHint": "Log in with EVE Online to add your first character.",
     "portraitAlt": "Portrait of {{name}}",
     "select": "Select {{name}}",
+    "star": "Star {{name}}",
+    "unstar": "Unstar {{name}}",
     "sortBy": "Sort by",
     "sortDirection": "Reverse sort direction",
     "sortKeys": {
