@@ -25,7 +25,7 @@ import {
 import type { WalletDivision } from './divisions';
 
 /**
- * Runway at or under which the chip warns.
+ * Runway under which the chip warns.
  *
  * Thirty by coincidence, not by derivation: it happens to equal
  * `VITALS_WINDOW_DAYS`, but the two answer different questions — that one is

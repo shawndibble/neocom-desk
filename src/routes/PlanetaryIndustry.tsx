@@ -23,7 +23,7 @@ import { db } from '@/db';
 import { loadCharacterPlanets, loadAllColonyDetails } from '@/features/pi/data';
 import { PlanPanel } from '@/features/pi/PlanPanel';
 import { AdvisorPanel } from '@/features/pi/AdvisorPanel';
-import { useShowAltColonies } from '@/features/pi/coloniesAltPref';
+import { useShowAltColonies } from '@/features/pi/showAltColoniesPref';
 import {
   loadPiRosterSnapshot,
   type PiRosterSnapshot,
@@ -819,7 +819,7 @@ export function PlanetaryIndustry() {
   }, []);
   // Off by default: appends every other Character's cache-only colonies
   // (features/pi/roster.ts) below the active Character's live ones, grouped
-  // by character. Remembered under its own key — see `coloniesAltPref.ts` for
+  // by character. Remembered under its own key — see `showAltColoniesPref.ts` for
   // why it is not the Advisor's. Ungated on `hydrated`: the roster loads
   // unconditionally in `loadPiSnapshot`, so this only decides whether rows
   // already in memory are rendered, and costs no request either way.

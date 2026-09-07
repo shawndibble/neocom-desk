@@ -38,7 +38,10 @@ const DAY_MS = 86_400_000;
  */
 export const DARK_AFTER_DAYS = 30;
 
-/** `DARK_AFTER_DAYS` in milliseconds — the default span, for callers that want it directly. */
+/**
+ * `DARK_AFTER_DAYS` in milliseconds. Kept for the tests, which express spans
+ * in it; no production caller reads it now that the span is a parameter.
+ */
 export const DARK_AFTER_MS = DARK_AFTER_DAYS * DAY_MS;
 
 /**

@@ -94,6 +94,26 @@ function newBuildPlan(
   // same guard `fallbackFacility` exists for.
   const preferred =
     FACILITY_PRESETS[facilityDefaults.facility].activity === activity ? facilityDefaults : null;
+  /**
+   * Facility, rig level and owner-set tax move together, from one source.
+   *
+   * Taking the facility from one place and the rig from another produces a
+   * combination neither source ever held — an NPC station with T2 rigs fitted,
+   * which `normalizeFacilityDefaults` refuses to even store. It also made the
+   * pilot's configured rig and tax unreachable: any earlier plan, whatever its
+   * activity, supplied a `rigLevel` and won.
+   */
+  const facilityConfig: FacilityDefaults = defaultsMatchActivity
+    ? {
+        facility: defaultsFrom.facility,
+        rigLevel: defaultsFrom.rigLevel,
+        facilityTaxPct: defaultsFrom.facilityTaxPct ?? null,
+      }
+    : (preferred ?? {
+        facility: fallbackFacility(activity),
+        rigLevel: 'none',
+        facilityTaxPct: null,
+      });
   return {
     id: crypto.randomUUID(),
     characterId,
@@ -102,10 +122,8 @@ function newBuildPlan(
     runs: 1,
     me: owned?.material_efficiency ?? 0,
     te: owned?.time_efficiency ?? 0,
-    facility: defaultsMatchActivity
-      ? defaultsFrom.facility
-      : (preferred?.facility ?? fallbackFacility(activity)),
-    rigLevel: defaultsFrom?.rigLevel ?? preferred?.rigLevel ?? 'none',
+    facility: facilityConfig.facility,
+    rigLevel: facilityConfig.rigLevel,
     security: defaultsFrom?.security ?? 'highsec',
     hubId: defaultsFrom?.hubId ?? DEFAULT_TRADE_HUB.id,
     // Carried like facility/rig/hub: a pilot who builds in one system builds
@@ -114,11 +132,9 @@ function newBuildPlan(
     ...(defaultsFrom?.buildSystemId !== undefined
       ? { buildSystemId: defaultsFrom.buildSystemId, buildSystemName: defaultsFrom.buildSystemName }
       : {}),
-    ...(defaultsFrom?.facilityTaxPct !== undefined
-      ? { facilityTaxPct: defaultsFrom.facilityTaxPct }
-      : preferred?.facilityTaxPct != null
-        ? { facilityTaxPct: preferred.facilityTaxPct }
-        : {}),
+    ...(facilityConfig.facilityTaxPct != null
+      ? { facilityTaxPct: facilityConfig.facilityTaxPct }
+      : {}),
     // Carried like the hub it names a side of: a pilot who sources on buy
     // orders sources their next plan that way too.
     ...(defaultsFrom?.materialPriceBasis !== undefined

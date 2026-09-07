@@ -13,7 +13,7 @@ import {
   useShowAltColonies,
   DEFAULT_PI_COLONIES_SHOW_ALTS,
   PI_COLONIES_SHOW_ALTS_KEY,
-} from '@/features/pi/coloniesAltPref';
+} from '@/features/pi/showAltColoniesPref';
 import { usePlanControls, DEFAULT_PI_PLAN_CONTROLS } from '@/features/pi/planControlsPref';
 import { App } from '@/app/App';
 import { expandChain } from '@/engine/pi/chain';

@@ -11,7 +11,8 @@
  * Default `'local'`, which is what every `formatTimestamp` surface already
  * did, so nothing moves until the pilot asks it to.
  *
- * Two deliberate exclusions, both recorded as scope decisions:
+ * Two deliberate exclusions, recorded as a scope decision
+ * (`docs/context/decisions/`):
  *
  * - **The Calendar grids.** `lib/calendarGrid.ts` buckets events into
  *   *local-day* cells. Switching only the rendered string would put a

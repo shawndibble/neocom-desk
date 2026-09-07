@@ -3,7 +3,7 @@
  * colonies, not just the active one?
  *
  * The Colonies panel has its own "Show alt colonies" switch, remembered under
- * its own key (`coloniesAltPref.ts`). It is deliberately not this one: it sits
+ * its own key (`showAltColoniesPref.ts`). It is deliberately not this one: it sits
  * on a different tab and answers a different question — *show me* versus *plan
  * with*. Sharing one key would couple the two tabs through the route, so that
  * widening the view to see where an alt's colonies sit would quietly widen the

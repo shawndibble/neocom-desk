@@ -702,8 +702,11 @@ describe('Settings defaults', () => {
     await screen.findByRole('heading', { level: 1, name: /settings/i });
 
     // The point of the control: the key existed but was only reachable from
-    // inside one panel of one page.
-    expect(screen.getByRole('combobox', { name: /default trade hub/i })).toHaveTextContent(/jita/i);
+    // inside one panel of one page. `findBy`, because the panel withholds
+    // every control until its stores have hydrated.
+    expect(await screen.findByRole('combobox', { name: /default trade hub/i })).toHaveTextContent(
+      /jita/i
+    );
   });
 
   it('clamps the assumed ME into the range the engine accepts', async () => {
@@ -711,7 +714,7 @@ describe('Settings defaults', () => {
     render(<App />);
     await screen.findByRole('heading', { level: 1, name: /settings/i });
 
-    const input = screen.getByLabelText(/assumed me/i);
+    const input = await screen.findByLabelText(/assumed me/i);
     await user.clear(input);
     await user.type(input, '99');
 
@@ -726,9 +729,39 @@ describe('Settings defaults', () => {
     render(<App />);
     await screen.findByRole('heading', { level: 1, name: /settings/i });
 
-    expect(screen.getByRole('combobox', { name: /default facility/i })).toHaveTextContent(/npc/i);
+    expect(await screen.findByRole('combobox', { name: /default facility/i })).toHaveTextContent(
+      /npc/i
+    );
     expect(screen.queryByRole('group', { name: /rigs/i })).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/facility tax/i)).not.toBeInTheDocument();
+  });
+
+  it('shows the stored values on a cold load, not the defaults', async () => {
+    // /settings is deep-linkable and mounts none of the pages that hydrate
+    // these stores, so it has to hydrate them itself.
+    await db.settings.put({ key: ASSUMED_ME_SETTING_KEY, value: 7 });
+    render(<App />);
+    await screen.findByRole('heading', { level: 1, name: /settings/i });
+
+    expect(await screen.findByLabelText(/assumed me/i)).toHaveValue(7);
+  });
+
+  it('never writes a default over a stored record it has not read yet', async () => {
+    // The packed facility record makes an unhydrated read destructive, not
+    // merely stale: changing one field spreads the rest, so an unhydrated
+    // `{npcStation, none, null}` would wipe a stored rig level and tax.
+    await db.settings.put({
+      key: 'industryFacilityDefaults',
+      value: { facility: 'azbel', rigLevel: 't2', facilityTaxPct: 5 },
+    });
+    render(<App />);
+    await screen.findByRole('heading', { level: 1, name: /settings/i });
+
+    expect(await screen.findByRole('group', { name: /rigs/i })).toBeInTheDocument();
+    expect(screen.getByLabelText(/facility tax/i)).toHaveValue(5);
+    expect(await db.settings.get('industryFacilityDefaults')).toMatchObject({
+      value: { facility: 'azbel', rigLevel: 't2', facilityTaxPct: 5 },
+    });
   });
 
   it('reveals rig and tax once the default facility is a player structure', async () => {
@@ -747,7 +780,7 @@ describe('Settings defaults', () => {
     render(<App />);
     await screen.findByRole('heading', { level: 1, name: /settings/i });
 
-    const group = screen.getByRole('group', { name: /extractor is expiring/i });
+    const group = await screen.findByRole('group', { name: /extractor is expiring/i });
     expect(group.querySelector('[aria-pressed="true"]')).toHaveTextContent(/24 hours/i);
   });
 

@@ -4,7 +4,7 @@ import {
   useShowAltColonies,
   PI_COLONIES_SHOW_ALTS_KEY,
   DEFAULT_PI_COLONIES_SHOW_ALTS,
-} from './coloniesAltPref';
+} from './showAltColoniesPref';
 import { useAltColonies, PI_ALT_COLONIES_KEY, DEFAULT_PI_ALT_COLONIES } from './altColoniesPref';
 
 beforeEach(async () => {

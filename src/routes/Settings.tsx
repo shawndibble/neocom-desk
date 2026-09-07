@@ -14,12 +14,14 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  Spinner,
   Tabs,
   TextInput,
   type DataTableColumn,
 } from '@/components/ui';
+import type { LocalSettingStore } from '@/lib/useLocalSetting';
 import { useFontScale, FONT_SCALE_STEPS, type FontScale } from '@/lib/fontScale';
-import { useTimeFormat, TIME_FORMATS } from '@/lib/timeFormat';
+import { useTimeFormat, useTimeZone, TIME_FORMATS } from '@/lib/timeFormat';
 import { VIEW_PREFERENCE_KEYS } from '@/lib/viewPreferenceKeys';
 import { formatAge } from '@/lib/age';
 import { formatTimestamp } from '@/lib/timestamp';
@@ -109,6 +111,7 @@ function characterCell(
 
 function ActivityLogPanel() {
   const { t } = useTranslation();
+  const timeZone = useTimeZone();
   const entries = useActivityLog((state) => state.entries);
   const clearLog = useActivityLog((state) => state.clear);
   const characterNames = useCharacterNames();
@@ -139,7 +142,7 @@ function ActivityLogPanel() {
         className: 'whitespace-nowrap text-text-dim',
         // Full date, not just time-of-day: a session that crosses midnight
         // otherwise makes two entries on different days read as minutes apart.
-        render: (entry) => formatTimestamp(new Date(entry.timestamp)),
+        render: (entry) => formatTimestamp(new Date(entry.timestamp), timeZone),
       },
       {
         id: 'outcome',
@@ -149,7 +152,7 @@ function ActivityLogPanel() {
         render: (entry) => t(OUTCOME_LABEL_KEYS[entry.outcome]),
       },
     ],
-    [t, characterNames]
+    [t, characterNames, timeZone]
   );
 
   return (
@@ -202,6 +205,7 @@ function latestFetchPerSource(entries: ActivityLogEntry[]): ActivityLogEntry[] {
 
 function DataAgePanel() {
   const { t } = useTranslation();
+  const timeZone = useTimeZone();
   const entries = useActivityLog((state) => state.entries);
   const characterNames = useCharacterNames();
   const rows = useMemo(() => latestFetchPerSource(entries), [entries]);
@@ -224,13 +228,13 @@ function DataAgePanel() {
         header: t('dataAge.columnUpdated'),
         className: 'whitespace-nowrap text-text-dim',
         render: (entry) => (
-          <span title={formatTimestamp(new Date(entry.timestamp))}>
+          <span title={formatTimestamp(new Date(entry.timestamp), timeZone)}>
             {formatAge(Date.now() - entry.timestamp, t)}
           </span>
         ),
       },
     ],
-    [t, characterNames]
+    [t, characterNames, timeZone]
   );
 
   return (
@@ -356,6 +360,29 @@ function ChipRow<T extends string | number>({
  * here defaults to exactly what the app did before it was settable, so an
  * existing pilot's numbers do not move until they ask them to.
  */
+/**
+ * Hydrates a preference store and reports whether it has settled.
+ *
+ * Every other page reads these stores after its own `hydrate()`; this page is
+ * the only one that *writes* them, and it mounts none of those pages. Without
+ * this, a cold load of `/settings` — a deep-linkable route — renders every
+ * control at its default rather than the stored value. For a packed record
+ * that is destructive rather than merely wrong: spreading an unhydrated
+ * `{ npcStation, none, null }` over a stored `{ azbel, t2, 5 }` while changing
+ * one field silently discards the rig level and the facility tax.
+ *
+ * `fontScale` and `timeFormat` escape this only because `App.tsx` hydrates
+ * them for the whole shell.
+ */
+function useHydratedStore<T>(store: LocalSettingStore<T>): boolean {
+  const hydrated = store((state) => state.hydrated);
+  const hydrate = store((state) => state.hydrate);
+  useEffect(() => {
+    void hydrate();
+  }, [hydrate]);
+  return hydrated;
+}
+
 function DefaultsPanel() {
   const { t } = useTranslation();
   const hub = useMarketHub((state) => state.value);
@@ -367,7 +394,26 @@ function DefaultsPanel() {
   const expiringHours = useExpiringWindowHours((state) => state.value);
   const setExpiringHours = useExpiringWindowHours((state) => state.setValue);
 
+  // Each on its own line, never `a() && b()`: `&&` short-circuits, which would
+  // make every hook after the first false one a conditional call.
+  const hubHydrated = useHydratedStore(useMarketHub);
+  const assumedMeHydrated = useHydratedStore(useAssumedMe);
+  const facilityHydrated = useHydratedStore(useFacilityDefaults);
+  const expiringHydrated = useHydratedStore(useExpiringWindowHours);
+  const ready = hubHydrated && assumedMeHydrated && facilityHydrated && expiringHydrated;
+
   const facilityPreset = FACILITY_PRESETS[facilityDefaults.facility];
+
+  // Nothing until every row holds its real value. A control that rendered its
+  // default first would not merely flicker: a press landing in that window
+  // writes the default over what is on disk.
+  if (!ready) {
+    return (
+      <Panel title={t('settings.defaultsTitle')}>
+        <Spinner />
+      </Panel>
+    );
+  }
 
   return (
     <Panel title={t('settings.defaultsTitle')}>
@@ -508,8 +554,9 @@ function CorpDefaultsPanel() {
   const access = useCorpAccess();
   const darkAfterDays = useDarkThreshold((state) => state.value);
   const setDarkAfterDays = useDarkThreshold((state) => state.setValue);
+  const hydrated = useHydratedStore(useDarkThreshold);
 
-  if (access.state !== 'ready') return null;
+  if (access.state !== 'ready' || !hydrated) return null;
 
   return (
     <Panel title={t('settings.corpDefaultsTitle')}>
