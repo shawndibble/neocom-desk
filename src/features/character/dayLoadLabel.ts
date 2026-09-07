@@ -27,7 +27,9 @@ export function useDayLoadLabel(): (date: Date, load: DayLoad | undefined) => st
       day: 'numeric',
       month: 'long',
     });
-    const kindList = new Intl.ListFormat(i18n.language, { style: 'short', type: 'conjunction' });
+    // `long` rather than `short`: this is read aloud, and "Industry jobs and
+    // Planets" is a sentence where "Industry jobs, & Planets" is not.
+    const kindList = new Intl.ListFormat(i18n.language, { style: 'long', type: 'conjunction' });
 
     return (date, load) =>
       load

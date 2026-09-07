@@ -17,6 +17,7 @@ import {
   CALENDAR_HIDDEN_KINDS_KEY,
 } from '@/features/character/calendarKindFilter';
 import { App } from '@/app/App';
+import { NARROW_QUERY } from '@/lib/useIsNarrow';
 
 vi.mock('virtual:pwa-register/react', () => ({
   useRegisterSW: () => ({
@@ -112,6 +113,55 @@ const server = setupServer(...baseHandlers());
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 afterAll(() => server.close());
+/**
+ * `vitest.setup.ts` stubs `matchMedia` to never match, and `useIsNarrow` is
+ * phrased as a max-width so that reads as "wide" — so every test here renders
+ * the Calendar Map unless it calls this, which flips the page to its Day
+ * Ticker branch. Same shape as `FilterBar.test.tsx`.
+ */
+let restoreMatchMedia: (() => void) | undefined;
+
+function useNarrowViewport(): void {
+  const real = window.matchMedia;
+  window.matchMedia = (media: string) =>
+    ({
+      media,
+      matches: media === NARROW_QUERY,
+      onchange: null,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      addListener: () => {},
+      removeListener: () => {},
+      dispatchEvent: () => false,
+    }) as unknown as MediaQueryList;
+  restoreMatchMedia = () => {
+    window.matchMedia = real;
+  };
+}
+
+afterEach(() => {
+  restoreMatchMedia?.();
+  restoreMatchMedia = undefined;
+});
+
+/**
+ * Every day cell's accessible name that reports a load, from whichever of the
+ * two surfaces rendered — the Calendar Map and the Day Ticker deliberately
+ * publish the same group name, so this reads either one.
+ */
+function dayCells(): HTMLElement[] {
+  return within(screen.getByRole('group', { name: /calendar map/i })).getAllByRole('button');
+}
+
+function dayLabelsWithLoad(): string[] {
+  return dayCells()
+    .map((cell) => cell.getAttribute('aria-label') ?? '')
+    .filter((label) => label.includes('due:'));
+}
+
+/** The Day Ticker's fixed span — `TICKER_DAYS` in the route, a fortnight. */
+const TICKER_DAYS = 14;
+
 afterEach(() => server.resetHandlers());
 beforeEach(async () => {
   await db.characters.clear();
@@ -154,10 +204,13 @@ describe('Calendar', () => {
   });
 
   /**
-   * The map's dots and the ticker's segments are pure colour, so a day cell's
-   * accessible name is the only thing that says which kinds landed on it
-   * (DESIGN.md §7) — and since the colour now means kind rather than urgency,
-   * naming a severity there would describe a signal the page no longer paints.
+   * The map's dots are pure colour, so a day cell's accessible name is the
+   * only thing that says which kinds landed on it (DESIGN.md §7) — and since
+   * the colour now means kind rather than urgency, naming a severity there
+   * would describe a signal the page no longer paints.
+   *
+   * This one is the wide branch: the stubbed `matchMedia` never matches, so
+   * the Calendar Map renders. The Day Ticker gets its own test below.
    *
    * The `{{`/`undefined` assertion is the point of the test: an interpolation
    * renamed on one side only does not throw, it just ships a placeholder into
@@ -168,15 +221,33 @@ describe('Calendar', () => {
     render(<App />);
 
     expect(await screen.findByText('Fleet Op')).toBeInTheDocument();
+    // A month of cells, which is what proves this is the grid and not the ticker.
+    expect(dayCells().length).toBeGreaterThan(TICKER_DAYS);
+    expect(dayLabelsWithLoad()).toEqual(
+      expect.arrayContaining([expect.stringContaining('Calendar events')])
+    );
+    expect(dayLabelsWithLoad().join(' ')).not.toMatch(/\{\{|undefined/);
+  });
 
-    const labels = within(screen.getByRole('group', { name: /calendar map/i }))
-      .getAllByRole('button')
-      .map((cell) => cell.getAttribute('aria-label') ?? '')
-      .filter((label) => label.includes('due:'));
+  /**
+   * The same assertion against the phone's branch, which the wide test above
+   * cannot reach: both surfaces publish the identical `calendar.map.label`
+   * group name, so a test that does not force the viewport silently exercises
+   * only the map. `/simplify` caught the Day Ticker being fed the wrong grid
+   * once already — that class of bug hides behind exactly this shared label.
+   */
+  it('names the same kinds on the Day Ticker', async () => {
+    useNarrowViewport();
+    server.use(http.get(`${ESI}/industry/jobs`, () => HttpResponse.json(jobs)));
+    render(<App />);
 
-    expect(labels.length).toBeGreaterThan(0);
-    expect(labels.join(' ')).toContain('Calendar events');
-    expect(labels.join(' ')).not.toMatch(/\{\{|undefined/);
+    expect(await screen.findByText('Fleet Op')).toBeInTheDocument();
+    // Exactly a fortnight of columns — the ticker, not the grid.
+    expect(dayCells()).toHaveLength(TICKER_DAYS);
+    expect(dayLabelsWithLoad()).toEqual(
+      expect.arrayContaining([expect.stringContaining('Calendar events')])
+    );
+    expect(dayLabelsWithLoad().join(' ')).not.toMatch(/\{\{|undefined/);
   });
 
   /**
