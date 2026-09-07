@@ -1,7 +1,7 @@
 /**
  * The roster table and the change summary above it (issue #297).
  *
- * A real `DataTable` here, unlike `CorpBoard.tsx`'s list of cards: every member
+ * A real `DataTable` here, unlike the ops board's list of cards: every member
  * carries the same five fields, and comparing one column down a column is
  * precisely what this page is for. The board avoided a table because its five
  * item kinds share almost no fields; a roster is the opposite case.

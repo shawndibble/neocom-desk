@@ -47,6 +47,18 @@ export const tabScrollerClassName = 'tab-scroller overflow-x-auto overscroll-x-c
 export const tabListClassName = 'flex w-max min-w-full items-end gap-1 border-b border-line';
 
 /**
+ * The same bar with no baseline of its own, for a bar sharing a line already
+ * drawn by its container — `PageHeader`'s `subNav` slot, where the header
+ * element carries the hairline so the title, the tabs and the actions all sit
+ * on one rule.
+ *
+ * A second exported class rather than a `border-b-0` override on the class
+ * above: both set `border-bottom-width`, so which one won would depend on
+ * Tailwind's generated order rather than on the caller's intent.
+ */
+export const tabListFlushClassName = 'flex items-end gap-1';
+
+/**
  * One item, in either state. `-mb-px` lands its underline on the bar's
  * baseline. Height comes from the shared `controlHeightClassName.md` scale
  * (DESIGN.md §3's one-file rule — never hand-write a height here) rather

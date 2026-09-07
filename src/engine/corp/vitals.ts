@@ -95,3 +95,46 @@ export function runwayDays(balance: number, outgoingsPerDay: number): number | n
   if (outgoingsPerDay <= 0 || balance <= 0) return null;
   return balance / outgoingsPerDay;
 }
+
+/** Every figure the corp's money surfaces print, from one composition. */
+export interface VitalsFigures {
+  /** Every readable division added up. */
+  total: number;
+  /** Income minus spending over the window. */
+  net: number;
+  /** Days `journalDivision`'s own balance covers, or `null` — see `runwayDays`. */
+  runwayDays: number | null;
+}
+
+/**
+ * The rail's three figures, composed once.
+ *
+ * Extracted for #566: the Standing panel prints the same runway and net as
+ * `CorpVitalsRail` does, and two call sites each doing their own division
+ * lookup is how the two would eventually disagree about which wallet the
+ * runway describes.
+ *
+ * Both halves of the runway come from the same wallet, deliberately. ESI
+ * publishes no all-divisions journal and the seven are separately role-gated,
+ * so the spending figure can only ever be one division's. Putting *every*
+ * division's balance over one division's spending would answer a question
+ * nobody asked — a corporation that pays its bills out of division 3 would read
+ * as having years of runway.
+ */
+export function vitalsFigures(
+  // `VitalsDivisionBalance` carries only a balance — `totalBalance` needs
+  // nothing else — but the runway has to pick one division out of the seven, so
+  // this one function needs the number alongside it.
+  divisions: readonly (VitalsDivisionBalance & { division: number })[],
+  journal: readonly VitalsJournalEntry[],
+  journalDivision: number,
+  nowMs: number
+): VitalsFigures {
+  const journalBalance =
+    divisions.find((division) => division.division === journalDivision)?.balance ?? 0;
+  return {
+    total: totalBalance(divisions),
+    net: netOverWindow(journal, nowMs),
+    runwayDays: runwayDays(journalBalance, dailyOutgoings(journal, nowMs)),
+  };
+}

@@ -14,14 +14,7 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { Panel, StatChip } from '@/components/ui';
 import { formatIsk } from '@/lib/isk';
-import {
-  VITALS_WINDOW_DAYS,
-  dailyOutgoings,
-  netOverWindow,
-  runwayDays,
-  totalBalance,
-  type VitalsJournalEntry,
-} from '@/engine/corp/vitals';
+import { VITALS_WINDOW_DAYS, vitalsFigures, type VitalsJournalEntry } from '@/engine/corp/vitals';
 import type { WalletDivision } from './divisions';
 
 /**
@@ -59,21 +52,14 @@ export function CorpVitalsRail({
 }: CorpVitalsRailProps) {
   const { t } = useTranslation();
 
-  const total = totalBalance(divisions);
-  const net = netOverWindow(journal, nowMs);
-  /**
-   * Both halves of the runway come from the same wallet, deliberately.
-   *
-   * ESI publishes no all-divisions journal and the seven are separately
-   * role-gated, so the spending figure can only ever be one division's. Putting
-   * *every* division's balance over one division's spending would answer a
-   * question nobody asked — a corporation that pays its bills out of division 3
-   * would read as having years of runway — and the tooltip would be describing
-   * a calculation that never ran.
-   */
-  const journalBalance =
-    divisions.find((division) => division.division === journalDivision)?.balance ?? 0;
-  const runway = runwayDays(journalBalance, dailyOutgoings(journal, nowMs));
+  // One composition, shared with the Standing panel (#566): two call sites each
+  // picking their own division out of the seven is how the two surfaces would
+  // eventually disagree about which wallet the runway describes.
+  const {
+    total,
+    net,
+    runwayDays: runway,
+  } = vitalsFigures(divisions, journal, journalDivision, nowMs);
 
   return (
     <Panel title={t('corp.vitalsTitle')}>
@@ -85,7 +71,13 @@ export function CorpVitalsRail({
           isn't a `<dl>`'s allowed content model — the link's own implicit
           role already names each row, so no ARIA list role is needed either.
         */}
-        <div className="divide-y divide-line text-xs">
+        {/*
+          Two columns from `sm` up. Seven single-column rows across a half-width
+          panel is a stack of hairlines with an empty middle — the same wasted
+          width, one panel down (#566). `divide-y` cannot span columns, so each
+          row carries its own bottom hairline instead.
+        */}
+        <div className="grid max-w-3xl text-xs sm:grid-cols-2 sm:gap-x-6">
           {divisions.map((division) => {
             const label =
               division.name ?? t('corp.vitals.division', { division: division.division });
@@ -97,7 +89,7 @@ export function CorpVitalsRail({
               <Link
                 key={division.division}
                 to={`/wallet?owner=corporation&division=${division.division}`}
-                className="flex items-baseline justify-between gap-3 py-2 hover:underline"
+                className="flex items-baseline justify-between gap-3 border-b border-line py-2 last:border-b-0 hover:underline"
                 aria-label={t('corp.vitals.viewInWallet', { division: label })}
               >
                 {/*

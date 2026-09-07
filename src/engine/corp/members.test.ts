@@ -7,6 +7,9 @@ import {
   filterRosterRows,
   isEmptyRosterDiff,
   memberStanding,
+  peopleHighlightIds,
+  PEOPLE_HIGHLIGHT_LIMIT,
+  peopleHighlights,
   type MemberActivity,
   type RosterSearchFields,
 } from './members';
@@ -216,5 +219,87 @@ describe('filterRosterRows', () => {
 
   it('drops a row that matches nothing', () => {
     expect(filterRosterRows([row()], 'caldari')).toEqual([]);
+  });
+});
+
+describe('peopleHighlights', () => {
+  const PH_NOW = Date.UTC(2026, 8, 7, 12);
+  const PH_DAY = 86_400_000;
+
+  const member = (characterId: number, daysDark: number): MemberActivity => ({
+    characterId,
+    logonMs: PH_NOW - daysDark * PH_DAY,
+    logoffMs: PH_NOW - daysDark * PH_DAY,
+    startMs: PH_NOW - 400 * PH_DAY,
+    shipTypeId: null,
+    locationId: null,
+  });
+
+  it('names the longest-absent dark members first', () => {
+    const highlights = peopleHighlights(
+      [member(1, 45), member(2, 120), member(3, 31)],
+      null,
+      PH_NOW
+    );
+
+    expect(highlights.dark.map((entry) => entry.characterId)).toEqual([2, 1, 3]);
+  });
+
+  it("answers to the corporation's own dark threshold", () => {
+    const roster = [member(1, 120), member(2, 45), member(3, 20)];
+
+    // The default calls all three dark; a 60-day policy calls one.
+    expect(
+      peopleHighlights(roster, null, PH_NOW, PEOPLE_HIGHLIGHT_LIMIT, 60).dark.map(
+        (entry) => entry.characterId
+      )
+    ).toEqual([1]);
+    expect(
+      peopleHighlights(roster, null, PH_NOW, PEOPLE_HIGHLIGHT_LIMIT, 14).dark.map(
+        (entry) => entry.characterId
+      )
+    ).toEqual([1, 2, 3]);
+  });
+
+  it('leaves out members who are not dark', () => {
+    const highlights = peopleHighlights([member(1, 2), member(2, 40)], null, PH_NOW);
+
+    expect(highlights.dark.map((entry) => entry.characterId)).toEqual([2]);
+  });
+
+  it('caps each list', () => {
+    const highlights = peopleHighlights(
+      [member(1, 45), member(2, 120), member(3, 31), member(4, 90)],
+      { joined: [10, 11, 12, 13], left: [20, 21, 22, 23] },
+      PH_NOW,
+      2
+    );
+
+    expect(highlights.dark).toHaveLength(2);
+    expect(highlights.joined).toEqual([10, 11]);
+    expect(highlights.left).toEqual([20, 21]);
+  });
+
+  // A diff that could not be read is "unknown", not "nothing changed" — the
+  // same distinction the rail's chips make.
+  it('reports no roster change for a null diff', () => {
+    const highlights = peopleHighlights([member(1, 45)], null, PH_NOW);
+
+    expect(highlights.joined).toEqual([]);
+    expect(highlights.left).toEqual([]);
+  });
+
+  it('collects every id needing a name, once', () => {
+    const highlights = peopleHighlights([member(1, 45)], { joined: [1, 2], left: [3] }, PH_NOW);
+
+    expect(peopleHighlightIds(highlights).sort()).toEqual([1, 2, 3]);
+  });
+
+  it('is empty for a non-positive limit', () => {
+    expect(peopleHighlights([member(1, 45)], { joined: [2], left: [3] }, PH_NOW, 0)).toEqual({
+      dark: [],
+      joined: [],
+      left: [],
+    });
   });
 });

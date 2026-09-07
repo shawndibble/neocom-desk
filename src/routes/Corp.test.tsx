@@ -161,7 +161,7 @@ describe('access states (AC1)', () => {
     );
 
     await waitFor(() => expect(mocked.loadCorporationStructures).toHaveBeenCalled());
-    expect(await screen.findByText('Nothing due')).toBeInTheDocument();
+    expect(await screen.findByText('Every structure is fuelled')).toBeInTheDocument();
   });
 
   it.each(['none', 'roles-without-grant'] as const)(
@@ -209,8 +209,11 @@ describe('per-panel capability gating (AC3)', () => {
     expect(mocked.loadCorporationWalletJournal).not.toHaveBeenCalled();
     expect(mocked.loadCorporationIndustryJobs).not.toHaveBeenCalled();
     expect(screen.queryByText('Vitals')).not.toBeInTheDocument();
-    // No "no jobs" noise about a panel this character cannot read.
-    expect(screen.queryByText('Nothing due')).not.toBeInTheDocument();
+    // No "no jobs" noise about a card this character cannot read (#566): a
+    // Station Manager gets Fuel and Timers and no Industry jobs card at all.
+    expect(screen.queryByText('Industry jobs')).not.toBeInTheDocument();
+    // Nor a money figure in Standing, whose clock half they do hold.
+    expect(screen.queryByText('Runway')).not.toBeInTheDocument();
   });
 
   it('shows the vitals rail, named by the corporation’s own division names', async () => {
@@ -302,11 +305,12 @@ describe('per-panel capability gating (AC3)', () => {
 
   /**
    * The mirror of the case above, and the harder half of AC3: an Accountant
-   * holds none of the board's three capabilities, so there is no board — not an
-   * empty one saying "Nothing due" about endpoints they were never allowed to
-   * ask about.
+   * holds none of the board's three capabilities, so there are no Kind Cards —
+   * not empty ones claiming their kind is clear about endpoints they were never
+   * allowed to ask about. Standing still renders, carrying only its money half
+   * (#566): the figures degrade one at a time, not as a panel.
    */
-  it('gives an Accountant the rail and no board panel at all', async () => {
+  it('gives an Accountant the rail and no kind cards at all', async () => {
     mockedAccess.mockReturnValue(accessOf('ready', { canReadWallet: true }));
     mocked.loadCorporationWallets.mockResolvedValue(cached([]));
     mocked.loadCorporationDivisions.mockResolvedValue(cached({}));
@@ -315,8 +319,15 @@ describe('per-panel capability gating (AC3)', () => {
     renderCorp();
 
     await waitFor(() => expect(screen.getByText('Vitals')).toBeInTheDocument());
-    expect(screen.queryByText('Ops board')).not.toBeInTheDocument();
-    expect(screen.queryByText('Nothing due')).not.toBeInTheDocument();
+    expect(screen.queryByText('Fuel')).not.toBeInTheDocument();
+    expect(screen.queryByText('Structure timers')).not.toBeInTheDocument();
+    expect(screen.queryByText('Moon chunks')).not.toBeInTheDocument();
+    expect(screen.queryByText('Industry jobs')).not.toBeInTheDocument();
+    // Standing is up for the money figures, and says nothing about clocks it
+    // could not read.
+    expect(screen.getByText('Standing')).toBeInTheDocument();
+    expect(screen.queryByText('Due in 24h')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Deadlines per day/)).not.toBeInTheDocument();
   });
 });
 
@@ -377,7 +388,14 @@ describe('the board (AC2, AC5, AC6)', () => {
     expect(screen.queryByText('12m')).not.toBeInTheDocument();
   });
 
-  it('leads with the most urgent item across every source', async () => {
+  /**
+   * #566 replaced the one merged list with per-kind cards, so "leads with" has
+   * no single list to be true of any more. What survives — and what this now
+   * asserts — is that the two sources land in their own cards, and that
+   * Standing counts them together, which is the whole reason the grouping is
+   * safe to make.
+   */
+  it('sends each source to its own card, and counts them together in Standing', async () => {
     mocked.loadCorporationStructures.mockResolvedValue(
       cached([
         {
@@ -414,9 +432,19 @@ describe('the board (AC2, AC5, AC6)', () => {
     renderCorp();
 
     await waitFor(() => expect(screen.getByText('Fortizar')).toBeInTheDocument());
-    const rows = screen.getAllByRole('listitem');
-    expect(rows[0]).toHaveTextContent('Type 1001');
-    expect(rows[1]).toHaveTextContent('Fortizar');
+
+    // Each card holds only its own kind: the 20-day fuel clock under Fuel, the
+    // three-hours-late delivery under Industry jobs.
+    const fuelCard = screen.getByRole('heading', { name: 'Fuel' }).closest('section');
+    const jobsCard = screen.getByRole('heading', { name: 'Industry jobs' }).closest('section');
+    expect(fuelCard).toHaveTextContent('Fortizar');
+    expect(fuelCard).not.toHaveTextContent('Type 1001');
+    expect(jobsCard).toHaveTextContent('Type 1001');
+    expect(jobsCard).not.toHaveTextContent('Fortizar');
+
+    // One overdue job inside 24h, and the fuel clock 20 days out is not.
+    expect(screen.getByText('Due in 24h')).toBeInTheDocument();
+    expect(screen.getByText('1 already overdue')).toBeInTheDocument();
   });
 
   /**
@@ -561,21 +589,21 @@ describe('the board (AC2, AC5, AC6)', () => {
   it('states the hourly cache in the data-age tooltip', async () => {
     mocked.loadCorporationStructures.mockResolvedValue(cached([]));
     renderCorp();
-    await waitFor(() => expect(screen.getByText('Nothing due')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Every structure is fuelled')).toBeInTheDocument());
     expect(screen.getByText('30m ago').getAttribute('title')).toContain('about an hour');
   });
 
   it('offers the section’s sub-nav, which Members will join', async () => {
     mocked.loadCorporationStructures.mockResolvedValue(cached([]));
     renderCorp();
-    await waitFor(() => expect(screen.getByText('Nothing due')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Every structure is fuelled')).toBeInTheDocument());
     expect(screen.getByRole('navigation', { name: 'Corporation' })).toBeInTheDocument();
   });
 
   it('does not blank the board while a manual refresh is in flight (issue #418)', async () => {
     mocked.loadCorporationStructures.mockResolvedValue(cached([]));
     renderCorp();
-    await waitFor(() => expect(screen.getByText('Nothing due')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Every structure is fuelled')).toBeInTheDocument());
 
     let resolveSecondFetch!: (value: ReturnType<typeof cached<never[]>>) => void;
     mocked.loadCorporationStructures.mockReturnValueOnce(
@@ -585,11 +613,11 @@ describe('the board (AC2, AC5, AC6)', () => {
     );
 
     await userEvent.setup().click(screen.getByRole('button', { name: 'Refresh corp data' }));
-    expect(screen.getByText('Nothing due')).toBeInTheDocument();
+    expect(screen.getByText('Every structure is fuelled')).toBeInTheDocument();
 
     resolveSecondFetch(cached([]));
     await waitFor(() => expect(mocked.loadCorporationStructures).toHaveBeenCalledTimes(2));
-    expect(screen.getByText('Nothing due')).toBeInTheDocument();
+    expect(screen.getByText('Every structure is fuelled')).toBeInTheDocument();
   });
 });
 
@@ -603,7 +631,7 @@ describe('an unknown corporation', () => {
     mockedAccess.mockReturnValue(accessOf('ready', { canReadStructures: true }));
     mocked.loadCorporationId.mockResolvedValue(null);
     renderCorp();
-    await waitFor(() => expect(screen.getByText('Nothing due')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Every structure is fuelled')).toBeInTheDocument());
     expect(mocked.loadCorporationStructures).not.toHaveBeenCalled();
   });
 });
