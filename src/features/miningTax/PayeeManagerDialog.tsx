@@ -13,7 +13,9 @@ import {
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import type { PayeeRecord } from '@/db';
+import { DEFAULT_TRADE_HUB, TRADE_HUBS, type TradeHub } from '@/market/hubs';
 import { createPayee, deletePayee, loadPayees, updatePayee } from './payees';
+import { hubForPayee } from './pricing';
 import type { TrackedCharacter } from './snapshot';
 
 interface PayeeManagerDialogProps {
@@ -31,17 +33,42 @@ interface DraftPayee {
   id: string | null;
   name: string;
   defaultTaxPct: string;
+  /**
+   * Always a concrete hub, never absent — the *stored* field is optional, and
+   * the default hub's own id is what "stored nothing" round-trips through.
+   * That keeps one option in the picker meaning Jita, rather than a "default"
+   * entry and a "Jita" entry that a pilot would have to be told are the same.
+   */
+  hubId: TradeHub['id'];
+  /**
+   * Carried through the edit round-trip untouched. `updatePayee` deletes any
+   * field its input omits, so not carrying this would make an ordinary rename
+   * silently forget the system `AssignDialog`'s "remember this system"
+   * checkbox learned.
+   */
+  systemId?: number;
 }
 
-const EMPTY_DRAFT: DraftPayee = { id: null, name: '', defaultTaxPct: '' };
+const EMPTY_DRAFT: DraftPayee = {
+  id: null,
+  name: '',
+  defaultTaxPct: '',
+  hubId: DEFAULT_TRADE_HUB.id,
+};
 
 /**
  * Manage Payees (decision doc): create/edit/remove the corps and people a
  * character owes a moon-rental tax to. Per-character, like the character
- * whose ledger it's opened from. Name + default tax % only — the moon/system
- * tag (CONTEXT.md's Payee entry) is set from `AssignDialog`'s "remember this
- * system" checkbox instead, at the moment it's actually useful, rather than
- * asking for a system id here.
+ * whose ledger it's opened from. Name, default tax %, and the trade hub the
+ * Payee's ore is valued at — the moon/system tag (CONTEXT.md's Payee entry) is
+ * set from `AssignDialog`'s "remember this system" checkbox instead, at the
+ * moment it's actually useful, rather than asking for a system id here.
+ *
+ * The hub belongs to the Payee rather than to this device because the figure
+ * it produces is a bill one player sends another: a device-local pick would
+ * have two corpmates computing different amounts owed for the same ore. It is
+ * deliberately not the Market Browser's `marketHub`, which is one pilot's
+ * viewing preference.
  */
 export function PayeeManagerDialog({
   open,
@@ -81,7 +108,15 @@ export function PayeeManagerDialog({
   }
 
   function startEdit(payee: PayeeRecord) {
-    setDraft({ id: payee.id, name: payee.name, defaultTaxPct: String(payee.defaultTaxPct) });
+    setDraft({
+      id: payee.id,
+      name: payee.name,
+      defaultTaxPct: String(payee.defaultTaxPct),
+      // A stored hub this build doesn't know reads as Jita here exactly as it
+      // does when pricing — the picker never opens on a blank selection.
+      hubId: hubForPayee(payee.hubId).id,
+      systemId: payee.systemId,
+    });
     setError(null);
   }
 
@@ -96,11 +131,20 @@ export function PayeeManagerDialog({
       setError(t('miningTax.payeeTaxPctInvalid'));
       return;
     }
+    // The default hub is stored as *no* hub, which is what every Payee
+    // predating this field already means — so "Jita" never becomes a second
+    // way of saying the same thing that only some records carry.
+    const input = {
+      name,
+      defaultTaxPct: pct,
+      systemId: draft.systemId,
+      ...(draft.hubId === DEFAULT_TRADE_HUB.id ? {} : { hubId: draft.hubId }),
+    };
     const existing = draft.id ? payees.find((p) => p.id === draft.id) : undefined;
     if (existing) {
-      await updatePayee(existing, { name, defaultTaxPct: pct });
+      await updatePayee(existing, input);
     } else {
-      await createPayee(characterId, { name, defaultTaxPct: pct });
+      await createPayee(characterId, input);
     }
     setDraft(EMPTY_DRAFT);
     setError(null);
@@ -159,7 +203,10 @@ export function PayeeManagerDialog({
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm">{payee.name}</p>
                   <p className="mt-0.5 text-[0.6875rem] text-text-dim">
-                    {t('miningTax.defaultTaxPctValue', { pct: payee.defaultTaxPct })}
+                    {t('miningTax.payeeSummary', {
+                      pct: payee.defaultTaxPct,
+                      hub: hubForPayee(payee.hubId).systemName,
+                    })}
                   </p>
                 </div>
                 <IconButton
@@ -204,6 +251,26 @@ export function PayeeManagerDialog({
             placeholder={t('miningTax.defaultTaxPctPlaceholder')}
             aria-label={t('miningTax.defaultTaxPctPlaceholder')}
           />
+          <div className="space-y-1">
+            <Select
+              value={draft.hubId}
+              onValueChange={(value) => setDraft({ ...draft, hubId: value as TradeHub['id'] })}
+            >
+              <SelectTrigger aria-label={t('miningTax.payeeHubLabel')}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {TRADE_HUBS.map((hub) => (
+                  <SelectItem key={hub.id} value={hub.id}>
+                    {hub.id === DEFAULT_TRADE_HUB.id
+                      ? t('miningTax.payeeHubDefaultOption', { hub: hub.systemName })
+                      : hub.systemName}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-[0.6875rem] text-text-dim">{t('miningTax.payeeHubHint')}</p>
+          </div>
           {error && (
             <p role="alert" className="text-xs text-danger">
               {error}

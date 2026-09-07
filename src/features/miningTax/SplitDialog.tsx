@@ -30,7 +30,13 @@ interface SplitDialogProps {
   systemName: string;
   payees: readonly PayeeRecord[];
   typeNames: ReadonlyMap<number, string>;
-  unitPrices: ReadonlyMap<number, number>;
+  /**
+   * Prices at a given Payee's trade hub. A split is the one flow that needs
+   * two of them at once: the units staying put are worth what the original
+   * Payee's hub bids, the moved units what the *second* Payee's hub bids, and
+   * the second Payee is picked here.
+   */
+  pricesFor: (hubId: string | undefined) => ReadonlyMap<number, number>;
   busy: boolean;
   onSplit: () => void;
 }
@@ -41,8 +47,9 @@ interface SplitDialogProps {
  * in the same system, and ESI reports them as one entry. Per ore type a
  * slider (or typed figure) moves units to a second Payee, and a radio picks
  * which side collects any ore ESI reports for this day later
- * (`engine/miningTax/ownership.ts`). Both sides are re-priced at the current
- * Jita buy — see `splitAssignment`.
+ * (`engine/miningTax/ownership.ts`). Each side is re-priced at the current buy
+ * orders of *its own* Payee's trade hub — the two Payees need not share one —
+ * see `splitAssignment`.
  */
 export function SplitDialog({
   open,
@@ -52,7 +59,7 @@ export function SplitDialog({
   systemName,
   payees,
   typeNames,
-  unitPrices,
+  pricesFor,
   busy,
   onSplit,
 }: SplitDialogProps) {
@@ -79,8 +86,15 @@ export function SplitDialog({
   );
   const pctValue = Number(taxPct);
   const safePct = Number.isFinite(pctValue) ? pctValue : 0;
-  const keptValue = computeAssignmentValue(keptLines, unitPrices, assignment.taxPct);
-  const newValue = computeAssignmentValue(movedLines, unitPrices, safePct);
+  // One book per side, resolved live: the preview below has to move when the
+  // pilot picks a second Payee that bills somewhere else, not only when they
+  // move units.
+  const prices = {
+    kept: pricesFor(payees.find((p) => p.id === assignment.payeeId)?.hubId),
+    moved: pricesFor(otherPayees.find((p) => p.id === payeeId)?.hubId),
+  };
+  const keptValue = computeAssignmentValue(keptLines, prices.kept, assignment.taxPct);
+  const newValue = computeAssignmentValue(movedLines, prices.moved, safePct);
   const movedUnits = movedLines.reduce((sum, line) => sum + line.quantity, 0);
 
   const canSplit =
@@ -113,7 +127,7 @@ export function SplitDialog({
           taxPct: pctValue,
           ...(someoneElseCollects ? {} : { collector }),
         },
-        unitPrices
+        prices
       );
       onSplit();
     } finally {
