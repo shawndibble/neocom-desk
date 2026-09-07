@@ -29,7 +29,10 @@
     "soon": "Soon",
     "switchCharacter": "Switch character",
     "more": "More",
-    "mobileLabel": "Mobile navigation"
+    "mobileLabel": "Mobile navigation",
+    "alerts": "Alerts",
+    "alertsWithCount_one": "Alerts, {{count}} waiting",
+    "alertsWithCount_other": "Alerts, {{count}} waiting"
   },
   "reauth": {
     "navLocked": "Needs a new login",
@@ -879,6 +882,34 @@
     "notificationsSettings": "Settings",
     "notificationsOtherCharacters": "Other characters",
     "notificationsSpan": "{{count}} alerts from {{oldest}} to {{newest}}"
+  },
+  "alerts": {
+    "title": "Alerts",
+    "summary_one": "{{count}} alert · {{types}} types · {{characters}} characters",
+    "summary_other": "{{count}} alerts · {{types}} types · {{characters}} characters",
+    "settings": "Notification settings",
+    "dismissAll": "Dismiss all",
+    "byType": "By type",
+    "deviceWide": "Every character on this device",
+    "muted": "Muted",
+    "mute": "Stop showing {{type}} in this list",
+    "unmute": "Show {{type}} in this list again",
+    "muteHint": "Stop showing this type",
+    "unmuteHint": "Show this type again",
+    "dismissType": "Dismiss every {{type}} alert",
+    "dismissOne": "Dismiss {{title}}",
+    "newest": "newest {{age}}",
+    "mutedTypes": "Muted types",
+    "filterTitle": "Filter alerts",
+    "searchLabel": "Search alerts",
+    "searchPlaceholder": "Search alerts",
+    "characterLabel": "Character",
+    "allCharacters": "All characters",
+    "empty": "No alerts yet",
+    "emptyHint": "Events you have enabled appear here while the app is open.",
+    "noMatches": "No alerts match these filters",
+    "feedOff": "The in-app alert list is switched off in Settings, so nothing new will be added to it. What is already here is still listed.",
+    "retention": "This device keeps the last 300 alerts, and syncs 30 days of them between your devices."
   },
   "common": {
     "close": "Close",

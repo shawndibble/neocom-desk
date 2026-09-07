@@ -14,6 +14,7 @@ import { Login } from '@/routes/Login';
 import { Callback } from '@/routes/Callback';
 import { Characters } from '@/routes/Characters';
 import { Overview } from '@/routes/Overview';
+import { Alerts } from '@/routes/Alerts';
 import { Skills } from '@/routes/Skills';
 import { SkillPlans } from '@/routes/SkillPlans';
 import { SkillPlanEditor } from '@/routes/SkillPlanEditor';
@@ -80,6 +81,7 @@ const BASENAME = import.meta.env.BASE_URL.replace(/\/$/, '') || '/';
 const ROUTE_ELEMENTS = {
   '/characters': <Characters />,
   '/overview': <Overview />,
+  '/alerts': <Alerts />,
   // The Skills section opens on planning: /skills is an index that redirects,
   // so the rail's own link (and any existing bookmark) lands on the plan list
   // while the trained view keeps a URL of its own.
