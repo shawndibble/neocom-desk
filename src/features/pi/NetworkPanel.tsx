@@ -24,7 +24,7 @@ import { useTranslation } from 'react-i18next';
 import { InfoTooltip, Panel } from '@/components/ui';
 import { formatIsk } from '@/lib/isk';
 import type { TradeHub } from '@/market/hubs';
-import type { NetworkPlan } from '@/engine/pi/network';
+import type { NetworkBlocker, NetworkPlan } from '@/engine/pi/network';
 import { customsRatePercent, hostRateFor } from './customsRate';
 import { DirectiveRow } from './DirectiveRow';
 import { inputChips } from './inputChips';
@@ -53,6 +53,36 @@ function ReachableByBuying({ plan }: { plan: NetworkPlan }) {
 
 /** The plan panel names no owners: it lists the set, not one pilot's card. */
 const EMPTY_OWNERS: ReadonlyMap<number, string> = new Map();
+
+/** Names shown per blocked reason before the rest collapse into "+N more". */
+const BLOCKED_NAMES_SHOWN = 5;
+
+/**
+ * One bullet per blocked product reads as a wall once a hub is picked: most
+ * of the schematics on a system-wide plan hit the same one or two reasons
+ * (no host has room, or the customs cut eats the margin), so grouping by
+ * reason turns dozens of near-duplicate lines into a handful.
+ */
+function groupBlockers(
+  lines: NetworkPlan['blocked']
+): { reason: NetworkBlocker; names: string[] }[] {
+  const order: NetworkBlocker[] = [];
+  const byReason = new Map<NetworkBlocker, string[]>();
+  for (const line of lines) {
+    if (!byReason.has(line.reason)) {
+      order.push(line.reason);
+      byReason.set(line.reason, []);
+    }
+    byReason.get(line.reason)?.push(line.name);
+  }
+  return order.map((reason) => ({ reason, names: byReason.get(reason) ?? [] }));
+}
+
+function blockedNamesLabel(names: string[]): string {
+  if (names.length <= BLOCKED_NAMES_SHOWN) return names.join(', ');
+  const shown = names.slice(0, BLOCKED_NAMES_SHOWN).join(', ');
+  return `${shown} +${names.length - BLOCKED_NAMES_SHOWN} more`;
+}
 
 export function NetworkPanel({
   hub,
@@ -192,12 +222,12 @@ export function NetworkPanel({
               products at once, and `ReachableByBuying` above says the same
               thing in one sentence rather than a catalogue. */}
           {blockers.length > 0 && (
-            <ul className="text-[0.6875rem] text-text-dim">
-              {blockers.map((line) => (
-                <li key={line.typeId}>
+            <ul className="space-y-0.5 text-[0.6875rem] text-text-dim">
+              {groupBlockers(blockers).map(({ reason, names }) => (
+                <li key={reason}>
                   {t('piAdvisor.networkBlocked', {
-                    name: line.name,
-                    reason: t(`piAdvisor.networkBlockedReason.${line.reason}`),
+                    name: blockedNamesLabel(names),
+                    reason: t(`piAdvisor.networkBlockedReason.${reason}`),
                   })}
                 </li>
               ))}

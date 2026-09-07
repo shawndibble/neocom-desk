@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import '@/i18n';
-import type { NetworkPlan, NetworkOpportunity } from '@/engine/pi/network';
+import type { NetworkPlan, NetworkOpportunity, NetworkBlocker } from '@/engine/pi/network';
 import { DEFAULT_TRADE_HUB } from '@/market/hubs';
 import { NetworkPanel } from './NetworkPanel';
 
@@ -23,8 +23,16 @@ function opportunity(overrides: Partial<NetworkOpportunity>): NetworkOpportunity
   };
 }
 
-function plan(opportunities: NetworkOpportunity[]): NetworkPlan {
-  return { opportunities, conversions: [], unallocated: [], blocked: [] };
+function plan(
+  opportunities: NetworkOpportunity[],
+  blocked: NetworkPlan['blocked'] = []
+): NetworkPlan {
+  return { opportunities, conversions: [], unallocated: [], blocked };
+}
+
+let nextBlockedTypeId = 1000;
+function blocked(reason: NetworkBlocker, names: string[]): NetworkPlan['blocked'] {
+  return names.map((name) => ({ typeId: nextBlockedTypeId++, name, reason }));
 }
 
 const planetNames = new Map([
@@ -90,5 +98,43 @@ describe('NetworkPanel', () => {
       />
     );
     expect(screen.getByText(/this system’s 6% customs rate/)).toBeInTheDocument();
+  });
+
+  it('groups blocked products by reason into one line instead of one bullet each', () => {
+    render(
+      <NetworkPanel
+        hub={DEFAULT_TRADE_HUB}
+        plan={plan(
+          [opportunity({ hostPlanetId: 1, marginPerHour: 500 })],
+          blocked('unprofitable', ['Oxides', 'Coolant'])
+        )}
+        buyInputs
+        assumesRemoval={false}
+        planetNames={planetNames}
+        taxRate={0.06}
+      />
+    );
+    expect(
+      screen.getByText('Oxides, Coolant — the customs office takes more than it earns')
+    ).toBeInTheDocument();
+  });
+
+  it('collapses a long reason group to a handful of names plus a count', () => {
+    const names = ['A', 'B', 'C', 'D', 'E', 'F', 'G'];
+    render(
+      <NetworkPanel
+        hub={DEFAULT_TRADE_HUB}
+        plan={plan(
+          [opportunity({ hostPlanetId: 1, marginPerHour: 500 })],
+          blocked('no-host-budget', names)
+        )}
+        buyInputs
+        assumesRemoval={false}
+        planetNames={planetNames}
+        taxRate={0.06}
+      />
+    );
+    expect(screen.getByText(/A, B, C, D, E \+2 more/)).toBeInTheDocument();
+    expect(screen.queryByText(/, F/)).not.toBeInTheDocument();
   });
 });
