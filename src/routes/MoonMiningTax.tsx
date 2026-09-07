@@ -46,7 +46,8 @@ import {
   markAssignmentsPaid,
   resolveNeedsReview,
 } from '@/features/miningTax/assignments';
-import { tagAsIgnored, tagAsMoonOre } from '@/features/miningTax/typeOverrides';
+import { loadTypeOverrides, tagAsIgnored, tagAsMoonOre } from '@/features/miningTax/typeOverrides';
+import { TypeOverridesDialog } from '@/features/miningTax/TypeOverridesDialog';
 import { STATUS_TEXT_CLASS } from '@/features/miningTax/statusTone';
 import { computePayeeBalances, summarizeUnassigned } from '@/features/miningTax/balances';
 import {
@@ -156,6 +157,22 @@ export function MoonMiningTax() {
   const [statusFilter, setStatusFilter] =
     useState<ReadonlySet<MiningTaxRowStatus>>(DEFAULT_STATUSES);
   const [payeeManagerCharacterId, setPayeeManagerCharacterId] = useState<number | null>(null);
+  const [oreTagsOpen, setOreTagsOpen] = useState(false);
+  // Whether the pilot has any manual ore tags at all. The header action is
+  // hidden without them — a recovery affordance for a rare data-correction
+  // workaround should not sit in the header of every ledger that never needed
+  // one. Re-read on every snapshot, so tagging from the banner reveals the way
+  // back in the same beat.
+  const [hasOreTags, setHasOreTags] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    void loadTypeOverrides().then(({ moonOreTypeIds, ignoredTypeIds }) => {
+      if (!cancelled) setHasOreTags(moonOreTypeIds.length > 0 || ignoredTypeIds.length > 0);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [data]);
   // Row keys checked in the table's select column. Feeds all three bulk
   // actions (settle up / combine / dismiss), never just bulk-pay.
   const [selection, setSelection] = useState<ReadonlySet<string>>(new Set());
@@ -698,6 +715,11 @@ export function MoonMiningTax() {
                 {t('miningTax.managePayeesAction')}
               </Button>
             )}
+            {hasOreTags && (
+              <Button onClick={() => setOreTagsOpen(true)}>
+                {t('miningTax.reviewOreTagsAction')}
+              </Button>
+            )}
             <IconButton
               icon={<Icon.Refresh />}
               label={t('miningTax.refresh')}
@@ -1019,6 +1041,14 @@ export function MoonMiningTax() {
             </Panel>
           )}
         </>
+      )}
+
+      {oreTagsOpen && (
+        <TypeOverridesDialog
+          open={oreTagsOpen}
+          onClose={() => setOreTagsOpen(false)}
+          onChanged={refresh}
+        />
       )}
 
       {payeeManagerCharacterId !== null && (
