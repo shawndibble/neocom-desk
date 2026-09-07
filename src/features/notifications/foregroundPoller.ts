@@ -116,7 +116,7 @@ export interface PollDependencies {
   alreadyDelivered: (occurrenceKey: string) => Promise<boolean>;
   /**
    * Clears Notification Feed rows for occurrences this poll proved never
-   * happened (`pollDomains.ts`'s `superseded`). A Scheduled Push fires
+   * happened (`pollDomains.ts`'s `disproven`). A Scheduled Push fires
    * without a re-check (ADR 0010), so a pilot who restarts an extractor
    * program in game with the app closed is told it expired; the row that
    * push wrote is keyed on the dead program's expiry, so no later poll ever
@@ -313,10 +313,10 @@ async function runForegroundPollOnce(deps: PollDependencies): Promise<void> {
       // (`feedSelection.isEntryVisible`), so there is nothing visible left to
       // retract — and one with the scope revoked cannot prove anything about
       // them either way.
-      if (run.domain.superseded) {
+      if (run.domain.disproven) {
         retractedKeys.push(
           ...run.domain
-            .superseded(character.characterId, previous, next)
+            .disproven(character.characterId, previous, next)
             .map((fire) => occurrenceKey(fire, deps.now()))
         );
       }
@@ -437,7 +437,7 @@ async function runForegroundPollOnce(deps: PollDependencies): Promise<void> {
 
   // A retraction cannot address a row this poll just wrote: a retracted key
   // carries the *replaced* program's expiry and every key written above
-  // carries the live one, and `supersededExtractorOccurrences` requires those
+  // carries the live one, and `disprovenExtractorOccurrences` requires those
   // to differ. That is the whole safety argument — running after the delivery
   // loop does not add to it, since `mergeFeedRecord` takes the later
   // `dismissedAt` and so a dismissal sticks whichever order the two land in.

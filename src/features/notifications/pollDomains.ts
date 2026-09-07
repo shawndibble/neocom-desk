@@ -54,7 +54,7 @@ import {
   diffIndustryJobComplete,
   diffPlanetaryExtractionDone,
   diffPlanetaryExtractorExpiring,
-  supersededExtractorOccurrences,
+  disprovenExtractorOccurrences,
   diffNewMail,
   diffNewCalendarEvent,
   diffCalendarEventStarting,
@@ -229,16 +229,18 @@ interface PollDomainSpec<TRaw, TSnapshot, TFire extends AnyNotificationFire> {
    * The inverse of `diffs`: occurrences this poll can prove never happened,
    * so an alert already delivered for one can be retracted from the
    * Notification Feed. Only the planetary domain has any — see
-   * `engine/notificationDiffs.supersededExtractorOccurrences` — because only
+   * `engine/notificationDiffs.disprovenExtractorOccurrences` — because only
    * there does a routine in-game action falsify a Scheduled Push that has
    * already fired, under a *different* Occurrence Key than the corrected
    * state will later produce, so nothing else revisits the row.
    *
-   * Ungated by `enabledEvents` on purpose: the rows being retracted may have
-   * been written by Web Push or another device, so the state of this
-   * device's toggles is no evidence about whether one exists.
+   * The poller runs this without the per-event filter it applies to `diffs`:
+   * the row being retracted may have been written by Web Push or another
+   * device, for either of this domain's two events, so one enabled event's
+   * fetch retracts both. It does still ride on the domain being fetched at
+   * all — see the call site for why that bound is right rather than a gap.
    */
-  readonly superseded?: (
+  readonly disproven?: (
     characterId: number,
     prev: TSnapshot | undefined,
     next: TSnapshot
@@ -279,11 +281,7 @@ export interface PollDomain {
     next: unknown,
     enabledEvents: ReadonlySet<NotificationEventId>
   ) => AnyNotificationFire[];
-  readonly superseded?: (
-    characterId: number,
-    prev: unknown,
-    next: unknown
-  ) => AnyNotificationFire[];
+  readonly disproven?: (characterId: number, prev: unknown, next: unknown) => AnyNotificationFire[];
   readonly projection?: (
     characterId: number,
     characterName: string,
@@ -320,9 +318,9 @@ function defineDomain<TRaw, TSnapshot, TFire extends AnyNotificationFire>(
       }
       return fires;
     },
-    superseded: spec.superseded
+    disproven: spec.disproven
       ? (characterId, prev, next) =>
-          spec.superseded!(characterId, prev as TSnapshot | undefined, next as TSnapshot)
+          spec.disproven!(characterId, prev as TSnapshot | undefined, next as TSnapshot)
       : undefined,
     projection: spec.projection
       ? (characterId, characterName, snapshot, nowMs) =>
@@ -457,7 +455,7 @@ function isExtractorSnapshot(raw: unknown): raw is ColonyExtractorSnapshot {
   const r = raw as Record<string, unknown>;
   if (typeof r.pinId !== 'number' || typeof r.expiryTimeMs !== 'number') return false;
   // Optional in storage as well as on the wire: every snapshot written before
-  // `supersededExtractorOccurrences` needed `install_time` lacks the field,
+  // `disprovenExtractorOccurrences` needed `install_time` lacks the field,
   // and those must stay readable rather than being discarded as a stale shape
   // on the first poll after an update.
   return r.installTimeMs === undefined || typeof r.installTimeMs === 'number';
@@ -502,7 +500,7 @@ export const colonyDomain = defineDomain<
           pinId: p.pinId,
           expiryTimeMs: p.expiryTimeMs,
           ...(p.installTimeMs !== undefined ? { installTimeMs: p.installTimeMs } : {}),
-          // Carried only for `supersededExtractorOccurrences`; no warning
+          // Carried only for `disprovenExtractorOccurrences`; no warning
           // reads it (ADR 0005). Omitted rather than defaulted when ESI left
           // it out, since a default would be evidence this does not have.
         })),
@@ -517,7 +515,7 @@ export const colonyDomain = defineDomain<
     gatedOn('planetaryExtractionDone', diffPlanetaryExtractionDone),
     gatedOn('planetaryExtractorExpiring', diffPlanetaryExtractorExpiring),
   ],
-  superseded: supersededExtractorOccurrences,
+  disproven: disprovenExtractorOccurrences,
   projection: async (characterId, characterName, snapshot, nowMs) => {
     const planetNames = await resolveProjectionNames(
       snapshot.colonies.map((colony) => colony.planetId),

@@ -228,7 +228,7 @@ export interface ColonyExtractorSnapshot {
    *
    * Not part of any warning: `expiry_time` alone answers idle and
    * expiring-soon (ADR 0005). It is here for
-   * `supersededExtractorOccurrences`, which needs to know whether a
+   * `disprovenExtractorOccurrences`, which needs to know whether a
    * replacement program went in *before* the one it replaced ran out —
    * the only evidence on the wire that an already-delivered alert was
    * about something that never happened.
@@ -313,7 +313,7 @@ export const EXTRACTOR_EXPIRY_WARNING_MS: readonly number[] = [24 * 3_600_000, 1
 
 /**
  * One warning about one program at one lead time. Shared by the diff that
- * raises these and by `supersededExtractorOccurrences`, which retracts them:
+ * raises these and by `disprovenExtractorOccurrences`, which retracts them:
  * the two must build an identical fire or the retraction addresses a row that
  * does not exist, and nothing would say so.
  */
@@ -439,7 +439,7 @@ export function diffPlanetaryExtractorExpiring(
  * some other party wrote, and re-deriving that format here would be the one
  * way to silently miss.
  */
-export function supersededExtractorOccurrences(
+export function disprovenExtractorOccurrences(
   characterId: number,
   prev: PlanetarySnapshot | undefined,
   next: PlanetarySnapshot

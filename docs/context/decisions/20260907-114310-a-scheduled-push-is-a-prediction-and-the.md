@@ -35,7 +35,7 @@ _Recorded 2026-09-07._
   happened.** A restarted extractor takes a new `expiry_time`, hence a new
   Occurrence Key, so the row a stale push wrote is never revisited by ordinary
   polling — it would sit in the Notification Feed unchallenged forever.
-  `engine/notificationDiffs.supersededExtractorOccurrences` reads the
+  `engine/notificationDiffs.disprovenExtractorOccurrences` reads the
   replacement program's `install_time`: a program installed _before_ the one
   it replaced was due to expire is proof that expiry never came. This rules
   out leaving hedged wording as the whole answer; the alert is honest, but the

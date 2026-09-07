@@ -322,7 +322,7 @@ describe('projection wiring', () => {
   });
 
   it('carries each extractor install time into the colony snapshot, and omits it when ESI did', async () => {
-    // The only evidence `supersededExtractorOccurrences` can retract on.
+    // The only evidence `disprovenExtractorOccurrences` can retract on.
     // Dropped here — as this mapping did before the retraction needed it —
     // and the feature silently never fires, with nothing failing to say so.
     vi.mocked(loadCharacterPlanets).mockResolvedValue(
