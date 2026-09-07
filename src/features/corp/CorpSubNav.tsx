@@ -6,6 +6,7 @@ import {
   tabItemClassName,
   tabItemIdleClassName,
   tabListClassName,
+  tabListFlushClassName,
   tabScrollerClassName,
 } from '@/components/ui/tabStyles';
 import { useCorpAccess } from './useCorpAccess';
@@ -33,13 +34,19 @@ function subNavClass({ isActive }: { isActive: boolean }): string {
  * for the wallet rail would follow a Members tab straight into an empty state
  * about a permission no login can grant. The entry is simply absent for them —
  * the same hide rule, applied one level down.
+ *
+ * Two independent wrappers, and they answer different questions.
+ * `tabScrollerClassName` makes the bar scroll sideways rather than squeeze its
+ * entries (#562) — that is about width. `flush` drops the bar's *own* baseline
+ * for a caller that already draws one, which is `PageHeader`'s `subNav` slot
+ * (#566) — that is about which element owns the hairline.
  */
-export function CorpSubNav() {
+export function CorpSubNav({ flush = false }: { flush?: boolean } = {}) {
   const { t } = useTranslation();
   const { capabilities } = useCorpAccess();
   return (
     <div className={tabScrollerClassName}>
-      <nav aria-label={t('nav.corp')} className={tabListClassName}>
+      <nav aria-label={t('nav.corp')} className={flush ? tabListFlushClassName : tabListClassName}>
         <NavLink to="/corp" end className={subNavClass}>
           {t('corp.overviewTab')}
         </NavLink>

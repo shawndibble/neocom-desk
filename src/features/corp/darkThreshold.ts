@@ -22,6 +22,17 @@ export const DARK_THRESHOLD_SETTING_KEY = 'corpDarkAfterDays';
 /** The spans a corp inactivity policy is actually written in. */
 export const DARK_AFTER_DAY_OPTIONS: readonly number[] = [14, 30, 60, 90];
 
+/**
+ * The most inclusive policy the setting can hold.
+ *
+ * `/corp`'s loader selects the members it resolves names for at this span
+ * rather than at the one in force, because the preference hydrates
+ * asynchronously and a name it never asked for prints as `#id` (see
+ * `Corp.tsx`). Derived from the option list so a new, looser preset cannot
+ * leave that selection behind.
+ */
+export const LOOSEST_DARK_AFTER_DAYS = Math.min(...DARK_AFTER_DAY_OPTIONS);
+
 export const useDarkThreshold = createLocalSetting<number>({
   key: DARK_THRESHOLD_SETTING_KEY,
   defaultValue: DARK_AFTER_DAYS,

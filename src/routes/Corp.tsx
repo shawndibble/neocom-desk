@@ -23,14 +23,17 @@
  */
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { DataAgeBadge, EmptyState, IconButton, PageHeader, Panel, Spinner } from '@/components/ui';
+import { DataAgeBadge, EmptyState, IconButton, PageHeader, Spinner } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
 import { useCorpRouteGate } from '@/features/corp/useCorpRouteGate';
 import { CorpSubNav } from '@/features/corp/CorpSubNav';
-import { CorpBoard } from '@/features/corp/CorpBoard';
 import { CorpVitalsRail } from '@/features/corp/CorpVitalsRail';
+import { CorpStanding } from '@/features/corp/CorpStanding';
+import { CorpKindCards } from '@/features/corp/CorpKindCards';
+import { CorpOfflineServices } from '@/features/corp/CorpOfflineServices';
 import { CorpPeopleRail } from '@/features/corp/CorpPeopleRail';
+import { LOOSEST_DARK_AFTER_DAYS } from '@/features/corp/darkThreshold';
 // The board's "open in-game" context menu action (issue #419) is this same
 // modal Market/Industry/Assets already use for "Show info" — item info never
 // existed as a real in-game protocol link in a browser (`showinfo:` is dead
@@ -72,9 +75,25 @@ import {
   toVitalsJournal,
 } from '@/features/corp/boardSources';
 import { loadTypeNames } from '@/features/character/typeNames';
+import { resolveNames } from '@/features/character/names';
 import { buildCorpBoard } from '@/engine/corp/board';
-import { diffRoster, type MemberActivity, type RosterDiff } from '@/engine/corp/members';
-import type { VitalsJournalEntry } from '@/engine/corp/vitals';
+import {
+  DEADLINE_STRIP_DAYS,
+  deadlinesByDay,
+  dueSoon,
+  groupBoardByKind,
+} from '@/engine/corp/deadlines';
+import {
+  NO_PEOPLE_HIGHLIGHTS,
+  diffRoster,
+  peopleHighlightIds,
+  PEOPLE_HIGHLIGHT_LIMIT,
+  peopleHighlights,
+  type MemberActivity,
+  type PeopleHighlights,
+  type RosterDiff,
+} from '@/engine/corp/members';
+import { vitalsFigures, type VitalsJournalEntry } from '@/engine/corp/vitals';
 import type { CorpCapabilities } from '@/engine/corpRoles';
 import type {
   CorporationIndustryJob,
@@ -117,6 +136,9 @@ interface CorpSnapshot {
    */
   rosterDiff: RosterDiff | null;
   typeNames: ReadonlyMap<number, string>;
+  /** The few members the People panel names, and their names (#566). */
+  peopleHighlights: PeopleHighlights;
+  memberNames: ReadonlyMap<number, string>;
   /** Oldest `fetchedAt` across the panels actually read — see `Corp` below. */
   oldestFetchedAt: Date | null;
   /** Captured in the loader: `Date.now()` in render is impure. */
@@ -133,6 +155,8 @@ const EMPTY_SNAPSHOT: CorpSnapshot = {
   members: null,
   rosterDiff: null,
   typeNames: new Map(),
+  peopleHighlights: NO_PEOPLE_HIGHLIGHTS,
+  memberNames: new Map(),
   oldestFetchedAt: null,
   loadedAt: 0,
 };
@@ -212,6 +236,38 @@ async function loadCorpSnapshot(
   // the SDE snapshot first and only falls back to ESI for what it misses.
   const typeNames = jobRows === null ? new Map() : await loadTypeNames(jobTypeIds(jobRows));
 
+  /**
+   * The People panel's named lists (#566).
+   *
+   * Selected first, resolved second, and capped by the engine — so this costs
+   * one `/universe/names` call for at most nine ids however large the
+   * corporation is. `resolveNames` is the app's own cached bulk resolver, so a
+   * revisit usually costs none.
+   */
+  const memberActivity =
+    tracking?.cached === undefined || tracking.cached === null
+      ? null
+      : toMemberActivity(tracking.cached.data);
+  const highlights =
+    memberActivity === null
+      ? NO_PEOPLE_HIGHLIGHTS
+      : // The *loosest* threshold the setting offers, not the one in force. The
+        // dark threshold is a device preference (`darkThreshold.ts`) that the
+        // loader cannot read reliably — it hydrates asynchronously — and a
+        // name the panel wants but the loader never asked for prints as `#id`.
+        // Selecting at 14 days and re-filtering in the panel cannot go wrong in
+        // that direction: `peopleHighlights` sorts by absence, so a stricter
+        // policy only trims this list's tail.
+        peopleHighlights(
+          memberActivity,
+          rosterDiff,
+          loadedAt,
+          PEOPLE_HIGHLIGHT_LIMIT,
+          LOOSEST_DARK_AFTER_DAYS
+        );
+  const highlightIds = peopleHighlightIds(highlights);
+  const memberNames = highlightIds.length === 0 ? new Map() : await resolveNames(highlightIds);
+
   // The oldest of the panels that were read, not the newest: the badge is a
   // promise about the whole view, and a fresh wallet must not vouch for an
   // hour-old structure list.
@@ -242,11 +298,10 @@ async function loadCorpSnapshot(
     // comes from tracking rather than from the id list because that is what
     // `/corp/members` counts — counting the ids instead would drift from the
     // page this links to whenever the two reads disagree.
-    members:
-      tracking?.cached === undefined || tracking.cached === null
-        ? null
-        : toMemberActivity(tracking.cached.data),
+    members: memberActivity,
     rosterDiff,
+    peopleHighlights: highlights,
+    memberNames,
     typeNames,
     oldestFetchedAt,
     loadedAt,
@@ -311,13 +366,59 @@ function CorpBoardView({ capabilities }: { capabilities: CorpCapabilities }) {
     });
   }, [data]);
 
+  /**
+   * The board, split by kind and summarised — #566's three derived reads.
+   *
+   * All three come out of `engine/corp/deadlines.ts` and none of them re-ranks
+   * anything: `groupBoardByKind` filters, and the two summaries count. The
+   * single merged ordering `buildCorpBoard` produced is still the only ordering
+   * on this page.
+   */
+  const grouped = useMemo(() => groupBoardByKind(items), [items]);
+  const clocks = useMemo(
+    () =>
+      data === null || !canReadAnything
+        ? null
+        : {
+            due: dueSoon(items, data.loadedAt),
+            days: deadlinesByDay(items, data.loadedAt, DEADLINE_STRIP_DAYS),
+          },
+    [items, data, canReadAnything]
+  );
+
   if (!snapshot.hydrated) return <Spinner />;
 
   const showVitals = capabilities.canReadWallet && data !== null;
   const showPeople = capabilities.canReadMembers && data !== null && data.members !== null;
 
+  /**
+   * Standing's money half, or `null` — the figure-by-figure half of AC3. Read
+   * through the engine's own composition rather than recomputed here, so the
+   * runway this panel prints is the runway the rail prints
+   * (`vitalsFigures`, #566).
+   */
+  const walletDivisionsRead = data?.wallets ?? null;
+  const money =
+    showVitals && walletDivisionsRead !== null
+      ? {
+          ...vitalsFigures(
+            walletDivisionsRead,
+            data.journal,
+            MASTER_WALLET_DIVISION,
+            data.loadedAt
+          ),
+          divisionCount: walletDivisionsRead.length,
+        }
+      : null;
+
   return (
     <div className="space-y-4">
+      {/*
+        Title, tabs, data age and the refresh action on one 36px line (#566).
+        The three stacked bands this replaces — `PageHeader`, then `CorpSubNav`,
+        then the board panel's own header — were about 110px of chrome before
+        any data, on the one route in the app whose whole job is triage.
+      */}
       <PageHeader
         title={t('corp.title')}
         meta={
@@ -325,6 +426,7 @@ function CorpBoardView({ capabilities }: { capabilities: CorpCapabilities }) {
             <DataAgeBadge date={data.oldestFetchedAt} note={t('corp.dataAgeNote')} />
           ) : undefined
         }
+        subNav={<CorpSubNav flush />}
         actions={
           <IconButton
             icon={<Icon.Refresh />}
@@ -334,59 +436,55 @@ function CorpBoardView({ capabilities }: { capabilities: CorpCapabilities }) {
           />
         }
       />
-      <CorpSubNav />
 
       {snapshot.loading && data === null ? (
         <Spinner />
       ) : (
-        <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start">
+        <div className="space-y-3">
           {/*
-            AC3's harder half. "Cannot read" and "read fine, nothing due" are
-            different answers and must look different: an Accountant who holds
-            none of the board's three capabilities gets no board panel at all,
-            while a Station Manager whose structures are simply all healthy gets
-            one saying so. Collapsing them would put "Nothing due" in front of
-            someone who was never allowed to ask.
+            Answer first. Standing carries the figures a manager acts on and the
+            Deadline Strip that says when — and each figure is gated on its own
+            source, so a Station Manager who is not an Accountant gets the
+            clocks with no money figures beside them rather than two holes
+            (AC3). With neither readable the panel renders nothing at all.
           */}
-          {canReadAnything && (
-            // `min-w-0`: a grid item's default `min-width` is `auto` (its own
-            // content's intrinsic width), not 0 — unlike a flex item. Below
-            // `lg`, this cell has no explicit track sizing to fall back on
-            // (that's what `minmax(0,1fr)` supplies at `lg`+), so without this
-            // an unbroken structure name inside `CorpBoard`'s `truncate` row
-            // widens the grid track itself instead of being clipped, and the
-            // whole board overflows a 320px viewport (issue #419).
-            <Panel title={t('corp.boardTitle')} padded={false} className="min-w-0">
-              <CorpBoard
-                items={items}
-                onShowInfo={(typeId, itemName) => setInfoModalItem({ typeId, itemName })}
-              />
-            </Panel>
-          )}
-          {/*
-            Money and People, the two halves of the side rail — each simply
-            absent without its capability, no placeholder and no "you cannot
-            see this". Their own reads were never fired either (see the loader).
+          <CorpStanding clocks={clocks} money={money} />
 
-            The pair share the one 18rem grid cell rather than taking a cell
-            each, which is what keeps the board's own column full width. They
-            sit side by side wherever there is room for it and stack where
-            there is not — which includes `lg` and up, where the column is
-            the fixed 18rem track: two ~9rem columns would overflow, since a
-            `StatChip` and the rail's ISK figures are `shrink-0` by contract.
-            The two-column class is also conditional on both rails actually
-            rendering, so a wallet-only Character's Money rail keeps the full
-            width it had before this pair existed.
+          {/*
+            AC3's harder half, unchanged in substance from the flat board it
+            replaces. "Cannot read" and "read fine, nothing due" are different
+            answers and must look different: a card exists only for a kind whose
+            own capability is held, and only then does an empty one say "nothing
+            due". Collapsing them would put "No moon chunks" in front of someone
+            who was never allowed to ask.
+          */}
+          <CorpKindCards
+            grouped={grouped}
+            capabilities={capabilities}
+            onShowInfo={(typeId, itemName) => setInfoModalItem({ typeId, itemName })}
+          />
+
+          {/*
+            The board's one untimed kind, on the one surface that suits it. Absent
+            entirely when every service is online — see `CorpOfflineServices`.
+          */}
+          {capabilities.canReadStructures && (
+            <CorpOfflineServices items={grouped.get('serviceOffline') ?? []} />
+          )}
+
+          {/*
+            Money and People along the bottom, each simply absent without its
+            capability — no placeholder and no "you cannot see this". Their own
+            reads were never fired either (see the loader). Two half-width
+            panels rather than the 18rem rail they used to share: the rail ran
+            out of content two-thirds down the page, which was most of the empty
+            space #566 exists to remove.
           */}
           {(showVitals || showPeople) && data !== null && (
-            // `min-w-0` for the same reason the board's own Panel needs it
-            // (issue #419): this is a grid item of the outer grid too, and an
-            // unbroken division name in the vitals rail's `truncate`d `dt`
-            // would otherwise widen this whole cell below `lg`.
             <div
               className={cx(
                 'grid min-w-0 gap-3',
-                showVitals && showPeople && 'sm:grid-cols-2 lg:grid-cols-1'
+                showVitals && showPeople && 'lg:grid-cols-2 lg:items-start'
               )}
             >
               {showVitals && (
@@ -400,6 +498,8 @@ function CorpBoardView({ capabilities }: { capabilities: CorpCapabilities }) {
               {showPeople && (
                 <CorpPeopleRail
                   members={data.members ?? []}
+                  highlights={data.peopleHighlights}
+                  names={data.memberNames}
                   diff={data.rosterDiff}
                   nowMs={data.loadedAt}
                 />
