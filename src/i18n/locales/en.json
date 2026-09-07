@@ -2322,7 +2322,7 @@
       "statSellsOutCaption_other": "{{count}} a day",
       "statVolumeLeft": "Volume left",
       "statOrderExpires": "Order expires",
-      "statExpiresCaption": "{{date}} · listed {{listed}}",
+      "statExpiresCaption": "{{date}} \u00b7 listed {{listed}}",
       "statIfSellsAsListed": "If it sells as listed",
       "statPerUnitAfterFees": "a unit, after fees",
       "exitsTitle": "Is there a better exit?",
@@ -2467,7 +2467,7 @@
         "feed": "{{event}}, Overview list"
       },
       "columnEvent": "Event",
-      "eveTypesHint": "EVE’s own in-game notifications, grouped by family. These default to the Overview page only, except the three structure-under-attack alerts, which also raise a browser pop-up — flip any of them per column.",
+      "eveTypesHint": "EVE’s own in-game notifications, grouped by family. These default to the Overview page only, except the attack and loss alerts, which also raise a browser pop-up — flip any of them per column.",
       "family": {
         "structures": "Structures",
         "war": "War",

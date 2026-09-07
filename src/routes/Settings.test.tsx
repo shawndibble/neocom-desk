@@ -617,13 +617,14 @@ describe('Settings — Notifications (issue #170)', () => {
 
   it('labels the two delivery columns with what each one does', async () => {
     render(<App />);
-    await notificationsPanel();
+    const panel = within(await notificationsPanel());
 
     // "App" and "List" named neither the pop-up nor the page it lands on.
-    const captions = await screen.findAllByText(/^Browser$/);
-    expect(captions.length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/^Overview$/).length).toBeGreaterThan(0);
-    expect(screen.queryByText(/^App$/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/^List$/)).not.toBeInTheDocument();
+    // Scoped to the panel: the app's own nav has an "Overview" link, which
+    // would satisfy an unscoped query whether or not the caption changed.
+    expect((await panel.findAllByText(/^Browser$/)).length).toBeGreaterThan(0);
+    expect(panel.getAllByText(/^Overview$/).length).toBeGreaterThan(0);
+    expect(panel.queryByText(/^App$/)).not.toBeInTheDocument();
+    expect(panel.queryByText(/^List$/)).not.toBeInTheDocument();
   });
 });

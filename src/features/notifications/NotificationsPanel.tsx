@@ -76,7 +76,7 @@ import {
   eveTypesByFamily,
   type NotificationChannel,
 } from './eventSelection';
-import { eveTypeLabelKey, humanizeEveType } from './eveTypeLabel';
+import { eveTypeLabel } from './eveTypeLabel';
 import { filterNotificationSections } from './notificationSearch';
 import { parseIskAmount, formatIsk } from '@/lib/isk';
 import { refreshAppBadge } from './appBadge';
@@ -103,7 +103,7 @@ const EVENT_BY_ID = new Map(NOTIFICATION_EVENTS.map((event) => [event.id, event]
  * moment a caption is wider than a checkbox. Which it now is: the columns
  * used to read "App" and "List", neither of which said what it delivered.
  */
-const CHANNEL_COLUMNS = 'grid shrink-0 grid-cols-[3.5rem_3.5rem] justify-items-center';
+const CHANNEL_COLUMNS = 'grid shrink-0 grid-cols-[4.25rem_4.25rem] justify-items-center';
 
 /**
  * Every corp event (issue #299) — used to attach the best-effort disclosure
@@ -464,7 +464,17 @@ export function NotificationsPanel() {
                                 content={t(`settings.notifications.columnHint.${channel}`)}
                                 openOnTap
                               >
-                                <span className="text-[0.6875rem] leading-tight text-text-dim">
+                                {/* `tabIndex` because a Tooltip's trigger has to
+                                    be focusable to be read without a pointer
+                                    (`components/ui/Tooltip.tsx`, ADR 0008), and
+                                    the dotted underline is what says there is
+                                    something to read. Uppercase micro-heading
+                                    per docs/DESIGN.md §2, matching the Family
+                                    headers further down. */}
+                                <span
+                                  tabIndex={0}
+                                  className="cursor-help text-[0.6875rem] leading-tight font-semibold tracking-wide text-text-dim uppercase underline decoration-dotted decoration-text-dim/50 underline-offset-2"
+                                >
                                   {t(`settings.notifications.column.${channel}`)}
                                 </span>
                               </Tooltip>
@@ -742,9 +752,7 @@ export function NotificationsPanel() {
                                               // ESI's own `CamelCase` identifier is what
                                               // used to label these rows. It named the
                                               // type without saying what it was.
-                                              const typeLabel = t(eveTypeLabelKey(type), {
-                                                defaultValue: humanizeEveType(type),
-                                              });
+                                              const typeLabel = eveTypeLabel(t, type);
                                               return (
                                                 <li
                                                   key={type}

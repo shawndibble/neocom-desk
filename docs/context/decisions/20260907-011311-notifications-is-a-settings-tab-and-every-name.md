@@ -37,6 +37,14 @@ _Recorded 2026-09-07._
   themselves to their own content and drift apart, so they share one explicit
   two-track class.
 
+- **In the UI the Notification Feed is called "Overview", and the code keeps
+  the domain name.** The feed is a section of the Overview page and nowhere
+  else, so "Overview" is what a reader can act on — where the row will appear —
+  while "feed" names a concept they have never been shown. `NotificationChannel`
+  stays `'feed'` in every module, preference key and stored record; only the
+  strings in `en.json` changed. The two names are the same channel, one facing
+  each way.
+
 - **An EVE Notification `type` is shown as a phrase, never as ESI's
   `CamelCase`.** `StructureImpendingAbandonmentAssetsAtRisk` reached the user
   in two places — as a row label in the per-type list, and inside the generic

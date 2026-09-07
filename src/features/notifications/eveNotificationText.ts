@@ -34,7 +34,7 @@ import {
 } from '@/engine/eveNotificationPayload';
 import { formatIsk } from '@/lib/isk';
 import { formatLocalDate, formatLocalDateTime } from '@/lib/localDate';
-import { eveTypeLabelKey, humanizeEveType } from './eveTypeLabel';
+import { eveTypeLabel } from './eveTypeLabel';
 
 /** Deliberately not `CharacterRef` — importing it back from `foregroundPoller.ts` would be a cycle. */
 export interface EveNotificationTextCharacter {
@@ -78,9 +78,7 @@ function genericText(
   fire: EveNotificationFire,
   character: EveNotificationTextCharacter
 ): { title: string; body: string } {
-  const typeName = i18n.t(eveTypeLabelKey(fire.type), {
-    defaultValue: humanizeEveType(fire.type),
-  });
+  const typeName = eveTypeLabel(i18n.t, fire.type);
   return {
     title: i18n.t(`${BASE}.title`),
     body: i18n.t(`${BASE}.body`, { character: character.name, typeName }),
