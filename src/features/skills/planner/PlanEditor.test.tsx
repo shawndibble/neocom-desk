@@ -119,6 +119,7 @@ function renderEditor(
           plan={plan}
           catalog={CATALOG}
           trainedSkills={NO_TRAINED}
+          trainedSkillsKnown
           attributes={ATTRIBUTES}
           implants={IMPLANTS}
           attributesResult={ATTRIBUTES_RESULT}
@@ -842,6 +843,7 @@ describe('PlanEditor prereq promotion', () => {
           plan={{ ...PLAN, entries: [{ skillTypeID: 40, targetLevel: 3 }] }}
           catalog={PREREQ_CATALOG}
           trainedSkills={NO_TRAINED}
+          trainedSkillsKnown
           attributes={ATTRIBUTES}
           implants={IMPLANTS}
           attributesResult={null}
@@ -1291,6 +1293,42 @@ describe('an attribute sheet nothing explains', () => {
     expect(screen.getByText(/totalling 160/i)).toBeInTheDocument();
     // No accelerator was recovered, so nothing is prefilled either.
     expect(screen.getByLabelText<HTMLInputElement>('Booster').checked).toBe(false);
+  });
+});
+
+describe('splitting a plan into one row per level', () => {
+  const MULTI_LEVEL = { ...PLAN, entries: [{ skillTypeID: 10, targetLevel: 3 }], markers: [1] };
+
+  it('splits an entry that trains several levels, carrying its marker along', async () => {
+    const { onUpdate } = renderEditor(vi.fn(), { plan: MULTI_LEVEL });
+
+    await waitFor(() =>
+      expect(onUpdate).toHaveBeenCalledWith({
+        entries: [
+          { skillTypeID: 10, targetLevel: 1 },
+          { skillTypeID: 10, targetLevel: 2 },
+          { skillTypeID: 10, targetLevel: 3 },
+        ],
+        // Was "before entry 1"; the same entry now sits at position 3.
+        markers: [3],
+      })
+    );
+  });
+
+  it("rewrites nothing until the character's trained levels are actually known", async () => {
+    // The empty map is also what stands in before /skills has been read at
+    // all — on a fresh device, offline with no cache, or with an expired
+    // token. Splitting against it cuts rows for levels the character already
+    // has, and those rows train nothing, so no later split can remove them:
+    // a correct plan would be rewritten into a permanently wrong one without
+    // the user touching anything.
+    const { onUpdate } = renderEditor(vi.fn(), {
+      plan: MULTI_LEVEL,
+      trainedSkillsKnown: false,
+    });
+
+    await waitFor(() => expect(screen.getByText('Your entries')).toBeInTheDocument());
+    expect(onUpdate).not.toHaveBeenCalled();
   });
 });
 

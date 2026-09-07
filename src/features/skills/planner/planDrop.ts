@@ -29,6 +29,7 @@
 import { arrayMove } from '@dnd-kit/sortable';
 import { normalizePlanWithBoundaries } from '@/engine/plan';
 import type { EngineSkill, PlanEntry, TrainedSkill } from '@/engine/types';
+import { entrySlices } from './entrySlices';
 import { buildRows, normalizeMarkers, rowsToState, type PlanRow } from './markers';
 import type { MergedRow } from './queueRows';
 import { entryId } from './reorder';
@@ -70,11 +71,21 @@ export type PlanDropResult =
     })
   | {
       ok: false;
-      /** The skill that cannot go there. */
+      /** The row that cannot go there, and the level it trains. */
       skillTypeID: number;
-      /** The entry that requires it, and so has to stay behind it. */
+      targetLevel: number;
+      /** The entry that would train that level first, and so has to stay behind it. */
       blockedBy: number;
+      blockedByLevel: number;
     };
+
+/** A row left with nothing to train, and the entry that took its levels. */
+interface GhostEntry {
+  skillTypeID: number;
+  targetLevel: number;
+  blockedBy: number;
+  blockedByLevel: number;
+}
 
 /** The entry row a prereq row was inserted for: the next entry row below it. */
 function owningEntryRowId(rows: readonly MergedRow[], prereqId: string): string | null {
@@ -95,11 +106,17 @@ function blockOwnerId(rows: readonly MergedRow[], id: string): string | null {
  * `buildRows` output with the prereq row's promoted entry spliced in where the
  * dimmed row already sat — just ahead of the entry it was pulled in for.
  *
- * Purely additive: entries are one per skill *level* (reorder.ts), and a
- * prereq row only renders for a level no entry covers, so the promoted row
- * can never duplicate an existing one and the skill's other levels keep their
- * own positions. It inherits its siblings' priority, since a band is resolved
- * per skill rather than per row.
+ * Entries are one per skill *level* (reorder.ts), so this adds the promoted
+ * level alone and the skill's other levels keep their own positions — where
+ * the per-skill rule used to raise an existing entry's target to cover it.
+ *
+ * The filter is what keeps `entryId` unique rather than the row list being
+ * additive by construction: a prereq row normally renders only for a level no
+ * entry covers, but a ghost entry (one an earlier entry already trained past)
+ * has its levels drawn as prereq rows while still holding that exact
+ * `entryId`. Promoting one of those moves the ghost here instead of minting a
+ * twin. It inherits its siblings' priority, since a band is resolved per
+ * skill rather than per row.
  */
 function withPromotedEntry(
   entries: readonly PlanEntry[],
@@ -164,11 +181,10 @@ function ghostEntries(
   entries: readonly PlanEntry[],
   skills: ReadonlyMap<number, EngineSkill>,
   trainedSkills: ReadonlyMap<number, TrainedSkill>
-): Map<string, { skillTypeID: number; blockedBy: number }> {
-  const ghosts = new Map<string, { skillTypeID: number; blockedBy: number }>();
-  // Boundaries are indexed over the catalog-known subset, exactly as
-  // computeQueue and summarizeEntryQueue index them.
-  const valid = entries.filter((e) => skills.has(e.skillTypeID));
+): Map<string, GhostEntry> {
+  const ghosts = new Map<string, GhostEntry>();
+  const isKnown = (skillTypeID: number) => skills.has(skillTypeID);
+  const valid = entries.filter((e) => isKnown(e.skillTypeID));
 
   let plan;
   try {
@@ -179,12 +195,9 @@ function ghostEntries(
     return ghosts;
   }
 
-  valid.forEach((entry, index) => {
-    const start = index === 0 ? 0 : plan.entryBoundaries[index - 1];
-    const end = plan.entryBoundaries[index];
-    for (let i = start; i < end; i++) {
-      if (plan.steps[i].skillTypeID === entry.skillTypeID) return;
-    }
+  entrySlices(entries, plan.entryBoundaries, plan.steps, isKnown).forEach((slice, index) => {
+    const entry = entries[index];
+    if (!isKnown(entry.skillTypeID) || slice.ownStart !== -1) return;
 
     const firstStep = plan.steps.findIndex((s) => s.skillTypeID === entry.skillTypeID);
     // No steps at all means the skill is already trained to this target — an
@@ -194,7 +207,9 @@ function ghostEntries(
     if (owner === -1) return;
     ghosts.set(entryId(entry), {
       skillTypeID: entry.skillTypeID,
+      targetLevel: entry.targetLevel,
       blockedBy: valid[owner].skillTypeID,
+      blockedByLevel: valid[owner].targetLevel,
     });
   });
   return ghosts;

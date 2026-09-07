@@ -129,13 +129,25 @@ describe('planDrop — a drop the normalizer would silently undo', () => {
     // rows: prereq 1-I, 1-II, 1-III, entry 2, entry 3
     const entries = [entry(2, 5), entry(3)];
     const result = drop(entries, undefined, prereqRowId(1, 1), entryId(entry(3)));
-    expect(result).toEqual({ ok: false, skillTypeID: 1, blockedBy: 2 });
+    expect(result).toEqual({
+      ok: false,
+      skillTypeID: 1,
+      targetLevel: 1,
+      blockedBy: 2,
+      blockedByLevel: 5,
+    });
   });
 
   it('rejects dragging an existing entry below its own dependent', () => {
     const entries = [entry(1, 3), entry(2, 5)];
     const result = drop(entries, undefined, entryId(entry(1, 3)), entryId(entry(2, 5)));
-    expect(result).toEqual({ ok: false, skillTypeID: 1, blockedBy: 2 });
+    expect(result).toEqual({
+      ok: false,
+      skillTypeID: 1,
+      targetLevel: 3,
+      blockedBy: 2,
+      blockedByLevel: 5,
+    });
   });
 
   it('allows a partial-cover move that still leaves the entry levels of its own', () => {
@@ -154,7 +166,15 @@ describe('planDrop — a drop the normalizer would silently undo', () => {
     // allowed this and left a zero-time row behind.
     const entries = [entry(1, 2), entry(1, 3)];
     const result = drop(entries, undefined, entryId(entry(1, 3)), entryId(entry(1, 2)));
-    expect(result).toEqual({ ok: false, skillTypeID: 1, blockedBy: 1 });
+    // Same skill on both sides — the editor says so in its own words rather
+    // than "Mass Production is a prerequisite of Mass Production".
+    expect(result).toEqual({
+      ok: false,
+      skillTypeID: 1,
+      targetLevel: 2,
+      blockedBy: 1,
+      blockedByLevel: 3,
+    });
   });
 
   it('leaves an already-trained entry alone rather than calling it blocked', () => {
@@ -166,6 +186,18 @@ describe('planDrop — a drop the normalizer would silently undo', () => {
 });
 
 describe('planDrop — ordinary entry and marker drags', () => {
+  it('drops another skill between two levels of one skill — the reason levels became rows', () => {
+    // The point of one row per level, in the user's own words: "if I want to
+    // move other skills between these two, I can". The guard that refuses a
+    // drop for stranding a sibling row must not refuse this one, which
+    // strands nothing — both levels still train.
+    const entries = [entry(1, 2), entry(1, 3), entry(3)];
+    const result = drop(entries, undefined, entryId(entry(3)), entryId(entry(1, 3)));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.entries).toEqual([entry(1, 2), entry(3), entry(1, 3)]);
+  });
+
   it('reorders two unrelated entries', () => {
     const entries = [entry(3), entry(1, 3)];
     const result = drop(entries, undefined, entryId(entry(1, 3)), entryId(entry(3)));

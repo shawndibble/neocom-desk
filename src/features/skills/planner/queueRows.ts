@@ -7,6 +7,7 @@
  * buildRows exactly, so bandStarts keeps working unmodified against those).
  */
 import type { PlanEntry, ScheduledStep } from '@/engine/types';
+import { entrySlices } from './entrySlices';
 import { buildRows, type PlanRow } from './markers';
 import { entryId } from './reorder';
 
@@ -60,46 +61,24 @@ export function summarizeEntryQueue(
   isKnown: (skillTypeID: number) => boolean
 ): Map<string, EntryQueueInfo> {
   const result = new Map<string, EntryQueueInfo>();
-  let prevBoundary = 0;
-  let boundaryIndex = 0;
-  const carriedCumulative = () =>
-    prevBoundary > 0 ? scheduled[prevBoundary - 1].cumulativeSeconds : 0;
+  const slices = entrySlices(entries, entryBoundaries, scheduled, isKnown);
 
-  for (const entry of entries) {
-    if (!isKnown(entry.skillTypeID)) {
-      result.set(entryId(entry), {
-        summary: {
-          seconds: 0,
-          cumulativeSeconds: carriedCumulative(),
-          steps: [],
-          stepIndices: [],
-        },
-        prereqRows: [],
-      });
-      continue;
-    }
-
-    const boundary = entryBoundaries[boundaryIndex++];
-    const range = scheduled.slice(prevBoundary, boundary);
-    const ownStart = range.findIndex((s) => s.skillTypeID === entry.skillTypeID);
-    const own = ownStart === -1 ? [] : range.slice(ownStart);
-    const prereq = ownStart === -1 ? range : range.slice(0, ownStart);
-    const seconds = own.reduce((sum, s) => sum + s.seconds, 0);
-    const cumulativeSeconds =
-      range.length > 0 ? range[range.length - 1].cumulativeSeconds : carriedCumulative();
-    const ownOffset = prevBoundary + (ownStart === -1 ? range.length : ownStart);
+  entries.forEach((entry, i) => {
+    const { start, ownStart, end } = slices[i];
+    const carried = start > 0 ? scheduled[start - 1].cumulativeSeconds : 0;
+    const own = ownStart === -1 ? [] : scheduled.slice(ownStart, end);
+    const prereq = scheduled.slice(start, ownStart === -1 ? end : ownStart);
 
     result.set(entryId(entry), {
       summary: {
-        seconds,
-        cumulativeSeconds,
-        steps: [...own],
-        stepIndices: own.map((_, i) => ownOffset + i),
+        seconds: own.reduce((sum, s) => sum + s.seconds, 0),
+        cumulativeSeconds: end > start ? scheduled[end - 1].cumulativeSeconds : carried,
+        steps: own,
+        stepIndices: own.map((_, offset) => (ownStart === -1 ? 0 : ownStart) + offset),
       },
-      prereqRows: prereq.map((step, i) => ({ step, stepIndex: prevBoundary + i })),
+      prereqRows: prereq.map((step, offset) => ({ step, stepIndex: start + offset })),
     });
-    prevBoundary = boundary;
-  }
+  });
   return result;
 }
 

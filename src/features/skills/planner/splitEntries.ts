@@ -10,6 +10,7 @@
  */
 import { normalizePlanWithBoundaries } from '@/engine/plan';
 import type { EngineSkill, PlanEntry, TrainedSkill } from '@/engine/types';
+import { entrySlices } from './entrySlices';
 
 export interface SplitPlan {
   entries: PlanEntry[];
@@ -34,30 +35,32 @@ function ownLevelsPerEntry(
   skills: ReadonlyMap<number, EngineSkill>,
   trainedSkills: ReadonlyMap<number, TrainedSkill>
 ): number[][] | null {
-  // Boundaries are indexed over the catalog-known subset, exactly as
-  // computeQueue, summarizeEntryQueue and planDrop index them.
-  const valid = entries.filter((e) => skills.has(e.skillTypeID));
+  const isKnown = (skillTypeID: number) => skills.has(skillTypeID);
   let plan;
   try {
-    plan = normalizePlanWithBoundaries(valid, skills, trainedSkills);
+    plan = normalizePlanWithBoundaries(
+      entries.filter((e) => isKnown(e.skillTypeID)),
+      skills,
+      trainedSkills
+    );
   } catch {
     // A circular or unknown-skill plan is already broken and already
     // reported by the editor. Splitting is a convenience, not a repair.
     return null;
   }
 
-  const byValidIndex = valid.map((entry, i) => {
-    const start = i === 0 ? 0 : plan.entryBoundaries[i - 1];
-    const end = plan.entryBoundaries[i];
-    const levels: number[] = [];
-    for (let s = start; s < end; s++) {
-      if (plan.steps[s].skillTypeID === entry.skillTypeID) levels.push(plan.steps[s].level);
+  return entrySlices(entries, plan.entryBoundaries, plan.steps, isKnown).map(
+    ({ ownStart, end }) => {
+      if (ownStart === -1) return [];
+      const levels: number[] = [];
+      for (let i = ownStart; i < end; i++) {
+        if (plan.steps[i].skillTypeID === plan.steps[ownStart].skillTypeID) {
+          levels.push(plan.steps[i].level);
+        }
+      }
+      return levels;
     }
-    return levels;
-  });
-
-  let validIndex = 0;
-  return entries.map((entry) => (skills.has(entry.skillTypeID) ? byValidIndex[validIndex++] : []));
+  );
 }
 
 /**
@@ -100,7 +103,16 @@ export function splitEntriesByLevel(
   if (split.length === entries.length) return unchanged;
   return {
     entries: split,
-    markers: markers?.map((m) => rowsBefore[Math.min(entries.length, Math.max(0, m))]),
+    // `Math.round` before indexing: `rowsBefore` is a dense array, so a
+    // fractional or NaN position (corrupt or externally-written data — the
+    // editor only ever writes integers) would read `undefined` and persist a
+    // hole in a `number[]`. `normalizeMarkers` clamps such values on every
+    // read and so tolerated them; writing one back does not, and Firestore
+    // rejects `undefined` inside an array outright.
+    markers: markers?.map((m) => {
+      const position = Number.isFinite(m) ? Math.round(m) : 0;
+      return rowsBefore[Math.min(entries.length, Math.max(0, position))];
+    }),
     changed: true,
   };
 }

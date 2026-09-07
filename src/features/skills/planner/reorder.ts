@@ -100,7 +100,10 @@ export function applyReorderSuggestion(
   const byLevel = new Map<string, number>();
   const bySkill = new Map<number, number>();
   suggestedSteps.forEach((step, index) => {
-    const key = `${step.skillTypeID}-${step.level}`;
+    // Through `entryId` rather than re-spelling its format: a step and the
+    // entry that trains it are the same (skill, level) pair, and two copies
+    // of that key would drift apart.
+    const key = entryId({ skillTypeID: step.skillTypeID, targetLevel: step.level });
     if (!byLevel.has(key)) byLevel.set(key, index);
     if (!bySkill.has(step.skillTypeID)) bySkill.set(step.skillTypeID, index);
   });

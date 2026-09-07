@@ -78,6 +78,14 @@ describe('splitEntriesByLevel', () => {
     expect(result.entries).toEqual([entry(999, 5)]);
   });
 
+  it('leaves a marker that is not a whole number as a usable position', () => {
+    // Corrupt or externally-written data only, but the result is persisted
+    // now rather than clamped on every read, and an `undefined` hole in a
+    // number[] fails the Firestore write for the whole plan.
+    const result = splitEntriesByLevel([entry(1, 3)], [Number.NaN, 1.5], SKILLS, NO_TRAINED);
+    expect(result.markers?.every((m) => Number.isInteger(m))).toBe(true);
+  });
+
   it('reports no change for an empty plan', () => {
     expect(splitEntriesByLevel([], undefined, SKILLS, NO_TRAINED).changed).toBe(false);
   });

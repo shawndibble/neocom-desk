@@ -78,9 +78,9 @@ export function parseSkillPlanXml(
 
     const existing = byTypeID.get(skill.typeID);
     if (!existing || entry.level > existing.targetLevel) {
-      // Omit the key entirely when absent — an explicit `priority: undefined`
-      // would later clobber an already-set priority when a caller merges
-      // this entry into an existing plan via object-spread (upsertEntry).
+      // Omit the key entirely when absent: an explicit `priority: undefined`
+      // reads as "no priority" to any later spread of this entry rather than
+      // leaving the field unset, and Firestore rejects the value outright.
       byTypeID.set(skill.typeID, {
         skillTypeID: skill.typeID,
         targetLevel: entry.level,

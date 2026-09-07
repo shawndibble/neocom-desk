@@ -144,6 +144,8 @@ interface PlanEditorProps {
   plan: SkillPlanRecord;
   catalog: SkillCatalog;
   trainedSkills: ReadonlyMap<number, TrainedSkill>;
+  /** See `PlanEditorData` — false until /skills has actually been read. */
+  trainedSkillsKnown: boolean;
   attributes: Attributes;
   implants: Implants;
   /**
@@ -244,6 +246,7 @@ export function PlanEditor({
   plan,
   catalog,
   trainedSkills,
+  trainedSkillsKnown,
   attributes,
   implants,
   attributesResult,
@@ -490,13 +493,15 @@ export function PlanEditor({
   // Markers to keep them in front of the same entries. Idempotent, so a plan
   // already split writes nothing and this never loops.
   //
-  // Load order is load-bearing: splitting against a half-loaded character
-  // would cut rows for levels they have already trained. It cannot happen —
-  // the route renders this editor only once `catalog` is set, and
-  // `usePlanEditorData` sets `catalog` and `trainedSkills` from a single
-  // awaited batch, so a non-empty catalog means the trained levels are in
-  // hand too.
+  // Gated on `trainedSkillsKnown`, never on the catalog: the catalog ships in
+  // the bundle and loads even when ESI has told us nothing, and splitting a
+  // plan against "no levels trained" cuts rows for levels the character
+  // already has. Those extra rows train nothing, so a later split cannot
+  // remove them — it would rewrite a correct plan into a permanently wrong
+  // one, on a fresh device or an expired token, without the user touching
+  // anything.
   useEffect(() => {
+    if (!trainedSkillsKnown) return;
     const split = splitEntriesByLevel(
       plan.entries,
       plan.markers,
@@ -505,7 +510,14 @@ export function PlanEditor({
     );
     if (!split.changed) return;
     onUpdate({ entries: split.entries, ...(split.markers ? { markers: split.markers } : {}) });
-  }, [plan.entries, plan.markers, catalog.engineSkills, trainedSkills, onUpdate]);
+  }, [
+    plan.entries,
+    plan.markers,
+    catalog.engineSkills,
+    trainedSkills,
+    trainedSkillsKnown,
+    onUpdate,
+  ]);
 
   // BUG #1: optimizeResult/reorderPreview index into `scheduled` by position.
   // Once entries change (add/remove/reorder) or the plan itself is swapped,
@@ -920,11 +932,21 @@ export function PlanEditor({
         trainedSkills,
       });
       if (!result.ok) {
+        // A skill is never its own prerequisite: when both sides are the same
+        // skill, what refused the drop is one of its own levels being trained
+        // first, and the cross-skill wording ("X is a prerequisite of X")
+        // reads as gibberish for the very gesture per-level rows exist for.
         setDropError(
-          t('plans.dropBlocked', {
-            skill: nameFor(result.skillTypeID),
-            blocker: nameFor(result.blockedBy),
-          })
+          result.skillTypeID === result.blockedBy
+            ? t('plans.dropBlockedSameSkill', {
+                skill: nameFor(result.skillTypeID),
+                level: ROMAN[result.targetLevel - 1],
+                blockerLevel: ROMAN[result.blockedByLevel - 1],
+              })
+            : t('plans.dropBlocked', {
+                skill: nameFor(result.skillTypeID),
+                blocker: nameFor(result.blockedBy),
+              })
         );
         return;
       }
@@ -1264,7 +1286,18 @@ export function PlanEditor({
                 marker precisely to find out. The Modal the button opens is
                 still the place to *accept* the spread. */}
             {markersVerdict && (
-              <p className="text-xs text-success">{confirmRemapOutcome(markersVerdict)}</p>
+              // Success green only when the markers actually save something.
+              // A standing line saying "no remap improves this plan" painted
+              // green would be a status color used decoratively (DESIGN.md
+              // §6) — tolerable for a two-second toast, not for something
+              // that never leaves the pane.
+              <p
+                className={
+                  markersVerdict.kind === 'saves' ? 'text-xs text-success' : 'text-xs text-text-dim'
+                }
+              >
+                {confirmRemapOutcome(markersVerdict)}
+              </p>
             )}
           </div>
         </div>
