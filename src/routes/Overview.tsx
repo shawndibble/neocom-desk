@@ -23,6 +23,7 @@ import { maxMarketOrders } from '@/engine/market/orderSlots';
 import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
 import { formatDuration } from '@/lib/duration';
 import { formatTimestamp } from '@/lib/timestamp';
+import { useTimeZone } from '@/lib/timeFormat';
 import { CharacterHeader } from '@/features/character/CharacterHeader';
 import { OverviewSubNav } from '@/features/character/OverviewSubNav';
 import { NotificationFeedPanel } from '@/features/notifications/NotificationFeedPanel';
@@ -155,6 +156,7 @@ function SummaryTile({
 
 export function Overview() {
   const { t } = useTranslation();
+  const timeZone = useTimeZone();
   // One `cacheKey` per panel, not one for the page: they load independently,
   // so a return visit should restore each as soon as that panel's own last
   // result exists.
@@ -344,7 +346,7 @@ export function Overview() {
                   {activeEntry?.finish_date && (
                     <span className="ml-2 text-xs text-text-dim">
                       {t('overview.finishes', {
-                        date: formatTimestamp(new Date(activeEntry.finish_date)),
+                        date: formatTimestamp(new Date(activeEntry.finish_date), timeZone),
                       })}{' '}
                       ·{' '}
                       {t('overview.timeLeft', {

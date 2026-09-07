@@ -28,6 +28,7 @@ import { IssuerLink } from './IssuerLink';
 import { typeIconUrl } from '@/lib/eveImages';
 import { formatIsk } from '@/lib/isk';
 import { formatTimestamp } from '@/lib/timestamp';
+import { useTimeZone } from '@/lib/timeFormat';
 import type { Contract, ContractItem } from '@/esi/endpoints';
 
 export interface ContractDetailModalProps {
@@ -56,6 +57,7 @@ export function ContractDetailModal({
   onClose,
 }: ContractDetailModalProps) {
   const { t } = useTranslation();
+  const timeZone = useTimeZone();
   const [location, setLocation] = useState<LocationState | undefined>(undefined);
   /** Stays `undefined` forever for a courier/loan contract — `HAS_ITEMS` gates both the fetch and the render, so it's never inspected there. */
   const [items, setItems] = useState<ItemsState | undefined>(undefined);
@@ -177,22 +179,22 @@ export function ContractDetailModal({
             )}
 
             <dt className="text-text-dim uppercase">{t('contracts.detailDateIssued')}</dt>
-            <dd>{formatTimestamp(new Date(contract.date_issued))}</dd>
+            <dd>{formatTimestamp(new Date(contract.date_issued), timeZone)}</dd>
 
             <dt className="text-text-dim uppercase">{t('contracts.detailDateExpired')}</dt>
-            <dd>{formatTimestamp(new Date(contract.date_expired))}</dd>
+            <dd>{formatTimestamp(new Date(contract.date_expired), timeZone)}</dd>
 
             {contract.date_accepted && (
               <>
                 <dt className="text-text-dim uppercase">{t('contracts.detailDateAccepted')}</dt>
-                <dd>{formatTimestamp(new Date(contract.date_accepted))}</dd>
+                <dd>{formatTimestamp(new Date(contract.date_accepted), timeZone)}</dd>
               </>
             )}
 
             {contract.date_completed && (
               <>
                 <dt className="text-text-dim uppercase">{t('contracts.detailDateCompleted')}</dt>
-                <dd>{formatTimestamp(new Date(contract.date_completed))}</dd>
+                <dd>{formatTimestamp(new Date(contract.date_completed), timeZone)}</dd>
               </>
             )}
 

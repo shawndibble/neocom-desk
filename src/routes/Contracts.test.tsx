@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, within, waitFor } from '@testing-library/react';
+import { act, render, screen, within, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
@@ -9,6 +9,8 @@ import { STALE_FETCHED_AT } from '@/esi/cacheFixtures';
 import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharacter';
 import { usePublicInfo } from '@/stores/publicInfo';
 import { usePublicInfoModalStore } from '@/stores/publicInfoModal';
+import { DEFAULT_TIME_FORMAT, TIME_FORMAT_SETTING_KEY, useTimeFormat } from '@/lib/timeFormat';
+import { formatTimestamp } from '@/lib/timestamp';
 import { App } from '@/app/App';
 
 vi.mock('virtual:pwa-register/react', () => ({
@@ -84,6 +86,10 @@ beforeEach(async () => {
   useActiveCharacter.setState({ activeCharacterId: null, hydrated: false });
   usePublicInfo.setState({ byCharacterId: {} });
   usePublicInfoModalStore.setState({ request: null });
+  // Module singleton, shared by every test in this file: without the reset a
+  // preference set by one test leaves the rest rendering UTC, and a leaked
+  // `hydrated: true` makes App's `hydrate()` early-return.
+  useTimeFormat.setState({ value: DEFAULT_TIME_FORMAT, hydrated: false });
 
   await db.characters.put({ characterId: CHAR_ID, name: 'Pilot One', ownerHash: 'oh', addedAt: 1 });
   await db.tokens.put({
@@ -267,5 +273,65 @@ describe('Contracts market/issuer links and filters (issue #417)', () => {
     await user.click(screen.getByRole('button', { name: 'Retry' }));
 
     await waitFor(() => expect(page2Requests).toBeGreaterThan(requestsBeforeRetry));
+  });
+});
+
+/**
+ * Vitest pins `TZ=UTC` (vite.config.ts), under which
+ * `formatTimestamp(d, 'UTC')` and `formatTimestamp(d)` are the same string —
+ * so a Contracts page that ignored the preference outright would still pass
+ * these. Both tests move the host zone off UTC for their duration, and the
+ * guard assertion in each states that premise out loud so this can never
+ * quietly go vacuous if the config's zone ever changes.
+ */
+describe('Time format preference', () => {
+  /** The instant is fixed; only its rendering depends on the zone below. */
+  const EXPIRES = new Date(contractPage1[0].date_expired);
+  const ORIGINAL_TZ = process.env.TZ;
+
+  beforeEach(() => {
+    process.env.TZ = 'America/New_York';
+  });
+  afterEach(() => {
+    process.env.TZ = ORIGINAL_TZ;
+  });
+
+  it('renders the Expires column in UTC when the stored preference is EVE time', async () => {
+    expect(formatTimestamp(EXPIRES, 'UTC')).not.toBe(formatTimestamp(EXPIRES));
+    await db.settings.put({ key: TIME_FORMAT_SETTING_KEY, value: 'eve' });
+
+    render(<App />);
+    await screen.findByText('Rifter fit');
+    const table = screen.getByRole('table', { name: 'Contracts' });
+
+    await waitFor(() =>
+      expect(within(table).getByText(formatTimestamp(EXPIRES, 'UTC'))).toBeInTheDocument()
+    );
+    expect(within(table).queryByText(formatTimestamp(EXPIRES))).not.toBeInTheDocument();
+  });
+
+  /**
+   * The column set is a `useMemo`. Mounting with the preference already set
+   * would pass even if `timeZone` were missing from its deps — the memo would
+   * simply have closed over the right zone once. Flipping it *after* mount is
+   * what actually proves the table re-renders instead of holding stale strings.
+   */
+  it('reformats an already-rendered table when the pilot switches to EVE time', async () => {
+    expect(formatTimestamp(EXPIRES, 'UTC')).not.toBe(formatTimestamp(EXPIRES));
+
+    render(<App />);
+    await screen.findByText('Rifter fit');
+    const table = screen.getByRole('table', { name: 'Contracts' });
+    expect(within(table).getByText(formatTimestamp(EXPIRES))).toBeInTheDocument();
+
+    // The store's own setter, exactly as a Settings control would call it —
+    // it takes the hydration generation, so App's in-flight `hydrate()`
+    // cannot land afterwards and undo the choice.
+    await act(async () => {
+      await useTimeFormat.getState().setValue('eve');
+    });
+
+    expect(within(table).getByText(formatTimestamp(EXPIRES, 'UTC'))).toBeInTheDocument();
+    expect(within(table).queryByText(formatTimestamp(EXPIRES))).not.toBeInTheDocument();
   });
 });

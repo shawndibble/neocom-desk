@@ -25,6 +25,7 @@ import { Button, EmptyState, IconButton, Panel, buttonClassName } from '@/compon
 import { Close } from '@/components/ui/icons';
 import { formatAge } from '@/lib/age';
 import { formatTimestamp } from '@/lib/timestamp';
+import { useTimeZone } from '@/lib/timeFormat';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { readFeed, dismissFeedEntries, type NotificationFeedEntry } from './feed';
 import { refreshAppBadge } from './appBadge';
@@ -232,11 +233,14 @@ function FiredSpan({ fires }: { fires: readonly NotificationFeedEntry[] }) {
  */
 function FiredAt({ firedAt }: { firedAt: number }) {
   const { t } = useTranslation();
+  // Subscribed here rather than in the panel: this is the component that
+  // renders the stamp, and it is the one that has to re-render on a change.
+  const timeZone = useTimeZone();
   const date = new Date(firedAt);
   return (
     <time
       dateTime={date.toISOString()}
-      title={formatTimestamp(date)}
+      title={formatTimestamp(date, timeZone)}
       className="shrink-0 pt-0.5 text-[0.6875rem] tabular-nums text-text-dim"
     >
       {/* eslint-disable-next-line react-hooks/purity -- relative age reads the wall clock; it only affects this label */}

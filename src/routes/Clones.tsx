@@ -29,6 +29,7 @@ import type { CharacterClones, JumpClone } from '@/esi/endpoints';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { formatDuration } from '@/lib/duration';
 import { formatTimestamp } from '@/lib/timestamp';
+import { useTimeZone } from '@/lib/timeFormat';
 import { cloneJumpCooldown, INFOMORPH_SYNCHRONIZING_SKILL_ID } from '@/engine/cloneJump';
 
 /** Stable identity, so the fallback doesn't invalidate the column memo every render. */
@@ -117,6 +118,7 @@ async function loadClonesSnapshot(
 /** Clones: jump clones, their locations and implants, plus the current jump cooldown. */
 export function Clones() {
   const { t } = useTranslation();
+  const timeZone = useTimeZone();
   const { data, error, loading, hydrated, activeCharacterId, refresh } = useRouteSnapshot(
     loadClonesSnapshot,
     undefined,
@@ -256,7 +258,7 @@ export function Clones() {
               {lastStationChangeDate && (
                 <span className="text-text-dim">
                   {t('clones.lastStationChange', {
-                    date: formatTimestamp(new Date(lastStationChangeDate)),
+                    date: formatTimestamp(new Date(lastStationChangeDate), timeZone),
                   })}
                 </span>
               )}
@@ -266,7 +268,7 @@ export function Clones() {
                 value={
                   cooldown.onCooldown && cooldown.readyAt
                     ? t('clones.cooldownOnCooldownValue', {
-                        date: formatTimestamp(cooldown.readyAt),
+                        date: formatTimestamp(cooldown.readyAt, timeZone),
                         duration: formatDuration((cooldown.readyAt.getTime() - loadedAt) / 1000),
                       })
                     : t('clones.cooldownReadyValue')

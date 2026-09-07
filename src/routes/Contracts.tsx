@@ -36,6 +36,7 @@ import { resolveNames } from '@/features/character/names';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { formatIsk } from '@/lib/isk';
 import { formatTimestamp } from '@/lib/timestamp';
+import { useTimeZone } from '@/lib/timeFormat';
 import { downloadCsv } from '@/lib/downloadCsv';
 import { contractsCsvColumns } from '@/features/character/contractsCsv';
 import type { Contract } from '@/esi/endpoints';
@@ -165,6 +166,7 @@ function ContractsFilterBar({
 /** Contracts: table with status chips, stale offers dimmed, detail on click. Read-only, cached for offline. */
 export function Contracts() {
   const { t } = useTranslation();
+  const timeZone = useTimeZone();
   const { data, error, loading, hydrated, activeCharacterId, refresh } = useRouteSnapshot(
     loadContractsSnapshot,
     undefined,
@@ -243,10 +245,10 @@ export function Contracts() {
         header: t('contracts.expires'),
         className: 'whitespace-nowrap text-text-dim',
         sortValue: (contract) => new Date(contract.date_expired).getTime(),
-        render: (contract) => formatTimestamp(new Date(contract.date_expired)),
+        render: (contract) => formatTimestamp(new Date(contract.date_expired), timeZone),
       },
     ],
-    [t, issuerNames]
+    [t, issuerNames, timeZone]
   );
 
   const contracts = useMemo(
