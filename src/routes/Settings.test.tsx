@@ -615,6 +615,40 @@ describe('Settings — Notifications (issue #170)', () => {
     expect(screen.queryByText('CorpAllBillMsg')).not.toBeInTheDocument();
   });
 
+  /**
+   * The absence half is the point. A badge that says "arrives with the app
+   * closed" is a promise, and the only events that can keep it are the ones
+   * the backend can schedule ahead (`PROJECTABLE_EVENT_IDS`). `eveNotification`
+   * is on that engine list for its reinforcement-exit sub-case alone, so a
+   * badge on that row would make the promise for 25 types that cannot keep it
+   * — which is what breaks if someone later drops the filter.
+   */
+  it('marks only the events that really arrive with the app closed', async () => {
+    render(<App />);
+    const panel = within(await notificationsPanel());
+
+    const badgeName = /arrives even with the app closed/i;
+    // The label and its badge are siblings inside one wrapper span, so the
+    // label's parent is exactly the scope to ask about.
+    await panel.findByText('Skill Level Complete');
+    const rowFor = (name: string) => within(panel.getByText(name).parentElement!);
+
+    // Scheduled Push: a knowable future instant the backend can fire on.
+    expect(
+      rowFor('Skill Level Complete').getByRole('img', { name: badgeName })
+    ).toBeInTheDocument();
+    expect(
+      rowFor('Planetary Extractor Expiring').getByRole('img', { name: badgeName })
+    ).toBeInTheDocument();
+    expect(rowFor('Structure Fuel Low').getByRole('img', { name: badgeName })).toBeInTheDocument();
+
+    // Poll-only: nothing knows when these happen until they have happened.
+    expect(rowFor('New Mail').queryByRole('img', { name: badgeName })).toBeNull();
+    expect(rowFor('Contract Accepted').queryByRole('img', { name: badgeName })).toBeNull();
+    expect(rowFor('Member Joined').queryByRole('img', { name: badgeName })).toBeNull();
+    expect(rowFor('EVE Notifications').queryByRole('img', { name: badgeName })).toBeNull();
+  });
+
   it('labels the two delivery columns with what each one does', async () => {
     render(<App />);
     const panel = within(await notificationsPanel());

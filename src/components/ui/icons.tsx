@@ -15,6 +15,7 @@
  */
 
 import {
+  Broadcast,
   ArrowClockwise,
   ArrowCounterClockwise,
   ArrowDown,
@@ -187,6 +188,14 @@ export const Reaction = withWeight(Flask);
 export const AddToPlan = withWeight(Plus);
 /** A row's browser-notification channel is currently on (issue #364). */
 export const BrowserNotifyOn = withWeight(Bell);
+
+/**
+ * Marks a Notification Event the backend can schedule ahead of time, so it
+ * arrives with the app closed. Deliberately not another bell: the Bell family
+ * above already means "the browser-notification channel", and this is a
+ * property of the event, not of a channel.
+ */
+export const ScheduledPush = withWeight(Broadcast);
 /** A row's browser-notification channel is currently off (issue #364). */
 export const BrowserNotifyOff = withWeight(BellSlash);
 /** Hide a Notification Feed row's type from the feed (issue #364) — one-way from here, reversible in Settings. */
