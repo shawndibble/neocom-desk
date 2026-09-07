@@ -23,7 +23,19 @@ import { ENDPOINT_ROUTES } from '@/esi/endpointRoutes';
 import { useActivityLog, type ActivityLogEntry } from '@/stores/activityLog';
 import type { ActivityOutcome } from '@/esi/activityLog';
 
-type SettingsTab = 'general' | 'dataAge' | 'activity';
+type SettingsTab = 'general' | 'notifications' | 'dataAge' | 'activity';
+
+/**
+ * Which tab a deep link's hash asks for. The Overview feed links to
+ * `/settings#notifications`, which used to resolve by scrolling within the
+ * default General tab; Notifications is now a tab of its own, so a hash that
+ * names a section on a *different* tab has to select that tab or the link
+ * lands on a page with no sign of what it came for.
+ */
+const TAB_FOR_HASH: Readonly<Record<string, SettingsTab>> = {
+  notifications: 'notifications',
+  'corp-access': 'general',
+};
 
 const FONT_SCALE_LABEL_KEYS = {
   0.875: 'settings.fontScaleSmall',
@@ -250,16 +262,32 @@ export function Settings() {
   const scale = useFontScale((state) => state.value);
   const setScale = useFontScale((state) => state.setValue);
   const { hash } = useLocation();
-  const [tab, setTab] = useState<SettingsTab>('general');
+  // Resolved in the initializer, not an effect, so the first paint is already
+  // the tab the link asked for — an effect would render General first and swap
+  // it out underneath the reader.
+  const [tab, setTab] = useState<SettingsTab>(() => TAB_FOR_HASH[hash.slice(1)] ?? 'general');
+
+  // A *later* hash change (a second click on the same link from elsewhere in
+  // the app) has to move the tab too. Adjusted during render rather than in an
+  // effect, the same pattern `NotificationsPanel`'s threshold field uses:
+  // this is deriving state from a prop, not synchronizing with an external
+  // system, and an effect would render the wrong tab first.
+  const [prevHash, setPrevHash] = useState(hash);
+  if (hash !== prevHash) {
+    setPrevHash(hash);
+    const targetTab = TAB_FOR_HASH[hash.slice(1)];
+    if (targetTab !== undefined) setTab(targetTab);
+  }
 
   // react-router does not act on a URL hash by itself, so a deep link from
-  // elsewhere in the app (the Overview feed's "Settings" link) would land at
-  // the top of a long page with no sign of what it came for. Both anchors
-  // this targets live in the General tab, which is already the default.
+  // elsewhere in the app would land at the top of a long page with no sign of
+  // what it came for. Selecting the tab above is the whole answer for a
+  // section that *is* a tab; an anchor within one still needs scrolling to,
+  // which is a DOM call and so genuinely belongs in an effect.
   useEffect(() => {
     if (!hash) return;
     document.getElementById(hash.slice(1))?.scrollIntoView({ block: 'start' });
-  }, [hash]);
+  }, [hash, tab]);
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
@@ -270,6 +298,7 @@ export function Settings() {
         onChange={(id) => setTab(id as SettingsTab)}
         tabs={[
           { id: 'general', label: t('settings.tabs.general') },
+          { id: 'notifications', label: t('settings.tabs.notifications') },
           { id: 'dataAge', label: t('settings.tabs.dataAge') },
           { id: 'activity', label: t('settings.tabs.activity') },
         ]}
@@ -315,13 +344,6 @@ export function Settings() {
             </dl>
           </Panel>
           {/*
-            Anchor for the Overview feed's "Settings" link. Scrolled to by the
-            effect above — react-router does not act on a hash by itself.
-          */}
-          <div id="notifications" className="scroll-mt-4">
-            <NotificationsPanel />
-          </div>
-          {/*
             Anchor for anything that needs to send a Character here to grant corp
             access — with corp UI hidden rather than locked, this row is the only
             way in for a Character that dismissed the one-time prompt.
@@ -330,6 +352,16 @@ export function Settings() {
             <CorpAccessPanel />
           </div>
           <DataPanel />
+        </div>
+      )}
+      {/*
+        The Overview feed's "Settings" link targets `#notifications`, which
+        `TAB_FOR_HASH` turns into this tab. The id stays on the wrapper so the
+        scroll in the effect above still has something to find.
+      */}
+      {tab === 'notifications' && (
+        <div id="notifications" className="scroll-mt-4">
+          <NotificationsPanel />
         </div>
       )}
       {tab === 'dataAge' && <DataAgePanel />}

@@ -1837,6 +1837,34 @@
       "browserOff": "Turn on browser notifications",
       "hideInFeed": "Hide in feed"
     },
+    "eveTypeName": {
+      "StructureUnderAttack": "Structure Under Attack",
+      "StructureLostShields": "Structure Lost Shields",
+      "StructureLostArmor": "Structure Lost Armor",
+      "StructureFuelAlert": "Structure Low on Fuel",
+      "StructureWentLowPower": "Structure Went Low Power",
+      "StructureWentHighPower": "Structure Went High Power",
+      "StructureServicesOffline": "Structure Services Offline",
+      "StructureImpendingAbandonmentAssetsAtRisk": "Assets at Risk of Abandonment",
+      "StructureDestroyed": "Structure Destroyed",
+      "StructuresJobsPaused": "Industry Jobs Paused",
+      "StructuresJobsCancelled": "Industry Jobs Cancelled",
+      "StructureLowReagentsAlert": "Structure Low on Reagents",
+      "StructureNoReagentsAlert": "Structure Out of Reagents",
+      "MoonminingExtractionFinished": "Moon Extraction Ready",
+      "MoonminingAutomaticFracture": "Moon Chunk Fractured",
+      "CorpAllBillMsg": "Corporation Bill Issued",
+      "BillOutOfMoneyMsg": "Bill Could Not Be Paid",
+      "CorpOfficeExpirationMsg": "Corporation Office Expiring",
+      "InfrastructureHubBillAboutToExpire": "Infrastructure Hub Bill Expiring",
+      "WarDeclared": "War Declared",
+      "AllWarDeclaredMsg": "War Declared on Your Alliance",
+      "CorpBecameWarEligible": "Corporation Became War Eligible",
+      "CorpAppNewMsg": "New Corporation Application",
+      "CorpKicked": "Corporation Kicked From Alliance",
+      "OrbitalAttacked": "Customs Office Attacked",
+      "OrbitalReinforced": "Customs Office Reinforced"
+    },
     "fired": {
       "pushFallback": {
         "title": "Neocom Desk",
@@ -1887,7 +1915,7 @@
       },
       "eveNotification": {
         "title": "EVE notification",
-        "body": "{{character}} received a new EVE notification ({{type}}).",
+        "body": "{{character}} received a new EVE notification: {{typeName}}.",
         "structureById": "structure #{{id}}",
         "entityById": "#{{id}}",
         "planetById": "planet #{{id}}",
@@ -2294,7 +2322,7 @@
       "statSellsOutCaption_other": "{{count}} a day",
       "statVolumeLeft": "Volume left",
       "statOrderExpires": "Order expires",
-      "statExpiresCaption": "{{date}} \u00b7 listed {{listed}}",
+      "statExpiresCaption": "{{date}} · listed {{listed}}",
       "statIfSellsAsListed": "If it sells as listed",
       "statPerUnitAfterFees": "a unit, after fees",
       "exitsTitle": "Is there a better exit?",
@@ -2369,6 +2397,7 @@
     "title": "Settings",
     "tabs": {
       "general": "General",
+      "notifications": "Notifications",
       "dataAge": "Data Age",
       "activity": "Activity Log"
     },
@@ -2381,7 +2410,7 @@
     "fontScaleExtraLarge": "Extra large",
     "notificationsTitle": "Notifications",
     "notifications": {
-      "hint": "Choose how you'd like to be told, and what about, per character. App sends a browser notification; List adds it to the Overview page. Stays on this device.",
+      "hint": "Pick what each character is told about, and how. Browser raises a pop-up from your operating system; Overview adds a row to the Overview page inside the app. These choices stay on this device.",
       "blockedNotice": "Notifications are blocked — enable them in your browser's site settings, then return here.",
       "installRequiredNotice": "On iPhone and iPad, notifications only work once Neocom is installed to your home screen — Safari's Share menu, then \"Add to Home Screen.\" Open it from there and come back to turn them on.",
       "enableHint": "This device hasn't granted notification permission yet.",
@@ -2426,8 +2455,8 @@
       "feedChannelLabel": "Overview notifications",
       "feedChannelHint": "A dismissible list on the Overview page. Works on every device.",
       "column": {
-        "browser": "App",
-        "feed": "List"
+        "browser": "Browser",
+        "feed": "Overview"
       },
       "selectAll": {
         "browser": "Toggle all browser notifications for {{character}}",
@@ -2438,7 +2467,7 @@
         "feed": "{{event}}, Overview list"
       },
       "columnEvent": "Event",
-      "eveTypesHint": "This curated set of notifications, grouped by family below, defaults to the Overview list only, except the three structure-under-attack alerts, which also default to a browser notification — flip any type up or down per channel.",
+      "eveTypesHint": "EVE’s own in-game notifications, grouped by family. These default to the Overview page only, except the three structure-under-attack alerts, which also raise a browser pop-up — flip any of them per column.",
       "family": {
         "structures": "Structures",
         "war": "War",
@@ -2450,6 +2479,10 @@
       "selectAllFamily": {
         "browser": "Toggle all browser notifications for {{family}}",
         "feed": "Toggle all Overview notifications for {{family}}"
+      },
+      "columnHint": {
+        "browser": "Browser: a pop-up from your operating system, outside the app.",
+        "feed": "Overview: a row on the Overview page, inside the app."
       }
     },
     "dataTitle": "Data",
