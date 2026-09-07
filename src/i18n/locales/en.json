@@ -1490,7 +1490,9 @@
     "networkGreedy": "Allocated best-paying first — not provably optimal.",
     "networkAssumesRemoval": "Assumes the unfed factories below come out first; this spends the budget they free up.",
     "networkNothing": "Nothing yet: no two of these colonies make a pair of inputs that combine.",
-    "networkBlocked": "{{name}} — {{reason}}",
+    "networkBlockedCount_one": "{{count}} product",
+    "networkBlockedCount_other": "{{count}} products",
+    "networkBlockedSuffix": "— {{reason}}",
     "networkBlockedReason": {
       "no-host-budget": "no colony here has the CPU/Powergrid for a factory",
       "needs-price": "the hub quotes no price for it",

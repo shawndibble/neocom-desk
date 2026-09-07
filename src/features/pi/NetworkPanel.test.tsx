@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import '@/i18n';
 import type { NetworkPlan, NetworkOpportunity, NetworkBlocker } from '@/engine/pi/network';
 import { DEFAULT_TRADE_HUB } from '@/market/hubs';
@@ -100,7 +100,7 @@ describe('NetworkPanel', () => {
     expect(screen.getByText(/this system’s 6% customs rate/)).toBeInTheDocument();
   });
 
-  it('groups blocked products by reason into one line instead of one bullet each', () => {
+  it('groups blocked products by reason into a count, not one bullet each', () => {
     render(
       <NetworkPanel
         hub={DEFAULT_TRADE_HUB}
@@ -114,12 +114,12 @@ describe('NetworkPanel', () => {
         taxRate={0.06}
       />
     );
-    expect(
-      screen.getByText('Oxides, Coolant — the customs office takes more than it earns')
-    ).toBeInTheDocument();
+    expect(screen.getByText('— the customs office takes more than it earns')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '2 products' })).toBeInTheDocument();
+    expect(screen.queryByText('Oxides')).not.toBeInTheDocument();
   });
 
-  it('collapses a long reason group to a handful of names plus a count', () => {
+  it('names every blocked product in the count’s tooltip, however many there are', () => {
     const names = ['A', 'B', 'C', 'D', 'E', 'F', 'G'];
     render(
       <NetworkPanel
@@ -134,7 +134,8 @@ describe('NetworkPanel', () => {
         taxRate={0.06}
       />
     );
-    expect(screen.getByText(/A, B, C, D, E \+2 more/)).toBeInTheDocument();
-    expect(screen.queryByText(/, F/)).not.toBeInTheDocument();
+    const trigger = screen.getByRole('button', { name: '7 products' });
+    fireEvent.focus(trigger);
+    expect(screen.getByRole('tooltip')).toHaveTextContent('A, B, C, D, E, F, G');
   });
 });
