@@ -93,9 +93,13 @@ function blockOwnerId(rows: readonly MergedRow[], id: string): string | null {
 
 /**
  * `buildRows` output with the prereq row's promoted entry spliced in where the
- * dimmed row already sat — just ahead of the entry it was pulled in for. Any
- * pre-existing entry for that skill is moved rather than duplicated (one entry
- * per skill; see reorder.ts), keeping the higher of the two target levels.
+ * dimmed row already sat — just ahead of the entry it was pulled in for.
+ *
+ * Purely additive: entries are one per skill *level* (reorder.ts), and a
+ * prereq row only renders for a level no entry covers, so the promoted row
+ * can never duplicate an existing one and the skill's other levels keep their
+ * own positions. It inherits its siblings' priority, since a band is resolved
+ * per skill rather than per row.
  */
 function withPromotedEntry(
   entries: readonly PlanEntry[],
@@ -108,10 +112,12 @@ function withPromotedEntry(
   const ownerId = owningEntryRowId(rows, rowId);
   if (ownerId === null) return null;
 
-  const existing = entries.find((e) => e.skillTypeID === prereq.skillTypeID);
-  const promoted: PlanEntry = existing
-    ? { ...existing, targetLevel: Math.max(existing.targetLevel, prereq.level) }
-    : { skillTypeID: prereq.skillTypeID, targetLevel: prereq.level };
+  const sibling = entries.find((e) => e.skillTypeID === prereq.skillTypeID);
+  const promoted: PlanEntry = {
+    skillTypeID: prereq.skillTypeID,
+    targetLevel: prereq.level,
+    ...(sibling?.priority ? { priority: sibling.priority } : {}),
+  };
 
   const planRows = buildRows(entries, markers).filter((r) => r.id !== entryId(promoted));
   const index = planRows.findIndex((r) => r.id === ownerId);
@@ -142,22 +148,27 @@ export function promotePrereq({
 }
 
 /**
- * The entry that leaves `skillTypeID` with no levels of its own to train, or
- * null if this order is fine. An empty own-range means the schedule already
- * trained the skill for an earlier entry, so the row would render as a
- * zero-time ghost while the plan ignored where the user put it.
+ * Every entry left with no level of its own to train, keyed by `entryId`. An
+ * empty own-range means the schedule already trained that level for an
+ * earlier entry, so the row would render as a zero-time ghost while the plan
+ * ignored where the user put it.
+ *
+ * All entries, not just the dragged one: with one entry per skill level,
+ * dropping "Mass Production V" above "Mass Production IV" leaves *V* with
+ * both levels to train and strands *IV* — the dragged row looks fine and its
+ * sibling is the ghost. The caller compares this before and after the drop so
+ * only a newly-created ghost refuses it; a plan that already contained one
+ * keeps dragging normally.
  */
-function ghostBlocker(
+function ghostEntries(
   entries: readonly PlanEntry[],
-  skillTypeID: number,
   skills: ReadonlyMap<number, EngineSkill>,
   trainedSkills: ReadonlyMap<number, TrainedSkill>
-): number | null {
+): Map<string, { skillTypeID: number; blockedBy: number }> {
+  const ghosts = new Map<string, { skillTypeID: number; blockedBy: number }>();
   // Boundaries are indexed over the catalog-known subset, exactly as
   // computeQueue and summarizeEntryQueue index them.
   const valid = entries.filter((e) => skills.has(e.skillTypeID));
-  const index = valid.findIndex((e) => e.skillTypeID === skillTypeID);
-  if (index === -1) return null;
 
   let plan;
   try {
@@ -165,20 +176,28 @@ function ghostBlocker(
   } catch {
     // A circular or unknown-skill plan is already broken and already
     // reported by the editor; don't blame this drop for it.
-    return null;
-  }
-  const start = index === 0 ? 0 : plan.entryBoundaries[index - 1];
-  const end = plan.entryBoundaries[index];
-  for (let i = start; i < end; i++) {
-    if (plan.steps[i].skillTypeID === skillTypeID) return null;
+    return ghosts;
   }
 
-  const firstStep = plan.steps.findIndex((s) => s.skillTypeID === skillTypeID);
-  // No steps at all means the skill is already trained to this target — an
-  // empty row wherever it sits, not an ordering problem this drop created.
-  if (firstStep === -1) return null;
-  const owner = plan.entryBoundaries.findIndex((boundary) => boundary > firstStep);
-  return owner === -1 ? null : valid[owner].skillTypeID;
+  valid.forEach((entry, index) => {
+    const start = index === 0 ? 0 : plan.entryBoundaries[index - 1];
+    const end = plan.entryBoundaries[index];
+    for (let i = start; i < end; i++) {
+      if (plan.steps[i].skillTypeID === entry.skillTypeID) return;
+    }
+
+    const firstStep = plan.steps.findIndex((s) => s.skillTypeID === entry.skillTypeID);
+    // No steps at all means the skill is already trained to this target — an
+    // empty row wherever it sits, not an ordering problem a drop created.
+    if (firstStep === -1) return;
+    const owner = plan.entryBoundaries.findIndex((boundary) => boundary > firstStep);
+    if (owner === -1) return;
+    ghosts.set(entryId(entry), {
+      skillTypeID: entry.skillTypeID,
+      blockedBy: valid[owner].skillTypeID,
+    });
+  });
+  return ghosts;
 }
 
 /**
@@ -249,11 +268,13 @@ export function planDrop({
   );
 
   // Markers carry no prerequisites, so they can go anywhere.
-  const dragged =
-    promoted?.skillTypeID ?? next.entries.find((e) => entryId(e) === activeId)?.skillTypeID;
-  if (dragged === undefined) return { ok: true, ...next, promoted };
+  if (!promoted && !next.entries.some((e) => entryId(e) === activeId)) {
+    return { ok: true, ...next, promoted };
+  }
 
-  const blockedBy = ghostBlocker(next.entries, dragged, skills, trainedSkills);
-  if (blockedBy !== null) return { ok: false, skillTypeID: dragged, blockedBy };
+  const before = ghostEntries(entries, skills, trainedSkills);
+  for (const [id, ghost] of ghostEntries(next.entries, skills, trainedSkills)) {
+    if (!before.has(id)) return { ok: false, ...ghost };
+  }
   return { ok: true, ...next, promoted };
 }

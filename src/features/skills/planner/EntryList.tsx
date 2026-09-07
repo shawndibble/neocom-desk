@@ -1,4 +1,4 @@
-import { Fragment, memo, useCallback, useEffect, useState } from 'react';
+import { Fragment, memo, useEffect, useState } from 'react';
 import {
   DndContext,
   KeyboardSensor,
@@ -18,7 +18,6 @@ import { CSS } from '@dnd-kit/utilities';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
-  Caret,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -27,7 +26,7 @@ import {
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { PRIORITY_ORDER } from '@/engine/planPriority';
-import type { AttributeName, Attributes, PlanPriority, ScheduledStep } from '@/engine/types';
+import type { AttributeName, Attributes, PlanPriority } from '@/engine/types';
 import { formatDuration, stepFinish } from '@/lib/duration';
 import { formatLocalDate } from '@/lib/localDate';
 import type { AttributePair } from './attributePairBands';
@@ -251,78 +250,6 @@ function BoosterMark() {
   );
 }
 
-interface LevelBreakdownProps {
-  /** The entry's own steps, one per level the plan trains (`steps[i]` at `stepIndices[i]`). */
-  steps: readonly ScheduledStep[];
-  stepIndices: readonly number[];
-  name: string;
-  columns: ColumnVisibility;
-  isDesktop: boolean;
-  boostedSteps: ReadonlySet<number> | undefined;
-  /** When training begins, so each level can show the date it finishes on. */
-  startDate: Date | undefined;
-}
-
-/**
- * The levels behind a single entry row (#254), revealed by its caret. A "Carrier
- * V" entry queues I–V as five scheduled steps but shows one aggregated time,
- * which read as the missing levels the user reported; this is where those
- * levels and their individual times live.
- *
- * The per-level duration is always shown — it is the whole content of the
- * disclosure, and unlike the row above it, it is opened on request rather than
- * always on screen, so `columns.perLevelTime` doesn't gate it. The finish date
- * follows the row above: its own column under the desktop header, and a
- * labelled inline value below `md`, where a fixed 6rem column would not fit.
- * `ACTION_SPACER` trails the line to clear the row's remove button and keep the
- * numbers in their column.
- */
-function LevelBreakdown({
-  steps,
-  stepIndices,
-  name,
-  columns,
-  isDesktop,
-  boostedSteps,
-  startDate,
-}: LevelBreakdownProps) {
-  const { t } = useTranslation();
-  return (
-    <ul
-      aria-label={t('plans.levelBreakdown', { name })}
-      className="mt-1 border-t border-line pt-1 pl-6 text-[0.6875rem] text-text-dim"
-    >
-      {steps.map((step, i) => (
-        <li key={step.level} className="flex items-center justify-between gap-2 py-0.5">
-          <span className="flex-1 truncate" aria-label={t('plans.level', { level: step.level })}>
-            {ROMAN[step.level - 1]}
-            {(boostedSteps?.has(stepIndices[i]) ?? false) && <BoosterMark />}
-          </span>
-          {isDesktop ? (
-            <>
-              <TimeCell value={formatDuration(step.seconds)} />
-              {columns.cumulativeTime && (
-                <TimeCell value={doneByText(step.cumulativeSeconds, startDate)} />
-              )}
-            </>
-          ) : (
-            <>
-              <TimeCell value={formatDuration(step.seconds)} fixedWidth={false} />
-              {columns.cumulativeTime && (
-                <MetaValue
-                  label={t('plans.columnDoneBy')}
-                  value={doneByText(step.cumulativeSeconds, startDate)}
-                />
-              )}
-            </>
-          )}
-          <span aria-hidden="true" className={ACTION_SPACER} />
-        </li>
-      ))}
-    </ul>
-  );
-}
-
 interface EntryRowProps {
   row: Extract<MergedRow, { kind: 'entry' }>;
   name: string;
@@ -333,10 +260,7 @@ interface EntryRowProps {
   startDate: Date | undefined;
   columns: ColumnVisibility;
   isDesktop: boolean;
-  /** Whether this row's level breakdown is open. Owned by EntryList so a row can be re-rendered/reordered without losing it. */
-  expanded: boolean;
-  onToggleLevels: (rowId: string) => void;
-  onRemove: (skillTypeID: number) => void;
+  onRemove: (skillTypeID: number, targetLevel: number) => void;
   onSetPriority: (skillTypeID: number, priority: PlanPriority) => void;
 }
 
@@ -357,72 +281,41 @@ const EntryRow = memo(function EntryRow({
   startDate,
   columns,
   isDesktop,
-  expanded,
-  onToggleLevels,
   onRemove,
   onSetPriority,
 }: EntryRowProps) {
   const { t } = useTranslation();
   const { setNodeRef, style, handleProps, isDragging } = useRowSortable(row.id);
-  const { entry, steps, stepIndices } = row;
+  const { entry, stepIndices } = row;
   const boosted = stepIndices.some((i) => boostedSteps?.has(i) ?? false);
+  // Names the level, not just the skill: a plan holds one row per level, so
+  // two rows of the same skill would otherwise offer two buttons with the
+  // identical accessible name "Remove Gunnery".
+  const rowLabel = `${name} ${ROMAN[entry.targetLevel - 1]}`;
 
   const dragHandle = (
     <button
       type="button"
       {...handleProps}
-      aria-label={t('plans.reorderEntry', { name })}
+      aria-label={t('plans.reorderEntry', { name: rowLabel })}
       className="cursor-grab touch-none px-1 text-text-faint hover:text-text focus-visible:outline-2 focus-visible:outline-accent"
     >
       ⠿
     </button>
   );
 
-  /**
-   * The levels this entry actually trains, taken from its scheduled steps
-   * rather than `targetLevel` — a "Carrier V" entry on a level-III character
-   * queues IV and V, and labelling it "I–V" would be a lie. Only a row with
-   * more than one level has anything to disclose, so only that row gets a
-   * caret; one level (or none, for an already-trained or unknown skill) reads
-   * exactly as it did before.
-   */
-  const expandable = steps.length > 1;
-  const levelLabel = expandable
-    ? t('plans.levelRange', {
-        from: ROMAN[steps[0].level - 1],
-        to: ROMAN[steps[steps.length - 1].level - 1],
-      })
-    : ROMAN[entry.targetLevel - 1];
-
-  const nameContent = (
-    <>
-      {expandable ? (
-        <Caret expanded={expanded} />
-      ) : (
-        <span aria-hidden="true" className={CARET_SPACER} />
-      )}
+  // One row trains one level (reorder.ts), so the row says which level it is
+  // and there is nothing left to disclose — the caret and the per-level
+  // breakdown it opened (#254) both retired with the level ranges that made
+  // them necessary.
+  const nameSpan = (
+    <span className={NAME_CELL}>
+      <span aria-hidden="true" className={CARET_SPACER} />
       <span className="truncate">
-        {name} {levelLabel}
+        {name} {ROMAN[entry.targetLevel - 1]}
         {boosted && <BoosterMark />}
       </span>
-    </>
-  );
-
-  // A button, not an extra icon control: the caret rides in front of the name
-  // the way the Skills group headers and the Market group tree do it, so the
-  // whole name is the target and the row spends no width it doesn't already
-  // have. The drag handle stays the sole reorder affordance.
-  const nameSpan = expandable ? (
-    <button
-      type="button"
-      aria-expanded={expanded}
-      onClick={() => onToggleLevels(row.id)}
-      className={`${NAME_CELL} text-left hover:text-accent focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent`}
-    >
-      {nameContent}
-    </button>
-  ) : (
-    <span className={NAME_CELL}>{nameContent}</span>
+    </span>
   );
 
   const attributeBadge =
@@ -444,8 +337,8 @@ const EntryRow = memo(function EntryRow({
       variant="danger"
       size="sm"
       className={ICON_BUTTON}
-      onClick={() => onRemove(entry.skillTypeID)}
-      aria-label={t('plans.removeEntry', { name })}
+      onClick={() => onRemove(entry.skillTypeID, entry.targetLevel)}
+      aria-label={t('plans.removeEntry', { name: rowLabel })}
     >
       <span aria-hidden="true">✕</span>
     </Button>
@@ -504,17 +397,6 @@ const EntryRow = memo(function EntryRow({
           </div>
           {metaLine}
         </>
-      )}
-      {expandable && expanded && (
-        <LevelBreakdown
-          steps={steps}
-          stepIndices={stepIndices}
-          name={name}
-          columns={columns}
-          isDesktop={isDesktop}
-          boostedSteps={boostedSteps}
-          startDate={startDate}
-        />
       )}
     </li>
   );
@@ -748,7 +630,7 @@ interface EntryListProps {
   /** When training begins, for each row's finish date (#20). Omitted when there's no wall-clock basis to offer — rows then fall back to a running total. */
   startDate?: Date;
   onReorder: (activeId: string, overId: string) => void;
-  onRemove: (skillTypeID: number) => void;
+  onRemove: (skillTypeID: number, targetLevel: number) => void;
   onRemoveMarker: (markerIndex: number) => void;
   /** A marker's target attribute spread, once known. Undefined when no "Optimize at my markers" result covers it yet. */
   markerAttributesFor?: (markerIndex: number) => Attributes | undefined;
@@ -801,19 +683,6 @@ export function EntryList({
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
-  // Which entry rows have their level breakdown open (#254). Keyed by row id,
-  // which is derived from the skill, so reordering a row keeps its state.
-  // Deliberately in-memory: a transient "show me the levels", not a view
-  // preference like the Columns toggle.
-  const [expandedRowIds, setExpandedRowIds] = useState<ReadonlySet<string>>(() => new Set());
-  const toggleLevels = useCallback((rowId: string) => {
-    setExpandedRowIds((prev) => {
-      const next = new Set(prev);
-      if (!next.delete(rowId)) next.add(rowId);
-      return next;
-    });
-  }, []);
-
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
     if (over && active.id !== over.id) onReorder(String(active.id), String(over.id));
@@ -865,8 +734,6 @@ export function EntryList({
                       startDate={startDate}
                       columns={columns}
                       isDesktop={isDesktop}
-                      expanded={expandedRowIds.has(row.id)}
-                      onToggleLevels={toggleLevels}
                       onRemove={onRemove}
                       onSetPriority={onSetPriority}
                     />

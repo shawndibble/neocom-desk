@@ -87,6 +87,7 @@ import {
   applyReorderSuggestion,
   setEntryPriority,
 } from './reorder';
+import { splitEntriesByLevel } from './splitEntries';
 import {
   addMarker,
   addMarkerAttributes,
@@ -283,7 +284,6 @@ export function PlanEditor({
   // Panel/Modal results those same actions already produce below.
   const [optimizeConfirm, setOptimizeConfirm] = useState<string | null>(null);
   const [markerConfirm, setMarkerConfirm] = useState(false);
-  const [markersOptimizeConfirm, setMarkersOptimizeConfirm] = useState<string | null>(null);
   const [reorderConfirm, setReorderConfirm] = useState(false);
   // Outcome of the last drag on the entry list. A drop that would land a
   // skill after something requiring it is refused rather than silently
@@ -299,7 +299,12 @@ export function PlanEditor({
   // than removing on click, matching the pattern PlanList already uses for
   // deleting a whole plan (CONTEXT.md's "an in-app Modal replacing
   // window.confirm on delete").
-  const [removingSkillTypeID, setRemovingSkillTypeID] = useState<number | null>(null);
+  // The row awaiting the remove-confirm Modal. Skill *and* level: a plan
+  // holds one entry per level, so "which row" needs both.
+  const [removingEntry, setRemovingEntry] = useState<{
+    skillTypeID: number;
+    targetLevel: number;
+  } | null>(null);
 
   // The entry list is the only thing that scrolls independently: it gets a
   // live-measured cap so it fills the room actually left below it, while the
@@ -478,6 +483,30 @@ export function PlanEditor({
     [plan.entries, catalog, trainedSkills, attributes, effectiveImplants, activeBoosters]
   );
 
+  // One row per skill level (reorder.ts). Plans written before that rule —
+  // and any entry added at a level several above the character's trained one
+  // — hold a single entry spanning "IV–V", which cannot be dragged apart.
+  // Split it, once, the first time such a plan is opened, moving its Remap
+  // Markers to keep them in front of the same entries. Idempotent, so a plan
+  // already split writes nothing and this never loops.
+  //
+  // Load order is load-bearing: splitting against a half-loaded character
+  // would cut rows for levels they have already trained. It cannot happen —
+  // the route renders this editor only once `catalog` is set, and
+  // `usePlanEditorData` sets `catalog` and `trainedSkills` from a single
+  // awaited batch, so a non-empty catalog means the trained levels are in
+  // hand too.
+  useEffect(() => {
+    const split = splitEntriesByLevel(
+      plan.entries,
+      plan.markers,
+      catalog.engineSkills,
+      trainedSkills
+    );
+    if (!split.changed) return;
+    onUpdate({ entries: split.entries, ...(split.markers ? { markers: split.markers } : {}) });
+  }, [plan.entries, plan.markers, catalog.engineSkills, trainedSkills, onUpdate]);
+
   // BUG #1: optimizeResult/reorderPreview index into `scheduled` by position.
   // Once entries change (add/remove/reorder) or the plan itself is swapped,
   // those positions are stale and can point past the end of the new
@@ -498,7 +527,6 @@ export function PlanEditor({
     setOptimizeVerdict(null);
     setReorderPreview(null);
     setOptimizeConfirm(null);
-    setMarkersOptimizeConfirm(null);
     // A refusal describes one drag against one entry order — once the order
     // moves on it describes nothing. (promoteConfirm is the opposite: a
     // "that worked" note about the change that just landed, so it clears on
@@ -586,6 +614,35 @@ export function PlanEditor({
     [scheduled]
   );
 
+  // What each marker resolves to right now — kept in sync with `plan.markers`
+  // itself (a plain derivation, not state, and cheap: unlike `placeRemaps`,
+  // the cut points are fixed by the markers rather than searched, so this is
+  // one bounded per-segment allocation search per marker, not a DP over where
+  // to cut), so a marker row shows its target attributes immediately: after
+  // Accept on either preview Modal, after a drag, and on a fresh page load or
+  // another device, without a separate "Optimize at my markers" click first.
+  // Lives up here, with its verdict, so headerBadge below can read both.
+  const markersAtCurrentPositions = useMemo(() => {
+    if (!plan.markers || plan.markers.length === 0) return null;
+    return optimizeAtMarkers(scheduled, catalog.engineSkills, {
+      markers: markerStepIndices(plan.entries, plan.markers, catalog.engineSkills, trainedSkills),
+      currentAttributes: attributes,
+      implants: effectiveImplants,
+    });
+  }, [
+    plan.markers,
+    plan.entries,
+    scheduled,
+    catalog.engineSkills,
+    trainedSkills,
+    attributes,
+    effectiveImplants,
+  ]);
+  const markersVerdict = useMemo(
+    () => (markersAtCurrentPositions ? markerVerdict(markersAtCurrentPositions) : null),
+    [markersAtCurrentPositions]
+  );
+
   // Header badge: live (no click, no spinner) via Booster-blind costing —
   // the only path cheap enough to run on every render. A Booster expiring
   // mid-plan can push placeRemaps' Booster-aware DP into seconds of
@@ -594,7 +651,24 @@ export function PlanEditor({
   // explicit "Optimize remaps" result (Booster-aware, computed on click) and
   // shows nothing until the user has clicked it once — never a stale or
   // wrong number, never a spinner.
+  //
+  // A plan whose markers actually split something gets its chip from them,
+  // regardless of remapCount: a marker is the user's own remap decision, not
+  // a hypothetical the optimizer proposes, so what it saves against training
+  // everything on current attributes is the number that answers "how much is
+  // this saving me". Markers all sitting at the plan's end remap nothing, so
+  // that plan falls through to the budget path below rather than reporting a
+  // 0 the chip would render as "None" — the "remapping cannot help this
+  // plan" lie planHeaderStats.ts refuses to tell.
   const headerBadge = useMemo(() => {
+    if (markersAtCurrentPositions && markersVerdict?.kind !== 'markersAtEnd') {
+      const markerCount = markersAtCurrentPositions.segments.filter((s) => s.remap).length;
+      return toOptimizationBadge(
+        markersAtCurrentPositions.savingsSeconds,
+        markerCount,
+        markerCount
+      );
+    }
     // A plan with no remaps to spend gets no chip on either path — the rule
     // and the reasoning live in evaluateOptimizationBadge, but the Booster
     // branch below never reaches it.
@@ -610,6 +684,8 @@ export function PlanEditor({
       implants: effectiveImplants,
     });
   }, [
+    markersAtCurrentPositions,
+    markersVerdict,
     activeBoosters,
     optimizeResult,
     remapCount,
@@ -729,44 +805,9 @@ export function PlanEditor({
     setOptimizeVerdict(null);
   }
 
-  /**
-   * What each marker resolves to right now — kept in sync with `plan.markers`
-   * itself (a plain derivation, not state, and cheap: unlike `placeRemaps`,
-   * the cut points are fixed by the markers rather than searched, so this is
-   * one bounded per-segment allocation search per marker, not a DP over where
-   * to cut), so a marker row shows its target attributes immediately: after
-   * Accept on either preview Modal, after a drag, and on a fresh page load or
-   * another device, without a separate "Optimize at my markers" click first.
-   * That button now only reveals the panel below (`markersPanelOpen`) — an
-   * explicit finding the user asked to see, not a second computation of what
-   * this memo already holds.
-   */
-  const markersAtCurrentPositions = useMemo(() => {
-    if (!plan.markers || plan.markers.length === 0) return null;
-    return optimizeAtMarkers(scheduled, catalog.engineSkills, {
-      markers: markerStepIndices(plan.entries, plan.markers, catalog.engineSkills, trainedSkills),
-      currentAttributes: attributes,
-      implants: effectiveImplants,
-    });
-  }, [
-    plan.markers,
-    plan.entries,
-    scheduled,
-    catalog.engineSkills,
-    trainedSkills,
-    attributes,
-    effectiveImplants,
-  ]);
-  const markersVerdict = useMemo(
-    () => (markersAtCurrentPositions ? markerVerdict(markersAtCurrentPositions) : null),
-    [markersAtCurrentPositions]
-  );
-
   function handleOptimizeAtMarkers() {
     if (scheduled.length === 0 || !markersVerdict) return;
     setMarkersPanelOpen(true);
-    setMarkersOptimizeConfirm(confirmRemapOutcome(markersVerdict));
-    setTimeout(() => setMarkersOptimizeConfirm(null), 2000);
   }
 
   /** Accept on the Optimize at my markers preview Modal. */
@@ -932,17 +973,19 @@ export function PlanEditor({
   );
 
   /** EntryList's `onRemove`: opens the confirm Modal rather than removing immediately (#408). */
-  const requestRemoveEntry = useCallback((skillTypeID: number) => {
-    setRemovingSkillTypeID(skillTypeID);
+  const requestRemoveEntry = useCallback((skillTypeID: number, targetLevel: number) => {
+    setRemovingEntry({ skillTypeID, targetLevel });
   }, []);
 
   /** The confirm Modal's Remove button: the removal `onRemove` used to do inline before #408. */
   const confirmRemoveEntry = useCallback(() => {
-    if (removingSkillTypeID === null) return;
-    const skillTypeID = removingSkillTypeID;
-    const entryIndex = plan.entries.findIndex((e) => e.skillTypeID === skillTypeID);
+    if (removingEntry === null) return;
+    const { skillTypeID, targetLevel } = removingEntry;
+    const entryIndex = plan.entries.findIndex(
+      (e) => e.skillTypeID === skillTypeID && e.targetLevel === targetLevel
+    );
     onUpdate({
-      entries: removeEntry(plan.entries, skillTypeID),
+      entries: removeEntry(plan.entries, skillTypeID, targetLevel),
       ...(plan.markers
         ? {
             markers: markersAfterEntryRemoval(plan.markers, entryIndex, plan.entries.length),
@@ -955,8 +998,8 @@ export function PlanEditor({
           }
         : {}),
     });
-    setRemovingSkillTypeID(null);
-  }, [removingSkillTypeID, plan.entries, plan.markers, plan.markerAttributes, onUpdate]);
+    setRemovingEntry(null);
+  }, [removingEntry, plan.entries, plan.markers, plan.markerAttributes, onUpdate]);
 
   const handleRemoveMarker = useCallback(
     (markerIndex: number) => {
@@ -1190,11 +1233,17 @@ export function PlanEditor({
           )}
           <div className="space-y-1.5">
             {toolAction({
+              icon: <Icon.SuggestReorder size={Icon.ICON_SIZE.sm} />,
+              label: t('plans.suggestReorder'),
+              onClick: handleSuggestReorder,
+              disabled: scheduled.length === 0,
+            })}
+            {reorderConfirm && confirmation(t('plans.reorderSuggested'))}
+            {toolAction({
               icon: <Icon.OptimizeRemaps size={Icon.ICON_SIZE.sm} />,
               label: t('plans.optimizeRemaps'),
               onClick: handleOptimizeRemaps,
               disabled: scheduled.length === 0,
-              tooltip: t('plans.optimizeRemapsTooltip'),
             })}
             {optimizeConfirm && confirmation(optimizeConfirm)}
             {toolAction({
@@ -1209,14 +1258,14 @@ export function PlanEditor({
               onClick: handleOptimizeAtMarkers,
               disabled: scheduled.length === 0 || (plan.markers?.length ?? 0) === 0,
             })}
-            {markersOptimizeConfirm && confirmation(markersOptimizeConfirm)}
-            {toolAction({
-              icon: <Icon.SuggestReorder size={Icon.ICON_SIZE.sm} />,
-              label: t('plans.suggestReorder'),
-              onClick: handleSuggestReorder,
-              disabled: scheduled.length === 0,
-            })}
-            {reorderConfirm && confirmation(t('plans.reorderSuggested'))}
+            {/* Standing, not a post-click toast: the moment the plan carries
+                a Remap Marker, what it saves is a fact about the plan, and
+                waiting behind a click hid it from the user who placed the
+                marker precisely to find out. The Modal the button opens is
+                still the place to *accept* the spread. */}
+            {markersVerdict && (
+              <p className="text-xs text-success">{confirmRemapOutcome(markersVerdict)}</p>
+            )}
           </div>
         </div>
       ),
@@ -1457,24 +1506,6 @@ export function PlanEditor({
           skillCount={scheduledSkillCount}
           projectedFinish={planFinish}
           badge={headerBadge}
-          // Only when it actually shortened these totals: an expired Booster
-          // is ignored by computeSchedule, so disclosing one would be its own
-          // small lie. The tools pane keeps the "Expired" hint for that case.
-          //
-          // Read off `booster.bonus` — the map computeSchedule costed with —
-          // rather than the bonus the input beside it edits. They agree while
-          // the input writes one figure into all five attributes, but a
-          // per-attribute Booster would desync them, and a chip stating a
-          // bonus the arithmetic did not apply is the very thing it exists
-          // to prevent.
-          booster={
-            booster && !boosterExpired
-              ? {
-                  bonus: Math.max(...ATTRIBUTE_NAMES.map((name) => booster.bonus[name] ?? 0)),
-                  expiresAt: booster.expiresAt,
-                }
-              : null
-          }
         />
 
         {!isDesktop && toolsPane}
@@ -1754,17 +1785,20 @@ export function PlanEditor({
       />
 
       <Modal
-        open={removingSkillTypeID !== null}
-        onClose={() => setRemovingSkillTypeID(null)}
+        open={removingEntry !== null}
+        onClose={() => setRemovingEntry(null)}
         title={t('plans.removeEntryConfirmTitle')}
       >
         <p className="text-xs text-text-dim">
           {t('plans.removeEntryConfirm', {
-            name: removingSkillTypeID === null ? '' : nameFor(removingSkillTypeID),
+            name:
+              removingEntry === null
+                ? ''
+                : `${nameFor(removingEntry.skillTypeID)} ${ROMAN[removingEntry.targetLevel - 1]}`,
           })}
         </p>
         <div className="mt-3 flex justify-end gap-2">
-          <Button size="sm" onClick={() => setRemovingSkillTypeID(null)}>
+          <Button size="sm" onClick={() => setRemovingEntry(null)}>
             {t('plans.cancel')}
           </Button>
           <Button variant="danger" size="sm" onClick={confirmRemoveEntry}>

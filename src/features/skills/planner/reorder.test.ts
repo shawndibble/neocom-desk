@@ -10,30 +10,34 @@ import {
 } from './reorder';
 
 describe('entryId', () => {
-  it('is the skillTypeID as a string', () => {
-    expect(entryId({ skillTypeID: 3300, targetLevel: 5 })).toBe('3300');
+  it('is the skill and its level, so one skill can hold several rows', () => {
+    expect(entryId({ skillTypeID: 3300, targetLevel: 5 })).toBe('3300-5');
+    expect(entryId({ skillTypeID: 3300, targetLevel: 4 })).not.toBe(
+      entryId({ skillTypeID: 3300, targetLevel: 5 })
+    );
   });
 });
 
 describe('dedupeEntries', () => {
-  it('collapses multiple rows for one skill to its highest target level', () => {
-    expect(
-      dedupeEntries([
-        { skillTypeID: 3300, targetLevel: 4 },
-        { skillTypeID: 3300, targetLevel: 5 },
-      ])
-    ).toEqual([{ skillTypeID: 3300, targetLevel: 5 }]);
+  it("keeps a skill's distinct levels as separate rows", () => {
+    const entries: PlanEntry[] = [
+      { skillTypeID: 3300, targetLevel: 4 },
+      { skillTypeID: 3300, targetLevel: 5 },
+    ];
+    // The whole point of the per-level rule: the user can drag another skill
+    // between Mass Production IV and V, so collapsing them would take that away.
+    expect(dedupeEntries(entries)).toEqual(entries);
   });
 
-  it('keeps first-appearance order across distinct skills', () => {
+  it('drops a row repeating a (skill, level) already present, keeping the first', () => {
     expect(
       dedupeEntries([
         { skillTypeID: 2, targetLevel: 3 },
         { skillTypeID: 1, targetLevel: 1 },
-        { skillTypeID: 2, targetLevel: 5 },
+        { skillTypeID: 2, targetLevel: 3 },
       ])
     ).toEqual([
-      { skillTypeID: 2, targetLevel: 5 },
+      { skillTypeID: 2, targetLevel: 3 },
       { skillTypeID: 1, targetLevel: 1 },
     ]);
   });
@@ -42,14 +46,12 @@ describe('dedupeEntries', () => {
     expect(dedupeEntries([])).toEqual([]);
   });
 
-  it('preserves fields beyond skillTypeID and targetLevel, from the first appearance', () => {
+  it('preserves fields beyond skillTypeID and targetLevel, from the row it keeps', () => {
     const entries: PlanEntry[] = [
       { skillTypeID: 1, targetLevel: 3, priority: 'high' },
-      { skillTypeID: 1, targetLevel: 5, priority: 'low' },
+      { skillTypeID: 1, targetLevel: 3, priority: 'low' },
     ];
-    // targetLevel takes the max (5), but priority comes from the first
-    // appearance ('high'), not the entry that happened to have the higher level.
-    expect(dedupeEntries(entries)).toEqual([{ skillTypeID: 1, targetLevel: 5, priority: 'high' }]);
+    expect(dedupeEntries(entries)).toEqual([{ skillTypeID: 1, targetLevel: 3, priority: 'high' }]);
   });
 });
 
@@ -63,7 +65,7 @@ describe('upsertEntry', () => {
     ]);
   });
 
-  it('raises the target level of an existing entry in place, never duplicating', () => {
+  it('adds a higher level of a skill already in the plan as its own row', () => {
     const result = upsertEntry(
       [
         { skillTypeID: 1, targetLevel: 3 },
@@ -71,24 +73,23 @@ describe('upsertEntry', () => {
       ],
       { skillTypeID: 1, targetLevel: 5 }
     );
+    // Level 5 is a row of its own; splitEntriesByLevel is what turns it into
+    // the individual levels 4 and 5 once the character's trained level is known.
     expect(result).toEqual([
-      { skillTypeID: 1, targetLevel: 5 },
+      { skillTypeID: 1, targetLevel: 3 },
       { skillTypeID: 2, targetLevel: 1 },
+      { skillTypeID: 1, targetLevel: 5 },
     ]);
   });
 
-  it('never lowers an existing target level', () => {
+  it('adds nothing when an existing row already trains the skill that high', () => {
+    // A row for a level an earlier row already covers would train nothing and
+    // render as a zero-time ghost.
     const result = upsertEntry([{ skillTypeID: 1, targetLevel: 5 }], {
       skillTypeID: 1,
       targetLevel: 2,
     });
     expect(result).toEqual([{ skillTypeID: 1, targetLevel: 5 }]);
-  });
-
-  it('preserves fields beyond skillTypeID and targetLevel when merging in place', () => {
-    const existing: PlanEntry[] = [{ skillTypeID: 1, targetLevel: 3, priority: 'high' }];
-    const result = upsertEntry(existing, { skillTypeID: 1, targetLevel: 5 });
-    expect(result).toEqual([{ skillTypeID: 1, targetLevel: 5, priority: 'high' }]);
   });
 });
 
@@ -118,20 +119,55 @@ describe('setEntryPriority', () => {
 });
 
 describe('removeEntry', () => {
-  it('removes the matching skill only', () => {
+  it('removes the matching row only', () => {
     const result = removeEntry(
       [
         { skillTypeID: 1, targetLevel: 3 },
         { skillTypeID: 2, targetLevel: 1 },
       ],
-      1
+      1,
+      3
     );
     expect(result).toEqual([{ skillTypeID: 2, targetLevel: 1 }]);
+  });
+
+  it("leaves the skill's other levels where the user put them", () => {
+    const result = removeEntry(
+      [
+        { skillTypeID: 1, targetLevel: 4 },
+        { skillTypeID: 2, targetLevel: 1 },
+        { skillTypeID: 1, targetLevel: 5 },
+      ],
+      1,
+      5
+    );
+    expect(result).toEqual([
+      { skillTypeID: 1, targetLevel: 4 },
+      { skillTypeID: 2, targetLevel: 1 },
+    ]);
   });
 });
 
 describe('applyReorderSuggestion', () => {
-  it('sorts entries by first occurrence in the suggested steps, preserving target levels', () => {
+  it("orders a skill's own levels by where the suggestion trains each one", () => {
+    const entries = [
+      { skillTypeID: 1, targetLevel: 5 },
+      { skillTypeID: 2, targetLevel: 1 },
+      { skillTypeID: 1, targetLevel: 4 },
+    ];
+    const suggestedSteps = [
+      { skillTypeID: 1, level: 4 },
+      { skillTypeID: 2, level: 1 },
+      { skillTypeID: 1, level: 5 },
+    ];
+    expect(applyReorderSuggestion(entries, suggestedSteps)).toEqual([
+      { skillTypeID: 1, targetLevel: 4 },
+      { skillTypeID: 2, targetLevel: 1 },
+      { skillTypeID: 1, targetLevel: 5 },
+    ]);
+  });
+
+  it("falls back to a skill's first step when the suggestion has no step for that exact level", () => {
     const entries = [
       { skillTypeID: 1, targetLevel: 5 },
       { skillTypeID: 2, targetLevel: 3 },

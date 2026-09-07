@@ -145,7 +145,6 @@
     "exportClipboard": "Export to clipboard",
     "exportCopied": "Copied to clipboard",
     "optimizeRemaps": "Optimize remaps",
-    "optimizeRemapsTooltip": "Evaluates the plan's entries in their current order — it never reorders them. Grouping similar skills together first (e.g. with \"Suggest reorder\") tends to produce bigger savings.",
     "suggestReorder": "Suggest reorder",
     "remapSaves": "Remapping saves {{duration}}",
     "remapNoGain": "No remap improves this plan in its current order — keeping current attributes. Try \"Suggest reorder\" to group similar skills first, then optimize again.",
@@ -270,10 +269,7 @@
     "headerProjectedFinish": "Projected finish",
     "headerNoFinish": "—",
     "headerSavingsLabel": "Remap savings",
-    "headerSavingsNone": "None",
-    "headerBoosterLabel": "Booster assumed",
-    "headerBoosterValue": "+{{bonus}} until {{date}}",
-    "headerBoosterTooltip": "These times assume the booster you entered under Training, not one the game knows about. Until it expires they run faster than your in-game skill queue."
+    "headerSavingsNone": "None"
   },
   "skillCompare": {
     "pickCharacters": "Characters to compare",

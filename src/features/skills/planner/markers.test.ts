@@ -16,6 +16,7 @@ import {
   reorderRows,
   segmentsToMarkers,
 } from './markers';
+import { entryId } from './reorder';
 
 const entry = (skillTypeID: number, targetLevel = 1): PlanEntry => ({ skillTypeID, targetLevel });
 
@@ -57,7 +58,13 @@ describe('buildRows', () => {
   it('interleaves marker rows before the entry at their position', () => {
     const entries = [entry(1), entry(2), entry(3)];
     const rows = buildRows(entries, [1, 3]);
-    expect(rows.map((r) => r.id)).toEqual(['1', markerRowId(0), '2', '3', markerRowId(1)]);
+    expect(rows.map((r) => r.id)).toEqual([
+      entryId(entry(1)),
+      markerRowId(0),
+      entryId(entry(2)),
+      entryId(entry(3)),
+      markerRowId(1),
+    ]);
     expect(rows.map((r) => r.kind)).toEqual(['entry', 'marker', 'entry', 'entry', 'marker']);
   });
 
@@ -72,7 +79,7 @@ describe('reorderRows', () => {
 
   it('moves an entry across a marker and recomputes marker positions', () => {
     // Rows: [e1, M0@1, e2, e3]. Drag e3 onto e1: [e3, e1, M0, e2].
-    const result = reorderRows(entries, [1], '3', '1');
+    const result = reorderRows(entries, [1], entryId(entry(3)), entryId(entry(1)));
     expect(result.entries.map((e) => e.skillTypeID)).toEqual([3, 1, 2]);
     expect(result.markers).toEqual([2]);
     // The lone marker didn't change relative order, so it's still ordinal 0.
@@ -81,14 +88,14 @@ describe('reorderRows', () => {
 
   it('moves a marker onto an entry row', () => {
     // Rows: [e1, M0@1, e2, e3]. Drag M0 onto e3: [e1, e2, e3, M0] -> position 3.
-    const result = reorderRows(entries, [1], markerRowId(0), '3');
+    const result = reorderRows(entries, [1], markerRowId(0), entryId(entry(3)));
     expect(result.entries.map((e) => e.skillTypeID)).toEqual([1, 2, 3]);
     expect(result.markers).toEqual([3]);
     expect(result.markerOrder).toEqual([0]);
   });
 
   it('returns the input unchanged for unknown ids', () => {
-    const result = reorderRows(entries, [1], 'nope', '1');
+    const result = reorderRows(entries, [1], 'nope', entryId(entry(1)));
     expect(result.entries).toEqual(entries);
     expect(result.markers).toEqual([1]);
     expect(result.markerOrder).toEqual([0]);
@@ -111,7 +118,7 @@ describe('reorderRows', () => {
       { skillTypeID: 2, targetLevel: 1, priority: 'low' },
       { skillTypeID: 3, targetLevel: 1, priority: 'normal' },
     ];
-    const result = reorderRows(withExtra, [], '3', '1');
+    const result = reorderRows(withExtra, [], entryId(entry(3)), entryId(entry(1)));
     expect(result.entries).toEqual([
       { skillTypeID: 3, targetLevel: 1, priority: 'normal' },
       { skillTypeID: 1, targetLevel: 1, priority: 'high' },

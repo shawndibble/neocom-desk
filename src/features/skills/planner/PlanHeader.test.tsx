@@ -4,7 +4,7 @@ import '@/i18n';
 import { PlanHeader } from './PlanHeader';
 
 describe('PlanHeader', () => {
-  describe('projected finish and booster expiry render in the viewer local timezone (#207)', () => {
+  describe('projected finish renders in the viewer local timezone (#207)', () => {
     const originalTz = process.env.TZ;
     afterEach(() => {
       process.env.TZ = originalTz;
@@ -18,12 +18,10 @@ describe('PlanHeader', () => {
           skillCount={0}
           projectedFinish={new Date('2026-09-01T00:00:00Z')}
           badge={null}
-          booster={{ bonus: 12, expiresAt: new Date('2026-09-15T00:30:00Z') }}
         />
       );
 
       expect(screen.getByText('2026-08-31')).toBeInTheDocument();
-      expect(screen.getByText(/2026-09-14/)).toBeInTheDocument();
     });
   });
 
@@ -115,37 +113,13 @@ describe('PlanHeader', () => {
     expect(screen.getByText('None')).toBeInTheDocument();
   });
 
-  it('does not mention a booster when none is assumed', () => {
-    render(<PlanHeader totalSeconds={1000} skillCount={2} projectedFinish={null} badge={null} />);
-
-    expect(screen.queryByText(/booster/i)).not.toBeInTheDocument();
-  });
-
-  it('discloses on the total itself that the estimate assumes a hypothetical booster', () => {
-    // The bug report compared this total against the in-game queue and found
-    // it 32% fast. It was: the user had a +12 accelerator ticked in the
-    // What-if panel. The per-row BoosterMark said so per skill, but the one
-    // number they actually compared said nothing at all.
-    render(
-      <PlanHeader
-        totalSeconds={1000}
-        skillCount={2}
-        projectedFinish={null}
-        badge={null}
-        booster={{ bonus: 12, expiresAt: new Date('2026-09-15T21:00:00Z') }}
-      />
-    );
-
-    expect(screen.getByText(/\+12/)).toBeInTheDocument();
-    expect(screen.getByText(/booster/i)).toBeInTheDocument();
-  });
-
   it('wraps whole chips onto a second line rather than crushing them into one', () => {
-    // Reported with a Booster on: five chips is more than the strip fits
-    // beside the sidebar, and it used to answer that by refusing to wrap
-    // (`lg:flex-nowrap`) and scrolling sideways instead. StatChip is a
-    // fixed-height box, so the chips ahead of the scroll got squeezed until
-    // their labels broke over two lines inside a one-line-tall border.
+    // Reported with all chips present: four chips is more than the strip
+    // fits beside the sidebar at some widths, and it used to answer that by
+    // refusing to wrap (`lg:flex-nowrap`) and scrolling sideways instead.
+    // StatChip is a fixed-height box, so the chips ahead of the scroll got
+    // squeezed until their labels broke over two lines inside a
+    // one-line-tall border.
     render(
       <PlanHeader
         totalSeconds={1000}
@@ -157,7 +131,6 @@ describe('PlanHeader', () => {
           requestedRemapCount: 2,
           capped: false,
         }}
-        booster={{ bonus: 12, expiresAt: new Date('2026-09-15T21:00:00Z') }}
       />
     );
 

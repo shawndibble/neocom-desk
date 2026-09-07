@@ -442,15 +442,16 @@ describe('PlanEditor tools pane', () => {
     await openTools(user);
 
     expect(screen.queryByRole('dialog')).toBeNull();
+    // Standing, before any click: a plan carrying a marker says what that
+    // marker saves without being asked. The Modal below is where the spread
+    // is accepted, not where the figure is first disclosed.
+    expect(within(sectionFor('Actions')).getByText(/^Saves/)).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Optimize at my markers' }));
 
     const dialog = screen.getByRole('dialog', { name: 'Optimize at my markers' });
     expect(within(dialog).getByText(/^Remapping saves/)).toBeInTheDocument();
     expect(within(dialog).getByText('Segment 1')).toBeInTheDocument();
-    // The beside-the-button confirmation (#222) still fires alongside the
-    // Modal, same as "Suggest reorder"'s toast + Modal pairing.
-    expect(within(sectionFor('Actions')).getByRole('status')).toHaveTextContent(/^Saves/);
 
     await user.click(within(dialog).getByRole('button', { name: 'Accept' }));
 
@@ -1302,7 +1303,7 @@ describe('removing an entry requires confirmation (#408)', () => {
     // Clicking Remove on the row only opens the Modal — the entry survives
     // until the Modal's own Remove button is clicked.
     expect(onUpdate).not.toHaveBeenCalled();
-    expect(screen.getByText(/remove "skill a" from this plan/i)).toBeInTheDocument();
+    expect(screen.getByText(/remove "skill a i+v?" from this plan/i)).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Remove' }));
 
@@ -1319,6 +1320,6 @@ describe('removing an entry requires confirmation (#408)', () => {
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
 
     expect(onUpdate).not.toHaveBeenCalled();
-    expect(screen.queryByText(/remove "skill a" from this plan/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/remove "skill a i+v?" from this plan/i)).not.toBeInTheDocument();
   });
 });
