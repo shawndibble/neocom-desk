@@ -420,6 +420,38 @@ describe('OpenOrdersPanel', () => {
     expect(within(belowFloorGroup).getByText('Never sell below')).toBeInTheDocument();
   });
 
+  it('drops the floor column once a filter narrows the visible rows to ones with no floor, even though a filtered-out row still has one', async () => {
+    const user = userEvent.setup();
+    mockedLoadAll.mockResolvedValue(
+      snapshot([
+        {
+          characterId: 1,
+          characterName: 'Alpha',
+          orders: [BELOW_FLOOR_ORDER, NO_COST_BASIS_ORDER],
+          fetchedAt: Date.now(),
+          fromCache: false,
+          needsReauth: false,
+        },
+      ])
+    );
+    mockedCostBases.mockResolvedValue(new Map([[101, costBasis(600)]]));
+
+    renderPanel();
+    await screen.findByTestId('order-group-belowFloor');
+    await user.click(screen.getByRole('button', { name: 'Show healthy orders' }));
+    // Both groups' tables carry the column at this point.
+    expect(screen.getAllByText('Never sell below').length).toBeGreaterThan(0);
+
+    // Narrows the visible set to Pyerite (no floor) only — Tritanium (which
+    // has one) is filtered out, not just folded.
+    await user.type(screen.getByPlaceholderText('Search by item…'), 'Pyerite');
+
+    await waitFor(() =>
+      expect(screen.queryByTestId('order-group-belowFloor')).not.toBeInTheDocument()
+    );
+    expect(screen.queryByText('Never sell below')).not.toBeInTheDocument();
+  });
+
   it("opens the detail modal from a row's Details button", async () => {
     const user = userEvent.setup();
     mockedLoadAll.mockResolvedValue(

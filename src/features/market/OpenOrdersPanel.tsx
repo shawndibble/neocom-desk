@@ -674,9 +674,13 @@ export function OpenOrdersPanel() {
     },
   ];
 
-  // No order carries a floor (nothing has a linked build), so the whole
-  // column would be a wall of dashes — dropped rather than shown empty.
-  const hasFloorData = allRows.some((row) => row.floor !== null);
+  // No VISIBLE order carries a floor (nothing has a linked build), so the
+  // whole column would be a wall of dashes — dropped rather than shown
+  // empty. Reads `groupingRows`, not `allRows`: a filter (search, problem
+  // chip, character) can narrow what's on screen to rows with no floor
+  // while some filtered-out row elsewhere still has one, and the column
+  // must track what's actually visible, not the character's full order set.
+  const hasFloorData = groupingRows.some((row) => row.floor !== null);
   const visibleColumns = columns.filter((column) => column.id !== 'floor' || hasFloorData);
 
   return (

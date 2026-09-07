@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatIsk, formatIskCompact, parseIskAmount } from './isk';
+import { formatIsk, formatIskAuto, formatIskCompact, parseIskAmount } from './isk';
 
 describe('formatIsk', () => {
   describe('default (0 decimals — Industry/Market Browser)', () => {
@@ -35,6 +35,23 @@ describe('formatIsk', () => {
   it('clamps exact negative zero regardless of precision', () => {
     expect(formatIsk(-0)).toBe('0');
     expect(formatIsk(-0, 2)).toBe('0.00');
+  });
+});
+
+describe('formatIskAuto', () => {
+  it('keeps 2 decimals at and under 100 ISK, where cents can be the whole story', () => {
+    expect(formatIskAuto(100)).toBe('100.00');
+    expect(formatIskAuto(4.99)).toBe('4.99');
+  });
+
+  it('drops decimals once an amount is over 100 ISK', () => {
+    expect(formatIskAuto(100.01)).toBe('100');
+    expect(formatIskAuto(31_537_450.72)).toBe('31,537,451');
+  });
+
+  it('applies the same 100 ISK threshold to a negative amount by magnitude', () => {
+    expect(formatIskAuto(-100.01)).toBe('-100');
+    expect(formatIskAuto(-4.99)).toBe('-4.99');
   });
 });
 
