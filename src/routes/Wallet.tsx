@@ -43,6 +43,7 @@ import {
 import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
 import { formatTimestamp } from '@/lib/timestamp';
+import { useTimeZone } from '@/lib/timeFormat';
 import { downloadCsv } from '@/lib/downloadCsv';
 import { walletJournalCsvColumns } from '@/features/character/walletJournalCsv';
 import {
@@ -483,6 +484,10 @@ function walletDivisionFromParam(param: string | null): number {
  */
 export function Wallet() {
   const { t } = useTranslation();
+  // Read once here, not in `CorpWalletView`: that view is handed this page's
+  // own `journalColumns` rather than declaring a second set, so the zone has
+  // to reach it the same way — through the memo below.
+  const timeZone = useTimeZone();
   const navigate = useNavigate();
   const { data, error, loading, hydrated, activeCharacterId, refreshCount, refresh } =
     useRouteSnapshot(loadWalletSnapshot, undefined, { cacheKey: 'wallet' });
@@ -649,7 +654,7 @@ export function Wallet() {
         id: 'date',
         header: t('wallet.date'),
         className: 'whitespace-nowrap text-text-dim',
-        render: (entry) => formatTimestamp(new Date(entry.date)),
+        render: (entry) => formatTimestamp(new Date(entry.date), timeZone),
         sortValue: (entry) => entry.date,
       },
       {
@@ -688,7 +693,7 @@ export function Wallet() {
         sortValue: (entry) => entry.balance,
       },
     ],
-    [t]
+    [t, timeZone]
   );
 
   // Unsorted: `DataTable`'s own `defaultSort` below is the one place these

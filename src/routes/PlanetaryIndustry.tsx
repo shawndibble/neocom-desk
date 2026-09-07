@@ -61,6 +61,7 @@ import type { CachedResult, StatusResult } from '@/esi/cache';
 import type { CharacterPlanet, CharacterPlanetDetail, PlanetPin } from '@/esi/endpoints';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { formatTimestamp } from '@/lib/timestamp';
+import { useTimeZone } from '@/lib/timeFormat';
 import { formatDuration } from '@/lib/duration';
 
 const NO_NAMES: ReadonlyMap<number, string> = new Map();
@@ -486,6 +487,9 @@ function ColonyRow({
   loadedAt,
 }: ColonyRowProps) {
   const { t } = useTranslation();
+  // `ColonyRow`, not the page: this is the component that renders the Last
+  // update stamp, and the page above it renders none of its own.
+  const timeZone = useTimeZone();
   // No cached detail at all, or an extractor pin the adapter had to drop for
   // missing data: either way, computing "healthy" from what's left would be
   // exactly the confident-wrong-number the staleness rule exists to avoid.
@@ -648,7 +652,7 @@ function ColonyRow({
             )}
             <StatChip
               label={t('pi.lastUpdate')}
-              value={formatTimestamp(new Date(planet.last_update))}
+              value={formatTimestamp(new Date(planet.last_update), timeZone)}
               tooltip={t('pi.lastUpdateTooltip')}
               className="ml-auto"
             />
