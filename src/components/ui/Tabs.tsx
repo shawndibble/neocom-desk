@@ -1,10 +1,11 @@
-import { useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { cx } from '@/lib/cx';
 import {
   tabItemActiveClassName,
   tabItemClassName,
   tabItemIdleClassName,
   tabListClassName,
+  tabScrollerClassName,
 } from './tabStyles';
 
 export interface TabItem {
@@ -23,9 +24,33 @@ interface TabsProps {
   className?: string;
 }
 
-/** Controlled horizontal tab bar. For peer views within a page, not navigation. */
+/**
+ * Controlled horizontal tab bar. For peer views within a page, not navigation.
+ *
+ * The bar scrolls sideways rather than squeezing when it outgrows its frame —
+ * see `tabScrollerClassName` for why the scroller is the wrapper and not the
+ * tablist itself.
+ */
 export function Tabs({ tabs, value, onChange, label, className = '' }: TabsProps) {
   const listRef = useRef<HTMLDivElement>(null);
+
+  /**
+   * Keeps the selected tab on screen when the selection changes from outside
+   * this component — a deep link that opens a specific tab, a page selecting
+   * one in response to something else. A click or an arrow key brings its own
+   * tab into view (you cannot click what you cannot see, and `.focus()`
+   * scrolls to what it focuses), so this is only for the case nothing else
+   * covers.
+   *
+   * `block: 'nearest'` is load-bearing: the default `'start'` would scroll the
+   * page vertically to put the tab bar at the top, which is not what changing
+   * a tab asked for.
+   */
+  useEffect(() => {
+    listRef.current
+      ?.querySelector<HTMLButtonElement>(`[data-tab-id="${value}"]`)
+      ?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  }, [value]);
 
   function onKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
     if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
@@ -38,35 +63,43 @@ export function Tabs({ tabs, value, onChange, label, className = '' }: TabsProps
   }
 
   return (
-    <div
-      ref={listRef}
-      role="tablist"
-      aria-label={label}
-      onKeyDown={onKeyDown}
-      className={cx(tabListClassName, className)}
-    >
-      {tabs.map((tab) => {
-        const active = tab.id === value;
-        return (
-          <button
-            key={tab.id}
-            type="button"
-            role="tab"
-            data-tab-id={tab.id}
-            aria-selected={active}
-            tabIndex={active ? 0 : -1}
-            onClick={() => onChange(tab.id)}
-            className={cx(tabItemClassName, active ? tabItemActiveClassName : tabItemIdleClassName)}
-          >
-            {tab.label}
-            {tab.badge !== undefined && tab.badge > 0 && (
-              <span className="ml-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-accent px-1 text-[0.625rem] font-semibold text-panel tabular-nums">
-                {tab.badge}
-              </span>
-            )}
-          </button>
-        );
-      })}
+    // `className` lands on the scroller, not the tablist: callers pass spacing
+    // (`mt-3`), and margin on the inner bar would be measured inside the
+    // scrollport.
+    <div className={cx(tabScrollerClassName, className)}>
+      <div
+        ref={listRef}
+        role="tablist"
+        aria-label={label}
+        onKeyDown={onKeyDown}
+        className={tabListClassName}
+      >
+        {tabs.map((tab) => {
+          const active = tab.id === value;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              role="tab"
+              data-tab-id={tab.id}
+              aria-selected={active}
+              tabIndex={active ? 0 : -1}
+              onClick={() => onChange(tab.id)}
+              className={cx(
+                tabItemClassName,
+                active ? tabItemActiveClassName : tabItemIdleClassName
+              )}
+            >
+              {tab.label}
+              {tab.badge !== undefined && tab.badge > 0 && (
+                <span className="ml-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-accent px-1 text-[0.625rem] font-semibold text-panel tabular-nums">
+                  {tab.badge}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }

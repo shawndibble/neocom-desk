@@ -8,6 +8,7 @@ import {
   tabItemClassName,
   tabItemIdleClassName,
   tabListClassName,
+  tabScrollerClassName,
 } from '@/components/ui/tabStyles';
 
 function subNavClass({ isActive }: { isActive: boolean }): string {
@@ -36,29 +37,31 @@ export function OverviewSubNav() {
   const locked = useLockedRoutes(TAB_PATHS);
 
   return (
-    <nav aria-label={t('nav.overview')} className={tabListClassName}>
-      <NavLink to="/overview" className={subNavClass}>
-        {t('nav.overview')}
-      </NavLink>
-      {/*
-        The rail used to carry this marker for /clones; the tab has to keep it
-        now that the rail no longer lists the route. Informational only, and it
-        rides on `title` rather than extra text so the link stays named
-        "Clones" — see `NavItem` in Layout.tsx for the full reasoning.
-      */}
-      <NavLink
-        to="/clones"
-        className={subNavClass}
-        title={locked.has('/clones') ? t('reauth.navLocked') : undefined}
-      >
-        {t('nav.clones')}
-        {locked.has('/clones') && (
-          <span aria-hidden="true" className="size-1.5 shrink-0 rounded-full bg-warning" />
-        )}
-      </NavLink>
-      <NavLink to="/employment-history" className={subNavClass}>
-        {t('nav.employmentHistory')}
-      </NavLink>
-    </nav>
+    <div className={tabScrollerClassName}>
+      <nav aria-label={t('nav.overview')} className={tabListClassName}>
+        <NavLink to="/overview" className={subNavClass}>
+          {t('nav.overview')}
+        </NavLink>
+        {/*
+          The rail used to carry this marker for /clones; the tab has to keep it
+          now that the rail no longer lists the route. Informational only, and it
+          rides on `title` rather than extra text so the link stays named
+          "Clones" — see `NavItem` in Layout.tsx for the full reasoning.
+        */}
+        <NavLink
+          to="/clones"
+          className={subNavClass}
+          title={locked.has('/clones') ? t('reauth.navLocked') : undefined}
+        >
+          {t('nav.clones')}
+          {locked.has('/clones') && (
+            <span aria-hidden="true" className="size-1.5 shrink-0 rounded-full bg-warning" />
+          )}
+        </NavLink>
+        <NavLink to="/employment-history" className={subNavClass}>
+          {t('nav.employmentHistory')}
+        </NavLink>
+      </nav>
+    </div>
   );
 }

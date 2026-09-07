@@ -6,6 +6,7 @@ import {
   tabItemClassName,
   tabItemIdleClassName,
   tabListClassName,
+  tabScrollerClassName,
 } from '@/components/ui/tabStyles';
 import { useCorpAccess } from './useCorpAccess';
 
@@ -37,20 +38,22 @@ export function CorpSubNav() {
   const { t } = useTranslation();
   const { capabilities } = useCorpAccess();
   return (
-    <nav aria-label={t('nav.corp')} className={tabListClassName}>
-      <NavLink to="/corp" end className={subNavClass}>
-        {t('corp.overviewTab')}
-      </NavLink>
-      {capabilities.canReadMembers && (
-        <NavLink to="/corp/members" end className={subNavClass}>
-          {t('corp.membersTab')}
+    <div className={tabScrollerClassName}>
+      <nav aria-label={t('nav.corp')} className={tabListClassName}>
+        <NavLink to="/corp" end className={subNavClass}>
+          {t('corp.overviewTab')}
         </NavLink>
-      )}
-      {capabilities.canReadAssets && (
-        <NavLink to="/corp/assets" end className={subNavClass}>
-          {t('corp.assetsTab')}
-        </NavLink>
-      )}
-    </nav>
+        {capabilities.canReadMembers && (
+          <NavLink to="/corp/members" end className={subNavClass}>
+            {t('corp.membersTab')}
+          </NavLink>
+        )}
+        {capabilities.canReadAssets && (
+          <NavLink to="/corp/assets" end className={subNavClass}>
+            {t('corp.assetsTab')}
+          </NavLink>
+        )}
+      </nav>
+    </div>
   );
 }

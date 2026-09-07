@@ -39,6 +39,29 @@ describe('Tabs', () => {
     expect(screen.getByRole('tab', { name: 'History' })).not.toHaveTextContent(/\d/);
   });
 
+  /**
+   * The bar scrolls sideways once it outgrows its frame, so a tab selected
+   * from outside this component — a deep link opening a specific tab — can
+   * start off-screen. jsdom does no layout, so what is asserted is that the
+   * newly selected tab is the one asked to scroll, and that it is asked with
+   * `block: 'nearest'`: the default would scroll the page vertically to put
+   * the tab bar at the top, which changing a tab never asked for.
+   */
+  it('scrolls the selected tab into view when the selection changes', () => {
+    const scrollIntoView = vi
+      .spyOn(Element.prototype, 'scrollIntoView')
+      .mockImplementation(() => undefined);
+
+    const { rerender } = render(<Tabs tabs={tabs} value="open" onChange={() => undefined} />);
+    expect(scrollIntoView.mock.instances.at(-1)).toBe(screen.getByRole('tab', { name: 'Open' }));
+    expect(scrollIntoView).toHaveBeenLastCalledWith({ block: 'nearest', inline: 'nearest' });
+
+    rerender(<Tabs tabs={tabs} value="history" onChange={() => undefined} />);
+    expect(scrollIntoView.mock.instances.at(-1)).toBe(screen.getByRole('tab', { name: 'History' }));
+
+    scrollIntoView.mockRestore();
+  });
+
   it('moves selection with arrow keys, wrapping', async () => {
     const onChange = vi.fn();
     render(<Tabs tabs={tabs} value="open" onChange={onChange} />);
