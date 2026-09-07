@@ -16,6 +16,8 @@
  * names get resolved — the engine ranks, it does not look anything up.
  */
 
+import { severityForRemaining, type DeadlineSeverity } from '../severity';
+
 /**
  * The kinds of clock the board merges, in the order that breaks a deadline tie.
  *
@@ -37,8 +39,13 @@ export type CorpBoardItemKind = (typeof CORP_BOARD_ITEM_KINDS)[number];
 /**
  * How urgent an item is. Derived from time remaining and nothing else — see
  * `severityForRemaining`.
+ *
+ * An alias for the shared `DeadlineSeverity`, kept under its corp name because
+ * five modules already read rows and strips in these terms. The ladder itself
+ * moved to `engine/severity.ts` when the character's Coming Up rail needed the
+ * same one; this file re-exports it so no corp call site had to move with it.
  */
-export type CorpBoardSeverity = 'critical' | 'warning' | 'watch' | 'clear';
+export type CorpBoardSeverity = DeadlineSeverity;
 
 /**
  * What kind of clock an item has, which is also what its sort position means:
@@ -166,29 +173,18 @@ export interface CorpBoardSources {
   jobs?: readonly BoardJobSource[];
 }
 
-const HOUR_MS = 3_600_000;
-const DAY_MS = 86_400_000;
-
 /**
- * The one severity ladder, applied to every kind of item alike.
+ * The one severity ladder, applied to every kind of item alike — now shared
+ * with the character board, so it lives in `engine/severity.ts`.
  *
- * This function existing at all is the point: a Fortizar with 25 days of fuel
- * and an Athanor with 2 are the same kind of item at very different urgencies,
- * so urgency cannot be a property of the endpoint an item came from. Nothing
- * here may branch on `CorpBoardItemKind`.
- *
- * `null` — an item with no clock — takes the middle tone. It cannot derive a
- * level, and neither extreme is honest: an offline service is a real fault, but
- * a standing one, and ranking it above a structure that runs dry tonight would
- * invert the ordering the board exists to provide.
+ * Re-exported rather than wrapped: `board.test.ts` and every corp consumer
+ * import it from here, and a wrapper would be a second function to keep
+ * honest for no gain. `null` — an item with no clock — takes the middle tone
+ * there for the reason this file has always given: an offline service is a
+ * real fault, but a standing one, and ranking it above a structure that runs
+ * dry tonight would invert the ordering the board exists to provide.
  */
-export function severityForRemaining(remainingMs: number | null): CorpBoardSeverity {
-  if (remainingMs === null) return 'warning';
-  if (remainingMs <= 24 * HOUR_MS) return 'critical';
-  if (remainingMs <= 3 * DAY_MS) return 'warning';
-  if (remainingMs <= 7 * DAY_MS) return 'watch';
-  return 'clear';
-}
+export { severityForRemaining };
 
 /** The per-source half of an item; the two builders below add every derived field. */
 type ItemBase = Pick<CorpBoardItem, 'id' | 'kind' | 'subject' | 'detail' | 'typeId'>;
