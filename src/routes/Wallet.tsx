@@ -607,7 +607,15 @@ export function Wallet() {
   const divisionLabel = (entry: WalletDivision) =>
     entry.name ?? t('wallet.corpDivisionFallback', { division: entry.division });
 
-  /** One Refresh button, so it reloads whichever corp reads this page is showing. */
+  /**
+   * One Refresh button, so it reloads whichever corp reads this page is showing.
+   *
+   * "Showing" means *enabled*, not *on screen*: a tab visited once this visit
+   * stays enabled so a tab toggle doesn't re-page it (#413), so once Journal
+   * and Transactions have both been opened, Refresh on the Balance tab reloads
+   * all three. That is the cost of #413's own trade and it is bounded — the
+   * user asked for a refresh, and each read is one per division per visit.
+   */
   const handleCorpRefresh = () => {
     corpBalances.refresh();
     corpJournal.refresh();
@@ -769,9 +777,13 @@ export function Wallet() {
   const [transactionFilter, setTransactionFilter] = useState<WalletTransactionFilter>(
     EMPTY_WALLET_TRANSACTION_FILTER
   );
-  const [lastTransactionScope, setLastTransactionScope] = useState(effectiveDivision);
-  if (lastTransactionScope !== effectiveDivision) {
-    setLastTransactionScope(effectiveDivision);
+  // Keyed on the journal's own scope string, owner included — not on the
+  // division alone. The tab only exists for a corporation, so an owner flip
+  // hides it either way; but the flip *back* can land straight on Transactions
+  // through `?tab=`, and it would arrive carrying the filter from before.
+  const [lastTransactionScope, setLastTransactionScope] = useState(journalFilterScope);
+  if (lastTransactionScope !== journalFilterScope) {
+    setLastTransactionScope(journalFilterScope);
     setTransactionFilter(EMPTY_WALLET_TRANSACTION_FILTER);
   }
   const filteredTransactions = useMemo(

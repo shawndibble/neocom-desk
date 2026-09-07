@@ -541,6 +541,35 @@ describe('Wallet', () => {
       expect(within(table).queryByText('Tritanium')).not.toBeInTheDocument();
     });
 
+    /**
+     * The filter is per-visit view state, and "this division traded nothing"
+     * is what a filter left over from another owner or division looks like.
+     */
+    it('drops the filter when the owner switches away and back', async () => {
+      const user = userEvent.setup();
+      await seedCorpCharacter();
+
+      window.history.pushState({}, '', '/wallet?owner=corporation&tab=transactions');
+      render(<App />);
+
+      const search = await screen.findByPlaceholderText('Search item…');
+      await user.type(search, 'Megacyte');
+      expect(await screen.findByText('No transactions match this filter.')).toBeInTheDocument();
+
+      await user.click(screen.getByRole('button', { name: 'Personal' }));
+      // Scoped to the switch: the personal Balance tab it lands on also has a
+      // sortable "Corporation" column header in the loyalty table.
+      const ownerButton = (name: string) =>
+        screen.getAllByRole('button', { name }).find((el) => el.hasAttribute('aria-pressed'))!;
+      await user.click(ownerButton('Corporation'));
+
+      // Back on the corp side, the tab is offered again and its filter is empty.
+      await user.click(await screen.findByRole('tab', { name: 'Transactions' }));
+      const table = await screen.findByRole('table', { name: 'Transactions' });
+      expect(await within(table).findByText('Tritanium')).toBeInTheDocument();
+      expect(screen.getByPlaceholderText('Search item…')).toHaveValue('');
+    });
+
     it('says so when the filter, not the division, is why the table is empty', async () => {
       const user = userEvent.setup();
       await seedCorpCharacter();
