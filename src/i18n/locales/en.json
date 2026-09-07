@@ -716,8 +716,8 @@
       },
       "market": {
         "name": "Market",
-        "desc": "Order books, spreads and variation comparison across Jita, Amarr, Dodixie, Rens and Hek. Browsing prices needs no login at all.",
-        "tag": "Public data"
+        "desc": "Order books, spreads and variation comparison across Jita, Amarr, Dodixie, Rens and Hek. Built on public price data, so it works whatever you did or didn't grant.",
+        "tag": "No scope needed"
       },
       "orders": {
         "name": "Market Orders",
