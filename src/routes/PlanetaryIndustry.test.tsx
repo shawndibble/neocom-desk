@@ -9,6 +9,12 @@ import '@/i18n';
 import { db } from '@/db';
 import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharacter';
 import { usePublicInfo } from '@/stores/publicInfo';
+import {
+  useShowAltColonies,
+  DEFAULT_PI_COLONIES_SHOW_ALTS,
+  PI_COLONIES_SHOW_ALTS_KEY,
+} from '@/features/pi/coloniesAltPref';
+import { usePlanControls, DEFAULT_PI_PLAN_CONTROLS } from '@/features/pi/planControlsPref';
 import { App } from '@/app/App';
 import { expandChain } from '@/engine/pi/chain';
 import type { PiData } from '@/sde/types';
@@ -218,6 +224,10 @@ beforeEach(async () => {
   await db.esiCache.clear();
   useActiveCharacter.setState({ activeCharacterId: null, hydrated: false });
   usePublicInfo.setState({ byCharacterId: {} });
+  // Module-scope stores: without a reset, a choice one test makes is the state
+  // the next one opens on.
+  useShowAltColonies.setState({ value: DEFAULT_PI_COLONIES_SHOW_ALTS, hydrated: false });
+  usePlanControls.setState({ value: DEFAULT_PI_PLAN_CONTROLS, hydrated: false });
 
   await db.characters.put({ characterId: CHAR_ID, name: 'Pilot One', ownerHash: 'oh', addedAt: 1 });
   await db.tokens.put({
@@ -524,7 +534,7 @@ describe('PlanetaryIndustry', () => {
       })
     );
 
-    render(<App />);
+    const { unmount } = render(<App />);
     await colonyPanelFor(/Jita IV/);
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: /show alt colonies/i }));
@@ -537,6 +547,17 @@ describe('PlanetaryIndustry', () => {
     expect(within(panel).getByText('Pilot One')).toBeInTheDocument();
     expect(within(panel).getByText('Alt Two')).toBeInTheDocument();
     expect(altPlanetsFetch).not.toHaveBeenCalled();
+
+    // And the choice survives leaving the page. The alt roster is loaded
+    // unconditionally and cache-only, so remembering "on" costs no extra
+    // request — `altPlanetsFetch` is still untouched on the second visit.
+    unmount();
+    useShowAltColonies.setState({ hydrated: false });
+    render(<App />);
+    await colonyPanelFor(/Jita IV/);
+    expect(await within(coloniesPanel()).findByText('Alt Two')).toBeInTheDocument();
+    expect(altPlanetsFetch).not.toHaveBeenCalled();
+    expect((await db.settings.get(PI_COLONIES_SHOW_ALTS_KEY))?.value).toBe(true);
   });
 
   it('skips an alt without the planets scope: no ESI call, no re-auth banner', async () => {

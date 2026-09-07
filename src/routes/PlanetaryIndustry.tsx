@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Navigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -22,6 +22,7 @@ import { db } from '@/db';
 import { loadCharacterPlanets, loadAllColonyDetails } from '@/features/pi/data';
 import { PlanPanel } from '@/features/pi/PlanPanel';
 import { AdvisorPanel } from '@/features/pi/AdvisorPanel';
+import { useShowAltColonies } from '@/features/pi/coloniesAltPref';
 import {
   loadPiRosterSnapshot,
   type PiRosterSnapshot,
@@ -803,8 +804,16 @@ export function PlanetaryIndustry() {
   }, []);
   // Off by default: appends every other Character's cache-only colonies
   // (features/pi/roster.ts) below the active Character's live ones, grouped
-  // by character.
-  const [showAltColonies, setShowAltColonies] = useState(false);
+  // by character. Remembered under its own key — see `coloniesAltPref.ts` for
+  // why it is not the Advisor's. Ungated on `hydrated`: the roster loads
+  // unconditionally in `loadPiSnapshot`, so this only decides whether rows
+  // already in memory are rendered, and costs no request either way.
+  const showAltColonies = useShowAltColonies((state) => state.value);
+  const hydrateShowAltColonies = useShowAltColonies((state) => state.hydrate);
+  const setShowAltColonies = useShowAltColonies((state) => state.setValue);
+  useEffect(() => {
+    void hydrateShowAltColonies();
+  }, [hydrateShowAltColonies]);
 
   const tab: PiTab = parseTab(searchParams.get('tab'));
   const plannedTypeId = parsePositiveInt(searchParams.get('type'));
@@ -1020,7 +1029,7 @@ export function PlanetaryIndustry() {
                     <FilterChip
                       label={t('pi.altColonies.toggleLabel')}
                       selected={showAltColonies}
-                      onToggle={() => setShowAltColonies((current) => !current)}
+                      onToggle={() => void setShowAltColonies(!showAltColonies)}
                       count={otherCharacterCount}
                     />
                   ) : undefined
