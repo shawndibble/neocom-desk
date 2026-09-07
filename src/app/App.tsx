@@ -99,11 +99,24 @@ const ROUTE_ELEMENTS = {
 // `Object.entries` widens the key back to `string`; the union is the point.
 const FEATURE_ROUTES = Object.entries(ROUTE_ELEMENTS) as [AppRoutePath, ReactElement][];
 
-/** Index gate: characters exist -> /characters, none -> /login. */
+/**
+ * Index gate: an active Character -> /overview, characters but none picked ->
+ * /characters, none at all -> /login.
+ *
+ * Overview is what the rail opens with and what a returning user came back
+ * for; the character list is a place you go to switch or add one, so landing
+ * there every time made every visit start with a step. Waits on the
+ * active-character store as well as the count — deciding before hydration
+ * resolves would send a returning user to /characters, which Overview's own
+ * guard would then have to send back.
+ */
 function Root() {
   const characterCount = useLiveQuery(() => db.characters.count());
-  if (characterCount === undefined) return <BootScreen />;
-  return <Navigate to={characterCount > 0 ? '/characters' : '/login'} replace />;
+  const hydrated = useActiveCharacter((state) => state.hydrated);
+  const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
+  if (characterCount === undefined || !hydrated) return <BootScreen />;
+  if (characterCount === 0) return <Navigate to="/login" replace />;
+  return <Navigate to={activeCharacterId === null ? '/characters' : '/overview'} replace />;
 }
 
 export function App() {
