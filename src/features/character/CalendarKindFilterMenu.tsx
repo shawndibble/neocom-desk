@@ -19,6 +19,11 @@
  *
  * The trigger states how many types are hidden **as a number**, not as an
  * accent tint — "this list is filtered" may not be carried by colour alone.
+ *
+ * Each row carries its kind's swatch, which makes this menu double as the
+ * legend for the colour the rest of the page paints (`components/ui/kindTone.ts`).
+ * That is deliberate: the hues are picked *here*, so the place they are picked
+ * is the place to learn them.
  */
 import { useTranslation } from 'react-i18next';
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent } from '@/components/ui';
@@ -28,6 +33,7 @@ import { controlHeightClassName } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
 import { CHARACTER_BOARD_ITEM_KINDS, type CharacterBoardItemKind } from '@/engine/character/board';
 import { KIND_LABEL } from './calendarKindLabels';
+import { KIND_FILL } from '@/components/ui/kindTone';
 
 export interface CalendarKindFilterMenuProps {
   hidden: readonly CharacterBoardItemKind[];
@@ -96,6 +102,16 @@ export function CalendarKindFilterMenu({
             onSelect={(event) => event.preventDefault()}
             onCheckedChange={() => onToggle(kind)}
           >
+            {/*
+              The swatch makes this menu the legend for the six hues the rail,
+              the map and the ticker paint — the one place a pilot can learn
+              that mint means Planets. Decorative only: the label it sits
+              beside already says the same thing (DESIGN.md §5, §7).
+            */}
+            <span
+              aria-hidden="true"
+              className={`size-2 shrink-0 rounded-full ${KIND_FILL[kind]}`}
+            />
             <span className="flex-1">{t(KIND_LABEL[kind])}</span>
             <span className="ml-2 text-[0.6875rem] text-text-dim tabular-nums">
               {countLabel(kind)}

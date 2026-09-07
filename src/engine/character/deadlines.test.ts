@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildCharacterBoard, type BoardClockSource } from './board';
+import { buildCharacterBoard, CHARACTER_BOARD_ITEM_KINDS, type BoardClockSource } from './board';
 import {
   countsByDay,
   countsByKind,
@@ -56,38 +56,67 @@ describe('countsByDay', () => {
 
     const days = countsByDay(board);
 
-    expect(days.get(local(2026, 9, 7, 0, 0))).toEqual({ count: 2, severity: 'critical' });
-    expect(days.get(local(2026, 9, 20, 0, 0))).toEqual({ count: 1, severity: 'clear' });
+    expect(days.get(local(2026, 9, 7, 0, 0))).toEqual({ count: 2, kinds: ['industryJob'] });
+    expect(days.get(local(2026, 9, 20, 0, 0))).toEqual({ count: 1, kinds: ['industryJob'] });
     expect(days.has(local(2026, 9, 8, 0, 0))).toBe(false);
   });
 
   /**
-   * A day is coloured by the worst thing landing on it, not by the first or
-   * the last one read — the whole point of a day bucket is that one bad item
-   * cannot hide behind four calm ones.
+   * The count carries how much lands on a day; the kinds carry what it is.
+   * Listing a kind once however many items it contributes is what lets the
+   * map spend one dot per kind rather than one per item — four skill
+   * completions are one fact about the day, not four.
    */
-  it('takes the worst severity on a day, whatever order the items arrive in', () => {
+  it('lists each kind once, in board order, whatever order the items arrive in', () => {
     const board = buildCharacterBoard({
       nowMs: NOW,
-      // Same day, four days out: `clear` on its own would be wrong for a day
-      // that also holds something due within the hour.
-      industryJobs: [clock('calm', local(2026, 9, 11, 9))],
-      contractExpiries: [clock('urgent', local(2026, 9, 11, 10))],
+      // Deliberately handed in an order that is neither board order nor the
+      // order they fall due, so a pass cannot come from either accident.
+      orderExpiries: [clock('order', local(2026, 9, 11, 8))],
+      industryJobs: [clock('job-1', local(2026, 9, 11, 9)), clock('job-2', local(2026, 9, 11, 21))],
+      calendarEvents: [
+        {
+          id: 'op',
+          subject: 'op',
+          detail: '',
+          deadlineMs: local(2026, 9, 11, 19),
+          response: 'accepted',
+          important: false,
+        },
+      ],
     });
-
-    const withUrgent = countsByDay(
-      buildCharacterBoard({
-        nowMs: local(2026, 9, 10, 12),
-        industryJobs: [clock('calm', local(2026, 9, 11, 9))],
-        contractExpiries: [clock('urgent', local(2026, 9, 11, 10))],
-      })
-    );
 
     expect(countsByDay(board).get(local(2026, 9, 11, 0, 0))).toEqual({
-      count: 2,
-      severity: 'watch',
+      count: 4,
+      kinds: ['calendarEvent', 'industryJob', 'orderExpiry'],
     });
-    expect(withUrgent.get(local(2026, 9, 11, 0, 0))).toEqual({ count: 2, severity: 'critical' });
+  });
+
+  it('holds every kind a day can carry without collapsing any of them', () => {
+    const day = local(2026, 9, 11, 9);
+    const board = buildCharacterBoard({
+      nowMs: NOW,
+      calendarEvents: [
+        {
+          id: 'op',
+          subject: 'op',
+          detail: '',
+          deadlineMs: day,
+          response: 'accepted',
+          important: false,
+        },
+      ],
+      skillTraining: [clock('skill', day)],
+      industryJobs: [clock('job', day)],
+      planetExtractions: [clock('planet', day)],
+      contractExpiries: [clock('contract', day)],
+      orderExpiries: [clock('order', day)],
+    });
+
+    expect(countsByDay(board).get(local(2026, 9, 11, 0, 0))).toEqual({
+      count: 6,
+      kinds: [...CHARACTER_BOARD_ITEM_KINDS],
+    });
   });
 });
 

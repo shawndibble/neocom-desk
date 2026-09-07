@@ -4,7 +4,8 @@
  * A month grid and a list cannot share a 390px viewport — the grid wins the
  * space and the list, which is the thing being read, gets what is left. So on
  * a phone the map collapses to its useful axis: a week of day columns, each
- * with a severity bar and a count, scrolled sideways for the weeks after it.
+ * with a count and a bar segmented by kind, scrolled sideways for the weeks
+ * after it.
  *
  * The same `DayLoad` buckets the wide grid reads, sliced rather than
  * re-bucketed — a prefix of the engine's answer cannot disagree with the wider
@@ -16,7 +17,8 @@ import type { DayLoad } from '@/engine/character/deadlines';
 import { localMidnight } from '@/engine/character/deadlines';
 import type { GridDay } from '@/lib/calendarGrid';
 import { cx } from '@/lib/cx';
-import { SEVERITY_FILL, SEVERITY_LABEL } from '@/components/ui/severityTone';
+import { KIND_FILL } from '@/components/ui/kindTone';
+import { useDayLoadLabel } from './dayLoadLabel';
 
 export interface CalendarDayTickerProps {
   days: readonly GridDay[];
@@ -35,11 +37,7 @@ export function CalendarDayTicker({
 }: CalendarDayTickerProps) {
   const { t, i18n } = useTranslation();
   const weekday = new Intl.DateTimeFormat(i18n.language, { weekday: 'short' });
-  const fullDate = new Intl.DateTimeFormat(i18n.language, {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-  });
+  const dayLabel = useDayLoadLabel();
   const todayMs = localMidnight(nowMs);
 
   return (
@@ -58,16 +56,8 @@ export function CalendarDayTicker({
             key={day.key}
             type="button"
             aria-pressed={isSelected}
-            /* The bar is colour and nothing else, so the name carries the word. */
-            aria-label={
-              load
-                ? t('calendar.map.dayWithLoad', {
-                    date: fullDate.format(day.date),
-                    count: load.count,
-                    severity: t(SEVERITY_LABEL[load.severity]),
-                  })
-                : t('calendar.map.dayEmpty', { date: fullDate.format(day.date) })
-            }
+            /* The bar is colour and nothing else, so the name carries the words. */
+            aria-label={dayLabel(day.date, load)}
             onClick={() => onSelectDay(isSelected ? null : dayStartMs)}
             className={cx(
               'flex min-h-11 w-12 shrink-0 flex-col items-center gap-1 rounded-xs border px-1 py-1.5',
@@ -89,11 +79,17 @@ export function CalendarDayTicker({
             >
               {day.date.getDate()}
             </span>
-            {/* Reserved whether or not the day holds anything, so every column lines up. */}
-            <span
-              aria-hidden="true"
-              className={`h-0.5 w-6 rounded-full ${load ? SEVERITY_FILL[load.severity] : ''}`}
-            />
+            {/*
+              One segment per kind, sharing the bar's width — the phone's
+              version of the grid's row of dots, and the same `load.kinds`
+              order, so a day reads the same on both. Reserved whether or not
+              the day holds anything, so every column lines up.
+            */}
+            <span aria-hidden="true" className="flex h-0.5 w-6 gap-px overflow-hidden rounded-full">
+              {load?.kinds.map((kind) => (
+                <span key={kind} className={`flex-1 ${KIND_FILL[kind]}`} />
+              ))}
+            </span>
             <span className="h-3.5 text-[0.6875rem] leading-3.5 text-text-dim tabular-nums">
               {load ? load.count : ''}
             </span>

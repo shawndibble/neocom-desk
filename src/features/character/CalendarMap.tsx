@@ -3,8 +3,15 @@
  *
  * The grid used to hold up to three event chips per cell and defer the rest to
  * a Week view. It no longer holds anything — a cell shows its date, how many
- * clocks land on it, and a dot per clock coloured by severity. The detail
- * lives in the Coming Up Rail beside it, which has the width for it.
+ * clocks land on it, and one dot per *kind* of clock. The detail lives in the
+ * Coming Up Rail beside it, which has the width for it.
+ *
+ * **One dot per kind, not per item.** The dots used to be one per clock, all
+ * painted the day's worst severity — so four dots repeated the count sitting
+ * two inches away and a `+N` overflow was needed for busy days. Now the number
+ * carries how much and the dots carry what of, which is the question the grid
+ * is actually good at answering: there are only six kinds, so no cell can
+ * overflow and the dots line up in the same order in every cell.
  *
  * **Past days are drawn, hatched and captioned.** ESI's `/calendar` returns
  * events from now only and the cache replaces its row wholesale, so no past
@@ -24,10 +31,8 @@ import { localMidnight } from '@/engine/character/deadlines';
 import { weekdayLabels, type GridDay } from '@/lib/calendarGrid';
 import { cx } from '@/lib/cx';
 
-import { SEVERITY_FILL, SEVERITY_LABEL } from '@/components/ui/severityTone';
-
-/** Beyond this a cell shows a count instead of more dots — four dots is already a texture, not a number. */
-const MAX_DOTS = 4;
+import { KIND_FILL } from '@/components/ui/kindTone';
+import { useDayLoadLabel } from './dayLoadLabel';
 
 export interface CalendarMapProps {
   days: readonly GridDay[];
@@ -50,13 +55,9 @@ export function CalendarPastHint({ className = '' }: { className?: string }) {
 }
 
 export function CalendarMap({ days, loads, nowMs, selectedDayMs, onSelectDay }: CalendarMapProps) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const labels = weekdayLabels();
-  const fullDate = new Intl.DateTimeFormat(i18n.language, {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-  });
+  const dayLabel = useDayLoadLabel();
   const todayMs = localMidnight(nowMs);
 
   return (
@@ -94,19 +95,11 @@ export function CalendarMap({ days, loads, nowMs, selectedDayMs, onSelectDay }: 
               aria-pressed={isSelected}
               /*
                 DESIGN.md §7: colour is never the only signal. The dots carry
-                severity visually and nothing else does, so the day's own name
-                says it in words — which is also what makes the weekday header
-                row safe to hide from assistive tech.
+                the kinds visually and nothing else does, so the day's own name
+                lists them in words — which is also what makes the weekday
+                header row safe to hide from assistive tech.
               */
-              aria-label={
-                load
-                  ? t('calendar.map.dayWithLoad', {
-                      date: fullDate.format(day.date),
-                      count: load.count,
-                      severity: t(SEVERITY_LABEL[load.severity]),
-                    })
-                  : t('calendar.map.dayEmpty', { date: fullDate.format(day.date) })
-              }
+              aria-label={dayLabel(day.date, load)}
               // A past day is still a real button: pressing it scopes the rail
               // to a day that is genuinely empty, which is a truthful answer.
               // Disabling it would leave the pilot with a dead control and no
@@ -138,18 +131,13 @@ export function CalendarMap({ days, loads, nowMs, selectedDayMs, onSelectDay }: 
               </span>
               {load && (
                 <span className="mt-auto flex flex-wrap items-center gap-1 pt-1">
-                  {Array.from({ length: Math.min(load.count, MAX_DOTS) }, (_, i) => (
+                  {load.kinds.map((kind) => (
                     <span
-                      key={i}
+                      key={kind}
                       aria-hidden="true"
-                      className={`size-1.5 rounded-full ${SEVERITY_FILL[load.severity]}`}
+                      className={`size-1.5 rounded-full ${KIND_FILL[kind]}`}
                     />
                   ))}
-                  {load.count > MAX_DOTS && (
-                    <span className="text-[0.6875rem] text-text-dim tabular-nums">
-                      +{load.count - MAX_DOTS}
-                    </span>
-                  )}
                 </span>
               )}
             </button>

@@ -73,16 +73,6 @@ describe('buildCharacterBoard', () => {
     expect(board[1].remainingMs).toBe(-1 * HOUR);
   });
 
-  it('derives severity from the shared ladder, not from the kind', () => {
-    const board = build({
-      calendarEvents: [event({ id: 'soon', deadlineMs: at(2 * HOUR) })],
-      orderExpiries: [clock({ id: 'far', deadlineMs: at(30 * DAY) })],
-    });
-
-    expect(board.find((item) => item.sourceId === 'soon')?.severity).toBe('critical');
-    expect(board.find((item) => item.sourceId === 'far')?.severity).toBe('clear');
-  });
-
   /**
    * Ties are broken explicitly rather than left to sort stability, so the
    * board is a function of its inputs and not of the order this happened to

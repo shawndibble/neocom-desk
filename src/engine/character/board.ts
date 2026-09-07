@@ -12,9 +12,16 @@
  *
  * Pure by construction (CLAUDE.md): plain numbers and strings in, plain objects
  * out. `nowMs` is a parameter rather than a `Date.now()` call, so every
- * ordering and every severity is deterministic under test. Callers adapt the
- * ESI shapes at the boundary (`features/character/calendarBoardSources.ts`) —
- * this ranks, it does not fetch, parse a date or look a name up.
+ * ordering is deterministic under test. Callers adapt the ESI shapes at the
+ * boundary (`features/character/calendarBoardSources.ts`) — this ranks, it
+ * does not fetch, parse a date or look a name up.
+ *
+ * **No severity here.** The board used to carry `severityForRemaining`'s
+ * four-value ladder and the page used to paint it. Colour on this page now
+ * names the *kind* of clock instead (`components/ui/kindTone.ts`), and urgency
+ * is carried by the two things that always said it plainly: the order of the
+ * list and the countdown on every row. `engine/severity.ts` stays where it is
+ * — the corp ops board still ranks by it.
  *
  * Unlike the corp board there is no `timing` union here. Every character clock
  * is a real instant or it is not on the board at all: a paused skill queue has
@@ -22,8 +29,6 @@
  * system already reports, not a countdown. The adapter drops those rather than
  * inventing an untimed row with nothing to sort on.
  */
-
-import { severityForRemaining, type DeadlineSeverity } from '../severity';
 
 /**
  * The kinds of clock the board merges, in the order that breaks a deadline tie.
@@ -85,7 +90,6 @@ export interface CharacterBoardItem extends BoardClockSource {
    * every one of them into a single tie. Clamp at the point of display.
    */
   remainingMs: number;
-  severity: DeadlineSeverity;
   /** Calendar events only; `null` for every other kind. */
   response: CalendarResponse | null;
   /** Calendar events only; `false` for every other kind. */
@@ -146,7 +150,6 @@ function toItem(
     detail: source.detail,
     deadlineMs: source.deadlineMs,
     remainingMs,
-    severity: severityForRemaining(remainingMs),
     response: isCalendarEvent(source) ? source.response : null,
     important: isCalendarEvent(source) ? source.important : false,
   };

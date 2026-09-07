@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
@@ -151,6 +151,32 @@ describe('Calendar', () => {
 
     expect(await screen.findByText('Fleet Op')).toBeInTheDocument();
     expect(await screen.findByText(/industry jobs/i)).toBeInTheDocument();
+  });
+
+  /**
+   * The map's dots and the ticker's segments are pure colour, so a day cell's
+   * accessible name is the only thing that says which kinds landed on it
+   * (DESIGN.md §7) — and since the colour now means kind rather than urgency,
+   * naming a severity there would describe a signal the page no longer paints.
+   *
+   * The `{{`/`undefined` assertion is the point of the test: an interpolation
+   * renamed on one side only does not throw, it just ships a placeholder into
+   * a name nobody sighted will ever read.
+   */
+  it('names the kinds landing on a day, rather than a severity', async () => {
+    server.use(http.get(`${ESI}/industry/jobs`, () => HttpResponse.json(jobs)));
+    render(<App />);
+
+    expect(await screen.findByText('Fleet Op')).toBeInTheDocument();
+
+    const labels = within(screen.getByRole('group', { name: /calendar map/i }))
+      .getAllByRole('button')
+      .map((cell) => cell.getAttribute('aria-label') ?? '')
+      .filter((label) => label.includes('due:'));
+
+    expect(labels.length).toBeGreaterThan(0);
+    expect(labels.join(' ')).toContain('Calendar events');
+    expect(labels.join(' ')).not.toMatch(/\{\{|undefined/);
   });
 
   /**

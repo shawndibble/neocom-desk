@@ -11,8 +11,8 @@
  *
  * Every converter **drops** a row it cannot give a real instant to, rather than
  * passing a `NaN` or a `null` deadline down. A `NaN` sorts unpredictably and
- * compares false against every severity threshold, so it must not reach the
- * engine at all; and a character clock with no instant is not a countdown —
+ * buckets onto no day at all, so it must not reach the engine; and a character
+ * clock with no instant is not a countdown —
  * a paused skill queue is a standing fault the notification system already
  * reports, not a row with nothing to sort on.
  */
