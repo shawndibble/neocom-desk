@@ -7,6 +7,7 @@ import {
   diffIndustryJobComplete,
   diffPlanetaryExtractionDone,
   diffPlanetaryExtractorExpiring,
+  supersededExtractorOccurrences,
   diffNewMail,
   diffNewCalendarEvent,
   diffCalendarEventStarting,
@@ -23,6 +24,7 @@ import {
   type SkillQueueSnapshot,
   type IndustryJobEntrySnapshot,
   type IndustryJobSnapshot,
+  type ColonyExtractorSnapshot,
   type ColonySnapshotEntry,
   type ExtractorExpiringFire,
   type PlanetarySnapshot,
@@ -47,6 +49,7 @@ import {
   type CorpWalletDivisionSnapshot,
   type CorpWalletSnapshot,
 } from './notificationDiffs';
+import { occurrenceKey } from './occurrenceKey';
 
 function entry(
   overrides: Partial<SkillQueueEntrySnapshot> &
@@ -480,7 +483,7 @@ const HOUR = 3_600_000;
 /** A colony whose extractor pin ids are given explicitly, so a restart on the same pin is expressible. */
 function colonyWithPins(
   planetId: number,
-  extractors: readonly { pinId: number; expiryTimeMs: number }[]
+  extractors: readonly ColonyExtractorSnapshot[]
 ): ColonySnapshotEntry {
   return { planetId, extractors };
 }
@@ -654,6 +657,162 @@ describe('diffPlanetaryExtractorExpiring', () => {
       expiringFire(7, 1, 1, 24 * HOUR, T0 + 24 * HOUR + FIVE_MIN),
       expiringFire(7, 1, 2, 24 * HOUR, T0 + 24 * HOUR + FIVE_MIN),
     ]);
+  });
+});
+
+describe('supersededExtractorOccurrences', () => {
+  const OLD_EXPIRY = T0 + 10 * HOUR;
+  const NEW_EXPIRY = T0 + 58 * HOUR;
+
+  /** The reported case: replaced ten minutes before the old program ran out. */
+  function restartedEarly(planetId = 1, pinId = 1) {
+    return {
+      prev: planetarySnapshot(
+        [colonyWithPins(planetId, [{ pinId, expiryTimeMs: OLD_EXPIRY }])],
+        T0
+      ),
+      next: planetarySnapshot(
+        [
+          colonyWithPins(planetId, [
+            { pinId, expiryTimeMs: NEW_EXPIRY, installTimeMs: OLD_EXPIRY - 10 * 60_000 },
+          ]),
+        ],
+        OLD_EXPIRY + HOUR
+      ),
+    };
+  }
+
+  it('finds nothing without a baseline to compare against', () => {
+    const { next } = restartedEarly();
+    expect(supersededExtractorOccurrences(7, undefined, next)).toEqual([]);
+  });
+
+  it('finds every occurrence keyed on a program replaced before it could expire', () => {
+    const { prev, next } = restartedEarly();
+    expect(supersededExtractorOccurrences(7, prev, next)).toEqual([
+      expiringFire(7, 1, 1, 24 * HOUR, OLD_EXPIRY),
+      expiringFire(7, 1, 1, 12 * HOUR, OLD_EXPIRY),
+      { eventId: 'planetaryExtractionDone', characterId: 7, planetId: 1, expiryTimeMs: OLD_EXPIRY },
+    ]);
+  });
+
+  it('finds nothing when the program was left to expire and only then restarted', () => {
+    // The extraction really did stop: the feed row is history, not a mistake.
+    const prev = planetarySnapshot(
+      [colonyWithPins(1, [{ pinId: 1, expiryTimeMs: OLD_EXPIRY }])],
+      T0
+    );
+    const next = planetarySnapshot(
+      [colonyWithPins(1, [{ pinId: 1, expiryTimeMs: NEW_EXPIRY, installTimeMs: OLD_EXPIRY + 1 }])],
+      OLD_EXPIRY + 2 * HOUR
+    );
+    expect(supersededExtractorOccurrences(7, prev, next)).toEqual([]);
+  });
+
+  it('finds nothing for a program still running under its original expiry', () => {
+    const prev = planetarySnapshot(
+      [colonyWithPins(1, [{ pinId: 1, expiryTimeMs: OLD_EXPIRY }])],
+      T0
+    );
+    const next = planetarySnapshot(
+      [colonyWithPins(1, [{ pinId: 1, expiryTimeMs: OLD_EXPIRY, installTimeMs: T0 - HOUR }])],
+      T0 + FIVE_MIN
+    );
+    expect(supersededExtractorOccurrences(7, prev, next)).toEqual([]);
+  });
+
+  it('claims nothing when ESI omitted the replacement program install time', () => {
+    // `install_time` is spec-optional (`features/pi/adapters.ts`). Without it
+    // there is no evidence the old program was cut short, and a retraction on
+    // a guess would erase a true "extraction done" from the feed.
+    const prev = planetarySnapshot(
+      [colonyWithPins(1, [{ pinId: 1, expiryTimeMs: OLD_EXPIRY }])],
+      T0
+    );
+    const next = planetarySnapshot(
+      [colonyWithPins(1, [{ pinId: 1, expiryTimeMs: NEW_EXPIRY }])],
+      OLD_EXPIRY + HOUR
+    );
+    expect(supersededExtractorOccurrences(7, prev, next)).toEqual([]);
+  });
+
+  it('claims nothing about a colony or pin that has since disappeared', () => {
+    const prev = planetarySnapshot(
+      [
+        colonyWithPins(1, [{ pinId: 1, expiryTimeMs: OLD_EXPIRY }]),
+        colonyWithPins(2, [{ pinId: 9, expiryTimeMs: OLD_EXPIRY }]),
+      ],
+      T0
+    );
+    const next = planetarySnapshot([colonyWithPins(2, [])], OLD_EXPIRY + HOUR);
+    expect(supersededExtractorOccurrences(7, prev, next)).toEqual([]);
+  });
+
+  it('retracts the colony-level stop only when every pin that set the soonest expiry was cut short', () => {
+    // `planetaryExtractionDone` keys on `Math.min(...expiries)` and
+    // `colonyStatus` reads a colony as idle the moment *any* program expires,
+    // so a second pin sharing that expiry and left alone means the colony did
+    // go idle — only the restarted pin's own warnings are retractable.
+    const prev = planetarySnapshot(
+      [
+        colonyWithPins(1, [
+          { pinId: 1, expiryTimeMs: OLD_EXPIRY },
+          { pinId: 2, expiryTimeMs: OLD_EXPIRY },
+        ]),
+      ],
+      T0
+    );
+    const next = planetarySnapshot(
+      [
+        colonyWithPins(1, [
+          { pinId: 1, expiryTimeMs: NEW_EXPIRY, installTimeMs: OLD_EXPIRY - HOUR },
+          { pinId: 2, expiryTimeMs: OLD_EXPIRY, installTimeMs: T0 - HOUR },
+        ]),
+      ],
+      OLD_EXPIRY + HOUR
+    );
+    expect(supersededExtractorOccurrences(7, prev, next)).toEqual([
+      expiringFire(7, 1, 1, 24 * HOUR, OLD_EXPIRY),
+      expiringFire(7, 1, 1, 12 * HOUR, OLD_EXPIRY),
+    ]);
+  });
+
+  it('leaves a later pin alone when only the soonest-expiring one was restarted', () => {
+    const laterExpiry = OLD_EXPIRY + 20 * HOUR;
+    const prev = planetarySnapshot(
+      [
+        colonyWithPins(1, [
+          { pinId: 1, expiryTimeMs: OLD_EXPIRY },
+          { pinId: 2, expiryTimeMs: laterExpiry },
+        ]),
+      ],
+      T0
+    );
+    const next = planetarySnapshot(
+      [
+        colonyWithPins(1, [
+          { pinId: 1, expiryTimeMs: NEW_EXPIRY, installTimeMs: OLD_EXPIRY - HOUR },
+          { pinId: 2, expiryTimeMs: laterExpiry, installTimeMs: T0 - HOUR },
+        ]),
+      ],
+      OLD_EXPIRY + HOUR
+    );
+    expect(supersededExtractorOccurrences(7, prev, next)).toEqual([
+      expiringFire(7, 1, 1, 24 * HOUR, OLD_EXPIRY),
+      expiringFire(7, 1, 1, 12 * HOUR, OLD_EXPIRY),
+      { eventId: 'planetaryExtractionDone', characterId: 7, planetId: 1, expiryTimeMs: OLD_EXPIRY },
+    ]);
+  });
+
+  it('produces occurrence keys the poller and the push backend already agree on', () => {
+    // The retraction has to address the very rows a Scheduled Push wrote, so
+    // the fires must key identically to the ones `projection.ts` projected.
+    const { prev, next } = restartedEarly();
+    const keys = supersededExtractorOccurrences(7, prev, next).map((fire) =>
+      occurrenceKey(fire, next.nowMs)
+    );
+    expect(keys).toContain(`7:planetaryExtractionDone:1:${OLD_EXPIRY}`);
+    expect(keys).toContain(`7:planetaryExtractorExpiring:1:${OLD_EXPIRY}:${12 * HOUR}`);
   });
 });
 

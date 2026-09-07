@@ -54,6 +54,7 @@ import {
   diffIndustryJobComplete,
   diffPlanetaryExtractionDone,
   diffPlanetaryExtractorExpiring,
+  supersededExtractorOccurrences,
   diffNewMail,
   diffNewCalendarEvent,
   diffCalendarEventStarting,
@@ -225,6 +226,24 @@ interface PollDomainSpec<TRaw, TSnapshot, TFire extends AnyNotificationFire> {
   /** Run in order against the snapshot; a domain may register more than one. */
   readonly diffs: readonly DomainDiff<TSnapshot, TFire>[];
   /**
+   * The inverse of `diffs`: occurrences this poll can prove never happened,
+   * so an alert already delivered for one can be retracted from the
+   * Notification Feed. Only the planetary domain has any — see
+   * `engine/notificationDiffs.supersededExtractorOccurrences` — because only
+   * there does a routine in-game action falsify a Scheduled Push that has
+   * already fired, under a *different* Occurrence Key than the corrected
+   * state will later produce, so nothing else revisits the row.
+   *
+   * Ungated by `enabledEvents` on purpose: the rows being retracted may have
+   * been written by Web Push or another device, so the state of this
+   * device's toggles is no evidence about whether one exists.
+   */
+  readonly superseded?: (
+    characterId: number,
+    prev: TSnapshot | undefined,
+    next: TSnapshot
+  ) => TFire[];
+  /**
    * Turns this poll's snapshot into Scheduled Push Projection rows (issue
    * #355, ADR 0010) — absent for a domain with nothing inside the 72-hour
    * horizon worth projecting (mail, wallet, market orders, corp roster: all
@@ -259,6 +278,11 @@ export interface PollDomain {
     prev: unknown,
     next: unknown,
     enabledEvents: ReadonlySet<NotificationEventId>
+  ) => AnyNotificationFire[];
+  readonly superseded?: (
+    characterId: number,
+    prev: unknown,
+    next: unknown
   ) => AnyNotificationFire[];
   readonly projection?: (
     characterId: number,
@@ -296,6 +320,10 @@ function defineDomain<TRaw, TSnapshot, TFire extends AnyNotificationFire>(
       }
       return fires;
     },
+    superseded: spec.superseded
+      ? (characterId, prev, next) =>
+          spec.superseded!(characterId, prev as TSnapshot | undefined, next as TSnapshot)
+      : undefined,
     projection: spec.projection
       ? (characterId, characterName, snapshot, nowMs) =>
           spec.projection!(characterId, characterName, snapshot as TSnapshot, nowMs)
@@ -427,7 +455,12 @@ export const industryJobDomain = defineDomain<
 function isExtractorSnapshot(raw: unknown): raw is ColonyExtractorSnapshot {
   if (typeof raw !== 'object' || raw === null) return false;
   const r = raw as Record<string, unknown>;
-  return typeof r.pinId === 'number' && typeof r.expiryTimeMs === 'number';
+  if (typeof r.pinId !== 'number' || typeof r.expiryTimeMs !== 'number') return false;
+  // Optional in storage as well as on the wire: every snapshot written before
+  // `supersededExtractorOccurrences` needed `install_time` lacks the field,
+  // and those must stay readable rather than being discarded as a stale shape
+  // on the first poll after an update.
+  return r.installTimeMs === undefined || typeof r.installTimeMs === 'number';
 }
 
 function isColonySnapshotEntry(raw: unknown): raw is ColonySnapshotEntry {
@@ -465,7 +498,14 @@ export const colonyDomain = defineDomain<
       const programs = extractorProgramsFromPins(detail.cached.data.pins);
       colonies.push({
         planetId: planet.planet_id,
-        extractors: programs.map((p) => ({ pinId: p.pinId, expiryTimeMs: p.expiryTimeMs })),
+        extractors: programs.map((p) => ({
+          pinId: p.pinId,
+          expiryTimeMs: p.expiryTimeMs,
+          ...(p.installTimeMs !== undefined ? { installTimeMs: p.installTimeMs } : {}),
+          // Carried only for `supersededExtractorOccurrences`; no warning
+          // reads it (ADR 0005). Omitted rather than defaulted when ESI left
+          // it out, since a default would be evidence this does not have.
+        })),
       });
     }
     return colonies;
@@ -477,6 +517,7 @@ export const colonyDomain = defineDomain<
     gatedOn('planetaryExtractionDone', diffPlanetaryExtractionDone),
     gatedOn('planetaryExtractorExpiring', diffPlanetaryExtractorExpiring),
   ],
+  superseded: supersededExtractorOccurrences,
   projection: async (characterId, characterName, snapshot, nowMs) => {
     const planetNames = await resolveProjectionNames(
       snapshot.colonies.map((colony) => colony.planetId),

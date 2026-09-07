@@ -35,6 +35,7 @@ import { loadCorporationWallets, loadCorporationWalletJournal } from '@/features
 import { loadCharacterRoles } from '@/features/corp/roles';
 import { loadUniverseType } from '@/features/skills/data';
 import { loadPlanetName } from '@/features/pi/names';
+import { loadCharacterPlanets, loadAllColonyDetails } from '@/features/pi/data';
 import { db } from '@/db';
 import type { StatusResult } from '@/esi/cache';
 import type {
@@ -77,6 +78,10 @@ vi.mock('@/features/pi/names', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/features/pi/names')>();
   return { ...actual, loadPlanetName: vi.fn() };
 });
+vi.mock('@/features/pi/data', () => ({
+  loadCharacterPlanets: vi.fn(),
+  loadAllColonyDetails: vi.fn(),
+}));
 
 function statusResult<T>(data: T, truncated: boolean): StatusResult<T> {
   return {
@@ -314,6 +319,61 @@ describe('projection wiring', () => {
     const rows = await industryJobDomain.projection!(7, 'Kestrel', snapshot, T0);
     expect(rows).toHaveLength(1);
     expect(rows[0].body).toContain('Rifter');
+  });
+
+  it('carries each extractor install time into the colony snapshot, and omits it when ESI did', async () => {
+    // The only evidence `supersededExtractorOccurrences` can retract on.
+    // Dropped here — as this mapping did before the retraction needed it —
+    // and the feature silently never fires, with nothing failing to say so.
+    vi.mocked(loadCharacterPlanets).mockResolvedValue(
+      statusResult([{ planet_id: 40000001, solar_system_id: 1, owner_id: 7 }], false) as never
+    );
+    vi.mocked(loadAllColonyDetails).mockResolvedValue(
+      new Map([
+        [
+          40000001,
+          statusResult(
+            {
+              links: [],
+              routes: [],
+              pins: [
+                {
+                  pin_id: 1,
+                  type_id: 2848,
+                  latitude: 0,
+                  longitude: 0,
+                  expiry_time: '2026-09-07T12:00:00Z',
+                  install_time: '2026-09-05T12:00:00Z',
+                  extractor_details: { heads: [] },
+                },
+                {
+                  pin_id: 2,
+                  type_id: 2848,
+                  latitude: 0,
+                  longitude: 0,
+                  expiry_time: '2026-09-07T18:00:00Z',
+                  extractor_details: { heads: [] },
+                },
+              ],
+            },
+            false
+          ),
+        ],
+      ]) as never
+    );
+    expect(await colonyDomain.load(7)).toEqual([
+      {
+        planetId: 40000001,
+        extractors: [
+          {
+            pinId: 1,
+            expiryTimeMs: Date.parse('2026-09-07T12:00:00Z'),
+            installTimeMs: Date.parse('2026-09-05T12:00:00Z'),
+          },
+          { pinId: 2, expiryTimeMs: Date.parse('2026-09-07T18:00:00Z') },
+        ],
+      },
+    ]);
   });
 
   it('resolves planet names for colonies', async () => {

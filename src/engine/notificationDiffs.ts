@@ -222,6 +222,18 @@ export function diffIndustryJobComplete(
 export interface ColonyExtractorSnapshot {
   pinId: number;
   expiryTimeMs: number;
+  /**
+   * When this program was installed, or absent when ESI omitted it —
+   * `install_time` is spec-optional (`features/pi/adapters.ts`).
+   *
+   * Not part of any warning: `expiry_time` alone answers idle and
+   * expiring-soon (ADR 0005). It is here for
+   * `supersededExtractorOccurrences`, which needs to know whether a
+   * replacement program went in *before* the one it replaced ran out —
+   * the only evidence on the wire that an already-delivered alert was
+   * about something that never happened.
+   */
+  installTimeMs?: number;
 }
 
 export interface ColonySnapshotEntry {
@@ -364,6 +376,89 @@ export function diffPlanetaryExtractorExpiring(
           expiryTimeMs: extractor.expiryTimeMs,
         });
       }
+    }
+  }
+  return fires;
+}
+
+/**
+ * The mirror image of the two diffs above: occurrences already announced that
+ * this poll can prove never happened.
+ *
+ * A Scheduled Push is a prediction fired without a re-check (ADR 0010), so a
+ * pilot who does a reset run in game with the app closed gets told programs
+ * expired that they had already replaced. `projection.ts` hedges the copy so
+ * the alert is no longer a false claim; this is the other half, for the row
+ * it leaves in the Notification Feed. A restarted program takes a **new**
+ * `expiry_time`, hence a new Occurrence Key, so nothing in ordinary polling
+ * ever revisits the old row — it would sit there unchallenged forever.
+ *
+ * The evidence is `install_time`. A replacement installed *before* the
+ * program it replaced was due to expire is proof that expiry never arrived.
+ * Everything short of that proof answers empty, deliberately: a program left
+ * to run out and only then restarted did genuinely stop, and its feed row is
+ * history rather than a mistake. So a missing `install_time` (spec-optional),
+ * a vanished colony or pin, and an unchanged expiry all retract nothing —
+ * the cost of a wrong retraction is erasing something true.
+ *
+ * Returns fires rather than keys so the caller derives Occurrence Keys
+ * through `occurrenceKey.ts`, the same function the projection and the
+ * Foreground Poller use — retracting a row means addressing the exact id
+ * some other party wrote, and re-deriving that format here would be the one
+ * way to silently miss.
+ */
+export function supersededExtractorOccurrences(
+  characterId: number,
+  prev: PlanetarySnapshot | undefined,
+  next: PlanetarySnapshot
+): (ExtractorExpiringFire | PlanetaryNotificationFire)[] {
+  if (!prev) return [];
+  const nextByPlanet = new Map(next.colonies.map((c) => [c.planetId, c]));
+  const fires: (ExtractorExpiringFire | PlanetaryNotificationFire)[] = [];
+
+  for (const prevColony of prev.colonies) {
+    if (prevColony.extractors.length === 0) continue;
+    const nextColony = nextByPlanet.get(prevColony.planetId);
+    if (!nextColony) continue;
+    const nextByPin = new Map(nextColony.extractors.map((e) => [e.pinId, e]));
+
+    const cutShort = (program: ColonyExtractorSnapshot): boolean => {
+      const replacement = nextByPin.get(program.pinId);
+      if (!replacement || replacement.installTimeMs === undefined) return false;
+      // A pin still carrying the same expiry is the same program, not a
+      // replacement — program identity is (pinId, expiryTimeMs).
+      if (replacement.expiryTimeMs === program.expiryTimeMs) return false;
+      return replacement.installTimeMs < program.expiryTimeMs;
+    };
+
+    const supersededPrograms = prevColony.extractors.filter(cutShort);
+    for (const program of supersededPrograms) {
+      for (const thresholdMs of EXTRACTOR_EXPIRY_WARNING_MS) {
+        fires.push({
+          eventId: 'planetaryExtractorExpiring',
+          characterId,
+          planetId: prevColony.planetId,
+          pinId: program.pinId,
+          thresholdMs,
+          expiryTimeMs: program.expiryTimeMs,
+        });
+      }
+    }
+
+    // `planetaryExtractionDone` keys on the colony's soonest expiry, and
+    // `colonyStatus` reads a colony as idle the moment *any* program passes
+    // its own. So the colony genuinely stopped unless every program holding
+    // that soonest expiry was cut short — one left alone is enough to have
+    // idled the colony on schedule.
+    const soonestExpiryMs = Math.min(...prevColony.extractors.map((e) => e.expiryTimeMs));
+    const atSoonest = prevColony.extractors.filter((e) => e.expiryTimeMs === soonestExpiryMs);
+    if (atSoonest.every(cutShort)) {
+      fires.push({
+        eventId: 'planetaryExtractionDone',
+        characterId,
+        planetId: prevColony.planetId,
+        expiryTimeMs: soonestExpiryMs,
+      });
     }
   }
   return fires;
