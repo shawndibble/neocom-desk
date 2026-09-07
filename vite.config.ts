@@ -4,6 +4,7 @@ import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
 import { sentryVitePlugin } from '@sentry/vite-plugin';
+import { copyFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { readFileSync } from 'node:fs';
 
@@ -68,6 +69,34 @@ const DOM_TS_TESTS = [
  */
 const sentryAuthToken = process.env.SENTRY_AUTH_TOKEN;
 
+/**
+ * GitHub Pages has no SPA rewrite: it looks for a file at the requested path
+ * and, finding none, serves `404.html`. So every deep link — a shared
+ * `/overview`, a bookmark, and the EVE SSO redirect back to `/callback` —
+ * lands on GitHub's own 404 page for anyone whose service worker is not yet
+ * installed and controlling navigations (src/sw.ts handles the rest).
+ *
+ * Shipping `index.html` under that name too is the standard fix: Pages still
+ * answers 404, but the body is the app, which boots and routes the path
+ * client-side. An address that really matches nothing then reaches the `*`
+ * route and its own NotFound screen, rather than a stock GitHub page.
+ *
+ * Last in `plugins` so `closeBundle` runs after VitePWA has taken its manifest
+ * — otherwise the copy is precached as a second, identical `index.html`.
+ */
+function spaFallbackHtml() {
+  return {
+    name: 'neocom-spa-fallback-html',
+    // Build only. `closeBundle` also fires when a dev server shuts down, where
+    // there is no `dist/` to copy and the throw would surface as a crash on
+    // Ctrl+C in a fresh worktree.
+    apply: 'build' as const,
+    closeBundle() {
+      copyFileSync('dist/index.html', 'dist/404.html');
+    },
+  };
+}
+
 export default defineConfig({
   base: '/',
   build: { sourcemap: sentryAuthToken ? 'hidden' : false },
@@ -131,6 +160,7 @@ export default defineConfig({
           }),
         ]
       : []),
+    spaFallbackHtml(),
   ],
   resolve: {
     alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
