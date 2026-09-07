@@ -78,10 +78,13 @@ here — they go one per file in `docs/context/decisions/`.
 - **Cost Index**: A solar system's current manufacturing activity level
   (read live from ESI). Higher activity in a system drives its Job Fee up;
   distinct from EIV, which prices the materials rather than the system.
-- **Dark**: A member with no login for `DARK_AFTER_DAYS` (30) or more.
-  `engine/corp/members.ts` owns the threshold as a named constant; nothing in
-  the UI may hold a second opinion about what dark means. A member who joined
-  and has never logged in is counted from the day they joined, not excluded.
+- **Dark**: A member with no login for the corp's inactivity span or more —
+  the pilot's own setting (14/30/60/90 days), defaulting to
+  `DARK_AFTER_DAYS` (30). `engine/corp/members.ts` still owns the default and
+  takes the span as an argument; one value is threaded from the view boundary
+  so the table's tone, the rail's count and the roster's dark-only filter can
+  never hold a second opinion about what dark means. A member who joined and
+  has never logged in is counted from the day they joined, not excluded.
 - **Data Age**: Timestamp shown on every API-derived view; how old the cached data is. Refresh happens on app open + manual button only.
 - **Data Owner**: Whose rows a page's table is showing — `personal` or
   `corporation`. Selected per page by the Personal / Corporation switch,

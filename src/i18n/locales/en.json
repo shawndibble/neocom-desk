@@ -2567,7 +2567,40 @@
     "dataTitle": "Data",
     "dataHint": "Clear locally cached EVE data if a view looks stale or you're troubleshooting — the app refetches from ESI as needed.",
     "clearCache": "Clear cached ESI data",
-    "clearCacheConfirm": "Cache cleared."
+    "clearCacheConfirm": "Cache cleared.",
+    "defaultsTitle": "Defaults",
+    "corpDefaultsTitle": "Corporation",
+    "timeFormatLabel": "Time format",
+    "timeFormatHint": "EVE runs on UTC — the clock other players quote timers in. Calendar keeps your local days either way.",
+    "timeFormat": {
+      "local": "My local time",
+      "eve": "EVE time (UTC)"
+    },
+    "tradeHubLabel": "Default trade hub",
+    "tradeHubHint": "Prices shown in the Market browser, the LP store and item lookups. Moon mining tax uses each payee’s own hub instead.",
+    "facilityLabel": "Default facility",
+    "facilityHint": "Where a new build plan starts. Only used for your first plan — after that, a new plan copies your most recent one.",
+    "rigLevelLabel": "Rigs",
+    "rigLevel": {
+      "none": "No rigs",
+      "t1": "T1",
+      "t2": "T2"
+    },
+    "facilityTaxLabel": "Facility tax (%)",
+    "facilityTaxHint": "What the structure owner charges. Leave blank to use the standard rate.",
+    "assumedMeLabel": "Assumed ME for blueprints you don’t own",
+    "assumedMeHint": "Sub-builds are quoted at this ME. A blueprint you do own always uses its real ME instead.",
+    "piExpiringLabel": "Warn me an extractor is expiring",
+    "piExpiringHint": "How far ahead the Colonies list flags an extractor — and sorts it to the top.",
+    "darkThresholdLabel": "Members go dark after",
+    "darkThresholdHint": "Your corp’s inactivity policy. Sets the roster’s Dark filter and its count.",
+    "hours_one": "{{count}} hour",
+    "hours_other": "{{count}} hours",
+    "days_one": "{{count}} day",
+    "days_other": "{{count}} days",
+    "resetViewPrefs": "Reset saved view preferences",
+    "resetViewPrefsHint": "Pages remember sorts, filters and expanded sections as you use them. This puts them all back to their defaults. Your characters, groups, plans and saved comparisons are untouched.",
+    "resetViewPrefsConfirm": "View preferences reset."
   },
   "shortcuts": {
     "title": "Keyboard shortcuts",

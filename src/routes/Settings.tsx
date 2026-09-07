@@ -9,16 +9,38 @@ import {
   FilterChip,
   PageHeader,
   Panel,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
   Tabs,
+  TextInput,
   type DataTableColumn,
 } from '@/components/ui';
 import { useFontScale, FONT_SCALE_STEPS, type FontScale } from '@/lib/fontScale';
+import { useTimeFormat, TIME_FORMATS } from '@/lib/timeFormat';
+import { VIEW_PREFERENCE_KEYS } from '@/lib/viewPreferenceKeys';
 import { formatAge } from '@/lib/age';
 import { formatTimestamp } from '@/lib/timestamp';
 import { SHORTCUTS } from '@/lib/shortcuts';
+import { TRADE_HUBS, type TradeHub } from '@/market/hubs';
+import { FACILITY_PRESETS, type RigLevel } from '@/engine/industry/types';
+import { useMarketHub } from '@/features/market/hub';
+import { useAssumedMe, MIN_ASSUMED_ME, MAX_ASSUMED_ME } from '@/features/industry/assumedMe';
+import {
+  useFacilityDefaults,
+  normalizeFacilityDefaults,
+  type FacilityDefaults,
+} from '@/features/industry/facilityDefaults';
+import { useExpiringWindowHours, EXPIRING_WINDOW_HOUR_OPTIONS } from '@/features/pi/expiringWindow';
+import { useDarkThreshold, DARK_AFTER_DAY_OPTIONS } from '@/features/corp/darkThreshold';
+import { useCorpAccess } from '@/features/corp/useCorpAccess';
 import { NotificationsPanel } from '@/features/notifications/NotificationsPanel';
 import { CorpAccessPanel } from '@/features/corp/CorpAccessPanel';
 import { db } from '@/db';
+
+const RIG_LEVEL_OPTIONS: readonly RigLevel[] = ['none', 't1', 't2'];
 import { ENDPOINT_ROUTES } from '@/esi/endpointRoutes';
 import { useActivityLog, type ActivityLogEntry } from '@/stores/activityLog';
 import type { ActivityOutcome } from '@/esi/activityLog';
@@ -252,6 +274,254 @@ function DataPanel() {
           {t('settings.clearCache')}
         </Button>
         {clearedConfirm && <ActionConfirmation message={t('settings.clearCacheConfirm')} />}
+        <ResetViewPreferences />
+      </div>
+    </Panel>
+  );
+}
+
+/**
+ * Undoes the preferences pages remember silently — a pinned sort, a filter, a
+ * remembered tab. Those have no control of their own anywhere, by design
+ * (a duplicate control on this page is a second thing that can drift from what
+ * the page itself shows), which is exactly why there has to be one way back.
+ *
+ * Scoped to `VIEW_PREFERENCE_KEYS`, never `db.settings.clear()`: that table
+ * also holds hand-made character groups, saved skill comparisons, starred
+ * characters and ore classifications. Clearing it wholesale would destroy work
+ * the pilot did on purpose.
+ */
+function ResetViewPreferences() {
+  const { t } = useTranslation();
+  const [confirmed, setConfirmed] = useState(false);
+
+  async function handleReset() {
+    await db.settings.bulkDelete([...VIEW_PREFERENCE_KEYS]);
+    setConfirmed(true);
+    setTimeout(() => setConfirmed(false), 2000);
+    // Every one of these is read through a `createLocalSetting` store that has
+    // already hydrated, so the rows are gone but the stores still hold the old
+    // values. A reload is the honest way to show the result rather than
+    // reaching into fifteen stores from here.
+    window.location.reload();
+  }
+
+  return (
+    <div className="space-y-2 border-t border-line pt-3">
+      <p className="text-xs text-text-dim">{t('settings.resetViewPrefsHint')}</p>
+      <Button size="sm" onClick={() => void handleReset()}>
+        {t('settings.resetViewPrefs')}
+      </Button>
+      {confirmed && <ActionConfirmation message={t('settings.resetViewPrefsConfirm')} />}
+    </div>
+  );
+}
+
+/** A labelled row of preset chips — the shape every threshold control here uses. */
+function ChipRow<T extends string | number>({
+  label,
+  hint,
+  options,
+  selected,
+  onSelect,
+  labelFor,
+}: {
+  label: string;
+  hint?: string;
+  options: readonly T[];
+  selected: T;
+  onSelect: (value: T) => void;
+  labelFor: (value: T) => string;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <p className="text-xs font-semibold">{label}</p>
+      {hint && <p className="text-xs text-text-dim">{hint}</p>}
+      <div role="group" aria-label={label} className="flex flex-wrap gap-2">
+        {options.map((option) => (
+          <FilterChip
+            key={String(option)}
+            label={labelFor(option)}
+            selected={selected === option}
+            onToggle={() => onSelect(option)}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * What a page assumes when the pilot has not said otherwise. Every control
+ * here defaults to exactly what the app did before it was settable, so an
+ * existing pilot's numbers do not move until they ask them to.
+ */
+function DefaultsPanel() {
+  const { t } = useTranslation();
+  const hub = useMarketHub((state) => state.value);
+  const setHub = useMarketHub((state) => state.setValue);
+  const assumedMe = useAssumedMe((state) => state.value);
+  const setAssumedMe = useAssumedMe((state) => state.setValue);
+  const facilityDefaults = useFacilityDefaults((state) => state.value);
+  const setFacilityDefaults = useFacilityDefaults((state) => state.setValue);
+  const expiringHours = useExpiringWindowHours((state) => state.value);
+  const setExpiringHours = useExpiringWindowHours((state) => state.setValue);
+
+  const facilityPreset = FACILITY_PRESETS[facilityDefaults.facility];
+
+  return (
+    <Panel title={t('settings.defaultsTitle')}>
+      <div className="max-w-md space-y-4">
+        <div className="space-y-1.5">
+          <label htmlFor="settings-hub" className="block text-xs font-semibold">
+            {t('settings.tradeHubLabel')}
+          </label>
+          <p className="text-xs text-text-dim">{t('settings.tradeHubHint')}</p>
+          <Select value={hub} onValueChange={(value) => void setHub(value as TradeHub['id'])}>
+            <SelectTrigger id="settings-hub" aria-label={t('settings.tradeHubLabel')}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {TRADE_HUBS.map((tradeHub) => (
+                <SelectItem key={tradeHub.id} value={tradeHub.id}>
+                  {tradeHub.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-1.5 border-t border-line pt-3">
+          <label htmlFor="settings-facility" className="block text-xs font-semibold">
+            {t('settings.facilityLabel')}
+          </label>
+          <p className="text-xs text-text-dim">{t('settings.facilityHint')}</p>
+          <Select
+            value={facilityDefaults.facility}
+            onValueChange={(value) =>
+              void setFacilityDefaults(
+                // Normalised on the way in: an NPC station fits no rigs and its
+                // tax is fixed, so switching to one has to drop both rather
+                // than leave a combination that cannot exist. Same rule
+                // `BuildPlanDetail` applies to a plan.
+                normalizeFacilityDefaults({
+                  ...facilityDefaults,
+                  facility: value as FacilityDefaults['facility'],
+                })
+              )
+            }
+          >
+            <SelectTrigger id="settings-facility" aria-label={t('settings.facilityLabel')}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {Object.values(FACILITY_PRESETS).map((preset) => (
+                <SelectItem key={preset.kind} value={preset.kind}>
+                  {preset.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {/* Rig and owner-set tax only exist for a player structure. */}
+          {facilityPreset.structure && (
+            <div className="space-y-3 border-l-2 border-line pt-2 pl-3">
+              <ChipRow
+                label={t('settings.rigLevelLabel')}
+                options={RIG_LEVEL_OPTIONS}
+                selected={facilityDefaults.rigLevel}
+                onSelect={(rigLevel) => void setFacilityDefaults({ ...facilityDefaults, rigLevel })}
+                labelFor={(rigLevel) => t(`settings.rigLevel.${rigLevel}`)}
+              />
+              <div className="space-y-1.5">
+                <label htmlFor="settings-facility-tax" className="block text-xs font-semibold">
+                  {t('settings.facilityTaxLabel')}
+                </label>
+                <p className="text-xs text-text-dim">{t('settings.facilityTaxHint')}</p>
+                <TextInput
+                  id="settings-facility-tax"
+                  type="number"
+                  min={0}
+                  step={0.01}
+                  value={facilityDefaults.facilityTaxPct ?? ''}
+                  placeholder={String(facilityPreset.defaultTaxPct)}
+                  onChange={(event) => {
+                    const raw = event.target.value.trim();
+                    const parsed = Number(raw);
+                    void setFacilityDefaults({
+                      ...facilityDefaults,
+                      // Empty means "use the preset's own", which is what a
+                      // plan with no tax of its own already does.
+                      facilityTaxPct:
+                        raw === '' || !Number.isFinite(parsed) || parsed < 0 ? null : parsed,
+                    });
+                  }}
+                />
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="space-y-1.5 border-t border-line pt-3">
+          <label htmlFor="settings-assumed-me" className="block text-xs font-semibold">
+            {t('settings.assumedMeLabel')}
+          </label>
+          <p className="text-xs text-text-dim">{t('settings.assumedMeHint')}</p>
+          <TextInput
+            id="settings-assumed-me"
+            type="number"
+            min={MIN_ASSUMED_ME}
+            max={MAX_ASSUMED_ME}
+            step={1}
+            value={assumedMe}
+            onChange={(event) => {
+              const parsed = Math.round(Number(event.target.value));
+              if (!Number.isFinite(parsed)) return;
+              void setAssumedMe(Math.min(MAX_ASSUMED_ME, Math.max(MIN_ASSUMED_ME, parsed)));
+            }}
+          />
+        </div>
+
+        <div className="border-t border-line pt-3">
+          <ChipRow
+            label={t('settings.piExpiringLabel')}
+            hint={t('settings.piExpiringHint')}
+            options={EXPIRING_WINDOW_HOUR_OPTIONS}
+            selected={expiringHours}
+            onSelect={(hours) => void setExpiringHours(hours)}
+            labelFor={(hours) => t('settings.hours', { count: hours })}
+          />
+        </div>
+      </div>
+    </Panel>
+  );
+}
+
+/**
+ * The corp roster's inactivity policy. Rendered only for a Character who can
+ * actually reach the corp section — a setting for a page you cannot open is
+ * noise, and this follows the same hide-rather-than-lock rule the corp nav
+ * itself uses.
+ */
+function CorpDefaultsPanel() {
+  const { t } = useTranslation();
+  const access = useCorpAccess();
+  const darkAfterDays = useDarkThreshold((state) => state.value);
+  const setDarkAfterDays = useDarkThreshold((state) => state.setValue);
+
+  if (access.state !== 'ready') return null;
+
+  return (
+    <Panel title={t('settings.corpDefaultsTitle')}>
+      <div className="max-w-md">
+        <ChipRow
+          label={t('settings.darkThresholdLabel')}
+          hint={t('settings.darkThresholdHint')}
+          options={DARK_AFTER_DAY_OPTIONS}
+          selected={darkAfterDays}
+          onSelect={(days) => void setDarkAfterDays(days)}
+          labelFor={(days) => t('settings.days', { count: days })}
+        />
       </div>
     </Panel>
   );
@@ -261,6 +531,8 @@ export function Settings() {
   const { t } = useTranslation();
   const scale = useFontScale((state) => state.value);
   const setScale = useFontScale((state) => state.setValue);
+  const timeFormat = useTimeFormat((state) => state.value);
+  const setTimeFormat = useTimeFormat((state) => state.setValue);
   const { hash } = useLocation();
   // Resolved in the initializer, not an effect, so the first paint is already
   // the tab the link asked for — an effect would render General first and swap
@@ -322,8 +594,28 @@ export function Settings() {
                   />
                 ))}
               </div>
+              {/*
+                EVE runs on UTC and so does every timer other players quote,
+                which is why one column already rendered it before this was
+                settable. The Calendar grids are deliberately excluded — they
+                bucket events into local-day cells, so converting only the
+                rendered string would file a late-evening event under the wrong
+                day.
+              */}
+              <div className="border-t border-line pt-3">
+                <ChipRow
+                  label={t('settings.timeFormatLabel')}
+                  hint={t('settings.timeFormatHint')}
+                  options={TIME_FORMATS}
+                  selected={timeFormat}
+                  onSelect={(format) => void setTimeFormat(format)}
+                  labelFor={(format) => t(`settings.timeFormat.${format}`)}
+                />
+              </div>
             </div>
           </Panel>
+          <DefaultsPanel />
+          <CorpDefaultsPanel />
           <Panel title={t('shortcuts.title')}>
             {/* `max-w-md` inside the full-width page frame: a description and its
                 key are a pair, and at the page's own width `justify-between` threw

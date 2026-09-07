@@ -19,6 +19,16 @@ import {
 } from '@/features/notifications/permission';
 import { App } from '@/app/App';
 import { formatTimestamp } from '@/lib/timestamp';
+import { useTimeFormat, DEFAULT_TIME_FORMAT, TIME_FORMAT_SETTING_KEY } from '@/lib/timeFormat';
+import { useMarketHub } from '@/features/market/hub';
+import { useAssumedMe, ASSUMED_ME_SETTING_KEY } from '@/features/industry/assumedMe';
+import {
+  useFacilityDefaults,
+  DEFAULT_FACILITY_DEFAULTS,
+} from '@/features/industry/facilityDefaults';
+import { useExpiringWindowHours } from '@/features/pi/expiringWindow';
+import { useDarkThreshold } from '@/features/corp/darkThreshold';
+import { VIEW_PREFERENCE_KEYS } from '@/lib/viewPreferenceKeys';
 
 vi.mock('virtual:pwa-register/react', () => ({
   useRegisterSW: () => ({
@@ -62,6 +72,14 @@ beforeEach(async () => {
   await db.tokens.clear();
   useActiveCharacter.setState({ activeCharacterId: null, hydrated: false });
   useFontScale.setState({ value: DEFAULT_FONT_SCALE, hydrated: false });
+  // Module-scope singletons: a value left over from a previous test would
+  // make the assertions below pass or fail for the wrong reason.
+  useTimeFormat.setState({ value: DEFAULT_TIME_FORMAT, hydrated: false });
+  useMarketHub.setState({ value: 'jita', hydrated: false });
+  useAssumedMe.setState({ value: 0, hydrated: false });
+  useFacilityDefaults.setState({ value: DEFAULT_FACILITY_DEFAULTS, hydrated: false });
+  useExpiringWindowHours.setState({ value: 24, hydrated: false });
+  useDarkThreshold.setState({ value: 30, hydrated: false });
   useNotificationPreferences.setState({ value: DEFAULT_NOTIFICATION_PREFERENCES, hydrated: false });
   useNotificationPromptState.setState({
     value: { ...DEFAULT_NOTIFICATION_PROMPT_STATE, seen: true },
@@ -660,5 +678,114 @@ describe('Settings — Notifications (issue #170)', () => {
     expect(panel.getAllByText(/^Overview$/).length).toBeGreaterThan(0);
     expect(panel.queryByText(/^App$/)).not.toBeInTheDocument();
     expect(panel.queryByText(/^List$/)).not.toBeInTheDocument();
+  });
+});
+
+describe('Settings defaults', () => {
+  it('defaults the time format to local, and persists a switch to EVE time', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByRole('heading', { level: 1, name: /settings/i });
+
+    const group = screen.getByRole('group', { name: /time format/i });
+    expect(group.querySelector('[aria-pressed="true"]')).toHaveTextContent(/my local time/i);
+
+    await user.click(screen.getByRole('button', { name: /eve time/i }));
+
+    await waitFor(async () => {
+      expect((await db.settings.get(TIME_FORMAT_SETTING_KEY))?.value).toBe('eve');
+    });
+  });
+
+  it('surfaces the trade hub that Market Browser already writes', async () => {
+    render(<App />);
+    await screen.findByRole('heading', { level: 1, name: /settings/i });
+
+    // The point of the control: the key existed but was only reachable from
+    // inside one panel of one page.
+    expect(screen.getByRole('combobox', { name: /default trade hub/i })).toHaveTextContent(/jita/i);
+  });
+
+  it('clamps the assumed ME into the range the engine accepts', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByRole('heading', { level: 1, name: /settings/i });
+
+    const input = screen.getByLabelText(/assumed me/i);
+    await user.clear(input);
+    await user.type(input, '99');
+
+    // The engine range-checks ME and throws outside 0..10, so the control
+    // must never hand it a value it would reject.
+    await waitFor(async () => {
+      expect((await db.settings.get(ASSUMED_ME_SETTING_KEY))?.value).toBe(10);
+    });
+  });
+
+  it('hides rig and tax for an NPC station, which fits neither', async () => {
+    render(<App />);
+    await screen.findByRole('heading', { level: 1, name: /settings/i });
+
+    expect(screen.getByRole('combobox', { name: /default facility/i })).toHaveTextContent(/npc/i);
+    expect(screen.queryByRole('group', { name: /rigs/i })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/facility tax/i)).not.toBeInTheDocument();
+  });
+
+  it('reveals rig and tax once the default facility is a player structure', async () => {
+    useFacilityDefaults.setState({
+      value: { facility: 'azbel', rigLevel: 't1', facilityTaxPct: 2 },
+      hydrated: true,
+    });
+    render(<App />);
+    await screen.findByRole('heading', { level: 1, name: /settings/i });
+
+    expect(await screen.findByRole('group', { name: /rigs/i })).toBeInTheDocument();
+    expect(screen.getByLabelText(/facility tax/i)).toHaveValue(2);
+  });
+
+  it('offers the PI expiring-soon window, defaulting to 24 hours', async () => {
+    render(<App />);
+    await screen.findByRole('heading', { level: 1, name: /settings/i });
+
+    const group = screen.getByRole('group', { name: /extractor is expiring/i });
+    expect(group.querySelector('[aria-pressed="true"]')).toHaveTextContent(/24 hours/i);
+  });
+
+  it('hides the corp inactivity policy from a character with no corp access', async () => {
+    render(<App />);
+    await screen.findByRole('heading', { level: 1, name: /settings/i });
+
+    // Hide rather than lock, the same rule the corp nav follows — a setting
+    // for a page you cannot open is noise.
+    expect(screen.queryByRole('group', { name: /members go dark/i })).not.toBeInTheDocument();
+  });
+});
+
+describe('Reset saved view preferences', () => {
+  it('clears every view-preference key and nothing else', async () => {
+    const reloadSpy = vi.fn();
+    vi.stubGlobal('location', { ...window.location, reload: reloadSpy });
+
+    for (const key of VIEW_PREFERENCE_KEYS) {
+      await db.settings.put({ key, value: 'something' });
+    }
+    // User-created content and the active character must survive.
+    await db.settings.put({ key: 'overviewGroups', value: { groups: ['Mains'] } });
+    await db.settings.put({ key: 'characters.starred', value: [CHAR_ID] });
+
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByRole('heading', { level: 1, name: /settings/i });
+
+    await user.click(screen.getByRole('button', { name: /reset saved view preferences/i }));
+
+    await waitFor(async () => {
+      for (const key of VIEW_PREFERENCE_KEYS) {
+        expect(await db.settings.get(key)).toBeUndefined();
+      }
+    });
+    expect(await db.settings.get('overviewGroups')).toBeDefined();
+    expect(await db.settings.get('characters.starred')).toBeDefined();
+    expect(await db.settings.get(ACTIVE_CHARACTER_KEY)).toBeDefined();
   });
 });
