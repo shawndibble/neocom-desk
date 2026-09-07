@@ -6,6 +6,7 @@ import {
   useState,
   type PointerEvent,
   type ReactElement,
+  type ReactNode,
   type TouchEvent,
 } from 'react';
 import { Tooltip as TooltipPrimitive } from 'radix-ui';
@@ -18,8 +19,19 @@ const TOUCH_LONG_PRESS_MS = 500;
 const TOUCH_MOVE_TOLERANCE_PX = 10;
 
 interface TooltipProps {
-  /** One-line plain-language tooltip content. A literal `\n` renders as a line break (`whitespace-pre-line`), for a rare second line like a formula's numbers. */
-  content: string;
+  /**
+   * Tooltip content. Usually one line of plain language, where a literal `
+`
+   * renders as a line break (`whitespace-pre-line`) — for a rare second line
+   * like a formula's numbers.
+   *
+   * A node is for the rare bubble that must lead with something the reader
+   * cannot miss (the industry materials table's make-or-buy verdict, bold over
+   * its reasoning), never for laying out a panel: 14rem of undismissable,
+   * unscrollable hover is the wrong home for a list, and on touch it is only
+   * reachable by long-press.
+   */
+  content: ReactNode;
   /** Single focusable trigger element (button, etc.) — tooltip reveals on hover or focus. */
   children: ReactElement<{ className?: string }>;
   /**

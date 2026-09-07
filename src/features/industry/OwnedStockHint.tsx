@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui';
+import { Tooltip } from '@/components/ui';
 import type { DetectedOwnedStock } from '@/engine/industry/ownedStock';
 import type { OwnedStockDetection } from './ownedStockDetection';
 
@@ -28,7 +28,7 @@ interface OwnedStockHintProps {
 }
 
 /**
- * The detected-owned-stock line under a material's "Owned" input (issue #181).
+ * The detected-owned-stock offer under a material's "Owned" input (issue #181).
  *
  * The number is a suggestion, never a stored value: detection writes nothing,
  * and this row's "use" action goes through the same sourcing-change callback
@@ -36,6 +36,17 @@ interface OwnedStockHintProps {
  * the raw total, because the field means "units of this material this plan
  * draws on" — the engine already clamps to that range, and storing an oversized
  * number would silently cover a larger requirement if `runs` went up later.
+ *
+ * One control, not two. This used to print the detected total beside the offer
+ * — "16 owned   USE 16" — which said the same number twice in a column already
+ * dense with numbers, in a table now long enough that every repeated word
+ * costs a row. The total and the full placement breakdown moved onto the
+ * offer's own hover tooltip, where they are read when wanted rather than
+ * always; the offer itself is the only thing left on screen.
+ *
+ * So nothing renders once the offer is taken (`canApply` false) — by then the
+ * quantity is in the input beside it, which is the thing the plan actually
+ * uses.
  *
  * When any Character's asset list was short or unreadable the total is rendered
  * as a lower bound. Under-reporting owned stock inflates the plan's buy list
@@ -64,69 +75,49 @@ export function OwnedStockHint({
     ? t('industry.detectedOwnedAtLeast', { quantity })
     : t('industry.detectedOwned', { quantity });
 
+  if (!canApply) return null;
+
   return (
-    <span className="flex items-center justify-end gap-2 text-[0.6875rem] text-text-dim">
-      <Popover>
-        <PopoverTrigger asChild>
-          <button
-            type="button"
-            aria-label={t('industry.detectedOwnedFor', { detected, material: materialName })}
-            className="rounded-xs underline decoration-dotted underline-offset-2 hover:text-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-          >
-            {detected}
-          </button>
-        </PopoverTrigger>
-        <PopoverContent
-          align="end"
-          aria-label={t('industry.detectedOwnedTitle', { material: materialName })}
-          className="max-w-80 p-2 text-left text-xs font-normal"
-        >
-          <p className="font-semibold text-text">
-            {t('industry.detectedOwnedTitle', { material: materialName })}
-          </p>
-          <ul className="mt-1 space-y-0.5">
+    <Tooltip
+      content={
+        <span className="flex flex-col gap-1 text-left">
+          <span className="font-semibold">{detected}</span>
+          <span className="flex flex-col">
             {shown.map((placement) => (
-              <li
-                key={`${placement.characterId}:${placement.locationId}`}
-                className="flex justify-between gap-3"
-              >
-                <span>
-                  {t('industry.detectedOwnedPlacement', {
-                    character: detection.characterNameFor(placement.characterId),
-                    location: detection.locationLabelFor(placement),
-                  })}
-                </span>
-                <span className="tabular-nums">{placement.quantity.toLocaleString()}</span>
-              </li>
+              <span key={`${placement.characterId}:${placement.locationId}`}>
+                {t('industry.detectedOwnedPlacement', {
+                  character: detection.characterNameFor(placement.characterId),
+                  location: detection.locationLabelFor(placement),
+                })}
+                {': '}
+                {placement.quantity.toLocaleString()}
+              </span>
             ))}
             {remaining > 0 && (
-              <li className="text-text-faint">
-                {t('industry.detectedOwnedMoreLocations', { more: remaining })}
-              </li>
+              <span>{t('industry.detectedOwnedMoreLocations', { more: remaining })}</span>
             )}
-          </ul>
+          </span>
           {detection.lowerBound && (
-            <p className="mt-2 text-warning">
+            <span className="text-warning">
               {t('industry.detectedOwnedIncomplete', {
                 characters: [...detection.incompleteCharacters].join(', '),
               })}
-            </p>
+            </span>
           )}
-        </PopoverContent>
-      </Popover>
-      {canApply && (
-        <button
-          type="button"
-          onClick={onApply}
-          aria-label={t('industry.useDetectedFor', {
-            quantity: suggestion.toLocaleString(),
-            material: materialName,
-          })}
-          className="rounded-xs font-semibold text-accent uppercase hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-        >
-          {t('industry.useDetected', { quantity: suggestion.toLocaleString() })}
-        </button>
-      )}
-    </span>
+        </span>
+      }
+    >
+      <button
+        type="button"
+        onClick={onApply}
+        aria-label={t('industry.useDetectedFor', {
+          quantity: suggestion.toLocaleString(),
+          material: materialName,
+        })}
+        className="flex items-center justify-end rounded-xs text-[0.6875rem] font-semibold text-accent uppercase hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+      >
+        {t('industry.useDetected', { quantity: suggestion.toLocaleString() })}
+      </button>
+    </Tooltip>
   );
 }

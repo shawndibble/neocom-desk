@@ -419,9 +419,23 @@ export function Industry() {
     if (activeCharacterId !== null) scheduleSync(activeCharacterId);
   }
 
+  /**
+   * Merged against the stored record inside a transaction, never against
+   * `selectedPlan` from this render's closure. A whole-record `put` built on a
+   * closure snapshot silently reverts every field the patch does not mention
+   * back to whatever they were when that snapshot was taken — which wiped
+   * `buildHere` (ten build choices at once) whenever an async write landed
+   * with a stale one in hand. `saveSourcingEdit` has always taken this path
+   * for exactly this reason; the two whole-field writers now do too.
+   */
   async function handleUpdate(patch: PlanPatch) {
-    if (!selectedPlan) return;
-    await db.buildPlans.put({ ...selectedPlan, ...patch, updatedAt: Date.now() });
+    const planId = selectedPlan?.id;
+    if (planId === undefined) return;
+    await db.transaction('rw', db.buildPlans, async () => {
+      const stored = await db.buildPlans.get(planId);
+      if (!stored) return;
+      await db.buildPlans.put({ ...stored, ...patch, updatedAt: Date.now() });
+    });
     if (activeCharacterId !== null) scheduleSync(activeCharacterId);
   }
 
@@ -435,8 +449,18 @@ export function Industry() {
    * and would churn every device's sync for a value the pilot never changed.
    */
   async function handleDerivedFix(patch: PlanPatch) {
-    if (!selectedPlan) return;
-    await db.buildPlans.put({ ...selectedPlan, ...patch });
+    const planId = selectedPlan?.id;
+    if (planId === undefined) return;
+    // Read-modify-write for the same reason as `handleUpdate`, and more
+    // urgently: this one fires from an async effect reconciling the build
+    // system, so the closure it captured is *routinely* older than what the
+    // pilot has done since — every edit made while that lookup was in flight
+    // was being rolled back by its result.
+    await db.transaction('rw', db.buildPlans, async () => {
+      const stored = await db.buildPlans.get(planId);
+      if (!stored) return;
+      await db.buildPlans.put({ ...stored, ...patch });
+    });
     if (activeCharacterId !== null) scheduleSync(activeCharacterId);
   }
 

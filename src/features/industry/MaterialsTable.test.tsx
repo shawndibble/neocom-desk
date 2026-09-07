@@ -106,6 +106,19 @@ const queryRevertButton = (material: string) =>
   screen.queryByRole('button', { name: `Reset ${material} to the market price` });
 const valueOf = (input: HTMLElement) => (input as HTMLInputElement).value;
 
+// The detected-stock offer is now the only control the hint renders: the total
+// and its placement breakdown live on the offer's own hover tooltip.
+const useOffer = (material: string) =>
+  within(row(material)).getByRole('button', { name: new RegExp(`of the ${material} you own$`) });
+const queryUseOffer = (material: string) =>
+  within(row(material)).queryByRole('button', { name: new RegExp(`of the ${material} you own$`) });
+
+/** Hovers a trigger and returns its revealed bubble. */
+async function tooltipOf(trigger: HTMLElement): Promise<HTMLElement> {
+  fireEvent.pointerMove(trigger);
+  return await screen.findByRole('tooltip');
+}
+
 async function setField(input: HTMLElement, value: string) {
   const user = userEvent.setup();
   await user.clear(input);
@@ -121,7 +134,9 @@ describe('MaterialsTable sourcing', () => {
     // one price per row, already filled in, and editing it is the override.
     expect(valueOf(priceInput('Tritanium'))).toBe('5');
     expect(tritanium.getByText('5,000')).toBeTruthy();
-    expect(tritanium.getByText('Hub')).toBeTruthy();
+    // No tag at all: a hub price is what every row is unless something says
+    // otherwise, so the word was a per-row repeat that ruled nothing out.
+    expect(tritanium.queryByText('Hub')).toBeNull();
     // Nothing to revert to — the row is already showing the market's number.
     expect(queryRevertButton('Tritanium')).toBeNull();
   });
@@ -155,9 +170,12 @@ describe('MaterialsTable sourcing', () => {
 
     expect(onChange).toHaveBeenCalledWith(34, { ownedQuantity: 400 });
     const tritanium = within(row('Tritanium'));
-    // 600 still to buy at 5 ISK, the 400 owned are free.
+    // 600 still to buy at 5 ISK, the 400 owned are free. The split itself is
+    // no longer restated under the total — "Need" beside the quantity is the
+    // only part of it not already on the row.
     expect(tritanium.getByText('3,000')).toBeTruthy();
-    expect(tritanium.getByText('400 owned + 600 x 5')).toBeTruthy();
+    expect(tritanium.getByText('Need: 600')).toBeTruthy();
+    expect(tritanium.queryByText(/owned \+/)).toBeNull();
     // Untouched rows keep their hub pricing.
     expect(within(row('Pyerite')).getByText('2,000')).toBeTruthy();
   });
@@ -168,7 +186,8 @@ describe('MaterialsTable sourcing', () => {
     await setField(ownedInput('Tritanium'), '5000');
 
     const tritanium = within(row('Tritanium'));
-    expect(tritanium.getByText('all 1,000 owned')).toBeTruthy();
+    // Clamped to the requirement, so there is nothing left to need.
+    expect(tritanium.getByText('Need: 0')).toBeTruthy();
     expect(tritanium.getByText('0')).toBeTruthy();
     // The number the player typed is kept — it is not an error to fix — and
     // comes back masked, since 5000 is what they typed but 5,000 is what the
@@ -201,7 +220,7 @@ describe('MaterialsTable sourcing', () => {
     expect(onChange).toHaveBeenCalledWith(34, { overridePrice: undefined });
     const tritanium = within(row('Tritanium'));
     expect(tritanium.getByText('5,000')).toBeTruthy();
-    expect(tritanium.getByText('Hub')).toBeTruthy();
+    expect(tritanium.queryByText('Hub')).toBeNull();
   });
 
   it('distinguishes hub-priced, owned and overridden rows by text, not colour alone', () => {
@@ -215,8 +234,9 @@ describe('MaterialsTable sourcing', () => {
     // Overridden — flagged even though the override equals the hub price, so
     // the cue cannot come from comparing numbers.
     expect(within(row('Tritanium')).getByText('Override')).toBeTruthy();
-    // Fully owned.
-    expect(within(row('Pyerite')).getByText('all 200 owned')).toBeTruthy();
+    // Fully owned — nothing left to buy, so the row needs none and costs none.
+    expect(within(row('Pyerite')).getByText('Need: 0')).toBeTruthy();
+    expect(within(row('Pyerite')).getByText('0')).toBeTruthy();
   });
 
   it('labels a partly-owned unpriced remainder without inventing a total', () => {
@@ -224,7 +244,8 @@ describe('MaterialsTable sourcing', () => {
 
     const pyerite = within(row('Pyerite'));
     expect(pyerite.getByText('No price')).toBeTruthy();
-    expect(pyerite.getByText('50 owned + 150 to buy')).toBeTruthy();
+    expect(pyerite.getByText('Need: 150')).toBeTruthy();
+    expect(pyerite.getByText(String.raw`—`)).toBeTruthy();
   });
 
   it('is reachable and committable with the keyboard alone', async () => {
@@ -239,7 +260,7 @@ describe('MaterialsTable sourcing', () => {
     await user.tab();
     expect(document.activeElement).toBe(priceInput('Tritanium'));
     expect(onChange).toHaveBeenCalledWith(34, { ownedQuantity: 250 });
-    expect(within(row('Tritanium')).getByText('250 owned + 750 x 5')).toBeTruthy();
+    expect(within(row('Tritanium')).getByText('Need: 750')).toBeTruthy();
   });
 
   it('keeps a visible focus ring on both editable inputs', () => {
@@ -280,19 +301,14 @@ describe('MaterialsTable stacked card', () => {
 
   it('starts every value at the card gutter below sm and right-aligns it from sm up', () => {
     render(<Harness />);
-    const tritanium = within(row('Tritanium'));
 
     expect(ownedInput('Tritanium').parentElement).toHaveClass('items-start', 'sm:items-end');
-    expect(cell('Tritanium', 'Line total').firstElementChild).toHaveClass(
-      'items-start',
-      'sm:items-end'
-    );
+    expect(cell('Tritanium', 'Qty').firstElementChild).toHaveClass('items-start', 'sm:items-end');
     // The price cell stacks field over source tag; the column starts at the
     // gutter on the card and hugs the right edge from sm up like the rest.
-    expect(tritanium.getByText('Hub').parentElement?.parentElement).toHaveClass(
-      'items-start',
-      'sm:items-end'
-    );
+    // Read off an overridden row, since a plain hub-priced one now carries no
+    // tag under its field at all.
+    expect(priceInput('Tritanium').parentElement).toHaveClass('items-start', 'sm:items-end');
   });
 
   it('left-aligns the digits inside a sourcing field below sm, so they sit in the value column too', () => {
@@ -362,7 +378,7 @@ describe('MaterialsTable number mask', () => {
     await user.tab();
 
     expect(onChange).not.toHaveBeenCalled();
-    expect(within(row('Tritanium')).getByText('Hub')).toBeTruthy();
+    expect(within(row('Tritanium')).queryByText('Hub')).toBeNull();
   });
 
   it('does not pin a stale price when the market refreshes under a focused field', async () => {
@@ -382,7 +398,7 @@ describe('MaterialsTable number mask', () => {
 
     expect(onChange).not.toHaveBeenCalled();
     expect(valueOf(priceInput('Tritanium'))).toBe('401,000');
-    expect(within(row('Tritanium')).getByText('Hub')).toBeTruthy();
+    expect(within(row('Tritanium')).queryByText('Hub')).toBeNull();
   });
 
   it('puts the field on the cell edge the PRICE header is aligned to', async () => {
@@ -430,7 +446,7 @@ describe('MaterialsTable price field', () => {
     expect(onChange).toHaveBeenLastCalledWith(34, { overridePrice: undefined });
     const tritanium = within(row('Tritanium'));
     expect(valueOf(priceInput('Tritanium'))).toBe('5');
-    expect(tritanium.getByText('Hub')).toBeTruthy();
+    expect(tritanium.queryByText('Hub')).toBeNull();
     expect(tritanium.getByText('5,000')).toBeTruthy();
     // Back to tracking the market, so there is nothing left to revert.
     expect(queryRevertButton('Tritanium')).toBeNull();
@@ -458,7 +474,7 @@ describe('MaterialsTable price field', () => {
     await user.tab();
 
     expect(onChange).not.toHaveBeenCalled();
-    expect(within(row('Tritanium')).getByText('Hub')).toBeTruthy();
+    expect(within(row('Tritanium')).queryByText('Hub')).toBeNull();
     expect(queryRevertButton('Tritanium')).toBeNull();
   });
 });
@@ -633,14 +649,16 @@ describe('MaterialsTable detected owned stock (issue #181)', () => {
     },
   };
 
-  it('shows the detected total beside the Owned input, and none for a material without stock', () => {
+  it('offers the detected stock under the Owned input, and nothing for a material without any', async () => {
     render(<Harness detection={detectionOf(TRIT_STOCK)} />);
 
+    // The offer is the only thing on the row — the total it would apply is on
+    // its hover tooltip rather than printed beside it.
+    const offer = useOffer('Tritanium');
+    expect(offer).toHaveTextContent('Use 1,000');
+    expect(await tooltipOf(offer)).toHaveTextContent('You own 9,000');
     expect(
-      within(row('Tritanium')).getByRole('button', { name: /detected for Tritanium/ })
-    ).toHaveTextContent('9,000 owned');
-    expect(
-      within(row('Pyerite')).queryByRole('button', { name: /detected for/ })
+      within(row('Pyerite')).queryByRole('button', { name: /you own/ })
     ).not.toBeInTheDocument();
   });
 
@@ -656,11 +674,7 @@ describe('MaterialsTable detected owned stock (issue #181)', () => {
     const onChange = vi.fn();
     render(<Harness detection={detectionOf(TRIT_STOCK)} onChange={onChange} />);
 
-    await user.click(
-      within(row('Tritanium')).getByRole('button', {
-        name: 'Use 1,000 detected owned for Tritanium',
-      })
-    );
+    await user.click(useOffer('Tritanium'));
 
     // 9,000 detected against a 1,000-unit requirement.
     expect(onChange).toHaveBeenCalledWith(34, { ownedQuantity: 1000 });
@@ -674,41 +688,27 @@ describe('MaterialsTable detected owned stock (issue #181)', () => {
       <Harness initial={{ 34: { ownedQuantity: 1000 } }} detection={detectionOf(TRIT_STOCK)} />
     );
 
-    expect(
-      within(row('Tritanium')).queryByRole('button', {
-        name: 'Use 1,000 detected owned for Tritanium',
-      })
-    ).not.toBeInTheDocument();
+    expect(queryUseOffer('Tritanium')).not.toBeInTheDocument();
   });
 
   it('breaks the total down by Character and location', async () => {
-    const user = userEvent.setup();
     render(<Harness detection={detectionOf(TRIT_STOCK)} />);
 
-    await user.click(
-      within(row('Tritanium')).getByRole('button', { name: /detected for Tritanium/ })
-    );
-
-    const menu = screen.getByRole('dialog');
-    expect(menu).toHaveTextContent('Main Pilot — Jita IV - Moon 4');
-    expect(menu).toHaveTextContent('Alt Pilot — Amarr');
+    const bubble = await tooltipOf(useOffer('Tritanium'));
+    expect(bubble).toHaveTextContent('Main Pilot — Jita IV - Moon 4');
+    expect(bubble).toHaveTextContent('Alt Pilot — Amarr');
   });
 
   it('caps the breakdown at five locations with a remainder line', async () => {
-    const user = userEvent.setup();
     const placements = Array.from({ length: 7 }, (_, i) => placement(91, 70000000 + i, 100 - i));
     render(<Harness detection={detectionOf({ 34: { quantity: 700, placements } })} />);
 
-    await user.click(
-      within(row('Tritanium')).getByRole('button', { name: /detected for Tritanium/ })
-    );
-
-    expect(within(screen.getByRole('dialog')).getAllByRole('listitem')).toHaveLength(6);
-    expect(screen.getByRole('dialog')).toHaveTextContent('and 2 more');
+    const bubble = await tooltipOf(useOffer('Tritanium'));
+    expect(bubble).toHaveTextContent('and 2 more');
+    expect(bubble).not.toHaveTextContent('70000005');
   });
 
   it('renders an incomplete detection as a lower bound and names the Characters behind it', async () => {
-    const user = userEvent.setup();
     render(
       <Harness
         detection={detectionOf(TRIT_STOCK, {
@@ -718,19 +718,12 @@ describe('MaterialsTable detected owned stock (issue #181)', () => {
       />
     );
 
-    const trigger = within(row('Tritanium')).getByRole('button', {
-      name: /detected for Tritanium/,
-    });
-    expect(trigger).toHaveTextContent('≥ 9,000 owned');
-
-    await user.click(trigger);
-    expect(screen.getByRole('dialog')).toHaveTextContent(
-      'Asset data is incomplete for Alt Pilot, No Scope Pilot'
-    );
+    const bubble = await tooltipOf(useOffer('Tritanium'));
+    expect(bubble).toHaveTextContent('You own ≥ 9,000');
+    expect(bubble).toHaveTextContent('Asset data is incomplete for Alt Pilot, No Scope Pilot');
   });
 
   it('scopes the headline and the "use detected" offer to selected locations, but keeps the full breakdown (#454)', async () => {
-    const user = userEvent.setup();
     // Full detected total is 9,000 across two locations; the plan's scope
     // only counts the 6,000 held by Main Pilot at Jita.
     render(
@@ -741,45 +734,25 @@ describe('MaterialsTable detected owned stock (issue #181)', () => {
       />
     );
 
-    const trigger = within(row('Tritanium')).getByRole('button', {
-      name: /detected for Tritanium/,
-    });
-    expect(trigger).toHaveTextContent('6,000 owned');
-
-    await user.click(trigger);
-    const menu = screen.getByRole('dialog');
+    const bubble = await tooltipOf(useOffer('Tritanium'));
+    expect(bubble).toHaveTextContent('You own 6,000');
     // The breakdown still lists every placement, including the one outside
     // the plan's selected scope, so the player sees the full picture.
-    expect(menu).toHaveTextContent('Main Pilot — Jita IV - Moon 4');
-    expect(menu).toHaveTextContent('Alt Pilot — Amarr');
+    expect(bubble).toHaveTextContent('Main Pilot — Jita IV - Moon 4');
+    expect(bubble).toHaveTextContent('Alt Pilot — Amarr');
 
-    expect(
-      within(row('Tritanium')).getByRole('button', {
-        name: 'Use 1,000 detected owned for Tritanium',
-      })
-    ).toBeInTheDocument();
+    expect(useOffer('Tritanium')).toBeInTheDocument();
   });
 
-  it('shows "0 owned" with no use action when a material\'s stock all sits outside the selected scope (#454)', async () => {
-    const user = userEvent.setup();
+  it('offers nothing when a material’s stock all sits outside the selected scope (#454)', () => {
     // Real stock exists (9,000 across two locations), but none of it is
     // inside the plan's selected locations — a state that could not occur
-    // before per-location scoping existed.
+    // before per-location scoping existed. "Use 0" is not an offer to make,
+    // and with the offer gone there is nothing left on the row: the count it
+    // would have applied is zero anyway.
     render(<Harness detection={detectionOf(TRIT_STOCK, { scopedQuantityFor: () => 0 })} />);
 
-    const trigger = within(row('Tritanium')).getByRole('button', {
-      name: /detected for Tritanium/,
-    });
-    expect(trigger).toHaveTextContent('0 owned');
-    expect(
-      within(row('Tritanium')).queryByRole('button', { name: /^Use \d/ })
-    ).not.toBeInTheDocument();
-
-    // The breakdown still shows the full, unfiltered picture.
-    await user.click(trigger);
-    const menu = screen.getByRole('dialog');
-    expect(menu).toHaveTextContent('Main Pilot — Jita IV - Moon 4');
-    expect(menu).toHaveTextContent('Alt Pilot — Amarr');
+    expect(queryUseOffer('Tritanium')).not.toBeInTheDocument();
   });
 });
 
@@ -800,15 +773,17 @@ describe('MaterialsTable make-or-buy marker', () => {
   it('marks a material worth building, spelling out both prices', () => {
     renderTable(advise(buildIt));
     const marker = within(row('Mechanical Parts')).getByRole('img');
-    expect(marker).toHaveAccessibleName(/^Cheaper to build: 42\.96 a unit to manufacture at ME 0%/);
-    expect(marker).toHaveAccessibleName(/against 50\.00 to buy/);
-    expect(marker).toHaveAccessibleName(/Worth 70 across the 10 units still to buy/);
+    // Verdict first, then the two prices it turns on, then what the gap is
+    // worth — terse fragments, since this is read off a hover at a glance.
+    expect(marker).toHaveAccessibleName(/^Suggestion: Build It\. Build 42\.96\/u at ME 0%/);
+    expect(marker).toHaveAccessibleName(/Buy 50\.00\/u/);
+    expect(marker).toHaveAccessibleName(/Saves 70 on 10/);
   });
 
   it('marks a material worth buying with a different glyph, not a different colour', () => {
     const buy = renderTable(advise({ ...buildIt, verdict: 'buy', makeUnitPrice: 60 }));
     expect(within(row('Mechanical Parts')).getByRole('img')).toHaveAccessibleName(
-      /^Cheaper to buy: 50\.00 a unit/
+      /^Suggestion: Buy It\. Build 60\.00\/u at ME 0% . Buy 50\.00\/u/
     );
     // The opposite verdict has to differ in shape, not only in tone
     // (docs/DESIGN.md §7) — each render is scoped to its own container, the
@@ -822,7 +797,7 @@ describe('MaterialsTable make-or-buy marker', () => {
   it('names planetary industry rather than manufacturing for a schematic', () => {
     renderTable(advise({ ...buildIt, method: 'planetary', me: null }));
     expect(within(row('Mechanical Parts')).getByRole('img')).toHaveAccessibleName(
-      /Cheaper to make with planetary industry: 42\.96 a unit in inputs/
+      /^Suggestion: Build It\. PI inputs 42\.96\/u/
     );
   });
 
@@ -839,7 +814,7 @@ describe('MaterialsTable make-or-buy marker', () => {
   it('names reacting rather than manufacturing for a reaction formula (issue #460)', () => {
     renderTable(advise({ ...buildIt, method: 'reaction', me: null }));
     expect(within(row('Mechanical Parts')).getByRole('img')).toHaveAccessibleName(
-      /Cheaper to react: 42\.96 a unit to react at an unfitted Athanor/
+      /^Suggestion: Build It\. React 42\.96\/u at an unfitted Athanor/
     );
   });
 
@@ -870,7 +845,7 @@ describe('MaterialsTable make-or-buy marker', () => {
       ),
       ...advise({ ...buildIt, savings: 0 }),
     });
-    expect(within(row('Mechanical Parts')).getByRole('img')).not.toHaveAccessibleName(/Worth/);
+    expect(within(row('Mechanical Parts')).getByRole('img')).not.toHaveAccessibleName(/Saves/);
   });
 
   it('reveals the house Tooltip bubble on hover, not a bare browser title', async () => {
@@ -888,7 +863,7 @@ describe('MaterialsTable make-or-buy marker', () => {
     // (zeroed, but still a real timer) rather than opening synchronously —
     // `findByRole` is what `Tooltip.test.tsx`'s own hover case waits on too.
     const tooltip = await screen.findByRole('tooltip');
-    expect(tooltip).toHaveTextContent(/Cheaper to build: 42\.96 a unit/);
+    expect(tooltip).toHaveTextContent(/Build 42\.96\/u at ME 0%/);
     expect(marker).toHaveAttribute('aria-describedby', tooltip.id);
   });
 
@@ -1049,8 +1024,8 @@ describe('MaterialsTable build-here control', () => {
 
     fireEvent.pointerMove(control);
     const tooltip = await screen.findByRole('tooltip');
-    expect(tooltip).toHaveTextContent(/Cheaper to build: 42\.96 a unit/);
-    expect(tooltip).toHaveTextContent(/Worth 70 across the 10 units still to buy/);
+    expect(tooltip).toHaveTextContent(/Build 42\.96\/u at ME 0%/);
+    expect(tooltip).toHaveTextContent(/Saves 70 on 10/);
   });
 
   it('replaces a built material’s price with what the job costs a unit', () => {
@@ -1068,13 +1043,15 @@ describe('MaterialsTable build-here control', () => {
     expect(within(built).queryByLabelText(/^Price for/)).toBeNull();
   });
 
-  it('puts the job fee, not a purchase total, in a built row’s line total', () => {
+  it('puts runs alone, never a purchase total, in a built row’s line total', () => {
     renderTable({ materials: building(), canBuildHere: buildable, onToggleBuildHere: vi.fn() });
+    const built = within(row('Mechanical Parts'));
 
     // The ingredients have rows of their own in this same flat list, so a
     // rolled-up total here would be counted twice by anyone reading down the
-    // column. The fee is the one figure those rows do not already carry.
-    expect(within(row('Mechanical Parts')).getByText(/in fees$/)).toBeInTheDocument();
+    // column. The job fee is in the modal with the rest of the job.
+    expect(built.getByText('3 runs')).toBeInTheDocument();
+    expect(built.queryByText(/in fees/)).toBeNull();
   });
 
   it('offers the build control on every row — nothing is indented as a sub-input', () => {

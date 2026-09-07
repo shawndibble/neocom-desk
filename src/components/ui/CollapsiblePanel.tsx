@@ -21,6 +21,17 @@ interface CollapsiblePanelProps {
    * caller keeps its `expanded` state either way; this only overrides it.
    */
   collapsible?: boolean;
+  /**
+   * Shown in the body in place of `children` while folded. For a panel whose
+   * detail is worth hiding but whose headline is not — the few figures that
+   * say whether the detail is worth opening at all.
+   *
+   * Deliberately the body rather than `meta`: a summary of more than a couple
+   * of values crowds the title it sits beside and wraps under any action
+   * buttons in the header, while the body is a full-width row already sized
+   * for figures. `meta` stays the one-line read.
+   */
+  collapsedSummary?: ReactNode;
   className?: string;
   children: ReactNode;
 }
@@ -29,9 +40,13 @@ interface CollapsiblePanelProps {
  * A `Panel` whose body can be folded away behind its header. The header
  * keeps the title, a `meta` summary and any `actions`, so a closed panel
  * still answers the question it exists for — the caret only decides
- * whether the detail underneath is on screen. Nothing is rendered while
- * closed: a folded table is not a hidden table, it is absent, so it costs
- * no layout and no live queries keep running for it.
+ * whether the detail underneath is on screen. `children` are not rendered
+ * while closed: a folded table is not a hidden table, it is absent, so it
+ * costs no layout and no live queries keep running for it.
+ *
+ * `collapsedSummary` is the exception, and the only thing a folded panel
+ * renders in its body — a handful of figures standing in for the detail, so
+ * the fold costs a reader the breakdown rather than the answer.
  */
 export function CollapsiblePanel({
   title,
@@ -42,6 +57,7 @@ export function CollapsiblePanel({
   labels,
   padded = true,
   collapsible = true,
+  collapsedSummary,
   className,
   children,
 }: CollapsiblePanelProps) {
@@ -67,7 +83,7 @@ export function CollapsiblePanel({
         </>
       }
     >
-      {open ? children : null}
+      {open ? children : collapsedSummary}
     </Panel>
   );
 }

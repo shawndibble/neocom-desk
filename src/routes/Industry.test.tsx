@@ -496,7 +496,9 @@ describe('Industry: jargon tooltips (UX-REVIEW #8)', () => {
     await user.click(screen.getByRole('button', { name: /Override/ }));
     await user.click(screen.getByRole('combobox', { name: 'Facility' }));
     await user.click(await screen.findByRole('option', { name: 'Raitaru' }));
-    expect(screen.getByLabelText('Facility tax %')).toBeInTheDocument();
+    // The facility write is a read-modify-write transaction, so the tax field
+    // appears on the render after the store reports it.
+    expect(await screen.findByLabelText('Facility tax %')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'About facility tax' })).toBeInTheDocument();
   });
 });
@@ -924,10 +926,12 @@ describe('Industry: make-or-buy marker on materials', () => {
     // 10 Mechanical Parts means 2 runs of 9841: 40 Tritanium at 10 = 400,
     // plus a fee on an EIV of 320 (index 16 + SCC 12.8 + NPC tax 0.8) —
     // 42.96 each against the hub's 50.
+    // Suggestion first, then the two prices, then what a click does — which
+    // is the opposite of the suggestion here only when the row is already
+    // built (docs/context/decisions).
     await waitFor(() =>
       expect(tooltip).toHaveTextContent(
-        'Cheaper to build: 42.96 a unit to manufacture at ME 0%, against 50.00 to buy. ' +
-          'Worth 70 across the 10 units still to buy.'
+        'Suggestion: Build ItBuild 42.96/u at ME 0% · Buy 50.00/u Saves 70 on 10Click to Build'
       )
     );
   });
@@ -957,7 +961,7 @@ describe('Industry: make-or-buy marker on materials', () => {
     const tooltip = await screen.findByRole('tooltip');
 
     // ME10 takes the same 2 runs down to 36 Tritanium: 389.6 over 10 units.
-    await waitFor(() => expect(tooltip).toHaveTextContent(/38\.96 a unit .* at ME 10%/));
+    await waitFor(() => expect(tooltip).toHaveTextContent(/Build 38\.96\/u at ME 10%/));
   });
 
   it('leaves minerals with no control — nothing in the SDE produces them', async () => {
@@ -1005,7 +1009,9 @@ describe('Industry: owned-stock scope (#454)', () => {
 
     await user.click(select);
     await user.click(await screen.findByRole('option', { name: 'Selected locations' }));
-    expect(select).toHaveTextContent('Selected locations');
+    // The write is a read-modify-write transaction, so the value reaches the
+    // control on the render after the store reports it, not synchronously.
+    await waitFor(() => expect(select).toHaveTextContent('Selected locations'));
 
     // No Characters are authenticated in this test, so there is no detected
     // stock to choose locations from yet.

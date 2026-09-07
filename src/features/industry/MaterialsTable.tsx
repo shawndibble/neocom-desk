@@ -171,19 +171,31 @@ const BUILD_GLYPH: Record<MakeMethod, typeof Icon.Build> = {
  * materials column, so a row's tooltip and its control never say something
  * different about the same number.
  */
-function makeOrBuyLabel(advice: MakeOrBuy, remaining: number, t: Translate): string {
-  const building = advice.verdict === 'build';
+function makeOrBuyVerdict(advice: MakeOrBuy, t: Translate): string {
+  return t('industry.makeOrBuy.suggestion', {
+    verdict: t(`industry.makeOrBuy.${advice.verdict === 'build' ? 'actionBuild' : 'actionBuy'}`),
+  });
+}
+
+/**
+ * The reasoning under the verdict: the two unit prices the call turns on, and
+ * what the gap is worth. Deliberately terse fragments rather than sentences —
+ * this is read at a glance off a hover, where a paragraph is worse than a
+ * comparison. One string per method, not one per method-and-verdict: the
+ * verdict is the heading now, so the numbers no longer have to restate it.
+ */
+function makeOrBuyReason(advice: MakeOrBuy, remaining: number, t: Translate): string {
   const method =
     advice.method === 'manufacturing'
       ? 'Manufacturing'
       : advice.method === 'reaction'
         ? 'Reaction'
         : 'Planetary';
-  const sentences = [
+  const parts = [
     // Two decimals on the unit prices, unlike the whole-ISK columns beside
     // them: the verdict turns on the gap between these two numbers, and
     // rounding a 5.4-vs-5.6 call to "5 against 5" would make it unreadable.
-    t(`industry.makeOrBuy.${building ? 'build' : 'buy'}${method}`, {
+    t(`industry.makeOrBuy.reason${method}`, {
       make: formatIsk(advice.makeUnitPrice, 2),
       buy: formatIsk(advice.buyUnitPrice, 2),
       me: advice.me,
@@ -192,14 +204,59 @@ function makeOrBuyLabel(advice: MakeOrBuy, remaining: number, t: Translate): str
   // Nothing is riding on a fully owned row: there is no remainder to spend
   // the difference on either way.
   if (remaining > 0 && advice.savings > 0) {
-    sentences.push(
+    parts.push(
       t('industry.makeOrBuy.savings', {
         amount: formatIsk(advice.savings),
         quantity: remaining.toLocaleString(),
       })
     );
   }
-  return sentences.join(' ');
+  return parts.join(' ');
+}
+
+/** Plain text for an accessible name, which cannot take a node. */
+function makeOrBuyLabel(advice: MakeOrBuy, remaining: number, t: Translate): string {
+  return `${makeOrBuyVerdict(advice, t)}. ${makeOrBuyReason(advice, remaining, t)}`;
+}
+
+/**
+ * The advice as a tooltip bubble: the suggestion on its own line, bold, the
+ * reasoning under it, and — where the trigger is the toggle rather than the
+ * advisory glyph — what clicking will do.
+ *
+ * The suggestion leads because it is the only part a player needs every time
+ * — "which of these two should I be doing" — and it used to be inferable only
+ * from which of six phrasings the sentence happened to start with. Bold and
+ * on its own line, it survives a glance; the prices below it are there for
+ * when the answer is close enough to want checking.
+ *
+ * `action` is the row's *current* state inverted, never the suggestion: a row
+ * already being built is clicked to go back to buying, whatever the advice
+ * says. Keeping the two apart is the whole point of spelling the click out —
+ * "Suggestion: Build It" over "Click to Buy" is a row that is already right,
+ * which is exactly the case a single line of text used to render as a
+ * contradiction.
+ */
+function MakeOrBuyTooltip({
+  advice,
+  remaining,
+  action,
+}: {
+  advice: MakeOrBuy;
+  remaining: number;
+  /** What a click does. Omitted on the advice-only marker, which has nothing to click. */
+  action?: 'build' | 'buy';
+}) {
+  const { t } = useTranslation();
+  return (
+    <span className="flex flex-col gap-1">
+      <span className="font-semibold">{makeOrBuyVerdict(advice, t)}</span>
+      <span>{makeOrBuyReason(advice, remaining, t)}</span>
+      {action && (
+        <span>{t(`industry.makeOrBuy.${action === 'build' ? 'clickBuild' : 'clickBuy'}`)}</span>
+      )}
+    </span>
+  );
 }
 
 /**
@@ -236,7 +293,7 @@ function MakeOrBuyMarker({ advice, remaining }: { advice: MakeOrBuy; remaining: 
   const planetary = building && advice.method === 'planetary';
   const Glyph = building ? BUILD_GLYPH[advice.method] : Icon.Buy;
   return (
-    <Tooltip content={label} openOnTap>
+    <Tooltip content={<MakeOrBuyTooltip advice={advice} remaining={remaining} />} openOnTap>
       <span
         role="img"
         aria-label={label}
@@ -318,9 +375,20 @@ export function MaterialsTable({
           // keyboard/screen-reader user from hearing a whole paragraph on
           // every Tab. `undefined` falls back to `label` (IconButton's own
           // rule), so a row with no advice still just shows the short action.
-          const tooltip = advice
-            ? `${actionLabel}. ${makeOrBuyLabel(advice, material.remainingQuantity, t)}`
-            : undefined;
+          // The bubble is the advice, not a restatement of the action: the
+          // glyph already shows what clicking does, and `label` (the
+          // accessible name) still says it in words. What a player cannot get
+          // from either is which way they *should* go — so the verdict leads,
+          // and it now shows on a row already being built too, where it used
+          // to vanish and leave the bare action reading as a recommendation
+          // to undo the build (`buyPricedLine`).
+          const tooltip = advice ? (
+            <MakeOrBuyTooltip
+              advice={advice}
+              remaining={material.remainingQuantity}
+              action={building ? 'buy' : 'build'}
+            />
+          ) : undefined;
           return (
             // Flat — no indent, no depth. Every row is one material the plan
             // needs, whether the plan's blueprint asked for it or a build
@@ -377,38 +445,6 @@ export function MaterialsTable({
                 )}
               </span>
               {name}
-              {/*
-                Only on a row that is actually being built, and after the name
-                rather than in the icon slot before it: the slot already holds
-                the toggle that decides *whether* this is built, and this
-                answers the separate question of *how* — the runs and the
-                ingredient list the flat table no longer nests underneath.
-              */}
-              {building && onShowRecipe && (
-                <button
-                  type="button"
-                  // Named for the material it belongs to, since a column of
-                  // identical "Build it" links tells a screen-reader user
-                  // nothing about which row they are on. The visible label
-                  // leads the accessible name rather than being replaced by
-                  // it (WCAG 2.5.3), and it is an `aria-label` rather than an
-                  // `sr-only` span so the row's own name stays a single text
-                  // node for anything matching on it.
-                  aria-label={t('industry.buildRecipe.actionFor', { material: name })}
-                  // The app's inline text-action style (`OpenOrdersPanel`'s
-                  // show/hide healthy, `PublicInfoModal`'s cross-links), at
-                  // the caption size the rest of this table's secondary text
-                  // uses — not a `Button`, which is a box in a row that is
-                  // already dense with them.
-                  // `whitespace-nowrap` because the material column is narrow
-                  // and long names already wrap: without it the link breaks
-                  // across two lines mid-phrase and grows every built row.
-                  className="text-[0.6875rem] whitespace-nowrap text-accent underline hover:text-text"
-                  onClick={() => onShowRecipe(material.typeID)}
-                >
-                  {t('industry.buildRecipe.action')}
-                </button>
-              )}
             </span>
           );
         },
@@ -418,7 +454,23 @@ export function MaterialsTable({
         header: t('industry.quantity'),
         align: 'right',
         className: 'tabular-nums',
-        render: (material) => material.quantity.toLocaleString(),
+        // The requirement, and — once the player says they own some — what is
+        // actually left to get. That subtraction is the number a shopping list
+        // is really made of, and doing it in your head down a column of six
+        // figures is exactly the arithmetic this table exists to save. Only
+        // shown when it differs from the quantity above it.
+        render: (material) => (
+          <span className="flex flex-col items-start sm:items-end">
+            <span>{material.quantity.toLocaleString()}</span>
+            {material.ownedQuantity > 0 && (
+              <span className="text-[0.6875rem] whitespace-nowrap text-text-dim">
+                {t('industry.needAfterOwned', {
+                  quantity: material.remainingQuantity.toLocaleString(),
+                })}
+              </span>
+            )}
+          </span>
+        ),
       },
       {
         id: 'owned',
@@ -471,41 +523,60 @@ export function MaterialsTable({
         header: t('industry.price'),
         align: 'right',
         render: (material) => {
-          // A material being produced has no purchase price to edit — it
-          // isn't bought at a unit price — but it still has a real per-unit
-          // cost: the rolled-up cost of the job that makes it, materials and
-          // every sub-job's fee included, however deep that job's own inputs
-          // go. Poisoned (a descendant neither owned, priced, nor itself
-          // buildable) shows as unpriced rather than a silently wrong number.
-          const recipe = buildRecipe(material);
-          if (recipe) {
-            const unitCost = recipe.unitCost;
+          const name = nameFor(material.typeID);
+          // A material being produced has no purchase price at all — it is
+          // not bought at one — so this cell carries the row's *state* and the
+          // way into the job behind it instead: "Built", as the link that
+          // opens the recipe. That link used to sit after the material name
+          // while a rolled-up unit cost sat here, which spent two cells and a
+          // wrapped line per built row to say one thing. The unit cost itself
+          // is in the modal, next to the runs and inputs that explain it.
+          if (material.subBuilds.length > 0) {
             return (
               <span className="flex flex-col items-start gap-0.5 sm:items-end">
-                <span className="tabular-nums">
-                  {unitCost === null ? t('common.unknown') : formatIsk(unitCost, 2)}
-                </span>
-                <span
-                  className={cx(
-                    'text-[0.6875rem]',
-                    unitCost === null ? 'text-warning' : 'text-text-dim'
-                  )}
-                >
-                  {unitCost === null ? t('industry.unpriced') : t('industry.priceSourceBuilt')}
-                </span>
+                {onShowRecipe ? (
+                  <button
+                    type="button"
+                    // Named for its own row: a column of identical "Built"
+                    // links tells a screen-reader user nothing about which
+                    // material they are on. The visible word leads the
+                    // accessible name rather than being replaced by it.
+                    aria-label={t('industry.buildRecipe.actionFor', { material: name })}
+                    className="text-[0.6875rem] whitespace-nowrap text-accent uppercase hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                    onClick={() => onShowRecipe(material.typeID)}
+                  >
+                    {t('industry.priceSourceBuilt')}
+                  </button>
+                ) : (
+                  <span className="text-[0.6875rem] text-text-dim">
+                    {t('industry.priceSourceBuilt')}
+                  </span>
+                )}
+                {/* Kept even though the numbers went: "something under this
+                    has no price" is a warning about the plan's totals, not a
+                    price, and hiding it would quietly understate the cost. */}
+                {material.unpriced && (
+                  <span className="text-[0.6875rem] text-warning">{t('industry.unpriced')}</span>
+                )}
               </span>
             );
           }
           const state = materialRowState(material, sourcing, pricesReady);
           const overridden = state.priceSource === 'override';
-          const name = nameFor(material.typeID);
           // Nothing to price a fully owned material at, so a row with no
           // number is not a problem worth a warning — only a real remainder
           // is.
+          //
+          // No tag at all on a plain hub price: that is what every row is
+          // unless something says otherwise, so "Hub" repeated down a table
+          // this long was a word per row that ruled nothing out. The tags
+          // that survive are the exceptions — a price the player typed, a row
+          // that costs nothing because they own it, and a row the market has
+          // no number for.
           const tag = overridden
             ? { text: t('industry.priceSourceOverride'), tone: 'text-accent' }
             : state.unitPrice !== null
-              ? { text: t('industry.priceSourceHub'), tone: 'text-text-dim' }
+              ? null
               : state.fullyOwned
                 ? { text: t('industry.priceSourceOwned'), tone: 'text-text-dim' }
                 : { text: t('industry.unpriced'), tone: 'text-warning' };
@@ -540,19 +611,26 @@ export function MaterialsTable({
                 onCommit={(overridePrice) => onSourcingChange(material.typeID, { overridePrice })}
               />
               {/* Under the field, not beside it: the source tag is a caption
-                  on the number, and beside it the column outgrew the table. */}
-              <span className="inline-flex items-center gap-1">
-                <span className={cx('text-[0.6875rem]', tag.tone)}>{tag.text}</span>
-                {overridden && (
-                  <IconButton
-                    size="sm"
-                    variant="plain"
-                    icon={<Icon.Revert size={Icon.ICON_SIZE.sm} />}
-                    label={t('industry.resetPriceFor', { material: name })}
-                    onClick={() => onSourcingChange(material.typeID, { overridePrice: undefined })}
-                  />
-                )}
-              </span>
+                  on the number, and beside it the column outgrew the table.
+                  The whole line is dropped on an untagged row rather than left
+                  as an empty one, so a plain hub-priced row is a single line
+                  tall. */}
+              {(tag || overridden) && (
+                <span className="inline-flex items-center gap-1">
+                  {tag && <span className={cx('text-[0.6875rem]', tag.tone)}>{tag.text}</span>}
+                  {overridden && (
+                    <IconButton
+                      size="sm"
+                      variant="plain"
+                      icon={<Icon.Revert size={Icon.ICON_SIZE.sm} />}
+                      label={t('industry.resetPriceFor', { material: name })}
+                      onClick={() =>
+                        onSourcingChange(material.typeID, { overridePrice: undefined })
+                      }
+                    />
+                  )}
+                </span>
+              )}
             </span>
           );
         },
@@ -563,49 +641,26 @@ export function MaterialsTable({
         align: 'right',
         className: 'tabular-nums',
         render: (material) => {
-          // A built row deliberately puts no purchase total in this column.
-          // What building it costs is its ingredients, and now that the table
-          // is flat those ingredients have their own rows in this same list —
-          // a rolled-up total here would be added twice by anyone reading
-          // down the column. The per-unit build cost is still in the price
-          // cell beside it (a rate, not a summand), and the installation fee
-          // is the one figure the ingredient rows do *not* already carry, so
-          // that is what goes here under the runs count.
-          const recipe = buildRecipe(material);
-          if (recipe) {
-            return (
-              <span className="flex flex-col items-start sm:items-end">
-                <span>{t('industry.subBuildRuns', { runs: recipe.runs.toLocaleString() })}</span>
-                <span className="text-[0.6875rem] whitespace-nowrap text-text-dim">
-                  {t('industry.subBuildJobFees', { fees: formatIsk(recipe.jobFees) })}
-                </span>
-              </span>
-            );
+          // A built row puts no purchase total here: its ingredients have
+          // rows of their own in this flat list, so a rolled-up figure would
+          // be counted twice by anyone reading down the column. Runs is the
+          // one number worth a glance — the job fee, the per-run yield and
+          // the spare units are all in the "Built" modal beside it, which is
+          // where a player goes when the runs count raises a question.
+          if (material.subBuilds.length > 0) {
+            const runs = buildRecipe(material)?.runs ?? 0;
+            return <span>{t('industry.subBuildRuns', { runs: runs.toLocaleString() })}</span>;
           }
+          // The total, and nothing else. What it is made of — units owned,
+          // units still to buy, the price they are bought at — is already in
+          // the three cells to the left of it, and restating it here put a
+          // second line under every part-owned row in a table long enough
+          // that the repeat cost more than it explained. "Need:" under the
+          // quantity is the one piece of that arithmetic worth keeping,
+          // because it is the only number not already on the row.
           const state = materialRowState(material, sourcing, pricesReady);
-          const owned = material.ownedQuantity;
           return (
-            <span className="flex flex-col items-start sm:items-end">
-              <span>
-                {state.lineCost === null ? t('common.unknown') : formatIsk(state.lineCost)}
-              </span>
-              {owned > 0 && (
-                <span className="text-[0.6875rem] whitespace-nowrap text-text-dim">
-                  {state.fullyOwned
-                    ? t('industry.sourcingAllOwned', { owned: owned.toLocaleString() })
-                    : state.unitPrice !== null
-                      ? t('industry.sourcingSplit', {
-                          owned: owned.toLocaleString(),
-                          bought: material.remainingQuantity.toLocaleString(),
-                          price: formatIsk(state.unitPrice),
-                        })
-                      : t('industry.sourcingSplitUnpriced', {
-                          owned: owned.toLocaleString(),
-                          bought: material.remainingQuantity.toLocaleString(),
-                        })}
-                </span>
-              )}
-            </span>
+            <span>{state.lineCost === null ? t('common.unknown') : formatIsk(state.lineCost)}</span>
           );
         },
       },

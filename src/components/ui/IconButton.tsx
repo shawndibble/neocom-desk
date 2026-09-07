@@ -17,10 +17,12 @@ interface IconButtonProps extends Omit<
   /**
    * Shortens the visible bubble only: a per-item action keeps the item in
    * `label` ("Delete Rifter run") for a screen reader, while a pointer user
-   * looking at the row needs "Delete". Keep it a substring of `label` (WCAG
-   * 2.5.3 Label in Name). Defaults to `label`.
+   * looking at the row needs "Delete". Keep text here a substring of `label`
+   * (WCAG 2.5.3 Label in Name) — which does not bind an icon-only control
+   * like this one, so a bubble that explains rather than names (the materials
+   * table's make-or-buy verdict) may be a node instead. Defaults to `label`.
    */
-  tooltip?: string;
+  tooltip?: ReactNode;
   onClick?: () => void;
   /** Present makes this a toggle: renders `aria-pressed` and takes the accent treatment when on. */
   pressed?: boolean;

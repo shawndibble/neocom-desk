@@ -44,6 +44,7 @@ import { writeToClipboard } from '@/lib/clipboard';
 import { unmaskNumber } from '@/lib/numberMask';
 import { MaterialsTable, SourcingInput } from './MaterialsTable';
 import { BuildRecipeModal } from './BuildRecipeModal';
+import { buyPricedLine } from './materialRow';
 import { materialsCsvColumns } from './materialsCsv';
 import { hasShoppingList, shoppingListText } from './shoppingList';
 import {
@@ -55,6 +56,7 @@ import {
   type MaterialTableRow,
 } from './subBuildPlan';
 import { formatIsk } from '@/lib/isk';
+import { cx } from '@/lib/cx';
 import { bulkOwnedStockSuggestions, filterStockByScope } from '@/engine/industry/ownedStock';
 import {
   stockLocationLabel,
@@ -294,38 +296,6 @@ export function BuildPlanDetail({
     [ownedBlueprints, plan.blueprintTypeID]
   );
 
-  // Keyed off the blueprint, not the computed cost lines: detected stock does
-  // not depend on runs/ME/TE, and this array keys the detection memo.
-  const materialTypeIds = useMemo(
-    () => (blueprint ? blueprint.materials.map((m) => m.typeID) : []),
-    [blueprint]
-  );
-  const {
-    stock: detectedStock,
-    characterNames,
-    locationNames,
-    incompleteCharacters,
-  } = useDetectedOwnedStock(ownedStockSnapshot, materialTypeIds);
-
-  // Narrowed to the plan's owned-stock scope (issue #454); `detectedStock`
-  // itself stays the full, galaxy-wide picture the breakdown popover shows.
-  const scopedStock = useMemo(
-    () => filterStockByScope(detectedStock, plan.ownedStockScope),
-    [detectedStock, plan.ownedStockScope]
-  );
-
-  const detection = useMemo<OwnedStockDetection>(
-    () => ({
-      stockFor: (typeID) => detectedStock.get(typeID),
-      scopedQuantityFor: (typeID) => scopedStock.get(typeID)?.quantity ?? 0,
-      lowerBound: incompleteCharacters.length > 0,
-      incompleteCharacters,
-      characterNameFor: (characterId) => characterNames.get(characterId) ?? t('common.unknown'),
-      locationLabelFor: (placement) => stockLocationLabel(placement, locationNames, t),
-    }),
-    [detectedStock, scopedStock, characterNames, locationNames, incompleteCharacters, t]
-  );
-
   /**
    * The one map every "what does this material cost to buy" on the plan reads
    * — its own cost lines, its sub-build inputs and its make-or-buy verdicts,
@@ -396,18 +366,6 @@ export function BuildPlanDetail({
   const pricesReady =
     snapshot !== null && snapshot.adjustedPrices !== null && snapshot.systemCostIndex !== null;
 
-  // "Use all" fills only rows with nothing typed in them: a
-  // hand-entered value, including a deliberate 0, is never clobbered by a bulk
-  // action. The per-row action is the one that overwrites — clicking it on that
-  // row means it.
-  const bulkDetectedPatches = useMemo<SourcingPatchEntry[]>(
-    () =>
-      bulkOwnedStockSuggestions(result?.materials ?? [], plan.materialSourcing, scopedStock).map(
-        ({ typeID, ownedQuantity }) => ({ typeID, patch: { ownedQuantity } })
-      ),
-    [result, plan.materialSourcing, scopedStock]
-  );
-
   /**
    * The facility/rig/security/tax inputs every engine context on this plan
    * needs — the "where and how a job runs" half, which doesn't depend on
@@ -459,6 +417,67 @@ export function BuildPlanDetail({
     [result]
   );
 
+  // Every material on the table, not just the blueprint's own: a mineral a
+  // sub-build introduced is as ownable as anything else, and while this was
+  // the blueprint's material list a player with 10,714,573 Tritanium in the
+  // hangar was told they owned none of it the moment the Tritanium row came
+  // from a component's recipe rather than the ship's.
+  //
+  // Still keyed off content, not array identity. `detectOwnedStock` scans
+  // every Character's whole asset list — tens of thousands of rows — so it
+  // must not re-run on a runs/ME/TE keystroke, and `visibleMaterials` is a
+  // fresh array on each of those. The joined id list is the real dependency:
+  // it changes when a build is toggled (which does add and remove rows) and
+  // not when a number beside one is edited.
+  const materialTypeIdKey = useMemo(
+    () =>
+      [...new Set(visibleMaterials.map((material) => material.typeID))]
+        .sort((a, b) => a - b)
+        .join(','),
+    [visibleMaterials]
+  );
+  const materialTypeIds = useMemo(
+    () => (materialTypeIdKey === '' ? [] : materialTypeIdKey.split(',').map(Number)),
+    [materialTypeIdKey]
+  );
+  const {
+    stock: detectedStock,
+    characterNames,
+    locationNames,
+    incompleteCharacters,
+  } = useDetectedOwnedStock(ownedStockSnapshot, materialTypeIds);
+
+  // Narrowed to the plan's owned-stock scope (issue #454); `detectedStock`
+  // itself stays the full, galaxy-wide picture the breakdown popover shows.
+  const scopedStock = useMemo(
+    () => filterStockByScope(detectedStock, plan.ownedStockScope),
+    [detectedStock, plan.ownedStockScope]
+  );
+
+  const detection = useMemo<OwnedStockDetection>(
+    () => ({
+      stockFor: (typeID) => detectedStock.get(typeID),
+      scopedQuantityFor: (typeID) => scopedStock.get(typeID)?.quantity ?? 0,
+      lowerBound: incompleteCharacters.length > 0,
+      incompleteCharacters,
+      characterNameFor: (characterId) => characterNames.get(characterId) ?? t('common.unknown'),
+      locationLabelFor: (placement) => stockLocationLabel(placement, locationNames, t),
+    }),
+    [detectedStock, scopedStock, characterNames, locationNames, incompleteCharacters, t]
+  );
+
+  // "Use all" fills only rows with nothing typed in them: a
+  // hand-entered value, including a deliberate 0, is never clobbered by a bulk
+  // action. The per-row action is the one that overwrites — clicking it on that
+  // row means it.
+  const bulkDetectedPatches = useMemo<SourcingPatchEntry[]>(
+    () =>
+      bulkOwnedStockSuggestions(result?.materials ?? [], plan.materialSourcing, scopedStock).map(
+        ({ typeID, ownedQuantity }) => ({ typeID, patch: { ownedQuantity } })
+      ),
+    [result, plan.materialSourcing, scopedStock]
+  );
+
   /**
    * The recipe behind whichever built row's "Build it" is open — the runs and
    * ingredient list the flat table no longer nests (`subBuildPlan`). Held as
@@ -502,11 +521,19 @@ export function BuildPlanDetail({
     const verdicts = new Map<number, MakeOrBuy>();
     if (!makeOrBuyContext) return verdicts;
     for (const material of visibleMaterials) {
-      const verdict = makeOrBuy(material, recipeFor(material.typeID), makeOrBuyContext);
+      // Priced at what it would cost to buy even while it is being built
+      // (`buyPricedLine`) — the verdict compares against buying, so a built
+      // row's null unit price would silently withdraw the advice exactly
+      // when the player is acting on it.
+      const verdict = makeOrBuy(
+        buyPricedLine(material, plan.materialSourcing, materialPrices),
+        recipeFor(material.typeID),
+        makeOrBuyContext
+      );
       if (verdict) verdicts.set(material.typeID, verdict);
     }
     return verdicts;
-  }, [visibleMaterials, makeOrBuyContext, recipeFor]);
+  }, [visibleMaterials, makeOrBuyContext, recipeFor, plan.materialSourcing, materialPrices]);
 
   /** Top-level materials the player chose to build — what the sub-build footnote summarizes. */
   const builtTopLevel = useMemo(
@@ -1137,11 +1164,55 @@ export function BuildPlanDetail({
         {result && !error && (
           <CollapsiblePanel
             title={t('industry.costsAndRevenue')}
-            meta={
+            /*
+             * Folded, this panel is the whole verdict in three numbers: what
+             * the job costs, what it brings in, and the difference. In the
+             * body rather than beside the title — three figures crowd a title
+             * that already sits next to two header buttons, and wrapped under
+             * them. Total cost alone, which the header used to carry open or
+             * closed, answered half the question and repeated a number the
+             * open table states anyway.
+             */
+            collapsedSummary={
               pricesReady && (
-                <span className="text-xs tabular-nums text-text-dim">
-                  {formatIsk(result.totalCost)}
-                </span>
+                <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-xs">
+                  <dt className="text-text-dim">{t('industry.totalCost')}</dt>
+                  <dd className="text-right tabular-nums">{formatIsk(result.totalCost)}</dd>
+                  {result.revenue !== null && (
+                    <>
+                      <dt className="text-text-dim">{t('industry.revenue')}</dt>
+                      <dd className="text-right tabular-nums">{formatIsk(result.revenue)}</dd>
+                    </>
+                  )}
+                  {result.profit !== null && (
+                    <>
+                      {/*
+                        The rule is on the row itself rather than an element
+                        between the rows: a bare separator child of a `<dl>` is
+                        neither a term nor a definition, and a border-top on
+                        both cells of the last pair draws the same line across
+                        the full width without inventing one.
+
+                        Green or red on the figure, and it is the only coloured
+                        thing here: sign is what a reader is actually scanning
+                        for, and the `-` in front of it carries the same meaning
+                        for anyone who cannot see the difference
+                        (docs/DESIGN.md §7).
+                      */}
+                      <dt className="border-t border-line pt-1 text-text-dim">
+                        {t('industry.netProfit')}
+                      </dt>
+                      <dd
+                        className={cx(
+                          'border-t border-line pt-1 text-right tabular-nums',
+                          result.profit < 0 ? 'text-isk-neg' : 'text-isk-pos'
+                        )}
+                      >
+                        {formatIsk(result.profit)}
+                      </dd>
+                    </>
+                  )}
+                </dl>
               )
             }
             expanded={costsExpanded}
