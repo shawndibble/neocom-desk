@@ -20,12 +20,12 @@
  * visible, so a character that needs a different set is one click away.
  */
 import { createLocalSetting } from '@/lib/useLocalSetting';
-import { MAIL_TABS, parseMailFolders, type MailTab } from '@/engine/mail';
+import { MAIL_FOLDERS, parseMailFolders, type MailTab } from '@/engine/mail';
 
 export const MAIL_FOLDERS_SETTING_KEY = 'mailFolders';
 
 /** All four, matching the All tab this replaces — no folder is hidden until the pilot hides it. */
-export const DEFAULT_MAIL_FOLDERS: readonly MailTab[] = MAIL_TABS;
+export const DEFAULT_MAIL_FOLDERS: readonly MailTab[] = MAIL_FOLDERS;
 
 export const useMailFolders = createLocalSetting<readonly MailTab[]>({
   key: MAIL_FOLDERS_SETTING_KEY,

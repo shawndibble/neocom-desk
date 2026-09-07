@@ -41,7 +41,7 @@ import {
   mailSearchMatches,
   resolveMailTab,
   unreadCountsByTab,
-  MAIL_TABS,
+  MAIL_FOLDERS,
   type MailTab,
 } from '@/engine/mail';
 import type { MailBody, MailHeader, MailLabel, MailLabels, MailingList } from '@/esi/endpoints';
@@ -403,7 +403,7 @@ export function Mail() {
               aria-label={t('mail.foldersLabel')}
               className="flex flex-wrap items-center gap-2"
             >
-              {MAIL_TABS.map((folder) => {
+              {MAIL_FOLDERS.map((folder) => {
                 // Straight from each System Label's own `unread_count`, never
                 // summed across the selected folders: round 18 recorded that
                 // these come from ESI as-is, and `total_unread_count` is not
@@ -460,7 +460,7 @@ export function Mail() {
                   hint={t('mail.noFoldersHint')}
                   className="py-6"
                   action={
-                    <Button size="sm" onClick={() => void setFolders(MAIL_TABS)}>
+                    <Button size="sm" onClick={() => void setFolders(MAIL_FOLDERS)}>
                       {t('mail.showAllFolders')}
                     </Button>
                   }
@@ -503,9 +503,11 @@ export function Mail() {
                             setSelectedId(header.mail_id);
                             markLocalRead(header.mail_id);
                           }}
-                          // Not the bare boolean: `aria-current={false}` renders
-                          // the string "false", which ARIA reads as truthy — so
-                          // every row announced itself as the current one.
+                          // `aria-current={false}` renders the string "false",
+                          // which is a valid token meaning "not current" — so
+                          // this is tidiness, not a bug fix: it drops an
+                          // attribute from every unselected row rather than
+                          // spelling out the default.
                           aria-current={isSelected ? 'true' : undefined}
                           className={cx(
                             'flex w-full min-w-0 items-start gap-2 border-l-2 py-1.5 pr-3 pl-2.5 text-left transition-colors',
@@ -543,11 +545,25 @@ export function Mail() {
                               {header.subject || t('mail.noSubject')}
                             </span>
                             <span className="flex items-center gap-1.5 text-xs text-text-dim">
+                              {/* Glyph *and* the folder's name, not the glyph
+                                  alone: DESIGN.md §5 blesses a bare decorative
+                                  icon only "beside its own visible text label",
+                                  and dropping the name would have made folder
+                                  identity harder to see than the uppercase tag
+                                  this replaced — the opposite of the point,
+                                  now that several folders share one list by
+                                  default. */}
                               <FolderIcon
                                 aria-hidden="true"
                                 size={Icon.ICON_SIZE.sm}
                                 className="shrink-0"
                               />
+                              <span className="shrink-0 tracking-wide uppercase">
+                                {t(TAB_LABEL_KEY[tab])}
+                              </span>
+                              <span aria-hidden="true" className="shrink-0 text-text-faint">
+                                ·
+                              </span>
                               <span className="min-w-0 truncate">{party}</span>
                               {header.timestamp && (
                                 // `text-text-dim`, not the `text-text-faint` this
@@ -560,13 +576,12 @@ export function Mail() {
                             </span>
                           </span>
 
-                          {/* What the glyph, the dot and the weight say
-                              visually, said in words — DESIGN.md §7's "colour is
-                              never the sole signal". */}
-                          <span className="sr-only">
-                            {t(TAB_LABEL_KEY[tab])}
-                            {!isRead && ` \u00b7 ${t('mail.unread')}`}
-                          </span>
+                          {/* The dot and the bold weight say "unread" in
+                              colour and typography only — DESIGN.md §7's
+                              "colour is never the sole signal" wants it in
+                              words too. The folder needs no such gloss: its
+                              name is rendered above. */}
+                          {!isRead && <span className="sr-only">{t('mail.unread')}</span>}
                         </button>
                       </li>
                     );

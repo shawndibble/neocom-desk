@@ -35,15 +35,23 @@ _Recorded 2026-09-07._
   green/amber/red already mean status, four new hues would read as status and
   read wrong. It would also make this the app's first nominal palette, which
   the next categorical set (contract types, notification kinds) would then
-  either reuse wrongly or fork. The folder tag becomes `Icon.MailInbox` /
-  `MailSent` / `Corporation` / `MailAlliance` instead, with the folder name
-  carried in `sr-only` text.
+  either reuse wrongly or fork.
+  - The folder gains a glyph (`Icon.MailInbox` / `MailSent` / `Corporation` /
+    `MailAlliance`) **beside its name, not instead of it**. Dropping the name
+    for a bare glyph was tried and reversed: DESIGN.md §5 blesses a decorative
+    icon only "beside its own visible text label", and with several folders
+    sharing one list by default, glyph-only identity would have read _worse_
+    than the uppercase tag it replaced — the opposite of what this change is
+    for.
 
-- **The colour the page gains is accent, in the five places DESIGN.md already
-  licenses it** ("accent = interactive/selected"): the unread dot, the
-  selected row's left edge, the selected folder chips, and the reading pane's
-  own header strip. The page had effectively no colour at all before — that,
-  not the absence of folder hues, is what made it read flat.
+- **The colour the page gains is accent, in three places**: the unread dot,
+  the selected row's left edge, and the selected folder chips. The page had
+  effectively no colour at all before — that, not the absence of folder hues,
+  is what made it read flat.
+  - The last two are DESIGN.md §6's "accent = interactive/selected" directly.
+    The unread dot is **state**, not selection, so §6 does not license it on
+    its own — the precedent is `Tabs.tsx`'s own unread badge, which already
+    painted this page's per-folder counts `bg-accent` before this change.
 
 - **2px is allowed for a state stripe.** DESIGN.md §3's "Borders: always 1px"
   governs box borders. A 2px state edge already ships in `tabItemClassName`
@@ -55,11 +63,14 @@ _Recorded 2026-09-07._
   resolved for the reading pane, so this costs no extra lookup — and it is
   what makes Sent distinguishable without spending a colour on it.
 
-- **Three shipped defects fixed in passing**, all in the same rows:
+- **Two shipped defects fixed in passing, plus one tidy-up**, all in the
+  same rows:
   - The received date used `text-text-faint`, which DESIGN.md §1 restricts to
     decoration ("never for content someone must read") and §7 measures below
     AA. Now `text-text-dim`.
   - Selection painted `bg-panel-2` — the exact fill hover already paints — so
     the open mail was invisible once the pointer moved.
-  - `aria-current={selectedId === header.mail_id}` rendered the string
-    `"false"` on every unselected row, which ARIA reads as truthy.
+  - `aria-current={selectedId === header.mail_id}` spelled out `"false"` on
+    every unselected row. Not a defect — `false` is a valid `aria-current`
+    token and is its default — but the attribute is now simply omitted
+    instead.

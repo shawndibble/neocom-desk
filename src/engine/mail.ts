@@ -154,16 +154,20 @@ export function capHeadersForDisplay<H>(
  * tag a multi-labelled header wears, which is a different question from which
  * order a pilot scans the filters in.
  */
-export const MAIL_TABS: readonly MailTab[] = ['inbox', 'corp', 'alliance', 'sent'];
+export const MAIL_FOLDERS: readonly MailTab[] = ['inbox', 'corp', 'alliance', 'sent'];
 
 /**
  * Validates a persisted folder selection (`parse` for `createLocalSetting`).
- * An empty stored array is rejected rather than honoured, for the same reason
- * `toggleMailFolder` refuses to produce one.
+ *
+ * An empty stored array is rejected rather than honoured. Deselecting every
+ * folder is allowed *within* a session — the page explains that state and
+ * offers a way out of it — but a reload that restored it would drop a pilot
+ * onto an empty page with no memory of having asked for one, so the stored
+ * value falls back to all four.
  */
 export function parseMailFolders(raw: unknown): MailTab[] | null {
   if (!Array.isArray(raw) || raw.length === 0) return null;
   const isTab = (value: unknown): value is MailTab =>
-    typeof value === 'string' && (MAIL_TABS as readonly string[]).includes(value);
+    typeof value === 'string' && (MAIL_FOLDERS as readonly string[]).includes(value);
   return raw.every(isTab) ? (raw as MailTab[]) : null;
 }

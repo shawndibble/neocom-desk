@@ -7,7 +7,7 @@ import {
   parseMailFolders,
   resolveMailTab,
   unreadCountsByTab,
-  MAIL_TABS,
+  MAIL_FOLDERS,
 } from './mail';
 
 describe('buildLabelTabMap', () => {
@@ -188,9 +188,9 @@ describe('capHeadersForDisplay', () => {
   });
 });
 
-describe('MAIL_TABS', () => {
+describe('MAIL_FOLDERS', () => {
   it('lists the four System Label folders in display order', () => {
-    expect(MAIL_TABS).toEqual(['inbox', 'corp', 'alliance', 'sent']);
+    expect(MAIL_FOLDERS).toEqual(['inbox', 'corp', 'alliance', 'sent']);
   });
 });
 
