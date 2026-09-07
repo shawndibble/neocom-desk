@@ -9,7 +9,3 @@ test-results
 .env
 .DS_Store
 .auth-profile
-
-# Seeded design canvas (~2 MB of editor payload); `build.mjs` + the design
-# skill's seeder regenerate it from the artboards beside it.
-design/**/overview-triage-concepts.html

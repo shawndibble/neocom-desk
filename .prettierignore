@@ -7,9 +7,3 @@ playwright-report
 test-results
 firestore.rules
 functions/lib
-
-# Generated design artboards (design/overview-triage/build.mjs writes these).
-# Reformatting them would put prettier and the generator permanently at odds;
-# the generator is the source, and it *is* formatted.
-design/**/*.dc.html
-design/**/overview-triage-concepts.html
