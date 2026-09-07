@@ -302,9 +302,17 @@ async function runForegroundPollOnce(deps: PollDependencies): Promise<void> {
       snapshots.set(run, next);
       const previous = run.next[character.characterId];
       fires.push(...run.domain.diff(character.characterId, previous, next, enabledEvents));
-      // Not filtered by `enabledEvents`: a row worth retracting can have been
-      // written by Web Push or another device, so this device's toggles say
-      // nothing about whether one is sitting there.
+      // Unlike the diffs, not filtered per event: the row being retracted may
+      // have been written by Web Push or another device, for either of this
+      // domain's two events, so one enabled event's fetch retracts both.
+      //
+      // It still rides on the domain having been fetched at all (the
+      // `enabledEvents.size === 0` skip above, AC5), and that is the right
+      // bound rather than a gap: a character with both planetary events off
+      // on both channels has those rows hidden from the feed anyway
+      // (`feedSelection.isEntryVisible`), so there is nothing visible left to
+      // retract — and one with the scope revoked cannot prove anything about
+      // them either way.
       if (run.domain.superseded) {
         retractedKeys.push(
           ...run.domain
@@ -427,10 +435,12 @@ async function runForegroundPollOnce(deps: PollDependencies): Promise<void> {
     }
   }
 
-  // After the delivery loop, so a retraction can never race a row this same
-  // poll is writing. It cannot address one either — a retracted key carries
-  // the *replaced* program's expiry and every key written above carries the
-  // live one — but the ordering makes that independent of the diff details.
+  // A retraction cannot address a row this poll just wrote: a retracted key
+  // carries the *replaced* program's expiry and every key written above
+  // carries the live one, and `supersededExtractorOccurrences` requires those
+  // to differ. That is the whole safety argument — running after the delivery
+  // loop does not add to it, since `mergeFeedRecord` takes the later
+  // `dismissedAt` and so a dismissal sticks whichever order the two land in.
   const retractedKeys = updates.flatMap((update) => update.retractedKeys);
   if (retractedKeys.length > 0) await deps.retractFromFeed(retractedKeys);
 

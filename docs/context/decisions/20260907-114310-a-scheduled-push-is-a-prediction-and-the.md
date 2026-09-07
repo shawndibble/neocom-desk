@@ -49,6 +49,15 @@ _Recorded 2026-09-07._
   pilot's own history. This rules out inferring a restart from a changed
   expiry alone, which is the cheaper signal and the wrong one.
 
+- **An alert is judged against its own moment, not against the program's
+  fate.** One rule covers both events: retract when the replacement was
+  already installed _before that occurrence fired_ — the expiry itself for the
+  stop, `expiry - threshold` for a lead-time warning. So a 24-hour warning
+  that fired while the program was still live survives the reset it very
+  likely prompted. This rules out "the program was replaced, therefore
+  everything about it is noise": a warning that did its job is not a false
+  row, and dismissing it would erase the alert for having worked.
+
 - **Retraction dismisses; it never deletes.** The feed syncs (issue #361), and
   `feed.dismissFeedEntry` records that this collection carries no tombstones —
   a deleted row simply returns on the next pull from another device, whereas
@@ -57,18 +66,28 @@ _Recorded 2026-09-07._
   which would need its own merge rule and its own rendering to say something
   the dismissal already says: this no longer needs your attention.
 
-- **Verification of a push at delivery is rejected, not deferred lightly.**
-  The service worker could in principle re-check ESI when a push arrives and
-  correct the copy. It cannot in practice: an EVE access token lives about 20
-  minutes and is only refreshed while the app is open and visible
-  (`ForegroundNotificationPoller` gates on `document.hidden`), so at push time
-  — by definition, app closed — there is no usable token. Reaching one would
-  mean refreshing from the service worker, and EVE SSO rotates refresh tokens,
-  so a refresh racing the page's own would burn it and log the character out
-  (ADR 0001's storage rule is what makes the token device-local in the first
-  place). Paying that risk on the app's auth path, for a fan-out of ESI calls
-  inside a push handler where a slow path costs the subscription on WebKit
-  (`pushHandler.ts`: no silent path), buys corrected copy that hedging makes
-  honest for free. This rules out SW-side verification for as long as those
-  constraints hold; it does not rule out a backend that could verify, which
-  ADR 0010 rejected on separate grounds.
+- **Re-checking ESI from the service worker when a push arrives is rejected.**
+  It would need an access token, and there is not one: an EVE access token
+  lives about 20 minutes and is only refreshed while the app is open _and
+  visible_ (`ForegroundNotificationPoller.tsx` returns early on
+  `document.hidden`), so at push time — by definition, app closed — the stored
+  token is dead. Reaching a live one means refreshing from the worker, and
+  `auth/session.ts`'s single-flight guard is a module-scoped `Map` that
+  provably cannot span the worker's separate JS context; since EVE SSO rotates
+  refresh tokens, such a refresh racing the page's own burns it and logs the
+  character out. Paying that on the app's auth path — for a per-planet ESI
+  fan-out inside a handler where a slow path costs the push subscription
+  outright on WebKit (`pushHandler.ts`: no silent path) — buys corrected copy
+  that hedging makes honest for free. This does not rule out a backend that
+  could verify, which ADR 0010 rejected on separate grounds.
+
+- **A token-free check inside the worker is unexamined, not ruled out.** The
+  worker could compare an arriving push against the colony snapshot already
+  in Dexie, with no ESI call and no token. It would not have caught the
+  reported case — the app was closed, so that snapshot is exactly the stale
+  one the projection was built from — but it is reachable in a narrower one:
+  `features/notifications/projectionUpload.ts` swallows an upload failure with
+  a bare `console.error`, so a reset made with the app _open_ can refresh the
+  local snapshot, fail to replace the backend's row, and still be pushed. That
+  is a real gap; it is recorded here rather than closed, because the same
+  failure is better addressed where it happens.

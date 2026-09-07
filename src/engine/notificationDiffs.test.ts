@@ -687,13 +687,80 @@ describe('supersededExtractorOccurrences', () => {
     expect(supersededExtractorOccurrences(7, undefined, next)).toEqual([]);
   });
 
-  it('finds every occurrence keyed on a program replaced before it could expire', () => {
+  it('finds every occurrence that was already false when it fired', () => {
+    // `restartedEarly` replaces the program 10 minutes before its expiry, so
+    // both lead-time warnings — fired 24h and 12h out — were honest at the
+    // time about a program that was still live. Only the stop itself never
+    // happened, and only the stop is retracted.
     const { prev, next } = restartedEarly();
+    expect(supersededExtractorOccurrences(7, prev, next)).toEqual([
+      { eventId: 'planetaryExtractionDone', characterId: 7, planetId: 1, expiryTimeMs: OLD_EXPIRY },
+    ]);
+  });
+
+  it('retracts a lead-time warning only when the replacement predates the warning itself', () => {
+    // Replaced 30 hours out, so both warnings would have fired about a
+    // program that was already gone.
+    const prev = planetarySnapshot(
+      [colonyWithPins(1, [{ pinId: 1, expiryTimeMs: OLD_EXPIRY }])],
+      OLD_EXPIRY - 40 * HOUR
+    );
+    const next = planetarySnapshot(
+      [
+        colonyWithPins(1, [
+          { pinId: 1, expiryTimeMs: NEW_EXPIRY, installTimeMs: OLD_EXPIRY - 30 * HOUR },
+        ]),
+      ],
+      OLD_EXPIRY + HOUR
+    );
     expect(supersededExtractorOccurrences(7, prev, next)).toEqual([
       expiringFire(7, 1, 1, 24 * HOUR, OLD_EXPIRY),
       expiringFire(7, 1, 1, 12 * HOUR, OLD_EXPIRY),
       { eventId: 'planetaryExtractionDone', characterId: 7, planetId: 1, expiryTimeMs: OLD_EXPIRY },
     ]);
+  });
+
+  it('keeps a lead-time warning that was true when it fired, retracting only the later ones', () => {
+    // Replaced 18 hours out: the 24-hour warning was honest — the program was
+    // live and really did have under 24 hours left — and dismissing it would
+    // erase the very nudge the pilot acted on. The 12-hour one is the false
+    // one, about a program that by then no longer existed.
+    const prev = planetarySnapshot(
+      [colonyWithPins(1, [{ pinId: 1, expiryTimeMs: OLD_EXPIRY }])],
+      OLD_EXPIRY - 40 * HOUR
+    );
+    const next = planetarySnapshot(
+      [
+        colonyWithPins(1, [
+          { pinId: 1, expiryTimeMs: NEW_EXPIRY, installTimeMs: OLD_EXPIRY - 18 * HOUR },
+        ]),
+      ],
+      OLD_EXPIRY + HOUR
+    );
+    expect(supersededExtractorOccurrences(7, prev, next)).toEqual([
+      expiringFire(7, 1, 1, 12 * HOUR, OLD_EXPIRY),
+      { eventId: 'planetaryExtractionDone', characterId: 7, planetId: 1, expiryTimeMs: OLD_EXPIRY },
+    ]);
+  });
+
+  it('retracts nothing on the boundary, where the replacement lands exactly when the alert fired', () => {
+    // Proof, not a tie-break: an `install_time` equal to the fire instant
+    // does not establish that the alert was about a program already replaced.
+    const prev = planetarySnapshot(
+      [colonyWithPins(1, [{ pinId: 1, expiryTimeMs: OLD_EXPIRY }])],
+      OLD_EXPIRY - 40 * HOUR
+    );
+    const next = planetarySnapshot(
+      [
+        colonyWithPins(1, [
+          { pinId: 1, expiryTimeMs: NEW_EXPIRY, installTimeMs: OLD_EXPIRY - 12 * HOUR },
+        ]),
+      ],
+      OLD_EXPIRY + HOUR
+    );
+    expect(supersededExtractorOccurrences(7, prev, next)).not.toContainEqual(
+      expiringFire(7, 1, 1, 12 * HOUR, OLD_EXPIRY)
+    );
   });
 
   it('finds nothing when the program was left to expire and only then restarted', () => {
@@ -765,7 +832,7 @@ describe('supersededExtractorOccurrences', () => {
     const next = planetarySnapshot(
       [
         colonyWithPins(1, [
-          { pinId: 1, expiryTimeMs: NEW_EXPIRY, installTimeMs: OLD_EXPIRY - HOUR },
+          { pinId: 1, expiryTimeMs: NEW_EXPIRY, installTimeMs: OLD_EXPIRY - 30 * HOUR },
           { pinId: 2, expiryTimeMs: OLD_EXPIRY, installTimeMs: T0 - HOUR },
         ]),
       ],
@@ -791,7 +858,7 @@ describe('supersededExtractorOccurrences', () => {
     const next = planetarySnapshot(
       [
         colonyWithPins(1, [
-          { pinId: 1, expiryTimeMs: NEW_EXPIRY, installTimeMs: OLD_EXPIRY - HOUR },
+          { pinId: 1, expiryTimeMs: NEW_EXPIRY, installTimeMs: OLD_EXPIRY - 30 * HOUR },
           { pinId: 2, expiryTimeMs: laterExpiry, installTimeMs: T0 - HOUR },
         ]),
       ],
@@ -807,7 +874,18 @@ describe('supersededExtractorOccurrences', () => {
   it('produces occurrence keys the poller and the push backend already agree on', () => {
     // The retraction has to address the very rows a Scheduled Push wrote, so
     // the fires must key identically to the ones `projection.ts` projected.
-    const { prev, next } = restartedEarly();
+    const prev = planetarySnapshot(
+      [colonyWithPins(1, [{ pinId: 1, expiryTimeMs: OLD_EXPIRY }])],
+      OLD_EXPIRY - 40 * HOUR
+    );
+    const next = planetarySnapshot(
+      [
+        colonyWithPins(1, [
+          { pinId: 1, expiryTimeMs: NEW_EXPIRY, installTimeMs: OLD_EXPIRY - 30 * HOUR },
+        ]),
+      ],
+      OLD_EXPIRY + HOUR
+    );
     const keys = supersededExtractorOccurrences(7, prev, next).map((fire) =>
       occurrenceKey(fire, next.nowMs)
     );
