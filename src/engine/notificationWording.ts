@@ -12,6 +12,15 @@
  *
  * `{{placeholder}}` matches i18next's own interpolation syntax so a
  * template reads identically wherever it is rendered from.
+ *
+ * Four of the six are shared by both paths. The two planetary events are
+ * read by the **live path only**: `projection.ts` hedges them (a reset run
+ * done in game while the app is closed falsifies the prediction before it
+ * fires) and writes that copy inline, as it already does for
+ * `structureFuelLow`. They stay here because the live path is the one that
+ * has actually observed the colony go idle, and this is where its wording
+ * belongs; `src/i18n/index.test.ts` pins the divergence so it cannot spread
+ * to the other four by accident.
  */
 
 export interface NotificationWordingTemplate {
