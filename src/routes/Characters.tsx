@@ -36,6 +36,14 @@ import { deriveQueueState, type QueueState } from '@/features/skills/queueStatus
 import { removeCharacter } from '@/features/character/removeCharacter';
 import { updateGroups, useOverviewGroups } from '@/features/character/overviewGroups';
 import {
+  isCharacterStarred,
+  partitionStarredFirst,
+  pruneStarredCharacters,
+  starredCharactersNeedPruning,
+  useStarredCharacters,
+  withToggledStar,
+} from '@/features/character/starredCharacters';
+import {
   addGroup,
   groupsNeedPruning,
   moveCharacterToGroup,
@@ -86,7 +94,9 @@ interface CharacterCardProps {
   queue: QueueInfo | undefined;
   groups: readonly CharacterGroup[];
   groupId: string | null;
+  starred: boolean;
   onSelect: (characterId: number) => void;
+  onToggleStar: (characterId: number) => void;
   onMoveToGroup: (characterId: number, groupId: string | null) => void;
   onRemove: (characterId: number, name: string) => void;
 }
@@ -109,7 +119,9 @@ function CharacterCard({
   queue,
   groups,
   groupId,
+  starred,
   onSelect,
+  onToggleStar,
   onMoveToGroup,
   onRemove,
 }: CharacterCardProps) {
@@ -160,6 +172,16 @@ function CharacterCard({
             name/corp/alliance identity block, so they sit at the top right
             rather than crowding the stat row below. */}
         <div className="flex shrink-0 items-center gap-2">
+          {/* Filled when starred, outline when not — the state is on the glyph
+              as well as in the accent `pressed` treatment, so it survives a
+              reader who can't tell the two colours apart. The label says which
+              way the press goes, not just which card it belongs to. */}
+          <IconButton
+            icon={<Icon.Pin weight={starred ? 'fill' : 'light'} />}
+            label={t(starred ? 'characters.unstar' : 'characters.star', { name: character.name })}
+            pressed={starred}
+            onClick={() => onToggleStar(character.characterId)}
+          />
           {groups.length > 0 && (
             <Select
               value={groupId ?? UNGROUPED_VALUE}
@@ -324,6 +346,11 @@ export function Characters() {
   const hydrateGroups = useOverviewGroups((state) => state.hydrate);
   const setGroupsValue = useOverviewGroups((state) => state.setValue);
 
+  const starred = useStarredCharacters((state) => state.value);
+  const starredHydrated = useStarredCharacters((state) => state.hydrated);
+  const hydrateStarred = useStarredCharacters((state) => state.hydrate);
+  const setStarred = useStarredCharacters((state) => state.setValue);
+
   const density = useFontScale((state) => state.value);
   const setDensity = useFontScale((state) => state.setValue);
 
@@ -359,6 +386,10 @@ export function Characters() {
   useEffect(() => {
     void hydrateGroups();
   }, [hydrateGroups]);
+
+  useEffect(() => {
+    void hydrateStarred();
+  }, [hydrateStarred]);
 
   useEffect(() => {
     characters?.forEach((character) => void loadPublicInfo(character.characterId));
@@ -407,6 +438,20 @@ export function Characters() {
     }
   }, [characters, groupsValue, groupsHydrated, setGroupsValue]);
 
+  // Same self-heal for stars, and for the same reason — but note this lives
+  // here rather than in `confirmRemoveCharacter`: a Character can also leave
+  // this device without passing through that button (a sold Character, dropped
+  // by `handleOwnerHashChange` — see removeCharacter.ts's header). Reconciling
+  // against the roster catches every route out; a hook on the confirm handler
+  // would catch one of them.
+  useEffect(() => {
+    if (!characters || !starredHydrated) return;
+    const existingIds = new Set(characters.map((character) => character.characterId));
+    if (starredCharactersNeedPruning(starred, existingIds)) {
+      void setStarred(pruneStarredCharacters(starred, existingIds));
+    }
+  }, [characters, starred, starredHydrated, setStarred]);
+
   const groupIdByCharacterId = useMemo(() => {
     const map = new Map<number, string>();
     for (const group of groupsValue.groups) {
@@ -418,6 +463,10 @@ export function Characters() {
   async function select(characterId: number) {
     await setActiveCharacter(characterId);
     navigate('/overview');
+  }
+
+  async function handleToggleStar(characterId: number) {
+    await setStarred(withToggledStar(starred, characterId));
   }
 
   function requestRemoveCharacter(characterId: number, name: string) {
@@ -484,7 +533,13 @@ export function Characters() {
     const filteredIds = characterIds.filter((characterId) => matchesSearch(characterId));
     if (filteredIds.length === 0) return null;
 
-    const sortedIds = sortCharacterIds(filteredIds, stats, sortKey, sortDirection);
+    // Starred first, then the chosen sort key — a layer on top of the sort,
+    // not a replacement for it, so a star raises one card and leaves the order
+    // of everything around it exactly as the user asked for.
+    const sortedIds = partitionStarredFirst(
+      sortCharacterIds(filteredIds, stats, sortKey, sortDirection),
+      starred
+    );
     return (
       <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {sortedIds.map((characterId) => {
@@ -499,7 +554,9 @@ export function Characters() {
               queue={queueById.get(characterId)}
               groups={groupsValue.groups}
               groupId={groupIdByCharacterId.get(characterId) ?? null}
+              starred={isCharacterStarred(starred, characterId)}
               onSelect={(id) => void select(id)}
+              onToggleStar={(id) => void handleToggleStar(id)}
               onMoveToGroup={(id, groupId) => void handleMoveToGroup(id, groupId)}
               onRemove={(id, name) => requestRemoveCharacter(id, name)}
             />

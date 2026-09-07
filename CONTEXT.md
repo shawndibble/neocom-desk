@@ -381,6 +381,16 @@ default tax %, optional moon/system tag}`. The moon/system tag lets the UI
   `scopesForGroup(group)` from the grouped ones, both from the same registry.
   `corp` is the only group today.
 - **Skill Plan**: An ordered list of skill-level entries a user intends to train. User-editable (drag and drop). Distinct from the in-game **Skill Queue**, which is the game's actual training queue.
+- **Starred Character**: A Character the user has pinned to the top of the
+  Characters page. Device-local and never synced, for the same reason an
+  **Account** grouping is — a star is a statement about the roster, not about
+  one Character, so no Character's sync scope owns it. Deliberately "starred",
+  not "pinned": **Pin** already means a planetary structure (and a **Station
+  Pin**), and this is neither. It floats a card within whichever group section
+  the Character is already in — it does not lift it out of its group — and it
+  layers on top of the chosen sort key rather than replacing it. User-created
+  content, not view state: nothing clears a star but the user, except a star
+  whose Character has left the device.
 - **Sustained Extraction Rate**: An extractor program's whole output averaged
   over its whole length, off CCP's decay curve. The one honest
   units-per-hour summary of a program that in fact yields a different amount
