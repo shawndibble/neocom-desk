@@ -545,6 +545,48 @@ export function OpenOrdersPanel() {
     });
   }, [detailRow, snapshot, jumpsByPair]);
 
+  /**
+   * The currently open row's structure market book (issue #538), once its
+   * location is confirmed a player structure. An EFFECT, not a one-shot call
+   * from `openDetails`: the NPC-station lookup can still be loading (or have
+   * failed) the moment a row is clicked — `stationsLoaded` false at that
+   * instant — and only resolve afterward, on a later snapshot. Keying off
+   * `detailRow`/`snapshot` means this re-evaluates whenever either changes,
+   * including a background refresh landing while the modal stays open,
+   * rather than being stuck with nothing left to retry it (the region
+   * "Check deeper" button may already be hidden by then, since `deep` can
+   * have resolved independently in the meantime).
+   *
+   * Inlined rather than calling `ensureStructureChecked` (used by
+   * `onCheckDeeper`'s manual retry instead), and every `setState` deferred
+   * into a microtask: react-hooks's set-state-in-effect rule rejects a
+   * synchronous `setState` in an effect body, even one guarding a fetch —
+   * same reason the jumps effect above only ever sets state from a `.then()`.
+   */
+  useEffect(() => {
+    if (!detailRow || !snapshot?.stationsLoaded) return;
+    if (detailRow.stationName !== null) return;
+    const { characterId, locationId } = detailRow;
+    void Promise.resolve().then(() => {
+      if (structureByKey.has(locationId) || structureLoadingKeys.has(locationId)) return;
+      setStructureLoadingKeys((prev) => new Set(prev).add(locationId));
+      void loadStructureCompetition(characterId, locationId)
+        .then((result) => {
+          if (result) setStructureByKey((prev) => new Map(prev).set(locationId, result));
+        })
+        .catch(() => {
+          // Left uncached on failure so the next refresh/press retries.
+        })
+        .finally(() => {
+          setStructureLoadingKeys((prev) => {
+            const next = new Set(prev);
+            next.delete(locationId);
+            return next;
+          });
+        });
+    });
+  }, [detailRow, snapshot, structureByKey, structureLoadingKeys]);
+
   if (!hydrated) {
     return (
       <div className="flex justify-center py-16">
@@ -584,11 +626,9 @@ export function OpenOrdersPanel() {
     ensureDeepChecked(row.regionId, row.typeId);
     ensureHistoryLoaded(row.regionId, row.typeId);
     ensureReprocessingLoaded(row.locationId, row.typeId);
-    // stationName null (with the NPC lookup loaded) means a player structure
-    // (issue #538) — the region book above never covers its own orders.
-    if (row.stationName === null && snapshot?.stationsLoaded) {
-      ensureStructureChecked(row.characterId, row.locationId);
-    }
+    // The structure market fetch (issue #538) is NOT triggered here — see
+    // the effect below keyed off `detailRow`/`snapshot`, which also covers
+    // `stationsLoaded` resolving after this click.
   }
 
   /**
