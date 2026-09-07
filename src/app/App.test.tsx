@@ -65,6 +65,10 @@ describe('routing guard', () => {
     await db.settings.put({ key: ACTIVE_CHARACTER_KEY, value: 91 });
     render(<App />);
     await waitFor(() => expect(window.location.pathname).toBe('/overview'));
+    // The URL alone would also pass on a bounce that lands here and leaves
+    // again, so assert on something only Overview renders: the rail dropped
+    // /clones when it became one of this page's tabs (round 23).
+    expect(await screen.findByRole('link', { name: 'Clones' })).toBeInTheDocument();
   });
 
   it('redirects / to /characters when characters exist but none is active', async () => {
