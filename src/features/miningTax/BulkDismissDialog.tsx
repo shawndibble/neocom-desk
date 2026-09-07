@@ -99,7 +99,7 @@ export function BulkDismissDialog({
                     {showCharacter && ` · ${dr.row.characterName}`}
                   </span>
                   <span className={cx('shrink-0 tabular-nums', !on && 'text-text-faint')}>
-                    {formatIsk(estimatedValueOf(dr), 2)} ISK
+                    {formatIsk(estimatedValueOf(dr))} ISK
                   </span>
                 </label>
               </li>
@@ -111,7 +111,7 @@ export function BulkDismissDialog({
           <span className="text-[0.6875rem] text-text-dim">
             {t('miningTax.bulkDismissIncluded', { count: included.length })}
           </span>
-          <span className="text-sm font-semibold tabular-nums">{formatIsk(total, 2)} ISK</span>
+          <span className="text-sm font-semibold tabular-nums">{formatIsk(total)} ISK</span>
         </div>
 
         <div className="flex flex-wrap gap-2 pt-1">
