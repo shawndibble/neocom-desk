@@ -7,7 +7,7 @@
  * rung twice. Pass `label` where the glyph really is the only statement of it.
  */
 import { ICON_SIZE } from './icons';
-import { SEVERITY_GLYPH, SEVERITY_TONE } from './severityTone';
+import { SEVERITY_STYLE } from './severityTone';
 import type { BoardSeverity } from '@/engine/severity';
 
 export interface SeverityIconProps {
@@ -25,14 +25,14 @@ export function SeverityIcon({
   className,
   label,
 }: SeverityIconProps) {
-  const Glyph = SEVERITY_GLYPH[severity];
+  const { glyph: Glyph, tone } = SEVERITY_STYLE[severity];
   return (
     <Glyph
       aria-hidden={label === undefined ? 'true' : undefined}
       aria-label={label}
       role={label === undefined ? undefined : 'img'}
       size={size}
-      className={`shrink-0 ${SEVERITY_TONE[severity]} ${className ?? ''}`}
+      className={`shrink-0 ${tone} ${className ?? ''}`}
     />
   );
 }

@@ -21,6 +21,7 @@
  * numbers.
  */
 import { useTranslation } from 'react-i18next';
+import { SEVERITY_STYLE } from '@/components/ui';
 import { useIsNarrow } from '@/lib/useIsNarrow';
 import type { DeadlineDay } from '@/engine/corp/deadlines';
 import type { CorpBoardSeverity } from '@/engine/corp/board';
@@ -46,12 +47,8 @@ const SEVERITY_FILL: Record<CorpBoardSeverity, string> = {
   clear: 'bg-text-dim',
 };
 
-const SEVERITY_LABEL: Record<CorpBoardSeverity, string> = {
-  critical: 'corp.board.severity.critical',
-  warning: 'corp.board.severity.warning',
-  watch: 'corp.board.severity.watch',
-  clear: 'corp.board.severity.clear',
-};
+/* Names come from the shared ladder (`components/ui/severityTone.ts`) — this
+   strip's own copy predated the Overview board wanting the same four words. */
 
 const LEGEND_ORDER: readonly CorpBoardSeverity[] = ['critical', 'warning', 'watch', 'clear'];
 
@@ -95,7 +92,7 @@ export function CorpDeadlineStrip({ days: allDays }: CorpDeadlineStripProps) {
       t('corp.standing.strip.describeDay', {
         day: dayMonth.format(day.startMs),
         count: day.count,
-        severity: t(SEVERITY_LABEL[day.severity ?? 'clear']),
+        severity: t(SEVERITY_STYLE[day.severity ?? 'clear'].labelKey),
       })
     )
     .join('; ');
@@ -122,7 +119,7 @@ export function CorpDeadlineStrip({ days: allDays }: CorpDeadlineStripProps) {
                 aria-hidden="true"
                 className={`size-2 shrink-0 rounded-[1px] ${SEVERITY_FILL[severity]}`}
               />
-              {t(SEVERITY_LABEL[severity])}
+              {t(SEVERITY_STYLE[severity].labelKey)}
             </span>
           ))}
         </div>

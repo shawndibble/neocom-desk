@@ -161,9 +161,10 @@ describe('Alerts', () => {
     ]);
     renderPage();
 
-    await userEvent.click(await screen.findByRole('button', { expanded: false }));
-    expect(await screen.findByText('Kaelen Vor')).toBeInTheDocument();
-    expect(screen.getByText('Sera Vantis')).toBeInTheDocument();
+    const row = (await screen.findByText('New Mail')).closest('button') as HTMLElement;
+    await userEvent.click(row);
+    expect(await screen.findAllByText('Kaelen Vor')).not.toHaveLength(0);
+    expect(screen.getAllByText('Sera Vantis')).not.toHaveLength(0);
   });
 
   it('leaves dismissed fires out entirely', async () => {
@@ -258,7 +259,8 @@ describe('Alerts', () => {
     expect(within(screen.getAllByRole('listitem')[0]).getByText('2')).toBeInTheDocument();
 
     await openFilters();
-    await userEvent.selectOptions(await screen.findByLabelText('Character'), String(SERA));
+    await userEvent.click(await screen.findByLabelText('Character'));
+    await userEvent.click(await screen.findByRole('option', { name: 'Sera Vantis' }));
     await waitFor(() => {
       expect(within(screen.getAllByRole('listitem')[0]).getByText('1')).toBeInTheDocument();
     });

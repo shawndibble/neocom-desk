@@ -9,7 +9,7 @@
  */
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import { Caret, CharacterAvatar, IconButton, SeverityIcon, Tooltip } from '@/components/ui';
+import { Caret, CharacterAvatar, IconButton, SeverityIcon } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { formatAge } from '@/lib/age';
 import { formatTimestamp } from '@/lib/timestamp';
@@ -62,7 +62,7 @@ export function AlertGroupRow({
           <span className="min-w-0 flex-1 truncate text-sm">
             {group.label}
             {group.muted && (
-              <span className="ml-2 text-[0.6875rem] tracking-widest text-text-faint uppercase">
+              <span className="ml-2 text-[0.6875rem] tracking-widest text-text-dim uppercase">
                 {t('alerts.muted')}
               </span>
             )}
@@ -72,19 +72,26 @@ export function AlertGroupRow({
           {/* eslint-disable-next-line react-hooks/purity -- relative age reads the wall clock; it only affects this label */}
           {t('alerts.newest', { age: formatAge(Math.max(0, Date.now() - group.newestFiredAt), t) })}
         </span>
-        <Tooltip content={group.muted ? t('alerts.unmuteHint') : t('alerts.muteHint')} openOnTap>
-          <IconButton
-            icon={group.muted ? <Icon.BrowserNotifyOn /> : <Icon.HideInFeed />}
-            label={
-              group.muted
-                ? t('alerts.unmute', { type: group.label })
-                : t('alerts.mute', { type: group.label })
-            }
-            variant="plain"
-            size="sm"
-            onClick={onToggleMute}
-          />
-        </Tooltip>
+        {/*
+          One glyph, pressed or not, rather than two. `HideInFeed` is the feed
+          channel's own icon; its opposite number in the Bell family belongs to
+          the *browser* channel, which `icons.tsx` says must stay a pair. A
+          toggle is the honest shape anyway — `aria-pressed` says which way it
+          is set without needing a second symbol to learn.
+        */}
+        <IconButton
+          icon={<Icon.HideInFeed />}
+          pressed={group.muted}
+          label={
+            group.muted
+              ? t('alerts.unmute', { type: group.label })
+              : t('alerts.mute', { type: group.label })
+          }
+          tooltip={group.muted ? t('alerts.unmuteHint') : t('alerts.muteHint')}
+          variant="plain"
+          size="sm"
+          onClick={onToggleMute}
+        />
         <IconButton
           icon={<Icon.Close />}
           label={t('alerts.dismissType', { type: group.label })}
@@ -142,10 +149,12 @@ function AlertFireRow({
           characterId={entry.characterId}
           size="sm"
           loading="lazy"
-          className="size-5 sm:size-5"
+          className="size-5"
         />
         <span className="hidden sm:inline">{name}</span>
-        <span className="sr-only">{name}</span>
+        {/* Only below `sm`, where the name above is hidden and the portrait is
+            the sole identification — unconditional, it announced twice. */}
+        <span className="sr-only sm:hidden">{name}</span>
       </span>
       <time
         dateTime={firedAt.toISOString()}

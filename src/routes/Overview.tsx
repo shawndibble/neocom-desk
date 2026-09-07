@@ -24,7 +24,7 @@
  * Scoped to the active Character, with one exception: the alert feed is
  * device-wide, because the poller is (`features/notifications/`).
  */
-import { useMemo } from 'react';
+import { Fragment, useMemo } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -32,6 +32,7 @@ import { Spinner } from '@/components/ui';
 import type { CachedResult } from '@/features/skills/data';
 import { loadSkillCatalog, type SkillCatalog } from '@/features/skills/skillMap';
 import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
+import { maxMarketOrders } from '@/engine/market/orderSlots';
 import { rememberSpSummary, getLastKnownSpSummary } from '@/stores/characterSp';
 import { loadWalletBalanceWithStatus } from '@/features/character/wallet';
 import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
@@ -59,13 +60,30 @@ import {
   loadMiningTaxBoard,
   loadPlanetaryBoard,
 } from '@/features/overview/boardData';
-import type { BoardSeverity } from '@/engine/severity';
+import {
+  industrySeverity,
+  miningTaxSeverity,
+  ordersSeverity,
+  planetarySeverity,
+} from '@/features/overview/boardSeverity';
+import { compareSeverity, type BoardSeverity } from '@/engine/severity';
 import { isJobDone } from '@/features/industry/jobs';
 import type { CharacterSkills, SkillQueueEntry } from '@/esi/endpoints';
 import { sortQueueEntries, selectActiveEntryFromSorted, selectQueueDepth } from './overviewQueue';
 
 /** Stable identity, so the industry card does not re-render on every parent render before its load lands. */
 const EMPTY_NAMES: ReadonlyMap<number, string> = new Map();
+
+/**
+ * Written out rather than built from the index: Tailwind scans source for
+ * literal class names, so `order-${i}` would emit nothing at all.
+ */
+const NARROW_ORDER = [
+  'order-1 sm:order-none',
+  'order-2 sm:order-none',
+  'order-3 sm:order-none',
+  'order-4 sm:order-none',
+];
 
 interface WalletPanelData {
   result: CachedResult<number> | null;
@@ -83,6 +101,14 @@ interface SkillsQueuePanelData {
   queueNeedsReauth: boolean;
   totalSp: number | null;
   catalog: SkillCatalog;
+  /**
+   * Open-order ceiling for the Open Orders card's footer. Derived here rather
+   * than in its own snapshot: the Trade-group skill levels it needs are
+   * already in this load's corrected skills, so it costs no extra ESI read.
+   * Null until /skills has landed — an untrained character still has slots, so
+   * "5" and "not loaded yet" must not look alike.
+   */
+  maxOrders: number | null;
 }
 
 async function loadSkillsQueuePanel(characterId: number): Promise<SkillsQueuePanelData> {
@@ -103,6 +129,7 @@ async function loadSkillsQueuePanel(characterId: number): Promise<SkillsQueuePan
     queueNeedsReauth: corrected.queueNeedsReauth,
     totalSp: corrected.totalSp,
     catalog,
+    maxOrders: corrected.skillsResult ? maxMarketOrders(corrected.trained) : null,
   };
 }
 
@@ -153,6 +180,14 @@ export function Overview() {
     const snapshot = ordersSnapshot.data;
     if (!snapshot) return [];
     /*
+     * Narrowed to the active Character below. `loadOpenOrdersSnapshot` fans out
+     * across every Character because it backs the cross-character Orders page;
+     * this board is one pilot's, like every other card on it, and the tile it
+     * replaced read `loadOrders(characterId)`. Filtering the built rows rather
+     * than the snapshot keeps the one loader shared — and costs nothing, since
+     * the other Characters' orders were already fetched for the page's cache.
+     */
+    /*
      * Deliberately without `deepCompetition`/`structureCompetition`: those are
      * per-order region and structure book fetches the Orders page issues when a
      * row is opened. The board is a summary — an order beaten at its own
@@ -168,8 +203,22 @@ export function Overview() {
       stationNames: new Map([...snapshot.npcStations].map(([id, s]) => [id, s.name])),
       skillsByCharacter: snapshot.skillsByCharacter,
       now: snapshot.now,
-    });
-  }, [ordersSnapshot.data]);
+    }).filter((row) => row.characterId === activeCharacterId);
+  }, [ordersSnapshot.data, activeCharacterId]);
+
+  /*
+   * Whether *this* Character's orders could be read — not whether any could.
+   * A snapshot with no entry for them at all means the grant was never given
+   * (`openOrdersData.ts` lists those in `skipped` rather than fetching them).
+   */
+  const ordersNeedReauth = useMemo(() => {
+    const snapshot = ordersSnapshot.data;
+    if (!snapshot || activeCharacterId === null) return false;
+    const entry = snapshot.openOrders.entries.find(
+      (candidate) => candidate.characterId === activeCharacterId
+    );
+    return entry === undefined || entry.needsReauth;
+  }, [ordersSnapshot.data, activeCharacterId]);
 
   const storedFeed = useLiveQuery(() => readFeed(), [], []);
   const visibleAlerts = useMemo(
@@ -259,6 +308,66 @@ export function Overview() {
 
   const walletBalance = walletSnapshot.data?.result?.data ?? null;
 
+  /*
+   * Worst first, but only where it pays. Below `sm` the cards stack in one
+   * column and about three fit above the fold, so the thing on fire has to
+   * lead; from `sm` up the whole grid is on screen at once and a position that
+   * stays put between visits is worth more than a ranking nobody has to scroll
+   * to. `sm:order-none` is what hands the fixed order back.
+   *
+   * A null severity (still loading) sorts last rather than as `clear`: a card
+   * that has made no claim yet must not jump the queue on a guess and
+   * reshuffle the stack under the reader's thumb as each load lands.
+   */
+  const cards = [
+    {
+      key: 'orders',
+      severity: ordersSeverity(orderRows, ordersNeedReauth),
+      render: (className: string) => (
+        <OrdersCard
+          className={className}
+          rows={orderRows}
+          maxOrders={skillsQueueData?.maxOrders ?? null}
+          needsReauth={ordersNeedReauth}
+        />
+      ),
+    },
+    {
+      key: 'mining',
+      severity: miningTaxSeverity(miningSnapshot.data),
+      render: (className: string) => (
+        <MiningTaxCard className={className} data={miningSnapshot.data} />
+      ),
+    },
+    {
+      key: 'planetary',
+      severity: planetarySeverity(planetary),
+      render: (className: string) => <PlanetaryCard className={className} data={planetary} />,
+    },
+    {
+      key: 'industry',
+      severity: industrySeverity(industryJobs, industrySnapshot.data?.needsReauth ?? false, now),
+      render: (className: string) => (
+        <IndustryCard
+          className={className}
+          jobs={industryJobs}
+          productNames={industrySnapshot.data?.productNames ?? EMPTY_NAMES}
+          needsReauth={industrySnapshot.data?.needsReauth ?? false}
+          nowMs={now}
+        />
+      ),
+    },
+  ];
+  const rank = new Map(
+    [...cards]
+      .sort((a, b) =>
+        a.severity === null || b.severity === null
+          ? Number(a.severity === null) - Number(b.severity === null)
+          : compareSeverity(a.severity, b.severity)
+      )
+      .map((card, i) => [card.key, i])
+  );
+
   return (
     <div className="mx-auto max-w-6xl space-y-4">
       <CharacterHeader
@@ -281,6 +390,9 @@ export function Overview() {
                 to: soonest.to,
               }
         }
+        trainingUnavailable={skillsQueueData?.queueNeedsReauth ?? false}
+        walletUnavailable={walletSnapshot.data?.needsReauth ?? false}
+        failed={Boolean(walletSnapshot.error)}
         training={
           activeSkillName === null
             ? null
@@ -340,15 +452,9 @@ export function Overview() {
               on its own data would make "still loading" and "nothing here"
               look identical to "this domain does not exist" — which is the
               failure this board was rebuilt to avoid. */}
-          <OrdersCard rows={orderRows} />
-          <MiningTaxCard data={miningSnapshot.data} />
-          <PlanetaryCard data={planetary} />
-          <IndustryCard
-            jobs={industryJobs}
-            productNames={industrySnapshot.data?.productNames ?? EMPTY_NAMES}
-            needsReauth={industrySnapshot.data?.needsReauth ?? false}
-            nowMs={now}
-          />
+          {cards.map(({ key, render }) => (
+            <Fragment key={key}>{render(NARROW_ORDER[rank.get(key) ?? 0])}</Fragment>
+          ))}
         </div>
         <AlertsColumn
           groups={alertGroups}

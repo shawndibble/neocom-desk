@@ -31,7 +31,8 @@ export { useFilterSurface } from './filterSurface';
 export { Disclosure, Caret } from './Disclosure';
 export { LogoMark } from './LogoMark';
 export { SeverityIcon } from './SeverityIcon';
-export { SEVERITY_TONE, SEVERITY_GLYPH, SEVERITY_LABEL_KEY } from './severityTone';
+export { SEVERITY_STYLE } from './severityTone';
+export type { SeverityStyle } from './severityTone';
 export {
   ContextMenu,
   ContextMenuTrigger,

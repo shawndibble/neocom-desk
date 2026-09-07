@@ -11,7 +11,7 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Panel, SEVERITY_TONE, SeverityIcon } from '@/components/ui';
+import { Panel, SEVERITY_STYLE, SeverityIcon } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import type { BoardSeverity } from '@/engine/severity';
 import type { AppRoutePath } from '@/app/routeScopes';
@@ -26,9 +26,19 @@ export interface BoardCardProps {
   children: ReactNode;
   /** Pinned to the card's bottom edge, so cards in a row line up however tall each one's body is. */
   footer?: ReactNode;
+  /** The board's own ordering class. Not a general style hook — see `Overview.tsx`. */
+  className?: string;
 }
 
-export function BoardCard({ title, meta, to, openLabel, children, footer }: BoardCardProps) {
+export function BoardCard({
+  title,
+  meta,
+  to,
+  openLabel,
+  children,
+  footer,
+  className = '',
+}: BoardCardProps) {
   return (
     /*
       Three things, and all three are load-bearing for one effect: cards in a
@@ -44,7 +54,7 @@ export function BoardCard({ title, meta, to, openLabel, children, footer }: Boar
     */
     <Panel
       fill
-      className="flex h-full flex-col"
+      className={`flex h-full flex-col ${className}`}
       title={title}
       meta={meta}
       actions={
@@ -94,7 +104,7 @@ export function NumberTile({ label, value, severity }: NumberTileProps) {
           reads as a bullet point rather than as a severity. */}
       <span className="flex items-center gap-1.5 text-xl font-medium tabular-nums">
         {!zero && <SeverityIcon severity={severity} />}
-        <span className={zero ? 'text-text' : SEVERITY_TONE[severity]}>{value}</span>
+        <span className={zero ? 'text-text' : SEVERITY_STYLE[severity].tone}>{value}</span>
       </span>
       <span className="text-[0.6875rem] tracking-widest text-text-dim uppercase">{label}</span>
     </span>
@@ -130,7 +140,7 @@ export function TriageRow({ severity, when, subject, detail, to }: TriageRowProp
         className="flex min-h-11 items-center gap-2.5 px-3 py-1.5 hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent md:min-h-9"
       >
         <span
-          className={`flex w-20 shrink-0 items-center gap-1.5 text-xs font-semibold tabular-nums ${SEVERITY_TONE[severity]}`}
+          className={`flex w-20 shrink-0 items-center gap-1.5 text-xs font-semibold tabular-nums ${SEVERITY_STYLE[severity].tone}`}
         >
           <SeverityIcon severity={severity} />
           {when}

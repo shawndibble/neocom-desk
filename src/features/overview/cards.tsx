@@ -8,14 +8,13 @@
  */
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import { Panel, SEVERITY_LABEL_KEY, SeverityIcon } from '@/components/ui';
-import { worstSeverity, type BoardSeverity } from '@/engine/severity';
+import { Panel, SEVERITY_STYLE, SeverityIcon } from '@/components/ui';
+import type { BoardSeverity } from '@/engine/severity';
 import { formatDuration } from '@/lib/duration';
 import { formatIskCompact } from '@/lib/isk';
 import { formatAge } from '@/lib/age';
 import {
   activityI18nKey,
-  isCompletingSoon,
   isJobDone,
   secondsRemaining,
   sortJobsBySoonest,
@@ -26,10 +25,26 @@ import type { OpenOrderRow } from '@/features/market/openOrdersModel';
 import { openOrderProblemCounts, needsAttentionCount } from '@/features/market/openOrdersModel';
 import type { DisplayAlertGroup } from '@/features/notifications/alertsFilter';
 import { BoardCard, NumberTile, TileRow, TriageRow } from './BoardCard';
+import {
+  industrySeverity,
+  jobSeverity,
+  miningTaxSeverity,
+  planetarySeverity,
+} from './boardSeverity';
 import type { MiningTaxBoardData, PlanetaryBoardData } from './boardData';
 
 /** How many rows a card shows before deferring to its own page. */
 const ROW_LIMIT = 4;
+
+/**
+ * What a tile shows when the question cannot be answered at all — a lapsed
+ * grant, not a zero.
+ *
+ * This is the one place the zero rule needs a companion. "0 undercut" in plain
+ * text means "checked, nothing to do"; printing it for a read that never
+ * happened would make a broken card the most reassuring thing on the board.
+ */
+const UNKNOWN = '—';
 
 // --- Open orders ----------------------------------------------------------
 
@@ -55,7 +70,18 @@ const ROW_LIMIT = 4;
  * and subtracting it would remove sell orders below cost that nobody has
  * undercut at all.
  */
-export function OrdersCard({ rows }: { rows: readonly OpenOrderRow[] }) {
+export function OrdersCard({
+  rows,
+  maxOrders,
+  needsReauth,
+  className,
+}: {
+  rows: readonly OpenOrderRow[];
+  /** The ceiling the Trade skills grant. Null until /skills lands — an untrained pilot still has slots, so "5" and "not known yet" must not look alike. */
+  maxOrders: number | null;
+  needsReauth: boolean;
+  className?: string;
+}) {
   const { t } = useTranslation();
   const counts = openOrderProblemCounts(rows);
   const undercut = counts.undercutStation + counts.undercutSystem + counts.undercutRegion;
@@ -63,30 +89,49 @@ export function OrdersCard({ rows }: { rows: readonly OpenOrderRow[] }) {
 
   return (
     <BoardCard
+      className={className}
       title={t('overview.board.orders')}
       meta={
-        <span className="text-[0.6875rem] text-text-dim">
-          {t('overview.board.ordersMeta', { count: needsAttentionCount(rows) })}
-        </span>
+        needsReauth ? undefined : (
+          <span className="text-[0.6875rem] text-text-dim">
+            {t('overview.board.ordersMeta', { count: needsAttentionCount(rows) })}
+          </span>
+        )
       }
       to="/market?section=orders"
       openLabel={t('overview.board.open')}
       footer={
-        belowFloor > 0 ? (
-          <span className="text-danger">
-            {t('overview.board.belowFloor', { count: belowFloor })}
-          </span>
+        needsReauth ? (
+          t('overview.board.reauth')
         ) : (
-          t('overview.board.noneBelowFloor')
+          <>
+            {belowFloor > 0 ? (
+              <span className="text-danger">
+                {t('overview.board.belowFloor', { count: belowFloor })}
+              </span>
+            ) : (
+              t('overview.board.noneBelowFloor')
+            )}
+            {maxOrders !== null &&
+              ` · ${t('overview.board.slotsUsed', { used: rows.length, total: maxOrders })}`}
+          </>
         )
       }
     >
       <TileRow>
-        <NumberTile label={t('overview.board.undercut')} value={undercut} severity="warning" />
-        <NumberTile label={t('overview.board.outbid')} value={counts.outbid} severity="warning" />
+        <NumberTile
+          label={t('overview.board.undercut')}
+          value={needsReauth ? UNKNOWN : undercut}
+          severity="warning"
+        />
+        <NumberTile
+          label={t('overview.board.outbid')}
+          value={needsReauth ? UNKNOWN : counts.outbid}
+          severity="warning"
+        />
         <NumberTile
           label={t('overview.board.relist')}
-          value={counts.expiringOrStale}
+          value={needsReauth ? UNKNOWN : counts.expiringOrStale}
           severity="watch"
         />
       </TileRow>
@@ -103,11 +148,19 @@ export function OrdersCard({ rows }: { rows: readonly OpenOrderRow[] }) {
  * mining, so there is no "owed to you" side to report — an earlier draft had
  * one and it was meaningless.
  */
-export function MiningTaxCard({ data }: { data: MiningTaxBoardData | null }) {
+export function MiningTaxCard({
+  data,
+  className,
+}: {
+  data: MiningTaxBoardData | null;
+  className?: string;
+}) {
   const { t } = useTranslation();
   return (
     <BoardCard
+      className={className}
       title={t('overview.board.miningTax')}
+      meta={<SeverityWord severity={miningTaxSeverity(data)} />}
       to="/moon-mining"
       openLabel={t('overview.board.open')}
       footer={
@@ -115,7 +168,7 @@ export function MiningTaxCard({ data }: { data: MiningTaxBoardData | null }) {
           ? t('overview.board.checking')
           : data.needsReauth
             ? t('overview.board.reauth')
-            : data.oldestUnpaidDays === null
+            : data.oldestUnpaidDays === null || data.payeeCount === 0
               ? t('overview.board.miningSettled')
               : t('overview.board.miningFooter', {
                   count: data.payeeCount,
@@ -126,12 +179,18 @@ export function MiningTaxCard({ data }: { data: MiningTaxBoardData | null }) {
       <TileRow>
         <NumberTile
           label={t('overview.board.iskUnpaid')}
-          value={data === null || data.unpaidIsk === 0 ? 0 : formatIskCompact(data.unpaidIsk)}
+          value={
+            data?.needsReauth
+              ? UNKNOWN
+              : data === null || data.unpaidIsk === 0
+                ? 0
+                : formatIskCompact(data.unpaidIsk)
+          }
           severity="warning"
         />
         <NumberTile
           label={t('overview.board.unassigned')}
-          value={data?.unassignedCount ?? 0}
+          value={data?.needsReauth ? UNKNOWN : (data?.unassignedCount ?? 0)}
           severity="watch"
         />
       </TileRow>
@@ -148,23 +207,35 @@ export function MiningTaxCard({ data }: { data: MiningTaxBoardData | null }) {
  * trip. `groupColoniesIntoBatches` is where that judgement lives; this only
  * renders it.
  */
-export function PlanetaryCard({ data }: { data: PlanetaryBoardData | null }) {
+export function PlanetaryCard({
+  data,
+  className,
+}: {
+  data: PlanetaryBoardData | null;
+  className?: string;
+}) {
   const { t } = useTranslation();
   const batches = data?.batches.slice(0, ROW_LIMIT) ?? [];
 
   return (
     <BoardCard
+      className={className}
       title={t('overview.board.planetary')}
-      meta={<SeverityWord severity={worstSeverity(batches.map((b) => b.severity))} />}
+      meta={<SeverityWord severity={planetarySeverity(data)} />}
       to="/planetary-industry"
       openLabel={t('overview.board.open')}
       footer={
         data === null
           ? t('overview.board.checking')
-          : t('overview.board.planetaryFooter', {
-              count: data.colonyCount,
-              programs: data.programCount,
-            })
+          : data.needsReauth
+            ? t('overview.board.reauth')
+            : // Two counts, so two keys: i18next inflects one `count` per
+              // lookup, and "1 colony · 1 extractor programs" is what asking it
+              // to do both at once produces.
+              `${t('overview.board.colonyCount', { count: data.colonyCount })} · ${t(
+                'overview.board.programCount',
+                { count: data.programCount }
+              )}`
       }
     >
       {batches.length === 0 ? (
@@ -219,12 +290,14 @@ export function IndustryCard({
   productNames,
   needsReauth,
   nowMs,
+  className,
 }: {
   jobs: readonly IndustryJob[];
   productNames: ReadonlyMap<number, string>;
   /** A lapsed grant, not an idle character — an empty card must not conflate the two. */
   needsReauth: boolean;
   nowMs: number;
+  className?: string;
 }) {
   const { t } = useTranslation();
   const summary = summarizeJobs(jobs, nowMs);
@@ -234,22 +307,20 @@ export function IndustryCard({
     done.length > 0 ? Math.min(...done.map((job) => Date.parse(job.end_date))) : null;
   const runningShown = running.slice(0, summary.done > 0 ? ROW_LIMIT - 1 : ROW_LIMIT);
 
-  // The header is the worst of what is actually in the card, rows included —
-  // otherwise a job landing in forty minutes reads `watch` in its row and
-  // `clear` in the header directly above it.
-  const severities: BoardSeverity[] = running.map((job) => jobSeverity(job, nowMs));
-  if (summary.done > 0) severities.push('warning');
-
   return (
     <BoardCard
+      className={className}
       title={t('overview.board.industry')}
-      meta={<SeverityWord severity={worstSeverity(severities)} />}
+      meta={<SeverityWord severity={industrySeverity(jobs, needsReauth, nowMs)} />}
       to="/industry"
       openLabel={t('overview.board.open')}
-      footer={t('overview.board.industryFooter', {
-        count: summary.running,
-        more: Math.max(0, running.length - runningShown.length),
-      })}
+      footer={(() => {
+        const hidden = Math.max(0, running.length - runningShown.length);
+        if (summary.running === 0) return t('overview.board.industryIdle');
+        return hidden === 0
+          ? t('overview.board.industryRunning', { count: summary.running })
+          : t('overview.board.industryFooter', { count: summary.running, more: hidden });
+      })()}
     >
       {jobs.length === 0 ? (
         <CardEmpty>
@@ -289,18 +360,6 @@ export function IndustryCard({
       )}
     </BoardCard>
   );
-}
-
-/**
- * A running job's rung.
- *
- * Never worse than `watch`: it is doing exactly what it was told to, and only a
- * *finished* job is actually waiting on you. `isCompletingSoon` (the next hour)
- * is what separates "about to need collecting" from "running all week" — the
- * same threshold the Industry page's own rows highlight on.
- */
-function jobSeverity(job: IndustryJob, nowMs: number): BoardSeverity {
-  return isCompletingSoon(job, nowMs) ? 'watch' : 'clear';
 }
 
 // --- Alerts ---------------------------------------------------------------
@@ -406,12 +465,15 @@ function AlertColumnRow({ group }: { group: DisplayAlertGroup }) {
  * the two border colours apart (DESIGN.md §7), and the word is shorter than
  * the tooltip explaining a dot would be.
  */
-function SeverityWord({ severity }: { severity: BoardSeverity }) {
+function SeverityWord({ severity }: { severity: BoardSeverity | null }) {
   const { t } = useTranslation();
+  // Nothing at all while the card is still loading: a "Clear" verdict over a
+  // footer reading "Checking…" is a claim the card cannot yet make.
+  if (severity === null) return null;
   return (
     <span className="flex items-center gap-1 text-[0.6875rem] tracking-widest uppercase">
       <SeverityIcon severity={severity} />
-      <span className="text-text-dim">{t(SEVERITY_LABEL_KEY[severity])}</span>
+      <span className="text-text-dim">{t(SEVERITY_STYLE[severity].labelKey)}</span>
     </span>
   );
 }

@@ -94,14 +94,14 @@ export function groupColoniesIntoBatches<T>(
   nowMs: number,
   expiringSoonWindowMs: number = EXPIRING_SOON_WINDOW_MS
 ): ColonyBatch<T>[] {
-  const expired: T[] = [];
+  const expired: { colony: T; stoppedMs: number }[] = [];
   const noExtractor: T[] = [];
   const running: { colony: T; expiryMs: number }[] = [];
 
   for (const colony of colonies) {
     const status = statusOf(colony);
     if (status.idle) {
-      expired.push(colony);
+      expired.push({ colony, stoppedMs: status.soonestExpiryMs ?? nowMs });
     } else if (status.soonestExpiryMs === null) {
       noExtractor.push(colony);
     } else {
@@ -120,9 +120,9 @@ export function groupColoniesIntoBatches<T>(
   if (expired.length > 0) {
     batches.push({
       kind: 'expired',
-      expiryMs: Math.min(...expired.map((c) => statusOf(c).soonestExpiryMs ?? nowMs)),
+      expiryMs: Math.min(...expired.map((entry) => entry.stoppedMs)),
       severity: 'critical',
-      colonies: expired,
+      colonies: expired.map((entry) => entry.colony),
     });
   }
 

@@ -28,11 +28,15 @@ import {
   FilterBar,
   FilterChip,
   FilterField,
-  NativeSelect,
   PageHeader,
   Panel,
-  SEVERITY_LABEL_KEY,
+  SEVERITY_STYLE,
   SearchInput,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
   buttonClassName,
 } from '@/components/ui';
 import { BOARD_SEVERITIES, type BoardSeverity } from '@/engine/severity';
@@ -65,6 +69,9 @@ import { refreshAppBadge } from '@/features/notifications/appBadge';
 const FILTERABLE_SEVERITIES: readonly BoardSeverity[] = BOARD_SEVERITIES.filter(
   (severity) => severity !== 'clear'
 );
+
+/** Radix `Select` has no empty-string value, so "every character" needs a sentinel of its own. */
+const ALL_CHARACTERS = 'all';
 
 /** The next set with `value` flipped in or out — the sheet edits a draft by value, not a store. */
 function toggled<T>(set: ReadonlySet<T>, value: T): ReadonlySet<T> {
@@ -136,11 +143,7 @@ export function Alerts() {
   }, [liveGroups]);
 
   function toggleExpanded(key: string) {
-    setExpandedKeys((prev) => {
-      const next = new Set(prev);
-      if (!next.delete(key)) next.add(key);
-      return next;
-    });
+    setExpandedKeys((prev) => toggled(prev, key));
   }
 
   // Nothing until the stored preference is known: rendering the page and then
@@ -209,29 +212,39 @@ export function Alerts() {
         {(draft, setDraft) => (
           <>
             <FilterField label={t('alerts.characterLabel')}>
-              <NativeSelect
-                value={draft.characterId ?? ''}
-                aria-label={t('alerts.characterLabel')}
-                className="w-44"
-                onChange={(event) =>
+              {/* Radix `Select`, not `NativeSelect`: DESIGN.md makes the OS
+                  picker the documented exception, and nothing about a character
+                  list needs it. */}
+              <Select
+                value={draft.characterId === null ? ALL_CHARACTERS : String(draft.characterId)}
+                onValueChange={(value) =>
                   setDraft({
                     ...draft,
-                    characterId: event.target.value === '' ? null : Number(event.target.value),
+                    characterId: value === ALL_CHARACTERS ? null : Number(value),
                   })
                 }
               >
-                <option value="">{t('alerts.allCharacters')}</option>
-                {characters.map((character) => (
-                  <option key={character.characterId} value={character.characterId}>
-                    {character.name}
-                  </option>
-                ))}
-              </NativeSelect>
+                <SelectTrigger aria-label={t('alerts.characterLabel')} className="w-44">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ALL_CHARACTERS}>{t('alerts.allCharacters')}</SelectItem>
+                  {characters.map((character) => (
+                    <SelectItem key={character.characterId} value={String(character.characterId)}>
+                      {character.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </FilterField>
             {FILTERABLE_SEVERITIES.map((severity) => (
-              <FilterField key={severity} label={t(SEVERITY_LABEL_KEY[severity])} stretch={false}>
+              <FilterField
+                key={severity}
+                label={t(SEVERITY_STYLE[severity].labelKey)}
+                stretch={false}
+              >
                 <FilterChip
-                  label={t(SEVERITY_LABEL_KEY[severity])}
+                  label={t(SEVERITY_STYLE[severity].labelKey)}
                   count={severityCounts.get(severity) ?? 0}
                   selected={draft.severities.has(severity)}
                   onToggle={() =>

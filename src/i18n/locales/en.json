@@ -851,37 +851,8 @@
   "overview": {
     "title": "Overview",
     "wallet": "Wallet",
-    "walletEmpty": "No wallet data cached. Reconnect to fetch it.",
     "isk": "ISK",
-    "queue": "Training queue",
-    "queueEmpty": "No active in-game training queue cached.",
-    "queuePaused": "Training queue is paused.",
-    "queueScheduled": "Skill queue scheduled",
-    "queueDepth": "{{count}} queued · {{total}} left · finishes {{date}}",
     "timeLeft": "{{duration}} left",
-    "training": "Training {{name}}",
-    "finishes": "finishes {{date}}",
-    "reauthTitle": "Log in again to see your wallet",
-    "reauthHint": "Log in again to fetch this character's wallet balance.",
-    "reauthAction": "Log in again with EVE Online",
-    "queueReauthTitle": "Log in again to see the training queue",
-    "queueReauthHint": "Log in again to fetch this character's in-game skill queue.",
-    "queueReauthAction": "Log in again with EVE Online",
-    "refreshWallet": "Refresh wallet",
-    "refreshQueue": "Refresh training queue",
-    "industryTile": "Industry",
-    "ordersTile": "Open orders",
-    "contractsTile": "Contracts",
-    "tileReauthLabel": "{{label}}: log in again to see this data",
-    "tileRatioLabel": "{{label}}: {{used}} of {{total}}",
-    "notifications": "Notifications",
-    "notificationsEmpty": "No notifications yet",
-    "notificationsEmptyHint": "Events you have enabled will appear here while the app is open.",
-    "notificationsDismissAll": "Dismiss all",
-    "notificationsDismiss": "Dismiss {{title}}",
-    "notificationsSettings": "Settings",
-    "notificationsOtherCharacters": "Other characters",
-    "notificationsSpan": "{{count}} alerts from {{oldest}} to {{newest}}",
     "board": {
       "open": "Open",
       "refresh": "Refresh the board",
@@ -911,8 +882,6 @@
       "miningSettled": "Nothing outstanding",
       "planetary": "Planetary industry",
       "planetaryEmpty": "No colonies on this character.",
-      "planetaryFooter_one": "{{count}} colony · {{programs}} extractor programs",
-      "planetaryFooter_other": "{{count}} colonies · {{programs}} extractor programs",
       "stopped": "Stopped",
       "noProgram": "Unbuilt",
       "batch": {
@@ -943,7 +912,17 @@
       "jobSubject_other": "{{name}} ×{{count}}",
       "unknownProduct": "Unnamed job",
       "checking": "Checking…",
-      "reauth": "Log in again to see this."
+      "reauth": "Log in again to see this.",
+      "slotsUsed": "{{used}} of {{total}} slots used",
+      "industryRunning_one": "{{count}} running",
+      "industryRunning_other": "{{count}} running",
+      "industryIdle": "Nothing running",
+      "walletUnavailable": "Log in again",
+      "trainingUnavailable": "Log in again",
+      "colonyCount_one": "{{count}} colony",
+      "colonyCount_other": "{{count}} colonies",
+      "programCount_one": "{{count}} extractor program",
+      "programCount_other": "{{count}} extractor programs"
     }
   },
   "alerts": {
@@ -998,6 +977,12 @@
       "nullsec": "Nullsec",
       "wormhole": "Wormhole"
     }
+  },
+  "severity": {
+    "critical": "Critical",
+    "warning": "Due soon",
+    "watch": "Worth watching",
+    "clear": "Not urgent"
   },
   "wallet": {
     "title": "Wallet",
@@ -2772,12 +2757,6 @@
         "moonDecay": "Moon chunk breaks up on its own",
         "jobReady": "Job finished, waiting on delivery",
         "serviceOffline": "{{service}} is offline"
-      },
-      "severity": {
-        "critical": "Critical",
-        "warning": "Due soon",
-        "watch": "Worth watching",
-        "clear": "Not urgent"
       },
       "contextMenu": {
         "copyName": "Copy name",

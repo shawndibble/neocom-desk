@@ -20,8 +20,7 @@ import {
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuTrigger,
-  SEVERITY_LABEL_KEY,
-  SEVERITY_TONE,
+  SEVERITY_STYLE,
   SeverityIcon,
   Tooltip,
 } from '@/components/ui';
@@ -76,7 +75,7 @@ function detailText(item: CorpBoardItem, t: Translate): string {
  */
 function Countdown({ item }: { item: CorpBoardItem }) {
   const { t } = useTranslation();
-  const tone = SEVERITY_TONE[item.severity];
+  const tone = SEVERITY_STYLE[item.severity].tone;
   // `flex items-center gap-1` puts the shape beside the countdown text inside
   // this same element — a fourth row child would reflow the 320px stack this
   // element's own `w-full`/`sm:w-24` split is built for (issue #419).
@@ -212,7 +211,7 @@ export function CorpBoardRow({
           `sr-only` rather than a visible badge — a fifth element on every row
           would crowd the one thing the row exists to show.
         */}
-        <span className="sr-only">{t(SEVERITY_LABEL_KEY[item.severity])}</span>
+        <span className="sr-only">{t(SEVERITY_STYLE[item.severity].labelKey)}</span>
       </li>
     </BoardRowMenu>
   );

@@ -208,7 +208,7 @@ export async function hydrateNotificationPreferences(): Promise<void> {
   // Character present in the synced blob even when nothing actually
   // changed, so `merged !== current` is true on nearly every call — a
   // reference check here would call setValue every time this runs, and
-  // both NotificationsPanel and NotificationFeedPanel re-run this (via
+  // both NotificationsPanel and the Alerts page re-run this (via
   // refreshAppBadge) from a `useEffect` keyed on the store's value,
   // which would then loop without end. A content comparison is what
   // actually tells "unchanged" from "changed".

@@ -11,13 +11,31 @@
  * Device-wide, matching the page: the poller runs for every Character, and a
  * badge that hid an alt's alerts would be a badge you learn to distrust.
  */
+import { useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { readFeed } from './feed';
 import { visibleFeedEntries } from './feedSelection';
-import { useNotificationPreferences, isFeedChannelEnabled } from './preferences';
+import {
+  hydrateNotificationPreferences,
+  isFeedChannelEnabled,
+  useNotificationPreferences,
+} from './preferences';
 
 export function useUnreadAlertCount(): number {
   const prefs = useNotificationPreferences((state) => state.value);
+
+  /*
+   * Hydrated here rather than relied on from elsewhere. The Overview's old
+   * feed panel used to do it on the one route that showed alerts; this badge
+   * is in the rail, so it is on every route, and the only other hydrator is
+   * the Foreground Poller — which is not this hook's dependency and should not
+   * quietly become one. `hydrate` returns early once done, so the extra call
+   * costs nothing.
+   */
+  useEffect(() => {
+    void hydrateNotificationPreferences();
+  }, []);
+
   const entries = useLiveQuery(() => readFeed(), [], []);
   if (!prefs.masterEnabled || !isFeedChannelEnabled(prefs)) return 0;
   return visibleFeedEntries(entries, prefs).length;
