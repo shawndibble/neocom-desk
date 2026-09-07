@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -49,6 +49,7 @@ import {
 } from '@/features/miningTax/assignments';
 import { tagAsIgnored, tagAsMoonOre } from '@/features/miningTax/typeOverrides';
 import { TypeOverridesDialog } from '@/features/miningTax/TypeOverridesDialog';
+import { useStatusFilter } from '@/features/miningTax/statusFilterPref';
 import { STATUS_TEXT_CLASS } from '@/features/miningTax/statusTone';
 import { computePayeeBalances, summarizeUnassigned } from '@/features/miningTax/balances';
 import {
@@ -79,8 +80,6 @@ const ALL_STATUSES: readonly MiningTaxRowStatus[] = [
   'paid',
   'dismissed',
 ];
-// Everything except Paid and Dismissed — both are "handled", opt-in to view (decision doc's Paid precedent).
-const DEFAULT_STATUSES = new Set<MiningTaxRowStatus>(['unassigned', 'needs-review', 'outstanding']);
 
 interface Snapshot {
   entries: MoonMiningTaxRow[];
@@ -188,8 +187,19 @@ export function MoonMiningTax() {
 
   const [characterFilter, setCharacterFilter] = useState<ReadonlySet<number> | 'all'>('all');
   const [payeeFilter, setPayeeFilter] = useState<ReadonlySet<string> | 'all'>('all');
-  const [statusFilter, setStatusFilter] =
-    useState<ReadonlySet<MiningTaxRowStatus>>(DEFAULT_STATUSES);
+  // Remembered across visits (`statusFilterPref.ts`): this filter hides rows,
+  // so forgetting it silently drops whatever the pilot was working from.
+  const storedStatuses = useStatusFilter((state) => state.value);
+  const setStoredStatuses = useStatusFilter((state) => state.setValue);
+  const hydrateStatuses = useStatusFilter((state) => state.hydrate);
+  useEffect(() => {
+    void hydrateStatuses();
+  }, [hydrateStatuses]);
+  const statusFilter = useMemo(() => new Set(storedStatuses), [storedStatuses]);
+  const setStatusFilter = useCallback(
+    (next: ReadonlySet<MiningTaxRowStatus>) => void setStoredStatuses([...next]),
+    [setStoredStatuses]
+  );
   const [payeeManagerCharacterId, setPayeeManagerCharacterId] = useState<number | null>(null);
   // Unconditional, deliberately. Hiding this behind "the pilot has at least
   // one tag" reads tidier and reintroduces the shape of the bug it exists to
@@ -329,12 +339,15 @@ export function MoonMiningTax() {
   );
 
   function toggleStatus(status: MiningTaxRowStatus) {
-    setStatusFilter((previous) => {
-      const next = new Set(previous);
-      if (next.has(status)) next.delete(status);
-      else next.add(status);
-      return next;
-    });
+    const next = new Set(statusFilter);
+    if (next.has(status)) next.delete(status);
+    else next.add(status);
+    // Not an updater callback: the value now lives in a store rather than
+    // component state, and `statusFilter` is already the current one.
+    // Unselecting the last status is refused — an empty filter renders an
+    // empty table with nothing explaining it, and a stored empty array is
+    // rejected on read for the same reason.
+    if (next.size > 0) setStatusFilter(next);
   }
 
   function toggleCharacter(characterId: number) {

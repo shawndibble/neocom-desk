@@ -37,6 +37,7 @@ export const VIEW_PREFERENCE_KEYS: readonly string[] = [
   'loyaltyStorePriceBasis',
   'marketLocationMode',
   'marketPriceHistoryRange',
+  'miningTaxStatusFilter',
   'piAdvisorAltColonies',
   'piColoniesShowAlts',
   'piMarketSourcing',

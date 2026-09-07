@@ -26,6 +26,7 @@ const PINNED = [
   'loyaltyStorePriceBasis',
   'marketLocationMode',
   'marketPriceHistoryRange',
+  'miningTaxStatusFilter',
   'piAdvisorAltColonies',
   'piColoniesShowAlts',
   'piMarketSourcing',
