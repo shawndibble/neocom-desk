@@ -17,6 +17,7 @@ import { Link } from 'react-router-dom';
 import { DataAgeBadge, IconButton, SEVERITY_TONE } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import type { BoardSeverity } from '@/engine/severity';
+import { cx } from '@/lib/cx';
 
 export interface SummaryStripProps {
   deadline: { label: string; note: string; severity: BoardSeverity; to: string } | null;
@@ -117,7 +118,11 @@ function Value({
 }) {
   return (
     <span
-      className={`block truncate text-lg font-medium tabular-nums ${muted ? 'text-text-dim' : ''} ${className}`}
+      className={cx(
+        'block truncate text-lg font-medium tabular-nums',
+        muted && 'text-text-dim',
+        className
+      )}
     >
       {children}
     </span>

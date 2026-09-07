@@ -345,9 +345,13 @@ export function Overview() {
       */}
       <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <div className="grid min-w-0 gap-3 sm:grid-cols-2">
+          {/* Every card renders unconditionally, mid-load included. Gating one
+              on its own data would make "still loading" and "nothing here"
+              look identical to "this domain does not exist" — which is the
+              failure this board was rebuilt to avoid. */}
           <OrdersCard rows={orderRows} />
-          {miningSnapshot.data && <MiningTaxCard data={miningSnapshot.data} />}
-          {planetary && <PlanetaryCard data={planetary} />}
+          <MiningTaxCard data={miningSnapshot.data} />
+          <PlanetaryCard data={planetary} />
           <IndustryCard
             jobs={industryJobs}
             productNames={industrySnapshot.data?.productNames ?? EMPTY_NAMES}

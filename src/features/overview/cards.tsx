@@ -103,7 +103,7 @@ export function OrdersCard({ rows }: { rows: readonly OpenOrderRow[] }) {
  * mining, so there is no "owed to you" side to report — an earlier draft had
  * one and it was meaningless.
  */
-export function MiningTaxCard({ data }: { data: MiningTaxBoardData }) {
+export function MiningTaxCard({ data }: { data: MiningTaxBoardData | null }) {
   const { t } = useTranslation();
   return (
     <BoardCard
@@ -111,23 +111,25 @@ export function MiningTaxCard({ data }: { data: MiningTaxBoardData }) {
       to="/moon-mining"
       openLabel={t('overview.board.open')}
       footer={
-        data.oldestUnpaidDays === null
-          ? t('overview.board.miningSettled')
-          : t('overview.board.miningFooter', {
-              count: data.payeeCount,
-              days: data.oldestUnpaidDays,
-            })
+        data === null
+          ? t('overview.board.checking')
+          : data.oldestUnpaidDays === null
+            ? t('overview.board.miningSettled')
+            : t('overview.board.miningFooter', {
+                count: data.payeeCount,
+                days: data.oldestUnpaidDays,
+              })
       }
     >
       <TileRow>
         <NumberTile
           label={t('overview.board.iskUnpaid')}
-          value={data.unpaidIsk === 0 ? 0 : formatIskCompact(data.unpaidIsk)}
+          value={data === null || data.unpaidIsk === 0 ? 0 : formatIskCompact(data.unpaidIsk)}
           severity="warning"
         />
         <NumberTile
           label={t('overview.board.unassigned')}
-          value={data.unassignedCount}
+          value={data?.unassignedCount ?? 0}
           severity="watch"
         />
       </TileRow>
@@ -144,23 +146,29 @@ export function MiningTaxCard({ data }: { data: MiningTaxBoardData }) {
  * trip. `groupColoniesIntoBatches` is where that judgement lives; this only
  * renders it.
  */
-export function PlanetaryCard({ data }: { data: PlanetaryBoardData }) {
+export function PlanetaryCard({ data }: { data: PlanetaryBoardData | null }) {
   const { t } = useTranslation();
-  const batches = data.batches.slice(0, ROW_LIMIT);
+  const batches = data?.batches.slice(0, ROW_LIMIT) ?? [];
 
   return (
     <BoardCard
       title={t('overview.board.planetary')}
-      meta={<SeverityWord severity={worstSeverity(data.batches.map((b) => b.severity))} />}
+      meta={<SeverityWord severity={worstSeverity(batches.map((b) => b.severity))} />}
       to="/planetary-industry"
       openLabel={t('overview.board.open')}
-      footer={t('overview.board.planetaryFooter', {
-        count: data.colonyCount,
-        programs: data.programCount,
-      })}
+      footer={
+        data === null
+          ? t('overview.board.checking')
+          : t('overview.board.planetaryFooter', {
+              count: data.colonyCount,
+              programs: data.programCount,
+            })
+      }
     >
       {batches.length === 0 ? (
-        <CardEmpty>{t('overview.board.planetaryEmpty')}</CardEmpty>
+        <CardEmpty>
+          {data === null ? t('overview.board.checking') : t('overview.board.planetaryEmpty')}
+        </CardEmpty>
       ) : (
         <ul>
           {batches.map((batch) => (
@@ -172,7 +180,9 @@ export function PlanetaryCard({ data }: { data: PlanetaryBoardData }) {
                   ? t('overview.board.noProgram')
                   : batch.kind === 'expired'
                     ? t('overview.board.stopped')
-                    : formatDuration(Math.max(0, (batch.expiryMs ?? 0) - data.loadedAt) / 1000)
+                    : formatDuration(
+                        Math.max(0, (batch.expiryMs ?? 0) - (data?.loadedAt ?? 0)) / 1000
+                      )
               }
               subject={t(`overview.board.batch.${batch.kind}`, { count: batch.colonies.length })}
               detail={batch.colonies
