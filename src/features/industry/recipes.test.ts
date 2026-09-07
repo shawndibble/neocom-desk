@@ -45,6 +45,16 @@ const BLUEPRINTS: BlueprintMap = {
     skills: [],
     activity: 'manufacturing',
   },
+  // A fourth hop (43 <- 42), reachable only if the widening actually walks
+  // the whole tree rather than stopping at a fixed number of levels.
+  '9845': {
+    name: 'Zydrine Blueprint',
+    time: 25,
+    materials: [{ typeID: 43, quantity: 1 }],
+    products: [{ typeID: 42, quantity: 1 }],
+    skills: [],
+    activity: 'manufacturing',
+  },
 };
 
 const TYPES: TypeMap = {
@@ -182,11 +192,12 @@ describe('recipeInputTypeIds', () => {
 describe('buildPlanTypeIds', () => {
   // A plain blueprint, not from the fixture catalog: one material (2398) is a
   // planetary schematic's output, the other (40) is manufactured and itself
-  // has an input (41) with its own producer, and the product (9840) is
-  // manufactured by fixture blueprint 9841 — so the two-level widening below
-  // exercises the manufacturing and planetary recipe paths, and a second
-  // manufacturing hop, all at once, same as `BuildPlanDetail.tsx`'s price
-  // fetch (shared via this function, issue #453 — the Compare table widens
+  // heads a four-hop manufacturing chain (40 <- 41 <- 42 <- 43), and the
+  // product (9840) is manufactured by fixture blueprint 9841 — so the walk
+  // below exercises the manufacturing and planetary recipe paths, and
+  // several manufacturing hops, all at once, same as `BuildPlanDetail.tsx`'s
+  // price fetch (shared via this function, issue #453 — the Compare table
+  // widens
   // its own fetch identically).
   const blueprint = {
     name: 'Widening test blueprint',
@@ -198,22 +209,21 @@ describe('buildPlanTypeIds', () => {
     products: [{ typeID: 9840, quantity: 1 }],
   };
 
-  it('adds the product to materials, then two levels of recipe inputs for each', () => {
+  it('walks the whole recipe tree, not a fixed number of levels', () => {
     const ids = buildPlanTypeIds(blueprint, { catalog, pi: PI });
     // 2398 (material) -> planetary input 2267.
-    // 40 (material) -> manufacturing input 41 -> its own input 42.
+    // 40 (material) -> manufacturing input 41 -> 42 -> 43, four hops deep —
+    // a `buildHere` choice can now sit at any of them (docs/context/decisions),
+    // and each one needs a hub price for its own recipe's inputs.
     // 9840 (product) -> manufacturing input 34.
-    // The second level (41 -> 42) is what a make-or-buy verdict on an
-    // expanded row's own input (41) needs a price for — one level a plain
-    // `recipeInputTypeIds` pass never reaches.
-    expect(ids.sort((a, b) => a - b)).toEqual([34, 40, 41, 42, 2267, 2398, 9840]);
+    expect(ids.sort((a, b) => a - b)).toEqual([34, 40, 41, 42, 43, 2267, 2398, 9840]);
   });
 
   it('skips the planetary widening when pi.json is unavailable', () => {
     const ids = buildPlanTypeIds(blueprint, { catalog, pi: null });
     // No pi means no schematic for 2398, so 2267 never gets added — 2398
     // itself stays, as a plain material with nothing produced beneath it.
-    // The manufacturing side (40 -> 41 -> 42, 9840 -> 34) is unaffected.
-    expect(ids.sort((a, b) => a - b)).toEqual([34, 40, 41, 42, 2398, 9840]);
+    // The manufacturing side (40 -> 41 -> 42 -> 43, 9840 -> 34) is unaffected.
+    expect(ids.sort((a, b) => a - b)).toEqual([34, 40, 41, 42, 43, 2398, 9840]);
   });
 });

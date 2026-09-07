@@ -14,6 +14,7 @@ import type {
   IndustryBlueprint,
   SkillLevels,
 } from '@/engine/industry/types';
+import type { MaterialRecipe } from '@/engine/industry/makeOrBuy';
 import type { BuildPlanRecord } from '@/db';
 
 export interface ComputeBuildPlanInput {
@@ -27,6 +28,7 @@ export interface ComputeBuildPlanInput {
     | 'security'
     | 'facilityTaxPct'
     | 'materialSourcing'
+    | 'buildHere'
   >;
   blueprint: IndustryBlueprint;
   /** Manufacturing system cost index; pass 0 when unavailable (gate display on pricesReady instead). */
@@ -36,6 +38,8 @@ export interface ComputeBuildPlanInput {
   /** The plan's material price basis, already resolved by `priceBasis.ts`. */
   materialPrices?: HubPrices;
   skills: SkillLevels;
+  /** What produces a material, for anything `plan.buildHere` might name at any depth. */
+  recipeFor?: (typeID: number) => MaterialRecipe | null;
 }
 
 export interface ComputeBuildPlanResult {
@@ -56,6 +60,7 @@ export function computeBuildPlan({
   hubPrices,
   materialPrices,
   skills,
+  recipeFor,
 }: ComputeBuildPlanInput): ComputeBuildPlanResult {
   const facility = FACILITY_PRESETS[plan.facility];
   const runs = clampInt(plan.runs, 1, 100_000);
@@ -85,6 +90,8 @@ export function computeBuildPlan({
       materialPrices,
       materialSourcing: plan.materialSourcing,
       skills,
+      buildHere: plan.buildHere,
+      recipeFor,
     });
     return { result, error: null };
   } catch (err) {

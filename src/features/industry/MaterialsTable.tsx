@@ -296,12 +296,11 @@ export function MaterialsTable({
           const advice = makeOrBuy?.get(material.typeID);
           const name = nameFor(material.typeID);
           const building = material.subBuild !== undefined;
-          // Never offered on an indented row. That is what holds the feature
-          // to one level: a recipe input may well have a blueprint of its
-          // own, but expanding it would push the list toward raw planetary
-          // resources no market sells (docs/context/decisions).
-          const toggle =
-            !material.isSubInput && canBuildHere?.(material.typeID) ? onToggleBuildHere : undefined;
+          // Offered at any depth: a recipe input a build introduced is
+          // exactly as buildable as the plan's own materials, which is what
+          // lets a player keep drilling down as many levels as the recipe
+          // tree actually has (docs/context/decisions).
+          const toggle = canBuildHere?.(material.typeID) ? onToggleBuildHere : undefined;
           const actionLabel = t(building ? 'industry.buyInsteadFor' : 'industry.buildHereFor', {
             material: name,
           });
@@ -316,17 +315,20 @@ export function MaterialsTable({
             ? `${actionLabel}. ${makeOrBuyLabel(advice, material.remainingQuantity, t)}`
             : undefined;
           return (
-            // Indented when the row only exists because something above it is
-            // being built. The offset alone reaches a sighted reader on a
-            // wide-enough screen; the sr-only label below is what a screen
-            // reader and a narrow stacked card get instead, since neither has
-            // a column edge to measure the offset against.
+            // Indented one step per level it sits below the plan's own
+            // materials, `1rem` a level (the same offset the single-level
+            // indent used, `pl-4` on the app's `0.25rem` spacing scale —
+            // docs/DESIGN.md §3 — kept as an inline style since the depth is
+            // unbounded and Tailwind has no class for an arbitrary multiple).
+            // The offset alone reaches a sighted reader on a wide-enough
+            // screen; the sr-only label below is what a screen reader and a
+            // narrow stacked card get instead, since neither has a column
+            // edge to measure the offset against.
             <span
-              className={cx('inline-flex items-center gap-1.5', material.isSubInput && 'sm:pl-4')}
+              className="inline-flex items-center gap-1.5"
+              style={material.depth > 0 ? { paddingLeft: `${material.depth}rem` } : undefined}
             >
-              {material.isSubInput && (
-                <span className="sr-only">{t('industry.subBuildInput')}</span>
-              )}
+              {material.depth > 0 && <span className="sr-only">{t('industry.subBuildInput')}</span>}
               {toggle ? (
                 // The marker slot itself is the control on a material
                 // something here can produce — hammer to start building it,
@@ -423,13 +425,27 @@ export function MaterialsTable({
         header: t('industry.price'),
         align: 'right',
         render: (material) => {
-          // A material being produced has no purchase price to show or edit:
-          // what it costs is the inputs listed below it plus its job fee, and a
-          // hub price beside it would read as money this plan is spending.
+          // A material being produced has no purchase price to edit — it
+          // isn't bought at a unit price — but it still has a real per-unit
+          // cost: the rolled-up cost of the job that makes it, materials and
+          // every sub-job's fee included, however deep that job's own inputs
+          // go. Poisoned (a descendant neither owned, priced, nor itself
+          // buildable) shows as unpriced rather than a silently wrong number.
           if (material.subBuild) {
+            const unitCost = material.subBuild.unitCost;
             return (
-              <span className="text-[0.6875rem] text-text-dim">
-                {t('industry.priceSourceBuilt')}
+              <span className="flex flex-col items-start gap-0.5 sm:items-end">
+                <span className="tabular-nums">
+                  {unitCost === null ? t('common.unknown') : formatIsk(unitCost, 2)}
+                </span>
+                <span
+                  className={cx(
+                    'text-[0.6875rem]',
+                    unitCost === null ? 'text-warning' : 'text-text-dim'
+                  )}
+                >
+                  {unitCost === null ? t('industry.unpriced') : t('industry.priceSourceBuilt')}
+                </span>
               </span>
             );
           }
@@ -500,18 +516,24 @@ export function MaterialsTable({
         align: 'right',
         className: 'tabular-nums',
         render: (material) => {
-          // The job replaces the line total, because the money moved: this
-          // row's cost is now the indented inputs plus a fee counted once in
-          // the panel footer, and repeating either here would double it. Runs
-          // is the one number worth a glance here — the per-run yield and
-          // spare units it implies are already recoverable from the runs
-          // count and the indented inputs below, so a second line spelling
-          // them out is more to read without being more to know.
+          // The rolled-up cost of building this material — materials plus
+          // every sub-job's fee, at whatever depth — is a real number now,
+          // not a placeholder: this is exactly what the row's own build
+          // choice changed, and it is already inside the plan's totals.
+          // Runs stays alongside it since the per-run yield and spare units
+          // it implies are already recoverable from the runs count and the
+          // indented inputs below, so a second line spelling them out is more
+          // to read without being more to know.
           if (material.subBuild) {
             const { runs } = material.subBuild;
             return (
               <span className="flex flex-col items-start sm:items-end">
-                <span>{t('industry.subBuildRuns', { runs: runs.toLocaleString() })}</span>
+                <span>
+                  {material.unpriced ? t('common.unknown') : formatIsk(material.lineCost)}
+                </span>
+                <span className="text-[0.6875rem] whitespace-nowrap text-text-dim">
+                  {t('industry.subBuildRuns', { runs: runs.toLocaleString() })}
+                </span>
               </span>
             );
           }

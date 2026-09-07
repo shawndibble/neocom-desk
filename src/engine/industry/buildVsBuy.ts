@@ -1,36 +1,53 @@
 /**
  * Build-vs-buy comparison: total build cost (materials at their sourced prices
  * + job fee) against buying the product outright at the hub's lowest sell.
- * Material prices come from src/engine/industry/sourcing — owned units are
- * free, the rest is priced at an override or at `materialPrices` (the hub's
- * sell side unless the caller passes another map). Missing prices flag the
- * result as unpriceable instead of throwing.
+ * Material prices come from src/engine/industry/materialResolution — owned
+ * units are free, the rest is priced at an override, at `materialPrices` (the
+ * hub's sell side unless the caller passes another map), or — for a material
+ * named in `buildHere` — the rolled-up cost of the job that produces it,
+ * recursively. Missing prices flag the result as unpriceable instead of
+ * throwing; so does a built material that bottoms out unpriced.
  *
  * The product is always priced from `hubPrices`, never `materialPrices`: an
  * Acquisition Verdict asks what buying the product outright costs, and buying
  * outright pays the hub's lowest sell whatever the materials were sourced at.
  */
 
-import type { BuildResult, FacilityContext, IndustryInputs } from '@/engine/industry/types';
+import type { BuildResult, IndustryInputs } from '@/engine/industry/types';
 import { SKILL_IDS } from '@/engine/industry/types';
 import { effectiveMaterials } from '@/engine/industry/materials';
-import { materialCostLines } from '@/engine/industry/sourcing';
+import { resolveMaterial, unpricedLeafTypeIds } from '@/engine/industry/materialResolution';
+import type { SubBuildContext } from '@/engine/industry/subBuild';
 import { jobDurationSeconds } from '@/engine/industry/time';
 import { estimatedItemValue, jobFee } from '@/engine/industry/jobCost';
 import { brokerFee, breakEvenPrice, salesTax } from '@/engine/industry/fees';
 
 export function buildVsBuy(inputs: IndustryInputs): BuildResult {
   const { blueprint, runs, me, te, systemCostIndex, adjustedPrices, hubPrices, skills } = inputs;
-  const ctx: FacilityContext = {
+  const ctx: SubBuildContext = {
     facility: inputs.facility,
     rig: inputs.rig,
     security: inputs.security,
+    facilityTaxPct: inputs.facilityTaxPct,
+    systemCostIndex,
+    adjustedPrices,
+    skills,
   };
 
-  const materials = materialCostLines(
-    effectiveMaterials(blueprint, runs, me, ctx),
-    inputs.materialPrices ?? hubPrices,
-    inputs.materialSourcing
+  // One shared pool across every top-level material's own resolution, not one
+  // per `.map()` iteration: two different blueprint materials can each build
+  // down into the same recursive input (e.g. two components both consuming
+  // Tritanium), and owned stock of it exists once, not once per branch.
+  const ownedPool = new Map<number, number>();
+  const materials = effectiveMaterials(blueprint, runs, me, ctx).map((material) =>
+    resolveMaterial(material, {
+      buildHere: new Set(inputs.buildHere ?? []),
+      recipeFor: inputs.recipeFor ?? (() => null),
+      materialPrices: inputs.materialPrices ?? hubPrices,
+      sourcing: inputs.materialSourcing,
+      ctx,
+      ownedPool,
+    })
   );
   const seconds = jobDurationSeconds(blueprint.time, runs, te, skills, ctx);
   const fee = jobFee(
@@ -40,7 +57,10 @@ export function buildVsBuy(inputs: IndustryInputs): BuildResult {
     inputs.facilityTaxPct
   );
 
-  const unpricedMaterials = materials.filter((m) => m.unpriced).map(({ typeID }) => typeID);
+  // The actual blocking typeIDs, however deep they sit — a built material's
+  // own `unpriced` flag only ever reflects something underneath it, so its
+  // own typeID is never the right thing to report here.
+  const unpricedMaterials = unpricedLeafTypeIds(materials);
   const materialCost = materials.reduce((sum, { lineCost }) => sum + lineCost, 0);
   const totalCost = materialCost + fee.total;
 

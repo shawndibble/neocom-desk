@@ -19,10 +19,16 @@ import type { OwnedStockPlacement } from '@/engine/industry/ownedStock';
 import type { PiData } from '@/sde/types';
 import type { MakeOrBuy } from '@/engine/industry/makeOrBuy';
 import { FACILITY_PRESETS } from '@/engine/industry/types';
-import { planSubBuild } from '@/engine/industry/subBuild';
+import { resolveMaterial } from '@/engine/industry/materialResolution';
 import { applySourcingPatch } from './sourcingEdits';
 import { MaterialsTable } from './MaterialsTable';
+import type { MaterialTableRow } from './subBuildPlan';
 import type { OwnedStockDetection } from './ownedStockDetection';
+
+/** `MaterialsTable` needs a `depth` on every row; the table's own top-level rows are always depth 0. */
+function withDepth(materials: readonly MaterialCostLine[], depth = 0): MaterialTableRow[] {
+  return materials.map((material) => ({ ...material, depth }));
+}
 
 // The row menu's PI action reads `pi.json` for itself; the real payload keeps
 // "is 9840 planetary" an answer the SDE gives rather than one this file makes up.
@@ -69,7 +75,7 @@ function Harness({
   const [sourcing, setSourcing] = useState<MaterialSourcingMap | undefined>(initial);
   return (
     <MaterialsTable
-      materials={materialCostLines(MATERIALS, hubPrices, sourcing)}
+      materials={withDepth(materialCostLines(MATERIALS, hubPrices, sourcing))}
       nameFor={nameFor}
       sourcing={sourcing}
       pricesReady={pricesReady}
@@ -461,7 +467,9 @@ const MENU_MATERIALS: readonly EffectiveMaterial[] = [
   { typeID: 34, baseQuantity: 100, quantity: 100 },
   { typeID: 9840, baseQuantity: 10, quantity: 10 },
 ];
-const MENU_LINES: readonly MaterialCostLine[] = materialCostLines(MENU_MATERIALS, { 34: 10 });
+const MENU_LINES: readonly MaterialTableRow[] = withDepth(
+  materialCostLines(MENU_MATERIALS, { 34: 10 })
+);
 
 function renderTable(props: Partial<React.ComponentProps<typeof MaterialsTable>> = {}) {
   return render(
@@ -857,7 +865,9 @@ describe('MaterialsTable make-or-buy marker', () => {
 
   it('drops the savings clause from a fully owned row — nothing is riding on it', () => {
     renderTable({
-      materials: materialCostLines(MENU_MATERIALS, { 34: 10 }, { 9840: { ownedQuantity: 10 } }),
+      materials: withDepth(
+        materialCostLines(MENU_MATERIALS, { 34: 10 }, { 9840: { ownedQuantity: 10 } })
+      ),
       ...advise({ ...buildIt, savings: 0 }),
     });
     expect(within(row('Mechanical Parts')).getByRole('img')).not.toHaveAccessibleName(/Worth/);
@@ -912,25 +922,37 @@ describe('MaterialsTable build-here control', () => {
     products: [{ typeID: 9840, quantity: 4 }],
   };
 
-  /** A real planned job, so the row renders the numbers the engine would give it. */
-  function sub(material: MaterialCostLine) {
-    return (
-      planSubBuild(material, PARTS_BLUEPRINT, 0, {
-        facility: FACILITY_PRESETS.npcStation,
-        rig: 'none',
-        security: 'highsec',
-        systemCostIndex: 0.05,
-        adjustedPrices: {},
-        skills: {},
-      }) ?? undefined
-    );
+  const RESOLVE_CTX = {
+    facility: FACILITY_PRESETS.npcStation,
+    rig: 'none' as const,
+    security: 'highsec' as const,
+    systemCostIndex: 0.05,
+    adjustedPrices: {},
+    skills: {},
+  };
+
+  /** A real resolved job, so the row renders the numbers the engine would give it. */
+  function buildParts(line: MaterialTableRow): MaterialTableRow {
+    return {
+      ...resolveMaterial(
+        { typeID: line.typeID, baseQuantity: line.baseQuantity, quantity: line.quantity },
+        {
+          buildHere: new Set([9840]),
+          recipeFor: (typeID) =>
+            typeID === 9840 ? { method: 'manufacturing', blueprint: PARTS_BLUEPRINT, me: 0 } : null,
+          materialPrices: { 35: 10 },
+          sourcing: undefined,
+          ctx: RESOLVE_CTX,
+        }
+      ),
+      depth: line.depth,
+    };
   }
 
   const buildable = (typeID: number) => typeID === 9840;
 
   /** MENU_LINES with the parts row switched to being produced rather than bought. */
-  const building = () =>
-    MENU_LINES.map((line) => (line.typeID === 9840 ? { ...line, subBuild: sub(line) } : line));
+  const building = () => MENU_LINES.map((line) => (line.typeID === 9840 ? buildParts(line) : line));
 
   it('offers the control only on a material something can produce', () => {
     renderTable({ canBuildHere: buildable, onToggleBuildHere: vi.fn() });
@@ -1048,24 +1070,28 @@ describe('MaterialsTable build-here control', () => {
     expect(within(built).queryByLabelText(/^Price for/)).toBeNull();
   });
 
-  it('never offers to build an input that only exists because of another build', () => {
+  it('offers the build control at any depth, indented to show it is a recipe input', () => {
     const rows = [
       ...MENU_LINES,
       {
         ...materialCostLines([{ typeID: 35, baseQuantity: 15, quantity: 15 }], {})[0],
-        isSubInput: true,
+        depth: 1,
       },
     ];
     renderTable({ materials: rows, canBuildHere: () => true, onToggleBuildHere: vi.fn() });
 
-    // Both of the plan's own materials offer it; the indented input does not.
-    expect(screen.getAllByRole('button', { name: /here instead of buying it$/ })).toHaveLength(2);
-    expect(within(row('Pyerite')).queryByRole('button', { name: /Build/ })).toBeNull();
-    expect(screen.getByText('Pyerite')).toHaveClass('sm:pl-4');
-    // The indent alone reaches a sighted reader at `sm` and up; a screen
-    // reader and a narrow stacked card (where `sm:pl-4` is inert) get this
-    // instead.
-    expect(within(row('Pyerite')).getByText("input to another material's build")).toHaveClass(
+    // The plan's own two materials, plus the indented input one level down —
+    // a recipe input a build introduced is exactly as buildable as anything
+    // else on the plan (docs/context/decisions).
+    expect(screen.getAllByRole('button', { name: /here instead of buying it$/ })).toHaveLength(3);
+    const pyeriteControl = within(row('Pyerite')).getByRole('button', {
+      name: 'Build Pyerite here instead of buying it',
+    });
+    expect(pyeriteControl).toBeInTheDocument();
+    expect(pyeriteControl.closest('span')?.style.paddingLeft).toBe('1rem');
+    // The indent alone reaches a sighted reader on a wide-enough screen; a
+    // screen reader and a narrow stacked card get this instead.
+    expect(within(row('Pyerite')).getByText('input to a material being built here')).toHaveClass(
       'sr-only'
     );
   });
