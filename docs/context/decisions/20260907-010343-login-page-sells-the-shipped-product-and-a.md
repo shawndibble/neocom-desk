@@ -12,14 +12,21 @@ _Recorded 2026-09-07._
   can be checked against the app rather than admired. This rules out generic
   benefit copy: a block that can't point at a route doesn't go on the page.
 
-- **The feature catalog is pinned by `Login.test.tsx`, not merely written.**
-  The eight rows it listed had fallen behind Moon Mining, Corporation,
+- **The consent list is derived from the registry; the feature catalog is
+  not, and the two are pinned differently on purpose.** Both had rotted: the
+  catalog's eight rows had fallen behind Moon Mining, Corporation,
   Notifications, the Open Orders worklist, reactions, the Production Log and
-  the PI planner — the page had been quietly wrong for several releases with
-  nothing failing. The test now asserts every group and every row, so the next
-  feature that ships without a row fails CI instead of reading as stale. The
-  cost is deliberate: a row is one `FEATURE_GROUPS` entry plus three i18n keys,
-  and that is the point — it makes forgetting louder than remembering.
+  the PI planner, and `permissionsHint` had been omitting four Base Grant
+  scopes outright. Only one of them is derivable, so only one gets a real
+  guard. `Login.test.tsx` holds `BASE_GRANT_PHRASES`, a scope-to-disclosure
+  map asserted equal to `SCOPES` — registering a new ungrouped endpoint now
+  fails that test until someone writes how it will be disclosed, which is a
+  judgement a person has to make and a test can only force. The catalog's
+  twelve rows are pinned as strings: that stops a silent rename or deletion,
+  and nothing more. A new route shipping with no row still fails nothing,
+  because nothing enumerates the routes and not every route earns a row.
+  Claiming otherwise would be the same kind of overstatement this page was
+  being cleaned of.
 
 - **Catalog groups follow the app's own nav groups.** Progression / Economy /
   Operations, so the marketing page and the signed-in shell describe the same

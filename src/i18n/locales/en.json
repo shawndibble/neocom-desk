@@ -665,7 +665,7 @@
   },
   "login": {
     "button": "Log in with EVE Online",
-    "permissionsHint": "Signing in grants read-only access to your skills and training queue, wallet, assets, blueprints, industry jobs, mining ledger, market orders, contracts, mail, calendar, contacts, clones and implants, planetary colonies, loyalty points, notifications, current location, corporation roles, and the names of player structures you can dock at. EVE's consent screen lists the planetary scope as \"manage your planetary installations\" — Neocom Desk only reads that data and never writes to it. Corporation data is a separate grant, requested only if you open the corporation pages. Log in again after an update to pick up newly requested permissions.",
+    "permissionsHint": "Signing in grants read-only access to your skills and training queue, wallet, assets, blueprints, industry jobs, mining ledger, market orders, contracts, mail, calendar, contacts, clones and implants, planetary colonies, loyalty points, notifications, current location, corporation roles, and the player structures you can dock at — both their names and a search across them, which is how a build location is picked. EVE's consent screen lists the planetary scope as \"manage your planetary installations\" — Neocom Desk only reads that data and never writes to it. Corporation data is a separate grant, requested only if you open the corporation pages. Log in again after an update to pick up newly requested permissions.",
     "eyebrow": "Read-only · Free · Open source",
     "heading": "Command deck for every character you fly.",
     "trustLine": "Read-only access. Your refresh token never leaves this device.",
@@ -751,7 +751,7 @@
       },
       "notifications": {
         "name": "Notifications",
-        "desc": "Skill finished, job delivered, order filled, extractor done, structure under attack, fuel running low — per character, per event, delivered while the app is closed.",
+        "desc": "Per character, per event. Skills, industry jobs, extractors, calendar events and structure alarms carry a timestamp, so those arrive with the app closed; order fills, mail and contracts fire while it is open.",
         "tag": "Push"
       },
       "social": {
@@ -767,8 +767,8 @@
         "desc": "No order is placed, no mail is sent, no colony is touched. Every scope it asks for is a read."
       },
       "token": {
-        "name": "Your token stays on this device",
-        "desc": "The refresh token lives in this browser's own storage and nowhere else — never on a server, never in a log. Remove a character and it goes with it."
+        "name": "Your refresh token stays in this browser",
+        "desc": "It lives in this browser's own storage and nowhere else — never on a server, never in a log. Signing in to sync exchanges one short-lived access token and never the refresh token. Remove a character and it goes with it."
       },
       "offline": {
         "name": "Works when the connection doesn't",

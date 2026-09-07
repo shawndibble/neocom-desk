@@ -41,11 +41,21 @@ import { formatTimestamp } from '@/lib/timestamp';
 const REPO_URL = 'https://github.com/shawndibble/neocom-desk';
 
 /**
+ * One illustrated row of landing copy: a glyph, and the `login.*` sub-key its
+ * words live under. Every list on this page is a list of these — the shapes
+ * differ only in which strings they read off the key.
+ */
+interface LandingRow {
+  icon: ComponentType<IconProps>;
+  key: string;
+}
+
+/**
  * The four questions the page leads with. Each one names a surface a signed-in
  * pilot actually opens, so the claim under it can be checked against the app
  * rather than admired — no benefit here is broader than what ships.
  */
-const ANSWERS: { icon: ComponentType<IconProps>; key: string }[] = [
+const ANSWERS: LandingRow[] = [
   { icon: Orders, key: 'orders' },
   { icon: Industry, key: 'build' },
   { icon: Skills, key: 'training' },
@@ -57,10 +67,7 @@ const ANSWERS: { icon: ComponentType<IconProps>; key: string }[] = [
  * groups its routes (Progression / Economy / Operations) so the page and the
  * signed-in shell describe the same product in the same order.
  */
-const FEATURE_GROUPS: {
-  group: string;
-  items: { icon: ComponentType<IconProps>; key: string }[];
-}[] = [
+const FEATURE_GROUPS: { group: string; items: LandingRow[] }[] = [
   {
     group: 'progression',
     items: [
@@ -95,7 +102,7 @@ const FEATURE_GROUPS: {
  * third-party site. Deliberately the last thing above the closing button —
  * it is where the hesitation actually happens.
  */
-const TRUST: { icon: ComponentType<IconProps>; key: string }[] = [
+const TRUST: LandingRow[] = [
   { icon: ReadOnly, key: 'readOnly' },
   { icon: TokenPrivacy, key: 'token' },
   { icon: Offline, key: 'offline' },
@@ -246,95 +253,73 @@ export function Login() {
         </div>
       </section>
 
-      {/*
-        The three content sections below are named landmarks: on a page this
-        long, "skip to what it does" and "skip to what it asks for" are real
-        navigation, and the names double as the handle a test grabs a section
-        by — several labels here (Clones, Market) also appear in the preview
-        panel above, so an unscoped query would be ambiguous.
-      */}
-      <section aria-labelledby="login-answers-heading" className="border-t border-line">
-        <div className="mx-auto max-w-6xl px-6 py-14">
-          <h2 id="login-answers-heading" className="text-xl font-semibold">
-            {t('login.answersHeading')}
-          </h2>
-          <p className="mt-2 max-w-2xl text-sm text-text-dim">{t('login.answersLead')}</p>
-          <div className="mt-6 grid gap-3 md:grid-cols-2">
-            {ANSWERS.map(({ icon: Icon, key }) => (
-              // Untitled Panels: `Panel`'s own `title` is the uppercase
-              // micro-heading, and a question is the one heading on this page
-              // that has to read at body size to be worth asking.
-              <Panel key={key}>
-                <div className="flex items-start gap-3">
-                  <Icon size={ICON_SIZE.lg} className="mt-0.5 shrink-0 text-accent" />
-                  <h3 className="text-base font-semibold text-balance">
-                    {t(`login.answers.${key}.question`)}
-                  </h3>
-                </div>
-                <p className="mt-3 text-sm text-text-dim">{t(`login.answers.${key}.answer`)}</p>
-              </Panel>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section aria-labelledby="login-features-heading" className="border-t border-line">
-        <div className="mx-auto max-w-6xl px-6 py-14">
-          <h2 id="login-features-heading" className="text-xl font-semibold">
-            {t('login.featuresHeading')}
-          </h2>
-          {FEATURE_GROUPS.map(({ group, items }) => (
-            <div key={group} className="mt-6">
-              <h3 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                {t(`login.featureGroups.${group}`)}
-              </h3>
-              <div className="mt-2 border-t border-line">
-                {items.map(({ icon: Icon, key }) => (
-                  <div
-                    key={key}
-                    className="flex flex-wrap items-center gap-4 border-b border-line py-4"
-                  >
-                    <Icon size={ICON_SIZE.lg} className="shrink-0 text-accent" />
-                    <span className="w-44 shrink-0 text-sm font-semibold">
-                      {t(`login.features.${key}.name`)}
-                    </span>
-                    <span className="flex-1 basis-64 text-sm text-text-dim">
-                      {t(`login.features.${key}.desc`)}
-                    </span>
-                    <span className="rounded-xs border border-line bg-panel-2 px-2 py-0.5 text-[0.6875rem] text-text-dim">
-                      {t(`login.features.${key}.tag`)}
-                    </span>
-                  </div>
-                ))}
+      <LandingSection id="login-answers" heading={t('login.answersHeading')}>
+        <p className="mt-2 max-w-2xl text-sm text-text-dim">{t('login.answersLead')}</p>
+        <div className="mt-6 grid gap-3 md:grid-cols-2">
+          {ANSWERS.map(({ icon: Icon, key }) => (
+            // Untitled Panels: `Panel`'s own `title` is the uppercase
+            // micro-heading, and a question is the one heading on this page
+            // that has to read at body size to be worth asking.
+            <Panel key={key}>
+              <div className="flex items-start gap-3">
+                <Icon size={ICON_SIZE.lg} className="mt-0.5 shrink-0 text-accent" />
+                <h3 className="text-base font-semibold text-balance">
+                  {t(`login.answers.${key}.question`)}
+                </h3>
               </div>
-            </div>
+              <p className="mt-3 text-sm text-text-dim">{t(`login.answers.${key}.answer`)}</p>
+            </Panel>
           ))}
         </div>
-      </section>
+      </LandingSection>
 
-      <section aria-labelledby="login-trust-heading" className="border-t border-line">
-        <div className="mx-auto max-w-6xl px-6 py-14">
-          <h2 id="login-trust-heading" className="text-xl font-semibold">
-            {t('login.trustHeading')}
-          </h2>
-          <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {TRUST.map(({ icon: Icon, key }) => (
-              <Panel key={key}>
-                <Icon size={ICON_SIZE.lg} className="text-accent" />
-                <h3 className="mt-3 text-sm font-semibold">{t(`login.trust.${key}.name`)}</h3>
-                <p className="mt-1 text-sm text-text-dim">{t(`login.trust.${key}.desc`)}</p>
-              </Panel>
-            ))}
+      <LandingSection id="login-features" heading={t('login.featuresHeading')}>
+        {FEATURE_GROUPS.map(({ group, items }) => (
+          <div key={group} className="mt-6">
+            <h3 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+              {t(`login.featureGroups.${group}`)}
+            </h3>
+            <div className="mt-2 border-t border-line">
+              {items.map(({ icon: Icon, key }) => (
+                <div
+                  key={key}
+                  className="flex flex-wrap items-center gap-4 border-b border-line py-4"
+                >
+                  <Icon size={ICON_SIZE.lg} className="shrink-0 text-accent" />
+                  <span className="w-44 shrink-0 text-sm font-semibold">
+                    {t(`login.features.${key}.name`)}
+                  </span>
+                  <span className="flex-1 basis-64 text-sm text-text-dim">
+                    {t(`login.features.${key}.desc`)}
+                  </span>
+                  <span className="rounded-xs border border-line bg-panel-2 px-2 py-0.5 text-[0.6875rem] text-text-dim">
+                    {t(`login.features.${key}.tag`)}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
-          {/*
-            The full scope enumeration sits here rather than beside the hero
-            button: it is what a hesitant reader wants *after* the trust
-            points and immediately before the closing CTA, and at hero size it
-            was a wall of 11px text nobody read.
-          */}
-          <p className="mt-6 max-w-4xl text-xs text-text-dim">{t('login.permissionsHint')}</p>
+        ))}
+      </LandingSection>
+
+      <LandingSection id="login-trust" heading={t('login.trustHeading')}>
+        <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {TRUST.map(({ icon: Icon, key }) => (
+            <Panel key={key}>
+              <Icon size={ICON_SIZE.lg} className="text-accent" />
+              <h3 className="mt-3 text-sm font-semibold">{t(`login.trust.${key}.name`)}</h3>
+              <p className="mt-1 text-sm text-text-dim">{t(`login.trust.${key}.desc`)}</p>
+            </Panel>
+          ))}
         </div>
-      </section>
+        {/*
+          The full scope enumeration sits here rather than beside the hero
+          button: it is what a hesitant reader wants *after* the trust points
+          and immediately before the closing CTA, and at hero size it was a
+          wall of 11px text nobody read.
+        */}
+        <p className="mt-6 max-w-4xl text-xs text-text-dim">{t('login.permissionsHint')}</p>
+      </LandingSection>
 
       <section className="border-t border-line px-6 py-14 text-center">
         <h2 className="text-2xl font-semibold">{t('login.bottomCtaHeading')}</h2>
@@ -357,6 +342,34 @@ export function Login() {
         </a>
       </footer>
     </main>
+  );
+}
+
+/**
+ * One titled band of the landing page. Named as a landmark rather than left an
+ * anonymous `<section>`: on a page this long, "skip to what it does" and "skip
+ * to what it asks for" are real navigation, and the name doubles as the handle
+ * a test grabs a section by — several labels here (Clones, Market) also appear
+ * in the hero's preview panel, so an unscoped query would be ambiguous.
+ */
+function LandingSection({
+  id,
+  heading,
+  children,
+}: {
+  id: string;
+  heading: string;
+  children: ReactNode;
+}) {
+  return (
+    <section aria-labelledby={`${id}-heading`} className="border-t border-line">
+      <div className="mx-auto max-w-6xl px-6 py-14">
+        <h2 id={`${id}-heading`} className="text-xl font-semibold">
+          {heading}
+        </h2>
+        {children}
+      </div>
+    </section>
   );
 }
 
