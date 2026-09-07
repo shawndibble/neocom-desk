@@ -985,14 +985,16 @@ describe('Industry: make-or-buy marker on materials', () => {
     expect(await screen.findByText('Price data unavailable')).toBeInTheDocument();
 
     // The control itself still needs no prices to offer building; only the
-    // tooltip's price rationale does, and that never arrives here — the
-    // bubble stays the bare action.
+    // suggestion does, and that never arrives here. The bubble is then just
+    // what a click will do — never the bare action label, which read as a
+    // recommendation rather than a description.
     const control = await screen.findByRole('button', {
       name: 'Build Mechanical Parts here instead of buying it',
     });
     fireEvent.pointerMove(control);
     const tooltip = await screen.findByRole('tooltip');
-    expect(tooltip).toHaveTextContent('Build Mechanical Parts here instead of buying it');
+    expect(tooltip).toHaveTextContent('Click to Build');
+    expect(tooltip).not.toHaveTextContent('Suggestion:');
   });
 });
 

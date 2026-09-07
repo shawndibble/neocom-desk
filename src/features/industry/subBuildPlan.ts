@@ -27,10 +27,7 @@
  */
 
 import type { ResolvedMaterial, ResolvedSubBuild } from '@/engine/industry/materialResolution';
-import {
-  resolvedSubBuildFeeTotal,
-  resolvedSubBuildSeconds,
-} from '@/engine/industry/materialResolution';
+import { resolvedSubBuildSeconds } from '@/engine/industry/materialResolution';
 import type { MaterialCostLine } from '@/engine/industry/types';
 
 /** One row of the materials table: a material, summed over every place the plan needs it. */
@@ -225,9 +222,6 @@ export function shoppingListMaterials(materials: readonly ResolvedMaterial[]): M
   visit(materials);
   return [...merged.values()].map(costLine);
 }
-
-/** Every sub-job's own installation fee, added up across the whole resolved tree. */
-export const subBuildFeeTotal = resolvedSubBuildFeeTotal;
 
 /** Wall-clock every sub-job in the tree adds before the main run can even be installed. */
 export const subBuildSeconds = resolvedSubBuildSeconds;

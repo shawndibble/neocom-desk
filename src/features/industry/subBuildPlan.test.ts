@@ -8,7 +8,6 @@ import {
   hasSubBuilds,
   materialTableRows,
   shoppingListMaterials,
-  subBuildFeeTotal,
   subBuildSeconds,
 } from './subBuildPlan';
 
@@ -390,10 +389,9 @@ describe('shoppingListMaterials', () => {
   });
 });
 
-describe('subBuildFeeTotal / subBuildSeconds', () => {
+describe('subBuildSeconds', () => {
   it('is zero when nothing is built', () => {
     const resolved = resolve([{ typeID: SEAL, quantity: 150 }], []);
-    expect(subBuildFeeTotal(resolved)).toBe(0);
     expect(subBuildSeconds(resolved)).toBe(0);
   });
 
@@ -405,11 +403,7 @@ describe('subBuildFeeTotal / subBuildSeconds', () => {
       },
       materialPrices: { [TRITANIUM]: 5 },
     });
-
-    const sealFee = resolved[0].subBuild?.jobFee.total ?? 0;
     const fibreRow = resolved[0].subBuild?.inputs.find((i) => i.typeID === FIBRE);
-    const fibreFee = fibreRow?.subBuild?.jobFee.total ?? 0;
-    expect(subBuildFeeTotal(resolved)).toBeCloseTo(sealFee + fibreFee, 6);
 
     const sealSeconds = resolved[0].subBuild?.seconds ?? 0;
     const fibreSeconds = fibreRow?.subBuild?.seconds ?? 0;

@@ -109,9 +109,9 @@ const valueOf = (input: HTMLElement) => (input as HTMLInputElement).value;
 // The detected-stock offer is now the only control the hint renders: the total
 // and its placement breakdown live on the offer's own hover tooltip.
 const useOffer = (material: string) =>
-  within(row(material)).getByRole('button', { name: new RegExp(`of the ${material} you own$`) });
+  within(row(material)).getByRole('button', { name: new RegExp(`of the ${material} you own`) });
 const queryUseOffer = (material: string) =>
-  within(row(material)).queryByRole('button', { name: new RegExp(`of the ${material} you own$`) });
+  within(row(material)).queryByRole('button', { name: new RegExp(`of the ${material} you own`) });
 
 /** Hovers a trigger and returns its revealed bubble. */
 async function tooltipOf(trigger: HTMLElement): Promise<HTMLElement> {
@@ -691,24 +691,20 @@ describe('MaterialsTable detected owned stock (issue #181)', () => {
     expect(queryUseOffer('Tritanium')).not.toBeInTheDocument();
   });
 
-  it('breaks the total down by Character and location', async () => {
+  it('names the total on the offer, and nothing about where it sits', async () => {
     render(<Harness detection={detectionOf(TRIT_STOCK)} />);
 
+    // The per-Character, per-location breakdown is gone with the "N owned"
+    // text it used to hang off: a list that size needs a surface it can be
+    // dismissed and scrolled in, and a 14rem hover bubble is not one
+    // (docs/DESIGN.md, `Tooltip`).
     const bubble = await tooltipOf(useOffer('Tritanium'));
-    expect(bubble).toHaveTextContent('Main Pilot — Jita IV - Moon 4');
-    expect(bubble).toHaveTextContent('Alt Pilot — Amarr');
+    expect(bubble).toHaveTextContent('You own 9,000');
+    expect(bubble).not.toHaveTextContent('Main Pilot');
+    expect(bubble).not.toHaveTextContent('Jita IV - Moon 4');
   });
 
-  it('caps the breakdown at five locations with a remainder line', async () => {
-    const placements = Array.from({ length: 7 }, (_, i) => placement(91, 70000000 + i, 100 - i));
-    render(<Harness detection={detectionOf({ 34: { quantity: 700, placements } })} />);
-
-    const bubble = await tooltipOf(useOffer('Tritanium'));
-    expect(bubble).toHaveTextContent('and 2 more');
-    expect(bubble).not.toHaveTextContent('70000005');
-  });
-
-  it('renders an incomplete detection as a lower bound and names the Characters behind it', async () => {
+  it('marks an incomplete detection as a lower bound rather than an exact count', async () => {
     render(
       <Harness
         detection={detectionOf(TRIT_STOCK, {
@@ -718,12 +714,12 @@ describe('MaterialsTable detected owned stock (issue #181)', () => {
       />
     );
 
-    const bubble = await tooltipOf(useOffer('Tritanium'));
-    expect(bubble).toHaveTextContent('You own ≥ 9,000');
-    expect(bubble).toHaveTextContent('Asset data is incomplete for Alt Pilot, No Scope Pilot');
+    // Under-reporting owned stock inflates the buy list, so a possibly-short
+    // number must never look exact.
+    expect(await tooltipOf(useOffer('Tritanium'))).toHaveTextContent('You own ≥ 9,000');
   });
 
-  it('scopes the headline and the "use detected" offer to selected locations, but keeps the full breakdown (#454)', async () => {
+  it('scopes both the offer and its total to the selected locations (#454)', async () => {
     // Full detected total is 9,000 across two locations; the plan's scope
     // only counts the 6,000 held by Main Pilot at Jita.
     render(
@@ -734,14 +730,8 @@ describe('MaterialsTable detected owned stock (issue #181)', () => {
       />
     );
 
-    const bubble = await tooltipOf(useOffer('Tritanium'));
-    expect(bubble).toHaveTextContent('You own 6,000');
-    // The breakdown still lists every placement, including the one outside
-    // the plan's selected scope, so the player sees the full picture.
-    expect(bubble).toHaveTextContent('Main Pilot — Jita IV - Moon 4');
-    expect(bubble).toHaveTextContent('Alt Pilot — Amarr');
-
-    expect(useOffer('Tritanium')).toBeInTheDocument();
+    expect(await tooltipOf(useOffer('Tritanium'))).toHaveTextContent('You own 6,000');
+    expect(useOffer('Tritanium')).toHaveTextContent('Use 1,000');
   });
 
   it('offers nothing when a material’s stock all sits outside the selected scope (#454)', () => {

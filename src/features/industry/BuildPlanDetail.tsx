@@ -470,12 +470,17 @@ export function BuildPlanDetail({
   // hand-entered value, including a deliberate 0, is never clobbered by a bulk
   // action. The per-row action is the one that overwrites — clicking it on that
   // row means it.
+  //
+  // Over every row on the table, not the blueprint's own materials: the bulk
+  // action has to reach exactly what the per-row offers reach, or "use all"
+  // silently skips every mineral a sub-build introduced while the row beside
+  // it is still offering to apply one.
   const bulkDetectedPatches = useMemo<SourcingPatchEntry[]>(
     () =>
-      bulkOwnedStockSuggestions(result?.materials ?? [], plan.materialSourcing, scopedStock).map(
+      bulkOwnedStockSuggestions(visibleMaterials, plan.materialSourcing, scopedStock).map(
         ({ typeID, ownedQuantity }) => ({ typeID, patch: { ownedQuantity } })
       ),
-    [result, plan.materialSourcing, scopedStock]
+    [visibleMaterials, plan.materialSourcing, scopedStock]
   );
 
   /**
@@ -567,10 +572,13 @@ export function BuildPlanDetail({
     if (builtTopLevel.length === 0) return null;
     let total = 0;
     for (const material of builtTopLevel) {
-      const price =
-        plan.materialSourcing?.[material.typeID]?.overridePrice ?? materialPrices[material.typeID];
-      if (price === undefined) return null;
-      total += material.remainingQuantity * price;
+      // Through `buyPricedLine`, the same ladder the make-or-buy advice uses,
+      // rather than a third hand-rolled `override ?? hub`: that one guarded
+      // only `undefined`, so a NaN or negative override reached this figure
+      // and was rendered as ISK. The helper range-checks.
+      const { unitPrice } = buyPricedLine(material, plan.materialSourcing, materialPrices);
+      if (unitPrice === null) return null;
+      total += material.remainingQuantity * unitPrice;
     }
     return total;
   }, [builtTopLevel, plan.materialSourcing, materialPrices]);

@@ -1,21 +1,11 @@
 import { useTranslation } from 'react-i18next';
 import { Tooltip } from '@/components/ui';
-import type { DetectedOwnedStock } from '@/engine/industry/ownedStock';
 import type { OwnedStockDetection } from './ownedStockDetection';
 
-/**
- * Beyond this many locations the breakdown stops being a list and starts being
- * a wall — the tail is summarised as a count instead.
- */
-const MAX_BREAKDOWN_ROWS = 5;
-
 interface OwnedStockHintProps {
-  /** Every placement galaxy-wide, unfiltered by the plan's owned-stock scope — the breakdown list always shows the full picture. */
-  stock: DetectedOwnedStock;
   /**
-   * The total narrowed to the plan's owned-stock scope (issue #454), shown as
-   * the headline number. Equal to `stock.quantity` when the scope is absent
-   * or `everywhere`.
+   * The total narrowed to the plan's owned-stock scope (issue #454). Equal to
+   * the galaxy-wide total when the scope is absent or `everywhere`.
    */
   scopedQuantity: number;
   detection: OwnedStockDetection;
@@ -39,12 +29,19 @@ interface OwnedStockHintProps {
  *
  * One control, not two. This used to print the detected total beside the offer
  * — "16 owned   USE 16" — which said the same number twice in a column already
- * dense with numbers, in a table now long enough that every repeated word
- * costs a row. The total and the full placement breakdown moved onto the
- * offer's own hover tooltip, where they are read when wanted rather than
- * always; the offer itself is the only thing left on screen.
+ * dense with numbers, in a table long enough that every repeated word costs a
+ * row. The total moved onto the offer's own hover tooltip, read when wanted
+ * rather than always.
  *
- * So nothing renders once the offer is taken (`canApply` false) — by then the
+ * The tooltip is that total and nothing else. An earlier pass put the whole
+ * per-Character, per-station placement list in there too, which turned a 14rem
+ * hover bubble into a panel: not dismissible, not scrollable, and on touch
+ * reachable only by long-pressing a button whose tap commits a value. A
+ * breakdown that size needs a surface that opens and closes, and once the
+ * "N owned" text it used to hang off was gone it had no trigger left — so it
+ * is dropped rather than badly housed.
+ *
+ * Nothing renders once the offer is taken (`canApply` false): by then the
  * quantity is in the input beside it, which is the thing the plan actually
  * uses.
  *
@@ -53,7 +50,6 @@ interface OwnedStockHintProps {
  * and cost, so a possibly-short number must never look exact.
  */
 export function OwnedStockHint({
-  stock,
   scopedQuantity,
   detection,
   materialName,
@@ -62,11 +58,8 @@ export function OwnedStockHint({
   onApply,
 }: OwnedStockHintProps) {
   const { t } = useTranslation();
-  const shown = stock.placements.slice(0, MAX_BREAKDOWN_ROWS);
-  const remaining = stock.placements.length - shown.length;
-  // The headline reflects the plan's owned-stock scope (issue #454); the
-  // breakdown list below stays the full, unfiltered picture so the player can
-  // still see where every unit actually is.
+  if (!canApply) return null;
+
   const quantity = scopedQuantity.toLocaleString();
   // The lower-bound marker is part of the number, so it has to be part of the
   // accessible name too: a name that dropped it would announce a floor as an
@@ -75,44 +68,15 @@ export function OwnedStockHint({
     ? t('industry.detectedOwnedAtLeast', { quantity })
     : t('industry.detectedOwned', { quantity });
 
-  if (!canApply) return null;
-
   return (
-    <Tooltip
-      content={
-        <span className="flex flex-col gap-1 text-left">
-          <span className="font-semibold">{detected}</span>
-          <span className="flex flex-col">
-            {shown.map((placement) => (
-              <span key={`${placement.characterId}:${placement.locationId}`}>
-                {t('industry.detectedOwnedPlacement', {
-                  character: detection.characterNameFor(placement.characterId),
-                  location: detection.locationLabelFor(placement),
-                })}
-                {': '}
-                {placement.quantity.toLocaleString()}
-              </span>
-            ))}
-            {remaining > 0 && (
-              <span>{t('industry.detectedOwnedMoreLocations', { more: remaining })}</span>
-            )}
-          </span>
-          {detection.lowerBound && (
-            <span className="text-warning">
-              {t('industry.detectedOwnedIncomplete', {
-                characters: [...detection.incompleteCharacters].join(', '),
-              })}
-            </span>
-          )}
-        </span>
-      }
-    >
+    <Tooltip content={detected}>
       <button
         type="button"
         onClick={onApply}
         aria-label={t('industry.useDetectedFor', {
           quantity: suggestion.toLocaleString(),
           material: materialName,
+          detected,
         })}
         className="flex items-center justify-end rounded-xs text-[0.6875rem] font-semibold text-accent uppercase hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
       >

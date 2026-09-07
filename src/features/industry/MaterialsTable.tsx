@@ -242,7 +242,8 @@ function MakeOrBuyTooltip({
   remaining,
   action,
 }: {
-  advice: MakeOrBuy;
+  /** Omitted where there is no verdict — an unpriced recipe input, or nothing that produces this. */
+  advice?: MakeOrBuy;
   remaining: number;
   /** What a click does. Omitted on the advice-only marker, which has nothing to click. */
   action?: 'build' | 'buy';
@@ -250,8 +251,12 @@ function MakeOrBuyTooltip({
   const { t } = useTranslation();
   return (
     <span className="flex flex-col gap-1">
-      <span className="font-semibold">{makeOrBuyVerdict(advice, t)}</span>
-      <span>{makeOrBuyReason(advice, remaining, t)}</span>
+      {advice && (
+        <>
+          <span className="font-semibold">{makeOrBuyVerdict(advice, t)}</span>
+          <span>{makeOrBuyReason(advice, remaining, t)}</span>
+        </>
+      )}
       {action && (
         <span>{t(`industry.makeOrBuy.${action === 'build' ? 'clickBuild' : 'clickBuy'}`)}</span>
       )}
@@ -378,11 +383,16 @@ export function MaterialsTable({
           // The bubble is the advice, not a restatement of the action: the
           // glyph already shows what clicking does, and `label` (the
           // accessible name) still says it in words. What a player cannot get
-          // from either is which way they *should* go — so the verdict leads,
-          // and it now shows on a row already being built too, where it used
-          // to vanish and leave the bare action reading as a recommendation
-          // to undo the build (`buyPricedLine`).
-          const tooltip = advice ? (
+          // from either is which way they *should* go — so the suggestion
+          // leads, and it now shows on a row already being built too, where it
+          // used to vanish and leave the bare action reading as a
+          // recommendation to undo the build (`buyPricedLine`).
+          //
+          // A row with no verdict still gets the click line rather than
+          // falling through to `label`: `makeOrBuy` also returns nothing when
+          // the recipe's own inputs are unpriced, and "Buy X instead of
+          // building it" alone was the exact sentence that read as advice.
+          const tooltip = toggle ? (
             <MakeOrBuyTooltip
               advice={advice}
               remaining={material.remainingQuantity}
@@ -477,8 +487,8 @@ export function MaterialsTable({
         header: t('industry.ownedQuantity'),
         align: 'right',
         render: (material) => {
-          // Unfiltered — the breakdown popover always shows every placement,
-          // galaxy-wide, regardless of the plan's owned-stock scope.
+          // Whether anything is detected at all, galaxy-wide — the offer's
+          // own number is the scoped one below.
           const stock = detection?.stockFor(material.typeID);
           const owned = sourcing?.[material.typeID]?.ownedQuantity;
           // The offer respects the plan's owned-stock scope (issue #454): a
@@ -501,7 +511,6 @@ export function MaterialsTable({
               />
               {stock && detection && (
                 <OwnedStockHint
-                  stock={stock}
                   scopedQuantity={scopedQuantity}
                   detection={detection}
                   materialName={nameFor(material.typeID)}
