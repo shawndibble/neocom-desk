@@ -24,11 +24,22 @@ function fire(overrides: Partial<EveNotificationFire> = {}): EveNotificationFire
 const CHARACTER = { name: 'Test Pilot' };
 
 /**
- * The generic body is the one that spells the raw `type` out — so "this body
- * does not name its own type" is what distinguishes a real body from the
- * fallback, and is the shape AC1 asks for.
+ * The generic body is the one that says only "a notification arrived" — so its
+ * own opening phrase is what distinguishes a real body from the fallback, and
+ * is the shape AC1 asks for. Matched on the phrase rather than on the `type`,
+ * because the generic body no longer spells the type out: it names it in words
+ * now (`eveTypeLabel.ts`), so a raw identifier reaching a body is a
+ * regression, not a fallback — which is why both helpers assert its absence.
  */
+const GENERIC_BODY_PHRASE = 'received a new EVE notification';
+
+function expectTheGenericBody(body: string, type: string): void {
+  expect(body).toContain(GENERIC_BODY_PHRASE);
+  expect(body).not.toContain(type);
+}
+
 function expectNotTheGenericBody(body: string, type: string): void {
+  expect(body).not.toContain(GENERIC_BODY_PHRASE);
   expect(body).not.toContain(type);
 }
 
@@ -52,7 +63,10 @@ describe('eveNotificationText', () => {
       eveNotificationText(fire({ type: 'SomeBrandNewMsgType6041' }), CHARACTER)
     ).not.toThrow();
     const { body } = eveNotificationText(fire({ type: 'SomeBrandNewMsgType6041' }), CHARACTER);
-    expect(body).toContain('SomeBrandNewMsgType6041');
+    // Spaced out by `humanizeEveType`, never the raw identifier: a type with no
+    // catalog entry still reaches the tray as a phrase a reader can parse.
+    expectTheGenericBody(body, 'SomeBrandNewMsgType6041');
+    expect(body).toContain('Some Brand New Msg Type 6041');
   });
 
   it('has exactly one renderer per allow-listed type — no extra, no missing', () => {
@@ -95,7 +109,8 @@ describe('eveNotificationText — a payload it cannot read never costs the notif
       fire({ type: 'BillOutOfMoneyMsg', text: 'amount: 1\n' }),
       CHARACTER
     );
-    expect(body).toContain('BillOutOfMoneyMsg');
+    expectTheGenericBody(body, 'BillOutOfMoneyMsg');
+    expect(body).toContain('Bill Could Not Be Paid');
   });
 
   it('falls back rather than throwing when the fire timestamp is unusable', () => {
@@ -697,6 +712,7 @@ describe('eveNotificationText — corp governance and bills (tranche 2)', () => 
       fire({ type: 'InfrastructureHubBillAboutToExpire', text: 'corpID: 2001\n' }),
       CHARACTER
     );
-    expect(body).toContain('InfrastructureHubBillAboutToExpire');
+    expectTheGenericBody(body, 'InfrastructureHubBillAboutToExpire');
+    expect(body).toContain('Infrastructure Hub Bill Expiring');
   });
 });

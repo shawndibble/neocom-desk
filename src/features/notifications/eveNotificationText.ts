@@ -34,6 +34,7 @@ import {
 } from '@/engine/eveNotificationPayload';
 import { formatIsk } from '@/lib/isk';
 import { formatLocalDate, formatLocalDateTime } from '@/lib/localDate';
+import { eveTypeLabel } from './eveTypeLabel';
 
 /** Deliberately not `CharacterRef` — importing it back from `foregroundPoller.ts` would be a cycle. */
 export interface EveNotificationTextCharacter {
@@ -64,13 +65,23 @@ interface RenderContext {
 /** A chosen body sub-key plus its interpolation values, or `null` to fall back to the generic body. */
 type BodyChoice = { key: string; vars: Record<string, unknown> } | null;
 
+/**
+ * The floor every route through this module ends at. It names the type in
+ * words rather than in ESI's own `CamelCase`: the identifier was never
+ * meaningful to a reader, and a notification tray is the last place to
+ * discover that `StructureImpendingAbandonmentAssetsAtRisk` is a thing. The
+ * catalog answers for every allow-listed type; `humanizeEveType` covers a
+ * type that has no entry, which only a caller bypassing the poller's
+ * allow-list gate can produce.
+ */
 function genericText(
   fire: EveNotificationFire,
   character: EveNotificationTextCharacter
 ): { title: string; body: string } {
+  const typeName = eveTypeLabel(i18n.t, fire.type);
   return {
     title: i18n.t(`${BASE}.title`),
-    body: i18n.t(`${BASE}.body`, { character: character.name, type: fire.type }),
+    body: i18n.t(`${BASE}.body`, { character: character.name, typeName }),
   };
 }
 

@@ -23,7 +23,7 @@
  * (`features/notifications/ForegroundNotificationPoller.tsx`, issue #172)
  * reads these same toggles to decide what to fire; further Notification
  * Events land here as later tickets add their pollers (CONTEXT.md round 20).
- */ import { useEffect, useMemo, useState } from 'react';
+ */ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import {
@@ -76,6 +76,7 @@ import {
   eveTypesByFamily,
   type NotificationChannel,
 } from './eventSelection';
+import { eveTypeLabel } from './eveTypeLabel';
 import { filterNotificationSections } from './notificationSearch';
 import { parseIskAmount, formatIsk } from '@/lib/isk';
 import { refreshAppBadge } from './appBadge';
@@ -87,10 +88,22 @@ import {
 } from './permission';
 import { webPushSupport } from '@/sync/deviceRegistration';
 import { enableWebPush } from './webPush';
+import { useActiveCharacter } from '@/stores/activeCharacter';
 import { loadCharacterRoles, corpWideRoles } from '@/features/corp/roles';
 import { corpCapabilities, type CorpCapabilities } from '@/engine/corpRoles';
 
 const EVENT_BY_ID = new Map(NOTIFICATION_EVENTS.map((event) => [event.id, event]));
+
+/**
+ * One fixed-width track per delivery channel, shared by all five grids on
+ * this panel — the column captions, the per-character select-all row, the
+ * event rows, the Family headers and the eve-type rows. They are independent
+ * grids that only *look* like columns, so an auto track would size each to
+ * its own content and the captions would drift off the checkboxes below the
+ * moment a caption is wider than a checkbox. Which it now is: the columns
+ * used to read "App" and "List", neither of which said what it delivered.
+ */
+const CHANNEL_COLUMNS = 'grid shrink-0 grid-cols-[4.25rem_4.25rem] justify-items-center';
 
 /**
  * Every corp event (issue #299) — used to attach the best-effort disclosure
@@ -154,6 +167,26 @@ export function NotificationsPanel() {
 
   const [search, setSearch] = useState('');
   const [expandedCharacterIds, setExpandedCharacterIds] = useState<ReadonlySet<number>>(new Set());
+
+  /**
+   * The active Character's section starts open: with several Characters
+   * signed in, every section collapsed meant the one people came here to
+   * change was the one thing the page did not show.
+   *
+   * An effect rather than a `useState` initializer because
+   * `useActiveCharacter` hydrates from Dexie — `activeCharacterId` is `null`
+   * on the first render, so seeding at mount would seed nothing. It runs once
+   * per id: the ref is what keeps a re-render (or a hydration that resolves
+   * to the id already seeded) from re-opening a section the user has since
+   * collapsed by hand.
+   */
+  const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
+  const seededCharacterId = useRef<number | null>(null);
+  useEffect(() => {
+    if (activeCharacterId === null || seededCharacterId.current === activeCharacterId) return;
+    seededCharacterId.current = activeCharacterId;
+    setExpandedCharacterIds((prev) => new Set(prev).add(activeCharacterId));
+  }, [activeCharacterId]);
 
   function toggleExpanded(characterId: number) {
     setExpandedCharacterIds((prev) => {
@@ -395,7 +428,7 @@ export function NotificationsPanel() {
                       </button>
                       {/* One select-all per column, in the same grid track as
                           the checkboxes below so each sits over its own column. */}
-                      <div className="grid shrink-0 grid-cols-2 gap-x-6">
+                      <div className={CHANNEL_COLUMNS}>
                         {NOTIFICATION_CHANNELS.map((channel) => (
                           <SelectionCheckbox
                             key={channel}
@@ -424,14 +457,27 @@ export function NotificationsPanel() {
                         <div className="flex items-center justify-between gap-3 border-b border-line px-3 py-1.5">
                           <span className="sr-only">{t('settings.notifications.columnEvent')}</span>
                           <span aria-hidden="true" className="flex-1" />
-                          <div className="grid shrink-0 grid-cols-2 gap-x-6 text-center">
+                          <div className={CHANNEL_COLUMNS}>
                             {NOTIFICATION_CHANNELS.map((channel) => (
-                              <span
+                              <Tooltip
                                 key={channel}
-                                className="w-4 text-[0.6875rem] leading-tight text-text-dim"
+                                content={t(`settings.notifications.columnHint.${channel}`)}
+                                openOnTap
                               >
-                                {t(`settings.notifications.column.${channel}`)}
-                              </span>
+                                {/* `tabIndex` because a Tooltip's trigger has to
+                                    be focusable to be read without a pointer
+                                    (`components/ui/Tooltip.tsx`, ADR 0008), and
+                                    the dotted underline is what says there is
+                                    something to read. Uppercase micro-heading
+                                    per docs/DESIGN.md §2, matching the Family
+                                    headers further down. */}
+                                <span
+                                  tabIndex={0}
+                                  className="cursor-help text-[0.6875rem] leading-tight font-semibold tracking-wide text-text-dim uppercase underline decoration-dotted decoration-text-dim/50 underline-offset-2"
+                                >
+                                  {t(`settings.notifications.column.${channel}`)}
+                                </span>
+                              </Tooltip>
                             ))}
                           </div>
                         </div>
@@ -448,7 +494,7 @@ export function NotificationsPanel() {
                                   <span className={rowEnabled ? 'text-text' : 'text-text-faint'}>
                                     {eventLabel}
                                   </span>
-                                  <div className="grid shrink-0 grid-cols-2 gap-x-6">
+                                  <div className={CHANNEL_COLUMNS}>
                                     {NOTIFICATION_CHANNELS.map((channel) => (
                                       <ChannelCheckbox
                                         key={channel}
@@ -676,7 +722,7 @@ export function NotificationsPanel() {
                                             <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
                                               {familyLabel}
                                             </span>
-                                            <div className="grid shrink-0 grid-cols-2 gap-x-6">
+                                            <div className={CHANNEL_COLUMNS}>
                                               {NOTIFICATION_CHANNELS.map((channel) => (
                                                 <SelectionCheckbox
                                                   key={channel}
@@ -702,42 +748,57 @@ export function NotificationsPanel() {
                                             </div>
                                           </div>
                                           <ul className="divide-y divide-line/60">
-                                            {familyTypes.map((type) => (
-                                              <li
-                                                key={type}
-                                                className="flex items-center justify-between gap-3 px-3 py-1.5 text-xs"
-                                              >
-                                                <span className="truncate text-text-dim">
-                                                  {type}
-                                                </span>
-                                                <div className="grid shrink-0 grid-cols-2 gap-x-6">
-                                                  {NOTIFICATION_CHANNELS.map((channel) => (
-                                                    <ChannelCheckbox
-                                                      key={channel}
-                                                      channel={channel}
-                                                      eventLabel={type}
-                                                      enabled={
-                                                        !(channel === 'browser' && browserBlocked)
-                                                      }
-                                                      disabledReason={null}
-                                                      checked={isEveTypeEnabledFor(
-                                                        eveTypePrefs,
-                                                        type,
-                                                        channel
-                                                      )}
-                                                      onToggle={() =>
-                                                        void toggleEveTypeChannelPref(
-                                                          character.characterId,
-                                                          prefsValue,
+                                            {familyTypes.map((type) => {
+                                              // ESI's own `CamelCase` identifier is what
+                                              // used to label these rows. It named the
+                                              // type without saying what it was.
+                                              const typeLabel = eveTypeLabel(t, type);
+                                              return (
+                                                <li
+                                                  key={type}
+                                                  className="flex items-center justify-between gap-3 px-3 py-1.5 text-xs"
+                                                >
+                                                  {/* `title` for the same reason
+                                                      `DataAgePanel` uses one: the
+                                                      label truncates on a narrow
+                                                      screen, and now that it says
+                                                      something, the cut-off half
+                                                      is worth recovering. */}
+                                                  <span
+                                                    className="truncate text-text-dim"
+                                                    title={typeLabel}
+                                                  >
+                                                    {typeLabel}
+                                                  </span>
+                                                  <div className={CHANNEL_COLUMNS}>
+                                                    {NOTIFICATION_CHANNELS.map((channel) => (
+                                                      <ChannelCheckbox
+                                                        key={channel}
+                                                        channel={channel}
+                                                        eventLabel={typeLabel}
+                                                        enabled={
+                                                          !(channel === 'browser' && browserBlocked)
+                                                        }
+                                                        disabledReason={null}
+                                                        checked={isEveTypeEnabledFor(
+                                                          eveTypePrefs,
                                                           type,
                                                           channel
-                                                        )
-                                                      }
-                                                    />
-                                                  ))}
-                                                </div>
-                                              </li>
-                                            ))}
+                                                        )}
+                                                        onToggle={() =>
+                                                          void toggleEveTypeChannelPref(
+                                                            character.characterId,
+                                                            prefsValue,
+                                                            type,
+                                                            channel
+                                                          )
+                                                        }
+                                                      />
+                                                    ))}
+                                                  </div>
+                                                </li>
+                                              );
+                                            })}
                                           </ul>
                                         </div>
                                       );
