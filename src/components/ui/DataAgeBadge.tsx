@@ -2,6 +2,11 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { formatAge, HOUR_MS, DAY_MS } from '@/lib/age';
 import { formatTimestamp } from '@/lib/timestamp';
+// A device-local display preference, the same class as `lib/fontScale.ts` —
+// not feature logic and not a Dexie call, both of which a primitive must stay
+// clear of. Read here rather than taken as a prop because every one of this
+// badge's ~15 callers would otherwise have to thread the same global through.
+import { useTimeZone } from '@/lib/timeFormat';
 
 interface DataAgeBadgeProps {
   /** When the data was last fetched. */
@@ -46,6 +51,7 @@ function toneFor(ms: number): string {
  */
 export function DataAgeBadge({ date, note, dotOnly = false, className = '' }: DataAgeBadgeProps) {
   const { t } = useTranslation();
+  const timeZone = useTimeZone();
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
@@ -57,7 +63,9 @@ export function DataAgeBadge({ date, note, dotOnly = false, className = '' }: Da
   const age = formatAge(ms, t);
   // `dotOnly` drops the age from the visible text but must not drop it
   // altogether — it moves to the front of the tooltip instead.
-  const title = [dotOnly ? age : null, formatTimestamp(date), note].filter(Boolean).join(' — ');
+  const title = [dotOnly ? age : null, formatTimestamp(date, timeZone), note]
+    .filter(Boolean)
+    .join(' — ');
 
   return (
     <time
