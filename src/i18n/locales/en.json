@@ -951,7 +951,7 @@
     "secondPartyId": "Second party ID",
     "journalTruncatedHint": "Some pages failed to load. Refresh to try again.",
     "sideFilterLabel": "Side",
-    "sideFilterAll": "Buy and sell",
+    "sideFilterAll": "All sides",
     "transactionsSearchPlaceholder": "Search item…",
     "transactionsNoFilterMatches": "No transactions match this filter.",
     "transactionsTruncatedHint": "Only the most recent transactions were fetched. Older history is not shown.",
