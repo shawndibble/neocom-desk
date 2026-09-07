@@ -328,39 +328,54 @@ export function MaterialsTable({
             // (`subBuildPlan`). Which job introduced a quantity is the "Build
             // it" modal's question, not a shape for this list to carry.
             <span className="inline-flex items-center gap-1.5">
-              {toggle ? (
-                // The marker slot itself is the control on a material
-                // something here can produce — hammer to start building it,
-                // cart to go back to buying it, the same two glyphs and tones
-                // the advice-only marker uses for those two errands: the
-                // hammer is always `positive` (green) and the cart always the
-                // default dim, the same way regardless of which one this row
-                // currently shows — the tone rides with the glyph, not with
-                // the row's toggle state, so it stays a fixed "this action
-                // means build" / "this action means buy" cue rather than
-                // flipping meaning from row to row. There is nothing left to
-                // say in a second, separate icon once this one already reads
-                // as "switch this row to that": the plan's own context menu
-                // (`ItemContextMenu`'s "Add material components") reaches the
-                // identical toggle for a right-click or long-press.
-                <IconButton
-                  size="sm"
-                  variant="plain"
-                  tone={building ? 'default' : 'positive'}
-                  icon={
-                    building ? (
-                      <Icon.Buy size={Icon.ICON_SIZE.sm} />
-                    ) : (
-                      <Icon.Build size={Icon.ICON_SIZE.sm} />
-                    )
-                  }
-                  label={actionLabel}
-                  tooltip={tooltip}
-                  onClick={() => toggle(material.typeID)}
-                />
-              ) : (
-                advice && <MakeOrBuyMarker advice={advice} remaining={material.remainingQuantity} />
-              )}
+              {/*
+                One fixed-width slot, always rendered, sized to the toggle
+                (`IconButton size="sm"` is `size-9 md:size-7`) — so every
+                material name in the column starts at the same x whether its
+                row carries the toggle button, the smaller advisory glyph, or
+                nothing at all. Without it the three cases were three
+                different left edges, and the leaf rows a build introduced sat
+                visibly left of the plan's own materials above them: a ragged
+                margin that read as an indent nobody meant.
+              */}
+              <span className="inline-flex w-9 shrink-0 items-center justify-center md:w-7">
+                {toggle ? (
+                  // The slot's occupant is the control itself on a material
+                  // something here can produce — hammer to start building it,
+                  // cart to go back to buying it, the same two glyphs and
+                  // tones the advice-only marker uses for those two errands:
+                  // the hammer is always `positive` (green) and the cart
+                  // always the default dim, the same way regardless of which
+                  // one this row currently shows — the tone rides with the
+                  // glyph, not with the row's toggle state, so it stays a
+                  // fixed "this action means build" / "this action means buy"
+                  // cue rather than flipping meaning from row to row. There is
+                  // nothing left to say in a second, separate icon once this
+                  // one already reads as "switch this row to that": the plan's
+                  // own context menu (`ItemContextMenu`'s "Add material
+                  // components") reaches the identical toggle for a
+                  // right-click or long-press.
+                  <IconButton
+                    size="sm"
+                    variant="plain"
+                    tone={building ? 'default' : 'positive'}
+                    icon={
+                      building ? (
+                        <Icon.Buy size={Icon.ICON_SIZE.sm} />
+                      ) : (
+                        <Icon.Build size={Icon.ICON_SIZE.sm} />
+                      )
+                    }
+                    label={actionLabel}
+                    tooltip={tooltip}
+                    onClick={() => toggle(material.typeID)}
+                  />
+                ) : (
+                  advice && (
+                    <MakeOrBuyMarker advice={advice} remaining={material.remainingQuantity} />
+                  )
+                )}
+              </span>
               {name}
               {/*
                 Only on a row that is actually being built, and after the name
@@ -385,7 +400,10 @@ export function MaterialsTable({
                   // the caption size the rest of this table's secondary text
                   // uses — not a `Button`, which is a box in a row that is
                   // already dense with them.
-                  className="text-[0.6875rem] text-accent underline hover:text-text"
+                  // `whitespace-nowrap` because the material column is narrow
+                  // and long names already wrap: without it the link breaks
+                  // across two lines mid-phrase and grows every built row.
+                  className="text-[0.6875rem] whitespace-nowrap text-accent underline hover:text-text"
                   onClick={() => onShowRecipe(material.typeID)}
                 >
                   {t('industry.buildRecipe.action')}
