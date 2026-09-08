@@ -164,7 +164,7 @@ export const ROUTE_REQUIREMENTS = {
     endpoints: ['getCharacterContracts', 'postUniverseNames'],
     strings: 'contracts',
   },
-  // Now a redirect into Industry's BPC Sourcing tab, kept so existing links
+  // Now a redirect into Industry's BPC Search tab, kept so existing links
   // still land. Ungated because it gates nothing: the search reads a shared
   // Firestore snapshot plus public getUniverseRegion lookups, neither of them
   // a Character-scoped ESI endpoint.

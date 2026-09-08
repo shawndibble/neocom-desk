@@ -165,7 +165,7 @@ describe('BpcSourcingPanel', () => {
     window.history.pushState({}, '', '/bpc-contracts');
     render(<App />);
 
-    const tab = await screen.findByRole('tab', { name: 'BPC Sourcing' });
+    const tab = await screen.findByRole('tab', { name: 'BPC Search' });
     expect(tab).toHaveAttribute('aria-selected', 'true');
     expect(await screen.findByRole('table', { name: 'BPC Search' })).toBeInTheDocument();
   });
