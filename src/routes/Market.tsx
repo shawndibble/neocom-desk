@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useLocation, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import {
   Button,
   Caret,
@@ -94,6 +94,7 @@ import { formatIsk } from '@/lib/isk';
 import { typeIconUrl } from '@/lib/eveImages';
 import type { MarketFocusSearchState } from '@/lib/shortcuts';
 import { loadBlueprintCatalog, type BlueprintCatalog } from '@/features/industry/blueprintCatalog';
+import { buttonClassName } from '@/components/ui/buttonClassName';
 import { downloadCsv } from '@/lib/downloadCsv';
 import { orderBookCsvColumns, rangeLabel } from '@/features/market/orderBookCsv';
 import { OpenOrdersPanel } from '@/features/market/OpenOrdersPanel';
@@ -528,6 +529,16 @@ export function Market() {
   // on `chosenRegionId` rather than the persisted `hubId` store: the two can
   // diverge when a shared link or browser back/forward drives a different
   // effective hub without writing the device's persisted default.
+  /**
+   * A blueprint *original* can be sold on the market; a **copy** cannot — BPCs
+   * are contract-only. So an empty order book on a blueprint is the one case
+   * where "nobody is selling this" is misleading, and the honest answer is to
+   * point at the BPC search rather than leave the pilot to conclude the item
+   * is unavailable.
+   */
+  const selectedIsBlueprint =
+    selectedTypeId !== null && (blueprintCatalog?.byBlueprintTypeID.has(selectedTypeId) ?? false);
+
   const resetKey = `${selectedTypeId ?? 'none'}:${chosenRegionId}`;
   const [resetForKey, setResetForKey] = useState<string | null>(null);
   if (resetKey !== resetForKey) {
@@ -1330,9 +1341,21 @@ export function Market() {
                             hint={
                               stationFilter !== null
                                 ? t('market.emptyFilteredHint')
-                                : t('market.emptySellHint')
+                                : selectedIsBlueprint
+                                  ? t('market.emptySellBlueprintHint')
+                                  : t('market.emptySellHint')
                             }
                             className="py-6"
+                            action={
+                              selectedIsBlueprint && stationFilter === null ? (
+                                <Link
+                                  to="/industry?tab=sourcing"
+                                  className={buttonClassName({ size: 'sm' })}
+                                >
+                                  {t('market.searchBpcContracts')}
+                                </Link>
+                              ) : undefined
+                            }
                           />
                         ) : (
                           <>

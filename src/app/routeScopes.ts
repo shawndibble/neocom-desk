@@ -164,9 +164,10 @@ export const ROUTE_REQUIREMENTS = {
     endpoints: ['getCharacterContracts', 'postUniverseNames'],
     strings: 'contracts',
   },
-  // Public BPC contract search (issue #608, ADR 0013): reads a shared
-  // Firestore snapshot plus public getUniverseRegion lookups, neither of
-  // which is a Character-scoped ESI endpoint — same shape as Market Browser.
+  // Now a redirect into Industry's BPC Sourcing tab, kept so existing links
+  // still land. Ungated because it gates nothing: the search reads a shared
+  // Firestore snapshot plus public getUniverseRegion lookups, neither of them
+  // a Character-scoped ESI endpoint.
   '/bpc-contracts': UNGATED,
   // Deliberately does not list getCharacterSkills, even though the loader
   // reads it for the cooldown's Infomorph Synchronizing level: skills is a

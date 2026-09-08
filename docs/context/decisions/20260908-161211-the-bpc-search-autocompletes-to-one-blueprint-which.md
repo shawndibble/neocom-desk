@@ -58,9 +58,23 @@ _Recorded 2026-09-08 · issue #608._
   gives up is arrow-key traversal with `aria-activedescendant`; a half-built
   version of that is worse than none, so it is not attempted.
 
-- **The page stays at `/bpc-contracts` for now.** Moving it into Industry as a
-  third tab is a reasonable next step — a BPC is an industry input, ME/TE/runs
-  are industry vocabulary, and `BuildPlanRecord` already stores the four
-  fields the search filters on — but it touches routing, the nav rail, the
-  scope table and a 600-line route, none of which this change needs. Kept as
-  its own decision rather than a rider on the search redesign.
+- **The search is Industry's third tab, not a main-nav route.** Both homes had
+  a real claim: Market owns the verb ("I am shopping for something"), Industry
+  owns the workflow and the vocabulary. Industry wins on a tie-break —
+  Market's claim is fixable with a signpost and Industry's is not. A tab strip
+  reading Build Plans / Records / BPC Sourcing is a workflow; Market / Open /
+  History / Blueprints is three tabs about order books and one about
+  contracts. ME/TE/runs are meaningless outside manufacturing, and are
+  `BuildPlanRecord`'s own fields.
+
+- **Market pays off the shopping instinct with one line, not a tab.** A
+  blueprint _original_ can be sold on the market; a **copy** cannot. So an
+  empty sell book on a blueprint is the one case where "no one is selling
+  this" actively misleads, and that empty state now says copies are traded on
+  contract and links to the search. Shown only there — on a blueprint, with no
+  station filter narrowing the book — because anywhere else it is an advert.
+
+- **`/bpc-contracts` stays as a redirect**, and Industry's tab moved into
+  `?tab=`. The tab was component state, which gives a deep link nowhere to
+  land; Plans stays out of the URL as the default, so a visit that never
+  touched the strip does not acquire a query string.

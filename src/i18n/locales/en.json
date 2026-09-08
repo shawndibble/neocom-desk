@@ -24,7 +24,6 @@
     "mail": "Mail",
     "calendar": "Calendar",
     "contracts": "Contracts",
-    "bpcContracts": "BPC Search",
     "contacts": "Contacts",
     "settings": "Settings",
     "soon": "Soon",
@@ -668,7 +667,8 @@
     "heroTitle_one": "1 run · profit after fees",
     "heroTitle_other": "{{count}} runs · profit after fees",
     "needAfterOwned": "Need: {{quantity}}",
-    "netProfit": "Net profit"
+    "netProfit": "Net profit",
+    "bpcSourcingTab": "BPC Sourcing"
   },
   "login": {
     "button": "Log in with EVE Online",
@@ -2683,7 +2683,9 @@
       "quickAnswer": "Quick answer",
       "whoIsCheaper": "Who is cheaper, and where",
       "floorWorking": "Where that price comes from"
-    }
+    },
+    "emptySellBlueprintHint": "Copies of this blueprint are traded on contract, not on the market.",
+    "searchBpcContracts": "Search BPC contracts"
   },
   "error": {
     "title": "Something went wrong",

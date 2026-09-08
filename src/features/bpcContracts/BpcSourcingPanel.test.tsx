@@ -22,10 +22,13 @@ vi.mock('virtual:pwa-register/react', () => ({
   }),
 }));
 
+// The panel is a tab on Industry, so mounting it mounts Industry's own
+// loaders too — `loadPi` included. Same stub set as Industry.test.tsx.
 vi.mock('@/sde/loadSde', () => ({
   loadSkills: vi.fn(async () => []),
   loadTypes: vi.fn(async () => ({})),
   loadBlueprints: vi.fn(async (): Promise<BlueprintMap> => BLUEPRINTS),
+  loadPi: vi.fn(async () => ({ schematics: {}, raw: [] })),
 }));
 
 vi.mock('@/app/syncStatus', async (importOriginal) => {
@@ -107,10 +110,10 @@ beforeEach(async () => {
 
   await db.characters.put({ characterId: CHAR_ID, name: 'Pilot One', ownerHash: 'oh', addedAt: 1 });
   await db.settings.put({ key: ACTIVE_CHARACTER_KEY, value: CHAR_ID });
-  window.history.pushState({}, '', '/bpc-contracts');
+  window.history.pushState({}, '', '/industry?tab=sourcing');
 });
 
-describe('BpcContracts', () => {
+describe('BpcSourcingPanel', () => {
   it('renders synced BPC rows with item name, ME/TE/runs, price and region', async () => {
     loadPublicBpcContracts.mockResolvedValue(
       cachedSnapshot([row({ contractId: 1, typeId: 638, regionId: 10000002 })])
@@ -155,6 +158,16 @@ describe('BpcContracts', () => {
     render(<App />);
 
     expect(await screen.findByText("Public BPC search isn't available")).toBeInTheDocument();
+  });
+
+  it('still lands on the sourcing tab from the old /bpc-contracts link', async () => {
+    loadPublicBpcContracts.mockResolvedValue(cachedSnapshot([row({ contractId: 1, typeId: 638 })]));
+    window.history.pushState({}, '', '/bpc-contracts');
+    render(<App />);
+
+    const tab = await screen.findByRole('tab', { name: 'BPC Sourcing' });
+    expect(tab).toHaveAttribute('aria-selected', 'true');
+    expect(await screen.findByRole('table', { name: 'BPC Search' })).toBeInTheDocument();
   });
 
   it('suggests matching blueprints as you type, with how many offers each has', async () => {

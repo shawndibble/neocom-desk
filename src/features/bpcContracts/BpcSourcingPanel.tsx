@@ -1,5 +1,4 @@
 import { useMemo, useState } from 'react';
-import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -9,7 +8,6 @@ import {
   FilterBar,
   FilterField,
   IconButton,
-  PageHeader,
   Panel,
   Select,
   SelectContent,
@@ -248,8 +246,19 @@ function BpcFilterBar({ filter, onChange, regionOptions }: BpcFilterBarProps) {
   );
 }
 
-/** Public BPC contract search (issue #608, ADR 0013): searches a server-synced snapshot of every publicly contracted blueprint copy for sale, across every region. Not per-character — read-only, cached for offline. */
-export function BpcContracts() {
+/**
+ * Public BPC contract search (issue #608, ADR 0013): searches a server-synced
+ * snapshot of every publicly contracted blueprint copy for sale, across every
+ * region. Not per-character — read-only, cached for offline.
+ *
+ * Industry's third tab rather than its own route: a BPC is an industry input,
+ * ME/TE/runs are industry vocabulary (and are literally `BuildPlanRecord`'s
+ * own fields), and the thing you do after finding one is run a job. It loads
+ * its own snapshot rather than joining Industry's, because the two share no
+ * data — this one is global and Firestore-backed, Industry's is per-character
+ * and ESI-backed.
+ */
+export function BpcSourcingPanel() {
   const { t } = useTranslation();
   const timeZone = useTimeZone();
   const { data, error, loading, hydrated, activeCharacterId, refresh } = useRouteSnapshot(
@@ -467,34 +476,38 @@ export function BpcContracts() {
     [t, blueprintNames, regionNames, timeZone]
   );
 
-  if (!hydrated) {
+  if (!hydrated || activeCharacterId === null) {
+    // No redirect of its own: the Industry route this sits in already sends a
+    // characterless visitor to /characters, and a second `Navigate` racing it
+    // from inside a tab is how you get a redirect loop.
     return (
       <div className="flex justify-center py-16">
         <Spinner label={t('common.loading')} />
       </div>
     );
   }
-  if (activeCharacterId === null) return <Navigate to="/characters" replace />;
 
   return (
-    <div className="mx-auto max-w-6xl space-y-4">
-      <PageHeader
-        title={t('bpcContracts.title')}
-        meta={
-          contractsResult?.data?.lastSyncedAt && (
-            <DataAgeBadge date={new Date(contractsResult.data.lastSyncedAt)} />
-          )
-        }
-        actions={
-          <IconButton
-            icon={<Icon.Refresh />}
-            label={t('bpcContracts.refresh')}
-            onClick={refresh}
-            disabled={loading}
-          />
-        }
-      />
-
+    <Panel
+      padded={false}
+      title={t('bpcContracts.title')}
+      // The badge and Refresh hang on the panel's own toolbar rather than the
+      // page header, so nothing above the tab strip changes as you move
+      // between Industry's tabs — the same trade the Character tabs make.
+      meta={
+        contractsResult?.data?.lastSyncedAt && (
+          <DataAgeBadge date={new Date(contractsResult.data.lastSyncedAt)} />
+        )
+      }
+      actions={
+        <IconButton
+          icon={<Icon.Refresh />}
+          label={t('bpcContracts.refresh')}
+          onClick={refresh}
+          disabled={loading}
+        />
+      }
+    >
       {loading && !data ? (
         <div className="flex justify-center py-16">
           <Spinner label={t('common.loading')} />
@@ -509,7 +522,7 @@ export function BpcContracts() {
       ) : rows.length === 0 ? (
         <EmptyState title={t('bpcContracts.emptyTitle')} hint={t('bpcContracts.emptyHint')} />
       ) : (
-        <Panel padded={false}>
+        <>
           {contractsResult?.fromCache && (
             <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">
               {t('common.offlineTitle')}
@@ -645,9 +658,9 @@ export function BpcContracts() {
               )}
             </>
           )}
-        </Panel>
+        </>
       )}
-    </div>
+    </Panel>
   );
 }
 
