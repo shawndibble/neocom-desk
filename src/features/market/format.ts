@@ -24,9 +24,11 @@ export function formatAttributeValue(value: number, unit?: string | null): strin
 
 /**
  * An order's location as flat text — "Station · System (0.9)" — for the
- * copy-location context-menu action and the station-filter banner. Falls
- * back to the caller's unknown-structure label, the same way `LocationCell`
- * does for display.
+ * copy-location context-menu action and the CSV export. The on-screen
+ * Location column deliberately shows the station name alone (a station name
+ * already carries its system); this longer form is for a location leaving
+ * the app, where the reader has no book around it for context. Falls back to
+ * the caller's unknown-structure label, the same way `LocationCell` does.
  */
 export function formatOrderLocationText(
   location: ResolvedOrderLocation,

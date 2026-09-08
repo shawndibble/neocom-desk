@@ -2329,7 +2329,6 @@
     "minVolume": "Min. Volume",
     "unknownStructure": "Unknown Structure",
     "myOrder": "You",
-    "myOrderUndercutBy": "You · undercut {{gap}} ({{pct}}%)",
     "showAll": "Show all ({{count}} total)",
     "rangeStation": "Station",
     "rangeRegion": "Region",
