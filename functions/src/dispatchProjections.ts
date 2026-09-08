@@ -21,7 +21,17 @@ export interface StoredProjectionRow extends ProjectionRowInput {
 /** A row still unfired more than this long past its `fireAt` is deleted unsent, not sent late (CONTEXT round 45). */
 export const STALE_UNSENT_MS = 7 * 24 * 3_600_000;
 
-/** A fired row is kept as the backend's half of the Notification Feed, then purged like every other Feed row (round 20/45). */
+/**
+ * A fired row is kept as the backend's half of the Notification Feed, then
+ * purged like every other Feed row (round 20/45). `purgeFeed.ts` reuses this
+ * for the remote feed collection too (issue #595), so this is the one
+ * retention number on the backend.
+ *
+ * It is deliberately equal to the client's `FEED_SYNC_WINDOW_MS`
+ * (`src/features/notifications/feed.ts`). `functions/` is a separate package
+ * that cannot import from `src/`, so the two are held equal by this note at
+ * each declaration, not by a shared module — change one and change the other.
+ */
 export const FIRED_RETENTION_MS = 30 * 24 * 3_600_000;
 
 /** `fireAt === nowMs` counts as due — the same inclusive edge `projection.ts`'s `inHorizon` uses at the far boundary. */

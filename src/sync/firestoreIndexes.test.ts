@@ -44,6 +44,21 @@ const DISPATCHER_COLLECTION_GROUPS = ['projections', 'deviceRegistrations'];
 const overridesFor = (collectionGroup: string) =>
   config.fieldOverrides.filter((o) => o.collectionGroup === collectionGroup);
 
+/**
+ * Fields deliberately re-enabled beyond `ownerHash`, per collection group.
+ * The wildcard above exempts *every* field, so a field the backend needs to
+ * query has to be named here or the query has no index at all — this is the
+ * escape hatch that decision describes, and listing it makes each use
+ * deliberate rather than incidental.
+ */
+const EXTRA_INDEXED_FIELDS: Partial<Record<string, readonly string[]>> = {
+  // The server-side Notification Feed purge (issue #595) sweeps every
+  // account's subcollection in one collection-group query, so it needs
+  // `firedAt` indexed at COLLECTION_GROUP scope. Nothing filters on it within
+  // a single collection, so that scope is the only one re-enabled.
+  notificationFeed: ['firedAt'],
+};
+
 describe('firestore.indexes.json field overrides', () => {
   it.each(REMOTE_COLLECTIONS)('exempts every field of %s from auto-indexing', (group) => {
     expect(overridesFor(group)).toContainEqual({
@@ -72,7 +87,20 @@ describe('firestore.indexes.json field overrides', () => {
       overridesFor(group)
         .map((o) => o.fieldPath)
         .sort()
-    ).toEqual(['*', 'ownerHash']);
+    ).toEqual(['*', 'ownerHash', ...(EXTRA_INDEXED_FIELDS[group] ?? [])].sort());
+  });
+
+  it('re-enables firedAt on notificationFeed at collection-group scope', () => {
+    // `purgeNotificationFeed` (functions/src/index.ts) runs
+    // `collectionGroup('notificationFeed').where('firedAt', '<', cutoff)`.
+    // Without this entry the wildcard exemption leaves that query unindexed
+    // and it fails FAILED_PRECONDITION on every tick.
+    expect(overridesFor('notificationFeed')).toContainEqual({
+      collectionGroup: 'notificationFeed',
+      fieldPath: 'firedAt',
+      ttl: false,
+      indexes: [{ order: 'ASCENDING', queryScope: 'COLLECTION_GROUP' }],
+    });
   });
 
   it('overrides nothing outside the remotely-owned collections', () => {

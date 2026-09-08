@@ -321,6 +321,17 @@
       ]
     },
     {
+      "collectionGroup": "notificationFeed",
+      "fieldPath": "firedAt",
+      "ttl": false,
+      "indexes": [
+        {
+          "order": "ASCENDING",
+          "queryScope": "COLLECTION_GROUP"
+        }
+      ]
+    },
+    {
       "collectionGroup": "productionRuns",
       "fieldPath": "*",
       "ttl": false,

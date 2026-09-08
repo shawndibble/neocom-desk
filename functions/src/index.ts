@@ -5,7 +5,7 @@
 
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
-import { error as logError } from 'firebase-functions/logger';
+import { error as logError, warn as logWarn } from 'firebase-functions/logger';
 import { initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore, FieldValue, type Firestore } from 'firebase-admin/firestore';
@@ -28,6 +28,12 @@ import {
   FIRED_RETENTION_MS,
   type StoredProjectionRow,
 } from './dispatchProjections.js';
+import {
+  FEED_PURGE_BATCH_SIZE,
+  FEED_PURGE_MAX_PASSES,
+  NOTIFICATION_FEED_COLLECTION,
+  feedPurgeCutoff,
+} from './purgeFeed.js';
 
 initializeApp();
 
@@ -142,9 +148,9 @@ export const registerDevice = onCall<unknown>({ maxInstances: 5 }, async (reques
 
 /**
  * dispatchProjections: fires whatever is due (issue #358, ADR 0010,
- * CONTEXT.md round 45) — the only scheduled function in this codebase, so the
- * one Cloud Scheduler job this deployment needs. Runs every 5 minutes,
- * matching the Foreground Poller's own cadence (`POLL_INTERVAL_MS`).
+ * CONTEXT.md round 45). Runs every 5 minutes, matching the Foreground
+ * Poller's own cadence (`POLL_INTERVAL_MS`). One of this deployment's two
+ * Cloud Scheduler jobs — `purgeNotificationFeed` below is the other.
  *
  * Holds no EVE token and makes no ESI call: every row already carries
  * rendered title/body text, uploaded by a device that read the real data
@@ -227,4 +233,57 @@ export const dispatchProjections = onSchedule('every 5 minutes', async () => {
     for (const doc of stalePurgeSnapshot.docs) purgeBatch.delete(doc.ref);
     await purgeBatch.commit();
   }
+});
+
+/**
+ * purgeNotificationFeed: server-side expiry for the remote Notification Feed
+ * (issue #595), on the same 30 days the client rule and the fired-projection
+ * purge already use.
+ *
+ * #582 made `syncFeed` delete a remote row fired outside the window, which
+ * bounds the collection for any account that still syncs. It cannot reach an
+ * account whose devices were all uninstalled without the Characters being
+ * removed: nothing signs in as that uid again, so nothing runs the rule. This
+ * job does, and reaches pre-existing rows too — it is a *collection group*
+ * query, so one pass covers every `characters/{uid}/notificationFeed` without
+ * enumerating accounts.
+ *
+ * Daily rather than every 5 minutes: the retention is 30 days, so the tick
+ * only has to be small against that. It needs the collection-group index on
+ * `firedAt` in firestore.indexes.json — deploy indexes before this function,
+ * or the query fails FAILED_PRECONDITION until the index finishes building.
+ */
+export const purgeNotificationFeed = onSchedule('every 24 hours', async () => {
+  const db = getFirestore();
+  // Mirrors purgeFeed.ts's `isPurgeableFeedRow` (and so dispatchProjections'
+  // `isPastRetention`) as a query filter — a Firestore `where` can't call
+  // either, but the boundary must stay the one their tests pin. One cutoff
+  // for the whole run, so a long backlog can't shift the edge mid-pass.
+  const cutoff = feedPurgeCutoff(Date.now());
+
+  let deleted = 0;
+  for (let pass = 0; pass < FEED_PURGE_MAX_PASSES; pass += 1) {
+    const snapshot = await db
+      .collectionGroup(NOTIFICATION_FEED_COLLECTION)
+      .where('firedAt', '<', cutoff)
+      .limit(FEED_PURGE_BATCH_SIZE)
+      .get();
+    if (snapshot.empty) return;
+
+    const batch = db.batch();
+    for (const doc of snapshot.docs) batch.delete(doc.ref);
+    await batch.commit();
+    deleted += snapshot.size;
+
+    // A short page means the backlog is drained; anything else keeps going
+    // until the pass bound, which is what stops one run spinning forever.
+    if (snapshot.size < FEED_PURGE_BATCH_SIZE) return;
+  }
+
+  // Hit the ceiling: the remainder is simply left for tomorrow's tick rather
+  // than dropped, but it is worth knowing the backlog is that large.
+  logWarn('Notification Feed purge: pass limit reached, backlog continues next run', {
+    cutoff,
+    deleted,
+  });
 });
