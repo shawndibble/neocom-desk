@@ -672,7 +672,7 @@
     "heroTitle_other": "{{count}} runs · profit after fees",
     "needAfterOwned": "Need: {{quantity}}",
     "netProfit": "Net profit",
-    "bpcSourcingTab": "BPC Search"
+    "bpcSearchTab": "BPC Search"
   },
   "login": {
     "button": "Log in with EVE Online",

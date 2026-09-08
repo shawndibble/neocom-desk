@@ -490,10 +490,11 @@ export function BpcSourcingPanel() {
   return (
     <Panel
       padded={false}
-      title={t('bpcContracts.title')}
-      // The badge and Refresh hang on the panel's own toolbar rather than the
-      // page header, so nothing above the tab strip changes as you move
-      // between Industry's tabs — the same trade the Character tabs make.
+      // No title of its own: the tab immediately above already reads "BPC
+      // Search", and repeating it in the panel header directly beneath reads
+      // as a stutter. The header still renders — `meta` and `actions` are
+      // enough — so the badge and Refresh keep the toolbar they moved onto,
+      // and the table keeps its own accessible name from `bpcContracts.title`.
       meta={
         contractsResult?.data?.lastSyncedAt && (
           <DataAgeBadge date={new Date(contractsResult.data.lastSyncedAt)} />

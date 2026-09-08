@@ -623,7 +623,7 @@ export function Industry() {
             tabs={[
               { id: 'plans', label: t('industry.buildPlansTab') },
               { id: 'records', label: t('industry.recordsTab') },
-              { id: 'sourcing', label: t('industry.bpcSourcingTab') },
+              { id: 'sourcing', label: t('industry.bpcSearchTab') },
             ]}
           />
 
