@@ -14,7 +14,7 @@
  */
 import type { OpenOrderRow } from './openOrdersModel';
 import { compareOpenOrderRowsWorstFirst } from './openOrdersModel';
-import type { OrderProblem } from '@/engine/market/orderProblems';
+import { ORDER_PROBLEMS, type OrderProblem } from '@/engine/market/orderProblems';
 
 export type OpenOrdersSort = 'worstFirst' | 'expirySoonest' | 'iskTiedUp' | 'item' | 'character';
 
@@ -244,4 +244,73 @@ export function activeFilterChips(filter: OpenOrdersFilter): ActiveFilterChip[] 
 
 export function activeFilterCount(filter: OpenOrdersFilter): number {
   return activeFilterChips(filter).length;
+}
+
+// --- Deep links -----------------------------------------------------------
+
+/**
+ * Where the Orders page lives. Written down once here rather than at each
+ * caller, so a link built by the board and a link parsed by the page cannot
+ * disagree about the route they are both describing.
+ */
+const ORDERS_PATH = '/market?section=orders';
+
+export interface OpenOrdersLinkTarget {
+  /** OR'd, the way the filter's own `problems` are. */
+  problems?: readonly OrderProblem[];
+  characterIds?: readonly number[];
+}
+
+/**
+ * A link to the Orders page already narrowed to what the linker counted.
+ *
+ * The Overview board's tiles are the caller: a tile reading "21 undercut" that
+ * opens a page listing thirty is a tile that lied, because the board counts
+ * one Character's orders and the page fans out across all of them. Carrying
+ * the character makes the two figures agree, and `activeFilterChips` renders
+ * every value it applied as its own removable chip — so widening back out is
+ * one click, and visibly so.
+ *
+ * Repeated params rather than one comma-separated value: `URLSearchParams`
+ * reads and writes that shape natively, which leaves no delimiter to escape.
+ */
+export function openOrdersHref({ problems, characterIds }: OpenOrdersLinkTarget): string {
+  const params = new URLSearchParams();
+  for (const problem of problems ?? []) params.append('problem', problem);
+  for (const characterId of characterIds ?? []) params.append('character', String(characterId));
+  const query = params.toString();
+  return query === '' ? ORDERS_PATH : `${ORDERS_PATH}&${query}`;
+}
+
+/**
+ * The other direction: what a URL asks the Orders page to show.
+ *
+ * Layered onto the page's own default rather than onto `EMPTY_*` — arriving by
+ * deep link narrows the page, it does not reset everything else about it.
+ *
+ * Nothing here throws or reports a failure. A URL is typed, shared, bookmarked
+ * and edited by hand, so an unreadable value is an ordinary event rather than
+ * an error, and the page it asked for is still the right thing to show. The
+ * base is returned by identity when the URL says nothing, so a caller can tell
+ * "no deep link" from "a deep link that narrowed nothing".
+ */
+export function openOrdersFilterFromParams(
+  params: URLSearchParams,
+  base: OpenOrdersFilter
+): OpenOrdersFilter {
+  const problems = params
+    .getAll('problem')
+    .filter((value): value is OrderProblem =>
+      (ORDER_PROBLEMS as readonly string[]).includes(value)
+    );
+  const characterIds = params
+    .getAll('character')
+    .map((value) => Number.parseInt(value, 10))
+    .filter((value) => Number.isFinite(value));
+  if (problems.length === 0 && characterIds.length === 0) return base;
+  return {
+    ...base,
+    ...(problems.length > 0 && { problems }),
+    ...(characterIds.length > 0 && { characterIds }),
+  };
 }

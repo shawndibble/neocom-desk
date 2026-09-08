@@ -357,6 +357,7 @@ export function Overview() {
       render: () => (
         <OrdersCard
           rows={orderRows ?? []}
+          characterId={activeCharacterId}
           maxOrders={skillsQueueData?.maxOrders ?? null}
           needsReauth={ordersNeedReauth}
         />

@@ -373,6 +373,51 @@ describe('Overview board', () => {
   });
 
   /*
+   * A tile is a count of this Character's orders; the Orders page is every
+   * Character's. Opening the unfiltered page from a tile reading "3 undercut"
+   * would put that 3 next to a list of thirty, so the link carries both what
+   * was counted and whose it was.
+   */
+  it('opens each count on the Orders page narrowed to exactly what it counted', async () => {
+    await grantScopes([ORDERS_SCOPE]);
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/orders`, () =>
+        HttpResponse.json(Array.from({ length: 3 }, (_, i) => ({ ...OPEN_ORDER, order_id: i + 1 })))
+      ),
+      http.get('https://market.fuzzwork.co.uk/aggregates/', () =>
+        HttpResponse.json({
+          '3300': {
+            buy: { max: '0', volume: '0', orderCount: '0' },
+            sell: { min: '50', volume: '10', orderCount: '3' },
+          },
+        })
+      )
+    );
+    render(<App />);
+
+    const card = await findCard(/open orders/i);
+    // All three undercut scopes, because the tile sums all three — an order
+    // carries at most one, so the filter matches the same orders it counted.
+    expect(await within(card).findByRole('link', { name: /undercut/i })).toHaveAttribute(
+      'href',
+      `/market?section=orders&problem=undercutStation&problem=undercutSystem&problem=undercutRegion&character=${CHAR_ID}`
+    );
+    // The header's own link stays the whole page, the way every other card's does.
+    expect(within(card).getByRole('link', { name: /open/i })).toHaveAttribute(
+      'href',
+      '/market?section=orders'
+    );
+  });
+
+  it('leaves a zero unlinked — there is nothing behind it to open', async () => {
+    render(<App />);
+    const card = await findCard(/open orders/i);
+    await within(card).findByText('Undercut');
+
+    expect(within(card).queryByRole('link', { name: /undercut/i })).toBeNull();
+  });
+
+  /*
    * Asked for twice, in the review of the mockups: amber says "look here", and
    * a zero has nothing to look at. A toned zero sends you to a page where
    * there is nothing to do, which is the opposite of what this board is for.

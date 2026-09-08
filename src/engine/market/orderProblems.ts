@@ -46,6 +46,24 @@ export const ORDER_PROBLEMS: readonly OrderProblem[] = [
   'healthy',
 ];
 
+/**
+ * The three scopes that all mean "a rival is beating my sell price", tightest
+ * first.
+ *
+ * A named group because two places have to agree on it and would otherwise
+ * spell it out separately: the Overview board's "Undercut" tile sums these
+ * three counts, and the link under that tile narrows the Orders page to the
+ * same three. An order carries at most one of them — they come from a single
+ * `undercutScope` holding the tightest scope that beats it — so summing them
+ * cannot double-count, and filtering on all three matches exactly the orders
+ * the tile counted.
+ */
+export const UNDERCUT_PROBLEMS: readonly OrderProblem[] = [
+  'undercutStation',
+  'undercutSystem',
+  'undercutRegion',
+];
+
 export interface OrderProblemFacts {
   isBuyOrder: boolean;
   /** True when my sell price is under my own floor — needs a cost basis; false when unknown. */

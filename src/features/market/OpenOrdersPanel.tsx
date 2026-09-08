@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -61,6 +61,7 @@ import {
 import {
   EMPTY_OPEN_ORDERS_FILTER,
   filterOpenOrders,
+  openOrdersFilterFromParams,
   sortOpenOrders,
   activeFilterChips,
   type OpenOrdersFilter,
@@ -140,7 +141,22 @@ export function OpenOrdersPanel() {
     { cacheKey: 'market:open-orders' }
   );
 
-  const [filter, setFilter] = useState<OpenOrdersFilter>(DEFAULT_FILTER);
+  /*
+   * A deep link narrows the opening filter — the Overview board's count tiles
+   * link here already filtered to what they counted, so a tile reading "21
+   * undercut" and a page listing thirty cannot both be on screen.
+   *
+   * Read once on mount and never synced afterwards, which is what Wallet's
+   * `?tab=` and Market's own `?section=` do. The URL states where the player
+   * arrived, not where they have got to since; keeping it in step would mean
+   * every chip removed rewrites history, and a stale param nobody reads again
+   * costs nothing. `activeFilterChips` is what shows them the filter is on and
+   * hands them the way out of it.
+   */
+  const [searchParams] = useSearchParams();
+  const [filter, setFilter] = useState<OpenOrdersFilter>(() =>
+    openOrdersFilterFromParams(searchParams, DEFAULT_FILTER)
+  );
   const [detailOrderId, setDetailOrderId] = useState<number | null>(null);
   const [legendOpen, setLegendOpen] = useState(false);
   /** Groups the player has folded away by hand. `healthy` is never in here — see the toggle below. */

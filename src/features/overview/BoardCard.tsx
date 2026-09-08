@@ -74,6 +74,13 @@ export interface NumberTileProps {
   label: string;
   value: number | string;
   severity: DeadlineSeverity;
+  /**
+   * The page this count opens, already narrowed to what it counted. Optional:
+   * a tile whose figure has no filtered destination — mining tax's two — is
+   * plain text, and inventing a link to an unnarrowed page for it would send
+   * the reader somewhere that cannot show them the number they tapped.
+   */
+  to?: string;
 }
 
 /**
@@ -84,11 +91,18 @@ export interface NumberTileProps {
  * what a triage board is for — yellow says "look here", and a zero has nothing
  * to look at. The severity only applies once there is something behind the
  * number.
+ *
+ * **And a zero is never a link**, for the same reason and by the same test: a
+ * link is the strongest "look here" a tile has, and behind this one is a page
+ * filtered down to nothing. `—` is not a zero, though — it means the read
+ * failed — and it is not a link either, because the count it would carry is
+ * exactly what nobody knows.
  */
-export function NumberTile({ label, value, severity }: NumberTileProps) {
+export function NumberTile({ label, value, severity, to }: NumberTileProps) {
   const zero = value === 0 || value === '0';
-  return (
-    <span className="flex min-w-0 flex-1 flex-col gap-0.5 rounded-xs border border-line bg-panel-2 px-2.5 py-2">
+  const linked = to !== undefined && !zero && typeof value === 'number';
+  const body = (
+    <>
       {/* The digits take the tone too, not just the glyph beside them: the
           number is what is being read, and a coloured icon next to plain text
           reads as a bullet point rather than as a severity. */}
@@ -97,7 +111,18 @@ export function NumberTile({ label, value, severity }: NumberTileProps) {
         <span className={zero ? 'text-text' : SEVERITY_TEXT[severity]}>{value}</span>
       </span>
       <span className="text-[0.6875rem] tracking-widest text-text-dim uppercase">{label}</span>
-    </span>
+    </>
+  );
+  const className =
+    'flex min-w-0 flex-1 flex-col gap-0.5 rounded-xs border border-line bg-panel-2 px-2.5 py-2';
+  if (!linked) return <span className={className}>{body}</span>;
+  return (
+    <Link
+      to={to}
+      className={`${className} hover:border-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent`}
+    >
+      {body}
+    </Link>
   );
 }
 

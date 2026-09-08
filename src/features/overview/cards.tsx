@@ -23,6 +23,8 @@ import {
 import type { IndustryJob } from '@/esi/endpoints';
 import type { OpenOrderRow } from '@/features/market/openOrdersModel';
 import { openOrderProblemCounts, needsAttentionCount } from '@/features/market/openOrdersModel';
+import { openOrdersHref } from '@/features/market/openOrdersFilter';
+import { UNDERCUT_PROBLEMS, type OrderProblem } from '@/engine/market/orderProblems';
 import type { DisplayAlertGroup } from '@/features/notifications/alertsFilter';
 import { BoardCard, FoldedRow, NumberTile, TileRow, TriageRow } from './BoardCard';
 import {
@@ -72,10 +74,13 @@ const UNKNOWN = '—';
  */
 export function OrdersCard({
   rows,
+  characterId,
   maxOrders,
   needsReauth,
 }: {
   rows: readonly OpenOrderRow[];
+  /** Whose orders these are. Carried into each tile's link so the page it opens counts the same ones. */
+  characterId: number;
   /** The ceiling the Trade skills grant. Null until /skills lands — an untrained pilot still has slots, so "5" and "not known yet" must not look alike. */
   maxOrders: number | null;
   needsReauth: boolean;
@@ -84,6 +89,12 @@ export function OrdersCard({
   const counts = openOrderProblemCounts(rows);
   const undercut = counts.undercutStation + counts.undercutSystem + counts.undercutRegion;
   const belowFloor = counts.belowFloor;
+  // Each tile opens the Orders page filtered to exactly the rows it counted —
+  // including the character, because this card is one pilot's and that page is
+  // every pilot's. The header's own link stays the unfiltered page, the way
+  // every other card's does.
+  const href = (problems: readonly OrderProblem[]) =>
+    openOrdersHref({ problems, characterIds: [characterId] });
 
   return (
     <BoardCard
@@ -120,16 +131,19 @@ export function OrdersCard({
           label={t('overview.board.undercut')}
           value={needsReauth ? UNKNOWN : undercut}
           severity="warning"
+          to={href(UNDERCUT_PROBLEMS)}
         />
         <NumberTile
           label={t('overview.board.outbid')}
           value={needsReauth ? UNKNOWN : counts.outbid}
           severity="warning"
+          to={href(['outbid'])}
         />
         <NumberTile
           label={t('overview.board.relist')}
           value={needsReauth ? UNKNOWN : counts.expiringOrStale}
           severity="watch"
+          to={href(['expiringOrStale'])}
         />
       </TileRow>
     </BoardCard>
