@@ -17,7 +17,24 @@ test('logs in via mocked EVE SSO, picks a character, sees the overview wallet', 
   // hero button, the one actually in view on load.
   await page.getByRole('button', { name: 'Log in with EVE Online' }).first().click();
 
-  // authorize -> mocked 302 -> /callback -> token exchange -> /characters.
+  /*
+   * authorize -> mocked 302 -> /callback -> token exchange -> /characters.
+   *
+   * The 302 is a real navigation, so the app boots from scratch on the way —
+   * and `expect().toHaveURL` starts its clock immediately rather than waiting
+   * for that load. Measured against the dev server with the suite's own
+   * workers running, `responseEnd` is ~47ms while `loadEventEnd` is ~5.5s:
+   * Vite serves the document at once and then transforms a few hundred modules
+   * while every other worker asks it for the same thing. The token exchange
+   * itself is the last ~0.4s.
+   *
+   * So the default 5s budget was being spent almost entirely on startup, and
+   * the assertion raced it — passing or failing on how loaded the machine was.
+   * Waiting for the load first splits the two: this line covers the boot on
+   * its own generous navigation budget, and the assertion below is left
+   * covering what it names.
+   */
+  await page.waitForLoadState('load');
   await expect(page).toHaveURL(/\/characters$/);
   const characterButton = page.getByRole('button', { name: `Select ${CHARACTER_NAME}` });
   await expect(characterButton).toBeVisible();
