@@ -23,11 +23,11 @@ import { Link } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
 import {
-  Button,
   EmptyState,
   FilterBar,
   FilterChip,
   FilterField,
+  IconButton,
   PageHeader,
   Panel,
   SEVERITY_LABEL,
@@ -37,8 +37,10 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-  buttonClassName,
+  Tooltip,
+  iconButtonClassName,
 } from '@/components/ui';
+import * as Icon from '@/components/ui/icons';
 import { DEADLINE_SEVERITIES, type DeadlineSeverity } from '@/engine/severity';
 import { AlertGroupRow } from '@/features/notifications/AlertGroupRow';
 import { alertGroupLabel, groupAlertsByType } from '@/features/notifications/alertGroups';
@@ -156,29 +158,27 @@ export function Alerts() {
     <div className="mx-auto max-w-6xl space-y-4">
       <PageHeader
         title={t('alerts.title')}
-        meta={
-          <span className="text-xs text-text-dim">
-            {t('alerts.summary', {
-              count: liveEntries.length,
-              types: liveGroups.length,
-              characters: new Set(liveEntries.map((entry) => entry.characterId)).size,
-            })}
-          </span>
-        }
         actions={
           <>
-            {/* A Link styled as a button: it navigates, so it stays an anchor,
-                but it sits beside "Dismiss all" and reads as the same control. */}
-            <Link to="/settings#notifications" className={buttonClassName({ size: 'sm' })}>
-              {t('alerts.settings')}
-            </Link>
-            {liveEntries.length > 0 && (
-              <Button
-                size="sm"
-                onClick={() => void dismissFeedEntries(liveEntries.map((entry) => entry.id))}
+            {/* A Link styled as an icon button: it navigates, so it stays an
+                anchor, but it sits beside "Dismiss all" and reads as the same
+                control. Its name lives in the tooltip and the aria-label
+                alike, so the two can never drift. */}
+            <Tooltip content={t('alerts.settings')}>
+              <Link
+                to="/settings#notifications"
+                aria-label={t('alerts.settings')}
+                className={iconButtonClassName()}
               >
-                {t('alerts.dismissAll')}
-              </Button>
+                <Icon.Settings aria-hidden="true" />
+              </Link>
+            </Tooltip>
+            {liveEntries.length > 0 && (
+              <IconButton
+                icon={<Icon.DismissAll />}
+                label={t('alerts.dismissAll')}
+                onClick={() => void dismissFeedEntries(liveEntries.map((entry) => entry.id))}
+              />
             )}
           </>
         }

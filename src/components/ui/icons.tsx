@@ -32,6 +32,7 @@ import {
   CaretLeft,
   CaretRight,
   CaretUpDown,
+  Checks,
   CloudSlash,
   ChartLineUp,
   Check,
@@ -49,6 +50,7 @@ import {
   Flag,
   Flask,
   Funnel,
+  Gear,
   Gauge,
   GraduationCap,
   Hammer,
@@ -251,6 +253,18 @@ export const MoonMining = withWeight(Moon);
  * row's toggle and must stay a pair.
  */
 export const Notifications = withWeight(Bell);
+/**
+ * Where a feature's own preferences live — the Alerts page's shortcut into
+ * Settings, say. The destination, not an action, so it is never the glyph on a
+ * button that changes something.
+ */
+export const Settings = withWeight(Gear);
+/**
+ * Clear every alert currently listed. A double check, not a bin: dismissal is
+ * a flag and the rows stay stored (CONTEXT.md, Notification Feed) — a delete
+ * glyph would promise a destruction that does not happen.
+ */
+export const DismissAll = withWeight(Checks);
 /** Works with no connection: the installed PWA serving what it last fetched. */
 export const Offline = withWeight(CloudSlash);
 /** A character's own open market orders, as distinct from `Market`'s general price lookup. */
