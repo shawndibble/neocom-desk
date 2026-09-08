@@ -317,11 +317,19 @@ export function feedTransportStamp(row: FeedRow): number {
  * `purgeRemote` (issue #582) bounds the remote collection on that same
  * window, which until now gated only what a device started uploading, never
  * what stayed up there: a remote row fired more than `windowMs` ago is
- * deleted remotely and never pulled. Still no tombstone — the doc is
+ * deleted rather than pulled, on any pass that sees it. That last clause is
+ * the honest bound — an aged row's transport stamp has stopped moving, so an
+ * incremental pull filters it out and only the periodic full reconcile
+ * (`FULL_RECONCILE_INTERVAL_MS` in planSync.ts, itself 30 days) brings it
+ * back into view. Bounded at roughly 30–60 days, in other words, not
+ * expired to the day. Still no tombstone — the doc is
  * hard-deleted with no marker — and nothing resurrects it, because the
  * cutoff is computed from the same `now` and the same window
  * `pushEligible` was built from, so a purged row is by construction not
- * push-eligible. The device is not losing the entry either: the local
+ * push-eligible. That is exact within a pass; across devices it is only as
+ * good as their clocks agree, since `now` is wall-clock — a device running
+ * slow can re-push a row another just purged, and the next pass to see it
+ * purges it again. The device is not losing the entry either: the local
  * archive (`NOTIFICATION_FEED_LIMIT`, 300 rows) is the record, and the
  * remote collection only ever the window devices reconcile through. Purging
  * is ordered ahead of the dismissal branches so a row is either purged or

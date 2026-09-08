@@ -12,6 +12,13 @@ _Recorded 2026-09-07 · issue #582._
   which devices reconcile. A remote row whose `firedAt` is older than
   `FEED_SYNC_WINDOW_MS` is deleted remotely during sync. This rules out treating
   a remote row's absence as evidence the occurrence never happened.
+- **Bounded, not expired to the day.** A row is purged on the first pass that
+  _sees_ it, and an incremental pull (issue #581) does not see it: its transport
+  stamp stopped moving when it fired, so it sits below the cursor until the
+  periodic full reconcile — itself 30 days — reads the whole owned set again.
+  The real bound is therefore roughly 30–60 days. Bounded is the property that
+  matters; this rules out reading the window as a deletion SLA, or building
+  anything on a row being gone at exactly day 30.
 - **Still no tombstone.** The purged doc is hard-deleted with no marker left
   behind, which is the whole point — a tombstone per feed row would replace one
   unbounded collection with another. What stops resurrection is not a marker but

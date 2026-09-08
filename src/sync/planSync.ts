@@ -1154,7 +1154,10 @@ export async function removeProductionOrderWatch(
 // The remote copy is still bounded, though (issue #582): a remote row fired
 // more than FEED_SYNC_WINDOW_MS ago is deleted outright — no tombstone, so
 // nothing accumulates in its place. The same window that decides what a
-// device starts pushing now also decides what stays up there. A purged row
+// device starts pushing now also decides what stays up there — bounded,
+// though, not expired to the day: an aged row's transport stamp no longer
+// moves, so an incremental pull skips it and the periodic full reconcile is
+// what brings it back into view. Call it 30-60 days. A purged row
 // cannot ping-pong back: the purge cutoff and `pushEligible` are both
 // derived from the one `ctx.now`, so anything purged is already outside the
 // push window, and the device's own 300-row archive keeps the entry

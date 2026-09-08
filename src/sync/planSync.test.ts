@@ -16,6 +16,7 @@ import { CACHE_PURGE_PENDING_PREFIX } from '@/esi/cachePurge';
 import { FEED_SYNC_WINDOW_MAX_ROWS, FEED_SYNC_WINDOW_MS } from '@/features/notifications/feed';
 import { backfillAccountWideData } from './accountWideBackfill';
 import { remotePurgePendingKey } from './characterPurge';
+import { pullCursorKey } from './localBookkeeping';
 import { TOMBSTONE_TTL_MS } from './merge';
 import {
   clearStationPin,
@@ -1350,7 +1351,9 @@ describe('triggerSync: notification feed', () => {
     // different story since issue #582: a row past 30 days is purged remotely
     // rather than reconciled (see the retention block below).
     const now = Date.now();
-    const firedAt = now - FEED_SYNC_WINDOW_MAX_ROWS - 1;
+    // Older than all 100 rows below, but nowhere near 30 days old: the row
+    // cap is what leaves it out of pushEligible here, not the age half.
+    const firedAt = now - 1000;
     const dismissedAt = now - 10;
     await db.notificationFeed.bulkPut(
       Array.from({ length: FEED_SYNC_WINDOW_MAX_ROWS }, (_, i) =>
@@ -1393,8 +1396,13 @@ describe('triggerSync: notification feed', () => {
     expect(remoteStore.get(NOTIFICATION_FEED_PATH)?.has('occ-1')).toBe(false);
     expect(await db.notificationFeed.get('occ-1')).toMatchObject({ id: 'occ-1', firedAt });
 
-    // The second device's pass: the row is outside the push window it was
-    // purged for, so nothing puts it back for the first device to pull again.
+    // The second device's pass. Dropping the pull cursor is what makes it
+    // one: a device that has never synced this collection reads the whole
+    // owned set, so `mergeFeed` reaches the pushEligible check instead of
+    // short-circuiting on `since` — and that check is the property AC4 turns
+    // on. The row is outside the push window it was purged for, so nothing
+    // puts it back for the first device to pull again.
+    await db.settings.delete(pullCursorKey(1, 'notificationFeed'));
     await triggerSync(1);
     expect(remoteStore.get(NOTIFICATION_FEED_PATH)?.has('occ-1')).toBe(false);
   });
