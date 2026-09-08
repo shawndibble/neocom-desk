@@ -23,6 +23,7 @@
  * notification rather than derived at click time because the Service Worker
  * handling the click has no idea which fire produced it.
  */
+import { HIGHLIGHT_PARAM } from '@/lib/useHighlightParam';
 import type { NotificationEventId } from './events';
 
 const ICON_URL = '/icons/icon-192.png';
@@ -46,8 +47,8 @@ export const NOTIFICATION_ROUTES: Record<NotificationEventId, string> = {
   // the tab this used to land on is the one place the thing it is telling you
   // about is guaranteed not to be. Transactions is where the fill itself is
   // written down — what sold, how many, for how much, to whom.
-  // `notificationUrlForSubject` adds `&highlight=` where the fire knows its
-  // item, which pulses that row on arrival.
+  // `notificationUrlForSubject` adds `?highlight=` where the fire knows its
+  // subject, which pulses that row on arrival.
   marketOrderFilled: '/market?section=transactions',
   // ~100 EVE-native types (issue #274), most with no corresponding page in
   // the app. `/alerts` is a deliberate choice for this event rather than an
@@ -81,12 +82,12 @@ export interface NotificationTarget {
   eventId: NotificationEventId;
   characterId: number;
   /**
-   * The item the fire was about, for the events whose destination depends on
+   * The row the fire was about, for the events whose destination depends on
    * it. Baked into `data.url` at fire time rather than resolved on click: the
    * Service Worker handling a `notificationclick` has no idea which fire
    * produced the bubble it is closing.
    */
-  typeId?: number;
+  subjectId?: number;
 }
 
 /**
@@ -97,13 +98,6 @@ export function notificationUrlFor(eventId: string): string {
   return NOTIFICATION_ROUTES[eventId as NotificationEventId] ?? NOTIFICATION_FALLBACK_ROUTE;
 }
 
-/**
- * The query key `TransactionsPanel` reads to scroll to and pulse one row.
- * Exported so the panel and the link that sends it there cannot disagree on
- * the spelling.
- */
-export const HIGHLIGHT_PARAM = 'highlight';
-
 /** Adds one query parameter, whether or not `url` already carries a query string. */
 function withParam(url: string, key: string, value: string): string {
   const [path, query = ''] = url.split('?');
@@ -113,23 +107,63 @@ function withParam(url: string, key: string, value: string): string {
 }
 
 /**
+ * What a fire was *about*, structurally — deliberately not `AnyNotificationFire`,
+ * so this module stays free of a cycle back through the poller. Each event
+ * reads whichever of these fields its own diff sets.
+ */
+export interface NotificationSubject {
+  eventId: string;
+  typeId?: number;
+  journalEntryId?: number;
+  contractId?: number;
+  jobId?: number;
+  memberCharacterId?: number;
+}
+
+interface SubjectRoute {
+  /** The id of the row this fire was about, if its diff carries one. */
+  readonly subjectOf: (fire: NotificationSubject) => number | undefined;
+  /** How that id reaches the destination page. */
+  readonly url: (base: string, subjectId: number) => string;
+}
+
+/** Every subject-routed event lands on a table that pulses the row (`lib/useHighlightParam`). */
+const highlightRow = (base: string, subjectId: number) =>
+  withParam(base, HIGHLIGHT_PARAM, String(subjectId));
+
+/**
  * The events whose destination depends on *what the fire was about*, not only
  * on which event it was.
  *
- * A table rather than an `if` naming `marketOrderFilled` inside two separate
- * functions: the URL builder and the "has this fire a subject worth storing"
- * check both answer to one entry, so adding a second such event is one line
- * here instead of two edits that can disagree. Anything absent from this
- * table ignores its subject and resolves to `NOTIFICATION_ROUTES` exactly as
- * before.
+ * An alert that opens the right page still leaves the pilot scanning a table
+ * for the thing they were just told about. Every entry here names a
+ * destination that is a table, keyed by an id the fire already carries, so
+ * arriving means arriving *on the row*.
+ *
+ * The bar for an entry is that the row is **actually there on arrival**. That
+ * rules out `corpMemberLeft` — the roster no longer lists them — and it rules
+ * out every event whose destination is not a table at all: mail, the skill
+ * tree, the colony cards, the corp board, the calendar. A key matching no row
+ * is harmless, but an entry that can *never* match is a promise this cannot
+ * keep.
+ *
+ * A table rather than an `if` per event: the URL builder and the "has this
+ * fire a subject worth storing" check both answer to one entry, so a new event
+ * is one line here instead of two edits that can disagree.
  */
-const SUBJECT_ROUTES: Partial<
-  Record<NotificationEventId, (base: string, typeId: number) => string>
-> = {
-  // Landing on the Transactions tab already beats landing on Open Orders, but
-  // a pilot with a page of fills still has to hunt for the one they were just
-  // told about; the item id turns that into an arrival on the row itself.
-  marketOrderFilled: (base, typeId) => withParam(base, HIGHLIGHT_PARAM, String(typeId)),
+const SUBJECT_ROUTES: Partial<Record<NotificationEventId, SubjectRoute>> = {
+  // The fill itself — what sold, how many, to whom. ESI's transactions carry
+  // no order id, so the panel resolves the item to its newest sell; every
+  // other entry here is an exact row id.
+  marketOrderFilled: { subjectOf: (fire) => fire.typeId, url: highlightRow },
+  // The journal line that moved the balance.
+  walletBalanceChanged: { subjectOf: (fire) => fire.journalEntryId, url: highlightRow },
+  // The contract someone just took. Still listed — the filter defaults to every status.
+  contractAccepted: { subjectOf: (fire) => fire.contractId, url: highlightRow },
+  // The job sits in Active Jobs until it is delivered, which is the point.
+  industryJobComplete: { subjectOf: (fire) => fire.jobId, url: highlightRow },
+  // The new member's roster row.
+  corpMemberJoined: { subjectOf: (fire) => fire.memberCharacterId, url: highlightRow },
 };
 
 /**
@@ -139,18 +173,15 @@ const SUBJECT_ROUTES: Partial<
  * A fire carrying no subject — an older build's row, or one Web Push wrote —
  * degrades to the event's own route rather than to the fallback.
  */
-export function notificationUrlForSubject(eventId: string, typeId: number | undefined): string {
+export function notificationUrlForSubject(eventId: string, subjectId: number | undefined): string {
   const base = notificationUrlFor(eventId);
   const route = SUBJECT_ROUTES[eventId as NotificationEventId];
-  return route === undefined || typeId === undefined ? base : route(base, typeId);
+  return route === undefined || subjectId === undefined ? base : route.url(base, subjectId);
 }
 
-/** The item a fire was about, where its event has a use for one — see `NotificationFeedRecord.typeId`. */
-export function notificationSubjectTypeId(fire: {
-  eventId: string;
-  typeId?: number;
-}): number | undefined {
-  return fire.eventId in SUBJECT_ROUTES ? fire.typeId : undefined;
+/** The row a fire was about, where its event has a use for one — see `NotificationFeedRecord.subjectId`. */
+export function notificationSubjectId(fire: NotificationSubject): number | undefined {
+  return SUBJECT_ROUTES[fire.eventId as NotificationEventId]?.subjectOf(fire);
 }
 
 export function notificationTagFor(target: NotificationTarget): string {
@@ -167,7 +198,7 @@ export function notificationOptionsFor(
     badge: BADGE_URL,
     tag: notificationTagFor(target),
     renotify: true,
-    data: { url: notificationUrlForSubject(target.eventId, target.typeId) },
+    data: { url: notificationUrlForSubject(target.eventId, target.subjectId) },
   };
 }
 

@@ -1,4 +1,12 @@
-import { Fragment, useMemo, useState, type ReactElement, type ReactNode } from 'react';
+import {
+  Fragment,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactElement,
+  type ReactNode,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import { cx } from '@/lib/cx';
 import * as Icon from './icons';
@@ -64,6 +72,18 @@ interface DataTableProps<T> {
   rowKey: (row: T) => string | number;
   /** Row-level classes, e.g. Contracts dimming expired rows with `opacity-50`. */
   rowClassName?: (row: T) => string | undefined;
+  /**
+   * The row a notification pointed at (`lib/useHighlightParam`): scrolled into
+   * view once and pulsed, so the reader arrives on it rather than scanning for
+   * it.
+   *
+   * Handled here rather than by each panel because this component already owns
+   * `rowKey` and the DOM the row lives in — every caller would otherwise repeat
+   * the same ref, `querySelector` and reduced-motion check. A key matching no
+   * row does nothing, which is the ordinary case for a link that outlived the
+   * data it pointed at.
+   */
+  highlightRowKey?: string | number | null;
   /** Accessible name for the table. */
   label: string;
   className?: string;
@@ -135,6 +155,7 @@ export function DataTable<T>({
   rows,
   rowKey,
   rowClassName,
+  highlightRowKey = null,
   label,
   className = '',
   defaultSort,
@@ -145,6 +166,21 @@ export function DataTable<T>({
 }: DataTableProps<T>) {
   const { t } = useTranslation();
   const [sort, setSort] = useState<DataTableSort | null>(defaultSort ?? null);
+  const tableRef = useRef<HTMLTableElement>(null);
+
+  // Once, when the row first exists. Rows arrive a render or more after the
+  // key does (the fetch resolves later), so this depends on the row set as
+  // well as the key — and `scrollIntoView` on the same element twice is
+  // harmless, where missing it entirely leaves the reader where they landed.
+  useEffect(() => {
+    if (highlightRowKey === null) return;
+    const row = tableRef.current?.querySelector(
+      `[data-row-key="${CSS.escape(String(highlightRowKey))}"]`
+    );
+    if (!row) return;
+    const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+    row.scrollIntoView({ block: 'center', behavior: reduced ? 'auto' : 'smooth' });
+  }, [highlightRowKey, rows]);
 
   const headerPadding = density === 'compact' ? 'px-2 py-1' : 'px-3 py-2';
   const cellPadding = density === 'compact' ? 'px-2 py-1' : 'px-3 py-1.5';
@@ -202,6 +238,7 @@ export function DataTable<T>({
 
   return (
     <table
+      ref={tableRef}
       role="table"
       aria-label={label}
       className={cx('w-full text-xs', responsive === 'stack' && 'dt-stack', className)}
@@ -291,6 +328,7 @@ export function DataTable<T>({
                 onRowClick && 'cursor-pointer',
                 focusable &&
                   'focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent',
+                rowKey(row) === highlightRowKey && 'row-pulse',
                 rowClassName?.(row)
               )}
               tabIndex={focusable ? 0 : undefined}

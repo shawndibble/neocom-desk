@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Navigate, useSearchParams } from 'react-router-dom';
+import { useMemo } from 'react';
+import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   DataAgeBadge,
@@ -27,8 +27,8 @@ import {
 } from '@/features/character/walletTransactionsCsv';
 import type { WalletTransaction } from '@/esi/endpoints';
 import { HistoryViewSelect, type HistoryView } from './HistoryViewSelect';
-import { HIGHLIGHT_PARAM } from '@/features/notifications/notificationOptions';
-import { highlightedTransactionId, parseHighlightTypeId } from './transactionHighlight';
+import { useHighlightParam } from '@/lib/useHighlightParam';
+import { highlightedTransactionId } from './transactionHighlight';
 
 /** Stable identity, so the fallback doesn't invalidate the column memo every render. */
 const NO_TYPE_NAMES: ReadonlyMap<number, string> = new Map();
@@ -71,17 +71,7 @@ export function TransactionsPanel({ onViewChange }: TransactionsPanelProps) {
   const timeZone = useTimeZone();
   const { data, error, loading, hydrated, activeCharacterId, refreshCount, refresh } =
     useRouteSnapshot(loadTransactionsSnapshot, undefined, { cacheKey: 'market:transactions' });
-  const [searchParams, setSearchParams] = useSearchParams();
-  /**
-   * The item a "sell order filled" alert sent the reader here to look at.
-   *
-   * Latched into state on mount rather than read from the URL each render, and
-   * the param is dropped as soon as it is: a pilot who leaves for the Order
-   * History tab and comes back should not be pulsed at a second time, and a
-   * reload should not either. What they were shown once, they were shown.
-   */
-  const [highlightTypeId] = useState(() => parseHighlightTypeId(searchParams.get(HIGHLIGHT_PARAM)));
-
+  const highlightTypeId = useHighlightParam();
   // A manual Refresh that still falls back to cache is a more alarming case
   // than the initial load finding cache first — same banner, different copy.
   const offlineTitleKey = refreshCount > 0 ? 'common.refreshFailedTitle' : 'common.offlineTitle';
@@ -95,34 +85,15 @@ export function TransactionsPanel({ onViewChange }: TransactionsPanelProps) {
     [transactionsResult]
   );
 
+  /**
+   * The alert names the *item*; the table is keyed by transaction. Resolving
+   * one to the other is this panel's job because only it knows that rule —
+   * the newest sell of that item (`transactionHighlight.ts`).
+   */
   const highlightId = useMemo(
     () => highlightedTransactionId(transactions, highlightTypeId),
     [transactions, highlightTypeId]
   );
-
-  const tableRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (highlightTypeId === null) return;
-    // Spend the param even when nothing matched: the fill can be newer than
-    // the cached transactions, or older than the page cap, and a link that
-    // stays armed would pulse a *different* row once the cache catches up.
-    setSearchParams(
-      (prev) => {
-        const params = new URLSearchParams(prev);
-        params.delete(HIGHLIGHT_PARAM);
-        return params;
-      },
-      { replace: true }
-    );
-  }, [highlightTypeId, setSearchParams]);
-
-  useEffect(() => {
-    if (highlightId === null) return;
-    const row = tableRef.current?.querySelector(`[data-row-key="${highlightId}"]`);
-    if (!row) return;
-    const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
-    row.scrollIntoView({ block: 'center', behavior: reduced ? 'auto' : 'smooth' });
-  }, [highlightId]);
 
   const columns = useMemo<DataTableColumn<WalletTransaction>[]>(
     () => [
@@ -244,15 +215,13 @@ export function TransactionsPanel({ onViewChange }: TransactionsPanelProps) {
               {t(offlineTitleKey)}
             </p>
           )}
-          <div ref={tableRef}>
-            <DataTable
-              label={t('wallet.transactionsTab')}
-              columns={columns}
-              rows={transactions}
-              rowKey={(txn) => txn.transaction_id}
-              rowClassName={(txn) => (txn.transaction_id === highlightId ? 'row-pulse' : undefined)}
-            />
-          </div>
+          <DataTable
+            label={t('wallet.transactionsTab')}
+            columns={columns}
+            rows={transactions}
+            rowKey={(txn) => txn.transaction_id}
+            highlightRowKey={highlightId}
+          />
         </>
       )}
     </Panel>

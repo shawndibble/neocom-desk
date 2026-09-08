@@ -369,20 +369,29 @@ export interface NotificationFeedRecord {
    */
   dismissedAt?: number;
   /**
-   * The EVE item type this fire was *about*, where it was about one — set by
-   * `marketOrderFilled`, which is the first alert whose destination depends on
-   * its subject rather than only on its event.
+   * The row this fire was *about*, where its event lands on a table that can
+   * show it (`features/notifications/notificationOptions`'s `SUBJECT_ROUTES`).
+   * A journal entry id, a contract id, a job id, a member's character id — the
+   * `eventId` says which, because only that event's route reads it.
    *
    * Stored rather than re-derived because nothing else on the row identifies
-   * the item: the Occurrence Key is the order id, and the copy is a rendered
-   * sentence. Stored as the id rather than as a finished URL so
-   * `notificationOptions.ts` stays the one place that knows what the app's
-   * routes look like — a URL frozen into a row would rot the next time a tab
-   * moves, and this table keeps rows for months.
+   * the subject: the Occurrence Key is not always it (a market fill keys on
+   * the order but points at the item), and the copy is a rendered sentence.
+   * Stored as the id rather than as a finished URL so `notificationOptions.ts`
+   * stays the one place that knows what the app's routes look like — a URL
+   * frozen into a row would rot the next time a tab moves, and this table
+   * keeps rows for months.
    *
-   * Not indexed, so it needs no `db.version()` bump. A row without it (an
-   * older build's, or one Web Push wrote) falls back to the event's own
-   * route, which is exactly today's behaviour.
+   * Not indexed, so it needs no `db.version()` bump. A row without it — an
+   * older build's, or one Web Push wrote — falls back to the event's own
+   * route, which is exactly the behaviour before any of this existed.
+   */
+  subjectId?: number;
+  /**
+   * What `subjectId` was called for the one release it shipped as an
+   * item-type id only. Read as a fallback so rows already written (and already
+   * synced) keep their deep link; nothing writes it any more, and it can go
+   * once no device is plausibly still holding one.
    */
   typeId?: number;
 }

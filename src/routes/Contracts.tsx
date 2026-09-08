@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { useHighlightParam } from '@/lib/useHighlightParam';
 import {
   Button,
   DataAgeBadge,
@@ -181,6 +182,8 @@ export function Contracts() {
   const [selectedContract, setSelectedContract] = useState<Contract | null>(null);
   const [filter, setFilter] = useState<ContractsFilter>(EMPTY_CONTRACTS_FILTER);
   const [showAll, setShowAll] = useState(false);
+  // The contract a `contractAccepted` alert pointed at, if any.
+  const highlightedContractId = useHighlightParam();
 
   const columns = useMemo<DataTableColumn<Contract>[]>(
     () => [
@@ -263,7 +266,15 @@ export function Contracts() {
     () => filterContracts(contracts, filter, issuerNames),
     [contracts, filter, issuerNames]
   );
-  const visibleContracts = showAll ? filteredContracts : filteredContracts.slice(0, ROW_CAP);
+  // A contract an alert pointed at must be rendered to be scrolled to, and it
+  // can sit past the cap — an accepted contract is not necessarily a recent
+  // one. Uncapping is the honest fix: the alternative, splicing it into a
+  // capped list, would show it out of the order the table claims to be in.
+  const highlightBeyondCap =
+    highlightedContractId !== null &&
+    filteredContracts.findIndex((c) => c.contract_id === highlightedContractId) >= ROW_CAP;
+  const visibleContracts =
+    showAll || highlightBeyondCap ? filteredContracts : filteredContracts.slice(0, ROW_CAP);
 
   if (!hydrated) {
     return (
@@ -350,6 +361,7 @@ export function Contracts() {
                 columns={columns}
                 rows={visibleContracts}
                 rowKey={(contract) => contract.contract_id}
+                highlightRowKey={highlightedContractId}
                 rowClassName={(contract) => (isStale(contract) ? 'opacity-50' : undefined)}
               />
               {!showAll && filteredContracts.length > ROW_CAP && (

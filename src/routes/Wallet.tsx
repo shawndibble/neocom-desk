@@ -41,6 +41,7 @@ import {
   loadCorporationWallets,
 } from '@/features/corp/wallet';
 import { CorpTransactionsPanel } from '@/features/corp/CorpTransactionsPanel';
+import { useHighlightParam } from '@/lib/useHighlightParam';
 import { loadTypeNames } from '@/features/character/typeNames';
 import {
   EMPTY_WALLET_TRANSACTION_FILTER,
@@ -146,6 +147,12 @@ interface JournalTableProps {
   filteredJournal: readonly WalletJournalEntry[];
   journalColumns: DataTableColumn<WalletJournalEntry>[];
   label: string;
+  /**
+   * The journal line a wallet alert pointed at. Passed by the *personal*
+   * panel only — `walletBalanceChanged` is a character event, and the corp
+   * journal beside it has its own rows with their own ids.
+   */
+  highlightRowKey?: number | null;
 }
 
 /** The filter bar plus its result — either the table or a filtered-empty message. Shared by the personal and corp journal panels (issue #413). */
@@ -156,6 +163,7 @@ function JournalTable({
   filteredJournal,
   journalColumns,
   label,
+  highlightRowKey = null,
 }: JournalTableProps) {
   const { t } = useTranslation();
   return (
@@ -169,6 +177,7 @@ function JournalTable({
           columns={journalColumns}
           rows={filteredJournal}
           rowKey={(entry) => entry.id}
+          highlightRowKey={highlightRowKey}
           defaultSort={{ columnId: 'date', direction: 'desc' }}
         />
       )}
@@ -495,6 +504,8 @@ export function Wallet() {
   // state below — an invalid or missing value falls back to Balance.
   const [searchParams] = useSearchParams();
   const [tab, setTab] = useState<WalletTab>(() => walletTabFromParam(searchParams.get('tab')));
+  // The journal line a `walletBalanceChanged` alert pointed at, if any.
+  const highlightedEntryId = useHighlightParam();
 
   const {
     owner,
@@ -1049,6 +1060,7 @@ export function Wallet() {
                 filteredJournal={filteredJournal}
                 journalColumns={journalColumns}
                 label={t('wallet.journalTab')}
+                highlightRowKey={highlightedEntryId}
               />
             </>
           )}

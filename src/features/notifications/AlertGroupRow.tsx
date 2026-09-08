@@ -194,7 +194,7 @@ function AlertFireRow({
         push the rest of the list off the screen.
       */}
       <Link
-        to={notificationUrlForSubject(entry.eventId, entry.typeId)}
+        to={notificationUrlForSubject(entry.eventId, entry.subjectId ?? entry.typeId)}
         className="line-clamp-2 min-w-0 flex-1 rounded-xs py-1.5 text-xs text-text-dim hover:text-text focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent sm:line-clamp-none sm:truncate"
       >
         {entry.body}

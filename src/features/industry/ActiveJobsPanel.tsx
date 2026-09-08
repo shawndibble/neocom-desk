@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useHighlightParam } from '@/lib/useHighlightParam';
 import {
   Caret,
   DataAgeBadge,
@@ -168,6 +169,10 @@ export function ActiveJobsPanel({
     () => [...new Set(jobs.map((job) => job.activity_id))].sort((a, b) => a - b),
     [jobs]
   );
+
+  // The job an `industryJobComplete` alert pointed at, if any. It stays in
+  // this list until it is delivered, which is exactly what the alert is about.
+  const highlightedJobId = useHighlightParam();
 
   const filteredJobs = useMemo(
     () =>
@@ -487,6 +492,7 @@ export function ActiveJobsPanel({
                 columns={columns}
                 rows={filteredJobs}
                 rowKey={(job) => job.job_id}
+                highlightRowKey={highlightedJobId}
                 label={t('industry.jobsTitle')}
                 defaultSort={{ columnId: 'endsIn', direction: 'asc' }}
                 density="compact"
