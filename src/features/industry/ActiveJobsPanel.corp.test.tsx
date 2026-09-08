@@ -338,7 +338,7 @@ describe('ActiveJobsPanel: the corp side (AC 2, AC 3)', () => {
     );
   });
 
-  it('shows a corp-specific empty state rather than the personal one', async () => {
+  it('says "None" and keeps the owner switch, so an empty corp side is not a dead end', async () => {
     server.use(http.get(corpJobsUrl(), () => HttpResponse.json([])));
     await seedCorpCapableCharacter();
     const user = userEvent.setup();
@@ -355,7 +355,12 @@ describe('ActiveJobsPanel: the corp side (AC 2, AC 3)', () => {
     );
     await user.click(await screen.findByRole('button', { name: 'Corp jobs' }));
 
-    expect(await screen.findByText('No active corp jobs')).toBeInTheDocument();
+    expect(await screen.findByText('None')).toBeInTheDocument();
+    // The switch is the only thing left in the body — without it there is no
+    // way back to My jobs from an empty corp list.
+    expect(screen.getByRole('button', { name: 'My jobs' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'My jobs' }));
+    expect(await screen.findByText('Widget Alpha')).toBeInTheDocument();
   });
 
   /**
