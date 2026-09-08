@@ -18,24 +18,38 @@ const TIER_FILL: Record<StandingTier, string> = {
   excellent: '#04226c',
 };
 
-/** The white glyph inside the square, on the same 9×9 grid the client draws it on. */
+/**
+ * The white glyph inside the square, on the same 9×9 grid the client draws it
+ * on: a minus, an equals or a plus.
+ *
+ * The client draws TERRIBLE and BAD with the same minus, and GOOD and
+ * EXCELLENT with the same plus, leaving colour alone to separate each pair —
+ * two reds and two blues. DESIGN.md §7 does not allow that, so the extremes
+ * get a mark that runs the full width of the square while ±5 keeps the
+ * client's shorter one. Magnitude reads as mark size, sign as the glyph, and
+ * colour becomes the confirmation rather than the only channel. This is the
+ * one place the tag deliberately departs from the game's own art; the mark
+ * lengths below are the whole of the departure.
+ */
 const TIER_GLYPH: Record<StandingTier, readonly (readonly [number, number, number, number])[]> = {
-  // A single bar: minus.
-  terrible: [[2, 4, 5, 1]],
+  // A minus, full width.
+  terrible: [[1, 4, 7, 1]],
+  // A minus, the client's width.
   bad: [[2, 4, 5, 1]],
-  // Two bars: equals — neither plus nor minus.
+  // Two bars: equals — neither plus nor minus. Exactly as the client draws it.
   neutral: [
     [2, 3, 5, 1],
     [2, 5, 5, 1],
   ],
-  // A cross: plus.
+  // A plus, the client's width.
   good: [
     [2, 4, 5, 1],
     [4, 2, 1, 5],
   ],
+  // A plus, full width.
   excellent: [
-    [2, 4, 5, 1],
-    [4, 2, 1, 5],
+    [1, 4, 7, 1],
+    [4, 1, 1, 7],
   ],
 };
 

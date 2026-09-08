@@ -33,4 +33,33 @@ describe('StandingIcon', () => {
     render(<StandingIcon value={-25} />);
     expect(screen.getByRole('img', { name: 'Terrible standing (-10)' })).toBeInTheDocument();
   });
+
+  // DESIGN.md §7: colour is never the only signal. The client separates
+  // terrible from bad, and good from excellent, by hue alone — two reds and
+  // two blues — so the tag has to carry the magnitude in the mark as well.
+  it('separates the tiers that share a sign by more than their colour', () => {
+    /** The white mark only — what a reader who cannot see the hue is left with. */
+    const mark = (value: number) => {
+      const { container, unmount } = render(<StandingIcon value={value} />);
+      const rects = [...container.querySelectorAll('rect')]
+        .filter((rect) => rect.getAttribute('fill') === '#fcfefc')
+        .map((rect) =>
+          ['x', 'y', 'width', 'height'].map((a) => rect.getAttribute(a) ?? '0').join(',')
+        )
+        .join(' ');
+      unmount();
+      return rects;
+    };
+
+    // The helper really did drop the coloured square, so what follows is
+    // comparing marks and not fills.
+    expect(mark(-10)).not.toContain('9,9');
+    expect(mark(-10)).not.toBe('');
+
+    expect(mark(-10)).not.toBe(mark(-5));
+    expect(mark(10)).not.toBe(mark(5));
+    // And the three signs still differ from each other.
+    expect(mark(-5)).not.toBe(mark(0));
+    expect(mark(0)).not.toBe(mark(5));
+  });
 });
