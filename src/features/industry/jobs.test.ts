@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
-import { http, HttpResponse } from 'msw';
+import { http, HttpResponse, delay } from 'msw';
 import { setupServer } from 'msw/node';
 import { configureEsi, ESI_BASE_URL } from '@/esi/client';
 import { db } from '@/db';
@@ -14,21 +14,37 @@ import {
   activityI18nKey,
   contextMenuTypeId,
   summarizeJobs,
+  loadAllCharactersIndustryJobs,
+  flattenJobsWithCharacter,
+  type JobsFanOutEntry,
 } from './jobs';
 
 const CHAR_ID = 91;
+const JOBS_SCOPE = 'esi-industry.read_character_jobs.v1';
 const server = setupServer();
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 beforeEach(async () => {
   configureEsi({ getToken: vi.fn(async () => 'tok') });
   await db.esiCache.clear();
+  await db.characters.clear();
+  await db.tokens.clear();
 });
 afterEach(() => {
   server.resetHandlers();
   configureEsi({ getToken: null });
 });
 afterAll(() => server.close());
+
+function tokenWith(characterId: number, scopes: string[]) {
+  return {
+    characterId,
+    accessToken: 'at',
+    refreshToken: 'rt',
+    expiresAt: Date.now() + 6e5,
+    scopes,
+  };
+}
 
 function job(overrides: Partial<IndustryJob> = {}): IndustryJob {
   return {
@@ -254,5 +270,164 @@ describe('summarizeJobs', () => {
 
   it('is empty for no jobs', () => {
     expect(summarizeJobs([], NOW)).toEqual({ running: 0, done: 0, next: null });
+  });
+});
+
+const CHAR_A = 1;
+const CHAR_B = 2;
+const CHAR_C = 3;
+
+describe('loadAllCharactersIndustryJobs', () => {
+  beforeEach(async () => {
+    await db.characters.bulkPut([
+      { characterId: CHAR_A, name: 'Alice', ownerHash: 'oh1', addedAt: 1 },
+      { characterId: CHAR_B, name: 'Bob', ownerHash: 'oh2', addedAt: 2 },
+      { characterId: CHAR_C, name: 'Carol', ownerHash: 'oh3', addedAt: 3 },
+    ]);
+  });
+
+  it('skips a Character without the industry-jobs scope, never calling ESI for it', async () => {
+    await db.tokens.bulkPut([tokenWith(CHAR_A, [JOBS_SCOPE]), tokenWith(CHAR_B, [JOBS_SCOPE])]);
+    // CHAR_C has no token at all: never granted anything.
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_A}/industry/jobs`, () =>
+        HttpResponse.json([job({ job_id: 1 })])
+      ),
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_B}/industry/jobs`, () =>
+        HttpResponse.json([job({ job_id: 2 })])
+      ),
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_C}/industry/jobs`, () => {
+        throw new Error('must not fetch a Character without the industry-jobs scope');
+      })
+    );
+
+    const { entries, skipped } = await loadAllCharactersIndustryJobs();
+
+    expect(entries.map((e) => e.characterId)).toEqual([CHAR_A, CHAR_B]);
+    expect(skipped).toEqual([{ characterId: CHAR_C, name: 'Carol' }]);
+  });
+
+  it('surfaces needsReauth on one Character entry without failing the others', async () => {
+    await db.tokens.bulkPut([
+      tokenWith(CHAR_A, [JOBS_SCOPE]),
+      tokenWith(CHAR_B, [JOBS_SCOPE]),
+      tokenWith(CHAR_C, [JOBS_SCOPE]),
+    ]);
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_A}/industry/jobs`, () =>
+        HttpResponse.json([job({ job_id: 1 })])
+      ),
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_B}/industry/jobs`, () =>
+        HttpResponse.json({ error: 'token is not valid for scope' }, { status: 403 })
+      ),
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_C}/industry/jobs`, () =>
+        HttpResponse.json([job({ job_id: 3 })])
+      )
+    );
+
+    const { entries, skipped } = await loadAllCharactersIndustryJobs();
+
+    expect(skipped).toEqual([]);
+    expect(entries.map((e) => e.characterId)).toEqual([CHAR_A, CHAR_B, CHAR_C]);
+
+    const bob = entries.find((e) => e.characterId === CHAR_B);
+    expect(bob?.result.needsReauth).toBe(true);
+    expect(bob?.result.cached).toBeNull();
+
+    const alice = entries.find((e) => e.characterId === CHAR_A);
+    expect(alice?.result.needsReauth).toBe(false);
+    expect(alice?.result.cached?.data).toEqual([job({ job_id: 1 })]);
+  });
+
+  it('keeps entries in stable, character-list order regardless of which fetch resolves first', async () => {
+    await db.tokens.bulkPut([
+      tokenWith(CHAR_A, [JOBS_SCOPE]),
+      tokenWith(CHAR_B, [JOBS_SCOPE]),
+      tokenWith(CHAR_C, [JOBS_SCOPE]),
+    ]);
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_A}/industry/jobs`, () =>
+        HttpResponse.json([job({ job_id: 1 })])
+      ),
+      // CHAR_B is deliberately the slowest response of the three.
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_B}/industry/jobs`, async () => {
+        await delay(30);
+        return HttpResponse.json([job({ job_id: 2 })]);
+      }),
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_C}/industry/jobs`, () =>
+        HttpResponse.json([job({ job_id: 3 })])
+      )
+    );
+
+    const { entries } = await loadAllCharactersIndustryJobs();
+
+    expect(entries.map((e) => e.characterId)).toEqual([CHAR_A, CHAR_B, CHAR_C]);
+  });
+});
+
+describe('flattenJobsWithCharacter', () => {
+  function entry(overrides: Partial<JobsFanOutEntry> = {}): JobsFanOutEntry {
+    return {
+      characterId: CHAR_A,
+      characterName: 'Alice',
+      result: { cached: null, needsReauth: false },
+      ...overrides,
+    };
+  }
+
+  it('tags every job with its owning character', () => {
+    const flattened = flattenJobsWithCharacter(
+      [
+        entry({
+          characterId: CHAR_A,
+          characterName: 'Alice',
+          result: {
+            cached: {
+              data: [job({ job_id: 1 })],
+              fetchedAt: new Date(),
+              fromCache: false,
+              truncated: false,
+            },
+            needsReauth: false,
+          },
+        }),
+      ],
+      'all'
+    );
+    expect(flattened).toEqual([
+      { ...job({ job_id: 1 }), characterId: CHAR_A, characterName: 'Alice' },
+    ]);
+  });
+
+  it('excludes a Character not in the filter', () => {
+    const withJobs = (characterId: number, characterName: string): JobsFanOutEntry =>
+      entry({
+        characterId,
+        characterName,
+        result: {
+          cached: {
+            data: [job({ job_id: characterId })],
+            fetchedAt: new Date(),
+            fromCache: false,
+            truncated: false,
+          },
+          needsReauth: false,
+        },
+      });
+
+    const flattened = flattenJobsWithCharacter(
+      [withJobs(CHAR_A, 'Alice'), withJobs(CHAR_B, 'Bob')],
+      new Set([CHAR_A])
+    );
+
+    expect(flattened.map((j) => j.characterId)).toEqual([CHAR_A]);
+  });
+
+  it('treats a needsReauth or never-fetched entry as no jobs, not an error', () => {
+    const flattened = flattenJobsWithCharacter(
+      [entry({ result: { cached: null, needsReauth: true } })],
+      'all'
+    );
+    expect(flattened).toEqual([]);
   });
 });

@@ -7,6 +7,7 @@ import { isAllowedSyncedSettingKey, SYNCED_SETTING_KEYS } from './syncedSettings
 // deletions via deleteSyncedSetting so the tombstone path in merge.ts applies.
 const PINNED_SYNCED_SETTING_KEYS: string[] = [
   'sync.corpDarkAfterDays',
+  'sync.defaultCharacterFilter',
   'sync.industryAssumedMe',
   'sync.industryFacilityDefaults',
   'sync.marketHub',

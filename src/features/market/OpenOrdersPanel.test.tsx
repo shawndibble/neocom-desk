@@ -302,7 +302,7 @@ describe('OpenOrdersPanel', () => {
     expect(screen.queryByRole('button', { name: /^Alpha/ })).not.toBeInTheDocument();
   });
 
-  it('shows a character strip with needs-attention counts once more than one character has orders', async () => {
+  it('offers the CharacterFilterControl once more than one character has orders, and narrows the table on a pick', async () => {
     mockedLoadAll.mockResolvedValue(
       snapshot([
         {
@@ -327,14 +327,24 @@ describe('OpenOrdersPanel', () => {
       characterId === 1 ? new Map([[101, costBasis(600)]]) : new Map()
     );
 
+    const user = userEvent.setup();
     renderPanel();
 
     await screen.findByTestId('order-group-belowFloor');
-    expect(screen.getByText('All characters')).toBeInTheDocument();
-    const alphaChip = screen.getByRole('button', { name: /Alpha/ });
-    const bravoChip = screen.getByRole('button', { name: /Bravo/ });
-    expect(alphaChip).toHaveTextContent('1');
-    expect(bravoChip).toHaveTextContent('1');
+    // Defaults to "All characters" — the picker itself, not a chip per
+    // character (issue #607's UI-space audit).
+    const trigger = screen.getByRole('button', { name: 'All characters' });
+    expect(trigger).toBeInTheDocument();
+
+    await user.click(trigger);
+    // The active Character (from `useActiveCharacter`) is Alpha (id 1).
+    await user.click(screen.getByRole('menuitem', { name: 'This character' }));
+
+    // Narrowed to Alpha's own order (Tritanium, type 34); Bravo's (Mexallon,
+    // type 36) is gone. Both groups were on screen before the pick.
+    expect(await screen.findByText('Tritanium')).toBeInTheDocument();
+    expect(screen.queryByText('Mexallon')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'This character' })).toBeInTheDocument();
   });
 
   it('folds the healthy group (header and count, no table) until "Show healthy orders" is pressed', async () => {

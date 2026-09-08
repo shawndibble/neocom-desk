@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
-import { http, HttpResponse } from 'msw';
+import { http, HttpResponse, delay } from 'msw';
 import { setupServer } from 'msw/node';
 import { configureEsi, ESI_BASE_URL } from '@/esi/client';
 import { db } from '@/db';
@@ -9,21 +9,37 @@ import {
   loadWalletJournal,
   loadWalletJournalWithStatus,
   loadWalletTransactions,
+  loadAllCharactersWalletBalances,
+  totalWalletBalance,
+  type CharacterWalletBalance,
 } from './wallet';
 
 const CHAR_ID = 91;
+const WALLET_SCOPE = 'esi-wallet.read_character_wallet.v1';
 const server = setupServer();
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 beforeEach(async () => {
   configureEsi({ getToken: vi.fn(async () => 'tok') });
   await db.esiCache.clear();
+  await db.characters.clear();
+  await db.tokens.clear();
 });
 afterEach(() => {
   server.resetHandlers();
   configureEsi({ getToken: null });
 });
 afterAll(() => server.close());
+
+function tokenWith(characterId: number, scopes: string[]) {
+  return {
+    characterId,
+    accessToken: 'at',
+    refreshToken: 'rt',
+    expiresAt: Date.now() + 6e5,
+    scopes,
+  };
+}
 
 describe('loadWalletBalance', () => {
   it('fetches from ESI and caches it', async () => {
@@ -248,5 +264,127 @@ describe('loadWalletTransactions', () => {
     );
     const result = await loadWalletTransactions(CHAR_ID);
     expect(result?.data).toEqual(txns);
+  });
+});
+
+const CHAR_A = 1;
+const CHAR_B = 2;
+const CHAR_C = 3;
+
+describe('loadAllCharactersWalletBalances', () => {
+  beforeEach(async () => {
+    await db.characters.bulkPut([
+      { characterId: CHAR_A, name: 'Alice', ownerHash: 'oh1', addedAt: 1 },
+      { characterId: CHAR_B, name: 'Bob', ownerHash: 'oh2', addedAt: 2 },
+      { characterId: CHAR_C, name: 'Carol', ownerHash: 'oh3', addedAt: 3 },
+    ]);
+  });
+
+  it('skips a Character without the wallet scope, never calling ESI for it', async () => {
+    await db.tokens.bulkPut([tokenWith(CHAR_A, [WALLET_SCOPE]), tokenWith(CHAR_B, [WALLET_SCOPE])]);
+    // CHAR_C has no token at all: never granted anything.
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_A}/wallet`, () => HttpResponse.json(100)),
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_B}/wallet`, () => HttpResponse.json(200)),
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_C}/wallet`, () => {
+        throw new Error('must not fetch a Character without the wallet scope');
+      })
+    );
+
+    const { entries, skipped } = await loadAllCharactersWalletBalances();
+
+    expect(entries.map((e) => e.characterId)).toEqual([CHAR_A, CHAR_B]);
+    expect(skipped).toEqual([{ characterId: CHAR_C, name: 'Carol' }]);
+  });
+
+  it('surfaces needsReauth on one Character entry without failing the others', async () => {
+    await db.tokens.bulkPut([
+      tokenWith(CHAR_A, [WALLET_SCOPE]),
+      tokenWith(CHAR_B, [WALLET_SCOPE]),
+      tokenWith(CHAR_C, [WALLET_SCOPE]),
+    ]);
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_A}/wallet`, () => HttpResponse.json(100)),
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_B}/wallet`, () =>
+        HttpResponse.json({ error: 'token invalid' }, { status: 401 })
+      ),
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_C}/wallet`, () => HttpResponse.json(300))
+    );
+
+    const { entries, skipped } = await loadAllCharactersWalletBalances();
+
+    expect(skipped).toEqual([]);
+    expect(entries.map((e) => e.characterId)).toEqual([CHAR_A, CHAR_B, CHAR_C]);
+
+    const bob = entries.find((e) => e.characterId === CHAR_B);
+    expect(bob?.needsReauth).toBe(true);
+    expect(bob?.balanceResult).toBeNull();
+
+    const alice = entries.find((e) => e.characterId === CHAR_A);
+    expect(alice?.needsReauth).toBe(false);
+    expect(alice?.balanceResult?.data).toBe(100);
+  });
+
+  it('keeps entries in stable, character-list order regardless of which fetch resolves first', async () => {
+    await db.tokens.bulkPut([
+      tokenWith(CHAR_A, [WALLET_SCOPE]),
+      tokenWith(CHAR_B, [WALLET_SCOPE]),
+      tokenWith(CHAR_C, [WALLET_SCOPE]),
+    ]);
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_A}/wallet`, () => HttpResponse.json(100)),
+      // CHAR_B is deliberately the slowest response of the three.
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_B}/wallet`, async () => {
+        await delay(30);
+        return HttpResponse.json(200);
+      }),
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_C}/wallet`, () => HttpResponse.json(300))
+    );
+
+    const { entries } = await loadAllCharactersWalletBalances();
+
+    expect(entries.map((e) => e.characterId)).toEqual([CHAR_A, CHAR_B, CHAR_C]);
+  });
+});
+
+describe('totalWalletBalance', () => {
+  function entry(overrides: Partial<CharacterWalletBalance>): CharacterWalletBalance {
+    return {
+      characterId: 1,
+      characterName: 'Alice',
+      balanceResult: { data: 100, fetchedAt: new Date(), fromCache: false, truncated: false },
+      needsReauth: false,
+      ...overrides,
+    };
+  }
+
+  it('sums every entry with a usable balance', () => {
+    const total = totalWalletBalance([
+      entry({
+        characterId: 1,
+        balanceResult: { data: 100, fetchedAt: new Date(), fromCache: false, truncated: false },
+      }),
+      entry({
+        characterId: 2,
+        balanceResult: { data: 250, fetchedAt: new Date(), fromCache: false, truncated: false },
+      }),
+    ]);
+    expect(total).toBe(350);
+  });
+
+  it('excludes a needsReauth entry from the total rather than counting it as zero', () => {
+    const total = totalWalletBalance([
+      entry({
+        characterId: 1,
+        balanceResult: { data: 100, fetchedAt: new Date(), fromCache: false, truncated: false },
+      }),
+      entry({ characterId: 2, needsReauth: true, balanceResult: null }),
+    ]);
+    expect(total).toBe(100);
+  });
+
+  it('excludes a never-fetched entry from the total', () => {
+    const total = totalWalletBalance([entry({ characterId: 1, balanceResult: null })]);
+    expect(total).toBe(0);
   });
 });

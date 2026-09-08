@@ -515,6 +515,7 @@
     "jobsOwnerLabel": "Job owner",
     "jobsOwnerPersonal": "My jobs",
     "jobsOwnerCorporation": "Corp jobs",
+    "jobsCharacterNotShared": "This character hasn't granted industry-jobs access",
     "jobsCorpEmptyHint": "Refresh once you're back online to fetch this corporation's running industry jobs.",
     "jobsDone": "Done",
     "jobsCompletingSoon": "Completing soon",
@@ -802,6 +803,14 @@
     "errorMessage": "Something went wrong signing you in. Please try again.",
     "retry": "Try again"
   },
+  "character": {
+    "filter": {
+      "thisCharacter": "This character",
+      "allCharacters": "All characters",
+      "selectedCount_one": "{{count}} character",
+      "selectedCount_other": "{{count}} characters"
+    }
+  },
   "characters": {
     "title": "Characters",
     "add": "Add character",
@@ -999,6 +1008,10 @@
     "refresh": "Refresh",
     "isk": "ISK",
     "balanceEmpty": "No wallet data cached. Reconnect to fetch it.",
+    "balanceByCharacter": "Balance by character",
+    "totalBalance": "Total",
+    "balanceCharacterColumn": "Character",
+    "balanceCharacterNotShared": "This character hasn't granted wallet access",
     "everMarks": "EverMarks",
     "journalEmptyTitle": "No journal entries cached",
     "journalEmptyHint": "Reconnect to fetch this character's wallet journal.",
@@ -2696,7 +2709,7 @@
           "notificationFeed": "Your Alerts.",
           "notificationFeedNote": "Ones you have already been shown, so another device can catch up on what it missed. Kept for 30 days.",
           "settings": "The settings you chose on this page.",
-          "settingsNote": "Your notification preferences, the PI customs rates you overrode, and the defaults every page starts from — trade hub, industry facility, assumed ME, the PI expiring-soon window and the corp dark threshold. Nothing else on this page leaves your device."
+          "settingsNote": "Your notification preferences, the PI customs rates you overrode, and the defaults every page starts from — trade hub, industry facility, assumed ME, the PI expiring-soon window, the corp dark threshold, and the default characters shown. Nothing else on this page leaves your device."
         },
         "local": {
           "title": "Kept on this device only",
@@ -2836,6 +2849,8 @@
     "assumedMeHint": "Sub-builds are quoted at this ME. A blueprint you do own always uses its real ME instead.",
     "piExpiringLabel": "Warn me an extractor is expiring",
     "piExpiringHint": "How far ahead the Colonies list flags an extractor — and sorts it to the top.",
+    "defaultCharacterFilterLabel": "Default characters shown",
+    "defaultCharacterFilterHint": "Which character(s) Wallet Balance and Industry's Active Jobs open on by default.",
     "darkThresholdLabel": "Members go dark after",
     "darkThresholdHint": "Your corp’s inactivity policy. Sets the roster’s Dark filter and its count.",
     "hours_one": "{{count}} hour",

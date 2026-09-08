@@ -21,6 +21,7 @@ import { beginEveLogin } from '@/app/loginFlow';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
+import { toggleFilterMember } from '@/lib/multiSelectFilter';
 import type { TradeHub } from '@/market/hubs';
 import type { PayeeRecord } from '@/db';
 import { STATUS_LABEL_KEY, type MiningTaxRowStatus } from '@/engine/miningTax/rowStatus';
@@ -152,23 +153,6 @@ async function loadSnapshot(_characterId: number, signal: RouteSnapshotSignal): 
     unpricedByHub,
     unpricedTypeIds,
   };
-}
-
-/**
- * Flips one member of a multi-select filter. Every member selected, or none,
- * both read as "don't filter" — with a single Payee (or character) the only
- * possible toggle otherwise left an empty set, an empty table, and "0
- * payee(s)".
- */
-function toggleFilterMember<T>(
-  previous: ReadonlySet<T> | 'all',
-  member: T,
-  universe: readonly T[]
-): ReadonlySet<T> | 'all' {
-  const next = previous === 'all' ? new Set(universe) : new Set(previous);
-  if (next.has(member)) next.delete(member);
-  else next.add(member);
-  return next.size === universe.length || next.size === 0 ? 'all' : next;
 }
 
 /** Structural, not i18next's TFunction, so this stays easy to pass around without fighting its generics. */

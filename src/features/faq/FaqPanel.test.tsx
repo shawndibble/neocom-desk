@@ -48,6 +48,7 @@ const SETTING_KEY_TO_PHRASE: Readonly<Record<string, RegExp>> = {
   'sync.industryAssumedMe': /assumed ME/,
   'sync.piExpiringSoonHours': /expiring-soon window/i,
   'sync.corpDarkAfterDays': /dark threshold/i,
+  'sync.defaultCharacterFilter': /default characters shown/i,
 };
 
 function syncedItemIds(): Set<string> {

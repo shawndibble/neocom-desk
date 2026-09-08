@@ -29,6 +29,7 @@ import {
 } from '@/features/industry/facilityDefaults';
 import { useExpiringWindowHours } from '@/features/pi/expiringWindow';
 import { useDarkThreshold } from '@/features/corp/darkThreshold';
+import { useDefaultCharacterFilter } from '@/features/character/defaultCharacterFilter';
 import { VIEW_PREFERENCE_KEYS } from '@/lib/viewPreferenceKeys';
 
 vi.mock('virtual:pwa-register/react', () => ({
@@ -81,6 +82,7 @@ beforeEach(async () => {
   useFacilityDefaults.setState({ value: DEFAULT_FACILITY_DEFAULTS, hydrated: false });
   useExpiringWindowHours.setState({ value: 24, hydrated: false });
   useDarkThreshold.setState({ value: 30, hydrated: false });
+  useDefaultCharacterFilter.setState({ value: 'current', hydrated: false });
   useNotificationPreferences.setState({ value: DEFAULT_NOTIFICATION_PREFERENCES, hydrated: false });
   useNotificationPromptState.setState({
     value: { ...DEFAULT_NOTIFICATION_PROMPT_STATE, seen: true },
@@ -834,6 +836,27 @@ describe('Settings defaults', () => {
     // Hide rather than lock, the same rule the corp nav follows — a setting
     // for a page you cannot open is noise.
     expect(screen.queryByRole('group', { name: /members go dark/i })).not.toBeInTheDocument();
+  });
+
+  it('offers the default character filter, defaulting to "This character" (issue #607)', async () => {
+    render(<App />);
+    await screen.findByRole('heading', { level: 1, name: /settings/i });
+
+    expect(await screen.findByRole('button', { name: 'This character' })).toBeInTheDocument();
+  });
+
+  it('persists a switch to "All characters"', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByRole('heading', { level: 1, name: /settings/i });
+
+    await user.click(await screen.findByRole('button', { name: 'This character' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'All characters' }));
+
+    expect(await screen.findByRole('button', { name: 'All characters' })).toBeInTheDocument();
+    await waitFor(async () => {
+      expect((await db.settings.get('sync.defaultCharacterFilter'))?.value).toBe('all');
+    });
   });
 });
 

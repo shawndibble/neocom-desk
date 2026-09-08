@@ -48,8 +48,18 @@
 // edge above does not bite these either. Each is seeded from the device-local
 // key it used before it synced; `lib/useSyncedSetting.ts` explains why that
 // seed is written unstamped.
+//
+// sync.defaultCharacterFilter (issue #607): a sixth Defaults-panel preference,
+// added later than the five above and with no device-local life to seed from
+// (no `legacyKey`). Which Character(s) a cross-character view (Wallet
+// Balance, Industry Active Jobs) opens on by default — `'current'`, `'all'`,
+// or a hand-picked subset, stored as `StoredCharacterFilterValue`
+// (`features/character/characterFilterValue.ts`) since a `Set` is not
+// Firestore-safe. Same "set to another value, never unset" shape as the five
+// above, so the tombstone-expiry edge does not bite this one either.
 export const SYNCED_SETTING_KEYS: readonly string[] = [
   'sync.corpDarkAfterDays',
+  'sync.defaultCharacterFilter',
   'sync.industryAssumedMe',
   'sync.industryFacilityDefaults',
   'sync.marketHub',

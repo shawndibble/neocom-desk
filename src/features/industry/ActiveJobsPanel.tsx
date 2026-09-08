@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useHighlightParam } from '@/lib/useHighlightParam';
+import { useLiveQuery } from 'dexie-react-hooks';
 import {
   Caret,
   ContextMenuHint,
@@ -16,6 +17,7 @@ import {
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { beginEveLogin } from '@/app/loginFlow';
+import { db } from '@/db';
 import { loadTypes } from '@/sde/loadSde';
 import type { TypeMap } from '@/sde/types';
 import {
@@ -28,8 +30,11 @@ import {
   summarizeJobs,
   activityI18nKey,
   contextMenuTypeId,
+  loadAllCharactersIndustryJobs,
+  flattenJobsWithCharacter,
   type ActiveJob,
   type JobsLoadResult,
+  type JobsFanOutSnapshot,
 } from './jobs';
 import { formatDuration } from '@/lib/duration';
 import { formatEveDateTime } from '@/lib/eveTime';
@@ -41,6 +46,17 @@ import { OwnerSwitch } from '@/features/corp/OwnerSwitch';
 import { useCorpSnapshot } from '@/features/corp/useCorpSnapshot';
 import { loadCorporationIndustryJobs, type CorpJobsLoadResult } from '@/features/corp/jobs';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
+import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
+import { CharacterBadge } from '@/features/character/assetBrowserRows';
+import {
+  resolveCharacterFilter,
+  fromStoredCharacterFilterValue,
+  type CharacterFilterValue,
+} from '@/features/character/characterFilterValue';
+import { useDefaultCharacterFilter } from '@/features/character/defaultCharacterFilter';
+
+/** A row on the table, tagged with its owning Character even in the single-character view — so `rowKey` and the optional character column need no branch. */
+type JobRow = ActiveJob & { characterId: number; characterName: string };
 
 interface ActiveJobsPanelProps {
   characterId: number;
@@ -126,6 +142,74 @@ export function ActiveJobsPanel({
     { name: 'industry:corp-jobs', characterId }
   );
 
+  /**
+   * The character-filter picker (issue #607): `'current'` by default —
+   * today's exact behavior, no extra fan-out, and it keeps following the
+   * active Character across a switch with no resync logic of its own
+   * (`resolveCharacterFilter` re-resolves it fresh every render) — or
+   * All/a hand-picked subset once the pilot asks. Applies only to **My
+   * jobs**; Corp jobs are already "everyone in the corp," an orthogonal
+   * axis, so the picker is hidden while `showingCorp` (rendered below,
+   * beside `OwnerSwitch`).
+   */
+  const [jobsCharacterFilter, setJobsCharacterFilter] = useState<CharacterFilterValue>('current');
+  // Seeded once from the synced default (Settings' Defaults panel) the
+  // moment it hydrates — before that, `'current'` above is the safe seed,
+  // identical to what the default itself defaults to. A press before
+  // hydration lands is not overwritten: `seededFromDefault` only ever seeds
+  // the picker's very first value.
+  const defaultCharacterFilter = useDefaultCharacterFilter((state) => state.value);
+  const defaultCharacterFilterHydrated = useDefaultCharacterFilter((state) => state.hydrated);
+  const hydrateDefaultCharacterFilter = useDefaultCharacterFilter((state) => state.hydrate);
+  useEffect(() => {
+    void hydrateDefaultCharacterFilter();
+  }, [hydrateDefaultCharacterFilter]);
+  const [seededFromDefault, setSeededFromDefault] = useState(false);
+  if (defaultCharacterFilterHydrated && !seededFromDefault) {
+    setSeededFromDefault(true);
+    setJobsCharacterFilter(fromStoredCharacterFilterValue(defaultCharacterFilter));
+  }
+
+  const resolvedJobsFilter = resolveCharacterFilter(jobsCharacterFilter, characterId);
+  const showingAllJobs =
+    !showingCorp &&
+    (resolvedJobsFilter === 'all' ||
+      resolvedJobsFilter.size !== 1 ||
+      !resolvedJobsFilter.has(characterId));
+
+  const allCharacters = useLiveQuery(() => db.characters.toArray(), [], []);
+  const jobsFilterCandidates = useMemo(
+    () => (allCharacters ?? []).map((c) => ({ characterId: c.characterId, characterName: c.name })),
+    [allCharacters]
+  );
+  const characterNameById = useMemo(
+    () => new Map((allCharacters ?? []).map((c) => [c.characterId, c.name])),
+    [allCharacters]
+  );
+
+  // Nothing fetched until the picker actually leaves "current" — same
+  // opt-in shape as the corp read above, just not a corp read. No separate
+  // "loading" state: `jobsFanOut === null` already means "nothing to show
+  // yet" (set once, on the first successful load), and a manual refresh
+  // deliberately leaves the previous snapshot in place while it re-fetches —
+  // same retained-snapshot idiom `useRouteSnapshot`/`useCorpSnapshot` use
+  // elsewhere in this app, and the only way to give the effect below no
+  // synchronous `setState` call of its own (`react-hooks/set-state-in-effect`).
+  const [jobsFanOut, setJobsFanOut] = useState<JobsFanOutSnapshot | null>(null);
+  const [jobsFanOutRefreshCount, setJobsFanOutRefreshCount] = useState(0);
+  useEffect(() => {
+    if (!showingAllJobs) return;
+    let cancelled = false;
+    void loadAllCharactersIndustryJobs().then((snapshot) => {
+      if (!cancelled) setJobsFanOut(snapshot);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [showingAllJobs, jobsFanOutRefreshCount]);
+  const refreshJobsFanOut = useCallback(() => setJobsFanOutRefreshCount((c) => c + 1), []);
+  const jobsFanOutLoading = jobsFanOut === null;
+
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), TICK_MS);
     return () => clearInterval(id);
@@ -141,25 +225,93 @@ export function ActiveJobsPanel({
   const result: JobsLoadResult | CorpJobsLoadResult | null = showingCorp
     ? corp.data
     : (data?.result ?? null);
-  // `&& !…data`: with a retained snapshot the panel keeps its rows while the
-  // re-read runs, so the spinner is only for having nothing at all to show.
-  const listLoading = showingCorp ? corp.loading && corp.data === null : loading && !data;
-  const listRefreshCount = showingCorp ? corp.refreshCount : refreshCount;
-  const listRefresh = showingCorp ? corp.refresh : refresh;
+  const listLoading = showingCorp
+    ? corp.loading && corp.data === null
+    : showingAllJobs
+      ? jobsFanOutLoading
+      : // `&& !…data`: with a retained snapshot the panel keeps its rows while
+        // the re-read runs, so the spinner is only for having nothing at all
+        // to show.
+        loading && !data;
+  const listRefreshCount = showingCorp
+    ? corp.refreshCount
+    : showingAllJobs
+      ? jobsFanOutRefreshCount
+      : refreshCount;
+  const listRefresh = showingCorp ? corp.refresh : showingAllJobs ? refreshJobsFanOut : refresh;
 
-  const jobs = useMemo(() => sortJobsBySoonest<ActiveJob>(result?.cached?.data ?? []), [result]);
+  // Every derived note/badge below reads only the Characters the picker
+  // actually selected — narrowing to two of five must not still show a
+  // reauth banner or "hasn't shared" note for one of the other three.
+  const jobsFanOutSelectedEntries = useMemo(
+    () =>
+      (jobsFanOut?.entries ?? []).filter(
+        (entry) => resolvedJobsFilter === 'all' || resolvedJobsFilter.has(entry.characterId)
+      ),
+    [jobsFanOut, resolvedJobsFilter]
+  );
+  const jobsFanOutSkipped = useMemo(
+    () =>
+      (jobsFanOut?.skipped ?? []).filter(
+        (s) => resolvedJobsFilter === 'all' || resolvedJobsFilter.has(s.characterId)
+      ),
+    [jobsFanOut, resolvedJobsFilter]
+  );
+  // Per-character reauth notes for the multi-character path — the
+  // single-character paths (personal or corp) instead block the whole panel
+  // behind one `ReauthBanner` below, since there is only one Character's
+  // grant to ask about.
+  const jobsFanOutReauth = useMemo(
+    () => jobsFanOutSelectedEntries.filter((entry) => entry.result.needsReauth),
+    [jobsFanOutSelectedEntries]
+  );
+  const jobsFanOutFromCacheAny = useMemo(
+    () => jobsFanOutSelectedEntries.some((entry) => entry.result.cached?.fromCache),
+    [jobsFanOutSelectedEntries]
+  );
+  const jobsFanOutOldestFetchedAt = useMemo(() => {
+    const times = jobsFanOutSelectedEntries
+      .map((entry) => entry.result.cached?.fetchedAt.getTime())
+      .filter((t): t is number => t !== undefined);
+    return times.length > 0 ? new Date(Math.min(...times)) : null;
+  }, [jobsFanOutSelectedEntries]);
+  const dataAgeDate = showingAllJobs
+    ? jobsFanOutOldestFetchedAt
+    : (result?.cached?.fetchedAt ?? null);
+  const fromCacheAny = showingAllJobs
+    ? jobsFanOutFromCacheAny
+    : (result?.cached?.fromCache ?? false);
+
+  const jobs = useMemo<JobRow[]>(() => {
+    const unsorted: JobRow[] = showingAllJobs
+      ? flattenJobsWithCharacter(jobsFanOut?.entries ?? [], resolvedJobsFilter)
+      : (result?.cached?.data ?? []).map((job) => ({
+          ...job,
+          characterId,
+          characterName: characterNameById.get(characterId) ?? '',
+        }));
+    return sortJobsBySoonest(unsorted);
+  }, [showingAllJobs, jobsFanOut, resolvedJobsFilter, result, characterId, characterNameById]);
   const summary = useMemo(() => summarizeJobs(jobs, now), [jobs, now]);
+  // A single blocking re-auth state only applies to the two single-Character
+  // paths — the multi-character path never blocks the whole panel behind one
+  // banner, since one alt's revoked grant must not hide everyone else's jobs.
+  const blockingNeedsReauth = !showingAllJobs && (result?.needsReauth ?? false);
   // Loading, re-auth and the empty states are the whole story; only a real
   // list has anything to fold.
-  const collapsible = jobs.length > 0 && !listLoading && !result?.needsReauth;
+  const collapsible = jobs.length > 0 && !listLoading && !blockingNeedsReauth;
   const showList = !collapsible || expanded;
+  // Whether more than one Character's jobs are actually on screen — the
+  // character column and its badges only earn their place once they'd
+  // disambiguate something (`OpenOrdersPanel`'s `showCharacterStrip` precedent).
+  const showCharacterColumn = new Set(jobs.map((job) => job.characterId)).size > 1;
   // ESI or the cache answered and nothing is running. That is a one-word
   // fact, so it goes beside the title as `meta` and the body renders nothing
   // at all — a centred "no active jobs" card left the idle panel _taller_
   // than the same panel with jobs in it. Not the same as `jobsEmptyTitle`
   // below, which means we have never fetched and genuinely don't know.
-  const noneActive =
-    jobs.length === 0 && !listLoading && !result?.needsReauth && result?.cached != null;
+  const hasAnswered = showingAllJobs ? jobsFanOut !== null : result?.cached != null;
+  const noneActive = jobs.length === 0 && !listLoading && !blockingNeedsReauth && hasAnswered;
   // The owner switch still has to render when there are no corp jobs to show,
   // or flipping to an empty Corp jobs list is a dead end with no way back.
   const showBody = showList && !noneActive;
@@ -207,7 +359,7 @@ export function ActiveJobsPanel({
    * fraction and the warning tone are all relative to `now`, so memoising on
    * `t` alone would freeze the clock.
    */
-  const columns = useMemo<DataTableColumn<ActiveJob>[]>(
+  const columns = useMemo<DataTableColumn<JobRow>[]>(
     () => [
       {
         id: 'blueprint',
@@ -221,13 +373,15 @@ export function ActiveJobsPanel({
         // card's tint already carries the state.
         cellClassName: (job) => (soon(job) ? 'sm:border-l sm:border-l-warning' : undefined),
         render: (job) => (
-          <span className="flex items-center gap-1.5">
+          <span className="flex flex-wrap items-center gap-1.5">
             <span>{nameForBlueprint(job.blueprint_type_id)}</span>
             {soon(job) && (
               <span className="rounded-xs border border-warning/50 bg-warning/15 px-1.5 py-0.5 text-[0.625rem] font-semibold tracking-widest text-warning uppercase">
                 {t('industry.jobsCompletingSoon')}
               </span>
             )}
+            {/* Only once more than one Character's jobs are on screen (`showCharacterColumn`) — same gate as `OpenOrdersPanel`'s `showCharacterStrip`. */}
+            {showCharacterColumn && <CharacterBadge characterName={job.characterName} t={t} />}
           </span>
         ),
       },
@@ -302,11 +456,11 @@ export function ActiveJobsPanel({
         },
       },
     ],
-    [t, now, soon, nameForBlueprint]
+    [t, now, soon, nameForBlueprint, showCharacterColumn]
   );
 
   /** Right-click any row for the shared item menu. */
-  const jobContextMenu = (job: ActiveJob, tr: ReactElement): ReactElement => {
+  const jobContextMenu = (job: JobRow, tr: ReactElement): ReactElement => {
     const menuTypeId = contextMenuTypeId(job);
     return (
       <ItemContextMenu
@@ -383,7 +537,7 @@ export function ActiveJobsPanel({
               })}
             </span>
           )}
-          {result?.cached?.fetchedAt && <DataAgeBadge date={result.cached.fetchedAt} />}
+          {dataAgeDate && <DataAgeBadge date={dataAgeDate} />}
           <IconButton
             size="sm"
             icon={<Icon.Download />}
@@ -416,7 +570,7 @@ export function ActiveJobsPanel({
           <ContextMenuHint label={t('industry.jobsTitle')} />
         </span>
       }
-      padded={showBody || corpAvailable}
+      padded={showBody || corpAvailable || !showingCorp}
     >
       {/*
         First row inside the body rather than beside the header's badge and two
@@ -433,11 +587,48 @@ export function ActiveJobsPanel({
           corporationLabel={t('industry.jobsOwnerCorporation')}
         />
       )}
+      {/*
+        Always visible on the personal side, even while pinned to "This
+        character" — otherwise there is no way to discover the
+        cross-character view at all (issue #607). Hidden on the corp side:
+        Corp jobs are already "everyone in the corp," an orthogonal axis.
+      */}
+      {!showingCorp && (
+        <div
+          className={`flex flex-wrap items-center gap-2 ${showBody || corpAvailable ? 'mb-2' : ''}`}
+        >
+          <CharacterFilterControl
+            characters={jobsFilterCandidates}
+            activeCharacterId={characterId}
+            value={jobsCharacterFilter}
+            onChange={setJobsCharacterFilter}
+          />
+        </div>
+      )}
+      {showingAllJobs && (jobsFanOutReauth.length > 0 || jobsFanOutSkipped.length > 0) && (
+        <div className="mb-2 space-y-2">
+          {jobsFanOutReauth.map((entry) => (
+            <ReauthBanner
+              key={entry.characterId}
+              variant="ghost"
+              title={`${entry.characterName} — ${t('industry.jobsReauthTitle')}`}
+              hint={t('industry.jobsReauthHint')}
+              actionLabel={t('industry.jobsReauthAction')}
+              onLogin={() => void beginEveLogin()}
+            />
+          ))}
+          {jobsFanOutSkipped.map((s) => (
+            <p key={s.characterId} className="text-xs text-text-dim">
+              {s.name} — {t('industry.jobsCharacterNotShared')}
+            </p>
+          ))}
+        </div>
+      )}
       {!showBody ? null : listLoading ? (
         <div className="flex justify-center py-4">
           <Spinner size="sm" label={t('common.loading')} />
         </div>
-      ) : result?.needsReauth ? (
+      ) : blockingNeedsReauth ? (
         <ReauthBanner
           title={t('industry.jobsReauthTitle')}
           // Only a 401 reaches here on the corp side — its 403 is the in-game
@@ -458,7 +649,7 @@ export function ActiveJobsPanel({
         />
       ) : (
         <div className="space-y-2">
-          {result?.cached?.fromCache && (
+          {fromCacheAny && (
             <p className="text-[0.6875rem] text-warning uppercase">
               {listRefreshCount > 0 ? t('common.refreshFailedTitle') : t('common.offlineTitle')}
             </p>
@@ -493,6 +684,12 @@ export function ActiveJobsPanel({
               <DataTable
                 columns={columns}
                 rows={filteredJobs}
+                // Bare job_id, not a character-qualified key: ESI's job ids
+                // are already globally unique (same reasoning as
+                // OpenOrdersPanel's bare order_id), and highlightedJobId
+                // below — a raw job_id from a notification's deep link —
+                // must equal exactly what this returns for the pulse to find
+                // its row (`DataTable`'s `rowKey(row) === highlightRowKey`).
                 rowKey={(job) => job.job_id}
                 highlightRowKey={highlightedJobId}
                 label={t('industry.jobsTitle')}
