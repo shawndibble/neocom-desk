@@ -49,4 +49,11 @@ describe('isStoredCharacterFilterValue', () => {
   it.each([null, undefined, 42, 'other', ['1', 2], { mode: 'all' }])('rejects %j', (value) => {
     expect(isStoredCharacterFilterValue(value)).toBe(false);
   });
+
+  it.each([[0], [-1], [1.5], [Number.MAX_SAFE_INTEGER + 1], [NaN]])(
+    'rejects an id that is not a positive safe integer: %j',
+    (value) => {
+      expect(isStoredCharacterFilterValue(value)).toBe(false);
+    }
+  );
 });

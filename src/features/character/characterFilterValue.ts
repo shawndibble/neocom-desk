@@ -45,5 +45,12 @@ export function fromStoredCharacterFilterValue(
 
 export function isStoredCharacterFilterValue(raw: unknown): raw is StoredCharacterFilterValue {
   if (raw === 'current' || raw === 'all') return true;
-  return Array.isArray(raw) && raw.every((id) => typeof id === 'number');
+  // A character id is always a positive integer (ESI's own id space) —
+  // rejecting anything else here is what stops a corrupted or hand-edited
+  // synced row from resolving to a Set holding 0, a negative, NaN, or a
+  // fractional value, which would silently never match a real Character.
+  return (
+    Array.isArray(raw) &&
+    raw.every((id) => typeof id === 'number' && Number.isSafeInteger(id) && id > 0)
+  );
 }

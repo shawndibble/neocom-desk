@@ -667,5 +667,43 @@ describe('Wallet', () => {
       expect(await within(table).findByText('Pilot One')).toBeInTheDocument();
       expect(within(table).getByText('Pilot Two')).toBeInTheDocument();
     });
+
+    it('only shows a "hasn\'t granted access" notice for a skipped character actually in the selected filter', async () => {
+      const user = userEvent.setup();
+      await seedSecondCharacter();
+      const CHAR_C = 93;
+      await db.characters.put({
+        characterId: CHAR_C,
+        name: 'Pilot Three',
+        ownerHash: 'oh3',
+        addedAt: 3,
+      });
+      // CHAR_C deliberately gets no token at all — never granted the scope.
+      render(<App />);
+
+      await screen.findByText(/4,500\.00/);
+      await user.click(screen.getByRole('button', { name: 'This character' }));
+      await user.click(await screen.findByRole('menuitem', { name: 'All characters' }));
+
+      // All three selected: Pilot Three's skipped notice shows.
+      expect(
+        await screen.findByText(/Pilot Three.*hasn't granted wallet access/)
+      ).toBeInTheDocument();
+
+      // Narrow the filter to exclude Pilot Three — its notice must go with
+      // it, even though it's still a real skipped character overall (issue
+      // #607 CodeRabbit review: the notice list must follow the same filter
+      // the balance rows do).
+      await user.click(screen.getByRole('button', { name: 'All characters' }));
+      await user.click(screen.getByRole('menuitemcheckbox', { name: 'Pilot Three' }));
+      await user.keyboard('{Escape}');
+
+      expect(
+        screen.queryByText(/Pilot Three.*hasn't granted wallet access/)
+      ).not.toBeInTheDocument();
+      const table = screen.getByRole('table', { name: 'Balance by character' });
+      expect(within(table).getByText('Pilot One')).toBeInTheDocument();
+      expect(within(table).getByText('Pilot Two')).toBeInTheDocument();
+    });
   });
 });

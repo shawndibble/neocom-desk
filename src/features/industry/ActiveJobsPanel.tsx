@@ -240,25 +240,41 @@ export function ActiveJobsPanel({
       : refreshCount;
   const listRefresh = showingCorp ? corp.refresh : showingAllJobs ? refreshJobsFanOut : refresh;
 
-  // Per-character reauth/skipped notes for the multi-character path — the
+  // Every derived note/badge below reads only the Characters the picker
+  // actually selected — narrowing to two of five must not still show a
+  // reauth banner or "hasn't shared" note for one of the other three.
+  const jobsFanOutSelectedEntries = useMemo(
+    () =>
+      (jobsFanOut?.entries ?? []).filter(
+        (entry) => resolvedJobsFilter === 'all' || resolvedJobsFilter.has(entry.characterId)
+      ),
+    [jobsFanOut, resolvedJobsFilter]
+  );
+  const jobsFanOutSkipped = useMemo(
+    () =>
+      (jobsFanOut?.skipped ?? []).filter(
+        (s) => resolvedJobsFilter === 'all' || resolvedJobsFilter.has(s.characterId)
+      ),
+    [jobsFanOut, resolvedJobsFilter]
+  );
+  // Per-character reauth notes for the multi-character path — the
   // single-character paths (personal or corp) instead block the whole panel
   // behind one `ReauthBanner` below, since there is only one Character's
   // grant to ask about.
   const jobsFanOutReauth = useMemo(
-    () => (jobsFanOut?.entries ?? []).filter((entry) => entry.result.needsReauth),
-    [jobsFanOut]
+    () => jobsFanOutSelectedEntries.filter((entry) => entry.result.needsReauth),
+    [jobsFanOutSelectedEntries]
   );
-  const jobsFanOutSkipped = jobsFanOut?.skipped ?? [];
   const jobsFanOutFromCacheAny = useMemo(
-    () => (jobsFanOut?.entries ?? []).some((entry) => entry.result.cached?.fromCache),
-    [jobsFanOut]
+    () => jobsFanOutSelectedEntries.some((entry) => entry.result.cached?.fromCache),
+    [jobsFanOutSelectedEntries]
   );
   const jobsFanOutOldestFetchedAt = useMemo(() => {
-    const times = (jobsFanOut?.entries ?? [])
+    const times = jobsFanOutSelectedEntries
       .map((entry) => entry.result.cached?.fetchedAt.getTime())
       .filter((t): t is number => t !== undefined);
     return times.length > 0 ? new Date(Math.min(...times)) : null;
-  }, [jobsFanOut]);
+  }, [jobsFanOutSelectedEntries]);
   const dataAgeDate = showingAllJobs
     ? jobsFanOutOldestFetchedAt
     : (result?.cached?.fetchedAt ?? null);

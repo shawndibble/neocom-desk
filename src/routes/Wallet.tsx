@@ -922,7 +922,15 @@ export function Wallet() {
     () => totalWalletBalance(visibleWalletBalances),
     [visibleWalletBalances]
   );
-  const walletBalancesSkipped = walletBalancesSnapshot?.skipped ?? [];
+  // Narrowing to two of five Characters must not still show a "hasn't
+  // shared" notice for one of the other three — same filter
+  // `visibleWalletBalances` above already applies.
+  const walletBalancesSkipped = useMemo(() => {
+    const skipped = walletBalancesSnapshot?.skipped ?? [];
+    return resolvedWalletFilter === 'all'
+      ? skipped
+      : skipped.filter((s) => resolvedWalletFilter.has(s.characterId));
+  }, [walletBalancesSnapshot, resolvedWalletFilter]);
 
   if (!hydrated) {
     return (

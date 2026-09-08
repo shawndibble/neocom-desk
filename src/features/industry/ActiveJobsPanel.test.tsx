@@ -750,4 +750,54 @@ describe('ActiveJobsPanel: cross-character view (issue #607)', () => {
     expect(screen.getByText('Pilot Two')).toBeInTheDocument();
     expect(screen.getByText('2 running · 0 done')).toBeInTheDocument();
   });
+
+  it('only shows a "hasn\'t granted access" notice for a skipped Character actually in the selected filter', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(NOW);
+    await seedSecondCharacter();
+    const CHAR_C = 93;
+    await db.characters.put({
+      characterId: CHAR_C,
+      name: 'Pilot Three',
+      ownerHash: 'oh3',
+      addedAt: 3,
+    });
+    // CHAR_C deliberately gets no token at all — never granted the scope.
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+    render(
+      <MemoryRouter>
+        <ActiveJobsPanel
+          characterId={CHAR_ID}
+          onAddToQuickbar={() => {}}
+          quickbarAvailable={true}
+          onShowInfo={() => {}}
+        />
+      </MemoryRouter>
+    );
+
+    await user.click(await screen.findByRole('button', { name: 'This character' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'All characters' }));
+    await expandJobs(user);
+
+    // All three selected: Pilot Three's skipped notice shows.
+    expect(
+      await screen.findByText(/Pilot Three.*hasn't granted industry-jobs access/)
+    ).toBeInTheDocument();
+
+    // Narrow the filter to exclude Pilot Three — its notice must go with it,
+    // even though it's still a real skipped Character overall (issue #607
+    // CodeRabbit review: the notice list must follow the same filter the
+    // job rows do).
+    await user.click(screen.getByRole('button', { name: 'All characters' }));
+    await user.click(screen.getByRole('menuitemcheckbox', { name: 'Pilot Three' }));
+    await user.keyboard('{Escape}');
+
+    expect(
+      screen.queryByText(/Pilot Three.*hasn't granted industry-jobs access/)
+    ).not.toBeInTheDocument();
+    const table = screen.getByRole('table', { name: 'Active jobs' });
+    expect(within(table).getByText('Pilot One')).toBeInTheDocument();
+    expect(within(table).getByText('Pilot Two')).toBeInTheDocument();
+  });
 });
