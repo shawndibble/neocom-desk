@@ -908,7 +908,24 @@ export function Market() {
   // as its own history entry, so a URL grabbed right after matches what's on
   // screen and the browser's back/forward walks through prior selections.
   function navigateTo(typeId: number | null, next: MarketLocationParam) {
-    setSearchParams(buildMarketParams(typeId, next));
+    setSearchParams((prev) => {
+      // `buildMarketParams` returns the canonical type/hub/region set, and
+      // replacing those wholesale is the point — but the tab is not part of
+      // that state and has to survive a hub change, which is now reachable
+      // from two sections rather than one.
+      //
+      // Dropping it did two things, both bad. A `?section=` grabbed after
+      // changing hub no longer named the tab it was taken on, breaking the
+      // "a URL grabbed right after matches what's on screen" contract below.
+      // Worse, with a `type` still in the query — browse an item, switch to
+      // Appraisal, change hub — the result is `type` present and `section`
+      // absent, which `crossLinkedToBrowser` reads as an external item link
+      // and answers by throwing the pilot back to the Browser mid-appraisal.
+      const params = new URLSearchParams(buildMarketParams(typeId, next));
+      const section = prev.get('section');
+      if (section !== null) params.set('section', section);
+      return params;
+    });
   }
 
   function handleModeChange(mode: LocationMode) {

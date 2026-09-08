@@ -26,11 +26,14 @@ import {
   type DataTableColumn,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
+import { fieldBaseClassName } from '@/components/ui/controlStyles';
 import type { AppraisalRow } from '@/engine/market/appraisal';
+import { countPasteLines } from '@/engine/market/appraisalPaste';
 import { iskToneClass } from '@/features/character/format';
 import { formatIsk, formatIskAuto } from '@/lib/isk';
 import { downloadCsv } from '@/lib/downloadCsv';
 import { appraisalCsvColumns } from './appraisalCsv';
+import { formatVolume } from './format';
 import { isValidPricePercent, MAX_PRICE_PERCENT, MIN_PRICE_PERCENT } from './pricePercent';
 import type { AppraisalController } from './useAppraisal';
 
@@ -88,7 +91,8 @@ export function AppraisalPanel({
       header: t('market.appraisal.columnQuantity'),
       align: 'right',
       className: 'whitespace-nowrap tabular-nums',
-      render: (row) => formatIsk(row.quantity),
+      // A count, not ISK — `formatIsk` would run `clampIskZero` over it.
+      render: (row) => formatVolume(row.quantity),
       sortValue: (row) => row.quantity,
     },
     {
@@ -144,7 +148,12 @@ export function AppraisalPanel({
           controller.canAppraise ? (
             <StatChip
               label={t('market.appraisal.linesLabel')}
-              value={text.split(/\r\n|\r|\n/).filter((line) => line.trim() !== '').length}
+              // The box's own line count, which is deliberately not the
+              // table's row count: repeated names merge into one priced row,
+              // so "15 lines" and "14 items" can both be true. Split by the
+              // parser's own rule rather than a second regex here, so the two
+              // can never disagree about what a line is.
+              value={formatVolume(countPasteLines(text))}
             />
           ) : undefined
         }
@@ -160,7 +169,7 @@ export function AppraisalPanel({
             rows={14}
             spellCheck={false}
             placeholder={t('market.appraisal.pastePlaceholder')}
-            className="w-full rounded-xs border border-line bg-panel-2 p-2 font-mono text-[0.6875rem] text-text placeholder:text-text-faint focus-visible:outline-2 focus-visible:outline-accent"
+            className={`${fieldBaseClassName} w-full p-2 font-mono text-[0.6875rem]`}
           />
 
           <div className="flex items-center gap-2">

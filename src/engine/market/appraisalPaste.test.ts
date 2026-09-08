@@ -1,5 +1,26 @@
 import { describe, it, expect } from 'vitest';
-import { parseAppraisalPaste } from '@/engine/market/appraisalPaste';
+import { countPasteLines, parseAppraisalPaste } from '@/engine/market/appraisalPaste';
+
+describe('countPasteLines', () => {
+  it('counts the lines the parser would read, skipping blanks', () => {
+    expect(countPasteLines(['Tritanium\t100', '', '   ', 'Pyerite\t200'].join('\n'))).toBe(2);
+  });
+
+  it('counts every line ending the same way', () => {
+    expect(countPasteLines('a\r\nb\rc\nd')).toBe(4);
+  });
+
+  it('counts repeated names separately, unlike the parser’s merged entries', () => {
+    const text = 'Tritanium\t100\nTritanium\t50';
+    expect(countPasteLines(text)).toBe(2);
+    expect(parseAppraisalPaste(text)).toHaveLength(1);
+  });
+
+  it('counts nothing in empty or whitespace-only text', () => {
+    expect(countPasteLines('')).toBe(0);
+    expect(countPasteLines('  \n\n \t \n')).toBe(0);
+  });
+});
 
 describe('parseAppraisalPaste', () => {
   it('reads a bare item name as a quantity of one', () => {

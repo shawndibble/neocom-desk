@@ -27,8 +27,6 @@ import { loadMarketTypes } from '@/sde/loadMarketSde';
 export interface AppraisalOutcome {
   appraisal: Appraisal;
   unmatched: AppraisalUnmatched[];
-  /** Distinct names read out of the paste, matched or not. */
-  entryCount: number;
 }
 
 /**
@@ -106,6 +104,5 @@ export async function appraisePaste(
   return {
     appraisal: buildAppraisal(items, pricePercent),
     unmatched,
-    entryCount: entries.length,
   };
 }

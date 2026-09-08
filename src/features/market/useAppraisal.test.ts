@@ -14,7 +14,6 @@ function outcome(sell: number): AppraisalOutcome {
       totals: { buy: 0, sell, spread: sell, unpricedRows: 0 },
     },
     unmatched: [],
-    entryCount: 1,
   };
 }
 

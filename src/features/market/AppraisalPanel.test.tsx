@@ -47,7 +47,7 @@ const APPRAISAL: Appraisal = {
 };
 
 function outcome(overrides: Partial<AppraisalOutcome> = {}): AppraisalOutcome {
-  return { appraisal: APPRAISAL, unmatched: [], entryCount: 2, ...overrides };
+  return { appraisal: APPRAISAL, unmatched: [], ...overrides };
 }
 
 function renderPanel(props: Partial<Parameters<typeof AppraisalPanel>[0]> = {}) {

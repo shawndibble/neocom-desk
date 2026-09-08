@@ -81,12 +81,25 @@ function parseLine(text: string): { name: string; quantity: number } {
   return { name: text, quantity: 1 };
 }
 
+/** Every line ending EVE, Windows and the clipboard between them can produce. */
+const LINE_BREAK = /\r\n|\r|\n/;
+
+/**
+ * How many lines the parser would actually read — blank ones skipped, nothing
+ * merged. Exported so the paste box can label itself without a second opinion
+ * about what a line is; it is deliberately *not* the number of priced rows,
+ * since repeated names merge into one.
+ */
+export function countPasteLines(text: string): number {
+  return text.split(LINE_BREAK).filter((line) => line.trim() !== '').length;
+}
+
 /** Parse pasted item text. Never throws — an unreadable line becomes a name. */
 export function parseAppraisalPaste(text: string): AppraisalPasteEntry[] {
   const entries: AppraisalPasteEntry[] = [];
   const byName = new Map<string, AppraisalPasteEntry>();
 
-  const lines = text.split(/\r\n|\r|\n/);
+  const lines = text.split(LINE_BREAK);
   for (let i = 0; i < lines.length; i++) {
     const trimmed = lines[i].trim();
     if (trimmed === '') continue;

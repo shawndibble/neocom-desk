@@ -72,7 +72,6 @@ describe('appraisePaste', () => {
 
     expect(outcome.appraisal.rows.map((row) => row.name)).toEqual(['Tritanium']);
     expect(outcome.unmatched).toEqual([{ name: 'Nanite Repair Past', lines: [2] }]);
-    expect(outcome.entryCount).toBe(2);
   });
 
   it('leaves a side with no orders out of the total rather than pricing it at zero', async () => {
