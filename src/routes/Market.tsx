@@ -101,6 +101,9 @@ import { OpenOrdersPanel } from '@/features/market/OpenOrdersPanel';
 import { OrderHistoryPanel } from '@/features/market/OrderHistoryPanel';
 import type { HistoryView } from '@/features/market/HistoryViewSelect';
 import { TransactionsPanel } from '@/features/market/TransactionsPanel';
+import { AppraisalPanel } from '@/features/market/AppraisalPanel';
+import { useAppraisal } from '@/features/market/useAppraisal';
+import { useMarketPricePercent } from '@/features/market/pricePercent';
 
 /** Debounce for the catalogue search, so a fast typist doesn't re-filter the tree on every keystroke. */
 const SEARCH_DEBOUNCE_MS = 250;
@@ -124,13 +127,32 @@ const ROW_CAP = 15;
  * keeps every existing `?section=` link working and lets each view keep its
  * own `useRouteSnapshot`, so opening one never fetches the other.
  */
-type MarketSection = 'browser' | 'orders' | 'history' | 'transactions';
+type MarketSection = 'browser' | 'orders' | 'history' | 'transactions' | 'appraisal';
 function parseMarketSection(value: string | null): MarketSection {
-  return value === 'orders' || value === 'history' || value === 'transactions' ? value : 'browser';
+  return value === 'orders' ||
+    value === 'history' ||
+    value === 'transactions' ||
+    value === 'appraisal'
+    ? value
+    : 'browser';
 }
 
 function isHistoryView(section: MarketSection): section is HistoryView {
   return section === 'history' || section === 'transactions';
+}
+
+/**
+ * The two sections quoted at a Trade Hub, and so the two that share the page
+ * header's hub picker and refresh button.
+ *
+ * Appraisal deliberately does *not* get the **Location Mode** chips beside
+ * them. Fuzzwork's aggregates — the appraisal's price source — are per
+ * station, so a Region appraisal would mean one paginated ESI order-book call
+ * per pasted line. A control drawn on a tab where it cannot do anything is
+ * worse than one that is not there, so the chips stay with the Browser.
+ */
+function usesHubPicker(section: MarketSection): boolean {
+  return section === 'browser' || section === 'appraisal';
 }
 
 /**
@@ -316,6 +338,11 @@ export function Market() {
   const hydrateHub = useMarketHub((state) => state.hydrate);
   const setHubId = useMarketHub((state) => state.setValue);
   const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
+
+  // The Appraisal tab's other half of the same control pair as the hub above.
+  const pricePercent = useMarketPricePercent((state) => state.value);
+  const hydratePricePercent = useMarketPricePercent((state) => state.hydrate);
+  const setPricePercent = useMarketPricePercent((state) => state.setValue);
 
   const compareCount = useCompareSet((state) => state.items.length);
 
@@ -505,6 +532,10 @@ export function Market() {
   const chosenRegionId =
     effectiveLocation.mode === 'region' ? effectiveLocation.regionId : effectiveHub.regionId;
 
+  // Held here rather than inside `AppraisalPanel` so a pasted list survives a
+  // trip to the Browser tab, and so the header's refresh button can drive it.
+  const appraisal = useAppraisal(effectiveHub, pricePercent);
+
   const [orderBookResult, setOrderBookResult] = useState<OrderBookResult | null>(null);
   const [orderBookLoading, setOrderBookLoading] = useState(false);
   const [refreshTick, setRefreshTick] = useState(0);
@@ -558,7 +589,8 @@ export function Market() {
   useEffect(() => {
     void hydrateHub();
     void hydrateLocationMode();
-  }, [hydrateHub, hydrateLocationMode]);
+    void hydratePricePercent();
+  }, [hydrateHub, hydrateLocationMode, hydratePricePercent]);
 
   // Catches the device's persisted Location Mode up to a valid URL override.
   // `buildMarketParams` only ever writes one of `hub`/`region` at a time, so
@@ -900,7 +932,24 @@ export function Market() {
   // as its own history entry, so a URL grabbed right after matches what's on
   // screen and the browser's back/forward walks through prior selections.
   function navigateTo(typeId: number | null, next: MarketLocationParam) {
-    setSearchParams(buildMarketParams(typeId, next));
+    setSearchParams((prev) => {
+      // `buildMarketParams` returns the canonical type/hub/region set, and
+      // replacing those wholesale is the point — but the tab is not part of
+      // that state and has to survive a hub change, which is now reachable
+      // from two sections rather than one.
+      //
+      // Dropping it did two things, both bad. A `?section=` grabbed after
+      // changing hub no longer named the tab it was taken on, breaking the
+      // "a URL grabbed right after matches what's on screen" contract below.
+      // Worse, with a `type` still in the query — browse an item, switch to
+      // Appraisal, change hub — the result is `type` present and `section`
+      // absent, which `crossLinkedToBrowser` reads as an external item link
+      // and answers by throwing the pilot back to the Browser mid-appraisal.
+      const params = new URLSearchParams(buildMarketParams(typeId, next));
+      const section = prev.get('section');
+      if (section !== null) params.set('section', section);
+      return params;
+    });
   }
 
   function handleModeChange(mode: LocationMode) {
@@ -936,6 +985,13 @@ export function Market() {
   }
 
   function handleRefresh() {
+    // On Appraisal the button re-prices the pasted list instead, dropping the
+    // Fuzzwork TTL for those types only (`invalidateHubPrices`). Nothing
+    // below applies: there is no selected item and no order book on this tab.
+    if (section === 'appraisal') {
+      appraisal.refresh();
+      return;
+    }
     // Manual refresh must bypass getOrderBook's 300s TTL cache (CONTEXT.md
     // "Data Age": refresh happens on app open + manual button only) — scoped
     // to what's actually on screen (the selected item, plus the Variations
@@ -1095,26 +1151,31 @@ export function Market() {
       <PageHeader
         title={t('market.title')}
         actions={
-          section === 'browser' ? (
+          usesHubPicker(section) ? (
             <>
               {/* The mode chip and the picker next to it printed the same words
                   twice — "TRADE HUB · REGION · TRADE HUB [Jita]". The selected chip
                   *is* the picker's label, so the picker keeps the string as its
                   `aria-label` only: still announced, no longer duplicated on
-                  screen. */}
-              <div role="group" aria-label={t('market.locationMode')} className="flex gap-2">
-                <FilterChip
-                  label={t('market.modeHub')}
-                  selected={effectiveLocation.mode === 'hub'}
-                  onToggle={() => handleModeChange('hub')}
-                />
-                <FilterChip
-                  label={t('market.modeRegion')}
-                  selected={effectiveLocation.mode === 'region'}
-                  onToggle={() => handleModeChange('region')}
-                />
-              </div>
-              {effectiveLocation.mode === 'hub' ? (
+                  screen.
+
+                  Browser only: see `usesHubPicker`. Appraisal prices at a
+                  station, so it has no Region mode to toggle into. */}
+              {section === 'browser' && (
+                <div role="group" aria-label={t('market.locationMode')} className="flex gap-2">
+                  <FilterChip
+                    label={t('market.modeHub')}
+                    selected={effectiveLocation.mode === 'hub'}
+                    onToggle={() => handleModeChange('hub')}
+                  />
+                  <FilterChip
+                    label={t('market.modeRegion')}
+                    selected={effectiveLocation.mode === 'region'}
+                    onToggle={() => handleModeChange('region')}
+                  />
+                </div>
+              )}
+              {effectiveLocation.mode === 'hub' || section === 'appraisal' ? (
                 <Select
                   value={effectiveHub.id}
                   onValueChange={(value) => handleHubChange(value as TradeHub['id'])}
@@ -1156,7 +1217,15 @@ export function Market() {
                 icon={<Icon.Refresh />}
                 label={t('market.refresh')}
                 onClick={handleRefresh}
-                disabled={selectedTypeId === null || orderBookLoading}
+                // Section-aware: on the Browser this re-reads the selected
+                // item's order book, on Appraisal it re-prices the pasted
+                // list. Both are "refresh what is on screen", and neither has
+                // anything to do until there *is* something on screen.
+                disabled={
+                  section === 'appraisal'
+                    ? appraisal.result === null || appraisal.loading
+                    : selectedTypeId === null || orderBookLoading
+                }
               />
             </>
           ) : undefined
@@ -1176,6 +1245,7 @@ export function Market() {
           { id: 'browser', label: t('market.sections.browser') },
           { id: 'orders', label: t('market.sections.openOrders') },
           { id: 'history', label: t('market.sections.history') },
+          { id: 'appraisal', label: t('market.sections.appraisal') },
         ]}
       />
 
@@ -1183,6 +1253,17 @@ export function Market() {
 
       {section === 'history' && <OrderHistoryPanel onViewChange={handleSectionChange} />}
       {section === 'transactions' && <TransactionsPanel onViewChange={handleSectionChange} />}
+
+      {/* The list itself lives in `useAppraisal` at route level, so switching
+          to the Browser and back does not throw away a forty-line paste. */}
+      {section === 'appraisal' && (
+        <AppraisalPanel
+          controller={appraisal}
+          pricePercent={pricePercent}
+          onPricePercentChange={(value) => void setPricePercent(value)}
+          hubName={effectiveHub.systemName}
+        />
+      )}
 
       {section === 'browser' && (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-[22rem_1fr] lg:items-start">
