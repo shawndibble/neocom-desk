@@ -3,6 +3,9 @@ import {
   parseContractsCsv,
   parseContractItemsCsv,
   filterAndCompactBpcContracts,
+  eligibleContractFrom,
+  compactBpcItemRow,
+  sortBpcRows,
   chunkRows,
   chunkDocId,
   DEFAULT_CHUNK_SIZE,
@@ -160,6 +163,113 @@ describe('filterAndCompactBpcContracts', () => {
       NOW
     );
     expect(rows.map((r) => `${r.contractId}:${r.typeId}`)).toEqual([
+      '1:32858',
+      '1:32880',
+      '2:20185',
+    ]);
+  });
+});
+
+// The per-row seams the streaming sync drives directly. They are what
+// `filterAndCompactBpcContracts` is built from, so the suite above still
+// covers the whole join; these pin the pieces in isolation.
+describe('eligibleContractFrom', () => {
+  const [itemExchange, auction, courier, lapsed] = parseContractsCsv(
+    contractsCsv([
+      `0.0,1,${FUTURE},2026-08-11T18:10:34Z,0,,98745702,2120819548,5000000.0,0.0,60003760,"BPC bundle",item_exchange,10.0,2026-09-08T18:08:11Z,10000002,60003760,30000142,20000020,false,`,
+      `0.0,2,${FUTURE},2026-08-11T18:10:34Z,0,,98745702,2120819548,1000000.0,0.0,60008494,"Auctioned BPC",auction,10.0,2026-09-08T18:08:11Z,10000043,60008494,30002187,20000322,false,9000000.0`,
+      `0.0,3,${FUTURE},2026-08-11T18:10:34Z,0,,98745702,2120819548,,0.0,60003760,"Courier run",courier,10.0,2026-09-08T18:08:11Z,10000002,60003760,30000142,20000020,false,`,
+      `0.0,4,${PAST},2026-08-11T18:10:34Z,0,,98745702,2120819548,5000000.0,0.0,60003760,"Lapsed",item_exchange,10.0,2026-09-08T18:08:11Z,10000002,60003760,30000142,20000020,false,`,
+    ])
+  );
+
+  it('narrows a searchable contract to the fields the join needs', () => {
+    expect(eligibleContractFrom(itemExchange, NOW)).toEqual({
+      contractId: 1,
+      regionId: 10000002,
+      locationId: 60003760,
+      price: 5000000,
+      isAuction: false,
+      dateExpired: Date.parse(FUTURE),
+    });
+  });
+
+  it('keeps buyout only when the contract carries one', () => {
+    expect(eligibleContractFrom(auction, NOW)?.buyout).toBe(9000000);
+    expect(eligibleContractFrom(itemExchange, NOW)?.buyout).toBeUndefined();
+  });
+
+  it('rejects a contract type that carries no priced item to search', () => {
+    expect(eligibleContractFrom(courier, NOW)).toBeNull();
+  });
+
+  it('rejects a contract that lapsed between the scrape and this run', () => {
+    expect(eligibleContractFrom(lapsed, NOW)).toBeNull();
+  });
+
+  it('rejects an unparsable expiry rather than admitting a NaN row', () => {
+    const [broken] = parseContractsCsv(
+      contractsCsv([
+        `0.0,5,not-a-date,2026-08-11T18:10:34Z,0,,98745702,2120819548,5000000.0,0.0,60003760,"Broken",item_exchange,10.0,2026-09-08T18:08:11Z,10000002,60003760,30000142,20000020,false,`,
+      ])
+    );
+    expect(eligibleContractFrom(broken, NOW)).toBeNull();
+  });
+});
+
+describe('compactBpcItemRow', () => {
+  const parent = {
+    contractId: 1,
+    regionId: 10000002,
+    locationId: 60003760,
+    price: 5000000,
+    isAuction: false,
+    dateExpired: Date.parse(FUTURE),
+  };
+
+  const [bpc, requested, notBlueprint] = parseContractItemsCsv(
+    itemsCsv([
+      'true,true,1,10,1,1001,3,18,32858,2026-09-01T11:31:43Z,1',
+      'true,false,4,10,1,1004,1,10,32858,2026-09-01T11:31:43Z,1',
+      '"",true,5,,1,1005,,,47789,2026-09-01T11:31:43Z,1',
+    ])
+  );
+
+  it('joins a for-sale BPC to its parent contract', () => {
+    expect(compactBpcItemRow(bpc, parent)).toEqual({
+      contractId: 1,
+      regionId: 10000002,
+      locationId: 60003760,
+      typeId: 32858,
+      price: 5000000,
+      isAuction: false,
+      me: 10,
+      te: 18,
+      runs: 3,
+      quantity: 1,
+      dateExpired: Date.parse(FUTURE),
+    });
+  });
+
+  it('carries the parent buyout through when there is one', () => {
+    expect(compactBpcItemRow(bpc, { ...parent, buyout: 9000000 })?.buyout).toBe(9000000);
+  });
+
+  it('rejects a BPC the issuer wants rather than offers', () => {
+    expect(compactBpcItemRow(requested, parent)).toBeNull();
+  });
+
+  it('rejects an item that is not a blueprint copy', () => {
+    expect(compactBpcItemRow(notBlueprint, parent)).toBeNull();
+  });
+});
+
+describe('sortBpcRows', () => {
+  it('orders by contract then type, in place, independent of input order', () => {
+    const row = (contractId: number, typeId: number) =>
+      ({ contractId, typeId }) as ReturnType<typeof compactBpcItemRow> & object;
+    const rows = [row(2, 20185), row(1, 32880), row(1, 32858)];
+    expect(sortBpcRows(rows as never).map((r) => `${r.contractId}:${r.typeId}`)).toEqual([
       '1:32858',
       '1:32880',
       '2:20185',

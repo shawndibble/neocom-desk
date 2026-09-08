@@ -71,58 +71,117 @@ export function parseContractItemsCsv(csvText: string): ContractItemRecord[] {
 const SEARCHABLE_CONTRACT_TYPES = new Set(['item_exchange', 'auction']);
 
 /**
- * Joins BPC item rows to their eligible, unexpired parent contract and
- * compacts the result. `is_included` false means the item is what the
- * *contract issuer wants*, not what they're selling (an item_exchange
- * contract can ask for one item and offer another) — excluded, since this
- * feature searches BPCs for sale, not BPCs wanted.
+ * Everything the join needs from one contract, already converted — and
+ * nothing else. `contracts.csv` carries 21 columns and `columns: true` builds
+ * an object holding every one of them; keeping whole records alive as the
+ * lookup table is part of what made this sync's memory scale with the
+ * *archive* rather than with the ~50k contracts it actually indexes.
+ */
+export interface EligibleContract {
+  contractId: number;
+  regionId: number;
+  locationId: number;
+  price: number;
+  buyout?: number;
+  isAuction: boolean;
+  /** Epoch ms. */
+  dateExpired: number;
+}
+
+/**
+ * Narrows one `contracts.csv` record to an `EligibleContract`, or null when
+ * the contract is not worth indexing.
  *
- * `nowMs` filters out a contract that lapsed between EVE Ref's scrape (up to
- * ~30 minutes stale, per its own twice-hourly cadence) and this job's run —
- * an "outstanding" row in the CSV is not a guarantee it still is one.
+ * `nowMs` drops a contract that lapsed between EVE Ref's scrape (up to ~30
+ * minutes stale, per its own twice-hourly cadence) and this job's run — an
+ * "outstanding" row in the CSV is not a guarantee it still is one. Checking
+ * expiry here rather than once per item is the same filter one level up:
+ * every item on a lapsed contract was already being discarded.
+ */
+export function eligibleContractFrom(
+  contract: ContractRecord,
+  nowMs: number
+): EligibleContract | null {
+  if (!SEARCHABLE_CONTRACT_TYPES.has(contract.type)) return null;
+
+  const dateExpired = Date.parse(contract.date_expired);
+  if (!Number.isFinite(dateExpired) || dateExpired <= nowMs) return null;
+
+  const buyout = contract.buyout === '' ? NaN : Number(contract.buyout);
+  return {
+    contractId: Number(contract.contract_id),
+    regionId: Number(contract.region_id),
+    locationId: Number(contract.start_location_id),
+    price: Number(contract.price),
+    ...(Number.isFinite(buyout) ? { buyout } : {}),
+    isAuction: contract.type === 'auction',
+    dateExpired,
+  };
+}
+
+/**
+ * Joins one `contract_items.csv` record to its already-narrowed parent, or
+ * null when the item is not a BPC offered for sale. `is_included` false means
+ * the item is what the *contract issuer wants*, not what they're selling (an
+ * item_exchange contract can ask for one item and offer another) — excluded,
+ * since this feature searches BPCs for sale, not BPCs wanted.
+ */
+export function compactBpcItemRow(
+  item: ContractItemRecord,
+  contract: EligibleContract
+): BpcContractRow | null {
+  if (item.is_blueprint_copy !== 'true' || item.is_included !== 'true') return null;
+
+  return {
+    contractId: contract.contractId,
+    regionId: contract.regionId,
+    locationId: contract.locationId,
+    typeId: Number(item.type_id),
+    price: contract.price,
+    ...(contract.buyout === undefined ? {} : { buyout: contract.buyout }),
+    isAuction: contract.isAuction,
+    me: Number(item.material_efficiency),
+    te: Number(item.time_efficiency),
+    runs: Number(item.runs),
+    quantity: Number(item.quantity),
+    dateExpired: contract.dateExpired,
+  };
+}
+
+/**
+ * Deterministic order, in place: a chunk's content should only change where
+ * the underlying data changed, not from a CSV parse's incidental row order.
+ */
+export function sortBpcRows(rows: BpcContractRow[]): BpcContractRow[] {
+  return rows.sort((a, b) => a.contractId - b.contractId || a.typeId - b.typeId);
+}
+
+/**
+ * The whole join in one call, over already-parsed records. The scheduled sync
+ * drives the per-row seams above directly instead — it never holds either
+ * record array — so this stays as the composed, fixture-testable statement of
+ * what that streaming pass adds up to.
  */
 export function filterAndCompactBpcContracts(
   contracts: readonly ContractRecord[],
   items: readonly ContractItemRecord[],
   nowMs: number
 ): BpcContractRow[] {
-  const eligibleContracts = new Map<string, ContractRecord>();
+  const eligibleContracts = new Map<string, EligibleContract>();
   for (const contract of contracts) {
-    if (SEARCHABLE_CONTRACT_TYPES.has(contract.type)) {
-      eligibleContracts.set(contract.contract_id, contract);
-    }
+    const eligible = eligibleContractFrom(contract, nowMs);
+    if (eligible) eligibleContracts.set(contract.contract_id, eligible);
   }
 
   const rows: BpcContractRow[] = [];
   for (const item of items) {
-    if (item.is_blueprint_copy !== 'true' || item.is_included !== 'true') continue;
     const contract = eligibleContracts.get(item.contract_id);
     if (!contract) continue;
-
-    const dateExpired = Date.parse(contract.date_expired);
-    if (!Number.isFinite(dateExpired) || dateExpired <= nowMs) continue;
-
-    const buyout = contract.buyout === '' ? NaN : Number(contract.buyout);
-    rows.push({
-      contractId: Number(contract.contract_id),
-      regionId: Number(contract.region_id),
-      locationId: Number(contract.start_location_id),
-      typeId: Number(item.type_id),
-      price: Number(contract.price),
-      ...(Number.isFinite(buyout) ? { buyout } : {}),
-      isAuction: contract.type === 'auction',
-      me: Number(item.material_efficiency),
-      te: Number(item.time_efficiency),
-      runs: Number(item.runs),
-      quantity: Number(item.quantity),
-      dateExpired,
-    });
+    const row = compactBpcItemRow(item, contract);
+    if (row) rows.push(row);
   }
 
-  // Deterministic order: a chunk's content should only change where the
-  // underlying data changed, not from a CSV parse's incidental row order.
-  rows.sort((a, b) => a.contractId - b.contractId || a.typeId - b.typeId);
-  return rows;
+  return sortBpcRows(rows);
 }
 
 /**

@@ -51,15 +51,26 @@ routine addition, so it gets its own ADR rather than a scope decision.
 A new scheduled Cloud Function, `syncPublicBpcContracts` (every 30 minutes,
 matching EVE Ref's cadence), fetches and decompresses the archive
 (`unbzip2-stream` + `tar-stream`, both pure-JS, no native bindings — safe for
-Cloud Functions), parses `contracts.csv` and `contract_items.csv`
-(`csv-parse`), joins and filters them down to blueprint-copy rows offered for
-sale on an item_exchange/auction contract not yet expired, and writes the
-result as a **wholesale-replaced, chunked** snapshot: ~2,000 rows per chunk
+Cloud Functions), **streams** `contracts.csv` and then `contract_items.csv`
+(`csv-parse`) a row at a time, joins and filters them down to blueprint-copy
+rows offered for sale on an item_exchange/auction contract not yet expired,
+and writes the result as a **wholesale-replaced, chunked** snapshot: ~2,000 rows per chunk
 document (well under Firestore's 1MiB limit — the 2026-09-08 pull's 122,717
 rows chunked to 62 documents, largest ~383KB), plus one `meta` document
 recording `lastSyncedAt`/`chunkCount`/`rowCount`. 62 chunk writes + 1 meta
 write per run, ~48 runs/day, is ~3,000 writes/day — comfortably inside the
 free tier, nowhere near the one-doc-per-contract approach's ~1.1M/day.
+
+> **Amended 2026-09-08.** As first shipped, the function buffered both CSVs
+> and parsed each whole. That needed ~1.1GB of heap for 37MB of text —
+> `columns: true` materialises an object per row carrying all 21 (contracts)
+> or 11 (items) columns, and both record arrays were live at once — and it
+> OOM'd the 1GiB function on every scheduled run from deploy until the fix, so
+> the collection stayed empty and the feature never showed a single listing.
+> Streaming the two entries against a narrowed contract lookup produces the
+> same 122,038 rows at a 67MB peak, which is why the function now asks for
+> 512MiB rather than more. See
+> `docs/context/decisions/20260908-174412-the-public-bpc-sync-streams-the-archive-instead.md`.
 
 The collection, `publicBpcContracts`, is the app's first top-level,
 non-per-character Firestore collection: admin-write-only (the function uses

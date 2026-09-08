@@ -5,7 +5,7 @@
 
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
-import { error as logError, warn as logWarn } from 'firebase-functions/logger';
+import { error as logError, info as logInfo, warn as logWarn } from 'firebase-functions/logger';
 import { initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore, FieldValue, type Firestore } from 'firebase-admin/firestore';
@@ -34,16 +34,17 @@ import {
   NOTIFICATION_FEED_COLLECTION,
   feedPurgeCutoff,
 } from './purgeFeed.js';
-import { fetchPublicContractsCsvs } from './publicContractsArchive.js';
+import { streamPublicContractsCsvs } from './publicContractsArchive.js';
 import {
   chunkDocId,
   chunkRows,
-  filterAndCompactBpcContracts,
-  parseContractItemsCsv,
-  parseContractsCsv,
+  compactBpcItemRow,
+  eligibleContractFrom,
+  sortBpcRows,
   PUBLIC_BPC_CONTRACTS_COLLECTION,
   PUBLIC_BPC_CONTRACTS_META_DOC,
   type BpcContractRow,
+  type EligibleContract,
 } from './publicContracts.js';
 
 initializeApp();
@@ -356,20 +357,38 @@ async function writePublicBpcContractsSnapshot(
  * `publicBpcContracts` for signed-in clients to search.
  *
  * Every 30 minutes, matching EVE Ref's own twice-hourly refresh cadence.
- * Memory/timeout are sized for decompressing and parsing the ~35MB of CSV
- * text the two files this feature needs unpack to (measured against a live
- * pull, 2026-09-08) — well short of either ceiling in practice, but the
- * defaults (256MiB/60s) are not.
+ *
+ * The archive is streamed rather than buffered: `contracts.csv` is read into
+ * a lookup of only the fields the join needs, then `contract_items.csv` is
+ * joined against it row by row. Holding the two CSVs as text and parsing them
+ * whole needed ~1.1GB of heap for 37MB of input and OOM'd this function on
+ * every run between deploy and the fix; the streaming pass peaks near 120MB
+ * against the same live data, which is why 512MiB is now ample.
  */
 export const syncPublicBpcContracts = onSchedule(
-  { schedule: 'every 30 minutes', memory: '1GiB', timeoutSeconds: 300 },
+  { schedule: 'every 30 minutes', memory: '512MiB', timeoutSeconds: 300 },
   async () => {
-    const { contracts, contractItems } = await fetchPublicContractsCsvs();
-    const rows = filterAndCompactBpcContracts(
-      parseContractsCsv(contracts),
-      parseContractItemsCsv(contractItems),
-      Date.now()
-    );
-    await writePublicBpcContractsSnapshot(getFirestore(), rows);
+    const nowMs = Date.now();
+    const eligibleContracts = new Map<string, EligibleContract>();
+    const rows: BpcContractRow[] = [];
+
+    await streamPublicContractsCsvs({
+      onContract: (record) => {
+        const eligible = eligibleContractFrom(record, nowMs);
+        if (eligible) eligibleContracts.set(record.contract_id, eligible);
+      },
+      onItem: (record) => {
+        const contract = eligibleContracts.get(record.contract_id);
+        if (!contract) return;
+        const row = compactBpcItemRow(record, contract);
+        if (row) rows.push(row);
+      },
+    });
+
+    logInfo('public BPC contract sync', {
+      eligibleContracts: eligibleContracts.size,
+      rows: rows.length,
+    });
+    await writePublicBpcContractsSnapshot(getFirestore(), sortBpcRows(rows));
   }
 );
