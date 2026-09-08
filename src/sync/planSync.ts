@@ -1182,6 +1182,8 @@ interface RemoteNotificationFeedDoc extends RemoteFeedDoc {
   title: string;
   body: string;
   eveType?: string;
+  /** The item the alert was about, so the other device's row deep-links the same way. */
+  typeId?: number;
 }
 
 function toRemoteFeedDoc(row: NotificationFeedRecord, ownerHash: string): Record<string, unknown> {
@@ -1193,6 +1195,7 @@ function toRemoteFeedDoc(row: NotificationFeedRecord, ownerHash: string): Record
     body: row.body,
     firedAt: row.firedAt,
     ...(row.eveType !== undefined ? { eveType: row.eveType } : {}),
+    ...(row.typeId !== undefined ? { typeId: row.typeId } : {}),
     ...(row.dismissedAt !== undefined ? { dismissedAt: row.dismissedAt } : {}),
     ownerHash,
     // Transport only — what an incremental pull cursors on (issue #581).
@@ -1220,6 +1223,7 @@ function toLocalFeedRecord(
     body: remote.body,
     firedAt: remote.firedAt,
     ...(remote.eveType !== undefined ? { eveType: remote.eveType } : {}),
+    ...(remote.typeId !== undefined ? { typeId: remote.typeId } : {}),
     ...(remote.dismissedAt !== undefined ? { dismissedAt: remote.dismissedAt } : {}),
   });
 }

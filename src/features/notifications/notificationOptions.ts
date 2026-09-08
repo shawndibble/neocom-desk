@@ -42,8 +42,13 @@ export const NOTIFICATION_ROUTES: Record<NotificationEventId, string> = {
   // `?tab=` deep-links straight to the tab that actually shows the event,
   // not just the page — `Wallet.tsx` reads it once on mount.
   walletBalanceChanged: '/wallet?tab=journal',
-  // Open Orders is now Market's own tab, not a route of its own.
-  marketOrderFilled: '/market?section=orders',
+  // The *history*, not Open Orders: a filled order has left the open list, so
+  // the tab this used to land on is the one place the thing it is telling you
+  // about is guaranteed not to be. Transactions is where the fill itself is
+  // written down — what sold, how many, for how much, to whom.
+  // `notificationUrlForSubject` adds `&highlight=` where the fire knows its
+  // item, which pulses that row on arrival.
+  marketOrderFilled: '/market?section=transactions',
   // ~100 EVE-native types (issue #274), most with no corresponding page in
   // the app. `/alerts` is a deliberate choice for this event rather than an
   // inherited default — and now a real destination rather than a shrug: the
@@ -75,6 +80,13 @@ export interface AppNotificationOptions extends NotificationOptions {
 export interface NotificationTarget {
   eventId: NotificationEventId;
   characterId: number;
+  /**
+   * The item the fire was about, for the events whose destination depends on
+   * it. Baked into `data.url` at fire time rather than resolved on click: the
+   * Service Worker handling a `notificationclick` has no idea which fire
+   * produced the bubble it is closing.
+   */
+  typeId?: number;
 }
 
 /**
@@ -83,6 +95,40 @@ export interface NotificationTarget {
  */
 export function notificationUrlFor(eventId: string): string {
   return NOTIFICATION_ROUTES[eventId as NotificationEventId] ?? NOTIFICATION_FALLBACK_ROUTE;
+}
+
+/**
+ * The query key `TransactionsPanel` reads to scroll to and pulse one row.
+ * Exported so the panel and the link that sends it there cannot disagree on
+ * the spelling.
+ */
+export const HIGHLIGHT_PARAM = 'highlight';
+
+/**
+ * Where a fire lands, narrowed by *what it was about* where that changes the
+ * answer.
+ *
+ * Only `marketOrderFilled` uses the subject today. Landing on the Transactions
+ * tab already beats landing on Open Orders, but a pilot with a page of fills
+ * still has to hunt for the one they were just told about; the item id turns
+ * that into an arrival on the row itself.
+ *
+ * Every other event ignores `typeId` and resolves exactly as before, so a row
+ * that carries none — an older build's, or one Web Push wrote — degrades to
+ * the event's own route rather than to the fallback.
+ */
+export function notificationUrlForSubject(eventId: string, typeId: number | undefined): string {
+  const base = notificationUrlFor(eventId);
+  if (eventId !== 'marketOrderFilled' || typeId === undefined) return base;
+  return `${base}&${HIGHLIGHT_PARAM}=${typeId}`;
+}
+
+/** The item a fire was about, where it was about one — see `NotificationFeedRecord.typeId`. */
+export function notificationSubjectTypeId(fire: {
+  eventId: string;
+  typeId?: number;
+}): number | undefined {
+  return fire.eventId === 'marketOrderFilled' ? fire.typeId : undefined;
 }
 
 export function notificationTagFor(target: NotificationTarget): string {
@@ -99,7 +145,7 @@ export function notificationOptionsFor(
     badge: BADGE_URL,
     tag: notificationTagFor(target),
     renotify: true,
-    data: { url: notificationUrlFor(target.eventId) },
+    data: { url: notificationUrlForSubject(target.eventId, target.typeId) },
   };
 }
 

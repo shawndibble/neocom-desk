@@ -368,6 +368,23 @@ export interface NotificationFeedRecord {
    * treated as not dismissed.
    */
   dismissedAt?: number;
+  /**
+   * The EVE item type this fire was *about*, where it was about one — set by
+   * `marketOrderFilled`, which is the first alert whose destination depends on
+   * its subject rather than only on its event.
+   *
+   * Stored rather than re-derived because nothing else on the row identifies
+   * the item: the Occurrence Key is the order id, and the copy is a rendered
+   * sentence. Stored as the id rather than as a finished URL so
+   * `notificationOptions.ts` stays the one place that knows what the app's
+   * routes look like — a URL frozen into a row would rot the next time a tab
+   * moves, and this table keeps rows for months.
+   *
+   * Not indexed, so it needs no `db.version()` bump. A row without it (an
+   * older build's, or one Web Push wrote) falls back to the event's own
+   * route, which is exactly today's behaviour.
+   */
+  typeId?: number;
 }
 
 /**

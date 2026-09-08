@@ -281,6 +281,11 @@ export function DataTable<T>({
           const tr = (
             <tr
               role="row"
+              // The row's own identity, in the DOM. One static attribute, and
+              // the only way a caller can find a specific row to scroll to
+              // without this component growing a ref API — `TransactionsPanel`
+              // uses it to land on the fill a notification pointed at.
+              data-row-key={rowKey(row)}
               className={cx(
                 'hover:bg-panel-2',
                 onRowClick && 'cursor-pointer',

@@ -245,6 +245,43 @@
    * express neither the 45-degree rule nor its 6px pitch, and this is one
    * declaration against an asset request and a second file.
    */
+  /*
+   * The one row a notification sent the reader to
+   * (`features/market/TransactionsPanel.tsx`). Three slow washes of accent
+   * behind an otherwise ordinary row: enough to catch the eye on arrival,
+   * gone before it becomes a permanent second kind of selected row.
+   *
+   * A `<tr>` background rather than an outline or a border — a table row
+   * cannot carry either without the cell borders fighting it, and the cells
+   * are transparent, so the row's own background shows through.
+   */
+  .row-pulse {
+    animation: row-pulse 1.2s ease-out 3;
+  }
+
+  @keyframes row-pulse {
+    0%,
+    100% {
+      background-color: transparent;
+    }
+    35% {
+      background-color: color-mix(in srgb, var(--color-accent) 26%, transparent);
+    }
+  }
+
+  /*
+   * Reduced motion keeps the *finding*, drops the flashing: the row stays
+   * tinted instead of pulsing. Removing the cue entirely would strand a reader
+   * who arrived here precisely to be shown which row — and the tint is never
+   * the only signal, since the panel also scrolls the row into view.
+   */
+  @media (prefers-reduced-motion: reduce) {
+    .row-pulse {
+      animation: none;
+      background-color: color-mix(in srgb, var(--color-accent) 20%, transparent);
+    }
+  }
+
   .calendar-map-past {
     background-image: repeating-linear-gradient(
       135deg,

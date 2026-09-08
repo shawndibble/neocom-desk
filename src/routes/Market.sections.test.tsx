@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
@@ -337,6 +337,47 @@ describe('Market Transactions tab', () => {
     render(<App />);
     expect(await screen.findByText('Tritanium')).toBeInTheDocument();
     expect(screen.getByText('Sell')).toBeInTheDocument();
+  });
+
+  it('scrolls to and pulses the item a filled-sell-order alert pointed at', async () => {
+    const scrollIntoView = vi
+      .spyOn(Element.prototype, 'scrollIntoView')
+      .mockImplementation(() => {});
+    window.history.pushState({}, '', '/market?section=transactions&highlight=34');
+    render(<App />);
+
+    expect(await screen.findByText('Tritanium')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(document.querySelector('[data-row-key="1"]')?.className).toContain('row-pulse');
+    });
+    // Only the row the alert was about.
+    expect(document.querySelector('[data-row-key="2"]')?.className).not.toContain('row-pulse');
+    // Some other element scrolls itself on mount (the tab bar), so assert the
+    // row was among the elements scrolled to, not that it was the first.
+    await waitFor(() => {
+      expect(scrollIntoView.mock.instances).toContain(document.querySelector('[data-row-key="1"]'));
+    });
+
+    // Spent on arrival: a reload or a tab round-trip must not pulse again.
+    await waitFor(() => {
+      expect(new URLSearchParams(window.location.search).has('highlight')).toBe(false);
+    });
+    scrollIntoView.mockRestore();
+  });
+
+  it('pulses nothing when the item has no sell of its own to point at', async () => {
+    // Type 35 is in the list, but only as a buy — and the alert only ever
+    // fires for a filled *sell* order.
+    window.history.pushState({}, '', '/market?section=transactions&highlight=35');
+    render(<App />);
+
+    expect(await screen.findByText('Tritanium')).toBeInTheDocument();
+    expect(document.querySelector('.row-pulse')).toBeNull();
+    // Spent even so, or a link left armed would pulse a different row once the
+    // cache caught up with the fill.
+    await waitFor(() => {
+      expect(new URLSearchParams(window.location.search).has('highlight')).toBe(false);
+    });
   });
 
   it('signs and colors transaction totals: buy negative red, sell positive green', async () => {
