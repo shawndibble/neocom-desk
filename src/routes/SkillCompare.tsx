@@ -253,8 +253,21 @@ export function SkillCompare() {
     setActiveComparisonId(comparison.id);
   }
 
-  function handleLoad(comparison: SavedComparison) {
-    const known = new Set((characters ?? []).map((c) => c.characterId));
+  /**
+   * A saved comparison is clickable on the very first frame — the list renders
+   * straight out of the comparisons store — while `characters` arrives from a
+   * `useLiveQuery` a tick or more later. Resolving against a roster that has
+   * not loaded yet drops every id, which left an empty selection under a false
+   * "some characters were removed" notice that nothing re-ran once the roster
+   * did arrive (#594). So read the roster directly for that one early click.
+   *
+   * Awaiting it can't clobber a hand-picked selection: the character buttons
+   * render from that same `characters`, so there are none to press until it
+   * has resolved.
+   */
+  async function handleLoad(comparison: SavedComparison) {
+    const roster = characters ?? (await db.characters.toArray());
+    const known = new Set(roster.map((c) => c.characterId));
     const resolved = resolveComparisonCharacterIds(comparison, known);
     setDegradedNotice(resolved.length < comparison.characterIds.length);
     setSelectedIds(resolved);
@@ -453,7 +466,7 @@ export function SkillCompare() {
               <SavedComparisonRow
                 key={comparison.id}
                 comparison={comparison}
-                onLoad={handleLoad}
+                onLoad={(loaded) => void handleLoad(loaded)}
                 onRequestDelete={setDeletingId}
                 onRename={handleRename}
               />
