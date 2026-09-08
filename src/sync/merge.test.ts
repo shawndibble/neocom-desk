@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import type { SkillPlanRecord } from '@/db';
+import { FEED_SYNC_WINDOW_MS } from '@/features/notifications/feed';
 import {
   feedTransportStamp,
   mergeFeed,
   mergeRecords,
   mergeSettings,
   TOMBSTONE_TTL_MS,
+  type FeedMergeResult,
   type FeedRow,
   type LocalTombstone,
   type RemoteFeedDoc,
@@ -420,9 +422,24 @@ function remoteFeedRow(overrides: Partial<RemoteFeedDoc> = {}): RemoteFeedDoc {
   return { id: 'occ-1', firedAt: NOW - 1000, ownerHash: HASH, ...overrides };
 }
 
+/**
+ * Every case below is this device, at `NOW`, on the standard synced window —
+ * `now` and `windowMs` (issue #582) never vary between them, so only the
+ * inputs that do stay in the call. What a case is saying about the retention
+ * cutoff it says through the row's `firedAt` instead.
+ */
+function mergeFeedNow<L extends FeedRow, R extends RemoteFeedDoc>(
+  local: readonly L[],
+  pushEligible: ReadonlySet<string>,
+  remote: readonly R[],
+  since?: number
+): FeedMergeResult<L, R> {
+  return mergeFeed(local, pushEligible, remote, NOW, FEED_SYNC_WINDOW_MS, since);
+}
+
 describe('mergeFeed', () => {
   it('pushes a row that only exists locally, when within the push window', () => {
-    const result = mergeFeed([feedRow()], new Set(['occ-1']), []);
+    const result = mergeFeedNow([feedRow()], new Set(['occ-1']), []);
     expect(result.pushCreate.map((r) => r.id)).toEqual(['occ-1']);
     expect(result.pushDismiss).toEqual([]);
     expect(result.pullCreate).toEqual([]);
@@ -432,23 +449,29 @@ describe('mergeFeed', () => {
   it('does not push a local-only row outside the push window', () => {
     // An old row still in the local archive (cap 300) but past the 30-day/100-row
     // sync window (CONTEXT.md round 45) is left alone, not pushed.
-    const result = mergeFeed([feedRow()], new Set(), []);
+    const result = mergeFeedNow([feedRow()], new Set(), []);
     expect(result.pushCreate).toEqual([]);
   });
 
   it('pulls a row that only exists remotely', () => {
-    const result = mergeFeed([], new Set(), [remoteFeedRow()]);
+    const result = mergeFeedNow([], new Set(), [remoteFeedRow()]);
     expect(result.pullCreate.map((r) => r.id)).toEqual(['occ-1']);
     expect(result.pushCreate).toEqual([]);
   });
 
   it('does nothing when both sides have the row undismissed', () => {
-    const result = mergeFeed([feedRow()], new Set(['occ-1']), [remoteFeedRow()]);
-    expect(result).toEqual({ pushCreate: [], pushDismiss: [], pullCreate: [], pullDismiss: [] });
+    const result = mergeFeedNow([feedRow()], new Set(['occ-1']), [remoteFeedRow()]);
+    expect(result).toEqual({
+      pushCreate: [],
+      pushDismiss: [],
+      pullCreate: [],
+      pullDismiss: [],
+      purgeRemote: [],
+    });
   });
 
   it('pushes a dismissal newer than the remote copy, within the push window', () => {
-    const result = mergeFeed([feedRow({ dismissedAt: NOW - 10 })], new Set(['occ-1']), [
+    const result = mergeFeedNow([feedRow({ dismissedAt: NOW - 10 })], new Set(['occ-1']), [
       remoteFeedRow(),
     ]);
     expect(result.pushDismiss.map((r) => r.id)).toEqual(['occ-1']);
@@ -459,7 +482,7 @@ describe('mergeFeed', () => {
     // The push window only gates whether a *new* row starts syncing (pushCreate);
     // once the remote side already has the row, a dismissal correction must
     // still reach it regardless of whether the row is still push-eligible today.
-    const result = mergeFeed([feedRow({ dismissedAt: NOW - 10 })], new Set(), [remoteFeedRow()]);
+    const result = mergeFeedNow([feedRow({ dismissedAt: NOW - 10 })], new Set(), [remoteFeedRow()]);
     expect(result.pushDismiss.map((r) => r.id)).toEqual(['occ-1']);
     expect(result.pullDismiss).toEqual([]);
   });
@@ -467,13 +490,13 @@ describe('mergeFeed', () => {
   it('pulls a dismissal newer than the local copy, regardless of the local push window', () => {
     // The row has aged out of this device's push window but a dismissal from
     // another device must still win — see mergeFeed's doc comment.
-    const result = mergeFeed([feedRow()], new Set(), [remoteFeedRow({ dismissedAt: NOW - 10 })]);
+    const result = mergeFeedNow([feedRow()], new Set(), [remoteFeedRow({ dismissedAt: NOW - 10 })]);
     expect(result.pullDismiss.map((r) => r.id)).toEqual(['occ-1']);
     expect(result.pushDismiss).toEqual([]);
   });
 
   it('never regresses a local dismissal that is newer than a stale remote copy', () => {
-    const result = mergeFeed([feedRow({ dismissedAt: NOW - 10 })], new Set(['occ-1']), [
+    const result = mergeFeedNow([feedRow({ dismissedAt: NOW - 10 })], new Set(['occ-1']), [
       remoteFeedRow({ dismissedAt: NOW - 5000 }),
     ]);
     expect(result.pushDismiss.map((r) => r.id)).toEqual(['occ-1']);
@@ -481,16 +504,81 @@ describe('mergeFeed', () => {
   });
 
   it('produces no duplicate rows for the same Occurrence Key regardless of side', () => {
-    const result = mergeFeed([feedRow({ dismissedAt: NOW - 10 })], new Set(['occ-1']), [
+    const result = mergeFeedNow([feedRow({ dismissedAt: NOW - 10 })], new Set(['occ-1']), [
       remoteFeedRow(),
     ]);
     const touchedIds = [
-      ...result.pushCreate,
-      ...result.pushDismiss,
-      ...result.pullCreate,
-      ...result.pullDismiss,
-    ].map((r) => r.id);
+      ...result.pushCreate.map((r) => r.id),
+      ...result.pushDismiss.map((r) => r.id),
+      ...result.pullCreate.map((r) => r.id),
+      ...result.pullDismiss.map((r) => r.id),
+      ...result.purgeRemote,
+    ];
     expect(new Set(touchedIds).size).toBe(touchedIds.length);
+  });
+});
+
+// Issue #582: the remote collection had no upper bound and no expiry — only
+// characterPurge ever deleted a row. These pin the retention rule that bounds
+// it on the window the push side already used.
+describe('mergeFeed: remote retention purge', () => {
+  const CUTOFF = NOW - FEED_SYNC_WINDOW_MS;
+
+  it('purges a remote-only row past the window instead of pulling it (AC1)', () => {
+    const aged = remoteFeedRow({ firedAt: CUTOFF - 1 });
+    const result = mergeFeedNow([], new Set(), [aged]);
+    expect(result.purgeRemote).toEqual(['occ-1']);
+    expect(result.pullCreate).toEqual([]);
+  });
+
+  it('leaves a remote row exactly on the cutoff alone, and still push-eligible (AC2, AC4)', () => {
+    // rowsWithinSyncWindow keeps firedAt >= cutoff (feed.test.ts pins that),
+    // so the boundary row is inside the window on both sides of the rule. If
+    // purge used <= here, one pass would delete a row the same pass re-created.
+    const boundary = { id: 'occ-1', firedAt: CUTOFF };
+    const result = mergeFeedNow([boundary], new Set(['occ-1']), []);
+    expect(result.purgeRemote).toEqual([]);
+    expect(result.pushCreate).toEqual([boundary]);
+  });
+
+  it('purges a row one millisecond past the cutoff (AC2)', () => {
+    const result = mergeFeedNow([], new Set(), [remoteFeedRow({ firedAt: CUTOFF - 1 })]);
+    expect(result.purgeRemote).toEqual(['occ-1']);
+  });
+
+  it('purges rather than reconciling a dismissal, when both sides hold an aged row', () => {
+    // Never both in one pass: a row old enough to purge is old enough that its
+    // dismissal no longer matters.
+    const firedAt = CUTOFF - 1;
+    const result = mergeFeedNow([feedRow({ firedAt, dismissedAt: NOW - 10 })], new Set(), [
+      remoteFeedRow({ firedAt }),
+    ]);
+    expect(result.purgeRemote).toEqual(['occ-1']);
+    expect(result.pushDismiss).toEqual([]);
+  });
+
+  it('purges rather than pulling a dismissal on an aged row', () => {
+    const firedAt = CUTOFF - 1;
+    const result = mergeFeedNow([feedRow({ firedAt })], new Set(), [
+      remoteFeedRow({ firedAt, dismissedAt: NOW - 10 }),
+    ]);
+    expect(result.purgeRemote).toEqual(['occ-1']);
+    expect(result.pullDismiss).toEqual([]);
+  });
+
+  it('never purges on the strength of a local row alone (AC3)', () => {
+    // The local archive keeps 300 rows well past the 30-day window; purge is a
+    // statement about the remote copy, and there is no remote copy here.
+    const result = mergeFeedNow([feedRow({ firedAt: CUTOFF - 1 })], new Set(), []);
+    expect(result.purgeRemote).toEqual([]);
+    expect(result.pushCreate).toEqual([]);
+  });
+
+  it('purges an aged row the incremental pull surfaced (AC1)', () => {
+    const aged = remoteFeedRow({ firedAt: CUTOFF - 1 });
+    const result = mergeFeedNow([], new Set(), [aged], NOW - FEED_SYNC_WINDOW_MS - 5000);
+    expect(result.purgeRemote).toEqual(['occ-1']);
+    expect(result.pullCreate).toEqual([]);
   });
 });
 
@@ -570,13 +658,13 @@ describe('mergeFeed: incremental pull', () => {
 
   it('does not re-push a row the cursor already covers', () => {
     const row = feedLocal();
-    const result = mergeFeed([row], new Set(['occ-1']), [], NOW - 500);
+    const result = mergeFeedNow([row], new Set(['occ-1']), [], NOW - 500);
     expect(result.pushCreate).toEqual([]);
   });
 
   it('pushes a row whose dismissal postdates the cursor', () => {
     const row = feedLocal({ dismissedAt: NOW - 100 });
-    const result = mergeFeed([row], new Set(['occ-1']), [], NOW - 500);
+    const result = mergeFeedNow([row], new Set(['occ-1']), [], NOW - 500);
     // The dismissal moves the transport stamp, so the row is back in play even
     // though its firedAt is older than the cursor.
     expect(result.pushCreate).toEqual([row]);
@@ -584,13 +672,13 @@ describe('mergeFeed: incremental pull', () => {
 
   it('pushes every locally-known row on a full read, as before', () => {
     const row = feedLocal();
-    const result = mergeFeed([row], new Set(['occ-1']), []);
+    const result = mergeFeedNow([row], new Set(['occ-1']), []);
     expect(result.pushCreate).toEqual([row]);
   });
 
   it('still pulls a remote row the window returned', () => {
     const remote: RemoteFeedDoc = { id: 'occ-2', firedAt: NOW - 100, ownerHash: HASH };
-    const result = mergeFeed([], new Set(), [remote], NOW - 500);
+    const result = mergeFeedNow([], new Set(), [remote], NOW - 500);
     expect(result.pullCreate).toEqual([remote]);
   });
 });
