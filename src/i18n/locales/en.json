@@ -933,8 +933,6 @@
   },
   "alerts": {
     "title": "Alerts",
-    "summary_one": "{{count}} alert · {{types}} types · {{characters}} characters",
-    "summary_other": "{{count}} alerts · {{types}} types · {{characters}} characters",
     "settings": "Notification settings",
     "dismissAll": "Dismiss all",
     "byType": "By type",
