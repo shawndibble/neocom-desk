@@ -545,6 +545,15 @@ export interface CalendarEventEntrySnapshot {
   calendarEventId: number;
   /** Epoch ms this event starts (ESI's `event_date`). */
   startMs: number;
+  /**
+   * ESI's `title` — what the pilot actually named the thing.
+   *
+   * Optional because poller snapshots are persisted (`pollerState.ts`) and a
+   * row written before this field existed is still a valid baseline; a diff
+   * reading one must say less rather than refuse to fire. Every fresh snapshot
+   * carries it.
+   */
+  title?: string;
 }
 
 export interface CalendarSnapshot {
@@ -556,12 +565,22 @@ export interface NewCalendarEventFire {
   eventId: 'newCalendarEvent';
   characterId: number;
   calendarEventId: number;
+  /**
+   * When the new event starts. Carried on the fire because "you were invited
+   * to something" is not actionable without it — the whole question a pilot
+   * has on being added to a calendar is whether they can make it.
+   */
+  startMs: number;
+  /** Absent only for a snapshot written before the title was recorded. */
+  title?: string;
 }
 
 export interface CalendarEventStartingFire {
   eventId: 'calendarEventStarting';
   characterId: number;
   calendarEventId: number;
+  /** Absent only for a snapshot written before the title was recorded. */
+  title?: string;
 }
 
 /**
@@ -585,6 +604,8 @@ export function diffNewCalendarEvent(
       eventId: 'newCalendarEvent',
       characterId,
       calendarEventId: entry.calendarEventId,
+      startMs: entry.startMs,
+      ...(entry.title === undefined ? {} : { title: entry.title }),
     });
   }
   return fires;
@@ -611,6 +632,7 @@ export function diffCalendarEventStarting(
       eventId: 'calendarEventStarting',
       characterId,
       calendarEventId: entry.calendarEventId,
+      ...(entry.title === undefined ? {} : { title: entry.title }),
     });
   }
   return fires;

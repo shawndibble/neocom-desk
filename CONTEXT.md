@@ -55,9 +55,11 @@ here — they go one per file in `docs/context/decisions/`.
   landing on it, and nothing else. The detail lives in the **Coming Up Rail**
   beside it. Days
   before today are hatched and captioned rather than merely empty: ESI returns
-  calendar events from now only and the cache replaces its row wholesale, so a
-  past cell is structurally incapable of holding anything, which is a different
-  statement from "nothing on". Drawn at one of two densities — a month, or the
+  calendar events from now only, so a past cell is structurally incapable of
+  holding anything, which is a different statement from "nothing on". Today's
+  cell is the exception and deliberately so — an event ESI drops the moment it
+  starts is kept until local midnight, so a map cell can hold a fleet op that is
+  under way right now. Drawn at one of two densities — a month, or the
   fortnight around today.
 - **Character**: One EVE Online character. The unit of login (EVE SSO) and of API data. App supports many Characters side by side from day one.
 - **Character Board Item**: One clock on the `/calendar` board, from any of six

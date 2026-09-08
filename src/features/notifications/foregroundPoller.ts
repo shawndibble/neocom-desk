@@ -21,6 +21,8 @@ import { resolveNames } from '@/features/character/names';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { mapWithConcurrencyLimit, ESI_FANOUT_CONCURRENCY } from '@/lib/concurrency';
 import { formatIsk } from '@/lib/isk';
+import { formatCalendarTimestamp } from '@/lib/timestamp';
+import { timeZoneFor, useTimeFormat } from '@/lib/timeFormat';
 import i18n from '@/i18n';
 import type { LocalSettingStore } from '@/lib/useLocalSetting';
 import { NOTIFICATION_EVENTS, type NotificationEventId } from './events';
@@ -46,7 +48,7 @@ import {
 } from './eventSelection';
 import { readNotificationPermission } from './permission';
 import { displayPageNotification, livePageDisplayEnv } from './display';
-import { notificationOptionsFor } from './notificationOptions';
+import { notificationOptionsFor, notificationSubjectTypeId } from './notificationOptions';
 import { eveNotificationText } from './eveNotificationText';
 import { resolveEveNotificationNames } from './eveNotificationNames';
 import { uploadProjectionRows } from './projectionUpload';
@@ -454,6 +456,24 @@ function groupedTitle(title: string, count: number): string {
   return i18n.t('notifications.groupedTitle', { title, count });
 }
 
+/**
+ * When a newly-added calendar event starts, in the pilot's chosen clock
+ * (`lib/timeFormat.ts` — local, or EVE/UTC).
+ *
+ * Read through the store's `getState` rather than the `useTimeZone` hook: this
+ * runs in the poll loop, not in a component. The preference is hydrated by the
+ * time any poll runs (`ForegroundNotificationPoller` mounts inside the app),
+ * and its default is the same 'local' every other surface used before the
+ * preference existed, so a cold read is never wrong in a way a pilot notices.
+ *
+ * `undefined` when the snapshot carries no usable instant — the caller drops
+ * the clause rather than printing "Invalid Date".
+ */
+function calendarStartLabel(startMs: number): string | undefined {
+  if (!Number.isFinite(startMs)) return undefined;
+  return formatCalendarTimestamp(new Date(startMs), timeZoneFor(useTimeFormat.getState().value));
+}
+
 async function notificationText(
   fire: AnyNotificationFire,
   character: CharacterRef
@@ -498,15 +518,33 @@ async function notificationText(
     };
   }
   if (fire.eventId === 'newCalendarEvent') {
+    const when = calendarStartLabel(fire.startMs);
     return {
       title: i18n.t('notifications.fired.newCalendarEvent.title'),
-      body: i18n.t('notifications.fired.newCalendarEvent.body', { character: character.name }),
+      body:
+        fire.title === undefined || when === undefined
+          ? i18n.t('notifications.fired.newCalendarEvent.bodyUnnamed', {
+              character: character.name,
+            })
+          : i18n.t('notifications.fired.newCalendarEvent.body', {
+              character: character.name,
+              event: fire.title,
+              when,
+            }),
     };
   }
   if (fire.eventId === 'calendarEventStarting') {
     return {
       title: i18n.t('notifications.fired.calendarEventStarting.title'),
-      body: i18n.t('notifications.fired.calendarEventStarting.body', { character: character.name }),
+      body:
+        fire.title === undefined
+          ? i18n.t('notifications.fired.calendarEventStarting.bodyUnnamed', {
+              character: character.name,
+            })
+          : i18n.t('notifications.fired.calendarEventStarting.body', {
+              character: character.name,
+              event: fire.title,
+            }),
     };
   }
   if (fire.eventId === 'contractAccepted') {
@@ -659,7 +697,14 @@ async function sendBrowserNotification(
   await displayPageNotification(
     livePageDisplayEnv(),
     title,
-    notificationOptionsFor({ eventId: fire.eventId, characterId: character.characterId }, body)
+    notificationOptionsFor(
+      {
+        eventId: fire.eventId,
+        characterId: character.characterId,
+        typeId: notificationSubjectTypeId(fire),
+      },
+      body
+    )
   );
 }
 
@@ -688,6 +733,7 @@ async function recordFeedNotification(
       characterId: character.characterId,
       eventId: fire.eventId,
       eveType: fire.eventId === 'eveNotification' ? fire.type : undefined,
+      typeId: notificationSubjectTypeId(fire),
       title,
       body,
       firedAt,

@@ -252,6 +252,59 @@
       color-mix(in srgb, var(--color-line) 55%, transparent) 6px 7px
     );
   }
+
+  /*
+   * The one row a notification sent the reader to
+   * (`features/market/TransactionsPanel.tsx`). Three slow washes of accent
+   * behind an otherwise ordinary row: enough to catch the eye on arrival,
+   * gone before it becomes a permanent second kind of selected row.
+   *
+   * A `<tr>` background rather than an outline or a border — a table row
+   * cannot carry either without the cell borders fighting it, and the cells
+   * are transparent, so the row's own background shows through.
+   */
+  .row-pulse {
+    animation: row-pulse 1.2s ease-out 3;
+  }
+
+  @keyframes row-pulse {
+    0%,
+    100% {
+      background-color: transparent;
+    }
+    35% {
+      background-color: color-mix(in srgb, var(--color-accent) 26%, transparent);
+    }
+  }
+
+  /*
+   * Reduced motion drops the flashing but keeps the *ending*: one slow fade
+   * from tint to nothing, no repeats.
+   *
+   * A `animation: none` plus a static tint was the obvious version and the
+   * wrong one — nothing ever removes the class (the panel latches the
+   * highlight for its lifetime), so the row would stay permanently coloured,
+   * which is the "second kind of selected row" the block above exists to
+   * avoid, and colour standing alone as a persistent encoding is what
+   * DESIGN.md §7 rules out. Transient is what makes this an attention cue
+   * rather than a state, and it pairs with the scroll that put the row on
+   * screen. A colour crossfade moves nothing, so it is not what a
+   * reduced-motion request is asking to be spared.
+   */
+  @media (prefers-reduced-motion: reduce) {
+    .row-pulse {
+      animation: row-pulse-fade 2.4s ease-out 1;
+    }
+  }
+
+  @keyframes row-pulse-fade {
+    0% {
+      background-color: color-mix(in srgb, var(--color-accent) 22%, transparent);
+    }
+    100% {
+      background-color: transparent;
+    }
+  }
 }
 
 @layer base {

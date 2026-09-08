@@ -67,6 +67,7 @@ import { occurrenceKey, type OccurrenceFire } from './occurrenceKey';
 import {
   SHARED_NOTIFICATION_WORDING,
   renderWording,
+  type NotificationWordingTemplate,
   type SharedWordingEventId,
 } from './notificationWording';
 
@@ -209,12 +210,22 @@ function buildRow(
   };
 }
 
+/**
+ * `variant` picks the template's degraded body where it has one
+ * (`NotificationWordingTemplate.bodyUnnamed`), falling back to the ordinary
+ * body for a template that declares none — so a caller asking for a variant an
+ * event does not define renders a complete sentence rather than nothing.
+ */
 function renderShared(
   eventId: SharedWordingEventId,
-  vars: Readonly<Record<string, string | number>>
+  vars: Readonly<Record<string, string | number>>,
+  variant: 'body' | 'bodyUnnamed' = 'body'
 ): { title: string; body: string } {
-  const template = SHARED_NOTIFICATION_WORDING[eventId];
-  return { title: template.title, body: renderWording(template.body, vars) };
+  // Widened to the interface: the constant is `as const`, so its inferred
+  // union only carries `bodyUnnamed` on the members that declare one.
+  const template: NotificationWordingTemplate = SHARED_NOTIFICATION_WORDING[eventId];
+  const body = (variant === 'bodyUnnamed' ? template.bodyUnnamed : undefined) ?? template.body;
+  return { title: template.title, body: renderWording(body, vars) };
 }
 
 function skillLevelCompleteText(characterName: string, skillName: string, level: number) {
@@ -268,9 +279,16 @@ function planetaryExtractorExpiringText(
   };
 }
 
-function calendarEventStartingText(characterName: string) {
+/**
+ * Names the event where the snapshot knows it. A baseline persisted before the
+ * title was recorded falls back to the unnamed copy rather than pushing a
+ * sentence with a hole in it.
+ */
+function calendarEventStartingText(characterName: string, title: string | undefined) {
   assertWording('calendarEventStarting', 'assert');
-  return renderShared('calendarEventStarting', { character: characterName });
+  return title === undefined
+    ? renderShared('calendarEventStarting', { character: characterName }, 'bodyUnnamed')
+    : renderShared('calendarEventStarting', { character: characterName, event: title });
 }
 
 /**
@@ -498,6 +516,7 @@ export function projectCalendar(
       eventId: 'calendarEventStarting',
       characterId,
       calendarEventId: entry.calendarEventId,
+      ...(entry.title === undefined ? {} : { title: entry.title }),
     };
     rows.push(
       buildRow(
@@ -505,7 +524,7 @@ export function projectCalendar(
         'calendarEventStarting',
         fire,
         entry.startMs,
-        calendarEventStartingText(characterName)
+        calendarEventStartingText(characterName, entry.title)
       )
     );
   }

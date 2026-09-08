@@ -16,7 +16,7 @@ import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
 import type { NotificationFeedRecord } from '@/db';
 import type { DisplayAlertGroup } from './alertsFilter';
-import { notificationUrlFor } from './notificationOptions';
+import { notificationUrlForSubject } from './notificationOptions';
 
 export interface AlertGroupRowProps {
   group: DisplayAlertGroup;
@@ -194,7 +194,7 @@ function AlertFireRow({
         push the rest of the list off the screen.
       */}
       <Link
-        to={notificationUrlFor(entry.eventId)}
+        to={notificationUrlForSubject(entry.eventId, entry.typeId)}
         className="line-clamp-2 min-w-0 flex-1 rounded-xs py-1.5 text-xs text-text-dim hover:text-text focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent sm:line-clamp-none sm:truncate"
       >
         {entry.body}

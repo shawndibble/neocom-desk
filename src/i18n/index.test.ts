@@ -110,11 +110,31 @@ describe('notifications.fired.* — live i18next path agrees with projection.ts'
     expect(expiringRow?.body).toContain(`was due to expire in under ${hours} hours`);
   });
 
-  it('calendarEventStarting: same character produces the same string on both paths', () => {
+  it('calendarEventStarting: same character and event name produce the same string on both paths', () => {
+    const entries = [{ calendarEventId: 1, startMs: T0 + 5 * HOUR_MS, title: 'Fleet Op' }];
+    const [row] = projectCalendar(1, 'Kestrel', entries, T0);
+    const live = i18n.t('notifications.fired.calendarEventStarting.body', {
+      character: 'Kestrel',
+      event: 'Fleet Op',
+    });
+    expect(live).toEqual(row.body);
+    expect(live).toContain('Fleet Op');
+    expect(i18n.t('notifications.fired.calendarEventStarting.title')).toEqual(row.title);
+  });
+
+  /**
+   * The degraded body is shared too. A poller baseline persisted before the
+   * event title was recorded fires with no name to print, and both paths have
+   * to fall back to the same sentence — otherwise the push and the live toast
+   * for one occurrence read differently for a reason no pilot can see.
+   */
+  it('calendarEventStarting: the unnamed fallback is the same sentence on both paths', () => {
     const entries = [{ calendarEventId: 1, startMs: T0 + 5 * HOUR_MS }];
     const [row] = projectCalendar(1, 'Kestrel', entries, T0);
-    const live = i18n.t('notifications.fired.calendarEventStarting.body', { character: 'Kestrel' });
+    const live = i18n.t('notifications.fired.calendarEventStarting.bodyUnnamed', {
+      character: 'Kestrel',
+    });
     expect(live).toEqual(row.body);
-    expect(i18n.t('notifications.fired.calendarEventStarting.title')).toEqual(row.title);
+    expect(live).not.toContain('{{');
   });
 });
