@@ -303,6 +303,79 @@ describe('Alerts', () => {
     expect(await screen.findByText('New Mail')).toBeInTheDocument();
   });
 
+  /*
+   * Expanding a type is where the body copy lives, and on a phone that copy
+   * was fighting a portrait, a nine-character indent and a fixed-width clock
+   * for a 390px line. The portrait went first: it identified nothing the name
+   * beside it did not already say.
+   */
+  describe('an expanded type', () => {
+    /*
+     * Anchored on `expanded`, not on the name alone: "Stop showing New Mail"
+     * and "Dismiss every New Mail" sit in the same row and match the same
+     * words. The disclosure is the only one of the three that is a disclosure.
+     */
+    async function expandNewMail() {
+      await userEvent.click(
+        await screen.findByRole('button', { name: /new mail/i, expanded: false })
+      );
+    }
+
+    it('carries no character portrait', async () => {
+      await db.notificationFeed.bulkPut([
+        entry({ id: 'a', characterId: KAELEN }),
+        entry({ id: 'b', characterId: SERA }),
+      ]);
+      renderPage();
+      await expandNewMail();
+
+      // Both fires, so the assertion below is about an expanded list rather
+      // than an empty one that trivially has no portraits in it.
+      expect(await screen.findAllByText(/New Mail — body/)).toHaveLength(2);
+      expect(screen.queryAllByRole('img')).toHaveLength(0);
+    });
+
+    /*
+     * And so the name has to carry the identification on its own, at every
+     * width. It used to be hidden below `sm` with the portrait standing in for
+     * it — which is exactly the width where whose-alert-is-this matters most,
+     * this page existing because an alt's alerts were invisible until you
+     * switched to it.
+     */
+    /*
+     * The other half of the same rule: with one Character on the device every
+     * row would say the same name, and that name is width the body copy could
+     * have had. The seeded device has two, so this test removes one.
+     */
+    it('drops the name entirely when the device has only one character', async () => {
+      await db.characters.where('characterId').equals(SERA).delete();
+      await db.notificationFeed.bulkPut([entry({ id: 'a', characterId: KAELEN })]);
+      renderPage();
+      await expandNewMail();
+
+      expect(await screen.findAllByText(/New Mail — body/)).toHaveLength(1);
+      expect(screen.queryByText('Kaelen Vor')).not.toBeInTheDocument();
+    });
+
+    it('names the character once, visibly, rather than only to a screen reader', async () => {
+      await db.notificationFeed.bulkPut([
+        entry({ id: 'a', characterId: KAELEN }),
+        entry({ id: 'b', characterId: SERA }),
+      ]);
+      renderPage();
+      await expandNewMail();
+
+      for (const who of ['Kaelen Vor', 'Sera Vantis']) {
+        const named = await screen.findAllByText(who);
+        // Once, not twice: the old pair was a visible span plus an `sr-only`
+        // one, and dropping either half of that pair without the other is how
+        // this ends up announced twice or not at all.
+        expect(named, who).toHaveLength(1);
+        expect(named[0].className).not.toMatch(/sr-only/);
+      }
+    });
+  });
+
   it('offers an empty state rather than a bare panel', async () => {
     renderPage();
     expect(await screen.findByText('No alerts yet')).toBeInTheDocument();
