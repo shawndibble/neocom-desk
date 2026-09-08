@@ -5,7 +5,7 @@
  * chosen station or structure *is* — including the two values it settles by
  * being an NPC station rather than by anyone typing them.
  */
-import { FACILITY_PRESETS } from '@/engine/industry/types';
+import { EMPTY_RIG_FIT, FACILITY_PRESETS } from '@/engine/industry/types';
 import type { BuildPlanRecord } from '@/db';
 import type { BuildLocationOption } from './buildLocations';
 
@@ -13,7 +13,7 @@ type BuildLocationPatch = Pick<
   BuildPlanRecord,
   'facility' | 'security' | 'buildSystemId' | 'buildSystemName' | 'buildLocationId'
 > &
-  Partial<Pick<BuildPlanRecord, 'rigLevel' | 'facilityTaxPct' | 'buildLocationName'>>;
+  Partial<Pick<BuildPlanRecord, 'rigFit' | 'facilityTaxPct' | 'buildLocationName'>>;
 
 export function buildLocationPatch(option: BuildLocationOption): BuildLocationPatch {
   return {
@@ -32,6 +32,6 @@ export function buildLocationPatch(option: BuildLocationOption): BuildLocationPa
     // they pick a structure again later.
     ...(FACILITY_PRESETS[option.facility].structure
       ? {}
-      : { rigLevel: 'none' as const, facilityTaxPct: undefined }),
+      : { rigFit: EMPTY_RIG_FIT, facilityTaxPct: undefined }),
   };
 }

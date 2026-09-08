@@ -39,6 +39,20 @@ describe('ReloadPrompt', () => {
     expect(updateServiceWorker).toHaveBeenCalledWith(true);
   });
 
+  it('moves bottom-center with an accent highlight on desktop, issue #613', () => {
+    render(<ReloadPrompt />);
+    const toast = screen.getByRole('alert');
+    // Mobile: unchanged bottom-right corner toast.
+    expect(toast).toHaveClass('right-4', 'bottom-16');
+    // Desktop: bottom-center with an accent border so it isn't easy to miss.
+    expect(toast).toHaveClass(
+      'md:left-1/2',
+      'md:-translate-x-1/2',
+      'md:bottom-6',
+      'md:border-accent'
+    );
+  });
+
   it('dismisses the toast', async () => {
     const user = userEvent.setup();
     render(<ReloadPrompt />);

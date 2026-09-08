@@ -809,7 +809,7 @@ describe('Settings defaults', () => {
 
   it('reveals rig and tax once the default facility is a player structure', async () => {
     useFacilityDefaults.setState({
-      value: { facility: 'azbel', rigLevel: 't1', facilityTaxPct: 2 },
+      value: { facility: 'azbel', rigFit: ['meT1', 'teT1', 'none'], facilityTaxPct: 2 },
       hydrated: true,
     });
     render(<App />);

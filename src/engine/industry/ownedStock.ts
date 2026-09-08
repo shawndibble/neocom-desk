@@ -263,6 +263,28 @@ export interface OwnedStockSuggestion {
  * them specifically. The per-row action is the one that overwrites; clicking it
  * on that row means it.
  */
+/**
+ * The rows a bulk "use none" clears: those currently carrying a non-zero
+ * owned quantity, wherever it came from (hand-typed or an earlier "use all").
+ *
+ * Unlike `bulkOwnedStockSuggestions`, this *does* overwrite an existing
+ * value — clicking "use none" means exactly that for every row, not just the
+ * untouched ones. A row already at 0, or with no owned quantity stored at
+ * all, is left out of the patch since there is nothing to change.
+ */
+export function clearOwnedStockSuggestions(
+  materials: readonly { typeID: number }[],
+  sourcing: MaterialSourcingMap | undefined
+): OwnedStockSuggestion[] {
+  const suggestions: OwnedStockSuggestion[] = [];
+  for (const material of materials) {
+    const owned = sourcing?.[material.typeID]?.ownedQuantity;
+    if (owned === undefined || owned === 0) continue;
+    suggestions.push({ typeID: material.typeID, ownedQuantity: 0 });
+  }
+  return suggestions;
+}
+
 export function bulkOwnedStockSuggestions(
   materials: readonly { typeID: number; quantity: number }[],
   sourcing: MaterialSourcingMap | undefined,

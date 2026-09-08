@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   bulkOwnedStockSuggestions,
+  clearOwnedStockSuggestions,
   collectStockLocations,
   detectOwnedStock,
   filterStockByScope,
@@ -325,6 +326,37 @@ describe('bulkOwnedStockSuggestions', () => {
 
   it('suggests nothing for a material with no detected stock', () => {
     expect(bulkOwnedStockSuggestions(MATERIALS, undefined, stockOf({}))).toEqual([]);
+  });
+});
+
+describe('clearOwnedStockSuggestions', () => {
+  const MATERIALS = [{ typeID: TRITANIUM }, { typeID: PYERITE }, { typeID: ISOGEN }];
+
+  it('zeroes every row that currently carries a non-zero owned quantity', () => {
+    const sourcing = {
+      [TRITANIUM]: { ownedQuantity: 500 },
+      [PYERITE]: { ownedQuantity: 12 },
+    };
+    expect(clearOwnedStockSuggestions(MATERIALS, sourcing)).toEqual([
+      { typeID: TRITANIUM, ownedQuantity: 0 },
+      { typeID: PYERITE, ownedQuantity: 0 },
+    ]);
+  });
+
+  it('leaves a row already at 0 out of the patch, unlike a bare clobber', () => {
+    const sourcing = { [TRITANIUM]: { ownedQuantity: 0 }, [PYERITE]: { ownedQuantity: 40 } };
+    expect(clearOwnedStockSuggestions(MATERIALS, sourcing)).toEqual([
+      { typeID: PYERITE, ownedQuantity: 0 },
+    ]);
+  });
+
+  it('leaves an untouched row (no sourcing entry at all) out of the patch', () => {
+    expect(clearOwnedStockSuggestions(MATERIALS, undefined)).toEqual([]);
+  });
+
+  it('does not clear a row that only carries an override price', () => {
+    const sourcing = { [TRITANIUM]: { overridePrice: 6 } };
+    expect(clearOwnedStockSuggestions(MATERIALS, sourcing)).toEqual([]);
   });
 });
 

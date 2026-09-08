@@ -236,7 +236,7 @@ describe('Industry: Build Plan CRUD', () => {
     expect(stored[0].name).toBe('Rifter');
     // No prior plan to default from: falls back to the historical hardcoded defaults (#456).
     expect(stored[0].facility).toBe('npcStation');
-    expect(stored[0].rigLevel).toBe('none');
+    expect(stored[0].rigFit).toEqual(['none', 'none', 'none']);
     expect(stored[0].security).toBe('highsec');
     expect(stored[0].hubId).toBe(DEFAULT_TRADE_HUB.id);
     expect(stored[0].facilityTaxPct).toBeUndefined();
@@ -326,7 +326,7 @@ describe('Industry: Build Plan CRUD', () => {
       .and((p) => p.blueprintTypeID === 638)
       .first();
     expect(created?.facility).toBe('raitaru');
-    expect(created?.rigLevel).toBe('t2');
+    expect(created?.rigFit).toEqual(['meT2', 'teT2', 'none']);
     expect(created?.security).toBe('lowsec');
     expect(created?.hubId).toBe('amarr');
     expect(created?.facilityTaxPct).toBe(0.25);
