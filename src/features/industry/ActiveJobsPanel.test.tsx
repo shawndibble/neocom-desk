@@ -220,7 +220,7 @@ describe('ActiveJobsPanel: rendering', () => {
     expect(screen.queryByRole('table')).toBeNull();
   });
 
-  it('shows a "no active jobs" empty state (not the no-data-cached one) when ESI answers with zero jobs', async () => {
+  it('says "None" beside the title, with no body at all, when ESI answers with zero jobs', async () => {
     server.use(http.get(jobsUrl(), () => HttpResponse.json([])));
     render(
       <MemoryRouter>
@@ -232,8 +232,13 @@ describe('ActiveJobsPanel: rendering', () => {
         />
       </MemoryRouter>
     );
-    expect(await screen.findByText('No active jobs')).toBeInTheDocument();
+    // The whole point: an idle panel is its own header line, not a card that
+    // stands taller than the same panel with jobs running in it.
+    expect(await screen.findByText('None')).toBeInTheDocument();
     expect(screen.queryByText('No active jobs cached')).toBeNull();
+    expect(screen.queryByRole('table')).toBeNull();
+    // Still a working title line: the age badge and the refresh button stay.
+    expect(screen.getByRole('button', { name: 'Refresh' })).toBeInTheDocument();
   });
 
   it('shows the "no data cached" empty state when there is no data at all (offline, nothing cached)', async () => {
