@@ -92,6 +92,22 @@ function matchesHideHealthy(row: OpenOrderRow, hideHealthy: boolean): boolean {
   return row.problem !== 'healthy';
 }
 
+/**
+ * Every problem a filter may name — that is, every `OrderProblem` except
+ * `healthy`.
+ *
+ * `hideHealthy` is a separate axis and is on by default (the page folds
+ * healthy orders away; the "show healthy" toggle is the way back, not the
+ * funnel). So a filter naming `healthy` selects exactly the rows the same
+ * filter then hides: nought of N, under a chip that reads as though it should
+ * have matched something. It is a real word in this vocabulary and still not
+ * one a filter can honour, which is why it is excluded here rather than left
+ * to each caller to remember.
+ */
+export const FILTERABLE_PROBLEMS: readonly OrderProblem[] = ORDER_PROBLEMS.filter(
+  (problem) => problem !== 'healthy'
+);
+
 export function filterOpenOrders(
   rows: readonly OpenOrderRow[],
   filter: OpenOrdersFilter
@@ -301,7 +317,7 @@ export function openOrdersFilterFromParams(
   const problems = params
     .getAll('problem')
     .filter((value): value is OrderProblem =>
-      (ORDER_PROBLEMS as readonly string[]).includes(value)
+      (FILTERABLE_PROBLEMS as readonly string[]).includes(value)
     );
   const characterIds = params
     .getAll('character')

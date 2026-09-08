@@ -60,6 +60,7 @@ import {
 } from './openOrdersModel';
 import {
   EMPTY_OPEN_ORDERS_FILTER,
+  FILTERABLE_PROBLEMS,
   filterOpenOrders,
   openOrdersFilterFromParams,
   sortOpenOrders,
@@ -67,7 +68,7 @@ import {
   type OpenOrdersFilter,
   type OpenOrdersSort,
 } from './openOrdersFilter';
-import { ORDER_PROBLEMS, type OrderProblem } from '@/engine/market/orderProblems';
+import type { OrderProblem } from '@/engine/market/orderProblems';
 import { OrderProblemBadge } from './OrderProblemBadge';
 import { orderBadgeFor } from './orderBadgeKind';
 import { stationPriceKey } from './stationPriceKey';
@@ -88,10 +89,13 @@ const SORTS: readonly OpenOrdersSort[] = [
   'character',
 ];
 
-/** Every problem worth a funnel chip — every `OrderProblem` except `healthy`, which the fold toggle already covers. */
-const PROBLEM_FILTER_OPTIONS: readonly OrderProblem[] = ORDER_PROBLEMS.filter(
-  (problem) => problem !== 'healthy'
-);
+/**
+ * Every problem worth a funnel chip. The same set a deep link may name, and
+ * deliberately the same constant: the funnel and the URL are two ways to reach
+ * one filter, and `healthy` is excluded from both for the reason
+ * `FILTERABLE_PROBLEMS` gives.
+ */
+const PROBLEM_FILTER_OPTIONS = FILTERABLE_PROBLEMS;
 
 /** The five NPC trade hub stations — an order anywhere else sees far fewer buyers, which the row says out loud. */
 const HUB_STATION_IDS = new Set(TRADE_HUBS.map((hub) => hub.stationId));

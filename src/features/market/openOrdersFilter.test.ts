@@ -387,6 +387,19 @@ describe('the deep-link vocabulary', () => {
     expect(filter.characterIds).toEqual([91]);
   });
 
+  /*
+   * `healthy` is a real word in this vocabulary and still not one this
+   * endpoint can honour: the page folds healthy orders away by default
+   * (`hideHealthy`), so a filter naming it matches rows that the same filter
+   * then hides — nought of N, with a chip the reader cannot reason about. The
+   * funnel already cannot produce that state (`PROBLEM_FILTER_OPTIONS` leaves
+   * `healthy` out); only a URL can.
+   */
+  it('refuses `healthy`, which would filter to a guaranteed empty page', () => {
+    expect(parse('problem=healthy')).toBe(base);
+    expect(parse('problem=healthy&problem=outbid').problems).toEqual(['outbid']);
+  });
+
   it('leaves the rest of the filter exactly as it found it', () => {
     // Layered onto the page's own default, not onto an empty filter: arriving
     // by deep link must not quietly unfold every healthy order.

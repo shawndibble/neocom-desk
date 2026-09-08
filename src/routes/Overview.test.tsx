@@ -398,6 +398,11 @@ describe('Overview board', () => {
     const card = await findCard(/open orders/i);
     // All three undercut scopes, because the tile sums all three — an order
     // carries at most one, so the filter matches the same orders it counted.
+    //
+    // Their order here is `UNDERCUT_PROBLEMS`'s declaration order and nothing
+    // more: the filter ORs them, so reordering that constant changes this
+    // string without changing any behaviour. If this line ever fails on its
+    // own, read it as a reformatting, not as a routing bug.
     expect(await within(card).findByRole('link', { name: /undercut/i })).toHaveAttribute(
       'href',
       `/market?section=orders&problem=undercutStation&problem=undercutSystem&problem=undercutRegion&character=${CHAR_ID}`
