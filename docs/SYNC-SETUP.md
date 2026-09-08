@@ -71,6 +71,19 @@ firebase deploy --only functions,firestore
 `firebase deploy --only functions` runs the predeploy TypeScript build
 automatically. To deploy rules alone: `firebase deploy --only firestore:rules`.
 
+### Index exemptions are a one-way-ish deploy
+
+`firestore.indexes.json`'s `fieldOverrides` exempt every field of every synced
+collection group from automatic indexing and re-enable only `ownerHash` — the
+one field the client ever filters on (issue #583). Deploying them
+(`firebase deploy --only firestore:indexes`) **deletes** the single-field
+indexes they turn off; reverting rebuilds those from scratch, taking time
+proportional to the stored data. So treat that deploy as deliberate, and
+afterwards confirm a real sync still pulls (the failure mode is a
+`failed-precondition` on the `ownerHash` query, which looks exactly like a
+missing composite index). Adding a `where`/`orderBy` on any other synced
+field means re-enabling that field here first.
+
 ## What to verify afterwards
 
 1. **Function exists**: Firebase console → Functions shows `mintFirebaseToken`
