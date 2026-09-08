@@ -14,10 +14,7 @@ import {
   type StatusResult,
 } from '@/esi/cache';
 import { parseInstant } from '@/engine/esiInstant';
-import {
-  stillRunningToday,
-  type CalendarRetentionEntry,
-} from '@/engine/character/calendarRetention';
+import { stillRunning, type CalendarRetentionEntry } from '@/engine/character/calendarRetention';
 
 const KEYS = {
   events: 'calendar',
@@ -103,7 +100,7 @@ async function withStartedEventsRetained(
   const seen = (await readCached<CalendarEventSummary[]>(characterId, KEYS.seenEvents)) ?? [];
   const starts = startsById([...fresh, ...seen]);
   const retainedIds = new Set(
-    stillRunningToday(toRetentionEntries(seen, starts), toRetentionEntries(fresh, starts), nowMs)
+    stillRunning(toRetentionEntries(seen, starts), toRetentionEntries(fresh, starts), nowMs)
   );
 
   const merged = [...fresh, ...seen.filter((event) => retainedIds.has(event.event_id))];

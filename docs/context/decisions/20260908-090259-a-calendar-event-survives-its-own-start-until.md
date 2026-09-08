@@ -19,12 +19,23 @@ _Recorded 2026-09-08._
   This rules out retaining by age, by a grace period, or by "keep whatever we
   last saw" — each of which would leave a cancelled event on the board with
   nothing to remove it.
-- **Local midnight, not a rolling span.** "Some events start and run for several
-  hours" is a statement about a day. A rolling 24-hour window would carry
-  yesterday evening's op into this morning, filed under _Today_. Local days for
-  `engine/localDay.ts`'s reason: a pilot reading "Today" means their own. This
-  rules out a duration-based retention constant, and it keeps the Calendar Map's
-  claim about past cells true — nothing is retained into a day that has passed.
+- **The end of its own local day, or six hours after it started, whichever is
+  later.** End-of-day alone was the first rule and it was wrong at one hour of
+  the clock: a 22:00 op is still going at 01:00, and midnight is not evidence
+  that it ended. `ASSUMED_RUN_MS` stands in for a duration the calendar summary
+  does not carry — `GET /calendar/{event_id}` returns `duration`, but fetching
+  it for fifty events on every poll buys a sharper edge on a handful of late
+  ops at a lot of traffic. Local days for `engine/localDay.ts`'s reason: a
+  pilot reading "Today" means their own. This rules out a rolling 24-hour
+  window, which would file last night's op under _Today_.
+- **This is a run-out, never a look-back.** A longer tail was considered — keep
+  two calendar days so the pilot can see yesterday — and rejected. The device
+  only ever retains what it _saw_ before an event started, and ESI has no past-
+  events endpoint to fill the gaps from, so "yesterday" would hold the events
+  the app happened to be open for and silently omit the rest. A partial history
+  that reads as a complete one is worse than the hatched blank, which at least
+  says "I cannot know this". This rules out extending the window to make the
+  board a record of what happened.
 - **Retention lives in the calendar data layer, not in either consumer.** The
   `/calendar` map, rail and ticker and the Foreground Poller's calendar domain
   read the same function, so a board that lists a running op while the poller's
@@ -34,6 +45,11 @@ _Recorded 2026-09-08._
   an entry whose `startMs` is newly in the past — in a list ESI had already
   dropped it from, which it could only ever win by racing a cache. The event's
   wording change is downstream of the retention change, not beside it.
+- **A past day holding a retained event is not hatched.** The hatch claims a
+  day is structurally incapable of holding anything; a cell with a running op
+  in it is visibly capable, and hatch-plus-dot contradicts itself. Empty past
+  days keep it, which is the case it was written for. This rules out reading
+  the hatch as "before today" rather than as "nothing here is knowable".
 - **A running event's countdown reads "Started", not "Overdue".** Every other
   kind past its clock really is late; a calendar event past its clock is under
   way, and these rows exist precisely because it is. This rules out reusing the
