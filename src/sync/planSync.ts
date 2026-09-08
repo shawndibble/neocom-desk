@@ -537,6 +537,25 @@ interface SyncContext {
   now: number;
 }
 
+/**
+ * The only remote read in the app, and the only reason any field of a synced
+ * document is indexed at all.
+ *
+ * `firestore.indexes.json` exempts every field of every synced collection
+ * group from automatic indexing (`fieldPath: "*"`) and re-enables exactly
+ * one: `ownerHash` — issue #583, which is what stops Firestore storing an
+ * index entry per skill in a plan queue, per Quickbar item and per ore line
+ * for queries nobody makes. **So adding a `where(...)` or `orderBy(...)` on
+ * any other field here needs that field re-enabled in `fieldOverrides`
+ * first, and the exemptions redeployed.** A composite index still covers its
+ * own fields (an exemption applies only to automatic indexing), which is how
+ * the incremental pull's `updatedAt` filter below works without one.
+ *
+ * Miss that and the query throws `failed-precondition` at runtime — the same
+ * error a missing *composite* index gives, so it reads as one. `isMissingIndex`
+ * catches it for the `since` window only, and deliberately: falling back to a
+ * full read cannot rescue a query whose `ownerHash` index is the missing one.
+ */
 async function fetchOwnedDocs<R extends { ownerHash: string }>(
   col: CollectionReference,
   ownerHash: string,
