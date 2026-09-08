@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { db } from '@/db';
-import type { SyncStatus } from '@/sync';
+import type { SyncStatus } from '@/sync/status';
 import { createSyncedSetting } from './useSyncedSetting';
 
 // A real allow-listed key, because the factory rejects anything else — the
@@ -20,10 +20,17 @@ vi.mock('@/app/syncStatus', async (importOriginal) => ({
   isSyncConfigured: () => true,
 }));
 
-vi.mock('@/sync', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@/sync')>()),
+// A factory mock with no `importOriginal`, deliberately: several suites mock
+// the barrel exactly like this, and the factory under test must stay
+// initializable under one — which is why its allow-list check imports the leaf
+// module instead.
+vi.mock('@/sync', () => ({
   setSyncedSetting: (key: string, value: unknown) => setSyncedSetting(key, value),
   scheduleSync: (characterId: number) => scheduleSync(characterId),
+}));
+
+vi.mock('@/sync/status', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/sync/status')>()),
   subscribeSyncStatus: (listener: (status: SyncStatus) => void) => {
     statusListeners.push(listener);
     listener({ state: 'idle', lastSyncedAt: null, error: null });

@@ -35,6 +35,21 @@ const COLLECTION_TO_ITEM: Readonly<Record<(typeof REMOTE_COLLECTIONS)[number], s
   productionOrderWatches: 'productionRuns',
 };
 
+/**
+ * Which words in the "settings" line account for each allow-listed synced key.
+ * The line covers all of them at once, so it is the phrasing rather than the
+ * bullet that has to keep up.
+ */
+const SETTING_KEY_TO_PHRASE: Readonly<Record<string, RegExp>> = {
+  'sync.notificationFeedPrefs': /notification preferences/i,
+  'sync.piCustomsRates': /customs rates/i,
+  'sync.marketHub': /trade hub/i,
+  'sync.industryFacilityDefaults': /industry facility/i,
+  'sync.industryAssumedMe': /assumed ME/,
+  'sync.piExpiringSoonHours': /expiring-soon window/i,
+  'sync.corpDarkAfterDays': /dark threshold/i,
+};
+
 function syncedItemIds(): Set<string> {
   const group = WHAT_WE_STORE_GROUPS.find((g) => g.id === 'synced');
   return new Set(group?.items.map((item) => item.id) ?? []);
@@ -60,11 +75,20 @@ describe('FaqPanel — What We Store', () => {
     }
   });
 
-  it('says "two settings" only while exactly two settings sync', () => {
-    // The copy names a count. `SYNCED_SETTING_KEYS` is the allow-list it counts.
-    expect(SYNCED_SETTING_KEYS).toHaveLength(2);
+  it('names every setting that leaves the device', () => {
+    // The settings line used to name a count, which stopped scaling the moment
+    // a third preference synced. What has to stay true is the promise it ends
+    // on — "nothing else on this page leaves your device" — so each allowed key
+    // is pinned to the words that account for it, in the same two-file spirit
+    // as `syncedSettings.ts`: adding a key fails this until whoever added it
+    // decides what the reader is told.
     render(<FaqPanel />);
-    expect(screen.getByText(/two settings/i)).toBeInTheDocument();
+    const shown = document.body.textContent ?? '';
+    for (const key of SYNCED_SETTING_KEYS) {
+      const phrase = SETTING_KEY_TO_PHRASE[key];
+      expect(phrase, `"${key}" syncs but no words in the FAQ account for it`).toBeDefined();
+      expect(shown, `"${key}" syncs but the FAQ never mentions it`).toMatch(phrase);
+    }
   });
 
   it('renders every group and every line', () => {

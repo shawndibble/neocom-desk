@@ -54,12 +54,16 @@
  */
 import { db } from '@/db';
 import { isSyncConfigured } from '@/app/syncStatus';
-import {
-  isAllowedSyncedSettingKey,
-  scheduleSync,
-  setSyncedSetting,
-  subscribeSyncStatus,
-} from '@/sync';
+// Both leaf modules rather than the `@/sync` barrel, and not for weight —
+// `syncedSettings` is a string Set and `status` a listener list, neither of
+// which reaches Firebase either way. The allow-list check runs at *module
+// scope*, so routing it through the barrel would make five preference stores
+// fail to initialize in any suite that mocks `@/sync` with a factory (several
+// do), for a check that has nothing to do with what those suites are mocking.
+// Only the two functions that must load the sync driver come from the barrel.
+import { isAllowedSyncedSettingKey } from '@/sync/syncedSettings';
+import { subscribeSyncStatus } from '@/sync/status';
+import { scheduleSync, setSyncedSetting } from '@/sync';
 import { createSettingStore, type StoredRow } from './settingStore';
 import { settingCoercer, type LocalSettingStore } from './useLocalSetting';
 

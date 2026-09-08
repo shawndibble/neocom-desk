@@ -9,9 +9,6 @@
 // at first paint.
 
 export { getSyncStatus, subscribeSyncStatus, type SyncState, type SyncStatus } from './status';
-// Touches nothing but a string Set — no Firebase — so `lib/useSyncedSetting.ts`
-// can check a key at module scope without pulling the sync driver in.
-export { isAllowedSyncedSettingKey, SYNCED_SETTING_KEYS } from './syncedSettings';
 export { uidForCharacter } from './uid';
 export { TOMBSTONE_TTL_MS } from './merge';
 export { clearCharacterSyncBookkeeping } from './localBookkeeping';
