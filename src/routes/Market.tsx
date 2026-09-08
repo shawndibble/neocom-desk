@@ -802,11 +802,12 @@ export function Market() {
           <>
             {formatIsk(o.price, 2)}
             {/*
-              The tinted row (rowClassName below) is the visible marker for
-              "this one is mine" — no badge, no gap figure, nothing that adds
-              a line to every row of a book you scan by price. Colour is never
-              the sole signal though (docs/DESIGN.md §7), so the word rides
-              along unseen, the way `CorpBoardRow`'s severity label does.
+              The tinted row (`row-mine`, styles/index.css) is the visible
+              marker for "this one is mine" — no badge, no gap figure,
+              nothing that adds a line to every row of a book you scan by
+              price. Colour is never the sole signal though (docs/DESIGN.md
+              §7), so the word rides along unseen, the way `CorpBoardRow`'s
+              severity label does.
             */}
             {myOrderIds.has(o.order_id) && <span className="sr-only">{t('market.myOrder')}</span>}
           </>
@@ -1339,7 +1340,7 @@ export function Market() {
                               defaultSort={{ columnId: 'price', direction: 'asc' }}
                               rowContextMenu={orderRowContextMenu}
                               rowClassName={(o) =>
-                                myOrderIds.has(o.order_id) ? 'bg-accent/10' : undefined
+                                myOrderIds.has(o.order_id) ? 'row-mine' : undefined
                               }
                             />
                             {!sellShowAll && sortedSell.length > ROW_CAP && (
@@ -1398,7 +1399,7 @@ export function Market() {
                               defaultSort={{ columnId: 'price', direction: 'desc' }}
                               rowContextMenu={orderRowContextMenu}
                               rowClassName={(o) =>
-                                myOrderIds.has(o.order_id) ? 'bg-accent/10' : undefined
+                                myOrderIds.has(o.order_id) ? 'row-mine' : undefined
                               }
                             />
                             {!buyShowAll && sortedBuy.length > ROW_CAP && (

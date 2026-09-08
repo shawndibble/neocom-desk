@@ -305,6 +305,31 @@
       background-color: transparent;
     }
   }
+
+  /*
+   * A row of the Market Data order book that is one of my own orders
+   * (`routes/Market.tsx`). A flat accent wash, and nothing else: the book is
+   * scanned down the price column, and a badge or a second line under the
+   * price would break that column on some rows and not others. Unlike
+   * `row-pulse` above this is a state, not an arrival cue, so it persists —
+   * the row also carries an `sr-only` "You", which is what keeps colour from
+   * standing alone (DESIGN.md §7).
+   *
+   * Written here rather than as a `bg-accent/10` class handed to
+   * `DataTable`'s `rowClassName` because the component's own
+   * `hover:bg-panel-2` is a class *plus* a pseudo-class, and so outranks any
+   * plain background utility on the same element: the cursor would wipe out
+   * the one marker these rows have. `tr.row-mine` outranks it in turn, and
+   * the `:hover` rule keeps the row's hover feedback rather than trading it
+   * away.
+   */
+  tr.row-mine {
+    background-color: color-mix(in srgb, var(--color-accent) 10%, transparent);
+  }
+
+  tr.row-mine:hover {
+    background-color: color-mix(in srgb, var(--color-accent) 18%, transparent);
+  }
 }
 
 @layer base {
