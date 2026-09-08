@@ -157,7 +157,7 @@ describe('BpcContracts', () => {
     expect(await screen.findByText("Public BPC search isn't available")).toBeInTheDocument();
   });
 
-  it('suggests matching blueprints as you type, with how many copies each has', async () => {
+  it('suggests matching blueprints as you type, with how many offers each has', async () => {
     loadPublicBpcContracts.mockResolvedValue(
       cachedSnapshot([
         row({ contractId: 1, typeId: 638 }),
@@ -173,7 +173,7 @@ describe('BpcContracts', () => {
 
     const suggestions = screen.getByRole('list', { name: 'Matching blueprints' });
     expect(within(suggestions).getByText('Rifter Blueprint')).toBeInTheDocument();
-    expect(within(suggestions).getByText('2 copies')).toBeInTheDocument();
+    expect(within(suggestions).getByText('2 offers')).toBeInTheDocument();
     expect(within(suggestions).queryByText('Caracal Blueprint')).not.toBeInTheDocument();
   });
 
@@ -194,7 +194,7 @@ describe('BpcContracts', () => {
     const suggestions = screen.getByRole('list', { name: 'Matching blueprints' });
     await user.click(within(suggestions).getByRole('button'));
 
-    expect(screen.getByText('3 copies on contract')).toBeInTheDocument();
+    expect(screen.getByText('3 offers on contract')).toBeInTheDocument();
     // Scoped to the chips: these figures also appear in the region strip and
     // the table, which is the point — all three have to agree.
     expect(screen.getByText('Cheapest').parentElement).toHaveTextContent('3,000,000.00');
@@ -225,6 +225,23 @@ describe('BpcContracts', () => {
     expect(within(strip).getByText('1 offer')).toBeInTheDocument();
     // Cheapest region first, so the order itself carries the answer.
     expect(within(strip).getAllByRole('listitem')[0]).toHaveTextContent('The Forge');
+  });
+
+  it('sorts price on what a row costs, so a stray buyout on an exchange cannot jump the queue', async () => {
+    // EVE Ref's CSV carries a buyout on non-auction contracts whenever the
+    // field parses, so `buyout ?? price` sorted this 5M exchange row to the
+    // top at 0 while rendering it at 5M.
+    loadPublicBpcContracts.mockResolvedValue(
+      cachedSnapshot([
+        row({ contractId: 1, typeId: 638, price: 5_000_000, buyout: 0, isAuction: false }),
+        row({ contractId: 2, typeId: 870, price: 1_000_000 }),
+      ])
+    );
+    render(<App />);
+
+    const table = await screen.findByRole('table', { name: 'BPC Search' });
+    // Row 0 is the header; the cheapest row must lead under the default sort.
+    expect(within(table).getAllByRole('row')[1]).toHaveTextContent('1,000,000.00');
   });
 
   it('clearing the picked blueprint restores the full, browsable list', async () => {

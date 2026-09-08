@@ -159,14 +159,14 @@ describe('effectivePrice', () => {
 });
 
 describe('blueprintOfferStats', () => {
-  it('counts offers and keeps the best ME/TE and cheapest price per type', () => {
+  it('counts offers and keeps the best ME/TE per type', () => {
     const stats = blueprintOfferStats([
       row({ contractId: 1, typeId: 100, me: 8, te: 14, price: 9_000_000 }),
       row({ contractId: 2, typeId: 100, me: 10, te: 20, price: 12_000_000 }),
       row({ contractId: 3, typeId: 200, me: 4, te: 6, price: 3_000_000 }),
     ]);
-    expect(stats.get(100)).toEqual({ offerCount: 2, bestMe: 10, bestTe: 20, cheapest: 9_000_000 });
-    expect(stats.get(200)).toEqual({ offerCount: 1, bestMe: 4, bestTe: 6, cheapest: 3_000_000 });
+    expect(stats.get(100)).toEqual({ offerCount: 2, bestMe: 10, bestTe: 20 });
+    expect(stats.get(200)).toEqual({ offerCount: 1, bestMe: 4, bestTe: 6 });
   });
 
   it('takes the best ME and the best TE independently — they need not come from one row', () => {
@@ -178,12 +178,9 @@ describe('blueprintOfferStats', () => {
     expect(stats.get(100)?.bestTe).toBe(20);
   });
 
-  it('prices an auction at its buyout, the same expression the table sorts on', () => {
-    const stats = blueprintOfferStats([
-      row({ contractId: 1, typeId: 100, isAuction: true, price: 1, buyout: 8_000_000 }),
-      row({ contractId: 2, typeId: 100, price: 9_000_000 }),
-    ]);
-    expect(stats.get(100)?.cheapest).toBe(8_000_000);
+  it('counts one offer per contract row, not per copy — a quantity-3 contract is one offer', () => {
+    const stats = blueprintOfferStats([row({ contractId: 1, typeId: 100, quantity: 3 })]);
+    expect(stats.get(100)?.offerCount).toBe(1);
   });
 
   it('is empty given no rows', () => {

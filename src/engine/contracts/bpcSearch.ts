@@ -100,36 +100,43 @@ export interface BlueprintTypeOption {
   name: string;
 }
 
-/** What a blueprint's listings look like in aggregate, for the search's suggestion rows. */
+/**
+ * What a blueprint's listings look like in aggregate, for the search's
+ * suggestion rows. An **offer** is one contract row, which is not the same as
+ * one copy: a single contract can put `quantity: 3` copies up at one price.
+ * Counting rows is what the buyer is choosing between, so that is what this
+ * counts — and every surface says "offers", never "copies".
+ */
 export interface BlueprintOfferStats {
   offerCount: number;
   /** Highest ME on offer. Taken independently of `bestTe` — the two can come from different contracts, and a buyer filtering on one does not thereby get the other. */
   bestMe: number;
   bestTe: number;
-  cheapest: number;
 }
 
 /**
- * One pass over every row, keyed by type. The search's suggestion list needs a
+ * One pass over the rows, keyed by type. The search's suggestion list needs a
  * count and a best-ME/TE per candidate blueprint on every keystroke; deriving
  * those by re-filtering ~120,000 rows per suggestion is the shape that turns a
  * typeahead into a stutter, so the whole index is built once and looked up.
+ *
+ * Deliberately takes a row set rather than reaching for the whole snapshot:
+ * the caller passes rows already narrowed by the *other* filters, so a
+ * suggestion reading "40 offers" cannot be followed by a summary reading "2".
  */
 export function blueprintOfferStats(
   rows: readonly BpcContractRow[]
 ): Map<number, BlueprintOfferStats> {
   const stats = new Map<number, BlueprintOfferStats>();
   for (const row of rows) {
-    const price = effectivePrice(row);
     const existing = stats.get(row.typeId);
     if (!existing) {
-      stats.set(row.typeId, { offerCount: 1, bestMe: row.me, bestTe: row.te, cheapest: price });
+      stats.set(row.typeId, { offerCount: 1, bestMe: row.me, bestTe: row.te });
       continue;
     }
     existing.offerCount += 1;
     if (row.me > existing.bestMe) existing.bestMe = row.me;
     if (row.te > existing.bestTe) existing.bestTe = row.te;
-    if (price < existing.cheapest) existing.cheapest = price;
   }
   return stats;
 }

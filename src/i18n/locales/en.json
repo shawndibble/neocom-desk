@@ -1977,11 +1977,7 @@
     "notConfiguredHint": "This requires the app's sync backend, which isn't configured here.",
     "noFilterMatches": "No BPC listings match your filters.",
     "suggestionsLabel": "Matching blueprints",
-    "suggestionCopies_one": "{{count}} copy",
-    "suggestionCopies_other": "{{count}} copies",
-    "suggestionBestMeTe": "Best {{me}} / {{te}}",
-    "copiesOnContract_one": "{{count}} copy on contract",
-    "copiesOnContract_other": "{{count}} copies on contract",
+    "suggestionBestMeTe": "Best ME {{me}} / TE {{te}}",
     "cheapestLabel": "Cheapest",
     "medianLabel": "Median",
     "bestMeTeLabel": "Best ME / TE",
@@ -1989,7 +1985,10 @@
     "clearBlueprintShort": "Clear",
     "cheapestByRegion": "Cheapest by region",
     "regionOffers_one": "{{count}} offer",
-    "regionOffers_other": "{{count}} offers"
+    "regionOffers_other": "{{count}} offers",
+    "offersOnContract_one": "{{count}} offer on contract",
+    "offersOnContract_other": "{{count}} offers on contract",
+    "cheapestByRegionCapped": "Cheapest by region ({{shown}} of {{total}})"
   },
   "contacts": {
     "title": "Contacts",

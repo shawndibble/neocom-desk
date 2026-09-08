@@ -28,8 +28,11 @@ import {
   blueprintOfferStats,
   bpcPriceSummary,
   cheapestByRegion,
+  effectivePrice,
   filterBpcContracts,
   listedBlueprintTypeOptions,
+  type BlueprintOfferStats,
+  type BlueprintTypeOption,
   type BpcContractRow,
   type BpcSearchFilter,
 } from '@/engine/contracts/bpcSearch';
@@ -123,13 +126,7 @@ const SUGGESTION_LIMIT = 8;
 const REGION_CELL_LIMIT = 6;
 
 /** One row of the search's autocomplete: a candidate blueprint plus what its listings look like, so a dead blueprint is visible before it is chosen. */
-interface BlueprintSuggestion {
-  typeId: number;
-  name: string;
-  offerCount: number;
-  bestMe: number;
-  bestTe: number;
-}
+type BlueprintSuggestion = BlueprintTypeOption & BlueprintOfferStats;
 
 /** Positive-integer text field to a filter number, or null when blank/invalid — never NaN reaching the engine filter. */
 function parsePositiveNumber(value: string): number | null {
@@ -286,30 +283,45 @@ export function BpcContracts() {
     [rows, blueprintNames]
   );
 
-  // Built once per snapshot, not per keystroke: every suggestion row needs a
-  // count and a best ME/TE, and deriving those by re-scanning ~120,000 rows
-  // per candidate is what would make the autocomplete stutter.
-  const offerStats = useMemo(() => blueprintOfferStats(rows), [rows]);
+  /**
+   * Every filter *except* the blueprint itself. Suggestions are counted
+   * against this rather than the raw snapshot, so a row reading "40 offers"
+   * is never followed one click later by a summary reading "2" — with a
+   * region or a min ME set, the count a buyer is choosing between is the
+   * filtered one. Keyed on the individual fields rather than `uiFilter`, so
+   * typing in the search box does not rebuild it on every keystroke.
+   */
+  const nonTypeFilter: BpcSearchFilter = useMemo(
+    () => ({
+      ...EMPTY_BPC_SEARCH_FILTER,
+      regionId: uiFilter.regionId,
+      minMe: parsePositiveNumber(uiFilter.minMe),
+      minTe: parsePositiveNumber(uiFilter.minTe),
+      minRuns: parsePositiveNumber(uiFilter.minRuns),
+      maxPrice: parsePositiveNumber(uiFilter.maxPrice),
+    }),
+    [uiFilter.regionId, uiFilter.minMe, uiFilter.minTe, uiFilter.minRuns, uiFilter.maxPrice]
+  );
+
+  const suggestionRows = useMemo(
+    () => filterBpcContracts(rows, nonTypeFilter),
+    [rows, nonTypeFilter]
+  );
+  const offerStats = useMemo(() => blueprintOfferStats(suggestionRows), [suggestionRows]);
 
   const suggestions = useMemo<BlueprintSuggestion[]>(() => {
     if (selectedTypeId !== null || uiFilter.typeQuery.trim() === '') return [];
-    return rankedSearch(typeOptions, uiFilter.typeQuery, {
+    const matched: BlueprintSuggestion[] = [];
+    for (const option of rankedSearch(typeOptions, uiFilter.typeQuery, {
       primary: (option) => option.name,
       limit: SUGGESTION_LIMIT,
-    }).flatMap((option) => {
+    })) {
+      // A blueprint with no offers left under the current filters is not a
+      // candidate — picking it would resolve to an empty table.
       const stats = offerStats.get(option.typeId);
-      return stats
-        ? [
-            {
-              typeId: option.typeId,
-              name: option.name,
-              offerCount: stats.offerCount,
-              bestMe: stats.bestMe,
-              bestTe: stats.bestTe,
-            },
-          ]
-        : [];
-    });
+      if (stats) matched.push({ ...option, ...stats });
+    }
+    return matched;
   }, [typeOptions, uiFilter.typeQuery, selectedTypeId, offerStats]);
 
   const selectedName =
@@ -332,6 +344,10 @@ export function BpcContracts() {
   function changeFilter(next: UiFilter) {
     if (next.typeQuery !== uiFilter.typeQuery) setSelectedTypeId(null);
     setUiFilter(next);
+    // Any filter edit gives a different row set, so an expansion asked for
+    // against the previous one no longer means anything — same reset the two
+    // blueprint handlers do.
+    setShowAll(false);
   }
   const regionOptions = useMemo(
     () =>
@@ -353,16 +369,11 @@ export function BpcContracts() {
                 limit: TYPE_SEARCH_LIMIT,
               }).map((o) => o.typeId)
             );
-    return {
-      ...EMPTY_BPC_SEARCH_FILTER,
-      typeIds,
-      regionId: uiFilter.regionId,
-      minMe: parsePositiveNumber(uiFilter.minMe),
-      minTe: parsePositiveNumber(uiFilter.minTe),
-      minRuns: parsePositiveNumber(uiFilter.minRuns),
-      maxPrice: parsePositiveNumber(uiFilter.maxPrice),
-    };
-  }, [uiFilter, typeOptions, selectedTypeId]);
+    // The blueprint filter laid over the other ones, which `nonTypeFilter`
+    // already holds — the two must not drift, or the suggestion counts and
+    // the table would answer different questions.
+    return { ...nonTypeFilter, typeIds };
+  }, [nonTypeFilter, uiFilter.typeQuery, typeOptions, selectedTypeId]);
 
   const filteredRows = useMemo(() => filterBpcContracts(rows, engineFilter), [rows, engineFilter]);
   const visibleRows = showAll ? filteredRows : filteredRows.slice(0, ROW_CAP);
@@ -426,7 +437,12 @@ export function BpcContracts() {
         header: t('bpcContracts.priceColumn'),
         align: 'right',
         className: 'tabular-nums whitespace-nowrap',
-        sortValue: (row) => row.buyout ?? row.price,
+        // `effectivePrice`, not the `buyout ?? price` this used to inline: EVE
+        // Ref's CSV carries a buyout on non-auction contracts too whenever the
+        // field parses, so an item_exchange row with `buyout: 0` sorted to the
+        // top of the table while rendering — and now summarising — at its real
+        // price. One expression across the sort, the cell and the chips.
+        sortValue: effectivePrice,
         render: (row) =>
           row.isAuction
             ? row.buyout !== undefined
@@ -524,7 +540,7 @@ export function BpcContracts() {
                       })}
                     </span>
                     <span className="shrink-0 text-[0.6875rem] tabular-nums text-text-dim">
-                      {t('bpcContracts.suggestionCopies', { count: suggestion.offerCount })}
+                      {t('bpcContracts.regionOffers', { count: suggestion.offerCount })}
                     </span>
                   </button>
                 </li>
@@ -537,7 +553,7 @@ export function BpcContracts() {
               <div className="min-w-0">
                 <p className="truncate text-base font-semibold">{selectedName}</p>
                 <p className="text-[0.6875rem] text-text-dim">
-                  {t('bpcContracts.copiesOnContract', { count: summary.offerCount })}
+                  {t('bpcContracts.offersOnContract', { count: summary.offerCount })}
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2 md:ml-auto">
@@ -572,8 +588,16 @@ export function BpcContracts() {
 
           {regionPrices.length > 1 && (
             <div className="border-b border-line px-3 py-2">
+              {/* Says so when it is showing a subset: the cheapest region always
+                  survives the slice, but a blueprint listed in twenty regions
+                  would otherwise show six with nothing admitting it. */}
               <p className="pb-2 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                {t('bpcContracts.cheapestByRegion')}
+                {regionPrices.length > REGION_CELL_LIMIT
+                  ? t('bpcContracts.cheapestByRegionCapped', {
+                      shown: REGION_CELL_LIMIT,
+                      total: regionPrices.length,
+                    })
+                  : t('bpcContracts.cheapestByRegion')}
               </p>
               {/* Cheapest first, so the ordering carries the answer and the
                   accent on the leading cell is only reinforcement (DESIGN.md §7). */}

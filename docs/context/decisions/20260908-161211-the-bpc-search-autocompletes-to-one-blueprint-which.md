@@ -23,7 +23,19 @@ _Recorded 2026-09-08 · issue #608._
   table below no longer lists. A summary that disagreed with the rows under it
   would read as a data bug.
 
-- **One price expression, `buyout ?? price`, across every readout.**
+- **Suggestion counts respect every filter except the blueprint itself.**
+  Counting against the raw snapshot let a suggestion read "40 offers" and the
+  summary one click later read "2", once a region or a min ME was set. The
+  stats are built from rows pre-filtered by the other fields, memoised on
+  those fields so typing does not rebuild the index per keystroke.
+
+- **An "offer" is one contract row, and that is the word every surface uses.**
+  Not "copies": a contract can put `quantity: 3` up at one price, so a count
+  of rows is not a count of copies, and the table's own Qty column already
+  shows the difference. Counting rows is right — a row is what a buyer
+  chooses between — so only the noun needed fixing.
+
+- **One price expression across every readout.**
   `effectivePrice` is what the summary, the region strip and `DataTable`'s
   price sort all use, so the "cheapest" chip always names the first row of the
   table beneath it. This is deliberately _not_ `priceForMaxFilter`, which
@@ -31,6 +43,13 @@ _Recorded 2026-09-08 · issue #608._
   and must not be disqualified by a max-price filter, but it still has a
   starting bid to display. Same two fields, opposite treatment of the same
   gap, which is why they stay separate functions.
+
+  The price **column's sort** was pointed at `effectivePrice` as part of this,
+  which fixes a defect that predates the change: EVE Ref's CSV carries a
+  buyout on non-auction contracts whenever the field parses
+  (`functions/src/publicContracts.ts`), and `isAuction` comes separately from
+  the contract type — so an item_exchange row with `buyout: 0` sorted to the
+  top of the table at `0` while rendering at its real price.
 
 - **The suggestion list is in flow under the filter bar, not a floating
   combobox popover.** `radix-ui` ships no Combobox primitive and DESIGN.md
