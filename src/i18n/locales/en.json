@@ -2729,10 +2729,10 @@
         }
       },
       "feedbackTitle": "Where do I report a bug or ask for a feature?",
-      "feedbackBody": "On GitHub: <issues>github.com/shawndibble/neocom-desk/issues</issues>. Bugs and feature requests both go there, and it is the only place either is tracked.",
-      "feedbackHint": "For a bug, what helps most is the page you were on, the character it happened to, and what you expected instead. A screenshot is worth more than a description of one.",
+      "feedbackBody": "On GitHub: <issues>github.com/shawndibble/neocom-desk/issues</issues>.",
+      "feedbackHint": "For bugs, please include steps to reproduce and what the expected outcome should be.",
       "thanksTitle": "Is there someone I can thank?",
-      "thanksBody": "There is. In game, that is <pilot>Mero Otichoda</pilot>.",
+      "thanksBody": "In Game Name: <pilot>Mero Otichoda</pilot>.",
       "thanksHint": "Donations are welcome and never expected — the app is free, open source, and stays that way."
     },
     "displayTitle": "Display",
