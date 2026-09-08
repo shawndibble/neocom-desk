@@ -13,9 +13,10 @@ import {
 } from '@/db';
 import { GLOBAL_CACHE_CHARACTER_ID } from '@/esi/cache';
 import { CACHE_PURGE_PENDING_PREFIX } from '@/esi/cachePurge';
-import { FEED_SYNC_WINDOW_MS } from '@/features/notifications/feed';
+import { FEED_SYNC_WINDOW_MAX_ROWS, FEED_SYNC_WINDOW_MS } from '@/features/notifications/feed';
 import { backfillAccountWideData } from './accountWideBackfill';
 import { remotePurgePendingKey } from './characterPurge';
+import { pullCursorKey } from './localBookkeeping';
 import { TOMBSTONE_TTL_MS } from './merge';
 import {
   clearStationPin,
@@ -1345,19 +1346,65 @@ describe('triggerSync: notification feed', () => {
     expect((await db.notificationFeed.get('occ-1'))?.dismissedAt).toBe(dismissedAt);
   });
 
-  it('a dismissal pulls in even for a row that has aged out of the local push window', async () => {
-    const firedAt = Date.now() - FEED_SYNC_WINDOW_MS - 60_000;
-    const dismissedAt = Date.now() - 10;
+  it('a dismissal pulls in even for a row outside this device’s push window', async () => {
+    // Outside by *count* — the 100-row half of the sync window. Age is a
+    // different story since issue #582: a row past 30 days is purged remotely
+    // rather than reconciled (see the retention block below).
+    const now = Date.now();
+    // Older than all 100 rows below, but nowhere near 30 days old: the row
+    // cap is what leaves it out of pushEligible here, not the age half.
+    const firedAt = now - 1000;
+    const dismissedAt = now - 10;
+    await db.notificationFeed.bulkPut(
+      Array.from({ length: FEED_SYNC_WINDOW_MAX_ROWS }, (_, i) =>
+        feedRow({ id: `recent-${i}`, firedAt: now - i })
+      )
+    );
     await db.notificationFeed.put(feedRow({ firedAt }));
     seedRemote(NOTIFICATION_FEED_PATH, [remoteFeedDoc({ firedAt, dismissedAt })]);
     await triggerSync(1);
     expect((await db.notificationFeed.get('occ-1'))?.dismissedAt).toBe(dismissedAt);
   });
 
-  it('writes no tombstone and never deletes a remote row', async () => {
+  it('writes no tombstone and never deletes a remote row inside the sync window', async () => {
     await db.notificationFeed.put(feedRow({ dismissedAt: Date.now() }));
     await triggerSync(1);
     expect(deleteDoc).not.toHaveBeenCalled();
+  });
+
+  it('deletes a remote row past the sync window instead of pulling it (#582 AC1)', async () => {
+    seedRemote(NOTIFICATION_FEED_PATH, [
+      remoteFeedDoc({ firedAt: Date.now() - FEED_SYNC_WINDOW_MS - 60_000 }),
+    ]);
+
+    await triggerSync(1);
+
+    expect(deleteDoc).toHaveBeenCalledTimes(1);
+    expect(remoteStore.get(NOTIFICATION_FEED_PATH)?.has('occ-1')).toBe(false);
+    // Pulled would mean writing it locally only for trimFeed to drop it and
+    // the next pass to pull it again — the churn the purge exists to stop.
+    expect(await db.notificationFeed.get('occ-1')).toBeUndefined();
+  });
+
+  it('keeps the local archive when the remote copy is purged, and never re-pushes it (#582 AC3, AC4)', async () => {
+    const firedAt = Date.now() - FEED_SYNC_WINDOW_MS - 60_000;
+    await db.notificationFeed.put(feedRow({ firedAt }));
+    seedRemote(NOTIFICATION_FEED_PATH, [remoteFeedDoc({ firedAt })]);
+
+    await triggerSync(1);
+
+    expect(remoteStore.get(NOTIFICATION_FEED_PATH)?.has('occ-1')).toBe(false);
+    expect(await db.notificationFeed.get('occ-1')).toMatchObject({ id: 'occ-1', firedAt });
+
+    // The second device's pass. Dropping the pull cursor is what makes it
+    // one: a device that has never synced this collection reads the whole
+    // owned set, so `mergeFeed` reaches the pushEligible check instead of
+    // short-circuiting on `since` — and that check is the property AC4 turns
+    // on. The row is outside the push window it was purged for, so nothing
+    // puts it back for the first device to pull again.
+    await db.settings.delete(pullCursorKey(1, 'notificationFeed'));
+    await triggerSync(1);
+    expect(remoteStore.get(NOTIFICATION_FEED_PATH)?.has('occ-1')).toBe(false);
   });
 
   it('a pulled row never exceeds the local NOTIFICATION_FEED_LIMIT cap', async () => {

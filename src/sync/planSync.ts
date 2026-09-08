@@ -46,6 +46,7 @@ import { normalizeMaterialSourcingMap } from '@/engine/industry/sourcing';
 import { planetRichnessDeletedAtByKey, stationPinDeletedAtByKey } from './accountWideBackfill';
 import { purgeCharacterCacheOrSuppress } from '@/esi/cachePurge';
 import {
+  FEED_SYNC_WINDOW_MS,
   mergeFeedRecord,
   readFeed,
   rowsWithinSyncWindow,
@@ -1150,6 +1151,18 @@ export async function removeProductionOrderWatch(
 // that directly rather than forcing it through mergeRecords' delete-aware
 // shape.
 //
+// The remote copy is still bounded, though (issue #582): a remote row fired
+// more than FEED_SYNC_WINDOW_MS ago is deleted outright — no tombstone, so
+// nothing accumulates in its place. The same window that decides what a
+// device starts pushing now also decides what stays up there — bounded,
+// though, not expired to the day: an aged row's transport stamp no longer
+// moves, so an incremental pull skips it and the periodic full reconcile is
+// what brings it back into view. Call it 30-60 days. A purged row
+// cannot ping-pong back: the purge cutoff and `pushEligible` are both
+// derived from the one `ctx.now`, so anything purged is already outside the
+// push window, and the device's own 300-row archive keeps the entry
+// regardless.
+//
 // CONTEXT.md round 45 describes device-detected rows as eventually uploading
 // through the same callable Scheduled Push Projections use (issue #358),
 // once that callable exists. It doesn't yet (#358 is still open, gated on
@@ -1228,14 +1241,17 @@ async function syncFeed(ctx: SyncContext): Promise<void> {
     local,
     pushEligible,
     remote,
+    ctx.now,
+    FEED_SYNC_WINDOW_MS,
     pull.since
   );
 
-  await Promise.all(
-    [...plan.pushCreate, ...plan.pushDismiss].map((row) =>
+  await Promise.all([
+    ...[...plan.pushCreate, ...plan.pushDismiss].map((row) =>
       setDoc(doc(col, row.id), toRemoteFeedDoc(row, ctx.ownerHash))
-    )
-  );
+    ),
+    ...plan.purgeRemote.map((id) => deleteDoc(doc(col, id))),
+  ]);
 
   const localById = new Map(local.map((row) => [row.id, row]));
   const pulled = [...plan.pullCreate, ...plan.pullDismiss].map((row) =>

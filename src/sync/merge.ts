@@ -269,11 +269,31 @@ export interface FeedMergeResult<L extends FeedRow, R extends RemoteFeedDoc> {
   pullCreate: R[];
   /** Remote rows whose dismissal is newer than the local copy — pull the flag. */
   pullDismiss: R[];
+  /**
+   * Remote doc ids whose `firedAt` has aged past the synced window, to delete
+   * remotely (issue #582). Remote-only — the local row stays in this device's
+   * archive.
+   */
+  purgeRemote: string[];
 }
 
 /**
- * Feed sync has no tombstones (CONTEXT.md round 45: dismissal is a flag, this
- * collection never deletes) and no generic LWW over a whole record — content
+ * The feed's **transport** timestamp (issue #581) — what an incremental pull
+ * cursors on, written to the remote doc as a plain `updatedAt` by
+ * `toRemoteFeedDoc`. Deliberately NOT a merge input: {@link mergeFeed} keys on
+ * `firedAt`/`dismissedAt` and nothing here changes that. Derived from those two
+ * rather than stamped with `Date.now()` so the value a device compares locally
+ * and the value it wrote remotely are the same number — a `dismissedAt`-only
+ * change moves it (which is the whole reason the feed cannot cursor on
+ * `firedAt`), and a re-push never re-dates a row.
+ */
+export function feedTransportStamp(row: FeedRow): number {
+  return Math.max(row.firedAt, row.dismissedAt ?? 0);
+}
+
+/**
+ * Feed sync has no tombstones (CONTEXT.md round 45: dismissal is a flag, not
+ * a delete) and no generic LWW over a whole record — content
  * fields never change once a row is fired, only `dismissedAt` does. So unlike
  * {@link mergeRecords}, this keys strictly on `firedAt`/`dismissedAt`:
  * `dismissedAt` is the one field that reconciles LWW-style (higher wins,
@@ -293,25 +313,35 @@ export interface FeedMergeResult<L extends FeedRow, R extends RemoteFeedDoc> {
  * like the PULL direction, which always compares against every local row
  * passed in, never just the windowed subset, and never regresses an
  * already-recorded dismissal.
+ *
+ * `purgeRemote` (issue #582) bounds the remote collection on that same
+ * window, which until now gated only what a device started uploading, never
+ * what stayed up there: a remote row fired more than `windowMs` ago is
+ * deleted rather than pulled, on any pass that sees it. That last clause is
+ * the honest bound — an aged row's transport stamp has stopped moving, so an
+ * incremental pull filters it out and only the periodic full reconcile
+ * (`FULL_RECONCILE_INTERVAL_MS` in planSync.ts, itself 30 days) brings it
+ * back into view. Bounded at roughly 30–60 days, in other words, not
+ * expired to the day. Still no tombstone — the doc is
+ * hard-deleted with no marker — and nothing resurrects it, because the
+ * cutoff is computed from the same `now` and the same window
+ * `pushEligible` was built from, so a purged row is by construction not
+ * push-eligible. That is exact within a pass; across devices it is only as
+ * good as their clocks agree, since `now` is wall-clock — a device running
+ * slow can re-push a row another just purged, and the next pass to see it
+ * purges it again. The device is not losing the entry either: the local
+ * archive (`NOTIFICATION_FEED_LIMIT`, 300 rows) is the record, and the
+ * remote collection only ever the window devices reconcile through. Purging
+ * is ordered ahead of the dismissal branches so a row is either purged or
+ * reconciled in a pass, never both — a row old enough to purge is old enough
+ * that its dismissal no longer matters.
  */
-/**
- * The feed's **transport** timestamp (issue #581) — what an incremental pull
- * cursors on, written to the remote doc as a plain `updatedAt` by
- * `toRemoteFeedDoc`. Deliberately NOT a merge input: {@link mergeFeed} keys on
- * `firedAt`/`dismissedAt` and nothing here changes that. Derived from those two
- * rather than stamped with `Date.now()` so the value a device compares locally
- * and the value it wrote remotely are the same number — a `dismissedAt`-only
- * change moves it (which is the whole reason the feed cannot cursor on
- * `firedAt`), and a re-push never re-dates a row.
- */
-export function feedTransportStamp(row: FeedRow): number {
-  return Math.max(row.firedAt, row.dismissedAt ?? 0);
-}
-
 export function mergeFeed<L extends FeedRow, R extends RemoteFeedDoc>(
   local: readonly L[],
   pushEligible: ReadonlySet<string>,
   remote: readonly R[],
+  now: number,
+  windowMs: number,
   since?: number
 ): FeedMergeResult<L, R> {
   const result: FeedMergeResult<L, R> = {
@@ -319,15 +349,29 @@ export function mergeFeed<L extends FeedRow, R extends RemoteFeedDoc>(
     pushDismiss: [],
     pullCreate: [],
     pullDismiss: [],
+    purgeRemote: [],
   };
 
   const localById = new Map(local.map((r) => [r.id, r]));
   const remoteById = new Map(remote.map((r) => [r.id, r]));
   const ids = new Set([...localById.keys(), ...remoteById.keys()]);
+  // Strictly older, not older-or-equal: `rowsWithinSyncWindow` keeps
+  // `firedAt >= cutoff`, so a row sitting exactly on the cutoff is still
+  // push-eligible and must not be purged by the same pass that would
+  // immediately re-create it.
+  const purgeBefore = now - windowMs;
 
   for (const id of ids) {
     const l = localById.get(id);
     const r = remoteById.get(id);
+
+    // Keyed on the *remote* doc's own `firedAt` — this decides the fate of
+    // the remote copy, and the local twin (equal in practice: content never
+    // changes once a row is fired) is untouched either way.
+    if (r && r.firedAt < purgeBefore) {
+      result.purgeRemote.push(id);
+      continue;
+    }
 
     if (l && !r) {
       // Incremental pull: a row at or below the cursor was already reconciled,
