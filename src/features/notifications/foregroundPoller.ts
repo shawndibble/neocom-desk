@@ -48,7 +48,7 @@ import {
 } from './eventSelection';
 import { readNotificationPermission } from './permission';
 import { displayPageNotification, livePageDisplayEnv } from './display';
-import { notificationOptionsFor, notificationSubjectTypeId } from './notificationOptions';
+import { notificationOptionsFor, notificationSubjectId } from './notificationOptions';
 import { eveNotificationText } from './eveNotificationText';
 import { resolveEveNotificationNames } from './eveNotificationNames';
 import { uploadProjectionRows } from './projectionUpload';
@@ -701,7 +701,7 @@ async function sendBrowserNotification(
       {
         eventId: fire.eventId,
         characterId: character.characterId,
-        typeId: notificationSubjectTypeId(fire),
+        subjectId: notificationSubjectId(fire),
       },
       body
     )
@@ -733,7 +733,7 @@ async function recordFeedNotification(
       characterId: character.characterId,
       eventId: fire.eventId,
       eveType: fire.eventId === 'eveNotification' ? fire.type : undefined,
-      typeId: notificationSubjectTypeId(fire),
+      subjectId: notificationSubjectId(fire),
       title,
       body,
       firedAt,

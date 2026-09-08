@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
@@ -155,6 +155,27 @@ describe('Wallet', () => {
     render(<App />);
     expect(await screen.findByText('Bounty')).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Journal' })).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('scrolls to and pulses the journal line a wallet alert pointed at', async () => {
+    const scrollIntoView = vi
+      .spyOn(Element.prototype, 'scrollIntoView')
+      .mockImplementation(() => {});
+    window.history.pushState({}, '', '/wallet?tab=journal&highlight=2');
+    render(<App />);
+
+    expect(await screen.findByText('Donation')).toBeInTheDocument();
+    const pulsed = document.querySelector('[data-row-key="2"]');
+    expect(pulsed?.className).toContain('row-pulse');
+    // Only the line the alert was about.
+    expect(document.querySelector('[data-row-key="1"]')?.className).not.toContain('row-pulse');
+    expect(scrollIntoView.mock.instances).toContain(pulsed);
+
+    // Spent on arrival, so a reload or a tab round-trip does not pulse again.
+    await waitFor(() => {
+      expect(new URLSearchParams(window.location.search).has('highlight')).toBe(false);
+    });
+    scrollIntoView.mockRestore();
   });
 
   /**

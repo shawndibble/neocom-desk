@@ -1200,7 +1200,9 @@ interface RemoteNotificationFeedDoc extends RemoteFeedDoc {
   title: string;
   body: string;
   eveType?: string;
-  /** The item the alert was about, so the other device's row deep-links the same way. */
+  /** The row the alert was about, so the other device's link lands in the same place. */
+  subjectId?: number;
+  /** `subjectId`'s former name — read for rows written by the release that used it. */
   typeId?: number;
 }
 
@@ -1213,7 +1215,7 @@ function toRemoteFeedDoc(row: NotificationFeedRecord, ownerHash: string): Record
     body: row.body,
     firedAt: row.firedAt,
     ...(row.eveType !== undefined ? { eveType: row.eveType } : {}),
-    ...(row.typeId !== undefined ? { typeId: row.typeId } : {}),
+    ...(row.subjectId !== undefined ? { subjectId: row.subjectId } : {}),
     ...(row.dismissedAt !== undefined ? { dismissedAt: row.dismissedAt } : {}),
     ownerHash,
     // Transport only — what an incremental pull cursors on (issue #581).
@@ -1241,7 +1243,9 @@ function toLocalFeedRecord(
     body: remote.body,
     firedAt: remote.firedAt,
     ...(remote.eveType !== undefined ? { eveType: remote.eveType } : {}),
-    ...(remote.typeId !== undefined ? { typeId: remote.typeId } : {}),
+    ...((remote.subjectId ?? remote.typeId) !== undefined
+      ? { subjectId: remote.subjectId ?? remote.typeId }
+      : {}),
     ...(remote.dismissedAt !== undefined ? { dismissedAt: remote.dismissedAt } : {}),
   });
 }

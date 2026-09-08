@@ -14,6 +14,7 @@
  */
 import { useMemo, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useHighlightParam } from '@/lib/useHighlightParam';
 import {
   DataTable,
   EmptyState,
@@ -183,6 +184,11 @@ export function CorpRosterTable({
     [t]
   );
 
+  // The roster row a `corpMemberJoined` alert pointed at, if any. Its sibling
+  // `corpMemberLeft` deliberately has no highlight — that member is gone from
+  // this table, so there would be nothing to scroll to.
+  const highlightedMemberId = useHighlightParam();
+
   if (rows.length === 0) {
     return <EmptyState title={t('corp.members.empty')} hint={t('corp.members.emptyHint')} />;
   }
@@ -193,6 +199,7 @@ export function CorpRosterTable({
       rows={rows}
       rowContextMenu={rowContextMenu}
       rowKey={(row) => row.characterId}
+      highlightRowKey={highlightedMemberId}
       label={t('corp.members.tableLabel')}
       density="compact"
       defaultSort={{ columnId: 'lastSeen', direction: 'desc' }}

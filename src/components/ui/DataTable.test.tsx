@@ -70,6 +70,67 @@ function renderTable(props: Partial<Parameters<typeof DataTable<Row>>[0]> = {}) 
   );
 }
 
+describe('DataTable highlightRowKey', () => {
+  it('pulses only the named row and scrolls it into view', () => {
+    const scrollIntoView = vi
+      .spyOn(Element.prototype, 'scrollIntoView')
+      .mockImplementation(() => {});
+    renderTable({ highlightRowKey: 2 });
+
+    const pulsed = document.querySelector('[data-row-key="2"]');
+    expect(pulsed?.className).toContain('row-pulse');
+    expect(document.querySelector('[data-row-key="1"]')?.className).not.toContain('row-pulse');
+    expect(scrollIntoView.mock.instances).toContain(pulsed);
+    scrollIntoView.mockRestore();
+  });
+
+  it('does nothing for a key matching no row — a link that outlived its data', () => {
+    const scrollIntoView = vi
+      .spyOn(Element.prototype, 'scrollIntoView')
+      .mockImplementation(() => {});
+    renderTable({ highlightRowKey: 999 });
+
+    expect(document.querySelector('.row-pulse')).toBeNull();
+    expect(scrollIntoView).not.toHaveBeenCalled();
+    scrollIntoView.mockRestore();
+  });
+
+  it('pulses nothing at all when no row was named', () => {
+    renderTable();
+    expect(document.querySelector('.row-pulse')).toBeNull();
+  });
+
+  it('scrolls once the row arrives, not only when the key does', () => {
+    // The key is in the URL before the fetch resolves, so an effect keyed on
+    // the id alone would fire against an empty table and never run again.
+    const scrollIntoView = vi
+      .spyOn(Element.prototype, 'scrollIntoView')
+      .mockImplementation(() => {});
+    const { rerender } = render(
+      <DataTable
+        columns={columns}
+        rows={[]}
+        rowKey={(row: Row) => row.id}
+        label="Journal"
+        highlightRowKey={2}
+      />
+    );
+    expect(scrollIntoView).not.toHaveBeenCalled();
+
+    rerender(
+      <DataTable
+        columns={columns}
+        rows={rows}
+        rowKey={(row: Row) => row.id}
+        label="Journal"
+        highlightRowKey={2}
+      />
+    );
+    expect(scrollIntoView.mock.instances).toContain(document.querySelector('[data-row-key="2"]'));
+    scrollIntoView.mockRestore();
+  });
+});
+
 describe('DataTable', () => {
   it('exposes an accessible name and column headers', () => {
     renderTable();
