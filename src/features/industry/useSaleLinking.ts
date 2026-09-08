@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { db, type ProductionOrderWatchRecord, type ProductionSaleLinkRecord } from '@/db';
-import { scheduleSync } from '@/sync';
+import { markProductionRunDeleted, scheduleSync } from '@/sync';
 import { loadWalletTransactions } from '@/features/character/wallet';
 import { loadOrders } from '@/features/character/orders';
 import type { MarketOrder, WalletTransaction } from '@/esi/endpoints';
@@ -34,9 +34,10 @@ interface ManualSaleState {
 }
 
 /**
- * The "Sold" split button's three linking mechanisms (issue #525) — Link
- * Past Sale, Watch Open Order, Manual/Private Sale — plus the manual
- * refresh a watched order needs to pick up its latest `volume_remain`.
+ * The "Sold" split button's actions: its three linking mechanisms (issue
+ * #525) — Link Past Sale, Watch Open Order, Manual/Private Sale — plus the
+ * manual refresh a watched order needs to pick up its latest
+ * `volume_remain`, and Delete Production Run, which drops the run itself.
  * Shared between `ProductionRunsPanel` (one Build Plan's own runs) and
  * `ProductionLogPanel` (every run, every plan) so the two never drift.
  */
@@ -51,6 +52,13 @@ export function useSaleLinking(
   const [openOrders, setOpenOrders] = useState<MarketOrder[] | null>(null);
   const [manualSale, setManualSale] = useState<ManualSaleState | null>(null);
   const [refreshingRunId, setRefreshingRunId] = useState<string | null>(null);
+  /**
+   * The run whose delete confirmation is open. A menu item sits one
+   * mis-click from the trigger, and the deletion is tombstoned and cascades
+   * to the run's sale links and order watches, so it asks first — the same
+   * friction the edit modal's danger button gets from being two steps in.
+   */
+  const [deletingRunId, setDeletingRunId] = useState<string | null>(null);
 
   const linkedTransactionIds = new Set(
     saleLinks.flatMap((l) => (l.transactionId !== undefined ? [l.transactionId] : []))
@@ -152,6 +160,21 @@ export function useSaleLinking(
     closePicker();
   }
 
+  function confirmDeleteRun(runId: string) {
+    setDeletingRunId(runId);
+  }
+
+  function cancelDeleteRun() {
+    setDeletingRunId(null);
+  }
+
+  async function deleteRun() {
+    if (deletingRunId === null) return;
+    // `markProductionRunDeleted` tombstones and schedules its own sync.
+    await markProductionRunDeleted(characterId, deletingRunId);
+    setDeletingRunId(null);
+  }
+
   async function refreshWatches(runId: string) {
     const watchesForRun = orderWatches.filter((w) => w.runId === runId && !w.closed);
     if (watchesForRun.length === 0) return;
@@ -205,6 +228,7 @@ export function useSaleLinking(
     manualSale,
     setManualSaleForm,
     refreshingRunId,
+    deletingRunId,
     openPicker,
     closePicker,
     openManualSale,
@@ -213,6 +237,9 @@ export function useSaleLinking(
     linkPastSale,
     watchOpenOrder,
     refreshWatches,
+    confirmDeleteRun,
+    cancelDeleteRun,
+    deleteRun,
   };
 }
 

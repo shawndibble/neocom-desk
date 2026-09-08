@@ -86,7 +86,7 @@ export function statusColumn<Row extends ProductionRunSummary>(t: T): DataTableC
   };
 }
 
-/** The "Sold" split button wired to `useSaleLinking`, keyed off each row's own run/product — no plan context needed. */
+/** The "Sold" split button wired to `useSaleLinking`, keyed off each row's own run/product — no plan context needed. Its "Delete production run" item deletes the row's run, so this column also carries the delete action for both tables. */
 export function soldActionsColumn<Row extends ProductionRunSummary>(
   sale: SaleLinking
 ): DataTableColumn<Row> {
@@ -99,6 +99,7 @@ export function soldActionsColumn<Row extends ProductionRunSummary>(
         onSold={() => void sale.openPicker(r.run.id, r.run.productTypeID, 'sale')}
         onWatch={() => void sale.openPicker(r.run.id, r.run.productTypeID, 'watch')}
         onManual={() => sale.openManualSale(r.run.id)}
+        onDelete={() => sale.confirmDeleteRun(r.run.id)}
         onRefresh={
           r.orderWatches.some((w) => !w.closed)
             ? () => void sale.refreshWatches(r.run.id)

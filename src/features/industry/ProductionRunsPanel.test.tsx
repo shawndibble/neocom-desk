@@ -186,6 +186,53 @@ describe('ProductionRunsPanel', () => {
     expect(await db.productionSaleLinks.count()).toBe(0);
   });
 
+  it('deletes a run from the Sold menu once confirmed, cascading to its linked sale', async () => {
+    await addRun();
+    const now = Date.now();
+    await db.productionSaleLinks.add({
+      id: `${CHARACTER_ID}:txn:9001`,
+      characterId: CHARACTER_ID,
+      runId: 'run-1',
+      transactionId: 9001,
+      quantity: 5,
+      unitPrice: 100_000,
+      linkedAt: now,
+      updatedAt: now,
+    });
+    const user = userEvent.setup();
+    renderPanel(null);
+    await expandRuns(user);
+    await screen.findByRole('button', { name: 'Sold' });
+
+    await chooseSoldMenuItem(user, 'Delete production run');
+    const dialog = await screen.findByRole('dialog', { name: 'Delete production run' });
+    await user.click(within(dialog).getByRole('button', { name: 'Delete production run' }));
+
+    await waitFor(async () => {
+      expect(await db.productionRuns.count()).toBe(0);
+    });
+    expect(await db.productionSaleLinks.count()).toBe(0);
+  });
+
+  it('keeps the run when the delete confirmation is cancelled', async () => {
+    await addRun();
+    const user = userEvent.setup();
+    renderPanel(null);
+    await expandRuns(user);
+    await screen.findByRole('button', { name: 'Sold' });
+
+    await chooseSoldMenuItem(user, 'Delete production run');
+    const dialog = await screen.findByRole('dialog', { name: 'Delete production run' });
+    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+
+    await waitFor(() => {
+      expect(
+        screen.queryByRole('dialog', { name: 'Delete production run' })
+      ).not.toBeInTheDocument();
+    });
+    expect(await db.productionRuns.count()).toBe(1);
+  });
+
   it('links a past sale via the Sold button and shows realized profit', async () => {
     await addRun();
     loadWalletTransactions.mockResolvedValue({

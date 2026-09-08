@@ -459,6 +459,8 @@
     "productionRunStatusOpen": "Open",
     "productionRunStatusClosed": "Closed",
     "deleteProductionRun": "Delete production run",
+    "deleteProductionRunConfirm": "Delete this production run? Its logged cost, linked sales and watched orders are deleted from every device you sync with. This cannot be undone.",
+    "cancel": "Cancel",
     "realizedRevenue": "Realized revenue",
     "realizedProfit": "Realized profit",
     "linkPastSale": "Link Past Sale",

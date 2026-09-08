@@ -4,6 +4,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
   EmptyState,
   IconButton,
@@ -19,8 +20,12 @@ import { unmaskNumber } from '@/lib/numberMask';
 
 /**
  * The "Sold" split button — primary action Link Past Sale, plus an attached
- * chevron revealing Watch Open Order and Manual/Private Sale — shared by
- * `ProductionRunsPanel` and `ProductionLogPanel`'s action columns. An
+ * chevron revealing Watch Open Order, Manual/Private Sale and Delete
+ * Production Run — shared by `ProductionRunsPanel` and `ProductionLogPanel`'s
+ * action columns. The delete item is the only way to drop a run from the
+ * Records tab, whose rows click through to the Build Plan rather than into an
+ * edit modal; it says "Delete production run" rather than inventing a second
+ * verb for the danger button already in that modal. An
  * optional refresh icon sits beside it for a run with an open watch; only
  * `ProductionRunsPanel`'s per-plan table passes one today, but it takes no
  * plan context, so `ProductionLogPanel` gets it for free by passing the
@@ -30,12 +35,14 @@ export function SoldSplitButton({
   onSold,
   onWatch,
   onManual,
+  onDelete,
   onRefresh,
   refreshing = false,
 }: {
   onSold: () => void;
   onWatch: () => void;
   onManual: () => void;
+  onDelete: () => void;
   onRefresh?: () => void;
   refreshing?: boolean;
 }) {
@@ -61,6 +68,16 @@ export function SoldSplitButton({
           <DropdownMenuContent align="end">
             <DropdownMenuItem onSelect={onWatch}>{t('industry.watchOpenOrder')}</DropdownMenuItem>
             <DropdownMenuItem onSelect={onManual}>{t('industry.manualSale')}</DropdownMenuItem>
+            <DropdownMenuSeparator />
+            {/* `data-[highlighted]:text-danger` re-states the tone the shared item
+                style resets on hover/keyboard focus — the one item here that
+                destroys something should stay red while it's the active one. */}
+            <DropdownMenuItem
+              onSelect={onDelete}
+              className="text-danger data-[highlighted]:text-danger"
+            >
+              {t('industry.deleteProductionRun')}
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
@@ -150,10 +167,10 @@ function WatchPicker({
 }
 
 /**
- * The two dialogs `useSaleLinking`'s state drives: the Link Past Sale/Watch
- * Open Order picker, and the Manual/Private Sale form. One instance per
- * panel that uses the hook — mount it once alongside the table, not once
- * per row.
+ * The three dialogs `useSaleLinking`'s state drives: the Link Past Sale/Watch
+ * Open Order picker, the Manual/Private Sale form, and the delete
+ * confirmation. One instance per panel that uses the hook — mount it once
+ * alongside the table, not once per row.
  */
 export function SaleLinkingModals({ sale }: { sale: SaleLinking }) {
   const { t } = useTranslation();
@@ -229,6 +246,22 @@ export function SaleLinkingModals({ sale }: { sale: SaleLinking }) {
             className="w-full justify-center"
           >
             {t('industry.saveProductionRun')}
+          </Button>
+        </div>
+      </Modal>
+
+      <Modal
+        open={sale.deletingRunId !== null}
+        onClose={sale.cancelDeleteRun}
+        title={t('industry.deleteProductionRun')}
+      >
+        <p className="text-xs text-text-dim">{t('industry.deleteProductionRunConfirm')}</p>
+        <div className="mt-3 flex justify-end gap-2">
+          <Button size="sm" onClick={sale.cancelDeleteRun}>
+            {t('industry.cancel')}
+          </Button>
+          <Button size="sm" variant="danger" onClick={() => void sale.deleteRun()}>
+            {t('industry.deleteProductionRun')}
           </Button>
         </div>
       </Modal>
