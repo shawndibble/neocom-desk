@@ -24,6 +24,13 @@ jobs:
       - run: npm run format:check
       - run: npm run typecheck
       - run: npm run build
+      # functions/ is its own package, with its own lockfile, tsconfig and
+      # vitest run — neither the root typecheck above nor the pre-commit
+      # hook's copy of it ever reads it, so without these steps the Cloud
+      # Functions ship unchecked (issue #595).
+      - run: npm ci --prefix functions
+      - run: npm run typecheck --prefix functions
+      - run: npm test --prefix functions
 
   test:
     runs-on: ubuntu-latest

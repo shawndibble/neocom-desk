@@ -53,6 +53,11 @@ export function idsBeyondLimit(newestFirst: readonly { id: string }[], limit: nu
  * it).
  */
 export const FEED_SYNC_WINDOW_MAX_ROWS = 100;
+// Deliberately equal to the backend's `FIRED_RETENTION_MS`
+// (`functions/src/dispatchProjections.ts`), which is what the server-side feed
+// purge applies to the same collection (issue #595). `functions/` is a
+// separate package and cannot import this, so the two are held equal by this
+// note at each declaration — change one and change the other.
 export const FEED_SYNC_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
 
 export function rowsWithinSyncWindow<T extends { firedAt: number }>(
