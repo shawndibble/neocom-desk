@@ -790,6 +790,19 @@ export function Market() {
     () => [...filteredBuy].sort((a, b) => b.price - a.price),
     [filteredBuy]
   );
+  /**
+   * The catalogue is otherwise loaded lazily on the first context-menu open,
+   * so reading it here without asking for it meant `selectedIsBlueprint` was
+   * always false on a fresh page and the hint below never appeared at all.
+   * Requested only once the book is actually empty, which keeps the laziness
+   * this was built for: the payload is fetched in the one case its answer can
+   * change what is rendered, not on every item you click.
+   */
+  useEffect(() => {
+    // `ensureBlueprintCatalog` is ref-guarded, so re-running this costs nothing.
+    if (selectedTypeId !== null && sortedSell.length === 0) ensureBlueprintCatalog();
+  }, [selectedTypeId, sortedSell.length]);
+
   const sellRows = sellShowAll ? sortedSell : sortedSell.slice(0, ROW_CAP);
   const buyRows = buyShowAll ? sortedBuy : sortedBuy.slice(0, ROW_CAP);
 
