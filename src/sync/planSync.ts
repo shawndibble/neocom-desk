@@ -552,9 +552,8 @@ interface SyncContext {
  * the incremental pull's `updatedAt` filter below works without one.
  *
  * Miss that and the query throws `failed-precondition` at runtime — the same
- * error a missing *composite* index gives, so it reads as one. `isMissingIndex`
- * catches it for the `since` window only, and deliberately: falling back to a
- * full read cannot rescue a query whose `ownerHash` index is the missing one.
+ * error a missing *composite* index gives, so it reads as one. `isMissingIndex`'s
+ * full read is no safety net here either: it filters on `ownerHash` too.
  */
 async function fetchOwnedDocs<R extends { ownerHash: string }>(
   col: CollectionReference,
@@ -1315,6 +1314,9 @@ async function syncCharacter(characterId: number): Promise<void> {
   await syncFeed(ctx);
 
   // ---- Synced settings ----
+  // The second `ownerHash` read, and under the same index constraint as
+  // `fetchOwnedDocs` — see its docstring. Deliberately unwindowed: settings
+  // tombstones never expire and `mergeSettings`' absence semantics differ.
   const settingsCol = collection(firestore, 'characters', uid, 'settings');
   const snapshot = await getDocs(query(settingsCol, where('ownerHash', '==', ownerHash)));
   // Only honour well-formed synced keys: a hostile or stale doc naming a
