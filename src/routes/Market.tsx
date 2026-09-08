@@ -80,6 +80,8 @@ import {
   type OrderBookSummary,
 } from '@/engine/market/orderBook';
 import { resolveOrderBookRegion, type GlobalMarketOverride } from '@/engine/market/locationMode';
+import { myOrderGaps, type MyOrderGap } from '@/engine/market/myOrderGap';
+import { loadAllCharactersOpenOrders } from '@/features/market/openOrdersData';
 import {
   parseMarketParams,
   buildMarketParams,
@@ -88,7 +90,7 @@ import {
   type MarketLocationParam,
 } from '@/engine/market/urlState';
 import type { RegionOrder } from '@/esi/endpoints';
-import { formatIsk } from '@/lib/isk';
+import { formatIsk, formatIskAuto } from '@/lib/isk';
 import { typeIconUrl } from '@/lib/eveImages';
 import type { MarketFocusSearchState } from '@/lib/shortcuts';
 import { loadBlueprintCatalog, type BlueprintCatalog } from '@/features/industry/blueprintCatalog';
@@ -508,6 +510,12 @@ export function Market() {
   const [orderBookResult, setOrderBookResult] = useState<OrderBookResult | null>(null);
   const [orderBookLoading, setOrderBookLoading] = useState(false);
   const [refreshTick, setRefreshTick] = useState(0);
+  // Every authenticated character's own open order ids, across every item —
+  // not scoped to the selected type, since matching is by order_id against
+  // whatever's on screen. "Undercut, by how much" (issue request): the order
+  // book this page already fetches is the FULL region book, so a match here
+  // needs no extra ESI call, unlike the Open Orders page's tiered checks.
+  const [myOrderIds, setMyOrderIds] = useState<ReadonlySet<number>>(new Set());
   const [sellShowAll, setSellShowAll] = useState(false);
   const [buyShowAll, setBuyShowAll] = useState(false);
   // The order row context menu's "filter to this station" action (CONTEXT.md
@@ -610,6 +618,32 @@ export function Market() {
       cancelled = true;
     };
   }, []);
+
+  // Independent of the catalogue and order-book loads: a character with no
+  // orders scope, or with no characters signed in at all, simply resolves to
+  // an empty set — the highlight/gap below then degrades to "nothing here is
+  // mine" rather than erroring. Refetches on a manual Refresh (refreshTick)
+  // the same way the order book itself does, so placing or cancelling an
+  // order and hitting Refresh updates the highlight in place.
+  useEffect(() => {
+    let cancelled = false;
+    void loadAllCharactersOpenOrders()
+      .then((snapshot) => {
+        if (cancelled) return;
+        const ids = new Set<number>();
+        for (const entry of snapshot.entries) {
+          for (const order of entry.orders) ids.add(order.order_id);
+        }
+        setMyOrderIds(ids);
+      })
+      .catch(() => {
+        // Leaves myOrderIds at whatever it was — a failed fetch must not
+        // erase an already-known highlight.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [refreshTick]);
 
   // Fetched independently of the catalogue load above: variations.json is
   // Variations-panel-only data, so a slow or failed fetch degrades that one
@@ -750,6 +784,23 @@ export function Market() {
   const sellRows = sellShowAll ? sortedSell : sortedSell.slice(0, ROW_CAP);
   const buyRows = buyShowAll ? sortedBuy : sortedBuy.slice(0, ROW_CAP);
 
+  // Gaps computed over the full (unpaginated, but location-filtered) sides —
+  // not sellRows/buyRows — so a "Show all" click never changes an
+  // already-visible row's gap, and a match hidden behind the row cap still
+  // counts as a rival. sell/buy order_id ranges never overlap, so the two
+  // sides merge into one lookup the price cell can key on regardless of
+  // which table it's rendering.
+  const sellGaps = useMemo(
+    () => myOrderGaps(sortedSell, myOrderIds, false),
+    [sortedSell, myOrderIds]
+  );
+  const buyGaps = useMemo(() => myOrderGaps(sortedBuy, myOrderIds, true), [sortedBuy, myOrderIds]);
+  const myGaps = useMemo<ReadonlyMap<number, MyOrderGap>>(() => {
+    if (sellGaps.size === 0) return buyGaps;
+    if (buyGaps.size === 0) return sellGaps;
+    return new Map([...sellGaps, ...buyGaps]);
+  }, [sellGaps, buyGaps]);
+
   const stationFilterLabel = useMemo(() => {
     if (stationFilter === null || !orderBookResult) return null;
     const order = orderBookResult.orders.find((o) => o.location_id === stationFilter);
@@ -765,7 +816,26 @@ export function Market() {
         header: t('market.price'),
         align: 'right',
         className: 'tabular-nums',
-        render: (o) => formatIsk(o.price, 2),
+        render: (o) => {
+          const gap = myGaps.get(o.order_id);
+          return (
+            <div className="flex flex-col items-end">
+              <span>{formatIsk(o.price, 2)}</span>
+              {gap && (
+                <span
+                  className={`text-[0.625rem] font-semibold whitespace-nowrap ${gap.beaten ? 'text-danger' : 'text-accent'}`}
+                >
+                  {gap.beaten && gap.gapIsk !== null && gap.gapPct !== null
+                    ? t('market.myOrderUndercutBy', {
+                        gap: formatIskAuto(gap.gapIsk),
+                        pct: gap.gapPct.toFixed(1),
+                      })
+                    : t('market.myOrder')}
+                </span>
+              )}
+            </div>
+          );
+        },
         sortValue: (o) => o.price,
       },
       {
@@ -791,7 +861,7 @@ export function Market() {
         sortValue: (o) => orderExpiry(o).getTime(),
       },
     ],
-    [t, npcStationMap, solarSystemMap]
+    [t, npcStationMap, solarSystemMap, myGaps]
   );
   const buyColumns = useMemo<DataTableColumn<RegionOrder>[]>(
     () => [
@@ -1293,6 +1363,9 @@ export function Market() {
                               label={t('market.sell')}
                               defaultSort={{ columnId: 'price', direction: 'asc' }}
                               rowContextMenu={orderRowContextMenu}
+                              rowClassName={(o) =>
+                                myGaps.has(o.order_id) ? 'bg-accent/10' : undefined
+                              }
                             />
                             {!sellShowAll && sortedSell.length > ROW_CAP && (
                               <div className="px-3 py-2">
@@ -1349,6 +1422,9 @@ export function Market() {
                               label={t('market.buy')}
                               defaultSort={{ columnId: 'price', direction: 'desc' }}
                               rowContextMenu={orderRowContextMenu}
+                              rowClassName={(o) =>
+                                myGaps.has(o.order_id) ? 'bg-accent/10' : undefined
+                              }
                             />
                             {!buyShowAll && sortedBuy.length > ROW_CAP && (
                               <div className="px-3 py-2">
