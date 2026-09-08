@@ -2774,6 +2774,7 @@
     "clearCache": "Clear cached ESI data",
     "clearCacheConfirm": "Cache cleared.",
     "defaultsTitle": "Defaults",
+    "defaultsSyncHint": "Kept across your devices — set these once, on whichever one you have to hand.",
     "corpDefaultsTitle": "Corporation",
     "timeFormatLabel": "Time format",
     "timeFormatHint": "EVE runs on UTC — the clock other players quote timers in. Calendar keeps your local days either way.",

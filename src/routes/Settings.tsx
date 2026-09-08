@@ -361,11 +361,6 @@ function ChipRow<T extends string | number>({
 }
 
 /**
- * What a page assumes when the pilot has not said otherwise. Every control
- * here defaults to exactly what the app did before it was settable, so an
- * existing pilot's numbers do not move until they ask them to.
- */
-/**
  * Hydrates a preference store and reports whether it has settled.
  *
  * Every other page reads these stores after its own `hydrate()`; this page is
@@ -388,6 +383,15 @@ function useHydratedStore<T>(store: LocalSettingStore<T>): boolean {
   return hydrated;
 }
 
+/**
+ * What a page assumes when the pilot has not said otherwise. Every control
+ * here defaults to exactly what the app did before it was settable, so an
+ * existing pilot's numbers do not move until they ask them to.
+ *
+ * All of them sync (`lib/useSyncedSetting.ts`): these answer for the pilot,
+ * not for the machine. The text-scale control above them deliberately does
+ * not — that one answers for the screen.
+ */
 function DefaultsPanel() {
   const { t } = useTranslation();
   const hub = useMarketHub((state) => state.value);
@@ -423,6 +427,7 @@ function DefaultsPanel() {
   return (
     <Panel title={t('settings.defaultsTitle')}>
       <div className="max-w-md space-y-4">
+        <p className="text-xs text-text-dim">{t('settings.defaultsSyncHint')}</p>
         <div className="space-y-1.5">
           <label htmlFor="settings-hub" className="block text-xs font-semibold">
             {t('settings.tradeHubLabel')}
@@ -565,7 +570,8 @@ function CorpDefaultsPanel() {
 
   return (
     <Panel title={t('settings.corpDefaultsTitle')}>
-      <div className="max-w-md">
+      <div className="max-w-md space-y-4">
+        <p className="text-xs text-text-dim">{t('settings.defaultsSyncHint')}</p>
         <ChipRow
           label={t('settings.darkThresholdLabel')}
           hint={t('settings.darkThresholdHint')}
