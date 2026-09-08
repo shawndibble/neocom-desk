@@ -60,6 +60,7 @@ import {
   PencilSimple,
   Planet,
   Plus,
+  Prohibit,
   Queue,
   Receipt,
   ShieldCheck,
@@ -247,3 +248,11 @@ export const TokenPrivacy = withWeight(LockKey);
 export const OpenSource = withWeight(Code);
 /** Start the EVE SSO round trip. Replaces the `▶` dingbat the login button used to draw (DESIGN.md §5). */
 export const SignIn = withWeight(SignInGlyph);
+/**
+ * A contact this character has flagged to watch. Same glyph as
+ * `SeverityWatch`, kept separate because that one is a notification severity
+ * and this one is a per-contact flag — they are free to diverge.
+ */
+export const Watched = withWeight(Eye);
+/** A contact this character has blocked. */
+export const Blocked = withWeight(Prohibit);
