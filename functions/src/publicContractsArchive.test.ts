@@ -77,6 +77,29 @@ describe('streamContractsCsvEntries', () => {
   });
 
   /**
+   * A skipped entry has to be fully consumed before the next one is read, and
+   * a small one cannot show that: it lands in a single chunk either way. The
+   * real archive's first entry is tiny (meta.json) but the ones we skip at the
+   * end are megabytes, so this uses filler big enough to span several reads.
+   */
+  it('drains a large skipped entry before reading the one after it', async () => {
+    const { contracts, items, handlers } = collect();
+    await streamContractsCsvEntries(
+      tarStream([
+        ['filler.csv', 'a\n'.repeat(1_000_000)],
+        ['contracts.csv', CONTRACTS_CSV],
+        ['contract_items.csv', ITEMS_CSV],
+      ]),
+      handlers
+    );
+
+    expect(contracts).toHaveLength(1);
+    expect(contracts[0].contract_id).toBe('1');
+    expect(items).toHaveLength(1);
+    expect(items[0].type_id).toBe('32858');
+  });
+
+  /**
    * The two CSVs we read are entries 2 and 3 of 7; the rest unpack to ~19MB
    * we would otherwise decompress only to discard. Abandoning the source is
    * how that work is skipped, so it is worth pinning.
