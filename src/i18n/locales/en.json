@@ -2639,8 +2639,8 @@
           "piPicks": "The resources you chose to pull on each planet in the PI Advisor.",
           "miningTax": "Moon Mining payees and assignments.",
           "miningTaxNote": "The payees you named and the entries you assigned to them, including the ore and ISK figures snapshotted at that moment — that snapshot is the invoice, so it has to travel with it.",
-          "notificationFeed": "Your Notification Feed.",
-          "notificationFeedNote": "Alerts you have already been shown, so a second device can catch up on what it missed. Kept for 30 days.",
+          "notificationFeed": "Your Alerts.",
+          "notificationFeedNote": "Ones you have already been shown, so another device can catch up on what it missed. Kept for 30 days.",
           "settings": "Two settings: your notification preferences, and the PI customs rates you overrode. Nothing else on this page leaves your device."
         },
         "local": {
