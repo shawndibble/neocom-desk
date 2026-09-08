@@ -12,14 +12,21 @@
  * a pilot running 24-hour programs wants a shorter one, for the reason the
  * option list below spells out.
  *
+ * Synced across the pilot's devices: the window states how often they can
+ * actually do a reset run, which is a fact about them and not about whichever
+ * screen the Colonies view is open on.
+ *
  * **Not the notification cadence.** `engine/notificationDiffs.ts` keeps its own
  * `EXTRACTOR_EXPIRY_WARNING_MS` lead times, and its comment says why: "a
  * notification cadence is not a status colour". This preference governs the
  * Colonies table only.
  */
-import { createLocalSetting } from '@/lib/useLocalSetting';
+import { createSyncedSetting } from '@/lib/useSyncedSetting';
 
-export const PI_EXPIRING_WINDOW_SETTING_KEY = 'piExpiringSoonHours';
+export const PI_EXPIRING_WINDOW_SETTING_KEY = 'sync.piExpiringSoonHours';
+
+/** What it was stored under before it synced; its value is adopted once. */
+export const LEGACY_PI_EXPIRING_WINDOW_SETTING_KEY = 'piExpiringSoonHours';
 
 /**
  * Lead times a reset run is actually planned around.
@@ -53,8 +60,9 @@ export const DEFAULT_EXPIRING_WINDOW_HOURS = 24;
 
 const HOUR_MS = 3_600_000;
 
-export const useExpiringWindowHours = createLocalSetting<number>({
+export const useExpiringWindowHours = createSyncedSetting<number>({
   key: PI_EXPIRING_WINDOW_SETTING_KEY,
+  legacyKey: LEGACY_PI_EXPIRING_WINDOW_SETTING_KEY,
   defaultValue: DEFAULT_EXPIRING_WINDOW_HOURS,
   parse: (raw) =>
     typeof raw === 'number' && EXPIRING_WINDOW_HOUR_OPTIONS.includes(raw) ? raw : null,

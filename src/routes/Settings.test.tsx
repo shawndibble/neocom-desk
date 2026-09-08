@@ -25,6 +25,7 @@ import { useAssumedMe, ASSUMED_ME_SETTING_KEY } from '@/features/industry/assume
 import {
   useFacilityDefaults,
   DEFAULT_FACILITY_DEFAULTS,
+  FACILITY_DEFAULTS_SETTING_KEY,
 } from '@/features/industry/facilityDefaults';
 import { useExpiringWindowHours } from '@/features/pi/expiringWindow';
 import { useDarkThreshold } from '@/features/corp/darkThreshold';
@@ -793,7 +794,7 @@ describe('Settings defaults', () => {
     // merely stale: changing one field spreads the rest, so an unhydrated
     // `{npcStation, none, null}` would wipe a stored rig level and tax.
     await db.settings.put({
-      key: 'industryFacilityDefaults',
+      key: FACILITY_DEFAULTS_SETTING_KEY,
       value: { facility: 'azbel', rigLevel: 't2', facilityTaxPct: 5 },
     });
     render(<App />);
@@ -801,7 +802,7 @@ describe('Settings defaults', () => {
 
     expect(await screen.findByRole('group', { name: /rigs/i })).toBeInTheDocument();
     expect(screen.getByLabelText(/facility tax/i)).toHaveValue(5);
-    expect(await db.settings.get('industryFacilityDefaults')).toMatchObject({
+    expect(await db.settings.get(FACILITY_DEFAULTS_SETTING_KEY)).toMatchObject({
       value: { facility: 'azbel', rigLevel: 't2', facilityTaxPct: 5 },
     });
   });

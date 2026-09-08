@@ -380,4 +380,47 @@ describe('Alerts', () => {
     renderPage();
     expect(await screen.findByText('No alerts yet')).toBeInTheDocument();
   });
+  describe('header controls', () => {
+    it('names both header actions, which carry no visible text', async () => {
+      await db.notificationFeed.put(entry({ id: 'a' }));
+      renderPage();
+
+      // Icon-only controls fail by announcing "button"/"link" and nothing
+      // else; the tooltip and the accessible name are the same string here.
+      expect(await screen.findByRole('button', { name: 'Dismiss all' })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'Notification settings' })).toHaveAttribute(
+        'href',
+        '/settings#notifications'
+      );
+    });
+
+    it('still dismisses every live alert from the icon', async () => {
+      await db.notificationFeed.put(entry({ id: 'a' }));
+      await db.notificationFeed.put(entry({ id: 'b', eventId: 'skillComplete', title: 'Skill' }));
+      renderPage();
+
+      await userEvent.click(await screen.findByRole('button', { name: 'Dismiss all' }));
+
+      await waitFor(async () => {
+        const stored = await db.notificationFeed.toArray();
+        expect(stored.every((row) => row.dismissedAt !== undefined)).toBe(true);
+      });
+    });
+
+    it('hides the dismiss control when there is nothing live to dismiss', async () => {
+      renderPage();
+
+      await screen.findByRole('link', { name: 'Notification settings' });
+      expect(screen.queryByRole('button', { name: 'Dismiss all' })).not.toBeInTheDocument();
+    });
+
+    it('does not restate the counts beside the title', async () => {
+      await db.notificationFeed.put(entry({ id: 'a' }));
+      renderPage();
+
+      // The list below already says all of this, per type and per character.
+      await screen.findByText('New Mail');
+      expect(screen.queryByText(/alerts? .* types .* characters/)).not.toBeInTheDocument();
+    });
+  });
 });

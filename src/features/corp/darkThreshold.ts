@@ -11,13 +11,19 @@
  * Presets rather than a free number input: the UI copy reads "Dark (30d)" and
  * a preset keeps that legible. Default 30, unchanged from before.
  *
- * Device-local — one director, one policy — and only surfaced on the Settings
- * page for a Character who can actually see the corp section.
+ * One director, one policy — so it follows them across their devices rather
+ * than being re-set on each. Only surfaced on the Settings page for a
+ * Character who can actually see the corp section; a pilot with no corp access
+ * syncs the key and never sees a control for it, which costs nothing and means
+ * the policy is already there the day they are given the role.
  */
-import { createLocalSetting } from '@/lib/useLocalSetting';
+import { createSyncedSetting } from '@/lib/useSyncedSetting';
 import { DARK_AFTER_DAYS } from '@/engine/corp/members';
 
-export const DARK_THRESHOLD_SETTING_KEY = 'corpDarkAfterDays';
+export const DARK_THRESHOLD_SETTING_KEY = 'sync.corpDarkAfterDays';
+
+/** What it was stored under before it synced; its value is adopted once. */
+export const LEGACY_DARK_THRESHOLD_SETTING_KEY = 'corpDarkAfterDays';
 
 /** The spans a corp inactivity policy is actually written in. */
 export const DARK_AFTER_DAY_OPTIONS: readonly number[] = [14, 30, 60, 90];
@@ -33,8 +39,9 @@ export const DARK_AFTER_DAY_OPTIONS: readonly number[] = [14, 30, 60, 90];
  */
 export const LOOSEST_DARK_AFTER_DAYS = Math.min(...DARK_AFTER_DAY_OPTIONS);
 
-export const useDarkThreshold = createLocalSetting<number>({
+export const useDarkThreshold = createSyncedSetting<number>({
   key: DARK_THRESHOLD_SETTING_KEY,
+  legacyKey: LEGACY_DARK_THRESHOLD_SETTING_KEY,
   defaultValue: DARK_AFTER_DAYS,
   // Restricted to the presets: a stored value from a future build with a
   // different option list should fall back to the default rather than filter

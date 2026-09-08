@@ -176,7 +176,13 @@ immediate. Deletes MUST go through `markPlanDeleted`/`markBuildPlanDeleted`
 /`deleteSyncedSetting` (each records a tombstone) — a plain Dexie delete
 resurrects from the remote copy. `setSyncedSetting` also enforces the
 `SYNCED_SETTING_KEYS` allow-list (`src/sync/syncedSettings.ts`); adding a
-synced setting is a deliberate two-file edit (list + its pinned test).
+synced setting is a deliberate two-file edit (list + its pinned test). A
+preference with a _control_ rather than a call site goes through
+`lib/useSyncedSetting.ts`'s `createSyncedSetting` instead — same store shape as
+`createLocalSetting`, but it seeds from the pre-sync device-local key, fans
+`scheduleSync` out to every Character, and re-reads on each successful sync
+(pulls land in Dexie behind the store's back). Settings' Defaults panels are
+its five callers.
 `triggerSync` → `syncAuth.ensureSignedIn` (mints a Firebase custom token from
 the current EVE access token, uid `char:{characterId}`, claim `ownerHash`) →
 per collection: fetch remote docs filtered `where(ownerHash==current)` →
@@ -278,7 +284,7 @@ SDE rebuild: `npm run sde:build`.
 | `/planetary-industry`                         | Two peer tabs (`?tab=plan&type=`). **Colonies**: colony list, per-colony extractor/factory pins, idle/expiry warnings from extractor `expiry_time` only (ADR 0005), cross-character extractor timeline — no storage-fullness. **Plan**: chain planner over `engine/pi/chain` — sourcing floor, planet layout, customs rate, margin and footprint | shipped           |
 | `/assets`                                     | Asset list; station and player-structure locations both resolve to a name (structure resolution needs `esi-universe.read_structures.v1` and falls back to `Structure #{id}` pre-reauth or off the structure's ACL)                                                                                                                               | shipped           |
 | `/mail`, `/calendar`, `/contracts`, `/orders` | Character views                                                                                                                                                                                                                                                                                                                                  | shipped           |
-| `/settings`                                   | Device-local preferences: text-scale control (`useFontScale`, `src/lib/fontScale.ts`), recent ESI activity log (`stores/activityLog.ts`, issue #32)                                                                                                                                                                                              | shipped           |
+| `/settings`                                   | Preferences: the Defaults/Corporation panels' five synced ones (`lib/useSyncedSetting.ts`), device-local text-scale (`useFontScale`, `src/lib/fontScale.ts`) and time format, recent ESI activity log (`stores/activityLog.ts`, issue #32)                                                                                                       | shipped           |
 | `/market`                                     | **Market Browser** (general item price lookup, CONTEXT.md round 3): SDE search, pinned hub-price compare table                                                                                                                                                                                                                                   | shipped           |
 | `/styleguide`                                 | Hidden design-system reference                                                                                                                                                                                                                                                                                                                   | shipped (dev aid) |
 | `/error`                                      | Undisclosed Sentry probe: throws on render so production error reporting can be confirmed from a browser. Unlinked, no Character and no scope.                                                                                                                                                                                                   | shipped (dev aid) |

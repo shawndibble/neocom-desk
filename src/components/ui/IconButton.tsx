@@ -1,6 +1,11 @@
 import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from 'react';
 import { Tooltip } from './Tooltip';
-import { cx } from '@/lib/cx';
+import {
+  iconButtonClassName,
+  type IconButtonSize,
+  type IconButtonTone,
+  type IconButtonVariant,
+} from './iconButtonClassName';
 
 interface IconButtonProps extends Omit<
   ButtonHTMLAttributes<HTMLButtonElement>,
@@ -32,7 +37,7 @@ interface IconButtonProps extends Omit<
    * it, for affordances that sit inside a row and would otherwise draw a box
    * around every line of a list.
    */
-  variant?: 'ghost' | 'plain';
+  variant?: IconButtonVariant;
   /**
    * `danger` is the destructive treatment, matching `Button variant="danger"`.
    * `positive` is the "worth doing" treatment (`text-isk-pos`, the app's
@@ -42,9 +47,9 @@ interface IconButtonProps extends Omit<
    * stylesheet order, not by the order they appear in the attribute, so an
    * override passed in from outside is not reliably an override.
    */
-  tone?: 'default' | 'danger' | 'positive';
+  tone?: IconButtonTone;
   /** `md` (default) is the toolbar size; `sm` is for controls nested inside a dense row. */
-  size?: 'md' | 'sm';
+  size?: IconButtonSize;
   className?: string;
 }
 
@@ -91,37 +96,7 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
         aria-pressed={pressed}
         disabled={disabled}
         onClick={onClick}
-        className={cx(
-          'inline-flex shrink-0 items-center justify-center rounded-xs',
-          'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent',
-          'disabled:cursor-not-allowed disabled:opacity-40',
-          size === 'md' ? 'size-11 md:size-9' : 'size-9 md:size-7',
-          // `border` alone here: each state below names its own border colour,
-          // so no two border-colour utilities ever land on the element at once.
-          // Tailwind resolves same-property utilities by stylesheet order, not
-          // by their order in this attribute, so "a later class overrides an
-          // earlier one" is not something to rely on.
-          variant === 'ghost' && 'border',
-          pressed === true
-            ? cx('bg-accent/12 text-accent', variant === 'ghost' && 'border-accent')
-            : tone === 'danger'
-              ? cx(
-                  'text-danger',
-                  variant === 'ghost' && 'border-danger/60',
-                  !disabled && 'hover:bg-danger/10',
-                  variant === 'ghost' && !disabled && 'hover:border-danger'
-                )
-              : tone === 'positive'
-                ? cx('text-isk-pos', variant === 'ghost' && 'border-line')
-                : cx(
-                    'text-text-dim',
-                    variant === 'ghost' && 'border-line',
-                    !disabled && 'hover:text-text',
-                    variant === 'ghost' && 'bg-panel-2',
-                    variant === 'ghost' && !disabled && 'hover:border-line-bright'
-                  ),
-          className
-        )}
+        className={iconButtonClassName({ variant, tone, size, pressed, disabled, className })}
       >
         <span aria-hidden="true" className="flex items-center justify-center">
           {icon}

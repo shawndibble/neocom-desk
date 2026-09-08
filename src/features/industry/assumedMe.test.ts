@@ -1,6 +1,11 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { db } from '@/db';
-import { ASSUMED_ME_SETTING_KEY, DEFAULT_ASSUMED_ME, useAssumedMe } from './assumedMe';
+import {
+  ASSUMED_ME_SETTING_KEY,
+  DEFAULT_ASSUMED_ME,
+  LEGACY_ASSUMED_ME_SETTING_KEY,
+  useAssumedMe,
+} from './assumedMe';
 
 beforeEach(async () => {
   await db.settings.clear();
@@ -46,5 +51,16 @@ describe('useAssumedMe', () => {
   it('persists a chosen value', async () => {
     await useAssumedMe.getState().setValue(7);
     expect((await db.settings.get(ASSUMED_ME_SETTING_KEY))?.value).toBe(7);
+  });
+
+  it('adopts the value a pilot set before the preference synced', async () => {
+    await db.settings.put({ key: LEGACY_ASSUMED_ME_SETTING_KEY, value: 8 });
+    expect(await hydrated()).toBe(8);
+    expect((await db.settings.get(ASSUMED_ME_SETTING_KEY))?.value).toBe(8);
+  });
+
+  it('validates an adopted value like any other — a damaged legacy row is not trusted', async () => {
+    await db.settings.put({ key: LEGACY_ASSUMED_ME_SETTING_KEY, value: 11 });
+    expect(await hydrated()).toBe(DEFAULT_ASSUMED_ME);
   });
 });

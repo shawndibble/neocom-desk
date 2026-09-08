@@ -19,10 +19,15 @@
 //   classifications, which have their own undo on the ledger). Clearing any of
 //   these throws away work the pilot did on purpose.
 // - Anything with its own control on the Settings page — `fontScale`,
-//   `timeFormat`, `marketHub`, `industryAssumedMe`, `corpDarkAfterDays`,
-//   `piExpiringSoonHours`, `industryFacilityDefaults`. A pilot who set one
-//   deliberately would not expect a button labelled "view preferences" to
-//   revert it; those are changed where they are shown.
+//   `timeFormat`, and the Defaults panels' five, which now live under `sync.`
+//   keys (`sync.marketHub`, `sync.industryAssumedMe`,
+//   `sync.industryFacilityDefaults`, `sync.piExpiringSoonHours`,
+//   `sync.corpDarkAfterDays`) and are excluded twice over by the bullet below.
+//   A pilot who set one deliberately would not expect a button labelled "view
+//   preferences" to revert it; those are changed where they are shown. Their
+//   pre-sync rows (`marketHub`, `industryAssumedMe`, ...) are left behind on
+//   purpose (`lib/useSyncedSetting.ts`) and stay out of this list for the same
+//   reason: clearing one would strand an older bundle on the default.
 // - App bookkeeping. `activeCharacterId`, `corp.rosterBaseline`, the
 //   notification preference/permission/poller keys, `installPromptSeen`,
 //   `lastSeenVersion`, and every `sync.` key (planSync's namespace, which
