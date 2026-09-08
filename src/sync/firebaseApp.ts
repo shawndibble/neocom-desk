@@ -1,6 +1,9 @@
 // Lazy Firebase initialization from Vite env. Firebase exists ONLY to sync
 // editable data (ADR 0001): no EVE tokens ever flow through it except the
-// short-lived access token sent to the mintFirebaseToken callable.
+// short-lived access token sent to the mintFirebaseToken callable. One named
+// exception: `features/bpcContracts/syncedContracts.ts` reads the shared,
+// admin-write-only `publicBpcContracts` collection through this same client
+// (ADR 0013) — not per-character data, but still nothing an EVE token touches.
 
 import { getApps, initializeApp, type FirebaseApp } from 'firebase/app';
 import { getAuth, type Auth } from 'firebase/auth';

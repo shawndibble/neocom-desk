@@ -34,6 +34,17 @@ import {
   NOTIFICATION_FEED_COLLECTION,
   feedPurgeCutoff,
 } from './purgeFeed.js';
+import { fetchPublicContractsCsvs } from './publicContractsArchive.js';
+import {
+  chunkDocId,
+  chunkRows,
+  filterAndCompactBpcContracts,
+  parseContractItemsCsv,
+  parseContractsCsv,
+  PUBLIC_BPC_CONTRACTS_COLLECTION,
+  PUBLIC_BPC_CONTRACTS_META_DOC,
+  type BpcContractRow,
+} from './publicContracts.js';
 
 initializeApp();
 
@@ -287,3 +298,78 @@ export const purgeNotificationFeed = onSchedule('every 24 hours', async () => {
     deleted,
   });
 });
+
+/** Firestore's hard cap on writes in a single `WriteBatch`, with headroom for a shorter final page. */
+const BATCH_WRITE_PAGE_SIZE = 450;
+
+/** Applies more write operations than fit in one `WriteBatch` by paging them across several. */
+async function commitInPages(
+  db: Firestore,
+  ops: readonly ((batch: FirebaseFirestore.WriteBatch) => void)[]
+): Promise<void> {
+  for (let i = 0; i < ops.length; i += BATCH_WRITE_PAGE_SIZE) {
+    const batch = db.batch();
+    for (const op of ops.slice(i, i + BATCH_WRITE_PAGE_SIZE)) op(batch);
+    await batch.commit();
+  }
+}
+
+/**
+ * Replaces the public-BPC-contracts snapshot wholesale: chunk docs 0..N-1 are
+ * overwritten, any leftover chunk from a previously-larger run is deleted
+ * (`meta`'s stored `chunkCount` is how a shrinking dataset's stale chunks are
+ * found — nothing else records how many there used to be), and `meta` itself
+ * is updated last so a reader never sees a `chunkCount` ahead of what's
+ * actually been written this run.
+ */
+async function writePublicBpcContractsSnapshot(
+  db: Firestore,
+  rows: readonly BpcContractRow[]
+): Promise<void> {
+  const collection = db.collection(PUBLIC_BPC_CONTRACTS_COLLECTION);
+  const metaRef = collection.doc(PUBLIC_BPC_CONTRACTS_META_DOC);
+  const previousChunkCount = ((await metaRef.get()).data()?.chunkCount as number | undefined) ?? 0;
+
+  const chunks = chunkRows(rows);
+  const ops: ((batch: FirebaseFirestore.WriteBatch) => void)[] = chunks.map((chunk, index) => {
+    const ref = collection.doc(chunkDocId(index));
+    return (batch) => batch.set(ref, { rows: chunk });
+  });
+  for (let i = chunks.length; i < previousChunkCount; i += 1) {
+    const ref = collection.doc(chunkDocId(i));
+    ops.push((batch) => batch.delete(ref));
+  }
+  await commitInPages(db, ops);
+
+  await metaRef.set({
+    lastSyncedAt: Date.now(),
+    chunkCount: chunks.length,
+    rowCount: rows.length,
+  });
+}
+
+/**
+ * syncPublicBpcContracts: the public BPC contract search's data source
+ * (issue #608, ADR 0013). Pulls EVE Ref's public-contracts snapshot (no CORS,
+ * so the client can't fetch it directly), filters it down to blueprint
+ * copies offered for sale, and republishes the small result to
+ * `publicBpcContracts` for signed-in clients to search.
+ *
+ * Every 30 minutes, matching EVE Ref's own twice-hourly refresh cadence.
+ * Memory/timeout are sized for decompressing and parsing the ~35MB of CSV
+ * text the two files this feature needs unpack to (measured against a live
+ * pull, 2026-09-08) — well short of either ceiling in practice, but the
+ * defaults (256MiB/60s) are not.
+ */
+export const syncPublicBpcContracts = onSchedule(
+  { schedule: 'every 30 minutes', memory: '1GiB', timeoutSeconds: 300 },
+  async () => {
+    const { contracts, contractItems } = await fetchPublicContractsCsvs();
+    const rows = filterAndCompactBpcContracts(
+      parseContractsCsv(contracts),
+      parseContractItemsCsv(contractItems),
+      Date.now()
+    );
+    await writePublicBpcContractsSnapshot(getFirestore(), rows);
+  }
+);

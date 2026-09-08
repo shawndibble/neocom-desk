@@ -1,0 +1,200 @@
+import { describe, it, expect } from 'vitest';
+import {
+  parseContractsCsv,
+  parseContractItemsCsv,
+  filterAndCompactBpcContracts,
+  chunkRows,
+  chunkDocId,
+  DEFAULT_CHUNK_SIZE,
+} from './publicContracts.js';
+
+// Column order and sample values verified against a live EVE Ref
+// public-contracts-latest.v2.tar.bz2 pull (2026-09-08) — see ADR 0013.
+const CONTRACTS_HEADER =
+  'collateral,contract_id,date_expired,date_issued,days_to_complete,end_location_id,issuer_corporation_id,issuer_id,price,reward,start_location_id,title,type,volume,http_last_modified,region_id,station_id,system_id,constellation_id,for_corporation,buyout';
+
+const ITEMS_HEADER =
+  'is_blueprint_copy,is_included,item_id,material_efficiency,quantity,record_id,runs,time_efficiency,type_id,http_last_modified,contract_id';
+
+function contractsCsv(rows: string[]): string {
+  return [CONTRACTS_HEADER, ...rows].join('\n');
+}
+
+function itemsCsv(rows: string[]): string {
+  return [ITEMS_HEADER, ...rows].join('\n');
+}
+
+const NOW = Date.parse('2026-09-08T18:00:00Z');
+const FUTURE = '2026-09-09T18:00:00Z';
+const PAST = '2026-09-01T00:00:00Z';
+
+describe('parseContractsCsv / parseContractItemsCsv', () => {
+  it('parses a quoted title containing commas without shifting later columns', () => {
+    const rows = parseContractsCsv(
+      contractsCsv([
+        `0.0,234920481,${FUTURE},2026-08-11T18:10:34Z,0,60005668,98745702,2120819548,500000.0,0.0,60005668,"Rigs, 10/20, max ME",item_exchange,100.0,2026-09-08T18:08:11Z,10000043,60005668,30002197,20000323,true,`,
+      ])
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0].title).toBe('Rigs, 10/20, max ME');
+    expect(rows[0].type).toBe('item_exchange');
+    expect(rows[0].region_id).toBe('10000043');
+  });
+
+  it('parses contract items, leaving is_blueprint_copy blank for non-blueprint rows', () => {
+    const rows = parseContractItemsCsv(
+      itemsCsv([
+        '"",true,1053870035543,,1,5283227393,,,47789,2026-09-01T11:31:53Z,234920432',
+        'true,true,1043607688037,10,1,5283227785,1,20,32858,2026-09-01T11:31:43Z,234920481',
+      ])
+    );
+    expect(rows[0].is_blueprint_copy).toBe('');
+    expect(rows[1].is_blueprint_copy).toBe('true');
+    expect(rows[1].material_efficiency).toBe('10');
+  });
+});
+
+describe('filterAndCompactBpcContracts', () => {
+  const contracts = contractsCsv([
+    // eligible: item_exchange, not yet expired
+    `0.0,1,${FUTURE},2026-08-11T18:10:34Z,0,,98745702,2120819548,5000000.0,0.0,60003760,"BPC bundle",item_exchange,10.0,2026-09-08T18:08:11Z,10000002,60003760,30000142,20000020,false,`,
+    // eligible: auction, with a buyout
+    `0.0,2,${FUTURE},2026-08-11T18:10:34Z,0,,98745702,2120819548,1000000.0,0.0,60008494,"Auctioned BPC",auction,10.0,2026-09-08T18:08:11Z,10000043,60008494,30002187,20000322,false,9000000.0`,
+    // ineligible type: courier carries no priced item to search
+    `0.0,3,${FUTURE},2026-08-11T18:10:34Z,0,,98745702,2120819548,,0.0,60003760,"Courier run",courier,10.0,2026-09-08T18:08:11Z,10000002,60003760,30000142,20000020,false,`,
+    // already expired by the time this job runs
+    `0.0,4,${PAST},2026-08-11T18:10:34Z,0,,98745702,2120819548,5000000.0,0.0,60003760,"Lapsed",item_exchange,10.0,2026-09-08T18:08:11Z,10000002,60003760,30000142,20000020,false,`,
+  ]);
+
+  const items = itemsCsv([
+    // BPC, included, on the eligible item_exchange contract 1
+    'true,true,1,10,1,1001,3,18,32858,2026-09-01T11:31:43Z,1',
+    // a second BPC on the same contract (bundle)
+    'true,true,2,4,1,1002,5,10,32880,2026-09-01T11:31:43Z,1',
+    // BPC, included, on the eligible auction contract 2
+    'true,true,3,0,1,1003,1,0,20185,2026-09-01T11:31:43Z,2',
+    // BPC, but is_included=false (requested from the buyer, not for sale) — excluded
+    'true,false,4,10,1,1004,1,10,32858,2026-09-01T11:31:43Z,1',
+    // not a blueprint at all — excluded
+    '"",true,5,,1,1005,,,47789,2026-09-01T11:31:43Z,1',
+    // a BPC on the courier contract (ineligible contract type) — excluded
+    'true,true,6,10,1,1006,1,10,32858,2026-09-01T11:31:43Z,3',
+    // a BPC on the lapsed contract — excluded
+    'true,true,7,10,1,1007,1,10,32858,2026-09-01T11:31:43Z,4',
+    // a BPC whose contract_id matches nothing in contracts.csv — excluded
+    'true,true,8,10,1,1008,1,10,32858,2026-09-01T11:31:43Z,999',
+  ]);
+
+  it('joins BPC item rows to their eligible, unexpired parent contract', () => {
+    const rows = filterAndCompactBpcContracts(
+      parseContractsCsv(contracts),
+      parseContractItemsCsv(items),
+      NOW
+    );
+
+    expect(rows.map((r) => `${r.contractId}:${r.typeId}`)).toEqual([
+      '1:32858',
+      '1:32880',
+      '2:20185',
+    ]);
+  });
+
+  it('carries region, location, price, ME/TE/runs and the auction flag through', () => {
+    const [row] = filterAndCompactBpcContracts(
+      parseContractsCsv(contracts),
+      parseContractItemsCsv(items),
+      NOW
+    );
+
+    expect(row).toMatchObject({
+      contractId: 1,
+      regionId: 10000002,
+      locationId: 60003760,
+      typeId: 32858,
+      price: 5000000,
+      isAuction: false,
+      me: 10,
+      te: 18,
+      runs: 3,
+      quantity: 1,
+    });
+    expect(row.buyout).toBeUndefined();
+    expect(row.dateExpired).toBe(Date.parse(FUTURE));
+  });
+
+  it('carries buyout only when the contract has one', () => {
+    const rows = filterAndCompactBpcContracts(
+      parseContractsCsv(contracts),
+      parseContractItemsCsv(items),
+      NOW
+    );
+    const auctionRow = rows.find((r) => r.contractId === 2);
+    expect(auctionRow?.isAuction).toBe(true);
+    expect(auctionRow?.buyout).toBe(9000000);
+  });
+
+  it('excludes a BPC item requested from the buyer rather than offered for sale', () => {
+    const rows = filterAndCompactBpcContracts(
+      parseContractsCsv(contracts),
+      parseContractItemsCsv(items),
+      NOW
+    );
+    expect(
+      rows.some((r) => r.typeId === 32858 && r.quantity === 1 && r.me === 10 && r.te === 10)
+    ).toBe(false);
+  });
+
+  it('is empty given no rows', () => {
+    expect(filterAndCompactBpcContracts([], [], NOW)).toEqual([]);
+  });
+
+  it('sorts deterministically by contract then type, independent of input order', () => {
+    const shuffledItems = itemsCsv([
+      'true,true,3,0,1,1003,1,0,20185,2026-09-01T11:31:43Z,2',
+      'true,true,2,4,1,1002,5,10,32880,2026-09-01T11:31:43Z,1',
+      'true,true,1,10,1,1001,3,18,32858,2026-09-01T11:31:43Z,1',
+    ]);
+    const rows = filterAndCompactBpcContracts(
+      parseContractsCsv(contracts),
+      parseContractItemsCsv(shuffledItems),
+      NOW
+    );
+    expect(rows.map((r) => `${r.contractId}:${r.typeId}`)).toEqual([
+      '1:32858',
+      '1:32880',
+      '2:20185',
+    ]);
+  });
+});
+
+describe('chunkRows', () => {
+  it('splits rows into fixed-size chunks, in order', () => {
+    const rows = Array.from({ length: 5 }, (_, i) => i);
+    expect(chunkRows(rows, 2)).toEqual([[0, 1], [2, 3], [4]]);
+  });
+
+  it('returns one empty result for no rows', () => {
+    expect(chunkRows([], 2)).toEqual([]);
+  });
+
+  it('returns a single chunk when rows fit within one chunk size', () => {
+    expect(chunkRows([1, 2, 3], 10)).toEqual([[1, 2, 3]]);
+  });
+
+  it('defaults to DEFAULT_CHUNK_SIZE', () => {
+    const rows = Array.from({ length: DEFAULT_CHUNK_SIZE + 1 }, (_, i) => i);
+    expect(chunkRows(rows)).toHaveLength(2);
+  });
+
+  it('rejects a non-positive chunk size', () => {
+    expect(() => chunkRows([1], 0)).toThrow();
+  });
+});
+
+describe('chunkDocId', () => {
+  it('zero-pads so lexicographic and numeric chunk order agree', () => {
+    expect(chunkDocId(0)).toBe('chunk-0000');
+    expect(chunkDocId(12)).toBe('chunk-0012');
+    expect(chunkDocId(0) < chunkDocId(12)).toBe(true);
+  });
+});

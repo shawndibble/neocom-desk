@@ -33,6 +33,7 @@ import { Assets } from '@/routes/Assets';
 import { Mail } from '@/routes/Mail';
 import { Calendar } from '@/routes/Calendar';
 import { Contracts } from '@/routes/Contracts';
+import { BpcContracts } from '@/routes/BpcContracts';
 import { Contacts } from '@/routes/Contacts';
 import { EmploymentHistory } from '@/routes/EmploymentHistory';
 import { Settings } from '@/routes/Settings';
@@ -106,6 +107,7 @@ const ROUTE_ELEMENTS = {
   '/mail': <Mail />,
   '/calendar': <Calendar />,
   '/contracts': <Contracts />,
+  '/bpc-contracts': <BpcContracts />,
   '/contacts': <Contacts />,
   '/settings': <Settings />,
 } satisfies Record<AppRoutePath, ReactElement>;
