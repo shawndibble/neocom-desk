@@ -86,7 +86,12 @@ export function CalendarMap({ days, loads, nowMs, selectedDayMs, onSelectDay }: 
         {days.map((day) => {
           const dayStartMs = localMidnight(day.date.getTime());
           const load = loads.get(dayStartMs);
-          const isPast = dayStartMs < todayMs;
+          // The hatch claims a day is *structurally incapable* of holding
+          // anything — ESI returns events from now only. A past day that holds
+          // a retained late-night op (`engine/character/calendarRetention.ts`)
+          // is visibly capable, so hatching it would contradict the dot inside
+          // it. Empty past days keep the hatch, which is the case it is for.
+          const isPast = dayStartMs < todayMs && load === undefined;
           const isSelected = selectedDayMs === dayStartMs;
           return (
             <button
