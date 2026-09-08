@@ -55,7 +55,7 @@ import {
   clearOrderBookCache,
   type OrderBookResult,
 } from '@/features/market/orderBook';
-import { formatVolume, formatOrderLocationText } from '@/features/market/format';
+import { formatVolume } from '@/features/market/format';
 import { useIsDesktop } from '@/lib/useIsDesktop';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import { OrderRowContextMenu } from '@/features/market/OrderRowContextMenu';
@@ -80,7 +80,6 @@ import {
   type OrderBookSummary,
 } from '@/engine/market/orderBook';
 import { resolveOrderBookRegion, type GlobalMarketOverride } from '@/engine/market/locationMode';
-import { myOrderGaps, type MyOrderGap } from '@/engine/market/myOrderGap';
 import { loadAllCharactersOpenOrders } from '@/features/market/openOrdersData';
 import {
   parseMarketParams,
@@ -90,7 +89,7 @@ import {
   type MarketLocationParam,
 } from '@/engine/market/urlState';
 import type { RegionOrder } from '@/esi/endpoints';
-import { formatIsk, formatIskAuto } from '@/lib/isk';
+import { formatIsk } from '@/lib/isk';
 import { typeIconUrl } from '@/lib/eveImages';
 import type { MarketFocusSearchState } from '@/lib/shortcuts';
 import { loadBlueprintCatalog, type BlueprintCatalog } from '@/features/industry/blueprintCatalog';
@@ -154,15 +153,12 @@ interface LocationCellProps {
 
 function LocationCell({ order, npcStations, solarSystems, t }: LocationCellProps) {
   const location = resolveOrderLocation(order, npcStations, solarSystems);
-  return (
-    <span>
-      {location.stationName ?? t('market.unknownStructure')}
-      <span className="text-text-dim">
-        {' '}
-        · {location.systemName} ({location.security.toFixed(1)})
-      </span>
-    </span>
-  );
+  // Station name alone. The system and its security used to trail it, but an
+  // EVE station name already carries its system ("Jita IV - Moon 4 - ..."),
+  // so the suffix repeated a word the eye had just read on every row of the
+  // book. The full form survives where it is pasted or exported rather than
+  // scanned — `OrderRowContextMenu`'s copy action and `orderBookCsv`.
+  return <span>{location.stationName ?? t('market.unknownStructure')}</span>;
 }
 
 interface MarketGroupTreeProps {
@@ -512,9 +508,10 @@ export function Market() {
   const [refreshTick, setRefreshTick] = useState(0);
   // Every authenticated character's own open order ids, across every item —
   // not scoped to the selected type, since matching is by order_id against
-  // whatever's on screen. "Undercut, by how much" (issue request): the order
-  // book this page already fetches is the FULL region book, so a match here
-  // needs no extra ESI call, unlike the Open Orders page's tiered checks.
+  // whatever's on screen. Membership is the whole question here: a row that
+  // is mine gets a tinted background, and nothing else. How badly a rival
+  // beats it is the Open Orders page's job, which has the cost basis and the
+  // exits to say something useful about it.
   const [myOrderIds, setMyOrderIds] = useState<ReadonlySet<number>>(new Set());
   const [sellShowAll, setSellShowAll] = useState(false);
   const [buyShowAll, setBuyShowAll] = useState(false);
@@ -621,7 +618,7 @@ export function Market() {
 
   // Independent of the catalogue and order-book loads: a character with no
   // orders scope, or with no characters signed in at all, simply resolves to
-  // an empty set — the highlight/gap below then degrades to "nothing here is
+  // an empty set — the highlight below then degrades to "nothing here is
   // mine" rather than erroring. Refetches on a manual Refresh (refreshTick)
   // the same way the order book itself does, so placing or cancelling an
   // order and hitting Refresh updates the highlight in place.
@@ -784,29 +781,14 @@ export function Market() {
   const sellRows = sellShowAll ? sortedSell : sortedSell.slice(0, ROW_CAP);
   const buyRows = buyShowAll ? sortedBuy : sortedBuy.slice(0, ROW_CAP);
 
-  // Gaps computed over the full (unpaginated, but location-filtered) sides —
-  // not sellRows/buyRows — so a "Show all" click never changes an
-  // already-visible row's gap, and a match hidden behind the row cap still
-  // counts as a rival. sell/buy order_id ranges never overlap, so the two
-  // sides merge into one lookup the price cell can key on regardless of
-  // which table it's rendering.
-  const sellGaps = useMemo(
-    () => myOrderGaps(sortedSell, myOrderIds, false),
-    [sortedSell, myOrderIds]
-  );
-  const buyGaps = useMemo(() => myOrderGaps(sortedBuy, myOrderIds, true), [sortedBuy, myOrderIds]);
-  const myGaps = useMemo<ReadonlyMap<number, MyOrderGap>>(() => {
-    if (sellGaps.size === 0) return buyGaps;
-    if (buyGaps.size === 0) return sellGaps;
-    return new Map([...sellGaps, ...buyGaps]);
-  }, [sellGaps, buyGaps]);
-
   const stationFilterLabel = useMemo(() => {
     if (stationFilter === null || !orderBookResult) return null;
     const order = orderBookResult.orders.find((o) => o.location_id === stationFilter);
     if (!order) return null;
     const location = resolveOrderLocation(order, npcStationMap, solarSystemMap);
-    return formatOrderLocationText(location, t('market.unknownStructure'));
+    // Names the same station the Location column does, so the banner and the
+    // rows below it read alike.
+    return location.stationName ?? t('market.unknownStructure');
   }, [stationFilter, orderBookResult, npcStationMap, solarSystemMap, t]);
 
   const baseColumns = useMemo<DataTableColumn<RegionOrder>[]>(
@@ -816,26 +798,19 @@ export function Market() {
         header: t('market.price'),
         align: 'right',
         className: 'tabular-nums',
-        render: (o) => {
-          const gap = myGaps.get(o.order_id);
-          return (
-            <div className="flex flex-col items-end">
-              <span>{formatIsk(o.price, 2)}</span>
-              {gap && (
-                <span
-                  className={`text-[0.625rem] font-semibold whitespace-nowrap ${gap.beaten ? 'text-isk-neg' : 'text-success'}`}
-                >
-                  {gap.beaten && gap.gapIsk !== null && gap.gapPct !== null
-                    ? t('market.myOrderUndercutBy', {
-                        gap: formatIskAuto(gap.gapIsk),
-                        pct: gap.gapPct.toFixed(1),
-                      })
-                    : t('market.myOrder')}
-                </span>
-              )}
-            </div>
-          );
-        },
+        render: (o) => (
+          <>
+            {formatIsk(o.price, 2)}
+            {/*
+              The tinted row (rowClassName below) is the visible marker for
+              "this one is mine" — no badge, no gap figure, nothing that adds
+              a line to every row of a book you scan by price. Colour is never
+              the sole signal though (docs/DESIGN.md §7), so the word rides
+              along unseen, the way `CorpBoardRow`'s severity label does.
+            */}
+            {myOrderIds.has(o.order_id) && <span className="sr-only">{t('market.myOrder')}</span>}
+          </>
+        ),
         sortValue: (o) => o.price,
       },
       {
@@ -861,7 +836,7 @@ export function Market() {
         sortValue: (o) => orderExpiry(o).getTime(),
       },
     ],
-    [t, npcStationMap, solarSystemMap, myGaps]
+    [t, npcStationMap, solarSystemMap, myOrderIds]
   );
   const buyColumns = useMemo<DataTableColumn<RegionOrder>[]>(
     () => [
@@ -1364,7 +1339,7 @@ export function Market() {
                               defaultSort={{ columnId: 'price', direction: 'asc' }}
                               rowContextMenu={orderRowContextMenu}
                               rowClassName={(o) =>
-                                myGaps.has(o.order_id) ? 'bg-accent/10' : undefined
+                                myOrderIds.has(o.order_id) ? 'bg-accent/10' : undefined
                               }
                             />
                             {!sellShowAll && sortedSell.length > ROW_CAP && (
@@ -1423,7 +1398,7 @@ export function Market() {
                               defaultSort={{ columnId: 'price', direction: 'desc' }}
                               rowContextMenu={orderRowContextMenu}
                               rowClassName={(o) =>
-                                myGaps.has(o.order_id) ? 'bg-accent/10' : undefined
+                                myOrderIds.has(o.order_id) ? 'bg-accent/10' : undefined
                               }
                             />
                             {!buyShowAll && sortedBuy.length > ROW_CAP && (
