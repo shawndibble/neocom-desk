@@ -272,6 +272,25 @@ describe('ProductionLogPanel', () => {
     expect(onOpenRun).not.toHaveBeenCalled();
   });
 
+  it("removes a run from the runs table's Sold menu — the Records tab's only delete", async () => {
+    await addRun({ id: 'run-1' });
+
+    const user = userEvent.setup();
+    render(
+      <ProductionLogPanel characterId={CHARACTER_ID} catalog={CATALOG} skills={{}} plans={PLANS} />
+    );
+    await runsTable();
+
+    await user.click(await screen.findByRole('button', { name: 'More sale options' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Remove Run' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Remove Run' });
+    await user.click(within(dialog).getByRole('button', { name: 'Remove Run' }));
+
+    await waitFor(async () => {
+      expect(await db.productionRuns.count()).toBe(0);
+    });
+  });
+
   it("links a past sale directly from the runs table's Sold button", async () => {
     await addRun({ id: 'run-1' });
     loadWalletTransactions.mockResolvedValue({
