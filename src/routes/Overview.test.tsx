@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import '@/i18n';
@@ -31,6 +31,16 @@ const FIXTURE_SKILLS: SkillType[] = [
     prereqs: [],
   },
 ];
+
+vi.mock('@/sde/loadMarketSde', () => ({
+  loadNpcStations: vi.fn(async () => []),
+  loadMarketGroups: vi.fn(async () => []),
+  loadMarketTypes: vi.fn(async () => []),
+  loadSolarSystems: vi.fn(async () => []),
+  loadMarketRegions: vi.fn(async () => []),
+  loadGlobalMarkets: vi.fn(async () => []),
+  loadVariations: vi.fn(async () => ({ types: {}, metaGroups: {} })),
+}));
 
 vi.mock('@/sde/loadSde', () => ({
   loadSkills: vi.fn(async () => FIXTURE_SKILLS),
@@ -109,6 +119,38 @@ const server = setupServer(
     HttpResponse.json([])
   ),
   http.get(`https://esi.evetech.net/characters/${CHAR_ID}/contracts`, () => HttpResponse.json([])),
+  http.get(`https://esi.evetech.net/characters/${CHAR_ID}/planets`, () => HttpResponse.json([])),
+  http.get(`https://esi.evetech.net/characters/${CHAR_ID}/planets/:planetId`, () =>
+    HttpResponse.json({ links: [], pins: [], routes: [] })
+  ),
+  http.get(`https://esi.evetech.net/characters/${CHAR_ID}/mining/`, () => HttpResponse.json([])),
+  // Fuzzwork, not ESI: the Open Orders card asks it what rivals charge. An
+  // empty book means nothing beats anything, which is the quiet-board default.
+  http.get('https://market.fuzzwork.co.uk/aggregates/', () => HttpResponse.json({})),
+  // Public name lookups the board makes for its own row labels.
+  http.get('https://esi.evetech.net/universe/planets/:planetId', ({ params }) =>
+    HttpResponse.json({
+      name: `Gehi ${params.planetId}`,
+      planet_id: 1,
+      system_id: 30000142,
+      type_id: 11,
+    })
+  ),
+  http.get('https://esi.evetech.net/universe/types/:typeId', () =>
+    HttpResponse.json({ type_id: 3300, name: 'Gunnery', group_id: 10, published: true })
+  ),
+  http.post('https://esi.evetech.net/universe/names', () => HttpResponse.json([])),
+  // An order's cost basis is read out of the character's own transaction
+  // history; both are empty here, which is what "no cost basis known" means.
+  http.get(`https://esi.evetech.net/characters/${CHAR_ID}/wallet/transactions`, () =>
+    HttpResponse.json([])
+  ),
+  http.get(`https://esi.evetech.net/characters/${CHAR_ID}/wallet/journal`, () =>
+    HttpResponse.json([])
+  ),
+  http.get(`https://esi.evetech.net/characters/${CHAR_ID}/orders/history`, () =>
+    HttpResponse.json([])
+  ),
   http.get(`https://esi.evetech.net/characters/${CHAR_ID}/orders`, () => HttpResponse.json([]))
 );
 
@@ -136,6 +178,7 @@ beforeEach(async () => {
   await db.tokens.clear();
   await db.settings.clear();
   await db.esiCache.clear();
+  await db.notificationFeed.clear();
   useActiveCharacter.setState({ activeCharacterId: null, hydrated: false });
   usePublicInfo.setState({ byCharacterId: {} });
 
@@ -151,18 +194,120 @@ beforeEach(async () => {
   window.history.pushState({}, '', '/overview');
 });
 
-describe('Overview', () => {
-  it('shows the active character name and wallet balance with data age', async () => {
+/**
+ * Fixtures are always relative to the wall clock, never a calendar date.
+ *
+ * The board is entirely countdowns — batch expiries, job end dates, the
+ * deadline hero, every `formatDuration` — and this file already learned once
+ * (BUG #10, below) that a hardcoded past/future pair silently drifts out of
+ * the window it was written for and stops testing anything.
+ */
+function hoursFromNow(hours: number): string {
+  return new Date(Date.now() + hours * 3_600_000).toISOString();
+}
+
+const ORDERS_SCOPE = 'esi-markets.read_character_orders.v1';
+const PLANETS_SCOPE = 'esi-planets.manage_planets.v1';
+const INDUSTRY_SCOPE = 'esi-industry.read_character_jobs.v1';
+
+/**
+ * Adds scopes to the seeded token.
+ *
+ * Several of the board's loaders check the scope up front and skip the
+ * Character entirely rather than taking a live 403 — so a card stays
+ * deliberately empty until its scope is granted, and a test that wants rows
+ * has to say which grant it is testing under.
+ */
+async function grantScopes(scopes: readonly string[]): Promise<void> {
+  const token = await db.tokens.get(CHAR_ID);
+  await db.tokens.put({ ...token!, scopes: [...(token?.scopes ?? []), ...scopes] });
+}
+
+/** A card by its panel heading — the `<section>` around it, for scoped queries. */
+async function findCard(title: RegExp): Promise<HTMLElement> {
+  const heading = await screen.findByRole('heading', { name: title });
+  return heading.closest('section') as HTMLElement;
+}
+
+function industryJob({ jobId, endsInHours }: { jobId: number; endsInHours: number }) {
+  return {
+    job_id: jobId,
+    activity_id: 1,
+    blueprint_type_id: 3300,
+    product_type_id: 3300,
+    facility_id: 60003760,
+    station_id: 60003760,
+    runs: 2,
+    start_date: hoursFromNow(endsInHours - 24),
+    end_date: hoursFromNow(endsInHours),
+    status: 'active' as const,
+  };
+}
+
+/**
+ * Four colonies whose extractors all expire three hours out, give or take the
+ * minutes it took to walk the list in-client — which is exactly the shape
+ * `groupColoniesIntoBatches` exists to fold into one row.
+ */
+const COLONIES = [0, 0.1, 0.2, 0.3].map((offset, i) => ({
+  planet: {
+    planet_id: 4001 + i,
+    solar_system_id: 30000142,
+    planet_type: 'barren' as const,
+    owner_id: CHAR_ID,
+    upgrade_level: 5,
+    num_pins: 1,
+    last_update: hoursFromNow(-1),
+  },
+  detail: {
+    links: [],
+    routes: [],
+    pins: [
+      {
+        pin_id: 5001 + i,
+        type_id: 2848,
+        latitude: 0,
+        longitude: 0,
+        install_time: hoursFromNow(-21),
+        expiry_time: hoursFromNow(3 + offset),
+        extractor_details: { heads: [], cycle_time: 3600, qty_per_cycle: 1000 },
+      },
+    ],
+  },
+}));
+
+function feedEntry({
+  id,
+  eventId,
+  title,
+  eveType,
+  firedAt = Date.now(),
+}: {
+  id: string;
+  eventId: string;
+  title: string;
+  eveType?: string;
+  firedAt?: number;
+}) {
+  return { id, characterId: CHAR_ID, eventId, title, body: `${title} body`, firedAt, eveType };
+}
+
+async function seedFeed(entries: ReturnType<typeof feedEntry>[]): Promise<void> {
+  await db.notificationFeed.bulkPut(entries);
+}
+
+describe('Overview board', () => {
+  it('shows the active character, the wallet and what is training', async () => {
     render(<App />);
     expect(await screen.findByRole('heading', { name: 'Pilot One' })).toBeInTheDocument();
     expect(await screen.findByText(/1,234,567\.89/)).toBeInTheDocument();
+    expect(await screen.findByText('Gunnery')).toBeInTheDocument();
     expect(screen.getAllByText('just now').length).toBeGreaterThan(0);
     expect(lastAuthHeader).toBe('Bearer access-token-91');
   });
 
-  it('shows corp/alliance, total/unallocated SP, and the active training skill', async () => {
+  it('shows corp/alliance and total/unallocated SP in the shared header', async () => {
     render(<App />);
-    expect(await screen.findByText(/Training Gunnery/)).toBeInTheDocument();
     expect(await screen.findByText(/Test Corp/)).toBeInTheDocument();
     expect(screen.getByText(/Test Alliance/)).toBeInTheDocument();
     expect(screen.getByText('5,000,000')).toBeInTheDocument();
@@ -179,8 +324,8 @@ describe('Overview', () => {
             skill_id: 3300,
             queue_position: 0,
             finished_level: 5,
-            start_date: '2026-07-01T00:00:00Z',
-            finish_date: '2026-07-20T00:00:00Z',
+            start_date: hoursFromNow(-72),
+            finish_date: hoursFromNow(-24),
             level_end_sp: 512_000,
           },
         ])
@@ -192,324 +337,216 @@ describe('Overview', () => {
     expect(screen.queryByText('5,000,000')).not.toBeInTheDocument();
   });
 
-  it('gives the wallet and queue panels a common bottom edge when they share a row', async () => {
-    render(<App />);
-    await screen.findByText(/1,234,567\.89/);
-
-    // Asserted on the classes rather than on measured heights: jsdom has no
-    // layout engine, so every box it reports is 0 tall and a height comparison
-    // would pass no matter what these panels did.
-    const wallet = screen.getByRole('heading', { name: 'Wallet' }).closest('section');
-    const queue = screen.getByRole('heading', { name: 'Training queue' }).closest('section');
-    const grid = wallet?.parentElement;
-
-    // The default `stretch` is what equalises them; `items-start` would let
-    // each panel keep its own content height.
-    expect(grid?.className).not.toMatch(/items-start/);
-    // The grid stretches the queue's aria-live wrapper, not the panel inside
-    // it, so the panel has to be told to fill that wrapper.
-    expect(queue?.className).toMatch(/h-full/);
-    expect(queue?.parentElement?.className).toMatch(/h-full/);
-  });
-
-  it('centres the wallet balance in the taller card rather than stranding it at the top', async () => {
-    render(<App />);
-    const balance = await screen.findByText(/1,234,567\.89/);
-
-    // The whole flex chain has to hold, so it is walked rather than spot-
-    // checked: the box holding the balance centres it, the panel's content
-    // wrapper grows to give it room, and the section is the column that
-    // wrapper grows inside. Any one link missing puts the balance back at the
-    // top, and jsdom reports every height as 0, so position cannot be measured.
-    const centred = balance.parentElement;
-    expect(centred?.className).toMatch(/justify-center/);
-    expect(centred?.className).toMatch(/flex-1/);
-
-    const contentWrapper = centred?.parentElement;
-    expect(contentWrapper?.className).toMatch(/flex-1/);
-
-    const section = contentWrapper?.parentElement;
-    expect(section?.tagName).toBe('SECTION');
-    expect(section?.className).toMatch(/flex-col/);
-  });
-
-  it('keeps the block above the tabs to identity and SP alone', async () => {
-    render(<App />);
-    await screen.findByText(/1,234,567\.89/);
-
-    // No page title restating the tab, and no controls: the wallet and queue
-    // panels below carry their own data age. The name comes from a Dexie
-    // useLiveQuery independent of the wallet balance just awaited above, so
-    // this must wait for it too rather than assume it's already resolved —
-    // same lesson Settings.test.tsx documents for its own character-name read.
-    const header = (await screen.findByRole('heading', { level: 1, name: 'Pilot One' })).closest(
-      'header'
-    );
-    expect(header).not.toBeNull();
-    expect(within(header as HTMLElement).queryAllByRole('button')).toHaveLength(0);
-    expect(screen.queryByRole('heading', { level: 1, name: 'Overview' })).toBeNull();
-  });
-
-  it('falls back gracefully when the wallet fetch fails offline', async () => {
+  /*
+   * The premise of the whole redesign. The board is opened on the days when
+   * everything has gone wrong at once, so the failure that matters is not a
+   * wrong number — it is a card that grows without bound and pushes every
+   * other domain off the page.
+   */
+  it('renders 137 undercut orders as one number, not 137 rows', async () => {
+    await grantScopes([ORDERS_SCOPE]);
     server.use(
-      http.get('https://esi.evetech.net/characters/:id/wallet', () => HttpResponse.error())
-    );
-    render(<App />);
-    expect(await screen.findByText(/no wallet data cached/i)).toBeInTheDocument();
-  });
-
-  it('offers a re-login in the wallet panel when the wallet scope is gone', async () => {
-    server.use(
-      http.get(
-        'https://esi.evetech.net/characters/:id/wallet',
-        () => new HttpResponse(null, { status: 403 })
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/orders`, () =>
+        HttpResponse.json(
+          Array.from({ length: 137 }, (_, i) => ({ ...OPEN_ORDER, order_id: i + 1 }))
+        )
+      ),
+      // Every one of them beaten at its own station.
+      http.get('https://market.fuzzwork.co.uk/aggregates/', () =>
+        HttpResponse.json({
+          // `orderCount` is load-bearing: `fuzzwork.ts` reads a side without
+          // one as having no orders at all, so a price alone means nothing.
+          '3300': {
+            buy: { max: '0', volume: '0', orderCount: '0' },
+            sell: { min: '50', volume: '10', orderCount: '3' },
+          },
+        })
       )
     );
     render(<App />);
-    // Overview spans three scopes, so only the wallet PANEL degrades — the rest
-    // of the page must keep rendering rather than the whole route being gated.
-    expect(await screen.findByText(/log in again to see your wallet/i)).toBeInTheDocument();
-    expect(screen.queryByText(/no wallet data cached/i)).not.toBeInTheDocument();
+
+    const card = await findCard(/open orders/i);
+    expect(await within(card).findByText('137')).toBeInTheDocument();
+    // Three tiles and no per-order rows, whatever the count.
+    expect(within(card).queryAllByRole('listitem')).toHaveLength(0);
   });
 
-  it('does not offer a re-login when the wallet is merely unreachable', async () => {
-    server.use(
-      http.get('https://esi.evetech.net/characters/:id/wallet', () => HttpResponse.error())
-    );
+  /*
+   * Asked for twice, in the review of the mockups: amber says "look here", and
+   * a zero has nothing to look at. A toned zero sends you to a page where
+   * there is nothing to do, which is the opposite of what this board is for.
+   */
+  it('draws a zero as plain text, with neither the warning tone nor its glyph', async () => {
     render(<App />);
-    expect(await screen.findByText(/no wallet data cached/i)).toBeInTheDocument();
-    expect(screen.queryByText(/log in again to see your wallet/i)).not.toBeInTheDocument();
+    const card = await findCard(/open orders/i);
+    const undercut = within(card).getByText('Undercut').closest('span')?.parentElement;
+    const zero = within(undercut as HTMLElement).getByText('0');
+
+    expect(zero.className).not.toMatch(/text-warning/);
+    expect(zero.className).toMatch(/text-text/);
+    // The severity glyph is dropped too — colour is never the only signal, so
+    // leaving the shape behind would still say "look here" (DESIGN.md §7).
+    expect((undercut as HTMLElement).querySelector('svg')).toBeNull();
   });
 
-  it('redirects to /characters when no active character is set', async () => {
-    await db.settings.clear();
-    render(<App />);
-    expect(await screen.findByRole('heading', { name: 'Characters' })).toBeInTheDocument();
-  });
-
-  it('shows a re-login prompt in the queue panel when the skillqueue scope was revoked, without breaking the wallet/SP panels', async () => {
+  /*
+   * `colonyBatches.test.ts` covers the grouping itself; this covers that the
+   * card renders batches rather than colonies. PI is done in one sitting, so
+   * four planets on one timer is one trip, and four rows saying "3h" would be
+   * four times the reading for it.
+   */
+  it('folds four colonies sharing a timer into one reset run', async () => {
+    await grantScopes([PLANETS_SCOPE]);
     server.use(
-      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/skillqueue`, () =>
-        HttpResponse.json({ error: 'missing scope' }, { status: 403 })
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/planets`, () =>
+        HttpResponse.json(COLONIES.map((c) => c.planet))
+      ),
+      ...COLONIES.map((c) =>
+        http.get(
+          `https://esi.evetech.net/characters/${CHAR_ID}/planets/${c.planet.planet_id}`,
+          () => HttpResponse.json(c.detail)
+        )
       )
     );
     render(<App />);
-    expect(await screen.findByText('Log in again to see the training queue')).toBeInTheDocument();
-    // Sibling panels still render from their own (healthy) data.
-    expect(await screen.findByText(/1,234,567\.89/)).toBeInTheDocument();
-    expect(screen.getByText('5,000,000')).toBeInTheDocument();
-    expect(screen.queryByText(/no active in-game training queue cached/i)).not.toBeInTheDocument();
+
+    const card = await findCard(/planetary industry/i);
+    expect(await within(card).findByText(/4 colonies end together/i)).toBeInTheDocument();
+    expect(within(card).getAllByRole('listitem')).toHaveLength(1);
   });
 
-  it('links the wallet balance to /wallet and the queue line to /skills/plans', async () => {
-    render(<App />);
-    const balanceLink = await screen.findByRole('link', { name: /1,234,567\.89/ });
-    expect(balanceLink).toHaveAttribute('href', '/wallet');
-    const queueLink = await screen.findByRole('link', { name: /Training Gunnery/ });
-    expect(queueLink).toHaveAttribute('href', '/skills/plans');
-  });
-
-  it('shows queue depth (count, total remaining, final finish date) alongside the active entry', async () => {
-    render(<App />);
-    await screen.findByText(/Training Gunnery/);
-    expect(screen.getByText(/1 queued/)).toBeInTheDocument();
-  });
-
-  it('wraps the training-queue panel in an aria-live region', async () => {
-    render(<App />);
-    await screen.findByText(/Training Gunnery/);
-    const region = document.querySelector('[aria-live="polite"]');
-    expect(region).not.toBeNull();
-    expect(region?.textContent).toMatch(/Training Gunnery/);
-  });
-
-  it('offers a manual-refresh action on the wallet panel that re-fetches the balance', async () => {
-    const { default: userEvent } = await import('@testing-library/user-event');
-    render(<App />);
-    await screen.findByText(/1,234,567\.89/);
-
+  it('leads with the soonest deadline on the board and links to the card that owns it', async () => {
+    await grantScopes([PLANETS_SCOPE, INDUSTRY_SCOPE]);
     server.use(
-      http.get('https://esi.evetech.net/characters/:id/wallet', () => HttpResponse.json(42))
-    );
-    const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: 'Refresh wallet' }));
-
-    expect(await screen.findByText(/42\.00/)).toBeInTheDocument();
-  });
-
-  it('shows the queue-empty state, not a false "scheduled" line, when the queue fetch fails with nothing cached', async () => {
-    server.use(
-      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/skillqueue`, () =>
-        HttpResponse.error()
+      // A colony batch three hours out, against a job two days out and a skill
+      // thirty days out — the colony has to win, and clicking it has to land
+      // on Planetary rather than on whichever card happened to be checked first.
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/planets`, () =>
+        HttpResponse.json(COLONIES.map((c) => c.planet))
+      ),
+      ...COLONIES.map((c) =>
+        http.get(
+          `https://esi.evetech.net/characters/${CHAR_ID}/planets/${c.planet.planet_id}`,
+          () => HttpResponse.json(c.detail)
+        )
+      ),
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/industry/jobs`, () =>
+        HttpResponse.json([industryJob({ jobId: 7, endsInHours: 48 })])
       )
     );
     render(<App />);
-    expect(await screen.findByText(/no active in-game training queue cached/i)).toBeInTheDocument();
-    expect(screen.queryByText(/skill queue scheduled/i)).not.toBeInTheDocument();
-  });
 
-  it('distinguishes a revoked scope from "no data yet" on the industry/contracts tiles', async () => {
-    server.use(
-      http.get(
-        `https://esi.evetech.net/characters/${CHAR_ID}/industry/jobs`,
-        () => new HttpResponse(null, { status: 403 })
-      )
-    );
-    render(<App />);
-    await screen.findByText(/1,234,567\.89/);
-    const main = within(document.querySelector('main') as HTMLElement);
-    const industryLink = await main.findByRole('link', {
-      name: /industry: log in again to see this data/i,
+    const hero = await screen.findByText('Next deadline');
+    const cell = hero.parentElement as HTMLElement;
+
+    /*
+     * Waited on rather than read once: the six cards load independently, so
+     * the hero legitimately shows the skill queue's thirty days for a tick
+     * before the colony read lands and takes the lead. Asserting on the first
+     * render would be asserting on load order.
+     */
+    await waitFor(() => {
+      expect(within(cell).getByRole('link')).toHaveAttribute('href', '/planetary-industry');
     });
-    expect(within(industryLink).getByText('—')).toBeInTheDocument();
+    // The note, not the countdown: the fixture is three hours from the instant
+    // it was built and the clock has moved on by the time this renders, so an
+    // exact "3h" would be a flake waiting for a slow CI box.
+    const link = within(cell).getByRole('link');
+    expect(within(link).getByText('4 colonies end together')).toBeInTheDocument();
+    expect(within(link).getByText(/^2h 5\dm$/)).toBeInTheDocument();
   });
 
-  it('shows "queue paused" copy when entries exist but none carry start/finish dates', async () => {
-    server.use(
-      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/skillqueue`, () =>
-        HttpResponse.json([{ skill_id: 3300, queue_position: 0, finished_level: 5 }])
-      )
-    );
+  /*
+   * "A card that disappears when there is nothing wrong is a card you cannot
+   * tell from a card that failed to load." Every domain has to be present on a
+   * character that has never done any of it.
+   */
+  it('renders every card on a character with nothing going on', async () => {
     render(<App />);
-    expect(await screen.findByText(/paused/i)).toBeInTheDocument();
-    expect(screen.queryByText(/no active in-game training queue cached/i)).not.toBeInTheDocument();
+    await screen.findByText(/1,234,567\.89/);
+
+    for (const title of [
+      /open orders/i,
+      /mining tax/i,
+      /planetary industry/i,
+      /industry jobs/i,
+      /^alerts$/i,
+    ]) {
+      expect(await findCard(title)).toBeInTheDocument();
+    }
   });
 
-  it('shows "queue empty" copy for a genuinely empty queue', async () => {
-    server.use(
-      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/skillqueue`, () =>
-        HttpResponse.json([])
-      )
-    );
+  it('gives each card a link to the page that fixes it', async () => {
     render(<App />);
-    expect(await screen.findByText(/no active in-game training queue cached/i)).toBeInTheDocument();
+    await screen.findByText(/1,234,567\.89/);
+
+    const destinations: [RegExp, string][] = [
+      [/open orders/i, '/market?section=orders'],
+      [/mining tax/i, '/moon-mining'],
+      [/planetary industry/i, '/planetary-industry'],
+      [/industry jobs/i, '/industry'],
+    ];
+    for (const [title, href] of destinations) {
+      const card = await findCard(title);
+      expect(within(card).getByRole('link', { name: /open/i })).toHaveAttribute('href', href);
+    }
   });
 
-  it('degrades only the skills/queue panel on a generic (non-reauth) fetch error, leaving the wallet panel healthy', async () => {
-    const { loadSkills } = await import('@/sde/loadSde');
-    vi.mocked(loadSkills).mockRejectedValueOnce(new Error('SDE fetch failed'));
-    render(<App />);
-    expect(await screen.findByText(/1,234,567\.89/)).toBeInTheDocument();
-    expect(await screen.findByText('Could not load')).toBeInTheDocument();
-  });
-
-  it('shows industry/open-orders/contracts summary tiles with counts and links', async () => {
+  /*
+   * Finished jobs are interchangeable — they are all "go and click deliver" —
+   * so a dozen of them collapse into one row instead of pushing every running
+   * job off the card. The running ones stay individual: different items,
+   * different facilities, different clocks.
+   */
+  it('collapses delivered-ready jobs into one row and keeps running jobs separate', async () => {
+    await grantScopes([INDUSTRY_SCOPE]);
     server.use(
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/industry/jobs`, () =>
         HttpResponse.json([
-          {
-            job_id: 1,
-            activity_id: 1,
-            blueprint_type_id: 1,
-            facility_id: 1,
-            station_id: 1,
-            runs: 1,
-            start_date: '2026-08-01T00:00:00Z',
-            end_date: '2026-09-01T00:00:00Z',
-            status: 'active',
-          },
-        ])
-      ),
-      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/contracts`, () =>
-        HttpResponse.json([
-          {
-            contract_id: 1,
-            issuer_id: 1,
-            issuer_corporation_id: 1,
-            assignee_id: 1,
-            acceptor_id: 1,
-            type: 'item_exchange',
-            status: 'outstanding',
-            for_corporation: false,
-            availability: 'personal',
-            date_issued: '2026-08-01T00:00:00Z',
-            date_expired: '2026-09-01T00:00:00Z',
-          },
-          {
-            contract_id: 2,
-            issuer_id: 1,
-            issuer_corporation_id: 1,
-            assignee_id: 1,
-            acceptor_id: 1,
-            type: 'item_exchange',
-            status: 'finished',
-            for_corporation: false,
-            availability: 'personal',
-            date_issued: '2026-07-01T00:00:00Z',
-            date_expired: '2026-08-01T00:00:00Z',
-          },
+          industryJob({ jobId: 1, endsInHours: -5 }),
+          industryJob({ jobId: 2, endsInHours: -2 }),
+          industryJob({ jobId: 3, endsInHours: -1 }),
+          industryJob({ jobId: 4, endsInHours: 6 }),
+          industryJob({ jobId: 5, endsInHours: 30 }),
         ])
       )
     );
     render(<App />);
-    await screen.findByText(/1,234,567\.89/);
-    const main = within(document.querySelector('main') as HTMLElement);
 
-    const industryLink = main.getByRole('link', { name: /industry/i });
-    expect(industryLink).toHaveAttribute('href', '/industry');
-    expect(await within(industryLink).findByText('1')).toBeInTheDocument();
-
-    const contractsLink = main.getByRole('link', { name: /contracts/i });
-    expect(contractsLink).toHaveAttribute('href', '/contracts');
-    expect(await within(contractsLink).findByText('1')).toBeInTheDocument(); // only the outstanding one
-
-    const ordersLink = main.getByRole('link', { name: /open orders/i });
-    expect(ordersLink).toHaveAttribute('href', '/market?section=orders');
+    const card = await findCard(/industry jobs/i);
+    expect(await within(card).findByText(/3 jobs ready to deliver/i)).toBeInTheDocument();
+    // One collapsed row plus the two still running.
+    expect(within(card).getAllByRole('listitem')).toHaveLength(3);
   });
 
-  it('shows open orders over the order slots the trade skills grant, linking to the Open Orders tab', async () => {
-    server.use(
-      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/skills`, () =>
-        HttpResponse.json({
-          ...skillsPayload,
-          skills: [
-            ...skillsPayload.skills,
-            // Trade V (+20) and Retail III (+24) on top of the base 5.
-            {
-              skill_id: 3443,
-              trained_skill_level: 5,
-              active_skill_level: 5,
-              skillpoints_in_skill: 1,
-            },
-            {
-              skill_id: 3444,
-              trained_skill_level: 3,
-              active_skill_level: 3,
-              skillpoints_in_skill: 1,
-            },
-          ],
-        })
-      ),
-      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/orders`, () =>
-        HttpResponse.json([OPEN_ORDER, { ...OPEN_ORDER, order_id: 2 }])
-      )
-    );
+  /*
+   * The board is a summary of the feed, so it groups by notification *type*
+   * the same way the Alerts page does: a week away is hundreds of fires across
+   * a dozen types, and a row per fire would be the entire column.
+   */
+  it('groups the alerts column by type and links through to the feed', async () => {
+    await seedFeed([
+      feedEntry({ id: 'a', eventId: 'marketOrderFilled', title: 'Market order filled' }),
+      feedEntry({ id: 'b', eventId: 'marketOrderFilled', title: 'Market order filled' }),
+      feedEntry({ id: 'c', eventId: 'newMail', title: 'New mail' }),
+    ]);
     render(<App />);
-    await screen.findByText(/1,234,567\.89/);
-    const main = within(document.querySelector('main') as HTMLElement);
 
-    const ordersLink = await main.findByRole('link', { name: /open orders: 2 of 49/i });
-    expect(ordersLink).toHaveAttribute('href', '/market?section=orders');
-    expect(within(ordersLink).getByText('2')).toBeInTheDocument();
-    expect(within(ordersLink).getByText('/ 49')).toBeInTheDocument();
+    const card = await findCard(/^alerts$/i);
+    expect(await within(card).findByText('3 unread')).toBeInTheDocument();
+    const rows = within(card).getAllByRole('listitem');
+    expect(rows).toHaveLength(2);
+    expect(within(rows[0]).getByRole('link')).toHaveAttribute('href', '/alerts');
   });
 
-  it('offers a re-login on the open-orders tile when the orders scope is gone', async () => {
-    server.use(
-      http.get(
-        `https://esi.evetech.net/characters/${CHAR_ID}/orders`,
-        () => new HttpResponse(null, { status: 403 })
-      )
-    );
+  it('puts an unread count on the rail’s Alerts entry, and nothing at all at zero', async () => {
     render(<App />);
     await screen.findByText(/1,234,567\.89/);
-    const main = within(document.querySelector('main') as HTMLElement);
-    const ordersLink = await main.findByRole('link', {
-      name: /open orders: log in again to see this data/i,
-    });
-    // No "— / 5": a revoked scope hides the ratio rather than implying zero used.
-    expect(within(ordersLink).getByText('—')).toBeInTheDocument();
-    expect(ordersLink.textContent).not.toContain('/');
+    const nav = within(document.querySelector('nav') as HTMLElement);
+    expect(nav.getByRole('link', { name: 'Alerts' })).toHaveAttribute('href', '/alerts');
+
+    await seedFeed([feedEntry({ id: 'a', eventId: 'newMail', title: 'New mail' })]);
+    expect(await screen.findByRole('link', { name: /alerts, 1 waiting/i })).toBeInTheDocument();
   });
 });
 

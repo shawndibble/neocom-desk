@@ -524,7 +524,7 @@ describe('hydrateNotificationPreferences', () => {
    * rebuilds a fresh object graph for every Character present in the synced
    * blob even when nothing changed, so a naive reference check
    * (`merged !== current`) is true on nearly every call. Both
-   * NotificationsPanel and NotificationFeedPanel re-run this (via
+   * NotificationsPanel and the Alerts page re-run this (via
    * `refreshAppBadge`) from a `useEffect` keyed on the store's value — a
    * reference check there would call `setValue` every time, looping without
    * end. This asserts the store's value reference is stable across repeated

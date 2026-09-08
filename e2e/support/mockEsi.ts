@@ -90,6 +90,10 @@ const PREFETCHED_EMPTY = new Set(
     'corporationhistory',
     'industry/jobs',
     'mail',
+    // Trailing slash on purpose: `getCharacterMining` fetches
+    // `/characters/{id}/mining/`, and the Overview board reads it on every
+    // page now that the Mining Tax card is on the landing route.
+    'mining/',
     'notifications',
     'orders',
     'orders/history',

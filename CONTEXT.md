@@ -13,6 +13,12 @@ here — they go one per file in `docs/context/decisions/`.
 - **Acquisition Verdict**: Whether a Build Plan's product costs less to build
   than to buy outright at the trade hub. A personal-use comparison — no
   sales tax or broker fee applies, because nothing is being sold.
+- **Alert**: One fired Notification Event as it appears in the Notification
+  Feed and on `/alerts`. Grouped there by _type_ — the `eveType` for an EVE
+  notification, the event id otherwise — because a device back from a week
+  away holds hundreds of fires across a dozen-odd types, and the type is the
+  unit a reader mutes, dismisses or acts on. Distinct from the browser
+  notification the same fire may also raise: two delivery channels, one event.
 - **API-Derived Data**: Character data pulled from ESI (assets, mail, wallet, etc.). Cached locally per device for offline viewing. Never synced through the backend.
 - **Assignment**: Links a Mining Ledger Entry (or a split slice of its ore —
   whole lines or part of a line's quantity, for the two-corps-one-system-
@@ -413,6 +419,12 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   beside the PKCE verifier by `startLogin` and read back by `completeLogin`.
   The baseline the login path judges revocation against; the refresh path has
   none and uses the stored grant instead.
+- **Reset Run**: The unit of planetary work — every colony a pilot resets in
+  one sitting. Because they are installed back to back, their extractor
+  programs come to share an expiry give or take the minutes it took to walk
+  the list, so the Triage Board groups them into one row rather than one per
+  colony (`engine/pi/colonyBatches.ts`). A colony is what the Colonies table
+  lists; a Reset Run is what a pilot actually goes and does.
 - **Roster Baseline**: The member list one observer last saw, per Character,
   device-local and never synced. Each observer keeps its own; the baseline
   records what _that_ observer has already reported.
@@ -477,6 +489,13 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   a CPU optimisation, is what drove EVE University's worked "one extractor
   feeds three Basic Facilities" ratio: it is storage-overflow-driven. A layout
   can clear the Pin Budget and still stall.
+- **Triage Board**: What `/overview` is — not a dashboard of figures but an
+  answer to "is there anything I have to do before I log off", one card per
+  domain, each linking to the page that fixes it. Its organising rule: numbers
+  where the items are interchangeable, rows only where each item is genuinely
+  its own thing. Distinct from the **Corp Ops Board** (`/corp`), which answers
+  the same question for a corporation and shares the severity ladder but not
+  the layout.
 - **Trade Hub**: A market station/region the user picks for price lookups in a Build Plan.
 - **Training Progress**: How much SP a Character has already banked toward
   the level it is training _right now_. Distinct from **Trained Skills**,

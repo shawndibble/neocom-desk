@@ -30,6 +30,8 @@ export { DateRangeFields } from './DateRangeFields';
 export { useFilterSurface } from './filterSurface';
 export { Disclosure, Caret } from './Disclosure';
 export { LogoMark } from './LogoMark';
+export { SeverityIcon } from './SeverityIcon';
+export { SEVERITY_FILL, SEVERITY_ICON, SEVERITY_LABEL, SEVERITY_TEXT } from './severityTone';
 export {
   ContextMenu,
   ContextMenuTrigger,

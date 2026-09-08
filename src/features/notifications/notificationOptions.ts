@@ -28,7 +28,7 @@ import type { NotificationEventId } from './events';
 const ICON_URL = '/icons/icon-192.png';
 const BADGE_URL = '/icons/badge-96.png';
 
-/** Where each event's notification lands. Falls back to the dashboard. */
+/** Where each event's notification lands. Falls back to the Alerts page. */
 export const NOTIFICATION_ROUTES: Record<NotificationEventId, string> = {
   skillLevelComplete: '/skills/trained',
   characterNotTraining: '/skills/trained',
@@ -45,9 +45,12 @@ export const NOTIFICATION_ROUTES: Record<NotificationEventId, string> = {
   // Open Orders is now Market's own tab, not a route of its own.
   marketOrderFilled: '/market?section=orders',
   // ~100 EVE-native types (issue #274), most with no corresponding page in
-  // the app — the Overview fallback is a deliberate choice for this event,
-  // not an inherited default.
-  eveNotification: '/overview',
+  // the app. `/alerts` is a deliberate choice for this event rather than an
+  // inherited default — and now a real destination rather than a shrug: the
+  // page groups by `eveType`, so a tapped "structure under attack" lands on
+  // the list of every structure-under-attack alert, which is the closest thing
+  // to a page these types have.
+  eveNotification: '/alerts',
   // Corp events (issue #299): the board and the roster are the only two
   // corp routes the app serves (`app/routeScopes.ts`).
   structureFuelLow: '/corp',
@@ -57,7 +60,7 @@ export const NOTIFICATION_ROUTES: Record<NotificationEventId, string> = {
   corpWalletThreshold: '/corp',
 };
 
-export const NOTIFICATION_FALLBACK_ROUTE = '/overview';
+export const NOTIFICATION_FALLBACK_ROUTE = '/alerts';
 
 /**
  * `renotify` is real and required for our tag behaviour, but TypeScript's DOM

@@ -1116,7 +1116,7 @@ function toLocalFeedRecord(
 async function syncFeed(ctx: SyncContext): Promise<void> {
   const col = collection(ctx.firestore, 'characters', ctx.uid, NOTIFICATION_FEED_COLLECTION);
   const remote = await fetchOwnedDocs<RemoteNotificationFeedDoc>(col, ctx.ownerHash);
-  // Feed rows for every Character share one local table (NotificationFeedPanel
+  // Feed rows for every Character share one local table (the Alerts page
   // shows them together); only this Character's own rows sync to its uid.
   const local = (await readFeed()).filter((row) => row.characterId === ctx.characterId);
   const pushEligible = new Set(rowsWithinSyncWindow(local, ctx.now).map((row) => row.id));

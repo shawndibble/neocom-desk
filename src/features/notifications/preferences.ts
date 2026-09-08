@@ -30,6 +30,7 @@ import {
   type NotificationChannel,
 } from './eventSelection';
 import type { NotificationEventId } from './events';
+import type { EntryChannelTarget } from './feedSelection';
 import {
   SYNCED_NOTIFICATION_FEED_PREFS_KEY,
   withSyncedFeedPrefsApplied,
@@ -207,7 +208,7 @@ export async function hydrateNotificationPreferences(): Promise<void> {
   // Character present in the synced blob even when nothing actually
   // changed, so `merged !== current` is true on nearly every call — a
   // reference check here would call setValue every time this runs, and
-  // both NotificationsPanel and NotificationFeedPanel re-run this (via
+  // both NotificationsPanel and the Alerts page re-run this (via
   // refreshAppBadge) from a `useEffect` keyed on the store's value,
   // which would then loop without end. A content comparison is what
   // actually tells "unchanged" from "changed".
@@ -415,6 +416,42 @@ export async function toggleAllEveTypesChannelPref(
     withAllEveTypesToggledForCharacter(value, characterId, types, channel),
     channel
   );
+}
+
+/**
+ * Silence (or restore) one notification type in the **feed**, for several
+ * Characters at once — what the Alerts page's per-type row does.
+ *
+ * A `set`, not a toggle, and that is the whole reason it exists. A type on
+ * that page is one row spanning every Character it fired for, and those
+ * Characters can disagree about it: one muted from a context menu months ago,
+ * the rest not. Looping the existing `toggle*ChannelPref` over them would flip
+ * each independently and leave the row in the *inverted* mixed state it
+ * started in. Passing the intended end state instead makes the row's own
+ * reading of itself ("muted" = muted for all of them) the thing that changes.
+ *
+ * Sequential, re-reading the store between writes: `updateNotificationPrefs`
+ * takes a whole next value, so a parallel fan-out would have every write build
+ * on the same pre-loop snapshot and only the last would survive.
+ */
+export async function setFeedMutedForCharacters(
+  characterIds: readonly number[],
+  target: EntryChannelTarget,
+  muted: boolean
+): Promise<void> {
+  for (const characterId of characterIds) {
+    const value = useNotificationPreferences.getState().value;
+    const isMuted =
+      target.kind === 'eveType'
+        ? !isEveTypeEnabledFor(characterEveTypePrefs(value, characterId), target.type, 'feed')
+        : !isEventEnabledFor(characterEventPrefs(value, characterId), target.eventId, 'feed');
+    if (isMuted === muted) continue;
+    if (target.kind === 'eveType') {
+      await toggleEveTypeChannelPref(characterId, value, target.type, 'feed');
+    } else {
+      await toggleEventChannelPref(characterId, value, target.eventId, 'feed');
+    }
+  }
 }
 
 /** One Character's thresholds, defaulted (issue #299) — the shape both the settings row and the poller read. */

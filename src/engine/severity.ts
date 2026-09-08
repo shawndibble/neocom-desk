@@ -23,6 +23,38 @@ export type DeadlineSeverity = (typeof DEADLINE_SEVERITIES)[number];
 const HOUR_MS = 3_600_000;
 const DAY_MS = 86_400_000;
 
+const RANK: Record<DeadlineSeverity, number> = {
+  critical: 0,
+  warning: 1,
+  watch: 2,
+  clear: 3,
+};
+
+/**
+ * `Array#sort` comparator putting the worst first — the Overview board ranks
+ * its cards by it on a phone, where only about three fit above the fold.
+ */
+export function compareSeverity(a: DeadlineSeverity, b: DeadlineSeverity): number {
+  return RANK[a] - RANK[b];
+}
+
+/**
+ * The worst of several — what a card's header wears when it summarises the
+ * rows beneath it.
+ *
+ * An empty list reads as `clear` rather than null: every caller is already
+ * rendering something and needs a tone for it, and "nothing in here needs you"
+ * is precisely what `clear` says. Returning null would push the same decision
+ * out to each call site to make again.
+ */
+export function worstSeverity(severities: readonly DeadlineSeverity[]): DeadlineSeverity {
+  let worst: DeadlineSeverity = 'clear';
+  for (const severity of severities) {
+    if (RANK[severity] < RANK[worst]) worst = severity;
+  }
+  return worst;
+}
+
 /**
  * `remainingMs` is deliberately **unclamped** by every caller: an overdue item
  * arrives as a negative, which is what keeps overdue items ordered against

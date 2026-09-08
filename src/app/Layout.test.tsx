@@ -374,6 +374,10 @@ describe('Layout desktop rail domain grouping', () => {
     );
     expect(items).toEqual([
       'Overview',
+      // Directly under Overview rather than in Social: an alert is what the
+      // board is summarising, and the two are read in that order. Mail and
+      // calendar are correspondence, which is a different errand.
+      'Alerts',
       // Characters and Settings moved to the pinned character menu; Clones and
       // Employment History became Overview tabs; Market joined Economy, which
       // emptied General out of existence.

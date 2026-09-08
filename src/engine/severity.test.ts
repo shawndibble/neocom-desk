@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { DEADLINE_SEVERITIES, severityForRemaining } from './severity';
+import {
+  DEADLINE_SEVERITIES,
+  compareSeverity,
+  severityForRemaining,
+  worstSeverity,
+  type DeadlineSeverity,
+} from './severity';
 
 const HOUR = 3_600_000;
 const DAY = 86_400_000;
@@ -42,5 +48,28 @@ describe('severityForRemaining', () => {
 
   it('orders the exported list worst-first', () => {
     expect(DEADLINE_SEVERITIES).toEqual(['critical', 'warning', 'watch', 'clear']);
+  });
+});
+
+describe('compareSeverity', () => {
+  it('sorts worst first', () => {
+    const shuffled: DeadlineSeverity[] = ['clear', 'critical', 'watch', 'warning'];
+    expect([...shuffled].sort(compareSeverity)).toEqual(['critical', 'warning', 'watch', 'clear']);
+  });
+});
+
+describe('worstSeverity', () => {
+  it('picks the worst of several', () => {
+    expect(worstSeverity(['clear', 'warning', 'watch'])).toBe('warning');
+    expect(worstSeverity(['watch', 'critical'])).toBe('critical');
+  });
+
+  /*
+   * `clear`, not null: every caller is choosing a tone for something it is
+   * already rendering, and an empty list means "nothing in it needs you" —
+   * which is exactly what `clear` says.
+   */
+  it('reads an empty list as clear', () => {
+    expect(worstSeverity([])).toBe('clear');
   });
 });
