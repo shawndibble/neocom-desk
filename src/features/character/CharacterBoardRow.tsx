@@ -51,9 +51,16 @@ export function CharacterBoardRow({ item, onSelectEvent }: CharacterBoardRowProp
   // Clamped here and only here: the engine keeps `remainingMs` signed so
   // overdue items order against each other, and a countdown of "-3d 2h" is not
   // a thing anyone reads.
-  const countdown = overdue
-    ? t('calendar.overdue')
-    : t('calendar.due', { duration: formatDuration(item.remainingMs / 1000) });
+  // A calendar event past its clock is *running*, not late: ESI drops started
+  // events and the calendar layer keeps today's back
+  // (`engine/character/calendarRetention.ts`), so these rows exist precisely
+  // because the fleet op is under way. Every other kind past its clock really
+  // is overdue — a job sat undelivered, an order lapsed.
+  const countdown = !overdue
+    ? t('calendar.due', { duration: formatDuration(item.remainingMs / 1000) })
+    : item.kind === 'calendarEvent'
+      ? t('calendar.started')
+      : t('calendar.overdue');
 
   const openable = item.kind === 'calendarEvent' && onSelectEvent !== undefined;
 

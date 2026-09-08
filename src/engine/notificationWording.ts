@@ -28,6 +28,17 @@
 export interface NotificationWordingTemplate {
   readonly title: string;
   readonly body: string;
+  /**
+   * The body to use when the fire could not name its subject.
+   *
+   * Only `calendarEventStarting` has one, and only because its subject comes
+   * from a *persisted* snapshot: a baseline written before the event's title
+   * was recorded still fires, and it has to say something. This is that
+   * something — deliberately the exact copy the event carried before it
+   * learned to name anything, so the degraded case is a known-good sentence
+   * rather than one with an empty slot in it.
+   */
+  readonly bodyUnnamed?: string;
 }
 
 export const SHARED_NOTIFICATION_WORDING = {
@@ -53,7 +64,11 @@ export const SHARED_NOTIFICATION_WORDING = {
   },
   calendarEventStarting: {
     title: 'Calendar event starting',
-    body: "{{character}}'s calendar event is starting.",
+    // Named, because "a calendar event is starting" sends the pilot to the
+    // calendar to find out which one — and the title above has already spent
+    // the words "calendar event", so the body need not repeat them.
+    body: '{{character}}: {{event}} is starting.',
+    bodyUnnamed: "{{character}}'s calendar event is starting.",
   },
 } as const satisfies Record<string, NotificationWordingTemplate>;
 

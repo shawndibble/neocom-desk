@@ -11,11 +11,14 @@ const server = setupServer();
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 beforeEach(async () => {
   configureEsi({ getToken: vi.fn(async () => 'tok') });
+  // `shouldAdvanceTime` so msw's own timers still run under a faked clock.
+  vi.useFakeTimers({ shouldAdvanceTime: true });
   await db.esiCache.clear();
 });
 afterEach(() => {
   server.resetHandlers();
   configureEsi({ getToken: null });
+  vi.useRealTimers();
 });
 afterAll(() => server.close());
 
@@ -55,6 +58,87 @@ describe('loadCalendarEvents', () => {
   });
 
   it('reports needsReauth when the calendar scope was revoked (403) and nothing is cached', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/calendar`, () =>
+        HttpResponse.json({ error: 'missing scope' }, { status: 403 })
+      )
+    );
+    const result = await loadCalendarEvents(CHAR_ID);
+    expect(result.needsReauth).toBe(true);
+    expect(result.cached).toBeNull();
+  });
+});
+
+describe('loadCalendarEvents retention', () => {
+  function summary(eventId: number, date: Date, title: string) {
+    return {
+      event_id: eventId,
+      event_date: date.toISOString(),
+      title,
+      importance: 0,
+      event_response: 'accepted' as const,
+    };
+  }
+
+  it('keeps an event ESI dropped after it started, until its local day is over', async () => {
+    const now = new Date(2026, 8, 8, 14, 0, 0);
+    vi.setSystemTime(now);
+    const running = summary(1, new Date(2026, 8, 8, 12, 0, 0), 'Fleet Op');
+    const upcoming = summary(2, new Date(2026, 8, 8, 20, 0, 0), 'Structure Timer');
+
+    // First read: ESI still lists both.
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/calendar`, () =>
+        HttpResponse.json([running, upcoming])
+      )
+    );
+    expect((await loadCalendarEvents(CHAR_ID)).cached?.data).toEqual([running, upcoming]);
+
+    // Second read: the op has started, so ESI no longer returns it.
+    await db.esiCache.delete([CHAR_ID, 'calendar']);
+    server.resetHandlers();
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/calendar`, () =>
+        HttpResponse.json([upcoming])
+      )
+    );
+    expect((await loadCalendarEvents(CHAR_ID)).cached?.data).toEqual([running, upcoming]);
+
+    // Next day: the op is done being today's news.
+    vi.setSystemTime(new Date(2026, 8, 9, 9, 0, 0));
+    await db.esiCache.delete([CHAR_ID, 'calendar']);
+    expect((await loadCalendarEvents(CHAR_ID)).cached?.data).toEqual([upcoming]);
+  });
+
+  it('drops an event that vanished before it started — a cancellation, not ESI trimming', async () => {
+    vi.setSystemTime(new Date(2026, 8, 8, 14, 0, 0));
+    const upcoming = summary(1, new Date(2026, 8, 8, 20, 0, 0), 'Cancelled Op');
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/calendar`, () =>
+        HttpResponse.json([upcoming])
+      )
+    );
+    expect((await loadCalendarEvents(CHAR_ID)).cached?.data).toEqual([upcoming]);
+
+    await db.esiCache.delete([CHAR_ID, 'calendar']);
+    server.resetHandlers();
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/calendar`, () => HttpResponse.json([]))
+    );
+    expect((await loadCalendarEvents(CHAR_ID)).cached?.data).toEqual([]);
+  });
+
+  it('leaves the re-login state alone when nothing could be read at all', async () => {
+    vi.setSystemTime(new Date(2026, 8, 8, 14, 0, 0));
+    const running = summary(1, new Date(2026, 8, 8, 12, 0, 0), 'Fleet Op');
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/calendar`, () => HttpResponse.json([running]))
+    );
+    await loadCalendarEvents(CHAR_ID);
+
+    // Scope revoked: the seen-list must not resurrect a list to show.
+    await db.esiCache.delete([CHAR_ID, 'calendar']);
+    server.resetHandlers();
     server.use(
       http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/calendar`, () =>
         HttpResponse.json({ error: 'missing scope' }, { status: 403 })

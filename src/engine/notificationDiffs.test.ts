@@ -936,8 +936,12 @@ describe('diffNewMail', () => {
   });
 });
 
-function calendarEntry(calendarEventId: number, startMs: number): CalendarEventEntrySnapshot {
-  return { calendarEventId, startMs };
+function calendarEntry(
+  calendarEventId: number,
+  startMs: number,
+  title?: string
+): CalendarEventEntrySnapshot {
+  return { calendarEventId, startMs, ...(title === undefined ? {} : { title }) };
 }
 
 function calendarSnapshot(
@@ -960,7 +964,24 @@ describe('diffNewCalendarEvent', () => {
       T0 + 2000
     );
     expect(diffNewCalendarEvent(7, prev, next)).toEqual([
-      { eventId: 'newCalendarEvent', characterId: 7, calendarEventId: 6 },
+      { eventId: 'newCalendarEvent', characterId: 7, calendarEventId: 6, startMs: T0 + 5000 },
+    ]);
+  });
+
+  it("carries the event's name and start, so the alert can say which event and when", () => {
+    const prev = calendarSnapshot([calendarEntry(5, T0 + 1000, 'Old Op')], T0);
+    const next = calendarSnapshot(
+      [calendarEntry(6, T0 + 5000, 'Fleet Op'), calendarEntry(5, T0 + 1000, 'Old Op')],
+      T0 + 2000
+    );
+    expect(diffNewCalendarEvent(7, prev, next)).toEqual([
+      {
+        eventId: 'newCalendarEvent',
+        characterId: 7,
+        calendarEventId: 6,
+        startMs: T0 + 5000,
+        title: 'Fleet Op',
+      },
     ]);
   });
 
@@ -998,6 +1019,22 @@ describe('diffCalendarEventStarting', () => {
     const prev = calendarSnapshot([calendarEntry(1, T0 - 5000)], T0);
     const next = calendarSnapshot([calendarEntry(1, T0 - 5000)], T0 + FIVE_MIN);
     expect(diffCalendarEventStarting(7, prev, next)).toEqual([]);
+  });
+
+  it("carries the event's name, so the alert can say which event started", () => {
+    const prev = calendarSnapshot([calendarEntry(1, T0 + 1000, 'Fleet Op')], T0);
+    const next = calendarSnapshot([calendarEntry(1, T0 + 1000, 'Fleet Op')], T0 + 2000);
+    expect(diffCalendarEventStarting(7, prev, next)).toEqual([
+      { eventId: 'calendarEventStarting', characterId: 7, calendarEventId: 1, title: 'Fleet Op' },
+    ]);
+  });
+
+  it('omits the name for a snapshot written before it was recorded, rather than inventing one', () => {
+    const prev = calendarSnapshot([calendarEntry(1, T0 + 1000)], T0);
+    const next = calendarSnapshot([calendarEntry(1, T0 + 1000)], T0 + 2000);
+    expect(diffCalendarEventStarting(7, prev, next)).toEqual([
+      { eventId: 'calendarEventStarting', characterId: 7, calendarEventId: 1 },
+    ]);
   });
 
   it('fires for an event that only appears once already started (never seen upcoming before)', () => {

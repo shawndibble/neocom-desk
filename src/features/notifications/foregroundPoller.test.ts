@@ -732,7 +732,7 @@ describe('runForegroundPoll', () => {
     expect(deps.notify).not.toHaveBeenCalled();
     expect(savedCalendar).not.toBeNull();
     expect(savedCalendar![CHAR.characterId].entries).toEqual([
-      { calendarEventId: 9, startMs: Date.parse('2026-01-01T02:00:00Z') },
+      { calendarEventId: 9, startMs: Date.parse('2026-01-01T02:00:00Z'), title: 'Ops' },
     ]);
   });
 
@@ -764,6 +764,8 @@ describe('runForegroundPoll', () => {
       eventId: 'newCalendarEvent',
       characterId: CHAR.characterId,
       calendarEventId: 6,
+      startMs: Date.parse('2026-01-06T00:00:00Z'),
+      title: 'Ops',
     });
     expect(character).toEqual(CHAR);
   });
@@ -798,8 +800,51 @@ describe('runForegroundPoll', () => {
       eventId: 'calendarEventStarting',
       characterId: CHAR.characterId,
       calendarEventId: 1,
+      title: 'Ops',
     });
     expect(character).toEqual(CHAR);
+  });
+
+  it('names the event in the copy it delivers, for both calendar events', async () => {
+    let now = Date.parse('2026-01-01T00:30:00Z');
+    // Built eagerly: the baseline's own `nowMs` is the previous poll's clock,
+    // and reading `now` lazily would hand the diff this poll's instead.
+    const previous: CalendarPollerState = {
+      [CHAR.characterId]: {
+        entries: [{ calendarEventId: 1, startMs: Date.parse('2026-01-01T01:00:00Z') }],
+        nowMs: now,
+      },
+    };
+    const notify = vi.fn<PollDependencies['notify']>(async () => {});
+    const deps = baseDeps({
+      now: () => now,
+      grantedScopes: async () => new Set([SKILLQUEUE_SCOPE, CALENDAR_SCOPE]),
+      eventPrefsFor: async () => ({ newCalendarEvent: true, calendarEventStarting: true }),
+      prevCalendarState: async () => previous,
+      loadCalendarEvents: async () => [
+        calendarEvent({ event_id: 1, event_date: '2026-01-01T01:00:00Z', title: 'Fleet Op' }),
+        calendarEvent({
+          event_id: 2,
+          event_date: '2026-01-09T18:00:00Z',
+          title: 'Structure Timer',
+        }),
+      ],
+      notify,
+    });
+    now = Date.parse('2026-01-01T01:30:00Z');
+    await runForegroundPoll(deps);
+
+    const bodies = notify.mock.calls.map((call) => call[2]?.body ?? '');
+    const starting = bodies.find((body) => body.includes('is starting'));
+    const added = bodies.find((body) => body.includes('was added'));
+    expect(starting).toContain('Fleet Op');
+    // The name and the start time are the two things the alert now adds. The
+    // instant renders in the viewer's own locale and clock, and carries no
+    // year (formatCalendarTimestamp), so pin that a time of day reached the
+    // sentence rather than a whole formatted string a test host would rewrite.
+    expect(added).toContain('Structure Timer');
+    expect(added).toMatch(/[0-9]{1,2}:[0-9]{2}/);
+    for (const body of bodies) expect(body).not.toContain('{{');
   });
 
   it('skips contracts for a character with no granted scope', async () => {

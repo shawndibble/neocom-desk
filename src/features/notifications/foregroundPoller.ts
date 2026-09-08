@@ -21,6 +21,8 @@ import { resolveNames } from '@/features/character/names';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { mapWithConcurrencyLimit, ESI_FANOUT_CONCURRENCY } from '@/lib/concurrency';
 import { formatIsk } from '@/lib/isk';
+import { formatCalendarTimestamp } from '@/lib/timestamp';
+import { timeZoneFor, useTimeFormat } from '@/lib/timeFormat';
 import i18n from '@/i18n';
 import type { LocalSettingStore } from '@/lib/useLocalSetting';
 import { NOTIFICATION_EVENTS, type NotificationEventId } from './events';
@@ -454,6 +456,37 @@ function groupedTitle(title: string, count: number): string {
   return i18n.t('notifications.groupedTitle', { title, count });
 }
 
+/**
+ * When a newly-added calendar event starts, in the pilot's chosen clock
+ * (`lib/timeFormat.ts` — local, or EVE/UTC).
+ *
+ * Read through the store's `getState` rather than the `useTimeZone` hook: this
+ * runs in the poll loop, not in a component. The preference is hydrated by the
+ * time any poll runs (`ForegroundNotificationPoller` mounts inside the app),
+ * and its default is the same 'local' every other surface used before the
+ * preference existed, so a cold read is never wrong in a way a pilot notices.
+ *
+ * `undefined` when the snapshot carries no usable instant — the caller drops
+ * the clause rather than printing "Invalid Date".
+ */
+function calendarStartLabel(startMs: number): string | undefined {
+  if (!Number.isFinite(startMs)) return undefined;
+  return formatCalendarTimestamp(new Date(startMs), timeZoneFor(useTimeFormat.getState().value));
+}
+
+/**
+ * One of four bodies, by which halves the fire could supply. Four sentences
+ * rather than one with optional clauses: an interpolated string that has to
+ * read correctly with pieces missing ends up reading badly with all of them
+ * present, and these are the copy a pilot sees most.
+ */
+function newCalendarEventBodyKey(title: string | undefined, when: string | undefined): string {
+  if (title !== undefined && when !== undefined) return 'notifications.fired.newCalendarEvent.body';
+  if (title !== undefined) return 'notifications.fired.newCalendarEvent.bodyWithoutStart';
+  if (when !== undefined) return 'notifications.fired.newCalendarEvent.bodyWithoutEvent';
+  return 'notifications.fired.newCalendarEvent.bodyPlain';
+}
+
 async function notificationText(
   fire: AnyNotificationFire,
   character: CharacterRef
@@ -498,15 +531,31 @@ async function notificationText(
     };
   }
   if (fire.eventId === 'newCalendarEvent') {
+    // Both halves are best-effort and independently so: an event whose name
+    // or start this snapshot never recorded still deserves the alert, minus
+    // whichever half is missing.
+    const when = calendarStartLabel(fire.startMs);
     return {
       title: i18n.t('notifications.fired.newCalendarEvent.title'),
-      body: i18n.t('notifications.fired.newCalendarEvent.body', { character: character.name }),
+      body: i18n.t(newCalendarEventBodyKey(fire.title, when), {
+        character: character.name,
+        event: fire.title,
+        when,
+      }),
     };
   }
   if (fire.eventId === 'calendarEventStarting') {
     return {
       title: i18n.t('notifications.fired.calendarEventStarting.title'),
-      body: i18n.t('notifications.fired.calendarEventStarting.body', { character: character.name }),
+      body:
+        fire.title === undefined
+          ? i18n.t('notifications.fired.calendarEventStarting.bodyUnnamed', {
+              character: character.name,
+            })
+          : i18n.t('notifications.fired.calendarEventStarting.body', {
+              character: character.name,
+              event: fire.title,
+            }),
     };
   }
   if (fire.eventId === 'contractAccepted') {

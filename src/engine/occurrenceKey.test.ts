@@ -112,6 +112,7 @@ describe('occurrenceKey', () => {
       eventId: 'newCalendarEvent',
       characterId: 7,
       calendarEventId: 99,
+      startMs: T0 + 1000,
     };
     const starting: CalendarEventStartingFire = {
       eventId: 'calendarEventStarting',
@@ -119,6 +120,37 @@ describe('occurrenceKey', () => {
       calendarEventId: 99,
     };
     expect(occurrenceKey(newEvent, T0)).not.toEqual(occurrenceKey(starting, T0));
+  });
+
+  /**
+   * The copy a calendar alert carries grew a name and a start time; its
+   * identity did not. A key that moved with the copy would file a second feed
+   * row for an occurrence already synced under the old one, and re-announce it
+   * on every device that pulls.
+   */
+  it('keys calendar events on identity alone — the name and start time do not move them', () => {
+    const named: NewCalendarEventFire = {
+      eventId: 'newCalendarEvent',
+      characterId: 7,
+      calendarEventId: 99,
+      startMs: T0 + 1000,
+      title: 'Fleet Op',
+    };
+    expect(occurrenceKey(named, T0)).toEqual('7:newCalendarEvent:99');
+    expect(occurrenceKey({ ...named, title: undefined, startMs: T0 + 9999 }, T0)).toEqual(
+      occurrenceKey(named, T0)
+    );
+
+    const starting: CalendarEventStartingFire = {
+      eventId: 'calendarEventStarting',
+      characterId: 7,
+      calendarEventId: 99,
+      title: 'Fleet Op',
+    };
+    expect(occurrenceKey(starting, T0)).toEqual('7:calendarEventStarting:99');
+    expect(occurrenceKey({ ...starting, title: undefined }, T0)).toEqual(
+      occurrenceKey(starting, T0)
+    );
   });
 
   it('keys contractAccepted on contractId', () => {
