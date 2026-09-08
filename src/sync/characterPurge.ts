@@ -28,7 +28,17 @@ import { db } from '@/db';
 import { getSyncFirestore } from './firebaseApp';
 import { ensureSignedIn } from './syncAuth';
 
-const REMOTE_COLLECTIONS = [
+/**
+ * Every Editable Data collection a Character owns remotely — the purge list,
+ * and also the authoritative answer to "what leaves this device".
+ *
+ * Exported for `features/faq`, whose "What We Store" section is a promise to
+ * the user about exactly this set: a test there maps each entry to the line
+ * that tells the user about it, so a collection added here without a
+ * corresponding line fails that test rather than silently making the section
+ * untrue.
+ */
+export const REMOTE_COLLECTIONS = [
   'plans',
   'buildPlans',
   'quickbars',

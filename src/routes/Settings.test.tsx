@@ -616,6 +616,34 @@ describe('Settings — Notifications (issue #170)', () => {
     expect(await screen.findByRole('heading', { name: /^notifications$/i })).toBeInTheDocument();
   });
 
+  it('opens the FAQ tab and shows what the app stores', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await openTab(user, /^faq$/i);
+
+    expect(await screen.findByRole('heading', { name: /what we store/i })).toBeInTheDocument();
+    // The groups, not just the panel title: the tab is worth nothing if it
+    // renders a heading over an empty body.
+    expect(
+      screen.getByRole('heading', { name: /synced between your devices/i })
+    ).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /kept on this device only/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /never collected at all/i })).toBeInTheDocument();
+  });
+
+  it('lands on the FAQ tab from /settings#faq', async () => {
+    // The link to hand someone who asks what the app stores, from outside the
+    // app. Same hash-selects-a-tab path #notifications uses above.
+    window.history.pushState({}, '', '/settings#faq');
+    render(<App />);
+
+    expect(await screen.findByRole('tab', { name: /^faq$/i })).toHaveAttribute(
+      'aria-selected',
+      'true'
+    );
+    expect(await screen.findByRole('heading', { name: /what we store/i })).toBeInTheDocument();
+  });
+
   it("names EVE's own notification types in words, not in ESI's CamelCase", async () => {
     render(<App />);
     await notificationsPanel();

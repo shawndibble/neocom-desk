@@ -2494,7 +2494,54 @@
       "general": "General",
       "notifications": "Notifications",
       "dataAge": "Data Age",
-      "activity": "Activity Log"
+      "activity": "Activity Log",
+      "faq": "FAQ"
+    },
+    "faq": {
+      "storeTitle": "What we store",
+      "storeIntro": "Neocom Desk keeps as little as possible on a server. The short version: we store the things you make in the app, and none of what we read from EVE on your behalf.",
+      "store": {
+        "synced": {
+          "title": "Synced between your devices",
+          "description": "Saved so your work looks the same on your phone, your laptop and your desktop. Filed under each character’s EVE character ID — never a name, an email address, or an account we invented.",
+          "skillPlans": "Skill Plans — the plans you build. The skills you have actually trained come from EVE and stay on this device.",
+          "buildPlans": "Build Plans — the blueprint, runs, ME/TE, facility and hub you picked.",
+          "productionRuns": "Production Runs — what you logged as built, and the sales and orders you linked to it.",
+          "quickbar": "Your Quickbar — the items you saved in the Market browser.",
+          "stationPins": "The stations and structures you pinned in Assets.",
+          "piPicks": "The resources you chose to pull on each planet in the PI Advisor.",
+          "miningTax": "Moon Mining payees and assignments.",
+          "miningTaxNote": "The payees you named and the entries you assigned to them, including the ore and ISK figures snapshotted at that moment — that snapshot is the invoice, so it has to travel with it.",
+          "notificationFeed": "Your Notification Feed.",
+          "notificationFeedNote": "Alerts you have already been shown, so a second device can catch up on what it missed. Kept for 30 days.",
+          "settings": "Two settings: your notification preferences, and the PI customs rates you overrode. Nothing else on this page leaves your device."
+        },
+        "local": {
+          "title": "Kept on this device only",
+          "description": "Everything Neocom Desk reads from EVE is cached in this browser and refetched from ESI when it goes stale. None of it is uploaded.",
+          "esi": "Your assets, wallet, contracts, mail, contacts, clones, calendar, skills, skill queue, industry jobs and colonies.",
+          "corp": "Everything on the Corporation pages — wallet, members, structures, assets and moon extractions.",
+          "market": "Market prices, order books and the LP store.",
+          "login": "Your EVE sign-in.",
+          "loginNote": "The token that keeps you logged in is stored in this browser and nowhere else.",
+          "preferences": "The rest of Settings — text size, time format, defaults — and every sort, filter and expanded section a page remembers as you use it."
+        },
+        "never": {
+          "title": "Never collected at all",
+          "description": "Not held on your device, not held on a server, not asked for.",
+          "password": "Your EVE password.",
+          "passwordNote": "You sign in on EVE’s own login page. It is never typed into this app, and we never see it.",
+          "identity": "Your email address, your real name, or anything else that identifies you outside EVE.",
+          "account": "An account with us. There isn’t one — adding a character is the whole sign-up.",
+          "unadded": "Anything about characters you have not added, or corporations you are not in."
+        },
+        "notesTitle": "Worth knowing",
+        "notes": {
+          "push": "Push notifications, if you turn them on: we store a token for this device, the character IDs it covers, and the alerts due in the next 72 hours — including their text, so they can be delivered while the app is closed. Each character is verified with EVE at that moment, and the token used for that check is discarded straight after.",
+          "crashes": "Crash reports: when something goes wrong we receive the error and which page it happened on, so it can be fixed. IP addresses are switched off, request and response bodies are never captured, and your EVE tokens are stripped before anything is sent.",
+          "removal": "Removing a character deletes everything above from our servers. If its EVE login has already expired we cannot sign in to do that, so the deletion runs the next time you add that character back."
+        }
+      }
     },
     "displayTitle": "Display",
     "fontScaleLabel": "Text size",
