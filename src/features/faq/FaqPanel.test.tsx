@@ -44,6 +44,7 @@ const SETTING_KEY_TO_PHRASE: Readonly<Record<string, RegExp>> = {
   'sync.notificationFeedPrefs': /notification preferences/i,
   'sync.piCustomsRates': /customs rates/i,
   'sync.marketHub': /trade hub/i,
+  'sync.marketPricePercent': /appraisal price percentage/i,
   'sync.industryFacilityDefaults': /industry facility/i,
   'sync.industryAssumedMe': /assumed ME/,
   'sync.piExpiringSoonHours': /expiring-soon window/i,

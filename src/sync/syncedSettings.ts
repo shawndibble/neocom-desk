@@ -1,8 +1,13 @@
 // The complete allow-list of setting keys permitted to sync across devices.
 //
-// Adding a key here is deliberately a two-file edit: this list AND the pinned
-// literal in syncedSettings.test.ts. The friction is the point — whoever adds
-// a synced setting has to reckon with the delete semantics in merge.ts:
+// Adding a key here is deliberately a THREE-file edit: this list, the pinned
+// literal in syncedSettings.test.ts, and the words that account for it in the
+// FAQ's "What We Store" line — `settings.faq.store.synced.settingsNote` plus
+// its entry in FaqPanel.test.tsx's SETTING_KEY_TO_PHRASE, which fails until
+// whoever added the key decides what the reader is told. (That third file is
+// easy to miss running narrow tests; CI catches it.) The friction is the
+// point — whoever adds a synced setting has to reckon with the promise the
+// FAQ makes to the user, and with the delete semantics in merge.ts:
 // mergeSettings. A deleted synced setting propagates via a tombstone; the
 // remote tombstone expires after 30 days (TOMBSTONE_TTL_MS), so a device
 // offline past that window never sees the delete and re-pushes its stale copy.
