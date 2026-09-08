@@ -404,6 +404,14 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   device that has not been opened inside that window stops receiving Scheduled
   Pushes until it is, which is the accepted consequence of holding no tokens
   server-side.
+- **Pull Cursor**: How far a sync pass has read one remote collection for one
+  Character — the highest `updatedAt` it has actually observed there, plus when
+  it last read that collection unfiltered. The next pass asks Firestore only
+  for documents above the mark instead of re-reading the whole collection, and
+  falls back to an unfiltered read once the unfiltered one is older than the
+  tombstone TTL. A Pull Cursor is a statement about what this device has seen,
+  never about the current time: it never advances past the newest document in
+  the response.
 - **Quickbar**: The user's saved item shortcuts in the Market Browser's left
   column. Replaces the pin-to-compare grid; the comparison itself becomes a tab.
 - **Ratio Block**: The smallest whole-pin set that runs a chain once — one

@@ -172,6 +172,16 @@ describe('Login', () => {
     });
     await user.click(firstButton);
     expect(screen.getAllByRole('status').length).toBeGreaterThan(0);
+
+    // The press starts an async chain — a Dexie read, then a `crypto.subtle`
+    // PKCE digest — that ends in `assignLocation`. Asserting the spinner is
+    // the whole point of this test, so it deliberately does not await that
+    // chain's *effect*; but leaving it in flight makes it land during the
+    // next test, after `beforeEach` has cleared the mock, and that test then
+    // counts two navigations instead of one. Settling it here keeps the press
+    // inside the test that made it — this was the intermittent
+    // "expected 1, got 2" in `builds a PKCE authorize URL` below.
+    await waitFor(() => expect(assignLocation).toHaveBeenCalledTimes(1));
   });
 
   it('builds a PKCE authorize URL and navigates to EVE SSO', async () => {

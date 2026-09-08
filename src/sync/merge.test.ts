@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { SkillPlanRecord } from '@/db';
 import {
+  feedTransportStamp,
   mergeFeed,
   mergeRecords,
   mergeSettings,
@@ -490,5 +491,118 @@ describe('mergeFeed', () => {
       ...result.pullDismiss,
     ].map((r) => r.id);
     expect(new Set(touchedIds).size).toBe(touchedIds.length);
+  });
+});
+
+// Issue #581: an incremental pull hands the merge only the docs newer than the
+// cursor, so the two decisions that used to read remote *absence* have to be
+// re-derived from the local side. Everything above this block is the full-read
+// behaviour, unchanged.
+describe('mergeRecords: incremental pull', () => {
+  it('leaves an unchanged local row alone when the cursor already covers it', () => {
+    const since = NOW - 500;
+    const result = mergeRecords(
+      [localPlan({ updatedAt: NOW - 1000 })],
+      [],
+      [],
+      NOW,
+      undefined,
+      since
+    );
+    // Absence below the cursor means "reconciled last pass", not "never seen" —
+    // pushing here would re-upload every untouched row on every pass.
+    expect(result.pushUpserts).toEqual([]);
+  });
+
+  it('pushes a local row edited after the cursor', () => {
+    const since = NOW - 500;
+    const edited = localPlan({ updatedAt: NOW - 100 });
+    const result = mergeRecords([edited], [], [], NOW, undefined, since);
+    expect(result.pushUpserts).toEqual([edited]);
+  });
+
+  it('pushes a pending tombstone rather than clearing it on unprovable absence', () => {
+    const tombstone: LocalTombstone = { id: 'p1', deletedAt: NOW - 100 };
+    const result = mergeRecords<SkillPlanRecord, RemotePlanDoc>(
+      [],
+      [tombstone],
+      [],
+      NOW,
+      undefined,
+      NOW - 500
+    );
+    // A live remote copy at or below the cursor is simply not in `remote`;
+    // clearing on that would let the next pass pull the row back.
+    expect(result.pushTombstones).toEqual([tombstone]);
+    expect(result.clearLocalTombstones).toEqual([]);
+  });
+
+  it('still clears that tombstone on a full read, where absence is provable', () => {
+    const result = mergeRecords<SkillPlanRecord, RemotePlanDoc>(
+      [],
+      [{ id: 'p1', deletedAt: NOW - 100 }],
+      [],
+      NOW
+    );
+    expect(result.pushTombstones).toEqual([]);
+    expect(result.clearLocalTombstones).toEqual(['p1']);
+  });
+
+  it('applies a remote tombstone that arrives through the window', () => {
+    const result = mergeRecords(
+      [localPlan({ updatedAt: NOW - 1000 })],
+      [],
+      [remotePlan({ updatedAt: NOW - 100, deleted: true })],
+      NOW,
+      undefined,
+      NOW - 500
+    );
+    expect(result.deleteLocal).toEqual(['p1']);
+  });
+});
+
+describe('mergeFeed: incremental pull', () => {
+  const feedLocal = (overrides: Partial<FeedRow> = {}): FeedRow => ({
+    id: 'occ-1',
+    firedAt: NOW - 1000,
+    ...overrides,
+  });
+
+  it('does not re-push a row the cursor already covers', () => {
+    const row = feedLocal();
+    const result = mergeFeed([row], new Set(['occ-1']), [], NOW - 500);
+    expect(result.pushCreate).toEqual([]);
+  });
+
+  it('pushes a row whose dismissal postdates the cursor', () => {
+    const row = feedLocal({ dismissedAt: NOW - 100 });
+    const result = mergeFeed([row], new Set(['occ-1']), [], NOW - 500);
+    // The dismissal moves the transport stamp, so the row is back in play even
+    // though its firedAt is older than the cursor.
+    expect(result.pushCreate).toEqual([row]);
+  });
+
+  it('pushes every locally-known row on a full read, as before', () => {
+    const row = feedLocal();
+    const result = mergeFeed([row], new Set(['occ-1']), []);
+    expect(result.pushCreate).toEqual([row]);
+  });
+
+  it('still pulls a remote row the window returned', () => {
+    const remote: RemoteFeedDoc = { id: 'occ-2', firedAt: NOW - 100, ownerHash: HASH };
+    const result = mergeFeed([], new Set(), [remote], NOW - 500);
+    expect(result.pullCreate).toEqual([remote]);
+  });
+});
+
+describe('feedTransportStamp', () => {
+  it('is the firedAt of a live row', () => {
+    expect(feedTransportStamp({ id: 'occ-1', firedAt: NOW - 1000 })).toBe(NOW - 1000);
+  });
+
+  it('moves to the dismissal once dismissed — the reason firedAt cannot be the cursor', () => {
+    expect(feedTransportStamp({ id: 'occ-1', firedAt: NOW - 1000, dismissedAt: NOW - 10 })).toBe(
+      NOW - 10
+    );
   });
 });

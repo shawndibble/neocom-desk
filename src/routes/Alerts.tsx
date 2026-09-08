@@ -205,7 +205,15 @@ export function Alerts() {
             onChange={(event) => setFilter((prev) => ({ ...prev, query: event.target.value }))}
             aria-label={t('alerts.searchLabel')}
             placeholder={t('alerts.searchPlaceholder')}
-            className="w-full sm:w-64"
+            /*
+              `flex-1`, not `w-full`: the funnel button is the search box's own
+              sibling in `FilterBar`'s row, and a search box claiming the whole
+              width wraps it onto a line of its own — which is what every other
+              caller avoids by sizing the box this way (Wallet, Contracts,
+              Market > Open Orders, Characters, Loyalty Store all pass
+              `min-w-NN flex-1`). This page was the one that did not.
+            */
+            className="min-w-40 flex-1"
           />
         }
       >
@@ -286,6 +294,10 @@ export function Alerts() {
                   void setFeedMutedForCharacters(group.characterIds, group.target, !group.muted)
                 }
                 nameById={nameById}
+                // One Character on the device means every fire belongs to
+                // them, and the name on each row is width the body copy could
+                // have had.
+                showCharacter={characters.length > 1}
                 onDismissEntry={(id) => void dismissFeedEntries([id])}
               />
             ))}

@@ -11,10 +11,12 @@ import {
   Panel,
   ReauthBanner,
   Spinner,
-  StandingBar,
+  StandingIcon,
+  Tooltip,
   type DataTableColumn,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
+import { ICON_SIZE } from '@/components/ui/icons';
 import { beginEveLogin } from '@/app/loginFlow';
 import { loadContacts } from '@/features/character/contacts';
 import { ContactContextMenu } from '@/features/character/ContactContextMenu';
@@ -32,6 +34,20 @@ interface Snapshot {
   contactNames: Map<number, string>;
 }
 
+/**
+ * ESI's `contact_type` verbatim was what this column printed. "Player" is what
+ * a pilot calls a character contact (a "character" is also a thing corps and
+ * alliances are made of), and "Corp" is how the name is written everywhere in
+ * game — both shorter than what they replace, which is what lets this table
+ * keep real columns on a phone.
+ */
+const CONTACT_TYPE_KEY: Record<CharacterContact['contact_type'], string> = {
+  character: 'contacts.typeCharacter',
+  corporation: 'contacts.typeCorporation',
+  alliance: 'contacts.typeAlliance',
+  faction: 'contacts.typeFaction',
+};
+
 type StandingCategory = 'good' | 'neutral' | 'bad';
 
 const STANDING_CATEGORIES: readonly StandingCategory[] = ['good', 'neutral', 'bad'];
@@ -41,12 +57,6 @@ function standingCategory(standing: number): StandingCategory {
   if (standing < 0) return 'bad';
   return 'neutral';
 }
-
-const STANDING_TONE: Record<StandingCategory, string> = {
-  good: 'text-success',
-  neutral: 'text-text-dim',
-  bad: 'text-danger',
-};
 
 /** Stable identity, so the fallback doesn't invalidate the column memo every render. */
 const NO_NAMES: ReadonlyMap<number, string> = new Map();
@@ -62,6 +72,22 @@ async function loadContactsSnapshot(
   const contactIds = signal.cancelled ? [] : (contactsResult?.data ?? []).map((c) => c.contact_id);
   const contactNames = await resolveNames(contactIds);
   return { contactsResult, contactsNeedsReauth, contactsTruncated, contactNames };
+}
+
+/**
+ * One contact flag as an icon. `role="img"` plus a tooltip rather than a
+ * focusable trigger, the same trade `NotificationsPanel`'s badges make: the
+ * meaning must reach a screen reader, but a tab stop on every row of a long
+ * contact list is worse to keyboard through than the flag is worth.
+ */
+function FlagBadge({ icon, label, tone }: { icon: ReactElement; label: string; tone: string }) {
+  return (
+    <Tooltip content={label} openOnTap>
+      <span role="img" aria-label={label} className={`shrink-0 ${tone}`}>
+        {icon}
+      </span>
+    </Tooltip>
+  );
 }
 
 /** Contacts: standings, blocked/watched state, filterable by standing category. */
@@ -145,35 +171,45 @@ export function Contacts() {
         id: 'type',
         header: t('contacts.type'),
         className: 'text-text-dim',
-        render: (contact) => contact.contact_type,
-        sortValue: (contact) => contact.contact_type,
+        render: (contact) => t(CONTACT_TYPE_KEY[contact.contact_type]),
+        // Sorts on what is printed, not on ESI's word for it — otherwise
+        // "Player" would sort under C and "Corp" under C too, by accident.
+        sortValue: (contact) => t(CONTACT_TYPE_KEY[contact.contact_type]),
       },
       {
         id: 'standing',
         header: t('contacts.standing'),
-        align: 'right',
-        render: (contact) => (
-          <span className="inline-flex items-center justify-end gap-1.5">
-            <StandingBar value={contact.standing} />
-            <span
-              className={`tabular-nums font-semibold ${STANDING_TONE[standingCategory(contact.standing)]}`}
-            >
-              {contact.standing}
-            </span>
-          </span>
-        ),
+        // The tag replaces the bar *and* the number: the value is in its
+        // accessible name and its tooltip, and the column sorts on the raw
+        // number below, so nothing is lost by not printing it.
+        render: (contact) => <StandingIcon value={contact.standing} />,
         sortValue: (contact) => contact.standing,
       },
       {
         id: 'flags',
         header: t('contacts.flags'),
-        cellClassName: (contact) =>
-          contact.is_blocked ? 'text-danger' : contact.is_watched ? 'text-warning' : undefined,
         render: (contact) => {
-          const flags: string[] = [];
-          if (contact.is_blocked) flags.push(t('contacts.blocked'));
-          if (contact.is_watched) flags.push(t('contacts.watched'));
-          return flags.length > 0 ? flags.join(' · ') : '—';
+          const blocked = contact.is_blocked === true;
+          const watched = contact.is_watched === true;
+          if (!blocked && !watched) return '—';
+          return (
+            <span className="inline-flex items-center gap-1.5">
+              {blocked && (
+                <FlagBadge
+                  icon={<Icon.Blocked size={ICON_SIZE.sm} />}
+                  label={t('contacts.blocked')}
+                  tone="text-danger"
+                />
+              )}
+              {watched && (
+                <FlagBadge
+                  icon={<Icon.Watched size={ICON_SIZE.sm} />}
+                  label={t('contacts.watched')}
+                  tone="text-warning"
+                />
+              )}
+            </span>
+          );
         },
       },
     ],
@@ -266,6 +302,10 @@ export function Contacts() {
               rowKey={(contact) => contact.contact_id}
               defaultSort={{ columnId: 'standing', direction: 'desc' }}
               rowContextMenu={contactRowContextMenu}
+              // Four columns, three of them a short word or a single icon —
+              // narrow enough to stay a real table on a 390px screen rather
+              // than collapsing each contact into a labelled card.
+              responsive="table"
             />
           )}
         </Panel>

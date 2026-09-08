@@ -151,6 +151,16 @@ export function ActiveJobsPanel({
   // list has anything to fold.
   const collapsible = jobs.length > 0 && !listLoading && !result?.needsReauth;
   const showList = !collapsible || expanded;
+  // ESI or the cache answered and nothing is running. That is a one-word
+  // fact, so it goes beside the title as `meta` and the body renders nothing
+  // at all — a centred "no active jobs" card left the idle panel _taller_
+  // than the same panel with jobs in it. Not the same as `jobsEmptyTitle`
+  // below, which means we have never fetched and genuinely don't know.
+  const noneActive =
+    jobs.length === 0 && !listLoading && !result?.needsReauth && result?.cached != null;
+  // The owner switch still has to render when there are no corp jobs to show,
+  // or flipping to an empty Corp jobs list is a dead end with no way back.
+  const showBody = showList && !noneActive;
 
   // Chips only for activities actually present — a chip for an activity type
   // this character never runs would just be a permanently-dead toggle.
@@ -310,22 +320,28 @@ export function ActiveJobsPanel({
     <Panel
       title={t('industry.jobsTitle')}
       meta={
-        collapsible && (
-          <span className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs tabular-nums">
-            <span className="text-text">
-              {t('industry.jobsSummary', { running: summary.running, done: summary.done })}
-            </span>
-            {summary.next && (
-              <span
-                className={soon(summary.next.job) ? 'font-semibold text-warning' : 'text-text-dim'}
-              >
-                {t('industry.jobsNextFinish', {
-                  name: nameForBlueprint(summary.next.job.blueprint_type_id),
-                  time: formatDuration(summary.next.seconds),
-                })}
+        noneActive ? (
+          <span className="text-xs text-text-dim">{t('industry.jobsNoneMeta')}</span>
+        ) : (
+          collapsible && (
+            <span className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs tabular-nums">
+              <span className="text-text">
+                {t('industry.jobsSummary', { running: summary.running, done: summary.done })}
               </span>
-            )}
-          </span>
+              {summary.next && (
+                <span
+                  className={
+                    soon(summary.next.job) ? 'font-semibold text-warning' : 'text-text-dim'
+                  }
+                >
+                  {t('industry.jobsNextFinish', {
+                    name: nameForBlueprint(summary.next.job.blueprint_type_id),
+                    time: formatDuration(summary.next.seconds),
+                  })}
+                </span>
+              )}
+            </span>
+          )
         )
       }
       actions={
@@ -393,7 +409,7 @@ export function ActiveJobsPanel({
           )}
         </span>
       }
-      padded={showList || corpAvailable}
+      padded={showBody || corpAvailable}
     >
       {/*
         First row inside the body rather than beside the header's badge and two
@@ -402,7 +418,7 @@ export function ActiveJobsPanel({
       */}
       {corpAvailable && (
         <OwnerSwitch
-          className={showList ? 'mb-2' : undefined}
+          className={showBody ? 'mb-2' : undefined}
           value={owner}
           onChange={setOwner}
           label={t('industry.jobsOwnerLabel')}
@@ -410,7 +426,7 @@ export function ActiveJobsPanel({
           corporationLabel={t('industry.jobsOwnerCorporation')}
         />
       )}
-      {!showList ? null : listLoading ? (
+      {!showBody ? null : listLoading ? (
         <div className="flex justify-center py-4">
           <Spinner size="sm" label={t('common.loading')} />
         </div>
@@ -426,25 +442,13 @@ export function ActiveJobsPanel({
           onLogin={() => void beginEveLogin()}
         />
       ) : jobs.length === 0 ? (
-        // Distinguish "ESI/cache answered, character just has none running"
-        // (the common case) from "no data at all" (never fetched, offline).
-        result?.cached ? (
-          <EmptyState
-            title={t(
-              showingCorp ? 'industry.jobsCorpNoneActiveTitle' : 'industry.jobsNoneActiveTitle'
-            )}
-            hint={t(
-              showingCorp ? 'industry.jobsCorpNoneActiveHint' : 'industry.jobsNoneActiveHint'
-            )}
-            className="py-4"
-          />
-        ) : (
-          <EmptyState
-            title={t('industry.jobsEmptyTitle')}
-            hint={t(showingCorp ? 'industry.jobsCorpEmptyHint' : 'industry.jobsEmptyHint')}
-            className="py-4"
-          />
-        )
+        // Only the "no data at all" case reaches here — `noneActive` has
+        // already taken "answered, none running" out of the body.
+        <EmptyState
+          title={t('industry.jobsEmptyTitle')}
+          hint={t(showingCorp ? 'industry.jobsCorpEmptyHint' : 'industry.jobsEmptyHint')}
+          className="py-4"
+        />
       ) : (
         <div className="space-y-2">
           {result?.cached?.fromCache && (

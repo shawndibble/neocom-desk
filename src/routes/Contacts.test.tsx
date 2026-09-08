@@ -92,8 +92,29 @@ describe('Contacts', () => {
     expect(await screen.findByText('Good Friend')).toBeInTheDocument();
     expect(screen.getByText('Neutral Corp')).toBeInTheDocument();
     expect(screen.getByText('Bad Alliance')).toBeInTheDocument();
-    expect(screen.getByText('Watched')).toBeInTheDocument();
-    expect(screen.getByText('Blocked')).toBeInTheDocument();
+    // Flags are icons now; their meaning reaches a reader through the
+    // accessible name, not through a word in the cell.
+    expect(screen.getByRole('img', { name: 'Watched' })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Blocked' })).toBeInTheDocument();
+  });
+
+  it('names contact types the way a pilot does, not the way ESI does', async () => {
+    render(<App />);
+    await screen.findByText('Good Friend');
+
+    expect(screen.getByText('Player')).toBeInTheDocument();
+    expect(screen.getByText('Corp')).toBeInTheDocument();
+    expect(screen.getByText('Alliance')).toBeInTheDocument();
+    expect(screen.queryByText('character')).toBeNull();
+    expect(screen.queryByText('corporation')).toBeNull();
+  });
+
+  it('keeps real columns at phone width instead of collapsing rows into cards', async () => {
+    render(<App />);
+    await screen.findByText('Good Friend');
+
+    // `.dt-stack` is the below-`sm` collapse; four short columns don't need it.
+    expect(screen.getByRole('table', { name: 'Contacts' })).not.toHaveClass('dt-stack');
   });
 
   it('filters by standing category', async () => {
@@ -246,15 +267,25 @@ describe('Contacts standing filter chips (issue #403)', () => {
   });
 });
 
-describe('Contacts standing bar (issue #403)', () => {
-  it('renders standing as a bar, not just a colored number', async () => {
+describe('Contacts standing tag (issue #403)', () => {
+  it("uses the game's standing tag, and keeps the number in its accessible name", async () => {
     render(<App />);
     await screen.findByText('Good Friend');
 
     const goodRow = screen.getByText('Good Friend').closest('tr');
     expect(goodRow).not.toBeNull();
     expect(
-      within(goodRow as HTMLElement).getByRole('img', { name: 'Standing: 10' })
+      within(goodRow as HTMLElement).getByRole('img', { name: 'Excellent standing (10)' })
     ).toBeInTheDocument();
+    // The bar and the printed number it replaces are both gone.
+    expect(within(goodRow as HTMLElement).queryByText('10')).toBeNull();
+  });
+
+  it('tags each tier by the standing it is for', async () => {
+    render(<App />);
+    await screen.findByText('Good Friend');
+
+    expect(screen.getByRole('img', { name: 'Neutral standing (0)' })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Terrible standing (-10)' })).toBeInTheDocument();
   });
 });
