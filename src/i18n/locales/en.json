@@ -969,6 +969,7 @@
     "loadingEllipsis": "Loading…",
     "unknown": "—",
     "aboutLabel": "About {{label}}",
+    "contextMenuHint": "Right-click, or press and hold on touch, for more actions.",
     "offlineTitle": "Showing cached data",
     "refreshFailedTitle": "Refresh failed — showing cached data",
     "incompleteTitle": "Incomplete data — some pages could not be loaded",

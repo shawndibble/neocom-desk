@@ -2,6 +2,7 @@ import { useMemo, useState, type ReactElement } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
+  ContextMenuHint,
   DataAgeBadge,
   DataTable,
   EmptyState,
@@ -238,6 +239,7 @@ export function Contacts() {
               onClick={refresh}
               disabled={loading}
             />
+            <ContextMenuHint label={t('contacts.title')} />
           </>
         }
       />

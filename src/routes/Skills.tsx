@@ -3,6 +3,7 @@ import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   Caret,
+  ContextMenuHint,
   DataAgeBadge,
   EmptyState,
   PageHeader,
@@ -266,6 +267,7 @@ export function Skills() {
               onClick={() => downloadCsv('skills', skillCsvRows(groups), skillCsvColumns(t))}
             />
             <IconButton icon={<Icon.Refresh />} label={t('skills.refresh')} onClick={refresh} />
+            <ContextMenuHint label={t('nav.skills')} />
           </>
         }
       />
