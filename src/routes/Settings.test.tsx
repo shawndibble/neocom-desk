@@ -523,9 +523,18 @@ describe('Settings — Notifications (issue #170)', () => {
     render(<App />);
     await notificationsPanel();
 
-    expect(
-      await screen.findByRole('checkbox', { name: 'New Mail, browser notifications' })
-    ).toBeInTheDocument();
+    // Re-queried on every attempt rather than `expect(await findBy...)`, which
+    // captures a node once and then asserts it is still attached. The panel
+    // reads `characters` and `tokens` as two independent `useLiveQuery` calls
+    // and renders as soon as the first resolves, so the row this finds can be
+    // rebuilt when the second lands — detaching the captured node between the
+    // `await` and the assertion, and failing as "element could not be found in
+    // the document" a couple of hundred ms in rather than on a timeout.
+    await waitFor(() =>
+      expect(
+        screen.getByRole('checkbox', { name: 'New Mail, browser notifications' })
+      ).toBeInTheDocument()
+    );
     expect(screen.queryByText(/notifications are blocked/i)).not.toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: /turn on browser notifications/i })
