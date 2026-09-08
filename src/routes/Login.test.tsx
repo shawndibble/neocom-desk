@@ -122,11 +122,71 @@ describe('Login', () => {
       'Planetary Industry',
       'Moon Mining',
       'Corporation',
+      'Alerts',
       'Notifications',
       'Mail, Calendar & Contracts',
     ]) {
       expect(catalog.getByText(feature)).toBeInTheDocument();
     }
+  });
+
+  /*
+   * The hero preview is a mockup of the Overview board, and it rotted silently
+   * once: the triage-board redesign deleted `overview.queue`,
+   * `overview.notifications`, `overview.training` and `overview.finishes`, and
+   * because i18next renders a missing key as the key itself, the signed-out
+   * landing page printed the literal string `overview.queue` at visitors. Every
+   * test in this file still passed.
+   *
+   * So two things are pinned. The first is that the preview speaks the board's
+   * own vocabulary, which is what stops it drifting into a layout the app does
+   * not have. The second is the general guard: no unresolved key may reach the
+   * page at all — that is the assertion that would have caught the original
+   * failure, and it catches the next one wherever on this page it happens.
+   */
+  it("previews the Overview board using the board's own labels", async () => {
+    renderLogin();
+    const preview = within(await screen.findByRole('group', { name: /signed-in view/i }));
+
+    // The summary strip: the three cells the real strip carries.
+    for (const label of ['Next deadline', 'Training now', 'Wallet']) {
+      expect(preview.getByText(label)).toBeInTheDocument();
+    }
+    expect(preview.getByText('4 colonies end together')).toBeInTheDocument();
+
+    // Open orders: counts, not rows — the one rule the redesign turns on.
+    expect(preview.getByText('Open orders')).toBeInTheDocument();
+    expect(preview.getByText('27 need work')).toBeInTheDocument();
+    for (const [count, label] of [
+      ['21', 'Undercut'],
+      ['4', 'Outbid'],
+      ['2', 'Relist'],
+    ]) {
+      expect(preview.getByText(label)).toBeInTheDocument();
+      expect(preview.getAllByText(count).length).toBeGreaterThan(0);
+    }
+
+    // Alerts are folded to a line rather than given a card, as on a phone.
+    expect(preview.getByText('Alerts')).toBeInTheDocument();
+    expect(preview.getByText('70 unread')).toBeInTheDocument();
+  });
+
+  it('renders no unresolved i18n keys anywhere on the page', async () => {
+    const { container } = renderLogin();
+    await screen.findByRole('group', { name: /signed-in view/i });
+
+    // An i18next miss renders the key verbatim. Real copy on this page never
+    // contains a dotted path under one of the app's namespaces, so anything
+    // matching is a key that failed to resolve.
+    //
+    // Deliberately no leading : `textContent` runs the DOM's text together,
+    // so the real failure arrived as "...1,234,567,890.12 ISKoverview.queue2m
+    // ago..." — no word boundary in front of the key at all. An anchored
+    // pattern here passes against the very bug this test exists to catch.
+    const leaked = (container.textContent ?? '').match(
+      /(?:overview|login|skills|notifications|common|nav|settings|market|industry)\.[a-zA-Z][\w.]*/g
+    );
+    expect(leaked ?? []).toEqual([]);
   });
 
   it('answers the trust objections and enumerates the scopes it asks for', async () => {

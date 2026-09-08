@@ -752,6 +752,11 @@
         "desc": "Ops board, wallet divisions, corp industry jobs, division-grouped assets and a member roster that flags who has gone dark. Gated on your in-game roles.",
         "tag": "Role-gated"
       },
+      "alerts": {
+        "name": "Alerts",
+        "desc": "Every alert this device has fired, grouped by type — including the ones belonging to a character you were not looking at. Search it, filter by character, mute a type, or clear a whole group from its row.",
+        "tag": "Every character"
+      },
       "notifications": {
         "name": "Notifications",
         "desc": "Per character, per event. Skills, industry jobs, extractors, calendar events and structure alarms carry a timestamp, so those arrive with the app closed; order fills, mail and contracts fire while it is open.",

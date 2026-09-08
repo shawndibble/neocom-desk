@@ -5,7 +5,15 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { BootScreen } from '@/app/BootScreen';
 import { beginAddCharacterLogin } from '@/app/loginFlow';
 import { db } from '@/db';
-import { DataAgeBadge, LogoMark, Panel, Spinner, StatChip } from '@/components/ui';
+import {
+  DataAgeBadge,
+  LogoMark,
+  Panel,
+  SEVERITY_TEXT,
+  SeverityIcon,
+  Spinner,
+  StatChip,
+} from '@/components/ui';
 import { characterAvatarBoxClassName } from '@/components/ui/characterAvatarBox';
 import {
   Clones,
@@ -21,6 +29,7 @@ import {
   Orders,
   Planetary,
   ReadOnly,
+  ScheduledPush,
   SignIn,
   Skills,
   Social,
@@ -35,11 +44,11 @@ import {
   tabListClassName,
   tabScrollerClassName,
 } from '@/components/ui/tabStyles';
-import { formatAge, HOUR_MS, MINUTE_MS } from '@/lib/age';
+import { MINUTE_MS } from '@/lib/age';
+import { formatDuration } from '@/lib/duration';
 import { formatIsk } from '@/lib/isk';
-import { formatTimestamp } from '@/lib/timestamp';
-import { useTimeZone } from '@/lib/timeFormat';
 import { REPO_URL } from '@/lib/links';
+import type { DeadlineSeverity } from '@/engine/severity';
 
 /**
  * One illustrated row of landing copy: a glyph, and the `login.*` sub-key its
@@ -92,7 +101,12 @@ const FEATURE_GROUPS: { group: string; items: LandingRow[] }[] = [
     group: 'operations',
     items: [
       { icon: Corporation, key: 'corp' },
-      { icon: Notifications, key: 'notifications' },
+      // Alerts is the record of what fired; Notifications is how it gets to
+      // you. Two rows because the app splits them too — Alerts is a nav route,
+      // Notifications is a Settings panel plus the push path — and the bell
+      // belongs to the feed you read rather than to the delivery mechanism.
+      { icon: Notifications, key: 'alerts' },
+      { icon: ScheduledPush, key: 'notifications' },
       { icon: Social, key: 'social' },
     ],
   },
@@ -110,7 +124,13 @@ const TRUST: LandingRow[] = [
   { icon: OpenSource, key: 'openSource' },
 ];
 
-/** Sample values for the hero preview only — never real character data. */
+/**
+ * Sample values for the hero preview only — never real character data.
+ *
+ * The figures are the approved board mockup's own (`design/overview-triage`,
+ * tagged), so the landing page and the design that shipped tell one story: a
+ * reset run as the next deadline, 27 orders needing work, 70 unread alerts.
+ */
 const PREVIEW = {
   name: 'Aurelia Vex',
   totalSp: (84_213_904).toLocaleString(),
@@ -120,12 +140,26 @@ const PREVIEW = {
   // line names the skill alone (Overview.tsx reads catalog skill names,
   // never a level-suffixed one) — matching that exactly, not just its shape.
   trainingSkill: 'Gunnery',
+  /** The soonest clock on the board. A colony reset run, as on the mockup. */
+  deadlineSeconds: 3 * 3600 + 12 * 60,
+  deadlineColonies: 4,
+  trainingSeconds: 86_400 + 4 * 3600 + 20 * 60,
+  queued: 6,
+  orders: {
+    needWork: 27,
+    undercut: 21,
+    outbid: 4,
+    relist: 2,
+    belowFloor: 2,
+    used: 24,
+    slots: 41,
+  },
+  alerts: 70,
 };
 
 /** Landing page for signed-out users: what Neocom Desk does, and the EVE SSO login button. */
 export function Login() {
   const { t } = useTranslation();
-  const timeZone = useTimeZone();
   const [pending, setPending] = useState(false);
 
   // Wall-clock reads for illustrative "how fresh is this" values in the
@@ -133,11 +167,6 @@ export function Login() {
   // NotificationFeedPanel.tsx already accept for the real thing. Lazy
   // initializers run once on mount rather than every render.
   const [previewFetchedAt] = useState(() => new Date(Date.now() - 2 * MINUTE_MS));
-  // The `Date` is what's pinned at mount, not its rendered string: the clock
-  // read is the part that must not repeat, while the formatting has to rerun
-  // whenever the Time format preference changes — a string frozen in the
-  // initializer would keep the zone it was born in.
-  const [previewFinishAt] = useState(() => new Date(Date.now() + 4 * HOUR_MS + 12 * MINUTE_MS));
 
   // Bookmark/back-button case: a Character already exists, so the marketing
   // page is not the right thing to show — mirror App.tsx's root gate.
@@ -220,42 +249,109 @@ export function Login() {
             </div>
           </div>
 
+          {/*
+            The board at the width this column has: the summary strip, one full
+            card, and alerts folded to a single line. That is the phone board's
+            own shape rather than an invention — `Overview.tsx` folds the alerts
+            row and keeps the cards when it is narrow — so the preview shows a
+            layout the app really renders instead of a desktop board squeezed
+            until it stops being one.
+
+            Every label is read from `overview.board.*`, the same keys the real
+            board renders. The three panels this replaced still called
+            `overview.queue`, `overview.notifications`, `overview.training` and
+            `overview.finishes`, all four deleted when the Overview became a
+            triage board, so a signed-out visitor was being shown the literal
+            string `overview.queue`. Sharing the board's keys is what makes that
+            failure impossible rather than merely fixed once.
+          */}
           <div className="mt-3 flex flex-col gap-2">
-            <Panel title={t('overview.wallet')} actions={<DataAgeBadge date={previewFetchedAt} />}>
-              <p className="text-lg font-medium tabular-nums text-isk-pos">
-                {formatIsk(PREVIEW.wallet, 2)} {t('overview.isk')}
-              </p>
-            </Panel>
+            <div className="rounded-xs border border-line bg-panel-2/50 p-3">
+              <div className="flex flex-wrap items-start gap-x-6 gap-y-3">
+                <PreviewCell label={t('overview.board.nextDeadline')}>
+                  <p
+                    className={`text-2xl leading-tight font-medium tabular-nums ${SEVERITY_TEXT.warning}`}
+                  >
+                    {formatDuration(PREVIEW.deadlineSeconds)}
+                  </p>
+                  <p className="truncate text-xs text-text-dim">
+                    {t('overview.board.batch.running', { count: PREVIEW.deadlineColonies })}
+                  </p>
+                </PreviewCell>
 
-            <Panel title={t('overview.queue')} actions={<DataAgeBadge date={previewFetchedAt} />}>
-              <p className="text-sm">
-                {t('overview.training', { name: PREVIEW.trainingSkill })}
-                <span className="ml-2 text-xs text-text-dim">
-                  {t('overview.finishes', { date: formatTimestamp(previewFinishAt, timeZone) })}
+                <PreviewCell label={t('overview.board.trainingNow')}>
+                  <p className="text-sm font-medium">{PREVIEW.trainingSkill}</p>
+                  <p className="truncate text-xs text-text-dim">
+                    {t('overview.timeLeft', {
+                      duration: formatDuration(PREVIEW.trainingSeconds),
+                    })}
+                    {' · '}
+                    {t('overview.board.queued', { count: PREVIEW.queued })}
+                  </p>
+                </PreviewCell>
+
+                <PreviewCell label={t('overview.wallet')}>
+                  <p className="text-sm font-medium tabular-nums text-isk-pos">
+                    {formatIsk(PREVIEW.wallet, 2)} {t('overview.isk')}
+                  </p>
+                </PreviewCell>
+
+                <span className="ml-auto shrink-0">
+                  <DataAgeBadge date={previewFetchedAt} />
                 </span>
+              </div>
+            </div>
+
+            <Panel
+              title={t('overview.board.orders')}
+              meta={
+                <span className="text-[0.6875rem] text-text-dim">
+                  {t('overview.board.ordersMeta', { count: PREVIEW.orders.needWork })}
+                </span>
+              }
+              padded={false}
+            >
+              <div className="flex gap-2 p-3">
+                <PreviewTile
+                  label={t('overview.board.undercut')}
+                  value={PREVIEW.orders.undercut}
+                  severity="warning"
+                />
+                <PreviewTile
+                  label={t('overview.board.outbid')}
+                  value={PREVIEW.orders.outbid}
+                  severity="warning"
+                />
+                <PreviewTile
+                  label={t('overview.board.relist')}
+                  value={PREVIEW.orders.relist}
+                  severity="watch"
+                />
+              </div>
+              {/* Below-floor keeps the danger tone it carries on the real card:
+                  it is the one order problem losing ISK now rather than losing
+                  the sale. */}
+              <p className="border-t border-line px-3 py-2 text-[0.6875rem] text-text-dim">
+                <span className="text-danger">
+                  {t('overview.board.belowFloor', { count: PREVIEW.orders.belowFloor })}
+                </span>
+                {` · ${t('overview.board.slotsUsed', {
+                  used: PREVIEW.orders.used,
+                  total: PREVIEW.orders.slots,
+                })}`}
               </p>
             </Panel>
 
-            <Panel title={t('overview.notifications')}>
-              <ul className="divide-y divide-line">
-                <PreviewNotification
-                  title={t('notifications.fired.skillLevelComplete.title')}
-                  body={t('notifications.fired.skillLevelComplete.body', {
-                    character: PREVIEW.name,
-                    skill: 'Gunnery',
-                    level: 'IV',
-                  })}
-                  ageMs={5 * MINUTE_MS}
-                />
-                <PreviewNotification
-                  title={t('notifications.fired.industryJobComplete.title')}
-                  body={t('notifications.fired.industryJobComplete.body', {
-                    character: PREVIEW.name,
-                    item: 'Depleted Uranium Charge M ×500',
-                  })}
-                  ageMs={2 * HOUR_MS}
-                />
-              </ul>
+            <Panel padded={false}>
+              <div className="flex items-center gap-2 px-3 py-2">
+                <SeverityIcon severity="warning" />
+                <span className="min-w-0 flex-1 truncate text-xs">
+                  {t('overview.board.alerts')}
+                </span>
+                <span className="shrink-0 text-[0.6875rem] whitespace-nowrap text-text-dim">
+                  {t('overview.board.alertsUnread', { count: PREVIEW.alerts })}
+                </span>
+              </div>
             </Panel>
           </div>
         </div>
@@ -408,32 +504,47 @@ function SsoButton({
   );
 }
 
-function PreviewNotification({
-  title,
-  body,
-  ageMs,
-}: {
-  title: ReactNode;
-  body: ReactNode;
-  ageMs: number;
-}) {
-  const { t } = useTranslation();
-  const timeZone = useTimeZone();
-  // eslint-disable-next-line react-hooks/purity -- illustrative fired-at stamp, same as previewFetchedAt above
-  const firedAt = new Date(Date.now() - ageMs);
+/**
+ * One cell of the preview's summary strip.
+ *
+ * A sibling of `SummaryStrip`'s own `Cell` rather than an import of it: that
+ * component's cells wrap their values in router `Link`s, and every destination
+ * on this board is a route a signed-out visitor cannot reach. A mockup that
+ * offers live navigation into gated pages is a promise the page cannot keep.
+ */
+function PreviewCell({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <li className="flex items-start gap-3 py-2 first:pt-0">
-      <div className="min-w-0 flex-1">
-        <p className="text-sm font-medium">{title}</p>
-        <p className="text-xs text-text-dim">{body}</p>
-      </div>
-      <time
-        dateTime={firedAt.toISOString()}
-        title={formatTimestamp(firedAt, timeZone)}
-        className="shrink-0 pt-0.5 text-[0.6875rem] tabular-nums text-text-dim"
-      >
-        {formatAge(ageMs, t)}
-      </time>
-    </li>
+    <span className="flex min-w-0 flex-1 basis-36 flex-col gap-0.5">
+      <span className="text-[0.6875rem] tracking-widest text-text-dim uppercase">{label}</span>
+      {children}
+    </span>
+  );
+}
+
+/**
+ * One count on the preview's Open orders card — a static `NumberTile`.
+ *
+ * Same reasoning as `PreviewCell`: the real tile is a `Link` to the Orders
+ * page filtered to the rows it counted. It keeps the tone-and-glyph pairing
+ * through `SeverityIcon`, because DESIGN.md §7 holds here too — colour is
+ * never the only signal, on a mockup as much as on the board.
+ */
+function PreviewTile({
+  label,
+  value,
+  severity,
+}: {
+  label: string;
+  value: number;
+  severity: DeadlineSeverity;
+}) {
+  return (
+    <span className="flex min-w-0 flex-1 flex-col gap-0.5 rounded-xs border border-line bg-panel-2 px-2.5 py-2">
+      <span className="flex items-center gap-1.5 text-xl font-medium tabular-nums">
+        <SeverityIcon severity={severity} />
+        <span className={SEVERITY_TEXT[severity]}>{value}</span>
+      </span>
+      <span className="text-[0.6875rem] tracking-widest text-text-dim uppercase">{label}</span>
+    </span>
   );
 }
