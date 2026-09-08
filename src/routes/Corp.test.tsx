@@ -48,6 +48,27 @@ vi.mock('@/features/character/typeNames', () => ({
     async (ids: readonly number[]) => new Map(ids.map((id) => [id, `Type ${id}`]))
   ),
 }));
+/**
+ * The People panel's name resolution (#566). Unmocked, this file made a real
+ * `/universe/names` call to ESI: `Corp.tsx`'s loader awaits `resolveNames` for
+ * the highlighted members, this file runs no msw server, and nothing else
+ * stubs `fetch` — so every test seeding a roster hung on live network until
+ * `waitFor` gave up at `asyncUtilTimeout` (5s), failing a varying handful each
+ * run depending on what CCP's API did that minute.
+ *
+ * Resolves to an empty map, which is what the assertions here were written
+ * against and what the failing call was effectively returning: the panel then
+ * prints `#id` via `label(names.get(id) ?? null, id)`. Naming a member is
+ * therefore still uncovered by this file — worth its own test, but not one to
+ * invent here, where the fix is "stop touching the network".
+ *
+ * Spread from the original like the mocks above, so the module's other exports
+ * stay real for anything else in the tree that imports them.
+ */
+vi.mock('@/features/character/names', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/features/character/names')>()),
+  resolveNames: vi.fn(async () => new Map<number, string>()),
+}));
 
 const mockedAccess = vi.mocked(useCorpAccess);
 /** Every loader the route calls, wherever it lives, under one name. */

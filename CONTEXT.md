@@ -529,4 +529,13 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   variation group, shown as a sortable table (Name, Tier, Sell, Buy) beside
   it for price comparison; falls back to its Market Group siblings when it
   has no variation data.
+- **What We Store**: The section of Settings' FAQ tab that tells a pilot, in
+  their own words, what leaves their device. Not documentation — a
+  **commitment**: `sync/characterPurge.ts`'s exported `REMOTE_COLLECTIONS` is
+  the authoritative set, and `features/faq`'s test maps every entry in it to
+  the line that mentions it, so a newly synced collection fails the suite until
+  the copy accounts for it. Names its own exceptions (Notification Feed rows,
+  Scheduled Push occurrences, crash reports) rather than rounding them off; a
+  section a reader can catch overclaiming is worth less than none. Deep-linkable
+  at `/settings#faq`.
 - **What-If Implants**: Optimizer override that assumes a hypothetical implant set instead of the clone's current implants. Five independent per-attribute bonuses (+0..+5 each), since EVE's attribute hardwirings are per slot — a clone can run +4 PER / +5 INT / +3 MEM and nothing in WIL or CHA. The matched sets (+1..+5 in every slot) remain one-click **presets** over those five values; see round 28. Stored on the Skill Plan and synced with it (round 33).

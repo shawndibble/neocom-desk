@@ -39,8 +39,7 @@ import { formatAge, HOUR_MS, MINUTE_MS } from '@/lib/age';
 import { formatIsk } from '@/lib/isk';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
-
-const REPO_URL = 'https://github.com/shawndibble/neocom-desk';
+import { REPO_URL } from '@/lib/links';
 
 /**
  * One illustrated row of landing copy: a glyph, and the `login.*` sub-key its

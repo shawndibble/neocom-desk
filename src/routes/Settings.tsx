@@ -40,6 +40,7 @@ import { useDarkThreshold, DARK_AFTER_DAY_OPTIONS } from '@/features/corp/darkTh
 import { useCorpAccess } from '@/features/corp/useCorpAccess';
 import { NotificationsPanel } from '@/features/notifications/NotificationsPanel';
 import { CorpAccessPanel } from '@/features/corp/CorpAccessPanel';
+import { FaqPanel } from '@/features/faq/FaqPanel';
 import { db } from '@/db';
 import { ENDPOINT_ROUTES } from '@/esi/endpointRoutes';
 import { useActivityLog, type ActivityLogEntry } from '@/stores/activityLog';
@@ -47,7 +48,7 @@ import type { ActivityOutcome } from '@/esi/activityLog';
 
 const RIG_LEVEL_OPTIONS: readonly RigLevel[] = ['none', 't1', 't2'];
 
-type SettingsTab = 'general' | 'notifications' | 'dataAge' | 'activity';
+type SettingsTab = 'general' | 'notifications' | 'dataAge' | 'activity' | 'faq';
 
 /**
  * Which tab a deep link's hash asks for. The Overview feed links to
@@ -59,6 +60,10 @@ type SettingsTab = 'general' | 'notifications' | 'dataAge' | 'activity';
 const TAB_FOR_HASH: Readonly<Record<string, SettingsTab>> = {
   notifications: 'notifications',
   'corp-access': 'general',
+  // `/settings#faq` is the link to hand someone who asks what the app stores —
+  // worth being addressable from outside the app (a forum post, a README),
+  // which a tab with no hash of its own would not be.
+  faq: 'faq',
 };
 
 const FONT_SCALE_LABEL_KEYS = {
@@ -620,6 +625,7 @@ export function Settings() {
           { id: 'notifications', label: t('settings.tabs.notifications') },
           { id: 'dataAge', label: t('settings.tabs.dataAge') },
           { id: 'activity', label: t('settings.tabs.activity') },
+          { id: 'faq', label: t('settings.tabs.faq') },
         ]}
       />
       {tab === 'general' && (
@@ -705,6 +711,13 @@ export function Settings() {
       )}
       {tab === 'dataAge' && <DataAgePanel />}
       {tab === 'activity' && <ActivityLogPanel />}
+      {/* Same `id` wrapper as `#notifications` above, so `/settings#faq` both
+          selects the tab and has something for the scroll effect to find. */}
+      {tab === 'faq' && (
+        <div id="faq" className="scroll-mt-4">
+          <FaqPanel />
+        </div>
+      )}
     </div>
   );
 }
