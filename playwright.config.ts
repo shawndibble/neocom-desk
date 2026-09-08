@@ -88,7 +88,21 @@ export default defineConfig({
   testDir: './e2e',
   fullyParallel: true,
   retries: 1,
-  reporter: 'list',
+  /*
+   * `list` for the CI log, `html` for the failure itself.
+   *
+   * The workflow has always uploaded `playwright-report/` on failure — but
+   * with `list` alone nothing ever writes that directory, so the upload found
+   * no files, warned, and produced an empty artifact. Every e2e failure this
+   * repo has had therefore discarded its own evidence: the trace and the
+   * `error-context.md` page snapshot land under `test-results/`, and the run
+   * that could have explained them is gone by the time anyone looks.
+   *
+   * The HTML reporter embeds those attachments, so `playwright-report/` becomes
+   * what the workflow already expects it to be. `open: 'never'` keeps a local
+   * run from launching a browser at the end of it.
+   */
+  reporter: [['list'], ['html', { open: 'never' }]],
   use: {
     trace: 'on-first-retry',
     // Fixed desktop size so the left-rail nav (not the mobile tab bar) is

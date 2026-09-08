@@ -14,6 +14,7 @@ import { useLockedRoutes } from './useGrantedScopes';
 import { useKeyboardShortcuts } from './useKeyboardShortcuts';
 import { NotificationPermissionPrompt } from '@/features/notifications/NotificationPermissionPrompt';
 import { ForegroundNotificationPoller } from '@/features/notifications/ForegroundNotificationPoller';
+import { useUnreadAlertCount } from '@/features/notifications/useUnreadAlertCount';
 import { CorpGrantPrompt } from '@/features/corp/CorpGrantPrompt';
 import { useCorpAccess } from '@/features/corp/useCorpAccess';
 import { useActiveCorporationId } from '@/features/corp/owner';
@@ -93,6 +94,7 @@ function mobileNavClass({ isActive }: { isActive: boolean }): string {
  */
 const NAV_PATHS = [
   '/overview',
+  '/alerts',
   '/skills',
   '/industry',
   '/moon-mining',
@@ -133,6 +135,38 @@ function NavItem({ to, label, locked, onClick }: NavItemProps) {
       <span className="min-w-0 truncate">{label}</span>
       {locked && (
         <span aria-hidden="true" className="ml-auto size-1.5 shrink-0 rounded-full bg-warning" />
+      )}
+    </NavLink>
+  );
+}
+
+/**
+ * Alerts, with what is waiting on it.
+ *
+ * The count rides in the link's own accessible name rather than as a bare
+ * number a screen reader would read as "Alerts 12" — and it is a number, not a
+ * dot, because "some alerts" and "seventy alerts" are different situations and
+ * an accent tint conveys neither (DESIGN.md §7). Zero renders nothing: a badge
+ * reading "0" is a badge you stop looking at.
+ */
+function AlertsNavItem({ onClick }: { onClick?: () => void }) {
+  const { t } = useTranslation();
+  const unread = useUnreadAlertCount();
+  return (
+    <NavLink
+      to="/alerts"
+      onClick={onClick}
+      className={navClass}
+      aria-label={unread > 0 ? t('nav.alertsWithCount', { count: unread }) : undefined}
+    >
+      <span className="min-w-0 truncate">{t('nav.alerts')}</span>
+      {unread > 0 && (
+        <span
+          aria-hidden="true"
+          className="ml-auto shrink-0 rounded-xs bg-panel-2 px-1.5 text-[0.6875rem] font-medium tabular-nums text-text-dim"
+        >
+          {unread}
+        </span>
       )}
     </NavLink>
   );
@@ -301,6 +335,7 @@ function MobileMoreSheet({ open, onClose, activeCharacter, locked }: MobileMoreS
           between two of them left almost no dead zone for a thumb to miss
           into on this phone-only sheet. */}
       <div className="space-y-2 pb-3">
+        <AlertsNavItem onClick={onClose} />
         {/* The phone's only route to /corp: the tab bar is full at 4 + More. */}
         <CorpNavItem onClick={onClose} />
         {/*
@@ -417,6 +452,13 @@ export function Layout() {
             scrolling. */}
         <nav className="flex flex-1 flex-col gap-1 overflow-y-auto p-2">
           <NavItem to="/overview" label={t('nav.overview')} locked={locked.has('/overview')} />
+          {/*
+            Under Overview, not in Social: an alert is what the board is
+            summarising, and the two are read in that order. Mail and calendar
+            are correspondence — things other people sent you on purpose —
+            which is a different errand.
+          */}
+          <AlertsNavItem />
           {/*
             Beside Overview rather than inside a group: the two are the same
             kind of destination — "this pilot" and "this corporation" — and the

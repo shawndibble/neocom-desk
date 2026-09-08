@@ -12,22 +12,25 @@ import {
 import { occurrenceKey } from './occurrenceKey';
 import type { NotificationFire, EveNotificationEntrySnapshot } from './notificationDiffs';
 import { EXTRACTOR_EXPIRY_WARNING_MS } from './notificationDiffs';
+import { SHARED_NOTIFICATION_WORDING } from './notificationWording';
 
 const T0 = 1_700_000_000_000;
 const HOUR_MS = 3_600_000;
 
 describe('projectionWording', () => {
-  it('hedges structureFuelLow because a refuel while the app is closed can make it wrong', () => {
-    expect(projectionWording('structureFuelLow')).toEqual('hedge');
-  });
+  // A refuel falsifies the first; a reset run falsifies the other two.
+  it.each(['structureFuelLow', 'planetaryExtractionDone', 'planetaryExtractorExpiring'] as const)(
+    'hedges %s, which an ordinary in-game action can falsify before it fires',
+    (eventId) => {
+      expect(projectionWording(eventId)).toEqual('hedge');
+    }
+  );
 
   it('asserts every other projectable event', () => {
     const asserted: Parameters<typeof projectionWording>[0][] = [
       'skillLevelComplete',
       'characterNotTraining',
       'industryJobComplete',
-      'planetaryExtractionDone',
-      'planetaryExtractorExpiring',
       'calendarEventStarting',
       'eveNotification',
     ];
@@ -189,6 +192,40 @@ describe('projectColonies', () => {
     const extractionDone = rows.find((r) => r.eventId === 'planetaryExtractionDone');
     expect(extractionDone?.fireAt).toEqual(T0 + 10 * HOUR_MS);
     expect(extractionDone?.body).toContain('Amarr III');
+  });
+
+  it('states planetaryExtractionDone as a prediction, never as an observation', () => {
+    // A pilot who restarts the programs in game before this fires gets the
+    // push anyway — nothing between here and delivery can re-check it (ADR
+    // 0010). The live path keeps SHARED_NOTIFICATION_WORDING's "has stopped",
+    // which it has actually observed.
+    const colonies = [
+      { planetId: 40000001, extractors: [{ pinId: 1, expiryTimeMs: T0 + HOUR_MS }] },
+    ];
+    const rows = projectColonies(7, 'Kestrel', colonies, new Map([[40000001, 'Amarr III']]), T0);
+    const extractionDone = rows.find((r) => r.eventId === 'planetaryExtractionDone');
+    expect(extractionDone?.body).toContain('was due to stop');
+    expect(extractionDone?.body).not.toContain('has stopped');
+    // The headline is the whole claim on a lock screen, so it hedges too —
+    // this is the sentence the bug report actually quoted.
+    expect(extractionDone?.title).not.toEqual(
+      SHARED_NOTIFICATION_WORDING.planetaryExtractionDone.title
+    );
+    expect(extractionDone?.title.toLowerCase()).toContain('due to');
+  });
+
+  it('states planetaryExtractorExpiring as a prediction, never as an observation', () => {
+    const colonies = [
+      { planetId: 40000001, extractors: [{ pinId: 1, expiryTimeMs: T0 + 20 * HOUR_MS }] },
+    ];
+    const rows = projectColonies(7, 'Kestrel', colonies, new Map([[40000001, 'Amarr III']]), T0);
+    const expiring = rows.find((r) => r.eventId === 'planetaryExtractorExpiring');
+    expect(expiring?.body).toContain('was due to expire');
+    expect(expiring?.body).toContain('12 hours');
+    expect(expiring?.title).not.toEqual(
+      SHARED_NOTIFICATION_WORDING.planetaryExtractorExpiring.title
+    );
+    expect(expiring?.title.toLowerCase()).toContain('due to');
   });
 
   it('projects up to two planetaryExtractorExpiring rows per extractor, one per lead-time window', () => {

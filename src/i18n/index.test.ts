@@ -66,7 +66,15 @@ describe('notifications.fired.* — live i18next path agrees with projection.ts'
     expect(i18n.t('notifications.fired.industryJobComplete.title')).toEqual(row.title);
   });
 
-  it('planetaryExtractionDone and planetaryExtractorExpiring produce the same strings on both paths', () => {
+  /**
+   * The two planetary events are the exception to this file's rule, and the
+   * divergence is the point rather than drift: `projectionWording` hedges
+   * both on the push path because a reset run done in game while the app is
+   * closed falsifies them, while the live path has watched the colony go
+   * idle and says so. Pinned here — where the "both paths agree" invariant
+   * lives — so the exception cannot be quietly widened to the other four.
+   */
+  it('planetaryExtractionDone and planetaryExtractorExpiring name the same things on both paths, but only the live one asserts', () => {
     const expiryTimeMs = T0 + 30 * HOUR_MS;
     const colonies = [
       {
@@ -84,7 +92,13 @@ describe('notifications.fired.* — live i18next path agrees with projection.ts'
       character: 'Kestrel',
       planet: 'Amarr Prime III',
     });
-    expect(liveDone).toEqual(doneRow?.body);
+    expect(liveDone).toContain('has stopped');
+    expect(doneRow?.body).toContain('was due to stop');
+    // Same subject either way: only the claim about it changes.
+    for (const body of [liveDone, doneRow?.body ?? '']) {
+      expect(body).toContain('Kestrel');
+      expect(body).toContain('Amarr Prime III');
+    }
 
     const hours = Math.round((expiryTimeMs - (expiringRow?.fireAt ?? 0)) / HOUR_MS);
     const liveExpiring = i18n.t('notifications.fired.planetaryExtractorExpiring.body', {
@@ -92,7 +106,8 @@ describe('notifications.fired.* — live i18next path agrees with projection.ts'
       planet: 'Amarr Prime III',
       hours,
     });
-    expect(liveExpiring).toEqual(expiringRow?.body);
+    expect(liveExpiring).toContain(`expires in under ${hours} hours`);
+    expect(expiringRow?.body).toContain(`was due to expire in under ${hours} hours`);
   });
 
   it('calendarEventStarting: same character produces the same string on both paths', () => {

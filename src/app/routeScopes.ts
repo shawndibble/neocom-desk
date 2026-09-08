@@ -62,6 +62,14 @@ export const ROUTE_REQUIREMENTS = {
   '/skills': UNGATED,
   // Device-local display preferences only — no ESI endpoint to gate on.
   '/settings': UNGATED,
+  /**
+   * The Notification Feed's own page. Reads Dexie only: the rows were written
+   * by the Foreground Poller, whose *own* reads are gated per event
+   * (`features/notifications/events.ts` derives a scope per event id). A
+   * Character who granted nothing still has a feed — it is simply empty — so
+   * there is no endpoint here to gate the page on.
+   */
+  '/alerts': UNGATED,
 
   // Multi-scope pages: a page gate would hide panels that still work (Overview
   // mixes skills, queue and wallet; Skills adds implants; Industry adds
@@ -147,10 +155,11 @@ export const ROUTE_REQUIREMENTS = {
     endpoints: ['getCharacterMailHeaders', 'getCharacterMail', 'postUniverseNames'],
     strings: 'mail',
   },
-  '/calendar': {
-    endpoints: ['getCharacterCalendar', 'getCharacterCalendarEvent'],
-    strings: 'calendar',
-  },
+  // Multi-source page: the Calendar merges six clocks (calendar, skill queue,
+  // industry jobs, planets, contracts, orders) and each read fails on its own.
+  // A page gate on the calendar scope alone would blank five panels that still
+  // work; the filter menu names the sources that need a new login instead.
+  '/calendar': UNGATED,
   '/contracts': {
     endpoints: ['getCharacterContracts', 'postUniverseNames'],
     strings: 'contracts',

@@ -70,6 +70,33 @@ worth more than a better picker on one control.
 Distinct from `success`/`danger` so status badges and money never read as the same
 signal in one table. Always pair sign or +/− prefix with color (color-blind safety).
 
+### Clock kinds — the one nominal palette
+
+| Token                    | Value     | Use                                     |
+| ------------------------ | --------- | --------------------------------------- |
+| `kind-calendar-event`    | `#7e9cfd` | Calendar events on the Coming Up board. |
+| `kind-skill-training`    | `#d8beff` | Skill-queue completions.                |
+| `kind-industry-job`      | `#e59a55` | Industry job deliveries.                |
+| `kind-planet-extraction` | `#6fdecd` | PI extractor program ends.              |
+| `kind-contract-expiry`   | `#f2879f` | Contract expiries.                      |
+| `kind-order-expiry`      | `#c9d96a` | Market-order expiries.                  |
+
+Every other color scale in this app is **ordinal or semantic** — `securityStatusColor`
+is a position on a numeric scale, `STANDING_TONE` and the severity ladder are
+magnitudes. These six are **nominal**: no order, no magnitude, identity only. They say
+which part of the app a deadline came from, and they are read by
+`src/components/ui/kindTone.ts` (`KIND_FILL`, `KIND_TEXT`).
+
+- **This is meant to be the app's only nominal set.** The next categorical thing that
+  genuinely needs color extends these tokens rather than minting a parallel palette —
+  the fork is the failure mode the Mail decision named when it refused per-folder hues.
+- Every hue sits **≥ 20 ΔE from `accent`, `success`, `warning` and `danger`**, so a
+  category can never be mistaken for a status tone. Check that distance before adding
+  or changing one.
+- **Color is never the identity on its own** (§7). Each of these appears next to the
+  kind's own glyph or its written name — the filter menu carries a swatch beside every
+  label and is the legend for the whole set.
+
 ### Security status
 
 `securityStatusColor(security)` (`src/engine/securityStatus.ts`) colors a solar
@@ -157,7 +184,12 @@ md:h-9`** — pointer users never get the 44px box, touch users never get the
   deliberate exception at a flat `h-7`: readouts, not targets.
 - Radius: **minimal**. `rounded-xs` (2px) for panels, buttons, chips, inputs.
   `rounded-full` only for avatars, dots, spinners. Never `rounded-md`+ on rectangles.
-- Borders: always 1px (`border`), never 2px.
+- Borders: always 1px (`border`), never 2px. The one exception is a **state
+  stripe** — the 2px edge that marks an active tab (`tabItemClassName`'s
+  `border-b-2`), a grouped order's severity (`OpenOrdersPanel`'s
+  `GROUP_ACCENT`) or the selected mail (`Mail.tsx`). Those are not the box's
+  border; they are a selection marker that happens to be drawn as one, and at
+  1px they disappear into the hairlines around them.
 
 ## 4. Component inventory
 
@@ -331,6 +363,14 @@ Rules:
 - **Dark only.** No light theme. `color-scheme: dark` is set globally.
 - **No gradients, anywhere.** Flat fills only (`bg-accent/10`, `bg-panel-2`,
   …). Depth comes from the layering step below, not a fade.
+  - One exception, and it is not a fade: `.calendar-map-past`
+    (`styles/index.css`) draws a 45° hairline hatch with a
+    `repeating-linear-gradient`, because CSS has no other one-declaration way
+    to make a texture. The rule exists to keep depth coming from layering
+    rather than from soft colour ramps; a hatch has no ramp — every stop is
+    hard, and it reads as "not available", which no flat fill can say without
+    being mistaken for "empty". Reach for this only where a surface must look
+    unavailable rather than merely dim.
 - Layering: `bg` → `panel` → `panel-2`. Depth via background steps + hairlines,
   not shadows. Shadows only for popovers/menus (`shadow-lg shadow-black/50`).
 - One `primary` button per view; everything else `ghost`.
@@ -357,12 +397,34 @@ Rules:
 | `accent-contrast` on `accent` (primary button) | 9.42                  |
 | `text-faint` on `bg` (decorative only)         | 3.54 ⚠                |
 
+Clock-kind tokens (§1) color countdown **text**, so all six are measured on all three
+surfaces — `bg` / `panel` / `panel-2`:
+
+| Token                    | Ratios                |
+| ------------------------ | --------------------- |
+| `kind-calendar-event`    | 7.42 / 6.97 / 6.51    |
+| `kind-skill-training`    | 11.72 / 11.01 / 10.27 |
+| `kind-industry-job`      | 8.37 / 7.86 / 7.33    |
+| `kind-planet-extraction` | 11.98 / 11.25 / 10.50 |
+| `kind-contract-expiry`   | 8.05 / 7.56 / 7.05    |
+| `kind-order-expiry`      | 12.54 / 11.78 / 10.99 |
+
 - `text-faint` and `accent-dim` fail AA by design — restricted to non-text decoration.
 - Hairlines are decorative (1.5–2:1); interactive boundaries always carry a text label
   that meets AA on its own.
 - Focus: visible `outline-accent` ring on all interactive elements (never `outline-none`
   without replacement).
-- Color never the sole signal: ISK deltas keep signs, statuses keep words/icons.
+- Color never the sole signal: ISK deltas keep signs, statuses keep words/icons,
+  clock kinds keep their glyph and their written name.
+- **The nominal palette (§1) is reinforcement, never the signal.** Six hues cannot be
+  made mutually distinct under dichromacy while staying inside this palette's
+  lightness/chroma band; measured separation is ΔE ≥ 28 under normal vision and
+  ≥ 21 under protanopia, but industry/orders fall to ΔE 12 under deuteranopia and
+  industry/contracts to 10 under tritanopia. That is acceptable **because** nothing is
+  encoded by hue alone — it is why the rail's rows carry `KIND_ICON` and the kind's
+  name, the filter menu carries labels beside its swatches, and the map and ticker
+  name their kinds in `aria-label`. Do not add a surface that paints these hues with
+  nothing beside them.
 - Tabs: full `role="tablist"` semantics + arrow-key navigation.
 - Spinners expose `role="status"`; DataAgeBadge exposes absolute timestamp via
   `<time dateTime>` + `title`.

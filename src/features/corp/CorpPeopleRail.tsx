@@ -97,7 +97,7 @@ export function CorpPeopleRail({ members, highlights, names, diff, nowMs }: Corp
       title={t('corp.peopleTitle')}
       actions={
         // A Link styled as a control rather than a `Button`, matching
-        // `NotificationFeedPanel`: it navigates, so it stays an anchor.
+        // the Alerts page's settings link: it navigates, so it stays an anchor.
         <Link to="/corp/members" className={buttonClassName({ size: 'sm' })}>
           {t('corp.people.viewRoster')}
         </Link>

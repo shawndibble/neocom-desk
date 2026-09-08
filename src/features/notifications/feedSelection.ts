@@ -43,8 +43,15 @@ export function entryChannelTarget(
 }
 
 /**
- * Gated on the **feed** channel specifically: an event can be set to raise a
- * browser notification while staying out of this list, and the reverse.
+ * Whether this entry's type is currently silenced *in the feed* — an event can
+ * be set to raise a browser notification while staying out of this list, and
+ * the reverse.
+ *
+ * Exported because the Alerts page needs the question answered rather than
+ * acted on: it shows muted types, marked and behind a chip, since
+ * `NotificationContextMenu`'s own mute is one-way from a row that disappears
+ * the instant it applies. Un-muting has to be reachable somewhere that is not
+ * Settings.
  *
  * `eventId` is a plain string on the stored record (`src/db` holds no
  * dependency on this feature), and an entry written by an older build may
@@ -52,14 +59,13 @@ export function entryChannelTarget(
  * ids to enabled, so such a row stays visible and dismissible rather than
  * becoming unreachable clutter.
  */
-function isEntryVisible(
+export function isEntryMutedInFeed(
   entry: NotificationFeedEntry,
   prefs: NotificationPreferencesValue
 ): boolean {
-  if (entry.dismissedAt !== undefined) return false;
   const forCharacter = characterEventPrefs(prefs, entry.characterId);
   if (!isEventEnabledFor(forCharacter, entry.eventId as NotificationEventId, 'feed')) {
-    return false;
+    return true;
   }
   // A layer underneath the eventId check above: an eveNotification row also
   // carries the raw ESI type it fired for (issue #274), individually
@@ -67,9 +73,16 @@ function isEntryVisible(
   const target = entryChannelTarget(entry);
   if (target.kind === 'eveType') {
     const eveTypePrefs = characterEveTypePrefs(prefs, entry.characterId);
-    return isEveTypeEnabledFor(eveTypePrefs, target.type, 'feed');
+    return !isEveTypeEnabledFor(eveTypePrefs, target.type, 'feed');
   }
-  return true;
+  return false;
+}
+
+function isEntryVisible(
+  entry: NotificationFeedEntry,
+  prefs: NotificationPreferencesValue
+): boolean {
+  return entry.dismissedAt === undefined && !isEntryMutedInFeed(entry, prefs);
 }
 
 export function visibleFeedEntries(

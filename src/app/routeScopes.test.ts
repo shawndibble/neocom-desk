@@ -19,7 +19,6 @@ const paths = Object.keys(ROUTE_REQUIREMENTS) as AppRoutePath[];
 describe('scope derivation', () => {
   it('derives a gated route’s scopes from the registry, not from a copied string', () => {
     expect(requiredScopesForRoute('/mail')).toEqual(['esi-mail.read_mail.v1']);
-    expect(requiredScopesForRoute('/calendar')).toEqual(['esi-calendar.read_calendar_events.v1']);
     expect(requiredScopesForRoute('/assets')).toEqual(['esi-assets.read_assets.v1']);
     expect(requiredScopesForRoute('/contracts')).toEqual([
       'esi-contracts.read_character_contracts.v1',
@@ -80,7 +79,6 @@ describe('gated routes', () => {
     expect(paths.filter(isGatedRoute).sort()).toEqual([
       '/assets',
       '/assets/*',
-      '/calendar',
       '/clones',
       '/contacts',
       '/contracts',

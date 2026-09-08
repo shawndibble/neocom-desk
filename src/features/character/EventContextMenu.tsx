@@ -1,4 +1,12 @@
-/** Right-click menu for a Calendar event row (issue #416): copy its event id, and — from Week/Agenda only — jump Month view to its date. */
+/**
+ * Right-click menu for a Calendar event row (issue #416): copy its event id.
+ *
+ * It used to carry a second item, "Add to Month view", which jumped the Month
+ * view to the event's date from Week or Agenda. The Split redesign put the
+ * Calendar Map and the Coming Up Rail on screen at the same time, so there is
+ * no longer another view to jump to — the item was removed rather than
+ * repointed at something it never meant.
+ */
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -11,22 +19,10 @@ import { writeToClipboard } from '@/lib/clipboard';
 
 export interface EventContextMenuProps {
   eventId: number;
-  eventDate: Date;
-  /**
-   * Switches to Month view anchored on this event's date. Omitted by Month
-   * view itself — jumping to the view you're already in is a no-op action
-   * with nothing to click through to.
-   */
-  onAddToMonthView?: (date: Date) => void;
   children: ReactElement;
 }
 
-export function EventContextMenu({
-  eventId,
-  eventDate,
-  onAddToMonthView,
-  children,
-}: EventContextMenuProps) {
+export function EventContextMenu({ eventId, children }: EventContextMenuProps) {
   const { t } = useTranslation();
 
   return (
@@ -36,11 +32,6 @@ export function EventContextMenu({
         <ContextMenuItem onSelect={() => void writeToClipboard(String(eventId))}>
           {t('calendar.contextMenu.copyEventId')}
         </ContextMenuItem>
-        {onAddToMonthView && (
-          <ContextMenuItem onSelect={() => onAddToMonthView(eventDate)}>
-            {t('calendar.contextMenu.addToMonthView')}
-          </ContextMenuItem>
-        )}
       </ContextMenuContent>
     </ContextMenu>
   );
