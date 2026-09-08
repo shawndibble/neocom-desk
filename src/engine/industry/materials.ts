@@ -12,7 +12,7 @@ import type {
   FacilityContext,
   IndustryBlueprint,
 } from '@/engine/industry/types';
-import { RIG_MATERIAL_BONUS_PCT, rigSecurityMultiplierFor } from '@/engine/industry/types';
+import { rigBonusPct } from '@/engine/industry/types';
 
 function round2(x: number): number {
   return Math.round((x + Number.EPSILON) * 100) / 100;
@@ -33,8 +33,7 @@ export function materialModifier(me: number, ctx: FacilityContext): number {
   // Rigs only work on player structures. Reactor rigs scale by security band
   // on a different table than manufacturing rigs (issue #460).
   const rigPct = ctx.facility.structure
-    ? RIG_MATERIAL_BONUS_PCT[ctx.rig] *
-      rigSecurityMultiplierFor(ctx.facility.activity)[ctx.security]
+    ? rigBonusPct(ctx.rigFit, 'me', ctx.facility.activity, ctx.security)
     : 0;
   return (1 - me / 100) * (1 - structurePct / 100) * (1 - rigPct / 100);
 }

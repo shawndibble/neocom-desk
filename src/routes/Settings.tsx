@@ -27,7 +27,8 @@ import { formatAge } from '@/lib/age';
 import { formatTimestamp } from '@/lib/timestamp';
 import { SHORTCUTS } from '@/lib/shortcuts';
 import { TRADE_HUBS, type TradeHub } from '@/market/hubs';
-import { FACILITY_PRESETS, type RigLevel } from '@/engine/industry/types';
+import { FACILITY_PRESETS, RIG_KIND_OPTIONS, setRigSlot } from '@/engine/industry/types';
+import { rigKindLabelKey } from '@/features/industry/rigFitLabels';
 import { useMarketHub } from '@/features/market/hub';
 import { useAssumedMe, MIN_ASSUMED_ME, MAX_ASSUMED_ME } from '@/features/industry/assumedMe';
 import {
@@ -52,8 +53,6 @@ import { db } from '@/db';
 import { ENDPOINT_ROUTES } from '@/esi/endpointRoutes';
 import { useActivityLog, type ActivityLogEntry } from '@/stores/activityLog';
 import type { ActivityOutcome } from '@/esi/activityLog';
-
-const RIG_LEVEL_OPTIONS: readonly RigLevel[] = ['none', 't1', 't2'];
 
 type SettingsTab = 'general' | 'notifications' | 'dataAge' | 'activity' | 'faq';
 
@@ -508,13 +507,25 @@ function DefaultsPanel() {
           {/* Rig and owner-set tax only exist for a player structure. */}
           {facilityPreset.structure && (
             <div className="space-y-3 border-l-2 border-line pt-2 pl-3">
-              <ChipRow
-                label={t('settings.rigLevelLabel')}
-                options={RIG_LEVEL_OPTIONS}
-                selected={facilityDefaults.rigLevel}
-                onSelect={(rigLevel) => void setFacilityDefaults({ ...facilityDefaults, rigLevel })}
-                labelFor={(rigLevel) => t(`settings.rigLevel.${rigLevel}`)}
-              />
+              <div role="group" aria-label={t('settings.rigLevelLabel')} className="space-y-3">
+                <p className="text-xs font-semibold">{t('settings.rigLevelLabel')}</p>
+                {facilityDefaults.rigFit.map((kind, slot) => (
+                  <ChipRow
+                    // A slot's position is its identity, not the kind fitted in it.
+                    key={slot}
+                    label={t('industry.rigSlotLabel', { slot: slot + 1 })}
+                    options={RIG_KIND_OPTIONS}
+                    selected={kind}
+                    onSelect={(picked) =>
+                      void setFacilityDefaults({
+                        ...facilityDefaults,
+                        rigFit: setRigSlot(facilityDefaults.rigFit, slot, picked),
+                      })
+                    }
+                    labelFor={(kind) => t(rigKindLabelKey(kind))}
+                  />
+                ))}
+              </div>
               <div className="space-y-1.5">
                 <label htmlFor="settings-facility-tax" className="block text-xs font-semibold">
                   {t('settings.facilityTaxLabel')}

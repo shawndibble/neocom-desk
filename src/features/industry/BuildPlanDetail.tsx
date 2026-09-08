@@ -18,16 +18,25 @@ import {
   TextInput,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
-import { FACILITY_PRESETS, SKILL_IDS, industryActivityOf } from '@/engine/industry/types';
+import {
+  FACILITY_PRESETS,
+  RIG_KIND_OPTIONS,
+  SKILL_IDS,
+  EMPTY_RIG_FIT,
+  industryActivityOf,
+  resolveRigFit,
+  setRigSlot,
+} from '@/engine/industry/types';
 import { makeOrBuy, type MakeOrBuy, type MaterialRecipe } from '@/engine/industry/makeOrBuy';
 import { ownedStockSale } from '@/engine/industry/ownedStockSale';
 import type {
   FacilityKind,
   MaterialPriceBasis,
   MaterialSourcing,
-  RigLevel,
+  RigKind,
   SkillLevels,
 } from '@/engine/industry/types';
+import { rigKindLabelKey, rigFitSummaryLabel } from './rigFitLabels';
 import { DEFAULT_TRADE_HUB, TRADE_HUBS, getTradeHub } from '@/market/hubs';
 import type { BuildPlanRecord } from '@/db';
 import type { CharacterBlueprint } from '@/esi/endpoints';
@@ -58,7 +67,11 @@ import {
 } from './subBuildPlan';
 import { formatIsk } from '@/lib/isk';
 import { cx } from '@/lib/cx';
-import { bulkOwnedStockSuggestions, filterStockByScope } from '@/engine/industry/ownedStock';
+import {
+  bulkOwnedStockSuggestions,
+  clearOwnedStockSuggestions,
+  filterStockByScope,
+} from '@/engine/industry/ownedStock';
 import {
   stockLocationLabel,
   type OwnedStockDetection,
@@ -85,6 +98,7 @@ export type PlanPatch = Partial<
     | 'me'
     | 'te'
     | 'facility'
+    | 'rigFit'
     | 'rigLevel'
     | 'security'
     | 'hubId'
@@ -388,11 +402,11 @@ export function BuildPlanDetail({
   const facilityContext = useMemo(
     () => ({
       facility: facilityPreset,
-      rig: plan.rigLevel,
+      rigFit: resolveRigFit({ rigFit: plan.rigFit, rigLevel: plan.rigLevel }),
       security: plan.security,
       facilityTaxPct: facilityPreset.structure ? plan.facilityTaxPct : undefined,
     }),
-    [facilityPreset, plan.rigLevel, plan.security, plan.facilityTaxPct]
+    [facilityPreset, plan.rigFit, plan.rigLevel, plan.security, plan.facilityTaxPct]
   );
 
   /**
@@ -492,6 +506,18 @@ export function BuildPlanDetail({
         ({ typeID, ownedQuantity }) => ({ typeID, patch: { ownedQuantity } })
       ),
     [visibleMaterials, plan.materialSourcing, scopedStock]
+  );
+
+  // "Use none" is the reverse of "use all": it zeroes every row currently
+  // carrying a non-zero owned quantity, hand-typed or bulk-filled alike
+  // (issue #612) — a deliberate clobber, not the "only untouched rows" rule
+  // above.
+  const bulkClearPatches = useMemo<SourcingPatchEntry[]>(
+    () =>
+      clearOwnedStockSuggestions(visibleMaterials, plan.materialSourcing).map(
+        ({ typeID, ownedQuantity }) => ({ typeID, patch: { ownedQuantity } })
+      ),
+    [visibleMaterials, plan.materialSourcing]
   );
 
   /**
@@ -736,14 +762,7 @@ export function BuildPlanDetail({
     ),
     ...(facilityPreset.structure
       ? [
-          chip(
-            t('industry.setupChipRig'),
-            plan.rigLevel === 'none'
-              ? t('industry.rigNone')
-              : plan.rigLevel === 't1'
-                ? t('industry.rigT1')
-                : t('industry.rigT2')
-          ),
+          chip(t('industry.setupChipRig'), rigFitSummaryLabel(resolveRigFit(plan), t)),
           chip(t('industry.setupChipTax'), `${plan.facilityTaxPct ?? 0}%`),
         ]
       : []),
@@ -891,7 +910,9 @@ export function BuildPlanDetail({
                         update({
                           facility,
                           ...clearedBuildLocation,
-                          ...(structure ? {} : { rigLevel: 'none', facilityTaxPct: undefined }),
+                          ...(structure
+                            ? {}
+                            : { rigFit: EMPTY_RIG_FIT, facilityTaxPct: undefined }),
                         });
                       }}
                     >
@@ -940,22 +961,41 @@ export function BuildPlanDetail({
                     NPC station shows neither rather than showing them dead. Both
                     are already cleared on the plan when the facility changes. */}
                   {facilityPreset.structure && (
-                    <label className="flex flex-col gap-1 text-xs">
-                      {t('industry.rigLevel')}
-                      <Select
-                        value={plan.rigLevel}
-                        onValueChange={(value) => update({ rigLevel: value as RigLevel })}
-                      >
-                        <SelectTrigger aria-label={t('industry.rigLevel')}>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">{t('industry.rigNone')}</SelectItem>
-                          <SelectItem value="t1">{t('industry.rigT1')}</SelectItem>
-                          <SelectItem value="t2">{t('industry.rigT2')}</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </label>
+                    <div className="col-span-2 flex flex-col gap-1 text-xs sm:col-span-3">
+                      <span>{t('industry.rigFitLabel')}</span>
+                      <div className="flex flex-wrap gap-2">
+                        {resolveRigFit(plan).map((kind, slot) => (
+                          // A slot's position is its identity, not the kind
+                          // fitted in it, so the index is a stable key.
+                          <label key={slot} className="flex flex-col gap-1">
+                            <span className="sr-only">
+                              {t('industry.rigSlotLabel', { slot: slot + 1 })}
+                            </span>
+                            <Select
+                              value={kind}
+                              onValueChange={(value) =>
+                                update({
+                                  rigFit: setRigSlot(resolveRigFit(plan), slot, value as RigKind),
+                                })
+                              }
+                            >
+                              <SelectTrigger
+                                aria-label={t('industry.rigSlotLabel', { slot: slot + 1 })}
+                              >
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {RIG_KIND_OPTIONS.map((option) => (
+                                  <SelectItem key={option} value={option}>
+                                    {t(rigKindLabelKey(option))}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
                   )}
 
                   {facilityPreset.structure && (
@@ -1119,10 +1159,22 @@ export function BuildPlanDetail({
                   detection={detection}
                   onChange={(ownedStockScope) => update({ ownedStockScope })}
                   action={
-                    bulkDetectedPatches.length > 0 && (
-                      <Button size="sm" onClick={() => onSourcingChangeMany(bulkDetectedPatches)}>
-                        {t('industry.useAllOwned')}
-                      </Button>
+                    (bulkDetectedPatches.length > 0 || bulkClearPatches.length > 0) && (
+                      <div className="flex gap-2">
+                        {bulkDetectedPatches.length > 0 && (
+                          <Button
+                            size="sm"
+                            onClick={() => onSourcingChangeMany(bulkDetectedPatches)}
+                          >
+                            {t('industry.useAllOwned')}
+                          </Button>
+                        )}
+                        {bulkClearPatches.length > 0 && (
+                          <Button size="sm" onClick={() => onSourcingChangeMany(bulkClearPatches)}>
+                            {t('industry.useNoneOwned')}
+                          </Button>
+                        )}
+                      </div>
                     )
                   }
                 />

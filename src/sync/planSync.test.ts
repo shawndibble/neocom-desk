@@ -167,6 +167,18 @@ function buildPlan(overrides: Partial<BuildPlanRecord> = {}): BuildPlanRecord {
   };
 }
 
+/**
+ * What a legacy `rigLevel`-only remote doc resolves to once it round-trips
+ * through `toLocalRecord` — every pull normalizes to `rigFit` (issue #609),
+ * dropping the legacy field. Takes the exact remote record rather than
+ * rebuilding one, so `updatedAt` (and everything else) matches byte-for-byte.
+ */
+function pulledBuildPlan(remote: BuildPlanRecord): BuildPlanRecord {
+  const rest = { ...remote, rigFit: ['meT1', 'teT1', 'none'] as const };
+  delete rest.rigLevel;
+  return rest;
+}
+
 function remoteDoc(overrides: DocData = {}): DocData {
   return { ...plan(), ownerHash: HASH, deleted: false, ...overrides };
 }
@@ -634,7 +646,11 @@ describe('every stored field of a plan reaches the remote doc and comes back', (
     updatedAt: Date.now() - 1000,
   };
 
-  const fullBuildPlan: Required<BuildPlanRecord> = {
+  // `rigLevel` is the pre-#609 legacy field: excluded here since this app
+  // never writes it any more (`rigFit` is the one field that actually
+  // reaches the remote doc — see `resolveRigFit` in planSync.ts), so pinning
+  // it here would demand a round trip that no longer happens.
+  const fullBuildPlan: Required<Omit<BuildPlanRecord, 'rigLevel'>> = {
     id: 'b1',
     characterId: 1,
     name: 'Rifter run',
@@ -643,7 +659,7 @@ describe('every stored field of a plan reaches the remote doc and comes back', (
     me: 10,
     te: 20,
     facility: 'raitaru',
-    rigLevel: 't1',
+    rigFit: ['meT1', 'teT1', 'none'],
     security: 'highsec',
     hubId: 'jita',
     buildSystemId: 30003888,
@@ -694,7 +710,7 @@ describe('every stored field of a plan reaches the remote doc and comes back', (
       'me',
       'name',
       'ownedStockScope',
-      'rigLevel',
+      'rigFit',
       'runs',
       'security',
       'te',
@@ -765,7 +781,7 @@ describe('triggerSync: build plans', () => {
       me: p.me,
       te: p.te,
       facility: p.facility,
-      rigLevel: p.rigLevel,
+      rigFit: ['meT1', 'teT1', 'none'],
       security: p.security,
       hubId: p.hubId,
       facilityTaxPct: 1.5,
@@ -804,10 +820,10 @@ describe('triggerSync: build plans', () => {
   });
 
   it('pulls materialSourcing from a remote build plan into Dexie', async () => {
-    const expected = buildPlan({ materialSourcing: { 34: { overridePrice: 6.5 } } });
-    seedRemote(BUILD_PLANS_PATH, [{ ...expected, ownerHash: HASH, deleted: false }]);
+    const remote = buildPlan({ materialSourcing: { 34: { overridePrice: 6.5 } } });
+    seedRemote(BUILD_PLANS_PATH, [{ ...remote, ownerHash: HASH, deleted: false }]);
     await triggerSync(1);
-    expect(await db.buildPlans.get('b1')).toEqual(expected);
+    expect(await db.buildPlans.get('b1')).toEqual(pulledBuildPlan(remote));
   });
 
   it('round-trips ownedStockScope through the pushed doc', async () => {
@@ -835,11 +851,11 @@ describe('triggerSync: build plans', () => {
   });
 
   it('pulls buildHere from a remote build plan into Dexie', async () => {
-    const expected = buildPlan({ buildHere: [57478] });
-    seedRemote(BUILD_PLANS_PATH, [{ ...expected, ownerHash: HASH, deleted: false }]);
+    const remote = buildPlan({ buildHere: [57478] });
+    seedRemote(BUILD_PLANS_PATH, [{ ...remote, ownerHash: HASH, deleted: false }]);
     await triggerSync(1);
 
-    expect(await db.buildPlans.get('b1')).toEqual(expected);
+    expect(await db.buildPlans.get('b1')).toEqual(pulledBuildPlan(remote));
   });
 
   it('omits ownedStockScope from the pushed doc when absent (Firestore rejects undefined)', async () => {
@@ -851,10 +867,10 @@ describe('triggerSync: build plans', () => {
   });
 
   it('pulls ownedStockScope from a remote build plan into Dexie', async () => {
-    const expected = buildPlan({ ownedStockScope: { mode: 'everywhere' } });
-    seedRemote(BUILD_PLANS_PATH, [{ ...expected, ownerHash: HASH, deleted: false }]);
+    const remote = buildPlan({ ownedStockScope: { mode: 'everywhere' } });
+    seedRemote(BUILD_PLANS_PATH, [{ ...remote, ownerHash: HASH, deleted: false }]);
     await triggerSync(1);
-    expect(await db.buildPlans.get('b1')).toEqual(expected);
+    expect(await db.buildPlans.get('b1')).toEqual(pulledBuildPlan(remote));
   });
 
   it('omits undefined facilityTaxPct from the pushed doc (Firestore rejects undefined)', async () => {
@@ -866,10 +882,10 @@ describe('triggerSync: build plans', () => {
   });
 
   it('pulls a remote-only build plan into Dexie without remote-only fields', async () => {
-    const expected = buildPlan();
-    seedRemote(BUILD_PLANS_PATH, [{ ...expected, ownerHash: HASH, deleted: false }]);
+    const remote = buildPlan();
+    seedRemote(BUILD_PLANS_PATH, [{ ...remote, ownerHash: HASH, deleted: false }]);
     await triggerSync(1);
-    expect(await db.buildPlans.get('b1')).toEqual(expected);
+    expect(await db.buildPlans.get('b1')).toEqual(pulledBuildPlan(remote));
   });
 
   it('LWW: newer remote build plan overwrites local', async () => {

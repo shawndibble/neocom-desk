@@ -17,11 +17,11 @@ import type {
   IndustryBlueprint,
   MaterialCostLine,
   QuantityEntry,
-  RigLevel,
+  RigFit,
   SecurityBand,
   SkillLevels,
 } from '@/engine/industry/types';
-import { FACILITY_PRESETS } from '@/engine/industry/types';
+import { EMPTY_RIG_FIT, FACILITY_PRESETS } from '@/engine/industry/types';
 import { buildVsBuy } from '@/engine/industry/buildVsBuy';
 
 export type MakeMethod = 'manufacturing' | 'planetary' | 'reaction';
@@ -54,7 +54,7 @@ export type MaterialRecipe =
 /** Where the hypothetical sub-job would run: the parent plan's own facility and market. */
 export interface MakeOrBuyContext {
   facility: FacilityPreset;
-  rig: RigLevel;
+  rigFit: RigFit;
   security: SecurityBand;
   facilityTaxPct?: number;
   systemCostIndex: number;
@@ -109,7 +109,7 @@ function jobUnitCost(
     me,
     te: 0,
     facility: ctx.facility,
-    rig: ctx.rig,
+    rigFit: ctx.rigFit,
     security: ctx.security,
     facilityTaxPct: ctx.facilityTaxPct,
     systemCostIndex: ctx.systemCostIndex,
@@ -147,7 +147,7 @@ function reactionUnitCost(
   return jobUnitCost(blueprint, 0, needed, {
     ...ctx,
     facility: FACILITY_PRESETS.athanor,
-    rig: 'none',
+    rigFit: EMPTY_RIG_FIT,
   });
 }
 

@@ -9,7 +9,7 @@
  * All factors stack multiplicatively. Rig TE bonus scales with security band.
  */
 import type { FacilityContext, SkillLevels } from '@/engine/industry/types';
-import { RIG_TIME_BONUS_PCT, SKILL_IDS, rigSecurityMultiplierFor } from '@/engine/industry/types';
+import { SKILL_IDS, rigBonusPct } from '@/engine/industry/types';
 
 const INDUSTRY_PCT_PER_LEVEL = 4;
 const ADVANCED_INDUSTRY_PCT_PER_LEVEL = 3;
@@ -41,7 +41,7 @@ export function timeModifier(te: number, skills: SkillLevels, ctx: FacilityConte
           [SKILL_IDS.advancedIndustry, ADVANCED_INDUSTRY_PCT_PER_LEVEL],
         ] as const);
   const rigPct = ctx.facility.structure
-    ? RIG_TIME_BONUS_PCT[ctx.rig] * rigSecurityMultiplierFor(ctx.facility.activity)[ctx.security]
+    ? rigBonusPct(ctx.rigFit, 'te', ctx.facility.activity, ctx.security)
     : 0;
   let modifier = (1 - te / 100) * (1 - ctx.facility.timeBonusPct / 100) * (1 - rigPct / 100);
   for (const [typeID, pctPerLevel] of skillTerms) {

@@ -5,17 +5,17 @@ import type { FacilityContext, SkillLevels } from '@/engine/industry/types';
 
 const npc: FacilityContext = {
   facility: FACILITY_PRESETS.npcStation,
-  rig: 'none',
+  rigFit: ['none', 'none', 'none'],
   security: 'highsec',
 };
 const raitaruT1Hi: FacilityContext = {
   facility: FACILITY_PRESETS.raitaru,
-  rig: 't1',
+  rigFit: ['teT1', 'none', 'none'],
   security: 'highsec',
 };
 const athanor: FacilityContext = {
   facility: FACILITY_PRESETS.athanor,
-  rig: 'none',
+  rigFit: ['none', 'none', 'none'],
   security: 'highsec',
 };
 const noSkills: SkillLevels = {};
@@ -44,14 +44,23 @@ describe('timeModifier', () => {
     // T2 TE rig nullsec: 24% * 2.1 = 50.4% -> 0.496
     const ctx: FacilityContext = {
       facility: FACILITY_PRESETS.sotiyo,
-      rig: 't2',
+      rigFit: ['teT2', 'none', 'none'],
       security: 'nullsec',
     };
     expect(timeModifier(0, noSkills, ctx)).toBeCloseTo(0.7 * 0.496, 12);
   });
 
   it('ignores rigs at NPC stations', () => {
-    expect(timeModifier(0, noSkills, { ...npc, rig: 't2' })).toBe(1);
+    expect(timeModifier(0, noSkills, { ...npc, rigFit: ['teT2', 'none', 'none'] })).toBe(1);
+  });
+
+  it('an ME-only rig fit contributes nothing to the time bonus', () => {
+    const meOnly: FacilityContext = {
+      facility: FACILITY_PRESETS.raitaru,
+      rigFit: ['meT2', 'none', 'none'],
+      security: 'highsec',
+    };
+    expect(timeModifier(0, noSkills, meOnly)).toBeCloseTo(0.85, 12);
   });
 
   it('scales reactor rig time bonus by the reaction security table, not the manufacturing one', () => {
@@ -60,7 +69,7 @@ describe('timeModifier', () => {
     // Tatara also carries its own -25% structure time bonus (0.75).
     const tataraT2Null: FacilityContext = {
       facility: FACILITY_PRESETS.tatara,
-      rig: 't2',
+      rigFit: ['teT2', 'none', 'none'],
       security: 'nullsec',
     };
     expect(timeModifier(0, noSkills, tataraT2Null)).toBeCloseTo(0.75 * 0.736, 12);
@@ -93,7 +102,7 @@ describe('timeModifier', () => {
     // * Reactions V (0.8).
     const tataraT2Null: FacilityContext = {
       facility: FACILITY_PRESETS.tatara,
-      rig: 't2',
+      rigFit: ['teT2', 'none', 'none'],
       security: 'nullsec',
     };
     expect(timeModifier(0, { [SKILL_IDS.reactions]: 5 }, tataraT2Null)).toBeCloseTo(
