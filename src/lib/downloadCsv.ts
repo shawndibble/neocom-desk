@@ -28,7 +28,8 @@ export type CsvSurface =
   | 'market-sell'
   | 'market-buy'
   | 'market-variations'
-  | 'market-compare';
+  | 'market-compare'
+  | 'market-appraisal';
 
 /**
  * Serialize and hand the browser a file. Composes the pure serializer with

@@ -8,6 +8,7 @@ import {
   getHubPrices,
   getAdjustedPrices,
   clearMarketPriceCache,
+  invalidateHubPrices,
   HUB_PRICE_TTL_MS,
   ADJUSTED_PRICE_TTL_MS,
 } from './prices';
@@ -48,6 +49,32 @@ describe('getHubPrices', () => {
     const second = await getHubPrices(DEFAULT_TRADE_HUB, [34], clock);
     expect(second.get(34)).toEqual(first.get(34));
     expect(hits.count).toBe(1); // served from cache, no second request
+  });
+
+  it('re-fetches inside the TTL for type ids that were invalidated', async () => {
+    const hits = { count: 0 };
+    server.use(fuzzworkHandler(hits));
+    const clock = () => 1_000_000;
+
+    await getHubPrices(DEFAULT_TRADE_HUB, [34], clock);
+    expect(hits.count).toBe(1);
+
+    invalidateHubPrices(DEFAULT_TRADE_HUB.stationId, [34]);
+    await getHubPrices(DEFAULT_TRADE_HUB, [34], clock);
+    expect(hits.count).toBe(2);
+  });
+
+  it('leaves other stations’ cached prices alone when invalidating', async () => {
+    const hits = { count: 0 };
+    server.use(fuzzworkHandler(hits));
+    const clock = () => 1_000_000;
+
+    await getHubPrices(DEFAULT_TRADE_HUB, [34], clock);
+    expect(hits.count).toBe(1);
+
+    invalidateHubPrices(DEFAULT_TRADE_HUB.stationId + 1, [34]);
+    await getHubPrices(DEFAULT_TRADE_HUB, [34], clock);
+    expect(hits.count).toBe(1); // still cached
   });
 
   it('re-fetches once the 15-minute TTL has elapsed', async () => {

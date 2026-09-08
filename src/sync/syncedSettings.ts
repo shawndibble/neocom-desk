@@ -57,12 +57,24 @@
 // (`features/character/characterFilterValue.ts`) since a `Set` is not
 // Firestore-safe. Same "set to another value, never unset" shape as the five
 // above, so the tombstone-expiry edge does not bite this one either.
+//
+// sync.marketPricePercent: the percentage of market the Market page's
+// Appraisal tab prices a pasted list at. It sits in the same control cluster
+// as sync.marketHub and answers the same kind of question — "I value my loot
+// at 90% of Jita" is a fact about how the pilot trades, not about the machine
+// they opened — so one of the pair travelling while the other did not would be
+// a difference with nothing behind it. Same "set to another value, never
+// unset" shape as everything above (the field holds a value at all times and
+// no control clears it), so the tombstone-expiry edge does not bite this one
+// either. No `legacyKey`: the preference is new, with no device-local life to
+// seed from.
 export const SYNCED_SETTING_KEYS: readonly string[] = [
   'sync.corpDarkAfterDays',
   'sync.defaultCharacterFilter',
   'sync.industryAssumedMe',
   'sync.industryFacilityDefaults',
   'sync.marketHub',
+  'sync.marketPricePercent',
   'sync.notificationFeedPrefs',
   'sync.piCustomsRates',
   'sync.piExpiringSoonHours',

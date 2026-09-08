@@ -20,6 +20,19 @@ here — they go one per file in `docs/context/decisions/`.
   unit a reader mutes, dismisses or acts on. Distinct from the browser
   notification the same fire may also raise: two delivery channels, one event.
 - **API-Derived Data**: Character data pulled from ESI (assets, mail, wallet, etc.). Cached locally per device for offline viewing. Never synced through the backend.
+- **Appraisal**: A Market page tab that prices a pasted pile of items — loot,
+  a haul, a shopping list — at a **Trade Hub**, on both sides of the book at
+  once: what it fetches sold into buy orders, and what it costs bought off
+  sell orders. Scaled by a **Price Percent** the pilot sets. Priced at a hub
+  and never a Region (`20260908-164742`), and it shares the Market Browser's
+  hub rather than keeping one of its own. Distinct from **Compare**, which
+  puts a handful of Quickbar items side by side on their own prices: an
+  Appraisal answers "what is this pile worth", Compare answers "which of
+  these is cheaper".
+- **Price Percent**: The fraction of market an **Appraisal** is quoted at —
+  100 is the order book untouched, and a buyer quoting loot pays some
+  fraction of it. Applied to both sides, so the spread between them stays
+  meaningful. Synced across the pilot's devices alongside the hub.
 - **Assignment**: Links a Mining Ledger Entry (or a split slice of its ore —
   whole lines or part of a line's quantity, for the two-corps-one-system-
   one-day case, see Growth Collector) to a Payee, snapshotting
