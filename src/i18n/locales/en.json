@@ -922,7 +922,16 @@
       "colonyCount_one": "{{count}} colony",
       "colonyCount_other": "{{count}} colonies",
       "programCount_one": "{{count}} extractor program",
-      "programCount_other": "{{count}} extractor programs"
+      "programCount_other": "{{count}} extractor programs",
+      "ordersClear": "Nothing needs work",
+      "miningUnpaid": "{{isk}} unpaid",
+      "miningUnassigned_one": "{{count}} entry unassigned",
+      "miningUnassigned_other": "{{count}} entries unassigned",
+      "noColonies": "No colonies",
+      "alertTypes_one": "{{count}} type",
+      "alertTypes_other": "{{count}} types",
+      "everythingElse": "Everything else",
+      "foldedRowLabel": "{{domain}}: {{summary}}"
     }
   },
   "alerts": {

@@ -4,11 +4,13 @@ import {
   activeFilterCount,
   EMPTY_OPEN_ORDERS_FILTER,
   filterOpenOrders,
+  openOrdersFilterFromParams,
+  openOrdersHref,
   sortOpenOrders,
   type OpenOrdersFilter,
 } from './openOrdersFilter';
 import type { OpenOrderRow } from './openOrdersModel';
-import type { OrderProblem } from '@/engine/market/orderProblems';
+import { UNDERCUT_PROBLEMS, type OrderProblem } from '@/engine/market/orderProblems';
 
 function makeRow(overrides: Partial<OpenOrderRow> = {}): OpenOrderRow {
   return {
@@ -346,5 +348,80 @@ describe('activeFilterChips / activeFilterCount', () => {
     };
     expect(activeFilterCount(filter)).toBe(activeFilterChips(filter).length);
     expect(activeFilterCount(filter)).toBe(2);
+  });
+});
+
+/*
+ * The Overview board's count tiles link here already narrowed to what they
+ * counted, so these two are the deep-link vocabulary: one writes it, one reads
+ * it, and the round-trip below is what stops them drifting apart.
+ */
+describe('the deep-link vocabulary', () => {
+  const base: OpenOrdersFilter = { ...EMPTY_OPEN_ORDERS_FILTER, hideHealthy: true };
+
+  function parse(query: string): OpenOrdersFilter {
+    return openOrdersFilterFromParams(new URLSearchParams(query), base);
+  }
+
+  it('reads a repeated problem param as the OR the filter already means', () => {
+    // Repeated rather than comma-separated: `getAll` is the standard reading
+    // of it, so there is no delimiter to escape and no parser to get wrong.
+    expect(parse('problem=undercutStation&problem=undercutRegion').problems).toEqual([
+      'undercutStation',
+      'undercutRegion',
+    ]);
+  });
+
+  it('reads a repeated character param', () => {
+    expect(parse('character=91&character=42').characterIds).toEqual([91, 42]);
+  });
+
+  /*
+   * A URL is typed, shared and edited by hand. Every one of these is somebody
+   * arriving with a link that has rotted or been mangled, and the page they
+   * asked for — orders — is still the right answer.
+   */
+  it('drops what it does not recognise instead of throwing', () => {
+    const filter = parse('problem=undercutStation&problem=nonsense&character=91&character=abc');
+    expect(filter.problems).toEqual(['undercutStation']);
+    expect(filter.characterIds).toEqual([91]);
+  });
+
+  /*
+   * `healthy` is a real word in this vocabulary and still not one this
+   * endpoint can honour: the page folds healthy orders away by default
+   * (`hideHealthy`), so a filter naming it matches rows that the same filter
+   * then hides — nought of N, with a chip the reader cannot reason about. The
+   * funnel already cannot produce that state (`PROBLEM_FILTER_OPTIONS` leaves
+   * `healthy` out); only a URL can.
+   */
+  it('refuses `healthy`, which would filter to a guaranteed empty page', () => {
+    expect(parse('problem=healthy')).toBe(base);
+    expect(parse('problem=healthy&problem=outbid').problems).toEqual(['outbid']);
+  });
+
+  it('leaves the rest of the filter exactly as it found it', () => {
+    // Layered onto the page's own default, not onto an empty filter: arriving
+    // by deep link must not quietly unfold every healthy order.
+    const filter = parse('problem=outbid');
+    expect(filter.hideHealthy).toBe(true);
+    expect(filter.sort).toBe(base.sort);
+    expect(filter.text).toBe('');
+  });
+
+  it('hands back the base untouched when the URL says nothing', () => {
+    expect(parse('')).toBe(base);
+    expect(parse('section=orders')).toBe(base);
+  });
+
+  it('round-trips what the board links to', () => {
+    const href = openOrdersHref({ problems: UNDERCUT_PROBLEMS, characterIds: [91] });
+    const filter = parse(href.slice(href.indexOf('?') + 1));
+    expect(filter.problems).toEqual([...UNDERCUT_PROBLEMS]);
+    expect(filter.characterIds).toEqual([91]);
+  });
+
+  it('is the plain Orders page when there is nothing to narrow by', () => {
+    expect(openOrdersHref({})).toBe('/market?section=orders');
   });
 });

@@ -117,9 +117,9 @@ function snapshot(
   return { entries, skipped };
 }
 
-function renderPanel() {
+function renderPanel(initialEntry = '/market?section=orders') {
   return render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[initialEntry]}>
       <OpenOrdersPanel />
     </MemoryRouter>
   );
@@ -585,7 +585,7 @@ describe('OpenOrdersPanel', () => {
       await user.click(await screen.findByRole('button', { name: /^Filters/ }));
     }
 
-    function renderMixedFixture() {
+    function renderMixedFixture(initialEntry?: string) {
       mockedLoadAll.mockResolvedValue(
         snapshot([
           {
@@ -599,7 +599,7 @@ describe('OpenOrdersPanel', () => {
         ])
       );
       mockedCostBases.mockResolvedValue(new Map([[101, costBasis(600)]]));
-      return renderPanel();
+      return renderPanel(initialEntry);
     }
 
     it('narrows the list with a problem chip', async () => {
@@ -624,6 +624,63 @@ describe('OpenOrdersPanel', () => {
       expect(screen.queryByRole('combobox', { name: 'Expires within' })).not.toBeInTheDocument();
       await openFunnel(user);
       expect(screen.getByRole('combobox', { name: 'Expires within' })).toBeInTheDocument();
+    });
+
+    /*
+     * The Overview board's count tiles link here already narrowed to what they
+     * counted (`openOrdersHref`), so a tile reading "21 undercut" and a page
+     * listing thirty cannot both be on screen. `openOrdersFilter.test.ts`
+     * covers the parsing; these cover that the page actually opens on it.
+     */
+    it('opens narrowed to the problem the link names', async () => {
+      renderMixedFixture('/market?section=orders&problem=expiringOrStale');
+      // One of the three, where the page's own default matches two.
+      expect(await screen.findByText('1 of 3 orders match')).toBeInTheDocument();
+    });
+
+    it('opens narrowed to the character the link names', async () => {
+      mockedLoadAll.mockResolvedValue(
+        snapshot([
+          {
+            characterId: 1,
+            characterName: 'Alpha',
+            orders: [BELOW_FLOOR_ORDER, EXPIRING_ORDER],
+            fetchedAt: Date.now(),
+            fromCache: false,
+            needsReauth: false,
+          },
+          {
+            characterId: 2,
+            characterName: 'Beta',
+            orders: [order({ order_id: 301, type_id: 36, price: 300, duration: 5 })],
+            fetchedAt: Date.now(),
+            fromCache: false,
+            needsReauth: false,
+          },
+        ])
+      );
+      mockedCostBases.mockResolvedValue(new Map([[101, costBasis(600)]]));
+      renderPanel('/market?section=orders&character=1');
+
+      expect(await screen.findByText('2 of 3 orders match')).toBeInTheDocument();
+    });
+
+    it('keeps the filter it applied removable, rather than silently narrowing', async () => {
+      const user = userEvent.setup();
+      renderMixedFixture('/market?section=orders&problem=expiringOrStale');
+      await screen.findByText('1 of 3 orders match');
+
+      // The chip row is the only thing telling the reader why they are seeing
+      // one order out of three, and the only way back to all of them.
+      // "Problem: " is the chip's own prefix (`chipLabel`) — the group header
+      // below carries the same words without it.
+      await user.click(screen.getByRole('button', { name: /^Problem: Expiring or stale$/i }));
+      expect(await screen.findByText('2 of 3 orders match')).toBeInTheDocument();
+    });
+
+    it('ignores a param it cannot read instead of showing an empty page', async () => {
+      renderMixedFixture('/market?section=orders&problem=nonsense');
+      expect(await screen.findByText('2 of 3 orders match')).toBeInTheDocument();
     });
 
     it('still renders a zero-count problem chip, dimmed', async () => {

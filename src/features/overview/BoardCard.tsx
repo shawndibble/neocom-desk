@@ -26,19 +26,9 @@ export interface BoardCardProps {
   children: ReactNode;
   /** Pinned to the card's bottom edge, so cards in a row line up however tall each one's body is. */
   footer?: ReactNode;
-  /** The board's own ordering class. Not a general style hook — see `Overview.tsx`. */
-  className?: string;
 }
 
-export function BoardCard({
-  title,
-  meta,
-  to,
-  openLabel,
-  children,
-  footer,
-  className = '',
-}: BoardCardProps) {
+export function BoardCard({ title, meta, to, openLabel, children, footer }: BoardCardProps) {
   return (
     /*
       Three things, and all three are load-bearing for one effect: cards in a
@@ -54,7 +44,7 @@ export function BoardCard({
     */
     <Panel
       fill
-      className={`flex h-full flex-col ${className}`}
+      className="flex h-full flex-col"
       title={title}
       meta={meta}
       actions={
@@ -84,6 +74,13 @@ export interface NumberTileProps {
   label: string;
   value: number | string;
   severity: DeadlineSeverity;
+  /**
+   * The page this count opens, already narrowed to what it counted. Optional:
+   * a tile whose figure has no filtered destination — mining tax's two — is
+   * plain text, and inventing a link to an unnarrowed page for it would send
+   * the reader somewhere that cannot show them the number they tapped.
+   */
+  to?: string;
 }
 
 /**
@@ -94,11 +91,18 @@ export interface NumberTileProps {
  * what a triage board is for — yellow says "look here", and a zero has nothing
  * to look at. The severity only applies once there is something behind the
  * number.
+ *
+ * **And a zero is never a link**, for the same reason and by the same test: a
+ * link is the strongest "look here" a tile has, and behind this one is a page
+ * filtered down to nothing. `—` is not a zero, though — it means the read
+ * failed — and it is not a link either, because the count it would carry is
+ * exactly what nobody knows.
  */
-export function NumberTile({ label, value, severity }: NumberTileProps) {
+export function NumberTile({ label, value, severity, to }: NumberTileProps) {
   const zero = value === 0 || value === '0';
-  return (
-    <span className="flex min-w-0 flex-1 flex-col gap-0.5 rounded-xs border border-line bg-panel-2 px-2.5 py-2">
+  const linked = to !== undefined && !zero && typeof value === 'number';
+  const body = (
+    <>
       {/* The digits take the tone too, not just the glyph beside them: the
           number is what is being read, and a coloured icon next to plain text
           reads as a bullet point rather than as a severity. */}
@@ -107,7 +111,18 @@ export function NumberTile({ label, value, severity }: NumberTileProps) {
         <span className={zero ? 'text-text' : SEVERITY_TEXT[severity]}>{value}</span>
       </span>
       <span className="text-[0.6875rem] tracking-widest text-text-dim uppercase">{label}</span>
-    </span>
+    </>
+  );
+  const className =
+    'flex min-w-0 flex-1 flex-col gap-0.5 rounded-xs border border-line bg-panel-2 px-2.5 py-2';
+  if (!linked) return <span className={className}>{body}</span>;
+  return (
+    <Link
+      to={to}
+      className={`${className} hover:border-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent`}
+    >
+      {body}
+    </Link>
   );
 }
 
@@ -151,6 +166,56 @@ export function TriageRow({ severity, when, subject, detail, to }: TriageRowProp
             <span className="block truncate text-[0.6875rem] text-text-dim">{detail}</span>
           )}
         </span>
+      </Link>
+    </li>
+  );
+}
+
+export interface FoldedRowProps {
+  /** The domain's own name — the same words its card's header carries. */
+  domain: string;
+  /** One line from `boardSummary.ts`: the worst true thing this domain has to say. */
+  summary: string;
+  /** Null while the domain's read is still in flight — no glyph rather than a guessed one. */
+  severity: DeadlineSeverity | null;
+  to: string;
+}
+
+/**
+ * One domain, folded to a single line, for the phone's "Everything else".
+ *
+ * A sibling of `TriageRow` rather than a mode of it: that row's left column is
+ * a fixed-width clock, and every row on this card is a whole domain rather
+ * than one dated thing inside one. The two would only share a shape by making
+ * the clock optional, which is how a row component ends up rendering four
+ * layouts.
+ *
+ * The name truncates before the summary does. On the day the summary is the
+ * long one it is also the one worth reading — "Planetary industr…" beside "2
+ * colonies have stopped" still tells you where to tap, and the reverse does
+ * not.
+ */
+export function FoldedRow({ domain, summary, severity, to }: FoldedRowProps) {
+  const { t } = useTranslation();
+  return (
+    <li className="border-b border-line last:border-b-0">
+      <Link
+        to={to}
+        aria-label={t('overview.board.foldedRowLabel', { domain, summary })}
+        className="flex min-h-11 items-center gap-2 px-3 py-2 hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
+      >
+        {/* A fixed slot, so a domain still loading lines its name up with the
+            ones that have answered instead of sliding left. */}
+        <span className="flex w-4 shrink-0 justify-center">
+          {severity && <SeverityIcon severity={severity} />}
+        </span>
+        <span className="min-w-0 flex-1 truncate text-xs">{domain}</span>
+        <span className="shrink-0 text-[0.6875rem] whitespace-nowrap text-text-dim">{summary}</span>
+        <Icon.Descend
+          size={Icon.ICON_SIZE.sm}
+          className="shrink-0 text-accent"
+          aria-hidden="true"
+        />
       </Link>
     </li>
   );

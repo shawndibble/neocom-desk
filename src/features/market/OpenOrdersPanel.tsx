@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -60,13 +60,15 @@ import {
 } from './openOrdersModel';
 import {
   EMPTY_OPEN_ORDERS_FILTER,
+  FILTERABLE_PROBLEMS,
   filterOpenOrders,
+  openOrdersFilterFromParams,
   sortOpenOrders,
   activeFilterChips,
   type OpenOrdersFilter,
   type OpenOrdersSort,
 } from './openOrdersFilter';
-import { ORDER_PROBLEMS, type OrderProblem } from '@/engine/market/orderProblems';
+import type { OrderProblem } from '@/engine/market/orderProblems';
 import { OrderProblemBadge } from './OrderProblemBadge';
 import { orderBadgeFor } from './orderBadgeKind';
 import { stationPriceKey } from './stationPriceKey';
@@ -87,10 +89,13 @@ const SORTS: readonly OpenOrdersSort[] = [
   'character',
 ];
 
-/** Every problem worth a funnel chip — every `OrderProblem` except `healthy`, which the fold toggle already covers. */
-const PROBLEM_FILTER_OPTIONS: readonly OrderProblem[] = ORDER_PROBLEMS.filter(
-  (problem) => problem !== 'healthy'
-);
+/**
+ * Every problem worth a funnel chip. The same set a deep link may name, and
+ * deliberately the same constant: the funnel and the URL are two ways to reach
+ * one filter, and `healthy` is excluded from both for the reason
+ * `FILTERABLE_PROBLEMS` gives.
+ */
+const PROBLEM_FILTER_OPTIONS = FILTERABLE_PROBLEMS;
 
 /** The five NPC trade hub stations — an order anywhere else sees far fewer buyers, which the row says out loud. */
 const HUB_STATION_IDS = new Set(TRADE_HUBS.map((hub) => hub.stationId));
@@ -140,7 +145,22 @@ export function OpenOrdersPanel() {
     { cacheKey: 'market:open-orders' }
   );
 
-  const [filter, setFilter] = useState<OpenOrdersFilter>(DEFAULT_FILTER);
+  /*
+   * A deep link narrows the opening filter — the Overview board's count tiles
+   * link here already filtered to what they counted, so a tile reading "21
+   * undercut" and a page listing thirty cannot both be on screen.
+   *
+   * Read once on mount and never synced afterwards, which is what Wallet's
+   * `?tab=` and Market's own `?section=` do. The URL states where the player
+   * arrived, not where they have got to since; keeping it in step would mean
+   * every chip removed rewrites history, and a stale param nobody reads again
+   * costs nothing. `activeFilterChips` is what shows them the filter is on and
+   * hands them the way out of it.
+   */
+  const [searchParams] = useSearchParams();
+  const [filter, setFilter] = useState<OpenOrdersFilter>(() =>
+    openOrdersFilterFromParams(searchParams, DEFAULT_FILTER)
+  );
   const [detailOrderId, setDetailOrderId] = useState<number | null>(null);
   const [legendOpen, setLegendOpen] = useState(false);
   /** Groups the player has folded away by hand. `healthy` is never in here — see the toggle below. */

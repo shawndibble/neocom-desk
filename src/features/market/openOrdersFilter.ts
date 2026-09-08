@@ -14,7 +14,7 @@
  */
 import type { OpenOrderRow } from './openOrdersModel';
 import { compareOpenOrderRowsWorstFirst } from './openOrdersModel';
-import type { OrderProblem } from '@/engine/market/orderProblems';
+import { ORDER_PROBLEMS, type OrderProblem } from '@/engine/market/orderProblems';
 
 export type OpenOrdersSort = 'worstFirst' | 'expirySoonest' | 'iskTiedUp' | 'item' | 'character';
 
@@ -91,6 +91,22 @@ function matchesHideHealthy(row: OpenOrderRow, hideHealthy: boolean): boolean {
   if (!hideHealthy) return true;
   return row.problem !== 'healthy';
 }
+
+/**
+ * Every problem a filter may name — that is, every `OrderProblem` except
+ * `healthy`.
+ *
+ * `hideHealthy` is a separate axis and is on by default (the page folds
+ * healthy orders away; the "show healthy" toggle is the way back, not the
+ * funnel). So a filter naming `healthy` selects exactly the rows the same
+ * filter then hides: nought of N, under a chip that reads as though it should
+ * have matched something. It is a real word in this vocabulary and still not
+ * one a filter can honour, which is why it is excluded here rather than left
+ * to each caller to remember.
+ */
+export const FILTERABLE_PROBLEMS: readonly OrderProblem[] = ORDER_PROBLEMS.filter(
+  (problem) => problem !== 'healthy'
+);
 
 export function filterOpenOrders(
   rows: readonly OpenOrderRow[],
@@ -244,4 +260,73 @@ export function activeFilterChips(filter: OpenOrdersFilter): ActiveFilterChip[] 
 
 export function activeFilterCount(filter: OpenOrdersFilter): number {
   return activeFilterChips(filter).length;
+}
+
+// --- Deep links -----------------------------------------------------------
+
+/**
+ * Where the Orders page lives. Written down once here rather than at each
+ * caller, so a link built by the board and a link parsed by the page cannot
+ * disagree about the route they are both describing.
+ */
+const ORDERS_PATH = '/market?section=orders';
+
+export interface OpenOrdersLinkTarget {
+  /** OR'd, the way the filter's own `problems` are. */
+  problems?: readonly OrderProblem[];
+  characterIds?: readonly number[];
+}
+
+/**
+ * A link to the Orders page already narrowed to what the linker counted.
+ *
+ * The Overview board's tiles are the caller: a tile reading "21 undercut" that
+ * opens a page listing thirty is a tile that lied, because the board counts
+ * one Character's orders and the page fans out across all of them. Carrying
+ * the character makes the two figures agree, and `activeFilterChips` renders
+ * every value it applied as its own removable chip — so widening back out is
+ * one click, and visibly so.
+ *
+ * Repeated params rather than one comma-separated value: `URLSearchParams`
+ * reads and writes that shape natively, which leaves no delimiter to escape.
+ */
+export function openOrdersHref({ problems, characterIds }: OpenOrdersLinkTarget): string {
+  const params = new URLSearchParams();
+  for (const problem of problems ?? []) params.append('problem', problem);
+  for (const characterId of characterIds ?? []) params.append('character', String(characterId));
+  const query = params.toString();
+  return query === '' ? ORDERS_PATH : `${ORDERS_PATH}&${query}`;
+}
+
+/**
+ * The other direction: what a URL asks the Orders page to show.
+ *
+ * Layered onto the page's own default rather than onto `EMPTY_*` — arriving by
+ * deep link narrows the page, it does not reset everything else about it.
+ *
+ * Nothing here throws or reports a failure. A URL is typed, shared, bookmarked
+ * and edited by hand, so an unreadable value is an ordinary event rather than
+ * an error, and the page it asked for is still the right thing to show. The
+ * base is returned by identity when the URL says nothing, so a caller can tell
+ * "no deep link" from "a deep link that narrowed nothing".
+ */
+export function openOrdersFilterFromParams(
+  params: URLSearchParams,
+  base: OpenOrdersFilter
+): OpenOrdersFilter {
+  const problems = params
+    .getAll('problem')
+    .filter((value): value is OrderProblem =>
+      (FILTERABLE_PROBLEMS as readonly string[]).includes(value)
+    );
+  const characterIds = params
+    .getAll('character')
+    .map((value) => Number.parseInt(value, 10))
+    .filter((value) => Number.isFinite(value));
+  if (problems.length === 0 && characterIds.length === 0) return base;
+  return {
+    ...base,
+    ...(problems.length > 0 && { problems }),
+    ...(characterIds.length > 0 && { characterIds }),
+  };
 }
