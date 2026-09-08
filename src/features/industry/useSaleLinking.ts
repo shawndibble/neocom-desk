@@ -37,7 +37,7 @@ interface ManualSaleState {
  * The "Sold" split button's actions: its three linking mechanisms (issue
  * #525) — Link Past Sale, Watch Open Order, Manual/Private Sale — plus the
  * manual refresh a watched order needs to pick up its latest
- * `volume_remain`, and Remove Run, which deletes the run itself.
+ * `volume_remain`, and Delete Production Run, which drops the run itself.
  * Shared between `ProductionRunsPanel` (one Build Plan's own runs) and
  * `ProductionLogPanel` (every run, every plan) so the two never drift.
  */
@@ -53,12 +53,12 @@ export function useSaleLinking(
   const [manualSale, setManualSale] = useState<ManualSaleState | null>(null);
   const [refreshingRunId, setRefreshingRunId] = useState<string | null>(null);
   /**
-   * The run whose Remove Run confirmation is open. A menu item sits one
+   * The run whose delete confirmation is open. A menu item sits one
    * mis-click from the trigger, and the deletion is tombstoned and cascades
    * to the run's sale links and order watches, so it asks first — the same
    * friction the edit modal's danger button gets from being two steps in.
    */
-  const [removingRunId, setRemovingRunId] = useState<string | null>(null);
+  const [deletingRunId, setDeletingRunId] = useState<string | null>(null);
 
   const linkedTransactionIds = new Set(
     saleLinks.flatMap((l) => (l.transactionId !== undefined ? [l.transactionId] : []))
@@ -160,19 +160,19 @@ export function useSaleLinking(
     closePicker();
   }
 
-  function confirmRemoveRun(runId: string) {
-    setRemovingRunId(runId);
+  function confirmDeleteRun(runId: string) {
+    setDeletingRunId(runId);
   }
 
-  function cancelRemoveRun() {
-    setRemovingRunId(null);
+  function cancelDeleteRun() {
+    setDeletingRunId(null);
   }
 
-  async function removeRun() {
-    if (removingRunId === null) return;
+  async function deleteRun() {
+    if (deletingRunId === null) return;
     // `markProductionRunDeleted` tombstones and schedules its own sync.
-    await markProductionRunDeleted(characterId, removingRunId);
-    setRemovingRunId(null);
+    await markProductionRunDeleted(characterId, deletingRunId);
+    setDeletingRunId(null);
   }
 
   async function refreshWatches(runId: string) {
@@ -228,7 +228,7 @@ export function useSaleLinking(
     manualSale,
     setManualSaleForm,
     refreshingRunId,
-    removingRunId,
+    deletingRunId,
     openPicker,
     closePicker,
     openManualSale,
@@ -237,9 +237,9 @@ export function useSaleLinking(
     linkPastSale,
     watchOpenOrder,
     refreshWatches,
-    confirmRemoveRun,
-    cancelRemoveRun,
-    removeRun,
+    confirmDeleteRun,
+    cancelDeleteRun,
+    deleteRun,
   };
 }
 

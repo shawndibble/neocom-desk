@@ -186,7 +186,7 @@ describe('ProductionRunsPanel', () => {
     expect(await db.productionSaleLinks.count()).toBe(0);
   });
 
-  it('removes a run from the Sold menu once confirmed, cascading to its linked sale', async () => {
+  it('deletes a run from the Sold menu once confirmed, cascading to its linked sale', async () => {
     await addRun();
     const now = Date.now();
     await db.productionSaleLinks.add({
@@ -204,9 +204,9 @@ describe('ProductionRunsPanel', () => {
     await expandRuns(user);
     await screen.findByRole('button', { name: 'Sold' });
 
-    await chooseSoldMenuItem(user, 'Remove Run');
-    const dialog = await screen.findByRole('dialog', { name: 'Remove Run' });
-    await user.click(within(dialog).getByRole('button', { name: 'Remove Run' }));
+    await chooseSoldMenuItem(user, 'Delete production run');
+    const dialog = await screen.findByRole('dialog', { name: 'Delete production run' });
+    await user.click(within(dialog).getByRole('button', { name: 'Delete production run' }));
 
     await waitFor(async () => {
       expect(await db.productionRuns.count()).toBe(0);
@@ -214,19 +214,21 @@ describe('ProductionRunsPanel', () => {
     expect(await db.productionSaleLinks.count()).toBe(0);
   });
 
-  it('keeps the run when the Remove Run confirmation is cancelled', async () => {
+  it('keeps the run when the delete confirmation is cancelled', async () => {
     await addRun();
     const user = userEvent.setup();
     renderPanel(null);
     await expandRuns(user);
     await screen.findByRole('button', { name: 'Sold' });
 
-    await chooseSoldMenuItem(user, 'Remove Run');
-    const dialog = await screen.findByRole('dialog', { name: 'Remove Run' });
+    await chooseSoldMenuItem(user, 'Delete production run');
+    const dialog = await screen.findByRole('dialog', { name: 'Delete production run' });
     await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
 
     await waitFor(() => {
-      expect(screen.queryByRole('dialog', { name: 'Remove Run' })).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('dialog', { name: 'Delete production run' })
+      ).not.toBeInTheDocument();
     });
     expect(await db.productionRuns.count()).toBe(1);
   });

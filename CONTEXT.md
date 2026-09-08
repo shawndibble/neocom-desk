@@ -374,8 +374,11 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   panel). The per-run table names no Build Plan — a run outlives its plan
   (below) — so clicking a row jumps back to that run's own plan only when it
   still exists, and does nothing otherwise. It carries the same "Sold" split
-  button (Link Past Sale / Watch Open Order / Manual Sale) the per-plan panel
-  does, so a run can be linked to a sale without leaving Records.
+  button (Link Past Sale / Watch Open Order / Manual Sale, plus Delete
+  production run) the per-plan panel does, so a run can be linked to a sale —
+  or dropped when it was logged in error — without leaving Records. That menu
+  item is Records' only delete: its rows navigate, so there is no edit modal
+  here to hold a danger button like the per-plan panel's.
 - **Production Run**: A manual, pilot-entered snapshot of one production
   batch off a **Build Plan** — materials cost, job fee, and quantity as they
   stood at logging time, overridable at creation and never re-derived
