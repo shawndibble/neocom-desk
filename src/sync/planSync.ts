@@ -68,13 +68,20 @@ import {
   productionRunTombstonesKey,
   productionSaleLinkTombstonesKey,
   readTombstones,
+  clearPullCursors,
+  pullCursorKey,
+  readPullCursor,
+  writePullCursor,
+  type PullCursor,
 } from './localBookkeeping';
 import { setStatus } from './status';
 import { ensureSignedIn } from './syncAuth';
 import {
+  feedTransportStamp,
   mergeFeed,
   mergeRecords,
   mergeSettings,
+  TOMBSTONE_TTL_MS,
   type LocalTombstone,
   type RemoteBuildPlanDoc,
   type RemoteDoc,
@@ -476,6 +483,9 @@ async function handleOwnerHashChange(character: CharacterRecord): Promise<void> 
     await writeTombstones(productionOrderWatchTombstonesKey(character.characterId), []);
     await writeTombstones(payeeTombstonesKey(character.characterId), []);
     await writeTombstones(miningTaxAssignmentTombstonesKey(character.characterId), []);
+    // The new owner's docs can carry an `updatedAt` below the previous owner's
+    // high-water mark, so a surviving cursor would hide them entirely.
+    await clearPullCursors(character.characterId);
     // Cached wallet/mail/assets belong to the previous owner just as much as
     // the plans do. `auth/session` purges on the same signal at login; this
     // covers a transfer noticed between logins. Degrades rather than throws
@@ -528,12 +538,91 @@ interface SyncContext {
 
 async function fetchOwnedDocs<R extends { ownerHash: string }>(
   col: CollectionReference,
-  ownerHash: string
+  ownerHash: string,
+  since?: number
 ): Promise<R[]> {
   // Rules allow listing only what the client's where clause provably scopes to;
   // an unfiltered getDocs would also trip over stale-hash docs after a transfer.
-  const snapshot = await getDocs(query(col, where('ownerHash', '==', ownerHash)));
+  const owned = where('ownerHash', '==', ownerHash);
+  const snapshot = await getDocs(
+    since === undefined ? query(col, owned) : query(col, owned, where('updatedAt', '>', since))
+  );
   return snapshot.docs.map((d) => d.data() as R);
+}
+
+// ---------------------------------------------------------------------------
+// Incremental pull (issue #581)
+//
+// Every pass used to re-read every owned doc in all 12 collections — a full
+// collection scan each, on app start, on every Character switch and 2s after
+// every mutation. Firestore bills per document read, so that cost grows with
+// users x mutations x accumulated rows while the stored data barely moves.
+//
+// So each (Character, collection) carries a pull cursor and the read is
+// filtered to `updatedAt > cursor`. Remote tombstones are ordinary docs
+// carrying `updatedAt`, so a delete arrives through that window exactly like
+// an edit. What a partial remote set costs is the two `mergeRecords`
+// decisions that used to read remote *absence* — see its `since` docstring.
+//
+// The synced *settings* collection deliberately stays a full read: its
+// tombstones never expire and `mergeSettings`' absence semantics differ, and
+// it is the cheapest of the 12 (bounded by the synced-key allow-list).
+// ---------------------------------------------------------------------------
+
+/** How stale a cursor may get before the pass falls back to an unfiltered read. */
+const FULL_RECONCILE_INTERVAL_MS = TOMBSTONE_TTL_MS;
+
+interface PullWindow<R> {
+  /** The docs to merge: the whole owned set, or only what changed since the cursor. */
+  remote: R[];
+  /** Lower bound the merge must assume, or `undefined` when this was a full read. */
+  since: number | undefined;
+  /** Where to store `next`, once the pass has applied everything it read. */
+  cursorKey: string;
+  next: PullCursor;
+}
+
+/**
+ * Firestore refuses a composite query whose index is not deployed yet with
+ * `failed-precondition`. `firestore.indexes.json` is deployed by hand, so a
+ * client running this code before that lands must not simply stop syncing:
+ * the pass degrades to the unfiltered read it used to do, and records itself
+ * as a full read so nothing is missed.
+ */
+function isMissingIndex(err: unknown): boolean {
+  return (err as { code?: string } | null)?.code === 'failed-precondition';
+}
+
+async function pullOwnedDocs<R extends { ownerHash: string; updatedAt?: number }>(
+  col: CollectionReference,
+  ctx: SyncContext,
+  collectionName: string
+): Promise<PullWindow<R>> {
+  const cursorKey = pullCursorKey(ctx.characterId, collectionName);
+  const cursor = await readPullCursor(cursorKey);
+  // No cursor at all = an in-place upgrade, or a fresh device: full read, so
+  // pre-existing remote docs can never be missed.
+  const fresh = cursor !== undefined && ctx.now - cursor.fullAt <= FULL_RECONCILE_INTERVAL_MS;
+  let since = fresh ? cursor.high : undefined;
+  let remote: R[];
+  try {
+    remote = await fetchOwnedDocs<R>(col, ctx.ownerHash, since);
+  } catch (err) {
+    if (since === undefined || !isMissingIndex(err)) throw err;
+    since = undefined;
+    remote = await fetchOwnedDocs<R>(col, ctx.ownerHash);
+  }
+  // The high-water mark actually observed, never `ctx.now` (see PullCursor).
+  const observed = remote.reduce((high, d) => Math.max(high, d.updatedAt ?? 0), 0);
+  return {
+    remote,
+    since,
+    cursorKey,
+    next:
+      since === undefined
+        ? { high: observed, fullAt: ctx.now }
+        : { high: Math.max(since, observed), fullAt: cursor?.fullAt ?? ctx.now },
+  };
 }
 
 async function syncEditableCollection<L extends SyncRecord, R extends RemoteDoc>(
@@ -541,7 +630,8 @@ async function syncEditableCollection<L extends SyncRecord, R extends RemoteDoc>
   ctx: SyncContext
 ): Promise<void> {
   const col = collection(ctx.firestore, 'characters', ctx.uid, spec.name);
-  const remote = await fetchOwnedDocs<R>(col, ctx.ownerHash);
+  const pull = await pullOwnedDocs<R>(col, ctx, spec.name);
+  const remote = pull.remote;
   const local = await spec.loadLocal(ctx.characterId);
   const tombstoneKey = spec.tombstoneKey(ctx.characterId);
   const tombstones = await readTombstones(tombstoneKey);
@@ -551,7 +641,7 @@ async function syncEditableCollection<L extends SyncRecord, R extends RemoteDoc>
         deletedAtByKey: await spec.accountWide.deletedAtByKey(),
       }
     : undefined;
-  const plan = mergeRecords<L, R>(local, tombstones, remote, ctx.now, accountWide);
+  const plan = mergeRecords<L, R>(local, tombstones, remote, ctx.now, accountWide, pull.since);
 
   await Promise.all([
     ...plan.pushUpserts.map((p) => setDoc(doc(col, p.id), spec.toRemoteDoc(p, ctx.ownerHash))),
@@ -603,6 +693,10 @@ async function syncEditableCollection<L extends SyncRecord, R extends RemoteDoc>
       ...learned,
     ]);
   }
+
+  // Last, and only once every write above landed: a throw mid-pass must leave
+  // the cursor where it was so the next pass re-reads the same window.
+  await writePullCursor(pull.cursorKey, pull.next);
 }
 
 const skillPlanSpec: CollectionSpec<SkillPlanRecord, RemotePlanDoc> = {
@@ -1088,6 +1182,10 @@ function toRemoteFeedDoc(row: NotificationFeedRecord, ownerHash: string): Record
     ...(row.eveType !== undefined ? { eveType: row.eveType } : {}),
     ...(row.dismissedAt !== undefined ? { dismissedAt: row.dismissedAt } : {}),
     ownerHash,
+    // Transport only — what an incremental pull cursors on (issue #581).
+    // `mergeFeed` still keys on firedAt/dismissedAt and never reads this; a
+    // dismissal moves it, which a `firedAt` cursor could not have seen.
+    updatedAt: feedTransportStamp(row),
   };
 }
 
@@ -1115,7 +1213,12 @@ function toLocalFeedRecord(
 
 async function syncFeed(ctx: SyncContext): Promise<void> {
   const col = collection(ctx.firestore, 'characters', ctx.uid, NOTIFICATION_FEED_COLLECTION);
-  const remote = await fetchOwnedDocs<RemoteNotificationFeedDoc>(col, ctx.ownerHash);
+  const pull = await pullOwnedDocs<RemoteNotificationFeedDoc>(
+    col,
+    ctx,
+    NOTIFICATION_FEED_COLLECTION
+  );
+  const remote = pull.remote;
   // Feed rows for every Character share one local table (the Alerts page
   // shows them together); only this Character's own rows sync to its uid.
   const local = (await readFeed()).filter((row) => row.characterId === ctx.characterId);
@@ -1124,7 +1227,8 @@ async function syncFeed(ctx: SyncContext): Promise<void> {
   const plan = mergeFeed<NotificationFeedRecord, RemoteNotificationFeedDoc>(
     local,
     pushEligible,
-    remote
+    remote,
+    pull.since
   );
 
   await Promise.all(
@@ -1144,6 +1248,8 @@ async function syncFeed(ctx: SyncContext): Promise<void> {
     await trimFeed(new Set(pulled.map((row) => row.id)));
     await refreshAppBadge();
   }
+
+  await writePullCursor(pull.cursorKey, pull.next);
 }
 
 async function syncCharacter(characterId: number): Promise<void> {

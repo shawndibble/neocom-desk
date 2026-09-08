@@ -68,7 +68,18 @@ const fake = vi.hoisted(() => {
     const path = target.col?.path ?? target.path ?? '';
     const filters = target.filters ?? [];
     const docs = [...(remoteStore.get(path)?.entries() ?? [])]
-      .filter(([, d]) => filters.every((f) => (f.op === '==' ? d[f.field] === f.value : true)))
+      .filter(([, d]) =>
+        filters.every((f) => {
+          if (f.op === '==') return d[f.field] === f.value;
+          // Firestore's range operator excludes docs missing the field
+          // entirely — feed docs written before issue #581 added `updatedAt`.
+          if (f.op === '>') {
+            const field = d[f.field];
+            return typeof field === 'number' && field > (f.value as number);
+          }
+          return true;
+        })
+      )
       .map(([id, data]) => ({ id, data: () => data }));
     return { docs };
   };
@@ -261,7 +272,12 @@ function feedRow(overrides: Partial<NotificationFeedRecord> = {}): NotificationF
 }
 
 function remoteFeedDoc(overrides: DocData = {}): DocData {
-  return { ...feedRow(), ownerHash: HASH, ...overrides };
+  const merged = { ...feedRow(), ownerHash: HASH, ...overrides };
+  // The transport stamp toRemoteFeedDoc writes (issue #581); an explicit
+  // override still wins.
+  const firedAt = merged.firedAt as number;
+  const dismissedAt = merged.dismissedAt as number | undefined;
+  return { updatedAt: Math.max(firedAt, dismissedAt ?? 0), ...merged };
 }
 
 function seedRemote(path: string, docs: DocData[]): void {
@@ -1570,5 +1586,267 @@ describe('sync orchestration', () => {
     await new Promise((resolve) => setTimeout(resolve, 100)); // no extra runs
     expect(vi.mocked(getDocs)).toHaveBeenCalledTimes(12);
     expect(vi.mocked(setDoc)).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Issue #581: incremental pull
+// ---------------------------------------------------------------------------
+
+const PLANS_CURSOR_KEY = 'sync.__pullCursor.1.plans';
+const OWNER_FILTER = { field: 'ownerHash', op: '==', value: HASH };
+
+/** The where-constraints the read of `path` used, for reads made after `from`. */
+function filtersFor(path: string, from = 0): FakeFilter[] | undefined {
+  const call = vi
+    .mocked(getDocs)
+    .mock.calls.slice(from)
+    .find((c) => (c[0] as unknown as FakeQuery).col.path === path);
+  return call ? (call[0] as unknown as FakeQuery).filters : undefined;
+}
+
+function readsSoFar(): number {
+  return vi.mocked(getDocs).mock.calls.length;
+}
+
+async function readCursor(key: string): Promise<{ high: number; fullAt: number } | undefined> {
+  return (await db.settings.get(key))?.value as { high: number; fullAt: number } | undefined;
+}
+
+describe('triggerSync: incremental pull', () => {
+  it('reads the whole collection when no cursor is stored yet (AC7)', async () => {
+    // An in-place upgrade: remote docs predate this device by weeks, and an
+    // `updatedAt >` filter seeded from nothing would never surface them.
+    seedRemote(PLANS_PATH, [remoteDoc({ updatedAt: Date.now() - 20 * 24 * 60 * 60 * 1000 })]);
+
+    await triggerSync(1);
+
+    expect(await db.skillPlans.get('p1')).toBeDefined();
+    expect(filtersFor(PLANS_PATH)).toEqual([OWNER_FILTER]);
+  });
+
+  it('filters the next read on the stored cursor, returning nothing (AC1)', async () => {
+    const updatedAt = Date.now() - 5000;
+    seedRemote(PLANS_PATH, [remoteDoc({ updatedAt })]);
+    await triggerSync(1);
+
+    const from = readsSoFar();
+    await triggerSync(1);
+
+    expect(filtersFor(PLANS_PATH, from)).toEqual([
+      OWNER_FILTER,
+      { field: 'updatedAt', op: '>', value: updatedAt },
+    ]);
+    // Nothing changed remotely, so the window is empty and the row survives.
+    expect(await db.skillPlans.get('p1')).toBeDefined();
+  });
+
+  it('does not re-push a local row the cursor already covers', async () => {
+    const updatedAt = Date.now() - 5000;
+    await db.skillPlans.put(plan({ updatedAt }));
+    await triggerSync(1); // pushes p1
+    await triggerSync(1); // reads it back, cursor now at its updatedAt
+
+    vi.mocked(setDoc).mockClear();
+    await triggerSync(1);
+
+    // The regression this guards: remote absence below the cursor read as
+    // "never seen", re-uploading every row 2s after every mutation.
+    expect(
+      vi
+        .mocked(setDoc)
+        .mock.calls.filter((c) => (c[0] as unknown as FakeRef).col.path === PLANS_PATH)
+    ).toEqual([]);
+  });
+
+  it('pulls a remote delete through the incremental window (AC2)', async () => {
+    const updatedAt = Date.now() - 10_000;
+    seedRemote(PLANS_PATH, [remoteDoc({ updatedAt })]);
+    await triggerSync(1);
+    expect(await db.skillPlans.get('p1')).toBeDefined();
+
+    seedRemote(PLANS_PATH, [
+      { id: 'p1', characterId: 1, ownerHash: HASH, deleted: true, updatedAt: Date.now() },
+    ]);
+    const from = readsSoFar();
+    await triggerSync(1);
+
+    expect(await db.skillPlans.get('p1')).toBeUndefined();
+    // A tombstone is an ordinary doc carrying updatedAt, so no full read was
+    // needed to notice it.
+    expect(filtersFor(PLANS_PATH, from)).toEqual([
+      OWNER_FILTER,
+      { field: 'updatedAt', op: '>', value: updatedAt },
+    ]);
+  });
+
+  it('stores the newest updatedAt observed, never the wall clock (AC3)', async () => {
+    const newest = Date.now() - 60_000;
+    seedRemote(PLANS_PATH, [
+      remoteDoc({ id: 'p1', updatedAt: newest - 1000 }),
+      remoteDoc({ id: 'p2', updatedAt: newest }),
+    ]);
+
+    await triggerSync(1);
+
+    expect((await readCursor(PLANS_CURSOR_KEY))?.high).toBe(newest);
+  });
+
+  it('picks up a doc written mid-pass, below the clock but above the cursor (AC3)', async () => {
+    const newest = Date.now() - 60_000;
+    seedRemote(PLANS_PATH, [remoteDoc({ id: 'p1', updatedAt: newest })]);
+    await triggerSync(1);
+
+    // Written while the first pass was in flight: after the newest doc it saw,
+    // but before the clock reached `now`. A Date.now() cursor would skip it.
+    seedRemote(PLANS_PATH, [
+      remoteDoc({ id: 'p1', updatedAt: newest }),
+      remoteDoc({ id: 'p2', updatedAt: newest + 1000 }),
+    ]);
+    await triggerSync(1);
+
+    expect(await db.skillPlans.get('p2')).toBeDefined();
+  });
+
+  it('pulls a feed dismissal, which no firedAt cursor could see (AC4)', async () => {
+    const firedAt = FEED_ROW_FIRED_AT;
+    seedRemote(NOTIFICATION_FEED_PATH, [remoteFeedDoc({ firedAt })]);
+    await triggerSync(1);
+    expect((await db.notificationFeed.get('occ-1'))?.dismissedAt).toBeUndefined();
+
+    const dismissedAt = Date.now();
+    seedRemote(NOTIFICATION_FEED_PATH, [remoteFeedDoc({ firedAt, dismissedAt })]);
+    const from = readsSoFar();
+    await triggerSync(1);
+
+    expect((await db.notificationFeed.get('occ-1'))?.dismissedAt).toBe(dismissedAt);
+    expect(filtersFor(NOTIFICATION_FEED_PATH, from)).toEqual([
+      OWNER_FILTER,
+      { field: 'updatedAt', op: '>', value: firedAt },
+    ]);
+  });
+
+  it('writes the feed transport stamp on push, derived not wall-clocked', async () => {
+    const dismissedAt = Date.now() - 500;
+    await db.notificationFeed.put(feedRow({ dismissedAt }));
+
+    await triggerSync(1);
+
+    expect(remoteStore.get(NOTIFICATION_FEED_PATH)?.get('occ-1')?.updatedAt).toBe(dismissedAt);
+  });
+
+  it('purges an expired remote tombstone on the full-read path (AC5)', async () => {
+    seedRemote(PLANS_PATH, [
+      {
+        id: 'p1',
+        characterId: 1,
+        ownerHash: HASH,
+        deleted: true,
+        updatedAt: Date.now() - TOMBSTONE_TTL_MS - 1000,
+      },
+    ]);
+
+    await triggerSync(1); // no cursor stored: a full read
+
+    expect(remoteStore.get(PLANS_PATH)?.has('p1')).toBe(false);
+  });
+
+  it('falls back to a full read once the last one is older than the tombstone TTL (AC5)', async () => {
+    await db.settings.put({
+      key: PLANS_CURSOR_KEY,
+      value: { high: Date.now() - 1000, fullAt: Date.now() - TOMBSTONE_TTL_MS - 1000 },
+    });
+
+    await triggerSync(1);
+
+    // Housekeeping the incremental path cannot do — an expired tombstone is
+    // below every live cursor by definition.
+    expect(filtersFor(PLANS_PATH)).toEqual([OWNER_FILTER]);
+    expect((await readCursor(PLANS_CURSOR_KEY))?.fullAt).toBeGreaterThan(
+      Date.now() - TOMBSTONE_TTL_MS
+    );
+  });
+
+  it('keeps reading incrementally while the last full read is recent', async () => {
+    seedRemote(PLANS_PATH, [remoteDoc({ updatedAt: Date.now() - 5000 })]);
+    await triggerSync(1);
+    const first = await readCursor(PLANS_CURSOR_KEY);
+
+    await triggerSync(1);
+
+    // fullAt is a property of this device, not of the data: a quiet collection
+    // must not drift back into a full read on every pass.
+    expect((await readCursor(PLANS_CURSOR_KEY))?.fullAt).toBe(first?.fullAt);
+  });
+
+  it('clears the cursors when the ownerHash changes', async () => {
+    seedRemote(PLANS_PATH, [remoteDoc({ updatedAt: Date.now() - 5000 })]);
+    await triggerSync(1);
+    expect(await readCursor(PLANS_CURSOR_KEY)).toBeDefined();
+
+    // A transfer: the new owner's docs can carry an updatedAt below the old
+    // owner's high-water mark, so a surviving cursor would hide them.
+    await db.settings.put({ key: 'sync.__ownerHash.1', value: 'previous-owner-hash' });
+    remoteStore.clear();
+    const from = readsSoFar();
+    await triggerSync(1);
+
+    expect(filtersFor(PLANS_PATH, from)).toEqual([OWNER_FILTER]);
+  });
+
+  it('degrades to a full read when the composite index is not deployed yet', async () => {
+    seedRemote(PLANS_PATH, [remoteDoc({ id: 'p1', updatedAt: Date.now() - 5000 })]);
+    await triggerSync(1);
+
+    seedRemote(PLANS_PATH, [
+      remoteDoc({ id: 'p1', updatedAt: Date.now() - 5000 }),
+      remoteDoc({ id: 'p2', updatedAt: Date.now() - 6000 }),
+    ]);
+    vi.mocked(getDocs).mockImplementation((async (target: unknown) => {
+      const q = target as FakeQuery;
+      if (q.filters.length > 1) {
+        throw Object.assign(new Error('The query requires an index.'), {
+          code: 'failed-precondition',
+        });
+      }
+      return fake.getDocsImpl(q as never);
+    }) as never);
+
+    await triggerSync(1);
+
+    // firestore.indexes.json is deployed by hand, so a client that ships ahead
+    // of that deploy must keep syncing rather than throw on every pass.
+    expect(await db.skillPlans.get('p2')).toBeDefined();
+  });
+
+  it('leaves the cursor where it was when the pass fails', async () => {
+    const updatedAt = Date.now() - 5000;
+    seedRemote(PLANS_PATH, [remoteDoc({ id: 'p1', updatedAt })]);
+    await triggerSync(1);
+    const before = await readCursor(PLANS_CURSOR_KEY);
+
+    // A window with something new in it (which would move the cursor) and a
+    // push that fails before any of it is applied.
+    seedRemote(PLANS_PATH, [
+      remoteDoc({ id: 'p1', updatedAt }),
+      remoteDoc({ id: 'p3', updatedAt: Date.now() }),
+    ]);
+    await db.skillPlans.put(plan({ id: 'p2', updatedAt: Date.now() }));
+    vi.mocked(setDoc).mockRejectedValueOnce(new Error('offline'));
+    await expect(triggerSync(1)).rejects.toThrow('offline');
+
+    // Otherwise the window that failed to apply is never read again.
+    expect(await readCursor(PLANS_CURSOR_KEY)).toEqual(before);
+    expect(await db.skillPlans.get('p3')).toBeUndefined();
+  });
+
+  it('leaves the settings collection on a full read', async () => {
+    await triggerSync(1);
+    await triggerSync(1);
+
+    // mergeSettings' tombstones never expire and its absence semantics differ;
+    // the allow-list bounds the doc count anyway.
+    expect(filtersFor(SETTINGS_PATH, readsSoFar() - 12)).toEqual([OWNER_FILTER]);
+    expect(await readCursor('sync.__pullCursor.1.settings')).toBeUndefined();
   });
 });

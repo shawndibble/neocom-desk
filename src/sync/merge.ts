@@ -130,12 +130,30 @@ export interface AccountWideTombstones<L extends SyncRecord> {
   deletedAtByKey: Map<string, number>;
 }
 
+/**
+ * `since` marks an **incremental pull** (issue #581): `remote` is then not the
+ * whole owned set but only the docs whose `updatedAt` is greater than `since`,
+ * so remote *absence* no longer means "the remote side has never seen this".
+ * The two decisions that read absence are re-derived from the local side:
+ *
+ *   - `l && !r` pushes only when `l.updatedAt > since`. Below the cursor, the
+ *     previous pass already reconciled the row and absence means "in sync" —
+ *     pushing there would re-upload every untouched row on every pass.
+ *   - a local tombstone with no `r` pushes instead of clearing. A live remote
+ *     copy older than the cursor is invisible here, and clearing on that
+ *     unprovable absence would let the next pass pull the row back. The cost
+ *     is a remote tombstone doc for a row that may never have been pushed;
+ *     it is TTL-purged like any other.
+ *
+ * Omit `since` for a full read and every decision is exactly as before.
+ */
 export function mergeRecords<L extends SyncRecord, R extends RemoteDoc>(
   local: L[],
   localTombstones: LocalTombstone[],
   remote: R[],
   now: number,
-  accountWide?: AccountWideTombstones<L>
+  accountWide?: AccountWideTombstones<L>,
+  since?: number
 ): MergeResult<L, R> {
   const result: MergeResult<L, R> = {
     pushUpserts: [],
@@ -182,7 +200,10 @@ export function mergeRecords<L extends SyncRecord, R extends RemoteDoc>(
     if (t) {
       // Local pending deletion (no local row — guaranteed above).
       if (!r) {
-        result.clearLocalTombstones.push(id); // nothing remote to delete
+        // An incremental window cannot prove the remote side has nothing:
+        // a live copy at or below the cursor is simply not in `remote`.
+        if (since !== undefined) result.pushTombstones.push(t);
+        else result.clearLocalTombstones.push(id); // nothing remote to delete
       } else if (r.updatedAt > t.deletedAt) {
         result.pullUpserts.push(r); // edited elsewhere after the delete
         result.clearLocalTombstones.push(id);
@@ -209,7 +230,9 @@ export function mergeRecords<L extends SyncRecord, R extends RemoteDoc>(
     }
 
     if (l && !r) {
-      result.pushUpserts.push(l);
+      // Under a cursor, absence below it means the previous pass reconciled
+      // this row — only a local edit made after the cursor needs pushing.
+      if (since === undefined || l.updatedAt > since) result.pushUpserts.push(l);
     } else if (!l && r) {
       result.pullUpserts.push(r);
     } else if (l && r) {
@@ -271,10 +294,25 @@ export interface FeedMergeResult<L extends FeedRow, R extends RemoteFeedDoc> {
  * passed in, never just the windowed subset, and never regresses an
  * already-recorded dismissal.
  */
+/**
+ * The feed's **transport** timestamp (issue #581) — what an incremental pull
+ * cursors on, written to the remote doc as a plain `updatedAt` by
+ * `toRemoteFeedDoc`. Deliberately NOT a merge input: {@link mergeFeed} keys on
+ * `firedAt`/`dismissedAt` and nothing here changes that. Derived from those two
+ * rather than stamped with `Date.now()` so the value a device compares locally
+ * and the value it wrote remotely are the same number — a `dismissedAt`-only
+ * change moves it (which is the whole reason the feed cannot cursor on
+ * `firedAt`), and a re-push never re-dates a row.
+ */
+export function feedTransportStamp(row: FeedRow): number {
+  return Math.max(row.firedAt, row.dismissedAt ?? 0);
+}
+
 export function mergeFeed<L extends FeedRow, R extends RemoteFeedDoc>(
   local: readonly L[],
   pushEligible: ReadonlySet<string>,
-  remote: readonly R[]
+  remote: readonly R[],
+  since?: number
 ): FeedMergeResult<L, R> {
   const result: FeedMergeResult<L, R> = {
     pushCreate: [],
@@ -292,6 +330,9 @@ export function mergeFeed<L extends FeedRow, R extends RemoteFeedDoc>(
     const r = remoteById.get(id);
 
     if (l && !r) {
+      // Incremental pull: a row at or below the cursor was already reconciled,
+      // so its absence here is "in sync", not "never seen" — see mergeRecords.
+      if (since !== undefined && feedTransportStamp(l) <= since) continue;
       if (pushEligible.has(id)) result.pushCreate.push(l);
       continue;
     }
