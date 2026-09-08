@@ -1262,6 +1262,11 @@ export function Market() {
           pricePercent={pricePercent}
           onPricePercentChange={(value) => void setPricePercent(value)}
           hubName={effectiveHub.systemName}
+          blueprintCatalog={blueprintCatalog}
+          onRequestBlueprintCatalog={ensureBlueprintCatalog}
+          onAddToQuickbar={handleAddToQuickbar}
+          quickbarAvailable={activeCharacterId !== null}
+          onShowInfo={handleShowInfo}
         />
       )}
 

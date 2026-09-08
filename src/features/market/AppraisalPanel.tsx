@@ -12,10 +12,11 @@
  * narrower on the left: a paste box does not need the width the Market Group
  * tree does.
  */
-import { useState } from 'react';
+import { useState, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
+  ContextMenuHint,
   DataTable,
   EmptyState,
   IconButton,
@@ -30,10 +31,13 @@ import { fieldBaseClassName } from '@/components/ui/controlStyles';
 import type { AppraisalRow } from '@/engine/market/appraisal';
 import { countPasteLines } from '@/engine/market/appraisalPaste';
 import { iskToneClass } from '@/features/character/format';
+import type { BlueprintCatalog } from '@/features/industry/blueprintCatalog';
 import { formatIsk, formatIskAuto } from '@/lib/isk';
 import { downloadCsv } from '@/lib/downloadCsv';
 import { appraisalCsvColumns } from './appraisalCsv';
 import { formatVolume } from './format';
+import { ItemContextMenu } from './ItemContextMenu';
+import { MarketItemLink } from './MarketItemLink';
 import { isValidPricePercent, MAX_PRICE_PERCENT, MIN_PRICE_PERCENT } from './pricePercent';
 import type { AppraisalController } from './useAppraisal';
 
@@ -43,6 +47,12 @@ interface AppraisalPanelProps {
   onPricePercentChange: (value: number) => void;
   /** The hub the figures are quoted at, for the panel's own provenance chip. */
   hubName: string;
+  /** Same per-item context menu as the tree and the Variations table: null until requested, then per-typeId lookups. */
+  blueprintCatalog: BlueprintCatalog | null;
+  onRequestBlueprintCatalog: () => void;
+  onAddToQuickbar: (typeId: number, itemName: string) => void;
+  quickbarAvailable: boolean;
+  onShowInfo: (typeId: number, itemName: string) => void;
 }
 
 /** A missing price is a dash, never a zero — the house placeholder. */
@@ -56,6 +66,11 @@ export function AppraisalPanel({
   pricePercent,
   onPricePercentChange,
   hubName,
+  blueprintCatalog,
+  onRequestBlueprintCatalog,
+  onAddToQuickbar,
+  quickbarAvailable,
+  onShowInfo,
 }: AppraisalPanelProps) {
   const { t } = useTranslation();
   const { text, setText, result, loading, failed } = controller;
@@ -99,7 +114,12 @@ export function AppraisalPanel({
       id: 'item',
       header: t('market.appraisal.columnItem'),
       primary: true,
-      render: (row) => row.name,
+      // A priced line is nearly always followed by "…and what is the book
+      // actually like?", so the name is the way through to the Browser. The
+      // link drops `section`, which is exactly what `Market.tsx` reads as an
+      // incoming item link and answers by switching tabs; the paste itself
+      // survives the trip because `useAppraisal` lives at route level.
+      render: (row) => <MarketItemLink typeId={row.typeId}>{row.name}</MarketItemLink>,
       sortValue: (row) => row.name,
     },
     {
@@ -139,6 +159,33 @@ export function AppraisalPanel({
   const rows = result?.appraisal.rows ?? [];
   const totals = result?.appraisal.totals;
   const unmatched = result?.unmatched ?? [];
+
+  // The same menu the tree, the Quickbar and the Variations table carry — an
+  // appraised row is an item like any other, and every action on it applies.
+  // `ItemDetailModal` and `CompareDrawer` are rendered by `Market.tsx` outside
+  // its section guards, so Show Info and Add to Compare work from this tab
+  // without a second copy of either.
+  function rowContextMenu(row: AppraisalRow, tr: ReactElement) {
+    const blueprintTypeID =
+      blueprintCatalog === null
+        ? undefined
+        : (blueprintCatalog.byProductTypeID.get(row.typeId)?.blueprintTypeID ?? null);
+    return (
+      <ItemContextMenu
+        typeId={row.typeId}
+        itemName={row.name}
+        blueprintTypeID={blueprintTypeID}
+        onAddToQuickbar={onAddToQuickbar}
+        quickbarAvailable={quickbarAvailable}
+        onShowInfo={onShowInfo}
+        onOpenChange={(open) => {
+          if (open) onRequestBlueprintCatalog();
+        }}
+      >
+        {tr}
+      </ItemContextMenu>
+    );
+  }
 
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-[21rem_1fr] lg:items-start">
@@ -239,15 +286,18 @@ export function AppraisalPanel({
           ) : undefined
         }
         actions={
-          <IconButton
-            size="sm"
-            icon={<Icon.Download />}
-            label={t('market.appraisal.exportCsv')}
-            disabled={rows.length === 0}
-            onClick={() =>
-              downloadCsv('market-appraisal', rows, appraisalCsvColumns(t), new Date())
-            }
-          />
+          <span className="flex items-center gap-1">
+            <IconButton
+              size="sm"
+              icon={<Icon.Download />}
+              label={t('market.appraisal.exportCsv')}
+              disabled={rows.length === 0}
+              onClick={() =>
+                downloadCsv('market-appraisal', rows, appraisalCsvColumns(t), new Date())
+              }
+            />
+            <ContextMenuHint label={t('market.appraisal.resultTitle')} />
+          </span>
         }
       >
         {loading && result === null ? (
@@ -308,6 +358,7 @@ export function AppraisalPanel({
               rowKey={(row) => row.typeId}
               label={t('market.appraisal.resultTitle')}
               className="pb-1"
+              rowContextMenu={rowContextMenu}
             />
           </>
         )}

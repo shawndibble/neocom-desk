@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, within, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import type { Appraisal } from '@/engine/market/appraisal';
 import { AppraisalPanel } from './AppraisalPanel';
@@ -50,18 +51,36 @@ function outcome(overrides: Partial<AppraisalOutcome> = {}): AppraisalOutcome {
   return { appraisal: APPRAISAL, unmatched: [], ...overrides };
 }
 
-function renderPanel(props: Partial<Parameters<typeof AppraisalPanel>[0]> = {}) {
+/**
+ * Every priced row carries a Market link and an `ItemContextMenu`, both of
+ * which call `useLocation`/`useNavigate` unconditionally — so any render that
+ * produces rows needs a Router ancestor, same as `VariationsTable.test.tsx`.
+ */
+function renderPanel(
+  props: Partial<Parameters<typeof AppraisalPanel>[0]> = {},
+  { route = '/market?section=appraisal&hub=jita' }: { route?: string } = {}
+) {
   const onPricePercentChange = vi.fn();
+  const onAddToQuickbar = vi.fn();
+  const onShowInfo = vi.fn();
+  const onRequestBlueprintCatalog = vi.fn();
   render(
-    <AppraisalPanel
-      controller={controller()}
-      pricePercent={90}
-      onPricePercentChange={onPricePercentChange}
-      hubName="Jita"
-      {...props}
-    />
+    <MemoryRouter initialEntries={[route]}>
+      <AppraisalPanel
+        controller={controller()}
+        pricePercent={90}
+        onPricePercentChange={onPricePercentChange}
+        hubName="Jita"
+        blueprintCatalog={null}
+        onRequestBlueprintCatalog={onRequestBlueprintCatalog}
+        onAddToQuickbar={onAddToQuickbar}
+        quickbarAvailable
+        onShowInfo={onShowInfo}
+        {...props}
+      />
+    </MemoryRouter>
   );
-  return { onPricePercentChange };
+  return { onPricePercentChange, onAddToQuickbar, onShowInfo, onRequestBlueprintCatalog };
 }
 
 describe('AppraisalPanel', () => {
@@ -157,5 +176,53 @@ describe('AppraisalPanel', () => {
   it('reports a catalogue that would not load', () => {
     renderPanel({ controller: controller({ failed: true }) });
     expect(screen.getByText("Couldn't load the market catalogue")).toBeInTheDocument();
+  });
+});
+
+describe('AppraisalPanel — the row as an item', () => {
+  /**
+   * The link deliberately carries no `section`: that absence is what
+   * `Market.tsx` reads as an incoming item link and answers by switching to
+   * the Browser. Carrying `section=appraisal` through would land the pilot
+   * back on the tab they clicked from, which looks like a dead link.
+   */
+  it('links an item name into the Market Browser, keeping the hub it was priced at', () => {
+    renderPanel({ controller: controller({ result: outcome() }) });
+    const link = screen.getByRole('link', { name: 'Damage Control II' });
+    expect(link).toHaveAttribute('href', '/market?type=2048&hub=jita');
+  });
+
+  it('falls back to a bare item link when the URL names no location', () => {
+    renderPanel({ controller: controller({ result: outcome() }) }, { route: '/market' });
+    expect(screen.getByRole('link', { name: 'Damage Control II' })).toHaveAttribute(
+      'href',
+      '/market?type=2048'
+    );
+  });
+
+  it('carries the item context menu on every priced row', async () => {
+    const { onShowInfo } = renderPanel({ controller: controller({ result: outcome() }) });
+    fireEvent.contextMenu(screen.getByRole('row', { name: /Damage Control II/ }));
+
+    expect(await screen.findByRole('menuitem', { name: 'Show info' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Add to Compare' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'View in Market' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Show info' }));
+    expect(onShowInfo).toHaveBeenCalledWith(2048, 'Damage Control II');
+  });
+
+  /** Without this the Build Plan action sits on "Checking…" forever. */
+  it('asks for the blueprint catalog the first time a row menu opens', () => {
+    const { onRequestBlueprintCatalog } = renderPanel({
+      controller: controller({ result: outcome() }),
+    });
+    fireEvent.contextMenu(screen.getByRole('row', { name: /Damage Control II/ }));
+    expect(onRequestBlueprintCatalog).toHaveBeenCalled();
+  });
+
+  it('says in the title bar that the rows carry a menu', () => {
+    renderPanel({ controller: controller({ result: outcome() }) });
+    expect(screen.getByRole('button', { name: 'About Appraisal' })).toBeInTheDocument();
   });
 });

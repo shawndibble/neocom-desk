@@ -7,6 +7,7 @@ import '@/i18n';
 import { db } from '@/db';
 import { useMarketHub } from '@/features/market/hub';
 import { useMarketPricePercent } from '@/features/market/pricePercent';
+import { appraisePaste } from '@/features/market/appraisalData';
 import { Market } from './Market';
 import type { MarketGroupNode, MarketTypeEntry } from '@/sde/marketTypes';
 
@@ -120,5 +121,44 @@ describe('Market Appraisal tab navigation', () => {
     await waitFor(() => expect(probe.search).toContain('hub=amarr'));
     expect(new URLSearchParams(probe.search).get('section')).toBe('appraisal');
     expect(screen.getByText('Nothing appraised yet')).toBeInTheDocument();
+  });
+
+  /**
+   * The other half of that same rule, read the other way round: an appraised
+   * row's item link deliberately carries no `section`, so `crossLinkedToBrowser`
+   * treats it as an incoming item link and hands the pilot the order book. A
+   * link that stayed on this tab would look broken.
+   */
+  it('opens an appraised item in the Browser when its name is clicked', async () => {
+    const user = userEvent.setup();
+    vi.mocked(appraisePaste).mockResolvedValueOnce({
+      appraisal: {
+        rows: [
+          {
+            typeId: 34,
+            name: 'Tritanium',
+            quantity: 5,
+            buyEach: 4,
+            sellEach: 6,
+            buyTotal: 20,
+            sellTotal: 30,
+          },
+        ],
+        totals: { buy: 20, sell: 30, spread: 10, unpricedRows: 0 },
+      },
+      unmatched: [],
+    });
+    renderAt('/market?section=appraisal');
+
+    await user.type(await screen.findByLabelText(/Items from inventory/), 'Tritanium 5');
+    await user.click(screen.getByRole('button', { name: 'Appraise' }));
+
+    await user.click(await screen.findByRole('link', { name: 'Tritanium' }));
+
+    await waitFor(() => expect(probe.search).toContain('type=34'));
+    expect(new URLSearchParams(probe.search).has('section')).toBe(false);
+    // The Browser's own item view, not the paste box it was clicked from.
+    expect(await screen.findByRole('tab', { name: 'Market Data' })).toBeInTheDocument();
+    expect(screen.queryByLabelText(/Items from inventory/)).not.toBeInTheDocument();
   });
 });
