@@ -2,13 +2,21 @@
 
 _Recorded 2026-09-08._
 
-- **`marketOrderFilled` opens Market's Transactions view, not Open Orders.** A
-  filled order has by definition left the open list, so the tab this alert used
-  to land on is the one place the thing it is announcing is guaranteed not to
-  be. Transactions is where the fill itself is written down — what sold, how
-  many, at what unit price, to whom. This rules out reading `NOTIFICATION_ROUTES`
-  as "the page this event's data lives on"; it is "the page that answers the
-  question the alert just raised".
+- **`marketOrderFilled` opens Market's Transactions view, not Open Orders.**
+  This **supersedes `20260904-111509-markets-own-tabs.md`**, which set the
+  destination to `/market?section=orders` when Open Orders became a Market tab.
+  That decision was about which _page_ owns open orders and was right about it;
+  it simply carried the notification along with the move. A filled order has by
+  definition left the open list, so that tab is the one place the thing this
+  alert announces is guaranteed not to be. Transactions is where the fill
+  itself is written down — what sold, how many, at what unit price, to whom.
+  This rules out reading `NOTIFICATION_ROUTES` as "the page this event's data
+  lives on"; it is "the page that answers the question the alert just raised".
+  What that earlier decision noted and this keeps: the route still carries a
+  query string, so `notificationClick.ts`'s `isAlreadyThere` must keep
+  comparing `pathname + search`. The `?`-assumption it warned the next editor
+  about is now gone — `withParam` builds the URL through `URLSearchParams`
+  rather than concatenating.
 - **A notification's destination may depend on its subject, not only on its
   event.** `notificationUrlForSubject` adds `?highlight=<typeId>` for this one
   event, and the Transactions panel scrolls that row into view and pulses it.
@@ -32,15 +40,18 @@ _Recorded 2026-09-08._
   order fills as several transactions, which sort adjacently by date, so landing
   on the newest lands on the group. This rules out promising the alert points at
   one exact transaction.
-- **A subject a write does not carry is never blanked, only ever corrected.**
+- **A field a write does not carry is never blanked, only ever corrected.**
   `mergeFeedRecord` let the newest write win every field but `firedAt` and
-  `dismissedAt`, so a remote doc from a build predating a subject field — or
-  the `pullDismiss` that carries a remote dismissal back — erased the local
-  one. `eveType` and `typeId` now fall back to the stored value, because both
-  are facts fixed when the occurrence fired and absence means the writer did
-  not know one. This rules out reading "content never changes once a row is
-  fired" as "so any writer's copy of it is authoritative"; it fixes the same
-  latent hole for `eveType`, where the cost was a lost per-type mute.
+  `dismissedAt`, so a remote doc from a build predating a field — or the
+  `pullDismiss` that carries a remote dismissal back — erased the local value.
+  The rule is now stated once over the whole record: the incoming row is
+  applied _defined keys only_, because an absent field means the writer did not
+  know it and nothing here is ever meant to return to nothing once set.
+  Per-field fallbacks were the first shape and the wrong one — each new
+  optional field would have inherited the wrong default and needed its own
+  edit. This rules out reading "content never changes once a row is fired" as
+  "so any writer's copy of it is authoritative", and it closes the same latent
+  hole for `eveType`, where the cost was a lost per-type mute.
 - **The highlight is spent on arrival.** The `highlight` param is latched on
   mount and immediately dropped from the URL — including when nothing matched,
   since the fill can be newer than the cached transactions or older than the

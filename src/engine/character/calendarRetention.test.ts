@@ -42,10 +42,6 @@ describe('stillRunningToday', () => {
     expect(stillRunningToday([entry(1, TODAY_2PM)], [], TODAY_2PM)).toEqual([1]);
   });
 
-  it('drops an entry with an unparseable start rather than bucketing it onto no day', () => {
-    expect(stillRunningToday([entry(1, Number.NaN)], [], TODAY_2PM)).toEqual([]);
-  });
-
   it('returns ids once each, in the order previously seen', () => {
     const previous = [
       entry(3, TODAY_2PM - HOUR),

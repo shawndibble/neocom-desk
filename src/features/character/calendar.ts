@@ -35,23 +35,55 @@ const KEYS = {
   event: (eventId: number) => `calendar:${eventId}`,
 } as const;
 
-function toRetentionEntry(event: CalendarEventSummary): CalendarRetentionEntry {
-  return { id: event.event_id, startMs: parseInstant(event.event_date) ?? Number.NaN };
+/**
+ * Every event's start, parsed once.
+ *
+ * Once, because the string would otherwise be parsed to build the retention
+ * entries, again on each comparison during the sort, and a third time in the
+ * poller's own snapshot. An event whose `event_date` will not parse is simply
+ * absent from the map — that is what keeps a `NaN` out of the engine
+ * (`esiInstant.ts`), the same contract `board.ts`'s `deadlineMs` states.
+ *
+ * It is **not** dropped from the list: an unparseable date makes an event
+ * impossible to place on a clock, not impossible to show, and the view has
+ * always listed it.
+ */
+function startsById(events: readonly CalendarEventSummary[]): Map<number, number> {
+  const starts = new Map<number, number>();
+  for (const event of events) {
+    const startMs = parseInstant(event.event_date);
+    if (startMs !== null) starts.set(event.event_id, startMs);
+  }
+  return starts;
 }
 
-/**
- * Chronological, on the parsed instant rather than on the raw string: a
- * retained event is spliced in ahead of ESI's own already-ordered list, so the
- * union has to be re-ordered, and an undated row (one written by an older
- * build) must sink rather than throw or compare as NaN.
- */
-function byStart(a: CalendarEventSummary, b: CalendarEventSummary): number {
-  const left = parseInstant(a.event_date);
-  const right = parseInstant(b.event_date);
-  if (left === right) return 0;
-  if (left === null) return 1;
-  if (right === null) return -1;
-  return left - right;
+function toRetentionEntries(
+  events: readonly CalendarEventSummary[],
+  starts: ReadonlyMap<number, number>
+): CalendarRetentionEntry[] {
+  const entries: CalendarRetentionEntry[] = [];
+  for (const event of events) {
+    const startMs = starts.get(event.event_id);
+    if (startMs !== undefined) entries.push({ id: event.event_id, startMs });
+  }
+  return entries;
+}
+
+/** Same events in the same order — the cheap check that skips a pointless write. */
+function sameEvents(a: readonly CalendarEventSummary[], b: readonly CalendarEventSummary[]) {
+  return (
+    a.length === b.length &&
+    a.every((event, i) => {
+      const other = b[i];
+      return (
+        event.event_id === other.event_id &&
+        event.event_date === other.event_date &&
+        event.title === other.title &&
+        event.importance === other.importance &&
+        event.event_response === other.event_response
+      );
+    })
+  );
 }
 
 /**
@@ -69,15 +101,26 @@ async function withStartedEventsRetained(
   nowMs: number
 ): Promise<CalendarEventSummary[]> {
   const seen = (await readCached<CalendarEventSummary[]>(characterId, KEYS.seenEvents)) ?? [];
+  const starts = startsById([...fresh, ...seen]);
   const retainedIds = new Set(
-    stillRunningToday(seen.map(toRetentionEntry), fresh.map(toRetentionEntry), nowMs)
+    stillRunningToday(toRetentionEntries(seen, starts), toRetentionEntries(fresh, starts), nowMs)
   );
+
   const merged = [...fresh, ...seen.filter((event) => retainedIds.has(event.event_id))];
-  merged.sort(byStart);
-  // Written back as the union, so an event that started this morning survives
-  // every poll for the rest of the day rather than only the first one after
-  // ESI dropped it.
-  await writeCached(characterId, KEYS.seenEvents, merged, nowMs);
+  // A retained event is spliced in ahead of ESI's already-ordered list, so the
+  // union has to be re-ordered. An undated event sinks rather than throwing or
+  // comparing as NaN.
+  merged.sort(
+    (a, b) =>
+      (starts.get(a.event_id) ?? Number.POSITIVE_INFINITY) -
+      (starts.get(b.event_id) ?? Number.POSITIVE_INFINITY)
+  );
+
+  // Only when it actually changed. This runs on every poll tick, every
+  // `/calendar` mount and every prefetch warm, and the union is identical
+  // almost every time — `app/prefetch.ts` promises warming twice inside ten
+  // minutes costs one Dexie *read*, which an unconditional write would break.
+  if (!sameEvents(merged, seen)) await writeCached(characterId, KEYS.seenEvents, merged, nowMs);
   return merged;
 }
 

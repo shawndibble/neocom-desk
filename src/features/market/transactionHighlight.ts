@@ -10,28 +10,20 @@
  *
  * Pure: no fetch, no DOM, no clock. `TransactionsPanel` does the scrolling.
  */
-
-/** The slice of ESI's `WalletTransaction` this reads — deliberately not the whole shape. */
-export interface HighlightableTransaction {
-  transaction_id: number;
-  type_id: number;
-  is_buy: boolean;
-  /** ESI's ISO instant. Compared as a string: ISO-8601 UTC sorts lexicographically. */
-  date: string;
-}
+import type { WalletTransactionCommon } from '@/esi/endpoints';
 
 /**
- * The `?highlight=` query value as a type id, or null.
- *
- * Strict about what it accepts because the value comes from a URL a user can
- * edit or a link that has outlived its build: anything but a positive integer
- * is treated as "nothing to highlight" rather than searched for.
+ * The `?highlight=` value is an item id in a query string, which Market
+ * already has one reading of — re-exported under this module's own name so
+ * the panel reads it from the module that owns the rule, without a second
+ * spelling of "positive integer or nothing" appearing in the codebase.
  */
-export function parseHighlightTypeId(raw: string | null): number | null {
-  if (raw === null || !/^[1-9][0-9]*$/.test(raw)) return null;
-  const typeId = Number(raw);
-  return Number.isSafeInteger(typeId) ? typeId : null;
-}
+export { parsePositiveInt as parseHighlightTypeId } from '@/engine/market/urlState';
+
+export type HighlightableTransaction = Pick<
+  WalletTransactionCommon,
+  'transaction_id' | 'type_id' | 'is_buy' | 'date'
+>;
 
 export function highlightedTransactionId(
   rows: readonly HighlightableTransaction[],

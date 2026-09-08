@@ -104,31 +104,53 @@ export function notificationUrlFor(eventId: string): string {
  */
 export const HIGHLIGHT_PARAM = 'highlight';
 
+/** Adds one query parameter, whether or not `url` already carries a query string. */
+function withParam(url: string, key: string, value: string): string {
+  const [path, query = ''] = url.split('?');
+  const params = new URLSearchParams(query);
+  params.set(key, value);
+  return `${path}?${params}`;
+}
+
 /**
- * Where a fire lands, narrowed by *what it was about* where that changes the
+ * The events whose destination depends on *what the fire was about*, not only
+ * on which event it was.
+ *
+ * A table rather than an `if` naming `marketOrderFilled` inside two separate
+ * functions: the URL builder and the "has this fire a subject worth storing"
+ * check both answer to one entry, so adding a second such event is one line
+ * here instead of two edits that can disagree. Anything absent from this
+ * table ignores its subject and resolves to `NOTIFICATION_ROUTES` exactly as
+ * before.
+ */
+const SUBJECT_ROUTES: Partial<
+  Record<NotificationEventId, (base: string, typeId: number) => string>
+> = {
+  // Landing on the Transactions tab already beats landing on Open Orders, but
+  // a pilot with a page of fills still has to hunt for the one they were just
+  // told about; the item id turns that into an arrival on the row itself.
+  marketOrderFilled: (base, typeId) => withParam(base, HIGHLIGHT_PARAM, String(typeId)),
+};
+
+/**
+ * Where a fire lands, narrowed by what it was about where that changes the
  * answer.
  *
- * Only `marketOrderFilled` uses the subject today. Landing on the Transactions
- * tab already beats landing on Open Orders, but a pilot with a page of fills
- * still has to hunt for the one they were just told about; the item id turns
- * that into an arrival on the row itself.
- *
- * Every other event ignores `typeId` and resolves exactly as before, so a row
- * that carries none — an older build's, or one Web Push wrote — degrades to
- * the event's own route rather than to the fallback.
+ * A fire carrying no subject — an older build's row, or one Web Push wrote —
+ * degrades to the event's own route rather than to the fallback.
  */
 export function notificationUrlForSubject(eventId: string, typeId: number | undefined): string {
   const base = notificationUrlFor(eventId);
-  if (eventId !== 'marketOrderFilled' || typeId === undefined) return base;
-  return `${base}&${HIGHLIGHT_PARAM}=${typeId}`;
+  const route = SUBJECT_ROUTES[eventId as NotificationEventId];
+  return route === undefined || typeId === undefined ? base : route(base, typeId);
 }
 
-/** The item a fire was about, where it was about one — see `NotificationFeedRecord.typeId`. */
+/** The item a fire was about, where its event has a use for one — see `NotificationFeedRecord.typeId`. */
 export function notificationSubjectTypeId(fire: {
   eventId: string;
   typeId?: number;
 }): number | undefined {
-  return fire.eventId === 'marketOrderFilled' ? fire.typeId : undefined;
+  return fire.eventId in SUBJECT_ROUTES ? fire.typeId : undefined;
 }
 
 export function notificationTagFor(target: NotificationTarget): string {

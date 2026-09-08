@@ -34,7 +34,12 @@ import { localMidnight } from '../localDay';
 /** One previously-seen event, reduced to what the rule actually reads. */
 export interface CalendarRetentionEntry {
   id: number;
-  /** Epoch ms the event starts. A `NaN` is treated as unknown and never retained. */
+  /**
+   * Epoch ms the event starts. Already parsed by the caller; a `NaN` must
+   * never reach here — `features/character/calendar.ts` drops an event whose
+   * `event_date` will not parse, the same contract `board.ts`'s `deadlineMs`
+   * states for the same reason.
+   */
   startMs: number;
 }
 
@@ -56,7 +61,6 @@ export function stillRunningToday(
   const seen = new Set<number>();
   for (const event of previous) {
     if (freshIds.has(event.id) || seen.has(event.id)) continue;
-    if (!Number.isFinite(event.startMs)) continue;
     if (event.startMs > nowMs) continue;
     if (localMidnight(event.startMs) !== today) continue;
     seen.add(event.id);

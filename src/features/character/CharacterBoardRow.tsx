@@ -19,6 +19,7 @@
  */
 import { useTranslation } from 'react-i18next';
 import type { CharacterBoardItem, CharacterBoardItemKind } from '@/engine/character/board';
+import { runsPastItsDeadline } from '@/engine/character/board';
 import { formatDuration } from '@/lib/duration';
 import { formatTimeOfDay } from '@/lib/timestamp';
 import * as Icon from '@/components/ui/icons';
@@ -51,16 +52,12 @@ export function CharacterBoardRow({ item, onSelectEvent }: CharacterBoardRowProp
   // Clamped here and only here: the engine keeps `remainingMs` signed so
   // overdue items order against each other, and a countdown of "-3d 2h" is not
   // a thing anyone reads.
-  // A calendar event past its clock is *running*, not late: ESI drops started
-  // events and the calendar layer keeps today's back
-  // (`engine/character/calendarRetention.ts`), so these rows exist precisely
-  // because the fleet op is under way. Every other kind past its clock really
-  // is overdue — a job sat undelivered, an order lapsed.
-  const countdown = !overdue
-    ? t('calendar.due', { duration: formatDuration(item.remainingMs / 1000) })
-    : item.kind === 'calendarEvent'
-      ? t('calendar.started')
-      : t('calendar.overdue');
+  // Past its clock means *running* for a kind whose deadline is a start, and
+  // *late* for every other — a job sat undelivered, an order lapsed. Which
+  // kinds are which is `board.ts`'s to say; this only picks the word.
+  const countdown = overdue
+    ? t(runsPastItsDeadline(item.kind) ? 'calendar.started' : 'calendar.overdue')
+    : t('calendar.due', { duration: formatDuration(item.remainingMs / 1000) });
 
   const openable = item.kind === 'calendarEvent' && onSelectEvent !== undefined;
 

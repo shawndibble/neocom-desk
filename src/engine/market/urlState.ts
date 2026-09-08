@@ -17,7 +17,16 @@ export interface ParsedMarketParams {
 export type MarketLocationParam =
   { mode: 'hub'; hubId: string } | { mode: 'region'; regionId: number };
 
-function parsePositiveInt(raw: string | null): number | null {
+/**
+ * A positive integer query parameter, or null.
+ *
+ * Strict about what it accepts because the value comes from a URL a user can
+ * edit or a link that has outlived its build: anything else is treated as
+ * "not given" rather than coerced. Exported because ids arrive in query
+ * strings all over Market — the type being browsed, and the item a filled
+ * sell order's alert points at (`features/market/transactionHighlight.ts`).
+ */
+export function parsePositiveInt(raw: string | null): number | null {
   if (raw === null || !/^\d+$/.test(raw)) return null;
   const n = Number(raw);
   return Number.isSafeInteger(n) && n > 0 ? n : null;

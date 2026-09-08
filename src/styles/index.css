@@ -245,6 +245,14 @@
    * express neither the 45-degree rule nor its 6px pitch, and this is one
    * declaration against an asset request and a second file.
    */
+  .calendar-map-past {
+    background-image: repeating-linear-gradient(
+      135deg,
+      transparent 0 6px,
+      color-mix(in srgb, var(--color-line) 55%, transparent) 6px 7px
+    );
+  }
+
   /*
    * The one row a notification sent the reader to
    * (`features/market/TransactionsPanel.tsx`). Three slow washes of accent
@@ -270,24 +278,32 @@
   }
 
   /*
-   * Reduced motion keeps the *finding*, drops the flashing: the row stays
-   * tinted instead of pulsing. Removing the cue entirely would strand a reader
-   * who arrived here precisely to be shown which row — and the tint is never
-   * the only signal, since the panel also scrolls the row into view.
+   * Reduced motion drops the flashing but keeps the *ending*: one slow fade
+   * from tint to nothing, no repeats.
+   *
+   * A `animation: none` plus a static tint was the obvious version and the
+   * wrong one — nothing ever removes the class (the panel latches the
+   * highlight for its lifetime), so the row would stay permanently coloured,
+   * which is the "second kind of selected row" the block above exists to
+   * avoid, and colour standing alone as a persistent encoding is what
+   * DESIGN.md §7 rules out. Transient is what makes this an attention cue
+   * rather than a state, and it pairs with the scroll that put the row on
+   * screen. A colour crossfade moves nothing, so it is not what a
+   * reduced-motion request is asking to be spared.
    */
   @media (prefers-reduced-motion: reduce) {
     .row-pulse {
-      animation: none;
-      background-color: color-mix(in srgb, var(--color-accent) 20%, transparent);
+      animation: row-pulse-fade 2.4s ease-out 1;
     }
   }
 
-  .calendar-map-past {
-    background-image: repeating-linear-gradient(
-      135deg,
-      transparent 0 6px,
-      color-mix(in srgb, var(--color-line) 55%, transparent) 6px 7px
-    );
+  @keyframes row-pulse-fade {
+    0% {
+      background-color: color-mix(in srgb, var(--color-accent) 22%, transparent);
+    }
+    100% {
+      background-color: transparent;
+    }
   }
 }
 

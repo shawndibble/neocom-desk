@@ -112,6 +112,43 @@ describe('loadCalendarEvents retention', () => {
     expect((await loadCalendarEvents(CHAR_ID)).cached?.data).toEqual([upcoming]);
   });
 
+  it('keeps an event whose date will not parse — unplaceable on a clock, still listed', async () => {
+    vi.setSystemTime(new Date(2026, 8, 8, 14, 0, 0));
+    const undated = {
+      ...summary(1, new Date(2026, 8, 8, 20, 0, 0), 'Odd One'),
+      event_date: 'nope',
+    };
+    const dated = summary(2, new Date(2026, 8, 8, 20, 0, 0), 'Structure Timer');
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/calendar`, () =>
+        HttpResponse.json([undated, dated])
+      )
+    );
+    // Present, and sunk to the end rather than sorted against a NaN.
+    expect((await loadCalendarEvents(CHAR_ID)).cached?.data).toEqual([dated, undated]);
+  });
+
+  it('does not rewrite the seen row when the union has not changed', async () => {
+    vi.setSystemTime(new Date(2026, 8, 8, 14, 0, 0));
+    const upcoming = summary(1, new Date(2026, 8, 8, 20, 0, 0), 'Structure Timer');
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/calendar`, () =>
+        HttpResponse.json([upcoming])
+      )
+    );
+    await loadCalendarEvents(CHAR_ID);
+    const first = await db.esiCache.get([CHAR_ID, 'calendar:seen']);
+
+    // A second load a minute later reads the same events; the poller does this
+    // every five minutes per character and must not pay a write for it.
+    vi.setSystemTime(new Date(2026, 8, 8, 14, 1, 0));
+    await db.esiCache.delete([CHAR_ID, 'calendar']);
+    await loadCalendarEvents(CHAR_ID);
+    expect((await db.esiCache.get([CHAR_ID, 'calendar:seen']))?.fetchedAt).toEqual(
+      first?.fetchedAt
+    );
+  });
+
   it('drops an event that vanished before it started — a cancellation, not ESI trimming', async () => {
     vi.setSystemTime(new Date(2026, 8, 8, 14, 0, 0));
     const upcoming = summary(1, new Date(2026, 8, 8, 20, 0, 0), 'Cancelled Op');

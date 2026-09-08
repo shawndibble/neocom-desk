@@ -474,19 +474,6 @@ function calendarStartLabel(startMs: number): string | undefined {
   return formatCalendarTimestamp(new Date(startMs), timeZoneFor(useTimeFormat.getState().value));
 }
 
-/**
- * One of four bodies, by which halves the fire could supply. Four sentences
- * rather than one with optional clauses: an interpolated string that has to
- * read correctly with pieces missing ends up reading badly with all of them
- * present, and these are the copy a pilot sees most.
- */
-function newCalendarEventBodyKey(title: string | undefined, when: string | undefined): string {
-  if (title !== undefined && when !== undefined) return 'notifications.fired.newCalendarEvent.body';
-  if (title !== undefined) return 'notifications.fired.newCalendarEvent.bodyWithoutStart';
-  if (when !== undefined) return 'notifications.fired.newCalendarEvent.bodyWithoutEvent';
-  return 'notifications.fired.newCalendarEvent.bodyPlain';
-}
-
 async function notificationText(
   fire: AnyNotificationFire,
   character: CharacterRef
@@ -531,17 +518,19 @@ async function notificationText(
     };
   }
   if (fire.eventId === 'newCalendarEvent') {
-    // Both halves are best-effort and independently so: an event whose name
-    // or start this snapshot never recorded still deserves the alert, minus
-    // whichever half is missing.
     const when = calendarStartLabel(fire.startMs);
     return {
       title: i18n.t('notifications.fired.newCalendarEvent.title'),
-      body: i18n.t(newCalendarEventBodyKey(fire.title, when), {
-        character: character.name,
-        event: fire.title,
-        when,
-      }),
+      body:
+        fire.title === undefined || when === undefined
+          ? i18n.t('notifications.fired.newCalendarEvent.bodyUnnamed', {
+              character: character.name,
+            })
+          : i18n.t('notifications.fired.newCalendarEvent.body', {
+              character: character.name,
+              event: fire.title,
+              when,
+            }),
     };
   }
   if (fire.eventId === 'calendarEventStarting') {

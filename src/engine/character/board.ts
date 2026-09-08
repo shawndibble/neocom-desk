@@ -132,6 +132,20 @@ const KIND_RANK = new Map<CharacterBoardItemKind, number>(
   CHARACTER_BOARD_ITEM_KINDS.map((kind, index) => [kind, index])
 );
 
+/**
+ * Kinds whose deadline is a *start*, not an end — so being past it means the
+ * thing is happening, not that it is late.
+ *
+ * Only calendar events, and only because the calendar layer now keeps a
+ * started event on the board until local midnight
+ * (`engine/character/calendarRetention.ts`); before that, no row could ever
+ * outlive its own clock this way. Stated here because this module is where
+ * kinds and what they mean meet — the rail only picks the word.
+ */
+export function runsPastItsDeadline(kind: CharacterBoardItemKind): boolean {
+  return kind === 'calendarEvent';
+}
+
 function isCalendarEvent(source: BoardClockSource): source is BoardCalendarEventSource {
   return 'response' in source;
 }

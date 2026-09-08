@@ -2110,9 +2110,7 @@
       "newCalendarEvent": {
         "title": "New calendar event",
         "body": "{{character}}: {{event}} was added, starting {{when}}.",
-        "bodyWithoutStart": "{{character}}: {{event}} was added to the calendar.",
-        "bodyWithoutEvent": "{{character}} has a new calendar event starting {{when}}.",
-        "bodyPlain": "{{character}} has a new calendar event."
+        "bodyUnnamed": "{{character}} has a new calendar event."
       },
       "contractAccepted": {
         "title": "Contract accepted",

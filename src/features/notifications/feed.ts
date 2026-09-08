@@ -94,30 +94,42 @@ export async function readFeed(): Promise<NotificationFeedEntry[]> {
  *   dismissal to carry across, so a local dismissal survives a re-record and
  *   a remote one still applies on a pull.
  *
- * Everything else — the copy — comes from the newer write. With one
- * qualification: the fields naming what the occurrence was *about* (`eveType`,
- * `typeId`) are facts fixed when it fired, and absence means the writer did
- * not know one rather than that there is none. A remote doc written by a
- * build that predates the field, or the `pullDismiss` that carries a remote
- * dismissal back, arrives without it — and blanking the stored value costs
- * the row its per-type mute or its deep link for no reason a reader could
- * see. So those two fall back to what is already stored, while a write that
- * *does* carry one still corrects it.
+ * Everything else — the copy — comes from the newer write, **except where
+ * that write has nothing to say.** An absent field means the writer did not
+ * know it, never that it is being cleared: nothing on this record is ever
+ * meant to go back to nothing once set, and the parties disagree about what
+ * they know. A remote doc written by a build that predates a field, or the
+ * `pullDismiss` that carries a remote dismissal back, arrives without it —
+ * and blanking the stored value costs the row its per-type mute (`eveType`)
+ * or its deep link (`typeId`) for no reason a reader could see.
+ *
+ * So the incoming row is applied *defined keys only*, over the stored one.
+ * Stripping rather than relying on spread order is load-bearing:
+ * `recordFeedNotification` passes `eveType: … : undefined` explicitly, and a
+ * plain spread would write that `undefined` straight over a good value. A
+ * field the incoming write *does* carry still wins, so this corrects rather
+ * than freezes. Stated once and applied to the whole record, so the next
+ * optional field added here inherits the right default instead of the wrong
+ * one plus a bug report.
  */
+/** The record's own fields, minus the ones the writer left undefined. */
+function definedFieldsOf(entry: NotificationFeedEntry): Partial<NotificationFeedEntry> {
+  return Object.fromEntries(
+    Object.entries(entry).filter(([, value]) => value !== undefined)
+  ) as Partial<NotificationFeedEntry>;
+}
+
 export function mergeFeedRecord(
   existing: NotificationFeedEntry | undefined,
   incoming: NotificationFeedEntry
 ): NotificationFeedEntry {
   if (existing === undefined) return incoming;
   const dismissedAt = Math.max(existing.dismissedAt ?? 0, incoming.dismissedAt ?? 0);
-  const eveType = incoming.eveType ?? existing.eveType;
-  const typeId = incoming.typeId ?? existing.typeId;
   return {
-    ...incoming,
+    ...existing,
+    ...definedFieldsOf(incoming),
     firedAt: Math.min(existing.firedAt, incoming.firedAt),
     ...(dismissedAt > 0 ? { dismissedAt } : {}),
-    ...(eveType !== undefined ? { eveType } : {}),
-    ...(typeId !== undefined ? { typeId } : {}),
   };
 }
 
