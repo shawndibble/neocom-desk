@@ -537,6 +537,24 @@ interface SyncContext {
   now: number;
 }
 
+/**
+ * The only remote read in the app, and the only reason any field of a synced
+ * document is indexed at all.
+ *
+ * `firestore.indexes.json` exempts every field of every synced collection
+ * group from automatic indexing (`fieldPath: "*"`) and re-enables exactly
+ * one: `ownerHash` — issue #583, which is what stops Firestore storing an
+ * index entry per skill in a plan queue, per Quickbar item and per ore line
+ * for queries nobody makes. **So adding a `where(...)` or `orderBy(...)` on
+ * any other field here needs that field re-enabled in `fieldOverrides`
+ * first, and the exemptions redeployed.** A composite index still covers its
+ * own fields (an exemption applies only to automatic indexing), which is how
+ * the incremental pull's `updatedAt` filter below works without one.
+ *
+ * Miss that and the query throws `failed-precondition` at runtime — the same
+ * error a missing *composite* index gives, so it reads as one. `isMissingIndex`'s
+ * full read is no safety net here either: it filters on `ownerHash` too.
+ */
 async function fetchOwnedDocs<R extends { ownerHash: string }>(
   col: CollectionReference,
   ownerHash: string,
@@ -1296,6 +1314,9 @@ async function syncCharacter(characterId: number): Promise<void> {
   await syncFeed(ctx);
 
   // ---- Synced settings ----
+  // The second `ownerHash` read, and under the same index constraint as
+  // `fetchOwnedDocs` — see its docstring. Deliberately unwindowed: settings
+  // tombstones never expire and `mergeSettings`' absence semantics differ.
   const settingsCol = collection(firestore, 'characters', uid, 'settings');
   const snapshot = await getDocs(query(settingsCol, where('ownerHash', '==', ownerHash)));
   // Only honour well-formed synced keys: a hostile or stale doc naming a

@@ -98,7 +98,10 @@ const server = setupServer(
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 afterAll(() => server.close());
-afterEach(() => server.resetHandlers());
+afterEach(() => {
+  server.resetHandlers();
+  vi.restoreAllMocks();
+});
 
 async function seedCharacter(characterId: number, name: string) {
   await db.characters.put({ characterId, name, ownerHash: `oh-${characterId}`, addedAt: 1 });
@@ -238,18 +241,49 @@ describe('SkillCompare', () => {
         'Some characters in this comparison have been removed and are no longer shown.'
       )
     ).toBeInTheDocument();
-    // The table is awaited *before* the pressed state is read, as the tests
-    // above do. `picker()` waits only for the character buttons to exist —
-    // they arrive from a `useLiveQuery` that has nothing to do with which of
-    // them the saved comparison selected — so reading `aria-pressed`
-    // synchronously raced the selection being applied and failed under CI
-    // load. The table only renders once that selection is applied, which
-    // makes awaiting it the signal this assertion actually needs.
+    // The table is awaited *before* the pressed state is read: it renders only
+    // once the selection has been applied, so it is the signal this assertion
+    // needs — reading `aria-pressed` synchronously raced that. Note the click
+    // above deliberately does *not* wait for the roster first; that is the
+    // #594 race, and the test covering it directly is the next one.
     await screen.findByRole('table', { name: 'Skill comparison' });
     expect(within(await picker()).getByRole('button', { name: /Pilot One/ })).toHaveAttribute(
       'aria-pressed',
       'true'
     );
+  });
+
+  it('resolves a saved comparison clicked before the character roster has loaded', async () => {
+    // The saved list renders straight from the comparisons store, so it is
+    // clickable on the very first frame — before `db.characters`' useLiveQuery
+    // has resolved. Delaying that read makes the #594 CI flake deterministic:
+    // `handleLoad` resolved the comparison against an empty roster, dropped
+    // every id, and left a permanent "some characters removed" notice with a
+    // selection of none — which is why the awaited table never arrived.
+    const readRoster = db.characters.toArray.bind(db.characters);
+    vi.spyOn(db.characters, 'toArray').mockImplementation(() =>
+      readRoster().then(async (rows) => {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        return rows;
+      })
+    );
+    await useSkillComparisons.getState().setValue({
+      items: [{ id: 'both', name: 'Both pilots', characterIds: [CHAR_A, CHAR_B] }],
+      updatedAt: 1,
+    });
+
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(await screen.findByText('Both pilots'));
+
+    const table = await screen.findByRole('table', { name: 'Skill comparison' });
+    expect(within(rowByFirstCell(table, 'Gunnery')).getAllByRole('cell').length).toBe(4);
+    expect(
+      screen.queryByText(
+        'Some characters in this comparison have been removed and are no longer shown.'
+      )
+    ).not.toBeInTheDocument();
   });
 
   it('shows an empty state instead of a bare table when nothing is cached for the selection', async () => {

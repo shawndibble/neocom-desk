@@ -18,11 +18,15 @@ _Recorded 2026-09-07 · issue #595._
   `characters/{uid}/notificationFeed` without listing uids or holding a
   registry of accounts. That is what makes "an account nobody signs into" cost
   the same as any other. It needs a `COLLECTION_GROUP`-scoped index on
-  `firedAt`, declared under `fieldOverrides` in `firestore.indexes.json`; a
-  field override replaces the automatic single-field indexes for that path, so
-  the ordinary `COLLECTION`-scoped entries are spelled out alongside it rather
-  than left implicit. This rules out a purge that needs to know who the
-  account holders are.
+  `firedAt`, declared under `fieldOverrides` in `firestore.indexes.json`.
+  Issue #583's wildcard exemption (`fieldPath: "*"`, `indexes: []`) turned off
+  automatic indexing for every field of every synced collection, so this entry
+  is not a refinement of a default — without it the query has no index at all
+  and fails `FAILED_PRECONDITION`. `COLLECTION_GROUP` is the only scope
+  re-enabled: nothing filters `firedAt` within a single account's
+  subcollection, and #583's rule is that a field is indexed only where it is
+  actually queried. This rules out a purge that needs to know who the account
+  holders are.
 - **Daily, and bounded per run.** The retention is 30 days, so the tick only
   has to be small against that — every 24 hours, not the dispatcher's 5
   minutes. Each run deletes in batches of `FEED_PURGE_BATCH_SIZE` (500,
