@@ -24,7 +24,6 @@
     "mail": "Mail",
     "calendar": "Calendar",
     "contracts": "Contracts",
-    "bpcContracts": "BPC Search",
     "contacts": "Contacts",
     "settings": "Settings",
     "soon": "Soon",
@@ -672,7 +671,8 @@
     "heroTitle_one": "1 run · profit after fees",
     "heroTitle_other": "{{count}} runs · profit after fees",
     "needAfterOwned": "Need: {{quantity}}",
-    "netProfit": "Net profit"
+    "netProfit": "Net profit",
+    "bpcSourcingTab": "BPC Search"
   },
   "login": {
     "button": "Log in with EVE Online",
@@ -1979,7 +1979,20 @@
     "emptyHint": "The public contract index refreshes on its own schedule — check back shortly.",
     "notConfiguredTitle": "Public BPC search isn't available",
     "notConfiguredHint": "This requires the app's sync backend, which isn't configured here.",
-    "noFilterMatches": "No BPC listings match your filters."
+    "noFilterMatches": "No BPC listings match your filters.",
+    "suggestionsLabel": "Matching blueprints",
+    "suggestionBestMeTe": "Best ME {{me}} / TE {{te}}",
+    "cheapestLabel": "Cheapest",
+    "medianLabel": "Median",
+    "bestMeTeLabel": "Best ME / TE",
+    "clearBlueprint": "Clear blueprint filter: {{name}}",
+    "clearBlueprintShort": "Clear",
+    "cheapestByRegion": "Cheapest by region",
+    "regionOffers_one": "{{count}} offer",
+    "regionOffers_other": "{{count}} offers",
+    "offersOnContract_one": "{{count}} offer on contract",
+    "offersOnContract_other": "{{count}} offers on contract",
+    "cheapestByRegionCapped": "Cheapest by region ({{shown}} of {{total}})"
   },
   "contacts": {
     "title": "Contacts",
@@ -2674,7 +2687,9 @@
       "quickAnswer": "Quick answer",
       "whoIsCheaper": "Who is cheaper, and where",
       "floorWorking": "Where that price comes from"
-    }
+    },
+    "emptySellBlueprintHint": "Copies of this blueprint are traded on contract, not on the market.",
+    "searchBpcContracts": "Search BPC contracts"
   },
   "error": {
     "title": "Something went wrong",
