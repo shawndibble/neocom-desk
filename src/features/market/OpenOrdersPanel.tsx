@@ -26,6 +26,8 @@ import {
 import * as Icon from '@/components/ui/icons';
 import { beginEveLogin } from '@/app/loginFlow';
 import { CharacterBadge } from '@/features/character/assetBrowserRows';
+import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
+import { resolveCharacterFilter } from '@/features/character/characterFilterValue';
 import { loadReprocessing } from '@/sde/loadSde';
 import type { ReprocessingType } from '@/sde/types';
 import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
@@ -457,14 +459,6 @@ export function OpenOrdersPanel() {
   );
 
   const attentionCount = useMemo(() => needsAttentionCount(allRows), [allRows]);
-
-  const attentionByCharacter = useMemo(() => {
-    const m = new Map<number, number>();
-    for (const characterId of new Set(allRows.map((r) => r.characterId))) {
-      m.set(characterId, needsAttentionCount(allRows.filter((r) => r.characterId === characterId)));
-    }
-    return m;
-  }, [allRows]);
 
   const entriesWithOrders = useMemo(
     () => snapshot?.openOrders.entries.filter((e) => e.orders.length > 0) ?? [],
@@ -971,20 +965,18 @@ export function OpenOrdersPanel() {
 
           {showCharacterStrip && (
             <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2">
-              <FilterChip
-                label={t('market.orders.allCharacters')}
-                selected={filter.characterIds.length === 0}
-                onToggle={() => setFilter({ ...filter, characterIds: [] })}
+              <CharacterFilterControl
+                characters={entriesWithOrders}
+                activeCharacterId={activeCharacterId}
+                value={filter.characterIds.length === 0 ? 'all' : new Set(filter.characterIds)}
+                onChange={(next) => {
+                  const resolved = resolveCharacterFilter(next, activeCharacterId);
+                  setFilter({
+                    ...filter,
+                    characterIds: resolved === 'all' ? [] : [...resolved],
+                  });
+                }}
               />
-              {entriesWithOrders.map((entry) => (
-                <FilterChip
-                  key={entry.characterId}
-                  label={entry.characterName}
-                  count={attentionByCharacter.get(entry.characterId) ?? 0}
-                  selected={filter.characterIds.includes(entry.characterId)}
-                  onToggle={() => setFilter({ ...filter, characterIds: [entry.characterId] })}
-                />
-              ))}
             </div>
           )}
 

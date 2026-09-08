@@ -9,6 +9,7 @@ import { db } from '@/db';
 import { STALE_FETCHED_AT } from '@/esi/cacheFixtures';
 import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharacter';
 import { usePublicInfo } from '@/stores/publicInfo';
+import { useDefaultCharacterFilter } from '@/features/character/defaultCharacterFilter';
 import { App } from '@/app/App';
 import type { TypeMap } from '@/sde/types';
 
@@ -87,6 +88,7 @@ beforeEach(async () => {
   await db.esiCache.clear();
   useActiveCharacter.setState({ activeCharacterId: null, hydrated: false });
   usePublicInfo.setState({ byCharacterId: {} });
+  useDefaultCharacterFilter.setState({ value: 'current', hydrated: false });
 
   await db.characters.put({ characterId: CHAR_ID, name: 'Pilot One', ownerHash: 'oh', addedAt: 1 });
   await db.tokens.put({
@@ -603,6 +605,67 @@ describe('Wallet', () => {
 
       expect(await screen.findByText('No transactions match this filter.')).toBeInTheDocument();
       expect(screen.queryByText('No corp transactions cached')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('cross-character balances (issue #607)', () => {
+    const CHAR_B = 92;
+
+    async function seedSecondCharacter() {
+      await db.characters.put({
+        characterId: CHAR_B,
+        name: 'Pilot Two',
+        ownerHash: 'oh2',
+        addedAt: 2,
+      });
+      await db.tokens.put({
+        characterId: CHAR_B,
+        accessToken: 'access-token-b',
+        refreshToken: 'refresh-b',
+        expiresAt: Date.now() + 3_600_000,
+        scopes: ['esi-wallet.read_character_wallet.v1'],
+      });
+      server.use(
+        http.get(`https://esi.evetech.net/characters/${CHAR_B}/wallet`, () =>
+          HttpResponse.json(1500)
+        )
+      );
+    }
+
+    it("shows only the active character's balance by default — no picker-driven fetch", async () => {
+      await seedSecondCharacter();
+      render(<App />);
+
+      expect(await screen.findByText(/4,500\.00/)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'This character' })).toBeInTheDocument();
+      expect(screen.queryByText(/1,500\.00/)).not.toBeInTheDocument();
+    });
+
+    it('switching to "All characters" shows every character\'s balance and a total', async () => {
+      const user = userEvent.setup();
+      await seedSecondCharacter();
+      render(<App />);
+
+      await screen.findByText(/4,500\.00/);
+      await user.click(screen.getByRole('button', { name: 'This character' }));
+      await user.click(await screen.findByRole('menuitem', { name: 'All characters' }));
+
+      const table = await screen.findByRole('table', { name: 'Balance by character' });
+      expect(await within(table).findByText('Pilot One')).toBeInTheDocument();
+      expect(within(table).getByText('Pilot Two')).toBeInTheDocument();
+      // 4,500.00 + 1,500.00 = 6,000.00 — the Total line, distinct from either row.
+      expect(await screen.findByText(/6,000\.00/)).toBeInTheDocument();
+    });
+
+    it('opens on "All characters" when the synced default says so, without the pilot touching the picker', async () => {
+      await seedSecondCharacter();
+      await db.settings.put({ key: 'sync.defaultCharacterFilter', value: 'all' });
+      render(<App />);
+
+      expect(await screen.findByRole('button', { name: 'All characters' })).toBeInTheDocument();
+      const table = await screen.findByRole('table', { name: 'Balance by character' });
+      expect(await within(table).findByText('Pilot One')).toBeInTheDocument();
+      expect(within(table).getByText('Pilot Two')).toBeInTheDocument();
     });
   });
 });

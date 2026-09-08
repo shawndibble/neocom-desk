@@ -8,6 +8,7 @@ import '@/i18n';
 import { configureEsi, ESI_BASE_URL } from '@/esi/client';
 import { db } from '@/db';
 import type { TypeMap } from '@/sde/types';
+import { useDefaultCharacterFilter } from '@/features/character/defaultCharacterFilter';
 import { ActiveJobsPanel } from './ActiveJobsPanel';
 
 vi.mock('@/app/loginFlow', () => ({ beginEveLogin: vi.fn().mockResolvedValue(undefined) }));
@@ -33,6 +34,10 @@ beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 beforeEach(async () => {
   configureEsi({ getToken: vi.fn(async () => 'tok') });
   await db.esiCache.clear();
+  // Module-scope singleton: a value left over from a previous test would
+  // make the cross-character block's assertions pass or fail for the wrong
+  // reason (`Settings.test.tsx`'s precedent).
+  useDefaultCharacterFilter.setState({ value: 'current', hydrated: false });
 });
 afterEach(() => {
   server.resetHandlers();
@@ -643,5 +648,106 @@ describe('ActiveJobsPanel: table columns', () => {
     await user.click(screen.getByRole('button', { name: 'Runs' }));
     const resorted = within(container.querySelector('tbody')!).getAllByRole('row');
     expect(within(resorted[0]).getByText('Widget Beta')).toBeInTheDocument();
+  });
+});
+
+describe('ActiveJobsPanel: cross-character view (issue #607)', () => {
+  const CHAR_B = 92;
+  const JOBS_SCOPE = 'esi-industry.read_character_jobs.v1';
+
+  function job(characterId: number) {
+    return {
+      job_id: characterId,
+      activity_id: 1,
+      blueprint_type_id: 100,
+      facility_id: 60003760,
+      station_id: 60003760,
+      runs: 1,
+      start_date: new Date(NOW.getTime() - 30 * 60_000).toISOString(),
+      end_date: new Date(NOW.getTime() + 30 * 60_000).toISOString(),
+      status: 'active',
+    };
+  }
+
+  async function seedSecondCharacter() {
+    await db.characters.bulkPut([
+      { characterId: CHAR_ID, name: 'Pilot One', ownerHash: 'oh1', addedAt: 1 },
+      { characterId: CHAR_B, name: 'Pilot Two', ownerHash: 'oh2', addedAt: 2 },
+    ]);
+    await db.tokens.bulkPut([
+      {
+        characterId: CHAR_ID,
+        accessToken: 'a',
+        refreshToken: 'r',
+        expiresAt: Date.now() + 6e5,
+        scopes: [JOBS_SCOPE],
+      },
+      {
+        characterId: CHAR_B,
+        accessToken: 'a',
+        refreshToken: 'r',
+        expiresAt: Date.now() + 6e5,
+        scopes: [JOBS_SCOPE],
+      },
+    ]);
+    server.use(
+      http.get(jobsUrl(), () => HttpResponse.json([job(CHAR_ID)])),
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_B}/industry/jobs`, () =>
+        HttpResponse.json([job(CHAR_B)])
+      )
+    );
+  }
+
+  beforeEach(async () => {
+    await db.characters.clear();
+    await db.tokens.clear();
+  });
+
+  it('defaults to "This character" and never fetches the other character\'s jobs', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(NOW);
+    await seedSecondCharacter();
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+    render(
+      <MemoryRouter>
+        <ActiveJobsPanel
+          characterId={CHAR_ID}
+          onAddToQuickbar={() => {}}
+          quickbarAvailable={true}
+          onShowInfo={() => {}}
+        />
+      </MemoryRouter>
+    );
+
+    expect(await screen.findByRole('button', { name: 'This character' })).toBeInTheDocument();
+    await expandJobs(user);
+    expect(screen.queryByText('Pilot Two')).not.toBeInTheDocument();
+  });
+
+  it('switching to "All characters" merges both characters\' jobs, tagged with their owner', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(NOW);
+    await seedSecondCharacter();
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+    render(
+      <MemoryRouter>
+        <ActiveJobsPanel
+          characterId={CHAR_ID}
+          onAddToQuickbar={() => {}}
+          quickbarAvailable={true}
+          onShowInfo={() => {}}
+        />
+      </MemoryRouter>
+    );
+
+    await user.click(await screen.findByRole('button', { name: 'This character' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'All characters' }));
+
+    await expandJobs(user);
+    expect(await screen.findByText('Pilot One')).toBeInTheDocument();
+    expect(screen.getByText('Pilot Two')).toBeInTheDocument();
+    expect(screen.getByText('2 running · 0 done')).toBeInTheDocument();
   });
 });

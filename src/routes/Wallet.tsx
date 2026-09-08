@@ -1,6 +1,7 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { useLiveQuery } from 'dexie-react-hooks';
 import {
   DataAgeBadge,
   DataTable,
@@ -24,7 +25,22 @@ import {
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { beginEveLogin } from '@/app/loginFlow';
-import { loadWalletBalanceWithStatus, loadWalletJournal } from '@/features/character/wallet';
+import { db } from '@/db';
+import {
+  loadWalletBalanceWithStatus,
+  loadWalletJournal,
+  loadAllCharactersWalletBalances,
+  totalWalletBalance,
+  type CharacterWalletBalance,
+  type WalletBalancesSnapshot,
+} from '@/features/character/wallet';
+import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
+import {
+  resolveCharacterFilter,
+  fromStoredCharacterFilterValue,
+  type CharacterFilterValue,
+} from '@/features/character/characterFilterValue';
+import { useDefaultCharacterFilter } from '@/features/character/defaultCharacterFilter';
 import { loadCharacterLoyaltyPoints, splitEverMarks } from '@/features/character/loyalty';
 import { resolveNames } from '@/features/character/names';
 import type { CachedResult, StatusResult } from '@/esi/cache';
@@ -507,6 +523,70 @@ export function Wallet() {
   // The journal line a `walletBalanceChanged` alert pointed at, if any.
   const highlightedEntryId = useHighlightParam();
 
+  /**
+   * The cross-character Balance view (issue #607): `'current'` by default —
+   * today's exact behavior, no extra fan-out, and it keeps following the
+   * active Character across a switch with no resync logic of its own
+   * (`resolveCharacterFilter` re-resolves it fresh every render) — or All/a
+   * hand-picked subset once the pilot asks via `CharacterFilterControl`.
+   */
+  const [walletCharacterFilter, setWalletCharacterFilter] =
+    useState<CharacterFilterValue>('current');
+  // Seeded once from the synced default (Settings' Defaults panel) the
+  // moment it hydrates — see `ActiveJobsPanel.tsx`'s identical seeding for
+  // why `'current'` above is already the safe interim value.
+  const defaultCharacterFilter = useDefaultCharacterFilter((state) => state.value);
+  const defaultCharacterFilterHydrated = useDefaultCharacterFilter((state) => state.hydrated);
+  const hydrateDefaultCharacterFilter = useDefaultCharacterFilter((state) => state.hydrate);
+  useEffect(() => {
+    void hydrateDefaultCharacterFilter();
+  }, [hydrateDefaultCharacterFilter]);
+  const [seededWalletFilterFromDefault, setSeededWalletFilterFromDefault] = useState(false);
+  if (defaultCharacterFilterHydrated && !seededWalletFilterFromDefault) {
+    setSeededWalletFilterFromDefault(true);
+    setWalletCharacterFilter(fromStoredCharacterFilterValue(defaultCharacterFilter));
+  }
+
+  const resolvedWalletFilter = resolveCharacterFilter(walletCharacterFilter, activeCharacterId);
+  const showingAllWalletBalances =
+    resolvedWalletFilter === 'all' ||
+    resolvedWalletFilter.size !== 1 ||
+    !resolvedWalletFilter.has(activeCharacterId ?? -1);
+
+  const allCharacters = useLiveQuery(() => db.characters.toArray(), [], []);
+  const walletFilterCandidates = useMemo(
+    () => (allCharacters ?? []).map((c) => ({ characterId: c.characterId, characterName: c.name })),
+    [allCharacters]
+  );
+
+  // Nothing fetched until the picker actually leaves "current" — same
+  // opt-in shape as the corp reads below, just not a corp read: nothing here
+  // is fetched until the Character filter actually asks for more than the
+  // active Character. No separate "loading" state: `walletBalancesSnapshot
+  // === null` already means "nothing to show yet," and a manual refresh
+  // deliberately leaves the previous snapshot in place while it re-fetches —
+  // same retained-snapshot idiom `useRouteSnapshot`/`useCorpSnapshot` use
+  // elsewhere in this app, and the only way to give the effect below no
+  // synchronous `setState` call of its own (`react-hooks/set-state-in-effect`).
+  const [walletBalancesSnapshot, setWalletBalancesSnapshot] =
+    useState<WalletBalancesSnapshot | null>(null);
+  const [walletBalancesRefreshCount, setWalletBalancesRefreshCount] = useState(0);
+  useEffect(() => {
+    if (!showingAllWalletBalances) return;
+    let cancelled = false;
+    void loadAllCharactersWalletBalances().then((snapshot) => {
+      if (!cancelled) setWalletBalancesSnapshot(snapshot);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [showingAllWalletBalances, walletBalancesRefreshCount]);
+  const refreshWalletBalances = useCallback(
+    () => setWalletBalancesRefreshCount((count) => count + 1),
+    []
+  );
+  const walletBalancesLoading = walletBalancesSnapshot === null;
+
   const {
     owner,
     setOwner,
@@ -700,6 +780,36 @@ export function Wallet() {
     [t, corporationNames, navigate]
   );
 
+  const walletBalanceColumns = useMemo<DataTableColumn<CharacterWalletBalance>[]>(
+    () => [
+      {
+        id: 'character',
+        header: t('wallet.balanceCharacterColumn'),
+        primary: true,
+        sortValue: (row) => row.characterName,
+        render: (row) => row.characterName,
+      },
+      {
+        id: 'balance',
+        header: t('wallet.isk'),
+        align: 'right',
+        className: 'tabular-nums',
+        sortValue: (row) => (row.needsReauth ? -Infinity : (row.balanceResult?.data ?? -Infinity)),
+        render: (row) =>
+          row.needsReauth ? (
+            <span className="text-warning">{t('wallet.reauthTitle')}</span>
+          ) : row.balanceResult ? (
+            <span className={iskToneClass(row.balanceResult.data)}>
+              {formatIsk(row.balanceResult.data, 2)}
+            </span>
+          ) : (
+            t('common.unknown')
+          ),
+      },
+    ],
+    [t]
+  );
+
   const journalColumns = useMemo<DataTableColumn<WalletJournalEntry>[]>(
     () => [
       {
@@ -801,6 +911,18 @@ export function Wallet() {
     () => filterWalletTransactions(corpTransactionRows, transactionFilter, nameForType),
     [corpTransactionRows, transactionFilter, nameForType]
   );
+
+  const visibleWalletBalances = useMemo(() => {
+    const entries = walletBalancesSnapshot?.entries ?? [];
+    return resolvedWalletFilter === 'all'
+      ? entries
+      : entries.filter((entry) => resolvedWalletFilter.has(entry.characterId));
+  }, [walletBalancesSnapshot, resolvedWalletFilter]);
+  const walletBalancesTotal = useMemo(
+    () => totalWalletBalance(visibleWalletBalances),
+    [visibleWalletBalances]
+  );
+  const walletBalancesSkipped = walletBalancesSnapshot?.skipped ?? [];
 
   if (!hydrated) {
     return (
@@ -934,47 +1056,114 @@ export function Wallet() {
         <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
       ) : walletTab === 'balance' ? (
         <div className="space-y-4">
-          <Panel
-            title={t('wallet.balanceTab')}
-            actions={balanceResult ? <DataAgeBadge date={balanceResult.fetchedAt} /> : undefined}
-          >
-            <div className="flex flex-wrap gap-x-8 gap-y-4">
-              <div>
-                <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                  {t('wallet.isk')}
-                </p>
-                {balanceNeedsReauth ? (
-                  <ReauthBanner
-                    title={t('wallet.reauthTitle')}
-                    hint={t('wallet.reauthHint')}
-                    actionLabel={t('wallet.reauthAction')}
-                    onLogin={() => void beginEveLogin()}
-                  />
-                ) : balanceResult ? (
-                  <p
-                    className={`text-lg font-medium tabular-nums ${iskToneClass(balanceResult.data)}`}
-                  >
-                    {formatIsk(balanceResult.data, 2)}
+          {/*
+            Always visible, even while pinned to "This character" — otherwise
+            there is no way to discover the cross-character view at all
+            (issue #607). Below it, the panel content swaps: unchanged for
+            "This character", a per-character table + total for anything
+            wider.
+          */}
+          <div className="flex flex-wrap items-center gap-2">
+            <CharacterFilterControl
+              characters={walletFilterCandidates}
+              activeCharacterId={activeCharacterId}
+              value={walletCharacterFilter}
+              onChange={setWalletCharacterFilter}
+            />
+          </div>
+
+          {showingAllWalletBalances ? (
+            <Panel
+              padded={false}
+              title={t('wallet.balanceByCharacter')}
+              actions={
+                <IconButton
+                  size="sm"
+                  icon={<Icon.Refresh />}
+                  label={t('wallet.refresh')}
+                  onClick={refreshWalletBalances}
+                  disabled={walletBalancesLoading}
+                />
+              }
+            >
+              {walletBalancesLoading ? (
+                <div className="flex justify-center py-8">
+                  <Spinner label={t('common.loading')} />
+                </div>
+              ) : (
+                <>
+                  <p className="px-3 pt-2 text-lg font-medium tabular-nums">
+                    {t('wallet.totalBalance')}:{' '}
+                    <span className={iskToneClass(walletBalancesTotal)}>
+                      {formatIsk(walletBalancesTotal, 2)}
+                    </span>
                   </p>
-                ) : (
-                  <EmptyState title={t('wallet.balanceEmpty')} className="py-4" />
-                )}
+                  {walletBalancesSkipped.length > 0 && (
+                    <div className="space-y-1 px-3 pt-2">
+                      {walletBalancesSkipped.map((s) => (
+                        <p key={s.characterId} className="text-xs text-text-dim">
+                          {s.name} — {t('wallet.balanceCharacterNotShared')}
+                        </p>
+                      ))}
+                    </div>
+                  )}
+                  {visibleWalletBalances.length === 0 ? (
+                    <EmptyState title={t('wallet.balanceEmpty')} className="py-8" />
+                  ) : (
+                    <DataTable
+                      label={t('wallet.balanceByCharacter')}
+                      columns={walletBalanceColumns}
+                      rows={visibleWalletBalances}
+                      rowKey={(row) => row.characterId}
+                      defaultSort={{ columnId: 'character', direction: 'asc' }}
+                    />
+                  )}
+                </>
+              )}
+            </Panel>
+          ) : (
+            <Panel
+              title={t('wallet.balanceTab')}
+              actions={balanceResult ? <DataAgeBadge date={balanceResult.fetchedAt} /> : undefined}
+            >
+              <div className="flex flex-wrap gap-x-8 gap-y-4">
+                <div>
+                  <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                    {t('wallet.isk')}
+                  </p>
+                  {balanceNeedsReauth ? (
+                    <ReauthBanner
+                      title={t('wallet.reauthTitle')}
+                      hint={t('wallet.reauthHint')}
+                      actionLabel={t('wallet.reauthAction')}
+                      onLogin={() => void beginEveLogin()}
+                    />
+                  ) : balanceResult ? (
+                    <p
+                      className={`text-lg font-medium tabular-nums ${iskToneClass(balanceResult.data)}`}
+                    >
+                      {formatIsk(balanceResult.data, 2)}
+                    </p>
+                  ) : (
+                    <EmptyState title={t('wallet.balanceEmpty')} className="py-4" />
+                  )}
+                </div>
+                <div>
+                  <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                    {t('wallet.everMarks')}
+                  </p>
+                  <p className="text-lg font-medium tabular-nums">
+                    {loyaltyResult && !loyaltyNeedsReauth
+                      ? everMarks.toLocaleString()
+                      : t('common.unknown')}
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                  {t('wallet.everMarks')}
-                </p>
-                <p className="text-lg font-medium tabular-nums">
-                  {loyaltyResult && !loyaltyNeedsReauth
-                    ? everMarks.toLocaleString()
-                    : t('common.unknown')}
-                </p>
-              </div>
-            </div>
-            {(balanceResult?.fromCache || loyaltyResult?.fromCache) && (
-              <p className="mt-3 text-[0.6875rem] text-warning uppercase">{t(offlineTitleKey)}</p>
-            )}
-          </Panel>
+              {(balanceResult?.fromCache || loyaltyResult?.fromCache) && (
+                <p className="mt-3 text-[0.6875rem] text-warning uppercase">{t(offlineTitleKey)}</p>
+              )}
+            </Panel>
+          )}
 
           <Panel
             padded={false}

@@ -15,8 +15,13 @@
 import { getCharacterIndustryJobs, type IndustryJob } from '@/esi/endpoints';
 import { EsiError } from '@/esi/client';
 import { loadWithCacheStatus, type StatusResult } from '@/esi/cache';
+import { db } from '@/db';
+import { ESI_REGISTRY } from '@/esi/registry';
+import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
+import type { MultiSelectFilter } from '@/lib/multiSelectFilter';
 
 const KEY = 'industryJobs';
+const JOBS_SCOPE = ESI_REGISTRY.getCharacterIndustryJobs.scope;
 
 export type JobsLoadResult = StatusResult<IndustryJob[]>;
 
@@ -30,6 +35,91 @@ export function loadCharacterIndustryJobs(characterId: number): Promise<JobsLoad
       detectAuthFailure: (err) => err instanceof EsiError && err.status === 403,
       skipCacheOnAuthFailure: true,
     }
+  );
+}
+
+export interface JobsFanOutEntry {
+  characterId: number;
+  characterName: string;
+  result: JobsLoadResult;
+}
+
+export interface JobsFanOutSnapshot {
+  entries: JobsFanOutEntry[];
+  /** Never granted the industry-jobs scope — listed, never fetched (same policy as `openOrdersData.ts`). */
+  skipped: { characterId: number; name: string }[];
+}
+
+/**
+ * Every authenticated Character's active industry jobs, for Industry's
+ * cross-character Active Jobs view (issue #607). Mirrors
+ * `openOrdersData.ts`'s `loadAllCharactersOpenOrders`: the scope is checked
+ * UP FRONT per Character rather than left to a live 403 (a live 403 would
+ * raise the app-wide re-auth banner naming an alt the player never asked
+ * about), and a Character WITH the scope whose live call still comes back
+ * `needsReauth` stays in `entries` (not `skipped`) so its row can show its
+ * own re-auth prompt.
+ */
+export async function loadAllCharactersIndustryJobs(): Promise<JobsFanOutSnapshot> {
+  const characters = await db.characters.toArray();
+  const granted = await Promise.all(
+    characters.map(async (character) => {
+      const token = await db.tokens.get(character.characterId);
+      return (token?.scopes ?? []).includes(JOBS_SCOPE);
+    })
+  );
+
+  const toFetch = characters.filter((_, i) => granted[i]);
+  const noScopeSkipped = characters
+    .filter((_, i) => !granted[i])
+    .map(({ characterId, name }) => ({ characterId, name }));
+
+  // Slotted by original index, not push-on-completion order — same reasoning
+  // as `openOrdersData.ts`: ordering stays stable regardless of which
+  // Character's fetch lands first.
+  const slots: (JobsFanOutEntry | null)[] = new Array(toFetch.length).fill(null);
+  const fetchFailedSkipped: { characterId: number; name: string }[] = [];
+  await mapWithConcurrencyLimit(
+    toFetch.map((character, index) => ({ character, index })),
+    ESI_FANOUT_CONCURRENCY,
+    async ({ character, index }) => {
+      const { characterId, name } = character;
+      try {
+        const result = await loadCharacterIndustryJobs(characterId);
+        slots[index] = { characterId, characterName: name, result };
+      } catch {
+        fetchFailedSkipped.push({ characterId, name });
+      }
+    }
+  );
+
+  const entries = slots.filter((entry): entry is JobsFanOutEntry => entry !== null);
+  return { entries, skipped: [...noScopeSkipped, ...fetchFailedSkipped] };
+}
+
+export type IndustryJobWithCharacter = IndustryJob & {
+  characterId: number;
+  characterName: string;
+};
+
+/**
+ * Filters a fan-out's `entries` by the character picker's current value,
+ * then flattens each survivor's `result.cached?.data ?? []` into one list,
+ * each job tagged with its owner. The result still satisfies
+ * `sortJobsBySoonest`/`summarizeJobs`'s existing
+ * `T extends Pick<IndustryJob, 'end_date'>` bound unchanged.
+ */
+export function flattenJobsWithCharacter(
+  entries: readonly JobsFanOutEntry[],
+  filter: MultiSelectFilter<number>
+): IndustryJobWithCharacter[] {
+  const selected = entries.filter((entry) => filter === 'all' || filter.has(entry.characterId));
+  return selected.flatMap((entry) =>
+    (entry.result.cached?.data ?? []).map((job) => ({
+      ...job,
+      characterId: entry.characterId,
+      characterName: entry.characterName,
+    }))
   );
 }
 

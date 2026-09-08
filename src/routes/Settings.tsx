@@ -37,6 +37,13 @@ import {
 } from '@/features/industry/facilityDefaults';
 import { useExpiringWindowHours, EXPIRING_WINDOW_HOUR_OPTIONS } from '@/features/pi/expiringWindow';
 import { useDarkThreshold, DARK_AFTER_DAY_OPTIONS } from '@/features/corp/darkThreshold';
+import { useDefaultCharacterFilter } from '@/features/character/defaultCharacterFilter';
+import {
+  fromStoredCharacterFilterValue,
+  toStoredCharacterFilterValue,
+} from '@/features/character/characterFilterValue';
+import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
+import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useCorpAccess } from '@/features/corp/useCorpAccess';
 import { NotificationsPanel } from '@/features/notifications/NotificationsPanel';
 import { CorpAccessPanel } from '@/features/corp/CorpAccessPanel';
@@ -402,6 +409,8 @@ function DefaultsPanel() {
   const setFacilityDefaults = useFacilityDefaults((state) => state.setValue);
   const expiringHours = useExpiringWindowHours((state) => state.value);
   const setExpiringHours = useExpiringWindowHours((state) => state.setValue);
+  const defaultCharacterFilter = useDefaultCharacterFilter((state) => state.value);
+  const setDefaultCharacterFilter = useDefaultCharacterFilter((state) => state.setValue);
 
   // Each on its own line, never `a() && b()`: `&&` short-circuits, which would
   // make every hook after the first false one a conditional call.
@@ -409,9 +418,26 @@ function DefaultsPanel() {
   const assumedMeHydrated = useHydratedStore(useAssumedMe);
   const facilityHydrated = useHydratedStore(useFacilityDefaults);
   const expiringHydrated = useHydratedStore(useExpiringWindowHours);
-  const ready = hubHydrated && assumedMeHydrated && facilityHydrated && expiringHydrated;
+  const defaultCharacterFilterHydrated = useHydratedStore(useDefaultCharacterFilter);
+  const ready =
+    hubHydrated &&
+    assumedMeHydrated &&
+    facilityHydrated &&
+    expiringHydrated &&
+    defaultCharacterFilterHydrated;
 
   const facilityPreset = FACILITY_PRESETS[facilityDefaults.facility];
+
+  // Only for the picker's "This character" preview and quick-select — the
+  // stored default itself keeps meaning "whichever Character I'm on" even on
+  // a device with none active right now (`CharacterFilterControl` already
+  // omits that quick-select when this is null).
+  const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
+  const allCharacters = useLiveQuery(() => db.characters.toArray(), [], []);
+  const characterFilterCandidates = useMemo(
+    () => (allCharacters ?? []).map((c) => ({ characterId: c.characterId, characterName: c.name })),
+    [allCharacters]
+  );
 
   // Nothing until every row holds its real value. A control that rendered its
   // default first would not merely flicker: a press landing in that window
@@ -546,6 +572,19 @@ function DefaultsPanel() {
             selected={expiringHours}
             onSelect={(hours) => void setExpiringHours(hours)}
             labelFor={(hours) => t('settings.hours', { count: hours })}
+          />
+        </div>
+
+        <div className="space-y-1.5 border-t border-line pt-3">
+          <span className="block text-xs font-semibold">
+            {t('settings.defaultCharacterFilterLabel')}
+          </span>
+          <p className="text-xs text-text-dim">{t('settings.defaultCharacterFilterHint')}</p>
+          <CharacterFilterControl
+            characters={characterFilterCandidates}
+            activeCharacterId={activeCharacterId}
+            value={fromStoredCharacterFilterValue(defaultCharacterFilter)}
+            onChange={(next) => void setDefaultCharacterFilter(toStoredCharacterFilterValue(next))}
           />
         </div>
       </div>
