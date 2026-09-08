@@ -2526,22 +2526,19 @@
           "loginNote": "The token that keeps you logged in is stored in this browser and nowhere else.",
           "preferences": "The rest of Settings — text size, time format, defaults — and every sort, filter and expanded section a page remembers as you use it."
         },
-        "never": {
-          "title": "Never collected at all",
-          "description": "Not held on your device, not held on a server, not asked for.",
-          "password": "Your EVE password.",
-          "passwordNote": "You sign in on EVE’s own login page. It is never typed into this app, and we never see it.",
-          "identity": "Your email address, your real name, or anything else that identifies you outside EVE.",
-          "account": "An account with us. There isn’t one — adding a character is the whole sign-up.",
-          "unadded": "Anything about characters you have not added, or corporations you are not in."
-        },
         "notesTitle": "Worth knowing",
         "notes": {
           "push": "Push notifications, if you turn them on: we store a token for this device, the character IDs it covers, and the alerts due in the next 72 hours — including their text, so they can be delivered while the app is closed. Each character is verified with EVE at that moment, and the token used for that check is discarded straight after.",
           "crashes": "Crash reports: when something goes wrong we receive the error and which page it happened on, so it can be fixed. IP addresses are switched off, request and response bodies are never captured, and your EVE tokens are stripped before anything is sent.",
           "removal": "Removing a character deletes everything above from our servers. If its EVE login has already expired we cannot sign in to do that, so the deletion runs the next time you add that character back."
         }
-      }
+      },
+      "feedbackTitle": "Where do I report a bug or ask for a feature?",
+      "feedbackBody": "On GitHub: <issues>github.com/shawndibble/neocom-desk/issues</issues>. Bugs and feature requests both go there, and it is the only place either is tracked.",
+      "feedbackHint": "For a bug, what helps most is the page you were on, the character it happened to, and what you expected instead. A screenshot is worth more than a description of one.",
+      "thanksTitle": "Is there someone I can thank?",
+      "thanksBody": "There is. In game, that is <pilot>Mero Otichoda</pilot>.",
+      "thanksHint": "Donations are welcome and never expected — the app is free, open source, and stays that way."
     },
     "displayTitle": "Display",
     "fontScaleLabel": "Text size",

@@ -37,9 +37,14 @@ export interface WhatWeStoreGroup {
 }
 
 /**
- * Three groups, in the order that answers the question a worried reader
- * actually arrives with: what leaves this device, what does not, and what is
- * never collected at all.
+ * Two groups, in the order that answers the question a reader actually
+ * arrives with: what leaves this device, and what does not.
+ *
+ * There is deliberately no third "never collected at all" group. A list of
+ * things we don't hold is unfalsifiable by the reader and unbounded by
+ * nature — it invites padding, and it reads as protesting rather than
+ * answering. What the two groups above account for is the whole of what
+ * exists; anything absent from both is absent because it is not stored.
  */
 export const WHAT_WE_STORE_GROUPS: readonly WhatWeStoreGroup[] = [
   {
@@ -80,21 +85,6 @@ export const WHAT_WE_STORE_GROUPS: readonly WhatWeStoreGroup[] = [
         noteKey: 'settings.faq.store.local.loginNote',
       },
       { id: 'preferences', labelKey: 'settings.faq.store.local.preferences' },
-    ],
-  },
-  {
-    id: 'never',
-    titleKey: 'settings.faq.store.never.title',
-    descriptionKey: 'settings.faq.store.never.description',
-    items: [
-      {
-        id: 'password',
-        labelKey: 'settings.faq.store.never.password',
-        noteKey: 'settings.faq.store.never.passwordNote',
-      },
-      { id: 'identity', labelKey: 'settings.faq.store.never.identity' },
-      { id: 'account', labelKey: 'settings.faq.store.never.account' },
-      { id: 'unadded', labelKey: 'settings.faq.store.never.unadded' },
     ],
   },
 ];

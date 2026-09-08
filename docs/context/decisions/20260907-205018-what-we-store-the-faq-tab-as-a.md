@@ -2,14 +2,25 @@
 
 _Recorded 2026-09-07._
 
-- **Settings gains an FAQ tab, holding one section: What We Store.** The
-  question it answers — "what of mine is on your server?" — had no answer
-  anywhere in the product, only in `CONTEXT.md`'s **Editable Data** /
-  **API-Derived Data** split and ADR 0001, neither of which a pilot reads. The
-  tab is structured as a list of sections so a second question is an addition
-  rather than a rewrite, but ships with only the section that was asked for: an
-  FAQ padded with invented questions reads as filler and goes stale faster than
-  it helps.
+- **Settings gains an FAQ tab, one Panel per question.** It ships with three:
+  **What We Store**, where to report a bug or request a feature, and who to
+  thank. The first had no answer anywhere in the product — only in
+  `CONTEXT.md`'s **Editable Data** / **API-Derived Data** split and ADR 0001,
+  neither of which a pilot reads. Questions are added because someone asked
+  them, never to round the list out: an FAQ padded with invented questions
+  reads as filler and goes stale faster than it helps.
+
+- **What We Store has two groups, not three.** A "never collected at all"
+  group was written and then dropped. A list of what is _not_ held is
+  unfalsifiable by the reader and unbounded by nature — it invites padding, and
+  it reads as protesting rather than answering. The two groups that remain
+  account for everything that exists; absence from both is the answer. A test
+  pins the count at two so the group does not creep back.
+
+- **The repo URL has one definition.** `lib/links.ts` holds `REPO_URL` and
+  `ISSUES_URL`; the landing page footer, which had its own copy, now imports
+  them. Two definitions drift, and a stale URL is a dead end for exactly the
+  person trying to report something.
 
 - **The section is a commitment, and is wired so it cannot quietly go stale.**
   `sync/characterPurge.ts`'s `REMOTE_COLLECTIONS` is now exported and is the

@@ -628,7 +628,12 @@ describe('Settings — Notifications (issue #170)', () => {
       screen.getByRole('heading', { name: /synced between your devices/i })
     ).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: /kept on this device only/i })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: /never collected at all/i })).toBeInTheDocument();
+
+    // The tab carries all three questions, not just the first.
+    expect(
+      screen.getByRole('heading', { name: /report a bug or ask for a feature/i })
+    ).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /someone i can thank/i })).toBeInTheDocument();
   });
 
   it('lands on the FAQ tab from /settings#faq', async () => {

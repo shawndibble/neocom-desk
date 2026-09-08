@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react';
 import '@/i18n';
 import { REMOTE_COLLECTIONS } from '@/sync/characterPurge';
 import { SYNCED_SETTING_KEYS } from '@/sync/syncedSettings';
+import { ISSUES_URL } from '@/lib/links';
 import { FaqPanel } from './FaqPanel';
 import { WHAT_WE_STORE_GROUPS, WHAT_WE_STORE_NOTES } from './whatWeStore';
 
@@ -74,10 +75,18 @@ describe('FaqPanel — What We Store', () => {
       screen.getByRole('heading', { name: /synced between your devices/i })
     ).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: /kept on this device only/i })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: /never collected at all/i })).toBeInTheDocument();
 
     const lines = WHAT_WE_STORE_GROUPS.flatMap((g) => g.items).length + WHAT_WE_STORE_NOTES.length;
     expect(screen.getAllByRole('listitem')).toHaveLength(lines);
+  });
+
+  it('has no group listing things we do not hold', () => {
+    // Dropped on purpose: a list of what is *not* stored is unfalsifiable by
+    // the reader and unbounded by nature. The two groups account for what
+    // exists; absence from both is the answer.
+    expect(WHAT_WE_STORE_GROUPS).toHaveLength(2);
+    render(<FaqPanel />);
+    expect(screen.queryByRole('heading', { name: /never collected/i })).not.toBeInTheDocument();
   });
 
   it('states the three cases where something does leave the device', () => {
@@ -99,9 +108,30 @@ describe('FaqPanel — What We Store', () => {
     expect(screen.getByText(/next time you add that character back/i)).toBeInTheDocument();
   });
 
-  it('does not claim EVE data is uploaded, or that nothing at all is', () => {
+  it('does not claim EVE data is uploaded', () => {
     render(<FaqPanel />);
     expect(screen.getByText(/none of it is uploaded/i)).toBeInTheDocument();
-    expect(screen.getByText(/you sign in on EVE’s own login page/i)).toBeInTheDocument();
+  });
+});
+
+describe('FaqPanel — the other questions', () => {
+  it('points bug reports and feature requests at the issue tracker', () => {
+    render(<FaqPanel />);
+
+    expect(screen.getByRole('heading', { name: /report a bug or ask for a feature/i }));
+    const link = screen.getByRole('link', { name: /github\.com\/shawndibble\/neocom-desk/i });
+    expect(link).toHaveAttribute('href', ISSUES_URL);
+    // An external link opened in this tab loses whatever the pilot was doing.
+    expect(link).toHaveAttribute('target', '_blank');
+    expect(link).toHaveAttribute('rel', expect.stringContaining('noopener'));
+  });
+
+  it('names the pilot to thank', () => {
+    render(<FaqPanel />);
+
+    expect(screen.getByRole('heading', { name: /someone i can thank/i })).toBeInTheDocument();
+    expect(screen.getByText('Mero Otichoda')).toBeInTheDocument();
+    // "Welcome" and "expected" are different claims, and the copy makes both.
+    expect(screen.getByText(/never expected/i)).toBeInTheDocument();
   });
 });
