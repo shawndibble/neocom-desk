@@ -9,6 +9,7 @@ import { usePublicInfo } from '@/stores/publicInfo';
 import { App } from '@/app/App';
 import { selectActiveEntryFromSorted, sortQueueEntries, selectQueueDepth } from './overviewQueue';
 import type { SkillType } from '@/sde/types';
+import { PHONE_QUERY } from '@/lib/useIsPhone';
 
 vi.mock('virtual:pwa-register/react', () => ({
   useRegisterSW: () => ({
@@ -547,6 +548,175 @@ describe('Overview board', () => {
 
     await seedFeed([feedEntry({ id: 'a', eventId: 'newMail', title: 'New mail' })]);
     expect(await screen.findByRole('link', { name: /alerts, 1 waiting/i })).toBeInTheDocument();
+  });
+});
+
+/*
+ * Below `sm` the board folds: the two worst cards keep their full shape and
+ * every other domain drops to one line in "Everything else".
+ *
+ * `vitest.setup.ts` stubs `matchMedia` to never match, so every test above
+ * this point renders the wide board — narrow has to be asked for, the same way
+ * `FilterBar.test.tsx` asks for it.
+ */
+let restoreMatchMedia: (() => void) | undefined;
+
+function usePhoneViewport(): void {
+  const real = window.matchMedia;
+  window.matchMedia = (media: string) =>
+    ({
+      media,
+      matches: media === PHONE_QUERY,
+      onchange: null,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      addListener: () => {},
+      removeListener: () => {},
+      dispatchEvent: () => false,
+    }) as unknown as MediaQueryList;
+  restoreMatchMedia = () => {
+    window.matchMedia = real;
+  };
+}
+
+/** The domain cards, by the heading each one carries. */
+const DOMAINS = ['Open orders', 'Mining tax', 'Planetary industry', 'Industry jobs'] as const;
+
+/** Which domains kept a full card — a card is a heading with its own "Open" link. */
+function fullCardDomains(): string[] {
+  return DOMAINS.filter((domain) => {
+    const heading = screen.queryByRole('heading', { name: domain });
+    const card = heading?.closest('section');
+    return (
+      card !== null &&
+      card !== undefined &&
+      within(card).queryByRole('link', { name: /open/i }) !== null
+    );
+  });
+}
+
+/** One folded row's whole accessible name, or undefined if that domain did not fold. */
+function foldedRowLabel(domain: string): string | undefined {
+  const panel = screen.getByRole('heading', { name: 'Everything else' }).closest('section')!;
+  return within(panel)
+    .getAllByRole('link')
+    .map((link) => link.getAttribute('aria-label') ?? '')
+    .find((label) => label.startsWith(`${domain}:`));
+}
+
+/** Which domains folded to a line — `FoldedRow` names itself "<domain>: <summary>". */
+function foldedDomains(): string[] {
+  const panel = screen.getByRole('heading', { name: 'Everything else' }).closest('section')!;
+  return within(panel)
+    .getAllByRole('link')
+    .map((link) => (link.getAttribute('aria-label') ?? '').split(':')[0].trim());
+}
+
+describe('the board on a phone', () => {
+  beforeEach(() => usePhoneViewport());
+  afterEach(() => {
+    restoreMatchMedia?.();
+    restoreMatchMedia = undefined;
+  });
+
+  it('keeps two cards whole and folds the rest into one list, losing no domain', async () => {
+    await grantScopes([ORDERS_SCOPE, PLANETS_SCOPE, INDUSTRY_SCOPE]);
+    render(<App />);
+    await screen.findByText(/1,234,567\.89/);
+    await screen.findByRole('heading', { name: 'Everything else' });
+
+    const full = fullCardDomains();
+    expect(full).toHaveLength(2);
+    // Every domain still has a place, and none has two. A fold that quietly
+    // dropped the fourth card would look exactly like a fold that worked.
+    expect([...full, ...foldedDomains()].sort()).toEqual([...DOMAINS, 'Alerts'].sort());
+  });
+
+  it('gives the full cards to the worst domains', async () => {
+    // Two colonies whose extractors stopped six hours ago: `expired` is the
+    // one batch kind that is unconditionally critical, so planetary cannot
+    // lose the top slot to a threshold changing under this test.
+    const stopped = COLONIES.slice(0, 2).map((c) => ({
+      ...c,
+      detail: {
+        ...c.detail,
+        pins: c.detail.pins.map((pin) => ({ ...pin, expiry_time: hoursFromNow(-6) })),
+      },
+    }));
+    await grantScopes([ORDERS_SCOPE, PLANETS_SCOPE, INDUSTRY_SCOPE]);
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/planets`, () =>
+        HttpResponse.json(stopped.map((c) => c.planet))
+      ),
+      ...stopped.map((c) =>
+        http.get(
+          `https://esi.evetech.net/characters/${CHAR_ID}/planets/${c.planet.planet_id}`,
+          () => HttpResponse.json(c.detail)
+        )
+      )
+    );
+    render(<App />);
+    await screen.findByRole('heading', { name: 'Everything else' });
+    await waitFor(() => expect(fullCardDomains()).toContain('Planetary industry'));
+
+    // And what it says when folded is its own worst news, not a generic count.
+    const card = await findCard(/planetary industry/i);
+    expect(within(card).getByText(/2 colonies have stopped/i)).toBeInTheDocument();
+  });
+
+  /*
+   * Alerts is pinned to the folded list and never ranked against the cards.
+   * It is device-wide rather than this Character's, and its volume class is
+   * different from everything else here — letting one loud evening take both
+   * top slots is the failure its own column was built to prevent.
+   */
+  it('folds alerts however loud the day is, and never spends a card on it', async () => {
+    await grantScopes([ORDERS_SCOPE]);
+    await seedFeed(
+      Array.from({ length: 90 }, (_, i) =>
+        feedEntry({
+          id: `alert-${i}`,
+          eventId: 'eveNotification',
+          eveType: i % 2 === 0 ? 'StructureUnderAttack' : 'CorpAllBillMsg',
+          title: 'Alert',
+        })
+      )
+    );
+    render(<App />);
+    await screen.findByRole('heading', { name: 'Everything else' });
+
+    /*
+     * The feed arrives through a Dexie `useLiveQuery`, which lands after the
+     * board's own first paint — so the row exists (saying "Nothing new.")
+     * before it says this. Waiting on the text rather than on the row is what
+     * makes the difference; the default 1s budget is not enough for 90 seeded
+     * entries here.
+     *
+     * Two counts, two lookups: one key inflecting both would read "1 types".
+     */
+    /*
+     * The feed arrives through a Dexie `useLiveQuery`, so the row exists —
+     * saying "Nothing new." — before it says this.
+     *
+     * A floor rather than an exact 90, and a shape rather than exact figures:
+     * the app's own notification poller is live in this harness and files its
+     * own entry of its own type while the board renders. Pinning the numbers
+     * would make this test fail on unrelated work, and they are not what it is
+     * about — the two counts being *two lookups* is. One key asked to inflect
+     * both would read "1 types" the moment either figure were one.
+     */
+    const label = await waitFor(
+      () => {
+        // `?? ''` rather than a non-null assertion: a domain that has not
+        // folded yet simply fails the match, and `waitFor` tries again.
+        const found = foldedRowLabel('Alerts') ?? '';
+        expect(found).toMatch(/^Alerts: \d+ unread · \d+ types$/);
+        return found;
+      },
+      { timeout: 5000 }
+    );
+    expect(Number(/(\d+) unread/.exec(label)![1])).toBeGreaterThanOrEqual(90);
+    expect(fullCardDomains()).not.toContain('Alerts');
   });
 });
 

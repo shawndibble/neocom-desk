@@ -49,10 +49,12 @@ import { useNotificationPreferences } from '@/features/notifications/preferences
 import { SummaryStrip } from '@/features/overview/SummaryStrip';
 import {
   AlertsColumn,
+  EverythingElseCard,
   IndustryCard,
   MiningTaxCard,
   OrdersCard,
   PlanetaryCard,
+  type FoldedDomain,
 } from '@/features/overview/cards';
 import {
   loadIndustryBoard,
@@ -65,7 +67,15 @@ import {
   ordersSeverity,
   planetarySeverity,
 } from '@/features/overview/boardSeverity';
-import { compareSeverity, type DeadlineSeverity } from '@/engine/severity';
+import {
+  alertsSummary,
+  industrySummary,
+  miningTaxSummary,
+  ordersSummary,
+  planetarySummary,
+} from '@/features/overview/boardSummary';
+import { compareSeverity, worstSeverity, type DeadlineSeverity } from '@/engine/severity';
+import { useIsPhone } from '@/lib/useIsPhone';
 import { isJobDone } from '@/features/industry/jobs';
 import type { CharacterSkills, SkillQueueEntry } from '@/esi/endpoints';
 import { sortQueueEntries, selectActiveEntryFromSorted, selectQueueDepth } from './overviewQueue';
@@ -74,15 +84,13 @@ import { sortQueueEntries, selectActiveEntryFromSorted, selectQueueDepth } from 
 const EMPTY_NAMES: ReadonlyMap<number, string> = new Map();
 
 /**
- * Written out rather than built from the index: Tailwind scans source for
- * literal class names, so `order-${i}` would emit nothing at all.
+ * How many cards keep their full shape on a phone. Two, from the mockup
+ * (`design/overview-triage`, tagged): about three cards fit above the fold at
+ * 390px, and the third slot is what "Everything else" occupies — a domain
+ * summarised in one line you can still see beats a third card you have to
+ * scroll to.
  */
-const NARROW_ORDER = [
-  'order-1 sm:order-none',
-  'order-2 sm:order-none',
-  'order-3 sm:order-none',
-  'order-4 sm:order-none',
-];
+const PHONE_FULL_COUNT = 2;
 
 interface WalletPanelData {
   result: CachedResult<number> | null;
@@ -158,6 +166,7 @@ function stalest(dates: readonly (Date | null | undefined)[]): Date | null {
 export function Overview() {
   const { t } = useTranslation();
   const prefsValue = useNotificationPreferences((state) => state.value);
+  const isPhone = useIsPhone();
 
   // One `cacheKey` per card, not one for the page: they load independently, so
   // a return visit restores each as soon as that card's own last result exists
@@ -193,7 +202,10 @@ export function Overview() {
 
   const orderRows = useMemo(() => {
     const snapshot = ordersSnapshot.data;
-    if (!snapshot) return [];
+    // Null, not `[]`: "no open orders" and "the read has not landed" are the
+    // same empty list, and the card's severity ranks the phone's stack on the
+    // difference.
+    if (!snapshot) return null;
     /*
      * Narrowed to the active Character below. `loadOpenOrdersSnapshot` fans out
      * across every Character because it backs the cross-character Orders page;
@@ -324,11 +336,12 @@ export function Overview() {
   const walletBalance = walletSnapshot.data?.result?.data ?? null;
 
   /*
-   * Worst first, but only where it pays. Below `sm` the cards stack in one
+   * Worst first, but only where it pays. On a phone the cards stack in one
    * column and about three fit above the fold, so the thing on fire has to
-   * lead; from `sm` up the whole grid is on screen at once and a position that
-   * stays put between visits is worth more than a ranking nobody has to scroll
-   * to. `sm:order-none` is what hands the fixed order back.
+   * lead — and everything past `PHONE_FULL_COUNT` folds to a single line in
+   * "Everything else". From `sm` up the whole grid is on screen at once, and a
+   * position that stays put between visits is worth more than a ranking nobody
+   * has to scroll to: there the declaration order below is what renders.
    *
    * A null severity (still loading) sorts last rather than as `clear`: a card
    * that has made no claim yet must not jump the queue on a guess and
@@ -337,11 +350,13 @@ export function Overview() {
   const cards = [
     {
       key: 'orders',
+      domain: t('overview.board.orders'),
+      to: '/market?section=orders',
       severity: ordersSeverity(orderRows, ordersNeedReauth),
-      render: (className: string) => (
+      summary: ordersSummary(t, orderRows, ordersNeedReauth),
+      render: () => (
         <OrdersCard
-          className={className}
-          rows={orderRows}
+          rows={orderRows ?? []}
           maxOrders={skillsQueueData?.maxOrders ?? null}
           needsReauth={ordersNeedReauth}
         />
@@ -349,22 +364,28 @@ export function Overview() {
     },
     {
       key: 'mining',
+      domain: t('overview.board.miningTax'),
+      to: '/moon-mining',
       severity: miningTaxSeverity(miningSnapshot.data),
-      render: (className: string) => (
-        <MiningTaxCard className={className} data={miningSnapshot.data} />
-      ),
+      summary: miningTaxSummary(t, miningSnapshot.data),
+      render: () => <MiningTaxCard data={miningSnapshot.data} />,
     },
     {
       key: 'planetary',
+      domain: t('overview.board.planetary'),
+      to: '/planetary-industry',
       severity: planetarySeverity(planetary),
-      render: (className: string) => <PlanetaryCard className={className} data={planetary} />,
+      summary: planetarySummary(t, planetary),
+      render: () => <PlanetaryCard data={planetary} />,
     },
     {
       key: 'industry',
+      domain: t('overview.board.industry'),
+      to: '/industry',
       severity: industrySeverity(industryJobs, industrySnapshot.data?.needsReauth ?? false, now),
-      render: (className: string) => (
+      summary: industrySummary(t, industrySnapshot.data, now),
+      render: () => (
         <IndustryCard
-          className={className}
           jobs={industryJobs}
           productNames={industrySnapshot.data?.productNames ?? EMPTY_NAMES}
           needsReauth={industrySnapshot.data?.needsReauth ?? false}
@@ -373,15 +394,37 @@ export function Overview() {
       ),
     },
   ];
-  const rank = new Map(
-    [...cards]
-      .sort((a, b) =>
-        a.severity === null || b.severity === null
-          ? Number(a.severity === null) - Number(b.severity === null)
-          : compareSeverity(a.severity, b.severity)
-      )
-      .map((card, i) => [card.key, i])
+  const ranked = [...cards].sort((a, b) =>
+    a.severity === null || b.severity === null
+      ? Number(a.severity === null) - Number(b.severity === null)
+      : compareSeverity(a.severity, b.severity)
   );
+  const fullCards = isPhone ? ranked.slice(0, PHONE_FULL_COUNT) : cards;
+
+  /*
+   * Alerts leads the folded list instead of competing for a full card, and is
+   * never ranked against the others.
+   *
+   * It is the one row here that is device-wide rather than this Character's,
+   * and its volume class is different from everything else on the board — the
+   * reason it has a column of its own rather than a card. Letting it into the
+   * ranking would mean one loud evening pushes both genuine deadlines off the
+   * top of a phone, which is the failure the column was built to prevent. The
+   * mockup does the same: it folds a 70-unread alerts row while planetary and
+   * orders keep their cards.
+   */
+  const folded: FoldedDomain[] = isPhone
+    ? [
+        {
+          key: 'alerts',
+          domain: t('overview.board.alerts'),
+          summary: alertsSummary(t, visibleAlerts.length, alertGroups.length),
+          severity: worstSeverity(alertGroups.map((group) => group.severity)),
+          to: '/alerts',
+        },
+        ...ranked.slice(PHONE_FULL_COUNT),
+      ]
+    : [];
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
@@ -466,16 +509,21 @@ export function Overview() {
           {/* Every card renders unconditionally, mid-load included. Gating one
               on its own data would make "still loading" and "nothing here"
               look identical to "this domain does not exist" — which is the
-              failure this board was rebuilt to avoid. */}
-          {cards.map(({ key, render }) => (
-            <Fragment key={key}>{render(NARROW_ORDER[rank.get(key) ?? 0])}</Fragment>
+              failure this board was rebuilt to avoid. Folding a card on a
+              phone is not that: the domain still has its line, and says the
+              same three things it would have said in full. */}
+          {fullCards.map(({ key, render }) => (
+            <Fragment key={key}>{render()}</Fragment>
           ))}
+          <EverythingElseCard domains={folded} />
         </div>
-        <AlertsColumn
-          groups={alertGroups}
-          unread={visibleAlerts.length}
-          onDismissAll={() => void dismissFeedEntries(visibleAlerts.map((entry) => entry.id))}
-        />
+        {!isPhone && (
+          <AlertsColumn
+            groups={alertGroups}
+            unread={visibleAlerts.length}
+            onDismissAll={() => void dismissFeedEntries(visibleAlerts.map((entry) => entry.id))}
+          />
+        )}
       </div>
     </div>
   );

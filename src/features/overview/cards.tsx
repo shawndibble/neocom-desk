@@ -24,7 +24,7 @@ import type { IndustryJob } from '@/esi/endpoints';
 import type { OpenOrderRow } from '@/features/market/openOrdersModel';
 import { openOrderProblemCounts, needsAttentionCount } from '@/features/market/openOrdersModel';
 import type { DisplayAlertGroup } from '@/features/notifications/alertsFilter';
-import { BoardCard, NumberTile, TileRow, TriageRow } from './BoardCard';
+import { BoardCard, FoldedRow, NumberTile, TileRow, TriageRow } from './BoardCard';
 import {
   industrySeverity,
   jobSeverity,
@@ -74,13 +74,11 @@ export function OrdersCard({
   rows,
   maxOrders,
   needsReauth,
-  className,
 }: {
   rows: readonly OpenOrderRow[];
   /** The ceiling the Trade skills grant. Null until /skills lands — an untrained pilot still has slots, so "5" and "not known yet" must not look alike. */
   maxOrders: number | null;
   needsReauth: boolean;
-  className?: string;
 }) {
   const { t } = useTranslation();
   const counts = openOrderProblemCounts(rows);
@@ -89,7 +87,6 @@ export function OrdersCard({
 
   return (
     <BoardCard
-      className={className}
       title={t('overview.board.orders')}
       meta={
         needsReauth ? undefined : (
@@ -148,17 +145,10 @@ export function OrdersCard({
  * mining, so there is no "owed to you" side to report — an earlier draft had
  * one and it was meaningless.
  */
-export function MiningTaxCard({
-  data,
-  className,
-}: {
-  data: MiningTaxBoardData | null;
-  className?: string;
-}) {
+export function MiningTaxCard({ data }: { data: MiningTaxBoardData | null }) {
   const { t } = useTranslation();
   return (
     <BoardCard
-      className={className}
       title={t('overview.board.miningTax')}
       meta={<SeverityWord severity={miningTaxSeverity(data)} />}
       to="/moon-mining"
@@ -207,19 +197,12 @@ export function MiningTaxCard({
  * trip. `groupColoniesIntoBatches` is where that judgement lives; this only
  * renders it.
  */
-export function PlanetaryCard({
-  data,
-  className,
-}: {
-  data: PlanetaryBoardData | null;
-  className?: string;
-}) {
+export function PlanetaryCard({ data }: { data: PlanetaryBoardData | null }) {
   const { t } = useTranslation();
   const batches = data?.batches.slice(0, ROW_LIMIT) ?? [];
 
   return (
     <BoardCard
-      className={className}
       title={t('overview.board.planetary')}
       meta={<SeverityWord severity={planetarySeverity(data)} />}
       to="/planetary-industry"
@@ -290,14 +273,12 @@ export function IndustryCard({
   productNames,
   needsReauth,
   nowMs,
-  className,
 }: {
   jobs: readonly IndustryJob[];
   productNames: ReadonlyMap<number, string>;
   /** A lapsed grant, not an idle character — an empty card must not conflate the two. */
   needsReauth: boolean;
   nowMs: number;
-  className?: string;
 }) {
   const { t } = useTranslation();
   const summary = summarizeJobs(jobs, nowMs);
@@ -309,7 +290,6 @@ export function IndustryCard({
 
   return (
     <BoardCard
-      className={className}
       title={t('overview.board.industry')}
       meta={<SeverityWord severity={industrySeverity(jobs, needsReauth, nowMs)} />}
       to="/industry"
@@ -453,6 +433,49 @@ function AlertColumnRow({ group }: { group: DisplayAlertGroup }) {
         </span>
       </Link>
     </li>
+  );
+}
+
+// --- Everything else ------------------------------------------------------
+
+export interface FoldedDomain {
+  key: string;
+  domain: string;
+  summary: string;
+  severity: DeadlineSeverity | null;
+  to: string;
+}
+
+/**
+ * The phone's tail end: every domain that did not earn a full card, one line
+ * each.
+ *
+ * Below `sm` about three cards fit above the fold, so a board of four cards
+ * plus an alerts column is four screens of scrolling on the day it matters
+ * least — and the two that matter are already at the top, ranked. This says
+ * what the rest are up to without asking for the room to show it, and each row
+ * leads to the page that would.
+ *
+ * A `Panel` rather than a `BoardCard`: it has no page of its own to open, and
+ * "Everything else" is a leftover rather than a domain.
+ */
+export function EverythingElseCard({ domains }: { domains: readonly FoldedDomain[] }) {
+  const { t } = useTranslation();
+  if (domains.length === 0) return null;
+  return (
+    <Panel title={t('overview.board.everythingElse')} padded={false}>
+      <ul>
+        {domains.map((entry) => (
+          <FoldedRow
+            key={entry.key}
+            domain={entry.domain}
+            summary={entry.summary}
+            severity={entry.severity}
+            to={entry.to}
+          />
+        ))}
+      </ul>
+    </Panel>
   );
 }
 

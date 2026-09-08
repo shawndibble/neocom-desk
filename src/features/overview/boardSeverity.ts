@@ -27,11 +27,18 @@ import type { MiningTaxBoardData, PlanetaryBoardData } from './boardData';
  */
 const UNREADABLE: DeadlineSeverity = 'warning';
 
+/**
+ * Null while the snapshot is still in flight, like every other domain here.
+ * An empty row list is what both "no orders" and "not fetched yet" look like,
+ * and the second one answering `clear` would rank the card to the bottom of
+ * the phone's stack and then shuffle it back up as the read lands.
+ */
 export function ordersSeverity(
-  rows: readonly OpenOrderRow[],
+  rows: readonly OpenOrderRow[] | null,
   needsReauth: boolean
-): DeadlineSeverity {
+): DeadlineSeverity | null {
   if (needsReauth) return UNREADABLE;
+  if (rows === null) return null;
   const counts = openOrderProblemCounts(rows);
   if (counts.belowFloor > 0) return 'critical';
   const undercut = counts.undercutStation + counts.undercutSystem + counts.undercutRegion;
