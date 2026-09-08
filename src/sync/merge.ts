@@ -278,6 +278,20 @@ export interface FeedMergeResult<L extends FeedRow, R extends RemoteFeedDoc> {
 }
 
 /**
+ * The feed's **transport** timestamp (issue #581) — what an incremental pull
+ * cursors on, written to the remote doc as a plain `updatedAt` by
+ * `toRemoteFeedDoc`. Deliberately NOT a merge input: {@link mergeFeed} keys on
+ * `firedAt`/`dismissedAt` and nothing here changes that. Derived from those two
+ * rather than stamped with `Date.now()` so the value a device compares locally
+ * and the value it wrote remotely are the same number — a `dismissedAt`-only
+ * change moves it (which is the whole reason the feed cannot cursor on
+ * `firedAt`), and a re-push never re-dates a row.
+ */
+export function feedTransportStamp(row: FeedRow): number {
+  return Math.max(row.firedAt, row.dismissedAt ?? 0);
+}
+
+/**
  * Feed sync has no tombstones (CONTEXT.md round 45: dismissal is a flag, not
  * a delete) and no generic LWW over a whole record — content
  * fields never change once a row is fired, only `dismissedAt` does. So unlike
@@ -314,20 +328,6 @@ export interface FeedMergeResult<L extends FeedRow, R extends RemoteFeedDoc> {
  * reconciled in a pass, never both — a row old enough to purge is old enough
  * that its dismissal no longer matters.
  */
-/**
- * The feed's **transport** timestamp (issue #581) — what an incremental pull
- * cursors on, written to the remote doc as a plain `updatedAt` by
- * `toRemoteFeedDoc`. Deliberately NOT a merge input: {@link mergeFeed} keys on
- * `firedAt`/`dismissedAt` and nothing here changes that. Derived from those two
- * rather than stamped with `Date.now()` so the value a device compares locally
- * and the value it wrote remotely are the same number — a `dismissedAt`-only
- * change moves it (which is the whole reason the feed cannot cursor on
- * `firedAt`), and a re-push never re-dates a row.
- */
-export function feedTransportStamp(row: FeedRow): number {
-  return Math.max(row.firedAt, row.dismissedAt ?? 0);
-}
-
 export function mergeFeed<L extends FeedRow, R extends RemoteFeedDoc>(
   local: readonly L[],
   pushEligible: ReadonlySet<string>,

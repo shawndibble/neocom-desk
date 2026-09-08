@@ -535,10 +535,16 @@ describe('mergeFeed: remote retention purge', () => {
     // rowsWithinSyncWindow keeps firedAt >= cutoff (feed.test.ts pins that),
     // so the boundary row is inside the window on both sides of the rule. If
     // purge used <= here, one pass would delete a row the same pass re-created.
+    // Both sides hold it, so it is a purge candidate and push-eligible at
+    // once: under <= the same pass would delete the remote doc and re-create
+    // it from the local one.
     const boundary = { id: 'occ-1', firedAt: CUTOFF };
-    const result = mergeFeedNow([boundary], new Set(['occ-1']), []);
+    const result = mergeFeedNow([boundary], new Set(['occ-1']), [
+      remoteFeedRow({ firedAt: CUTOFF }),
+    ]);
     expect(result.purgeRemote).toEqual([]);
-    expect(result.pushCreate).toEqual([boundary]);
+    expect(result.pushCreate).toEqual([]);
+    expect(result.pullCreate).toEqual([]);
   });
 
   it('purges a row one millisecond past the cutoff (AC2)', () => {
