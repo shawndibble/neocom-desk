@@ -823,7 +823,7 @@ export function Market() {
               <span>{formatIsk(o.price, 2)}</span>
               {gap && (
                 <span
-                  className={`text-[0.625rem] font-semibold whitespace-nowrap ${gap.beaten ? 'text-danger' : 'text-accent'}`}
+                  className={`text-[0.625rem] font-semibold whitespace-nowrap ${gap.beaten ? 'text-isk-neg' : 'text-success'}`}
                 >
                   {gap.beaten && gap.gapIsk !== null && gap.gapPct !== null
                     ? t('market.myOrderUndercutBy', {
