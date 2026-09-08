@@ -261,6 +261,10 @@ export const ESI_REGISTRY = {
     route: '/universe/groups/{group_id}',
     scope: PUBLIC,
   },
+  getUniverseRegion: {
+    route: '/universe/regions/{region_id}',
+    scope: PUBLIC,
+  },
   getUniverseStation: {
     route: '/universe/stations/{station_id}',
     scope: PUBLIC,

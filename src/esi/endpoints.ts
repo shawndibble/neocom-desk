@@ -454,6 +454,23 @@ export function getCharacterAssets(
   });
 }
 
+// --- GET /universe/regions/{region_id} (public) ---
+
+export interface UniverseRegion {
+  region_id: number;
+  name: string;
+}
+
+export function getUniverseRegion(
+  regionId: number,
+  options: EndpointOptions = {}
+): Promise<EsiResult<UniverseRegion>> {
+  return esiFetch<UniverseRegion>(`/universe/regions/${regionId}`, {
+    ...options,
+    endpointId: 'getUniverseRegion',
+  });
+}
+
 // --- GET /universe/stations/{station_id} (public) ---
 
 export interface UniverseStation {

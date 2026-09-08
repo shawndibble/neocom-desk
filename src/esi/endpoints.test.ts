@@ -18,6 +18,7 @@ import {
   getCharacterWalletJournal,
   getCharacterWalletTransactions,
   getCharacterAssets,
+  getUniverseRegion,
   getUniverseStation,
   getUniverseSystem,
   getCharacterMailHeaders,
@@ -327,6 +328,20 @@ describe('public info endpoints', () => {
       { attribute_id: 177, value: 5.0 },
       { attribute_id: 176, value: 0.0 },
     ]);
+  });
+
+  it('getUniverseRegion is unauthenticated and returns the region name', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/universe/regions/10000002`, ({ request }) => {
+        const bad = rejectBadEsiHeaders(request);
+        if (bad) return bad;
+        return HttpResponse.json({ region_id: 10000002, name: 'The Forge' });
+      })
+    );
+
+    const result = await getUniverseRegion(10000002);
+
+    expect(result.data?.name).toBe('The Forge');
   });
 
   it('getUniverseStation is unauthenticated and returns the station name', async () => {
