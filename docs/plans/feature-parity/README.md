@@ -380,6 +380,12 @@ sync at cost L. Both rest on assumptions that do not hold.
 - **There is nothing to migrate.** No production `sync.`-prefixed key exists.
   The settings sync path is built and has no producers. The trade-hub
   preference people assume is synced is device-local (`marketHub`).
+  _(Superseded on both counts: `sync.` keys now have producers, and the
+  Settings page's Defaults — `marketHub` among them — sync. See
+  `docs/context/decisions/` for "the Settings page's Defaults answer for the
+  pilot". The argument below about account-level sync is unaffected: those are
+  device-global keys pushed under every Character's own uid, not an account
+  uid.)_
 - **Option (b) is not an L. It is a rewrite of the trust boundary.** EVE SSO
   exposes **no account identifier** — `sub` is per-Character and `owner` is
   the ownerHash, which changes on transfer. So an account grouping would be

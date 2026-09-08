@@ -2658,7 +2658,8 @@
           "miningTaxNote": "The payees you named and the entries you assigned to them, including the ore and ISK figures snapshotted at that moment — that snapshot is the invoice, so it has to travel with it.",
           "notificationFeed": "Your Alerts.",
           "notificationFeedNote": "Ones you have already been shown, so another device can catch up on what it missed. Kept for 30 days.",
-          "settings": "Two settings: your notification preferences, and the PI customs rates you overrode. Nothing else on this page leaves your device."
+          "settings": "The settings you chose on this page.",
+          "settingsNote": "Your notification preferences, the PI customs rates you overrode, and the defaults every page starts from — trade hub, industry facility, assumed ME, the PI expiring-soon window and the corp dark threshold. Nothing else on this page leaves your device."
         },
         "local": {
           "title": "Kept on this device only",
@@ -2668,7 +2669,7 @@
           "market": "Market prices, order books and the LP store.",
           "login": "Your EVE sign-in.",
           "loginNote": "The token that keeps you logged in is stored in this browser and nowhere else.",
-          "preferences": "The rest of Settings — text size, time format, defaults — and every sort, filter and expanded section a page remembers as you use it."
+          "preferences": "The rest of Settings — text size and time format, which answer for the screen you are looking at — and every sort, filter and expanded section a page remembers as you use it."
         },
         "notesTitle": "Worth knowing",
         "notes": {
@@ -2774,6 +2775,7 @@
     "clearCache": "Clear cached ESI data",
     "clearCacheConfirm": "Cache cleared.",
     "defaultsTitle": "Defaults",
+    "defaultsSyncHint": "Kept across your devices — set these once, on whichever one you have to hand.",
     "corpDefaultsTitle": "Corporation",
     "timeFormatLabel": "Time format",
     "timeFormatHint": "EVE runs on UTC — the clock other players quote timers in. Calendar keeps your local days either way.",

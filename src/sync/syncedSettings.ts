@@ -29,9 +29,33 @@
 // Never deleted via deleteSyncedSetting either: clearing one system's override
 // empties an entry and leaves the blob valid, so the tombstone-expiry edge
 // above does not bite this key.
+//
+// The five preferences behind Settings' Defaults and Corporation panels: the
+// trade hub the Market Browser opens at, the facility a first Build Plan
+// assumes, the ME an unowned sub-build is quoted at, the PI expiring-soon
+// window, and the corp roster's dark threshold. A pilot who says "quote my
+// builds at my rigged Azbel" is answering for themselves, not for one machine,
+// and had to answer again on every device.
+//
+// One key each, unlike the two blobs above: the set of defaults is fixed and
+// small, so an exact-match entry per preference is expressible — and each key
+// merges on its own, so changing the hub on a laptop cannot roll back an ME
+// set on a phone. The blob shape is what an *unbounded* key space (one entry
+// per Character, per system) forces; it is not the preferred shape.
+//
+// Never deleted via deleteSyncedSetting: a preference is set to another value,
+// never unset — there is no control that removes one — so the tombstone-expiry
+// edge above does not bite these either. Each is seeded from the device-local
+// key it used before it synced; `lib/useSyncedSetting.ts` explains why that
+// seed is written unstamped.
 export const SYNCED_SETTING_KEYS: readonly string[] = [
+  'sync.corpDarkAfterDays',
+  'sync.industryAssumedMe',
+  'sync.industryFacilityDefaults',
+  'sync.marketHub',
   'sync.notificationFeedPrefs',
   'sync.piCustomsRates',
+  'sync.piExpiringSoonHours',
 ];
 
 const allowed = new Set(SYNCED_SETTING_KEYS);

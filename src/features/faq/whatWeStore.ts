@@ -68,7 +68,11 @@ export const WHAT_WE_STORE_GROUPS: readonly WhatWeStoreGroup[] = [
         labelKey: 'settings.faq.store.synced.notificationFeed',
         noteKey: 'settings.faq.store.synced.notificationFeedNote',
       },
-      { id: 'settings', labelKey: 'settings.faq.store.synced.settings' },
+      {
+        id: 'settings',
+        labelKey: 'settings.faq.store.synced.settings',
+        noteKey: 'settings.faq.store.synced.settingsNote',
+      },
     ],
   },
   {

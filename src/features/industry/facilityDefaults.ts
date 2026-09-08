@@ -16,11 +16,20 @@
  * One packed record rather than three keys: rig level and facility tax only
  * mean anything for a player structure, and splitting them lets the three
  * drift into a combination the pilot never chose.
+ *
+ * Synced across the pilot's devices — the Azbel they build at is theirs, not
+ * their laptop's. The packing has one cost there, named in the decision that
+ * introduced it: `mergeSettings` is last-write-wins per *key*, so two devices
+ * that change different fields of this record before either syncs keep only
+ * the later record whole, rather than merging the two fields.
  */
-import { createLocalSetting } from '@/lib/useLocalSetting';
+import { createSyncedSetting } from '@/lib/useSyncedSetting';
 import { FACILITY_PRESETS, type FacilityKind, type RigLevel } from '@/engine/industry/types';
 
-export const FACILITY_DEFAULTS_SETTING_KEY = 'industryFacilityDefaults';
+export const FACILITY_DEFAULTS_SETTING_KEY = 'sync.industryFacilityDefaults';
+
+/** What it was stored under before it synced; its value is adopted once. */
+export const LEGACY_FACILITY_DEFAULTS_SETTING_KEY = 'industryFacilityDefaults';
 
 export interface FacilityDefaults {
   facility: FacilityKind;
@@ -74,8 +83,9 @@ function parseFacilityDefaults(raw: unknown): FacilityDefaults | null {
   });
 }
 
-export const useFacilityDefaults = createLocalSetting<FacilityDefaults>({
+export const useFacilityDefaults = createSyncedSetting<FacilityDefaults>({
   key: FACILITY_DEFAULTS_SETTING_KEY,
+  legacyKey: LEGACY_FACILITY_DEFAULTS_SETTING_KEY,
   defaultValue: DEFAULT_FACILITY_DEFAULTS,
   parse: parseFacilityDefaults,
 });
