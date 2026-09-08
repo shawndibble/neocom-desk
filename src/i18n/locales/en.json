@@ -1975,7 +1975,21 @@
     "emptyHint": "The public contract index refreshes on its own schedule — check back shortly.",
     "notConfiguredTitle": "Public BPC search isn't available",
     "notConfiguredHint": "This requires the app's sync backend, which isn't configured here.",
-    "noFilterMatches": "No BPC listings match your filters."
+    "noFilterMatches": "No BPC listings match your filters.",
+    "suggestionsLabel": "Matching blueprints",
+    "suggestionCopies_one": "{{count}} copy",
+    "suggestionCopies_other": "{{count}} copies",
+    "suggestionBestMeTe": "Best {{me}} / {{te}}",
+    "copiesOnContract_one": "{{count}} copy on contract",
+    "copiesOnContract_other": "{{count}} copies on contract",
+    "cheapestLabel": "Cheapest",
+    "medianLabel": "Median",
+    "bestMeTeLabel": "Best ME / TE",
+    "clearBlueprint": "Clear blueprint filter: {{name}}",
+    "clearBlueprintShort": "Clear",
+    "cheapestByRegion": "Cheapest by region",
+    "regionOffers_one": "{{count}} offer",
+    "regionOffers_other": "{{count}} offers"
   },
   "contacts": {
     "title": "Contacts",

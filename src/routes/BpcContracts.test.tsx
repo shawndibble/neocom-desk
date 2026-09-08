@@ -156,4 +156,96 @@ describe('BpcContracts', () => {
 
     expect(await screen.findByText("Public BPC search isn't available")).toBeInTheDocument();
   });
+
+  it('suggests matching blueprints as you type, with how many copies each has', async () => {
+    loadPublicBpcContracts.mockResolvedValue(
+      cachedSnapshot([
+        row({ contractId: 1, typeId: 638 }),
+        row({ contractId: 2, typeId: 638 }),
+        row({ contractId: 3, typeId: 870 }),
+      ])
+    );
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByRole('table', { name: 'BPC Search' });
+
+    await user.type(screen.getByPlaceholderText('Search blueprint name…'), 'Rifter');
+
+    const suggestions = screen.getByRole('list', { name: 'Matching blueprints' });
+    expect(within(suggestions).getByText('Rifter Blueprint')).toBeInTheDocument();
+    expect(within(suggestions).getByText('2 copies')).toBeInTheDocument();
+    expect(within(suggestions).queryByText('Caracal Blueprint')).not.toBeInTheDocument();
+  });
+
+  it('summarises one blueprint once it is picked from the suggestions', async () => {
+    loadPublicBpcContracts.mockResolvedValue(
+      cachedSnapshot([
+        row({ contractId: 1, typeId: 638, price: 5_000_000 }),
+        row({ contractId: 2, typeId: 638, price: 3_000_000 }),
+        row({ contractId: 3, typeId: 638, price: 9_000_000, regionId: 10000043 }),
+        row({ contractId: 4, typeId: 870 }),
+      ])
+    );
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByRole('table', { name: 'BPC Search' });
+
+    await user.type(screen.getByPlaceholderText('Search blueprint name…'), 'Rifter');
+    const suggestions = screen.getByRole('list', { name: 'Matching blueprints' });
+    await user.click(within(suggestions).getByRole('button'));
+
+    expect(screen.getByText('3 copies on contract')).toBeInTheDocument();
+    // Scoped to the chips: these figures also appear in the region strip and
+    // the table, which is the point — all three have to agree.
+    expect(screen.getByText('Cheapest').parentElement).toHaveTextContent('3,000,000.00');
+    expect(screen.getByText('Median').parentElement).toHaveTextContent('5,000,000.00');
+    // The suggestion list closes once a blueprint is pinned.
+    expect(screen.queryByRole('list', { name: 'Matching blueprints' })).not.toBeInTheDocument();
+  });
+
+  it('compares the cheapest offer per region for the picked blueprint', async () => {
+    loadPublicBpcContracts.mockResolvedValue(
+      cachedSnapshot([
+        row({ contractId: 1, typeId: 638, price: 5_000_000, regionId: 10000002 }),
+        row({ contractId: 2, typeId: 638, price: 3_000_000, regionId: 10000002 }),
+        row({ contractId: 3, typeId: 638, price: 9_000_000, regionId: 10000043 }),
+      ])
+    );
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByRole('table', { name: 'BPC Search' });
+
+    await user.type(screen.getByPlaceholderText('Search blueprint name…'), 'Rifter');
+    await user.click(
+      within(screen.getByRole('list', { name: 'Matching blueprints' })).getByRole('button')
+    );
+
+    const strip = screen.getByText('Cheapest by region').parentElement as HTMLElement;
+    expect(within(strip).getByText('2 offers')).toBeInTheDocument();
+    expect(within(strip).getByText('1 offer')).toBeInTheDocument();
+    // Cheapest region first, so the order itself carries the answer.
+    expect(within(strip).getAllByRole('listitem')[0]).toHaveTextContent('The Forge');
+  });
+
+  it('clearing the picked blueprint restores the full, browsable list', async () => {
+    loadPublicBpcContracts.mockResolvedValue(
+      cachedSnapshot([row({ contractId: 1, typeId: 638 }), row({ contractId: 2, typeId: 870 })])
+    );
+    const user = userEvent.setup();
+    render(<App />);
+    const table = await screen.findByRole('table', { name: 'BPC Search' });
+
+    await user.type(screen.getByPlaceholderText('Search blueprint name…'), 'Rifter');
+    await user.click(
+      within(screen.getByRole('list', { name: 'Matching blueprints' })).getByRole('button')
+    );
+    expect(within(table).queryByText('Caracal Blueprint')).not.toBeInTheDocument();
+
+    await user.click(
+      screen.getByRole('button', { name: 'Clear blueprint filter: Rifter Blueprint' })
+    );
+
+    expect(within(table).getByText('Caracal Blueprint')).toBeInTheDocument();
+    expect(within(table).getByText('Rifter Blueprint')).toBeInTheDocument();
+  });
 });

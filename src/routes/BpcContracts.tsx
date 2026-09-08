@@ -18,12 +18,16 @@ import {
   SelectValue,
   SearchInput,
   Spinner,
+  StatChip,
   TextInput,
   type DataTableColumn,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import {
   EMPTY_BPC_SEARCH_FILTER,
+  blueprintOfferStats,
+  bpcPriceSummary,
+  cheapestByRegion,
   filterBpcContracts,
   listedBlueprintTypeOptions,
   type BpcContractRow,
@@ -38,6 +42,7 @@ import { loadBlueprints } from '@/sde/loadSde';
 import { isSyncConfigured } from '@/app/syncStatus';
 import type { CachedResult } from '@/esi/cache';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
+import { cx } from '@/lib/cx';
 import { rankedSearch } from '@/lib/rankedSearch';
 import { formatIsk } from '@/lib/isk';
 import { formatTimestamp } from '@/lib/timestamp';
@@ -105,6 +110,26 @@ const EMPTY_UI_FILTER: UiFilter = {
 
 const ALL_REGIONS = 'all';
 const TYPE_SEARCH_LIMIT = 50;
+
+/**
+ * Blueprints offered in the autocomplete under the search box. Short on
+ * purpose: the list sits above the results it is narrowing, so a long one
+ * pushes the table off the screen — and past a handful of candidates the
+ * answer is to keep typing, not to scroll the suggestions.
+ */
+const SUGGESTION_LIMIT = 8;
+
+/** Region cells shown in the cheapest-by-region strip, in cheapest-first order — six fills the row at `lg` without wrapping into a second one that would outsize the table below it. */
+const REGION_CELL_LIMIT = 6;
+
+/** One row of the search's autocomplete: a candidate blueprint plus what its listings look like, so a dead blueprint is visible before it is chosen. */
+interface BlueprintSuggestion {
+  typeId: number;
+  name: string;
+  offerCount: number;
+  bestMe: number;
+  bestTe: number;
+}
 
 /** Positive-integer text field to a filter number, or null when blank/invalid — never NaN reaching the engine filter. */
 function parsePositiveNumber(value: string): number | null {
@@ -243,6 +268,16 @@ export function BpcContracts() {
 
   const [uiFilter, setUiFilter] = useState<UiFilter>(EMPTY_UI_FILTER);
   const [showAll, setShowAll] = useState(false);
+  /**
+   * The one blueprint the search has been narrowed to, or `null` while the
+   * query is still free text. Distinct from `uiFilter.typeQuery`: typing
+   * "rifter" narrows the table to every blueprint whose name matches, which is
+   * the browse path this page has always had; *choosing* one from the
+   * autocomplete is what unlocks the per-blueprint summary and the
+   * cheapest-by-region comparison, neither of which means anything averaged
+   * across several different blueprints.
+   */
+  const [selectedTypeId, setSelectedTypeId] = useState<number | null>(null);
 
   const rows = useMemo(() => contractsResult?.data?.rows ?? [], [contractsResult]);
 
@@ -250,6 +285,54 @@ export function BpcContracts() {
     () => listedBlueprintTypeOptions(rows, blueprintNames),
     [rows, blueprintNames]
   );
+
+  // Built once per snapshot, not per keystroke: every suggestion row needs a
+  // count and a best ME/TE, and deriving those by re-scanning ~120,000 rows
+  // per candidate is what would make the autocomplete stutter.
+  const offerStats = useMemo(() => blueprintOfferStats(rows), [rows]);
+
+  const suggestions = useMemo<BlueprintSuggestion[]>(() => {
+    if (selectedTypeId !== null || uiFilter.typeQuery.trim() === '') return [];
+    return rankedSearch(typeOptions, uiFilter.typeQuery, {
+      primary: (option) => option.name,
+      limit: SUGGESTION_LIMIT,
+    }).flatMap((option) => {
+      const stats = offerStats.get(option.typeId);
+      return stats
+        ? [
+            {
+              typeId: option.typeId,
+              name: option.name,
+              offerCount: stats.offerCount,
+              bestMe: stats.bestMe,
+              bestTe: stats.bestTe,
+            },
+          ]
+        : [];
+    });
+  }, [typeOptions, uiFilter.typeQuery, selectedTypeId, offerStats]);
+
+  const selectedName =
+    selectedTypeId === null ? null : (blueprintNames.get(selectedTypeId) ?? `#${selectedTypeId}`);
+
+  /** Picking from the autocomplete puts the blueprint's full name in the box, the way a combobox does — the field keeps showing what is being filtered on. */
+  function selectBlueprint(suggestion: BlueprintSuggestion) {
+    setSelectedTypeId(suggestion.typeId);
+    setUiFilter((filter) => ({ ...filter, typeQuery: suggestion.name }));
+    setShowAll(false);
+  }
+
+  function clearBlueprint() {
+    setSelectedTypeId(null);
+    setUiFilter((filter) => ({ ...filter, typeQuery: '' }));
+    setShowAll(false);
+  }
+
+  /** Editing the text drops the pinned blueprint — otherwise the box would show one name while the table filtered on another. */
+  function changeFilter(next: UiFilter) {
+    if (next.typeQuery !== uiFilter.typeQuery) setSelectedTypeId(null);
+    setUiFilter(next);
+  }
   const regionOptions = useMemo(
     () =>
       [...new Set(rows.map((r) => r.regionId))]
@@ -260,14 +343,16 @@ export function BpcContracts() {
 
   const engineFilter: BpcSearchFilter = useMemo(() => {
     const typeIds =
-      uiFilter.typeQuery.trim().length === 0
-        ? null
-        : new Set(
-            rankedSearch(typeOptions, uiFilter.typeQuery, {
-              primary: (o) => o.name,
-              limit: TYPE_SEARCH_LIMIT,
-            }).map((o) => o.typeId)
-          );
+      selectedTypeId !== null
+        ? new Set([selectedTypeId])
+        : uiFilter.typeQuery.trim().length === 0
+          ? null
+          : new Set(
+              rankedSearch(typeOptions, uiFilter.typeQuery, {
+                primary: (o) => o.name,
+                limit: TYPE_SEARCH_LIMIT,
+              }).map((o) => o.typeId)
+            );
     return {
       ...EMPTY_BPC_SEARCH_FILTER,
       typeIds,
@@ -277,10 +362,23 @@ export function BpcContracts() {
       minRuns: parsePositiveNumber(uiFilter.minRuns),
       maxPrice: parsePositiveNumber(uiFilter.maxPrice),
     };
-  }, [uiFilter, typeOptions]);
+  }, [uiFilter, typeOptions, selectedTypeId]);
 
   const filteredRows = useMemo(() => filterBpcContracts(rows, engineFilter), [rows, engineFilter]);
   const visibleRows = showAll ? filteredRows : filteredRows.slice(0, ROW_CAP);
+
+  // Both summarise `filteredRows`, not every row of the chosen blueprint, so
+  // they describe what is actually on screen: narrowing to ME ≥ 10 should move
+  // "cheapest" to the cheapest ME 10 copy, not keep quoting an ME 0 one the
+  // table below no longer lists.
+  const summary = useMemo(
+    () => (selectedTypeId === null ? null : bpcPriceSummary(filteredRows)),
+    [selectedTypeId, filteredRows]
+  );
+  const regionPrices = useMemo(
+    () => (selectedTypeId === null ? [] : cheapestByRegion(filteredRows)),
+    [selectedTypeId, filteredRows]
+  );
 
   const columns = useMemo<DataTableColumn<BpcContractRow>[]>(
     () => [
@@ -401,7 +499,108 @@ export function BpcContracts() {
               {t('common.offlineTitle')}
             </p>
           )}
-          <BpcFilterBar filter={uiFilter} onChange={setUiFilter} regionOptions={regionOptions} />
+          <BpcFilterBar filter={uiFilter} onChange={changeFilter} regionOptions={regionOptions} />
+
+          {suggestions.length > 0 && (
+            <ul
+              aria-label={t('bpcContracts.suggestionsLabel')}
+              className="max-h-72 overflow-y-auto border-b border-line"
+            >
+              {suggestions.map((suggestion) => (
+                <li key={suggestion.typeId} className="border-b border-line last:border-b-0">
+                  <button
+                    type="button"
+                    onClick={() => selectBlueprint(suggestion)}
+                    className="flex min-h-11 w-full items-center gap-3 px-3 py-1.5 text-left text-sm hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent md:min-h-9"
+                  >
+                    <span className="min-w-0 flex-1 truncate">{suggestion.name}</span>
+                    {/* Hidden on the narrowest screens rather than wrapped: three
+                        columns in a 390px row squeezes the name, which is the
+                        one part that has to stay readable. */}
+                    <span className="hidden shrink-0 text-[0.6875rem] tabular-nums text-text-dim sm:inline">
+                      {t('bpcContracts.suggestionBestMeTe', {
+                        me: suggestion.bestMe,
+                        te: suggestion.bestTe,
+                      })}
+                    </span>
+                    <span className="shrink-0 text-[0.6875rem] tabular-nums text-text-dim">
+                      {t('bpcContracts.suggestionCopies', { count: suggestion.offerCount })}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {selectedName !== null && summary !== null && (
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-line px-3 py-2">
+              <div className="min-w-0">
+                <p className="truncate text-base font-semibold">{selectedName}</p>
+                <p className="text-[0.6875rem] text-text-dim">
+                  {t('bpcContracts.copiesOnContract', { count: summary.offerCount })}
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 md:ml-auto">
+                {summary.cheapest !== null && (
+                  <StatChip
+                    label={t('bpcContracts.cheapestLabel')}
+                    value={formatIsk(summary.cheapest, 2)}
+                  />
+                )}
+                {summary.median !== null && (
+                  <StatChip
+                    label={t('bpcContracts.medianLabel')}
+                    value={formatIsk(summary.median, 2)}
+                  />
+                )}
+                {summary.bestMe !== null && summary.bestTe !== null && (
+                  <StatChip
+                    label={t('bpcContracts.bestMeTeLabel')}
+                    value={`${summary.bestMe} / ${summary.bestTe}`}
+                  />
+                )}
+                <IconButton
+                  icon={<Icon.Close />}
+                  label={t('bpcContracts.clearBlueprint', { name: selectedName })}
+                  tooltip={t('bpcContracts.clearBlueprintShort')}
+                  size="sm"
+                  onClick={clearBlueprint}
+                />
+              </div>
+            </div>
+          )}
+
+          {regionPrices.length > 1 && (
+            <div className="border-b border-line px-3 py-2">
+              <p className="pb-2 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                {t('bpcContracts.cheapestByRegion')}
+              </p>
+              {/* Cheapest first, so the ordering carries the answer and the
+                  accent on the leading cell is only reinforcement (DESIGN.md §7). */}
+              <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+                {regionPrices.slice(0, REGION_CELL_LIMIT).map((region, index) => (
+                  <li
+                    key={region.regionId}
+                    className={cx(
+                      'flex flex-col gap-0.5 rounded-xs border bg-panel-2 px-2.5 py-2',
+                      index === 0 ? 'border-accent-dim' : 'border-line'
+                    )}
+                  >
+                    <span className="truncate text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                      {regionNames.get(region.regionId) ?? `#${region.regionId}`}
+                    </span>
+                    <span className={cx('text-sm tabular-nums', index === 0 && 'text-accent')}>
+                      {formatIsk(region.cheapest, 2)}
+                    </span>
+                    <span className="text-[0.6875rem] tabular-nums text-text-dim">
+                      {t('bpcContracts.regionOffers', { count: region.offerCount })}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           {filteredRows.length === 0 ? (
             <EmptyState title={t('bpcContracts.noFilterMatches')} className="py-8" />
           ) : (
