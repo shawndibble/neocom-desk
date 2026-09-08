@@ -29,6 +29,7 @@ import {
   Orders,
   Planetary,
   ReadOnly,
+  ScheduledPush,
   SignIn,
   Skills,
   Social,
@@ -100,7 +101,12 @@ const FEATURE_GROUPS: { group: string; items: LandingRow[] }[] = [
     group: 'operations',
     items: [
       { icon: Corporation, key: 'corp' },
-      { icon: Notifications, key: 'notifications' },
+      // Alerts is the record of what fired; Notifications is how it gets to
+      // you. Two rows because the app splits them too — Alerts is a nav route,
+      // Notifications is a Settings panel plus the push path — and the bell
+      // belongs to the feed you read rather than to the delivery mechanism.
+      { icon: Notifications, key: 'alerts' },
+      { icon: ScheduledPush, key: 'notifications' },
       { icon: Social, key: 'social' },
     ],
   },

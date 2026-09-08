@@ -122,6 +122,7 @@ describe('Login', () => {
       'Planetary Industry',
       'Moon Mining',
       'Corporation',
+      'Alerts',
       'Notifications',
       'Mail, Calendar & Contracts',
     ]) {
