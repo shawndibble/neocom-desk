@@ -225,6 +225,29 @@ describe('mergeFeedRecord', () => {
     expect(mergeFeedRecord(undefined, incoming)).toEqual(incoming);
   });
 
+  /**
+   * The fields that say *what an occurrence was about* are facts fixed when it
+   * fired, and not every writer knows them: a remote doc written by a build
+   * that predates the field, or a `pullDismiss` carrying one back, arrives
+   * without it. Letting the newest write blank them costs the row its
+   * per-type mute (`eveType`) or its deep link (`typeId`) for no reason
+   * anyone could see.
+   */
+  it('keeps a subject the incoming write did not carry', () => {
+    const stored = { ...incoming, eventId: 'marketOrderFilled', typeId: 34 };
+    const pulled = { ...incoming, eventId: 'marketOrderFilled' };
+    expect(mergeFeedRecord(stored, pulled).typeId).toEqual(34);
+
+    const storedEve = { ...incoming, eventId: 'eveNotification', eveType: 'StructureUnderAttack' };
+    const pulledEve = { ...incoming, eventId: 'eveNotification' };
+    expect(mergeFeedRecord(storedEve, pulledEve).eveType).toEqual('StructureUnderAttack');
+  });
+
+  it('still lets a write that carries a subject correct the stored one', () => {
+    const stored = { ...incoming, eventId: 'marketOrderFilled', typeId: 34 };
+    expect(mergeFeedRecord(stored, { ...stored, typeId: 35 }).typeId).toEqual(35);
+  });
+
   it('takes the earlier firedAt and the newer copy, whichever side is older', () => {
     const stored = { ...incoming, title: 'Older copy', firedAt: 1000 };
     expect(mergeFeedRecord(stored, incoming)).toMatchObject({ firedAt: 1000, title: 'Newer copy' });

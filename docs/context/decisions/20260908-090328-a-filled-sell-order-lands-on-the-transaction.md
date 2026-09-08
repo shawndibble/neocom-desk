@@ -32,6 +32,15 @@ _Recorded 2026-09-08._
   order fills as several transactions, which sort adjacently by date, so landing
   on the newest lands on the group. This rules out promising the alert points at
   one exact transaction.
+- **A subject a write does not carry is never blanked, only ever corrected.**
+  `mergeFeedRecord` let the newest write win every field but `firedAt` and
+  `dismissedAt`, so a remote doc from a build predating a subject field — or
+  the `pullDismiss` that carries a remote dismissal back — erased the local
+  one. `eveType` and `typeId` now fall back to the stored value, because both
+  are facts fixed when the occurrence fired and absence means the writer did
+  not know one. This rules out reading "content never changes once a row is
+  fired" as "so any writer's copy of it is authoritative"; it fixes the same
+  latent hole for `eveType`, where the cost was a lost per-type mute.
 - **The highlight is spent on arrival.** The `highlight` param is latched on
   mount and immediately dropped from the URL — including when nothing matched,
   since the fill can be newer than the cached transactions or older than the

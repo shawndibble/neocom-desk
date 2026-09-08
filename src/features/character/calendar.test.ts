@@ -4,6 +4,8 @@ import { setupServer } from 'msw/node';
 import { configureEsi, ESI_BASE_URL } from '@/esi/client';
 import { db } from '@/db';
 import { loadCalendarEvents, loadCalendarEvent } from './calendar';
+import { calendarDomain } from '@/features/notifications/pollDomains';
+import type { CalendarSnapshot } from '@/engine/notificationDiffs';
 
 const CHAR_ID = 91;
 const server = setupServer();
@@ -147,6 +149,95 @@ describe('loadCalendarEvents retention', () => {
     const result = await loadCalendarEvents(CHAR_ID);
     expect(result.needsReauth).toBe(true);
     expect(result.cached).toBeNull();
+  });
+});
+
+/**
+ * The seam, end to end. `diffCalendarEventStarting` looks for an entry whose
+ * start is newly in the past — which, before retention, was an entry ESI had
+ * already dropped from the list the poller reads. The unit tests either side
+ * of this one each prove half: that retention keeps the event, and that the
+ * diff fires given a snapshot containing it. Only driving the real
+ * `loadCalendarEvents` through the domain's own `toSnapshot` and `diff` shows
+ * that the half the poller actually gets is the half the diff needs.
+ */
+describe('the calendar poll domain, fed by the real loader', () => {
+  it('fires calendarEventStarting for an event ESI dropped the moment it began', async () => {
+    const event = {
+      event_id: 1,
+      event_date: new Date(2026, 8, 8, 13, 0, 0).toISOString(),
+      title: 'Fleet Op',
+      importance: 0,
+      event_response: 'accepted' as const,
+    };
+
+    // Poll one, half an hour before the op: ESI still lists it.
+    const before = new Date(2026, 8, 8, 12, 30, 0).getTime();
+    vi.setSystemTime(before);
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/calendar`, () => HttpResponse.json([event]))
+    );
+    const first = await calendarDomain.load(CHAR_ID);
+    const prev = calendarDomain.toSnapshot(first!, before) as CalendarSnapshot;
+
+    // Poll two, half an hour after it started: ESI returns nothing at all.
+    const after = new Date(2026, 8, 8, 13, 30, 0).getTime();
+    vi.setSystemTime(after);
+    await db.esiCache.delete([CHAR_ID, 'calendar']);
+    server.resetHandlers();
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/calendar`, () => HttpResponse.json([]))
+    );
+    const second = await calendarDomain.load(CHAR_ID);
+    const next = calendarDomain.toSnapshot(second!, after) as CalendarSnapshot;
+
+    expect(
+      calendarDomain.diff(CHAR_ID, prev, next, new Set(['calendarEventStarting'] as const))
+    ).toEqual([
+      {
+        eventId: 'calendarEventStarting',
+        characterId: CHAR_ID,
+        calendarEventId: 1,
+        title: 'Fleet Op',
+      },
+    ]);
+  });
+
+  it('does not re-announce a retained event as new', async () => {
+    const event = {
+      event_id: 1,
+      event_date: new Date(2026, 8, 8, 13, 0, 0).toISOString(),
+      title: 'Fleet Op',
+      importance: 0,
+      event_response: 'accepted' as const,
+    };
+    const before = new Date(2026, 8, 8, 12, 30, 0).getTime();
+    vi.setSystemTime(before);
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/calendar`, () => HttpResponse.json([event]))
+    );
+    const prev = calendarDomain.toSnapshot(
+      (await calendarDomain.load(CHAR_ID))!,
+      before
+    ) as CalendarSnapshot;
+
+    const after = new Date(2026, 8, 8, 13, 30, 0).getTime();
+    vi.setSystemTime(after);
+    await db.esiCache.delete([CHAR_ID, 'calendar']);
+    server.resetHandlers();
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/calendar`, () => HttpResponse.json([]))
+    );
+    const next = calendarDomain.toSnapshot(
+      (await calendarDomain.load(CHAR_ID))!,
+      after
+    ) as CalendarSnapshot;
+
+    // It re-enters the list this device reads, but its id is below the
+    // high-water mark, which is exactly what that mark is for.
+    expect(
+      calendarDomain.diff(CHAR_ID, prev, next, new Set(['newCalendarEvent'] as const))
+    ).toEqual([]);
   });
 });
 

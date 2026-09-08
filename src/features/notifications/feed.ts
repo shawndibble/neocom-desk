@@ -94,7 +94,15 @@ export async function readFeed(): Promise<NotificationFeedEntry[]> {
  *   dismissal to carry across, so a local dismissal survives a re-record and
  *   a remote one still applies on a pull.
  *
- * Everything else — the copy — comes from the newer write.
+ * Everything else — the copy — comes from the newer write. With one
+ * qualification: the fields naming what the occurrence was *about* (`eveType`,
+ * `typeId`) are facts fixed when it fired, and absence means the writer did
+ * not know one rather than that there is none. A remote doc written by a
+ * build that predates the field, or the `pullDismiss` that carries a remote
+ * dismissal back, arrives without it — and blanking the stored value costs
+ * the row its per-type mute or its deep link for no reason a reader could
+ * see. So those two fall back to what is already stored, while a write that
+ * *does* carry one still corrects it.
  */
 export function mergeFeedRecord(
   existing: NotificationFeedEntry | undefined,
@@ -102,10 +110,14 @@ export function mergeFeedRecord(
 ): NotificationFeedEntry {
   if (existing === undefined) return incoming;
   const dismissedAt = Math.max(existing.dismissedAt ?? 0, incoming.dismissedAt ?? 0);
+  const eveType = incoming.eveType ?? existing.eveType;
+  const typeId = incoming.typeId ?? existing.typeId;
   return {
     ...incoming,
     firedAt: Math.min(existing.firedAt, incoming.firedAt),
     ...(dismissedAt > 0 ? { dismissedAt } : {}),
+    ...(eveType !== undefined ? { eveType } : {}),
+    ...(typeId !== undefined ? { typeId } : {}),
   };
 }
 
