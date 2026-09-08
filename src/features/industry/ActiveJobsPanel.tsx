@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useHighlightParam } from '@/lib/useHighlightParam';
 import {
   Caret,
+  ContextMenuHint,
   DataAgeBadge,
   DataTable,
   EmptyState,
@@ -412,6 +413,7 @@ export function ActiveJobsPanel({
               onClick={() => setExpanded((open) => !open)}
             />
           )}
+          <ContextMenuHint label={t('industry.jobsTitle')} />
         </span>
       }
       padded={showBody || corpAvailable}

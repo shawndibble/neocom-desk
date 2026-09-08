@@ -21,6 +21,7 @@ import { useEffect, useMemo, useState, type ReactElement } from 'react';
 import { useDarkThreshold } from '@/features/corp/darkThreshold';
 import { useTranslation } from 'react-i18next';
 import {
+  ContextMenuHint,
   DataAgeBadge,
   EmptyState,
   IconButton,
@@ -207,12 +208,15 @@ function CorpMembersView() {
           ) : undefined
         }
         actions={
-          <IconButton
-            icon={<Icon.Refresh />}
-            label={t('corp.members.refresh')}
-            onClick={snapshot.refresh}
-            disabled={snapshot.loading}
-          />
+          <>
+            <IconButton
+              icon={<Icon.Refresh />}
+              label={t('corp.members.refresh')}
+              onClick={snapshot.refresh}
+              disabled={snapshot.loading}
+            />
+            <ContextMenuHint label={t('corp.members.title')} />
+          </>
         }
       />
       <CorpSubNav />

@@ -4,6 +4,7 @@ import { useLocation, useSearchParams } from 'react-router-dom';
 import {
   Button,
   Caret,
+  ContextMenuHint,
   DataTable,
   EmptyState,
   FilterChip,
@@ -1324,25 +1325,28 @@ export function Market() {
                           <h2 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
                             {t('market.sell')}
                           </h2>
-                          <IconButton
-                            size="sm"
-                            icon={<Icon.Download />}
-                            label={t('market.exportCsvSell')}
-                            disabled={sortedSell.length === 0}
-                            onClick={() =>
-                              downloadCsv(
-                                'market-sell',
-                                sortedSell,
-                                orderBookCsvColumns(t, {
-                                  npcStations: npcStationMap,
-                                  solarSystems: solarSystemMap,
-                                  isBuy: false,
-                                }),
-                                new Date(),
-                                orderBookResult?.truncated ?? false
-                              )
-                            }
-                          />
+                          <span className="flex items-center gap-1">
+                            <IconButton
+                              size="sm"
+                              icon={<Icon.Download />}
+                              label={t('market.exportCsvSell')}
+                              disabled={sortedSell.length === 0}
+                              onClick={() =>
+                                downloadCsv(
+                                  'market-sell',
+                                  sortedSell,
+                                  orderBookCsvColumns(t, {
+                                    npcStations: npcStationMap,
+                                    solarSystems: solarSystemMap,
+                                    isBuy: false,
+                                  }),
+                                  new Date(),
+                                  orderBookResult?.truncated ?? false
+                                )
+                              }
+                            />
+                            <ContextMenuHint label={t('market.sell')} />
+                          </span>
                         </div>
                         {sortedSell.length === 0 ? (
                           <EmptyState
@@ -1383,25 +1387,28 @@ export function Market() {
                           <h2 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
                             {t('market.buy')}
                           </h2>
-                          <IconButton
-                            size="sm"
-                            icon={<Icon.Download />}
-                            label={t('market.exportCsvBuy')}
-                            disabled={sortedBuy.length === 0}
-                            onClick={() =>
-                              downloadCsv(
-                                'market-buy',
-                                sortedBuy,
-                                orderBookCsvColumns(t, {
-                                  npcStations: npcStationMap,
-                                  solarSystems: solarSystemMap,
-                                  isBuy: true,
-                                }),
-                                new Date(),
-                                orderBookResult?.truncated ?? false
-                              )
-                            }
-                          />
+                          <span className="flex items-center gap-1">
+                            <IconButton
+                              size="sm"
+                              icon={<Icon.Download />}
+                              label={t('market.exportCsvBuy')}
+                              disabled={sortedBuy.length === 0}
+                              onClick={() =>
+                                downloadCsv(
+                                  'market-buy',
+                                  sortedBuy,
+                                  orderBookCsvColumns(t, {
+                                    npcStations: npcStationMap,
+                                    solarSystems: solarSystemMap,
+                                    isBuy: true,
+                                  }),
+                                  new Date(),
+                                  orderBookResult?.truncated ?? false
+                                )
+                              }
+                            />
+                            <ContextMenuHint label={t('market.buy')} />
+                          </span>
                         </div>
                         {sortedBuy.length === 0 ? (
                           <EmptyState
