@@ -27,8 +27,7 @@ import { formatAge } from '@/lib/age';
 import { formatTimestamp } from '@/lib/timestamp';
 import { SHORTCUTS } from '@/lib/shortcuts';
 import { TRADE_HUBS, type TradeHub } from '@/market/hubs';
-import { FACILITY_PRESETS, RIG_KIND_OPTIONS, normalizeRigFit } from '@/engine/industry/types';
-import type { RigKind } from '@/engine/industry/types';
+import { FACILITY_PRESETS, RIG_KIND_OPTIONS, setRigSlot } from '@/engine/industry/types';
 import { rigKindLabelKey } from '@/features/industry/rigFitLabels';
 import { useMarketHub } from '@/features/market/hub';
 import { useAssumedMe, MIN_ASSUMED_ME, MAX_ASSUMED_ME } from '@/features/industry/assumedMe';
@@ -491,14 +490,12 @@ function DefaultsPanel() {
                     label={t('industry.rigSlotLabel', { slot: slot + 1 })}
                     options={RIG_KIND_OPTIONS}
                     selected={kind}
-                    onSelect={(next) => {
-                      const rigFit = [...facilityDefaults.rigFit] as RigKind[];
-                      rigFit[slot] = next;
+                    onSelect={(picked) =>
                       void setFacilityDefaults({
                         ...facilityDefaults,
-                        rigFit: normalizeRigFit(rigFit),
-                      });
-                    }}
+                        rigFit: setRigSlot(facilityDefaults.rigFit, slot, picked),
+                      })
+                    }
                     labelFor={(kind) => t(rigKindLabelKey(kind))}
                   />
                 ))}

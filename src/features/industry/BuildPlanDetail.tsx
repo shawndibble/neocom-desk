@@ -24,8 +24,8 @@ import {
   SKILL_IDS,
   EMPTY_RIG_FIT,
   industryActivityOf,
-  normalizeRigFit,
   resolveRigFit,
+  setRigSlot,
 } from '@/engine/industry/types';
 import { makeOrBuy, type MakeOrBuy, type MaterialRecipe } from '@/engine/industry/makeOrBuy';
 import { ownedStockSale } from '@/engine/industry/ownedStockSale';
@@ -973,11 +973,11 @@ export function BuildPlanDetail({
                             </span>
                             <Select
                               value={kind}
-                              onValueChange={(value) => {
-                                const next = [...resolveRigFit(plan)] as RigKind[];
-                                next[slot] = value as RigKind;
-                                update({ rigFit: normalizeRigFit(next) });
-                              }}
+                              onValueChange={(value) =>
+                                update({
+                                  rigFit: setRigSlot(resolveRigFit(plan), slot, value as RigKind),
+                                })
+                              }
                             >
                               <SelectTrigger
                                 aria-label={t('industry.rigSlotLabel', { slot: slot + 1 })}

@@ -108,6 +108,13 @@ export function normalizeRigFit(fit: readonly RigKind[] | undefined | null): Rig
   return [slots[0] ?? 'none', slots[1] ?? 'none', slots[2] ?? 'none'];
 }
 
+/** A fit with one slot replaced — the one edit every rig picker (a Build Plan's own, and Settings' facility defaults) makes. */
+export function setRigSlot(fit: RigFit, slot: number, kind: RigKind): RigFit {
+  const next = [...fit];
+  next[slot] = kind;
+  return normalizeRigFit(next);
+}
+
 /** Migrates a legacy single-tier `rigLevel` into the equivalent `RigFit` — one ME rig and one TE rig of that tier, reproducing exactly the bonus every existing Build Plan already computed. */
 export function rigFitFromLegacyLevel(level: RigLevel): RigFit {
   if (level === 't1') return ['meT1', 'teT1', 'none'];
@@ -285,8 +292,15 @@ export function rigSecurityMultiplierFor(activity: IndustryActivity): Record<Sec
 /**
  * EVE's stacking penalty for same-effect modules, strongest first: a 2nd rig
  * of the same bonus type contributes ~87% of its base bonus, a 3rd ~57%.
- * Fitting two ME rigs is legal but is not twice the ME bonus. Only 3 entries
- * are ever needed — `RIG_SLOT_COUNT` is the most a structure can fit.
+ * Fitting two ME rigs is legal but is not twice the ME bonus (issue #609 —
+ * the pre-existing single-tier model could never fit two rigs of one type at
+ * all, so this case did not previously exist). Only 3 entries are ever
+ * needed — `RIG_SLOT_COUNT` is the most a structure can fit.
+ *
+ * Source: EVE University wiki "Stacking penalties" — CCP's general module
+ * formula `multiplier(i) = e^(-(i / 2.67805)^2)` for the i-th strongest
+ * module (0-indexed) in a penalty group, rounded to 3 decimals: 1, 0.869,
+ * 0.571 for i = 0, 1, 2.
  */
 const STACKING_PENALTY_MULTIPLIERS: readonly number[] = [1, 0.869, 0.571];
 
