@@ -18,51 +18,53 @@ export interface SsoConfig {
   redirectUri?: string;
 }
 
+/**
+ * One pending authorize round trip, stored under its own `state`.
+ *
+ * Per-state rather than one shared slot because a shared slot is a race
+ * (issue #649): `startLogin` writes the stash and only then does the browser
+ * leave for `login.eveonline.com`, so a second press landing in that gap
+ * overwrote the verifier and state the *first*, already-committing navigation
+ * was about to use. SSO then came back with a `state` this tab no longer
+ * recognised and the login died — more often the faster the user moved, which
+ * is exactly how it was reported. Keying by `state` lets both round trips stay
+ * valid and lets whichever one returns be the one that completes.
+ *
+ * `scopes` rides along because it has the same lifetime and the same failure
+ * mode if it outlives one round trip: `purgeCacheIfConsentChangedOrPending`
+ * would go on treating a stale request as the baseline for grants it had
+ * nothing to do with.
+ */
+const PKCE_PREFIX = 'neocom.sso.pkce.';
+
+/**
+ * Legacy single-slot keys, read but never written. A login that left for SSO
+ * before this deploy comes back to a tab holding only these; dropping them
+ * would fail every login in flight at release.
+ */
 const VERIFIER_KEY = 'neocom.sso.verifier';
 const STATE_KEY = 'neocom.sso.state';
-/**
- * What the authorize URL asked SSO for, stashed for the callback to read.
- *
- * Alongside the PKCE verifier because it has the same lifetime — one authorize
- * round trip, this tab only — and the same failure mode if it outlives one:
- * `purgeCacheIfConsentChangedOrPending` would go on treating a stale request as
- * the baseline for grants it had nothing to do with.
- */
 const SCOPES_KEY = 'neocom.sso.scopes';
-/**
- * The Completed Callback Marker: the last callback this tab actually
- * completed, as `{ state, characterId, completedAt, replays }`.
- *
- * Not a fourth piece of the one-shot stash — it is written *after* that stash
- * is spent, and it is what makes a repeated callback idempotent (issue #649).
- * Switching user on EVE's login page can hand the browser the same
- * `/callback?code=…&state=…` twice; the second landing finds the stash gone
- * and, without this, showed a "login failed" panel over a login that had in
- * fact succeeded.
- *
- * It holds no token material and cannot mint a session: `state` is a spent
- * CSRF nonce that was in the URL bar anyway, and a match short-circuits to a
- * Character record that already exists rather than to a token exchange.
- */
-const COMPLETED_KEY = 'neocom.sso.completed';
 
 /**
- * Circuit breaker on the replay above. A marker that never expires is a
- * short-circuit that never expires with it: reopening a months-old callback
- * URL in the same tab would silently "succeed", and anything re-delivering
- * `/callback` in a tight cycle would be replayed without bound.
- *
- * The window is what a legitimate re-delivery needs — the switch-user round
- * trip lands again in seconds — and the count is the breaker proper, since a
- * window alone still permits unlimited replays inside it. Tripping either one
- * clears the marker for good and hands the user the honest "already used"
- * error, which is the correct answer once a repeat has stopped looking like
- * one browser redelivering one callback.
+ * Bounds on the pending set — a per-state store grows where a single slot
+ * could not. Both are generous next to a round trip measured in seconds; they
+ * exist so an abandoned login is eventually forgotten rather than kept for the
+ * life of the tab.
  */
-const REPLAY_WINDOW_MS = 5 * 60_000;
-const MAX_REPLAYS = 3;
+const PENDING_TTL_MS = 15 * 60_000;
+const MAX_PENDING = 5;
 
-/** Which way a login failed, for a UI that must tell them apart (issue #649). */
+interface PendingLogin {
+  verifier: string;
+  scopes: string[];
+  createdAt: number;
+}
+
+/**
+ * Which way a login failed. The callback route recovers from these rather
+ * than dead-ending on them, and words them apart when it cannot (issue #649).
+ */
 export type LoginFailureReason = 'no-login-in-progress' | 'state-mismatch';
 
 /**
@@ -90,14 +92,14 @@ function resolveConfig(config?: SsoConfig): { clientId: string; redirectUri: str
   };
 }
 
-/** Stash PKCE verifier + state and return the URL to redirect the user to. */
+/** Stash this round trip's PKCE verifier under its `state` and return the URL. */
 export async function startLogin(scopes: string[], config?: SsoConfig): Promise<string> {
   const { clientId, redirectUri } = resolveConfig(config);
   const verifier = generateVerifier();
   const state = generateVerifier(); // independent 32-byte random value
-  sessionStorage.setItem(VERIFIER_KEY, verifier);
-  sessionStorage.setItem(STATE_KEY, state);
-  sessionStorage.setItem(SCOPES_KEY, JSON.stringify(scopes));
+  const pending: PendingLogin = { verifier, scopes, createdAt: Date.now() };
+  writeStorage(PKCE_PREFIX + state, JSON.stringify(pending));
+  prunePendingLogins(state);
   return buildAuthorizeUrl({
     clientId,
     redirectUri,
@@ -288,63 +290,111 @@ export async function recordCharacterCorporation(
 }
 
 /**
- * What `startLogin` asked for, or `undefined` if this tab has no record of it.
- *
- * `undefined` is not "asked for nothing" — it is "unknown", and the purge falls
- * back to comparing against the stored grant, exactly as it did before #295.
- * Anything unreadable (cleared storage, a hand-edited or truncated value)
- * answers `undefined` for the same reason: the conservative reading is the one
- * that still catches a revocation.
+ * Every storage write here is best-effort. Storage can be full, or blocked
+ * outright (private-mode webviews, "block site data"), and a throw from
+ * `setItem` must not be what fails an otherwise good login.
  */
-function takeRequestedScopes(): string[] | undefined {
-  const raw = sessionStorage.getItem(SCOPES_KEY);
-  sessionStorage.removeItem(SCOPES_KEY);
+function writeStorage(key: string, value: string): void {
+  try {
+    sessionStorage.setItem(key, value);
+  } catch {
+    // A login that cannot stash cannot complete, but it fails at the callback
+    // with a real reason rather than here with a storage exception.
+  }
+}
+
+/** `null` for both "absent" and "unreadable" — neither can complete a login. */
+function readStorage(key: string): string | null {
+  try {
+    return sessionStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function removeStorage(key: string): void {
+  try {
+    sessionStorage.removeItem(key);
+  } catch {
+    // Nothing to do; the entry is bounded by TTL and MAX_PENDING anyway.
+  }
+}
+
+/** Keys of every pending round trip in this tab. */
+function pendingKeys(): string[] {
+  const keys: string[] = [];
+  try {
+    for (let i = 0; i < sessionStorage.length; i += 1) {
+      const key = sessionStorage.key(i);
+      if (key?.startsWith(PKCE_PREFIX)) keys.push(key);
+    }
+  } catch {
+    return [];
+  }
+  return keys;
+}
+
+function readPendingLogin(key: string): PendingLogin | undefined {
+  const raw = readStorage(key);
   if (raw === null) return undefined;
   try {
-    const parsed: unknown = JSON.parse(raw);
-    if (!Array.isArray(parsed) || !parsed.every((scope) => typeof scope === 'string')) {
-      return undefined;
-    }
-    return parsed;
+    const parsed = JSON.parse(raw) as Partial<PendingLogin>;
+    if (typeof parsed.verifier !== 'string') return undefined;
+    return {
+      verifier: parsed.verifier,
+      scopes: asScopes(parsed.scopes),
+      createdAt: typeof parsed.createdAt === 'number' ? parsed.createdAt : 0,
+    };
   } catch {
     return undefined;
   }
 }
 
-/**
- * The Character a *previous* completion of this exact callback signed in, or
- * `undefined` if this tab never completed it. See `COMPLETED_KEY`.
- *
- * Deliberately strict on both halves: the marker's `state` must equal the one
- * on this callback, and the Character it names must still be on the device.
- * A Character removed since then is a real "no login in progress" — replaying
- * it would navigate to a Character that is no longer there.
- */
-async function replayCompletedLogin(state: string): Promise<CharacterRecord | undefined> {
-  const raw = sessionStorage.getItem(COMPLETED_KEY);
-  if (!raw) return undefined;
-  try {
-    const marker = JSON.parse(raw) as {
-      state?: unknown;
-      characterId?: unknown;
-      completedAt?: unknown;
-      replays?: unknown;
-    };
-    if (marker.state !== state || typeof marker.characterId !== 'number') return undefined;
-
-    const completedAt = typeof marker.completedAt === 'number' ? marker.completedAt : 0;
-    const replays = typeof marker.replays === 'number' ? marker.replays : MAX_REPLAYS;
-    if (Date.now() - completedAt > REPLAY_WINDOW_MS || replays >= MAX_REPLAYS) {
-      sessionStorage.removeItem(COMPLETED_KEY);
-      return undefined;
+/** Drop expired round trips, then the oldest beyond `MAX_PENDING`. `keep` is never dropped. */
+function prunePendingLogins(keep: string): void {
+  const now = Date.now();
+  const keepKey = PKCE_PREFIX + keep;
+  const live: { key: string; createdAt: number }[] = [];
+  for (const key of pendingKeys()) {
+    if (key === keepKey) continue;
+    const pending = readPendingLogin(key);
+    if (!pending || now - pending.createdAt > PENDING_TTL_MS) {
+      removeStorage(key);
+      continue;
     }
+    live.push({ key, createdAt: pending.createdAt });
+  }
+  live.sort((a, b) => b.createdAt - a.createdAt);
+  for (const stale of live.slice(MAX_PENDING - 1)) removeStorage(stale.key);
+}
 
-    const character = await db.characters.get(marker.characterId);
-    if (!character) return undefined;
-    sessionStorage.setItem(COMPLETED_KEY, JSON.stringify({ ...marker, replays: replays + 1 }));
-    return character;
+/**
+ * The legacy single-slot stash, for a login that left before this deploy.
+ * Read once and cleared whatever the outcome — it cannot serve a second
+ * callback, and leaving it would shadow the per-state store.
+ */
+function takeLegacyPending(state: string): PendingLogin | undefined {
+  const expectedState = readStorage(STATE_KEY);
+  const verifier = readStorage(VERIFIER_KEY);
+  const rawScopes = readStorage(SCOPES_KEY);
+  removeStorage(STATE_KEY);
+  removeStorage(VERIFIER_KEY);
+  removeStorage(SCOPES_KEY);
+  if (!expectedState || !verifier || expectedState !== state) return undefined;
+  return { verifier, scopes: parseScopes(rawScopes), createdAt: 0 };
+}
+
+/** Anything that is not a list of strings reads as "asked for nothing known". */
+function asScopes(value: unknown): string[] {
+  return Array.isArray(value) && value.every((scope) => typeof scope === 'string') ? value : [];
+}
+
+function parseScopes(raw: string | null): string[] {
+  if (raw === null) return [];
+  try {
+    return asScopes(JSON.parse(raw));
   } catch {
-    return undefined;
+    return [];
   }
 }
 
@@ -354,32 +404,21 @@ export async function completeLogin(
   config?: SsoConfig
 ): Promise<CharacterRecord> {
   const { clientId } = resolveConfig(config);
-  const expectedState = sessionStorage.getItem(STATE_KEY);
-  const verifier = sessionStorage.getItem(VERIFIER_KEY);
-  if (!expectedState || !verifier) {
-    // The stash is one authorize round trip long by design, so "it is gone"
-    // covers both "this callback already ran" and "no login started here".
-    const already = await replayCompletedLogin(params.state);
-    if (already) return already;
-    throw new LoginError('no-login-in-progress', 'No login in progress');
+  const key = PKCE_PREFIX + params.state;
+  const pending = readPendingLogin(key) ?? takeLegacyPending(params.state);
+  if (!pending) {
+    // Told apart for the user's sake: another round trip still pending means
+    // this callback lost a race, whereas none at all means the stash is spent
+    // or this tab never started a login.
+    throw pendingKeys().length > 0
+      ? new LoginError('state-mismatch', 'SSO state mismatch')
+      : new LoginError('no-login-in-progress', 'No login in progress');
   }
-  if (params.state !== expectedState) throw new LoginError('state-mismatch', 'SSO state mismatch');
-  sessionStorage.removeItem(STATE_KEY);
-  sessionStorage.removeItem(VERIFIER_KEY);
-  const requestedScopes = takeRequestedScopes();
+  // One-shot: the code is single-use, so a second callback must not re-exchange.
+  removeStorage(key);
 
-  const tokens = await exchangeCode({ clientId, code: params.code, verifier });
-  const character = await persistTokens(tokens, requestedScopes);
-  sessionStorage.setItem(
-    COMPLETED_KEY,
-    JSON.stringify({
-      state: params.state,
-      characterId: character.characterId,
-      completedAt: Date.now(),
-      replays: 0,
-    })
-  );
-  return character;
+  const tokens = await exchangeCode({ clientId, code: params.code, verifier: pending.verifier });
+  return persistTokens(tokens, pending.scopes);
 }
 
 // Single-flight per character: EVE rotates refresh tokens, so two concurrent

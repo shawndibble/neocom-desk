@@ -63,19 +63,19 @@ External dependencies: `esi.evetech.net`, `login.eveonline.com`,
 ## 3. Data flows
 
 **SSO login (PKCE)**
-`app/loginFlow.beginEveLogin` → `auth/session.startLogin` stashes PKCE
-verifier+state in `sessionStorage`, redirects to `login.eveonline.com` →
+`app/loginFlow.beginEveLogin` → `auth/session.startLogin` stashes one
+**Pending Login** per round trip in `sessionStorage` — `neocom.sso.pkce.<state>`
+holding `{ verifier, scopes, createdAt }`, so two racing presses cannot clobber
+each other's verifier (#649) — redirects to `login.eveonline.com` →
 `routes/Callback.tsx` → `auth/session.completeLogin` validates state,
 exchanges code, decodes the JWT (`auth/jwt`), writes `CharacterRecord` +
 `TokenRecord` (refresh token) to Dexie. Later ESI calls go through
 `auth/session.getValidAccessToken` (single-flight refresh, buffer 60s before
 expiry) → `esi/client.configureEsi`'s injected `getToken`. A completed
-callback leaves a **Completed Callback Marker** (`neocom.sso.completed`:
-`{ state, characterId, completedAt, replays }`) so a second landing on the same
-`/callback` URL replays that Character instead of failing on the spent one-shot
-stash (#649), bounded by a latching breaker — 5 minutes, 3 replays, marker
-cleared when either trips. Failures carry a `LoginError` `reason` the route
-turns into distinct wording.
+callback that cannot complete does not dead-end: `routes/Callback.tsx` restarts
+the sign-in once (budget in `neocom.sso.autoRetries`, so it cannot loop between
+the app and SSO), else falls back to `/characters` when the device has one, and
+only then shows a panel — worded by the `LoginError` `reason`.
 
 **ESI read-through cache**
 Pattern: try live `esiFetch` → on success, write `db.esiCache` (keyed

@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
 import { StrictMode } from 'react';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
@@ -8,6 +9,11 @@ import '@/i18n';
 import { db } from '@/db';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { Callback } from './Callback';
+import { assignLocation } from '@/app/navigation';
+
+// `beginAddCharacterLogin` ends in a real top-level navigation; jsdom cannot
+// perform one, and the assertion here is which URL it was sent, not the trip.
+vi.mock('@/app/navigation', () => ({ assignLocation: vi.fn() }));
 
 const CHAR_ID = 2112625428;
 
@@ -45,6 +51,7 @@ afterAll(() => server.close());
 afterEach(() => server.resetHandlers());
 beforeEach(async () => {
   tokenRequests = 0;
+  vi.mocked(assignLocation).mockClear();
   sessionStorage.clear();
   await db.characters.clear();
   await db.tokens.clear();
@@ -52,6 +59,14 @@ beforeEach(async () => {
   await db.stationPins.clear();
   useActiveCharacter.setState({ activeCharacterId: null, hydrated: false });
 });
+
+/** One pending round trip, in the layout `startLogin` writes. */
+function stashLogin(state: string): void {
+  sessionStorage.setItem(
+    `neocom.sso.pkce.${state}`,
+    JSON.stringify({ verifier: 'verifier-1', scopes: [], createdAt: Date.now() })
+  );
+}
 
 function renderCallback(search: string) {
   return render(
@@ -69,8 +84,7 @@ function renderCallback(search: string) {
 
 describe('Callback', () => {
   it('completes login once (StrictMode-safe) and navigates to /characters', async () => {
-    sessionStorage.setItem('neocom.sso.state', 'state-1');
-    sessionStorage.setItem('neocom.sso.verifier', 'verifier-1');
+    stashLogin('state-1');
     renderCallback('?code=good-code&state=state-1');
 
     expect(await screen.findByText('characters page')).toBeInTheDocument();
@@ -98,8 +112,7 @@ describe('Callback', () => {
       scope: 'account',
       updatedAt: 12_345,
     });
-    sessionStorage.setItem('neocom.sso.state', 'state-1');
-    sessionStorage.setItem('neocom.sso.verifier', 'verifier-1');
+    stashLogin('state-1');
     renderCallback('?code=good-code&state=state-1');
 
     expect(await screen.findByText('characters page')).toBeInTheDocument();
@@ -115,35 +128,70 @@ describe('Callback', () => {
     });
   });
 
-  it('lands on /characters when the same callback arrives a second time (#649)', async () => {
-    sessionStorage.setItem('neocom.sso.state', 'state-1');
-    sessionStorage.setItem('neocom.sso.verifier', 'verifier-1');
-    const first = renderCallback('?code=good-code&state=state-1');
-    expect(await screen.findByText('characters page')).toBeInTheDocument();
-    first.unmount();
-
-    // Switching user on EVE's login page can hand the browser the same
-    // callback URL twice. The second landing is a fresh mount with the PKCE
-    // stash already spent — it must not accuse the user of a failed login.
+  it('restarts the sign-in once rather than dead-ending (#649)', async () => {
+    // Nothing stashed: this callback cannot complete. The user asked not to be
+    // shown a panel they cannot act on, so the route retries by itself.
     renderCallback('?code=good-code&state=state-1');
-    expect(await screen.findByText('characters page')).toBeInTheDocument();
-    expect(tokenRequests).toBe(1);
+
+    await vi.waitFor(() => expect(assignLocation).toHaveBeenCalledTimes(1));
+    expect(String(vi.mocked(assignLocation).mock.calls[0][0])).toContain('login.eveonline.com');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
-  it('shows an i18n error with a retry link on state mismatch', async () => {
-    sessionStorage.setItem('neocom.sso.state', 'state-1');
-    sessionStorage.setItem('neocom.sso.verifier', 'verifier-1');
-    renderCallback('?code=good-code&state=wrong-state');
+  it('stops after one automatic restart instead of looping (#649)', async () => {
+    // The retry leaves for SSO and comes back here; unbudgeted, that is a
+    // redirect loop between the app and EVE that the user cannot interrupt.
+    sessionStorage.setItem('neocom.sso.autoRetries', '1');
+    renderCallback('?code=good-code&state=state-1');
+
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+    expect(assignLocation).not.toHaveBeenCalled();
+  });
+
+  it('falls back to the Characters list when the device has one (#649)', async () => {
+    await db.characters.put({
+      characterId: 90_000_001,
+      name: 'Existing Pilot',
+      ownerHash: 'owner-hash-0',
+      addedAt: 1,
+    });
+    sessionStorage.setItem('neocom.sso.autoRetries', '1');
+    renderCallback('?code=good-code&state=state-1');
+
+    expect(await screen.findByText('characters page')).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('a successful login clears the retry budget (#649)', async () => {
+    sessionStorage.setItem('neocom.sso.autoRetries', '1');
+    stashLogin('state-1');
+    renderCallback('?code=good-code&state=state-1');
+
+    expect(await screen.findByText('characters page')).toBeInTheDocument();
+    expect(sessionStorage.getItem('neocom.sso.autoRetries')).toBeNull();
+  });
+
+  it('the panel restarts the sign-in instead of linking somewhere that cannot (#649)', async () => {
+    sessionStorage.setItem('neocom.sso.autoRetries', '1');
+    renderCallback('?code=good-code&state=state-1');
+
+    await userEvent.click(await screen.findByRole('button', { name: /try again/i }));
+    await vi.waitFor(() => expect(assignLocation).toHaveBeenCalledTimes(1));
+    expect(String(vi.mocked(assignLocation).mock.calls[0][0])).toContain('login.eveonline.com');
+  });
+
+  it('words a lost race apart from a spent link (#649)', async () => {
+    // A second round trip still pending means this callback lost a race.
+    sessionStorage.setItem('neocom.sso.autoRetries', '1');
+    stashLogin('other-state');
+    renderCallback('?code=good-code&state=state-1');
 
     expect(await screen.findByText(/could not be verified/i)).toBeInTheDocument();
     expect(tokenRequests).toBe(0);
-    expect(screen.getByRole('link', { name: /try again/i })).toHaveAttribute('href', '/login');
   });
 
   it('tells apart a spent sign-in from a failed one (#649)', async () => {
-    // No stash at all: the tab that started the login is not this one, or the
-    // link was reopened later. Distinct wording so the next bug report says
-    // which of the two happened.
+    sessionStorage.setItem('neocom.sso.autoRetries', '1');
     renderCallback('?code=good-code&state=state-1');
 
     expect(await screen.findByText(/already been used/i)).toBeInTheDocument();
@@ -156,23 +204,23 @@ describe('Callback', () => {
         HttpResponse.json({ error: 'invalid_grant' }, { status: 400 })
       )
     );
-    sessionStorage.setItem('neocom.sso.state', 'state-1');
-    sessionStorage.setItem('neocom.sso.verifier', 'verifier-1');
+    sessionStorage.setItem('neocom.sso.autoRetries', '1');
+    stashLogin('state-1');
     renderCallback('?code=good-code&state=state-1');
 
     expect(await screen.findByText(/something went wrong signing you in/i)).toBeInTheDocument();
   });
 
   it('announces the error panel to screen readers', async () => {
-    sessionStorage.setItem('neocom.sso.state', 'state-1');
-    sessionStorage.setItem('neocom.sso.verifier', 'verifier-1');
-    renderCallback('?code=good-code&state=wrong-state');
+    sessionStorage.setItem('neocom.sso.autoRetries', '1');
+    renderCallback('?code=good-code&state=state-1');
 
     expect(await screen.findByRole('alert')).toBeInTheDocument();
   });
 
   it('shows an error when code/state params are missing', async () => {
+    sessionStorage.setItem('neocom.sso.autoRetries', '1');
     renderCallback('');
-    expect(await screen.findByRole('link', { name: /try again/i })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /try again/i })).toBeInTheDocument();
   });
 });

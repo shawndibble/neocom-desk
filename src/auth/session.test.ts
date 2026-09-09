@@ -92,12 +92,12 @@ describe('startLogin', () => {
     const state = url.searchParams.get('state');
     expect(state).toBeTruthy();
 
-    // verifier + state stashed for the callback leg
-    const storedState = sessionStorage.getItem('neocom.sso.state');
-    const storedVerifier = sessionStorage.getItem('neocom.sso.verifier');
-    expect(storedState).toBe(state);
-    expect(storedVerifier).toBeTruthy();
-    await expect(challengeFromVerifier(storedVerifier!)).resolves.toBe(
+    // this round trip's verifier is stashed under its own state
+    const stored = sessionStorage.getItem(`neocom.sso.pkce.${state!}`);
+    expect(stored).toBeTruthy();
+    const { verifier, scopes } = JSON.parse(stored!) as { verifier: string; scopes: string[] };
+    expect(scopes).toEqual(['esi-skills.read_skills.v1']);
+    await expect(challengeFromVerifier(verifier)).resolves.toBe(
       url.searchParams.get('code_challenge')
     );
   });
@@ -122,7 +122,9 @@ describe('completeLogin', () => {
   it('happy path: validates state, exchanges code, persists character + token', async () => {
     const url = new URL(await startLogin(['esi-skills.read_skills.v1'], cfg));
     const state = url.searchParams.get('state')!;
-    const verifier = sessionStorage.getItem('neocom.sso.verifier')!;
+    const { verifier } = JSON.parse(sessionStorage.getItem(`neocom.sso.pkce.${state}`)!) as {
+      verifier: string;
+    };
 
     const character = await completeLogin({ code: 'good-code', state }, cfg);
     expect(character.characterId).toBe(CHAR_ID);
@@ -139,8 +141,7 @@ describe('completeLogin', () => {
 
     // exchange used the stored verifier, and the one-shot stash was cleared
     expect(tokenRequests[0].get('code_verifier')).toBe(verifier);
-    expect(sessionStorage.getItem('neocom.sso.verifier')).toBeNull();
-    expect(sessionStorage.getItem('neocom.sso.state')).toBeNull();
+    expect(sessionStorage.getItem(`neocom.sso.pkce.${state}`)).toBeNull();
   });
 
   it('rejects state mismatch without calling the token endpoint', async () => {
@@ -167,33 +168,53 @@ describe('completeLogin', () => {
     expect(new LoginError('state-mismatch', 'x')).toBeInstanceOf(Error);
   });
 
-  it('replays a completed login when the same callback arrives twice (#649)', async () => {
+  it('two racing logins both stay valid, and either can complete (#649)', async () => {
+    // The reported shape: a second press lands while the first navigation is
+    // already committing. A single shared slot let the second overwrite the
+    // first's verifier, so whichever round trip SSO returned lost.
+    const first = new URL(await startLogin(['esi-skills.read_skills.v1'], cfg));
+    const second = new URL(await startLogin(['esi-skills.read_skills.v1'], cfg));
+    const firstState = first.searchParams.get('state')!;
+    const secondState = second.searchParams.get('state')!;
+    expect(firstState).not.toBe(secondState);
+
+    const character = await completeLogin({ code: 'good-code', state: firstState }, cfg);
+    expect(character.characterId).toBe(CHAR_ID);
+
+    // The loser is still live, and still one-shot.
+    await db.tokens.clear();
+    await db.characters.clear();
+    expect((await completeLogin({ code: 'good-code', state: secondState }, cfg)).characterId).toBe(
+      CHAR_ID
+    );
+  });
+
+  it('each round trip keeps its own requested scopes (#649)', async () => {
+    const base = new URL(await startLogin(['esi-skills.read_skills.v1'], cfg));
+    await startLogin(['esi-skills.read_skills.v1', 'esi-wallet.read_character_wallet.v1'], cfg);
+
+    // Completing the first must judge revocation against what *it* asked for,
+    // not against the wider set the second round trip requested.
+    await completeLogin({ code: 'good-code', state: base.searchParams.get('state')! }, cfg);
+    expect((await db.tokens.get(CHAR_ID))?.scopes).toEqual(['esi-skills.read_skills.v1']);
+  });
+
+  it('a spent round trip cannot be exchanged twice (#649)', async () => {
     const url = new URL(await startLogin(['esi-skills.read_skills.v1'], cfg));
     const state = url.searchParams.get('state')!;
-    const first = await completeLogin({ code: 'good-code', state }, cfg);
+    await completeLogin({ code: 'good-code', state }, cfg);
 
-    // Second landing on the same callback URL: the one-shot PKCE stash is
-    // already spent, so this is exactly the '#649' switch-user shape.
-    const second = await completeLogin({ code: 'good-code', state }, cfg);
-    expect(second).toEqual(first);
+    await expect(completeLogin({ code: 'good-code', state }, cfg)).rejects.toMatchObject({
+      reason: 'no-login-in-progress',
+    });
     expect(tokenRequests).toHaveLength(1);
   });
 
-  it('does not replay a callback whose state never completed here (#649)', async () => {
-    const url = new URL(await startLogin(['esi-skills.read_skills.v1'], cfg));
-    await completeLogin({ code: 'good-code', state: url.searchParams.get('state')! }, cfg);
-
-    await expect(
-      completeLogin({ code: 'good-code', state: 'some-other-state' }, cfg)
-    ).rejects.toMatchObject({ reason: 'no-login-in-progress' });
-    expect(tokenRequests).toHaveLength(1);
-  });
-
-  // #649 arrived from an outside reporter suggesting the `state` check itself
-  // was at fault. It is not, and relaxing it is how a login-CSRF gets shipped:
-  // an attacker who can make a browser open `/callback?code=<their code>` would
-  // silently bind their own Character into the victim's app. These pin the two
-  // properties that keep that shut, so a later "fix" cannot quietly undo them.
+  // #649 came from an outside reporter suggesting the `state` check itself was
+  // at fault. It is not, and relaxing it is how a login-CSRF gets shipped: an
+  // attacker who can make a browser open `/callback?code=<their code>` would
+  // silently bind their own Character into the victim's app. A `state` with no
+  // stashed verifier behind it must never reach the token endpoint.
   it('a forged callback with no login in progress creates nothing (#649)', async () => {
     await expect(
       completeLogin({ code: 'attacker-code', state: 'attacker-state' }, cfg)
@@ -204,68 +225,51 @@ describe('completeLogin', () => {
     expect(await db.characters.count()).toBe(0);
   });
 
-  it('the replay path never exchanges a code or writes a token (#649)', async () => {
-    const url = new URL(await startLogin(['esi-skills.read_skills.v1'], cfg));
-    const state = url.searchParams.get('state')!;
-    await completeLogin({ code: 'good-code', state }, cfg);
-    const tokenBefore = await db.tokens.get(CHAR_ID);
+  it('a forged state cannot ride alongside a genuine pending login (#649)', async () => {
+    await startLogin(['esi-skills.read_skills.v1'], cfg);
 
-    // Same state, a different code: replay must ignore the code entirely
-    // rather than treat it as a fresh grant.
-    const replayed = await completeLogin({ code: 'attacker-code', state }, cfg);
-
-    expect(replayed.characterId).toBe(CHAR_ID);
-    expect(tokenRequests).toHaveLength(1);
-    expect(await db.tokens.get(CHAR_ID)).toEqual(tokenBefore);
-    expect(await db.characters.count()).toBe(1);
+    await expect(
+      completeLogin({ code: 'attacker-code', state: 'attacker-state' }, cfg)
+    ).rejects.toMatchObject({ reason: 'state-mismatch' });
+    expect(tokenRequests).toHaveLength(0);
+    expect(await db.tokens.count()).toBe(0);
   });
 
-  it('stops replaying after a few repeats rather than spinning (#649)', async () => {
-    const url = new URL(await startLogin(['esi-skills.read_skills.v1'], cfg));
-    const state = url.searchParams.get('state')!;
-    await completeLogin({ code: 'good-code', state }, cfg);
+  it('forgets abandoned round trips instead of keeping them for the tab (#649)', async () => {
+    const abandoned = new URL(await startLogin(['esi-skills.read_skills.v1'], cfg));
+    const abandonedState = abandoned.searchParams.get('state')!;
+    const key = `neocom.sso.pkce.${abandonedState}`;
+    const entry = JSON.parse(sessionStorage.getItem(key)!) as { createdAt: number };
+    entry.createdAt = Date.now() - 16 * 60_000;
+    sessionStorage.setItem(key, JSON.stringify(entry));
 
-    // Three repeats is already well past one browser redelivering one
-    // callback; the fourth gets the honest error instead of a fourth replay.
-    for (let i = 0; i < 3; i += 1) {
-      expect((await completeLogin({ code: 'good-code', state }, cfg)).characterId).toBe(CHAR_ID);
-    }
-    await expect(completeLogin({ code: 'good-code', state }, cfg)).rejects.toMatchObject({
-      reason: 'no-login-in-progress',
-    });
+    // The next login prunes it.
+    await startLogin(['esi-skills.read_skills.v1'], cfg);
+    expect(sessionStorage.getItem(key)).toBeNull();
 
-    // The breaker latches: the marker is gone, so it cannot re-arm itself.
-    expect(sessionStorage.getItem('neocom.sso.completed')).toBeNull();
-    expect(tokenRequests).toHaveLength(1);
+    await expect(
+      completeLogin({ code: 'good-code', state: abandonedState }, cfg)
+    ).rejects.toMatchObject({ reason: 'state-mismatch' });
   });
 
-  it('does not replay a callback older than the replay window (#649)', async () => {
-    const url = new URL(await startLogin(['esi-skills.read_skills.v1'], cfg));
-    const state = url.searchParams.get('state')!;
-    await completeLogin({ code: 'good-code', state }, cfg);
+  it('keeps the pending set bounded (#649)', async () => {
+    for (let i = 0; i < 8; i += 1) await startLogin(['esi-skills.read_skills.v1'], cfg);
 
-    const marker = JSON.parse(sessionStorage.getItem('neocom.sso.completed')!) as {
-      completedAt: number;
-    };
-    marker.completedAt = Date.now() - 6 * 60_000;
-    sessionStorage.setItem('neocom.sso.completed', JSON.stringify(marker));
-
-    await expect(completeLogin({ code: 'good-code', state }, cfg)).rejects.toMatchObject({
-      reason: 'no-login-in-progress',
-    });
-    expect(sessionStorage.getItem('neocom.sso.completed')).toBeNull();
+    const pending = Object.keys(sessionStorage).filter((k) => k.startsWith('neocom.sso.pkce.'));
+    expect(pending).toHaveLength(5);
   });
 
-  it('does not replay a completed login whose Character has since been removed (#649)', async () => {
-    const url = new URL(await startLogin(['esi-skills.read_skills.v1'], cfg));
-    const state = url.searchParams.get('state')!;
-    await completeLogin({ code: 'good-code', state }, cfg);
-    await db.characters.delete(CHAR_ID);
+  it('finishes a login that left before the per-state stash shipped (#649)', async () => {
+    // Legacy single-slot layout, as a tab mid-login across the deploy holds it.
+    const verifier = 'legacy-verifier';
+    sessionStorage.setItem('neocom.sso.verifier', verifier);
+    sessionStorage.setItem('neocom.sso.state', 'legacy-state');
+    sessionStorage.setItem('neocom.sso.scopes', JSON.stringify(['esi-skills.read_skills.v1']));
 
-    await expect(completeLogin({ code: 'good-code', state }, cfg)).rejects.toMatchObject({
-      reason: 'no-login-in-progress',
-    });
-    expect(tokenRequests).toHaveLength(1);
+    const character = await completeLogin({ code: 'good-code', state: 'legacy-state' }, cfg);
+    expect(character.characterId).toBe(CHAR_ID);
+    expect(tokenRequests[0].get('code_verifier')).toBe(verifier);
+    expect(sessionStorage.getItem('neocom.sso.verifier')).toBeNull();
   });
 });
 

@@ -108,12 +108,6 @@ here — they go one per file in `docs/context/decisions/`.
   it look empty for a reason that is not about the pilot's data. Map, ticker
   and rail all read the same board, so a day cannot show a dot for something
   the rail declines to list.
-- **Completed Callback Marker**: What one _finished_ authorize round trip
-  leaves behind — `state`, the Character it signed in, when, and how often it
-  has been replayed. Written by `completeLogin` after the PKCE stash is spent,
-  and read back when the same `/callback` URL is delivered twice, so the repeat
-  returns that Character instead of failing on the stash that is already gone.
-  Bounded by a latching breaker rather than living as long as the tab.
 - **Compare**: A tab that puts the Quickbar's items side by side on best sell,
   best buy, spread and volume, under the same **Location Mode** as the order
   book beside it.
@@ -450,10 +444,16 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
 - **Remap**: In-game reallocation of a character's attributes. The optimizer suggests where in a Skill Plan remaps should be placed.
 - **Remap Marker**: A user-placed row in a Skill Plan marking where the character will remap attributes. Draggable like a plan entry.
 - **Remaps Available**: How many attribute remaps the character can spend: bonus remaps (new characters get several) plus the yearly remap when off cooldown. Read from the API (bonus_remaps, last_remap_date, cooldown); user may override. Optimizer must support the common single-remap case: train a leading segment on current attributes, then remap at the optimizer-chosen point.
-- **Requested Scopes**: What one authorize round trip asked SSO for, stashed
-  beside the PKCE verifier by `startLogin` and read back by `completeLogin`.
-  The baseline the login path judges revocation against; the refresh path has
-  none and uses the stored grant instead.
+- **Pending Login**: One authorize round trip this tab has started and not yet
+  finished — its PKCE verifier, its **Requested Scopes**, and when it began —
+  stored by `startLogin` under its own `state` and taken by `completeLogin`.
+  Per-`state` rather than one shared slot so two round trips started close
+  together both stay valid; whichever SSO returns is the one that completes.
+  Bounded by a TTL and a maximum count, so an abandoned one is forgotten.
+- **Requested Scopes**: What one authorize round trip asked SSO for, carried on
+  its **Pending Login** and read back by `completeLogin`. The baseline the login
+  path judges revocation against; the refresh path has none and uses the stored
+  grant instead.
 - **Reset Run**: The unit of planetary work — every colony a pilot resets in
   one sitting. Because they are installed back to back, their extractor
   programs come to share an expiry give or take the minutes it took to walk
