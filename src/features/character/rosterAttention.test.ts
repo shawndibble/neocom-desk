@@ -33,13 +33,13 @@ async function addCharacter(characterId: number, name: string, scopes: string[])
   });
 }
 
-function job(jobId: number, endDate: string) {
+function job(jobId: number, endDate: string, activityId = 1) {
   return {
     job_id: jobId,
     end_date: endDate,
     start_date: '2026-09-01T00:00:00Z',
     blueprint_type_id: 1,
-    activity_id: 1,
+    activity_id: activityId,
     facility_id: 1,
     station_id: 1,
     runs: 1,
@@ -86,17 +86,22 @@ beforeEach(async () => {
 });
 
 describe('loadRosterAttention (cache-only)', () => {
-  it('reports a running job count and worst colony attention per character', async () => {
+  it('reports running job counts per category and worst colony attention per character', async () => {
     await addCharacter(CHAR_A, 'Pilot A', [JOBS_SCOPE, PLANETS_SCOPE]);
-    await writeCached(CHAR_A, 'industryJobs', [job(1, '2026-09-10T00:00:00Z')], 100);
+    await writeCached(
+      CHAR_A,
+      'industryJobs',
+      [job(1, '2026-09-10T00:00:00Z', 1), job(2, '2026-09-10T00:00:00Z', 8)],
+      100
+    );
     await writeCached(CHAR_A, 'planets', [planet(40000001)], 200);
     await writeCached(CHAR_A, 'planet:40000001', extractorDetail(1, EXPIRY_SOON), 200);
 
     const [entry] = await loadRosterAttention({ now: NOW });
 
     expect(entry.characterId).toBe(CHAR_A);
-    expect(entry.manufacturingRunning).toBe(1);
-    expect(entry.manufacturingFetchedAt).toEqual(new Date(100));
+    expect(entry.jobCounts).toEqual({ manufacturing: 1, science: 1, reaction: 0 });
+    expect(entry.jobCountsFetchedAt).toEqual(new Date(100));
     expect(entry.piAttention).toBe('expiring-soon');
     expect(entry.piFetchedAt).toEqual(new Date(200));
   });
@@ -108,7 +113,7 @@ describe('loadRosterAttention (cache-only)', () => {
 
     const [entry] = await loadRosterAttention({ now: NOW });
 
-    expect(entry.manufacturingRunning).toBeUndefined();
+    expect(entry.jobCounts).toBeUndefined();
     expect(entry.piAttention).toBeUndefined();
   });
 
@@ -117,7 +122,7 @@ describe('loadRosterAttention (cache-only)', () => {
 
     const [entry] = await loadRosterAttention({ now: NOW });
 
-    expect(entry.manufacturingRunning).toBeUndefined();
+    expect(entry.jobCounts).toBeUndefined();
     expect(entry.piAttention).toBeUndefined();
   });
 
@@ -138,8 +143,8 @@ describe('loadRosterAttention (cache-only)', () => {
 
     const entries = await loadRosterAttention({ now: NOW });
 
-    expect(entries.find((e) => e.characterId === CHAR_A)?.manufacturingRunning).toBe(1);
-    expect(entries.find((e) => e.characterId === CHAR_B)?.manufacturingRunning).toBe(0);
+    expect(entries.find((e) => e.characterId === CHAR_A)?.jobCounts?.manufacturing).toBe(1);
+    expect(entries.find((e) => e.characterId === CHAR_B)?.jobCounts?.manufacturing).toBe(0);
   });
 });
 
@@ -183,7 +188,7 @@ describe('loadRosterAttention (live)', () => {
 
     const [entry] = await loadRosterAttention({ live: true, now: NOW });
 
-    expect(entry.manufacturingRunning).toBe(1);
+    expect(entry.jobCounts).toEqual({ manufacturing: 1, science: 0, reaction: 0 });
     expect(entry.piAttention).toBe('healthy');
   });
 
@@ -197,7 +202,7 @@ describe('loadRosterAttention (live)', () => {
 
     const [entry] = await loadRosterAttention({ live: true, now: NOW });
 
-    expect(entry.manufacturingRunning).toBeUndefined();
+    expect(entry.jobCounts).toBeUndefined();
     expect(entry.piAttention).toBeUndefined();
   });
 });

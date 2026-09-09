@@ -18,11 +18,7 @@ import { readCachedRows } from '@/esi/cache';
 import { ESI_REGISTRY } from '@/esi/registry';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
 import type { CharacterPlanet, CharacterPlanetDetail, IndustryJob } from '@/esi/endpoints';
-import {
-  loadCharacterIndustryJobs,
-  summarizeJobs,
-  KEYS as JOBS_KEYS,
-} from '@/features/industry/jobs';
+import { loadCharacterIndustryJobs, KEYS as JOBS_KEYS } from '@/features/industry/jobs';
 import {
   loadCharacterPlanets,
   loadAllColonyDetails,
@@ -32,15 +28,16 @@ import {
 import { extractorProgramsFromPins } from '@/features/pi/adapters';
 import { colonyAttention, colonyStatus, sortColoniesByAttention } from '@/engine/pi/colonyStatus';
 import type { ColonyAttention, ColonyStatus } from '@/engine/pi/types';
+import { runningJobCountsByCategory, type JobSlotCategory } from '@/engine/industry/jobSlots';
 
 const JOBS_SCOPE = ESI_REGISTRY.getCharacterIndustryJobs.scope;
 const PLANETS_SCOPE = ESI_REGISTRY.getCharacterPlanets.scope;
 
 export interface AttentionEntry {
   characterId: number;
-  /** Active (non-completed) job count. Undefined: no scope, or nothing cached yet. */
-  manufacturingRunning: number | undefined;
-  manufacturingFetchedAt: Date | null;
+  /** Running jobs per slot category. Undefined: no scope, or nothing cached yet. */
+  jobCounts: Record<JobSlotCategory, number> | undefined;
+  jobCountsFetchedAt: Date | null;
   /** Worst colony's attention. Undefined: no scope, no colonies, or nothing cached yet. */
   piAttention: ColonyAttention | undefined;
   piFetchedAt: Date | null;
@@ -49,11 +46,16 @@ export interface AttentionEntry {
 function emptyEntry(characterId: number): AttentionEntry {
   return {
     characterId,
-    manufacturingRunning: undefined,
-    manufacturingFetchedAt: null,
+    jobCounts: undefined,
+    jobCountsFetchedAt: null,
     piAttention: undefined,
     piFetchedAt: null,
   };
+}
+
+/** `IndustryJob[]` -> `engine/industry/jobSlots.ts`'s named shape, the ESI/engine boundary adaptation. */
+function toJobSlotJobs(jobs: readonly IndustryJob[]) {
+  return jobs.map((job) => ({ activityId: job.activity_id, endMs: Date.parse(job.end_date) }));
 }
 
 async function grantedScopesByCharacter(
@@ -101,8 +103,8 @@ async function cacheOnlyAttention(
       if (granted.includes(JOBS_SCOPE)) {
         const jobsRow = jobRows.get(character.characterId);
         if (jobsRow) {
-          entry.manufacturingRunning = summarizeJobs(jobsRow.data, nowMs).running;
-          entry.manufacturingFetchedAt = jobsRow.fetchedAt;
+          entry.jobCounts = runningJobCountsByCategory(toJobSlotJobs(jobsRow.data), nowMs);
+          entry.jobCountsFetchedAt = jobsRow.fetchedAt;
         }
       }
 
@@ -151,8 +153,11 @@ async function liveAttention(
       requests.push(async () => {
         const result = await loadCharacterIndustryJobs(character.characterId);
         if (!result.cached) return;
-        entries[index].manufacturingRunning = summarizeJobs(result.cached.data, nowMs).running;
-        entries[index].manufacturingFetchedAt = result.cached.fetchedAt;
+        entries[index].jobCounts = runningJobCountsByCategory(
+          toJobSlotJobs(result.cached.data),
+          nowMs
+        );
+        entries[index].jobCountsFetchedAt = result.cached.fetchedAt;
       });
     }
 
