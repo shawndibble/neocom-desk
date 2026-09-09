@@ -35,7 +35,7 @@ export const useSpExtractionThresholdSp = createSyncedSetting<number>({
   key: SP_EXTRACTION_THRESHOLD_KEY,
   defaultValue: DEFAULT_SP_EXTRACTION_THRESHOLD_SP,
   // A non-finite or non-positive stored value can't have come from the
-  // control below (a plain positive-number input) — treat it as damaged
+  // control in Settings.tsx (a plain positive-number input) — treat it as damaged
   // rather than let a poisoned row (bad sync payload, manual Dexie edit)
   // reach isSpExtractionReady as a threshold of 0 or NaN.
   parse: (raw) => (typeof raw === 'number' && Number.isFinite(raw) && raw > 0 ? raw : null),

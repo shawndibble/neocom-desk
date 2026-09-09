@@ -27,8 +27,12 @@ const SKILL_ID = {
  * `features/skills/queueStatus.ts`'s trained-skills read already prefers.
  */
 export function jobSlotSkillsFromCharacterSkills(skills: readonly CharacterSkill[]): JobSlotSkills {
-  const levelOf = (skillId: number) =>
-    skills.find((skill) => skill.skill_id === skillId)?.active_skill_level ?? 0;
+  // One pass building an id->level map, not six `.find()` scans over the
+  // full list — a veteran character's `/skills` commonly runs several
+  // hundred entries, and this runs once per roster character on both the
+  // initial load and "Refresh all" (`jobSlotSkillsMap`).
+  const levelById = new Map(skills.map((skill) => [skill.skill_id, skill.active_skill_level]));
+  const levelOf = (skillId: number) => levelById.get(skillId) ?? 0;
 
   return {
     massProduction: levelOf(SKILL_ID.massProduction),

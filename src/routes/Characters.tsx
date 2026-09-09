@@ -27,6 +27,7 @@ import {
   SelectValue,
   Spinner,
   StatChip,
+  STAT_CHIP_TONE_TEXT_CLASS,
   TextInput,
   type DataTableColumn,
   type StatChipTone,
@@ -54,8 +55,7 @@ import {
   visibleAvailableColumns,
   type CharacterColumnId,
 } from '@/features/character/characterColumns';
-import { ATTENTION_RANK } from '@/engine/pi/colonyStatus';
-import type { ColonyAttention } from '@/engine/pi/types';
+import { ATTENTION_RANK, ATTENTION_TONE as PI_ATTENTION_TONE } from '@/engine/pi/colonyStatus';
 import { deriveQueueState, type QueueState } from '@/features/skills/queueStatus';
 import { removeCharacter } from '@/features/character/removeCharacter';
 import { updateGroups, useOverviewGroups } from '@/features/character/overviewGroups';
@@ -96,16 +96,6 @@ const QUEUE_STATE_TONE: Record<QueueState, StatChipTone> = {
   unknown: 'default',
 };
 
-// Same tones PlanetaryIndustry.tsx's own colony-attention badge uses — not
-// imported from there (it's route-local), but the reader should learn one
-// meaning for these colours, not two.
-const PI_ATTENTION_TONE: Record<ColonyAttention, StatChipTone> = {
-  idle: 'danger',
-  'expiring-soon': 'warning',
-  decayed: 'accent',
-  healthy: 'success',
-};
-
 // Same "most-needs-attention first" ordering as PI's ATTENTION_RANK, mapped
 // onto training's own tones: paused (danger) worst, then endingSoon (warning),
 // then idle/unknown (default, no distinct order between the two), then
@@ -116,32 +106,6 @@ const QUEUE_STATE_RANK: Record<QueueState, number> = {
   idle: 2,
   unknown: 2,
   training: 3,
-};
-
-// A table cell's own column header already names the stat — StatChip's
-// boxed "LABEL value" chip would repeat it (and repeat it again in the
-// stacked mobile layout, which already prints the header as the cell's
-// `data-label`). This is StatChip's own tone->colour map, applied to a bare
-// span instead of a chip, so a table cell still carries the same meaning.
-const TONE_TEXT_CLASS: Record<StatChipTone, string> = {
-  default: 'text-text',
-  accent: 'text-accent',
-  success: 'text-success',
-  warning: 'text-warning',
-  danger: 'text-danger',
-};
-
-const COLUMN_LABEL_KEY: Record<CharacterColumnId, string> = {
-  name: 'characters.column.name',
-  corp: 'characters.column.corp',
-  spTotal: 'characters.column.spTotal',
-  wallet: 'characters.column.wallet',
-  lastSynced: 'characters.column.lastSynced',
-  training: 'characters.column.training',
-  openJobs: 'characters.column.openJobs',
-  pi: 'characters.column.pi',
-  spReady: 'characters.column.spReady',
-  alerts: 'characters.column.alerts',
 };
 
 const DENSITY_LABEL_KEYS = {
@@ -184,6 +148,14 @@ function olderOf(a: Date | null | undefined, b: Date | null | undefined): Date |
   return a.getTime() <= b.getTime() ? a : b;
 }
 
+/** The one "how stale is this character" rule (`olderOf`'s doc comment) — shared by the card badge and the table's `lastSynced` column so they can't drift into disagreeing about the same character. */
+function characterLastSynced(
+  stats: CharacterSortStats | undefined,
+  queue: QueueInfo | undefined
+): Date | undefined {
+  return olderOf(olderOf(stats?.skillPointsFetchedAt, stats?.walletFetchedAt), queue?.fetchedAt);
+}
+
 function CharacterCard({
   character,
   info,
@@ -201,10 +173,7 @@ function CharacterCard({
   // One badge for the whole card, not one per stat (that was the actual
   // complaint — three "Xm ago"s in a row): the oldest of whichever fields
   // this character has cached, so the card never overstates its freshness.
-  const lastSynced = olderOf(
-    olderOf(stats?.skillPointsFetchedAt, stats?.walletFetchedAt),
-    queue?.fetchedAt
-  );
+  const lastSynced = characterLastSynced(stats, queue);
 
   return (
     <li className="flex flex-col gap-2 rounded-xs border border-line bg-panel/85 p-3 backdrop-blur-sm transition-colors hover:border-line-bright hover:bg-panel-2">
@@ -522,18 +491,9 @@ function buildColumns(
     lastSynced: {
       id: 'lastSynced',
       header: t('characters.column.lastSynced'),
-      sortValue: (row) => {
-        const age = olderOf(
-          olderOf(row.stats?.skillPointsFetchedAt, row.stats?.walletFetchedAt),
-          row.queue?.fetchedAt
-        );
-        return age?.getTime();
-      },
+      sortValue: (row) => characterLastSynced(row.stats, row.queue)?.getTime(),
       render: (row) => {
-        const age = olderOf(
-          olderOf(row.stats?.skillPointsFetchedAt, row.stats?.walletFetchedAt),
-          row.queue?.fetchedAt
-        );
+        const age = characterLastSynced(row.stats, row.queue);
         return age ? <DataAgeBadge date={age} /> : t('common.unknown');
       },
     },
@@ -543,7 +503,7 @@ function buildColumns(
       sortValue: (row) => (row.queue ? QUEUE_STATE_RANK[row.queue.state] : undefined),
       render: (row) =>
         row.queue ? (
-          <span className={TONE_TEXT_CLASS[QUEUE_STATE_TONE[row.queue.state]]}>
+          <span className={STAT_CHIP_TONE_TEXT_CLASS[QUEUE_STATE_TONE[row.queue.state]]}>
             {t(`characters.queueStates.${row.queue.state}`)}
           </span>
         ) : (
@@ -590,7 +550,7 @@ function buildColumns(
         row.attention?.piAttention === undefined ? (
           '—'
         ) : (
-          <span className={TONE_TEXT_CLASS[PI_ATTENTION_TONE[row.attention.piAttention]]}>
+          <span className={STAT_CHIP_TONE_TEXT_CLASS[PI_ATTENTION_TONE[row.attention.piAttention]]}>
             {t(`pi.attention.${row.attention.piAttention}`)}
           </span>
         ),
@@ -604,7 +564,7 @@ function buildColumns(
           : Number(isSpExtractionReady(row.totalSp, spExtractionThresholdSp)),
       render: (row) =>
         row.totalSp !== undefined && isSpExtractionReady(row.totalSp, spExtractionThresholdSp) ? (
-          <span className={TONE_TEXT_CLASS.success}>{t('characters.spReadyYes')}</span>
+          <span className={STAT_CHIP_TONE_TEXT_CLASS.success}>{t('characters.spReadyYes')}</span>
         ) : (
           '—'
         ),
@@ -617,7 +577,7 @@ function buildColumns(
       sortValue: (row) => row.alertCount,
       render: (row) =>
         row.alertCount > 0 ? (
-          <span className={TONE_TEXT_CLASS.warning}>{row.alertCount}</span>
+          <span className={STAT_CHIP_TONE_TEXT_CLASS.warning}>{row.alertCount}</span>
         ) : (
           '—'
         ),
@@ -628,11 +588,12 @@ function buildColumns(
 interface ColumnPickerMenuProps {
   available: readonly CharacterColumnId[];
   visible: readonly CharacterColumnId[];
+  columnsById: Record<CharacterColumnId, DataTableColumn<CharacterRow>>;
   onToggle: (id: CharacterColumnId) => void;
 }
 
-/** Which columns show in table view — a menu, not a form: every toggle is already reversible in one tap (same reasoning as CalendarKindFilterMenu). */
-function ColumnPickerMenu({ available, visible, onToggle }: ColumnPickerMenuProps) {
+/** Which columns show in table view — a menu, not a form: every toggle is already reversible in one tap (same reasoning as CalendarKindFilterMenu). Labels come straight from `columnsById`'s own already-translated `header`, not a second id->i18n-key table that could drift from it. */
+function ColumnPickerMenu({ available, visible, columnsById, onToggle }: ColumnPickerMenuProps) {
   const { t } = useTranslation();
   const visibleSet = new Set(visible);
 
@@ -654,7 +615,7 @@ function ColumnPickerMenu({ available, visible, onToggle }: ColumnPickerMenuProp
             onSelect={(event) => event.preventDefault()}
             onCheckedChange={() => onToggle(id)}
           >
-            {t(COLUMN_LABEL_KEY[id])}
+            {columnsById[id].header}
           </DropdownMenuCheckboxItem>
         ))}
       </DropdownMenuContent>
@@ -706,6 +667,15 @@ export function Characters() {
   const [attentionById, setAttentionById] = useState<Map<number, AttentionEntry>>(new Map());
   const [jobSlotSkillsById, setJobSlotSkillsById] = useState<Map<number, JobSlotSkills>>(new Map());
   const [totalSpById, setTotalSpById] = useState<Map<number, number>>(new Map());
+
+  /** The one place a fresh roster snapshot becomes the four derived maps it feeds — shared by the cache-only load effect and "Refresh all" so a future fifth map only needs adding here. */
+  function applyRoster(roster: readonly RosterEntry[], now: number) {
+    setStats(rosterSortStats(roster));
+    setQueueById(queueInfoMap(roster, now));
+    setJobSlotSkillsById(jobSlotSkillsMap(roster));
+    setTotalSpById(totalSpMap(roster));
+  }
+
   const [addingGroup, setAddingGroup] = useState(false);
   const [newGroupName, setNewGroupName] = useState('');
   const [search, setSearch] = useState('');
@@ -726,9 +696,11 @@ export function Characters() {
     [t, spExtractionThreshold]
   );
   const availableColumnIds = availableCharacterColumns(spExtractionEnabled);
-  const activeColumnIds = availableColumnIds.filter((id) =>
-    visibleAvailableColumns(visibleColumns, spExtractionEnabled).includes(id)
-  );
+  // `id` is already known available here, so this is just "is it checked" —
+  // `visibleAvailableColumns` (below, `handleToggleColumn`'s own zero-columns
+  // guard) is for narrowing the *raw stored* list, which can hold ids that
+  // aren't available right now; this list already excludes those.
+  const activeColumnIds = availableColumnIds.filter((id) => visibleColumns.includes(id));
 
   const query = search.trim().toLowerCase();
   function matchesSearch(characterId: number): boolean {
@@ -782,10 +754,7 @@ export function Characters() {
       const now = Date.now();
       const roster = await loadRosterSnapshot();
       if (cancelled) return;
-      setStats(rosterSortStats(roster));
-      setQueueById(queueInfoMap(roster, now));
-      setJobSlotSkillsById(jobSlotSkillsMap(roster));
-      setTotalSpById(totalSpMap(roster));
+      applyRoster(roster, now);
     })();
     return () => {
       cancelled = true;
@@ -862,10 +831,7 @@ export function Characters() {
         loadRosterSnapshot({ live: true }),
         loadRosterAttention({ live: true }),
       ]);
-      setStats(rosterSortStats(roster));
-      setQueueById(queueInfoMap(roster, now));
-      setJobSlotSkillsById(jobSlotSkillsMap(roster));
-      setTotalSpById(totalSpMap(roster));
+      applyRoster(roster, now);
       setAttentionById(new Map(attention.map((entry) => [entry.characterId, entry])));
     } finally {
       setRefreshingAll(false);
@@ -978,9 +944,9 @@ export function Characters() {
         }));
       return (
         // Deliberate deviation from DataTable's usual `.dt-stack` collapse on
-        // mobile (docs/context/decisions — mobile-horizontal-scroll-for-
-        // characters-table): a real, comparable table stays a table, and
-        // scrolls sideways instead, at every width.
+        // mobile (docs/context/decisions/20260909-130638-characters-table-
+        // view-mobile-scroll-roster-overview-split.md): a real, comparable
+        // table stays a table, and scrolls sideways instead, at every width.
         <div className="overflow-x-auto">
           <DataTable
             columns={activeColumnIds.map((id) => columnsById[id])}
@@ -1178,6 +1144,7 @@ export function Characters() {
               <ColumnPickerMenu
                 available={availableColumnIds}
                 visible={activeColumnIds}
+                columnsById={columnsById}
                 onToggle={handleToggleColumn}
               />
             )}
