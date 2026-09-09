@@ -354,7 +354,7 @@ export function OpportunitiesPanel({
     },
     {
       id: 'orderDepth',
-      header: t('industry.opportunitiesOrderDepth'),
+      header: t('industry.opportunitiesOrderDepthLabel'),
       render: (row) => (
         <span className="flex items-center gap-1">
           <StatChip
