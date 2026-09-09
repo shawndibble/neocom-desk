@@ -129,6 +129,34 @@ export async function installEsiMock(page: Page): Promise<void> {
     if (path === '/markets/prices') return json(MARKET_PRICES);
     if (path === '/industry/systems') return json(INDUSTRY_SYSTEMS);
 
+    // usePublicInfo.loadMany's bulk roster lookup (src/stores/publicInfo.ts):
+    // affiliations for whichever ids it was asked about, then names for the
+    // corp/alliance ids that came back. The fixture roster is one character,
+    // so only that id ever resolves — same shape ESI itself would return for
+    // an id it can't affiliate (silently omitted, not an error).
+    if (path === '/characters/affiliation') {
+      const ids = route.request().postDataJSON() as number[];
+      return json(
+        ids
+          .filter((id) => id === CHARACTER_ID)
+          .map((id) => ({
+            character_id: id,
+            corporation_id: CORPORATION_ID,
+            alliance_id: ALLIANCE_ID,
+          }))
+      );
+    }
+    if (path === '/universe/names') {
+      const ids = route.request().postDataJSON() as number[];
+      return json(
+        ids.map((id) => {
+          if (id === CORPORATION_ID) return { id, name: CORPORATION_NAME, category: 'corporation' };
+          if (id === ALLIANCE_ID) return { id, name: ALLIANCE_NAME, category: 'alliance' };
+          return { id, name: `Unknown ${id}`, category: 'character' };
+        })
+      );
+    }
+
     // Warmed at boot by `app/prefetch.ts` for every scope the mocked JWT
     // grants — which is all of them. No spec asserts on these surfaces yet, so
     // they answer empty; a spec that needs real rows should override this
