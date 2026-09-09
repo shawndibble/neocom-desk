@@ -83,7 +83,7 @@ describe('mostRecentlyUpdatedPlan', () => {
   });
 });
 
-describe('newBuildPlan — assumed ME', () => {
+describe('newBuildPlan — assumed ME and TE', () => {
   it('quotes a blueprint the character does not own at the assumed ME', () => {
     const created = newBuildPlan(1, entry(), null, null, DEFAULT_FACILITY_DEFAULTS, {
       assumedMe: 2,
@@ -102,14 +102,38 @@ describe('newBuildPlan — assumed ME', () => {
   });
 
   it('defaults to unresearched when no assumption is given', () => {
-    expect(newBuildPlan(1, entry(), null, null, DEFAULT_FACILITY_DEFAULTS).me).toBe(0);
+    const created = newBuildPlan(1, entry(), null, null, DEFAULT_FACILITY_DEFAULTS);
+    expect(created.me).toBe(0);
+    expect(created.te).toBe(0);
   });
 
-  it('leaves TE at 0 for an unowned blueprint — there is no assumed TE (#634)', () => {
+  it('quotes a blueprint the character does not own at the assumed TE (#634)', () => {
+    // The commonest unowned case is an invented BPC with no decryptor —
+    // ME2/TE4 — and quoting its time at 0 moves job time and ISK/hour.
     const created = newBuildPlan(1, entry(), null, null, DEFAULT_FACILITY_DEFAULTS, {
       assumedMe: 2,
+      assumedTe: 4,
     });
-    expect(created.te).toBe(0);
+    expect(created.me).toBe(2);
+    expect(created.te).toBe(4);
+  });
+
+  it('still quotes an owned blueprint at its real TE', () => {
+    const created = newBuildPlan(1, entry(), owned(), null, DEFAULT_FACILITY_DEFAULTS, {
+      assumedMe: 2,
+      assumedTe: 4,
+    });
+    expect(created.te).toBe(20);
+  });
+
+  it('assumes ME and TE independently', () => {
+    // They are separate preferences: a pilot who set one and not the other
+    // must not have the unset half quietly follow the set one.
+    const created = newBuildPlan(1, entry(), null, null, DEFAULT_FACILITY_DEFAULTS, {
+      assumedTe: 4,
+    });
+    expect(created.me).toBe(0);
+    expect(created.te).toBe(4);
   });
 });
 
@@ -177,15 +201,16 @@ describe('newBuildPlan — seeded ME/TE (#637)', () => {
     expect(created.runs).toBe(5);
   });
 
-  it('opens at the seeded research over the assumed-ME preference', () => {
+  it('opens at the seeded research over the assumed-ME and assumed-TE preferences', () => {
     const created = newBuildPlan(1, entry(), null, null, DEFAULT_FACILITY_DEFAULTS, {
       assumedMe: 2,
+      assumedTe: 4,
       me: 0,
       te: 0,
       runs: 1,
     });
     // Seeded 0 is a real answer about a real copy, not a missing one — an
-    // unresearched BPC must not fall through to the assumption.
+    // unresearched BPC must not fall through to either assumption (#634).
     expect(created.me).toBe(0);
     expect(created.te).toBe(0);
   });
@@ -198,6 +223,7 @@ describe('newBuildPlan — seeded ME/TE (#637)', () => {
     const created = newBuildPlan(1, entry(), owned(), null, DEFAULT_FACILITY_DEFAULTS, {
       ...seed,
       assumedMe: 2,
+      assumedTe: 4,
     });
     expect(matchesPlanSeed(created, seed)).toBe(true);
   });

@@ -1,4 +1,4 @@
-# Scope decisions — Seeded Build Plans: the listing's numbers win, reuse matches on value (issue #637)
+# Scope decisions — Seeded Build Plans: the Offer's numbers win, reuse matches on value (issue #637)
 
 _Recorded 2026-09-09 · issue #637._
 
@@ -17,9 +17,9 @@ _Recorded 2026-09-09 · issue #637._
   so an owned copy must not overwrite the listing. `??` and never `||`: an
   unresearched BPC is ME 0 / TE 0, a real answer about a real copy, and
   truthiness would silently fall through to the owned copy for exactly those
-  listings. #634 (assumed-TE _preference_) had not landed when this did; when it
-  does it slots in as the last fallback on the `te` line, matching `assumedMe`
-  on the line above.
+  Offers. #634 (the assumed-TE _preference_) landed while this was in flight and
+  was merged in here: `assumedTe` is now the last fallback on the `te` line, so
+  both lines read the same three-step chain.
 
 - **A seed is all-or-nothing, and parsed strictly rather than clamped.** All
   three of `me`/`te`/`runs` must be present, integral, and inside the game's own

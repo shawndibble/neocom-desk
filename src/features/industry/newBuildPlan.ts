@@ -39,9 +39,9 @@ export interface NewBuildPlanOverrides {
   /**
    * ME/TE of the specific blueprint copy this plan is quoting — a BPC Sourcing
    * Offer's own research, carried through the context menu (issue #637).
-   * Beats an owned copy *and* the assumed-ME preference: the pilot is judging
-   * a copy they might buy, not the one already in the hangar. Seeded 0 is a
-   * real answer about a real copy, so this is `??`-chained and never
+   * Beats an owned copy *and* the assumed-ME/TE preferences: the pilot is
+   * judging a copy they might buy, not the one already in the hangar. Seeded 0
+   * is a real answer about a real copy, so this is `??`-chained and never
    * truthiness-checked.
    */
   me?: number;
@@ -54,13 +54,22 @@ export interface NewBuildPlanOverrides {
    */
   name?: string;
   /**
-   * ME/TE for a blueprint the character does not own a copy of. Fit Import
+   * ME for a blueprint the character does not own a copy of. Fit Import
    * passes the assumed-ME preference here: most of a T2 fit needs an invented
    * BPC, and quoting all of it at ME0 overstates the group's material cost.
    * An owned copy still wins, the same precedence `materialEfficiencyFor`
    * applies to sub-jobs.
    */
   assumedMe?: number;
+  /**
+   * TE for a blueprint the character does not own a copy of (issue #634), from
+   * the preference beside the ME one. Separate rather than packed with it: the
+   * pair a real invented BPC carries is ME2 / TE4, so one number cannot
+   * answer for both, and material cost and job time are different questions a
+   * pilot may want answered differently. Same precedence — an owned copy's
+   * real TE wins.
+   */
+  assumedTe?: number;
   buildGroupId?: string;
   /**
    * Overrides `Date.now()`. Fit Import stamps the hull highest in the batch:
@@ -117,13 +126,13 @@ export function newBuildPlan(
         rigFit: EMPTY_RIG_FIT,
         facilityTaxPct: null,
       });
-  // One precedence order for research, everywhere: an explicit per-copy seed
-  // beats an owned copy, and an owned blueprint's real research beats the
-  // assumed value — the assumption exists to fill the gap where there is
-  // nothing to read. There is no assumed TE yet (#634 adds the preference);
-  // when it lands it slots in as the last fallback on the `te` line, matching
-  // `assumedMe` on the line above it.
+  // One precedence order for research, everywhere, and the same one on both
+  // lines below: an explicit per-copy seed (#637) beats an owned copy, and an
+  // owned blueprint's real research beats the assumed value (#634) — the
+  // assumption exists to fill the gap where there is nothing to read, and the
+  // seed exists because the pilot is quoting a copy that is not theirs yet.
   const assumedMe = overrides.assumedMe ?? 0;
+  const assumedTe = overrides.assumedTe ?? 0;
   return {
     id: crypto.randomUUID(),
     characterId,
@@ -131,7 +140,7 @@ export function newBuildPlan(
     blueprintTypeID: entry.blueprintTypeID,
     runs: overrides.runs ?? 1,
     me: overrides.me ?? owned?.material_efficiency ?? assumedMe,
-    te: overrides.te ?? owned?.time_efficiency ?? 0,
+    te: overrides.te ?? owned?.time_efficiency ?? assumedTe,
     facility: facilityConfig.facility,
     rigFit: facilityConfig.rigFit,
     security: defaultsFrom?.security ?? 'highsec',

@@ -6,6 +6,7 @@ import { FONT_SCALE_KEY } from '@/lib/fontScale';
 import { TIME_FORMAT_SETTING_KEY } from '@/lib/timeFormat';
 import { MARKET_HUB_SETTING_KEY } from '@/features/market/hub';
 import { ASSUMED_ME_SETTING_KEY } from '@/features/industry/assumedMe';
+import { ASSUMED_TE_SETTING_KEY } from '@/features/industry/assumedTe';
 import { DARK_THRESHOLD_SETTING_KEY } from '@/features/corp/darkThreshold';
 import { PI_EXPIRING_WINDOW_SETTING_KEY } from '@/features/pi/expiringWindow';
 import { FACILITY_DEFAULTS_SETTING_KEY } from '@/features/industry/facilityDefaults';
@@ -54,6 +55,7 @@ describe('VIEW_PREFERENCE_KEYS', () => {
       TIME_FORMAT_SETTING_KEY,
       MARKET_HUB_SETTING_KEY,
       ASSUMED_ME_SETTING_KEY,
+      ASSUMED_TE_SETTING_KEY,
       DARK_THRESHOLD_SETTING_KEY,
       PI_EXPIRING_WINDOW_SETTING_KEY,
       FACILITY_DEFAULTS_SETTING_KEY,

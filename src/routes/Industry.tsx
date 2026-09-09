@@ -68,6 +68,7 @@ import { BuildGroupPanel } from '@/features/industry/BuildGroupPanel';
 import { FitImportDialog } from '@/features/industry/FitImportDialog';
 import { fitImportGroupName, fitImportPlans } from '@/features/industry/fitImport';
 import { useAssumedMe } from '@/features/industry/assumedMe';
+import { useAssumedTe } from '@/features/industry/assumedTe';
 import type { FitToBuildPlansResult } from '@/engine/import/fitToBuildPlans';
 
 /**
@@ -179,11 +180,14 @@ export function Industry() {
   const setExpandedGroups = useExpandedGroups((state) => state.setValue);
   const assumedMe = useAssumedMe((state) => state.value);
   const hydrateAssumedMe = useAssumedMe((state) => state.hydrate);
+  const assumedTe = useAssumedTe((state) => state.value);
+  const hydrateAssumedTe = useAssumedTe((state) => state.hydrate);
   useEffect(() => {
     void hydrateBuildGroups();
     void hydrateExpandedGroups();
     void hydrateAssumedMe();
-  }, [hydrateBuildGroups, hydrateExpandedGroups, hydrateAssumedMe]);
+    void hydrateAssumedTe();
+  }, [hydrateBuildGroups, hydrateExpandedGroups, hydrateAssumedMe, hydrateAssumedTe]);
 
   const [selection, setSelection] = useState<DetailSelection>(NO_SELECTION);
   // Read back as the three things the pane below actually asks about. The tag
@@ -277,11 +281,12 @@ export function Industry() {
         mostRecentlyUpdatedPlan(plans),
         facilityDefaults,
         {
-          // The same assumed ME Fit Import seeds its plans with (#626). Passed
-          // here too so one blueprint cannot start at two different ME values
-          // depending on whether it was picked or imported; an owned copy still
-          // wins on both paths.
+          // The same assumed ME and TE Fit Import seeds its plans with (#626,
+          // #634). Passed here too so one blueprint cannot start at two
+          // different research levels depending on whether it was picked or
+          // imported; an owned copy still wins on both paths.
           assumedMe,
+          assumedTe,
           // An Offer's own numbers beat both (#637). The name carries them too:
           // the reuse rule below lets a pilot hold a plain plan and one or more
           // seeded plans for one blueprint, and three rows all reading "Rifter"
@@ -313,7 +318,7 @@ export function Industry() {
     // would re-fire a Dexie write. react-i18next only re-binds it on
     // `languageChanged`, which cannot happen while the app is English-only —
     // whoever adds a second locale needs to weigh that here.
-    [activeCharacterId, ownedBlueprints, plans, facilityDefaults, assumedMe, t]
+    [activeCharacterId, ownedBlueprints, plans, facilityDefaults, assumedMe, assumedTe, t]
   );
 
   // The Market Browser's item context menu "jump to a Build Plan" action
@@ -719,6 +724,7 @@ export function Industry() {
       defaultsFrom: mostRecentlyUpdatedPlan(plans),
       facilityDefaults,
       assumedMe,
+      assumedTe,
       buildGroupId: groupId,
     });
     if (newPlans.length === 0) return;

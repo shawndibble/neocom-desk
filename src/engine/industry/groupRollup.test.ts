@@ -235,3 +235,84 @@ describe('rollUpBuildGroup — mixed hubs', () => {
     expect(rollup.totalCost).toBe(315);
   });
 });
+
+describe('rollUpBuildGroup — buy list per hub', () => {
+  it('keeps one block per hub, in the same order as hubIds', () => {
+    const rollup = rollUpBuildGroup([
+      member({ planId: 'a', hubId: 'jita', shoppingMaterials: [line(34, 100)] }),
+      member({ planId: 'b', hubId: 'amarr', shoppingMaterials: [line(35, 50)] }),
+      member({ planId: 'c', hubId: 'jita', shoppingMaterials: [line(34, 20)] }),
+    ]);
+    expect(rollup.shoppingByHub.map((block) => block.hubId)).toEqual(rollup.hubIds);
+    expect(rollup.shoppingByHub.map((block) => block.hubId)).toEqual(['jita', 'amarr']);
+  });
+
+  it('merges members sharing a hub into one line, as the group total does', () => {
+    const rollup = rollUpBuildGroup([
+      member({ planId: 'a', hubId: 'jita', shoppingMaterials: [line(34, 100)] }),
+      member({ planId: 'b', hubId: 'jita', shoppingMaterials: [line(34, 20)] }),
+    ]);
+    expect(rollup.shoppingByHub).toHaveLength(1);
+    expect(rollup.shoppingByHub[0].materials).toHaveLength(1);
+    expect(rollup.shoppingByHub[0].materials[0].quantity).toBe(120);
+  });
+
+  it('splits a material two hubs both need, rather than picking one', () => {
+    const rollup = rollUpBuildGroup([
+      member({ planId: 'a', hubId: 'jita', shoppingMaterials: [line(34, 100)] }),
+      member({ planId: 'b', hubId: 'amarr', shoppingMaterials: [line(34, 30)] }),
+    ]);
+    expect(rollup.shoppingByHub[0].materials[0].remainingQuantity).toBe(100);
+    expect(rollup.shoppingByHub[1].materials[0].remainingQuantity).toBe(30);
+  });
+
+  it('accounts for every unit of the group buy list and no more', () => {
+    // The invariant that makes the split honest: pasting each block buys
+    // exactly what the group as a whole says it needs.
+    const rollup = rollUpBuildGroup([
+      member({ planId: 'a', hubId: 'jita', shoppingMaterials: [line(34, 100), line(35, 5)] }),
+      member({ planId: 'b', hubId: 'amarr', shoppingMaterials: [line(34, 30)] }),
+      member({ planId: 'c', hubId: 'rens', shoppingMaterials: [line(35, 7)] }),
+    ]);
+    const perHub = new Map<number, number>();
+    for (const block of rollup.shoppingByHub) {
+      for (const material of block.materials) {
+        perHub.set(
+          material.typeID,
+          (perHub.get(material.typeID) ?? 0) + material.remainingQuantity
+        );
+      }
+    }
+    expect(perHub).toEqual(
+      new Map(rollup.shoppingMaterials.map((m) => [m.typeID, m.remainingQuantity]))
+    );
+  });
+
+  it('gives a single-hub group one block holding the whole buy list', () => {
+    const rollup = rollUpBuildGroup([
+      member({ planId: 'a', hubId: 'jita', shoppingMaterials: [line(34, 100)] }),
+      member({ planId: 'b', hubId: 'jita', shoppingMaterials: [line(35, 50)] }),
+    ]);
+    expect(rollup.shoppingByHub).toHaveLength(1);
+    expect(rollup.shoppingByHub[0].materials).toEqual(rollup.shoppingMaterials);
+  });
+
+  it('has no blocks for an empty group', () => {
+    expect(rollUpBuildGroup([]).shoppingByHub).toEqual([]);
+  });
+
+  it('still lists a hub whose materials are all owned, and leaves the gating to the caller', () => {
+    // Same rule as the group-wide control: the block exists so the hub is
+    // named, and the caller disables a copy that would write an empty string.
+    const rollup = rollUpBuildGroup([
+      member({ planId: 'a', hubId: 'jita', shoppingMaterials: [line(34, 100)] }),
+      member({
+        planId: 'b',
+        hubId: 'amarr',
+        shoppingMaterials: [line(35, 50, { ownedQuantity: 50, remainingQuantity: 0 })],
+      }),
+    ]);
+    expect(rollup.shoppingByHub.map((block) => block.hubId)).toEqual(['jita', 'amarr']);
+    expect(rollup.shoppingByHub[1].materials[0].remainingQuantity).toBe(0);
+  });
+});
