@@ -60,7 +60,7 @@ import {
 import { useExpandedGroups, withGroupExpanded } from '@/features/industry/expandedGroups';
 import { BuildGroupPanel } from '@/features/industry/BuildGroupPanel';
 import { FitImportDialog } from '@/features/industry/FitImportDialog';
-import { fitImportPlans } from '@/features/industry/fitImport';
+import { applyFitImport, fitImportGroupName } from '@/features/industry/fitImport';
 import { useAssumedMe } from '@/features/industry/assumedMe';
 import type { FitToBuildPlansResult } from '@/engine/import/fitToBuildPlans';
 
@@ -647,48 +647,24 @@ export function Industry() {
     if (groupId !== null) await setGroupExpanded(groupId, true);
   }
 
-  /**
-   * Creates a group and one plan per buildable item in a pasted fit.
-   *
-   * One `bulkAdd` and one `scheduleSync`, not one of each per plan: a
-   * twenty-five-plan fit would otherwise re-fire the `useLiveQuery` above
-   * twenty-five times, re-rendering this whole route on each.
-   */
+  /** Creates a group and one plan per buildable item in a pasted fit, then opens it. */
   async function handleFitImport(preview: FitToBuildPlansResult) {
     if (activeCharacterId === null || !catalog) return;
-    const groupId = crypto.randomUUID();
-    const newPlans = fitImportPlans(preview, {
+    const result = await applyFitImport(preview, {
       characterId: activeCharacterId,
       catalog,
       ownedBlueprints,
       defaultsFrom: mostRecentlyUpdatedPlan(plans),
       facilityDefaults,
       assumedMe,
-      buildGroupId: groupId,
+      buildGroups,
+      setBuildGroups,
+      groupName: fitImportGroupName(preview, t),
     });
-    if (newPlans.length === 0) return;
-    // The group's record is written before its plans, the same rule the delete
-    // path follows from the other end (see `buildGroups.ts`).
-    //
-    // The ship goes into the stored name rather than being derived from the
-    // members later: nothing marks which plan is the hull, and any ordering
-    // that stood in for one (insertion order, newest `updatedAt`) names a
-    // different plan the moment the pilot edits a member.
-    const name =
-      preview.groupName === null
-        ? t('industry.newGroupName')
-        : preview.hull
-          ? t('industry.fitImportGroupName', {
-              fit: preview.groupName,
-              ship: preview.hull.productName,
-            })
-          : preview.groupName;
-    await setBuildGroups(addBuildGroup(buildGroups, activeCharacterId, { id: groupId, name }));
-    await db.buildPlans.bulkAdd(newPlans);
-    scheduleSync(activeCharacterId);
-    await setGroupExpanded(groupId, true);
+    if (!result) return;
+    await setGroupExpanded(result.groupId, true);
     setFitImportOpen(false);
-    selectGroup(groupId);
+    selectGroup(result.groupId);
   }
 
   function clearCompareMode() {
