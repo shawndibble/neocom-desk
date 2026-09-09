@@ -558,6 +558,25 @@ export function Wallet() {
     () => (allCharacters ?? []).map((c) => ({ characterId: c.characterId, characterName: c.name })),
     [allCharacters]
   );
+  /**
+   * The Balance panel's `meta`, so the picker rides in the panel's own title
+   * bar instead of a bare row floating above it — and so it survives the swap
+   * between the single-Character panel and the per-Character table below,
+   * which are two different `Panel`s (`ActiveJobsPanel`'s placement).
+   *
+   * Absent for a one-Character account: "This character" and "All characters"
+   * then resolve to the same pilot, leaving a control that cannot change
+   * anything (`OpenOrdersPanel`'s `showCharacterStrip` precedent).
+   */
+  const walletCharacterFilterMeta =
+    walletFilterCandidates.length > 1 ? (
+      <CharacterFilterControl
+        characters={walletFilterCandidates}
+        activeCharacterId={activeCharacterId}
+        value={walletCharacterFilter}
+        onChange={setWalletCharacterFilter}
+      />
+    ) : undefined;
 
   // Nothing fetched until the picker actually leaves "current" — same
   // opt-in shape as the corp reads below, just not a corp read: nothing here
@@ -1065,25 +1084,18 @@ export function Wallet() {
       ) : walletTab === 'balance' ? (
         <div className="space-y-4">
           {/*
-            Always visible, even while pinned to "This character" — otherwise
-            there is no way to discover the cross-character view at all
-            (issue #607). Below it, the panel content swaps: unchanged for
-            "This character", a per-character table + total for anything
-            wider.
+            The picker stays visible in both branches, even while pinned to
+            "This character" — otherwise there is no way to discover the
+            cross-character view at all (issue #607) — but it rides in each
+            panel's own header rather than a row above them. The panel content
+            swaps beneath it: unchanged for "This character", a per-character
+            table + total for anything wider.
           */}
-          <div className="flex flex-wrap items-center gap-2">
-            <CharacterFilterControl
-              characters={walletFilterCandidates}
-              activeCharacterId={activeCharacterId}
-              value={walletCharacterFilter}
-              onChange={setWalletCharacterFilter}
-            />
-          </div>
-
           {showingAllWalletBalances ? (
             <Panel
               padded={false}
               title={t('wallet.balanceByCharacter')}
+              meta={walletCharacterFilterMeta}
               actions={
                 <IconButton
                   size="sm"
@@ -1132,6 +1144,7 @@ export function Wallet() {
           ) : (
             <Panel
               title={t('wallet.balanceTab')}
+              meta={walletCharacterFilterMeta}
               actions={balanceResult ? <DataAgeBadge date={balanceResult.fetchedAt} /> : undefined}
             >
               <div className="flex flex-wrap gap-x-8 gap-y-4">

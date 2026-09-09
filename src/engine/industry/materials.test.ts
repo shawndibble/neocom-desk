@@ -9,12 +9,12 @@ import type { FacilityContext, IndustryBlueprint } from '@/engine/industry/types
 
 const npc: FacilityContext = {
   facility: FACILITY_PRESETS.npcStation,
-  rig: 'none',
+  rigFit: ['none', 'none', 'none'],
   security: 'highsec',
 };
 const raitaruT1Hi: FacilityContext = {
   facility: FACILITY_PRESETS.raitaru,
-  rig: 't1',
+  rigFit: ['meT1', 'none', 'none'],
   security: 'highsec',
 };
 
@@ -39,15 +39,24 @@ describe('materialModifier', () => {
     // T2 rig nullsec: 2.4% * 2.1 = 5.04% -> 0.9496 rig factor
     const nullT2: FacilityContext = {
       facility: FACILITY_PRESETS.sotiyo,
-      rig: 't2',
+      rigFit: ['meT2', 'none', 'none'],
       security: 'nullsec',
     };
     expect(materialModifier(0, nullT2)).toBeCloseTo(0.99 * 0.9496, 12);
   });
 
   it('ignores rigs at NPC stations', () => {
-    const npcRigged: FacilityContext = { ...npc, rig: 't2' };
+    const npcRigged: FacilityContext = { ...npc, rigFit: ['meT2', 'none', 'none'] };
     expect(materialModifier(10, npcRigged)).toBeCloseTo(0.9, 12);
+  });
+
+  it('a TE-only rig fit contributes nothing to the material bonus', () => {
+    const teOnly: FacilityContext = {
+      facility: FACILITY_PRESETS.raitaru,
+      rigFit: ['teT2', 'none', 'none'],
+      security: 'highsec',
+    };
+    expect(materialModifier(0, teOnly)).toBeCloseTo(0.99, 12);
   });
 
   it('scales reactor rig bonus by the reaction security table, not the manufacturing one', () => {
@@ -55,7 +64,7 @@ describe('materialModifier', () => {
     // vs. manufacturing's 2.4% * 2.1 = 5.04% -> 0.9496 for the same rig level.
     const tataraT2Null: FacilityContext = {
       facility: FACILITY_PRESETS.tatara,
-      rig: 't2',
+      rigFit: ['meT2', 'none', 'none'],
       security: 'nullsec',
     };
     expect(materialModifier(0, tataraT2Null)).toBeCloseTo(0.9736, 12);
@@ -64,7 +73,7 @@ describe('materialModifier', () => {
   it('leaves reactor rig bonus unscaled in lowsec (reaction table is 1x there)', () => {
     const athanorT1Low: FacilityContext = {
       facility: FACILITY_PRESETS.athanor,
-      rig: 't1',
+      rigFit: ['meT1', 'none', 'none'],
       security: 'lowsec',
     };
     // 2% * 1 (reaction lowsec multiplier) = 2% -> 0.98

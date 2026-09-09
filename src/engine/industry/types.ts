@@ -83,7 +83,69 @@ export function industryActivityOf(blueprint: IndustryBlueprint): IndustryActivi
  */
 export const MAX_JOB_RUNS = 100_000;
 
+/**
+ * Pre-issue-#609 single-tier rig model: one tier value read into both the ME
+ * and TE bonus tables at once — which is what a structure with one ME rig and
+ * one TE rig of the same tier actually produces, but gave no way to fit only
+ * one of the two, or a mismatched tier on each. Kept only so an existing Build
+ * Plan or synced record still resolves to the same bonus until it is next
+ * edited — see `rigFitFromLegacyLevel` and `resolveRigFit`.
+ */
 export type RigLevel = 'none' | 't1' | 't2';
+
+/**
+ * One specific rig a structure can fit (issue #609): which bonus line (ME or
+ * TE) and which tier. `'none'` is an empty slot.
+ */
+export type RigKind = 'none' | 'meT1' | 'meT2' | 'teT1' | 'teT2';
+
+/** Every Upwell engineering complex and refinery has exactly 3 rig slots. */
+export const RIG_SLOT_COUNT = 3;
+
+/** A structure's rig fit: up to 3 independently chosen rigs (issue #609). Always normalized to exactly `RIG_SLOT_COUNT` entries — 'none' fills an unused slot. */
+export type RigFit = readonly [RigKind, RigKind, RigKind];
+
+export const EMPTY_RIG_FIT: RigFit = ['none', 'none', 'none'];
+
+/** Every rig a pilot can pick for one slot, `'none'` first. */
+export const RIG_KIND_OPTIONS: readonly RigKind[] = ['none', 'meT1', 'meT2', 'teT1', 'teT2'];
+
+/** Pads or truncates any list of rig kinds to exactly `RIG_SLOT_COUNT` slots, filling the rest with `'none'`. */
+export function normalizeRigFit(fit: readonly RigKind[] | undefined | null): RigFit {
+  const slots = fit ?? [];
+  return [slots[0] ?? 'none', slots[1] ?? 'none', slots[2] ?? 'none'];
+}
+
+/** A fit with one slot replaced — the one edit every rig picker (a Build Plan's own, and Settings' facility defaults) makes. */
+export function setRigSlot(fit: RigFit, slot: number, kind: RigKind): RigFit {
+  const next = [...fit];
+  next[slot] = kind;
+  return normalizeRigFit(next);
+}
+
+/** Migrates a legacy single-tier `rigLevel` into the equivalent `RigFit` — one ME rig and one TE rig of that tier, reproducing exactly the bonus every existing Build Plan already computed. */
+export function rigFitFromLegacyLevel(level: RigLevel): RigFit {
+  if (level === 't1') return ['meT1', 'teT1', 'none'];
+  if (level === 't2') return ['meT2', 'teT2', 'none'];
+  return EMPTY_RIG_FIT;
+}
+
+/**
+ * The effective rig fit for a record that may still be in the pre-#609 shape:
+ * `rigFit` wins when present, else `rigLevel` is migrated, else the facility
+ * has no rigs fitted. Every reader of a persisted or synced Build Plan (or
+ * Facility Defaults) record goes through this rather than reading either
+ * field directly, so a record from before this existed and one written since
+ * behave identically.
+ */
+export function resolveRigFit(source: {
+  rigFit?: readonly RigKind[];
+  rigLevel?: RigLevel;
+}): RigFit {
+  if (source.rigFit !== undefined) return normalizeRigFit(source.rigFit);
+  if (source.rigLevel !== undefined) return rigFitFromLegacyLevel(source.rigLevel);
+  return EMPTY_RIG_FIT;
+}
 
 /** Security band of the facility's solar system. Wormholes count as nullsec. */
 export type SecurityBand = 'highsec' | 'lowsec' | 'nullsec';
@@ -184,8 +246,12 @@ export const FACILITY_PRESETS: Record<FacilityKind, FacilityPreset> = {
   },
 };
 
+type RigBonusType = 'me' | 'te';
+
 /**
- * Standup M-Set manufacturing rig base bonuses, percent.
+ * Standup M-Set manufacturing rig base bonuses, percent, by specific rig
+ * (issue #609 — replaces the pre-existing single-tier model, which applied
+ * one tier to both bonus lines at once).
  * Source: everef.net dogma (M-Set ME I -2%, ME II -2.4%, TE I -20%, TE II -24%).
  *
  * Reused as-is for reactor rigs (Standup reactor M-Set/L-Set): issue #460
@@ -193,8 +259,14 @@ export const FACILITY_PRESETS: Record<FacilityKind, FacilityPreset> = {
  * both rig lines. Only the security multiplier differs — see
  * `REACTION_RIG_SECURITY_MULTIPLIER` below.
  */
-export const RIG_MATERIAL_BONUS_PCT: Record<RigLevel, number> = { none: 0, t1: 2, t2: 2.4 };
-export const RIG_TIME_BONUS_PCT: Record<RigLevel, number> = { none: 0, t1: 20, t2: 24 };
+const RIG_KIND_BONUS: Readonly<
+  Record<Exclude<RigKind, 'none'>, { type: RigBonusType; pct: number }>
+> = {
+  meT1: { type: 'me', pct: 2 },
+  meT2: { type: 'me', pct: 2.4 },
+  teT1: { type: 'te', pct: 20 },
+  teT2: { type: 'te', pct: 24 },
+};
 
 /**
  * Engineering rig security multipliers applied to the base rig bonus.
@@ -223,6 +295,51 @@ export const REACTION_RIG_SECURITY_MULTIPLIER: Record<SecurityBand, number> = {
 /** Which security-multiplier table a rig reads, by the facility's own activity. One place to own this pick, rather than the same ternary at every call site. */
 export function rigSecurityMultiplierFor(activity: IndustryActivity): Record<SecurityBand, number> {
   return activity === 'reaction' ? REACTION_RIG_SECURITY_MULTIPLIER : RIG_SECURITY_MULTIPLIER;
+}
+
+/**
+ * EVE's stacking penalty for same-effect modules, strongest first: a 2nd rig
+ * of the same bonus type contributes ~87% of its base bonus, a 3rd ~57%.
+ * Fitting two ME rigs is legal but is not twice the ME bonus (issue #609 —
+ * the pre-existing single-tier model could never fit two rigs of one type at
+ * all, so this case did not previously exist). Only 3 entries are ever
+ * needed — `RIG_SLOT_COUNT` is the most a structure can fit.
+ *
+ * Source: EVE University wiki "Stacking penalties" — CCP's general module
+ * formula `multiplier(i) = e^(-(i / 2.67805)^2)` for the i-th strongest
+ * module (0-indexed) in a penalty group, rounded to 3 decimals: 1, 0.869,
+ * 0.571 for i = 0, 1, 2.
+ */
+const STACKING_PENALTY_MULTIPLIERS: readonly number[] = [1, 0.869, 0.571];
+
+function stackedRigBonusPct(fit: RigFit, bonusType: RigBonusType): number {
+  const contributions = fit
+    .map((kind) => (kind === 'none' ? null : RIG_KIND_BONUS[kind]))
+    .filter(
+      (spec): spec is { type: RigBonusType; pct: number } =>
+        spec !== null && spec.type === bonusType
+    )
+    .map((spec) => spec.pct)
+    .sort((a, b) => b - a);
+  return contributions.reduce(
+    (sum, pct, i) => sum + pct * (STACKING_PENALTY_MULTIPLIERS[i] ?? 0),
+    0
+  );
+}
+
+/**
+ * Effective ME or TE rig bonus percent for a rig fit: every slot contributing
+ * to `bonusType`, EVE-stacking-penalized against each other, times the
+ * facility's security-band multiplier for its activity. Callers still gate
+ * this at 0 for a non-structure — rigs only fit on player structures.
+ */
+export function rigBonusPct(
+  fit: RigFit,
+  bonusType: RigBonusType,
+  activity: IndustryActivity,
+  security: SecurityBand
+): number {
+  return stackedRigBonusPct(fit, bonusType) * rigSecurityMultiplierFor(activity)[security];
 }
 
 /**
@@ -268,7 +385,7 @@ export type SkillLevels = Record<number, number>;
 /** Where the job runs: facility preset + rig fit + system security band. */
 export interface FacilityContext {
   facility: FacilityPreset;
-  rig: RigLevel;
+  rigFit: RigFit;
   security: SecurityBand;
 }
 
@@ -296,7 +413,7 @@ export interface IndustryInputs {
   /** Blueprint time efficiency, 0..20. */
   te: number;
   facility: FacilityPreset;
-  rig: RigLevel;
+  rigFit: RigFit;
   security: SecurityBand;
   /** Facility tax, percent of EIV. Defaults to the preset's defaultTaxPct. */
   facilityTaxPct?: number;

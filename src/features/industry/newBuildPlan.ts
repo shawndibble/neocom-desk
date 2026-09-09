@@ -9,7 +9,7 @@
 
 import type { BuildPlanRecord } from '@/db';
 import type { CharacterBlueprint } from '@/esi/endpoints';
-import { FACILITY_PRESETS } from '@/engine/industry/types';
+import { EMPTY_RIG_FIT, FACILITY_PRESETS, resolveRigFit } from '@/engine/industry/types';
 import type { FacilityKind, IndustryActivity } from '@/engine/industry/types';
 import { DEFAULT_TRADE_HUB } from '@/market/hubs';
 import { DEFAULT_FACILITY_DEFAULTS, type FacilityDefaults } from './facilityDefaults';
@@ -81,23 +81,23 @@ export function newBuildPlan(
   const preferred =
     FACILITY_PRESETS[facilityDefaults.facility].activity === activity ? facilityDefaults : null;
   /**
-   * Facility, rig level and owner-set tax move together, from one source.
+   * Facility, rig fit and owner-set tax move together, from one source.
    *
    * Taking the facility from one place and the rig from another produces a
-   * combination neither source ever held — an NPC station with T2 rigs fitted,
+   * combination neither source ever held — an NPC station with rigs fitted,
    * which `normalizeFacilityDefaults` refuses to even store. It also made the
    * pilot's configured rig and tax unreachable: any earlier plan, whatever its
-   * activity, supplied a `rigLevel` and won.
+   * activity, supplied a rig fit and won.
    */
   const facilityConfig: FacilityDefaults = defaultsMatchActivity
     ? {
         facility: defaultsFrom.facility,
-        rigLevel: defaultsFrom.rigLevel,
+        rigFit: resolveRigFit(defaultsFrom),
         facilityTaxPct: defaultsFrom.facilityTaxPct ?? null,
       }
     : (preferred ?? {
         facility: fallbackFacility(activity),
-        rigLevel: 'none',
+        rigFit: EMPTY_RIG_FIT,
         facilityTaxPct: null,
       });
   // An owned blueprint's real research always wins over the assumed value —
@@ -112,7 +112,7 @@ export function newBuildPlan(
     me: owned?.material_efficiency ?? assumedMe,
     te: owned?.time_efficiency ?? 0,
     facility: facilityConfig.facility,
-    rigLevel: facilityConfig.rigLevel,
+    rigFit: facilityConfig.rigFit,
     security: defaultsFrom?.security ?? 'highsec',
     hubId: defaultsFrom?.hubId ?? DEFAULT_TRADE_HUB.id,
     // Carried like facility/rig/hub: a pilot who builds in one system builds

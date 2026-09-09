@@ -889,7 +889,7 @@ describe('MaterialsTable build-here control', () => {
 
   const RESOLVE_CTX = {
     facility: FACILITY_PRESETS.npcStation,
-    rig: 'none' as const,
+    rigFit: ['none', 'none', 'none'] as const,
     security: 'highsec' as const,
     systemCostIndex: 0.05,
     adjustedPrices: {},

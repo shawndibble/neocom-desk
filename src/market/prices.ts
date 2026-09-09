@@ -41,6 +41,21 @@ export function clearMarketPriceCache(): void {
 }
 
 /**
+ * Drops the cached prices for specific types at one station, so the next
+ * `getHubPrices` re-fetches them inside the TTL.
+ *
+ * For the manual refresh button, which CONTEXT.md's "Data Age" makes the one
+ * thing besides app open that may bypass a TTL. Scoped to a station and a
+ * type list rather than clearing the map, for the same reason Market's
+ * refresh re-fetches only what is on screen: a Build Plan holding prices for
+ * the same materials should not be made to re-fetch them because someone
+ * pressed refresh on a different page.
+ */
+export function invalidateHubPrices(stationId: number, typeIds: readonly number[]): void {
+  for (const typeId of typeIds) hubPriceCache.delete(hubCacheKey(stationId, typeId));
+}
+
+/**
  * Sell/buy aggregates for typeIds at hub, from cache where fresh. Falls back
  * to null prices per type (not a thrown error) when Fuzzwork is unreachable.
  */

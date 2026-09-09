@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { BuildPlanRecord } from '@/db';
 import type { CharacterBlueprint } from '@/esi/endpoints';
+import { EMPTY_RIG_FIT, resolveRigFit } from '@/engine/industry/types';
 import { DEFAULT_FACILITY_DEFAULTS } from './facilityDefaults';
 import type { BlueprintCatalogEntry } from './blueprintCatalog';
 import { fallbackFacility, mostRecentlyUpdatedPlan, newBuildPlan } from './newBuildPlan';
@@ -143,7 +144,9 @@ describe('newBuildPlan — carried defaults', () => {
     });
     const created = newBuildPlan(1, entry(), null, previous, DEFAULT_FACILITY_DEFAULTS);
     expect(created.facility).toBe('raitaru');
-    expect(created.rigLevel).toBe('t1');
+    // Through `resolveRigFit`, so a plan still in the pre-#609 `rigLevel`
+    // shape carries forward as the fit it migrates to.
+    expect(created.rigFit).toEqual(resolveRigFit(previous));
     expect(created.hubId).toBe('amarr');
     expect(created.buildSystemName).toBe('Badivefi');
   });
@@ -154,5 +157,8 @@ describe('newBuildPlan — carried defaults', () => {
     const previous = plan({ id: 'p', facility: 'raitaru' });
     const created = newBuildPlan(1, entry('reaction'), null, previous, DEFAULT_FACILITY_DEFAULTS);
     expect(created.facility).toBe('athanor');
+    // The fallback brings its own empty fit rather than the rejected
+    // facility's rigs, which the new facility could not host anyway.
+    expect(created.rigFit).toEqual(EMPTY_RIG_FIT);
   });
 });

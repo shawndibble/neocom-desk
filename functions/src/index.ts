@@ -5,7 +5,7 @@
 
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
-import { error as logError, warn as logWarn } from 'firebase-functions/logger';
+import { error as logError, info as logInfo, warn as logWarn } from 'firebase-functions/logger';
 import { initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore, FieldValue, type Firestore } from 'firebase-admin/firestore';
@@ -34,16 +34,17 @@ import {
   NOTIFICATION_FEED_COLLECTION,
   feedPurgeCutoff,
 } from './purgeFeed.js';
-import { fetchPublicContractsCsvs } from './publicContractsArchive.js';
+import { streamPublicContractsCsvs } from './publicContractsArchive.js';
 import {
   chunkDocId,
   chunkRows,
-  filterAndCompactBpcContracts,
-  parseContractItemsCsv,
-  parseContractsCsv,
+  compactBpcItemRow,
+  eligibleContractFrom,
+  sortBpcRows,
   PUBLIC_BPC_CONTRACTS_COLLECTION,
   PUBLIC_BPC_CONTRACTS_META_DOC,
   type BpcContractRow,
+  type EligibleContract,
 } from './publicContracts.js';
 
 initializeApp();
@@ -302,17 +303,38 @@ export const purgeNotificationFeed = onSchedule('every 24 hours', async () => {
 /** Firestore's hard cap on writes in a single `WriteBatch`, with headroom for a shorter final page. */
 const BATCH_WRITE_PAGE_SIZE = 450;
 
-/** Applies more write operations than fit in one `WriteBatch` by paging them across several. */
+/**
+ * Applies more write operations than fit in one `WriteBatch` by paging them
+ * across several.
+ *
+ * `pageSize` exists because the op *count* is not always the binding limit.
+ * `commit()` is where the Admin SDK encodes each document — `batch.set()` only
+ * stores it — so a page of documents that are individually large costs a
+ * transient proportional to the whole page. The BPC snapshot's ~370KB chunk
+ * docs need a much smaller page than the default; small per-doc writers can
+ * keep filling batches to Firestore's own limit.
+ */
 async function commitInPages(
   db: Firestore,
-  ops: readonly ((batch: FirebaseFirestore.WriteBatch) => void)[]
+  ops: readonly ((batch: FirebaseFirestore.WriteBatch) => void)[],
+  pageSize: number = BATCH_WRITE_PAGE_SIZE
 ): Promise<void> {
-  for (let i = 0; i < ops.length; i += BATCH_WRITE_PAGE_SIZE) {
+  for (let i = 0; i < ops.length; i += pageSize) {
     const batch = db.batch();
-    for (const op of ops.slice(i, i + BATCH_WRITE_PAGE_SIZE)) op(batch);
+    for (const op of ops.slice(i, i + pageSize)) op(batch);
     await batch.commit();
   }
 }
+
+/**
+ * Chunk docs per `WriteBatch`. Deliberately far below Firestore's 500-op cap:
+ * at ~370KB of row JSON each, committing all ~62 in one batch encodes the
+ * entire snapshot at once, which is what exhausted the 512MiB container even
+ * after the parse itself had been made cheap. Eight keeps that transient near
+ * 3MB. The total write count is unchanged — this only affects how many are
+ * in flight together.
+ */
+const PUBLIC_BPC_CHUNK_DOCS_PER_BATCH = 8;
 
 /**
  * Replaces the public-BPC-contracts snapshot wholesale: chunk docs 0..N-1 are
@@ -339,7 +361,7 @@ async function writePublicBpcContractsSnapshot(
     const ref = collection.doc(chunkDocId(i));
     ops.push((batch) => batch.delete(ref));
   }
-  await commitInPages(db, ops);
+  await commitInPages(db, ops, PUBLIC_BPC_CHUNK_DOCS_PER_BATCH);
 
   await metaRef.set({
     lastSyncedAt: Date.now(),
@@ -356,20 +378,46 @@ async function writePublicBpcContractsSnapshot(
  * `publicBpcContracts` for signed-in clients to search.
  *
  * Every 30 minutes, matching EVE Ref's own twice-hourly refresh cadence.
- * Memory/timeout are sized for decompressing and parsing the ~35MB of CSV
- * text the two files this feature needs unpack to (measured against a live
- * pull, 2026-09-08) — well short of either ceiling in practice, but the
- * defaults (256MiB/60s) are not.
+ *
+ * The archive is streamed rather than buffered: `contracts.csv` is read into
+ * a lookup of only the fields the join needs, then `contract_items.csv` is
+ * joined against it row by row. Holding the two CSVs as text and parsing them
+ * whole needed ~1.1GB of heap for 37MB of input; the streaming pass peaks near
+ * 150MB against the same live data.
+ *
+ * Memory stays at 1GiB even so. The parse is no longer what needs the room —
+ * the ~122k joined rows are retained until the snapshot is written, and the
+ * write encodes them on top of that. A 512MiB ceiling was tried and died
+ * during the write at 527MiB, having got all the way through the parse.
  */
 export const syncPublicBpcContracts = onSchedule(
   { schedule: 'every 30 minutes', memory: '1GiB', timeoutSeconds: 300 },
   async () => {
-    const { contracts, contractItems } = await fetchPublicContractsCsvs();
-    const rows = filterAndCompactBpcContracts(
-      parseContractsCsv(contracts),
-      parseContractItemsCsv(contractItems),
-      Date.now()
-    );
-    await writePublicBpcContractsSnapshot(getFirestore(), rows);
+    const nowMs = Date.now();
+    const eligibleContracts = new Map<string, EligibleContract>();
+    const rows: BpcContractRow[] = [];
+
+    await streamPublicContractsCsvs({
+      onContract: (record) => {
+        const eligible = eligibleContractFrom(record, nowMs);
+        if (eligible) eligibleContracts.set(record.contract_id, eligible);
+      },
+      onItem: (record) => {
+        const contract = eligibleContracts.get(record.contract_id);
+        if (!contract) return;
+        const row = compactBpcItemRow(record, contract);
+        if (row) rows.push(row);
+      },
+    });
+
+    logInfo('public BPC contract sync', {
+      eligibleContracts: eligibleContracts.size,
+      rows: rows.length,
+    });
+
+    // The lookup is dead once the join is done, and it is ~50k objects the
+    // write would otherwise be encoding rows alongside.
+    eligibleContracts.clear();
+    await writePublicBpcContractsSnapshot(getFirestore(), sortBpcRows(rows));
   }
 );

@@ -43,6 +43,7 @@ import {
   type MiningTaxAssignmentRecord,
 } from '@/db';
 import { normalizeMaterialSourcingMap } from '@/engine/industry/sourcing';
+import { resolveRigFit } from '@/engine/industry/types';
 import { planetRichnessDeletedAtByKey, stationPinDeletedAtByKey } from './accountWideBackfill';
 import { purgeCharacterCacheOrSuppress } from '@/esi/cachePurge';
 import {
@@ -774,7 +775,11 @@ const buildPlanSpec: CollectionSpec<BuildPlanRecord, RemoteBuildPlanDoc> = {
       me: p.me,
       te: p.te,
       facility: p.facility,
-      rigLevel: p.rigLevel,
+      // Always the normalized fit, never the legacy `rigLevel` — a self-heal
+      // that means a record pushed by this build is never behind a device
+      // still reading the pre-#609 shape only, and repeated pushes converge
+      // on one shape even if the local record still carries stale `rigLevel`.
+      rigFit: resolveRigFit(p),
       security: p.security,
       hubId: p.hubId,
       // One fact, routed as one pair: the id is what the fee is charged at and
@@ -818,7 +823,9 @@ const buildPlanSpec: CollectionSpec<BuildPlanRecord, RemoteBuildPlanDoc> = {
     me: r.me,
     te: r.te,
     facility: r.facility,
-    rigLevel: r.rigLevel,
+    // Migrates a remote doc from an older device that still only carries the
+    // legacy `rigLevel` (see the analogous note in `toRemoteDoc` above).
+    rigFit: resolveRigFit(r),
     security: r.security,
     hubId: r.hubId,
     ...(r.buildSystemId !== undefined && r.buildSystemName !== undefined

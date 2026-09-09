@@ -119,7 +119,7 @@ function computeBlueprintRow(
     me: 0,
     te: 0,
     facility: FACILITY_PRESETS.npcStation,
-    rig: 'none',
+    rigFit: ['none', 'none', 'none'],
     security: 'highsec',
     systemCostIndex: inputs.systemCostIndex ?? 0,
     adjustedPrices: inputs.adjustedPrices ?? {},

@@ -20,7 +20,7 @@ const baseInputs: IndustryInputs = {
   me: 10,
   te: 20,
   facility: FACILITY_PRESETS.raitaru,
-  rig: 't1',
+  rigFit: ['meT1', 'teT1', 'none'],
   security: 'highsec',
   facilityTaxPct: 1,
   systemCostIndex: 0.05,
@@ -223,7 +223,7 @@ describe('buildVsBuy', () => {
       me: 0,
       te: 0,
       facility: FACILITY_PRESETS.npcStation,
-      rig: 'none',
+      rigFit: ['none', 'none', 'none'],
       facilityTaxPct: undefined,
       skills: {},
     });

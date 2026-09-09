@@ -18,6 +18,7 @@ const BASE_PLAN: Pick<
   | 'me'
   | 'te'
   | 'facility'
+  | 'rigFit'
   | 'rigLevel'
   | 'security'
   | 'facilityTaxPct'
@@ -52,7 +53,7 @@ describe('computeBuildPlan', () => {
       me: 5,
       te: 10,
       facility: FACILITY_PRESETS.npcStation,
-      rig: 'none',
+      rigFit: ['none', 'none', 'none'],
       security: 'highsec',
       facilityTaxPct: undefined,
       ...MARKET,

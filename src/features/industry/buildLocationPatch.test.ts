@@ -47,7 +47,7 @@ describe('buildLocationPatch', () => {
   it("leaves a structure's rig and tax alone — the pilot owns those", () => {
     const patch = buildLocationPatch(option({ facility: 'sotiyo' }));
 
-    expect(patch).not.toHaveProperty('rigLevel');
+    expect(patch).not.toHaveProperty('rigFit');
     expect(patch).not.toHaveProperty('facilityTaxPct');
   });
 
@@ -56,7 +56,10 @@ describe('buildLocationPatch', () => {
     // pilot's to carry over from wherever they built last.
     const patch = buildLocationPatch(option({ facility: 'npcStation', name: 'Jita IV - Moon 4' }));
 
-    expect(patch).toMatchObject({ rigLevel: 'none', facilityTaxPct: undefined });
+    expect(patch).toMatchObject({
+      rigFit: ['none', 'none', 'none'],
+      facilityTaxPct: undefined,
+    });
   });
 
   it("leaves the station's own 0.25% to the engine rather than writing it onto the plan", () => {

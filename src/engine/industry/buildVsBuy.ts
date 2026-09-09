@@ -26,7 +26,7 @@ export function buildVsBuy(inputs: IndustryInputs): BuildResult {
   const { blueprint, runs, me, te, systemCostIndex, adjustedPrices, hubPrices, skills } = inputs;
   const ctx: SubBuildContext = {
     facility: inputs.facility,
-    rig: inputs.rig,
+    rigFit: inputs.rigFit,
     security: inputs.security,
     facilityTaxPct: inputs.facilityTaxPct,
     systemCostIndex,

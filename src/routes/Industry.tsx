@@ -37,6 +37,7 @@ import { ActiveJobsPanel } from '@/features/industry/ActiveJobsPanel';
 import { BuildPlanList } from '@/features/industry/BuildPlanList';
 import { BuildPlanCompare } from '@/features/industry/BuildPlanCompare';
 import { ProductionLogPanel } from '@/features/industry/ProductionLogPanel';
+import { BpcSourcingPanel } from '@/features/bpcContracts/BpcSourcingPanel';
 import {
   BuildPlanDetail,
   type PlanPatch,
@@ -85,6 +86,13 @@ type DetailSelection =
 
 const NO_SELECTION: DetailSelection = { kind: 'none' };
 
+type IndustryTab = 'plans' | 'records' | 'sourcing';
+
+/** An unknown or absent `?tab=` falls back to Plans rather than rendering nothing — a stale or hand-edited link should land somewhere useful. */
+function readIndustryTab(value: string | null): IndustryTab {
+  return value === 'records' || value === 'sourcing' ? value : 'plans';
+}
+
 /** Build Plan manager: create (via blueprint search)/duplicate/delete/rename plans, edit the selected one. */
 export function Industry() {
   const { t } = useTranslation();
@@ -99,7 +107,28 @@ export function Industry() {
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   const hydrated = useActiveCharacter((state) => state.hydrated);
   const [searchParams, setSearchParams] = useSearchParams();
-  const [tab, setTab] = useState<'plans' | 'records'>('plans');
+  /**
+   * In the URL, unlike the other two tabs' history, because `/bpc-contracts`
+   * redirects to `?tab=sourcing` — a deep link needs somewhere to land, and a
+   * tab held only in component state has no address to give it.
+   */
+  const tab = readIndustryTab(searchParams.get('tab'));
+  const setTab = useCallback(
+    (next: IndustryTab) => {
+      setSearchParams(
+        (previous) => {
+          const params = new URLSearchParams(previous);
+          // Plans is the default, so it stays out of the URL rather than
+          // leaving `?tab=plans` on every visit that never touched the strip.
+          if (next === 'plans') params.delete('tab');
+          else params.set('tab', next);
+          return params;
+        },
+        { replace: true }
+      );
+    },
+    [setSearchParams]
+  );
 
   // Stamped with the Character it was read for, because `useLiveQuery` holds
   // its previous result in a ref across a deps change: for one render after
@@ -718,14 +747,17 @@ export function Industry() {
           <Tabs
             label={t('nav.industry')}
             value={tab}
-            onChange={(id) => setTab(id as typeof tab)}
+            onChange={(id) => setTab(id as IndustryTab)}
             tabs={[
               { id: 'plans', label: t('industry.buildPlansTab') },
               { id: 'records', label: t('industry.recordsTab') },
+              { id: 'sourcing', label: t('industry.bpcSearchTab') },
             ]}
           />
 
-          {tab === 'records' ? (
+          {tab === 'sourcing' ? (
+            <BpcSourcingPanel />
+          ) : tab === 'records' ? (
             <ProductionLogPanel
               characterId={activeCharacterId}
               catalog={catalog}

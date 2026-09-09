@@ -2,8 +2,13 @@ import { describe, it, expect } from 'vitest';
 import {
   EMPTY_BPC_SEARCH_FILTER,
   filterBpcContracts,
+  blueprintOfferStats,
+  bpcPriceSummary,
+  cheapestByRegion,
+  effectivePrice,
   listedBlueprintTypeOptions,
   type BpcContractRow,
+  blueprintSearchName,
 } from './bpcSearch';
 
 function row(overrides: Partial<BpcContractRow> = {}): BpcContractRow {
@@ -135,5 +140,145 @@ describe('listedBlueprintTypeOptions', () => {
 
   it('is empty given no rows', () => {
     expect(listedBlueprintTypeOptions([], new Map())).toEqual([]);
+  });
+});
+
+describe('effectivePrice', () => {
+  it('is the plain price for an item exchange', () => {
+    expect(effectivePrice(row({ price: 5_000_000 }))).toBe(5_000_000);
+  });
+
+  it('is the buyout for an auction that has one — what the row actually costs', () => {
+    expect(effectivePrice(row({ isAuction: true, price: 1_000, buyout: 9_000_000 }))).toBe(
+      9_000_000
+    );
+  });
+
+  it('falls back to the starting bid for an auction with no buyout', () => {
+    expect(effectivePrice(row({ isAuction: true, price: 1_000 }))).toBe(1_000);
+  });
+});
+
+describe('blueprintOfferStats', () => {
+  it('counts offers and keeps the best ME/TE per type', () => {
+    const stats = blueprintOfferStats([
+      row({ contractId: 1, typeId: 100, me: 8, te: 14, price: 9_000_000 }),
+      row({ contractId: 2, typeId: 100, me: 10, te: 20, price: 12_000_000 }),
+      row({ contractId: 3, typeId: 200, me: 4, te: 6, price: 3_000_000 }),
+    ]);
+    expect(stats.get(100)).toEqual({ offerCount: 2, bestMe: 10, bestTe: 20 });
+    expect(stats.get(200)).toEqual({ offerCount: 1, bestMe: 4, bestTe: 6 });
+  });
+
+  it('takes the best ME and the best TE independently — they need not come from one row', () => {
+    const stats = blueprintOfferStats([
+      row({ contractId: 1, typeId: 100, me: 10, te: 0 }),
+      row({ contractId: 2, typeId: 100, me: 0, te: 20 }),
+    ]);
+    expect(stats.get(100)?.bestMe).toBe(10);
+    expect(stats.get(100)?.bestTe).toBe(20);
+  });
+
+  it('counts one offer per contract row, not per copy — a quantity-3 contract is one offer', () => {
+    const stats = blueprintOfferStats([row({ contractId: 1, typeId: 100, quantity: 3 })]);
+    expect(stats.get(100)?.offerCount).toBe(1);
+  });
+
+  it('is empty given no rows', () => {
+    expect(blueprintOfferStats([]).size).toBe(0);
+  });
+});
+
+describe('bpcPriceSummary', () => {
+  it('summarises count, cheapest, median and the best ME/TE on offer', () => {
+    const summary = bpcPriceSummary([
+      row({ contractId: 1, price: 5_000_000, me: 10, te: 12 }),
+      row({ contractId: 2, price: 1_000_000, me: 2, te: 20 }),
+      row({ contractId: 3, price: 3_000_000, me: 4, te: 4 }),
+    ]);
+    expect(summary).toEqual({
+      offerCount: 3,
+      cheapest: 1_000_000,
+      median: 3_000_000,
+      bestMe: 10,
+      bestTe: 20,
+    });
+  });
+
+  it('averages the middle pair for an even number of offers', () => {
+    const summary = bpcPriceSummary([
+      row({ contractId: 1, price: 1_000_000 }),
+      row({ contractId: 2, price: 2_000_000 }),
+      row({ contractId: 3, price: 3_000_000 }),
+      row({ contractId: 4, price: 6_000_000 }),
+    ]);
+    expect(summary.median).toBe(2_500_000);
+  });
+
+  it('reports nulls rather than zeroes for no offers — a missing price is not a free one', () => {
+    expect(bpcPriceSummary([])).toEqual({
+      offerCount: 0,
+      cheapest: null,
+      median: null,
+      bestMe: null,
+      bestTe: null,
+    });
+  });
+});
+
+describe('cheapestByRegion', () => {
+  it('gives one entry per region, cheapest first', () => {
+    expect(
+      cheapestByRegion([
+        row({ contractId: 1, regionId: 10000002, price: 4_000_000 }),
+        row({ contractId: 2, regionId: 10000002, price: 2_000_000 }),
+        row({ contractId: 3, regionId: 10000043, price: 1_000_000 }),
+      ])
+    ).toEqual([
+      { regionId: 10000043, cheapest: 1_000_000, offerCount: 1 },
+      { regionId: 10000002, cheapest: 2_000_000, offerCount: 2 },
+    ]);
+  });
+
+  it('prices an auction at its buyout', () => {
+    expect(
+      cheapestByRegion([
+        row({ contractId: 1, regionId: 10000002, isAuction: true, price: 1, buyout: 7_000_000 }),
+      ])
+    ).toEqual([{ regionId: 10000002, cheapest: 7_000_000, offerCount: 1 }]);
+  });
+
+  it('is empty given no rows', () => {
+    expect(cheapestByRegion([])).toEqual([]);
+  });
+});
+
+describe('blueprintSearchName', () => {
+  it('drops the trailing "Blueprint", which every name in the catalogue shares', () => {
+    expect(blueprintSearchName('Buzzard Blueprint')).toBe('Buzzard');
+    expect(blueprintSearchName('Heron Navy Issue Blueprint')).toBe('Heron Navy Issue');
+  });
+
+  it('leaves a name that does not end in Blueprint alone', () => {
+    expect(blueprintSearchName('Buzzard')).toBe('Buzzard');
+    expect(blueprintSearchName('#12345')).toBe('#12345');
+  });
+
+  it('keeps an interior "Blueprint" — only the trailing word is noise', () => {
+    expect(blueprintSearchName('Blueprint Efficiency Blueprint')).toBe('Blueprint Efficiency');
+  });
+
+  /**
+   * Stripping is what stops a one-letter query matching all ~2,900 types
+   * through the shared word, but it must never strip a name down to nothing —
+   * that would make the entry unmatchable rather than merely over-matched.
+   */
+  it('keeps the name when stripping would empty it', () => {
+    expect(blueprintSearchName('Blueprint')).toBe('Blueprint');
+  });
+
+  it('is case- and space-insensitive about the suffix', () => {
+    expect(blueprintSearchName('Buzzard BLUEPRINT')).toBe('Buzzard');
+    expect(blueprintSearchName('Buzzard blueprint  ')).toBe('Buzzard');
   });
 });

@@ -1467,4 +1467,47 @@ describe('Market search focus (issue #25 "jump to search" shortcut)', () => {
 
     expect(await screen.findByRole('searchbox')).not.toHaveFocus();
   });
+
+  it('points an empty blueprint order book at the BPC search, since copies are contract-only', async () => {
+    // 638 is BLUEPRINTS' own key, so the real blueprint catalogue indexes it —
+    // that catalogue loads lazily on demand, and the hint silently never
+    // rendered until the empty book asked for it.
+    vi.mocked(loadMarketTypes).mockResolvedValueOnce([
+      ...TYPES,
+      { typeId: 638, name: 'Rifter Blueprint', marketGroupId: 2 },
+    ]);
+    server.use(
+      http.get(`${ESI_BASE_URL}/markets/:regionId/orders`, () =>
+        HttpResponse.json([], { headers: { 'X-Pages': '1' } })
+      )
+    );
+    window.history.pushState({}, '', '/market?type=638');
+
+    render(<App />);
+
+    expect(
+      await screen.findByText('Copies of this blueprint are traded on contract, not on the market.')
+    ).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Search BPC contracts' })).toHaveAttribute(
+      'href',
+      '/industry?tab=sourcing'
+    );
+  });
+
+  it('leaves a non-blueprint empty order book alone', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/markets/:regionId/orders`, () =>
+        HttpResponse.json([], { headers: { 'X-Pages': '1' } })
+      )
+    );
+    window.history.pushState({}, '', '/market?type=587');
+
+    render(<App />);
+
+    expect(await screen.findByText('No sell orders')).toBeInTheDocument();
+    expect(
+      screen.getByText('No one is selling this item at this location right now.')
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Search BPC contracts' })).not.toBeInTheDocument();
+  });
 });
