@@ -113,7 +113,26 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
+      # `--with-deps` runs apt-get against the runner image's own Google Chrome
+      # repo, which intermittently serves an inconsistent index — `E: Failed to
+      # fetch .../chrome-stable/.../Packages.gz  Hash Sum mismatch`, exit 100.
+      # That killed the job in ~40s, before a browser existed and before a
+      # single test ran, so it also uploaded no report to explain itself. It is
+      # a CDN wobble on someone else's server, not a signal about the diff, so
+      # it gets retried rather than failing the PR. apt's cached index is
+      # cleared between attempts: a mismatched one is otherwise reused and the
+      # retry fails identically.
+      - name: Install Playwright browsers (retried — see comment)
+        run: |
+          for attempt in 1 2 3; do
+            if npx playwright install --with-deps chromium; then exit 0; fi
+            echo "::warning::playwright install failed (attempt $attempt/3), retrying"
+            sudo apt-get clean || true
+            sudo rm -rf /var/lib/apt/lists/* || true
+            sleep $((attempt * 20))
+          done
+          echo "::error::playwright install failed after 3 attempts"
+          exit 1
       # The `built` Playwright project renders dist/ via `vite preview`, so
       # the bundle has to exist before Playwright starts. Build-time env must
       # match what the dev-server project gets (see E2E_ENV in
