@@ -35,10 +35,12 @@ import { useDetectedOwnedStock } from './useDetectedOwnedStock';
 /**
  * Each member's resolved tree, flattened the two ways the rollup needs.
  *
- * `useComparedBuildResults` settles one plan at a time, so `rows` gets a fresh
- * identity once per member — and without this every already-settled member was
- * re-flattened on each settle. A 25-member fit did ~650 material-tree walks to
- * do 25 members' work.
+ * `useComparedBuildResults` settles each member into `rows` on its own, so
+ * `rows` gets a fresh identity per settle — and without this every
+ * already-settled member was re-flattened on each one. A 25-member fit did
+ * ~650 material-tree walks to do 25 members' work. Members sharing a hub now
+ * share one fetch and so tend to settle together, which shortens that run but
+ * does not remove it: a mixed-hub group still settles hub by hub.
  *
  * Module-level and keyed on the `BuildResult` itself: a result is replaced
  * wholesale when its plan is repriced, so a cache entry is valid exactly as

@@ -105,21 +105,23 @@ async function loadAdjustedPrices(): Promise<AdjustedPrices | null> {
 
 /**
  * Prices a whole set of plans at once: every request sharing a hub is served
- * by **one** Fuzzwork fetch over the union of their type ids, and the whole
- * batch shares one adjusted-price and one cost-index fetch (issue #628).
+ * by **one** `getHubPrices` lookup over the union of their type ids (itself
+ * chunked at Fuzzwork's per-request type cap), and the whole batch shares one
+ * adjusted-price and one cost-index fetch (issue #628).
  *
  * The multi-plan views made the per-plan shape bite: `ESI_FANOUT_CONCURRENCY`
  * bounds how many snapshot loads run at once, not how many happen, so a
  * 25-member Build Group — which is single-hub by construction, every member
- * created from one `defaultsFrom` — issued 25 fetches where one does. Nothing
+ * created from one `defaultsFrom` — issued 25 lookups where one does. Nothing
  * deduplicated them: `getHubPrices` caches by (station, type) *after* a fetch
  * resolves, so 25 concurrent cold-cache callers all miss and all fetch.
  *
- * Returns one promise per request, in request order, rather than one promise
- * for the array. A hub whose fetch fails must fail only its own requests —
- * every compared plan reports its own row, and one plan's failure never drops
- * another (issue #453) — which a single `Promise<MarketSnapshot[]>` could not
- * express without a result-union type.
+ * Sharing a fetch means sharing its outcome, and that is the trade this makes:
+ * plans at one hub used to fail independently, and now a hub that comes back
+ * empty comes back empty for all of them. What survives is the shape #453
+ * asked for — one promise per request, in request order, rather than one
+ * promise for the array — so a failure is confined to the hub that had it, and
+ * every plan still reports its own row rather than dropping out of the result.
  *
  * Each request still sees only its own type ids: unioning is a fetch-level
  * concern, and a plan reading prices for another plan's materials would be a

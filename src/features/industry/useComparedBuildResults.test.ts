@@ -213,6 +213,31 @@ describe('useComparedBuildResults', () => {
     expect(fine?.error).toBeNull();
   });
 
+  it('reports the failure on every plan sharing the failed hub, dropping none of them', async () => {
+    // The shape batching actually created: same-hub plans await one shared
+    // fetch, so they fail together. Each still gets its own row with its own
+    // error rather than vanishing from the comparison (issue #453).
+    const catalog = catalogWith([entry({ blueprintTypeID: 100 })]);
+    const plans = [
+      plan({ id: 'a', name: 'Plan A', hubId: 'jita' }),
+      plan({ id: 'b', name: 'Plan B', hubId: 'jita' }),
+    ];
+
+    mockedSnapshots.mockImplementation((requests) => {
+      const failed = Promise.reject(new Error('ESI unreachable'));
+      return requests.map(() => failed);
+    });
+
+    const { result } = renderHook(() => useComparedBuildResults({ plans, catalog, ...baseArgs }));
+
+    await waitFor(() => expect(result.current.every((row) => !row.loading)).toBe(true));
+
+    expect(result.current).toHaveLength(2);
+    expect(result.current.map((row) => row.planId)).toEqual(['a', 'b']);
+    expect(result.current.every((row) => row.error === 'ESI unreachable')).toBe(true);
+    expect(result.current.every((row) => row.result === null)).toBe(true);
+  });
+
   it('recomputes when the plan list changes', async () => {
     const catalog = catalogWith([entry({ blueprintTypeID: 100 })]);
     const { result, rerender } = renderHook(
