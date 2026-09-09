@@ -159,29 +159,38 @@ describe('Clones', () => {
     ).toBeInTheDocument();
   });
 
-  it('still resolves implant names via the per-id fallback when the names batch is rate-limited', async () => {
-    // A large jump-clone implant batch is more likely to hit ESI's
-    // error-limit throttling than a small one; before this fix, anything
-    // other than a 404 skipped the per-id fallback entirely and left every
-    // implant on the "Type #id" placeholder forever (a bare 429 has no
-    // Retry-After header, so esiFetch's one internal retry also fails fast).
+  it('leaves implants on "Type #id" rather than fanning out when the names batch is rate-limited', async () => {
+    // A large jump-clone implant batch is more likely to hit ESI's error-limit
+    // throttling than a small one — and a throttle is exactly when the per-id
+    // fallback must NOT fire (issue #655 item D). ESI's error limit is 100
+    // non-2xx responses per minute counted globally across every route, so
+    // answering one throttled batch with one GET /universe/types/{id} per
+    // implant would deepen the outage for every other panel in the app.
+    // Degrading to the placeholder until something asks again is the trade.
+    let typeRequests = 0;
     server.use(
-      http.post(`${ESI}/universe/names`, () => new HttpResponse(null, { status: 429 })),
-      http.get(`${ESI}/universe/types/19540`, () =>
-        HttpResponse.json({
+      http.post(
+        `${ESI}/universe/names`,
+        // retry-after: 0 so esiFetch's one blind retry doesn't idle the test.
+        () => new HttpResponse(null, { status: 429, headers: { 'retry-after': '0' } })
+      ),
+      http.get(`${ESI}/universe/types/19540`, () => {
+        typeRequests += 1;
+        return HttpResponse.json({
           type_id: 19540,
           name: 'High-grade Ascendancy Alpha',
           description: '',
           group_id: 300,
           published: true,
-        })
-      )
+        });
+      })
     );
 
     render(<App />);
 
-    expect(await screen.findByText('High-grade Ascendancy Alpha')).toBeInTheDocument();
-    expect(screen.queryByText('Type #19540')).not.toBeInTheDocument();
+    expect(await screen.findByText('Type #19540')).toBeInTheDocument();
+    expect(screen.queryByText('High-grade Ascendancy Alpha')).not.toBeInTheDocument();
+    expect(typeRequests).toBe(0);
   });
 
   it('renders a clone in an inaccessible structure as an id fallback, without a re-auth banner', async () => {
