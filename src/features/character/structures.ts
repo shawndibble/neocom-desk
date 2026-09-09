@@ -11,24 +11,92 @@
  * Cached per character, not under the global sentinel: unlike an NPC station,
  * a structure's visibility is genuinely ACL-gated, so caching a resolved name
  * globally would leak it to a character not on that ACL.
+ *
+ * A refusal is cached too, and has to be. A 403 writes no row, so without a
+ * memo of its own every caller re-asked on every visit — and the callers are
+ * fan-outs over *distinct locations*: a corp whose assets or members are
+ * spread across a hundred citadels the reading Character is not on the ACL of
+ * spent a hundred 403s per page load, forever. ESI's error limit is 100
+ * non-2xx responses per minute applied across *every* route, so a big enough
+ * corp could throttle the whole app out of one roster render. The nearby
+ * `heldAfterFailure` in `esi/cache.ts` does not cover this: it is skipped for
+ * `STALE_AFTER.static` keys, and it needs a stale row to hold, which a
+ * structure that has only ever been refused does not have.
  */
 import { AuthError } from '@/auth/sso';
 import { getUniverseStructure, type UniverseStructure } from '@/esi/endpoints';
 import { EsiError } from '@/esi/client';
-import { loadWithCache, STALE_AFTER } from '@/esi/cache';
+import {
+  loadWithCache,
+  readCached,
+  readCachedEntries,
+  writeCached,
+  STALE_AFTER,
+} from '@/esi/cache';
 
 function cacheKey(structureId: number): string {
   return `structure:${structureId}`;
+}
+
+/**
+ * Where the refusal is recorded — a sibling row rather than a field inside the
+ * name row, because the two are alternatives: a structure has a stored name or
+ * a stored refusal, never both at once from the same read. It sorts inside the
+ * same `[characterId+key]` range `cachePurge.ts` deletes, so a scope revoke or
+ * an owner change clears it along with everything else this Character cached.
+ */
+function forbiddenKey(structureId: number): string {
+  return `structure:${structureId}:forbidden`;
+}
+
+/**
+ * Deliberately the same window as the name itself.
+ *
+ * Both rows answer one question — what this Character can see of this
+ * structure — so putting the positive and negative halves on different clocks
+ * would be the surprising thing. It inherits the tradeoff the positive half
+ * already makes and the app already accepts: a Character who *gains* ACL
+ * access sees the name up to a day late, exactly as a Character who *loses* it
+ * keeps seeing the cached name up to a day on.
+ */
+const FORBIDDEN_MEMO_MS = STALE_AFTER.static;
+
+/** Has this Character asked for this structure recently and been refused? */
+async function isKnownForbidden(characterId: number, structureId: number): Promise<boolean> {
+  const key = forbiddenKey(structureId);
+  const row = (await readCachedEntries<true>(characterId, [key])).get(key);
+  return row !== undefined && Date.now() - row.fetchedAt < FORBIDDEN_MEMO_MS;
 }
 
 async function loadStructure(
   characterId: number,
   structureId: number
 ): Promise<UniverseStructure | null> {
+  // Not an early `return null`: this stands in for the request, so it has to
+  // answer the way the request would have. A Character who has lost ACL access
+  // still gets the name they cached while they had it, because that is what a
+  // live 403 does here today (`loadWithCacheStatus` falls back to the stored
+  // row on any failure it does not treat as an auth failure).
+  if (await isKnownForbidden(characterId, structureId)) {
+    return (await readCached<UniverseStructure>(characterId, cacheKey(structureId))) ?? null;
+  }
+
   const result = await loadWithCache(
     characterId,
     cacheKey(structureId),
-    async () => (await getUniverseStructure(characterId, structureId)).data,
+    async () => {
+      try {
+        return (await getUniverseStructure(characterId, structureId)).data;
+      } catch (err) {
+        // Only a 403. A 5xx, a timeout or an offline device says nothing about
+        // the ACL, and memoizing one as a refusal would hide a name for a day
+        // over a blip.
+        if (err instanceof EsiError && err.status === 403) {
+          await writeCached(characterId, forbiddenKey(structureId), true, Date.now());
+        }
+        throw err;
+      }
+    },
     {
       detectAuthFailure: (err) =>
         err instanceof AuthError || (err instanceof EsiError && err.status === 401),

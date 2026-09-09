@@ -126,9 +126,33 @@ describe('reopening a contract', () => {
     expect(calls).toEqual({ station: 1, structure: 1, items: 1 });
   });
 
-  it('retries a location it could not resolve, rather than caching "unknown"', async () => {
-    // Neither endpoint answers — offline, or a structure off this character's
-    // ACL. `null` means "don't know", so the next open must try again.
+  it('retries a location that failed for a reason other than the ACL', async () => {
+    // Neither endpoint answers and nothing here says the character is off the
+    // ACL — offline, or ESI having a bad minute. `null` means "don't know", so
+    // the next open must try again.
+    server.use(
+      http.get(`${ESI_BASE_URL}/universe/stations/${STRUCTURE_ID}`, () => {
+        calls.station += 1;
+        return new HttpResponse(null, { status: 404 });
+      }),
+      http.get(`${ESI_BASE_URL}/universe/structures/${STRUCTURE_ID}`, () => {
+        calls.structure += 1;
+        return new HttpResponse(null, { status: 503 });
+      })
+    );
+
+    const unresolved = `#${STRUCTURE_ID}`;
+    await openAndClose(contractAt(STRUCTURE_ID), unresolved);
+    expect(calls.structure).toBe(1);
+
+    await openAndClose(contractAt(STRUCTURE_ID), unresolved);
+    expect(calls.structure).toBe(2);
+  });
+
+  it('does NOT retry a location this character is off the ACL of', async () => {
+    // The one failure that is an answer rather than an outage: a 403 says this
+    // character cannot see this structure, and asking again on every reopen is
+    // what spends ESI's 100-errors-per-minute budget (see `structures.ts`).
     server.use(
       http.get(`${ESI_BASE_URL}/universe/stations/${STRUCTURE_ID}`, () => {
         calls.station += 1;
@@ -145,6 +169,6 @@ describe('reopening a contract', () => {
     expect(calls.structure).toBe(1);
 
     await openAndClose(contractAt(STRUCTURE_ID), unresolved);
-    expect(calls.structure).toBe(2);
+    expect(calls.structure).toBe(1);
   });
 });
