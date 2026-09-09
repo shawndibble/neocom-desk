@@ -26,15 +26,25 @@ import {
   plannableProductTypeID,
   type PlannableIndex,
 } from './plannableProduct';
+import { applyPlanSeed, type BuildPlanSeed } from './planSeed';
 
 export interface BuildPlanContextMenuProps {
   /** The row's own type — a blueprint on the BPC table, anything at all in a contract. */
   typeId: number;
   /** The element the menu hangs off: a `<tr>` from `DataTable`'s `rowContextMenu`, or any single element. */
   trigger: ReactElement;
+  /**
+   * The ME/TE/runs of the specific copy this row names, where the surface
+   * knows them — the BPC search table does, a contract's item list does not
+   * (issue #637). The plan then opens as a quote for *that* copy rather than
+   * at the generic defaults. Deliberately not a second menu entry: one action
+   * with one set of labels, per the decision recorded with #636 — a seeded
+   * row and a plain row read identically.
+   */
+  seed?: BuildPlanSeed;
 }
 
-export function BuildPlanContextMenu({ typeId, trigger }: BuildPlanContextMenuProps) {
+export function BuildPlanContextMenu({ typeId, trigger, seed }: BuildPlanContextMenuProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [index, setIndex] = useState<PlannableIndex | null>(null);
@@ -71,7 +81,10 @@ export function BuildPlanContextMenu({ typeId, trigger }: BuildPlanContextMenuPr
         <ContextMenuItem
           disabled={productTypeId == null}
           onSelect={() => {
-            if (productTypeId != null) navigate(`/industry?product=${productTypeId}`);
+            if (productTypeId == null) return;
+            const params = new URLSearchParams({ product: String(productTypeId) });
+            applyPlanSeed(params, seed ?? null);
+            navigate(`/industry?${params.toString()}`);
           }}
         >
           {productTypeId === undefined

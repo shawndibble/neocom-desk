@@ -51,6 +51,12 @@ import {
 } from '@/features/industry/lastOpenedPlan';
 import { mostRecentlyUpdatedPlan, newBuildPlan } from '@/features/industry/newBuildPlan';
 import {
+  clearPlanSeed,
+  matchesPlanSeed,
+  parsePlanSeed,
+  type BuildPlanSeed,
+} from '@/features/industry/planSeed';
+import {
   addBuildGroup,
   buildGroupsFor,
   removeBuildGroup,
@@ -258,7 +264,10 @@ export function Industry() {
   // plan selected (the blueprint-picker click handler; the render-time sync
   // below) do that themselves, outside the effect.
   const createPlan = useCallback(
-    async (entry: BlueprintCatalogEntry): Promise<string | null> => {
+    async (
+      entry: BlueprintCatalogEntry,
+      seed: BuildPlanSeed | null = null
+    ): Promise<string | null> => {
       if (activeCharacterId === null) return null;
       const owned = findOwnedBlueprint(ownedBlueprints, entry.blueprintTypeID);
       const plan = newBuildPlan(
@@ -267,17 +276,34 @@ export function Industry() {
         owned,
         mostRecentlyUpdatedPlan(plans),
         facilityDefaults,
-        // The same assumed ME Fit Import seeds its plans with (#626). Passed
-        // here too so one blueprint cannot start at two different ME values
-        // depending on whether it was picked or imported; an owned copy still
-        // wins on both paths.
-        { assumedMe }
+        {
+          // The same assumed ME Fit Import seeds its plans with (#626). Passed
+          // here too so one blueprint cannot start at two different ME values
+          // depending on whether it was picked or imported; an owned copy still
+          // wins on both paths.
+          assumedMe,
+          // A BPC listing's own numbers beat both (#637). The name carries them
+          // too: the reuse rule below lets a pilot hold a plain plan and one or
+          // more seeded plans for one blueprint, and three rows all reading
+          // "Rifter" would be unusable.
+          ...(seed
+            ? {
+                ...seed,
+                name: t('industry.seededPlanName', {
+                  name: entry.productName,
+                  me: seed.me,
+                  te: seed.te,
+                  runs: seed.runs,
+                }),
+              }
+            : {}),
+        }
       );
       await db.buildPlans.add(plan);
       scheduleSync(activeCharacterId);
       return plan.id;
     },
-    [activeCharacterId, ownedBlueprints, plans, facilityDefaults, assumedMe]
+    [activeCharacterId, ownedBlueprints, plans, facilityDefaults, assumedMe, t]
   );
 
   // The Market Browser's item context menu "jump to a Build Plan" action
@@ -287,11 +313,25 @@ export function Industry() {
   // render-time sync below and the effect's create-if-missing branch read
   // the same answer instead of re-deriving it twice.
   const productParam = searchParams.get('product');
+  // A BPC Search row also sends the copy's own ME/TE/runs (#637). Memoized on
+  // `searchParams` — which react-router keeps stable per `location.search` —
+  // because the create effect below depends on it: a fresh object every render
+  // would re-fire that effect, and it writes to Dexie.
+  const planSeed = useMemo(() => parsePlanSeed(searchParams), [searchParams]);
   const pendingEntry =
     productParam && catalog ? (catalog.byProductTypeID.get(Number(productParam)) ?? null) : null;
+  // Unseeded, this adopts any plan for the blueprint — the Market Browser,
+  // Assets and appraised-row behaviour, unchanged. Seeded, the plan must also
+  // hold the listing's three numbers: a plan for the same blueprint at other
+  // research is left alone and the seeded one is created beside it, while
+  // browsing back to the same listing reuses what the first click created.
   const pendingExistingPlan =
     pendingEntry && plans
-      ? (plans.find((p) => p.blueprintTypeID === pendingEntry.blueprintTypeID) ?? null)
+      ? (plans.find(
+          (p) =>
+            p.blueprintTypeID === pendingEntry.blueprintTypeID &&
+            (planSeed === null || matchesPlanSeed(p, planSeed))
+        ) ?? null)
       : null;
 
   // Render-time state adjustment ("Adjusting state when a prop changes",
@@ -313,11 +353,15 @@ export function Industry() {
   useEffect(() => {
     if (!productParam || activeCharacterId === null || !plans || !catalog) return;
     if (pendingEntry && !pendingExistingPlan) {
-      void createPlan(pendingEntry);
+      void createPlan(pendingEntry, planSeed);
       return;
     }
     const next = new URLSearchParams(searchParams);
     next.delete('product');
+    // Spent along with the param it rode in on: `?material=` below preserves
+    // whatever it does not delete, so a leftover seed would ride onto an
+    // unrelated navigation.
+    clearPlanSeed(next);
     setSearchParams(next, { replace: true });
   }, [
     productParam,
@@ -326,6 +370,7 @@ export function Industry() {
     catalog,
     pendingEntry,
     pendingExistingPlan,
+    planSeed,
     searchParams,
     setSearchParams,
     createPlan,

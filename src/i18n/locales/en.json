@@ -305,6 +305,7 @@
       "noBlueprintOptions": "No blueprint options"
     },
     "copySuffix": "{{name}} (copy)",
+    "seededPlanName": "{{name}} {{me}}/{{te}} ×{{runs}}",
     "duplicate": "Duplicate",
     "delete": "Delete",
     "rename": "Rename",

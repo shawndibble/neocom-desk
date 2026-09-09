@@ -479,6 +479,15 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   means the Base Grant. `SCOPES` derives from the ungrouped endpoints and
   `scopesForGroup(group)` from the grouped ones, both from the same registry.
   `corp` is the only group today.
+- **Seeded Build Plan**: A **Build Plan** opened from a **BPC Sourcing** row at
+  that listing's own ME, TE and runs rather than at the usual defaults, so a
+  pilot shopping a copy sees what _that_ copy builds (issue #637). The three
+  numbers travel as `me`/`te`/`runs` beside `?product=` and beat both an owned
+  copy and the assumed-ME preference — the one precedence order is seed >
+  owned copy > assumed preference. Reuse is by value: an existing plan holding
+  all three is re-opened, one at different research is left alone and the
+  seeded plan is created beside it. Named for the copy it quotes ("Rifter
+  10/20 ×5") so several plans for one blueprint stay tellable apart.
 - **Skill Plan**: An ordered list of skill-level entries a user intends to train. User-editable (drag and drop). Distinct from the in-game **Skill Queue**, which is the game's actual training queue.
 - **Standing (corp)**: The `/corp` overview's top panel: the figures a corp
   manager acts on — clocks due inside a day, Runway, 30-day net — beside the
