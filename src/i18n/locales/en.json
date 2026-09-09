@@ -301,9 +301,9 @@
   "industry": {
     "title": "Build Plans",
     "contextMenu": {
-      "startBuildPlan": "Start a Build Plan",
-      "startBuildPlanChecking": "Start a Build Plan (checking…)",
-      "notBuildable": "Nothing to build from this item"
+      "buildPlan": "Build Plan",
+      "buildPlanChecking": "Build Plan (checking…)",
+      "noBlueprintOptions": "No blueprint options"
     },
     "copySuffix": "{{name}} (copy)",
     "duplicate": "Duplicate",
@@ -2391,9 +2391,6 @@
       "viewInMarket": "View in Market",
       "quickbarNoCharacter": "Select a character to use the Quickbar",
       "copyName": "Copy name",
-      "buildPlan": "Build Plan",
-      "buildPlanChecking": "Build Plan (checking…)",
-      "noBlueprintOptions": "No blueprint options",
       "viewInIndustryAsMaterial": "View in Industry as material",
       "addMaterialComponents": "Add material components",
       "buyInsteadOfBuilding": "Buy instead",

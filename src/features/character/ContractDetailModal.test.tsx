@@ -240,7 +240,7 @@ describe('ContractDetailModal', () => {
     const included = await screen.findByRole('table', { name: 'Included' });
     fireEvent.contextMenu(within(included).getByText('Rifter Blueprint'));
 
-    fireEvent.click(await screen.findByRole('menuitem', { name: 'Start a Build Plan' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Build Plan' }));
 
     // 587 (Rifter), not 638 (the blueprint on the contract).
     expect(screen.getByTestId('location')).toHaveTextContent('/industry?product=587');

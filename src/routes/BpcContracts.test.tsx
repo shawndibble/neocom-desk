@@ -162,7 +162,7 @@ describe('BpcContracts', () => {
     const table = await screen.findByRole('table', { name: 'BPC Search' });
     fireEvent.contextMenu(within(table).getByText('Rifter Blueprint'));
 
-    fireEvent.click(await screen.findByRole('menuitem', { name: 'Start a Build Plan' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Build Plan' }));
 
     // 587 (Rifter), not 638 (its blueprint): Industry resolves `?product=` via
     // the catalog's `byProductTypeID`, so handing it the blueprint's own

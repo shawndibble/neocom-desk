@@ -14,6 +14,14 @@ _Recorded 2026-09-08._
   anything else is a disabled row saying so. Rules out a menu that only
   appears on blueprints, and rules out silently rendering nothing for an item
   the game can't build — the disabled row answers the question.
+- **One action, one label: the three menu strings moved to
+  `industry.contextMenu.*` and the Market Browser's `ItemContextMenu` now
+  reads them too.** Both menus offer the same action with the same
+  `/industry?product=` destination, so "Build Plan" / "Build Plan (checking…)"
+  / "No blueprint options" cannot be allowed to drift into two vocabularies
+  depending on which page the user right-clicked. Rules out a second set of
+  keys under `market.contextMenu.*` saying the same thing; the visible English
+  is unchanged.
 - **The plan is not seeded with the contracted copy's ME/TE/runs.** Starting a
   plan from a BPC listing uses the same defaults as every other entry point
   (owned blueprint's ME/TE, one run). Seeding from the listing is a genuinely

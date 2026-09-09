@@ -75,10 +75,10 @@ export function BuildPlanContextMenu({ typeId, trigger }: BuildPlanContextMenuPr
           }}
         >
           {productTypeId === undefined
-            ? t('industry.contextMenu.startBuildPlanChecking')
+            ? t('industry.contextMenu.buildPlanChecking')
             : productTypeId === null
-              ? t('industry.contextMenu.notBuildable')
-              : t('industry.contextMenu.startBuildPlan')}
+              ? t('industry.contextMenu.noBlueprintOptions')
+              : t('industry.contextMenu.buildPlan')}
         </ContextMenuItem>
       </ContextMenuContent>
     </ContextMenu>

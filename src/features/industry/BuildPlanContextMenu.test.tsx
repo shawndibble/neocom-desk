@@ -55,7 +55,7 @@ describe('BuildPlanContextMenu', () => {
     renderMenu(638);
     fireEvent.contextMenu(screen.getByTestId('row'));
 
-    fireEvent.click(await screen.findByRole('menuitem', { name: 'Start a Build Plan' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Build Plan' }));
 
     // 587 (Rifter), not 638 (its blueprint) — `/industry?product=` looks the
     // typeID up in the catalog's `byProductTypeID`, so the blueprint's own ID
@@ -67,7 +67,7 @@ describe('BuildPlanContextMenu', () => {
     renderMenu(587);
     fireEvent.contextMenu(screen.getByTestId('row'));
 
-    fireEvent.click(await screen.findByRole('menuitem', { name: 'Start a Build Plan' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Build Plan' }));
 
     expect(await screen.findByTestId('location')).toHaveTextContent('/industry?product=587');
   });
@@ -76,7 +76,7 @@ describe('BuildPlanContextMenu', () => {
     renderMenu(34);
     fireEvent.contextMenu(screen.getByTestId('row'));
 
-    const item = await screen.findByRole('menuitem', { name: 'Nothing to build from this item' });
+    const item = await screen.findByRole('menuitem', { name: 'No blueprint options' });
     expect(item).toHaveAttribute('data-disabled');
   });
 
@@ -85,7 +85,7 @@ describe('BuildPlanContextMenu', () => {
     expect(loadBlueprints).not.toHaveBeenCalled();
 
     fireEvent.contextMenu(screen.getByTestId('row'));
-    await screen.findByRole('menuitem', { name: 'Start a Build Plan' });
+    await screen.findByRole('menuitem', { name: 'Build Plan' });
     expect(loadBlueprints).toHaveBeenCalled();
   });
 });
