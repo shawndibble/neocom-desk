@@ -113,7 +113,42 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
+      # Chromium comes from Playwright's own CDN; the only thing `--with-deps`
+      # needs apt for is Ubuntu's shared libraries. The runner image ships
+      # Google's Chrome repo regardless, so `apt-get update` fetches an index
+      # this job never uses — and when that index is bad it fails the whole
+      # step (`Hash Sum mismatch`, exit 100) in ~40s, before a browser exists
+      # and before a single test runs. Dropping the source list removes a
+      # dependency on a server we were not using.
+      #
+      # Nothing here consumes it: playwright.config.ts uses
+      # `devices['Desktop Chrome']`, which picks a viewport and user agent, not
+      # `channel: 'chrome'`. A project that did ask for a real-Chrome channel
+      # would need this reconsidered.
+      #
+      # The retry below is the residual net — an Ubuntu archive wobble, or a
+      # failure fetching the browser itself — neither of which the line above
+      # covers.
+      - name: Install Playwright browsers
+        # A retry loop turns one hung install into three, and the job default
+        # is six hours.
+        timeout-minutes: 10
+        run: |
+          sudo rm -f /etc/apt/sources.list.d/google-chrome.list
+          for attempt in 1 2 3; do
+            if npx playwright install --with-deps chromium; then exit 0; fi
+            # Nothing follows the last attempt, so it neither sleeps nor claims
+            # it is about to retry.
+            if [ "$attempt" -eq 3 ]; then break; fi
+            echo "::warning::playwright install failed (attempt $attempt/3), retrying"
+            # The index specifically: a bad one is otherwise reused and the
+            # retry fails identically. `apt-get clean` is not used — it empties
+            # the .deb cache, which is not what goes wrong here.
+            sudo rm -rf /var/lib/apt/lists/* || true
+            sleep $((attempt * 20))
+          done
+          echo "::error::playwright install failed after 3 attempts"
+          exit 1
       # The `built` Playwright project renders dist/ via `vite preview`, so
       # the bundle has to exist before Playwright starts. Build-time env must
       # match what the dev-server project gets (see E2E_ENV in

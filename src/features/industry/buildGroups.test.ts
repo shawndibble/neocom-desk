@@ -6,12 +6,22 @@ import {
   removeBuildGroup,
   renameBuildGroup,
   withBuildGroups,
+  withGroupSnapshot,
   type BuildGroup,
+  type BuildGroupSnapshot,
   type BuildGroupsValue,
 } from './buildGroups';
 
 const groups = (...names: string[]): BuildGroup[] =>
   names.map((name, i) => ({ id: `g${i + 1}`, name, order: i }));
+
+const snapshot = (overrides: Partial<BuildGroupSnapshot> = {}): BuildGroupSnapshot => ({
+  hubId: 'jita',
+  facility: 'npcStation',
+  security: 'highsec',
+  appliedAt: 1000,
+  ...overrides,
+});
 
 describe('parseBuildGroups', () => {
   it('reads a well-formed per-Character map', () => {
@@ -137,5 +147,57 @@ describe('withBuildGroups', () => {
     // which is why the names live here rather than being derived.
     const value = withBuildGroups({}, 1, [{ id: 'g1', name: 'Empty', order: 0 }]);
     expect(buildGroupsFor(value, 1)).toEqual([{ id: 'g1', name: 'Empty', order: 0 }]);
+  });
+});
+
+describe('withGroupSnapshot', () => {
+  it('sets a snapshot on one group, leaving the rest of the group untouched', () => {
+    const value = withBuildGroups({}, 1, groups('Retarget me', 'Other'));
+    const next = withGroupSnapshot(value, 1, 'g1', snapshot());
+    expect(buildGroupsFor(next, 1)).toEqual([
+      { id: 'g1', name: 'Retarget me', order: 0, snapshot: snapshot() },
+      { id: 'g2', name: 'Other', order: 1 },
+    ]);
+  });
+
+  it('replaces an existing snapshot rather than merging it', () => {
+    const value = withGroupSnapshot(withBuildGroups({}, 1, groups('G')), 1, 'g1', snapshot());
+    const next = withGroupSnapshot(value, 1, 'g1', snapshot({ hubId: 'amarr', appliedAt: 2000 }));
+    expect(buildGroupsFor(next, 1)[0].snapshot).toEqual(
+      snapshot({ hubId: 'amarr', appliedAt: 2000 })
+    );
+  });
+
+  it('is a no-op for a group id that does not exist', () => {
+    const value = withBuildGroups({}, 1, groups('G'));
+    expect(withGroupSnapshot(value, 1, 'missing', snapshot())).toBe(value);
+  });
+});
+
+describe('parseBuildGroups — snapshot', () => {
+  it('keeps a group whose snapshot is well-formed', () => {
+    const raw = { 1: [{ id: 'g1', name: 'G', order: 0, snapshot: snapshot() }] };
+    expect(parseBuildGroups(raw)).toEqual({
+      1: [{ id: 'g1', name: 'G', order: 0, snapshot: snapshot() }],
+    });
+  });
+
+  it('drops a group whose snapshot is malformed, rather than keeping the group without it', () => {
+    // A half-written snapshot is worse than none: silently dropping just the
+    // snapshot would apply the pilot's Retarget to nothing and never say so.
+    const raw = { 1: [{ id: 'g1', name: 'G', order: 0, snapshot: { hubId: 'jita' } }] };
+    expect(parseBuildGroups(raw)).toEqual({});
+  });
+
+  it('drops a snapshot whose buildSystemId/buildSystemName is a half-pair', () => {
+    const raw = {
+      1: [{ id: 'g1', name: 'G', order: 0, snapshot: snapshot({ buildSystemId: 30000142 }) }],
+    };
+    expect(parseBuildGroups(raw)).toEqual({});
+  });
+
+  it('keeps a group with no snapshot at all — the pre-#632 shape', () => {
+    const raw = { 1: [{ id: 'g1', name: 'G', order: 0 }] };
+    expect(parseBuildGroups(raw)).toEqual({ 1: [{ id: 'g1', name: 'G', order: 0 }] });
   });
 });

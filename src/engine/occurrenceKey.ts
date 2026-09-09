@@ -32,6 +32,7 @@
  */
 import type {
   NotificationFire,
+  SpExtractionFire,
   IndustryJobNotificationFire,
   PlanetaryNotificationFire,
   MailNotificationFire,
@@ -59,6 +60,7 @@ import type {
  */
 export type OccurrenceFire =
   | NotificationFire
+  | SpExtractionFire
   | IndustryJobNotificationFire
   | PlanetaryNotificationFire
   | MailNotificationFire
@@ -91,7 +93,11 @@ export function occurrenceKey(fire: OccurrenceFire, nowMs: number): string {
   switch (fire.eventId) {
     case 'skillLevelComplete':
       return [characterId, fire.eventId, fire.skillId, fire.level, fire.finishMs].join(':');
+    // spExtractionReady shares characterNotTraining's reasoning: "ready" is a
+    // threshold crossing with no entity id of its own, so two devices agree
+    // only by bucketing the day they each independently observed it.
     case 'characterNotTraining':
+    case 'spExtractionReady':
       return [characterId, fire.eventId, dayBucket(nowMs)].join(':');
     case 'industryJobComplete':
     case 'corpIndustryJobReady':
@@ -165,6 +171,7 @@ export function occurrenceFiredAt(fire: OccurrenceFire, nowMs: number): number {
       return Number.isFinite(sentAt) ? sentAt : nowMs;
     }
     case 'characterNotTraining':
+    case 'spExtractionReady':
     case 'industryJobComplete':
     case 'corpIndustryJobReady':
     case 'planetaryExtractionDone':

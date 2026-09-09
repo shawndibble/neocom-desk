@@ -1,8 +1,9 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { InfoTooltip } from './Tooltip';
+import { STAT_CHIP_TONE_TEXT_CLASS, type StatChipTone } from './statChipTone';
 
-export type StatChipTone = 'default' | 'accent' | 'success' | 'warning' | 'danger';
+export type { StatChipTone };
 
 interface StatChipProps {
   label: string;
@@ -12,14 +13,6 @@ interface StatChipProps {
   /** One-line plain-language explanation, rendered as a small "?" tooltip next to the label. */
   tooltip?: string;
 }
-
-const TONE: Record<StatChipTone, string> = {
-  default: 'text-text',
-  accent: 'text-accent',
-  success: 'text-success',
-  warning: 'text-warning',
-  danger: 'text-danger',
-};
 
 export function StatChip({
   label,
@@ -40,7 +33,7 @@ export function StatChip({
     >
       <span className="font-semibold tracking-widest text-text-dim uppercase">{label}</span>
       {tooltip && <InfoTooltip label={t('common.aboutLabel', { label })} content={tooltip} />}
-      <span className={`font-medium tabular-nums ${TONE[tone]}`}>{value}</span>
+      <span className={`font-medium tabular-nums ${STAT_CHIP_TONE_TEXT_CLASS[tone]}`}>{value}</span>
     </span>
   );
 }

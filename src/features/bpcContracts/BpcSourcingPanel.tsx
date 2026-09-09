@@ -41,6 +41,7 @@ import {
 } from '@/features/bpcContracts/syncedContracts';
 import { loadRegionName } from '@/features/bpcContracts/regionNames';
 import { BpcContractModal } from '@/features/bpcContracts/BpcContractModal';
+import { BuildPlanContextMenu } from '@/features/industry/BuildPlanContextMenu';
 import { loadBlueprints } from '@/sde/loadSde';
 import { isSyncConfigured } from '@/app/syncStatus';
 import type { CachedResult } from '@/esi/cache';
@@ -667,6 +668,16 @@ export function BpcSourcingPanel() {
                 rowKey={(row, index) => `${row.contractId}:${row.typeId}:${index}`}
                 defaultSort={{ columnId: 'price', direction: 'asc' }}
                 onRowClick={setOpenRow}
+                rowContextMenu={(row, tr) => (
+                  // The Offer's own research and run count, not the
+                  // defaults: a pilot shopping a 10/20 five-run copy wants to
+                  // see what *that* copy builds (#637).
+                  <BuildPlanContextMenu
+                    typeId={row.typeId}
+                    seed={{ me: row.me, te: row.te, runs: row.runs }}
+                    trigger={tr}
+                  />
+                )}
               />
               {!showAll && filteredRows.length > ROW_CAP && (
                 <div className="px-3 py-2">
@@ -683,6 +694,10 @@ export function BpcSourcingPanel() {
       {openRow !== null && (
         <BpcContractModal
           row={openRow}
+          // Non-null past the `activeCharacterId === null` guard above; the
+          // modal needs one to resolve a player-structure location, whose ACL
+          // is per Character (#655 item F).
+          characterId={activeCharacterId}
           blueprintName={blueprintNames.get(openRow.typeId) ?? `#${openRow.typeId}`}
           regionName={regionNames.get(openRow.regionId) ?? `#${openRow.regionId}`}
           onClose={() => setOpenRow(null)}

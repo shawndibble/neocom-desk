@@ -24,6 +24,7 @@ import {
   CONTRACT_TYPE_KEY,
 } from './contractLabels';
 import { MarketItemLink } from '@/features/market/MarketItemLink';
+import { BuildPlanContextMenu } from '@/features/industry/BuildPlanContextMenu';
 import { IssuerLink } from './IssuerLink';
 import { typeIconUrl } from '@/lib/eveImages';
 import { formatIsk } from '@/lib/isk';
@@ -243,44 +244,60 @@ export function ContractDetailModal({
             <EmptyState title={t('contracts.detailNoItems')} className="py-4" />
           ) : (
             <>
-              {included.length > 0 && itemColumns && (
-                <div>
-                  <h3 className="border-b border-line pb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                    {t('contracts.detailItemsIncluded')}
-                  </h3>
-                  <div className="overflow-x-auto">
-                    <DataTable
-                      label={t('contracts.detailItemsIncluded')}
-                      columns={itemColumns}
-                      rows={included}
-                      rowKey={(item) => item.record_id}
-                      density="compact"
-                      responsive="table"
-                    />
-                  </div>
-                </div>
+              {itemColumns && (
+                <ItemSection
+                  title={t('contracts.detailItemsIncluded')}
+                  columns={itemColumns}
+                  items={included}
+                />
               )}
-              {requested.length > 0 && itemColumns && (
-                <div>
-                  <h3 className="border-b border-line pb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                    {t('contracts.detailItemsRequested')}
-                  </h3>
-                  <div className="overflow-x-auto">
-                    <DataTable
-                      label={t('contracts.detailItemsRequested')}
-                      columns={itemColumns}
-                      rows={requested}
-                      rowKey={(item) => item.record_id}
-                      density="compact"
-                      responsive="table"
-                    />
-                  </div>
-                </div>
+              {itemColumns && (
+                <ItemSection
+                  title={t('contracts.detailItemsRequested')}
+                  columns={itemColumns}
+                  items={requested}
+                />
               )}
             </>
           ))}
       </div>
     </Modal>
+  );
+}
+
+/**
+ * One "Included"/"Requested" list. Both are the same table over the same
+ * columns, differing only in title and rows, so they share a component
+ * rather than the block being written out twice — the right-click menu and
+ * the narrow-screen wrapper had to stay in step across both.
+ */
+function ItemSection({
+  title,
+  columns,
+  items,
+}: {
+  title: string;
+  columns: DataTableColumn<ContractItem>[];
+  items: ContractItem[];
+}) {
+  if (items.length === 0) return null;
+  return (
+    <div>
+      <h3 className="flex items-center gap-1.5 border-b border-line pb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+        {title}
+      </h3>
+      <div className="overflow-x-auto">
+        <DataTable
+          label={title}
+          columns={columns}
+          rows={items}
+          rowKey={(item) => item.record_id}
+          density="compact"
+          responsive="table"
+          rowContextMenu={(item, tr) => <BuildPlanContextMenu typeId={item.type_id} trigger={tr} />}
+        />
+      </div>
+    </div>
   );
 }
 

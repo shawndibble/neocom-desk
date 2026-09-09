@@ -46,6 +46,7 @@ import {
   pinRole,
 } from '@/features/pi/adapters';
 import {
+  ATTENTION_TONE as COLONY_ATTENTION_TONE,
   colonyAttention,
   colonyStatus,
   extractorState,
@@ -227,17 +228,15 @@ async function loadPiSnapshot(characterId: number, signal: RouteSnapshotSignal):
  */
 type EffectiveAttention = ColonyAttention | 'unknown';
 
-// `decayed` is deliberately not `warning`: it would then be indistinguishable
-// at a glance from `expiring-soon`, which is the more urgent call. `accent`
-// reads as "worth a look", which is all the flag claims to be.
+// The four real-attention tones are `engine/pi/colonyStatus.ts`'s own
+// `ATTENTION_TONE` (its doc comment has the "why" for each colour) — this
+// route just adds the one value that engine map can't have, since `unknown`
+// only exists here (a route-level fallback for data the engine never sees).
 const ATTENTION_TONE: Record<
   EffectiveAttention,
   'danger' | 'warning' | 'accent' | 'success' | 'default'
 > = {
-  idle: 'danger',
-  'expiring-soon': 'warning',
-  decayed: 'accent',
-  healthy: 'success',
+  ...COLONY_ATTENTION_TONE,
   unknown: 'default',
 };
 

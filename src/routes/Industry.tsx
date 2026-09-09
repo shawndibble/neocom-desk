@@ -36,6 +36,11 @@ import { useQuickbar } from '@/features/market/useQuickbar';
 import { ActiveJobsPanel } from '@/features/industry/ActiveJobsPanel';
 import { BuildPlanList } from '@/features/industry/BuildPlanList';
 import { BuildPlanCompare } from '@/features/industry/BuildPlanCompare';
+import { OpportunitiesPanel } from '@/features/industry/OpportunitiesPanel';
+import {
+  planForOpportunityCandidate,
+  type OpportunityRow,
+} from '@/features/industry/opportunities';
 import { ProductionLogPanel } from '@/features/industry/ProductionLogPanel';
 import { BpcSourcingPanel } from '@/features/bpcContracts/BpcSourcingPanel';
 import {
@@ -51,17 +56,27 @@ import {
 } from '@/features/industry/lastOpenedPlan';
 import { mostRecentlyUpdatedPlan, newBuildPlan } from '@/features/industry/newBuildPlan';
 import {
+  clearPlanSeed,
+  matchesPlanSeed,
+  parsePlanSeed,
+  type BuildPlanSeed,
+} from '@/features/industry/planSeed';
+import {
   addBuildGroup,
   buildGroupsFor,
   removeBuildGroup,
   renameBuildGroup,
   useBuildGroups,
+  withGroupSnapshot,
+  type BuildGroupSnapshot,
 } from '@/features/industry/buildGroups';
+import { retargetPatch } from '@/features/industry/retargetPatch';
 import { useExpandedGroups, withGroupExpanded } from '@/features/industry/expandedGroups';
 import { BuildGroupPanel } from '@/features/industry/BuildGroupPanel';
 import { FitImportDialog } from '@/features/industry/FitImportDialog';
 import { applyFitImport, fitImportGroupName } from '@/features/industry/fitImport';
 import { useAssumedMe } from '@/features/industry/assumedMe';
+import { useAssumedTe } from '@/features/industry/assumedTe';
 import type { FitToBuildPlansResult } from '@/engine/import/fitToBuildPlans';
 
 /**
@@ -86,11 +101,11 @@ type DetailSelection =
 
 const NO_SELECTION: DetailSelection = { kind: 'none' };
 
-type IndustryTab = 'plans' | 'records' | 'sourcing';
+type IndustryTab = 'plans' | 'records' | 'sourcing' | 'opportunities';
 
 /** An unknown or absent `?tab=` falls back to Plans rather than rendering nothing — a stale or hand-edited link should land somewhere useful. */
 function readIndustryTab(value: string | null): IndustryTab {
-  return value === 'records' || value === 'sourcing' ? value : 'plans';
+  return value === 'records' || value === 'sourcing' || value === 'opportunities' ? value : 'plans';
 }
 
 /** Build Plan manager: create (via blueprint search)/duplicate/delete/rename plans, edit the selected one. */
@@ -173,11 +188,14 @@ export function Industry() {
   const setExpandedGroups = useExpandedGroups((state) => state.setValue);
   const assumedMe = useAssumedMe((state) => state.value);
   const hydrateAssumedMe = useAssumedMe((state) => state.hydrate);
+  const assumedTe = useAssumedTe((state) => state.value);
+  const hydrateAssumedTe = useAssumedTe((state) => state.hydrate);
   useEffect(() => {
     void hydrateBuildGroups();
     void hydrateExpandedGroups();
     void hydrateAssumedMe();
-  }, [hydrateBuildGroups, hydrateExpandedGroups, hydrateAssumedMe]);
+    void hydrateAssumedTe();
+  }, [hydrateBuildGroups, hydrateExpandedGroups, hydrateAssumedMe, hydrateAssumedTe]);
 
   const [selection, setSelection] = useState<DetailSelection>(NO_SELECTION);
   // Read back as the three things the pane below actually asks about. The tag
@@ -258,7 +276,10 @@ export function Industry() {
   // plan selected (the blueprint-picker click handler; the render-time sync
   // below) do that themselves, outside the effect.
   const createPlan = useCallback(
-    async (entry: BlueprintCatalogEntry): Promise<string | null> => {
+    async (
+      entry: BlueprintCatalogEntry,
+      seed: BuildPlanSeed | null = null
+    ): Promise<string | null> => {
       if (activeCharacterId === null) return null;
       const owned = findOwnedBlueprint(ownedBlueprints, entry.blueprintTypeID);
       const plan = newBuildPlan(
@@ -267,17 +288,45 @@ export function Industry() {
         owned,
         mostRecentlyUpdatedPlan(plans),
         facilityDefaults,
-        // The same assumed ME Fit Import seeds its plans with (#626). Passed
-        // here too so one blueprint cannot start at two different ME values
-        // depending on whether it was picked or imported; an owned copy still
-        // wins on both paths.
-        { assumedMe }
+        {
+          // The same assumed ME and TE Fit Import seeds its plans with (#626,
+          // #634). Passed here too so one blueprint cannot start at two
+          // different research levels depending on whether it was picked or
+          // imported; an owned copy still wins on both paths.
+          assumedMe,
+          assumedTe,
+          // An Offer's own numbers beat both (#637). The name carries them too:
+          // the reuse rule below lets a pilot hold a plain plan and one or more
+          // seeded plans for one blueprint, and three rows all reading "Rifter"
+          // would be unusable. Spelled field by field rather than spread:
+          // TypeScript's excess-property check does not see through a spread,
+          // so `{ ...seed }` would couple `BuildPlanSeed` to
+          // `NewBuildPlanOverrides` by field-name coincidence alone.
+          ...(seed
+            ? {
+                me: seed.me,
+                te: seed.te,
+                runs: seed.runs,
+                name: t('industry.seededPlanName', {
+                  name: entry.productName,
+                  me: seed.me,
+                  te: seed.te,
+                  runs: seed.runs,
+                }),
+              }
+            : {}),
+        }
       );
       await db.buildPlans.add(plan);
       scheduleSync(activeCharacterId);
       return plan.id;
     },
-    [activeCharacterId, ownedBlueprints, plans, facilityDefaults, assumedMe]
+    // `t` is load-bearing here, not incidental: this callback is a dependency
+    // of the create-if-missing effect below, so a `t` whose identity churned
+    // would re-fire a Dexie write. react-i18next only re-binds it on
+    // `languageChanged`, which cannot happen while the app is English-only —
+    // whoever adds a second locale needs to weigh that here.
+    [activeCharacterId, ownedBlueprints, plans, facilityDefaults, assumedMe, assumedTe, t]
   );
 
   // The Market Browser's item context menu "jump to a Build Plan" action
@@ -287,11 +336,25 @@ export function Industry() {
   // render-time sync below and the effect's create-if-missing branch read
   // the same answer instead of re-deriving it twice.
   const productParam = searchParams.get('product');
+  // A BPC Sourcing Offer also sends the copy's own ME/TE/runs (#637). Memoized on
+  // `searchParams` — which react-router keeps stable per `location.search` —
+  // because the create effect below depends on it: a fresh object every render
+  // would re-fire that effect, and it writes to Dexie.
+  const planSeed = useMemo(() => parsePlanSeed(searchParams), [searchParams]);
   const pendingEntry =
     productParam && catalog ? (catalog.byProductTypeID.get(Number(productParam)) ?? null) : null;
+  // Unseeded, this adopts any plan for the blueprint — the Market Browser,
+  // Assets and appraised-row behaviour, unchanged. Seeded, the plan must also
+  // hold the Offer's three numbers: a plan for the same blueprint at other
+  // research is left alone and the seeded one is created beside it, while
+  // browsing back to the same Offer reuses what the first click created.
   const pendingExistingPlan =
     pendingEntry && plans
-      ? (plans.find((p) => p.blueprintTypeID === pendingEntry.blueprintTypeID) ?? null)
+      ? (plans.find(
+          (p) =>
+            p.blueprintTypeID === pendingEntry.blueprintTypeID &&
+            (planSeed === null || matchesPlanSeed(p, planSeed))
+        ) ?? null)
       : null;
 
   // Render-time state adjustment ("Adjusting state when a prop changes",
@@ -313,11 +376,15 @@ export function Industry() {
   useEffect(() => {
     if (!productParam || activeCharacterId === null || !plans || !catalog) return;
     if (pendingEntry && !pendingExistingPlan) {
-      void createPlan(pendingEntry);
+      void createPlan(pendingEntry, planSeed);
       return;
     }
     const next = new URLSearchParams(searchParams);
     next.delete('product');
+    // Spent along with the param it rode in on: `?material=` below preserves
+    // whatever it does not delete, so a leftover seed would ride onto an
+    // unrelated navigation.
+    clearPlanSeed(next);
     setSearchParams(next, { replace: true });
   }, [
     productParam,
@@ -326,6 +393,7 @@ export function Industry() {
     catalog,
     pendingEntry,
     pendingExistingPlan,
+    planSeed,
     searchParams,
     setSearchParams,
     createPlan,
@@ -424,6 +492,12 @@ export function Industry() {
     () => (selectedGroupId === null ? [] : membersOfGroup(selectedGroupId)),
     [membersOfGroup, selectedGroupId]
   );
+  /** The open plan's group's last Retarget (issue #632), for the quick-fill link. */
+  const selectedPlanGroupSnapshot = useMemo(() => {
+    const groupId = selectedPlan?.buildGroupId;
+    if (groupId === undefined) return null;
+    return groups.find((g) => g.id === groupId)?.snapshot ?? null;
+  }, [selectedPlan, groups]);
 
   // Narrow screens show one column at a time (CONTEXT.md round 25); matches
   // the grid's own `lg:` breakpoint so the JS-driven visibility and the CSS
@@ -647,6 +721,36 @@ export function Industry() {
     if (groupId !== null) await setGroupExpanded(groupId, true);
   }
 
+  /**
+   * Applies a Retarget group's chosen hub/facility/security/build-system to
+   * every checked member plan (issue #632), and keeps the group's own
+   * snapshot in step so the quick-fill link and the next Retarget both start
+   * from what was actually applied — not merely what the form last held.
+   *
+   * A plain bulk write, not a second source of truth: each patched plan owns
+   * its own values from here on, same as any manual edit (see
+   * `retargetPatch.ts` and the #626 decision).
+   */
+  async function handleRetargetGroup(
+    groupId: string,
+    target: Omit<BuildGroupSnapshot, 'appliedAt'>,
+    planIds: readonly string[]
+  ) {
+    if (activeCharacterId === null) return;
+    const snapshot: BuildGroupSnapshot = { ...target, appliedAt: Date.now() };
+    if (planIds.length > 0) {
+      const patch = retargetPatch(snapshot);
+      await db.transaction('rw', db.buildPlans, async () => {
+        const stored = await db.buildPlans.bulkGet([...planIds]);
+        const now = Date.now();
+        const updated = stored.flatMap((p) => (p ? [{ ...p, ...patch, updatedAt: now }] : []));
+        await db.buildPlans.bulkPut(updated);
+      });
+      scheduleSync(activeCharacterId);
+    }
+    await setBuildGroups(withGroupSnapshot(buildGroups, activeCharacterId, groupId, snapshot));
+  }
+
   /** Creates a group and one plan per buildable item in a pasted fit, then opens it. */
   async function handleFitImport(preview: FitToBuildPlansResult) {
     if (activeCharacterId === null || !catalog) return;
@@ -657,14 +761,38 @@ export function Industry() {
       defaultsFrom: mostRecentlyUpdatedPlan(plans),
       facilityDefaults,
       assumedMe,
+      assumedTe,
       buildGroups,
       setBuildGroups,
-      groupName: fitImportGroupName(preview, t),
+      groupName: fitImportGroupName(preview, {
+        withHull: (fit, ship) => t('industry.fitImportGroupName', { fit, ship }),
+        untitled: t('industry.newGroupName'),
+      }),
     });
     if (!result) return;
     await setGroupExpanded(result.groupId, true);
     setFitImportOpen(false);
     selectGroup(result.groupId);
+  }
+
+  /**
+   * Build Opportunities' "Add to Compare" (issue #642): seeds real,
+   * persisted Build Plans from the selected ranked rows, priced at the same
+   * owned-materials claim that ranked them, then hands the pilot straight to
+   * Compare. `OpportunitiesPanel` only lets the active Character's own rows
+   * be selected, so every seeded plan belongs here — no cross-character
+   * `scheduleSync` fan-out needed.
+   */
+  async function handleAddOpportunitiesToCompare(rows: readonly OpportunityRow[]) {
+    if (activeCharacterId === null || rows.length === 0) return;
+    const newPlans = rows.map((row) =>
+      planForOpportunityCandidate(row.candidate, facilityDefaults, row.materialSourcing)
+    );
+    await db.buildPlans.bulkAdd(newPlans);
+    scheduleSync(activeCharacterId);
+    setCompareSelectedIds(new Set(newPlans.map((p) => p.id)));
+    setSelection({ kind: 'compare' });
+    setTab('plans');
   }
 
   function clearCompareMode() {
@@ -728,11 +856,22 @@ export function Industry() {
               { id: 'plans', label: t('industry.buildPlansTab') },
               { id: 'records', label: t('industry.recordsTab') },
               { id: 'sourcing', label: t('industry.bpcSearchTab') },
+              { id: 'opportunities', label: t('industry.opportunitiesTab') },
             ]}
           />
 
           {tab === 'sourcing' ? (
             <BpcSourcingPanel />
+          ) : tab === 'opportunities' ? (
+            <OpportunitiesPanel
+              catalog={catalog}
+              pi={pi}
+              skills={skills}
+              facilityDefaults={facilityDefaults}
+              activeCharacterId={activeCharacterId}
+              ownedStockSnapshot={ownedStockSnapshot}
+              onAddToCompare={(rows) => void handleAddOpportunitiesToCompare(rows)}
+            />
           ) : tab === 'records' ? (
             <ProductionLogPanel
               characterId={activeCharacterId}
@@ -804,9 +943,13 @@ export function Industry() {
                       plans={selectedGroupPlans}
                       catalog={catalog}
                       pi={pi}
+                      ownedBlueprints={ownedBlueprints}
                       skills={skills}
                       ownedStockSnapshot={ownedStockSnapshot}
                       onOpenPlan={selectPlan}
+                      onRetarget={(target, planIds) =>
+                        void handleRetargetGroup(selectedGroup.id, target, planIds)
+                      }
                     />
                   ) : comparing ? (
                     comparePlans.length >= 2 ? (
@@ -814,6 +957,7 @@ export function Industry() {
                         plans={comparePlans}
                         catalog={catalog}
                         pi={pi}
+                        ownedBlueprints={ownedBlueprints}
                         skills={skills}
                         onDone={exitCompare}
                       />
@@ -844,6 +988,7 @@ export function Industry() {
                       onAddToQuickbar={quickbar.add}
                       quickbarAvailable={quickbar.available}
                       onShowInfo={(typeId, itemName) => setInfoModalItem({ typeId, itemName })}
+                      groupSnapshot={selectedPlanGroupSnapshot}
                     />
                   ) : plans.length > 0 ? (
                     <div className="flex justify-center py-8">

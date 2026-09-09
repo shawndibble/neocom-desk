@@ -1,21 +1,31 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook, waitFor } from '@testing-library/react';
+import { create } from 'zustand';
+import { renderHook, waitFor, act } from '@testing-library/react';
 import '@/i18n';
 import {
   useComparedBuildResults,
   type UseComparedBuildResultsArgs,
 } from './useComparedBuildResults';
 import { computeBuildPlan } from './computeBuildPlan';
-import { loadMarketSnapshot } from './marketData';
+import { loadMarketSnapshots, type MarketSnapshot } from './marketData';
+import { useAssumedMe } from './assumedMe';
 import type { BuildPlanRecord } from '@/db';
 import type { BlueprintCatalog, BlueprintCatalogEntry } from './blueprintCatalog';
 import type { BuildResult } from '@/engine/industry/types';
+import type { CharacterBlueprint } from '@/esi/endpoints';
 
 vi.mock('./computeBuildPlan', () => ({ computeBuildPlan: vi.fn() }));
-vi.mock('./marketData', () => ({ loadMarketSnapshot: vi.fn() }));
+vi.mock('./marketData', () => ({ loadMarketSnapshots: vi.fn() }));
+// A controllable stand-in for the real synced-setting store, so the
+// hydration-gating test below can flip `hydrated` deterministically instead
+// of racing the real Dexie/fake-indexeddb read.
+vi.mock('./assumedMe', () => ({
+  useAssumedMe: create(() => ({ value: 0, hydrated: false, hydrate: vi.fn() })),
+}));
 
 const mockedCompute = vi.mocked(computeBuildPlan);
-const mockedSnapshot = vi.mocked(loadMarketSnapshot);
+const mockedSnapshots = vi.mocked(loadMarketSnapshots);
+const mockedAssumedMe = vi.mocked(useAssumedMe);
 
 function plan(overrides: Partial<BuildPlanRecord> & { id: string }): BuildPlanRecord {
   return {
@@ -85,20 +95,28 @@ const RESULT: BuildResult = {
   recommendation: 'build',
 };
 
+const SNAPSHOT: MarketSnapshot = {
+  hubPrices: {},
+  hubBuyPrices: {},
+  hubSellVolumes: {},
+  adjustedPrices: {},
+  systemCostIndex: 0.01,
+};
+
 const baseArgs: Omit<UseComparedBuildResultsArgs, 'plans' | 'catalog'> = {
   pi: null,
+  ownedBlueprints: [],
   skills: {},
 };
 
 beforeEach(() => {
   mockedCompute.mockReset();
-  mockedSnapshot.mockReset();
-  mockedSnapshot.mockResolvedValue({
-    hubPrices: {},
-    hubBuyPrices: {},
-    adjustedPrices: {},
-    systemCostIndex: 0.01,
-  });
+  mockedSnapshots.mockReset();
+  // Hydrated by default so the existing tests below (which don't care about
+  // this setting) exercise the real fetch path; the hydration-gating test
+  // overrides this to `false` itself.
+  mockedAssumedMe.setState({ value: 0, hydrated: true, hydrate: vi.fn() });
+  mockedSnapshots.mockImplementation((requests) => requests.map(() => Promise.resolve(SNAPSHOT)));
   mockedCompute.mockReturnValue({ result: RESULT, error: null });
 });
 
@@ -159,7 +177,12 @@ describe('useComparedBuildResults', () => {
         error: null,
       },
     ]);
-    expect(mockedSnapshot).toHaveBeenCalledTimes(2);
+    // Both plans sit at the same hub, so one batched request set prices
+    // them both — not one snapshot load per plan (issue #628).
+    expect(mockedSnapshots).toHaveBeenCalledTimes(1);
+    const requests = mockedSnapshots.mock.calls[0]?.[0] ?? [];
+    expect(requests).toHaveLength(2);
+    expect(requests.every((request) => request.hub.id === 'jita')).toBe(true);
   });
 
   it('reports a plan whose blueprint is missing from the catalog as unresolved, without dropping it', async () => {
@@ -173,26 +196,26 @@ describe('useComparedBuildResults', () => {
     expect(result.current).toHaveLength(1);
     expect(result.current[0]?.result).toBeNull();
     expect(result.current[0]?.error).toBeTruthy();
-    expect(mockedSnapshot).not.toHaveBeenCalled();
+    expect(mockedSnapshots).toHaveBeenCalledWith([]);
   });
 
   it("reports one plan's market-snapshot failure without affecting the other plan's row", async () => {
     const catalog = catalogWith([entry({ blueprintTypeID: 100 }), entry({ blueprintTypeID: 200 })]);
+    // Two hubs, so each plan is priced by its own fetch: batching unions
+    // per hub, and one hub going down must not take the other hub's plan
+    // down with it (issue #453).
     const plans = [
-      plan({ id: 'a', name: 'Failing plan', blueprintTypeID: 100 }),
-      plan({ id: 'b', name: 'Fine plan', blueprintTypeID: 200 }),
+      plan({ id: 'a', name: 'Failing plan', blueprintTypeID: 100, hubId: 'jita' }),
+      plan({ id: 'b', name: 'Fine plan', blueprintTypeID: 200, hubId: 'amarr' }),
     ];
 
-    mockedSnapshot.mockImplementation(async () => {
-      throw new Error('ESI unreachable');
-    });
-    // Second call (for the "fine" plan) succeeds instead.
-    mockedSnapshot.mockRejectedValueOnce(new Error('ESI unreachable')).mockResolvedValueOnce({
-      hubPrices: {},
-      hubBuyPrices: {},
-      adjustedPrices: {},
-      systemCostIndex: 0.01,
-    });
+    mockedSnapshots.mockImplementation((requests) =>
+      requests.map((request) =>
+        request.hub.id === 'jita'
+          ? Promise.reject(new Error('ESI unreachable'))
+          : Promise.resolve(SNAPSHOT)
+      )
+    );
 
     const { result } = renderHook(() => useComparedBuildResults({ plans, catalog, ...baseArgs }));
 
@@ -204,6 +227,31 @@ describe('useComparedBuildResults', () => {
     expect(failing?.error).toBe('ESI unreachable');
     expect(fine?.result).toEqual(RESULT);
     expect(fine?.error).toBeNull();
+  });
+
+  it('reports the failure on every plan sharing the failed hub, dropping none of them', async () => {
+    // The shape batching actually created: same-hub plans await one shared
+    // fetch, so they fail together. Each still gets its own row with its own
+    // error rather than vanishing from the comparison (issue #453).
+    const catalog = catalogWith([entry({ blueprintTypeID: 100 })]);
+    const plans = [
+      plan({ id: 'a', name: 'Plan A', hubId: 'jita' }),
+      plan({ id: 'b', name: 'Plan B', hubId: 'jita' }),
+    ];
+
+    mockedSnapshots.mockImplementation((requests) => {
+      const failed = Promise.reject(new Error('ESI unreachable'));
+      return requests.map(() => failed);
+    });
+
+    const { result } = renderHook(() => useComparedBuildResults({ plans, catalog, ...baseArgs }));
+
+    await waitFor(() => expect(result.current.every((row) => !row.loading)).toBe(true));
+
+    expect(result.current).toHaveLength(2);
+    expect(result.current.map((row) => row.planId)).toEqual(['a', 'b']);
+    expect(result.current.every((row) => row.error === 'ESI unreachable')).toBe(true);
+    expect(result.current.every((row) => row.result === null)).toBe(true);
   });
 
   it('recomputes when the plan list changes', async () => {
@@ -225,12 +273,17 @@ describe('useComparedBuildResults', () => {
   it("prices each row at its own plan's material price basis", async () => {
     // Compare has to agree with the plan's own detail panel: a buy-basis plan
     // shown beside a sell-basis one must not quietly quote both at sell.
-    mockedSnapshot.mockResolvedValue({
-      hubPrices: { 34: 5 },
-      hubBuyPrices: { 34: 4 },
-      adjustedPrices: {},
-      systemCostIndex: 0.01,
-    });
+    mockedSnapshots.mockImplementation((requests) =>
+      requests.map(() =>
+        Promise.resolve({
+          hubPrices: { 34: 5 },
+          hubBuyPrices: { 34: 4 },
+          hubSellVolumes: {},
+          adjustedPrices: {},
+          systemCostIndex: 0.01,
+        })
+      )
+    );
     const catalog = catalogWith([entry({ blueprintTypeID: 100 })]);
     // Distinct run counts, because `computeBuildPlan` is handed a Pick of the
     // record that carries no id — runs is what tells the two calls apart.
@@ -247,5 +300,58 @@ describe('useComparedBuildResults', () => {
     );
     expect(byRuns.get(5)).toEqual({ 34: 5 });
     expect(byRuns.get(9)).toEqual({ 34: 4 });
+  });
+
+  it('wires a recipeFor into computeBuildPlan, matching what BuildPlanDetail.tsx passes, so a buildHere material rolls up instead of pricing at the hub', async () => {
+    const producedEntry = entry({
+      blueprintTypeID: 200,
+      productTypeID: 300,
+      productName: 'Component',
+    });
+    const catalog: BlueprintCatalog = {
+      ...catalogWith([entry({ blueprintTypeID: 100 }), producedEntry]),
+      byProductTypeID: new Map([[300, producedEntry]]),
+    };
+    const ownedBlueprints: CharacterBlueprint[] = [
+      {
+        item_id: 1,
+        type_id: 200,
+        runs: -1,
+        material_efficiency: 7,
+        time_efficiency: 14,
+        quantity: 1,
+      },
+    ];
+    const plans = [plan({ id: 'a', buildHere: [300] })];
+
+    const { result } = renderHook(() =>
+      useComparedBuildResults({ ...baseArgs, plans, catalog, ownedBlueprints })
+    );
+    await waitFor(() => expect(result.current[0]?.loading).toBe(false));
+
+    const call = mockedCompute.mock.calls[0]?.[0];
+    expect(typeof call?.recipeFor).toBe('function');
+    expect(call?.recipeFor?.(300)).toEqual(
+      expect.objectContaining({ method: 'manufacturing', me: 7 })
+    );
+  });
+
+  it('waits for the assumedMe setting to hydrate before fetching, instead of fetching once at the default and again once hydrated', async () => {
+    mockedAssumedMe.setState({ value: 0, hydrated: false, hydrate: vi.fn() });
+    const catalog = catalogWith([entry({ blueprintTypeID: 100 })]);
+    const plans = [plan({ id: 'a' })];
+
+    const { result } = renderHook(() => useComparedBuildResults({ ...baseArgs, plans, catalog }));
+
+    // Hydrate must resolve first (see hook comment above).
+    expect(result.current.every((row) => row.loading)).toBe(true);
+    expect(mockedSnapshots).not.toHaveBeenCalled();
+
+    act(() => {
+      mockedAssumedMe.setState({ value: 3, hydrated: true, hydrate: vi.fn() });
+    });
+
+    await waitFor(() => expect(result.current.every((row) => !row.loading)).toBe(true));
+    expect(mockedSnapshots).toHaveBeenCalledTimes(1);
   });
 });

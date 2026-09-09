@@ -73,6 +73,29 @@
 // no control clears it), so the tombstone-expiry edge does not bite this one
 // either. No `legacyKey`: the preference is new, with no device-local life to
 // seed from.
+//
+// sync.industryAssumedTe (issue #634): the time half of sync.industryAssumedMe
+// above, and it syncs for the same reason — "assume the BPC I have to invent is
+// TE4" is an answer about how the pilot builds, not about one machine, and a
+// plan quoted TE4 on a laptop and TE0 on a phone is the same plan disagreeing
+// with itself. Its own key rather than a pair packed with ME, so the two merge
+// independently: changing the TE assumption on one device cannot roll back an
+// ME set on another. Same "set to another value, never unset" shape as the
+// preferences above, so the tombstone-expiry edge does not bite it. No
+// `legacyKey`, unlike its ME twin: the preference is new, with no device-local
+// life to seed from.
+//
+// sync.spExtractionMonitoringEnabled / sync.spExtractionThresholdSp
+// (grilling session, 2026-09-09): whether SP Extraction monitoring is on for
+// the Characters table's SP-ready column and alert, and the spare-SP number
+// that decides "ready" (engine/spExtraction.ts). Two keys, not one blob:
+// each merges independently, so turning the feature on from a laptop cannot
+// roll back a threshold set from a phone. Same "set to another value, never
+// unset" shape as the five Defaults-panel preferences above, so the
+// tombstone-expiry edge does not bite either. No `legacyKey` for either:
+// both are new, with no device-local life to seed from. See
+// features/character/spExtractionSettings.ts.
+//
 // sync.industryBuildGroups (issue #626): a blob like the two above, and for
 // the same reason — the key space is unbounded (one entry per Build Group, per
 // Character), so one key per group is not expressible against an exact-match
@@ -89,6 +112,7 @@ export const SYNCED_SETTING_KEYS: readonly string[] = [
   'sync.corpDarkAfterDays',
   'sync.defaultCharacterFilter',
   'sync.industryAssumedMe',
+  'sync.industryAssumedTe',
   'sync.industryBuildGroups',
   'sync.industryFacilityDefaults',
   'sync.marketHub',
@@ -96,6 +120,8 @@ export const SYNCED_SETTING_KEYS: readonly string[] = [
   'sync.notificationFeedPrefs',
   'sync.piCustomsRates',
   'sync.piExpiringSoonHours',
+  'sync.spExtractionMonitoringEnabled',
+  'sync.spExtractionThresholdSp',
 ];
 
 const allowed = new Set(SYNCED_SETTING_KEYS);

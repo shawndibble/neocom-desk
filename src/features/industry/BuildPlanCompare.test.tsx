@@ -85,6 +85,7 @@ function renderCompare(rows: ComparedBuildRow[], onDone = vi.fn()) {
         plans={rows.map((r) => plan({ id: r.planId }))}
         catalog={EMPTY_CATALOG}
         pi={null}
+        ownedBlueprints={[]}
         skills={{}}
         onDone={onDone}
       />

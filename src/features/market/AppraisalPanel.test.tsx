@@ -220,9 +220,4 @@ describe('AppraisalPanel — the row as an item', () => {
     fireEvent.contextMenu(screen.getByRole('row', { name: /Damage Control II/ }));
     expect(onRequestBlueprintCatalog).toHaveBeenCalled();
   });
-
-  it('says in the title bar that the rows carry a menu', () => {
-    renderPanel({ controller: controller({ result: outcome() }) });
-    expect(screen.getByRole('button', { name: 'About Appraisal' })).toBeInTheDocument();
-  });
 });

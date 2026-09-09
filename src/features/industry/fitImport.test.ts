@@ -108,7 +108,7 @@ describe('fitImportPlans', () => {
     CATALOG
   );
 
-  function build(assumedMe = 2) {
+  function build(assumedMe = 2, assumedTe = 4) {
     return fitImportPlans(preview, {
       characterId: 1,
       catalog: CATALOG,
@@ -116,6 +116,7 @@ describe('fitImportPlans', () => {
       defaultsFrom: null,
       facilityDefaults: DEFAULT_FACILITY_DEFAULTS,
       assumedMe,
+      assumedTe,
       buildGroupId: 'g1',
     });
   }
@@ -149,6 +150,14 @@ describe('fitImportPlans', () => {
     expect(build(0).every((p) => p.me === 0)).toBe(true);
   });
 
+  it('seeds TE from the assumed-TE preference rather than 0 (#634)', () => {
+    // The same members, and the same reason on the other axis: at TE0 the
+    // group's job time — and the ISK/hour read off it — is wrong by the
+    // research a real invented BPC comes with.
+    expect(build(2, 4).every((p) => p.te === 4)).toBe(true);
+    expect(build(2, 0).every((p) => p.te === 0)).toBe(true);
+  });
+
   it('skips a candidate whose blueprint has left the catalog', () => {
     const plans = fitImportPlans(
       { ...preview, hull: { ...preview.hull!, blueprintTypeID: 999999 } },
@@ -159,6 +168,7 @@ describe('fitImportPlans', () => {
         defaultsFrom: null,
         facilityDefaults: DEFAULT_FACILITY_DEFAULTS,
         assumedMe: 0,
+        assumedTe: 0,
         buildGroupId: 'g1',
       }
     );
@@ -167,49 +177,38 @@ describe('fitImportPlans', () => {
 });
 
 describe('fitImportGroupName', () => {
-  const t = (key: string, opts?: Record<string, unknown>) =>
-    opts ? `${key}:${JSON.stringify(opts)}` : key;
+  const labels = {
+    withHull: (fit: string, ship: string) => `${fit} — ${ship}`,
+    untitled: 'New group',
+  };
+  const base = { hull: null, items: [], skipped: [], excludedCharges: [], headerFailed: false };
+  const hull = {
+    blueprintTypeID: 1,
+    productTypeID: 2,
+    productName: 'Buzzard',
+    quantity: 1,
+    runs: 1,
+    spare: 0,
+  };
 
-  it('falls back to a generic name when the paste carried no header', () => {
-    const preview: FitToBuildPlansResult = {
-      hull: null,
-      items: [],
-      skipped: [],
-      excludedCharges: [],
-      groupName: null,
-    };
-    expect(fitImportGroupName(preview, t)).toBe('industry.newGroupName');
+  it('names the group after both header names when it has both', () => {
+    const preview: FitToBuildPlansResult = { ...base, hull, groupName: 'Max Hacker' };
+    expect(fitImportGroupName(preview, labels)).toBe('Max Hacker — Buzzard');
   });
 
-  it('names the group after the fit and the hull it builds', () => {
-    const preview: FitToBuildPlansResult = {
-      hull: {
-        blueprintTypeID: BUZZARD_BP,
-        productTypeID: BUZZARD,
-        productName: 'Buzzard',
-        quantity: 1,
-        runs: 1,
-        spare: 0,
-      },
-      items: [],
-      skipped: [],
-      excludedCharges: [],
-      groupName: 'Max Hacker',
-    };
-    expect(fitImportGroupName(preview, t)).toBe(
-      'industry.fitImportGroupName:{"fit":"Max Hacker","ship":"Buzzard"}'
-    );
+  it('falls back to the hull alone after a bare [Ship] header', () => {
+    const preview: FitToBuildPlansResult = { ...base, hull, groupName: null };
+    expect(fitImportGroupName(preview, labels)).toBe('Buzzard');
   });
 
-  it('uses the paste’s own header when nothing buildable resolved as the hull', () => {
-    const preview: FitToBuildPlansResult = {
-      hull: null,
-      items: [],
-      skipped: [],
-      excludedCharges: [],
-      groupName: 'Max Hacker',
-    };
-    expect(fitImportGroupName(preview, t)).toBe('Max Hacker');
+  it('falls back to the fit name alone when the hull has no blueprint', () => {
+    const preview: FitToBuildPlansResult = { ...base, groupName: 'Max Hacker' };
+    expect(fitImportGroupName(preview, labels)).toBe('Max Hacker');
+  });
+
+  it('falls back to the generic name when the header could not be read', () => {
+    const preview: FitToBuildPlansResult = { ...base, groupName: null, headerFailed: true };
+    expect(fitImportGroupName(preview, labels)).toBe('New group');
   });
 });
 
@@ -227,6 +226,7 @@ describe('applyFitImport', () => {
       defaultsFrom: null,
       facilityDefaults: DEFAULT_FACILITY_DEFAULTS,
       assumedMe: 2,
+      assumedTe: 4,
       buildGroups: overrides.buildGroups ?? {},
       setBuildGroups: vi.fn<(value: BuildGroupsValue) => Promise<void>>(() => Promise.resolve()),
       groupName: 'Max Hacker (Buzzard)',
@@ -280,6 +280,7 @@ describe('applyFitImport', () => {
       skipped: [{ name: 'Sisters Core Probe Launcher', quantity: 1 }],
       excludedCharges: [],
       groupName: 'Empty Fit',
+      headerFailed: false,
     };
     const ctx = context();
     const result = await applyFitImport(emptyPreview, ctx);

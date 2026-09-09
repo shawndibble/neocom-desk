@@ -3,6 +3,7 @@ import { http, HttpResponse } from 'msw';
 import type { JsonBodyType } from 'msw';
 import { setupServer } from 'msw/node';
 import { configureEsi, ESI_BASE_URL } from './client';
+import { resetEsiBudget } from './budget';
 import { rejectBadEsiHeaders } from './test-helpers';
 import {
   getCharacterSkills,
@@ -47,6 +48,9 @@ beforeEach(() => {
 afterEach(() => {
   server.resetHandlers();
   configureEsi({ getToken: null });
+  // The app-wide budget (issue #655) is module state: the 429 test below would
+  // otherwise leave the circuit shut for every test that follows it.
+  resetEsiBudget();
 });
 afterAll(() => server.close());
 

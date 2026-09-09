@@ -9,6 +9,7 @@ const PINNED_SYNCED_SETTING_KEYS: string[] = [
   'sync.corpDarkAfterDays',
   'sync.defaultCharacterFilter',
   'sync.industryAssumedMe',
+  'sync.industryAssumedTe',
   'sync.industryBuildGroups',
   'sync.industryFacilityDefaults',
   'sync.marketHub',
@@ -16,6 +17,8 @@ const PINNED_SYNCED_SETTING_KEYS: string[] = [
   'sync.notificationFeedPrefs',
   'sync.piCustomsRates',
   'sync.piExpiringSoonHours',
+  'sync.spExtractionMonitoringEnabled',
+  'sync.spExtractionThresholdSp',
 ];
 
 describe('SYNCED_SETTING_KEYS', () => {

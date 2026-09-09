@@ -178,11 +178,16 @@ pilot owns each BPC, **every T2 member quotes at ME0/TE0** while a real
 invented BPC is ME2/TE4. The Group Rollup would overstate material cost on ~77%
 of its members, out of the box, on this very fixture.
 
-Fit Import seeds each created plan's `me`/`te` from the existing
+Fit Import seeds each created plan's `me` from the existing
 `sync.industryAssumedMe` preference. The mechanism exists
 (`assumedMeForUnowned`, `recipes.ts:29-37`) but today reaches **only sub-jobs**
 via `materialRecipe` — never a top-level plan's own `me`. An owned BPC still
 wins, exactly as `materialEfficiencyFor` already decides for sub-jobs.
+
+`te` had no such preference to seed from when this shipped, so it stayed 0;
+issue #634 added `sync.industryAssumedTe` beside the ME one and a plan's `te`
+now comes from that key. Sub-jobs are still timed at TE0
+(`engine/industry/makeOrBuy.ts`) — see the #634 decision file.
 
 ### Runs from quantity
 
@@ -403,11 +408,12 @@ makes groups fully usable with no dragging; and Compare → icon.
 - Group-aware Compare (comparing two groups as units).
 - Group-level settings (pinned hub, shared facility).
 - Mixed-hub multibuy reconciliation — PR 1 declines and names the hubs.
-- Batched market snapshots per hub. `useComparedBuildResults` calls
-  `loadMarketSnapshot` **once per plan** (`useComparedBuildResults.ts:87-92`),
-  and `ESI_FANOUT_CONCURRENCY` bounds concurrency, not total requests — so a
-  25-member group on one hub issues 25 snapshot fetches where one unioned fetch
-  would do.
+- ~~Batched market snapshots per hub.~~ Landed after PR 1 (issue #628):
+  `useComparedBuildResults` now makes one `loadMarketSnapshots` call for the
+  whole set, which unions the type ids of every plan sharing a hub into one
+  fetch. It used to call `loadMarketSnapshot` once per plan, and
+  `ESI_FANOUT_CONCURRENCY` bounds concurrency, not total requests — so a
+  25-member group on one hub issued 25 snapshot fetches where one does.
 - Relaxing `HEADER` to accept a bare `[Ship]`.
 
 ## i18n

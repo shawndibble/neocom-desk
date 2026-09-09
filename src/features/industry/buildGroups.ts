@@ -51,10 +51,37 @@
  * live in the store at the bottom, the same split `customsOverride.ts` uses.
  */
 
+import { FACILITY_PRESETS, type FacilityKind, type SecurityBand } from '@/engine/industry/types';
 import { coerceArrayEntry, parseCharacterKeyedRecord } from '@/lib/characterKeyedRecord';
 import { createSyncedSetting } from '@/lib/useSyncedSetting';
+import { TRADE_HUBS, type TradeHub } from '@/market/hubs';
 
 export const SYNCED_BUILD_GROUPS_KEY = 'sync.industryBuildGroups';
+
+/**
+ * What a group's members were last bulk-set to by "Retarget group" (issue
+ * #632) — a snapshot, not a live value. Read by exactly two UI affordances,
+ * the per-plan quick-fill link and (were the group empty) nothing else, and
+ * never by a calculation engine: the actual hub, facility, security and
+ * build system live only on each plan, same as the #626 decision this stays
+ * consistent with. A group carrying this is not a second writer for those
+ * facts — it is a clipboard the pilot fills by hand and pastes from later.
+ */
+export interface BuildGroupSnapshot {
+  hubId: TradeHub['id'];
+  facility: FacilityKind;
+  security: SecurityBand;
+  /**
+   * One fact, routed as a pair — the same rule `planSync.ts`'s `toRemoteDoc`
+   * applies to a plan's own `buildSystemId`/`buildSystemName`: a system
+   * without its name, or a name without its id, is worse than no system at
+   * all, so both are present or neither is.
+   */
+  buildSystemId?: number;
+  buildSystemName?: string;
+  /** When the group was last Retargeted onto these values. */
+  appliedAt: number;
+}
 
 /** One Build Group: what it is called and where it sits in the list. */
 export interface BuildGroup {
@@ -62,21 +89,42 @@ export interface BuildGroup {
   name: string;
   /** Position among the Character's groups. Contiguous from 0 after any edit. */
   order: number;
+  /** @see BuildGroupSnapshot */
+  snapshot?: BuildGroupSnapshot;
 }
 
 /** Every Character's groups, in one value — see the module comment. */
 export type BuildGroupsValue = Record<number, BuildGroup[]>;
 
+function usableSnapshot(value: unknown): value is BuildGroupSnapshot {
+  if (typeof value !== 'object' || value === null) return false;
+  const { hubId, facility, security, buildSystemId, buildSystemName, appliedAt } =
+    value as Partial<BuildGroupSnapshot>;
+  return (
+    typeof hubId === 'string' &&
+    TRADE_HUBS.some((hub) => hub.id === hubId) &&
+    typeof facility === 'string' &&
+    facility in FACILITY_PRESETS &&
+    (security === 'highsec' || security === 'lowsec' || security === 'nullsec') &&
+    (buildSystemId === undefined) === (buildSystemName === undefined) &&
+    (buildSystemId === undefined || typeof buildSystemId === 'number') &&
+    (buildSystemName === undefined || typeof buildSystemName === 'string') &&
+    typeof appliedAt === 'number' &&
+    Number.isFinite(appliedAt)
+  );
+}
+
 function usableGroup(value: unknown): value is BuildGroup {
   if (typeof value !== 'object' || value === null) return false;
-  const { id, name, order } = value as Partial<BuildGroup>;
+  const { id, name, order, snapshot } = value as Partial<BuildGroup>;
   return (
     typeof id === 'string' &&
     id !== '' &&
     typeof name === 'string' &&
     name.trim() !== '' &&
     typeof order === 'number' &&
-    Number.isFinite(order)
+    Number.isFinite(order) &&
+    (snapshot === undefined || usableSnapshot(snapshot))
   );
 }
 
@@ -165,6 +213,28 @@ export function removeBuildGroup(
     value,
     characterId,
     existing.filter((g) => g.id !== groupId)
+  );
+}
+
+/**
+ * The value with one group's Retarget snapshot set (or replaced). A no-op
+ * for a group id that does not exist, the same guard `renameBuildGroup`
+ * applies — Retarget reads its target group from the same render this
+ * writes from, so a stale id here means the group was deleted underneath
+ * the open dialog, not a bug to surface.
+ */
+export function withGroupSnapshot(
+  value: BuildGroupsValue,
+  characterId: number,
+  groupId: string,
+  snapshot: BuildGroupSnapshot
+): BuildGroupsValue {
+  const existing = buildGroupsFor(value, characterId);
+  if (!existing.some((g) => g.id === groupId)) return value;
+  return withBuildGroups(
+    value,
+    characterId,
+    existing.map((g) => (g.id === groupId ? { ...g, snapshot } : g))
   );
 }
 

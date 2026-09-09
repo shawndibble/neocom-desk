@@ -11,6 +11,7 @@ import type { CorpCapability } from '@/engine/corpRoles';
 export type NotificationEventId =
   | 'skillLevelComplete'
   | 'characterNotTraining'
+  | 'spExtractionReady'
   | 'industryJobComplete'
   | 'newMail'
   | 'planetaryExtractionDone'
@@ -60,6 +61,15 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventDef[] = [
     id: 'characterNotTraining',
     labelKey: 'settings.notifications.event.characterNotTraining',
     scope: requiredScope('getCharacterSkillQueue'),
+  },
+  {
+    // Opt-in behind sync.spExtractionMonitoringEnabled — the scope below
+    // just gates whether the event can fire at all once a pilot turns
+    // monitoring on; `pollDomains.ts`'s spExtractionDomain checks the
+    // setting itself before ever fetching skills for this reason.
+    id: 'spExtractionReady',
+    labelKey: 'settings.notifications.event.spExtractionReady',
+    scope: requiredScope('getCharacterSkills'),
   },
   {
     id: 'industryJobComplete',

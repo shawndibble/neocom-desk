@@ -7,6 +7,11 @@ import {
   Button,
   CharacterAvatar,
   DataAgeBadge,
+  DataTable,
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
   EmptyState,
   FilterBar,
   FilterChip,
@@ -22,7 +27,10 @@ import {
   SelectValue,
   Spinner,
   StatChip,
+  STAT_CHIP_TONE_TEXT_CLASS,
   TextInput,
+  Tooltip,
+  type DataTableColumn,
   type StatChipTone,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
@@ -31,9 +39,34 @@ import { isSyncConfigured } from '@/app/syncStatus';
 import { usePublicInfo, type PublicInfoEntry } from '@/stores/publicInfo';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useFontScale, FONT_SCALE_STEPS, type FontScale } from '@/lib/fontScale';
-import { loadRosterSnapshot } from '@/features/character/roster';
-import { deriveQueueState, type QueueState } from '@/features/skills/queueStatus';
+import { loadRosterSnapshot, type RosterEntry } from '@/features/character/roster';
+import { loadRosterAttention, type AttentionEntry } from '@/features/character/rosterAttention';
+import { useAlertCountsByCharacter } from '@/features/notifications/alertCountsByCharacter';
+import {
+  useSpExtractionMonitoringEnabled,
+  useSpExtractionThresholdSp,
+} from '@/features/character/spExtractionSettings';
+import { isSpExtractionReady } from '@/engine/spExtraction';
+import { maxJobSlots, type JobSlotCategory, type JobSlotSkills } from '@/engine/industry/jobSlots';
+import { jobSlotSkillsFromCharacterSkills } from '@/features/character/jobSlotSkills';
+import {
+  availableCharacterColumns,
+  useCharacterViewMode,
+  useVisibleCharacterColumns,
+  visibleAvailableColumns,
+  type CharacterColumnId,
+} from '@/features/character/characterColumns';
+import { ATTENTION_RANK, ATTENTION_TONE as PI_ATTENTION_TONE } from '@/engine/pi/colonyStatus';
+import {
+  classifySkillQueue,
+  deriveQueueState,
+  type QueueState,
+} from '@/features/skills/queueStatus';
+import { formatDuration } from '@/lib/duration';
+import { formatTimestamp } from '@/lib/timestamp';
+import { useTimeZone } from '@/lib/timeFormat';
 import { removeCharacter } from '@/features/character/removeCharacter';
+import { CharacterRowContextMenu } from '@/features/character/CharacterRowContextMenu';
 import { updateGroups, useOverviewGroups } from '@/features/character/overviewGroups';
 import {
   isCharacterStarred,
@@ -72,6 +105,18 @@ const QUEUE_STATE_TONE: Record<QueueState, StatChipTone> = {
   unknown: 'default',
 };
 
+// Same "most-needs-attention first" ordering as PI's ATTENTION_RANK, mapped
+// onto training's own tones: paused (danger) worst, then endingSoon (warning),
+// then idle/unknown (default, no distinct order between the two), then
+// training (success) last since it needs no attention at all.
+const QUEUE_STATE_RANK: Record<QueueState, number> = {
+  paused: 0,
+  endingSoon: 1,
+  idle: 2,
+  unknown: 2,
+  training: 3,
+};
+
 const DENSITY_LABEL_KEYS = {
   0.875: 'characters.densityCompact',
   1: 'characters.densityCozy',
@@ -85,6 +130,8 @@ interface QueueInfo {
   state: QueueState;
   /** When this character's cached queue was last fetched; null when never fetched. */
   fetchedAt: Date | null;
+  /** Epoch ms the currently-training entry finishes; null unless `state` is `training`/`endingSoon`. */
+  trainingFinishMs: number | null;
 }
 
 interface CharacterCardProps {
@@ -112,6 +159,14 @@ function olderOf(a: Date | null | undefined, b: Date | null | undefined): Date |
   return a.getTime() <= b.getTime() ? a : b;
 }
 
+/** The one "how stale is this character" rule (`olderOf`'s doc comment) — shared by the card badge and the table's `lastSynced` column so they can't drift into disagreeing about the same character. */
+function characterLastSynced(
+  stats: CharacterSortStats | undefined,
+  queue: QueueInfo | undefined
+): Date | undefined {
+  return olderOf(olderOf(stats?.skillPointsFetchedAt, stats?.walletFetchedAt), queue?.fetchedAt);
+}
+
 function CharacterCard({
   character,
   info,
@@ -129,10 +184,7 @@ function CharacterCard({
   // One badge for the whole card, not one per stat (that was the actual
   // complaint — three "Xm ago"s in a row): the oldest of whichever fields
   // this character has cached, so the card never overstates its freshness.
-  const lastSynced = olderOf(
-    olderOf(stats?.skillPointsFetchedAt, stats?.walletFetchedAt),
-    queue?.fetchedAt
-  );
+  const lastSynced = characterLastSynced(stats, queue);
 
   return (
     <li className="flex flex-col gap-2 rounded-xs border border-line bg-panel/85 p-3 backdrop-blur-sm transition-colors hover:border-line-bright hover:bg-panel-2">
@@ -332,6 +384,346 @@ function GroupSectionHeader({
   );
 }
 
+/** One character's table row — everything a column might render, gathered once per character rather than re-derived per cell. */
+interface CharacterRow {
+  character: CharacterRecord;
+  info: PublicInfoEntry | undefined;
+  stats: CharacterSortStats | undefined;
+  queue: QueueInfo | undefined;
+  attention: AttentionEntry | undefined;
+  alertCount: number;
+  /** From the same roster snapshot `stats` comes from — undefined until skills have loaded once. */
+  jobSlotSkills: JobSlotSkills | undefined;
+  /** Raw `total_sp` (not `correctedTotalSp`) — see `totalSpMap`'s doc comment. */
+  totalSp: number | undefined;
+  starred: boolean;
+}
+
+/** `queueById`'s shape, built once from a roster snapshot — shared by the initial cache-only load and the "Refresh all" live reload so the two never compute it differently. */
+function queueInfoMap(roster: readonly RosterEntry[], nowMs: number): Map<number, QueueInfo> {
+  return new Map(
+    roster.map((entry) => {
+      const entries = entry.queue?.data;
+      // `classifySkillQueue`'s own "currently training" row, not a second
+      // derivation of it — `deriveQueueState` already calls this for the
+      // categorical state, but doesn't expose which entry it landed on.
+      const training = entries
+        ? classifySkillQueue(entries, nowMs).find((row) => row.status === 'training')
+        : undefined;
+      return [
+        entry.characterId,
+        {
+          state: deriveQueueState(entries, nowMs),
+          fetchedAt: entry.queue?.fetchedAt ?? null,
+          trainingFinishMs:
+            training?.secondsRemaining != null ? nowMs + training.secondsRemaining * 1000 : null,
+        },
+      ];
+    })
+  );
+}
+
+/**
+ * Job-slot skill levels from the same roster snapshot `stats` comes from —
+ * `roster.ts` already fetches `/skills` for `correctedTotalSp`, so this reads
+ * the skills row already in hand rather than fetching it a second time. A
+ * character with no cached skills row at all is simply absent, not zero:
+ * `jobSlotSkillsFromCharacterSkills([])` would otherwise misreport "no
+ * capacity" for a character whose skills just haven't loaded yet.
+ */
+function jobSlotSkillsMap(roster: readonly RosterEntry[]): Map<number, JobSlotSkills> {
+  const map = new Map<number, JobSlotSkills>();
+  for (const entry of roster) {
+    if (entry.skills?.data) {
+      map.set(entry.characterId, jobSlotSkillsFromCharacterSkills(entry.skills.data.skills));
+    }
+  }
+  return map;
+}
+
+/**
+ * Raw `total_sp`, not `correctedTotalSp` — deliberately, and only for this
+ * one column. `correctedTotalSp` exists so a displayed SP total doesn't
+ * contradict a per-skill figure shown beside it (roster.ts's own comment);
+ * SP-extraction readiness needs no such agreement, and it must match what
+ * `pollDomains.ts`'s `spExtractionDomain` alerts on (also raw `total_sp`), or
+ * the table and the alert could disagree about whether a character is ready.
+ */
+function totalSpMap(roster: readonly RosterEntry[]): Map<number, number> {
+  const map = new Map<number, number>();
+  for (const entry of roster) {
+    if (entry.skills?.data) map.set(entry.characterId, entry.skills.data.total_sp);
+  }
+  return map;
+}
+
+/**
+ * One `manufacturing`/`science`/`reaction` job-slot column — three of these,
+ * not one combined column, so each category gets its own header-click sort
+ * (`DataTable` sorts one `sortValue` per column; a pilot who wants "who's out
+ * of reaction slots" specifically couldn't ask that of a single merged
+ * column). The number shown is *open* (free) slots — `max - running` — not
+ * the running count: "Open jobs" names how much room is left, and reading it
+ * as "jobs currently open/running" would say the opposite of what a pilot
+ * checking for spare capacity wants to know. `max` comes from
+ * `jobSlotSkills` (trained skills), `running` from `attention.jobCounts`
+ * (live industry jobs) — either missing means unknown, not zero.
+ */
+function openJobsColumn(
+  id: CharacterColumnId,
+  category: JobSlotCategory,
+  t: (key: string, options?: Record<string, unknown>) => string
+): DataTableColumn<CharacterRow> {
+  return {
+    id,
+    header: t(`characters.jobSlotCategory.${category}`),
+    align: 'right',
+    className: 'tabular-nums',
+    sortValue: (row) => {
+      const running = row.attention?.jobCounts?.[category];
+      const max = row.jobSlotSkills ? maxJobSlots(row.jobSlotSkills)[category] : undefined;
+      return running === undefined || max === undefined ? undefined : max - running;
+    },
+    render: (row) => {
+      const running = row.attention?.jobCounts?.[category];
+      const max = row.jobSlotSkills ? maxJobSlots(row.jobSlotSkills)[category] : undefined;
+      if (running === undefined || max === undefined) return '—';
+      const open = max - running;
+      // Red when every slot sits idle (0/5 used → nothing queued, go fill
+      // them), fading to plain text as slots fill up — the number is a
+      // call to action, not a health check, so more open reads as more
+      // urgent, not less.
+      const tone = open === max ? 'text-danger' : open / max >= 0.5 ? 'text-warning' : 'text-text';
+      return (
+        <Tooltip content={t('characters.openJobsTooltip', { used: running, max })}>
+          <span
+            tabIndex={0}
+            className={`cursor-help underline decoration-dotted decoration-current/50 underline-offset-2 ${tone}`}
+          >
+            {open}
+          </span>
+        </Tooltip>
+      );
+    },
+  };
+}
+
+/**
+ * Every column the table can show, keyed by id — the picker offers a subset
+ * of these keys, and the table renders whichever the pilot has checked, in
+ * this record's own order (not the order they were picked in).
+ */
+function buildColumns(
+  t: (key: string, options?: Record<string, unknown>) => string,
+  spExtractionThresholdSp: number,
+  onToggleStarred: (characterId: number) => void,
+  timeZone: 'UTC' | undefined
+): Record<CharacterColumnId, DataTableColumn<CharacterRow>> {
+  return {
+    name: {
+      id: 'name',
+      header: t('characters.column.name'),
+      primary: true,
+      sortValue: (row) => row.character.name,
+      render: (row) => (
+        <span className="flex min-w-0 items-center gap-2">
+          <CharacterAvatar
+            characterId={row.character.characterId}
+            size="sm"
+            loading="lazy"
+            alt={t('characters.portraitAlt', { name: row.character.name })}
+          />
+          <span className="truncate font-medium">{row.character.name}</span>
+        </span>
+      ),
+    },
+    corp: {
+      id: 'corp',
+      header: t('characters.column.corp'),
+      className: 'text-text-dim',
+      sortValue: (row) => row.info?.corporationName ?? '',
+      render: (row) => row.info?.corporationName ?? t('common.unknown'),
+    },
+    spTotal: {
+      id: 'spTotal',
+      header: t('characters.column.spTotal'),
+      align: 'right',
+      className: 'tabular-nums',
+      sortValue: (row) => row.stats?.skillPoints,
+      render: (row) =>
+        row.stats?.skillPoints === undefined
+          ? t('common.unknown')
+          : formatCompactNumber(row.stats.skillPoints),
+    },
+    wallet: {
+      id: 'wallet',
+      header: t('characters.column.wallet'),
+      align: 'right',
+      className: 'tabular-nums',
+      sortValue: (row) => row.stats?.wallet,
+      render: (row) =>
+        row.stats?.wallet === undefined ? t('common.unknown') : formatIskCompact(row.stats.wallet),
+    },
+    lastSynced: {
+      id: 'lastSynced',
+      header: t('characters.column.lastSynced'),
+      sortValue: (row) => characterLastSynced(row.stats, row.queue)?.getTime(),
+      render: (row) => {
+        const age = characterLastSynced(row.stats, row.queue);
+        return age ? <DataAgeBadge date={age} /> : t('common.unknown');
+      },
+    },
+    training: {
+      id: 'training',
+      header: t('characters.column.training'),
+      sortValue: (row) => (row.queue ? QUEUE_STATE_RANK[row.queue.state] : undefined),
+      render: (row) => {
+        if (!row.queue) return '—';
+        const tone = STAT_CHIP_TONE_TEXT_CLASS[QUEUE_STATE_TONE[row.queue.state]];
+        // Only `training`/`endingSoon` carry a finish time — paused/idle/
+        // unknown have nothing to count down to, so they keep the plain
+        // state label they've always shown.
+        if (row.queue.trainingFinishMs === null) {
+          return <span className={tone}>{t(`characters.queueStates.${row.queue.state}`)}</span>;
+        }
+        return (
+          <Tooltip content={formatTimestamp(new Date(row.queue.trainingFinishMs), timeZone)}>
+            <span
+              tabIndex={0}
+              className={`cursor-help underline decoration-dotted decoration-current/50 underline-offset-2 ${tone}`}
+            >
+              {formatDuration((row.queue.trainingFinishMs - Date.now()) / 1000)}
+            </span>
+          </Tooltip>
+        );
+      },
+    },
+    openJobsManufacturing: openJobsColumn('openJobsManufacturing', 'manufacturing', t),
+    openJobsScience: openJobsColumn('openJobsScience', 'science', t),
+    openJobsReaction: openJobsColumn('openJobsReaction', 'reaction', t),
+    pi: {
+      id: 'pi',
+      header: t('characters.column.pi'),
+      sortValue: (row) =>
+        row.attention?.piAttention === undefined
+          ? undefined
+          : ATTENTION_RANK[row.attention.piAttention],
+      render: (row) => {
+        const attention = row.attention?.piAttention;
+        if (attention === undefined) return '—';
+        const tone = STAT_CHIP_TONE_TEXT_CLASS[PI_ATTENTION_TONE[attention]];
+        const expiryMs = row.attention?.piSoonestExpiryMs;
+        // Some attention states have nothing currently extracting to count
+        // down to (e.g. `decayed` with no program running at all) — those
+        // keep the categorical label; anything with a real expiry gets the
+        // countdown instead, which is strictly more useful than the label.
+        if (expiryMs == null) {
+          return <span className={tone}>{t(`pi.attention.${attention}`)}</span>;
+        }
+        const label =
+          expiryMs <= Date.now() ? t('pi.expired') : formatDuration((expiryMs - Date.now()) / 1000);
+        return (
+          <Tooltip content={formatTimestamp(new Date(expiryMs), timeZone)}>
+            <span
+              tabIndex={0}
+              className={`cursor-help underline decoration-dotted decoration-current/50 underline-offset-2 ${tone}`}
+            >
+              {label}
+            </span>
+          </Tooltip>
+        );
+      },
+    },
+    spReady: {
+      id: 'spReady',
+      header: t('characters.column.spReady'),
+      sortValue: (row) =>
+        row.totalSp === undefined
+          ? undefined
+          : Number(isSpExtractionReady(row.totalSp, spExtractionThresholdSp)),
+      render: (row) =>
+        row.totalSp !== undefined && isSpExtractionReady(row.totalSp, spExtractionThresholdSp) ? (
+          <span className={STAT_CHIP_TONE_TEXT_CLASS.success}>{t('characters.spReadyYes')}</span>
+        ) : (
+          '—'
+        ),
+    },
+    alerts: {
+      id: 'alerts',
+      header: t('characters.column.alerts'),
+      align: 'right',
+      className: 'tabular-nums',
+      sortValue: (row) => row.alertCount,
+      render: (row) =>
+        row.alertCount > 0 ? (
+          <span className={STAT_CHIP_TONE_TEXT_CLASS.warning}>{row.alertCount}</span>
+        ) : (
+          '—'
+        ),
+    },
+    starred: {
+      id: 'starred',
+      header: t('characters.column.starred'),
+      align: 'right',
+      sortValue: (row) => Number(row.starred),
+      // Row click navigates to Overview (see the table's `onRowClick`) — this
+      // button must not also fire that when toggling the star, so it stops
+      // the click before it bubbles to the `<tr>`.
+      render: (row) => (
+        <span onClick={(event) => event.stopPropagation()}>
+          <IconButton
+            size="sm"
+            icon={<Icon.Pin weight={row.starred ? 'fill' : 'light'} />}
+            label={t(row.starred ? 'characters.unstar' : 'characters.star', {
+              name: row.character.name,
+            })}
+            pressed={row.starred}
+            onClick={() => onToggleStarred(row.character.characterId)}
+          />
+        </span>
+      ),
+    },
+  };
+}
+
+interface ColumnPickerMenuProps {
+  available: readonly CharacterColumnId[];
+  visible: readonly CharacterColumnId[];
+  columnsById: Record<CharacterColumnId, DataTableColumn<CharacterRow>>;
+  onToggle: (id: CharacterColumnId) => void;
+}
+
+/** Which columns show in table view — a menu, not a form: every toggle is already reversible in one tap (same reasoning as CalendarKindFilterMenu). Labels come straight from `columnsById`'s own already-translated `header`, not a second id->i18n-key table that could drift from it. */
+function ColumnPickerMenu({ available, visible, columnsById, onToggle }: ColumnPickerMenuProps) {
+  const { t } = useTranslation();
+  const visibleSet = new Set(visible);
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button size="md">{t('characters.columnsButton')}</Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="min-w-48">
+        <p className="px-2 py-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+          {t('characters.columnsMenuTitle')}
+        </p>
+        {available.map((id) => (
+          <DropdownMenuCheckboxItem
+            key={id}
+            checked={visibleSet.has(id)}
+            // A picker that closes on the first check makes picking several
+            // columns take one round trip per column.
+            onSelect={(event) => event.preventDefault()}
+            onCheckedChange={() => onToggle(id)}
+          >
+            {columnsById[id].header}
+          </DropdownMenuCheckboxItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 /** Character wall: pick the active character, group/sort/densify it, or add another via EVE SSO. */
 export function Characters() {
   const { t } = useTranslation();
@@ -354,10 +746,38 @@ export function Characters() {
   const density = useFontScale((state) => state.value);
   const setDensity = useFontScale((state) => state.setValue);
 
+  const viewMode = useCharacterViewMode((state) => state.value);
+  const setViewMode = useCharacterViewMode((state) => state.setValue);
+  const hydrateViewMode = useCharacterViewMode((state) => state.hydrate);
+
+  const visibleColumns = useVisibleCharacterColumns((state) => state.value);
+  const setVisibleColumns = useVisibleCharacterColumns((state) => state.setValue);
+  const hydrateVisibleColumns = useVisibleCharacterColumns((state) => state.hydrate);
+
+  const spExtractionEnabled = useSpExtractionMonitoringEnabled((state) => state.value);
+  const hydrateSpExtractionEnabled = useSpExtractionMonitoringEnabled((state) => state.hydrate);
+  const spExtractionThreshold = useSpExtractionThresholdSp((state) => state.value);
+  const hydrateSpExtractionThreshold = useSpExtractionThresholdSp((state) => state.hydrate);
+
+  const alertCounts = useAlertCountsByCharacter();
+  const timeZone = useTimeZone();
+
   const [sortKey, setSortKey] = useState<CharacterSortKey>('name');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [stats, setStats] = useState<Map<number, CharacterSortStats>>(new Map());
   const [queueById, setQueueById] = useState<Map<number, QueueInfo>>(new Map());
+  const [attentionById, setAttentionById] = useState<Map<number, AttentionEntry>>(new Map());
+  const [jobSlotSkillsById, setJobSlotSkillsById] = useState<Map<number, JobSlotSkills>>(new Map());
+  const [totalSpById, setTotalSpById] = useState<Map<number, number>>(new Map());
+
+  /** The one place a fresh roster snapshot becomes the four derived maps it feeds — shared by the cache-only load effect and "Refresh all" so a future fifth map only needs adding here. */
+  function applyRoster(roster: readonly RosterEntry[], now: number) {
+    setStats(rosterSortStats(roster));
+    setQueueById(queueInfoMap(roster, now));
+    setJobSlotSkillsById(jobSlotSkillsMap(roster));
+    setTotalSpById(totalSpMap(roster));
+  }
+
   const [addingGroup, setAddingGroup] = useState(false);
   const [newGroupName, setNewGroupName] = useState('');
   const [search, setSearch] = useState('');
@@ -366,11 +786,29 @@ export function Characters() {
     name: string;
   } | null>(null);
   const [deferredNoticeName, setDeferredNoticeName] = useState<string | null>(null);
+  const [refreshingAll, setRefreshingAll] = useState(false);
 
   const charactersById = useMemo(
     () => new Map((characters ?? []).map((character) => [character.characterId, character])),
     [characters]
   );
+
+  // Not `useMemo`: `handleToggleStar` below closes over `starred`/`setStarred`
+  // and is a fresh function every render anyway, so a memoized wrapper here
+  // would just recompute every render regardless — `buildColumns` itself is
+  // cheap (a handful of object literals, no per-character work).
+  const columnsById = buildColumns(
+    t,
+    spExtractionThreshold,
+    (id) => void handleToggleStar(id),
+    timeZone
+  );
+  const availableColumnIds = availableCharacterColumns(spExtractionEnabled);
+  // `id` is already known available here, so this is just "is it checked" —
+  // `visibleAvailableColumns` (below, `handleToggleColumn`'s own zero-columns
+  // guard) is for narrowing the *raw stored* list, which can hold ids that
+  // aren't available right now; this list already excludes those.
+  const activeColumnIds = availableColumnIds.filter((id) => visibleColumns.includes(id));
 
   const query = search.trim().toLowerCase();
   function matchesSearch(characterId: number): boolean {
@@ -392,6 +830,22 @@ export function Characters() {
   }, [hydrateStarred]);
 
   useEffect(() => {
+    void hydrateViewMode();
+  }, [hydrateViewMode]);
+
+  useEffect(() => {
+    void hydrateVisibleColumns();
+  }, [hydrateVisibleColumns]);
+
+  useEffect(() => {
+    void hydrateSpExtractionEnabled();
+  }, [hydrateSpExtractionEnabled]);
+
+  useEffect(() => {
+    void hydrateSpExtractionThreshold();
+  }, [hydrateSpExtractionThreshold]);
+
+  useEffect(() => {
     characters?.forEach((character) => void loadPublicInfo(character.characterId));
   }, [characters, loadPublicInfo]);
 
@@ -408,18 +862,25 @@ export function Characters() {
       const now = Date.now();
       const roster = await loadRosterSnapshot();
       if (cancelled) return;
-      setStats(rosterSortStats(roster));
-      setQueueById(
-        new Map(
-          roster.map((entry) => [
-            entry.characterId,
-            {
-              state: deriveQueueState(entry.queue?.data, now),
-              fetchedAt: entry.queue?.fetchedAt ?? null,
-            },
-          ])
-        )
-      );
+      applyRoster(roster, now);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [characters]);
+
+  // Mirrors the cache-only effect above, cache-only by default: manufacturing
+  // running counts and PI attention across the whole roster.
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      if (!characters || characters.length === 0) {
+        if (!cancelled) setAttentionById(new Map());
+        return;
+      }
+      const attention = await loadRosterAttention();
+      if (cancelled) return;
+      setAttentionById(new Map(attention.map((entry) => [entry.characterId, entry])));
     })();
     return () => {
       cancelled = true;
@@ -463,6 +924,40 @@ export function Characters() {
   async function select(characterId: number) {
     await setActiveCharacter(characterId);
     navigate('/overview');
+  }
+
+  /**
+   * Live pull for every character, capped-speed — same "cache-first, one
+   * explicit button for live" rule the PI alt-colonies view already follows,
+   * rather than a new pattern for this page.
+   */
+  async function handleRefreshAll() {
+    setRefreshingAll(true);
+    try {
+      const now = Date.now();
+      const [roster, attention] = await Promise.all([
+        loadRosterSnapshot({ live: true }),
+        loadRosterAttention({ live: true }),
+      ]);
+      applyRoster(roster, now);
+      setAttentionById(new Map(attention.map((entry) => [entry.characterId, entry])));
+    } finally {
+      setRefreshingAll(false);
+    }
+  }
+
+  function handleToggleColumn(id: CharacterColumnId) {
+    const next = visibleColumns.includes(id)
+      ? visibleColumns.filter((existing) => existing !== id)
+      : [...visibleColumns, id];
+    // A table with zero *rendered* columns is a blank page with no
+    // explanation — guard against the filtered/available count, not the raw
+    // stored list: `visibleColumns` can carry ids `availableCharacterColumns`
+    // currently excludes (e.g. `spReady` while monitoring is off), so a raw
+    // `next.length` check can stay non-zero while every id left actually
+    // renders nothing.
+    if (visibleAvailableColumns(next, spExtractionEnabled).length === 0) return;
+    void setVisibleColumns(next);
   }
 
   async function handleToggleStar(characterId: number) {
@@ -540,6 +1035,45 @@ export function Characters() {
       sortCharacterIds(filteredIds, stats, sortKey, sortDirection),
       starred
     );
+
+    if (viewMode === 'table') {
+      const rows: CharacterRow[] = sortedIds
+        .map((characterId) => charactersById.get(characterId))
+        .filter((character): character is CharacterRecord => character !== undefined)
+        .map((character) => ({
+          character,
+          info: publicInfo[character.characterId],
+          stats: stats.get(character.characterId),
+          queue: queueById.get(character.characterId),
+          attention: attentionById.get(character.characterId),
+          alertCount: alertCounts.get(character.characterId) ?? 0,
+          jobSlotSkills: jobSlotSkillsById.get(character.characterId),
+          totalSp: totalSpById.get(character.characterId),
+          starred: isCharacterStarred(starred, character.characterId),
+        }));
+      return (
+        // Deliberate deviation from DataTable's usual `.dt-stack` collapse on
+        // mobile (docs/context/decisions/20260909-130638-characters-table-
+        // view-mobile-scroll-roster-overview-split.md): a real, comparable
+        // table stays a table, and scrolls sideways instead, at every width.
+        <div className="overflow-x-auto">
+          <DataTable
+            columns={activeColumnIds.map((id) => columnsById[id])}
+            rows={rows}
+            rowKey={(row) => row.character.characterId}
+            label={t('characters.title')}
+            responsive="table"
+            onRowClick={(row) => void select(row.character.characterId)}
+            rowContextMenu={(row, tr) => (
+              <CharacterRowContextMenu characterId={row.character.characterId}>
+                {tr}
+              </CharacterRowContextMenu>
+            )}
+          />
+        </div>
+      );
+    }
+
     return (
       <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {sortedIds.map((characterId) => {
@@ -584,6 +1118,17 @@ export function Characters() {
         title={t('characters.title')}
         actions={
           <>
+            {characters.length > 0 && (
+              <Button
+                size="md"
+                onClick={() => void handleRefreshAll()}
+                disabled={refreshingAll}
+                title={t('characters.refreshAllHint')}
+              >
+                <Icon.Refresh className={refreshingAll ? 'animate-spin' : undefined} />
+                {refreshingAll ? t('characters.refreshingAll') : t('characters.refreshAll')}
+              </Button>
+            )}
             {/*
               The add-a-character branch, not a re-auth: SSO decides who comes
               back, so unioning with the *active* Character's grant would ask
@@ -692,6 +1237,31 @@ export function Characters() {
                 />
               ))}
             </div>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div role="group" aria-label={t('characters.viewModeLabel')} className="flex gap-2">
+              <FilterChip
+                size="md"
+                label={t('characters.viewCards')}
+                selected={viewMode === 'card'}
+                onToggle={() => void setViewMode('card')}
+              />
+              <FilterChip
+                size="md"
+                label={t('characters.viewTable')}
+                selected={viewMode === 'table'}
+                onToggle={() => void setViewMode('table')}
+              />
+            </div>
+            {viewMode === 'table' && (
+              <ColumnPickerMenu
+                available={availableColumnIds}
+                visible={activeColumnIds}
+                columnsById={columnsById}
+                onToggle={handleToggleColumn}
+              />
+            )}
           </div>
 
           {noSearchMatches ? (

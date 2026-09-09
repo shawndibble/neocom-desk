@@ -31,12 +31,18 @@ import { FACILITY_PRESETS, RIG_KIND_OPTIONS, setRigSlot } from '@/engine/industr
 import { rigKindLabelKey } from '@/features/industry/rigFitLabels';
 import { useMarketHub } from '@/features/market/hub';
 import { useAssumedMe, MIN_ASSUMED_ME, MAX_ASSUMED_ME } from '@/features/industry/assumedMe';
+import { useAssumedTe, MIN_ASSUMED_TE, MAX_ASSUMED_TE } from '@/features/industry/assumedTe';
 import {
   useFacilityDefaults,
   normalizeFacilityDefaults,
   type FacilityDefaults,
 } from '@/features/industry/facilityDefaults';
 import { useExpiringWindowHours, EXPIRING_WINDOW_HOUR_OPTIONS } from '@/features/pi/expiringWindow';
+import {
+  useSpExtractionMonitoringEnabled,
+  useSpExtractionThresholdSp,
+} from '@/features/character/spExtractionSettings';
+import { SP_EXTRACTION_CHUNK_SP } from '@/engine/spExtraction';
 import { useDarkThreshold, DARK_AFTER_DAY_OPTIONS } from '@/features/corp/darkThreshold';
 import { useDefaultCharacterFilter } from '@/features/character/defaultCharacterFilter';
 import {
@@ -404,26 +410,38 @@ function DefaultsPanel() {
   const setHub = useMarketHub((state) => state.setValue);
   const assumedMe = useAssumedMe((state) => state.value);
   const setAssumedMe = useAssumedMe((state) => state.setValue);
+  const assumedTe = useAssumedTe((state) => state.value);
+  const setAssumedTe = useAssumedTe((state) => state.setValue);
   const facilityDefaults = useFacilityDefaults((state) => state.value);
   const setFacilityDefaults = useFacilityDefaults((state) => state.setValue);
   const expiringHours = useExpiringWindowHours((state) => state.value);
   const setExpiringHours = useExpiringWindowHours((state) => state.setValue);
   const defaultCharacterFilter = useDefaultCharacterFilter((state) => state.value);
   const setDefaultCharacterFilter = useDefaultCharacterFilter((state) => state.setValue);
+  const spExtractionEnabled = useSpExtractionMonitoringEnabled((state) => state.value);
+  const setSpExtractionEnabled = useSpExtractionMonitoringEnabled((state) => state.setValue);
+  const spExtractionThreshold = useSpExtractionThresholdSp((state) => state.value);
+  const setSpExtractionThreshold = useSpExtractionThresholdSp((state) => state.setValue);
 
   // Each on its own line, never `a() && b()`: `&&` short-circuits, which would
   // make every hook after the first false one a conditional call.
   const hubHydrated = useHydratedStore(useMarketHub);
   const assumedMeHydrated = useHydratedStore(useAssumedMe);
+  const assumedTeHydrated = useHydratedStore(useAssumedTe);
   const facilityHydrated = useHydratedStore(useFacilityDefaults);
   const expiringHydrated = useHydratedStore(useExpiringWindowHours);
   const defaultCharacterFilterHydrated = useHydratedStore(useDefaultCharacterFilter);
+  const spExtractionEnabledHydrated = useHydratedStore(useSpExtractionMonitoringEnabled);
+  const spExtractionThresholdHydrated = useHydratedStore(useSpExtractionThresholdSp);
   const ready =
     hubHydrated &&
     assumedMeHydrated &&
+    assumedTeHydrated &&
     facilityHydrated &&
     expiringHydrated &&
-    defaultCharacterFilterHydrated;
+    defaultCharacterFilterHydrated &&
+    spExtractionEnabledHydrated &&
+    spExtractionThresholdHydrated;
 
   const facilityPreset = FACILITY_PRESETS[facilityDefaults.facility];
 
@@ -575,6 +593,31 @@ function DefaultsPanel() {
           />
         </div>
 
+        {/*
+          Beside its ME twin rather than merged with it: the two answer
+          different questions (material cost, job time), and TE's range is
+          0..20 where ME's is 0..10 (issue #634).
+        */}
+        <div className="space-y-1.5 border-t border-line pt-3">
+          <label htmlFor="settings-assumed-te" className="block text-xs font-semibold">
+            {t('settings.assumedTeLabel')}
+          </label>
+          <p className="text-xs text-text-dim">{t('settings.assumedTeHint')}</p>
+          <TextInput
+            id="settings-assumed-te"
+            type="number"
+            min={MIN_ASSUMED_TE}
+            max={MAX_ASSUMED_TE}
+            step={1}
+            value={assumedTe}
+            onChange={(event) => {
+              const parsed = Math.round(Number(event.target.value));
+              if (!Number.isFinite(parsed)) return;
+              void setAssumedTe(Math.min(MAX_ASSUMED_TE, Math.max(MIN_ASSUMED_TE, parsed)));
+            }}
+          />
+        </div>
+
         <div className="border-t border-line pt-3">
           <ChipRow
             label={t('settings.piExpiringLabel')}
@@ -597,6 +640,40 @@ function DefaultsPanel() {
             value={fromStoredCharacterFilterValue(defaultCharacterFilter)}
             onChange={(next) => void setDefaultCharacterFilter(toStoredCharacterFilterValue(next))}
           />
+        </div>
+
+        <div className="space-y-1.5 border-t border-line pt-3">
+          <label className="flex items-center gap-2 text-xs font-semibold">
+            <input
+              type="checkbox"
+              checked={spExtractionEnabled}
+              onChange={() => void setSpExtractionEnabled(!spExtractionEnabled)}
+              className="size-4 shrink-0 cursor-pointer accent-accent"
+            />
+            {t('settings.spExtractionEnabledLabel')}
+          </label>
+          <p className="text-xs text-text-dim">{t('settings.spExtractionEnabledHint')}</p>
+          {spExtractionEnabled && (
+            <div className="ml-6 space-y-1.5">
+              <label htmlFor="settings-sp-extraction-threshold" className="block text-xs">
+                {t('settings.spExtractionThresholdLabel')}
+              </label>
+              <p className="text-xs text-text-dim">{t('settings.spExtractionThresholdHint')}</p>
+              <TextInput
+                id="settings-sp-extraction-threshold"
+                type="number"
+                min={SP_EXTRACTION_CHUNK_SP}
+                step={SP_EXTRACTION_CHUNK_SP}
+                value={spExtractionThreshold}
+                onChange={(event) => {
+                  const parsed = Math.round(Number(event.target.value));
+                  if (!Number.isFinite(parsed) || parsed <= 0) return;
+                  void setSpExtractionThreshold(parsed);
+                }}
+                className="w-40"
+              />
+            </div>
+          )}
         </div>
       </div>
     </Panel>

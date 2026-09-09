@@ -142,28 +142,80 @@ describe('loadTypeNames', () => {
     expect(names.get(999999)).toBe('Type #999999');
   });
 
-  it('falls back to per-id resolution when the batch is rate-limited (429), not just on a 404', async () => {
-    // Clones.tsx can ask for far more distinct implant type ids in one batch
-    // than Skills.tsx's single-clone case — sustained ESI rate-limiting
-    // (esiFetch already retried once internally by the time this throws) is
-    // a real failure mode a 404-only fallback silently gives up on, leaving
-    // every one of those implants stuck on the "Type #id" placeholder.
+  it('does not fan out per-id when the batch is rate-limited (429)', async () => {
+    // The opposite of the 404 case: a 429 is not "this batch is unresolvable",
+    // it is ESI telling us to send less. Answering one throttled request with
+    // up to 1000 per-id ones spends the same globally-counted error budget the
+    // throttle is already protecting, so a throttled chunk keeps whatever
+    // names are cached and leaves the rest on their placeholder.
+    //
+    // Two ids on purpose: 200 has no cached row at all, which is what makes
+    // `resolveViaEsi` await the network half rather than returning 100's
+    // lapsed row and refreshing it in an un-awaited background call. A
+    // cached-only ask would let this assertion run before the fan-out it is
+    // trying to rule out had a chance to fire — and 200 is also the id that
+    // discriminates, since it reads `Widget 200` under the old fan-out.
+    await db.esiCache.put({ characterId: 0, key: 'type:100', value: 'Widget 100', fetchedAt: 1 });
+    let typeRequests = 0;
     server.use(
-      http.post(`${ESI_BASE_URL}/universe/names`, () => new HttpResponse(null, { status: 429 })),
-      http.get(`${ESI_BASE_URL}/universe/types/100`, () =>
-        HttpResponse.json({
-          type_id: 100,
-          name: 'Widget 100',
+      http.post(
+        `${ESI_BASE_URL}/universe/names`,
+        // retry-after: 0 so esiFetch's one blind retry doesn't idle the test.
+        () => new HttpResponse(null, { status: 429, headers: { 'retry-after': '0' } })
+      ),
+      http.get(`${ESI_BASE_URL}/universe/types/:id`, ({ params }) => {
+        typeRequests += 1;
+        const id = Number(params.id);
+        return HttpResponse.json({
+          type_id: id,
+          name: `Widget ${id}`,
           description: '',
           group_id: 1,
           published: true,
-        })
-      )
+        });
+      })
     );
 
-    const names = await loadTypeNames([100]);
+    const names = await loadTypeNames([100, 200]);
 
+    expect(typeRequests).toBe(0);
     expect(names.get(100)).toBe('Widget 100');
+    expect(names.get(200)).toBe('Type #200');
+  });
+
+  it('does not fan out per-id when the batch trips the error limit (420) — issue #655', async () => {
+    // 420 is the status the reported outage actually produced, and the one the
+    // old code amplified: the user's console showed GET /universe/types/21039
+    // twice, both 420, fired *by* this fallback in response to a 420 batch.
+    // An id with no cached name is left on its "Type #id" placeholder rather
+    // than chased with a request that cannot succeed and would deepen the
+    // outage for every other surface in the app.
+    let typeRequests = 0;
+    server.use(
+      http.post(
+        `${ESI_BASE_URL}/universe/names`,
+        // 420 takes the other branch of esiFetch's retryWaitMs (the error-limit
+        // reset header rather than Retry-After); 0 keeps the retry instant.
+        () => new HttpResponse(null, { status: 420, headers: { 'x-esi-error-limit-reset': '0' } })
+      ),
+      http.get(`${ESI_BASE_URL}/universe/types/:id`, ({ params }) => {
+        typeRequests += 1;
+        const id = Number(params.id);
+        return HttpResponse.json({
+          type_id: id,
+          name: `Widget ${id}`,
+          description: '',
+          group_id: 1,
+          published: true,
+        });
+      })
+    );
+
+    const names = await loadTypeNames([21039, 100]);
+
+    expect(typeRequests).toBe(0);
+    expect(names.get(21039)).toBe('Type #21039');
+    expect(names.get(100)).toBe('Type #100');
   });
 
   it('still falls straight to cache on a genuine network failure, not the per-id fallback', async () => {

@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 import {
   diffSkillLevelComplete,
   diffCharacterNotTraining,
+  diffSpExtractionReady,
+  type SpExtractionSnapshot,
   runSkillQueueNotificationDiffs,
   SKILL_QUEUE_NOTIFICATION_DIFFS,
   diffIndustryJobComplete,
@@ -260,6 +262,59 @@ describe('diffCharacterNotTraining', () => {
         finishMs: null,
       },
     ]);
+  });
+});
+
+describe('diffSpExtractionReady', () => {
+  const FLOOR = 5_000_000;
+
+  function spSnapshot(entries: { totalSp: number; thresholdSp: number }[]): SpExtractionSnapshot {
+    return { entries, nowMs: T0 };
+  }
+
+  it('fires on the first-ever poll if already ready (unlike characterNotTraining: this state takes months to flip, so the first poll after opting in is the pilot asking to be told)', () => {
+    const next = spSnapshot([{ totalSp: FLOOR + 500_000, thresholdSp: 500_000 }]);
+    expect(diffSpExtractionReady(1, undefined, next)).toEqual([
+      { eventId: 'spExtractionReady', characterId: 1 },
+    ]);
+  });
+
+  it('fires nothing on the first-ever poll if not yet ready', () => {
+    const next = spSnapshot([{ totalSp: FLOOR + 400_000, thresholdSp: 500_000 }]);
+    expect(diffSpExtractionReady(1, undefined, next)).toEqual([]);
+  });
+
+  it('fires once extractable SP crosses the threshold', () => {
+    const prev = spSnapshot([{ totalSp: FLOOR + 400_000, thresholdSp: 500_000 }]);
+    const next = spSnapshot([{ totalSp: FLOOR + 500_000, thresholdSp: 500_000 }]);
+    expect(diffSpExtractionReady(7, prev, next)).toEqual([
+      { eventId: 'spExtractionReady', characterId: 7 },
+    ]);
+  });
+
+  it('does not re-fire on every poll while it stays ready', () => {
+    const prev = spSnapshot([{ totalSp: FLOOR + 500_000, thresholdSp: 500_000 }]);
+    const next = spSnapshot([{ totalSp: FLOOR + 600_000, thresholdSp: 500_000 }]);
+    expect(diffSpExtractionReady(7, prev, next)).toEqual([]);
+  });
+
+  it('fires again after dropping below and crossing back up (e.g. after an extraction)', () => {
+    const wasReady = spSnapshot([{ totalSp: FLOOR + 500_000, thresholdSp: 500_000 }]);
+    const droppedBack = spSnapshot([{ totalSp: FLOOR, thresholdSp: 500_000 }]);
+    const readyAgain = spSnapshot([{ totalSp: FLOOR + 500_000, thresholdSp: 500_000 }]);
+
+    expect(diffSpExtractionReady(7, wasReady, droppedBack)).toEqual([]);
+    expect(diffSpExtractionReady(7, droppedBack, readyAgain)).toEqual([
+      { eventId: 'spExtractionReady', characterId: 7 },
+    ]);
+  });
+
+  it('never fires for a character nowhere near the floor, even well above the threshold on total SP alone', () => {
+    // The bug this guards against end-to-end: a naive totalSp >= threshold
+    // check would fire for every fresh character within days.
+    const prev = spSnapshot([{ totalSp: 400_000, thresholdSp: 500_000 }]);
+    const next = spSnapshot([{ totalSp: 1_000_000, thresholdSp: 500_000 }]);
+    expect(diffSpExtractionReady(7, prev, next)).toEqual([]);
   });
 });
 

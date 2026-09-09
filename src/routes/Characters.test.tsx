@@ -1,11 +1,12 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import '@/i18n';
 import { db } from '@/db';
+import { writeCached } from '@/esi/cache';
 import type { SkillQueueEntry } from '@/esi/endpoints';
 import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharacter';
 import { usePublicInfo } from '@/stores/publicInfo';
@@ -19,6 +20,20 @@ import {
   useStarredCharacters,
 } from '@/features/character/starredCharacters';
 import { FONT_SCALE_KEY, useFontScale } from '@/lib/fontScale';
+import {
+  DEFAULT_VISIBLE_CHARACTER_COLUMNS,
+  useCharacterViewMode,
+  useVisibleCharacterColumns,
+} from '@/features/character/characterColumns';
+import {
+  DEFAULT_SP_EXTRACTION_THRESHOLD_SP,
+  useSpExtractionMonitoringEnabled,
+  useSpExtractionThresholdSp,
+} from '@/features/character/spExtractionSettings';
+import * as rosterModule from '@/features/character/roster';
+import type { RosterEntry } from '@/features/character/roster';
+import * as rosterAttentionModule from '@/features/character/rosterAttention';
+import type { AttentionEntry } from '@/features/character/rosterAttention';
 import { Characters } from './Characters';
 
 vi.mock('@/app/loginFlow', () => ({
@@ -77,6 +92,16 @@ beforeEach(async () => {
   useOverviewGroups.setState({ value: { groups: [], updatedAt: 0 }, hydrated: false });
   useStarredCharacters.setState({ value: NO_STARRED_CHARACTERS, hydrated: false });
   useFontScale.setState({ value: 1, hydrated: false });
+  useCharacterViewMode.setState({ value: 'card', hydrated: false });
+  useVisibleCharacterColumns.setState({
+    value: DEFAULT_VISIBLE_CHARACTER_COLUMNS,
+    hydrated: false,
+  });
+  useSpExtractionMonitoringEnabled.setState({ value: false, hydrated: false });
+  useSpExtractionThresholdSp.setState({
+    value: DEFAULT_SP_EXTRACTION_THRESHOLD_SP,
+    hydrated: false,
+  });
   await db.characters.bulkPut([
     { characterId: 91, name: 'Pilot One', ownerHash: 'oh-1', addedAt: 1 },
     { characterId: 92, name: 'Pilot Two', ownerHash: 'oh-2', addedAt: 2 },
@@ -89,6 +114,10 @@ function renderCharacters() {
       <Routes>
         <Route path="/characters" element={<Characters />} />
         <Route path="/overview" element={<div>overview page</div>} />
+        <Route path="/skills/trained" element={<div>skills page</div>} />
+        <Route path="/industry" element={<div>industry page</div>} />
+        <Route path="/planetary-industry" element={<div>pi page</div>} />
+        <Route path="/alerts" element={<div>alerts page</div>} />
       </Routes>
     </MemoryRouter>
   );
@@ -544,3 +573,340 @@ async function waitForSettingsValue(
     { timeout: timeoutMs }
   );
 }
+
+describe('Characters table view', () => {
+  it('defaults to card view', async () => {
+    renderCharacters();
+    expect(await screen.findByRole('button', { name: 'Cards' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+  });
+
+  it('switching to Table view renders a real table with a header row and every character as a row', async () => {
+    const user = userEvent.setup();
+    renderCharacters();
+    await user.click(await screen.findByRole('button', { name: 'Table' }));
+
+    const table = await screen.findByRole('table');
+    expect(within(table).getByRole('columnheader', { name: /name/i })).toBeInTheDocument();
+    expect(within(table).getByText('Pilot One')).toBeInTheDocument();
+    expect(within(table).getByText('Pilot Two')).toBeInTheDocument();
+  });
+
+  it('clicking a table row selects that character and navigates to /overview, same as a card', async () => {
+    const user = userEvent.setup();
+    renderCharacters();
+    await user.click(await screen.findByRole('button', { name: 'Table' }));
+    await user.click(await screen.findByText('Pilot One'));
+
+    expect(await screen.findByText('overview page')).toBeInTheDocument();
+    expect(useActiveCharacter.getState().activeCharacterId).toBe(91);
+  });
+
+  it('the Columns picker adds and removes columns from the table, and persists the choice device-locally', async () => {
+    const user = userEvent.setup();
+    renderCharacters();
+    await user.click(await screen.findByRole('button', { name: 'Table' }));
+
+    // Wallet isn't one of the default-visible columns.
+    expect(
+      within(screen.getByRole('table')).queryByRole('columnheader', { name: /wallet/i })
+    ).not.toBeInTheDocument();
+
+    await user.click(await screen.findByRole('button', { name: 'Columns' }));
+    await user.click(await screen.findByRole('menuitemcheckbox', { name: 'Wallet' }));
+    // The menu stays open on purpose (multi-select — see the component's own
+    // comment), and Radix marks the rest of the page aria-hidden while it's
+    // open, which hides the table from every role query below. Close it
+    // first, the way a real reader would before looking back at the table.
+    await user.keyboard('{Escape}');
+
+    expect(
+      within(screen.getByRole('table')).getByRole('columnheader', { name: /wallet/i })
+    ).toBeInTheDocument();
+    await waitForSettingsValue(
+      'charactersVisibleColumns',
+      (value) => Array.isArray(value) && value.includes('wallet')
+    );
+
+    // Toggling it back off removes the column again.
+    await user.click(await screen.findByRole('button', { name: 'Columns' }));
+    await user.click(await screen.findByRole('menuitemcheckbox', { name: 'Wallet' }));
+    await user.keyboard('{Escape}');
+    expect(
+      within(screen.getByRole('table')).queryByRole('columnheader', { name: /wallet/i })
+    ).not.toBeInTheDocument();
+  });
+
+  it('the Columns picker never lets the last rendered column disappear, even when a stale spReady entry is lingering in storage', async () => {
+    // Repro: enable monitoring, check spReady (on top of the defaults),
+    // disable monitoring again (spReady stays in storage but stops
+    // rendering), then uncheck every other column one by one. The stored
+    // list still has >1 entries the whole time (spReady never leaves it),
+    // so a guard on the raw stored length alone would let the last
+    // *rendered* column vanish — this must block that last uncheck instead.
+    await useSpExtractionMonitoringEnabled.getState().setValue(true);
+    const user = userEvent.setup();
+    renderCharacters();
+    await user.click(await screen.findByRole('button', { name: 'Table' }));
+
+    await user.click(await screen.findByRole('button', { name: 'Columns' }));
+    await user.click(await screen.findByRole('menuitemcheckbox', { name: 'SP ready' }));
+    await user.keyboard('{Escape}');
+
+    await useSpExtractionMonitoringEnabled.getState().setValue(false);
+
+    for (const label of [
+      'Alerts',
+      'Last synced',
+      'PI',
+      'Mfg',
+      'Sci',
+      'Rxn',
+      'Training',
+      'Starred',
+    ]) {
+      await user.click(await screen.findByRole('button', { name: 'Columns' }));
+      await user.click(await screen.findByRole('menuitemcheckbox', { name: label }));
+      await user.keyboard('{Escape}');
+    }
+
+    // Only "Name" is left rendering. Unchecking it too must be a no-op.
+    expect(within(screen.getByRole('table')).getByText('Pilot One')).toBeInTheDocument();
+    await user.click(await screen.findByRole('button', { name: 'Columns' }));
+    const nameItem = await screen.findByRole('menuitemcheckbox', { name: 'Name' });
+    expect(nameItem).toHaveAttribute('aria-checked', 'true');
+    await user.click(nameItem);
+    await user.keyboard('{Escape}');
+
+    expect(await screen.findByRole('table')).toBeInTheDocument();
+    expect(within(screen.getByRole('table')).getByText('Pilot One')).toBeInTheDocument();
+  });
+
+  it('Refresh all triggers a live pull for the whole roster, not just the active character', async () => {
+    const user = userEvent.setup();
+    const snapshotSpy = vi.spyOn(rosterModule, 'loadRosterSnapshot').mockResolvedValue([]);
+    const attentionSpy = vi
+      .spyOn(rosterAttentionModule, 'loadRosterAttention')
+      .mockResolvedValue([]);
+
+    try {
+      renderCharacters();
+      await user.click(await screen.findByRole('button', { name: /refresh all/i }));
+
+      await waitFor(() => {
+        expect(snapshotSpy).toHaveBeenCalledWith({ live: true });
+        expect(attentionSpy).toHaveBeenCalledWith({ live: true });
+      });
+    } finally {
+      snapshotSpy.mockRestore();
+      attentionSpy.mockRestore();
+    }
+  });
+
+  it('an Open Jobs column shows free slots (max minus running), coloured red when every slot sits idle', async () => {
+    // Pilot One: Mass Production II (skill_id 3387) -> 1 base + 2 = 3
+    // manufacturing slots, none running -> 3 open (all of them). The old bug
+    // showed the running count (0) here; this pins the fixed "max - running"
+    // math, and that "fully open" reads as red (a call to action), not green.
+    const roster: RosterEntry[] = [
+      {
+        characterId: 91,
+        name: 'Pilot One',
+        wallet: null,
+        queue: null,
+        correctedTotalSp: 1_000_000,
+        skills: {
+          data: {
+            total_sp: 1_000_000,
+            skills: [
+              {
+                skill_id: 3387,
+                trained_skill_level: 2,
+                active_skill_level: 2,
+                skillpoints_in_skill: 0,
+              },
+            ],
+          },
+          fetchedAt: new Date(),
+          fromCache: true,
+          truncated: false,
+        },
+      },
+    ];
+    const attention: AttentionEntry[] = [
+      {
+        characterId: 91,
+        jobCounts: { manufacturing: 0, science: 0, reaction: 0 },
+        jobCountsFetchedAt: new Date(),
+        piAttention: undefined,
+        piSoonestExpiryMs: undefined,
+        piFetchedAt: null,
+      },
+    ];
+    const snapshotSpy = vi.spyOn(rosterModule, 'loadRosterSnapshot').mockResolvedValue(roster);
+    const attentionSpy = vi
+      .spyOn(rosterAttentionModule, 'loadRosterAttention')
+      .mockResolvedValue(attention);
+
+    try {
+      const user = userEvent.setup();
+      renderCharacters();
+      await user.click(await screen.findByRole('button', { name: 'Table' }));
+
+      const table = await screen.findByRole('table');
+      const mfgHeader = within(table).getByRole('columnheader', { name: 'Mfg' });
+      const mfgIndex = within(table).getAllByRole('columnheader').indexOf(mfgHeader);
+      const pilotRow = within(table).getByText('Pilot One').closest('tr');
+      if (!pilotRow) throw new Error('expected a Pilot One row');
+      const mfgCell = within(pilotRow).getAllByRole('cell')[mfgIndex];
+      const value = within(mfgCell).getByText('3');
+      expect(value).toBeInTheDocument();
+      expect(value).toHaveClass('text-danger');
+    } finally {
+      snapshotSpy.mockRestore();
+      attentionSpy.mockRestore();
+    }
+  });
+
+  it('the Starred column toggles the pinned star without navigating the row', async () => {
+    const user = userEvent.setup();
+    renderCharacters();
+    await user.click(await screen.findByRole('button', { name: 'Table' }));
+
+    await user.click(await screen.findByRole('button', { name: 'Star Pilot One' }));
+
+    await waitForSettingsValue(
+      STARRED_CHARACTERS_SETTING_KEY,
+      (value) => Array.isArray(value) && value.includes(91)
+    );
+    // Toggling the star must not also fire the row's own click-to-navigate.
+    expect(screen.queryByText('overview page')).not.toBeInTheDocument();
+  });
+
+  describe('row context menu', () => {
+    it('offers Overview, Skill training, Industry, PI, and Alerts for the row under the pointer', async () => {
+      renderCharacters();
+      await userEvent.setup().click(await screen.findByRole('button', { name: 'Table' }));
+
+      const row = (await screen.findByText('Pilot One')).closest('tr');
+      if (!row) throw new Error('expected a Pilot One row');
+      fireEvent.contextMenu(row);
+
+      for (const label of ['Overview', 'Skills', 'Industry', 'PI', 'Alerts']) {
+        expect(screen.getByRole('menuitem', { name: label })).toBeInTheDocument();
+      }
+    });
+
+    it('picking a destination switches the active character and navigates there', async () => {
+      renderCharacters();
+      await userEvent.setup().click(await screen.findByRole('button', { name: 'Table' }));
+
+      const row = (await screen.findByText('Pilot Two')).closest('tr');
+      if (!row) throw new Error('expected a Pilot Two row');
+      fireEvent.contextMenu(row);
+
+      fireEvent.click(await screen.findByRole('menuitem', { name: 'Industry' }));
+
+      expect(await screen.findByText('industry page')).toBeInTheDocument();
+      expect(useActiveCharacter.getState().activeCharacterId).toBe(92);
+    });
+  });
+
+  it('the Training column counts down to the current skill finishing, not just the state label', async () => {
+    // This suite's shared beforeEach doesn't clear esiCache/tokens (other
+    // tests never collide on them) — this test and the PI one below both
+    // seed character 91, so each starts from a clean slate rather than
+    // risking the other's fixture still sitting in cache.
+    await db.esiCache.clear();
+    await db.tokens.clear();
+    const now = Date.now();
+    const entries: SkillQueueEntry[] = [
+      {
+        skill_id: 1,
+        queue_position: 0,
+        finished_level: 1,
+        start_date: new Date(now - 60_000).toISOString(),
+        finish_date: new Date(now + 90 * 60_000).toISOString(),
+      },
+    ];
+    await writeCached(91, 'skillqueue', entries, now);
+
+    const user = userEvent.setup();
+    renderCharacters();
+    await user.click(await screen.findByRole('button', { name: 'Table' }));
+
+    const table = await screen.findByRole('table');
+    const trainingHeader = within(table).getByRole('columnheader', { name: 'Training' });
+    const trainingIndex = within(table).getAllByRole('columnheader').indexOf(trainingHeader);
+    const pilotRow = within(table).getByText('Pilot One').closest('tr');
+    if (!pilotRow) throw new Error('expected a Pilot One row');
+    const cell = within(pilotRow).getAllByRole('cell')[trainingIndex];
+    // ~90 minutes out: "1h 30m" (rounds down towards the minute the fixture landed on).
+    const value = await within(cell).findByText(/^1h \d+m$/);
+    expect(value).toHaveAttribute('tabIndex', '0');
+  });
+
+  it('the PI column counts down to the soonest colony expiry, not just the attention label', async () => {
+    await db.esiCache.clear();
+    await db.tokens.clear();
+    const now = Date.now();
+    await db.tokens.put({
+      characterId: 91,
+      accessToken: 'at',
+      refreshToken: 'rt',
+      expiresAt: now + 6e5,
+      scopes: ['esi-planets.manage_planets.v1'],
+    });
+    await writeCached(
+      91,
+      'planets',
+      [
+        {
+          solar_system_id: 30000142,
+          planet_id: 40000001,
+          planet_type: 'temperate' as const,
+          owner_id: 1,
+          last_update: new Date(now).toISOString(),
+          upgrade_level: 3,
+          num_pins: 1,
+        },
+      ],
+      now
+    );
+    await writeCached(
+      91,
+      'planet:40000001',
+      {
+        links: [],
+        routes: [],
+        pins: [
+          {
+            pin_id: 1,
+            type_id: 2848,
+            latitude: 0,
+            longitude: 0,
+            expiry_time: new Date(now + 3 * 60 * 60_000).toISOString(),
+            extractor_details: { heads: [{ head_id: 1, latitude: 0, longitude: 0 }] },
+          },
+        ],
+      },
+      now
+    );
+
+    const user = userEvent.setup();
+    renderCharacters();
+    await user.click(await screen.findByRole('button', { name: 'Table' }));
+
+    const table = await screen.findByRole('table');
+    const piHeader = within(table).getByRole('columnheader', { name: 'PI' });
+    const piIndex = within(table).getAllByRole('columnheader').indexOf(piHeader);
+    const pilotRow = within(table).getByText('Pilot One').closest('tr');
+    if (!pilotRow) throw new Error('expected a Pilot One row');
+    const cell = within(pilotRow).getAllByRole('cell')[piIndex];
+    const value = await within(cell).findByText(/^\d+h \d+m$/);
+    expect(value).toHaveAttribute('tabIndex', '0');
+  });
+});
