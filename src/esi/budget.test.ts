@@ -16,6 +16,7 @@ import {
   EsiBudgetError,
   type BudgetState,
 } from './budget';
+import { REQUEST_TIMEOUT_MS } from './client';
 
 const NOW = 1_700_000_000_000;
 
@@ -397,6 +398,21 @@ describe('planRequest — a shut circuit', () => {
     });
     const { plan } = planRequest(shut, NOW + 45_001);
     expect(plan).toEqual({ kind: 'go', waitMs: 0 });
+  });
+});
+
+describe('the bounds hold together', () => {
+  it('caps a whole call well inside the token expiry buffer', () => {
+    // The access token is fetched *before* the gate, and
+    // `auth/session.ts`'s `getValidAccessToken` only guarantees it is good for
+    // `EXPIRY_BUFFER_MS` (60s) from that moment. `REQUEST_TIMEOUT_MS` bounds
+    // everything after it — gate wait, permit queue, fetch, body — so a request
+    // that queued behind a fan-out can never go out with an expired token. It
+    // would 401, and a 401 paints the shell-wide re-auth banner over what is
+    // really congestion.
+    expect(REQUEST_TIMEOUT_MS).toBeLessThan(60_000);
+    // And a policy wait is a fraction of the call it sits inside.
+    expect(MAX_BUDGET_WAIT_MS).toBeLessThan(REQUEST_TIMEOUT_MS);
   });
 });
 

@@ -26,16 +26,32 @@ export const COMPATIBILITY_DATE = '2026-08-01';
 export const USER_AGENT = 'Neocom Desk (github.com/shawndibble/neocom-desk)';
 
 /**
- * How long one request may take before it is abandoned.
+ * How long one `esiFetch` call may take, **queue included**, before it is
+ * abandoned. One clock covers waiting at the gate, waiting for a permit, the
+ * fetch and the body read — a promise about the whole call, not about the
+ * connection alone.
  *
  * `esiFetch` had no timeout at all, which was survivable while a hung socket
  * only stalled its own call site. It is not survivable now that every request
  * holds one of `budget.ts`'s `ESI_MAX_IN_FLIGHT` app-wide permits: twelve hung
  * sockets would be the app's whole ESI layer. Deliberately generous — this is
- * the "this connection is dead" bound, not a latency target; `esi/cache.ts`'s
- * 250ms grace race is what keeps a merely slow call off the screen.
+ * the "this call is dead" bound, not a latency target; `esi/cache.ts`'s 250ms
+ * grace race is what keeps a merely slow call off the screen.
+ *
+ * **Must stay below `auth/session.ts`'s `EXPIRY_BUFFER_MS` (60s).** The token is
+ * fetched *before* the gate, and `getValidAccessToken` only guarantees it is
+ * good for that buffer. Capping the whole call at half of it is what makes it
+ * impossible for a request that queued behind a fan-out to go out with an
+ * expired token — which would 401, and paint the shell-wide re-auth banner over
+ * what is really just congestion. Raise this above 60s and that starts
+ * happening; `budget.test.ts` pins the relationship.
+ *
+ * The accepted consequence of one clock: a request that spent most of it queued
+ * gets a short fetch window, so the tail of a very deep backlog fails into the
+ * cache rather than merely finishing late. That is the intended trade — a
+ * backlog that cannot drain inside 30s is one the app should stop growing.
  */
-const REQUEST_TIMEOUT_MS = 30_000;
+export const REQUEST_TIMEOUT_MS = 30_000;
 
 export type GetToken = (characterId: number) => Promise<string>;
 

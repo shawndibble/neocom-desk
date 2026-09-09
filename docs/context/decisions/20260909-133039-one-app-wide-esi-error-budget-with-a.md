@@ -46,14 +46,34 @@ _Recorded 2026-09-09 · issue #655._
   and the app would otherwise drop a whole boot prefetch over a two-second
   hiccup.
 
-- **Queueing for one of the ceiling's permits is throughput, not policy, and is
-  deliberately not refused.** Bounding it too would drop a boot prefetch merely
-  because the app is busy on a slow connection, and the same queue already
-  existed inside every `mapWithConcurrencyLimit` — the ceiling only moved it
-  somewhere it can be seen. It ends when a permit frees, when the caller's
-  signal fires, or, worst case, when the holders ahead hit the request timeout
-  below. Meanwhile `esi/cache.ts`'s 250ms grace has already put rows on screen,
-  so a queued request is not a spinner.
+- **Queueing for one of the ceiling's permits is throughput, not policy, so it
+  is not _refused_ up front — but it is still bounded.** Refusing it would drop
+  a boot prefetch merely because the app is busy on a slow connection, and the
+  same queue already existed inside every `mapWithConcurrencyLimit`; the ceiling
+  only moved it somewhere it can be seen. `client.ts` passes its per-call
+  request scope into the gate, so a caller queued past `REQUEST_TIMEOUT_MS` is
+  aborted there with an `EsiTimeoutError` instead of waiting forever. Nothing in
+  the module waits without an end. Meanwhile `esi/cache.ts`'s 250ms grace has
+  already put rows on screen, so a queued request is not a spinner.
+
+- **`REQUEST_TIMEOUT_MS` is one clock for the whole call — gate wait, permit
+  queue, fetch and body read — not just for the connection.** Two clocks (a
+  queue deadline plus a fetch deadline) was the alternative, and it was rejected
+  for a reason that is load-bearing rather than aesthetic: the access token is
+  fetched _before_ the gate, and `auth/session.ts`'s `getValidAccessToken` only
+  guarantees it good for `EXPIRY_BUFFER_MS` (60s) from that moment. A single
+  bound at half of that makes it impossible for a request that queued behind a
+  fan-out to go out with an expired token — which would 401, and a 401 paints
+  the shell-wide re-auth banner over what is really congestion. Split the clock
+  and the total becomes unbounded again, and the banner becomes reachable.
+  `budget.test.ts` pins the relationship so raising the timeout past the buffer
+  fails rather than quietly reintroducing it.
+
+  The accepted consequence: a request that spent most of its 30s queued gets a
+  short fetch window, so the tail of a very deep backlog fails into the cache
+  rather than merely finishing late. That is the intended trade — a backlog that
+  cannot drain inside 30 seconds is one the app should stop growing, and the
+  cache-first read path already has rows on screen for it.
 
 - **The accepted consequence: a caller with no stored row now gets an empty
   view where it previously got a spinner and then data.** `esi/cache.ts` returns
@@ -113,9 +133,12 @@ _Recorded 2026-09-09 · issue #655._
 - **`esiFetch` gets a 30-second request timeout, because the ceiling made one
   hung socket everybody's problem.** With no ceiling, a hung request stalled
   only its own call site; holding one of twelve app-wide permits, twelve of them
-  would be the whole ESI layer. The timeout is the "this connection is dead"
-  bound, not a latency target — `esi/cache.ts`'s 250ms grace race remains the
-  answer to a merely slow call.
+  would be the whole ESI layer. It is the "this call is dead" bound, not a
+  latency target — `esi/cache.ts`'s 250ms grace race remains the answer to a
+  merely slow call. It also spans the body read, not just the headers: `fetch`
+  ties the response stream to the signal it was given, so a scope ending at the
+  headers would have left `response.json()` on a slow body uncancellable, which
+  the caller's own `AbortSignal` never was.
 
 - **The gate is entered at the leaf, and only at the leaf.** The permit is taken
   inside `esiFetch` after the token await and held across exactly one `fetch`;

@@ -50,8 +50,9 @@
  *
  * That bound covers the three **policy** waits — circuit, brake, and the queue
  * behind the brake. Queueing for one of the ceiling's permits is throughput
- * rather than policy and is deliberately not refused; `passEsiGate` says why,
- * and what ends it.
+ * rather than policy, so it is not refused up front; it is bounded instead by
+ * `client.ts`'s per-call request scope, which aborts it at
+ * `REQUEST_TIMEOUT_MS`. Nothing here waits without an end.
  *
  * The accepted consequence: a caller with **no** stored row gets
  * `{ cached: null }` — an empty view where it would previously have shown a
@@ -96,8 +97,9 @@ export const MAX_REQUEST_SPACING_MS = 2000;
 /**
  * The bound on every **policy** wait — the circuit's, the brake's and the queue
  * behind the brake, added together. Past it the gate refuses instead of holding
- * on. (Queueing for a permit is throughput, not policy; `passEsiGate` says why
- * that one is not refused and what ends it.)
+ * on. (Queueing for a permit is throughput rather than policy, so it is not
+ * refused up front; it is bounded by `client.ts`'s request scope instead. See
+ * `passEsiGate`.)
  *
  * Five seconds is where "a hiccup" stops and "an outage" starts, for this app.
  * A brief 429 names a `Retry-After` of a second or three and is worth sitting
@@ -407,16 +409,19 @@ function sleep(ms: number, signal?: AbortSignal): Promise<void> {
  * Rejects with `EsiBudgetError` when the budget is spent for longer than the
  * bounded wait, and with the signal's reason if the caller aborts.
  *
- * Two waits happen here and they are bounded differently. The **policy** wait —
- * circuit, brake, and the queue behind the brake — is capped at
- * `MAX_BUDGET_WAIT_MS` and refused past it, because holding a view for an
- * outage is worse than answering it from disk. Queueing for a permit is not a
- * policy wait but **throughput**, and it is deliberately not refused: dropping
- * work because the app is merely busy would lose a prefetch on a slow
- * connection for no gain, and the same queue already existed inside every
- * `mapWithConcurrencyLimit`. It ends when a permit frees, when the caller's
- * signal fires, or — in the worst case — when the holders ahead hit
- * `client.ts`'s request timeout, which is the reason that timeout exists.
+ * Two waits happen here and they end differently.
+ *
+ * The **policy** wait — circuit, brake, and the queue behind the brake — is
+ * capped at `MAX_BUDGET_WAIT_MS` and *refused* past it, because holding a view
+ * for an outage is worse than answering it from disk.
+ *
+ * Queueing for a permit is not policy but **throughput**, so it is not refused
+ * up front — dropping work because the app is merely busy would lose a prefetch
+ * on a slow connection for no gain, and the same queue already existed inside
+ * every `mapWithConcurrencyLimit`. It is still bounded: `client.ts` passes the
+ * signal from its own request scope, so a caller queued past
+ * `REQUEST_TIMEOUT_MS` is aborted here with an `EsiTimeoutError` rather than
+ * waiting on a permit forever. Nothing in this module waits without an end.
  */
 export async function passEsiGate(signal?: AbortSignal): Promise<Release> {
   const { plan, state } = planRequest(budget, Date.now());
