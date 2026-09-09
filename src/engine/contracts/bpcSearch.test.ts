@@ -8,6 +8,7 @@ import {
   effectivePrice,
   listedBlueprintTypeOptions,
   type BpcContractRow,
+  blueprintSearchName,
 } from './bpcSearch';
 
 function row(overrides: Partial<BpcContractRow> = {}): BpcContractRow {
@@ -249,5 +250,35 @@ describe('cheapestByRegion', () => {
 
   it('is empty given no rows', () => {
     expect(cheapestByRegion([])).toEqual([]);
+  });
+});
+
+describe('blueprintSearchName', () => {
+  it('drops the trailing "Blueprint", which every name in the catalogue shares', () => {
+    expect(blueprintSearchName('Buzzard Blueprint')).toBe('Buzzard');
+    expect(blueprintSearchName('Heron Navy Issue Blueprint')).toBe('Heron Navy Issue');
+  });
+
+  it('leaves a name that does not end in Blueprint alone', () => {
+    expect(blueprintSearchName('Buzzard')).toBe('Buzzard');
+    expect(blueprintSearchName('#12345')).toBe('#12345');
+  });
+
+  it('keeps an interior "Blueprint" — only the trailing word is noise', () => {
+    expect(blueprintSearchName('Blueprint Efficiency Blueprint')).toBe('Blueprint Efficiency');
+  });
+
+  /**
+   * Stripping is what stops a one-letter query matching all ~2,900 types
+   * through the shared word, but it must never strip a name down to nothing —
+   * that would make the entry unmatchable rather than merely over-matched.
+   */
+  it('keeps the name when stripping would empty it', () => {
+    expect(blueprintSearchName('Blueprint')).toBe('Blueprint');
+  });
+
+  it('is case- and space-insensitive about the suffix', () => {
+    expect(blueprintSearchName('Buzzard BLUEPRINT')).toBe('Buzzard');
+    expect(blueprintSearchName('Buzzard blueprint  ')).toBe('Buzzard');
   });
 });

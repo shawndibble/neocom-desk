@@ -1992,7 +1992,19 @@
     "regionOffers_other": "{{count}} offers",
     "offersOnContract_one": "{{count}} offer on contract",
     "offersOnContract_other": "{{count}} offers on contract",
-    "cheapestByRegionCapped": "Cheapest by region ({{shown}} of {{total}})"
+    "cheapestByRegionCapped": "Cheapest by region ({{shown}} of {{total}})",
+    "suggestionsHeading": "Pick a blueprint",
+    "priceLabel": "Price",
+    "meTeLabel": "ME / TE",
+    "runsLabel": "Runs",
+    "qtyLabel": "Qty",
+    "stationLabel": "Station",
+    "unknownStation": "Unknown station (#{{id}})",
+    "contractIdLabel": "Contract",
+    "contentsHeading": "Everything on this contract",
+    "requestedItem": "Requested",
+    "itemMeTe": "ME {{me}} / TE {{te}}",
+    "runsShort": "{{runs}} runs"
   },
   "contacts": {
     "title": "Contacts",

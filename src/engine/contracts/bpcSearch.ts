@@ -205,6 +205,24 @@ export function cheapestByRegion(rows: readonly BpcContractRow[]): RegionCheapes
 }
 
 /**
+ * The part of a blueprint's name worth matching a query against.
+ *
+ * Every entry in the catalogue ends in "Blueprint", so a plain substring
+ * search over the full name makes any query that is itself a substring of
+ * that one shared word — "b", "lu", "print" — match all ~2,900 types at once.
+ * Ranking cannot rescue that: the matches are real, they are just
+ * meaningless. Dropping the shared suffix before matching is what makes
+ * "buzz" reach Buzzard instead of the first fifty types alphabetically.
+ *
+ * Only dropped when something survives it: a type genuinely called
+ * "Blueprint" must stay matchable rather than become unreachable.
+ */
+export function blueprintSearchName(name: string): string {
+  const stripped = name.replace(/\s+blueprint\s*$/i, '').trim();
+  return stripped.length > 0 ? stripped : name.trim();
+}
+
+/**
  * Distinct blueprint/formula types actually present in the loaded rows,
  * named from the SDE blueprint catalog and sorted by name — the item-type
  * search's corpus. Deliberately narrower than the whole SDE catalog: search
