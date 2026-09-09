@@ -1,6 +1,6 @@
 ---
 name: add-missing-features
-description: Survey third-party EVE tools for capability Neocom Desk lacks — especially industry and marketing — pressure-test each candidate with a hostile reviewer, mock up the survivors, and file them as ready-for-human tickets. Fires on explicit request only: the user typing /add-missing-features.
+description: Survey third-party EVE tools for capability Neocom Desk lacks — especially industry and marketing — pressure-test each candidate with a hostile reviewer, mock up the survivors, and file them as ready-for-human tickets. Fires on explicit request only: the user typing /add-missing-features — a run files real GitHub issues, so an unasked-for trigger creates them.
 ---
 
 # Add Missing Features
@@ -89,6 +89,9 @@ useful result, not a failure.
 
 Each surviving candidate carries, as required fields:
 
+- **Player value**: the in-game problem this solves, and roughly what share of
+  industry-focused players could actually use it. Answer it in players, not in
+  features — see the player-reach bar in step 4.
 - **Verdict**: expansion of an existing page, or a new page. Name the exact
   route or module it extends.
 - **ESI backing**: the endpoints it needs, their cache TTL, and any role gate.
@@ -112,6 +115,15 @@ sees this file — these constraints:
 
 Give it this kill-bar:
 
+- **Player reach**: would a real player in the game actually want this, and
+  could the _majority_ of industry-focused players use it? This is the bar a
+  technically clean feature fails most often. A feature that only pays off at a
+  scale of play few reach — a corp director's roles, a nullsec structure, a
+  null-sec-only material, hundreds of transactions a day, a second account —
+  serves a handful of people however well it is built. Name who it is for and
+  roughly what fraction of industry players that is; a feature for the top few
+  percent needs a much stronger case than one a solo highsec manufacturer opens
+  on day one.
 - **ESI reality**: does the endpoint exist, is it role-gated behind a corp
   director, is its cache TTL too coarse for the feature to mean anything?
 - **Client-side reality**: the app is a local-first PWA — ESI data lives in
@@ -185,6 +197,8 @@ reads only this before deciding whether to read on.
 **Category:** enhancement
 **Summary:** one line
 **Prior art:** the third-party tool(s) that do this, and what they get right
+**Player value:** the in-game problem this solves, and what share of
+industry-focused players can use it
 **Current behavior:** what the app does today, and the gap
 **Desired behavior:** what should happen, including edge cases
 **ESI backing:** endpoints, cache TTL, scopes or role gates
