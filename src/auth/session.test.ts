@@ -189,6 +189,37 @@ describe('completeLogin', () => {
     expect(tokenRequests).toHaveLength(1);
   });
 
+  // #649 arrived from an outside reporter suggesting the `state` check itself
+  // was at fault. It is not, and relaxing it is how a login-CSRF gets shipped:
+  // an attacker who can make a browser open `/callback?code=<their code>` would
+  // silently bind their own Character into the victim's app. These pin the two
+  // properties that keep that shut, so a later "fix" cannot quietly undo them.
+  it('a forged callback with no login in progress creates nothing (#649)', async () => {
+    await expect(
+      completeLogin({ code: 'attacker-code', state: 'attacker-state' }, cfg)
+    ).rejects.toMatchObject({ reason: 'no-login-in-progress' });
+
+    expect(tokenRequests).toHaveLength(0);
+    expect(await db.tokens.count()).toBe(0);
+    expect(await db.characters.count()).toBe(0);
+  });
+
+  it('the replay path never exchanges a code or writes a token (#649)', async () => {
+    const url = new URL(await startLogin(['esi-skills.read_skills.v1'], cfg));
+    const state = url.searchParams.get('state')!;
+    await completeLogin({ code: 'good-code', state }, cfg);
+    const tokenBefore = await db.tokens.get(CHAR_ID);
+
+    // Same state, a different code: replay must ignore the code entirely
+    // rather than treat it as a fresh grant.
+    const replayed = await completeLogin({ code: 'attacker-code', state }, cfg);
+
+    expect(replayed.characterId).toBe(CHAR_ID);
+    expect(tokenRequests).toHaveLength(1);
+    expect(await db.tokens.get(CHAR_ID)).toEqual(tokenBefore);
+    expect(await db.characters.count()).toBe(1);
+  });
+
   it('does not replay a completed login whose Character has since been removed (#649)', async () => {
     const url = new URL(await startLogin(['esi-skills.read_skills.v1'], cfg));
     const state = url.searchParams.get('state')!;

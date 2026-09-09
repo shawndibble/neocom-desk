@@ -49,6 +49,18 @@ _Recorded 2026-09-09 · issue #649._
   completed one would be the wrong Character. The switch-user sequence never
   hits it — nothing calls `startLogin` between the two landings.
 
+- **The `state` check was not relaxed, and must not be.** #649 came from an
+  outside reporter who suggested `state` itself was the fault. Treated as a
+  hypothesis to test, not a fix to apply: relaxing state validation is exactly
+  how a login-CSRF ships — an attacker able to make a victim's browser open
+  `/callback?code=<their own code>` would silently bind their Character into
+  the victim's app. The mismatch branch still throws before any token request.
+  The replay branch is not a hole in that: it never exchanges a code (it
+  ignores `params.code` outright), never writes a token, and can only return a
+  Character already in this device's Dexie, gated on a 32-byte nonce an
+  attacker cannot predict. `session.test.ts` pins both properties by name so a
+  later "fix" cannot quietly undo them.
+
 - **The reporter's `state` hypothesis is ruled out, not deferred.** `state` is
   an independent 32-byte random value from `generateVerifier()`; it encodes no
   account or character id, and the one in the report round-tripped intact.
