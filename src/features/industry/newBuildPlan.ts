@@ -72,6 +72,12 @@ export interface NewBuildPlanOverrides {
   assumedTe?: number;
   buildGroupId?: string;
   /**
+   * Materials to seed as built rather than bought (issue #652 — Opportunities'
+   * auto make-or-buy depth pass). Absent rather than an empty array whenever
+   * nothing was auto-picked, matching every other optional override here.
+   */
+  buildHere?: number[];
+  /**
    * Overrides `Date.now()`. Fit Import stamps the hull highest in the batch:
    * `mostRecentlyUpdatedPlan` uses a strict `>`, so plans sharing one
    * timestamp tie and array order — effectively UUID order — would otherwise
@@ -173,6 +179,7 @@ export function newBuildPlan(
       ? { buildLocationName: defaultsFrom.buildLocationName }
       : {}),
     ...(overrides.buildGroupId !== undefined ? { buildGroupId: overrides.buildGroupId } : {}),
+    ...(overrides.buildHere !== undefined ? { buildHere: overrides.buildHere } : {}),
     updatedAt: overrides.updatedAt ?? Date.now(),
   };
 }

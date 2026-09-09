@@ -5,11 +5,15 @@ import type { BuildResult } from '@/engine/industry/types';
 import {
   autoRecalculates,
   buildOpportunityCandidates,
+  computeOpportunityRow,
   opportunitiesCacheKey,
   rankOpportunityRows,
   type OpportunityCandidate,
   type UnrankedOpportunityRow,
 } from './opportunities';
+import { recipeForLookup } from './recipes';
+import { DEFAULT_FACILITY_DEFAULTS } from './facilityDefaults';
+import type { MarketSnapshot } from './marketData';
 import { DEFAULT_TRADE_HUB } from '@/market/hubs';
 
 function catalogEntry(
@@ -93,6 +97,61 @@ describe('buildOpportunityCandidates', () => {
   });
 });
 
+describe('computeOpportunityRow — auto make-or-buy depth (issue #652)', () => {
+  // Root blueprint (1) needs 100 Tritanium (34) per run; a second blueprint
+  // (900) shows Tritanium itself can be built from 10 units of a much
+  // cheaper raw input (999) — building 34 is a huge saving over buying it.
+  const rootEntry = catalogEntry(1);
+  const subEntry: BlueprintCatalogEntry = {
+    blueprintTypeID: 900,
+    blueprint: {
+      name: 'Reprocessed Ore',
+      time: 100,
+      materials: [{ typeID: 999, quantity: 10 }],
+      products: [{ typeID: 34, quantity: 50 }],
+      skills: [],
+      activity: 'manufacturing',
+    },
+    productTypeID: 34,
+    productName: 'Tritanium',
+    productNameLower: 'tritanium',
+  };
+  const cat = catalog([rootEntry, subEntry]);
+  const candidate: OpportunityCandidate = {
+    id: '100:1',
+    characterId: 100,
+    characterName: 'Pilot',
+    blueprint: owned(1),
+    catalogEntry: rootEntry,
+  };
+  const snapshot: MarketSnapshot = {
+    hubPrices: { 2: 100_000, 34: 5000, 999: 1 },
+    hubBuyPrices: {},
+    hubSellVolumes: { 2: 10 },
+    adjustedPrices: { 34: 1, 999: 1 },
+    systemCostIndex: 0.05,
+  };
+  const recipeFor = recipeForLookup({ catalog: cat, pi: null, ownedBlueprints: [] });
+
+  function row(depth: number) {
+    return computeOpportunityRow(candidate, snapshot, DEFAULT_FACILITY_DEFAULTS, {}, new Map(), {
+      recipeFor,
+      depth,
+    });
+  }
+
+  it('auto-builds nothing at depth 0 — matches plain (issue #642) behavior', () => {
+    expect(row(0)?.buildHere).toEqual([]);
+  });
+
+  it('picks the cheaper-to-build material at depth 1, and its cost actually rolls into the row', () => {
+    const plain = row(0)!;
+    const auto = row(1)!;
+    expect(auto.buildHere).toEqual([34]);
+    expect(auto.result.totalCost).toBeLessThan(plain.result.totalCost);
+  });
+});
+
 describe('opportunitiesCacheKey', () => {
   function candidate(id: string): OpportunityCandidate {
     return {
@@ -105,15 +164,21 @@ describe('opportunitiesCacheKey', () => {
   }
 
   it('is independent of array order', () => {
-    const a = opportunitiesCacheKey([candidate('b'), candidate('a')], DEFAULT_TRADE_HUB);
-    const b = opportunitiesCacheKey([candidate('a'), candidate('b')], DEFAULT_TRADE_HUB);
+    const a = opportunitiesCacheKey([candidate('b'), candidate('a')], DEFAULT_TRADE_HUB, 1);
+    const b = opportunitiesCacheKey([candidate('a'), candidate('b')], DEFAULT_TRADE_HUB, 1);
     expect(a).toBe(b);
   });
 
   it('changes when the hub changes', () => {
-    const jita = opportunitiesCacheKey([candidate('a')], DEFAULT_TRADE_HUB);
-    const amarr = opportunitiesCacheKey([candidate('a')], { ...DEFAULT_TRADE_HUB, id: 'amarr' });
+    const jita = opportunitiesCacheKey([candidate('a')], DEFAULT_TRADE_HUB, 1);
+    const amarr = opportunitiesCacheKey([candidate('a')], { ...DEFAULT_TRADE_HUB, id: 'amarr' }, 1);
     expect(jita).not.toBe(amarr);
+  });
+
+  it('changes when the auto-build depth changes — a stale-depth cache would serve the wrong buildHere picks', () => {
+    const depth1 = opportunitiesCacheKey([candidate('a')], DEFAULT_TRADE_HUB, 1);
+    const depth2 = opportunitiesCacheKey([candidate('a')], DEFAULT_TRADE_HUB, 2);
+    expect(depth1).not.toBe(depth2);
   });
 });
 
@@ -163,6 +228,7 @@ describe('rankOpportunityRows', () => {
       result: buildResult({ iskPerHour, totalCost: 1_000_000 }),
       sellDepthIsk: 3_000_000,
       materialSourcing: {},
+      buildHere: [],
     };
   }
 

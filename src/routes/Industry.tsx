@@ -786,7 +786,12 @@ export function Industry() {
   async function handleAddOpportunitiesToCompare(rows: readonly OpportunityRow[]) {
     if (activeCharacterId === null || rows.length === 0) return;
     const newPlans = rows.map((row) =>
-      planForOpportunityCandidate(row.candidate, facilityDefaults, row.materialSourcing)
+      planForOpportunityCandidate(
+        row.candidate,
+        facilityDefaults,
+        row.materialSourcing,
+        row.buildHere
+      )
     );
     await db.buildPlans.bulkAdd(newPlans);
     scheduleSync(activeCharacterId);

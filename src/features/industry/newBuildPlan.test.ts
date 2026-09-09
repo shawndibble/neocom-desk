@@ -155,6 +155,18 @@ describe('newBuildPlan — overrides', () => {
     const created = newBuildPlan(1, entry(), null, null, DEFAULT_FACILITY_DEFAULTS);
     expect('buildGroupId' in created).toBe(false);
   });
+
+  it('seeds buildHere from the caller — Opportunities carrying its auto-picked materials into a new plan', () => {
+    const created = newBuildPlan(1, entry(), null, null, DEFAULT_FACILITY_DEFAULTS, {
+      buildHere: [502, 501],
+    });
+    expect(created.buildHere).toEqual([502, 501]);
+  });
+
+  it('omits buildHere entirely when nothing was auto-picked', () => {
+    const created = newBuildPlan(1, entry(), null, null, DEFAULT_FACILITY_DEFAULTS);
+    expect('buildHere' in created).toBe(false);
+  });
 });
 
 describe('newBuildPlan — carried defaults', () => {

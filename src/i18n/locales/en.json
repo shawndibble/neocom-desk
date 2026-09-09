@@ -742,6 +742,12 @@
     "opportunitiesTitle": "Build Opportunities",
     "opportunitiesBlueprint": "Blueprint",
     "opportunitiesUnitMargin": "Unit margin",
+    "opportunitiesAutoBuildDepthLabel": "Auto build",
+    "opportunitiesAutoBuildDepthOff": "Off",
+    "opportunitiesAutoBuildDepthLevels_one": "{{count}} level",
+    "opportunitiesAutoBuildDepthLevels_other": "{{count}} levels",
+    "opportunitiesAutoBuildBadgeFor": "Auto-build assumed for {{name}}",
+    "opportunitiesAutoBuildBadge": "This row's ranking assumes some of its materials are built rather than bought, per the Auto build depth setting.",
     "opportunitiesOrderDepthLabel": "Depth",
     "opportunitiesOrderDepth": {
       "deep": "Deep",
