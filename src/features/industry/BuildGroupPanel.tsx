@@ -13,7 +13,7 @@
  * outlive their plans by design, so "what did this fit actually cost" is a
  * question this view cannot answer and must not appear to.
  */
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, EmptyState, Panel, Spinner } from '@/components/ui';
 import type { BuildPlanRecord } from '@/db';
@@ -63,8 +63,10 @@ function flattenOnce(result: BuildResult) {
   return flattened;
 }
 
-/** The whole-group copy control's key in `copiedKey`; no hub can collide with it. */
+/** The whole-group copy control's key in `copyState`; no hub can collide with it. */
 const GROUP_COPY = 'group';
+
+type CopyStatus = 'copied' | 'failed';
 
 /**
  * `systemName`, which hubs.ts keeps for exactly this — the full station name
@@ -96,10 +98,10 @@ export function BuildGroupPanel({
   onOpenPlan,
 }: BuildGroupPanelProps) {
   const { t } = useTranslation();
-  // Which list was copied last, not a bare boolean: a mixed-hub group shows one
-  // copy control per hub, and a shared flag would report Amarr as copied the
-  // moment Jita was. `GROUP_COPY` is the whole-group control's own key.
-  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  // Which list the outcome belongs to, not a bare flag: a mixed-hub group
+  // shows one copy control per hub, and a shared flag would report Amarr as
+  // copied the moment Jita was. `GROUP_COPY` is the whole-group control's key.
+  const [copyState, setCopyState] = useState<{ key: string; status: CopyStatus } | null>(null);
   const rows = useComparedBuildResults({ plans, catalog, pi, skills });
 
   const members: BuildGroupMember[] = useMemo(() => {
@@ -157,14 +159,52 @@ export function BuildGroupPanel({
     [members, detectedOwnedStock]
   );
 
+  // The copy outcome is a flash, not a state the panel keeps. Cleared by an
+  // effect rather than a `setTimeout` in the handler, so unmounting mid-flash
+  // — or copying another hub before it fades — cancels the pending timer
+  // instead of setting state on a gone component.
+  useEffect(() => {
+    if (copyState === null) return;
+    const timer = setTimeout(() => setCopyState(null), 2000);
+    return () => clearTimeout(timer);
+  }, [copyState]);
+
   const rowByPlanId = useMemo(() => new Map(rows.map((row) => [row.planId, row])), [rows]);
   const loading = rows.some((row) => row.loading);
   const failed = rows.filter((row) => row.error !== null);
-  const canCopy = rollup.singleHub && hasShoppingList(rollup.shoppingMaterials);
 
+  // Hubs with a member still loading, or one that could not be priced. Such a
+  // member contributes nothing to the rollup (see `members` above), so its
+  // hub's list is real but incomplete, and a paste made now would quietly be
+  // short those units — the same reason a single plan's copy waits for its own
+  // result. Tracked per hub, so one hub's unresolved member does not withhold
+  // another hub's perfectly complete list.
+  const incompleteHubs = useMemo(() => {
+    const settled = new Set(members.map((member) => member.planId));
+    const hubs = new Set<string>();
+    for (const plan of plans) if (!settled.has(plan.id)) hubs.add(plan.hubId);
+    return hubs;
+  }, [members, plans]);
+
+  const canCopy =
+    rollup.singleHub && incompleteHubs.size === 0 && hasShoppingList(rollup.shoppingMaterials);
+
+  // The rejection is caught and shown, not left to `void`, exactly as the
+  // single plan's copy does it: a browser that denies clipboard access, or a
+  // page that lost focus between the click and the write, is a real path, and
+  // a button that silently keeps reading "Copy" reports success it never had.
   async function handleCopy(key: string, materials: readonly MaterialCostLine[]) {
-    await writeToClipboard(shoppingListText(materials, (id) => nameForType(catalog, id)));
-    setCopiedKey(key);
+    try {
+      await writeToClipboard(shoppingListText(materials, (id) => nameForType(catalog, id)));
+      setCopyState({ key, status: 'copied' });
+    } catch {
+      setCopyState({ key, status: 'failed' });
+    }
+  }
+
+  /** Whether `key`'s control is the one the last copy attempt belongs to. */
+  function copyStatusFor(key: string): CopyStatus | null {
+    return copyState?.key === key ? copyState.status : null;
   }
 
   if (plans.length === 0) {
@@ -190,7 +230,7 @@ export function BuildGroupPanel({
             onClick={() => void handleCopy(GROUP_COPY, rollup.shoppingMaterials)}
             disabled={!canCopy}
           >
-            {copiedKey === GROUP_COPY
+            {copyStatusFor(GROUP_COPY) === 'copied'
               ? t('industry.copyShoppingListDone')
               : t('industry.copyShoppingList')}
           </Button>
@@ -233,6 +273,15 @@ export function BuildGroupPanel({
 
         <p className="mt-2 text-xs text-text-dim">{t('industry.groupEstimateNote')}</p>
 
+        {/* Shown as a line rather than as the button's own label: the message
+            is about the clipboard, not about which list, and it is a sentence
+            long — it would not fit on any of the controls that can raise it. */}
+        {copyState?.status === 'failed' && (
+          <p role="alert" className="mt-2 text-xs text-danger">
+            {t('industry.copyShoppingListFailed')}
+          </p>
+        )}
+
         {/* A mixture is a shopping trip with two stops, not a dead end (issue
             #631). The header control above stays disabled — there is no one
             list it could copy — and each hub gets its own paste here rather
@@ -250,16 +299,14 @@ export function BuildGroupPanel({
                   key={block.hubId}
                   size="sm"
                   onClick={() => void handleCopy(block.hubId, block.materials)}
-                  // Same rule as the whole-group control: a hub whose every
-                  // material is already owned would copy an empty string.
-                  disabled={!hasShoppingList(block.materials)}
+                  // Same rules as the whole-group control: a hub whose every
+                  // material is already owned would copy an empty string, and
+                  // one still missing a member would copy a short list.
+                  disabled={incompleteHubs.has(block.hubId) || !hasShoppingList(block.materials)}
                 >
-                  {t(
-                    copiedKey === block.hubId
-                      ? 'industry.copyHubShoppingListDone'
-                      : 'industry.copyHubShoppingList',
-                    { hub: hubLabel(block.hubId) }
-                  )}
+                  {copyStatusFor(block.hubId) === 'copied'
+                    ? t('industry.copyHubShoppingListDone', { hub: hubLabel(block.hubId) })
+                    : t('industry.copyHubShoppingList', { hub: hubLabel(block.hubId) })}
                 </Button>
               ))}
             </div>

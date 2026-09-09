@@ -107,10 +107,15 @@ function renderMixedGroup() {
     row('a', [material(34, 100)]),
     row('b', [material(35, 50)]),
   ]);
+  renderPanel([plan('a', 'jita'), plan('b', 'amarr')]);
+  return written;
+}
+
+function renderPanel(plans: BuildPlanRecord[]) {
   render(
     <BuildGroupPanel
       group={GROUP}
-      plans={[plan('a', 'jita'), plan('b', 'amarr')]}
+      plans={plans}
       catalog={CATALOG}
       pi={null}
       skills={{} as never}
@@ -118,7 +123,16 @@ function renderMixedGroup() {
       onOpenPlan={() => {}}
     />
   );
-  return written;
+}
+
+function loadingRow(planId: string): ComparedBuildRow {
+  return {
+    planId,
+    planName: `Plan ${planId}`,
+    result: null,
+    loading: true,
+    error: null,
+  } as ComparedBuildRow;
 }
 
 describe('BuildGroupPanel — mixed-hub multibuy', () => {
@@ -150,23 +164,48 @@ describe('BuildGroupPanel — mixed-hub multibuy', () => {
     expect((groupCopy as HTMLButtonElement).disabled).toBe(true);
   });
 
+  it('says the clipboard refused rather than reporting a copy that never happened', async () => {
+    configureClipboard(async () => {
+      throw new Error('denied');
+    });
+    mockedUseComparedBuildResults.mockReturnValue([
+      row('a', [material(34, 100)]),
+      row('b', [material(35, 50)]),
+    ]);
+    renderPanel([plan('a', 'jita'), plan('b', 'amarr')]);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Copy Jita list' }));
+
+    expect(screen.getByText(/reach the clipboard/)).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Copy Jita list' })).toBeTruthy();
+  });
+
+  it('waits for a hub’s own members, without holding up the other hub', () => {
+    // An unsettled member contributes nothing to the rollup, so Jita's list is
+    // short its units until Plan b lands — but Amarr's is already whole.
+    configureClipboard(async () => {});
+    mockedUseComparedBuildResults.mockReturnValue([
+      row('a', [material(34, 100)]),
+      loadingRow('b'),
+      row('c', [material(35, 50)]),
+    ]);
+    renderPanel([plan('a', 'jita'), plan('b', 'jita'), plan('c', 'amarr')]);
+
+    expect(
+      (screen.getByRole('button', { name: 'Copy Jita list' }) as HTMLButtonElement).disabled
+    ).toBe(true);
+    expect(
+      (screen.getByRole('button', { name: 'Copy Amarr list' }) as HTMLButtonElement).disabled
+    ).toBe(false);
+  });
+
   it('disables a hub whose materials are all owned rather than copying nothing', () => {
     configureClipboard(async () => {});
     mockedUseComparedBuildResults.mockReturnValue([
       row('a', [material(34, 100)]),
       row('b', [material(35, 50, 0)]),
     ]);
-    render(
-      <BuildGroupPanel
-        group={GROUP}
-        plans={[plan('a', 'jita'), plan('b', 'amarr')]}
-        catalog={CATALOG}
-        pi={null}
-        skills={{} as never}
-        ownedStockSnapshot={SNAPSHOT}
-        onOpenPlan={() => {}}
-      />
-    );
+    renderPanel([plan('a', 'jita'), plan('b', 'amarr')]);
 
     expect(
       (screen.getByRole('button', { name: 'Copy Amarr list' }) as HTMLButtonElement).disabled

@@ -573,7 +573,7 @@
     "groupJobFees": "Job fees (top level)",
     "groupJobTime": "Total job time",
     "groupEstimateNote": "An estimate of what this group will cost to build. Production records are kept per plan, so this never reports what it actually cost.",
-    "groupMixedHubs": "These plans buy at different trade hubs ({{hubs}}). Multibuy is per station, so there is one list per hub to copy — paste each at its own station.",
+    "groupMixedHubs": "These plans buy at different trade hubs ({{hubs}}). Multibuy is per station, so there is no one list to paste — copy each hub's list below and paste it at that station.",
     "groupUnpriceable": "At least one plan has a material with no price, so the totals below are underestimated.",
     "groupOverClaimed": "These plans together claim more than you own: {{materials}}. Each plan counts your stock separately, so the amount to buy is understated.",
     "fitImportOpen": "Import a fit",
