@@ -2828,7 +2828,7 @@
           "notificationFeed": "Your Alerts.",
           "notificationFeedNote": "Ones you have already been shown, so another device can catch up on what it missed. Kept for 30 days.",
           "settings": "The settings you chose on this page.",
-          "settingsNote": "Your notification preferences, the PI customs rates you overrode, your industry build groups, the defaults every page starts from — trade hub, industry facility, assumed ME and assumed TE, the PI expiring-soon window, the corp dark threshold, and the default characters shown — and the appraisal price percentage you set on the Market page. Nothing else on this page leaves your device."
+          "settingsNote": "Your notification preferences, the PI customs rates you overrode, your industry build groups, the defaults every page starts from — trade hub, industry facility, assumed ME and assumed TE, the PI expiring-soon window, the corp dark threshold, and the default characters shown — the appraisal price percentage you set on the Market page, and whether SP Extraction monitoring is on along with the SP threshold you set for it. Nothing else on this page leaves your device."
         },
         "local": {
           "title": "Kept on this device only",
