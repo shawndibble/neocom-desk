@@ -4,6 +4,7 @@ import { setupServer } from 'msw/node';
 import { configureEsi, ESI_BASE_URL } from '@/esi/client';
 import { corpCacheKey } from '@/esi/cache';
 import { db } from '@/db';
+import { ESI_FANOUT_CONCURRENCY } from '@/lib/concurrency';
 import {
   KEYS,
   loadCorporationMemberIds,
@@ -194,6 +195,61 @@ describe('loadMemberLabels (AC3)', () => {
 
     expect(structureCalls).toBe(1);
     expect(labels.locations.get(STRUCTURE_ID)).toBe('X-7OMU - Home');
+  });
+
+  /**
+   * Issue #655. Deduplication alone does not bound this: a corp spread across
+   * nullsec stands in as many distinct Upwell structures as it holds, each its
+   * own `/universe/structures/{id}`, and the roster used to ask for all of them
+   * at once — on top of every other read the app had in flight.
+   * `corp/assets.ts` took the `ESI_FANOUT_CONCURRENCY` cap in issue #420 and
+   * this call site was missed, so pin the cap rather than trust the shape of
+   * the code: the upper bound is what an uncapped `Promise.all` fails, the
+   * lower bound is what a fully sequential loop fails.
+   */
+  it('caps the per-structure name-resolution fan-out instead of firing every request at once', async () => {
+    const FLOOR = 1_000_000_000_000;
+    const structureIds = Array.from({ length: ESI_FANOUT_CONCURRENCY + 5 }, (_, i) => FLOOR + i);
+    const members = structureIds.map((locationId, i) => ({
+      characterId: 1000 + i,
+      logonMs: null,
+      logoffMs: null,
+      startMs: null,
+      shipTypeId: null,
+      locationId,
+    }));
+
+    let inFlight = 0;
+    let peak = 0;
+    server.use(
+      // The character column still resolves in parallel with the structures;
+      // only the structure half is counted below.
+      http.post(`${ESI_BASE_URL}/universe/names`, async ({ request }) => {
+        const ids = (await request.json()) as number[];
+        return HttpResponse.json(
+          ids.map((id) => ({ id, name: `Name ${id}`, category: 'character' }))
+        );
+      }),
+      ...structureIds.map((id) =>
+        http.get(`${ESI_BASE_URL}/universe/structures/${id}`, async () => {
+          inFlight += 1;
+          peak = Math.max(peak, inFlight);
+          await new Promise((resolve) => setTimeout(resolve, 0));
+          inFlight -= 1;
+          return HttpResponse.json({
+            name: `Structure ${id}`,
+            owner_id: 1,
+            solar_system_id: 30000001,
+          });
+        })
+      )
+    );
+
+    const labels = await loadMemberLabels(CHAR_ID, members);
+
+    expect(labels.locations.size).toBe(structureIds.length);
+    expect(peak).toBeLessThanOrEqual(ESI_FANOUT_CONCURRENCY);
+    expect(peak).toBeGreaterThan(1);
   });
 
   it('asks for the names of members who are no longer on the roster', async () => {
