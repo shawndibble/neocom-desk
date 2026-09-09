@@ -56,7 +56,10 @@ import {
   removeBuildGroup,
   renameBuildGroup,
   useBuildGroups,
+  withGroupSnapshot,
+  type BuildGroupSnapshot,
 } from '@/features/industry/buildGroups';
+import { retargetPatch } from '@/features/industry/retargetPatch';
 import { useExpandedGroups, withGroupExpanded } from '@/features/industry/expandedGroups';
 import { BuildGroupPanel } from '@/features/industry/BuildGroupPanel';
 import { FitImportDialog } from '@/features/industry/FitImportDialog';
@@ -424,6 +427,12 @@ export function Industry() {
     () => (selectedGroupId === null ? [] : membersOfGroup(selectedGroupId)),
     [membersOfGroup, selectedGroupId]
   );
+  /** The open plan's group's last Retarget (issue #632), for the quick-fill link. */
+  const selectedPlanGroupSnapshot = useMemo(() => {
+    const groupId = selectedPlan?.buildGroupId;
+    if (groupId === undefined) return null;
+    return groups.find((g) => g.id === groupId)?.snapshot ?? null;
+  }, [selectedPlan, groups]);
 
   // Narrow screens show one column at a time (CONTEXT.md round 25); matches
   // the grid's own `lg:` breakpoint so the JS-driven visibility and the CSS
@@ -648,6 +657,36 @@ export function Industry() {
   }
 
   /**
+   * Applies a Retarget group's chosen hub/facility/security/build-system to
+   * every checked member plan (issue #632), and keeps the group's own
+   * snapshot in step so the quick-fill link and the next Retarget both start
+   * from what was actually applied — not merely what the form last held.
+   *
+   * A plain bulk write, not a second source of truth: each patched plan owns
+   * its own values from here on, same as any manual edit (see
+   * `retargetPatch.ts` and the #626 decision).
+   */
+  async function handleRetargetGroup(
+    groupId: string,
+    target: Omit<BuildGroupSnapshot, 'appliedAt'>,
+    planIds: readonly string[]
+  ) {
+    if (activeCharacterId === null) return;
+    const snapshot: BuildGroupSnapshot = { ...target, appliedAt: Date.now() };
+    if (planIds.length > 0) {
+      const patch = retargetPatch(snapshot);
+      await db.transaction('rw', db.buildPlans, async () => {
+        const stored = await db.buildPlans.bulkGet([...planIds]);
+        const now = Date.now();
+        const updated = stored.flatMap((p) => (p ? [{ ...p, ...patch, updatedAt: now }] : []));
+        await db.buildPlans.bulkPut(updated);
+      });
+      scheduleSync(activeCharacterId);
+    }
+    await setBuildGroups(withGroupSnapshot(buildGroups, activeCharacterId, groupId, snapshot));
+  }
+
+  /**
    * Creates a group and one plan per buildable item in a pasted fit.
    *
    * One `bulkAdd` and one `scheduleSync`, not one of each per plan: a
@@ -831,6 +870,9 @@ export function Industry() {
                       skills={skills}
                       ownedStockSnapshot={ownedStockSnapshot}
                       onOpenPlan={selectPlan}
+                      onRetarget={(target, planIds) =>
+                        void handleRetargetGroup(selectedGroup.id, target, planIds)
+                      }
                     />
                   ) : comparing ? (
                     comparePlans.length >= 2 ? (
@@ -868,6 +910,7 @@ export function Industry() {
                       onAddToQuickbar={quickbar.add}
                       quickbarAvailable={quickbar.available}
                       onShowInfo={(typeId, itemName) => setInfoModalItem({ typeId, itemName })}
+                      groupSnapshot={selectedPlanGroupSnapshot}
                     />
                   ) : plans.length > 0 ? (
                     <div className="flex justify-center py-8">
