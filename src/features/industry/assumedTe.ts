@@ -28,10 +28,10 @@ import { createSyncedSetting } from '@/lib/useSyncedSetting';
 
 export const ASSUMED_TE_SETTING_KEY = 'sync.industryAssumedTe';
 
-/**
- * No `legacyKey`, unlike assumed ME: the preference is new and never had a
- * device-local life to seed from, the same as `sync.marketPricePercent`.
- */
+// No `legacyKey`, unlike assumed ME: the preference is new and never had a
+// device-local life to seed from, the same as `sync.marketPricePercent`.
+
+/** The engine range-checks TE and throws outside 0..20 — twice ME's depth. */
 export const MIN_ASSUMED_TE = 0;
 export const MAX_ASSUMED_TE = 20;
 export const DEFAULT_ASSUMED_TE = 0;

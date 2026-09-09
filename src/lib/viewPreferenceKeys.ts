@@ -19,10 +19,14 @@
 //   classifications, which have their own undo on the ledger). Clearing any of
 //   these throws away work the pilot did on purpose.
 // - Anything with its own control on the Settings page — `fontScale`,
-//   `timeFormat`, and the Defaults panels' five, which now live under `sync.`
-//   keys (`sync.marketHub`, `sync.industryAssumedMe`,
+//   `timeFormat`, and every Defaults/Corporation panel preference, which now
+//   live under `sync.` keys (`sync.marketHub`, `sync.marketPricePercent`,
+//   `sync.industryAssumedMe`, `sync.industryAssumedTe`,
 //   `sync.industryFacilityDefaults`, `sync.piExpiringSoonHours`,
-//   `sync.corpDarkAfterDays`) and are excluded twice over by the bullet below.
+//   `sync.corpDarkAfterDays`, `sync.defaultCharacterFilter`) and are excluded
+//   twice over by the bullet below. Not a count — one more lands every time a
+//   preference does, and the pinned test in `viewPreferenceKeys.test.ts` is
+//   what actually holds the line.
 //   A pilot who set one deliberately would not expect a button labelled "view
 //   preferences" to revert it; those are changed where they are shown. Their
 //   pre-sync rows (`marketHub`, `industryAssumedMe`, ...) are left behind on
