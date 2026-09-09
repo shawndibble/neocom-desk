@@ -2241,6 +2241,10 @@
         "title": "New mail",
         "body": "{{character}} has new mail."
       },
+      "spExtractionReady": {
+        "title": "SP extraction ready",
+        "body": "{{character}} has enough spare skill points to use a Skill Extractor."
+      },
       "newCalendarEvent": {
         "title": "New calendar event",
         "body": "{{character}}: {{event}} was added, starting {{when}}.",
@@ -2877,6 +2881,7 @@
       "event": {
         "skillLevelComplete": "Skill Level Complete",
         "characterNotTraining": "Character Not Training",
+        "spExtractionReady": "SP Extraction Ready",
         "industryJobComplete": "Industry Job Complete",
         "newMail": "New Mail",
         "planetaryExtractionDone": "Planetary Extraction Done",

@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { occurrenceKey, occurrenceFiredAt } from './occurrenceKey';
 import type {
   NotificationFire,
+  SpExtractionFire,
   IndustryJobNotificationFire,
   PlanetaryNotificationFire,
   MailNotificationFire,
@@ -53,6 +54,12 @@ describe('occurrenceKey', () => {
       level: null,
       finishMs: null,
     };
+    expect(occurrenceKey(fire, T0)).toEqual(occurrenceKey(fire, T0 + 60_000));
+    expect(occurrenceKey(fire, T0)).not.toEqual(occurrenceKey(fire, T0 + 86_400_000));
+  });
+
+  it('buckets spExtractionReady by day, same as characterNotTraining', () => {
+    const fire: SpExtractionFire = { eventId: 'spExtractionReady', characterId: 7 };
     expect(occurrenceKey(fire, T0)).toEqual(occurrenceKey(fire, T0 + 60_000));
     expect(occurrenceKey(fire, T0)).not.toEqual(occurrenceKey(fire, T0 + 86_400_000));
   });

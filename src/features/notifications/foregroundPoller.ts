@@ -607,6 +607,12 @@ async function notificationText(
       body: i18n.t('notifications.fired.characterNotTraining.body', { character: character.name }),
     };
   }
+  if (fire.eventId === 'spExtractionReady') {
+    return {
+      title: i18n.t('notifications.fired.spExtractionReady.title'),
+      body: i18n.t('notifications.fired.spExtractionReady.body', { character: character.name }),
+    };
+  }
   if (fire.eventId === 'structureFuelLow') {
     return {
       title: i18n.t('notifications.fired.structureFuelLow.title'),

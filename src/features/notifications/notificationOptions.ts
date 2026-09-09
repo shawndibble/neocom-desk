@@ -33,6 +33,10 @@ const BADGE_URL = '/icons/badge-96.png';
 export const NOTIFICATION_ROUTES: Record<NotificationEventId, string> = {
   skillLevelComplete: '/skills/trained',
   characterNotTraining: '/skills/trained',
+  // The Characters table view, not the skill tree: "ready to extract" is a
+  // roster-wide, cross-character fact, and that table is where the SP-ready
+  // column and its threshold live.
+  spExtractionReady: '/characters',
   industryJobComplete: '/industry',
   planetaryExtractionDone: '/planetary-industry',
   planetaryExtractorExpiring: '/planetary-industry',

@@ -96,6 +96,7 @@ const EVENT_SEVERITY: Readonly<Partial<Record<NotificationEventId, DeadlineSever
   corpWalletThreshold: 'warning',
   planetaryExtractorExpiring: 'warning',
   // Waiting on you, but nothing is burning.
+  spExtractionReady: 'watch',
   industryJobComplete: 'watch',
   corpIndustryJobReady: 'watch',
   planetaryExtractionDone: 'watch',
