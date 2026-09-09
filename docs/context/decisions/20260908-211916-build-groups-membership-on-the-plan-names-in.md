@@ -91,13 +91,16 @@ deploy --only firestore`, and CI deploys nothing and tests that file with
   batch size is worse than declining; the pilot knows their ammo stockpile and
   the app does not. A checkbox includes them at `runs: 1`.
 
-- **Fit Import seeds each created plan's ME/TE from `sync.industryAssumedMe`
+- **Fit Import seeds each created plan's ME from `sync.industryAssumedMe`
   rather than defaulting to 0.** Ten of the thirteen rows in the canonical
   Buzzard fixture are T2 and need an invented BPC, which is out of scope for
   Build Plans — so a hard 0 would quote ~77% of a typical imported group as
   unresearched and overstate its material cost on the feature's own headline
   number. An owned BPC still wins, the same precedence `materialEfficiencyFor`
-  already applies to sub-jobs.
+  already applies to sub-jobs. (This bullet originally read "ME/TE"; only the
+  ME half shipped with #626 — there was no TE preference to seed from. Issue
+  #634 added `sync.industryAssumedTe` beside it, and TE now comes from that
+  key, not this one.)
 
 - **The hull is an ordinary member plan, written with the highest `updatedAt`
   in the batch.** `mostRecentlyUpdatedPlan` uses a strict `>`, so plans sharing

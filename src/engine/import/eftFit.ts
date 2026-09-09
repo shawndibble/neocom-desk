@@ -5,7 +5,8 @@
  *
  * Format spec verified against developers.eveonline.com/docs/guides/fitting/
  * (2026-08):
- * - Line 1: "[Ship Name, Fit Name]".
+ * - Line 1: "[Ship Name, Fit Name]" — the fit name is optional, so a bare
+ *   "[Ship Name]" (or one left empty, "[Ship Name, ]") still names a hull.
  * - Body: low/med/high slot modules, rigs, subsystems, services, drones,
  *   cargo — sections separated by one blank line (two between drones and
  *   cargo, which we treat the same as one: blank lines are pure separators,
@@ -53,7 +54,15 @@ export interface EftFit {
   errors: EftParseError[];
 }
 
-const HEADER = /^\[\s*(.+?)\s*,\s*(.+?)\s*\]$/;
+// The ", Fit Name" clause is optional: EVE and third-party tools both emit a
+// bare "[Ship]" for an unnamed fit, and losing the hull over a missing
+// nickname costs the pilot the one name they always care about (issue #630).
+// The ship group excludes commas so "[Rifter, Kite, cheap]" still splits at
+// the first one, and excludes a leading space so "[ , Max Hacker]" is a
+// header error rather than the whitespace hull the old regex read it as. The
+// fit group stays permissive
+// (`.*?`) so a bracketed fit name like "[Rifter, [PVP]]" survives.
+const HEADER = /^\[\s*([^\s,\]][^,\]]*?)\s*(?:,\s*(.*?)\s*)?\]$/;
 const EMPTY_SLOT = /^\[Empty\s+.+\s+slot\]$/i;
 const OFFLINE_SUFFIX = /\s*\/offline\s*$/i;
 const QUANTITY_SUFFIX = /^(.*\S)\s+x(\d+)$/i;
@@ -69,14 +78,19 @@ export function parseEftFit(text: string): EftFit {
 
   const headerIndex = lines.findIndex((l) => l.trim() !== '');
   const headerLine = headerIndex === -1 ? '' : lines[headerIndex].trim();
-  const headerMatch = HEADER.exec(headerLine);
+  // A fit body pasted without its header line starts on an empty slot, which
+  // — now that a bare "[Ship]" is a legal header — would otherwise be read as
+  // a hull named "Empty high slot".
+  const headerMatch = EMPTY_SLOT.test(headerLine) ? null : HEADER.exec(headerLine);
   if (headerMatch) {
-    [, shipName, fitName] = headerMatch;
+    shipName = headerMatch[1];
+    // Absent on a bare "[Ship]", empty on "[Ship, ]" — the same to callers.
+    fitName = headerMatch[2] ?? '';
   } else {
     errors.push({
       line: headerIndex === -1 ? 1 : headerIndex + 1,
       text: headerLine,
-      reason: 'invalid or missing fit header, expected "[Ship Name, Fit Name]"',
+      reason: 'invalid or missing fit header, expected "[Ship Name]" or "[Ship Name, Fit Name]"',
     });
   }
 

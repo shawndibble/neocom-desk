@@ -5,6 +5,7 @@ import { EMPTY_RIG_FIT, resolveRigFit } from '@/engine/industry/types';
 import { DEFAULT_FACILITY_DEFAULTS } from './facilityDefaults';
 import type { BlueprintCatalogEntry } from './blueprintCatalog';
 import { fallbackFacility, mostRecentlyUpdatedPlan, newBuildPlan } from './newBuildPlan';
+import { matchesPlanSeed } from './planSeed';
 
 function entry(activity: 'manufacturing' | 'reaction' = 'manufacturing'): BlueprintCatalogEntry {
   return {
@@ -82,7 +83,7 @@ describe('mostRecentlyUpdatedPlan', () => {
   });
 });
 
-describe('newBuildPlan — assumed ME', () => {
+describe('newBuildPlan — assumed ME and TE', () => {
   it('quotes a blueprint the character does not own at the assumed ME', () => {
     const created = newBuildPlan(1, entry(), null, null, DEFAULT_FACILITY_DEFAULTS, {
       assumedMe: 2,
@@ -101,14 +102,38 @@ describe('newBuildPlan — assumed ME', () => {
   });
 
   it('defaults to unresearched when no assumption is given', () => {
-    expect(newBuildPlan(1, entry(), null, null, DEFAULT_FACILITY_DEFAULTS).me).toBe(0);
+    const created = newBuildPlan(1, entry(), null, null, DEFAULT_FACILITY_DEFAULTS);
+    expect(created.me).toBe(0);
+    expect(created.te).toBe(0);
   });
 
-  it('leaves TE at 0 for an unowned blueprint — there is no assumed TE (#634)', () => {
+  it('quotes a blueprint the character does not own at the assumed TE (#634)', () => {
+    // The commonest unowned case is an invented BPC with no decryptor —
+    // ME2/TE4 — and quoting its time at 0 moves job time and ISK/hour.
     const created = newBuildPlan(1, entry(), null, null, DEFAULT_FACILITY_DEFAULTS, {
       assumedMe: 2,
+      assumedTe: 4,
     });
-    expect(created.te).toBe(0);
+    expect(created.me).toBe(2);
+    expect(created.te).toBe(4);
+  });
+
+  it('still quotes an owned blueprint at its real TE', () => {
+    const created = newBuildPlan(1, entry(), owned(), null, DEFAULT_FACILITY_DEFAULTS, {
+      assumedMe: 2,
+      assumedTe: 4,
+    });
+    expect(created.te).toBe(20);
+  });
+
+  it('assumes ME and TE independently', () => {
+    // They are separate preferences: a pilot who set one and not the other
+    // must not have the unset half quietly follow the set one.
+    const created = newBuildPlan(1, entry(), null, null, DEFAULT_FACILITY_DEFAULTS, {
+      assumedTe: 4,
+    });
+    expect(created.me).toBe(0);
+    expect(created.te).toBe(4);
   });
 });
 
@@ -160,5 +185,57 @@ describe('newBuildPlan — carried defaults', () => {
     // The fallback brings its own empty fit rather than the rejected
     // facility's rigs, which the new facility could not host anyway.
     expect(created.rigFit).toEqual(EMPTY_RIG_FIT);
+  });
+});
+
+describe('newBuildPlan — seeded ME/TE (#637)', () => {
+  it('opens at the seeded research, over an owned copy at different research', () => {
+    // The pilot is quoting a copy they might buy, not the one in the hangar.
+    const created = newBuildPlan(1, entry(), owned(), null, DEFAULT_FACILITY_DEFAULTS, {
+      me: 4,
+      te: 12,
+      runs: 5,
+    });
+    expect(created.me).toBe(4);
+    expect(created.te).toBe(12);
+    expect(created.runs).toBe(5);
+  });
+
+  it('opens at the seeded research over the assumed-ME and assumed-TE preferences', () => {
+    const created = newBuildPlan(1, entry(), null, null, DEFAULT_FACILITY_DEFAULTS, {
+      assumedMe: 2,
+      assumedTe: 4,
+      me: 0,
+      te: 0,
+      runs: 1,
+    });
+    // Seeded 0 is a real answer about a real copy, not a missing one — an
+    // unresearched BPC must not fall through to either assumption (#634).
+    expect(created.me).toBe(0);
+    expect(created.te).toBe(0);
+  });
+
+  it('writes the seed back verbatim, so a seeded plan matches its own seed', () => {
+    // `Industry`'s create-if-missing effect stops re-firing only once the plan
+    // it wrote matches the seed it was given: were these ever to disagree it
+    // would write a plan on every render.
+    const seed = { me: 7, te: 14, runs: 3 };
+    const created = newBuildPlan(1, entry(), owned(), null, DEFAULT_FACILITY_DEFAULTS, {
+      ...seed,
+      assumedMe: 2,
+      assumedTe: 4,
+    });
+    expect(matchesPlanSeed(created, seed)).toBe(true);
+  });
+
+  it('takes the name the caller supplies, so a seeded plan is tellable apart', () => {
+    const created = newBuildPlan(1, entry(), null, null, DEFAULT_FACILITY_DEFAULTS, {
+      name: 'Rifter 10/20 ×5',
+    });
+    expect(created.name).toBe('Rifter 10/20 ×5');
+  });
+
+  it('still names a plan after its product when the caller supplies nothing', () => {
+    expect(newBuildPlan(1, entry(), null, null, DEFAULT_FACILITY_DEFAULTS).name).toBe('Rifter');
   });
 });

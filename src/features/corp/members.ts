@@ -17,9 +17,11 @@
  *
  * The name/ship/location resolution below is the other half of this module.
  * AC3 is a bound on *calls*, not on ids: a 200-member corp must not fan out to
- * 200 requests, so characters and NPC locations go through the bulk resolvers
- * and Upwell structures are deduplicated down to the handful a corp actually
- * docks in.
+ * 200 requests, so characters and NPC locations go through the bulk resolvers.
+ * Upwell structures have no bulk endpoint, so deduplication is the only thing
+ * that thins them — and for a corp genuinely spread across a hundred of them it
+ * thins nothing. Those go out capped rather than all at once (issue #655): the
+ * cap bounds how many are in flight, not how many are asked for.
  */
 import {
   getCorporationMembers,
@@ -31,6 +33,7 @@ import { resolveNames } from '@/features/character/names';
 import { loadStructureName } from '@/features/character/structures';
 import { loadTypeNames } from '@/features/character/typeNames';
 import type { MemberActivity } from '@/engine/corp/members';
+import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
 import { loadCorpPaginatedWithCacheStatus, loadCorpWithCacheStatus } from './corpRead';
 
 export const KEYS = {
@@ -132,8 +135,21 @@ async function resolveEntityNames(ids: readonly number[]): Promise<Map<number, s
 /**
  * Location names for the distinct places the roster is standing in.
  *
- * Deduplicated first, which is what makes this bounded in practice: two hundred
- * members share a home structure and a trade hub, not two hundred addresses.
+ * Deduplication cuts the count but does not bound it: a corp spread across
+ * nullsec stands in as many distinct Upwell structures as it holds, and each is
+ * its own `/universe/structures/{id}` because they have no bulk endpoint. So
+ * the structure half goes out at `ESI_FANOUT_CONCURRENCY` — the policy
+ * `features/corp/assets.ts` took in issue #420, which this call site was missed
+ * by until issue #655.
+ *
+ * Worth being exact about what that cap buys, because a structure the reading
+ * Character is off the ACL of answers 403 and ESI counts every non-2xx against
+ * one global 100-per-minute budget: ten in flight rather than a hundred does
+ * not on its own keep a hundred refusals inside that budget. Memoizing the
+ * refusal and an app-wide breaker are what do, and both are separate items on
+ * #655. The cap's own job is the smaller one — this page stops dumping its
+ * whole burst at once on top of every other read the app has in flight.
+ *
  * A structure the reading Character is not on the ACL for resolves to nothing
  * and the view falls back to the raw id, exactly as Assets does.
  */
@@ -146,12 +162,10 @@ async function resolveLocationNames(
   const bulkIds = unique.filter((id) => id < UPWELL_STRUCTURE_ID_FLOOR);
 
   const names = await resolveEntityNames(bulkIds);
-  const structureNames = await Promise.all(
-    structureIds.map(async (id) => [id, await loadStructureName(characterId, id)] as const)
-  );
-  for (const [id, name] of structureNames) {
+  await mapWithConcurrencyLimit(structureIds, ESI_FANOUT_CONCURRENCY, async (id) => {
+    const name = await loadStructureName(characterId, id);
     if (name !== null) names.set(id, name);
-  }
+  });
   return names;
 }
 

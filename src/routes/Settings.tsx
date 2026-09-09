@@ -31,6 +31,7 @@ import { FACILITY_PRESETS, RIG_KIND_OPTIONS, setRigSlot } from '@/engine/industr
 import { rigKindLabelKey } from '@/features/industry/rigFitLabels';
 import { useMarketHub } from '@/features/market/hub';
 import { useAssumedMe, MIN_ASSUMED_ME, MAX_ASSUMED_ME } from '@/features/industry/assumedMe';
+import { useAssumedTe, MIN_ASSUMED_TE, MAX_ASSUMED_TE } from '@/features/industry/assumedTe';
 import {
   useFacilityDefaults,
   normalizeFacilityDefaults,
@@ -404,6 +405,8 @@ function DefaultsPanel() {
   const setHub = useMarketHub((state) => state.setValue);
   const assumedMe = useAssumedMe((state) => state.value);
   const setAssumedMe = useAssumedMe((state) => state.setValue);
+  const assumedTe = useAssumedTe((state) => state.value);
+  const setAssumedTe = useAssumedTe((state) => state.setValue);
   const facilityDefaults = useFacilityDefaults((state) => state.value);
   const setFacilityDefaults = useFacilityDefaults((state) => state.setValue);
   const expiringHours = useExpiringWindowHours((state) => state.value);
@@ -415,12 +418,14 @@ function DefaultsPanel() {
   // make every hook after the first false one a conditional call.
   const hubHydrated = useHydratedStore(useMarketHub);
   const assumedMeHydrated = useHydratedStore(useAssumedMe);
+  const assumedTeHydrated = useHydratedStore(useAssumedTe);
   const facilityHydrated = useHydratedStore(useFacilityDefaults);
   const expiringHydrated = useHydratedStore(useExpiringWindowHours);
   const defaultCharacterFilterHydrated = useHydratedStore(useDefaultCharacterFilter);
   const ready =
     hubHydrated &&
     assumedMeHydrated &&
+    assumedTeHydrated &&
     facilityHydrated &&
     expiringHydrated &&
     defaultCharacterFilterHydrated;
@@ -571,6 +576,31 @@ function DefaultsPanel() {
               const parsed = Math.round(Number(event.target.value));
               if (!Number.isFinite(parsed)) return;
               void setAssumedMe(Math.min(MAX_ASSUMED_ME, Math.max(MIN_ASSUMED_ME, parsed)));
+            }}
+          />
+        </div>
+
+        {/*
+          Beside its ME twin rather than merged with it: the two answer
+          different questions (material cost, job time), and TE's range is
+          0..20 where ME's is 0..10 (issue #634).
+        */}
+        <div className="space-y-1.5 border-t border-line pt-3">
+          <label htmlFor="settings-assumed-te" className="block text-xs font-semibold">
+            {t('settings.assumedTeLabel')}
+          </label>
+          <p className="text-xs text-text-dim">{t('settings.assumedTeHint')}</p>
+          <TextInput
+            id="settings-assumed-te"
+            type="number"
+            min={MIN_ASSUMED_TE}
+            max={MAX_ASSUMED_TE}
+            step={1}
+            value={assumedTe}
+            onChange={(event) => {
+              const parsed = Math.round(Number(event.target.value));
+              if (!Number.isFinite(parsed)) return;
+              void setAssumedTe(Math.min(MAX_ASSUMED_TE, Math.max(MIN_ASSUMED_TE, parsed)));
             }}
           />
         </div>

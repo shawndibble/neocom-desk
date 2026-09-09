@@ -29,7 +29,11 @@
  *
  * It does not re-net owned stock across the group, and it does not resolve a
  * mixture of trade hubs. Both are reported instead — see `overClaimed` and
- * `hubIds`.
+ * `hubIds`. A mixture is split rather than resolved: `shoppingByHub` is the
+ * same buy list partitioned by the hub each unit is bought at, so a pilot with
+ * plans at two hubs pastes twice instead of not at all (issue #631). Nothing
+ * is moved between hubs to make that tidier — the hub is the plan's fact, and
+ * a group that quietly re-homed a member would be a second writer for it.
  *
  * It is also a forward estimate only. Production Runs carry no group and
  * outlive their plans by design, so nothing here can say what a fit actually
@@ -50,6 +54,12 @@ export interface BuildGroupMember {
   shoppingMaterials: readonly MaterialCostLine[];
   /** `materialTableRows(result.materials)` — the whole tree, built rows kept. */
   tableMaterials: readonly MaterialCostLine[];
+}
+
+/** One hub's share of the group buy list — what to paste into multibuy there. */
+export interface HubShoppingList {
+  hubId: string;
+  materials: MaterialCostLine[];
 }
 
 export interface BuildGroupRollup {
@@ -81,9 +91,25 @@ export interface BuildGroupRollup {
   seconds: number;
   /** True when any member is unpriceable. One bad member taints the total. */
   unpriceable: boolean;
-  /** Distinct member hubs, in first-appearance order. */
+  /**
+   * The buy list partitioned by hub — one block per distinct member hub, in
+   * first-appearance order, each merged the same way `shoppingMaterials` is.
+   * Multibuy is per station, so this is the shape a mixed-hub group is
+   * actually pasteable in: one block, one station, one paste.
+   *
+   * Every unit of `shoppingMaterials` appears in exactly one block: the blocks
+   * partition the members, and a member's materials are all bought at that
+   * member's hub. A block whose materials are all owned is still listed, so
+   * the hub is named; the caller decides whether there is anything to copy.
+   */
+  shoppingByHub: HubShoppingList[];
+  /**
+   * Distinct member hubs, in first-appearance order. Derived from
+   * `shoppingByHub` rather than accumulated alongside it — one fact, one
+   * writer, so a hub can never be warned about without a block to paste.
+   */
   hubIds: string[];
-  /** True when every member shares one hub — the only case a multibuy paste can work. */
+  /** True when every member shares one hub — the only case a single paste covers the group. */
   singleHub: boolean;
   /**
    * Materials the members between them claim to own more of than the Character
@@ -115,6 +141,25 @@ function mergeMaterials(
   return [...merged.values()];
 }
 
+/**
+ * The members grouped by hub, in first-appearance order, each group's buy list
+ * merged. Built from the members themselves rather than by re-splitting the
+ * merged list, which could not be done: once two hubs' lines are merged, the
+ * quantity no longer records where any of it was bought.
+ */
+function shoppingListsByHub(members: readonly BuildGroupMember[]): HubShoppingList[] {
+  const byHub = new Map<string, BuildGroupMember[]>();
+  for (const member of members) {
+    const existing = byHub.get(member.hubId);
+    if (existing) existing.push(member);
+    else byHub.set(member.hubId, [member]);
+  }
+  return [...byHub].map(([hubId, hubMembers]) => ({
+    hubId,
+    materials: mergeMaterials(hubMembers, (m) => m.shoppingMaterials),
+  }));
+}
+
 export function rollUpBuildGroup(
   members: readonly BuildGroupMember[],
   { detectedOwnedStock }: RollUpBuildGroupOptions = {}
@@ -122,10 +167,8 @@ export function rollUpBuildGroup(
   const shoppingMaterials = mergeMaterials(members, (m) => m.shoppingMaterials);
   const tableMaterials = mergeMaterials(members, (m) => m.tableMaterials);
 
-  const hubIds: string[] = [];
-  for (const member of members) {
-    if (!hubIds.includes(member.hubId)) hubIds.push(member.hubId);
-  }
+  const shoppingByHub = shoppingListsByHub(members);
+  const hubIds = shoppingByHub.map((block) => block.hubId);
 
   // Sum only while every member has a price: one null makes the total
   // unknowable, and a partial sum presented as a whole is worse than none.
@@ -157,10 +200,13 @@ export function rollUpBuildGroup(
     buyCost,
     seconds: members.reduce((sum, m) => sum + m.result.seconds, 0),
     unpriceable: members.some((m) => m.result.unpriceable),
+    shoppingByHub,
     hubIds,
     // An empty group has no mixture to warn about, but also nothing to paste;
     // the caller gates the copy control on there being rows, as it already
-    // does for a single plan whose materials are all owned.
+    // does for a single plan whose materials are all owned. A mixture is no
+    // longer a dead end — it is `shoppingByHub`, one paste per hub — so this
+    // now says only whether one paste covers the whole group.
     singleHub: hubIds.length <= 1,
     overClaimed,
   };

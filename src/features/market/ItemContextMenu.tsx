@@ -79,12 +79,15 @@ export function ItemContextMenu({
   const addToCompare = useCompareSet((state) => state.add);
   const piPlannable = usePiPlannable(typeId);
 
+  // `industry.*`, not `market.*`: `BuildPlanContextMenu` offers this same
+  // action on the pages this richer menu doesn't reach (the BPC search table,
+  // a contract's item list), and one action wants one set of labels.
   const buildPlanLabel =
     blueprintTypeID === undefined
-      ? t('market.contextMenu.buildPlanChecking')
+      ? t('industry.contextMenu.buildPlanChecking')
       : blueprintTypeID === null
-        ? t('market.contextMenu.noBlueprintOptions')
-        : t('market.contextMenu.buildPlan');
+        ? t('industry.contextMenu.noBlueprintOptions')
+        : t('industry.contextMenu.buildPlan');
 
   return (
     <ContextMenu onOpenChange={onOpenChange}>

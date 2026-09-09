@@ -2,7 +2,12 @@ import { describe, expect, it } from 'vitest';
 import type { FitToBuildPlansResult } from '@/engine/import/fitToBuildPlans';
 import { DEFAULT_FACILITY_DEFAULTS } from './facilityDefaults';
 import type { BlueprintCatalog, BlueprintCatalogEntry } from './blueprintCatalog';
-import { fitBlueprintLookup, fitImportPlans, previewFitImport } from './fitImport';
+import {
+  fitBlueprintLookup,
+  fitImportGroupName,
+  fitImportPlans,
+  previewFitImport,
+} from './fitImport';
 
 const BUZZARD_BP = 11194;
 const BUZZARD = 11192;
@@ -100,7 +105,7 @@ describe('fitImportPlans', () => {
     CATALOG
   );
 
-  function build(assumedMe = 2) {
+  function build(assumedMe = 2, assumedTe = 4) {
     return fitImportPlans(preview, {
       characterId: 1,
       catalog: CATALOG,
@@ -108,6 +113,7 @@ describe('fitImportPlans', () => {
       defaultsFrom: null,
       facilityDefaults: DEFAULT_FACILITY_DEFAULTS,
       assumedMe,
+      assumedTe,
       buildGroupId: 'g1',
     });
   }
@@ -141,6 +147,14 @@ describe('fitImportPlans', () => {
     expect(build(0).every((p) => p.me === 0)).toBe(true);
   });
 
+  it('seeds TE from the assumed-TE preference rather than 0 (#634)', () => {
+    // The same members, and the same reason on the other axis: at TE0 the
+    // group's job time — and the ISK/hour read off it — is wrong by the
+    // research a real invented BPC comes with.
+    expect(build(2, 4).every((p) => p.te === 4)).toBe(true);
+    expect(build(2, 0).every((p) => p.te === 0)).toBe(true);
+  });
+
   it('skips a candidate whose blueprint has left the catalog', () => {
     const plans = fitImportPlans(
       { ...preview, hull: { ...preview.hull!, blueprintTypeID: 999999 } },
@@ -151,9 +165,46 @@ describe('fitImportPlans', () => {
         defaultsFrom: null,
         facilityDefaults: DEFAULT_FACILITY_DEFAULTS,
         assumedMe: 0,
+        assumedTe: 0,
         buildGroupId: 'g1',
       }
     );
     expect(plans.map((p) => p.name)).toEqual(['Scourge Fury Heavy Missile']);
+  });
+});
+
+describe('fitImportGroupName', () => {
+  const labels = {
+    withHull: (fit: string, ship: string) => `${fit} — ${ship}`,
+    untitled: 'New group',
+  };
+  const base = { hull: null, items: [], skipped: [], excludedCharges: [], headerFailed: false };
+  const hull = {
+    blueprintTypeID: 1,
+    productTypeID: 2,
+    productName: 'Buzzard',
+    quantity: 1,
+    runs: 1,
+    spare: 0,
+  };
+
+  it('names the group after both header names when it has both', () => {
+    const preview: FitToBuildPlansResult = { ...base, hull, groupName: 'Max Hacker' };
+    expect(fitImportGroupName(preview, labels)).toBe('Max Hacker — Buzzard');
+  });
+
+  it('falls back to the hull alone after a bare [Ship] header', () => {
+    const preview: FitToBuildPlansResult = { ...base, hull, groupName: null };
+    expect(fitImportGroupName(preview, labels)).toBe('Buzzard');
+  });
+
+  it('falls back to the fit name alone when the hull has no blueprint', () => {
+    const preview: FitToBuildPlansResult = { ...base, groupName: 'Max Hacker' };
+    expect(fitImportGroupName(preview, labels)).toBe('Max Hacker');
+  });
+
+  it('falls back to the generic name when the header could not be read', () => {
+    const preview: FitToBuildPlansResult = { ...base, groupName: null, headerFailed: true };
+    expect(fitImportGroupName(preview, labels)).toBe('New group');
   });
 });

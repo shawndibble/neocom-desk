@@ -299,7 +299,13 @@
   },
   "industry": {
     "title": "Build Plans",
+    "contextMenu": {
+      "buildPlan": "Build Plan",
+      "buildPlanChecking": "Build Plan (checking…)",
+      "noBlueprintOptions": "No blueprint options"
+    },
     "copySuffix": "{{name}} (copy)",
+    "seededPlanName": "{{name}} {{me}}/{{te}} ×{{runs}}",
     "duplicate": "Duplicate",
     "delete": "Delete",
     "rename": "Rename",
@@ -554,6 +560,7 @@
     "toggleGroup": "Show or hide the plans in {{name}}",
     "moveToGroup": "Move to group",
     "removeFromGroup": "No group",
+    "dragToGroup": "Drag onto a group to move this plan into it",
     "groupMembers": "Plans in this group",
     "groupMemberCount_one": "{{count}} plan",
     "groupMemberCount_other": "{{count}} plans",
@@ -567,7 +574,7 @@
     "groupJobFees": "Job fees (top level)",
     "groupJobTime": "Total job time",
     "groupEstimateNote": "An estimate of what this group will cost to build. Production records are kept per plan, so this never reports what it actually cost.",
-    "groupMixedHubs": "These plans buy at different trade hubs ({{hubs}}). The costs still add up, but multibuy is per station, so there is no single list to paste.",
+    "groupMixedHubs": "These plans buy at different trade hubs ({{hubs}}). Multibuy is per station, so there is no one list to paste — copy each hub's list below and paste it at that station.",
     "groupUnpriceable": "At least one plan has a material with no price, so the totals below are underestimated.",
     "groupOverClaimed": "These plans together claim more than you own: {{materials}}. Each plan counts your stock separately, so the amount to buy is understated.",
     "retargetGroupAction": "Retarget group",
@@ -598,7 +605,7 @@
     "fitImportSkipped": "No blueprint — not imported",
     "fitImportCharges": "Loaded ammo — not imported",
     "fitImportIncludeCharges": "Include loaded ammo, one run each",
-    "fitImportHeaderFailed": "Couldn't read the fit header, so no ship was imported. An EFT fit starts with [Ship, Fit name].",
+    "fitImportHeaderFailed": "Couldn't read the fit header, so no ship was imported. An EFT fit starts with [Ship] or [Ship, Fit name].",
     "fitImportGroupName": "{{fit}} — {{ship}}",
     "fitImportApply_one": "Create 1 plan",
     "fitImportApply_other": "Create {{count}} plans",
@@ -615,6 +622,8 @@
     "exportCsvJobs": "Export jobs",
     "copyShoppingList": "Copy shopping list for multibuy",
     "copyShoppingListDone": "Shopping list copied",
+    "copyHubShoppingList": "Copy {{hub}} list",
+    "copyHubShoppingListDone": "{{hub}} list copied",
     "copyShoppingListFailed": "Couldn't reach the clipboard. Check the browser's clipboard permission.",
     "csvMaterial": "Material",
     "csvQuantity": "Quantity",
@@ -861,6 +870,9 @@
     "completing": "Completing login…",
     "errorTitle": "Login failed",
     "errorMessage": "Something went wrong signing you in. Please try again.",
+    "errorSpent": "This sign-in link has already been used, or it was opened in a different browser tab or window. Start the sign-in again.",
+    "errorMismatch": "This sign-in could not be verified. Another sign-in may have started before this one finished. Start the sign-in again.",
+    "errorDenied": "Sign-in was cancelled on the EVE Online page. Nothing was added.",
     "retry": "Try again"
   },
   "character": {
@@ -2471,9 +2483,6 @@
       "viewInMarket": "View in Market",
       "quickbarNoCharacter": "Select a character to use the Quickbar",
       "copyName": "Copy name",
-      "buildPlan": "Build Plan",
-      "buildPlanChecking": "Build Plan (checking…)",
-      "noBlueprintOptions": "No blueprint options",
       "viewInIndustryAsMaterial": "View in Industry as material",
       "addMaterialComponents": "Add material components",
       "buyInsteadOfBuilding": "Buy instead",
@@ -2831,7 +2840,7 @@
           "notificationFeed": "Your Alerts.",
           "notificationFeedNote": "Ones you have already been shown, so another device can catch up on what it missed. Kept for 30 days.",
           "settings": "The settings you chose on this page.",
-          "settingsNote": "Your notification preferences, the PI customs rates you overrode, your industry build groups, the defaults every page starts from — trade hub, industry facility, assumed ME, the PI expiring-soon window, the corp dark threshold, and the default characters shown — and the appraisal price percentage you set on the Market page. Nothing else on this page leaves your device."
+          "settingsNote": "Your notification preferences, the PI customs rates you overrode, your industry build groups, the defaults every page starts from — trade hub, industry facility, assumed ME and assumed TE, the PI expiring-soon window, the corp dark threshold, and the default characters shown — and the appraisal price percentage you set on the Market page. Nothing else on this page leaves your device."
         },
         "local": {
           "title": "Kept on this device only",
@@ -2963,7 +2972,9 @@
     "facilityTaxLabel": "Facility tax (%)",
     "facilityTaxHint": "What the structure owner charges. Leave blank to use the standard rate.",
     "assumedMeLabel": "Assumed ME for blueprints you don’t own",
-    "assumedMeHint": "Sub-builds are quoted at this ME. A blueprint you do own always uses its real ME instead.",
+    "assumedMeHint": "New plans and sub-builds are quoted at this ME. A blueprint you do own always uses its real ME instead.",
+    "assumedTeLabel": "Assumed TE for blueprints you don’t own",
+    "assumedTeHint": "New plans start at this TE — an invented copy comes out at TE 4. A blueprint you do own always uses its real TE instead. Sub-builds are still timed at TE 0.",
     "piExpiringLabel": "Warn me an extractor is expiring",
     "piExpiringHint": "How far ahead the Colonies list flags an extractor — and sorts it to the top.",
     "defaultCharacterFilterLabel": "Default characters shown",

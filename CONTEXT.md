@@ -175,7 +175,7 @@ here — they go one per file in `docs/context/decisions/`.
   string gets its own independent opt-out underneath, discovered as it fires
   rather than enumerated from a closed list.
 - **Facility Preset**: Industry location model: NPC station or player structure type + rig level. Manufacturing structures (Raitaru/Azbel/Sotiyo, engineering complexes) and reaction structures (Athanor/Tatara, refineries — no NPC-station equivalent) each use their own **Industry Activity**'s rig bonuses and security-multiplier table (issue #460); the two never mix on one facility. Drives ME/time/cost bonuses in a Build Plan.
-- **Fit Import**: Pasting EFT fit text into Industry to get a **Build Group** holding one **Build Plan** per buildable item in the fit, named from the paste's own `[Ship, Fit]` header. Counts quantities the way a fit expresses them — one line per copy fitted _and_ the `xN` suffix, both reaching the same total — and reports what it could not build (faction, named and meta modules have no blueprint, and a fifth of a routine paste is normally one of those) rather than dropping it silently. New plans take their ME/TE from the assumed-ME preference rather than 0, since most of a T2 fit needs an invented BPC and quoting it unresearched overstates the group's cost. Distinct from the Skill Planner's clipboard import, which reads the same text for the skills it demands; the two share `parseEftFit` and nothing else.
+- **Fit Import**: Pasting EFT fit text into Industry to get a **Build Group** holding one **Build Plan** per buildable item in the fit, named from the paste's own `[Ship, Fit]` header. Counts quantities the way a fit expresses them — one line per copy fitted _and_ the `xN` suffix, both reaching the same total — and reports what it could not build (faction, named and meta modules have no blueprint, and a fifth of a routine paste is normally one of those) rather than dropping it silently. New plans take their ME from the assumed-ME preference and their TE from the assumed-TE one rather than 0, since most of a T2 fit needs an invented BPC (ME2 / TE4 without a decryptor) and quoting it unresearched overstates the group's cost and understates its job time. Distinct from the Skill Planner's clipboard import, which reads the same text for the skills it demands; the two share `parseEftFit` and nothing else.
 - **Foreground Poller**: Client-side interval (5 minutes) that checks each
   enabled Notification Event's underlying ESI data while the app is open and
   the tab/window is visible; paused via the Page Visibility API when
@@ -188,7 +188,7 @@ here — they go one per file in `docs/context/decisions/`.
   the Notification Feed already shows as delivered (Occurrence Key, round
   44/#360).
 - **Freshness Window** (round 25): how long a cached row is served without asking ESI again. Ten minutes for a Character's own data, a day for game constants. Distinct from **Data Age**, which reports how old the shown data is; the window decides whether to go and get newer.
-- **Group Rollup**: What a **Build Group** shows when opened instead of one of its members: every member's materials merged by type, and the costs summed. A forward estimate only — Production Runs carry no group, so it never claims to say what a fit actually cost. Sums each member's own remaining quantities rather than re-netting owned stock across the group, so the total always agrees with the member pages beside it, and separately names any material the members collectively claim more of than the Character owns. Reports a mixture rather than resolving it: members sitting on different trade hubs still total in ISK, but the multibuy paste is withheld and the hubs named, since multibuy is per-station.
+- **Group Rollup**: What a **Build Group** shows when opened instead of one of its members: every member's materials merged by type, and the costs summed. A forward estimate only — Production Runs carry no group, so it never claims to say what a fit actually cost. Sums each member's own remaining quantities rather than re-netting owned stock across the group, so the total always agrees with the member pages beside it, and separately names any material the members collectively claim more of than the Character owns. Reports a mixture rather than resolving it: members sitting on different trade hubs still total in ISK, and since multibuy is per-station the paste is split rather than withheld — one list per hub, each copied on its own, with the hubs named. Nothing is re-homed to make the group tidy; the hub is the member plan's own fact.
 - **Growth Collector**: On a Mining Ledger Entry covered by two or more
   Assignments (a quantity split, issue #523), the one Assignment that
   receives any ore ESI reports for that day _after_ the split — flagged
@@ -354,6 +354,13 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   that recipient is confirmed as settling this Payee's entries, after which
   recipient identity (not amount or date) is the primary match signal
   (issue #540).
+- **Pending Login**: One authorize round trip this tab has started and not yet
+  finished — its PKCE verifier, its **Requested Scopes**, and when it began —
+  stored by `startLogin` under its own `state` and taken by `completeLogin`.
+  Per-`state` rather than one shared slot so two round trips started close
+  together both stay valid; whichever SSO returns is the one that completes.
+  Bounded by a TTL, enforced when it is redeemed as well as when a later login
+  prunes, and by a maximum count — so an abandoned one is forgotten.
 - **Pin Budget**: The CPU and Powergrid a Command Center supplies to one
   colony, and the fixed amount each pin draws from it. **This is the pin cap
   — the game defines no pin-count limit** — so "how many P1 pins, or fewer
@@ -444,10 +451,10 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
 - **Remap**: In-game reallocation of a character's attributes. The optimizer suggests where in a Skill Plan remaps should be placed.
 - **Remap Marker**: A user-placed row in a Skill Plan marking where the character will remap attributes. Draggable like a plan entry.
 - **Remaps Available**: How many attribute remaps the character can spend: bonus remaps (new characters get several) plus the yearly remap when off cooldown. Read from the API (bonus_remaps, last_remap_date, cooldown); user may override. Optimizer must support the common single-remap case: train a leading segment on current attributes, then remap at the optimizer-chosen point.
-- **Requested Scopes**: What one authorize round trip asked SSO for, stashed
-  beside the PKCE verifier by `startLogin` and read back by `completeLogin`.
-  The baseline the login path judges revocation against; the refresh path has
-  none and uses the stored grant instead.
+- **Requested Scopes**: What one authorize round trip asked SSO for, carried on
+  its **Pending Login** and read back by `completeLogin`. The baseline the login
+  path judges revocation against; the refresh path has none and uses the stored
+  grant instead.
 - **Reset Run**: The unit of planetary work — every colony a pilot resets in
   one sitting. Because they are installed back to back, their extractor
   programs come to share an expiry give or take the minutes it took to walk
@@ -479,6 +486,14 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   means the Base Grant. `SCOPES` derives from the ungrouped endpoints and
   `scopesForGroup(group)` from the grouped ones, both from the same registry.
   `corp` is the only group today.
+- **Seeded Build Plan**: A **Build Plan** opened from a BPC Sourcing **Offer**,
+  or from a blueprint line in a BPC contract's contents list, at that copy's
+  own ME, TE and runs rather than at the usual defaults, so a pilot shopping
+  or bundle-checking a copy sees what _that_ copy builds (issues #637, #638).
+  A contract line seeds only when ESI reports all three numbers for it —
+  optional there, unlike an Offer's, which always carries them. Named for the
+  copy it quotes ("Rifter 10/20 ×5"), since a Character can hold a plain plan
+  and several seeded plans for one blueprint at once.
 - **Skill Plan**: An ordered list of skill-level entries a user intends to train. User-editable (drag and drop). Distinct from the in-game **Skill Queue**, which is the game's actual training queue.
 - **Standing (corp)**: The `/corp` overview's top panel: the figures a corp
   manager acts on — clocks due inside a day, Runway, 30-day net — beside the

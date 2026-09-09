@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, within, fireEvent } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import '@/i18n';
@@ -14,6 +14,17 @@ vi.mock('@/sde/loadSde', () => ({
   loadTypes: vi.fn(async () => ({
     '34': { name: 'Tritanium' },
     '35': { name: 'Pyerite' },
+    '638': { name: 'Rifter Blueprint' },
+  })),
+  loadBlueprints: vi.fn(async () => ({
+    '638': {
+      name: 'Rifter Blueprint',
+      time: 1200,
+      materials: [],
+      products: [{ typeID: 587, quantity: 1 }],
+      skills: [],
+      activity: 'manufacturing',
+    },
   })),
 }));
 
@@ -54,11 +65,18 @@ const COURIER: Contract = {
   days_to_complete: 3,
 };
 
+/** Reports where the router ended up, so a navigating menu action is assertable. */
+function LocationProbe() {
+  const location = useLocation();
+  return <div data-testid="location">{`${location.pathname}${location.search}`}</div>;
+}
+
 /** `MarketItemLink` needs a router context — same wrapper `ImplantChip.test.tsx` uses. */
 function renderModal(props: ContractDetailModalProps) {
   return render(
     <MemoryRouter>
       <ContractDetailModal {...props} />
+      <LocationProbe />
     </MemoryRouter>
   );
 }
@@ -201,6 +219,73 @@ describe('ContractDetailModal', () => {
     });
     const link = await screen.findByRole('link', { name: /Tritanium/ });
     expect(link).toHaveAttribute('href', expect.stringContaining('/market?'));
+  });
+
+  it('right-clicking a blueprint line item starts a Build Plan for what it builds', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/universe/stations/60003760`, () => new Promise(() => {})),
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/contracts/12345/items`, () =>
+        HttpResponse.json([
+          { record_id: 1, type_id: 638, quantity: 1, is_included: true, is_singleton: true },
+        ])
+      )
+    );
+    renderModal({
+      characterId: CHAR_ID,
+      contract: ITEM_EXCHANGE,
+      issuerName: 'Mero Otichoda',
+      onClose: () => {},
+    });
+
+    const included = await screen.findByRole('table', { name: 'Included' });
+    fireEvent.contextMenu(within(included).getByText('Rifter Blueprint'));
+
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Build Plan' }));
+
+    // 587 (Rifter), not 638 (the blueprint on the contract).
+    expect(screen.getByTestId('location')).toHaveTextContent('/industry?product=587');
+  });
+
+  it('explains the right-click menu once, not once per item list', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/universe/stations/60003760`, () => new Promise(() => {})),
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/contracts/12345/items`, () =>
+        HttpResponse.json([
+          { record_id: 1, type_id: 34, quantity: 744, is_included: true, is_singleton: false },
+          { record_id: 2, type_id: 35, quantity: 1, is_included: false, is_singleton: false },
+        ])
+      )
+    );
+    renderModal({
+      characterId: CHAR_ID,
+      contract: ITEM_EXCHANGE,
+      issuerName: 'Mero Otichoda',
+      onClose: () => {},
+    });
+
+    expect(await screen.findByRole('button', { name: 'About Included' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'About Requested' })).not.toBeInTheDocument();
+  });
+
+  it('still explains the menu when a contract only requests items', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/universe/stations/60003760`, () => new Promise(() => {})),
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/contracts/12345/items`, () =>
+        HttpResponse.json([
+          { record_id: 2, type_id: 35, quantity: 1, is_included: false, is_singleton: false },
+        ])
+      )
+    );
+    renderModal({
+      characterId: CHAR_ID,
+      contract: ITEM_EXCHANGE,
+      issuerName: 'Mero Otichoda',
+      onClose: () => {},
+    });
+
+    // The hint follows the first list actually rendered, so pinning it to
+    // Included would leave this contract's menu unexplained.
+    expect(await screen.findByRole('button', { name: 'About Requested' })).toBeInTheDocument();
   });
 
   it('issuer name opens the shared Public Info Modal (issue #417)', () => {

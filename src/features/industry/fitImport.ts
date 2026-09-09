@@ -83,6 +83,22 @@ export function previewFitImport(
   return fitToBuildPlans(parseEftFit(text), fitBlueprintLookup(catalog), options);
 }
 
+/**
+ * What to call the build group a fit import creates. Four ways it lands, now
+ * that a bare `[Ship]` header names a hull and no fit (issue #630): both
+ * names, either one alone, or a header that gave neither. The labels come in
+ * as callbacks so the i18next lookup stays at the route, where the rest of
+ * this module's strings already live.
+ */
+export function fitImportGroupName(
+  preview: FitToBuildPlansResult,
+  labels: { withHull: (fit: string, ship: string) => string; untitled: string }
+): string {
+  const ship = preview.hull?.productName ?? null;
+  if (preview.groupName && ship) return labels.withHull(preview.groupName, ship);
+  return preview.groupName ?? ship ?? labels.untitled;
+}
+
 /** Everything the import needs in order to build records from a preview. */
 export interface FitImportPlanContext {
   characterId: number;
@@ -93,6 +109,8 @@ export interface FitImportPlanContext {
   facilityDefaults: FacilityDefaults;
   /** ME to quote a blueprint the character owns no copy of — `sync.industryAssumedMe`. */
   assumedMe: number;
+  /** TE for the same blueprints, from `sync.industryAssumedTe` (issue #634). */
+  assumedTe: number;
   buildGroupId: string;
 }
 
@@ -131,6 +149,7 @@ export function fitImportPlans(
       {
         runs: candidate.runs,
         assumedMe: context.assumedMe,
+        assumedTe: context.assumedTe,
         buildGroupId: context.buildGroupId,
         updatedAt,
       }

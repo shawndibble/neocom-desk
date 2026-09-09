@@ -6,16 +6,16 @@ import {
   type UseComparedBuildResultsArgs,
 } from './useComparedBuildResults';
 import { computeBuildPlan } from './computeBuildPlan';
-import { loadMarketSnapshot } from './marketData';
+import { loadMarketSnapshots, type MarketSnapshot } from './marketData';
 import type { BuildPlanRecord } from '@/db';
 import type { BlueprintCatalog, BlueprintCatalogEntry } from './blueprintCatalog';
 import type { BuildResult } from '@/engine/industry/types';
 
 vi.mock('./computeBuildPlan', () => ({ computeBuildPlan: vi.fn() }));
-vi.mock('./marketData', () => ({ loadMarketSnapshot: vi.fn() }));
+vi.mock('./marketData', () => ({ loadMarketSnapshots: vi.fn() }));
 
 const mockedCompute = vi.mocked(computeBuildPlan);
-const mockedSnapshot = vi.mocked(loadMarketSnapshot);
+const mockedSnapshots = vi.mocked(loadMarketSnapshots);
 
 function plan(overrides: Partial<BuildPlanRecord> & { id: string }): BuildPlanRecord {
   return {
@@ -85,6 +85,13 @@ const RESULT: BuildResult = {
   recommendation: 'build',
 };
 
+const SNAPSHOT: MarketSnapshot = {
+  hubPrices: {},
+  hubBuyPrices: {},
+  adjustedPrices: {},
+  systemCostIndex: 0.01,
+};
+
 const baseArgs: Omit<UseComparedBuildResultsArgs, 'plans' | 'catalog'> = {
   pi: null,
   skills: {},
@@ -92,13 +99,8 @@ const baseArgs: Omit<UseComparedBuildResultsArgs, 'plans' | 'catalog'> = {
 
 beforeEach(() => {
   mockedCompute.mockReset();
-  mockedSnapshot.mockReset();
-  mockedSnapshot.mockResolvedValue({
-    hubPrices: {},
-    hubBuyPrices: {},
-    adjustedPrices: {},
-    systemCostIndex: 0.01,
-  });
+  mockedSnapshots.mockReset();
+  mockedSnapshots.mockImplementation((requests) => requests.map(() => Promise.resolve(SNAPSHOT)));
   mockedCompute.mockReturnValue({ result: RESULT, error: null });
 });
 
@@ -159,7 +161,12 @@ describe('useComparedBuildResults', () => {
         error: null,
       },
     ]);
-    expect(mockedSnapshot).toHaveBeenCalledTimes(2);
+    // Both plans sit at the same hub, so one batched request set prices
+    // them both — not one snapshot load per plan (issue #628).
+    expect(mockedSnapshots).toHaveBeenCalledTimes(1);
+    const requests = mockedSnapshots.mock.calls[0]?.[0] ?? [];
+    expect(requests).toHaveLength(2);
+    expect(requests.every((request) => request.hub.id === 'jita')).toBe(true);
   });
 
   it('reports a plan whose blueprint is missing from the catalog as unresolved, without dropping it', async () => {
@@ -173,26 +180,26 @@ describe('useComparedBuildResults', () => {
     expect(result.current).toHaveLength(1);
     expect(result.current[0]?.result).toBeNull();
     expect(result.current[0]?.error).toBeTruthy();
-    expect(mockedSnapshot).not.toHaveBeenCalled();
+    expect(mockedSnapshots).toHaveBeenCalledWith([]);
   });
 
   it("reports one plan's market-snapshot failure without affecting the other plan's row", async () => {
     const catalog = catalogWith([entry({ blueprintTypeID: 100 }), entry({ blueprintTypeID: 200 })]);
+    // Two hubs, so each plan is priced by its own fetch: batching unions
+    // per hub, and one hub going down must not take the other hub's plan
+    // down with it (issue #453).
     const plans = [
-      plan({ id: 'a', name: 'Failing plan', blueprintTypeID: 100 }),
-      plan({ id: 'b', name: 'Fine plan', blueprintTypeID: 200 }),
+      plan({ id: 'a', name: 'Failing plan', blueprintTypeID: 100, hubId: 'jita' }),
+      plan({ id: 'b', name: 'Fine plan', blueprintTypeID: 200, hubId: 'amarr' }),
     ];
 
-    mockedSnapshot.mockImplementation(async () => {
-      throw new Error('ESI unreachable');
-    });
-    // Second call (for the "fine" plan) succeeds instead.
-    mockedSnapshot.mockRejectedValueOnce(new Error('ESI unreachable')).mockResolvedValueOnce({
-      hubPrices: {},
-      hubBuyPrices: {},
-      adjustedPrices: {},
-      systemCostIndex: 0.01,
-    });
+    mockedSnapshots.mockImplementation((requests) =>
+      requests.map((request) =>
+        request.hub.id === 'jita'
+          ? Promise.reject(new Error('ESI unreachable'))
+          : Promise.resolve(SNAPSHOT)
+      )
+    );
 
     const { result } = renderHook(() => useComparedBuildResults({ plans, catalog, ...baseArgs }));
 
@@ -204,6 +211,31 @@ describe('useComparedBuildResults', () => {
     expect(failing?.error).toBe('ESI unreachable');
     expect(fine?.result).toEqual(RESULT);
     expect(fine?.error).toBeNull();
+  });
+
+  it('reports the failure on every plan sharing the failed hub, dropping none of them', async () => {
+    // The shape batching actually created: same-hub plans await one shared
+    // fetch, so they fail together. Each still gets its own row with its own
+    // error rather than vanishing from the comparison (issue #453).
+    const catalog = catalogWith([entry({ blueprintTypeID: 100 })]);
+    const plans = [
+      plan({ id: 'a', name: 'Plan A', hubId: 'jita' }),
+      plan({ id: 'b', name: 'Plan B', hubId: 'jita' }),
+    ];
+
+    mockedSnapshots.mockImplementation((requests) => {
+      const failed = Promise.reject(new Error('ESI unreachable'));
+      return requests.map(() => failed);
+    });
+
+    const { result } = renderHook(() => useComparedBuildResults({ plans, catalog, ...baseArgs }));
+
+    await waitFor(() => expect(result.current.every((row) => !row.loading)).toBe(true));
+
+    expect(result.current).toHaveLength(2);
+    expect(result.current.map((row) => row.planId)).toEqual(['a', 'b']);
+    expect(result.current.every((row) => row.error === 'ESI unreachable')).toBe(true);
+    expect(result.current.every((row) => row.result === null)).toBe(true);
   });
 
   it('recomputes when the plan list changes', async () => {
@@ -225,12 +257,16 @@ describe('useComparedBuildResults', () => {
   it("prices each row at its own plan's material price basis", async () => {
     // Compare has to agree with the plan's own detail panel: a buy-basis plan
     // shown beside a sell-basis one must not quietly quote both at sell.
-    mockedSnapshot.mockResolvedValue({
-      hubPrices: { 34: 5 },
-      hubBuyPrices: { 34: 4 },
-      adjustedPrices: {},
-      systemCostIndex: 0.01,
-    });
+    mockedSnapshots.mockImplementation((requests) =>
+      requests.map(() =>
+        Promise.resolve({
+          hubPrices: { 34: 5 },
+          hubBuyPrices: { 34: 4 },
+          adjustedPrices: {},
+          systemCostIndex: 0.01,
+        })
+      )
+    );
     const catalog = catalogWith([entry({ blueprintTypeID: 100 })]);
     // Distinct run counts, because `computeBuildPlan` is handed a Pick of the
     // record that carries no id — runs is what tells the two calls apart.
