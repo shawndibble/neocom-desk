@@ -23,6 +23,9 @@ import type { MultiSelectFilter } from '@/lib/multiSelectFilter';
 const KEY = 'industryJobs';
 const JOBS_SCOPE = ESI_REGISTRY.getCharacterIndustryJobs.scope;
 
+/** The cache key this module owns, exported so a cache-only cross-character reader (`rosterAttention.ts`) reads exactly the row this loader writes. */
+export const KEYS = { jobs: KEY } as const;
+
 export type JobsLoadResult = StatusResult<IndustryJob[]>;
 
 /** Active (non-completed) industry jobs for a character. ESI or cache, with a distinct reauth state. */

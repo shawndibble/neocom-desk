@@ -4,7 +4,6 @@ import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import {
   Button,
   Caret,
-  ContextMenuHint,
   DataTable,
   EmptyState,
   FilterChip,
@@ -1431,7 +1430,6 @@ export function Market() {
                                 )
                               }
                             />
-                            <ContextMenuHint label={t('market.sell')} />
                           </span>
                         </div>
                         {sortedSell.length === 0 ? (
@@ -1505,7 +1503,6 @@ export function Market() {
                                 )
                               }
                             />
-                            <ContextMenuHint label={t('market.buy')} />
                           </span>
                         </div>
                         {sortedBuy.length === 0 ? (

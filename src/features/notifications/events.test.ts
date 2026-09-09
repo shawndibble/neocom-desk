@@ -4,10 +4,11 @@ import { NOTIFICATION_EVENTS, NOTIFICATION_EVENT_IDS } from './events';
 import { isEventEnabledFor, isEveTypeEnabledFor } from './eventSelection';
 
 describe('NOTIFICATION_EVENTS', () => {
-  it('lists exactly the 10 synthesized events from CONTEXT.md round 20, plus eveNotification (issue #274), planetaryExtractorExpiring (issue #310) and the five corp events (issue #299), in order', () => {
+  it('lists exactly the 10 synthesized events from CONTEXT.md round 20, plus eveNotification (issue #274), planetaryExtractorExpiring (issue #310), spExtractionReady (grilling session, 2026-09-09) and the five corp events (issue #299), in order', () => {
     expect(NOTIFICATION_EVENT_IDS).toEqual([
       'skillLevelComplete',
       'characterNotTraining',
+      'spExtractionReady',
       'industryJobComplete',
       'newMail',
       'planetaryExtractionDone',
@@ -40,6 +41,9 @@ describe('NOTIFICATION_EVENTS', () => {
 
     const walletEvent = NOTIFICATION_EVENTS.find((e) => e.id === 'walletBalanceChanged');
     expect(walletEvent?.scope).toBe(ESI_REGISTRY.getCharacterWallet.scope);
+
+    const spExtractionEvent = NOTIFICATION_EVENTS.find((e) => e.id === 'spExtractionReady');
+    expect(spExtractionEvent?.scope).toBe(ESI_REGISTRY.getCharacterSkills.scope);
   });
 
   it('gives every event a distinct settings.notifications.event.* label key', () => {

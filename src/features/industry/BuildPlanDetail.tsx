@@ -3,7 +3,6 @@ import { useTranslation } from 'react-i18next';
 import {
   Button,
   CollapsiblePanel,
-  ContextMenuHint,
   DataAgeBadge,
   EmptyState,
   IconButton,
@@ -1147,7 +1146,6 @@ export function BuildPlanDetail({
                 onClick={() => setRefreshTick((v) => v + 1)}
               />
               {result && <span className="tabular-nums">{formatDuration(result.seconds)}</span>}
-              <ContextMenuHint label={t('industry.materials')} />
             </span>
           }
         >

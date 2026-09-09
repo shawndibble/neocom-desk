@@ -38,6 +38,11 @@ import {
   type FacilityDefaults,
 } from '@/features/industry/facilityDefaults';
 import { useExpiringWindowHours, EXPIRING_WINDOW_HOUR_OPTIONS } from '@/features/pi/expiringWindow';
+import {
+  useSpExtractionMonitoringEnabled,
+  useSpExtractionThresholdSp,
+} from '@/features/character/spExtractionSettings';
+import { SP_EXTRACTION_CHUNK_SP } from '@/engine/spExtraction';
 import { useDarkThreshold, DARK_AFTER_DAY_OPTIONS } from '@/features/corp/darkThreshold';
 import { useDefaultCharacterFilter } from '@/features/character/defaultCharacterFilter';
 import {
@@ -413,6 +418,10 @@ function DefaultsPanel() {
   const setExpiringHours = useExpiringWindowHours((state) => state.setValue);
   const defaultCharacterFilter = useDefaultCharacterFilter((state) => state.value);
   const setDefaultCharacterFilter = useDefaultCharacterFilter((state) => state.setValue);
+  const spExtractionEnabled = useSpExtractionMonitoringEnabled((state) => state.value);
+  const setSpExtractionEnabled = useSpExtractionMonitoringEnabled((state) => state.setValue);
+  const spExtractionThreshold = useSpExtractionThresholdSp((state) => state.value);
+  const setSpExtractionThreshold = useSpExtractionThresholdSp((state) => state.setValue);
 
   // Each on its own line, never `a() && b()`: `&&` short-circuits, which would
   // make every hook after the first false one a conditional call.
@@ -422,13 +431,17 @@ function DefaultsPanel() {
   const facilityHydrated = useHydratedStore(useFacilityDefaults);
   const expiringHydrated = useHydratedStore(useExpiringWindowHours);
   const defaultCharacterFilterHydrated = useHydratedStore(useDefaultCharacterFilter);
+  const spExtractionEnabledHydrated = useHydratedStore(useSpExtractionMonitoringEnabled);
+  const spExtractionThresholdHydrated = useHydratedStore(useSpExtractionThresholdSp);
   const ready =
     hubHydrated &&
     assumedMeHydrated &&
     assumedTeHydrated &&
     facilityHydrated &&
     expiringHydrated &&
-    defaultCharacterFilterHydrated;
+    defaultCharacterFilterHydrated &&
+    spExtractionEnabledHydrated &&
+    spExtractionThresholdHydrated;
 
   const facilityPreset = FACILITY_PRESETS[facilityDefaults.facility];
 
@@ -627,6 +640,40 @@ function DefaultsPanel() {
             value={fromStoredCharacterFilterValue(defaultCharacterFilter)}
             onChange={(next) => void setDefaultCharacterFilter(toStoredCharacterFilterValue(next))}
           />
+        </div>
+
+        <div className="space-y-1.5 border-t border-line pt-3">
+          <label className="flex items-center gap-2 text-xs font-semibold">
+            <input
+              type="checkbox"
+              checked={spExtractionEnabled}
+              onChange={() => void setSpExtractionEnabled(!spExtractionEnabled)}
+              className="size-4 shrink-0 cursor-pointer accent-accent"
+            />
+            {t('settings.spExtractionEnabledLabel')}
+          </label>
+          <p className="text-xs text-text-dim">{t('settings.spExtractionEnabledHint')}</p>
+          {spExtractionEnabled && (
+            <div className="ml-6 space-y-1.5">
+              <label htmlFor="settings-sp-extraction-threshold" className="block text-xs">
+                {t('settings.spExtractionThresholdLabel')}
+              </label>
+              <p className="text-xs text-text-dim">{t('settings.spExtractionThresholdHint')}</p>
+              <TextInput
+                id="settings-sp-extraction-threshold"
+                type="number"
+                min={SP_EXTRACTION_CHUNK_SP}
+                step={SP_EXTRACTION_CHUNK_SP}
+                value={spExtractionThreshold}
+                onChange={(event) => {
+                  const parsed = Math.round(Number(event.target.value));
+                  if (!Number.isFinite(parsed) || parsed <= 0) return;
+                  void setSpExtractionThreshold(parsed);
+                }}
+                className="w-40"
+              />
+            </div>
+          )}
         </div>
       </div>
     </Panel>

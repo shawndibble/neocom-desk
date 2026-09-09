@@ -16,7 +16,6 @@ import { useState, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
-  ContextMenuHint,
   DataTable,
   EmptyState,
   IconButton,
@@ -286,18 +285,15 @@ export function AppraisalPanel({
           ) : undefined
         }
         actions={
-          <span className="flex items-center gap-1">
-            <IconButton
-              size="sm"
-              icon={<Icon.Download />}
-              label={t('market.appraisal.exportCsv')}
-              disabled={rows.length === 0}
-              onClick={() =>
-                downloadCsv('market-appraisal', rows, appraisalCsvColumns(t), new Date())
-              }
-            />
-            <ContextMenuHint label={t('market.appraisal.resultTitle')} />
-          </span>
+          <IconButton
+            size="sm"
+            icon={<Icon.Download />}
+            label={t('market.appraisal.exportCsv')}
+            disabled={rows.length === 0}
+            onClick={() =>
+              downloadCsv('market-appraisal', rows, appraisalCsvColumns(t), new Date())
+            }
+          />
         }
       >
         {loading && result === null ? (

@@ -18,7 +18,7 @@
  */
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ContextMenuHint, EmptyState, Modal, Spinner, StatChip } from '@/components/ui';
+import { EmptyState, Modal, Spinner, StatChip } from '@/components/ui';
 import { formatIsk } from '@/lib/isk';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
@@ -127,7 +127,6 @@ export function BpcContractModal({
         <div>
           <p className="flex items-center gap-1.5 pb-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
             {t('bpcContracts.contentsHeading')}
-            <ContextMenuHint label={t('bpcContracts.contentsHeading')} />
           </p>
           {items === undefined ? (
             <Spinner />

@@ -5,7 +5,8 @@ export { Button } from './Button';
 export type { ButtonVariant, ButtonSize } from './Button';
 export { buttonClassName } from './buttonClassName';
 export { StatChip } from './StatChip';
-export type { StatChipTone } from './StatChip';
+export { STAT_CHIP_TONE_TEXT_CLASS } from './statChipTone';
+export type { StatChipTone } from './statChipTone';
 export { DataAgeBadge } from './DataAgeBadge';
 export { EmptyState } from './EmptyState';
 export { Tabs } from './Tabs';
@@ -44,7 +45,6 @@ export {
   ContextMenuSubTrigger,
   ContextMenuSubContent,
 } from './ContextMenu';
-export { ContextMenuHint } from './ContextMenuHint';
 export { Popover, PopoverContent, PopoverTrigger } from './Popover';
 export {
   DropdownMenu,

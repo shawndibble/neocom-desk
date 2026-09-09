@@ -18,7 +18,7 @@
  * allowed to ask (AC3).
  */
 import { useTranslation } from 'react-i18next';
-import { ContextMenuHint, EmptyState, Panel } from '@/components/ui';
+import { EmptyState, Panel } from '@/components/ui';
 import type { CorpBoardItem, CorpBoardItemKind } from '@/engine/corp/board';
 import type { CorpCapabilities, CorpCapability } from '@/engine/corpRoles';
 import { CorpBoardRow } from './CorpBoardRow';
@@ -114,7 +114,6 @@ function KindCard({
           </span>
         ) : undefined
       }
-      actions={items.length > 0 ? <ContextMenuHint label={t(TITLE_FOR_KIND[kind])} /> : undefined}
     >
       {items.length === 0 ? (
         <EmptyState title={t(EMPTY_FOR_KIND[kind])} />

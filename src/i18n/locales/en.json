@@ -957,7 +957,34 @@
     "cancel": "Cancel",
     "ok": "OK",
     "searchPlaceholder": "Search by name or corporation",
-    "noSearchMatches": "No characters match this search."
+    "noSearchMatches": "No characters match this search.",
+    "viewModeLabel": "View",
+    "viewCards": "Cards",
+    "viewTable": "Table",
+    "columnsButton": "Columns",
+    "columnsMenuTitle": "Columns",
+    "refreshAll": "Refresh all",
+    "refreshingAll": "Refreshing…",
+    "refreshAllHint": "Pulls live data for every character. This may take a moment for a large roster.",
+    "column": {
+      "name": "Name",
+      "corp": "Corp",
+      "spTotal": "SP",
+      "wallet": "Wallet",
+      "lastSynced": "Last synced",
+      "training": "Training",
+      "openJobs": "Open jobs",
+      "pi": "PI",
+      "spReady": "SP ready",
+      "alerts": "Alerts"
+    },
+    "jobSlotCategory": {
+      "manufacturing": "Manufacturing",
+      "science": "Science",
+      "reaction": "Reactions"
+    },
+    "openJobsHeaderTooltip": "Running jobs, manufacturing / science / reactions. Hover a row's value for slot capacity.",
+    "spReadyYes": "Ready"
   },
   "overview": {
     "title": "Overview",
@@ -1078,7 +1105,6 @@
     "loadingEllipsis": "Loading…",
     "unknown": "—",
     "aboutLabel": "About {{label}}",
-    "contextMenuHint": "Right-click, or press and hold on touch, for more actions.",
     "offlineTitle": "Showing cached data",
     "refreshFailedTitle": "Refresh failed — showing cached data",
     "incompleteTitle": "Incomplete data — some pages could not be loaded",
@@ -2278,6 +2304,10 @@
         "title": "New mail",
         "body": "{{character}} has new mail."
       },
+      "spExtractionReady": {
+        "title": "SP extraction ready",
+        "body": "{{character}} has enough spare skill points to use a Skill Extractor."
+      },
       "newCalendarEvent": {
         "title": "New calendar event",
         "body": "{{character}}: {{event}} was added, starting {{when}}.",
@@ -2865,7 +2895,7 @@
           "notificationFeed": "Your Alerts.",
           "notificationFeedNote": "Ones you have already been shown, so another device can catch up on what it missed. Kept for 30 days.",
           "settings": "The settings you chose on this page.",
-          "settingsNote": "Your notification preferences, the PI customs rates you overrode, your industry build groups, the defaults every page starts from — trade hub, industry facility, assumed ME and assumed TE, the PI expiring-soon window, the corp dark threshold, and the default characters shown — and the appraisal price percentage you set on the Market page. Nothing else on this page leaves your device."
+          "settingsNote": "Your notification preferences, the PI customs rates you overrode, your industry build groups, the defaults every page starts from — trade hub, industry facility, assumed ME and assumed TE, the PI expiring-soon window, the corp dark threshold, and the default characters shown — the appraisal price percentage you set on the Market page, and whether SP Extraction monitoring is on along with the SP threshold you set for it. Nothing else on this page leaves your device."
         },
         "local": {
           "title": "Kept on this device only",
@@ -2914,6 +2944,7 @@
       "event": {
         "skillLevelComplete": "Skill Level Complete",
         "characterNotTraining": "Character Not Training",
+        "spExtractionReady": "SP Extraction Ready",
         "industryJobComplete": "Industry Job Complete",
         "newMail": "New Mail",
         "planetaryExtractionDone": "Planetary Extraction Done",
@@ -3004,6 +3035,10 @@
     "piExpiringHint": "How far ahead the Colonies list flags an extractor — and sorts it to the top.",
     "defaultCharacterFilterLabel": "Default characters shown",
     "defaultCharacterFilterHint": "Which character(s) Wallet Balance and Industry's Active Jobs open on by default.",
+    "spExtractionEnabledLabel": "SP extraction monitoring",
+    "spExtractionEnabledHint": "Flags a character on the Characters table, and alerts you, once they've banked enough spare skill points to safely use a Skill Extractor. Off by default.",
+    "spExtractionThresholdLabel": "SP extraction threshold",
+    "spExtractionThresholdHint": "How much spare SP (above the 5,000,000 floor a character can never drop below) counts as \"ready.\" One Skill Extractor pulls 500,000 SP.",
     "darkThresholdLabel": "Members go dark after",
     "darkThresholdHint": "Your corp’s inactivity policy. Sets the roster’s Dark filter and its count.",
     "hours_one": "{{count}} hour",

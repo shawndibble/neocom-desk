@@ -165,6 +165,17 @@ here — they go one per file in `docs/context/decisions/`.
 - **EIV (Estimated Item Value)**: The SCC's reference price for the materials
   a manufacturing job consumes, at ME0 quantities. Used only to size the
   **Job Fee** — it is not what the materials actually cost to buy.
+- **Error Budget**: ESI's allowance of 100 non-2xx/3xx responses per 60
+  seconds, counted **globally across every route** for the whole client — not
+  per endpoint and not per Character. Spend it and ESI answers 420 to
+  everything until the window rolls over, so one page's fan-out of forbidden
+  structures can throttle every other Character's mail, contracts and jobs
+  (issue #655). Distinct from the **rate** limit (429, `X-Ratelimit-*`), which
+  is about request volume rather than errors. `src/esi/budget.ts` is the app's
+  one reading of it: it tracks `X-ESI-Error-Limit-Remain`/`-Reset` off every
+  response, spaces requests out before the budget is gone, and shuts a
+  **circuit** on a 420/429 so callers fail fast into the cache instead of each
+  retrying into a closed door.
 - **EVE Notification**: The single Notification Event (`eveNotification`,
   issue #274) covering everything `GET /characters/{character_id}/notifications/`
   pushes — a different, non-overlapping source from every other Notification

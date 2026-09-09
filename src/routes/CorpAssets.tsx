@@ -20,7 +20,6 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  ContextMenuHint,
   DataAgeBadge,
   DataTable,
   Disclosure,
@@ -366,15 +365,12 @@ function CorpAssetsView() {
           ) : undefined
         }
         actions={
-          <>
-            <IconButton
-              icon={<Icon.Refresh />}
-              label={t('corp.assets.refresh')}
-              onClick={snapshot.refresh}
-              disabled={snapshot.loading}
-            />
-            <ContextMenuHint label={t('corp.assets.title')} />
-          </>
+          <IconButton
+            icon={<Icon.Refresh />}
+            label={t('corp.assets.refresh')}
+            onClick={snapshot.refresh}
+            disabled={snapshot.loading}
+          />
         }
       />
       <CorpSubNav />
