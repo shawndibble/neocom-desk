@@ -198,14 +198,14 @@ describe('loadMemberLabels (AC3)', () => {
   });
 
   /**
-   * Issue #655. Deduplication alone does not bound this: a large corp spread
-   * across nullsec is standing in as many distinct Upwell structures as it
-   * holds, each its own `/universe/structures/{id}` call, and each one the
-   * reading Character is off the ACL of answers 403 — which counts against
-   * ESI's global 100-non-2xx-per-minute error budget. Firing them all at once
-   * exhausted that budget in production and 420'd every other request the app
-   * made. `corp/assets.ts` took this cap in issue #420 and the roster was
-   * missed, so this pins the cap rather than trusting the shape of the code.
+   * Issue #655. Deduplication alone does not bound this: a corp spread across
+   * nullsec stands in as many distinct Upwell structures as it holds, each its
+   * own `/universe/structures/{id}`, and the roster used to ask for all of them
+   * at once — on top of every other read the app had in flight.
+   * `corp/assets.ts` took the `ESI_FANOUT_CONCURRENCY` cap in issue #420 and
+   * this call site was missed, so pin the cap rather than trust the shape of
+   * the code: the upper bound is what an uncapped `Promise.all` fails, the
+   * lower bound is what a fully sequential loop fails.
    */
   it('caps the per-structure name-resolution fan-out instead of firing every request at once', async () => {
     const FLOOR = 1_000_000_000_000;

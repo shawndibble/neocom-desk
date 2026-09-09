@@ -17,10 +17,11 @@
  *
  * The name/ship/location resolution below is the other half of this module.
  * AC3 is a bound on *calls*, not on ids: a 200-member corp must not fan out to
- * 200 requests, so characters and NPC locations go through the bulk resolvers,
- * and Upwell structures — which have no bulk endpoint — are deduplicated and
- * then rate-capped, because deduplication alone bounds nothing for a corp that
- * is genuinely spread across a hundred citadels (issue #655).
+ * 200 requests, so characters and NPC locations go through the bulk resolvers.
+ * Upwell structures have no bulk endpoint, so deduplication is the only thing
+ * that thins them — and for a corp genuinely spread across a hundred of them it
+ * thins nothing. Those go out capped rather than all at once (issue #655): the
+ * cap bounds how many are in flight, not how many are asked for.
  */
 import {
   getCorporationMembers,
@@ -134,16 +135,20 @@ async function resolveEntityNames(ids: readonly number[]): Promise<Map<number, s
 /**
  * Location names for the distinct places the roster is standing in.
  *
- * Deduplication cuts the count but does not bound it: this used to claim that
- * two hundred members share a home structure and a trade hub rather than two
- * hundred addresses, and issue #655 is what a corp spread across nullsec does
- * to that assumption — a hundred distinct citadels, each its own
- * `/universe/structures/{id}` because Upwell structures have no bulk endpoint.
- * Worse, a structure the reading Character is off the ACL of answers 403, and
- * ESI counts non-2xx responses against a global 100-per-minute error budget,
- * so an uncapped fan-out here 420s every other request the app makes, for
- * every Character. Hence the same `ESI_FANOUT_CONCURRENCY` cap
- * `features/corp/assets.ts` took in issue #420; the roster was missed then.
+ * Deduplication cuts the count but does not bound it: a corp spread across
+ * nullsec stands in as many distinct Upwell structures as it holds, and each is
+ * its own `/universe/structures/{id}` because they have no bulk endpoint. So
+ * the structure half goes out at `ESI_FANOUT_CONCURRENCY` — the policy
+ * `features/corp/assets.ts` took in issue #420, which this call site was missed
+ * by until issue #655.
+ *
+ * Worth being exact about what that cap buys, because a structure the reading
+ * Character is off the ACL of answers 403 and ESI counts every non-2xx against
+ * one global 100-per-minute budget: ten in flight rather than a hundred does
+ * not on its own keep a hundred refusals inside that budget. Memoizing the
+ * refusal and an app-wide breaker are what do, and both are separate items on
+ * #655. The cap's own job is the smaller one — this page stops dumping its
+ * whole burst at once on top of every other read the app has in flight.
  *
  * A structure the reading Character is not on the ACL for resolves to nothing
  * and the view falls back to the raw id, exactly as Assets does.
