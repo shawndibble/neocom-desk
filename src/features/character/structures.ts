@@ -8,25 +8,54 @@
  * would pin the shell-wide reauth notice permanently with no re-login able to
  * fix it. Only a 401 (or a failed token refresh) is a real auth failure.
  *
- * Cached per character, not under the global sentinel: unlike an NPC station,
- * a structure's visibility is genuinely ACL-gated, so caching a resolved name
- * globally would leak it to a character not on that ACL.
+ * A resolved name is written under the character that resolved it *and*
+ * mirrored to the global sentinel row, so every other Character in this
+ * browser's roster reads it with no ESI call of their own. That used to be
+ * called out as a leak: the ACL is genuinely per-Character, so a name one
+ * Character can see is not automatically one every Character should. What
+ * changed is *who* the "every Character" is — every row here is scoped to
+ * `db.characters`, i.e. only the Characters the person at this keyboard has
+ * already added to their own app. Sharing a name across a person's own alts
+ * once one of them proves ACL access is not exposing it to a stranger; it is
+ * the same person's own client remembering what it already knows. (Issue
+ * #655 follow-up.)
  *
- * A refusal is cached too, and has to be. A 403 writes no row, so without a
- * memo of its own every caller re-asked on every visit — and the callers are
- * fan-outs over *distinct locations*: a corp whose assets or members are
- * spread across a hundred citadels the reading Character is not on the ACL of
- * spent a hundred 403s per page load, forever. ESI's error limit is 100
- * non-2xx responses per minute applied across *every* route, so a big enough
- * corp could throttle the whole app out of one roster render. The nearby
- * `heldAfterFailure` in `esi/cache.ts` does not cover this: it is skipped for
- * `STALE_AFTER.static` keys, and it needs a stale row to hold, which a
- * structure that has only ever been refused does not have. (Issue #655.)
+ * A refusal is cached too, and has to be, on two levels:
+ *
+ * - Per Character (`forbiddenKey`): a 403 writes no name row, so without a
+ *   memo of its own every caller re-asked on every visit — and the callers
+ *   are fan-outs over *distinct locations*, so a corp spread across a
+ *   hundred citadels the reading Character is not on the ACL of spent a
+ *   hundred 403s per page load, forever.
+ * - Roster-wide (`rosterForbiddenKey`): once every Character in the roster
+ *   has been tried and refused, that is recorded too, so a citadel none of
+ *   them can see is swept once a day *for the whole roster*, not once a day
+ *   *per Character* — a roster of fifteen otherwise turns one forbidden
+ *   structure into fifteen daily refusals instead of one.
+ *
+ * ESI's error limit is 100 non-2xx/3xx responses per minute applied across
+ * *every* route, so a big enough corp could throttle the whole app out of one
+ * roster render; both memos above exist to bound that, and every ESI call
+ * this module makes (including the roster fallback's) still passes through
+ * `esi/budget.ts`'s app-wide circuit, so a sweep that meets a spent budget
+ * backs off or fails fast into the cache rather than adding to the storm. The
+ * nearby `heldAfterFailure` in `esi/cache.ts` does not cover the per-Character
+ * case on its own: it is skipped for `STALE_AFTER.static` keys, and it needs
+ * a stale row to hold, which a structure that has only ever been refused does
+ * not have. (Issue #655.)
  */
+import { db } from '@/db';
 import { AuthError } from '@/auth/sso';
 import { getUniverseStructure, type UniverseStructure } from '@/esi/endpoints';
 import { EsiError } from '@/esi/client';
-import { loadWithCache, readCachedEntries, writeCached, STALE_AFTER } from '@/esi/cache';
+import {
+  loadWithCache,
+  readCached,
+  readCachedEntries,
+  writeCached,
+  GLOBAL_CACHE_CHARACTER_ID,
+  STALE_AFTER,
+} from '@/esi/cache';
 
 function cacheKey(structureId: number): string {
   return `structure:${structureId}`;
@@ -48,6 +77,17 @@ function cacheKey(structureId: number): string {
  */
 function forbiddenKey(structureId: number): string {
   return `structure:${structureId}:forbidden`;
+}
+
+/**
+ * Recorded once every Character in the roster has been tried and refused
+ * (see `resolveViaRoster`). Lives on the global sentinel row, same as the
+ * shared name row `cacheKey` doubles as once resolved — this is a roster-wide
+ * fact, not one Character's own ACL state, so it belongs beside the other
+ * shared row rather than under any one `characterId`.
+ */
+function rosterForbiddenKey(structureId: number): string {
+  return `structure:${structureId}:roster-forbidden`;
 }
 
 /**
@@ -94,18 +134,30 @@ async function readMemo(
   };
 }
 
-async function loadStructure(
+/**
+ * One Character's own attempt, with no roster fallback — the leaf every
+ * candidate in `resolveViaRoster`'s sweep calls, so trying the roster never
+ * recurses into trying the roster again.
+ *
+ * `forbidden: true` means *this* Character is confirmed off the ACL (a fresh
+ * 403, or a same-day memo of one) — the only condition worth spending the
+ * rest of the roster on. Anything else (offline, a 5xx, nothing cached yet)
+ * says nothing about the ACL, so it reports `forbidden: false` and callers
+ * stop there instead of fanning out over every other Character for a blip.
+ */
+async function loadOwnStructure(
   characterId: number,
   structureId: number
-): Promise<UniverseStructure | null> {
+): Promise<{ structure: UniverseStructure | null; forbidden: boolean }> {
   // Not an early `return null`: this stands in for the request, so it has to
   // answer the way the request would have. A Character who has lost ACL access
   // still gets the name they cached while they had it, because that is what a
   // live 403 does here today (`loadWithCacheStatus` falls back to the stored
   // row on any failure it does not treat as an auth failure).
   const memo = await readMemo(characterId, structureId);
-  if (memo.forbidden) return memo.name ?? null;
+  if (memo.forbidden) return { structure: memo.name ?? null, forbidden: true };
 
+  let forbidden = false;
   const result = await loadWithCache(
     characterId,
     cacheKey(structureId),
@@ -117,6 +169,7 @@ async function loadStructure(
         // the ACL, and memoizing one as a refusal would hide a name for a day
         // over a blip.
         if (err instanceof EsiError && err.status === 403) {
+          forbidden = true;
           await writeCached(characterId, forbiddenKey(structureId), true, Date.now());
         }
         throw err;
@@ -131,7 +184,73 @@ async function loadStructure(
       staleAfterMs: STALE_AFTER.static,
     }
   );
-  return result?.data ?? null;
+  return { structure: result?.data ?? null, forbidden };
+}
+
+/**
+ * Tried only after this Character is confirmed off the ACL. Sequential and
+ * stopping at the first success, so it spends the fewest possible 403s
+ * rather than always paying for the whole roster — every candidate that
+ * already carries its own same-day refusal memo answers `loadOwnStructure`
+ * without touching the network at all, so the calls that actually reach ESI
+ * here are only the roster members being asked for the first time today.
+ *
+ * A miss across the whole roster is memoized on `rosterForbiddenKey` so the
+ * next ask — by this Character or any other — skips the sweep entirely until
+ * that memo lapses. Without it, a citadel none of the roster can see would be
+ * swept again every time a *different* Character happened to hit it first
+ * that day. That memo is written only when every other Character came back a
+ * *confirmed* 403 — never when one merely produced no answer (a timeout, a
+ * 5xx, or the app-wide budget gate refusing that particular call). Writing it
+ * on an inconclusive attempt would risk hiding a citadel some Character can
+ * actually see for a full day, over nothing worse than a blip that would have
+ * resolved on the very next visit.
+ */
+async function resolveViaRoster(
+  askingCharacterId: number,
+  structureId: number
+): Promise<UniverseStructure | null> {
+  const memo = await readCachedEntries<boolean>(GLOBAL_CACHE_CHARACTER_ID, [
+    rosterForbiddenKey(structureId),
+  ]);
+  const refusal = memo.get(rosterForbiddenKey(structureId));
+  if (refusal !== undefined && Date.now() - refusal.fetchedAt < FORBIDDEN_MEMO_MS) return null;
+
+  const others = (await db.characters.toArray())
+    .map((character) => character.characterId)
+    .filter((characterId) => characterId !== askingCharacterId);
+
+  let everyOtherConfirmedForbidden = others.length > 0;
+  for (const characterId of others) {
+    const { structure, forbidden } = await loadOwnStructure(characterId, structureId);
+    if (structure) return structure;
+    if (!forbidden) everyOtherConfirmedForbidden = false;
+  }
+
+  if (everyOtherConfirmedForbidden) {
+    await writeCached(GLOBAL_CACHE_CHARACTER_ID, rosterForbiddenKey(structureId), true, Date.now());
+  }
+  return null;
+}
+
+async function loadStructure(
+  characterId: number,
+  structureId: number
+): Promise<UniverseStructure | null> {
+  const shared = await readCached<UniverseStructure>(
+    GLOBAL_CACHE_CHARACTER_ID,
+    cacheKey(structureId)
+  );
+  if (shared) return shared;
+
+  const own = await loadOwnStructure(characterId, structureId);
+  const structure =
+    own.structure ?? (own.forbidden ? await resolveViaRoster(characterId, structureId) : null);
+
+  if (structure) {
+    await writeCached(GLOBAL_CACHE_CHARACTER_ID, cacheKey(structureId), structure, Date.now());
+  }
+  return structure;
 }
 
 /** Structure name, or null if unresolvable (no ACL access, offline, or uncached). */

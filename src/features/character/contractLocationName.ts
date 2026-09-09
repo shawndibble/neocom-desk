@@ -25,11 +25,13 @@
  *
  * The *answer* is cached, not just the lookups behind it, so a reopen collapses
  * to one Dexie read for both id spaces. Per character, not under the global
- * sentinel, because a structure name is ACL-gated and `structures.ts` must not
- * leak one to a character not on that ACL. An unresolvable location (offline,
- * or a structure this character can't see into) caches nothing and is retried
- * on the next open, which is the honest outcome: `null` here means "don't
- * know", never "has no name".
+ * sentinel: `structures.ts` already shares a resolved structure name across
+ * this browser's own roster on its own row (issue #669), so duplicating that
+ * sharing here would only be a second cache of the same fact under a
+ * different key. An unresolvable location (offline, or a structure nobody in
+ * the roster can see into) caches nothing and is retried on the next open,
+ * which is the honest outcome: `null` here means "don't know", never "has no
+ * name".
  */
 import { loadWithCache, STALE_AFTER } from '@/esi/cache';
 import { lookupNpcStation } from '@/sde/npcStations';
