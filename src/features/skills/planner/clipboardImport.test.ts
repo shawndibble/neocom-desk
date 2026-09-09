@@ -102,6 +102,37 @@ describe('previewClipboardImport: EFT fit', () => {
     expect(preview.errors).toEqual([]);
   });
 
+  it('takes the hull from a bare [Ship] header, which used to be dropped', async () => {
+    // Behaviour change (issue #630): `[Rifter]` used to fail the header
+    // outright, so the Skill Planner planned the modules and silently left out
+    // everything the hull itself needs.
+    const deps: ClipboardImportDeps = {
+      skillByName: new Map(),
+      typeByName,
+      loadType: loadTypeFixture({
+        [RIFTER_TYPE_ID]: [
+          { attribute_id: 182, value: 3329 }, // Minmatar Frigate
+          { attribute_id: 277, value: 1 },
+        ],
+        [MODULE_TYPE_ID]: [
+          { attribute_id: 182, value: 3336 }, // Gunnery
+          { attribute_id: 277, value: 3 },
+        ],
+      }),
+    };
+
+    const preview = await previewClipboardImport('[Rifter]\n\nGyrostabilizer II', deps);
+
+    expect(preview.shipName).toBe('Rifter');
+    expect(preview.fitName).toBe('');
+    expect(preview.entries).toEqual([
+      { skillTypeID: 3329, targetLevel: 1 },
+      { skillTypeID: 3336, targetLevel: 3 },
+    ]);
+    expect(preview.warnings).toEqual([]);
+    expect(preview.errors).toEqual([]);
+  });
+
   it('warns on unresolved item names without dropping resolvable ones', async () => {
     const deps: ClipboardImportDeps = {
       skillByName: new Map(),
@@ -162,12 +193,14 @@ describe('previewClipboardImport: EFT fit', () => {
       typeByName: new Map(),
       loadType: async () => null,
     };
-    // Starts with "[" (routes to EFT mode) but has no comma-separated fit name.
-    const preview = await previewClipboardImport('[Rifter]\nGyrostabilizer II', deps);
+    // Starts with "[" (so it routes to EFT mode) but names no ship. A bare
+    // "[Rifter]" used to stand in for a broken header here; it parses fine now
+    // (issue #630), so this needs a header that is genuinely unreadable.
+    const preview = await previewClipboardImport('[, Max Hacker]\nGyrostabilizer II', deps);
     expect(preview.errors).toEqual([
       {
         line: 1,
-        text: '[Rifter]',
+        text: '[, Max Hacker]',
         reason: 'invalid or missing fit header, expected "[Ship Name, Fit Name]"',
       },
     ]);

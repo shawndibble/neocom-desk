@@ -72,11 +72,10 @@ export interface FitSkippedItem {
 
 export interface FitToBuildPlansResult {
   /**
-   * The hull, or null when the header could not be read — `shipName` and
-   * `fitName` are written together or not at all, so an unreadable header
-   * costs the ship too. Kept apart from `items` so the caller can give it the
-   * newest `updatedAt` of the batch, which decides what the pilot's *next*
-   * hand-made plan defaults from (issue #456).
+   * The hull, or null when the header could not be read at all, or when the
+   * ship it named has no blueprint. Kept apart from `items` so the caller can
+   * give it the newest `updatedAt` of the batch, which decides what the
+   * pilot's *next* hand-made plan defaults from (issue #456).
    */
   hull: FitBuildCandidate | null;
   /** Every other buildable item, in first-appearance order. */
@@ -86,12 +85,19 @@ export interface FitToBuildPlansResult {
   /** Charges withheld by default, so the dialog can say so. Empty when `includeCharges`. */
   excludedCharges: FitSkippedItem[];
   /**
-   * The fit name from the `[Ship, Fit]` header, or null when it could not be
-   * read — which also means no `hull`, since the parser writes both header
-   * names together or neither. Callers test this rather than a second
-   * `headerFailed` flag that could only ever say the same thing.
+   * The fit name from the `[Ship, Fit]` header, or null when there isn't one —
+   * a bare `[Ship]` header reads perfectly well and names no fit (issue #630),
+   * and an empty name is not a name. Ask `headerFailed`, not this, whether the
+   * header parsed.
    */
   groupName: string | null;
+  /**
+   * The header line could not be read at all, so nothing came from it: no
+   * hull, no group name. Distinct from `hull === null` (a readable header
+   * whose ship merely has no blueprint) and from `groupName === null` (a bare
+   * `[Ship]`, which imports its hull fine).
+   */
+  headerFailed: boolean;
 }
 
 export interface FitToBuildPlansOptions {
@@ -139,9 +145,9 @@ export function fitToBuildPlans(
   lookup: FitBlueprintLookup,
   { includeCharges = false }: FitToBuildPlansOptions = {}
 ): FitToBuildPlansResult {
-  // Both header names are assigned together inside the parser's single
-  // `if (headerMatch)` branch, so either both are set or neither is. Testing
-  // one is testing both.
+  // The parser writes a ship name only from a header it could read, and its
+  // ship group requires a non-space character — so an empty `shipName` is an
+  // exact test for a failed header, fit name present or not.
   const headerFailed = fit.shipName === '';
 
   const resolved = new Map<number, { resolution: FitBlueprintResolution; quantity: number }>();
@@ -199,6 +205,9 @@ export function fitToBuildPlans(
     }),
     skipped: [...skipped.values()],
     excludedCharges: [...excludedCharges.values()],
-    groupName: headerFailed ? null : fit.fitName,
+    // An empty fit name is not a name: after a bare `[Ship]` header the caller
+    // names the group after the hull instead.
+    groupName: headerFailed || fit.fitName === '' ? null : fit.fitName,
+    headerFailed,
   };
 }

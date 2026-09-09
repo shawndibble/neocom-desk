@@ -674,15 +674,18 @@ export function Industry() {
     // members later: nothing marks which plan is the hull, and any ordering
     // that stood in for one (insertion order, newest `updatedAt`) names a
     // different plan the moment the pilot edits a member.
-    const name =
-      preview.groupName === null
-        ? t('industry.newGroupName')
-        : preview.hull
-          ? t('industry.fitImportGroupName', {
-              fit: preview.groupName,
-              ship: preview.hull.productName,
-            })
-          : preview.groupName;
+    //
+    // Four ways this lands, because a bare `[Ship]` header now yields a hull
+    // with no fit name (issue #630): both names, either one alone, or a
+    // header that gave neither.
+    const name = preview.groupName
+      ? preview.hull
+        ? t('industry.fitImportGroupName', {
+            fit: preview.groupName,
+            ship: preview.hull.productName,
+          })
+        : preview.groupName
+      : (preview.hull?.productName ?? t('industry.newGroupName'));
     await setBuildGroups(addBuildGroup(buildGroups, activeCharacterId, { id: groupId, name }));
     await db.buildPlans.bulkAdd(newPlans);
     scheduleSync(activeCharacterId);
