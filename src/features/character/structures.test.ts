@@ -60,7 +60,7 @@ describe('loadStructureName', () => {
     expect(authFailures).toEqual([]);
   });
 
-  it('does not re-request a structure that already answered 403 (issue: ESI error limit)', async () => {
+  it('does not re-request a structure that already answered 403 (issue #655)', async () => {
     let requests = 0;
     server.use(
       http.get(`${ESI_BASE_URL}/universe/structures/1000000000004`, () => {

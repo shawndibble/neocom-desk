@@ -21,18 +21,12 @@
  * corp could throttle the whole app out of one roster render. The nearby
  * `heldAfterFailure` in `esi/cache.ts` does not cover this: it is skipped for
  * `STALE_AFTER.static` keys, and it needs a stale row to hold, which a
- * structure that has only ever been refused does not have.
+ * structure that has only ever been refused does not have. (Issue #655.)
  */
 import { AuthError } from '@/auth/sso';
 import { getUniverseStructure, type UniverseStructure } from '@/esi/endpoints';
 import { EsiError } from '@/esi/client';
-import {
-  loadWithCache,
-  readCached,
-  readCachedEntries,
-  writeCached,
-  STALE_AFTER,
-} from '@/esi/cache';
+import { loadWithCache, readCachedEntries, writeCached, STALE_AFTER } from '@/esi/cache';
 
 function cacheKey(structureId: number): string {
   return `structure:${structureId}`;
@@ -41,9 +35,16 @@ function cacheKey(structureId: number): string {
 /**
  * Where the refusal is recorded — a sibling row rather than a field inside the
  * name row, because the two are alternatives: a structure has a stored name or
- * a stored refusal, never both at once from the same read. It sorts inside the
- * same `[characterId+key]` range `cachePurge.ts` deletes, so a scope revoke or
- * an owner change clears it along with everything else this Character cached.
+ * a stored refusal, never both at once from the same read.
+ *
+ * It sorts inside the `[characterId+key]` range `purgeCharacterCache` deletes,
+ * so a scope revoke or an owner change clears it along with everything else
+ * this Character cached. It is deliberately *not* `corp:`-prefixed, so
+ * `purgeCorpScopedCache` leaves it alone on a corporation change — the same
+ * treatment the `structure:{id}` name row gets, and the two have to agree. A
+ * pilot who changes corp therefore waits out the window below before the new
+ * corp's citadels resolve, exactly as they keep seeing the old corp's names
+ * for that long.
  */
 function forbiddenKey(structureId: number): string {
   return `structure:${structureId}:forbidden`;
@@ -61,11 +62,36 @@ function forbiddenKey(structureId: number): string {
  */
 const FORBIDDEN_MEMO_MS = STALE_AFTER.static;
 
-/** Has this Character asked for this structure recently and been refused? */
-async function isKnownForbidden(characterId: number, structureId: number): Promise<boolean> {
-  const key = forbiddenKey(structureId);
-  const row = (await readCachedEntries<true>(characterId, [key])).get(key);
-  return row !== undefined && Date.now() - row.fetchedAt < FORBIDDEN_MEMO_MS;
+/**
+ * The stored name and the stored refusal, in one read.
+ *
+ * Both keys go through a single `readCachedEntries` — one purge check and one
+ * `bulkGet` — rather than a call each, which is the convention that function's
+ * own docstring states. It matters more here than in most places: the caller is
+ * a fan-out over every distinct location on a page, which is the traffic this
+ * memo exists to cut.
+ *
+ * The freshness test is a bare age comparison rather than `esi/cache.ts`'s
+ * `readFreshRow`, which is not exported and would pull the shared module into a
+ * fix local to this file. Nothing it adds applies here: a `true` row carries no
+ * `Expires` header to take the later of, and `isRefreshInvalidated` is a no-op
+ * above `STALE_AFTER.default`, which `FORBIDDEN_MEMO_MS` is.
+ */
+async function readMemo(
+  characterId: number,
+  structureId: number
+): Promise<{ forbidden: boolean; name: UniverseStructure | undefined }> {
+  const nameKey = cacheKey(structureId);
+  const refusalKey = forbiddenKey(structureId);
+  const rows = await readCachedEntries<UniverseStructure | boolean>(characterId, [
+    nameKey,
+    refusalKey,
+  ]);
+  const refusal = rows.get(refusalKey);
+  return {
+    forbidden: refusal !== undefined && Date.now() - refusal.fetchedAt < FORBIDDEN_MEMO_MS,
+    name: rows.get(nameKey)?.value as UniverseStructure | undefined,
+  };
 }
 
 async function loadStructure(
@@ -77,9 +103,8 @@ async function loadStructure(
   // still gets the name they cached while they had it, because that is what a
   // live 403 does here today (`loadWithCacheStatus` falls back to the stored
   // row on any failure it does not treat as an auth failure).
-  if (await isKnownForbidden(characterId, structureId)) {
-    return (await readCached<UniverseStructure>(characterId, cacheKey(structureId))) ?? null;
-  }
+  const memo = await readMemo(characterId, structureId);
+  if (memo.forbidden) return memo.name ?? null;
 
   const result = await loadWithCache(
     characterId,
