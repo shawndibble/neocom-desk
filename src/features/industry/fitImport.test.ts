@@ -1,8 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { db, type BuildPlanRecord } from '@/db';
 import type { FitToBuildPlansResult } from '@/engine/import/fitToBuildPlans';
 import { DEFAULT_FACILITY_DEFAULTS } from './facilityDefaults';
 import type { BlueprintCatalog, BlueprintCatalogEntry } from './blueprintCatalog';
+import { buildGroupsFor, type BuildGroupsValue } from './buildGroups';
 import {
+  applyFitImport,
   fitBlueprintLookup,
   fitImportGroupName,
   fitImportPlans,
@@ -206,5 +209,89 @@ describe('fitImportGroupName', () => {
   it('falls back to the generic name when the header could not be read', () => {
     const preview: FitToBuildPlansResult = { ...base, groupName: null, headerFailed: true };
     expect(fitImportGroupName(preview, labels)).toBe('New group');
+  });
+});
+
+describe('applyFitImport', () => {
+  const preview: FitToBuildPlansResult = previewFitImport(
+    '[Buzzard, Max Hacker]\n\nScourge Fury Heavy Missile x150',
+    CATALOG
+  );
+
+  function context(overrides: { buildGroups?: BuildGroupsValue } = {}) {
+    return {
+      characterId: 1,
+      catalog: CATALOG,
+      ownedBlueprints: [],
+      defaultsFrom: null,
+      facilityDefaults: DEFAULT_FACILITY_DEFAULTS,
+      assumedMe: 2,
+      assumedTe: 4,
+      buildGroups: overrides.buildGroups ?? {},
+      setBuildGroups: vi.fn<(value: BuildGroupsValue) => Promise<void>>(() => Promise.resolve()),
+      groupName: 'Max Hacker (Buzzard)',
+    };
+  }
+
+  beforeEach(async () => {
+    await db.buildPlans.clear();
+  });
+
+  it('writes the group before the plans, and returns the new group id', async () => {
+    const calls: string[] = [];
+    const ctx = context();
+    ctx.setBuildGroups.mockImplementation(async () => {
+      calls.push('group');
+    });
+    const originalBulkAdd = db.buildPlans.bulkAdd.bind(db.buildPlans);
+    const bulkAdd = vi.spyOn(db.buildPlans, 'bulkAdd').mockImplementation(((
+      items: readonly BuildPlanRecord[]
+    ) => {
+      calls.push('plans');
+      return originalBulkAdd(items);
+    }) as typeof db.buildPlans.bulkAdd);
+
+    const result = await applyFitImport(preview, ctx);
+
+    expect(result).not.toBeNull();
+    expect(calls).toEqual(['group', 'plans']);
+    bulkAdd.mockRestore();
+  });
+
+  it('adds the group under the given name and character', async () => {
+    const ctx = context();
+    await applyFitImport(preview, ctx);
+    const [value] = ctx.setBuildGroups.mock.calls[0];
+    expect(buildGroupsFor(value, 1).map((g) => g.name)).toEqual(['Max Hacker (Buzzard)']);
+  });
+
+  it('persists every plan tagged with the new group id', async () => {
+    const ctx = context();
+    const result = await applyFitImport(preview, ctx);
+    const stored = await db.buildPlans.toArray();
+    expect(stored).toHaveLength(2);
+    expect(stored.every((p) => p.buildGroupId === result?.groupId)).toBe(true);
+  });
+
+  it('writes nothing and returns null when the preview resolves to no buildable plans', async () => {
+    const emptyPreview: FitToBuildPlansResult = {
+      hull: null,
+      items: [],
+      skipped: [{ name: 'Sisters Core Probe Launcher', quantity: 1 }],
+      excludedCharges: [],
+      groupName: 'Empty Fit',
+      headerFailed: false,
+    };
+    const ctx = context();
+    const result = await applyFitImport(emptyPreview, ctx);
+    expect(result).toBeNull();
+    expect(ctx.setBuildGroups).not.toHaveBeenCalled();
+    expect(await db.buildPlans.count()).toBe(0);
+  });
+
+  it('mints a fresh group id on every call, even for the same preview', async () => {
+    const first = await applyFitImport(preview, context());
+    const second = await applyFitImport(preview, context());
+    expect(first?.groupId).not.toBe(second?.groupId);
   });
 });

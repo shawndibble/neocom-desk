@@ -8,7 +8,8 @@
  * `clipboardImport` already use.
  */
 
-import type { BuildPlanRecord } from '@/db';
+import { db, type BuildPlanRecord } from '@/db';
+import { scheduleSync } from '@/sync';
 import type { CharacterBlueprint } from '@/esi/endpoints';
 import {
   fitToBuildPlans,
@@ -21,6 +22,7 @@ import type { FacilityDefaults } from './facilityDefaults';
 import { findOwnedBlueprint } from './data';
 import type { BlueprintCatalog, BlueprintCatalogEntry } from './blueprintCatalog';
 import { newBuildPlan } from './newBuildPlan';
+import { addBuildGroup, type BuildGroupsValue } from './buildGroups';
 
 /**
  * Lower-cased item name to typeID, built once per catalog.
@@ -164,4 +166,40 @@ export function fitImportPlans(
     if (plan) plans.push(plan);
   });
   return plans;
+}
+
+/** Everything `applyFitImport` needs beyond `fitImportPlanContext`, to also create the group that holds the plans. */
+export interface FitImportApplyContext extends Omit<FitImportPlanContext, 'buildGroupId'> {
+  buildGroups: BuildGroupsValue;
+  setBuildGroups: (value: BuildGroupsValue) => Promise<void>;
+  groupName: string;
+}
+
+/**
+ * Creates a Build Group and its plans from a Fit Import preview, and persists
+ * both — the write behind the dialog's "Add" button.
+ *
+ * Write order matters and is owned here, not by the caller: the group's
+ * record goes down *before* the plans that point at it, the same rule
+ * `buildGroups.ts` documents for the delete path in reverse. A single
+ * `bulkAdd` and one `scheduleSync` cover every plan, not one of each per plan
+ * — see `fitImportPlans`. Returns `null`, having written nothing, when the
+ * preview resolves to no buildable plans at all (an all-skipped paste).
+ */
+export async function applyFitImport(
+  preview: FitToBuildPlansResult,
+  context: FitImportApplyContext
+): Promise<{ groupId: string } | null> {
+  const buildGroupId = crypto.randomUUID();
+  const newPlans = fitImportPlans(preview, { ...context, buildGroupId });
+  if (newPlans.length === 0) return null;
+  await context.setBuildGroups(
+    addBuildGroup(context.buildGroups, context.characterId, {
+      id: buildGroupId,
+      name: context.groupName,
+    })
+  );
+  await db.buildPlans.bulkAdd(newPlans);
+  scheduleSync(context.characterId);
+  return { groupId: buildGroupId };
 }
