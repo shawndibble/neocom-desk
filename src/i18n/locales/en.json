@@ -979,9 +979,9 @@
       "starred": "Starred"
     },
     "jobSlotCategory": {
-      "manufacturing": "Manufacturing",
-      "science": "Science",
-      "reaction": "Reactions"
+      "manufacturing": "Mfg",
+      "science": "Sci",
+      "reaction": "Rxn"
     },
     "openJobsTooltip": "{{used}}/{{max}} slots used",
     "spReadyYes": "Ready"

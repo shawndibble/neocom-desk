@@ -6,6 +6,7 @@ import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import '@/i18n';
 import { db } from '@/db';
+import { writeCached } from '@/esi/cache';
 import type { SkillQueueEntry } from '@/esi/endpoints';
 import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharacter';
 import { usePublicInfo } from '@/stores/publicInfo';
@@ -661,9 +662,9 @@ describe('Characters table view', () => {
       'Alerts',
       'Last synced',
       'PI',
-      'Manufacturing',
-      'Science',
-      'Reactions',
+      'Mfg',
+      'Sci',
+      'Rxn',
       'Training',
       'Starred',
     ]) {
@@ -705,10 +706,11 @@ describe('Characters table view', () => {
     }
   });
 
-  it('an Open Jobs column shows free slots (max minus running), not the running count', async () => {
-    // Pilot One: Mass Production II (skill_id 3387) -> 1 base + 2 = 3 manufacturing
-    // slots. One manufacturing job running -> 2 open. The old bug showed the
-    // running count (1) here; this pins the fixed "denominator - numerator" math.
+  it('an Open Jobs column shows free slots (max minus running), coloured red when every slot sits idle', async () => {
+    // Pilot One: Mass Production II (skill_id 3387) -> 1 base + 2 = 3
+    // manufacturing slots, none running -> 3 open (all of them). The old bug
+    // showed the running count (0) here; this pins the fixed "max - running"
+    // math, and that "fully open" reads as red (a call to action), not green.
     const roster: RosterEntry[] = [
       {
         characterId: 91,
@@ -737,9 +739,10 @@ describe('Characters table view', () => {
     const attention: AttentionEntry[] = [
       {
         characterId: 91,
-        jobCounts: { manufacturing: 1, science: 0, reaction: 0 },
+        jobCounts: { manufacturing: 0, science: 0, reaction: 0 },
         jobCountsFetchedAt: new Date(),
         piAttention: undefined,
+        piSoonestExpiryMs: undefined,
         piFetchedAt: null,
       },
     ];
@@ -754,12 +757,14 @@ describe('Characters table view', () => {
       await user.click(await screen.findByRole('button', { name: 'Table' }));
 
       const table = await screen.findByRole('table');
-      const mfgHeader = within(table).getByRole('columnheader', { name: 'Manufacturing' });
+      const mfgHeader = within(table).getByRole('columnheader', { name: 'Mfg' });
       const mfgIndex = within(table).getAllByRole('columnheader').indexOf(mfgHeader);
       const pilotRow = within(table).getByText('Pilot One').closest('tr');
       if (!pilotRow) throw new Error('expected a Pilot One row');
       const mfgCell = within(pilotRow).getAllByRole('cell')[mfgIndex];
-      expect(within(mfgCell).getByText('2')).toBeInTheDocument();
+      const value = within(mfgCell).getByText('3');
+      expect(value).toBeInTheDocument();
+      expect(value).toHaveClass('text-danger');
     } finally {
       snapshotSpy.mockRestore();
       attentionSpy.mockRestore();
@@ -808,5 +813,100 @@ describe('Characters table view', () => {
       expect(await screen.findByText('industry page')).toBeInTheDocument();
       expect(useActiveCharacter.getState().activeCharacterId).toBe(92);
     });
+  });
+
+  it('the Training column counts down to the current skill finishing, not just the state label', async () => {
+    // This suite's shared beforeEach doesn't clear esiCache/tokens (other
+    // tests never collide on them) — this test and the PI one below both
+    // seed character 91, so each starts from a clean slate rather than
+    // risking the other's fixture still sitting in cache.
+    await db.esiCache.clear();
+    await db.tokens.clear();
+    const now = Date.now();
+    const entries: SkillQueueEntry[] = [
+      {
+        skill_id: 1,
+        queue_position: 0,
+        finished_level: 1,
+        start_date: new Date(now - 60_000).toISOString(),
+        finish_date: new Date(now + 90 * 60_000).toISOString(),
+      },
+    ];
+    await writeCached(91, 'skillqueue', entries, now);
+
+    const user = userEvent.setup();
+    renderCharacters();
+    await user.click(await screen.findByRole('button', { name: 'Table' }));
+
+    const table = await screen.findByRole('table');
+    const trainingHeader = within(table).getByRole('columnheader', { name: 'Training' });
+    const trainingIndex = within(table).getAllByRole('columnheader').indexOf(trainingHeader);
+    const pilotRow = within(table).getByText('Pilot One').closest('tr');
+    if (!pilotRow) throw new Error('expected a Pilot One row');
+    const cell = within(pilotRow).getAllByRole('cell')[trainingIndex];
+    // ~90 minutes out: "1h 30m" (rounds down towards the minute the fixture landed on).
+    const value = await within(cell).findByText(/^1h \d+m$/);
+    expect(value).toHaveAttribute('tabIndex', '0');
+  });
+
+  it('the PI column counts down to the soonest colony expiry, not just the attention label', async () => {
+    await db.esiCache.clear();
+    await db.tokens.clear();
+    const now = Date.now();
+    await db.tokens.put({
+      characterId: 91,
+      accessToken: 'at',
+      refreshToken: 'rt',
+      expiresAt: now + 6e5,
+      scopes: ['esi-planets.manage_planets.v1'],
+    });
+    await writeCached(
+      91,
+      'planets',
+      [
+        {
+          solar_system_id: 30000142,
+          planet_id: 40000001,
+          planet_type: 'temperate' as const,
+          owner_id: 1,
+          last_update: new Date(now).toISOString(),
+          upgrade_level: 3,
+          num_pins: 1,
+        },
+      ],
+      now
+    );
+    await writeCached(
+      91,
+      'planet:40000001',
+      {
+        links: [],
+        routes: [],
+        pins: [
+          {
+            pin_id: 1,
+            type_id: 2848,
+            latitude: 0,
+            longitude: 0,
+            expiry_time: new Date(now + 3 * 60 * 60_000).toISOString(),
+            extractor_details: { heads: [{ head_id: 1, latitude: 0, longitude: 0 }] },
+          },
+        ],
+      },
+      now
+    );
+
+    const user = userEvent.setup();
+    renderCharacters();
+    await user.click(await screen.findByRole('button', { name: 'Table' }));
+
+    const table = await screen.findByRole('table');
+    const piHeader = within(table).getByRole('columnheader', { name: 'PI' });
+    const piIndex = within(table).getAllByRole('columnheader').indexOf(piHeader);
+    const pilotRow = within(table).getByText('Pilot One').closest('tr');
+    if (!pilotRow) throw new Error('expected a Pilot One row');
+    const cell = within(pilotRow).getAllByRole('cell')[piIndex];
+    const value = await within(cell).findByText(/^\d+h \d+m$/);
+    expect(value).toHaveAttribute('tabIndex', '0');
   });
 });

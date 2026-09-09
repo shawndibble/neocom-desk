@@ -40,6 +40,13 @@ export interface AttentionEntry {
   jobCountsFetchedAt: Date | null;
   /** Worst colony's attention. Undefined: no scope, no colonies, or nothing cached yet. */
   piAttention: ColonyAttention | undefined;
+  /**
+   * The same worst colony's own soonest extractor expiry — null when it has
+   * none running (a colony can be the "worst" on attention alone, e.g.
+   * `decayed`, with nothing currently extracting). Undefined only alongside
+   * `piAttention` being undefined (no scope / no colonies / not cached yet).
+   */
+  piSoonestExpiryMs: number | null | undefined;
   piFetchedAt: Date | null;
 }
 
@@ -49,6 +56,7 @@ function emptyEntry(characterId: number): AttentionEntry {
     jobCounts: undefined,
     jobCountsFetchedAt: null,
     piAttention: undefined,
+    piSoonestExpiryMs: undefined,
     piFetchedAt: null,
   };
 }
@@ -71,10 +79,10 @@ async function grantedScopesByCharacter(
   return map;
 }
 
-/** The worst attention across every colony a Character owns — same ranking `sortColoniesByAttention` sorts by, read off its first result rather than duplicated here. */
-function worstAttention(statuses: readonly ColonyStatus[], nowMs: number): ColonyAttention {
+/** The worst-attention colony across everything a Character owns — same ranking `sortColoniesByAttention` sorts by, read off its first result rather than duplicated here. */
+function worstColonyStatus(statuses: readonly ColonyStatus[], nowMs: number): ColonyStatus {
   const [worst] = sortColoniesByAttention(statuses, (status) => status, nowMs);
-  return colonyAttention(worst, nowMs);
+  return worst;
 }
 
 function statusFromPins(
@@ -121,7 +129,9 @@ async function cacheOnlyAttention(
             const statuses = planets.map((planet) =>
               statusFromPins(details.get(planet.planet_id)?.data.pins, nowMs)
             );
-            entry.piAttention = worstAttention(statuses, nowMs);
+            const worst = worstColonyStatus(statuses, nowMs);
+            entry.piAttention = colonyAttention(worst, nowMs);
+            entry.piSoonestExpiryMs = worst.soonestExpiryMs;
           }
         }
       }
@@ -175,7 +185,9 @@ async function liveAttention(
         const statuses = planets.map((planet) =>
           statusFromPins(details.get(planet.planet_id)?.cached?.data.pins, nowMs)
         );
-        entries[index].piAttention = worstAttention(statuses, nowMs);
+        const worst = worstColonyStatus(statuses, nowMs);
+        entries[index].piAttention = colonyAttention(worst, nowMs);
+        entries[index].piSoonestExpiryMs = worst.soonestExpiryMs;
       });
     }
   });

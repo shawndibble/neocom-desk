@@ -57,7 +57,14 @@ import {
   type CharacterColumnId,
 } from '@/features/character/characterColumns';
 import { ATTENTION_RANK, ATTENTION_TONE as PI_ATTENTION_TONE } from '@/engine/pi/colonyStatus';
-import { deriveQueueState, type QueueState } from '@/features/skills/queueStatus';
+import {
+  classifySkillQueue,
+  deriveQueueState,
+  type QueueState,
+} from '@/features/skills/queueStatus';
+import { formatDuration } from '@/lib/duration';
+import { formatTimestamp } from '@/lib/timestamp';
+import { useTimeZone } from '@/lib/timeFormat';
 import { removeCharacter } from '@/features/character/removeCharacter';
 import { CharacterRowContextMenu } from '@/features/character/CharacterRowContextMenu';
 import { updateGroups, useOverviewGroups } from '@/features/character/overviewGroups';
@@ -123,6 +130,8 @@ interface QueueInfo {
   state: QueueState;
   /** When this character's cached queue was last fetched; null when never fetched. */
   fetchedAt: Date | null;
+  /** Epoch ms the currently-training entry finishes; null unless `state` is `training`/`endingSoon`. */
+  trainingFinishMs: number | null;
 }
 
 interface CharacterCardProps {
@@ -393,13 +402,24 @@ interface CharacterRow {
 /** `queueById`'s shape, built once from a roster snapshot — shared by the initial cache-only load and the "Refresh all" live reload so the two never compute it differently. */
 function queueInfoMap(roster: readonly RosterEntry[], nowMs: number): Map<number, QueueInfo> {
   return new Map(
-    roster.map((entry) => [
-      entry.characterId,
-      {
-        state: deriveQueueState(entry.queue?.data, nowMs),
-        fetchedAt: entry.queue?.fetchedAt ?? null,
-      },
-    ])
+    roster.map((entry) => {
+      const entries = entry.queue?.data;
+      // `classifySkillQueue`'s own "currently training" row, not a second
+      // derivation of it — `deriveQueueState` already calls this for the
+      // categorical state, but doesn't expose which entry it landed on.
+      const training = entries
+        ? classifySkillQueue(entries, nowMs).find((row) => row.status === 'training')
+        : undefined;
+      return [
+        entry.characterId,
+        {
+          state: deriveQueueState(entries, nowMs),
+          fetchedAt: entry.queue?.fetchedAt ?? null,
+          trainingFinishMs:
+            training?.secondsRemaining != null ? nowMs + training.secondsRemaining * 1000 : null,
+        },
+      ];
+    })
   );
 }
 
@@ -457,6 +477,8 @@ function openJobsColumn(
   return {
     id,
     header: t(`characters.jobSlotCategory.${category}`),
+    align: 'right',
+    className: 'tabular-nums',
     sortValue: (row) => {
       const running = row.attention?.jobCounts?.[category];
       const max = row.jobSlotSkills ? maxJobSlots(row.jobSlotSkills)[category] : undefined;
@@ -467,13 +489,19 @@ function openJobsColumn(
       const max = row.jobSlotSkills ? maxJobSlots(row.jobSlotSkills)[category] : undefined;
       if (running === undefined || max === undefined) return '—';
       const open = max - running;
-      // Red at zero spare slots, yellow below half spare, plain text
-      // otherwise — a graduated "how much room is left" read using the same
-      // tone tokens as every other column, not a one-off continuous colour.
-      const tone = open === 0 ? 'text-danger' : open / max < 0.5 ? 'text-warning' : 'text-text';
+      // Red when every slot sits idle (0/5 used → nothing queued, go fill
+      // them), fading to plain text as slots fill up — the number is a
+      // call to action, not a health check, so more open reads as more
+      // urgent, not less.
+      const tone = open === max ? 'text-danger' : open / max >= 0.5 ? 'text-warning' : 'text-text';
       return (
         <Tooltip content={t('characters.openJobsTooltip', { used: running, max })}>
-          <span className={tone}>{open}</span>
+          <span
+            tabIndex={0}
+            className={`cursor-help underline decoration-dotted decoration-current/50 underline-offset-2 ${tone}`}
+          >
+            {open}
+          </span>
         </Tooltip>
       );
     },
@@ -488,7 +516,8 @@ function openJobsColumn(
 function buildColumns(
   t: (key: string, options?: Record<string, unknown>) => string,
   spExtractionThresholdSp: number,
-  onToggleStarred: (characterId: number) => void
+  onToggleStarred: (characterId: number) => void,
+  timeZone: 'UTC' | undefined
 ): Record<CharacterColumnId, DataTableColumn<CharacterRow>> {
   return {
     name: {
@@ -548,14 +577,26 @@ function buildColumns(
       id: 'training',
       header: t('characters.column.training'),
       sortValue: (row) => (row.queue ? QUEUE_STATE_RANK[row.queue.state] : undefined),
-      render: (row) =>
-        row.queue ? (
-          <span className={STAT_CHIP_TONE_TEXT_CLASS[QUEUE_STATE_TONE[row.queue.state]]}>
-            {t(`characters.queueStates.${row.queue.state}`)}
-          </span>
-        ) : (
-          '—'
-        ),
+      render: (row) => {
+        if (!row.queue) return '—';
+        const tone = STAT_CHIP_TONE_TEXT_CLASS[QUEUE_STATE_TONE[row.queue.state]];
+        // Only `training`/`endingSoon` carry a finish time — paused/idle/
+        // unknown have nothing to count down to, so they keep the plain
+        // state label they've always shown.
+        if (row.queue.trainingFinishMs === null) {
+          return <span className={tone}>{t(`characters.queueStates.${row.queue.state}`)}</span>;
+        }
+        return (
+          <Tooltip content={formatTimestamp(new Date(row.queue.trainingFinishMs), timeZone)}>
+            <span
+              tabIndex={0}
+              className={`cursor-help underline decoration-dotted decoration-current/50 underline-offset-2 ${tone}`}
+            >
+              {formatDuration((row.queue.trainingFinishMs - Date.now()) / 1000)}
+            </span>
+          </Tooltip>
+        );
+      },
     },
     openJobsManufacturing: openJobsColumn('openJobsManufacturing', 'manufacturing', t),
     openJobsScience: openJobsColumn('openJobsScience', 'science', t),
@@ -567,14 +608,31 @@ function buildColumns(
         row.attention?.piAttention === undefined
           ? undefined
           : ATTENTION_RANK[row.attention.piAttention],
-      render: (row) =>
-        row.attention?.piAttention === undefined ? (
-          '—'
-        ) : (
-          <span className={STAT_CHIP_TONE_TEXT_CLASS[PI_ATTENTION_TONE[row.attention.piAttention]]}>
-            {t(`pi.attention.${row.attention.piAttention}`)}
-          </span>
-        ),
+      render: (row) => {
+        const attention = row.attention?.piAttention;
+        if (attention === undefined) return '—';
+        const tone = STAT_CHIP_TONE_TEXT_CLASS[PI_ATTENTION_TONE[attention]];
+        const expiryMs = row.attention?.piSoonestExpiryMs;
+        // Some attention states have nothing currently extracting to count
+        // down to (e.g. `decayed` with no program running at all) — those
+        // keep the categorical label; anything with a real expiry gets the
+        // countdown instead, which is strictly more useful than the label.
+        if (expiryMs == null) {
+          return <span className={tone}>{t(`pi.attention.${attention}`)}</span>;
+        }
+        const label =
+          expiryMs <= Date.now() ? t('pi.expired') : formatDuration((expiryMs - Date.now()) / 1000);
+        return (
+          <Tooltip content={formatTimestamp(new Date(expiryMs), timeZone)}>
+            <span
+              tabIndex={0}
+              className={`cursor-help underline decoration-dotted decoration-current/50 underline-offset-2 ${tone}`}
+            >
+              {label}
+            </span>
+          </Tooltip>
+        );
+      },
     },
     spReady: {
       id: 'spReady',
@@ -702,6 +760,7 @@ export function Characters() {
   const hydrateSpExtractionThreshold = useSpExtractionThresholdSp((state) => state.hydrate);
 
   const alertCounts = useAlertCountsByCharacter();
+  const timeZone = useTimeZone();
 
   const [sortKey, setSortKey] = useState<CharacterSortKey>('name');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
@@ -738,7 +797,12 @@ export function Characters() {
   // and is a fresh function every render anyway, so a memoized wrapper here
   // would just recompute every render regardless — `buildColumns` itself is
   // cheap (a handful of object literals, no per-character work).
-  const columnsById = buildColumns(t, spExtractionThreshold, (id) => void handleToggleStar(id));
+  const columnsById = buildColumns(
+    t,
+    spExtractionThreshold,
+    (id) => void handleToggleStar(id),
+    timeZone
+  );
   const availableColumnIds = availableCharacterColumns(spExtractionEnabled);
   // `id` is already known available here, so this is just "is it checked" —
   // `visibleAvailableColumns` (below, `handleToggleColumn`'s own zero-columns
