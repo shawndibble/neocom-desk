@@ -25,13 +25,16 @@ import i18n from '@/i18n';
 import type { BuildPlanRecord } from '@/db';
 import { industryActivityOf } from '@/engine/industry/types';
 import type { BuildResult, IndustryBlueprint, SkillLevels } from '@/engine/industry/types';
+import type { MaterialRecipe } from '@/engine/industry/makeOrBuy';
+import type { CharacterBlueprint } from '@/esi/endpoints';
 import type { PiData } from '@/sde/types';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import { toIndustryBlueprint, type BlueprintCatalog } from './blueprintCatalog';
 import { computeBuildPlan } from './computeBuildPlan';
 import { loadMarketSnapshots, type MarketSnapshot, type MarketSnapshotRequest } from './marketData';
 import { materialPricesFor } from './priceBasis';
-import { buildPlanTypeIds } from './recipes';
+import { buildPlanTypeIds, recipeForLookup } from './recipes';
+import { useAssumedMe } from './assumedMe';
 
 export interface ComparedBuildRow {
   planId: string;
@@ -49,6 +52,7 @@ export interface UseComparedBuildResultsArgs {
   /** Null while the blueprint catalog is still loading — nothing to compute yet. */
   catalog: BlueprintCatalog | null;
   pi: PiData | null;
+  ownedBlueprints: readonly CharacterBlueprint[];
   skills: SkillLevels;
 }
 
@@ -113,7 +117,8 @@ async function computeRow(
   plan: BuildPlanRecord,
   catalog: BlueprintCatalog,
   priced: PricedPlan | null,
-  skills: SkillLevels
+  skills: SkillLevels,
+  recipeFor: (typeID: number) => MaterialRecipe | null
 ): Promise<ComparedBuildRow> {
   const base = {
     planId: plan.id,
@@ -137,6 +142,7 @@ async function computeRow(
       hubPrices: snap.hubPrices,
       materialPrices: materialPricesFor(snap, plan.materialPriceBasis),
       skills,
+      recipeFor,
     });
     return { ...base, result, error };
   } catch (err) {
@@ -148,6 +154,7 @@ export function useComparedBuildResults({
   plans,
   catalog,
   pi,
+  ownedBlueprints,
   skills,
 }: UseComparedBuildResultsArgs): ComparedBuildRow[] {
   const [rows, setRows] = useState<ComparedBuildRow[]>([]);
@@ -162,14 +169,28 @@ export function useComparedBuildResults({
   });
   const plansKey = plans.map((p) => `${p.id}:${p.updatedAt}`).join(',');
 
+  // Same setting BuildPlanDetail.tsx uses for the open plan — unowned
+  // sub-builds must quote at the pilot's assumption, not 0, or profit
+  // silently disagrees between views.
+  const assumedMe = useAssumedMe((state) => state.value);
+  const assumedMeHydrated = useAssumedMe((state) => state.hydrated);
+  const hydrateAssumedMe = useAssumedMe((state) => state.hydrate);
+  useEffect(() => {
+    void hydrateAssumedMe();
+  }, [hydrateAssumedMe]);
+
   useEffect(() => {
     const currentPlans = plansRef.current;
     if (!catalog || currentPlans.length === 0) {
       setRows([]);
       return;
     }
-    let cancelled = false;
     setRows(currentPlans.map((plan) => placeholderRow(plan, catalog)));
+    // Skip fetching until the real assumedMe lands, rather than fetching once
+    // at the default and again once hydrated — a batched multi-plan fetch is
+    // too expensive to double.
+    if (!assumedMeHydrated) return;
+    let cancelled = false;
 
     // Every plan's request goes in together, so plans sharing a hub share a
     // fetch. Plans with no blueprint contribute none; the returned promises
@@ -180,12 +201,22 @@ export function useComparedBuildResults({
     const snapshots = loadMarketSnapshots(requests);
     const snapshotByRequest = new Map(requests.map((request, i) => [request, snapshots[i]!]));
 
+    // Shared by every compared plan, matching BuildPlanDetail.tsx's own
+    // recipeFor, so a buildHere choice rolls up the same way here as it does
+    // on the plan's own page.
+    const recipeFor = recipeForLookup({
+      catalog,
+      pi,
+      ownedBlueprints,
+      assumedMeForUnowned: assumedMe,
+    });
+
     for (const [index, plan] of currentPlans.entries()) {
       const entry = priceable[index];
       const priced = entry
         ? { blueprint: entry.blueprint, snapshot: snapshotByRequest.get(entry.request)! }
         : null;
-      void computeRow(plan, catalog, priced, skills).then((row) => {
+      void computeRow(plan, catalog, priced, skills, recipeFor).then((row) => {
         if (cancelled) return;
         setRows((prev) => prev.map((r) => (r.planId === plan.id ? row : r)));
       });
@@ -194,7 +225,7 @@ export function useComparedBuildResults({
     return () => {
       cancelled = true;
     };
-  }, [plansKey, catalog, pi, skills]);
+  }, [plansKey, catalog, pi, ownedBlueprints, assumedMe, assumedMeHydrated, skills]);
 
   return rows;
 }

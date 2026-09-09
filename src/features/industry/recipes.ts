@@ -103,6 +103,15 @@ export function materialRecipe(typeID: number, sources: RecipeSources): Material
 }
 
 /**
+ * Every `computeBuildPlan` caller passes this so `buildHere` resolves to a
+ * rolled-up sub-build, not a hub purchase — `buildVsBuy` silently treats a
+ * missing `recipeFor` as "nothing builds."
+ */
+export function recipeForLookup(sources: RecipeSources): (typeID: number) => MaterialRecipe | null {
+  return (typeID) => materialRecipe(typeID, sources);
+}
+
+/**
  * Every typeID a make-or-buy verdict needs a hub price for: the materials
  * themselves plus, one level down, whatever their recipes consume. The Build
  * Plan's price fetch is one batched call, so widening it here costs nothing
