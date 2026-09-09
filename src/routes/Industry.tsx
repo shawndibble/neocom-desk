@@ -36,6 +36,11 @@ import { useQuickbar } from '@/features/market/useQuickbar';
 import { ActiveJobsPanel } from '@/features/industry/ActiveJobsPanel';
 import { BuildPlanList } from '@/features/industry/BuildPlanList';
 import { BuildPlanCompare } from '@/features/industry/BuildPlanCompare';
+import { OpportunitiesPanel } from '@/features/industry/OpportunitiesPanel';
+import {
+  planForOpportunityCandidate,
+  type OpportunityRow,
+} from '@/features/industry/opportunities';
 import { ProductionLogPanel } from '@/features/industry/ProductionLogPanel';
 import { BpcSourcingPanel } from '@/features/bpcContracts/BpcSourcingPanel';
 import {
@@ -96,11 +101,11 @@ type DetailSelection =
 
 const NO_SELECTION: DetailSelection = { kind: 'none' };
 
-type IndustryTab = 'plans' | 'records' | 'sourcing';
+type IndustryTab = 'plans' | 'records' | 'sourcing' | 'opportunities';
 
 /** An unknown or absent `?tab=` falls back to Plans rather than rendering nothing — a stale or hand-edited link should land somewhere useful. */
 function readIndustryTab(value: string | null): IndustryTab {
-  return value === 'records' || value === 'sourcing' ? value : 'plans';
+  return value === 'records' || value === 'sourcing' || value === 'opportunities' ? value : 'plans';
 }
 
 /** Build Plan manager: create (via blueprint search)/duplicate/delete/rename plans, edit the selected one. */
@@ -787,6 +792,26 @@ export function Industry() {
     selectGroup(groupId);
   }
 
+  /**
+   * Build Opportunities' "Add to Compare" (issue #642): seeds real,
+   * persisted Build Plans from the selected ranked rows, priced at the same
+   * owned-materials claim that ranked them, then hands the pilot straight to
+   * Compare. `OpportunitiesPanel` only lets the active Character's own rows
+   * be selected, so every seeded plan belongs here — no cross-character
+   * `scheduleSync` fan-out needed.
+   */
+  async function handleAddOpportunitiesToCompare(rows: readonly OpportunityRow[]) {
+    if (activeCharacterId === null || rows.length === 0) return;
+    const newPlans = rows.map((row) =>
+      planForOpportunityCandidate(row.candidate, facilityDefaults, row.materialSourcing)
+    );
+    await db.buildPlans.bulkAdd(newPlans);
+    scheduleSync(activeCharacterId);
+    setCompareSelectedIds(new Set(newPlans.map((p) => p.id)));
+    setSelection({ kind: 'compare' });
+    setTab('plans');
+  }
+
   function clearCompareMode() {
     setCompareMode(false);
     setCompareSelectedIds(new Set());
@@ -848,11 +873,22 @@ export function Industry() {
               { id: 'plans', label: t('industry.buildPlansTab') },
               { id: 'records', label: t('industry.recordsTab') },
               { id: 'sourcing', label: t('industry.bpcSearchTab') },
+              { id: 'opportunities', label: t('industry.opportunitiesTab') },
             ]}
           />
 
           {tab === 'sourcing' ? (
             <BpcSourcingPanel />
+          ) : tab === 'opportunities' ? (
+            <OpportunitiesPanel
+              catalog={catalog}
+              pi={pi}
+              skills={skills}
+              facilityDefaults={facilityDefaults}
+              activeCharacterId={activeCharacterId}
+              ownedStockSnapshot={ownedStockSnapshot}
+              onAddToCompare={(rows) => void handleAddOpportunitiesToCompare(rows)}
+            />
           ) : tab === 'records' ? (
             <ProductionLogPanel
               characterId={activeCharacterId}

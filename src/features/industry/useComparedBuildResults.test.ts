@@ -98,6 +98,7 @@ const RESULT: BuildResult = {
 const SNAPSHOT: MarketSnapshot = {
   hubPrices: {},
   hubBuyPrices: {},
+  hubSellVolumes: {},
   adjustedPrices: {},
   systemCostIndex: 0.01,
 };
@@ -277,6 +278,7 @@ describe('useComparedBuildResults', () => {
         Promise.resolve({
           hubPrices: { 34: 5 },
           hubBuyPrices: { 34: 4 },
+          hubSellVolumes: {},
           adjustedPrices: {},
           systemCostIndex: 0.01,
         })

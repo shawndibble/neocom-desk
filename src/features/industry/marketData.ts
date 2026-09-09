@@ -36,6 +36,13 @@ export interface MarketSnapshot {
    * reason to fetch again.
    */
   hubBuyPrices: HubPrices;
+  /**
+   * Units for sale at the hub, same type IDs as `hubPrices`. Read from the
+   * same Fuzzwork aggregate already fetched for pricing — Build Opportunities'
+   * order-depth indicator (`sellVolume * hubPrices[typeId]`) rides on this
+   * rather than costing a separate per-type order-book request.
+   */
+  hubSellVolumes: HubPrices;
   /** Global adjusted prices (job-cost EIV). Null when the live ESI call failed. */
   adjustedPrices: AdjustedPrices | null;
   /**
@@ -167,17 +174,25 @@ export function loadMarketSnapshots(
     const hubAggregates = await hubBatches.get(request.hub.stationId)!;
     const hubPrices: HubPrices = {};
     const hubBuyPrices: HubPrices = {};
+    const hubSellVolumes: HubPrices = {};
     for (const typeId of request.typeIds) {
       const aggregate = hubAggregates.get(typeId);
       if (!aggregate) continue;
       if (aggregate.sellMin !== null) hubPrices[typeId] = aggregate.sellMin;
       if (aggregate.buyMax !== null) hubBuyPrices[typeId] = aggregate.buyMax;
+      hubSellVolumes[typeId] = aggregate.sellVolume;
     }
 
     const indices = await costIndices.get(request.activity ?? 'manufacturing')!;
     const systemCostIndex = indices?.get(request.costIndexSystemId ?? request.hub.systemId) ?? null;
 
-    return { hubPrices, hubBuyPrices, adjustedPrices: await adjustedPrices, systemCostIndex };
+    return {
+      hubPrices,
+      hubBuyPrices,
+      hubSellVolumes,
+      adjustedPrices: await adjustedPrices,
+      systemCostIndex,
+    };
   });
 }
 
