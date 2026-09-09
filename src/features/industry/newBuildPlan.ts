@@ -37,6 +37,23 @@ export function mostRecentlyUpdatedPlan(
 export interface NewBuildPlanOverrides {
   runs?: number;
   /**
+   * ME/TE of the specific blueprint copy this plan is quoting — a BPC Sourcing
+   * Offer's own research, carried through the context menu (issue #637).
+   * Beats an owned copy *and* the assumed-ME/TE preferences: the pilot is
+   * judging a copy they might buy, not the one already in the hangar. Seeded 0
+   * is a real answer about a real copy, so this is `??`-chained and never
+   * truthiness-checked.
+   */
+  me?: number;
+  te?: number;
+  /**
+   * The plan's name, where the caller has a better one than the bare product
+   * name — a seeded plan reads "Rifter 10/20 x5" so a pilot holding a plain
+   * plan and one or more seeded plans for one blueprint can tell them apart.
+   * Composed at the UI layer, which is where i18next lives.
+   */
+  name?: string;
+  /**
    * ME for a blueprint the character does not own a copy of. Fit Import
    * passes the assumed-ME preference here: most of a T2 fit needs an invented
    * BPC, and quoting all of it at ME0 overstates the group's material cost.
@@ -109,18 +126,21 @@ export function newBuildPlan(
         rigFit: EMPTY_RIG_FIT,
         facilityTaxPct: null,
       });
-  // An owned blueprint's real research always wins over the assumed value —
-  // the assumption exists to fill the gap where there is nothing to read.
+  // One precedence order for research, everywhere, and the same one on both
+  // lines below: an explicit per-copy seed (#637) beats an owned copy, and an
+  // owned blueprint's real research beats the assumed value (#634) — the
+  // assumption exists to fill the gap where there is nothing to read, and the
+  // seed exists because the pilot is quoting a copy that is not theirs yet.
   const assumedMe = overrides.assumedMe ?? 0;
   const assumedTe = overrides.assumedTe ?? 0;
   return {
     id: crypto.randomUUID(),
     characterId,
-    name: entry.productName,
+    name: overrides.name ?? entry.productName,
     blueprintTypeID: entry.blueprintTypeID,
     runs: overrides.runs ?? 1,
-    me: owned?.material_efficiency ?? assumedMe,
-    te: owned?.time_efficiency ?? assumedTe,
+    me: overrides.me ?? owned?.material_efficiency ?? assumedMe,
+    te: overrides.te ?? owned?.time_efficiency ?? assumedTe,
     facility: facilityConfig.facility,
     rigFit: facilityConfig.rigFit,
     security: defaultsFrom?.security ?? 'highsec',

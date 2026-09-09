@@ -673,7 +673,14 @@ export function BpcSourcingPanel() {
                 defaultSort={{ columnId: 'price', direction: 'asc' }}
                 onRowClick={setOpenRow}
                 rowContextMenu={(row, tr) => (
-                  <BuildPlanContextMenu typeId={row.typeId} trigger={tr} />
+                  // The Offer's own research and run count, not the
+                  // defaults: a pilot shopping a 10/20 five-run copy wants to
+                  // see what *that* copy builds (#637).
+                  <BuildPlanContextMenu
+                    typeId={row.typeId}
+                    seed={{ me: row.me, te: row.te, runs: row.runs }}
+                    trigger={tr}
+                  />
                 )}
               />
               {!showAll && filteredRows.length > ROW_CAP && (
