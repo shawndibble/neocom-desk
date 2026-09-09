@@ -17,6 +17,7 @@ import { loadStationName } from '@/features/character/stations';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { loadPublicContractItems } from '@/features/bpcContracts/publicContractItems';
 import { BuildPlanContextMenu } from '@/features/industry/BuildPlanContextMenu';
+import { seedFromContractItem } from '@/features/industry/planSeed';
 import type { PublicContractItem } from '@/esi/endpoints';
 import type { BpcContractRow } from '@/engine/contracts/bpcSearch';
 
@@ -122,6 +123,8 @@ export function BpcContractModal({
                 <BuildPlanContextMenu
                   key={item.record_id}
                   typeId={item.type_id}
+                  // This line's own ME/TE/runs, when ESI reported all three.
+                  seed={seedFromContractItem(item)}
                   trigger={
                     <li
                       // Focusable so the menu is reachable by keyboard

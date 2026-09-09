@@ -100,7 +100,7 @@ beforeEach(() => {
 });
 
 describe('BpcContractModal — Build Plan context menu', () => {
-  it('right-clicking a blueprint line starts a Build Plan for what it builds', async () => {
+  it('right-clicking a blueprint line starts a Build Plan seeded at that line’s ME/TE/runs', async () => {
     renderModal();
 
     // Scoped to the contents list: the modal's own title is the blueprint name too.
@@ -109,8 +109,94 @@ describe('BpcContractModal — Build Plan context menu', () => {
 
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Build Plan' }));
 
-    // 587 (Rifter), not 638 (the blueprint in the contract).
+    // 587 (Rifter), not 638 (the blueprint in the contract) — and this
+    // line's own 10/20 x5, not the generic defaults (issue #638).
+    expect(screen.getByTestId('location')).toHaveTextContent(
+      '/industry?product=587&me=10&te=20&runs=5'
+    );
+  });
+
+  it('seeds the same line identically on a second click, the key Industry’s reuse rule matches on', async () => {
+    renderModal();
+    const contents = await screen.findByRole('list');
+    const line = within(contents).getByText('Rifter Blueprint');
+
+    for (let i = 0; i < 2; i++) {
+      fireEvent.contextMenu(line);
+      fireEvent.click(await screen.findByRole('menuitem', { name: 'Build Plan' }));
+      expect(screen.getByTestId('location')).toHaveTextContent(
+        '/industry?product=587&me=10&te=20&runs=5'
+      );
+    }
+  });
+
+  it('falls back to the unseeded menu when ESI omits one of the copy’s numbers', async () => {
+    loadPublicContractItems.mockResolvedValue(
+      items([
+        {
+          record_id: 1,
+          type_id: 638,
+          quantity: 1,
+          is_included: true,
+          is_blueprint_copy: true,
+          material_efficiency: 10,
+          time_efficiency: 20,
+          // runs omitted — a worse answer would seed a 0-run plan.
+        },
+      ])
+    );
+    renderModal();
+
+    const contents = await screen.findByRole('list');
+    fireEvent.contextMenu(within(contents).getByText('Rifter Blueprint'));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Build Plan' }));
+
     expect(screen.getByTestId('location')).toHaveTextContent('/industry?product=587');
+    expect(screen.getByTestId('location')).not.toHaveTextContent('me=');
+  });
+
+  it('seeds two bundled copies at different research to different plans', async () => {
+    loadPublicContractItems.mockResolvedValue(
+      items([
+        {
+          record_id: 1,
+          type_id: 638,
+          quantity: 1,
+          is_included: true,
+          is_blueprint_copy: true,
+          material_efficiency: 10,
+          time_efficiency: 20,
+          runs: 5,
+        },
+        {
+          record_id: 2,
+          type_id: 638,
+          quantity: 1,
+          is_included: true,
+          is_blueprint_copy: true,
+          material_efficiency: 2,
+          time_efficiency: 4,
+          runs: 1,
+        },
+      ])
+    );
+    renderModal();
+
+    const contents = await screen.findByRole('list');
+    const rows = within(contents).getAllByText('Rifter Blueprint');
+    expect(rows).toHaveLength(2);
+
+    fireEvent.contextMenu(rows[0]);
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Build Plan' }));
+    expect(screen.getByTestId('location')).toHaveTextContent(
+      '/industry?product=587&me=10&te=20&runs=5'
+    );
+
+    fireEvent.contextMenu(rows[1]);
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Build Plan' }));
+    expect(screen.getByTestId('location')).toHaveTextContent(
+      '/industry?product=587&me=2&te=4&runs=1'
+    );
   });
 
   it('disables the action on a bundled item nothing builds', async () => {
