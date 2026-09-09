@@ -89,7 +89,7 @@ export function FitImportDialog({ catalog, onApply, onClose }: FitImportDialogPr
 
         {preview && (
           <div className="space-y-3 border-t border-line pt-3 text-xs">
-            {preview.groupName === null && (
+            {preview.headerFailed && (
               <p role="alert" className="text-danger">
                 {t('industry.fitImportHeaderFailed')}
               </p>
