@@ -11,6 +11,7 @@ import { Button, DataTable, InfoTooltip, Panel } from '@/components/ui';
 import type { DataTableColumn } from '@/components/ui';
 import type { BuildPlanRecord } from '@/db';
 import type { SkillLevels } from '@/engine/industry/types';
+import type { CharacterBlueprint } from '@/esi/endpoints';
 import type { PiData } from '@/sde/types';
 import { formatDuration } from '@/lib/duration';
 import { formatIsk } from '@/lib/isk';
@@ -23,6 +24,7 @@ interface BuildPlanCompareProps {
   plans: readonly BuildPlanRecord[];
   catalog: BlueprintCatalog;
   pi: PiData | null;
+  ownedBlueprints: readonly CharacterBlueprint[];
   skills: SkillLevels;
   /** Exits compare mode, restoring the previously open single-plan detail. */
   onDone: () => void;
@@ -62,9 +64,16 @@ function unresolvedReason(
   return null;
 }
 
-export function BuildPlanCompare({ plans, catalog, pi, skills, onDone }: BuildPlanCompareProps) {
+export function BuildPlanCompare({
+  plans,
+  catalog,
+  pi,
+  ownedBlueprints,
+  skills,
+  onDone,
+}: BuildPlanCompareProps) {
   const { t } = useTranslation();
-  const rows = useComparedBuildResults({ plans, catalog, pi, skills });
+  const rows = useComparedBuildResults({ plans, catalog, pi, ownedBlueprints, skills });
   const unknown = t('common.unknown');
 
   const columns: DataTableColumn<ComparedBuildRow>[] = [

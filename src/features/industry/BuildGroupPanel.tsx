@@ -19,6 +19,7 @@ import { Button, EmptyState, Panel, Spinner } from '@/components/ui';
 import type { BuildPlanRecord } from '@/db';
 import { rollUpBuildGroup, type BuildGroupMember } from '@/engine/industry/groupRollup';
 import type { BuildResult, MaterialCostLine, SkillLevels } from '@/engine/industry/types';
+import type { CharacterBlueprint } from '@/esi/endpoints';
 import { writeToClipboard } from '@/lib/clipboard';
 import { formatDuration } from '@/lib/duration';
 import { formatIsk } from '@/lib/isk';
@@ -83,6 +84,7 @@ interface BuildGroupPanelProps {
   plans: readonly BuildPlanRecord[];
   catalog: BlueprintCatalog;
   pi: PiData | null;
+  ownedBlueprints: readonly CharacterBlueprint[];
   skills: SkillLevels;
   ownedStockSnapshot: OwnedStockSnapshot;
   /** Opens one member on its own, the way clicking it in the list would. */
@@ -96,6 +98,7 @@ export function BuildGroupPanel({
   plans,
   catalog,
   pi,
+  ownedBlueprints,
   skills,
   ownedStockSnapshot,
   onOpenPlan,
@@ -107,7 +110,7 @@ export function BuildGroupPanel({
   // copied the moment Jita was. `GROUP_COPY` is the whole-group control's key.
   const [copyState, setCopyState] = useState<{ key: string; status: CopyStatus } | null>(null);
   const [retargeting, setRetargeting] = useState(false);
-  const rows = useComparedBuildResults({ plans, catalog, pi, skills });
+  const rows = useComparedBuildResults({ plans, catalog, pi, ownedBlueprints, skills });
 
   const members: BuildGroupMember[] = useMemo(() => {
     const byId = new Map(plans.map((p) => [p.id, p]));

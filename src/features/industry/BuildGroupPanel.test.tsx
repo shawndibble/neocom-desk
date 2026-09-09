@@ -118,6 +118,7 @@ function renderPanel(plans: BuildPlanRecord[]) {
       plans={plans}
       catalog={CATALOG}
       pi={null}
+      ownedBlueprints={[]}
       skills={{} as never}
       ownedStockSnapshot={SNAPSHOT}
       onOpenPlan={() => {}}

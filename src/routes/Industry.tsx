@@ -924,6 +924,7 @@ export function Industry() {
                       plans={selectedGroupPlans}
                       catalog={catalog}
                       pi={pi}
+                      ownedBlueprints={ownedBlueprints}
                       skills={skills}
                       ownedStockSnapshot={ownedStockSnapshot}
                       onOpenPlan={selectPlan}
@@ -937,6 +938,7 @@ export function Industry() {
                         plans={comparePlans}
                         catalog={catalog}
                         pi={pi}
+                        ownedBlueprints={ownedBlueprints}
                         skills={skills}
                         onDone={exitCompare}
                       />

@@ -27,7 +27,7 @@ import {
   resolveRigFit,
   setRigSlot,
 } from '@/engine/industry/types';
-import { makeOrBuy, type MakeOrBuy, type MaterialRecipe } from '@/engine/industry/makeOrBuy';
+import { makeOrBuy, type MakeOrBuy } from '@/engine/industry/makeOrBuy';
 import { ownedStockSale } from '@/engine/industry/ownedStockSale';
 import type {
   FacilityKind,
@@ -48,7 +48,7 @@ import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import { nameForType, toIndustryBlueprint, type BlueprintCatalog } from './blueprintCatalog';
 import { findOwnedBlueprint } from './data';
 import { computeBuildPlan } from './computeBuildPlan';
-import { buildPlanTypeIds, materialRecipe } from './recipes';
+import { buildPlanTypeIds, recipeForLookup } from './recipes';
 import { loadMarketSnapshot, type MarketSnapshot } from './marketData';
 import { materialPriceBasisOf, materialPricesFor } from './priceBasis';
 import { formatDuration } from '@/lib/duration';
@@ -347,9 +347,7 @@ export function BuildPlanDetail({
    * during a slow or unreachable price fetch.
    */
   const recipeFor = useMemo(
-    () =>
-      (typeID: number): MaterialRecipe | null =>
-        materialRecipe(typeID, { catalog, pi, ownedBlueprints, assumedMeForUnowned: assumedMe }),
+    () => recipeForLookup({ catalog, pi, ownedBlueprints, assumedMeForUnowned: assumedMe }),
     [catalog, pi, ownedBlueprints, assumedMe]
   );
 
