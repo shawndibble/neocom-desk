@@ -187,12 +187,21 @@ describe('fitToBuildPlans — merging and degenerate headers', () => {
     expect(result.items[0].quantity).toBe(2);
   });
 
+  it('keeps the hull from a bare [Ship] header, with no group name to show for it', () => {
+    // A bare `[Buzzard]` is a readable header, so the hull survives (issue
+    // #630) — but there is no fit name, and an empty one is not a name.
+    const result = fitToBuildPlans(parseEftFit('[Buzzard]\nInertial Stabilizers II'), lookup);
+    expect(result.headerFailed).toBe(false);
+    expect(result.hull?.productName).toBe('Buzzard');
+    expect(result.groupName).toBeNull();
+  });
+
   it('reports an unreadable header as an error and imports no hull', () => {
-    // shipName and fitName are written together or not at all, so a header
-    // that fails to parse costs the hull too — surfaced, never silent.
+    // An unreadable header costs the hull too — surfaced, never silent. The
+    // group name says nothing on its own now that a bare `[Ship]` header
+    // yields a hull with no fit name, so `headerFailed` is the signal.
     const result = fitToBuildPlans(parseEftFit('Inertial Stabilizers II'), lookup);
-    // One signal, not two: the parser writes both header names together or
-    // neither, so a null group name already says the hull is missing.
+    expect(result.headerFailed).toBe(true);
     expect(result.hull).toBeNull();
     expect(result.groupName).toBeNull();
   });

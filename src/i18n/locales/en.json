@@ -592,7 +592,7 @@
     "fitImportSkipped": "No blueprint — not imported",
     "fitImportCharges": "Loaded ammo — not imported",
     "fitImportIncludeCharges": "Include loaded ammo, one run each",
-    "fitImportHeaderFailed": "Couldn't read the fit header, so no ship was imported. An EFT fit starts with [Ship, Fit name].",
+    "fitImportHeaderFailed": "Couldn't read the fit header, so no ship was imported. An EFT fit starts with [Ship] or [Ship, Fit name].",
     "fitImportGroupName": "{{fit}} — {{ship}}",
     "fitImportApply_one": "Create 1 plan",
     "fitImportApply_other": "Create {{count}} plans",

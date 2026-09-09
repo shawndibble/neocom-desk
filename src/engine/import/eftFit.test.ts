@@ -16,6 +16,42 @@ describe('parseEftFit', () => {
     expect(result.errors).toEqual([]);
   });
 
+  it('parses a bare [Ship] header, keeping the hull and leaving the fit name empty', () => {
+    const result = parseEftFit('[Buzzard]\n\nDamage Control II');
+    expect(result.shipName).toBe('Buzzard');
+    expect(result.fitName).toBe('');
+    expect(result.errors).toEqual([]);
+  });
+
+  it('parses a header whose fit name is present but empty', () => {
+    const result = parseEftFit('[Buzzard, ]\n\nDamage Control II');
+    expect(result.shipName).toBe('Buzzard');
+    expect(result.fitName).toBe('');
+    expect(result.errors).toEqual([]);
+  });
+
+  it('parses a fit name wrapped in its own brackets', () => {
+    const result = parseEftFit('[Rifter, [PVP]]\n\nDamage Control II');
+    expect(result.shipName).toBe('Rifter');
+    expect(result.fitName).toBe('[PVP]');
+    expect(result.errors).toEqual([]);
+  });
+
+  it('rejects a header with no ship name, rather than reading the fit name as a hull', () => {
+    const result = parseEftFit('[ , Max Hacker]\n\nDamage Control II');
+    expect(result.shipName).toBe('');
+    expect(result.fitName).toBe('');
+    expect(result.errors).toHaveLength(1);
+    expect(result.errors[0].line).toBe(1);
+  });
+
+  it('rejects a fit body pasted without its header, not reading [Empty x slot] as a hull', () => {
+    const result = parseEftFit('[Empty high slot]\nDamage Control II');
+    expect(result.shipName).toBe('');
+    expect(result.errors).toHaveLength(1);
+    expect(result.items).toEqual([{ name: 'Damage Control II', quantity: 1 }]);
+  });
+
   it('parses module lines across blank-line-separated slot sections', () => {
     const text = [
       '[Rifter, My Fit]',
@@ -88,7 +124,7 @@ describe('parseEftFit', () => {
       {
         line: 1,
         text: '',
-        reason: 'invalid or missing fit header, expected "[Ship Name, Fit Name]"',
+        reason: 'invalid or missing fit header, expected "[Ship Name]" or "[Ship Name, Fit Name]"',
       },
     ]);
   });
@@ -102,7 +138,7 @@ describe('parseEftFit', () => {
       {
         line: 1,
         text: 'not a fit',
-        reason: 'invalid or missing fit header, expected "[Ship Name, Fit Name]"',
+        reason: 'invalid or missing fit header, expected "[Ship Name]" or "[Ship Name, Fit Name]"',
       },
     ]);
   });
