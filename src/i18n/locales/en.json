@@ -920,7 +920,28 @@
     "cancel": "Cancel",
     "ok": "OK",
     "searchPlaceholder": "Search by name or corporation",
-    "noSearchMatches": "No characters match this search."
+    "noSearchMatches": "No characters match this search.",
+    "viewModeLabel": "View",
+    "viewCards": "Cards",
+    "viewTable": "Table",
+    "columnsButton": "Columns",
+    "columnsMenuTitle": "Columns",
+    "refreshAll": "Refresh all",
+    "refreshingAll": "Refreshing…",
+    "refreshAllHint": "Pulls live data for every character. This may take a moment for a large roster.",
+    "column": {
+      "name": "Name",
+      "corp": "Corp",
+      "spTotal": "SP",
+      "wallet": "Wallet",
+      "lastSynced": "Last synced",
+      "training": "Training",
+      "manufacturing": "Manufacturing",
+      "pi": "PI",
+      "spReady": "SP ready",
+      "alerts": "Alerts"
+    },
+    "spReadyYes": "Ready"
   },
   "overview": {
     "title": "Overview",
