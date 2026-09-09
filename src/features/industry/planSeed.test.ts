@@ -4,6 +4,7 @@ import {
   clearPlanSeed,
   matchesPlanSeed,
   parsePlanSeed,
+  seedFromContractItem,
   type BuildPlanSeed,
 } from './planSeed';
 
@@ -67,6 +68,69 @@ describe('applyPlanSeed / clearPlanSeed', () => {
     expect(params.get('te')).toBeNull();
     expect(params.get('runs')).toBeNull();
     expect(params.get('tab')).toBe('plans');
+  });
+});
+
+describe('seedFromContractItem', () => {
+  it('seeds from a blueprint copy line reporting all three numbers', () => {
+    expect(
+      seedFromContractItem({
+        is_blueprint_copy: true,
+        material_efficiency: 10,
+        time_efficiency: 20,
+        runs: 5,
+      })
+    ).toEqual({ me: 10, te: 20, runs: 5 });
+  });
+
+  it('accepts an unresearched copy (ME 0 / TE 0)', () => {
+    expect(
+      seedFromContractItem({
+        is_blueprint_copy: true,
+        material_efficiency: 0,
+        time_efficiency: 0,
+        runs: 1,
+      })
+    ).toEqual({ me: 0, te: 0, runs: 1 });
+  });
+
+  it('falls back to no seed when ESI omits any one of the three', () => {
+    // A worse answer than the current defaults would be quoting a copy as
+    // completely unresearched just because a field was absent.
+    expect(
+      seedFromContractItem({ is_blueprint_copy: true, time_efficiency: 20, runs: 5 })
+    ).toBeNull();
+    expect(
+      seedFromContractItem({ is_blueprint_copy: true, material_efficiency: 10, runs: 5 })
+    ).toBeNull();
+    expect(
+      seedFromContractItem({
+        is_blueprint_copy: true,
+        material_efficiency: 10,
+        time_efficiency: 20,
+      })
+    ).toBeNull();
+    expect(seedFromContractItem({ is_blueprint_copy: true })).toBeNull();
+  });
+
+  it('never seeds a line that is not a blueprint copy', () => {
+    // A non-blueprint line (ore, modules) is planned as itself or disabled,
+    // never seeded — even if it somehow carried these fields.
+    expect(
+      seedFromContractItem({
+        material_efficiency: 10,
+        time_efficiency: 20,
+        runs: 5,
+      })
+    ).toBeNull();
+    expect(
+      seedFromContractItem({
+        is_blueprint_copy: false,
+        material_efficiency: 10,
+        time_efficiency: 20,
+        runs: 5,
+      })
+    ).toBeNull();
   });
 });
 

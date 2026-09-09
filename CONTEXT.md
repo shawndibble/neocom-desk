@@ -486,11 +486,14 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   means the Base Grant. `SCOPES` derives from the ungrouped endpoints and
   `scopesForGroup(group)` from the grouped ones, both from the same registry.
   `corp` is the only group today.
-- **Seeded Build Plan**: A **Build Plan** opened from a BPC Sourcing **Offer**
-  at that Offer's own ME, TE and runs rather than at the usual defaults, so a
-  pilot shopping a copy sees what _that_ copy builds (issue #637). Named for
-  the copy it quotes ("Rifter 10/20 ×5"), since a Character can hold a plain
-  plan and several seeded plans for one blueprint at once.
+- **Seeded Build Plan**: A **Build Plan** opened from a BPC Sourcing **Offer**,
+  or from a blueprint line in a BPC contract's contents list, at that copy's
+  own ME, TE and runs rather than at the usual defaults, so a pilot shopping
+  or bundle-checking a copy sees what _that_ copy builds (issues #637, #638).
+  A contract line seeds only when ESI reports all three numbers for it —
+  optional there, unlike an Offer's, which always carries them. Named for the
+  copy it quotes ("Rifter 10/20 ×5"), since a Character can hold a plain plan
+  and several seeded plans for one blueprint at once.
 - **Skill Plan**: An ordered list of skill-level entries a user intends to train. User-editable (drag and drop). Distinct from the in-game **Skill Queue**, which is the game's actual training queue.
 - **Standing (corp)**: The `/corp` overview's top panel: the figures a corp
   manager acts on — clocks due inside a day, Runway, 30-day net — beside the

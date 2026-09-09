@@ -35,13 +35,12 @@ export interface BuildPlanContextMenuProps {
   trigger: ReactElement;
   /**
    * The ME/TE/runs of the specific copy this row names, where the surface
-   * knows them — a BPC Sourcing Offer does, a contract's item list does not
-   * (issue #637). The plan then opens as a quote for *that* copy rather than
-   * at the generic defaults. Deliberately not a second menu entry: one action
-   * with one set of labels, per the decision recorded with #636 — a seeded
-   * row and a plain row read identically.
+   * knows them — always for a BPC Sourcing Offer, sometimes for a contract
+   * line (`seedFromContractItem` returns `null` when ESI didn't report all
+   * three). `null`/`undefined` both mean the plain defaults. Not a second
+   * menu entry: one action, one label, seeded or not.
    */
-  seed?: BuildPlanSeed;
+  seed?: BuildPlanSeed | null;
 }
 
 export function BuildPlanContextMenu({ typeId, trigger, seed }: BuildPlanContextMenuProps) {

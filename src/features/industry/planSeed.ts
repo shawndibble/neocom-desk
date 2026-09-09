@@ -70,6 +70,25 @@ export function clearPlanSeed(params: URLSearchParams): void {
 }
 
 /**
+ * A seed from one BPC contract item line — a structural subset of
+ * `PublicContractItem`, not that type itself, to keep this module decoupled
+ * from `@/esi/endpoints`. Same all-or-nothing rule as `parsePlanSeed`: ESI
+ * can omit any one of the three, and quoting a copy as unresearched because
+ * a field was absent is worse than falling back to unseeded.
+ */
+export function seedFromContractItem(item: {
+  is_blueprint_copy?: boolean;
+  material_efficiency?: number;
+  time_efficiency?: number;
+  runs?: number;
+}): BuildPlanSeed | null {
+  if (!item.is_blueprint_copy) return null;
+  const { material_efficiency: me, time_efficiency: te, runs } = item;
+  if (me === undefined || te === undefined || runs === undefined) return null;
+  return { me, te, runs };
+}
+
+/**
  * Whether an existing plan is the one a seeded click already created.
  *
  * Matched on the three values rather than on a marker stored on the plan:
