@@ -2,13 +2,42 @@ import { useRegisterSW } from 'virtual:pwa-register/react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui';
 
-/** Toast shown when the service worker has a new version waiting. */
+const UPDATE_CHECK_INTERVAL_MS = 10 * 60 * 1000;
+
+// React StrictMode double-invokes the useState lazy initializer that
+// registerSW runs on, so onRegisteredSW can fire twice on first mount in
+// dev — guard per registration so only one polling interval ever runs for it.
+const pollingRegistrations = new WeakSet<ServiceWorkerRegistration>();
+
+async function checkForUpdate(swUrl: string, registration: ServiceWorkerRegistration) {
+  try {
+    if (registration.installing || !navigator.onLine) return;
+    // Bypass HTTP cache so a stale sw.js (cached by the browser or a proxy)
+    // doesn't mask a real update — same pattern vite-plugin-pwa docs
+    // recommend for robust periodic checks.
+    const resp = await fetch(swUrl, {
+      cache: 'no-store',
+      headers: { cache: 'no-store', 'cache-control': 'no-cache' },
+    });
+    if (resp.ok) await registration.update();
+  } catch {
+    // Offline/flaky network mid-check — next interval tick retries.
+  }
+}
+
+/** Toast for a waiting SW update; also polls the registration periodically to trigger update checks. */
 export function ReloadPrompt() {
   const { t } = useTranslation();
   const {
     needRefresh: [needRefresh, setNeedRefresh],
     updateServiceWorker,
-  } = useRegisterSW();
+  } = useRegisterSW({
+    onRegisteredSW(swUrl, registration) {
+      if (!registration || pollingRegistrations.has(registration)) return;
+      pollingRegistrations.add(registration);
+      setInterval(() => void checkForUpdate(swUrl, registration), UPDATE_CHECK_INTERVAL_MS);
+    },
+  });
 
   if (!needRefresh) return null;
 
