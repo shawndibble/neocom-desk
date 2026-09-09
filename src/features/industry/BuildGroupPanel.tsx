@@ -32,6 +32,7 @@ import { hasShoppingList, shoppingListText } from './shoppingList';
 import { materialTableRows, shoppingListMaterials } from './subBuildPlan';
 import { useComparedBuildResults } from './useComparedBuildResults';
 import { useDetectedOwnedStock } from './useDetectedOwnedStock';
+import { RetargetGroupDialog, type RetargetTarget } from './RetargetGroupDialog';
 
 /**
  * Each member's resolved tree, flattened the two ways the rollup needs.
@@ -88,6 +89,8 @@ interface BuildGroupPanelProps {
   ownedStockSnapshot: OwnedStockSnapshot;
   /** Opens one member on its own, the way clicking it in the list would. */
   onOpenPlan: (planId: string) => void;
+  /** "Retarget group" (issue #632): bulk-writes `target` onto every plan in `planIds`. */
+  onRetarget: (target: RetargetTarget, planIds: string[]) => void;
 }
 
 export function BuildGroupPanel({
@@ -99,12 +102,14 @@ export function BuildGroupPanel({
   skills,
   ownedStockSnapshot,
   onOpenPlan,
+  onRetarget,
 }: BuildGroupPanelProps) {
   const { t } = useTranslation();
   // Which list the outcome belongs to, not a bare flag: a mixed-hub group
   // shows one copy control per hub, and a shared flag would report Amarr as
   // copied the moment Jita was. `GROUP_COPY` is the whole-group control's key.
   const [copyState, setCopyState] = useState<{ key: string; status: CopyStatus } | null>(null);
+  const [retargeting, setRetargeting] = useState(false);
   const rows = useComparedBuildResults({ plans, catalog, pi, ownedBlueprints, skills });
 
   const members: BuildGroupMember[] = useMemo(() => {
@@ -228,15 +233,20 @@ export function BuildGroupPanel({
         title={group.name}
         meta={t('industry.groupMemberCount', { count: plans.length })}
         actions={
-          <Button
-            size="sm"
-            onClick={() => void handleCopy(GROUP_COPY, rollup.shoppingMaterials)}
-            disabled={!canCopy}
-          >
-            {copyStatusFor(GROUP_COPY) === 'copied'
-              ? t('industry.copyShoppingListDone')
-              : t('industry.copyShoppingList')}
-          </Button>
+          <>
+            <Button size="sm" onClick={() => setRetargeting(true)}>
+              {t('industry.retargetGroupAction')}
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => void handleCopy(GROUP_COPY, rollup.shoppingMaterials)}
+              disabled={!canCopy}
+            >
+              {copyStatusFor(GROUP_COPY) === 'copied'
+                ? t('industry.copyShoppingListDone')
+                : t('industry.copyShoppingList')}
+            </Button>
+          </>
         }
       >
         {loading && (
@@ -381,6 +391,18 @@ export function BuildGroupPanel({
           </ul>
         )}
       </Panel>
+
+      {retargeting && (
+        <RetargetGroupDialog
+          group={group}
+          plans={plans}
+          onApply={(target, planIds) => {
+            onRetarget(target, planIds);
+            setRetargeting(false);
+          }}
+          onClose={() => setRetargeting(false)}
+        />
+      )}
     </div>
   );
 }

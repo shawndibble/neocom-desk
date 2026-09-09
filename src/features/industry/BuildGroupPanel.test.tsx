@@ -122,6 +122,7 @@ function renderPanel(plans: BuildPlanRecord[]) {
       skills={{} as never}
       ownedStockSnapshot={SNAPSHOT}
       onOpenPlan={() => {}}
+      onRetarget={() => {}}
     />
   );
 }

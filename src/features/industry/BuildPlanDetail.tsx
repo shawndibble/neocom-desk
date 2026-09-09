@@ -37,6 +37,9 @@ import type {
   SkillLevels,
 } from '@/engine/industry/types';
 import { rigKindLabelKey, rigFitSummaryLabel } from './rigFitLabels';
+import type { BuildGroupSnapshot } from './buildGroups';
+import { GroupTargetLink } from './GroupTargetLink';
+import { retargetPatch } from './retargetPatch';
 import { DEFAULT_TRADE_HUB, TRADE_HUBS, getTradeHub } from '@/market/hubs';
 import type { BuildPlanRecord } from '@/db';
 import type { CharacterBlueprint } from '@/esi/endpoints';
@@ -171,6 +174,8 @@ interface BuildPlanDetailProps {
   /** False with no active character — the Quickbar has nobody to save the material under. */
   quickbarAvailable: boolean;
   onShowInfo: (typeId: number, itemName: string) => void;
+  /** This plan's group's last Retarget (issue #632), or null when ungrouped or not yet Retargeted. */
+  groupSnapshot: BuildGroupSnapshot | null;
 }
 
 function clampInt(value: number, min: number, max: number): number {
@@ -206,6 +211,7 @@ export function BuildPlanDetail({
   onAddToQuickbar,
   quickbarAvailable,
   onShowInfo,
+  groupSnapshot,
 }: BuildPlanDetailProps) {
   const { t } = useTranslation();
 
@@ -884,8 +890,13 @@ export function BuildPlanDetail({
             </div>
 
             <div>
-              <h3 className="border-b border-line pb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+              <h3 className="flex items-center justify-between gap-2 border-b border-line pb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
                 {t('industry.groupLocationMarket')}
+                <GroupTargetLink
+                  plan={plan}
+                  snapshot={groupSnapshot}
+                  onApply={() => groupSnapshot && update(retargetPatch(groupSnapshot))}
+                />
               </h3>
               <div className="mt-2 flex flex-col gap-3">
                 <BuildLocationPicker
