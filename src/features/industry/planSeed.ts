@@ -1,10 +1,10 @@
 /**
- * The three numbers a BPC Search row is actually judged on — its ME, TE and
- * runs — carried from the row's context menu to `/industry` so the plan it
- * opens is a quote for *that copy* rather than for a hypothetical one
+ * The three numbers a BPC Sourcing **Offer** is actually judged on — its ME,
+ * TE and runs — carried from the row's context menu to `/industry` so the plan
+ * it opens is a quote for *that copy* rather than for a hypothetical one
  * (issue #637). This reverses #636's "the plan is not seeded" bullet.
  *
- * All-or-nothing on purpose: a listing always has all three, so a query
+ * All-or-nothing on purpose: an Offer always has all three, so a query
  * carrying only some of them is a hand-edited or truncated URL, not a
  * half-seeded intent. Missing one means no seed at all, and the unseeded
  * `?product=` path (Market Browser, Assets, appraised rows) behaves exactly
@@ -44,7 +44,7 @@ export function parsePlanSeed(params: ParamReader): BuildPlanSeed | null {
   // the detail pane's inputs enforce.
   const me = parseSeedNumber(params.get('me'), 0, 10);
   const te = parseSeedNumber(params.get('te'), 0, 20);
-  // A BPC Search row is always a copy (`is_blueprint_copy`), so runs is at
+  // An Offer is always a copy (`is_blueprint_copy`), so runs is at
   // least 1 — an original's ESI runs of -1 never reaches here, and a zero-run
   // plan builds nothing.
   const runs = parseSeedNumber(params.get('runs'), 1, Number.MAX_SAFE_INTEGER);
@@ -73,10 +73,10 @@ export function clearPlanSeed(params: URLSearchParams): void {
  * Whether an existing plan is the one a seeded click already created.
  *
  * Matched on the three values rather than on a marker stored on the plan:
- * browsing back to the same listing then reuses the plan instead of piling up
+ * browsing back to the same Offer then reuses the plan instead of piling up
  * duplicates, while a plan for the same blueprint at *different* research is
  * left untouched and the seeded one is created beside it. The consequence,
- * taken knowingly: edit a seeded plan's ME and the next click on that listing
+ * taken knowingly: edit a seeded plan's ME and the next click on that Offer
  * creates a fresh plan, because the old one no longer describes that copy.
  */
 export function matchesPlanSeed(plan: BuildPlanSeed, seed: BuildPlanSeed): boolean {

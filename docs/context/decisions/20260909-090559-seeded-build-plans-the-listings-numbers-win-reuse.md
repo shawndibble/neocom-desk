@@ -57,10 +57,24 @@ _Recorded 2026-09-09 · issue #637._
   is not allowed to fork into "Build Plan" and "Build Plan from this copy".
 
 - **Only the BPC Sourcing search table seeds.** `BpcContractModal`'s contents
-  list and the character `ContractDetailModal`'s tables keep the plain menu:
-  they render raw ESI contract items, which the shape those views fetch does
-  not carry ME/TE/runs on. Extending the seed there is a separate piece of
-  work, the same way this one was separate from #636.
+  list and the character `ContractDetailModal`'s tables keep the plain menu.
+  Not because those views lack the numbers — `PublicContractItem` carries
+  `material_efficiency`, `time_efficiency` and `runs`, and `BpcContractModal`
+  already renders all three — but because it carries them _optionally_
+  ("Present on blueprint copies only"), while `BpcContractRow`'s are required:
+  `compactBpcItemRow` filters to `is_blueprint_copy` before constructing one.
+  An Offer can therefore always seed, whereas the modals would need a
+  per-item presence check and a partial-data path, which is its own piece of
+  work — the same way this one was separate from #636. `ContractItem` (the
+  Character's own contracts) has `runs` but no ME/TE at all.
+
+- **An unresearched single-run Offer reuses a plain plan, and that is correct.**
+  A plan created from the defaults holds `{ me: 0, te: 0, runs: 1 }`, which is
+  exactly what such an Offer seeds, so the reuse rule adopts it and no second
+  plan appears. The distinguishability requirement is vacuous there rather than
+  violated: the plain plan _is_ an accurate quote for that copy, and creating a
+  differently-named twin of it would break the no-duplicates requirement
+  standing right beside it.
 
 - **The seed is cleared with the `?product=` param it rode in on.** `?material=`
   preserves whatever it does not delete, so a leftover `me`/`te`/`runs` would

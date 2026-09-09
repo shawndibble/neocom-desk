@@ -37,8 +37,8 @@ export function mostRecentlyUpdatedPlan(
 export interface NewBuildPlanOverrides {
   runs?: number;
   /**
-   * ME/TE of the specific blueprint copy this plan is quoting — a BPC Search
-   * listing's own research, carried through the context menu (issue #637).
+   * ME/TE of the specific blueprint copy this plan is quoting — a BPC Sourcing
+   * Offer's own research, carried through the context menu (issue #637).
    * Beats an owned copy *and* the assumed-ME preference: the pilot is judging
    * a copy they might buy, not the one already in the hangar. Seeded 0 is a
    * real answer about a real copy, so this is `??`-chained and never

@@ -282,13 +282,18 @@ export function Industry() {
           // depending on whether it was picked or imported; an owned copy still
           // wins on both paths.
           assumedMe,
-          // A BPC listing's own numbers beat both (#637). The name carries them
-          // too: the reuse rule below lets a pilot hold a plain plan and one or
-          // more seeded plans for one blueprint, and three rows all reading
-          // "Rifter" would be unusable.
+          // An Offer's own numbers beat both (#637). The name carries them too:
+          // the reuse rule below lets a pilot hold a plain plan and one or more
+          // seeded plans for one blueprint, and three rows all reading "Rifter"
+          // would be unusable. Spelled field by field rather than spread:
+          // TypeScript's excess-property check does not see through a spread,
+          // so `{ ...seed }` would couple `BuildPlanSeed` to
+          // `NewBuildPlanOverrides` by field-name coincidence alone.
           ...(seed
             ? {
-                ...seed,
+                me: seed.me,
+                te: seed.te,
+                runs: seed.runs,
                 name: t('industry.seededPlanName', {
                   name: entry.productName,
                   me: seed.me,
@@ -303,6 +308,11 @@ export function Industry() {
       scheduleSync(activeCharacterId);
       return plan.id;
     },
+    // `t` is load-bearing here, not incidental: this callback is a dependency
+    // of the create-if-missing effect below, so a `t` whose identity churned
+    // would re-fire a Dexie write. react-i18next only re-binds it on
+    // `languageChanged`, which cannot happen while the app is English-only —
+    // whoever adds a second locale needs to weigh that here.
     [activeCharacterId, ownedBlueprints, plans, facilityDefaults, assumedMe, t]
   );
 
@@ -313,7 +323,7 @@ export function Industry() {
   // render-time sync below and the effect's create-if-missing branch read
   // the same answer instead of re-deriving it twice.
   const productParam = searchParams.get('product');
-  // A BPC Search row also sends the copy's own ME/TE/runs (#637). Memoized on
+  // A BPC Sourcing Offer also sends the copy's own ME/TE/runs (#637). Memoized on
   // `searchParams` — which react-router keeps stable per `location.search` —
   // because the create effect below depends on it: a fresh object every render
   // would re-fire that effect, and it writes to Dexie.
@@ -322,9 +332,9 @@ export function Industry() {
     productParam && catalog ? (catalog.byProductTypeID.get(Number(productParam)) ?? null) : null;
   // Unseeded, this adopts any plan for the blueprint — the Market Browser,
   // Assets and appraised-row behaviour, unchanged. Seeded, the plan must also
-  // hold the listing's three numbers: a plan for the same blueprint at other
+  // hold the Offer's three numbers: a plan for the same blueprint at other
   // research is left alone and the seeded one is created beside it, while
-  // browsing back to the same listing reuses what the first click created.
+  // browsing back to the same Offer reuses what the first click created.
   const pendingExistingPlan =
     pendingEntry && plans
       ? (plans.find(

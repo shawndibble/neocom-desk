@@ -35,7 +35,7 @@ export interface BuildPlanContextMenuProps {
   trigger: ReactElement;
   /**
    * The ME/TE/runs of the specific copy this row names, where the surface
-   * knows them — the BPC search table does, a contract's item list does not
+   * knows them — a BPC Sourcing Offer does, a contract's item list does not
    * (issue #637). The plan then opens as a quote for *that* copy rather than
    * at the generic defaults. Deliberately not a second menu entry: one action
    * with one set of labels, per the decision recorded with #636 — a seeded
