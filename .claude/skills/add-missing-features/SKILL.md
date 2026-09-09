@@ -99,18 +99,19 @@ populated state. A survivor that only deepens existing math skips this step.
 
 ## 6. Publish the tickets
 
-Invoke `/to-tickets` with these overrides stated explicitly in the invocation,
-because both are departures from that skill's defaults:
+`/to-tickets` is user-invoked (`disable-model-invocation: true`), so an agent
+running this skill **cannot fire it** — it will not appear in the invocable
+skill list. Follow its `<issue-template>` directly and create each issue with
+`gh issue create` (see `docs/agents/issue-tracker.md`). When a human is driving
+and types `/to-tickets` themselves, the two departures below still apply.
 
-- **Unattended** — skip its "quiz the user" step. Nobody is there. Record the
-  decisions it would have asked about in the ticket body instead.
+Two departures from that skill's defaults:
+
+- **Unattended** — its "quiz the user" step does not run. Nobody is there.
+  Record the decisions it would have asked about in the ticket body instead.
 - **Label `ready-for-human`**, never its `ready-for-agent` default. These are
   proposals a human accepts before any agent builds them; `ready-for-agent`
   would let `/next-ticket` start building unreviewed work.
-
-If `/to-tickets` cannot be invoked programmatically, follow its `<issue-template>`
-and create the issues directly with `gh issue create` — the tickets are the
-same either way.
 
 Every ticket opens with a **TL;DR**: one or two sentences, before any other
 section, saying what the feature does and whether it is an expansion or a new
