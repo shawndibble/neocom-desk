@@ -78,3 +78,25 @@ _Recorded 2026-09-09._
   disagree about the same character. `Characters.tsx`'s `totalSpMap` is the
   one place that distinction is made; don't "fix" it back to
   `row.stats.skillPoints`.
+
+- **Open Jobs is three columns (Mfg/Sci/Rxn), each showing _free_ slots
+  (`max - running`), coloured red→yellow→plain as more of them sit idle.**
+  Not one combined column: `DataTable` sorts one `sortValue` per column, and
+  a pilot who wants "who's out of reaction slots specifically" can't ask that
+  of a merged cell. The number is deliberately the inverse of the running-job
+  count — "Open jobs" names spare capacity, and red means "slots sit empty,
+  go queue something", not "slots are full" (the two read as opposite
+  problems, so getting this backwards is worse than showing nothing).
+  `Characters.tsx`'s `openJobsColumn` is the one place this math and the
+  tone thresholds live.
+
+- **Training and PI both show a live countdown (`formatDuration`) with an
+  exact-timestamp tooltip (`formatTimestamp` + `useTimeZone`), not just the
+  categorical state/attention label.** Neither is a new data source: the
+  training finish time already lived in `RosterEntry.queue.data`
+  (`classifySkillQueue`'s own `'training'` row), and the PI expiry already
+  lived in `engine/pi/colonyStatus.ts`'s `ColonyStatus.soonestExpiryMs` —
+  `rosterAttention.ts`'s `worstAttention` computed it and threw it away. Both
+  columns fall back to the plain label when there's nothing to count down to
+  (paused/idle training, a colony with no extractor running) — the countdown
+  replaces the label, it doesn't hide it.

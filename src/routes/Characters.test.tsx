@@ -1,11 +1,12 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import '@/i18n';
 import { db } from '@/db';
+import { writeCached } from '@/esi/cache';
 import type { SkillQueueEntry } from '@/esi/endpoints';
 import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharacter';
 import { usePublicInfo } from '@/stores/publicInfo';
@@ -30,7 +31,9 @@ import {
   useSpExtractionThresholdSp,
 } from '@/features/character/spExtractionSettings';
 import * as rosterModule from '@/features/character/roster';
+import type { RosterEntry } from '@/features/character/roster';
 import * as rosterAttentionModule from '@/features/character/rosterAttention';
+import type { AttentionEntry } from '@/features/character/rosterAttention';
 import { Characters } from './Characters';
 
 vi.mock('@/app/loginFlow', () => ({
@@ -111,6 +114,10 @@ function renderCharacters() {
       <Routes>
         <Route path="/characters" element={<Characters />} />
         <Route path="/overview" element={<div>overview page</div>} />
+        <Route path="/skills/trained" element={<div>skills page</div>} />
+        <Route path="/industry" element={<div>industry page</div>} />
+        <Route path="/planetary-industry" element={<div>pi page</div>} />
+        <Route path="/alerts" element={<div>alerts page</div>} />
       </Routes>
     </MemoryRouter>
   );
@@ -651,7 +658,16 @@ describe('Characters table view', () => {
 
     await useSpExtractionMonitoringEnabled.getState().setValue(false);
 
-    for (const label of ['Alerts', 'Last synced', 'PI', 'Open jobs', 'Training']) {
+    for (const label of [
+      'Alerts',
+      'Last synced',
+      'PI',
+      'Mfg',
+      'Sci',
+      'Rxn',
+      'Training',
+      'Starred',
+    ]) {
       await user.click(await screen.findByRole('button', { name: 'Columns' }));
       await user.click(await screen.findByRole('menuitemcheckbox', { name: label }));
       await user.keyboard('{Escape}');
@@ -688,5 +704,209 @@ describe('Characters table view', () => {
       snapshotSpy.mockRestore();
       attentionSpy.mockRestore();
     }
+  });
+
+  it('an Open Jobs column shows free slots (max minus running), coloured red when every slot sits idle', async () => {
+    // Pilot One: Mass Production II (skill_id 3387) -> 1 base + 2 = 3
+    // manufacturing slots, none running -> 3 open (all of them). The old bug
+    // showed the running count (0) here; this pins the fixed "max - running"
+    // math, and that "fully open" reads as red (a call to action), not green.
+    const roster: RosterEntry[] = [
+      {
+        characterId: 91,
+        name: 'Pilot One',
+        wallet: null,
+        queue: null,
+        correctedTotalSp: 1_000_000,
+        skills: {
+          data: {
+            total_sp: 1_000_000,
+            skills: [
+              {
+                skill_id: 3387,
+                trained_skill_level: 2,
+                active_skill_level: 2,
+                skillpoints_in_skill: 0,
+              },
+            ],
+          },
+          fetchedAt: new Date(),
+          fromCache: true,
+          truncated: false,
+        },
+      },
+    ];
+    const attention: AttentionEntry[] = [
+      {
+        characterId: 91,
+        jobCounts: { manufacturing: 0, science: 0, reaction: 0 },
+        jobCountsFetchedAt: new Date(),
+        piAttention: undefined,
+        piSoonestExpiryMs: undefined,
+        piFetchedAt: null,
+      },
+    ];
+    const snapshotSpy = vi.spyOn(rosterModule, 'loadRosterSnapshot').mockResolvedValue(roster);
+    const attentionSpy = vi
+      .spyOn(rosterAttentionModule, 'loadRosterAttention')
+      .mockResolvedValue(attention);
+
+    try {
+      const user = userEvent.setup();
+      renderCharacters();
+      await user.click(await screen.findByRole('button', { name: 'Table' }));
+
+      const table = await screen.findByRole('table');
+      const mfgHeader = within(table).getByRole('columnheader', { name: 'Mfg' });
+      const mfgIndex = within(table).getAllByRole('columnheader').indexOf(mfgHeader);
+      const pilotRow = within(table).getByText('Pilot One').closest('tr');
+      if (!pilotRow) throw new Error('expected a Pilot One row');
+      const mfgCell = within(pilotRow).getAllByRole('cell')[mfgIndex];
+      const value = within(mfgCell).getByText('3');
+      expect(value).toBeInTheDocument();
+      expect(value).toHaveClass('text-danger');
+    } finally {
+      snapshotSpy.mockRestore();
+      attentionSpy.mockRestore();
+    }
+  });
+
+  it('the Starred column toggles the pinned star without navigating the row', async () => {
+    const user = userEvent.setup();
+    renderCharacters();
+    await user.click(await screen.findByRole('button', { name: 'Table' }));
+
+    await user.click(await screen.findByRole('button', { name: 'Star Pilot One' }));
+
+    await waitForSettingsValue(
+      STARRED_CHARACTERS_SETTING_KEY,
+      (value) => Array.isArray(value) && value.includes(91)
+    );
+    // Toggling the star must not also fire the row's own click-to-navigate.
+    expect(screen.queryByText('overview page')).not.toBeInTheDocument();
+  });
+
+  describe('row context menu', () => {
+    it('offers Overview, Skill training, Industry, PI, and Alerts for the row under the pointer', async () => {
+      renderCharacters();
+      await userEvent.setup().click(await screen.findByRole('button', { name: 'Table' }));
+
+      const row = (await screen.findByText('Pilot One')).closest('tr');
+      if (!row) throw new Error('expected a Pilot One row');
+      fireEvent.contextMenu(row);
+
+      for (const label of ['Overview', 'Skills', 'Industry', 'PI', 'Alerts']) {
+        expect(screen.getByRole('menuitem', { name: label })).toBeInTheDocument();
+      }
+    });
+
+    it('picking a destination switches the active character and navigates there', async () => {
+      renderCharacters();
+      await userEvent.setup().click(await screen.findByRole('button', { name: 'Table' }));
+
+      const row = (await screen.findByText('Pilot Two')).closest('tr');
+      if (!row) throw new Error('expected a Pilot Two row');
+      fireEvent.contextMenu(row);
+
+      fireEvent.click(await screen.findByRole('menuitem', { name: 'Industry' }));
+
+      expect(await screen.findByText('industry page')).toBeInTheDocument();
+      expect(useActiveCharacter.getState().activeCharacterId).toBe(92);
+    });
+  });
+
+  it('the Training column counts down to the current skill finishing, not just the state label', async () => {
+    // This suite's shared beforeEach doesn't clear esiCache/tokens (other
+    // tests never collide on them) — this test and the PI one below both
+    // seed character 91, so each starts from a clean slate rather than
+    // risking the other's fixture still sitting in cache.
+    await db.esiCache.clear();
+    await db.tokens.clear();
+    const now = Date.now();
+    const entries: SkillQueueEntry[] = [
+      {
+        skill_id: 1,
+        queue_position: 0,
+        finished_level: 1,
+        start_date: new Date(now - 60_000).toISOString(),
+        finish_date: new Date(now + 90 * 60_000).toISOString(),
+      },
+    ];
+    await writeCached(91, 'skillqueue', entries, now);
+
+    const user = userEvent.setup();
+    renderCharacters();
+    await user.click(await screen.findByRole('button', { name: 'Table' }));
+
+    const table = await screen.findByRole('table');
+    const trainingHeader = within(table).getByRole('columnheader', { name: 'Training' });
+    const trainingIndex = within(table).getAllByRole('columnheader').indexOf(trainingHeader);
+    const pilotRow = within(table).getByText('Pilot One').closest('tr');
+    if (!pilotRow) throw new Error('expected a Pilot One row');
+    const cell = within(pilotRow).getAllByRole('cell')[trainingIndex];
+    // ~90 minutes out: "1h 30m" (rounds down towards the minute the fixture landed on).
+    const value = await within(cell).findByText(/^1h \d+m$/);
+    expect(value).toHaveAttribute('tabIndex', '0');
+  });
+
+  it('the PI column counts down to the soonest colony expiry, not just the attention label', async () => {
+    await db.esiCache.clear();
+    await db.tokens.clear();
+    const now = Date.now();
+    await db.tokens.put({
+      characterId: 91,
+      accessToken: 'at',
+      refreshToken: 'rt',
+      expiresAt: now + 6e5,
+      scopes: ['esi-planets.manage_planets.v1'],
+    });
+    await writeCached(
+      91,
+      'planets',
+      [
+        {
+          solar_system_id: 30000142,
+          planet_id: 40000001,
+          planet_type: 'temperate' as const,
+          owner_id: 1,
+          last_update: new Date(now).toISOString(),
+          upgrade_level: 3,
+          num_pins: 1,
+        },
+      ],
+      now
+    );
+    await writeCached(
+      91,
+      'planet:40000001',
+      {
+        links: [],
+        routes: [],
+        pins: [
+          {
+            pin_id: 1,
+            type_id: 2848,
+            latitude: 0,
+            longitude: 0,
+            expiry_time: new Date(now + 3 * 60 * 60_000).toISOString(),
+            extractor_details: { heads: [{ head_id: 1, latitude: 0, longitude: 0 }] },
+          },
+        ],
+      },
+      now
+    );
+
+    const user = userEvent.setup();
+    renderCharacters();
+    await user.click(await screen.findByRole('button', { name: 'Table' }));
+
+    const table = await screen.findByRole('table');
+    const piHeader = within(table).getByRole('columnheader', { name: 'PI' });
+    const piIndex = within(table).getAllByRole('columnheader').indexOf(piHeader);
+    const pilotRow = within(table).getByText('Pilot One').closest('tr');
+    if (!pilotRow) throw new Error('expected a Pilot One row');
+    const cell = within(pilotRow).getAllByRole('cell')[piIndex];
+    const value = await within(cell).findByText(/^\d+h \d+m$/);
+    expect(value).toHaveAttribute('tabIndex', '0');
   });
 });

@@ -979,17 +979,17 @@
       "wallet": "Wallet",
       "lastSynced": "Last synced",
       "training": "Training",
-      "openJobs": "Open jobs",
       "pi": "PI",
       "spReady": "SP ready",
-      "alerts": "Alerts"
+      "alerts": "Alerts",
+      "starred": "Starred"
     },
     "jobSlotCategory": {
-      "manufacturing": "Manufacturing",
-      "science": "Science",
-      "reaction": "Reactions"
+      "manufacturing": "Mfg",
+      "science": "Sci",
+      "reaction": "Rxn"
     },
-    "openJobsHeaderTooltip": "Running jobs, manufacturing / science / reactions. Hover a row's value for slot capacity.",
+    "openJobsTooltip": "{{used}}/{{max}} slots used",
     "spReadyYes": "Ready"
   },
   "overview": {

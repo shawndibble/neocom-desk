@@ -103,6 +103,7 @@ describe('loadRosterAttention (cache-only)', () => {
     expect(entry.jobCounts).toEqual({ manufacturing: 1, science: 1, reaction: 0 });
     expect(entry.jobCountsFetchedAt).toEqual(new Date(100));
     expect(entry.piAttention).toBe('expiring-soon');
+    expect(entry.piSoonestExpiryMs).toBe(Date.parse(EXPIRY_SOON));
     expect(entry.piFetchedAt).toEqual(new Date(200));
   });
 
@@ -115,6 +116,7 @@ describe('loadRosterAttention (cache-only)', () => {
 
     expect(entry.jobCounts).toBeUndefined();
     expect(entry.piAttention).toBeUndefined();
+    expect(entry.piSoonestExpiryMs).toBeUndefined();
   });
 
   it('is undefined when scoped but nothing has been cached yet', async () => {
@@ -124,6 +126,7 @@ describe('loadRosterAttention (cache-only)', () => {
 
     expect(entry.jobCounts).toBeUndefined();
     expect(entry.piAttention).toBeUndefined();
+    expect(entry.piSoonestExpiryMs).toBeUndefined();
   });
 
   it('is undefined (not zero colonies-worth of attention) when a scoped character has none', async () => {
@@ -133,6 +136,7 @@ describe('loadRosterAttention (cache-only)', () => {
     const [entry] = await loadRosterAttention({ now: NOW });
 
     expect(entry.piAttention).toBeUndefined();
+    expect(entry.piSoonestExpiryMs).toBeUndefined();
   });
 
   it('covers every character on the device, independently', async () => {
@@ -190,6 +194,7 @@ describe('loadRosterAttention (live)', () => {
 
     expect(entry.jobCounts).toEqual({ manufacturing: 1, science: 0, reaction: 0 });
     expect(entry.piAttention).toBe('healthy');
+    expect(entry.piSoonestExpiryMs).toBe(Date.parse(EXPIRY_FAR));
   });
 
   it('leaves a field unset rather than failing the whole character when one read throws', async () => {
@@ -204,5 +209,6 @@ describe('loadRosterAttention (live)', () => {
 
     expect(entry.jobCounts).toBeUndefined();
     expect(entry.piAttention).toBeUndefined();
+    expect(entry.piSoonestExpiryMs).toBeUndefined();
   });
 });
