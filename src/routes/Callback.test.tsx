@@ -64,14 +64,24 @@ beforeEach(async () => {
 function stashLogin(state: string): void {
   sessionStorage.setItem(
     `neocom.sso.pkce.${state}`,
-    JSON.stringify({ verifier: 'verifier-1', scopes: [], createdAt: Date.now() })
+    JSON.stringify({
+      verifier: 'verifier-1',
+      scopes: ['esi-skills.read_skills.v1'],
+      createdAt: Date.now(),
+    })
   );
-  sessionStorage.setItem('neocom.sso.intent', JSON.stringify([]));
+  stashIntent();
 }
 
 /** What `startLogin` leaves behind so a failed callback can restart the same login. */
-function stashIntent(scopes: string[] = []): void {
+function stashIntent(scopes: string[] = ['esi-skills.read_skills.v1']): void {
   sessionStorage.setItem('neocom.sso.intent', JSON.stringify(scopes));
+}
+
+/** An intent to retry, and the automatic restart already spent on it. */
+function exhaustedBudget(): void {
+  stashIntent();
+  sessionStorage.setItem('neocom.sso.autoRetries', '1');
 }
 
 function renderCallback(search: string) {
@@ -148,8 +158,7 @@ describe('Callback', () => {
   it('stops after one automatic restart instead of looping (#649)', async () => {
     // The retry leaves for SSO and comes back here; unbudgeted, that is a
     // redirect loop between the app and EVE that the user cannot interrupt.
-    sessionStorage.setItem('neocom.sso.autoRetries', '1');
-    stashIntent();
+    exhaustedBudget();
     renderCallback('?code=good-code&state=state-1');
 
     expect(await screen.findByRole('alert')).toBeInTheDocument();
@@ -194,11 +203,30 @@ describe('Callback', () => {
       ownerHash: 'owner-hash-0',
       addedAt: 1,
     });
-    sessionStorage.setItem('neocom.sso.autoRetries', '1');
-    stashIntent();
+    exhaustedBudget();
     renderCallback('?code=good-code&state=state-1');
 
     expect(await screen.findByRole('alert')).toBeInTheDocument();
+  });
+
+  it('a post-login hiccup does not put an error over a signed-in Character (#649)', async () => {
+    // The token is in Dexie by now; nothing after it may claim the login failed.
+    stashLogin('state-1');
+    vi.spyOn(useActiveCharacter.getState(), 'setActiveCharacter').mockRejectedValueOnce(
+      new Error('dexie is unhappy')
+    );
+    renderCallback('?code=good-code&state=state-1');
+
+    expect(await screen.findByText('characters page')).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('a cancelled sign-in leaves no fuel for a later automatic retry (#649)', async () => {
+    stashIntent();
+    renderCallback('?error=access_denied&state=state-1');
+
+    expect(await screen.findByText(/cancelled on the eve online page/i)).toBeInTheDocument();
+    expect(sessionStorage.getItem('neocom.sso.intent')).toBeNull();
   });
 
   it('a successful login clears the retry budget and the intent (#649)', async () => {
@@ -212,8 +240,7 @@ describe('Callback', () => {
   });
 
   it('the panel restarts the sign-in instead of linking somewhere that cannot (#649)', async () => {
-    sessionStorage.setItem('neocom.sso.autoRetries', '1');
-    stashIntent();
+    exhaustedBudget();
     renderCallback('?code=good-code&state=state-1');
 
     await userEvent.click(await screen.findByRole('button', { name: /try again/i }));
@@ -223,8 +250,7 @@ describe('Callback', () => {
 
   it('words a lost race apart from a spent link (#649)', async () => {
     // A second round trip still pending means this callback lost a race.
-    sessionStorage.setItem('neocom.sso.autoRetries', '1');
-    stashIntent();
+    exhaustedBudget();
     stashLogin('other-state');
     renderCallback('?code=good-code&state=state-1');
 
@@ -233,8 +259,7 @@ describe('Callback', () => {
   });
 
   it('tells apart a spent sign-in from a failed one (#649)', async () => {
-    sessionStorage.setItem('neocom.sso.autoRetries', '1');
-    stashIntent();
+    exhaustedBudget();
     renderCallback('?code=good-code&state=state-1');
 
     expect(await screen.findByText(/already been used/i)).toBeInTheDocument();
@@ -255,16 +280,14 @@ describe('Callback', () => {
   });
 
   it('announces the error panel to screen readers', async () => {
-    sessionStorage.setItem('neocom.sso.autoRetries', '1');
-    stashIntent();
+    exhaustedBudget();
     renderCallback('?code=good-code&state=state-1');
 
     expect(await screen.findByRole('alert')).toBeInTheDocument();
   });
 
   it('shows an error when code/state params are missing', async () => {
-    sessionStorage.setItem('neocom.sso.autoRetries', '1');
-    stashIntent();
+    exhaustedBudget();
     renderCallback('');
     expect(await screen.findByRole('button', { name: /try again/i })).toBeInTheDocument();
   });

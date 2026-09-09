@@ -38,17 +38,29 @@ _Recorded 2026-09-09 · issue #649._
   not in the list. It would also have denied #649's reporter — who has
   Characters — the one signal that says which failure they hit.
 
-- **The retry asks for what the original login asked for.** `startLogin`
-  records the request in `neocom.sso.intent`; the retry replays it. `/callback`
-  serves every entry point — Add Character, a `ScopeGate`, a corp grant — and
-  they ask for different scopes, so retrying a failed corp grant as a plain
-  re-auth would succeed while silently not granting corp access, the quiet
-  downgrade `loginFlow` exists to avoid. No recorded intent means no automatic
-  retry rather than a guess.
+- **The retry asks for what the original login asked for, and never less.**
+  `scopesForRetry` unions every live Pending Login and only then falls back to
+  the single `neocom.sso.intent` slot. `/callback` serves every entry point —
+  Add Character, a `ScopeGate`, a corp grant — and they ask for different
+  scopes, so retrying a failed corp grant as a plain re-auth would succeed
+  while silently not granting corp access, the quiet downgrade `loginFlow`
+  exists to avoid. The intent slot alone is not enough: it holds the _most
+  recent_ request, so with two round trips open it describes whichever started
+  last. Under-asking is the failure that matters — SSO issues a token carrying
+  exactly what was requested, so a dropped scope is a grant thrown away. No
+  record at all means no automatic retry rather than a guess.
+
+- **Nothing after the token is stored may report a failure.** `setActiveCharacter`
+  can reject, and letting it reach the panel would put "Login failed" over a
+  Character that is signed in — the trade `features/character/addCharacter`
+  already makes one layer down, reintroduced above it by an earlier revision of
+  this branch and now closed in both places.
 
 - **An SSO `?error=` is terminal.** The commonest one is the user pressing
   Cancel on EVE's page; retrying it bounces them straight back to EVE, which is
-  the opposite of honouring it. It gets its own wording and no retry.
+  the opposite of honouring it. It gets its own wording, and clears the
+  _intent_ rather than the retry budget — clearing the budget would re-arm the
+  automatic restart and leave the intent behind as fuel for it.
 
 - **The automatic restart is budgeted, and the budget survives a page load.**
   One retry, counted in `sessionStorage` (`neocom.sso.autoRetries`), cleared on
@@ -66,10 +78,12 @@ _Recorded 2026-09-09 · issue #649._
   user's whole experience. The panel never renders the thrown Error's own text,
   which may hold an ESI/PKCE internal detail.
 
-- **The pending set is bounded — 15 minutes, 5 entries.** A per-state store
-  grows where a single slot could not. Both bounds are generous next to a round
-  trip measured in seconds; they exist so an abandoned login is forgotten
-  rather than kept for the life of the tab.
+- **The pending set is bounded — 15 minutes, 5 entries — and the TTL is
+  enforced on redemption, not only on prune.** A per-state store grows where a
+  single slot could not. Pruning runs from `startLogin`, so a tab that starts
+  no further login would otherwise still redeem an hours-old round trip and the
+  documented bound would be fiction. Both numbers are generous next to a round
+  trip measured in seconds.
 
 - **The legacy single-slot keys are read, never written.** A tab that left for
   SSO before this shipped comes back holding only `neocom.sso.verifier` /

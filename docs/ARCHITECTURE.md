@@ -71,13 +71,13 @@ each other's verifier (#649) — redirects to `login.eveonline.com` →
 exchanges code, decodes the JWT (`auth/jwt`), writes `CharacterRecord` +
 `TokenRecord` (refresh token) to Dexie. Later ESI calls go through
 `auth/session.getValidAccessToken` (single-flight refresh, buffer 60s before
-expiry) → `esi/client.configureEsi`'s injected `getToken`. A completed
-callback that cannot complete does not dead-end: `routes/Callback.tsx` restarts
-the sign-in once — reusing `neocom.sso.intent`, so a corp grant is not retried
-as a plain re-auth — under a budget in `neocom.sso.autoRetries` that stops it
-looping between the app and SSO. Only then does a panel appear, worded by the
-`LoginError` `reason`, with a button that restarts the sign-in. A `?error=`
-from SSO (a cancelled sign-in) is terminal and never retried.
+expiry) → `esi/client.configureEsi`'s injected `getToken`. A callback that
+cannot complete does not dead-end: `app/loginFlow.retryLastLoginOnce` restarts
+the sign-in asking for what a live Pending Login (else `neocom.sso.intent`)
+asked for, so a corp grant is not retried as a plain re-auth, under a budget in
+`neocom.sso.autoRetries` that stops it looping between the app and SSO. Only
+then does a panel appear, worded per failure, with a button that restarts the
+sign-in. A `?error=` from SSO (a cancelled sign-in) is terminal.
 
 **ESI read-through cache**
 Pattern: try live `esiFetch` → on success, write `db.esiCache` (keyed

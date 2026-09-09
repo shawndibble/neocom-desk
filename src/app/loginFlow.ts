@@ -1,5 +1,5 @@
 // Kicks off EVE SSO: stash PKCE state, then leave the app for login.eveonline.com.
-import { startLogin, lastLoginScopes } from '@/auth/session';
+import { startLogin, scopesForRetry, takeRetryBudget } from '@/auth/session';
 import { SCOPES, scopesForGroup } from '@/esi/scopes';
 import type { ScopeGroup } from '@/esi/registry';
 import { db } from '@/db';
@@ -103,8 +103,13 @@ export async function beginAddCharacterLogin(): Promise<void> {
  * granting what was asked for.
  */
 export async function retryLastLogin(): Promise<boolean> {
-  const scopes = lastLoginScopes();
+  const scopes = scopesForRetry();
   if (!scopes) return false;
   assignLocation(await startLogin(scopes));
   return true;
+}
+
+/** `retryLastLogin`, but only while the automatic-restart budget allows it. */
+export async function retryLastLoginOnce(): Promise<boolean> {
+  return takeRetryBudget() ? retryLastLogin() : false;
 }

@@ -18,23 +18,7 @@ export interface SsoConfig {
   redirectUri?: string;
 }
 
-/**
- * One pending authorize round trip, stored under its own `state`.
- *
- * Per-state rather than one shared slot because a shared slot is a race
- * (issue #649): `startLogin` writes the stash and only then does the browser
- * leave for `login.eveonline.com`, so a second press landing in that gap
- * overwrote the verifier and state the *first*, already-committing navigation
- * was about to use. SSO then came back with a `state` this tab no longer
- * recognised and the login died — more often the faster the user moved, which
- * is exactly how it was reported. Keying by `state` lets both round trips stay
- * valid and lets whichever one returns be the one that completes.
- *
- * `scopes` rides along because it has the same lifetime and the same failure
- * mode if it outlives one round trip: `purgeCacheIfConsentChangedOrPending`
- * would go on treating a stale request as the baseline for grants it had
- * nothing to do with.
- */
+/** Key prefix for a Pending Login; the rest of the key is its `state`. */
 const PKCE_PREFIX = 'neocom.sso.pkce.';
 
 /**
@@ -46,12 +30,6 @@ const VERIFIER_KEY = 'neocom.sso.verifier';
 const STATE_KEY = 'neocom.sso.state';
 const SCOPES_KEY = 'neocom.sso.scopes';
 
-/**
- * Bounds on the pending set — a per-state store grows where a single slot
- * could not. Both are generous next to a round trip measured in seconds; they
- * exist so an abandoned login is eventually forgotten rather than kept for the
- * life of the tab.
- */
 /**
  * What the most recent `startLogin` asked for, kept so a failed callback can
  * restart *that* login rather than a different one.
@@ -65,9 +43,38 @@ const SCOPES_KEY = 'neocom.sso.scopes';
  */
 const INTENT_KEY = 'neocom.sso.intent';
 
+/**
+ * How long a Pending Login stays usable, and how many may exist at once — a
+ * per-state store grows where a single slot could not. Both are generous next
+ * to a round trip measured in seconds; they exist so an abandoned login is
+ * forgotten rather than kept for the life of the tab. The TTL is enforced on
+ * read as well as on prune, so it holds in a tab that starts no further login.
+ */
 const PENDING_TTL_MS = 15 * 60_000;
 const MAX_PENDING = 5;
 
+/**
+ * How many times a failed callback may restart the sign-in by itself.
+ *
+ * One. The retry leaves for SSO and comes back to `/callback`, so an
+ * unbudgeted one is a redirect loop between the app and EVE — invisible to the
+ * user and impossible to interrupt. Counted in storage, not in a ref, because
+ * the retry is a full page load.
+ */
+const RETRY_KEY = 'neocom.sso.autoRetries';
+const MAX_AUTO_RETRIES = 1;
+
+/**
+ * One authorize round trip this tab has started and not yet finished.
+ *
+ * Stored under its own `state` rather than in one shared slot, because a
+ * shared slot is a race (issue #649): `startLogin` writes the stash and only
+ * then does the browser leave for `login.eveonline.com`, so a second press
+ * landing in that gap overwrote the verifier the first, already-committing
+ * navigation was about to use. SSO then came back with a `state` this tab no
+ * longer recognised and the login died. Keyed by `state`, both round trips
+ * stay valid and whichever returns is the one that completes.
+ */
 interface PendingLogin {
   verifier: string;
   /**
@@ -120,9 +127,11 @@ export async function startLogin(scopes: string[], config?: SsoConfig): Promise<
   const verifier = generateVerifier();
   const state = generateVerifier(); // independent 32-byte random value
   const pending: PendingLogin = { verifier, scopes, createdAt: Date.now() };
+  // Prune first: at quota, the write below would otherwise fail for room that
+  // pruning was about to free. `state` is not yet written, so nothing is lost.
+  prunePendingLogins(state);
   writeStorage(PKCE_PREFIX + state, JSON.stringify(pending));
   writeStorage(INTENT_KEY, JSON.stringify(scopes));
-  prunePendingLogins(state);
   return buildAuthorizeUrl({
     clientId,
     redirectUri,
@@ -357,20 +366,20 @@ function pendingKeys(): string[] {
   return keys;
 }
 
-function readPendingLogin(key: string): PendingLogin | undefined {
+/** `expired` is separate so `prunePendingLogins` can tell "gone" from "stale". */
+function readPendingLogin(key: string, allowExpired = false): PendingLogin | undefined {
   const raw = readStorage(key);
   if (raw === null) return undefined;
+  let parsed: Partial<PendingLogin>;
   try {
-    const parsed = JSON.parse(raw) as Partial<PendingLogin>;
-    if (typeof parsed.verifier !== 'string') return undefined;
-    return {
-      verifier: parsed.verifier,
-      scopes: asScopes(parsed.scopes),
-      createdAt: typeof parsed.createdAt === 'number' ? parsed.createdAt : 0,
-    };
+    parsed = JSON.parse(raw) as Partial<PendingLogin>;
   } catch {
     return undefined;
   }
+  if (typeof parsed.verifier !== 'string') return undefined;
+  const createdAt = typeof parsed.createdAt === 'number' ? parsed.createdAt : 0;
+  if (!allowExpired && Date.now() - createdAt > PENDING_TTL_MS) return undefined;
+  return { verifier: parsed.verifier, scopes: asScopes(parsed.scopes), createdAt };
 }
 
 /** Drop expired round trips, then the oldest beyond `MAX_PENDING`. `keep` is never dropped. */
@@ -380,7 +389,7 @@ function prunePendingLogins(keep: string): void {
   const live: { key: string; createdAt: number }[] = [];
   for (const key of pendingKeys()) {
     if (key === keepKey) continue;
-    const pending = readPendingLogin(key);
+    const pending = readPendingLogin(key, true);
     if (!pending || now - pending.createdAt > PENDING_TTL_MS) {
       removeStorage(key);
       continue;
@@ -399,11 +408,13 @@ function prunePendingLogins(keep: string): void {
 function takeLegacyPending(state: string): PendingLogin | undefined {
   const expectedState = readStorage(STATE_KEY);
   const verifier = readStorage(VERIFIER_KEY);
+  // Compared before it is cleared: a stray callback must not destroy a legacy
+  // login still in flight, which is the only kind this path exists to finish.
+  if (!expectedState || !verifier || expectedState !== state) return undefined;
   const rawScopes = readStorage(SCOPES_KEY);
   removeStorage(STATE_KEY);
   removeStorage(VERIFIER_KEY);
   removeStorage(SCOPES_KEY);
-  if (!expectedState || !verifier || expectedState !== state) return undefined;
   return { verifier, scopes: parseScopes(rawScopes), createdAt: 0 };
 }
 
@@ -424,16 +435,56 @@ function parseScopes(raw: string | null): string[] | undefined {
 }
 
 /**
- * The scopes the most recent login asked for, or `undefined` if this tab has
- * not started one. See `INTENT_KEY`.
+ * What a retry should ask SSO for, or `undefined` if this tab has no record of
+ * a login to retry.
+ *
+ * The union of every live Pending Login first, and only then the single
+ * `INTENT_KEY` slot. That slot holds the *most recent* request, so with two
+ * round trips open at once — an Add Character and a corp grant, say — it
+ * describes whichever started last, and retrying the other from it could ask
+ * for less than it originally did. Under-asking is the failure that matters:
+ * SSO issues a token carrying exactly what was requested, so a dropped scope
+ * is a grant silently thrown away. Where a round trip is still live its own
+ * scopes are exact, and the union cannot narrow any of them.
  */
-export function lastLoginScopes(): string[] | undefined {
+export function scopesForRetry(): string[] | undefined {
+  const live = pendingKeys().flatMap((key) => readPendingLogin(key)?.scopes ?? []);
+  if (live.length > 0) return [...new Set(live)];
   return parseScopes(readStorage(INTENT_KEY));
 }
 
-/** Forget the last login's intent — call once it has succeeded. */
+/**
+ * Spend one automatic-restart attempt, or `false` when none is left.
+ *
+ * No storage means no automatic retry: failing closed costs one manual press,
+ * failing open risks the loop `RETRY_KEY` exists to bound.
+ */
+export function takeRetryBudget(): boolean {
+  const spent = Number(readStorage(RETRY_KEY) ?? '0');
+  if (!(spent < MAX_AUTO_RETRIES)) return false;
+  const before = readStorage(RETRY_KEY);
+  writeStorage(RETRY_KEY, String(spent + 1));
+  return readStorage(RETRY_KEY) !== before;
+}
+
+/** Give back the automatic restarts — a user-initiated retry is not one. */
+export function clearRetryBudget(): void {
+  removeStorage(RETRY_KEY);
+}
+
+/**
+ * Forget what there was to retry. Used on success, and on a cancelled sign-in
+ * — where clearing the *budget* instead would re-arm the automatic restart and
+ * leave the intent behind as fuel for it.
+ */
 export function clearLoginIntent(): void {
   removeStorage(INTENT_KEY);
+}
+
+/** Forget the last login's intent and its retries — call once it has succeeded. */
+export function clearLoginRecovery(): void {
+  clearLoginIntent();
+  removeStorage(RETRY_KEY);
 }
 
 /** Handle the SSO callback: validate state, exchange code, persist character + token. */

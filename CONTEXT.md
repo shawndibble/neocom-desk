@@ -354,6 +354,13 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   that recipient is confirmed as settling this Payee's entries, after which
   recipient identity (not amount or date) is the primary match signal
   (issue #540).
+- **Pending Login**: One authorize round trip this tab has started and not yet
+  finished — its PKCE verifier, its **Requested Scopes**, and when it began —
+  stored by `startLogin` under its own `state` and taken by `completeLogin`.
+  Per-`state` rather than one shared slot so two round trips started close
+  together both stay valid; whichever SSO returns is the one that completes.
+  Bounded by a TTL, enforced when it is redeemed as well as when a later login
+  prunes, and by a maximum count — so an abandoned one is forgotten.
 - **Pin Budget**: The CPU and Powergrid a Command Center supplies to one
   colony, and the fixed amount each pin draws from it. **This is the pin cap
   — the game defines no pin-count limit** — so "how many P1 pins, or fewer
@@ -444,12 +451,6 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
 - **Remap**: In-game reallocation of a character's attributes. The optimizer suggests where in a Skill Plan remaps should be placed.
 - **Remap Marker**: A user-placed row in a Skill Plan marking where the character will remap attributes. Draggable like a plan entry.
 - **Remaps Available**: How many attribute remaps the character can spend: bonus remaps (new characters get several) plus the yearly remap when off cooldown. Read from the API (bonus_remaps, last_remap_date, cooldown); user may override. Optimizer must support the common single-remap case: train a leading segment on current attributes, then remap at the optimizer-chosen point.
-- **Pending Login**: One authorize round trip this tab has started and not yet
-  finished — its PKCE verifier, its **Requested Scopes**, and when it began —
-  stored by `startLogin` under its own `state` and taken by `completeLogin`.
-  Per-`state` rather than one shared slot so two round trips started close
-  together both stay valid; whichever SSO returns is the one that completes.
-  Bounded by a TTL and a maximum count, so an abandoned one is forgotten.
 - **Requested Scopes**: What one authorize round trip asked SSO for, carried on
   its **Pending Login** and read back by `completeLogin`. The baseline the login
   path judges revocation against; the refresh path has none and uses the stored

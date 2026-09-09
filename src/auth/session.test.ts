@@ -4,6 +4,7 @@ import { setupServer } from 'msw/node';
 import {
   startLogin,
   completeLogin,
+  scopesForRetry,
   getValidAccessToken,
   recordCharacterCorporation,
   LoginError,
@@ -257,6 +258,52 @@ describe('completeLogin', () => {
 
     const pending = Object.keys(sessionStorage).filter((k) => k.startsWith('neocom.sso.pkce.'));
     expect(pending).toHaveLength(5);
+  });
+
+  it('expires a stale round trip even when no later login prunes it (#649)', async () => {
+    const url = new URL(await startLogin(['esi-skills.read_skills.v1'], cfg));
+    const state = url.searchParams.get('state')!;
+    const key = `neocom.sso.pkce.${state}`;
+    const entry = JSON.parse(sessionStorage.getItem(key)!) as { createdAt: number };
+    entry.createdAt = Date.now() - 16 * 60_000;
+    sessionStorage.setItem(key, JSON.stringify(entry));
+
+    await expect(completeLogin({ code: 'good-code', state }, cfg)).rejects.toMatchObject({
+      reason: 'state-mismatch',
+    });
+    expect(tokenRequests).toHaveLength(0);
+  });
+
+  it('a retry asks for what a live round trip asked for, never less (#649)', async () => {
+    // The single intent slot holds the most recent request, so with two round
+    // trips open it describes the wrong one; a live Pending Login is exact.
+    await startLogin(['esi-skills.read_skills.v1', 'esi-corporations.read_divisions.v1'], cfg);
+    await startLogin(['esi-skills.read_skills.v1'], cfg);
+
+    expect(scopesForRetry()).toEqual(
+      expect.arrayContaining(['esi-corporations.read_divisions.v1'])
+    );
+  });
+
+  it('falls back to the last intent once no round trip is live (#649)', async () => {
+    const url = new URL(await startLogin(['esi-skills.read_skills.v1'], cfg));
+    await completeLogin({ code: 'good-code', state: url.searchParams.get('state')! }, cfg);
+
+    expect(scopesForRetry()).toEqual(['esi-skills.read_skills.v1']);
+  });
+
+  it('a stray callback does not destroy a legacy login still in flight (#649)', async () => {
+    sessionStorage.setItem('neocom.sso.verifier', 'legacy-verifier');
+    sessionStorage.setItem('neocom.sso.state', 'legacy-state');
+
+    await expect(
+      completeLogin({ code: 'good-code', state: 'some-other-state' }, cfg)
+    ).rejects.toMatchObject({ reason: 'no-login-in-progress' });
+
+    // Still redeemable by the callback it belongs to.
+    expect(
+      (await completeLogin({ code: 'good-code', state: 'legacy-state' }, cfg)).characterId
+    ).toBe(CHAR_ID);
   });
 
   it('finishes a login that left before the per-state stash shipped (#649)', async () => {
