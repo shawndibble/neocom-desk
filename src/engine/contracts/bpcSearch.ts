@@ -77,9 +77,149 @@ export function filterBpcContracts(
   });
 }
 
+/**
+ * What a row costs a buyer, and the one expression every price readout on the
+ * page agrees on — `DataTable`'s price column already sorts on `buyout ??
+ * price`, so a "cheapest" chip computed any other way would name a number the
+ * first row beneath it contradicts.
+ *
+ * Deliberately not `priceForMaxFilter` above, which answers a different
+ * question. That one asks "could this row exceed the ceiling I set", where a
+ * no-buyout auction's eventual price is unknowable and must not disqualify
+ * the row; this one asks "what number do I show", where the starting bid is
+ * the only figure there is. Same two fields, opposite treatment of the same
+ * gap — which is why they stay separate functions rather than one with a flag.
+ */
+export function effectivePrice(row: BpcContractRow): number {
+  if (!row.isAuction) return row.price;
+  return row.buyout ?? row.price;
+}
+
 export interface BlueprintTypeOption {
   typeId: number;
   name: string;
+}
+
+/**
+ * What a blueprint's listings look like in aggregate, for the search's
+ * suggestion rows. An **offer** is one contract row, which is not the same as
+ * one copy: a single contract can put `quantity: 3` copies up at one price.
+ * Counting rows is what the buyer is choosing between, so that is what this
+ * counts — and every surface says "offers", never "copies".
+ */
+export interface BlueprintOfferStats {
+  offerCount: number;
+  /** Highest ME on offer. Taken independently of `bestTe` — the two can come from different contracts, and a buyer filtering on one does not thereby get the other. */
+  bestMe: number;
+  bestTe: number;
+}
+
+/**
+ * One pass over the rows, keyed by type. The search's suggestion list needs a
+ * count and a best-ME/TE per candidate blueprint on every keystroke; deriving
+ * those by re-filtering ~120,000 rows per suggestion is the shape that turns a
+ * typeahead into a stutter, so the whole index is built once and looked up.
+ *
+ * Deliberately takes a row set rather than reaching for the whole snapshot:
+ * the caller passes rows already narrowed by the *other* filters, so a
+ * suggestion reading "40 offers" cannot be followed by a summary reading "2".
+ */
+export function blueprintOfferStats(
+  rows: readonly BpcContractRow[]
+): Map<number, BlueprintOfferStats> {
+  const stats = new Map<number, BlueprintOfferStats>();
+  for (const row of rows) {
+    const existing = stats.get(row.typeId);
+    if (!existing) {
+      stats.set(row.typeId, { offerCount: 1, bestMe: row.me, bestTe: row.te });
+      continue;
+    }
+    existing.offerCount += 1;
+    if (row.me > existing.bestMe) existing.bestMe = row.me;
+    if (row.te > existing.bestTe) existing.bestTe = row.te;
+  }
+  return stats;
+}
+
+/** The headline numbers for one blueprint's listings, shown once the search narrows to a single type. */
+export interface BpcPriceSummary {
+  offerCount: number;
+  /** `null` for no offers — distinct from `0`, which would read as a free blueprint. */
+  cheapest: number | null;
+  median: number | null;
+  bestMe: number | null;
+  bestTe: number | null;
+}
+
+/**
+ * Median rather than mean: a handful of 50-run copies among single-run ones
+ * drags an average somewhere no actual contract sits, which is exactly the
+ * number a buyer would misread as "the going rate".
+ */
+export function bpcPriceSummary(rows: readonly BpcContractRow[]): BpcPriceSummary {
+  if (rows.length === 0) {
+    return { offerCount: 0, cheapest: null, median: null, bestMe: null, bestTe: null };
+  }
+  const prices = rows.map(effectivePrice).sort((a, b) => a - b);
+  const middle = prices.length >> 1;
+  const median =
+    prices.length % 2 === 1 ? prices[middle] : (prices[middle - 1] + prices[middle]) / 2;
+  return {
+    offerCount: rows.length,
+    cheapest: prices[0],
+    median,
+    bestMe: rows.reduce((best, row) => Math.max(best, row.me), rows[0].me),
+    bestTe: rows.reduce((best, row) => Math.max(best, row.te), rows[0].te),
+  };
+}
+
+/** One region's cheapest listing of whatever row set it was computed over. */
+export interface RegionCheapest {
+  regionId: number;
+  cheapest: number;
+  offerCount: number;
+}
+
+/**
+ * Cheapest-first, one entry per region. This is the comparison the flat table
+ * cannot make: a blueprint's listings are scattered across dozens of regions,
+ * and the question a buyer actually has — where is this cheapest — is
+ * otherwise answered only by sorting by price and reading the region column of
+ * whichever row happens to be top.
+ */
+export function cheapestByRegion(rows: readonly BpcContractRow[]): RegionCheapest[] {
+  const byRegion = new Map<number, RegionCheapest>();
+  for (const row of rows) {
+    const price = effectivePrice(row);
+    const existing = byRegion.get(row.regionId);
+    if (!existing) {
+      byRegion.set(row.regionId, { regionId: row.regionId, cheapest: price, offerCount: 1 });
+      continue;
+    }
+    existing.offerCount += 1;
+    if (price < existing.cheapest) existing.cheapest = price;
+  }
+  // Ties broken by region id so the order is stable across syncs rather than
+  // depending on which contract the CSV happened to list first.
+  return [...byRegion.values()].sort((a, b) => a.cheapest - b.cheapest || a.regionId - b.regionId);
+}
+
+/**
+ * The part of a blueprint's name worth matching a query against.
+ *
+ * Every entry in the catalogue ends in "Blueprint", so a plain substring
+ * search over the full name makes any query that is itself a substring of
+ * that one shared word — "b", "lu", "print" — match all ~2,900 types at once.
+ * Ranking cannot rescue that: the matches are real, they are just
+ * meaningless. Dropping the shared suffix before matching is what makes
+ * "buzz" reach Buzzard instead of the first fifty types alphabetically.
+ *
+ * Only dropped when something survives it: a type genuinely called
+ * "Blueprint" must stay matchable rather than become unreachable.
+ */
+export function blueprintSearchName(name: string): string {
+  const stripped = name.replace(/\s+blueprint\s*$/i, '').trim();
+  return stripped.length > 0 ? stripped : name.trim();
 }
 
 /**

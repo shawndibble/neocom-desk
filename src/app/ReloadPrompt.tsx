@@ -15,7 +15,14 @@ export function ReloadPrompt() {
   return (
     <div
       role="alert"
-      className="fixed right-4 bottom-16 z-50 flex items-center gap-3 rounded-xs border border-line-bright bg-panel-2 px-3 py-2 text-sm shadow-lg md:bottom-4"
+      // Mobile keeps the original bottom-right corner toast, clearing the
+      // bottom nav bar. Desktop moves it bottom-center and grows a size and
+      // border weight — a corner toast is too easy to miss against a full
+      // desktop layout, which is exactly what issue #613 reported. No accent
+      // or shadow here: DESIGN.md §6 reserves accent for interactive/selected
+      // elements (the Reload button already carries it) and shadows for
+      // popovers/menus, so the emphasis comes from layering weight instead.
+      className="fixed right-4 bottom-16 z-50 flex items-center gap-3 rounded-xs border border-line-bright bg-panel-2 px-3 py-2 text-sm shadow-lg md:right-auto md:bottom-6 md:left-1/2 md:-translate-x-1/2 md:border-2 md:px-5 md:py-4 md:text-base"
     >
       <span>{t('pwa.updateReady')}</span>
       <Button size="sm" variant="primary" onClick={() => void updateServiceWorker(true)}>

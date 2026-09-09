@@ -5,6 +5,7 @@ import type {
   MaterialPriceBasis,
   MaterialSourcing,
   OwnedStockScope,
+  RigFit,
   RigLevel,
   SecurityBand,
 } from '@/engine/industry/types';
@@ -190,7 +191,20 @@ export interface BuildPlanRecord {
   /** Blueprint time efficiency, 0..20. */
   te: number;
   facility: FacilityKind;
-  rigLevel: RigLevel;
+  /**
+   * The structure's fitted rigs, up to 3 slots (issue #609). Additive and
+   * unindexed, so no Dexie schema version bump — same convention as
+   * `materialSourcing` below. Absent on a record written before this existed;
+   * read it (and `rigLevel` below) through `resolveRigFit`, never directly.
+   */
+  rigFit?: RigFit;
+  /**
+   * The pre-#609 single-tier rig model: one tier applied to both the ME and
+   * TE bonus at once. No longer written by this app, but a record synced from
+   * an older build (or not yet re-saved) may still carry only this — see
+   * `resolveRigFit`. Optional now for that reason; it used to be required.
+   */
+  rigLevel?: RigLevel;
   security: SecurityBand;
   hubId: TradeHub['id'];
   /**

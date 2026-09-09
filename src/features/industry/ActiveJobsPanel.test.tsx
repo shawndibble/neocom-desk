@@ -703,6 +703,79 @@ describe('ActiveJobsPanel: cross-character view (issue #607)', () => {
     await db.tokens.clear();
   });
 
+  it('renders no character filter at all for an account with one Character — "This" and "All" would name the same pilot', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(NOW);
+    await db.characters.put({
+      characterId: CHAR_ID,
+      name: 'Pilot One',
+      ownerHash: 'oh1',
+      addedAt: 1,
+    });
+    server.use(http.get(jobsUrl(), () => HttpResponse.json([job(CHAR_ID)])));
+
+    render(
+      <MemoryRouter>
+        <ActiveJobsPanel
+          characterId={CHAR_ID}
+          onAddToQuickbar={() => {}}
+          quickbarAvailable={true}
+          onShowInfo={() => {}}
+        />
+      </MemoryRouter>
+    );
+
+    // Awaiting the fold toggle first proves the panel is fully loaded, so the
+    // filter's absence is the gate rather than a not-rendered-yet race.
+    expect(await screen.findByRole('button', { name: 'Show job list' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'This character' })).toBeNull();
+  });
+
+  it('puts the character filter in the panel header, so a folded panel is still one line', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(NOW);
+    await seedSecondCharacter();
+
+    render(
+      <MemoryRouter>
+        <ActiveJobsPanel
+          characterId={CHAR_ID}
+          onAddToQuickbar={() => {}}
+          quickbarAvailable={true}
+          onShowInfo={() => {}}
+        />
+      </MemoryRouter>
+    );
+
+    // Beside the summary in the header, not in a row of its own below it: the
+    // fold hides the body, so a body-row picker leaves the "collapsed" panel
+    // two rows tall with a stray control under the summary it qualifies.
+    const trigger = await screen.findByRole('button', { name: 'This character' });
+    expect(trigger.closest('header')).not.toBeNull();
+    expect(screen.queryByRole('table', { name: 'Active jobs' })).toBeNull();
+  });
+
+  it('keeps the character filter when nothing is running — an empty panel is where the cross-character view most needs finding', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(NOW);
+    await seedSecondCharacter();
+    server.use(http.get(jobsUrl(), () => HttpResponse.json([])));
+
+    render(
+      <MemoryRouter>
+        <ActiveJobsPanel
+          characterId={CHAR_ID}
+          onAddToQuickbar={() => {}}
+          quickbarAvailable={true}
+          onShowInfo={() => {}}
+        />
+      </MemoryRouter>
+    );
+
+    expect(await screen.findByText('None')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'This character' }).closest('header')).not.toBeNull();
+  });
+
   it('defaults to "This character" and never fetches the other character\'s jobs', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     vi.setSystemTime(NOW);

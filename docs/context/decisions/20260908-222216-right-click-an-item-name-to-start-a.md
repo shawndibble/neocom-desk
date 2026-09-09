@@ -28,11 +28,11 @@ _Recorded 2026-09-08._
   useful follow-up — "what would this specific copy earn me?" — but it needs
   new URL params and a change to Industry's `createPlan`, so it is its own
   piece of work rather than a side effect of adding a menu.
-- **The BPC search page has no per-contract detail view, so the second surface
-  is the existing contract detail modal.** That modal is reached from
-  Contracts, and it is the only place in the app where a blueprint appears as
-  a line item inside an opened contract. Rules out building a public-contract
-  items fetch for the BPC table just to host the same one action.
+- **The menu goes on every list that names an item in a contract**: the BPC
+  search table, `BpcContractModal`'s contents list, and the character
+  `ContractDetailModal`'s Included/Requested tables. A buyer reading a bundle
+  asks "can I build this?" of any line, not just the blueprint the row was
+  found by. Rules out putting it only on the search table.
 - **`blueprints.json` is fetched on first right-click, not on mount.** It is
   1.4MB (the reason `ItemContextMenu` makes its call sites thread
   `blueprintTypeID` down instead of loading it), and a contract detail modal

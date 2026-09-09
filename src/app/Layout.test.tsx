@@ -144,7 +144,7 @@ describe('Layout mobile "More" sheet (UX-REVIEW #4)', () => {
     expect(within(sheet).queryByRole('link', { name: 'Employment' })).not.toBeInTheDocument();
   });
 
-  it('orders the sheet to match the desktop rail: Market, Wallet, Assets, Contracts, BPC Search, Mail, Calendar, Contacts', async () => {
+  it('orders the sheet to match the desktop rail: Market, Wallet, Assets, Contracts, Mail, Calendar, Contacts', async () => {
     mockIsSyncConfigured.mockReturnValue(false);
     const user = userEvent.setup();
     renderLayout();
@@ -156,16 +156,7 @@ describe('Layout mobile "More" sheet (UX-REVIEW #4)', () => {
     // PI now lives in the primary tab bar, not the sheet.
     expect(within(sheet).queryByRole('link', { name: 'PI' })).not.toBeInTheDocument();
 
-    const labels = [
-      'Market',
-      'Wallet',
-      'Assets',
-      'Contracts',
-      'BPC Search',
-      'Mail',
-      'Calendar',
-      'Contacts',
-    ];
+    const labels = ['Market', 'Wallet', 'Assets', 'Contracts', 'Mail', 'Calendar', 'Contacts'];
     const links = labels.map((label) => within(sheet).getByRole('link', { name: label }));
     for (let i = 1; i < links.length; i++) {
       expect(
@@ -400,7 +391,6 @@ describe('Layout desktop rail domain grouping', () => {
       'Wallet',
       'Assets',
       'Contracts',
-      'BPC Search',
       '[Social]',
       'Mail',
       'Calendar',

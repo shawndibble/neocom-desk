@@ -11,6 +11,7 @@ const PINNED_SYNCED_SETTING_KEYS: string[] = [
   'sync.industryAssumedMe',
   'sync.industryFacilityDefaults',
   'sync.marketHub',
+  'sync.marketPricePercent',
   'sync.notificationFeedPrefs',
   'sync.piCustomsRates',
   'sync.piExpiringSoonHours',

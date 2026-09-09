@@ -6,7 +6,7 @@
  * see FACILITY_PRESETS.npcStation.defaultTaxPct), and never throws.
  */
 import { buildVsBuy } from '@/engine/industry/buildVsBuy';
-import { FACILITY_PRESETS } from '@/engine/industry/types';
+import { FACILITY_PRESETS, resolveRigFit } from '@/engine/industry/types';
 import type {
   AdjustedPrices,
   BuildResult,
@@ -24,6 +24,7 @@ export interface ComputeBuildPlanInput {
     | 'me'
     | 'te'
     | 'facility'
+    | 'rigFit'
     | 'rigLevel'
     | 'security'
     | 'facilityTaxPct'
@@ -81,7 +82,7 @@ export function computeBuildPlan({
       me,
       te,
       facility,
-      rig: plan.rigLevel,
+      rigFit: resolveRigFit(plan),
       security: plan.security,
       facilityTaxPct,
       systemCostIndex,

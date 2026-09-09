@@ -149,8 +149,8 @@ export function ActiveJobsPanel({
    * (`resolveCharacterFilter` re-resolves it fresh every render) — or
    * All/a hand-picked subset once the pilot asks. Applies only to **My
    * jobs**; Corp jobs are already "everyone in the corp," an orthogonal
-   * axis, so the picker is hidden while `showingCorp` (rendered below,
-   * beside `OwnerSwitch`).
+   * axis, so the picker is hidden while `showingCorp` (see
+   * `showCharacterFilter`, rendered in the panel header's `meta`).
    */
   const [jobsCharacterFilter, setJobsCharacterFilter] = useState<CharacterFilterValue>('current');
   // Seeded once from the synced default (Settings' Defaults panel) the
@@ -315,6 +315,19 @@ export function ActiveJobsPanel({
   // The owner switch still has to render when there are no corp jobs to show,
   // or flipping to an empty Corp jobs list is a dead end with no way back.
   const showBody = showList && !noneActive;
+  // The per-character notes sit outside `showBody` — a revoked grant is worth
+  // saying with the list folded — so the body is only genuinely empty, and the
+  // panel only genuinely one line, when these are absent too.
+  const hasFanOutNotices =
+    showingAllJobs && (jobsFanOutReauth.length > 0 || jobsFanOutSkipped.length > 0);
+  /**
+   * Hidden outright for a one-Character account: "This character" and "All
+   * characters" then resolve to the same pilot, so the picker is a control
+   * that cannot change anything (`OpenOrdersPanel`'s `showCharacterStrip`
+   * precedent). Hidden on the corp side too — Corp jobs are already "everyone
+   * in the corp," an orthogonal axis to which of *my* pilots to include.
+   */
+  const showCharacterFilter = !showingCorp && jobsFilterCandidates.length > 1;
 
   // Chips only for activities actually present — a chip for an activity type
   // this character never runs would just be a permanently-dead toggle.
@@ -476,11 +489,30 @@ export function ActiveJobsPanel({
     );
   };
 
-  return (
-    <Panel
-      title={t('industry.jobsTitle')}
-      meta={
-        noneActive ? (
+  /**
+   * The header's one-line read: who this panel is showing, then what it holds.
+   *
+   * The character filter sits here beside the title rather than in a row of
+   * its own inside the body, where issue #607 first put it. Three states
+   * forced the move: folded, the body is hidden but a body row was not, so the
+   * "collapsed" panel stayed two rows tall with a stray control under the
+   * summary; idle, the body is empty, so the picker sat alone in a padded box;
+   * and the summary it stands beside — "3 running · 1 done" — has no subject
+   * without it. `Panel`'s left-hand group deliberately doesn't wrap (it holds
+   * every panel's title), so the wrapper here carries its own.
+   */
+  const jobsMeta =
+    showCharacterFilter || noneActive || collapsible ? (
+      <span className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+        {showCharacterFilter && (
+          <CharacterFilterControl
+            characters={jobsFilterCandidates}
+            activeCharacterId={characterId}
+            value={jobsCharacterFilter}
+            onChange={setJobsCharacterFilter}
+          />
+        )}
+        {noneActive ? (
           <span className="text-xs text-text-dim">{t('industry.jobsNoneMeta')}</span>
         ) : (
           collapsible && (
@@ -502,8 +534,14 @@ export function ActiveJobsPanel({
               )}
             </span>
           )
-        )
-      }
+        )}
+      </span>
+    ) : undefined;
+
+  return (
+    <Panel
+      title={t('industry.jobsTitle')}
+      meta={jobsMeta}
       actions={
         <span className="flex items-center gap-2">
           {collapsible && !expanded && (
@@ -570,16 +608,20 @@ export function ActiveJobsPanel({
           <ContextMenuHint label={t('industry.jobsTitle')} />
         </span>
       }
-      padded={showBody || corpAvailable || !showingCorp}
+      // Nothing renders below with the list folded and no per-character note
+      // to make, so the panel sheds its padding and collapses to the header.
+      padded={showBody || corpAvailable || hasFanOutNotices}
     >
       {/*
         First row inside the body rather than beside the header's badge and two
         icon buttons: at 390px that row has no space left, and the switch is a
-        change of what the list below shows, not a header action.
+        change of what the list below shows, not a header action. Unlike the
+        character filter above it stays in the body — it is a two-option
+        segmented control, far wider than a dropdown trigger.
       */}
       {corpAvailable && (
         <OwnerSwitch
-          className={showBody ? 'mb-2' : undefined}
+          className={showBody || hasFanOutNotices ? 'mb-2' : undefined}
           value={owner}
           onChange={setOwner}
           label={t('industry.jobsOwnerLabel')}
@@ -587,25 +629,7 @@ export function ActiveJobsPanel({
           corporationLabel={t('industry.jobsOwnerCorporation')}
         />
       )}
-      {/*
-        Always visible on the personal side, even while pinned to "This
-        character" — otherwise there is no way to discover the
-        cross-character view at all (issue #607). Hidden on the corp side:
-        Corp jobs are already "everyone in the corp," an orthogonal axis.
-      */}
-      {!showingCorp && (
-        <div
-          className={`flex flex-wrap items-center gap-2 ${showBody || corpAvailable ? 'mb-2' : ''}`}
-        >
-          <CharacterFilterControl
-            characters={jobsFilterCandidates}
-            activeCharacterId={characterId}
-            value={jobsCharacterFilter}
-            onChange={setJobsCharacterFilter}
-          />
-        </div>
-      )}
-      {showingAllJobs && (jobsFanOutReauth.length > 0 || jobsFanOutSkipped.length > 0) && (
+      {hasFanOutNotices && (
         <div className="mb-2 space-y-2">
           {jobsFanOutReauth.map((entry) => (
             <ReauthBanner

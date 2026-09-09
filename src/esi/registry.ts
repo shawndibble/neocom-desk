@@ -157,6 +157,10 @@ export const ESI_REGISTRY = {
     route: '/characters/{character_id}/contracts/{contract_id}/items',
     scope: 'esi-contracts.read_character_contracts.v1',
   },
+  getPublicContractItems: {
+    route: '/contracts/public/items/{contract_id}',
+    scope: PUBLIC,
+  },
   getCharacterOrders: {
     route: '/characters/{character_id}/orders',
     scope: 'esi-markets.read_character_orders.v1',

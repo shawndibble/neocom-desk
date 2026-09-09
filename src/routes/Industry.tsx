@@ -22,7 +22,7 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 import { beginEveLogin } from '@/app/loginFlow';
 import { useIsDesktop } from '@/lib/useIsDesktop';
 import { DEFAULT_TRADE_HUB } from '@/market/hubs';
-import { FACILITY_PRESETS } from '@/engine/industry/types';
+import { EMPTY_RIG_FIT, FACILITY_PRESETS, resolveRigFit } from '@/engine/industry/types';
 import type {
   FacilityKind,
   IndustryActivity,
@@ -47,6 +47,7 @@ import { ActiveJobsPanel } from '@/features/industry/ActiveJobsPanel';
 import { BuildPlanList } from '@/features/industry/BuildPlanList';
 import { BuildPlanCompare } from '@/features/industry/BuildPlanCompare';
 import { ProductionLogPanel } from '@/features/industry/ProductionLogPanel';
+import { BpcSourcingPanel } from '@/features/bpcContracts/BpcSourcingPanel';
 import {
   BuildPlanDetail,
   type PlanPatch,
@@ -95,23 +96,23 @@ function newBuildPlan(
   const preferred =
     FACILITY_PRESETS[facilityDefaults.facility].activity === activity ? facilityDefaults : null;
   /**
-   * Facility, rig level and owner-set tax move together, from one source.
+   * Facility, rig fit and owner-set tax move together, from one source.
    *
    * Taking the facility from one place and the rig from another produces a
-   * combination neither source ever held — an NPC station with T2 rigs fitted,
+   * combination neither source ever held — an NPC station with rigs fitted,
    * which `normalizeFacilityDefaults` refuses to even store. It also made the
    * pilot's configured rig and tax unreachable: any earlier plan, whatever its
-   * activity, supplied a `rigLevel` and won.
+   * activity, supplied a rig fit and won.
    */
   const facilityConfig: FacilityDefaults = defaultsMatchActivity
     ? {
         facility: defaultsFrom.facility,
-        rigLevel: defaultsFrom.rigLevel,
+        rigFit: resolveRigFit(defaultsFrom),
         facilityTaxPct: defaultsFrom.facilityTaxPct ?? null,
       }
     : (preferred ?? {
         facility: fallbackFacility(activity),
-        rigLevel: 'none',
+        rigFit: EMPTY_RIG_FIT,
         facilityTaxPct: null,
       });
   return {
@@ -123,7 +124,7 @@ function newBuildPlan(
     me: owned?.material_efficiency ?? 0,
     te: owned?.time_efficiency ?? 0,
     facility: facilityConfig.facility,
-    rigLevel: facilityConfig.rigLevel,
+    rigFit: facilityConfig.rigFit,
     security: defaultsFrom?.security ?? 'highsec',
     hubId: defaultsFrom?.hubId ?? DEFAULT_TRADE_HUB.id,
     // Carried like facility/rig/hub: a pilot who builds in one system builds
@@ -163,6 +164,13 @@ function mostRecentlyUpdatedPlan(plans: BuildPlanRecord[] | undefined): BuildPla
   return plans.reduce((latest, p) => (p.updatedAt > latest.updatedAt ? p : latest));
 }
 
+type IndustryTab = 'plans' | 'records' | 'sourcing';
+
+/** An unknown or absent `?tab=` falls back to Plans rather than rendering nothing — a stale or hand-edited link should land somewhere useful. */
+function readIndustryTab(value: string | null): IndustryTab {
+  return value === 'records' || value === 'sourcing' ? value : 'plans';
+}
+
 /** Build Plan manager: create (via blueprint search)/duplicate/delete/rename plans, edit the selected one. */
 export function Industry() {
   const { t } = useTranslation();
@@ -177,7 +185,28 @@ export function Industry() {
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   const hydrated = useActiveCharacter((state) => state.hydrated);
   const [searchParams, setSearchParams] = useSearchParams();
-  const [tab, setTab] = useState<'plans' | 'records'>('plans');
+  /**
+   * In the URL, unlike the other two tabs' history, because `/bpc-contracts`
+   * redirects to `?tab=sourcing` — a deep link needs somewhere to land, and a
+   * tab held only in component state has no address to give it.
+   */
+  const tab = readIndustryTab(searchParams.get('tab'));
+  const setTab = useCallback(
+    (next: IndustryTab) => {
+      setSearchParams(
+        (previous) => {
+          const params = new URLSearchParams(previous);
+          // Plans is the default, so it stays out of the URL rather than
+          // leaving `?tab=plans` on every visit that never touched the strip.
+          if (next === 'plans') params.delete('tab');
+          else params.set('tab', next);
+          return params;
+        },
+        { replace: true }
+      );
+    },
+    [setSearchParams]
+  );
 
   // Stamped with the Character it was read for, because `useLiveQuery` holds
   // its previous result in a ref across a deps change: for one render after
@@ -590,14 +619,17 @@ export function Industry() {
           <Tabs
             label={t('nav.industry')}
             value={tab}
-            onChange={(id) => setTab(id as typeof tab)}
+            onChange={(id) => setTab(id as IndustryTab)}
             tabs={[
               { id: 'plans', label: t('industry.buildPlansTab') },
               { id: 'records', label: t('industry.recordsTab') },
+              { id: 'sourcing', label: t('industry.bpcSearchTab') },
             ]}
           />
 
-          {tab === 'records' ? (
+          {tab === 'sourcing' ? (
+            <BpcSourcingPanel />
+          ) : tab === 'records' ? (
             <ProductionLogPanel
               characterId={activeCharacterId}
               catalog={catalog}

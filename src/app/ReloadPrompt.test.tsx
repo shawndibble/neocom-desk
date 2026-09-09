@@ -39,6 +39,17 @@ describe('ReloadPrompt', () => {
     expect(updateServiceWorker).toHaveBeenCalledWith(true);
   });
 
+  it('moves bottom-center with a heavier border on desktop, issue #613', () => {
+    render(<ReloadPrompt />);
+    const toast = screen.getByRole('alert');
+    // Mobile: unchanged bottom-right corner toast.
+    expect(toast).toHaveClass('right-4', 'bottom-16');
+    // Desktop: bottom-center and a heavier border so it isn't easy to miss —
+    // no accent/shadow, which DESIGN.md §6 reserves for interactive elements
+    // and popovers/menus respectively.
+    expect(toast).toHaveClass('md:left-1/2', 'md:-translate-x-1/2', 'md:bottom-6', 'md:border-2');
+  });
+
   it('dismisses the toast', async () => {
     const user = userEvent.setup();
     render(<ReloadPrompt />);

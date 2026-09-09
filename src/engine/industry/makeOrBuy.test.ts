@@ -15,7 +15,7 @@ const partsBlueprint: IndustryBlueprint = {
 /** No facility/rig bonuses, so effective quantities are the raw ME0 ones. */
 const ctx: MakeOrBuyContext = {
   facility: FACILITY_PRESETS.npcStation,
-  rig: 'none',
+  rigFit: ['none', 'none', 'none'],
   security: 'highsec',
   systemCostIndex: 0.05,
   adjustedPrices: { 34: 4 },
@@ -70,7 +70,7 @@ describe('makeOrBuy', () => {
     const bonused: MakeOrBuyContext = {
       ...ctx,
       facility: FACILITY_PRESETS.raitaru,
-      rig: 't1',
+      rigFit: ['meT1', 'teT1', 'none'],
     };
     const researched: MaterialRecipe = { ...manufacturing, me: 10 };
     const result = makeOrBuy(line(), researched, bonused);
@@ -151,7 +151,7 @@ describe('makeOrBuy', () => {
       const raitaruParent: MakeOrBuyContext = {
         ...ctx,
         facility: FACILITY_PRESETS.raitaru,
-        rig: 't2',
+        rigFit: ['meT2', 'teT2', 'none'],
       };
       const result = makeOrBuy(line(), reaction, raitaruParent);
       expect(result?.makeUnitPrice).toBeCloseTo(321.6 / 15, 10);

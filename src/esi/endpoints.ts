@@ -1007,6 +1007,49 @@ export function getCharacterContractItems(
   });
 }
 
+// --- GET /contracts/public/items/{contract_id} (public) ---
+
+/**
+ * One line on a *public* contract. Deliberately not `ContractItem`: the
+ * public route carries the blueprint attributes a buyer shops on
+ * (`is_blueprint_copy`, ME/TE, runs) and omits `is_singleton`, so sharing one
+ * interface would mean fields that are mandatory on one route and absent on
+ * the other.
+ */
+export interface PublicContractItem {
+  record_id: number;
+  type_id: number;
+  quantity: number;
+  /** False means the issuer *wants* this item rather than offering it. */
+  is_included: boolean;
+  is_blueprint_copy?: boolean;
+  item_id?: number;
+  material_efficiency?: number;
+  time_efficiency?: number;
+  /** Present on blueprint copies only. */
+  runs?: number;
+}
+
+/**
+ * Item lines on a public contract — readable with no scope at all, which is
+ * what makes a detail view possible for contracts none of the user's
+ * characters is party to. The character-scoped route above cannot serve
+ * these: it only knows contracts that character is a party to.
+ *
+ * Paginated at 1,000 lines per page; only the first is read. A contract with
+ * more lines than that is not something a buyer browses, and a partial list
+ * beats refusing to open the modal.
+ */
+export function getPublicContractItems(
+  contractId: number,
+  options: EndpointOptions = {}
+): Promise<EsiResult<PublicContractItem[]>> {
+  return esiFetch<PublicContractItem[]>(`/contracts/public/items/${contractId}`, {
+    ...options,
+    endpointId: 'getPublicContractItems',
+  });
+}
+
 // --- GET /characters/{character_id}/orders (esi-markets.read_character_orders.v1) ---
 
 export interface MarketOrder {

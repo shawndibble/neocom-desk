@@ -33,7 +33,6 @@ import { Assets } from '@/routes/Assets';
 import { Mail } from '@/routes/Mail';
 import { Calendar } from '@/routes/Calendar';
 import { Contracts } from '@/routes/Contracts';
-import { BpcContracts } from '@/routes/BpcContracts';
 import { Contacts } from '@/routes/Contacts';
 import { EmploymentHistory } from '@/routes/EmploymentHistory';
 import { Settings } from '@/routes/Settings';
@@ -107,7 +106,9 @@ const ROUTE_ELEMENTS = {
   '/mail': <Mail />,
   '/calendar': <Calendar />,
   '/contracts': <Contracts />,
-  '/bpc-contracts': <BpcContracts />,
+  // The BPC search moved into Industry's tab strip; the old path stays as a
+  // redirect so bookmarks and any link already in the wild still land on it.
+  '/bpc-contracts': <Navigate to="/industry?tab=sourcing" replace />,
   '/contacts': <Contacts />,
   '/settings': <Settings />,
 } satisfies Record<AppRoutePath, ReactElement>;

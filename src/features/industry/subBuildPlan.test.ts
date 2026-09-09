@@ -18,7 +18,7 @@ const TRITANIUM = 34;
 
 const CTX = {
   facility: FACILITY_PRESETS.npcStation,
-  rig: 'none' as const,
+  rigFit: ['none', 'none', 'none'] as const,
   security: 'highsec' as const,
   systemCostIndex: 0.05,
   adjustedPrices: {},
