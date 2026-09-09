@@ -43,9 +43,12 @@ describe('parseEftFit', () => {
     const result = parseEftFit(
       '[Rifter, My Fit]\n\n125mm Gatling AutoCannon II, Republic Fleet EMP S'
     );
+    // Only the charge half carries `isCharge` — the flag marks ammo a module
+    // was left loaded with, so Fit Import can decline to quote a launcher
+    // count as a production batch (issue #626).
     expect(result.items).toEqual([
       { name: '125mm Gatling AutoCannon II', quantity: 1 },
-      { name: 'Republic Fleet EMP S', quantity: 1 },
+      { name: 'Republic Fleet EMP S', quantity: 1, isCharge: true },
     ]);
   });
 
@@ -140,9 +143,9 @@ describe('parseEftFit', () => {
       { name: 'Damage Control II', quantity: 1 },
       { name: '1MN Afterburner II', quantity: 1 },
       { name: '125mm Gatling AutoCannon II', quantity: 1 },
-      { name: 'Republic Fleet EMP S', quantity: 1 },
+      { name: 'Republic Fleet EMP S', quantity: 1, isCharge: true },
       { name: '125mm Gatling AutoCannon II', quantity: 1 },
-      { name: 'Republic Fleet EMP S', quantity: 1 },
+      { name: 'Republic Fleet EMP S', quantity: 1, isCharge: true },
       { name: 'Small Polycarbon Engine Housing I', quantity: 1 },
       { name: 'Warrior II', quantity: 5 },
       { name: 'Nanite Repair Paste', quantity: 50 },

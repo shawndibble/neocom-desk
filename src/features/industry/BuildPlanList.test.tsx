@@ -61,6 +61,20 @@ const NOOP_COMPARE_PROPS = {
   onOpenCompare: () => {},
 };
 
+/** Build Groups (issue #626), inert — the tests below are about plans. */
+const NOOP_GROUP_PROPS = {
+  groups: [],
+  expandedGroupIds: new Set<string>(),
+  selectedGroupId: null,
+  onToggleGroup: () => {},
+  onSelectGroup: () => {},
+  onCreateGroup: () => {},
+  onRenameGroup: () => {},
+  onDeleteGroup: () => {},
+  onMovePlan: () => {},
+  onOpenFitImport: () => {},
+};
+
 describe('BuildPlanList', () => {
   const PLANS = [
     plan({ id: 'a', name: 'Merlin run', updatedAt: 300 }),
@@ -79,6 +93,7 @@ describe('BuildPlanList', () => {
         onDelete={() => {}}
         onRename={() => {}}
         {...NOOP_COMPARE_PROPS}
+        {...NOOP_GROUP_PROPS}
       />
     );
   }
@@ -126,6 +141,7 @@ describe('BuildPlanList: compare mode (#453)', () => {
         onDelete={() => {}}
         onRename={() => {}}
         {...NOOP_COMPARE_PROPS}
+        {...NOOP_GROUP_PROPS}
       />
     );
     expect(screen.queryAllByRole('checkbox')).toHaveLength(0);
@@ -145,6 +161,7 @@ describe('BuildPlanList: compare mode (#453)', () => {
         onDelete={() => {}}
         onRename={() => {}}
         {...NOOP_COMPARE_PROPS}
+        {...NOOP_GROUP_PROPS}
         compareMode={true}
         compareSelectedIds={new Set(['a'])}
         onToggleCompareSelected={onToggleCompareSelected}
@@ -175,6 +192,7 @@ describe('BuildPlanList: compare mode (#453)', () => {
         onDelete={() => {}}
         onRename={() => {}}
         {...NOOP_COMPARE_PROPS}
+        {...NOOP_GROUP_PROPS}
         compareMode={true}
         compareSelectedIds={new Set(['a', 'b'])}
         onOpenCompare={onOpenCompare}
@@ -185,5 +203,79 @@ describe('BuildPlanList: compare mode (#453)', () => {
     expect(compareButton).toBeEnabled();
     await userEvent.click(compareButton);
     expect(onOpenCompare).toHaveBeenCalled();
+  });
+});
+
+describe('BuildPlanList: build groups (#626)', () => {
+  const GROUPS = [{ id: 'g1', name: "Loru's Max Hacker", order: 0 }];
+  const PLANS = [
+    plan({ id: 'a', name: 'Buzzard', buildGroupId: 'g1' }),
+    plan({ id: 'b', name: 'Data Analyzer II', buildGroupId: 'g1' }),
+    plan({ id: 'c', name: 'Rokh' }),
+  ];
+
+  function renderGrouped(overrides: Record<string, unknown> = {}) {
+    return render(
+      <BuildPlanList
+        plans={PLANS}
+        catalog={EMPTY_CATALOG}
+        selectedId={null}
+        onSelect={() => {}}
+        onCreate={() => {}}
+        onDuplicate={() => {}}
+        onDelete={() => {}}
+        onRename={() => {}}
+        {...NOOP_COMPARE_PROPS}
+        {...NOOP_GROUP_PROPS}
+        groups={GROUPS}
+        {...overrides}
+      />
+    );
+  }
+
+  it('collapses a group by default, hiding its members but naming the ship and the count', () => {
+    renderGrouped();
+    expect(screen.getByText("Loru's Max Hacker")).toBeInTheDocument();
+    // The hull names the row precisely because a collapsed group shows no
+    // members at all — it is the one thing the pilot scans for.
+    expect(screen.getByText('Buzzard')).toBeInTheDocument();
+    expect(screen.queryByText('Data Analyzer II')).not.toBeInTheDocument();
+    expect(screen.getByText('2')).toBeInTheDocument();
+  });
+
+  it('shows the members once expanded', () => {
+    renderGrouped({ expandedGroupIds: new Set(['g1']) });
+    expect(screen.getByText('Data Analyzer II')).toBeInTheDocument();
+  });
+
+  it('always lists a plan that is in no group', () => {
+    renderGrouped();
+    expect(screen.getByText('Rokh')).toBeInTheDocument();
+  });
+
+  it('lists a plan whose group is gone as an ordinary ungrouped plan', () => {
+    // A group deleted here, or a sync race delivering the plan before the
+    // settings blob — either way the plan must not vanish from the list.
+    renderGrouped({ groups: [] });
+    expect(screen.getByText('Buzzard')).toBeInTheDocument();
+    expect(screen.getByText('Data Analyzer II')).toBeInTheDocument();
+  });
+
+  it('toggles a group from its caret', async () => {
+    const onToggleGroup = vi.fn();
+    renderGrouped({ onToggleGroup });
+    await userEvent.click(
+      screen.getByRole('button', { name: /Show or hide the plans in Loru's Max Hacker/ })
+    );
+    expect(onToggleGroup).toHaveBeenCalledWith('g1');
+  });
+
+  it('distinguishes two same-named groups by ship in the delete button’s accessible name', () => {
+    // Groups are id-keyed and may share a name, so "Delete PvE" twice would
+    // leave a screen-reader user unable to tell which one they are on.
+    renderGrouped();
+    expect(
+      screen.getByRole('button', { name: "Delete group Loru's Max Hacker, Buzzard" })
+    ).toBeInTheDocument();
   });
 });

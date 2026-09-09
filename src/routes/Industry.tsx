@@ -1,9 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  DEFAULT_FACILITY_DEFAULTS,
-  useFacilityDefaults,
-  type FacilityDefaults,
-} from '@/features/industry/facilityDefaults';
+import { useFacilityDefaults } from '@/features/industry/facilityDefaults';
 import { Navigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -12,6 +8,7 @@ import { markBuildPlanDeleted, scheduleSync } from '@/sync';
 import {
   Button,
   EmptyState,
+  Modal,
   PageHeader,
   Panel,
   ReauthBanner,
@@ -21,14 +18,7 @@ import {
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { beginEveLogin } from '@/app/loginFlow';
 import { useIsDesktop } from '@/lib/useIsDesktop';
-import { DEFAULT_TRADE_HUB } from '@/market/hubs';
-import { FACILITY_PRESETS } from '@/engine/industry/types';
-import type {
-  FacilityKind,
-  IndustryActivity,
-  MaterialSourcing,
-  SkillLevels,
-} from '@/engine/industry/types';
+import type { MaterialSourcing, SkillLevels } from '@/engine/industry/types';
 import type { CharacterBlueprint } from '@/esi/endpoints';
 import { loadPi } from '@/sde/loadSde';
 import type { PiData } from '@/sde/types';
@@ -58,110 +48,20 @@ import {
   useLastOpenedPlan,
   withLastOpenedPlan,
 } from '@/features/industry/lastOpenedPlan';
-
-/**
- * The historical hardcoded default per activity — a character with no prior
- * plan of that activity, or whose most recent plan is the other activity
- * (issue #460: `defaultsFrom.facility` would otherwise be an NPC station
- * that cannot host a reaction, or a refinery that cannot manufacture).
- */
-function fallbackFacility(activity: IndustryActivity): FacilityKind {
-  return activity === 'reaction' ? 'athanor' : 'npcStation';
-}
-
-// Facility/rig/security/hub/tax, build system and build location all default
-// from the character's own most recently updated plan (issue #456), so a
-// second plan doesn't force re-picking settings the pilot already set once. `defaultsFrom` is that
-// plan, or null/undefined for a character with no plans yet, in which case
-// the historical hardcoded defaults apply. Only carried when it hosts the
-// same activity as the new plan (issue #460) — otherwise it names a
-// facility the new blueprint/formula cannot run at.
-function newBuildPlan(
-  characterId: number,
-  entry: BlueprintCatalogEntry,
-  owned: CharacterBlueprint | null,
-  defaultsFrom?: BuildPlanRecord | null,
-  facilityDefaults: FacilityDefaults = DEFAULT_FACILITY_DEFAULTS
-): BuildPlanRecord {
-  // Unlike `IndustryBlueprint.activity` (optional, for pre-#460 engine test
-  // literals), the SDE's own `BlueprintType.activity` is always set — no
-  // fallback needed here.
-  const activity = entry.blueprint.activity;
-  const defaultsMatchActivity =
-    defaultsFrom != null && FACILITY_PRESETS[defaultsFrom.facility].activity === activity;
-  // The pilot's own default, but only where it can host this activity — a
-  // refinery cannot manufacture and an NPC station cannot run a reaction, the
-  // same guard `fallbackFacility` exists for.
-  const preferred =
-    FACILITY_PRESETS[facilityDefaults.facility].activity === activity ? facilityDefaults : null;
-  /**
-   * Facility, rig level and owner-set tax move together, from one source.
-   *
-   * Taking the facility from one place and the rig from another produces a
-   * combination neither source ever held — an NPC station with T2 rigs fitted,
-   * which `normalizeFacilityDefaults` refuses to even store. It also made the
-   * pilot's configured rig and tax unreachable: any earlier plan, whatever its
-   * activity, supplied a `rigLevel` and won.
-   */
-  const facilityConfig: FacilityDefaults = defaultsMatchActivity
-    ? {
-        facility: defaultsFrom.facility,
-        rigLevel: defaultsFrom.rigLevel,
-        facilityTaxPct: defaultsFrom.facilityTaxPct ?? null,
-      }
-    : (preferred ?? {
-        facility: fallbackFacility(activity),
-        rigLevel: 'none',
-        facilityTaxPct: null,
-      });
-  return {
-    id: crypto.randomUUID(),
-    characterId,
-    name: entry.productName,
-    blueprintTypeID: entry.blueprintTypeID,
-    runs: 1,
-    me: owned?.material_efficiency ?? 0,
-    te: owned?.time_efficiency ?? 0,
-    facility: facilityConfig.facility,
-    rigLevel: facilityConfig.rigLevel,
-    security: defaultsFrom?.security ?? 'highsec',
-    hubId: defaultsFrom?.hubId ?? DEFAULT_TRADE_HUB.id,
-    // Carried like facility/rig/hub: a pilot who builds in one system builds
-    // their next thing there too, and re-typing it every plan is the annoyance
-    // issue #456 removed for the settings beside it.
-    ...(defaultsFrom?.buildSystemId !== undefined
-      ? { buildSystemId: defaultsFrom.buildSystemId, buildSystemName: defaultsFrom.buildSystemName }
-      : {}),
-    ...(facilityConfig.facilityTaxPct != null
-      ? { facilityTaxPct: facilityConfig.facilityTaxPct }
-      : {}),
-    // Carried like the hub it names a side of: a pilot who sources on buy
-    // orders sources their next plan that way too.
-    ...(defaultsFrom?.materialPriceBasis !== undefined
-      ? { materialPriceBasis: defaultsFrom.materialPriceBasis }
-      : {}),
-    // The picked place itself (#527), carried under the same activity check as
-    // `facility` rather than merely when the source plan has one: where the
-    // activity differs the new plan's facility is the hardcoded fallback, not
-    // the picked place's, so its name would label a job whose numbers came
-    // from somewhere else. The id and the name are independently optional —
-    // ESI withholds some structure names, and the id alone still drives the
-    // picker's stand-in label.
-    ...(defaultsMatchActivity && defaultsFrom.buildLocationId !== undefined
-      ? { buildLocationId: defaultsFrom.buildLocationId }
-      : {}),
-    ...(defaultsMatchActivity && defaultsFrom.buildLocationName !== undefined
-      ? { buildLocationName: defaultsFrom.buildLocationName }
-      : {}),
-    updatedAt: Date.now(),
-  };
-}
-
-/** The character's own plan with the highest `updatedAt`, or null if they have none yet. */
-function mostRecentlyUpdatedPlan(plans: BuildPlanRecord[] | undefined): BuildPlanRecord | null {
-  if (!plans || plans.length === 0) return null;
-  return plans.reduce((latest, p) => (p.updatedAt > latest.updatedAt ? p : latest));
-}
+import { mostRecentlyUpdatedPlan, newBuildPlan } from '@/features/industry/newBuildPlan';
+import {
+  addBuildGroup,
+  buildGroupsFor,
+  removeBuildGroup,
+  renameBuildGroup,
+  useBuildGroups,
+} from '@/features/industry/buildGroups';
+import { useExpandedGroups, withGroupExpanded } from '@/features/industry/expandedGroups';
+import { BuildGroupPanel } from '@/features/industry/BuildGroupPanel';
+import { FitImportDialog } from '@/features/industry/FitImportDialog';
+import { fitImportPlans } from '@/features/industry/fitImport';
+import { useAssumedMe } from '@/features/industry/assumedMe';
+import type { FitToBuildPlansResult } from '@/engine/import/fitToBuildPlans';
 
 /** Build Plan manager: create (via blueprint search)/duplicate/delete/rename plans, edit the selected one. */
 export function Industry() {
@@ -209,7 +109,36 @@ export function Industry() {
   // switching plans must not redo the whole-account asset load (issue #409).
   const ownedStockSnapshot = useOwnedStockSnapshot();
 
+  // Build Groups (issue #626). Names/order/existence sync as one setting;
+  // membership is `buildGroupId` on each plan. Which groups are *open* is
+  // device-local — a phone left collapsed must not fold up the desktop.
+  const buildGroups = useBuildGroups((state) => state.value);
+  const buildGroupsHydrated = useBuildGroups((state) => state.hydrated);
+  const hydrateBuildGroups = useBuildGroups((state) => state.hydrate);
+  const setBuildGroups = useBuildGroups((state) => state.setValue);
+  const expandedGroups = useExpandedGroups((state) => state.value);
+  const hydrateExpandedGroups = useExpandedGroups((state) => state.hydrate);
+  const setExpandedGroups = useExpandedGroups((state) => state.setValue);
+  const assumedMe = useAssumedMe((state) => state.value);
+  const hydrateAssumedMe = useAssumedMe((state) => state.hydrate);
+  useEffect(() => {
+    void hydrateBuildGroups();
+    void hydrateExpandedGroups();
+    void hydrateAssumedMe();
+  }, [hydrateBuildGroups, hydrateExpandedGroups, hydrateAssumedMe]);
+
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // The third kind of selection this pane can hold, beside a plan and the
+  // comparison table (issue #626). Kept apart from `selectedId` rather than
+  // folded into it: a plan id and a group id are not interchangeable, and
+  // `lastOpenedPlan` matches whatever it is given against the Character's own
+  // plans — filing a group id there would be dead weight for ever.
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
+  const [fitImportOpen, setFitImportOpen] = useState(false);
+  // Only ever set for a group that still has members: deleting an empty one
+  // destroys nothing, and a dialog asking about plans it does not have would
+  // be a worse answer than just doing it.
+  const [deletingGroupId, setDeletingGroupId] = useState<string | null>(null);
   // Which plan this Character had open last time (device-local). Read only
   // through `effectiveSelectedId` below, never written into `selectedId`
   // itself: `selectedId` also decides which column a narrow screen shows, and
@@ -315,6 +244,10 @@ export function Industry() {
   // rather than in the effect, which React's set-state-in-effect check flags
   // as cascading-render risk for exactly this shape.
   if (pendingExistingPlan && selectedId !== pendingExistingPlan.id) {
+    // Clears the group first, the same discipline `openRunFromRecords` applies
+    // to Compare: leaving both live would render the group's rollup while the
+    // URL insisted a plan was open.
+    setSelectedGroupId(null);
     setSelectedId(pendingExistingPlan.id);
   }
 
@@ -360,6 +293,7 @@ export function Industry() {
     : null;
 
   if (materialPlan && selectedId !== materialPlan.id) {
+    setSelectedGroupId(null);
     setSelectedId(materialPlan.id);
   }
 
@@ -375,6 +309,10 @@ export function Industry() {
   // remembered one was deleted — here or on another device).
   const effectiveSelectedId = useMemo(() => {
     if (!plans) return null;
+    // A group is showing, so the first-plan fallback below must not also pick
+    // a plan — it would mark a row selected under the group's own rollup and
+    // fetch market prices for a plan nobody opened.
+    if (selectedGroupId !== null) return null;
     if (selectedId && plans.some((p) => p.id === selectedId)) return selectedId;
     // Nothing until the memory has been read: the settings row and the Dexie
     // plan query race, and taking the first-plan fallback before the answer
@@ -386,7 +324,7 @@ export function Industry() {
       activeCharacterId === null ? null : lastOpenedPlanFor(lastOpened, activeCharacterId);
     if (remembered && plans.some((p) => p.id === remembered)) return remembered;
     return plans[0]?.id ?? null;
-  }, [plans, selectedId, lastOpened, lastOpenedHydrated, activeCharacterId]);
+  }, [plans, selectedId, selectedGroupId, lastOpened, lastOpenedHydrated, activeCharacterId]);
 
   const selectedPlan = useMemo(
     () => plans?.find((p) => p.id === effectiveSelectedId) ?? null,
@@ -414,6 +352,23 @@ export function Industry() {
     [plans, compareSelectedIds]
   );
 
+  const groups = useMemo(
+    () => (activeCharacterId === null ? [] : buildGroupsFor(buildGroups, activeCharacterId)),
+    [buildGroups, activeCharacterId]
+  );
+  const expandedGroupIds = useMemo(
+    () => new Set(activeCharacterId === null ? [] : (expandedGroups[activeCharacterId] ?? [])),
+    [expandedGroups, activeCharacterId]
+  );
+  const selectedGroup = useMemo(
+    () => groups.find((g) => g.id === selectedGroupId) ?? null,
+    [groups, selectedGroupId]
+  );
+  const selectedGroupPlans = useMemo(
+    () => plans?.filter((p) => p.buildGroupId === selectedGroupId) ?? [],
+    [plans, selectedGroupId]
+  );
+
   // Narrow screens show one column at a time (CONTEXT.md round 25); matches
   // the grid's own `lg:` breakpoint so the JS-driven visibility and the CSS
   // layout switch at the same width. Gated on the explicit `selectedId`, not
@@ -424,8 +379,9 @@ export function Industry() {
   // a separate screen, so opening it on a narrow screen must navigate away
   // from the list exactly like picking a plan does.
   const isDesktop = useIsDesktop();
-  const detailVisible = isDesktop || selectedId !== null || comparing;
-  const showBackControl = !isDesktop && (selectedId !== null || comparing);
+  const detailVisible = isDesktop || selectedId !== null || comparing || selectedGroupId !== null;
+  const showBackControl =
+    !isDesktop && (selectedId !== null || comparing || selectedGroupId !== null);
 
   if (!hydrated) {
     return (
@@ -542,6 +498,133 @@ export function Industry() {
     });
   }
 
+  /** Opens one plan, standing down any group rollup that was showing. */
+  function selectPlan(id: string) {
+    setSelectedGroupId(null);
+    setSelectedId(id);
+  }
+
+  /** Opens a group's rollup. Exits Compare first, which the detail pane checks before either. */
+  function selectGroup(groupId: string) {
+    exitCompare();
+    setSelectedId(null);
+    setSelectedGroupId(groupId);
+  }
+
+  async function setGroupExpanded(groupId: string, expanded: boolean) {
+    if (activeCharacterId === null) return;
+    await setExpandedGroups(
+      withGroupExpanded(expandedGroups, activeCharacterId, groupId, expanded)
+    );
+  }
+
+  async function handleCreateGroup() {
+    if (activeCharacterId === null) return;
+    const id = crypto.randomUUID();
+    await setBuildGroups(
+      addBuildGroup(buildGroups, activeCharacterId, { id, name: t('industry.newGroupName') })
+    );
+    // Opened as well as created: a group with nothing in it is the one state
+    // where an unopened row tells the pilot nothing at all.
+    await setGroupExpanded(id, true);
+    selectGroup(id);
+  }
+
+  async function handleRenameGroup(groupId: string, name: string) {
+    if (activeCharacterId === null) return;
+    await setBuildGroups(renameBuildGroup(buildGroups, activeCharacterId, groupId, name));
+  }
+
+  /**
+   * Deleting a group orphans its plans; it never cascades.
+   *
+   * A Build Plan is worth more than its membership — the same call
+   * `markBuildPlanDeleted` makes about Production Runs, which it deliberately
+   * does not cascade to either. The members reappear in the ungrouped list.
+   */
+  /** Asks first, but only when there are plans to say something about. */
+  function requestDeleteGroup(groupId: string) {
+    const members = plans?.filter((p) => p.buildGroupId === groupId) ?? [];
+    if (members.length === 0) void handleDeleteGroup(groupId);
+    else setDeletingGroupId(groupId);
+  }
+
+  async function handleDeleteGroup(groupId: string) {
+    if (activeCharacterId === null) return;
+    setDeletingGroupId(null);
+    const members = plans?.filter((p) => p.buildGroupId === groupId) ?? [];
+    if (members.length > 0) {
+      await db.transaction('rw', db.buildPlans, async () => {
+        for (const member of members) {
+          const stored = await db.buildPlans.get(member.id);
+          if (!stored) continue;
+          const orphaned = { ...stored, updatedAt: Date.now() };
+          delete orphaned.buildGroupId;
+          await db.buildPlans.put(orphaned);
+        }
+      });
+      scheduleSync(activeCharacterId);
+    }
+    await setBuildGroups(removeBuildGroup(buildGroups, activeCharacterId, groupId));
+    if (selectedGroupId === groupId) setSelectedGroupId(null);
+  }
+
+  /** Moves one plan between groups, or out of every group when `groupId` is null. */
+  async function handleMovePlan(planId: string, groupId: string | null) {
+    if (activeCharacterId === null) return;
+    await db.transaction('rw', db.buildPlans, async () => {
+      const stored = await db.buildPlans.get(planId);
+      if (!stored) return;
+      // Read-modify-write inside the transaction, never a whole-record put
+      // built on a render's closure — that reverts every field the caller did
+      // not mention, which is how `buildHere` used to get wiped.
+      const moved = { ...stored, updatedAt: Date.now() };
+      // Deleted rather than set to undefined: Firestore rejects undefined at
+      // any depth, and `toRemoteDoc` omits the key on `undefined` anyway, so
+      // an absent key is the one shape both stores agree on.
+      if (groupId === null) delete moved.buildGroupId;
+      else moved.buildGroupId = groupId;
+      await db.buildPlans.put(moved);
+    });
+    scheduleSync(activeCharacterId);
+    // Into a collapsed group the plan would simply vanish from the list, so
+    // the move opens its destination.
+    if (groupId !== null) await setGroupExpanded(groupId, true);
+  }
+
+  /**
+   * Creates a group and one plan per buildable item in a pasted fit.
+   *
+   * One `bulkAdd` and one `scheduleSync`, not one of each per plan: a
+   * twenty-five-plan fit would otherwise re-fire the `useLiveQuery` above
+   * twenty-five times, re-rendering this whole route on each.
+   */
+  async function handleFitImport(preview: FitToBuildPlansResult) {
+    if (activeCharacterId === null || !catalog) return;
+    const groupId = crypto.randomUUID();
+    const newPlans = fitImportPlans(preview, {
+      characterId: activeCharacterId,
+      catalog,
+      ownedBlueprints,
+      defaultsFrom: mostRecentlyUpdatedPlan(plans),
+      facilityDefaults,
+      assumedMe,
+      buildGroupId: groupId,
+    });
+    if (newPlans.length === 0) return;
+    await setBuildGroups(
+      addBuildGroup(buildGroups, activeCharacterId, {
+        id: groupId,
+        name: preview.groupName ?? t('industry.newGroupName'),
+      })
+    );
+    await db.buildPlans.bulkAdd(newPlans);
+    scheduleSync(activeCharacterId);
+    await setGroupExpanded(groupId, true);
+    setFitImportOpen(false);
+    selectGroup(groupId);
+  }
+
   function exitCompare() {
     setComparing(false);
     setCompareMode(false);
@@ -556,7 +639,11 @@ export function Industry() {
    */
   function openRunFromRecords(buildPlanId: string) {
     exitCompare();
-    setSelectedId(buildPlanId);
+    // A plan inside a collapsed group has no row on screen, so selecting it
+    // would look like the click did nothing. Open its group first.
+    const groupId = plans?.find((p) => p.id === buildPlanId)?.buildGroupId;
+    if (groupId !== undefined) void setGroupExpanded(groupId, true);
+    selectPlan(buildPlanId);
     setTab('plans');
   }
 
@@ -581,7 +668,7 @@ export function Industry() {
         </Panel>
       )}
 
-      {!plans || !catalog ? (
+      {!plans || !catalog || !buildGroupsHydrated ? (
         <div className="flex justify-center py-16">
           <Spinner label={t('common.loading')} />
         </div>
@@ -619,7 +706,7 @@ export function Industry() {
                   // screen: the first-plan fallback would otherwise leave a row
                   // highlighted on a narrow screen with nothing open.
                   selectedId={detailVisible ? effectiveSelectedId : null}
-                  onSelect={setSelectedId}
+                  onSelect={selectPlan}
                   onCreate={(entry) =>
                     void createPlan(entry).then((id) => {
                       if (id) setSelectedId(id);
@@ -633,6 +720,18 @@ export function Industry() {
                   onToggleCompareMode={toggleCompareMode}
                   onToggleCompareSelected={toggleCompareSelected}
                   onOpenCompare={() => setComparing(true)}
+                  groups={groups}
+                  expandedGroupIds={expandedGroupIds}
+                  selectedGroupId={detailVisible ? selectedGroupId : null}
+                  onToggleGroup={(groupId) =>
+                    void setGroupExpanded(groupId, !expandedGroupIds.has(groupId))
+                  }
+                  onSelectGroup={selectGroup}
+                  onCreateGroup={() => void handleCreateGroup()}
+                  onRenameGroup={(groupId, name) => void handleRenameGroup(groupId, name)}
+                  onDeleteGroup={requestDeleteGroup}
+                  onMovePlan={(planId, groupId) => void handleMovePlan(planId, groupId)}
+                  onOpenFitImport={() => setFitImportOpen(true)}
                 />
               </Panel>
 
@@ -640,13 +739,28 @@ export function Industry() {
                 {showBackControl && (
                   <Button
                     size="sm"
-                    onClick={() => (comparing ? exitCompare() : setSelectedId(null))}
+                    onClick={() => {
+                      if (comparing) exitCompare();
+                      else if (selectedGroupId !== null) setSelectedGroupId(null);
+                      else setSelectedId(null);
+                    }}
                   >
                     {t('industry.backToList')}
                   </Button>
                 )}
                 <div className="space-y-4">
-                  {!detailVisible ? null : comparing ? (
+                  {!detailVisible ? null : selectedGroup ? (
+                    <BuildGroupPanel
+                      key={selectedGroup.id}
+                      group={selectedGroup}
+                      plans={selectedGroupPlans}
+                      catalog={catalog}
+                      pi={pi}
+                      skills={skills}
+                      ownedStockSnapshot={ownedStockSnapshot}
+                      onOpenPlan={selectPlan}
+                    />
+                  ) : comparing ? (
                     comparePlans.length >= 2 ? (
                       <BuildPlanCompare
                         plans={comparePlans}
@@ -695,6 +809,34 @@ export function Industry() {
             </div>
           )}
         </>
+      )}
+
+      <Modal
+        open={deletingGroupId !== null}
+        onClose={() => setDeletingGroupId(null)}
+        title={t('industry.deleteGroup')}
+      >
+        <p className="text-xs text-text-dim">{t('industry.deleteGroupConfirm')}</p>
+        <div className="mt-3 flex justify-end gap-2">
+          <Button size="sm" onClick={() => setDeletingGroupId(null)}>
+            {t('industry.cancel')}
+          </Button>
+          <Button
+            size="sm"
+            variant="danger"
+            onClick={() => deletingGroupId && void handleDeleteGroup(deletingGroupId)}
+          >
+            {t('industry.deleteGroup')}
+          </Button>
+        </div>
+      </Modal>
+
+      {fitImportOpen && catalog && (
+        <FitImportDialog
+          catalog={catalog}
+          onApply={(preview) => void handleFitImport(preview)}
+          onClose={() => setFitImportOpen(false)}
+        />
       )}
 
       {infoModalItem && (

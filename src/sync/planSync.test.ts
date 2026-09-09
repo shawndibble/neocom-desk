@@ -658,6 +658,7 @@ describe('every stored field of a plan reaches the remote doc and comes back', (
       locations: [{ characterId: 1, locationId: 60003760, locationType: 'station' }],
     },
     buildHere: [57478],
+    buildGroupId: 'g1',
     updatedAt: Date.now() - 1000,
   };
 
@@ -679,6 +680,7 @@ describe('every stored field of a plan reaches the remote doc and comes back', (
   it('pins the Build Plan fields, so a new one has to be routed deliberately', () => {
     expect(Object.keys(fullBuildPlan).sort()).toEqual([
       'blueprintTypeID',
+      'buildGroupId',
       'buildHere',
       'buildLocationId',
       'buildLocationName',

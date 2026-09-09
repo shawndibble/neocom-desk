@@ -9,6 +9,7 @@ const PINNED_SYNCED_SETTING_KEYS: string[] = [
   'sync.corpDarkAfterDays',
   'sync.defaultCharacterFilter',
   'sync.industryAssumedMe',
+  'sync.industryBuildGroups',
   'sync.industryFacilityDefaults',
   'sync.marketHub',
   'sync.notificationFeedPrefs',

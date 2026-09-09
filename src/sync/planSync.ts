@@ -796,6 +796,14 @@ const buildPlanSpec: CollectionSpec<BuildPlanRecord, RemoteBuildPlanDoc> = {
       // expanded a row and collapsed it again is byte-identical to one that
       // never did — the same rule materialSourcing follows above.
       ...(p.buildHere !== undefined && p.buildHere.length > 0 ? { buildHere: p.buildHere } : {}),
+      // Build Group membership (issue #626). Easy to forget and impossible to
+      // notice: `RemoteBuildPlanDoc` derives from `BuildPlanRecord`, so a new
+      // field appears on the remote type for free and omitting it here
+      // compiles clean — while being silently dropped on push *and* pull.
+      // planSync.test.ts's `fullBuildPlan` is `Required<BuildPlanRecord>` and
+      // its key list is pinned, so a new field fails there until it is routed
+      // here deliberately.
+      ...(p.buildGroupId !== undefined ? { buildGroupId: p.buildGroupId } : {}),
       updatedAt: p.updatedAt,
       ownerHash,
       deleted: false,
@@ -823,6 +831,7 @@ const buildPlanSpec: CollectionSpec<BuildPlanRecord, RemoteBuildPlanDoc> = {
     ...(r.materialSourcing !== undefined ? { materialSourcing: r.materialSourcing } : {}),
     ...(r.ownedStockScope !== undefined ? { ownedStockScope: r.ownedStockScope } : {}),
     ...(r.buildHere !== undefined ? { buildHere: r.buildHere } : {}),
+    ...(r.buildGroupId !== undefined ? { buildGroupId: r.buildGroupId } : {}),
     updatedAt: r.updatedAt,
   }),
   bulkPutLocal: (records) => db.buildPlans.bulkPut(records),

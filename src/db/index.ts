@@ -268,6 +268,28 @@ export interface BuildPlanRecord {
    * plan behaved before this existed.
    */
   buildHere?: number[];
+  /**
+   * The **Build Group** this plan belongs to (issue #626), or absent for an
+   * ungrouped plan — which is how every plan behaved before this existed.
+   * Additive and unindexed, so no schema version bump, same as
+   * `materialSourcing` and `buildHere` above.
+   *
+   * Membership lives here and nowhere else. The group's own name, order and
+   * existence live in the `sync.industryBuildGroups` setting instead of a
+   * table, so there is exactly one writer for "which group is this plan in"
+   * and no merge can hand one plan to two groups, or leave a group listing a
+   * plan that moved.
+   *
+   * A value naming a group that is gone — deleted here, or a sync race
+   * delivering the plan before the setting — renders as an ordinary ungrouped
+   * plan rather than a broken group of one, the same rule
+   * `MiningTaxAssignmentRecord.groupId` follows. Deleting a group clears this
+   * on its members; it never deletes them.
+   *
+   * Named `buildGroupId`, not `groupId`, because `groupId` already means
+   * something else on `MiningTaxAssignmentRecord` in this same file.
+   */
+  buildGroupId?: string;
   /** Epoch ms of the last edit. */
   updatedAt: number;
 }

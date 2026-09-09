@@ -28,10 +28,21 @@
  * the sub-inputs that would replace the row do not exist on this plan.
  */
 
-import type { MaterialCostLine } from '@/engine/industry/types';
+/**
+ * The two functions below take only the two fields they actually read, rather
+ * than a whole `MaterialCostLine`. A **Build Group**'s merged buy list (issue
+ * #626) is summed across members and deliberately is not a `MaterialCostLine`
+ * — there is no single `baseQuantity` behind it, and its `unitPrice` is
+ * whichever member priced it first — but it is exactly as pasteable, and
+ * multibuy neither knows nor cares which shape it came from.
+ */
+export interface ShoppingListLine {
+  typeID: number;
+  remainingQuantity: number;
+}
 
 export function shoppingListText(
-  materials: readonly MaterialCostLine[],
+  materials: readonly ShoppingListLine[],
   nameFor: (typeID: number) => string
 ): string {
   return materials
@@ -46,6 +57,6 @@ export function shoppingListText(
  * owned has rows to show but nothing to order, and a button that copies an
  * empty string is worse than one that is plainly unavailable.
  */
-export function hasShoppingList(materials: readonly MaterialCostLine[]): boolean {
+export function hasShoppingList(materials: readonly ShoppingListLine[]): boolean {
   return materials.some((material) => material.remainingQuantity > 0);
 }

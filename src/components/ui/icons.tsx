@@ -49,6 +49,7 @@ import {
   FileText,
   Flag,
   Flask,
+  FolderSimple,
   Funnel,
   Gear,
   Gauge,
@@ -67,6 +68,7 @@ import {
   Prohibit,
   Queue,
   Receipt,
+  Scales,
   ShieldCheck,
   ShoppingCart,
   SignIn as SignInGlyph,
@@ -140,6 +142,20 @@ export const Pin = withWeight(Star);
 export const AllCharacters = withWeight(UsersThree);
 /** A container or a ship's bay — anything holding other assets. */
 export const Container = withWeight(Package);
+/**
+ * A **Build Group**: several Build Plans kept and costed together (issue
+ * #626). A folder rather than `Container`'s box, which already means a
+ * physical thing holding assets in space — a Build Group holds plans, which
+ * are not anywhere.
+ */
+export const BuildGroup = withWeight(FolderSimple);
+/**
+ * Put two or more of something side by side on the same measures — Build
+ * Plans, or a Quickbar's items. Scales rather than `Route`'s left-right
+ * arrows, which already mean "pick one of two options" and sit a couple of
+ * controls away on the same page.
+ */
+export const Compare = withWeight(Scales);
 /** Route preference (shortest vs safest). */
 export const Route = withWeight(ArrowsLeftRight);
 /** Something is incomplete or unresolved — pairs with `warning` text, never used alone. */
