@@ -43,12 +43,22 @@ export type BudgetRefusal = 'errorLimit' | 'rateLimit' | 'pacing';
 /**
  * The refusal the error budget hands back **without making a request**.
  *
- * `status` is 0 rather than 420/429 on purpose. Reporting a status ESI never
- * sent would be a lie in the one field callers read as "what ESI said", and
- * `features/character/typeNames.ts` acts on exactly that field: it answers a
- * 429/420 by fanning out up to a thousand per-id lookups, which is the last
- * thing a spent budget wants. `reason` carries which limit is holding, and
- * `retryAfterMs` how long — richer than a status, and true.
+ * `status` is 0 rather than 420/429 on purpose: a status is the one field
+ * callers read as "what did ESI say", and ESI said nothing here. `reason`
+ * carries which limit is holding and `retryAfterMs` how long — richer than a
+ * status, and true.
+ *
+ * That distinction is load-bearing for two callers that branch on `status`:
+ *
+ * - `features/character/structures.ts` memoizes a citadel as forbidden for 24h
+ *   on `status === 403`. A refusal is not an ACL answer and must not write that
+ *   memo, or a throttle would teach the app that structures it never asked
+ *   about are off-limits.
+ * - `features/character/typeNames.ts` used to answer a 429/420 by fanning out
+ *   up to a thousand per-id lookups. Issue #655's own item D (#657) has since
+ *   narrowed that catch to a 404, so this particular amplifier is gone — but it
+ *   is the reason the rule exists, and the next throttle branch someone writes
+ *   should not fire on a request that was never sent.
  *
  * Still an `EsiError`, and never 401/403, so `isAuthFailure` stays false and
  * `esi/cache.ts` falls back to the stored row exactly as it does for a 5xx: no

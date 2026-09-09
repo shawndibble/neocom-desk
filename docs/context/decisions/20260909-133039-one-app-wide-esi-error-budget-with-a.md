@@ -88,10 +88,19 @@ _Recorded 2026-09-09 · issue #655._
   `isAuthFailure` stays false, no re-auth banner is painted, the read-through
   cache falls back exactly as it does for a 5xx, and what a caller receives on
   success is unchanged. But it must not borrow a status ESI never returned:
-  `status` is the one field callers read as "what did ESI say", and
-  `features/character/typeNames.ts` acts on precisely that — it answers a
-  429/420 by fanning out up to a thousand per-id lookups, which is the last
-  thing a spent budget wants (that amplifier is item D's own subject).
+  `status` is the one field callers read as "what did ESI say", and two of them
+  act on precisely that.
+
+  `features/character/structures.ts` (item A) memoizes a citadel as forbidden
+  for 24h on `status === 403`. A refusal is not an ACL answer, and borrowing one
+  would teach the app that structures it never asked about are off-limits for a
+  day — the two items would have fought. `features/character/typeNames.ts` used
+  to answer a 429/420 by fanning out up to a thousand per-id lookups; item D
+  (#657) has since narrowed that catch to a 404, so that particular amplifier is
+  already gone, but it is the reason the rule exists and the next throttle
+  branch someone writes should not fire on a request that was never sent.
+  `budget.test.ts` pins a refusal against all four statuses.
+
   `EsiBudgetError` carries `reason` (`errorLimit` / `rateLimit` / `pacing`) and
   `retryAfterMs` instead: richer than a status, and true. A queue held back by
   the brake reports `pacing`, because no circuit shut and claiming one would be
@@ -113,13 +122,18 @@ _Recorded 2026-09-09 · issue #655._
   start-time check the circuit is reopened by its own stragglers, immediately,
   in exactly the storm it exists for.
 
-- **The brake trickles, it never clamps to zero.** This matters because PR
+- **The brake trickles, it never clamps to zero.** This matters because
   #653's `structures.ts` memoizes a forbidden citadel only on a _real_ 403 — a
   request the gate refuses teaches it nothing. Under the brake, requests are
   spread out, not stopped: a caller arriving after the last admission's spacing
-  has elapsed is admitted with no wait at all. So each page load still spends
-  most of a fresh 100-error window on real 403s and memoizes them, and the memo
-  converges over a small number of visits instead of being starved.
+  has elapsed is admitted with no wait at all. The brake also only engages at
+  `remain <= 30`, so roughly 70 of a fresh window's errors are spent at full
+  width before any pacing at all, and admissions continue past that. Each visit
+  gets a new window, so the memo converges over a couple of visits rather than
+  being starved. Items E/F (#660) help this further rather than complicating it:
+  NPC station names and the station-vs-structure discrimination now come from
+  the SDE snapshot, so those lookups have left the budget entirely and more of
+  each window is available to the 403s that do teach something.
 
 - **One existing behaviour changed deliberately: the blind 10-second retry is
   gone.** `esiFetch` used to sleep up to 10s on any 429/420 and retry once,

@@ -401,6 +401,40 @@ describe('planRequest — a shut circuit', () => {
   });
 });
 
+describe('a refusal is not mistaken for something ESI said', () => {
+  // The statuses other modules branch on. A refusal must match none of them:
+  // nothing was sent, so it is not an answer and must not read as one.
+  const refusal = new EsiBudgetError('errorLimit', 45_000);
+
+  it('is not the 403 that memoizes a citadel as forbidden for 24h', () => {
+    // `features/character/structures.ts` (issue #655 item A, PR #653) writes
+    // its forbidden memo on `err instanceof EsiError && err.status === 403`.
+    // A throttle is not an ACL answer; treating it as one would teach the app
+    // that structures it never asked about are off-limits, for a day.
+    expect(refusal.status).not.toBe(403);
+  });
+
+  it('is not an auth failure, so the cache falls back rather than the shell painting a re-auth banner', () => {
+    expect(refusal.status).not.toBe(401);
+    expect(refusal.status).not.toBe(403);
+  });
+
+  it('is not the 404 that fans a name batch out per id', () => {
+    // `features/character/typeNames.ts` routes *around* a 404 with up to a
+    // thousand per-id lookups. Answering a spent budget that way is the exact
+    // amplification item D (#657) removed.
+    expect(refusal.status).not.toBe(404);
+  });
+
+  it('is not the 429/420 a real throttle response carries', () => {
+    expect(refusal.status).not.toBe(429);
+    expect(refusal.status).not.toBe(420);
+    // What it carries instead, and what callers should read.
+    expect(refusal.reason).toBe('errorLimit');
+    expect(refusal.retryAfterMs).toBe(45_000);
+  });
+});
+
 describe('the bounds hold together', () => {
   it('caps a whole call well inside the token expiry buffer', () => {
     // The access token is fetched *before* the gate, and
