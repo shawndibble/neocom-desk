@@ -14,6 +14,13 @@ interface PanelProps {
    * Sits to the right of the title, in the same left-hand group: a one-line
    * read of what the panel holds (a count, a total, a countdown), so a
    * collapsed panel still says something without opening it.
+   *
+   * A control belongs here only when it names *what is being read* rather than
+   * acting on it — the Character filter on Active Jobs and Wallet Balance is
+   * the subject of the count beside it, and has to outlive the fold that hides
+   * the body. Anything that acts on the panel goes in `actions`; a control
+   * belonging to the title itself goes in `leading`. This group does not wrap,
+   * so a `meta` holding more than one thing carries its own `flex-wrap`.
    */
   meta?: ReactNode;
   children: ReactNode;

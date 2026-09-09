@@ -149,8 +149,8 @@ export function ActiveJobsPanel({
    * (`resolveCharacterFilter` re-resolves it fresh every render) — or
    * All/a hand-picked subset once the pilot asks. Applies only to **My
    * jobs**; Corp jobs are already "everyone in the corp," an orthogonal
-   * axis, so the picker is hidden while `showingCorp` (rendered below,
-   * beside `OwnerSwitch`).
+   * axis, so the picker is hidden while `showingCorp` (see
+   * `showCharacterFilter`, rendered in the panel header's `meta`).
    */
   const [jobsCharacterFilter, setJobsCharacterFilter] = useState<CharacterFilterValue>('current');
   // Seeded once from the synced default (Settings' Defaults panel) the
@@ -318,7 +318,7 @@ export function ActiveJobsPanel({
   // The per-character notes sit outside `showBody` — a revoked grant is worth
   // saying with the list folded — so the body is only genuinely empty, and the
   // panel only genuinely one line, when these are absent too.
-  const fanOutNotices =
+  const hasFanOutNotices =
     showingAllJobs && (jobsFanOutReauth.length > 0 || jobsFanOutSkipped.length > 0);
   /**
    * Hidden outright for a one-Character account: "This character" and "All
@@ -489,56 +489,59 @@ export function ActiveJobsPanel({
     );
   };
 
+  /**
+   * The header's one-line read: who this panel is showing, then what it holds.
+   *
+   * The character filter sits here beside the title rather than in a row of
+   * its own inside the body, where issue #607 first put it. Three states
+   * forced the move: folded, the body is hidden but a body row was not, so the
+   * "collapsed" panel stayed two rows tall with a stray control under the
+   * summary; idle, the body is empty, so the picker sat alone in a padded box;
+   * and the summary it stands beside — "3 running · 1 done" — has no subject
+   * without it. `Panel`'s left-hand group deliberately doesn't wrap (it holds
+   * every panel's title), so the wrapper here carries its own.
+   */
+  const jobsMeta =
+    showCharacterFilter || noneActive || collapsible ? (
+      <span className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+        {showCharacterFilter && (
+          <CharacterFilterControl
+            characters={jobsFilterCandidates}
+            activeCharacterId={characterId}
+            value={jobsCharacterFilter}
+            onChange={setJobsCharacterFilter}
+          />
+        )}
+        {noneActive ? (
+          <span className="text-xs text-text-dim">{t('industry.jobsNoneMeta')}</span>
+        ) : (
+          collapsible && (
+            <span className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs tabular-nums">
+              <span className="text-text">
+                {t('industry.jobsSummary', { running: summary.running, done: summary.done })}
+              </span>
+              {summary.next && (
+                <span
+                  className={
+                    soon(summary.next.job) ? 'font-semibold text-warning' : 'text-text-dim'
+                  }
+                >
+                  {t('industry.jobsNextFinish', {
+                    name: nameForBlueprint(summary.next.job.blueprint_type_id),
+                    time: formatDuration(summary.next.seconds),
+                  })}
+                </span>
+              )}
+            </span>
+          )
+        )}
+      </span>
+    ) : undefined;
+
   return (
     <Panel
       title={t('industry.jobsTitle')}
-      /*
-        The character filter sits here beside the title, not in a row of its
-        own inside the body where issue #607 first put it. Three states forced
-        the move: folded, the body is hidden, so a body row left the
-        "collapsed" panel two rows tall with a stray control under the summary;
-        idle, the body is empty, so the picker sat alone in a padded box; and
-        the summary it stands next to — "3 running · 1 done" — has no subject
-        without it. `Panel`'s left-hand group deliberately doesn't wrap (it
-        holds every panel's title), so the wrapper here carries its own.
-      */
-      meta={
-        showCharacterFilter || noneActive || collapsible ? (
-          <span className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
-            {showCharacterFilter && (
-              <CharacterFilterControl
-                characters={jobsFilterCandidates}
-                activeCharacterId={characterId}
-                value={jobsCharacterFilter}
-                onChange={setJobsCharacterFilter}
-              />
-            )}
-            {noneActive ? (
-              <span className="text-xs text-text-dim">{t('industry.jobsNoneMeta')}</span>
-            ) : (
-              collapsible && (
-                <span className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs tabular-nums">
-                  <span className="text-text">
-                    {t('industry.jobsSummary', { running: summary.running, done: summary.done })}
-                  </span>
-                  {summary.next && (
-                    <span
-                      className={
-                        soon(summary.next.job) ? 'font-semibold text-warning' : 'text-text-dim'
-                      }
-                    >
-                      {t('industry.jobsNextFinish', {
-                        name: nameForBlueprint(summary.next.job.blueprint_type_id),
-                        time: formatDuration(summary.next.seconds),
-                      })}
-                    </span>
-                  )}
-                </span>
-              )
-            )}
-          </span>
-        ) : undefined
-      }
+      meta={jobsMeta}
       actions={
         <span className="flex items-center gap-2">
           {collapsible && !expanded && (
@@ -607,7 +610,7 @@ export function ActiveJobsPanel({
       }
       // Nothing renders below with the list folded and no per-character note
       // to make, so the panel sheds its padding and collapses to the header.
-      padded={showBody || corpAvailable || fanOutNotices}
+      padded={showBody || corpAvailable || hasFanOutNotices}
     >
       {/*
         First row inside the body rather than beside the header's badge and two
@@ -618,7 +621,7 @@ export function ActiveJobsPanel({
       */}
       {corpAvailable && (
         <OwnerSwitch
-          className={showBody || fanOutNotices ? 'mb-2' : undefined}
+          className={showBody || hasFanOutNotices ? 'mb-2' : undefined}
           value={owner}
           onChange={setOwner}
           label={t('industry.jobsOwnerLabel')}
@@ -626,7 +629,7 @@ export function ActiveJobsPanel({
           corporationLabel={t('industry.jobsOwnerCorporation')}
         />
       )}
-      {fanOutNotices && (
+      {hasFanOutNotices && (
         <div className="mb-2 space-y-2">
           {jobsFanOutReauth.map((entry) => (
             <ReauthBanner

@@ -19,11 +19,15 @@
  * `routeScopes.ts`), and reusing the word here would read as a third,
  * unrelated meaning.
  *
- * On a page it goes in its panel's `meta` slot, beside the title, and a
- * caller with one Character to offer doesn't render it at all — see
+ * Where it goes: in the `meta` slot of the panel it filters, beside that
+ * panel's title, and not at all for a caller with one Character to offer —
+ * see
  * `docs/context/decisions/20260908-192806-the-character-filter-rides-in-the-panel-header.md`.
- * Settings is the exception on both counts: its copy is an account-level
- * default, not a filter over anything on screen.
+ * Two callers sit outside that rule for reasons of their own. Settings' copy
+ * is an account-level synced default rather than a filter over anything on
+ * screen, so it renders with one Character too. `OpenOrdersPanel` keeps its
+ * copy in a bordered body strip alongside the rest of that panel's filter
+ * chips, in a `Panel` whose header carries no title for it to sit beside.
  */
 import { useTranslation } from 'react-i18next';
 import {

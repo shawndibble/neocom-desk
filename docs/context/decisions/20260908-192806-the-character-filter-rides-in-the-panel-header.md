@@ -10,12 +10,13 @@ _Recorded 2026-09-08._
   panel was still two rows tall with a stray control under its summary. Idle,
   the body is empty, so the control sat alone in a padded box saying nothing.
   And the summary it stands beside — "3 running · 1 done" — has no subject
-  without it: the header could not say _whose_ jobs it was counting. `meta` is
-  already defined as the panel's one-line read that survives a fold
-  (`Panel.tsx`), which is exactly what the filter qualifies. This rules out the
-  header's right-hand `actions` cluster: those are verbs (export, refresh,
-  fold) and have no room at 390px, while the filter is a noun that says whose
-  panel this is.
+  without it: the header could not say _whose_ jobs it was counting. `meta` was
+  already the panel's one-line read that survives a fold — "a count, a total, a
+  countdown" — and the filter names the subject of exactly that sentence, so
+  `Panel`'s own doc now says a control may sit there when it names what is
+  being read rather than acting on it. This rules out the header's right-hand
+  `actions` cluster: those are verbs (export, refresh, fold) and have no room
+  at 390px, while the filter is a noun that says whose panel this is.
 
 - **The filter is not rendered at all for an account holding one Character.**
   "This character" and "All characters" both resolve to the same pilot, so the
@@ -34,3 +35,10 @@ _Recorded 2026-09-08._
 - **The Corp/My jobs `OwnerSwitch` stays in the body.** It is a two-option
   segmented control, far wider than a dropdown trigger, and it answers a
   different question (which _owner's_ jobs, not which of my pilots).
+
+- **`OpenOrdersPanel` keeps its filter in a body strip, and that is not drift.**
+  Its copy sits among that panel's other filter chips, in a `Panel` whose
+  header carries no title for the filter to stand beside, and it gates on
+  Characters that actually _have orders_ rather than Characters that exist. The
+  `meta` rule above is about a filter that qualifies a panel's header summary;
+  there is none there to qualify.
