@@ -99,19 +99,30 @@ populated state. A survivor that only deepens existing math skips this step.
 
 ## 6. Publish the tickets
 
-`/to-tickets` is user-invoked (`disable-model-invocation: true`), so an agent
-running this skill **cannot fire it** — it will not appear in the invocable
-skill list. Follow its `<issue-template>` directly and create each issue with
-`gh issue create` (see `docs/agents/issue-tracker.md`). When a human is driving
-and types `/to-tickets` themselves, the two departures below still apply.
+Invoke `/to-tickets`, stating both departures below in the invocation. If it
+does not appear in the invocable skill list for this run, follow its
+`<issue-template>` and create each issue with `gh issue create` instead (see
+`docs/agents/issue-tracker.md`) — the tickets are identical either way.
 
 Two departures from that skill's defaults:
 
 - **Unattended** — its "quiz the user" step does not run. Nobody is there.
   Record the decisions it would have asked about in the ticket body instead.
-- **Label `ready-for-human`**, never its `ready-for-agent` default. These are
-  proposals a human accepts before any agent builds them; `ready-for-agent`
-  would let `/next-ticket` start building unreviewed work.
+- **Label `enhancement,ready-for-human`**, never its `ready-for-agent`
+  default. Every triaged issue carries one category role and one state role
+  (`docs/agents/triage-labels.md`), so both labels go on. These are proposals a
+  human accepts before any agent builds them; `ready-for-agent` would let
+  `/next-ticket` start building unreviewed work.
+
+Give each ticket a `## Blocked by` section reading `None` unless a candidate
+genuinely gates another — `docs/agents/issue-tracker.md` treats that section as
+the unblocked check, and a missing one is ambiguous. Write acceptance criteria
+as observable behaviour rather than an implementation checklist: these are
+unreviewed proposals, and the human may reshape the feature before any agent
+touches it.
+
+Ship only the survivors. If the hostile review killed three of four, publish
+one ticket — never backfill to hit a target count.
 
 Every ticket opens with a **TL;DR**: one or two sentences, before any other
 section, saying what the feature does and whether it is an expansion or a new
