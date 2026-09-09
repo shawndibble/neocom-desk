@@ -112,9 +112,14 @@ If `/to-tickets` cannot be invoked programmatically, follow its `<issue-template
 and create the issues directly with `gh issue create` — the tickets are the
 same either way.
 
-Each ticket carries the candidate's verdict, ESI backing, integration plan, the
-hostile reviewer's surviving objections, and mockup links where step 5 produced
-them.
+Every ticket opens with a **TL;DR**: one or two sentences, before any other
+section, saying what the feature does and whether it is an expansion or a new
+page. A human reviewing the batch reads the TL;DR first and decides from it
+whether to read on, so it carries the decision, not a restatement of the title.
+
+Below the TL;DR each ticket carries the candidate's verdict, ESI backing,
+integration plan, the hostile reviewer's surviving objections, and mockup links
+where step 5 produced them.
 
 ## 7. Record the survey
 
