@@ -30,7 +30,8 @@ const STATE_KEY = 'neocom.sso.state';
  */
 const SCOPES_KEY = 'neocom.sso.scopes';
 /**
- * The last callback this tab actually completed: `{ state, characterId }`.
+ * The Completed Callback Marker: the last callback this tab actually
+ * completed, as `{ state, characterId, completedAt, replays }`.
  *
  * Not a fourth piece of the one-shot stash — it is written *after* that stash
  * is spent, and it is what makes a repeated callback idempotent (issue #649).

@@ -70,10 +70,12 @@ exchanges code, decodes the JWT (`auth/jwt`), writes `CharacterRecord` +
 `TokenRecord` (refresh token) to Dexie. Later ESI calls go through
 `auth/session.getValidAccessToken` (single-flight refresh, buffer 60s before
 expiry) → `esi/client.configureEsi`'s injected `getToken`. A completed
-callback leaves a `neocom.sso.completed` marker (`{ state, characterId }`) so
-a second landing on the same `/callback` URL replays that Character instead of
-failing on the spent one-shot stash (#649); failures carry a `LoginError`
-`reason` the route turns into distinct wording.
+callback leaves a **Completed Callback Marker** (`neocom.sso.completed`:
+`{ state, characterId, completedAt, replays }`) so a second landing on the same
+`/callback` URL replays that Character instead of failing on the spent one-shot
+stash (#649), bounded by a latching breaker — 5 minutes, 3 replays, marker
+cleared when either trips. Failures carry a `LoginError` `reason` the route
+turns into distinct wording.
 
 **ESI read-through cache**
 Pattern: try live `esiFetch` → on success, write `db.esiCache` (keyed

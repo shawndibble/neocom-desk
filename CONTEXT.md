@@ -108,6 +108,12 @@ here — they go one per file in `docs/context/decisions/`.
   it look empty for a reason that is not about the pilot's data. Map, ticker
   and rail all read the same board, so a day cannot show a dot for something
   the rail declines to list.
+- **Completed Callback Marker**: What one _finished_ authorize round trip
+  leaves behind — `state`, the Character it signed in, when, and how often it
+  has been replayed. Written by `completeLogin` after the PKCE stash is spent,
+  and read back when the same `/callback` URL is delivered twice, so the repeat
+  returns that Character instead of failing on the stash that is already gone.
+  Bounded by a latching breaker rather than living as long as the tab.
 - **Compare**: A tab that puts the Quickbar's items side by side on best sell,
   best buy, spread and volume, under the same **Location Mode** as the order
   book beside it.
