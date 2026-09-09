@@ -63,6 +63,18 @@ function flattenOnce(result: BuildResult) {
   return flattened;
 }
 
+/** The whole-group copy control's key in `copiedKey`; no hub can collide with it. */
+const GROUP_COPY = 'group';
+
+/**
+ * `systemName`, which hubs.ts keeps for exactly this — the full station name
+ * ("Jita IV - Moon 4 - Caldari Navy Assembly Plant") would bury the sentence
+ * it appears in and would not fit on a button at all.
+ */
+function hubLabel(hubId: string): string {
+  return getTradeHub(hubId)?.systemName ?? hubId;
+}
+
 interface BuildGroupPanelProps {
   group: BuildGroup;
   plans: readonly BuildPlanRecord[];
@@ -84,7 +96,10 @@ export function BuildGroupPanel({
   onOpenPlan,
 }: BuildGroupPanelProps) {
   const { t } = useTranslation();
-  const [copied, setCopied] = useState(false);
+  // Which list was copied last, not a bare boolean: a mixed-hub group shows one
+  // copy control per hub, and a shared flag would report Amarr as copied the
+  // moment Jita was. `GROUP_COPY` is the whole-group control's own key.
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const rows = useComparedBuildResults({ plans, catalog, pi, skills });
 
   const members: BuildGroupMember[] = useMemo(() => {
@@ -147,11 +162,9 @@ export function BuildGroupPanel({
   const failed = rows.filter((row) => row.error !== null);
   const canCopy = rollup.singleHub && hasShoppingList(rollup.shoppingMaterials);
 
-  async function handleCopy() {
-    await writeToClipboard(
-      shoppingListText(rollup.shoppingMaterials, (id) => nameForType(catalog, id))
-    );
-    setCopied(true);
+  async function handleCopy(key: string, materials: readonly MaterialCostLine[]) {
+    await writeToClipboard(shoppingListText(materials, (id) => nameForType(catalog, id)));
+    setCopiedKey(key);
   }
 
   if (plans.length === 0) {
@@ -172,8 +185,14 @@ export function BuildGroupPanel({
         title={group.name}
         meta={t('industry.groupMemberCount', { count: plans.length })}
         actions={
-          <Button size="sm" onClick={() => void handleCopy()} disabled={!canCopy}>
-            {copied ? t('industry.copyShoppingListDone') : t('industry.copyShoppingList')}
+          <Button
+            size="sm"
+            onClick={() => void handleCopy(GROUP_COPY, rollup.shoppingMaterials)}
+            disabled={!canCopy}
+          >
+            {copiedKey === GROUP_COPY
+              ? t('industry.copyShoppingListDone')
+              : t('industry.copyShoppingList')}
           </Button>
         }
       >
@@ -214,15 +233,37 @@ export function BuildGroupPanel({
 
         <p className="mt-2 text-xs text-text-dim">{t('industry.groupEstimateNote')}</p>
 
+        {/* A mixture is a shopping trip with two stops, not a dead end (issue
+            #631). The header control above stays disabled — there is no one
+            list it could copy — and each hub gets its own paste here rather
+            than in `actions`, where five buttons would not survive a phone. */}
         {!rollup.singleHub && (
-          <p role="alert" className="mt-2 text-xs text-warning">
-            {t('industry.groupMixedHubs', {
-              // `systemName`, which hubs.ts keeps for exactly this — the full
-              // station name ("Jita IV - Moon 4 - Caldari Navy Assembly
-              // Plant") would bury the sentence it appears in.
-              hubs: rollup.hubIds.map((id) => getTradeHub(id)?.systemName ?? id).join(', '),
-            })}
-          </p>
+          <div className="mt-2 space-y-2">
+            <p role="alert" className="text-xs text-warning">
+              {t('industry.groupMixedHubs', {
+                hubs: rollup.hubIds.map(hubLabel).join(', '),
+              })}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {rollup.shoppingByHub.map((block) => (
+                <Button
+                  key={block.hubId}
+                  size="sm"
+                  onClick={() => void handleCopy(block.hubId, block.materials)}
+                  // Same rule as the whole-group control: a hub whose every
+                  // material is already owned would copy an empty string.
+                  disabled={!hasShoppingList(block.materials)}
+                >
+                  {t(
+                    copiedKey === block.hubId
+                      ? 'industry.copyHubShoppingListDone'
+                      : 'industry.copyHubShoppingList',
+                    { hub: hubLabel(block.hubId) }
+                  )}
+                </Button>
+              ))}
+            </div>
+          </div>
         )}
         {rollup.unpriceable && (
           <p className="mt-2 text-xs text-warning">{t('industry.groupUnpriceable')}</p>
