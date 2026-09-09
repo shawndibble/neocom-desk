@@ -68,8 +68,10 @@ free tier, nowhere near the one-doc-per-contract approach's ~1.1M/day.
 > OOM'd the 1GiB function on every scheduled run from deploy until the fix, so
 > the collection stayed empty and the feature never showed a single listing.
 > Streaming the two entries against a narrowed contract lookup produces the
-> same 122,038 rows at a 67MB peak, which is why the function now asks for
-> 512MiB rather than more. See
+> same 122,038 rows at a 67MB peak. Memory stays at 1GiB regardless: the
+> joined rows are retained until the snapshot is written, and chunk documents
+> are committed eight per batch rather than all ~62, because `commit()` — not
+> `set()` — is where the Admin SDK encodes them. See
 > `docs/context/decisions/20260908-174412-the-public-bpc-sync-streams-the-archive-instead.md`.
 
 The collection, `publicBpcContracts`, is the app's first top-level,

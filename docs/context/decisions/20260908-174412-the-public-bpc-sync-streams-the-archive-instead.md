@@ -27,11 +27,21 @@ MiB exceeded`, twice an hour, silently. The BPC Search tab's "No public BPC
   against the same live archive: **122,038 rows either way**, peak heap 1.1GB
   before and 67MB after.
 
-- **Memory came down to 512MiB rather than up to 2GiB.** Raising the ceiling
-  would have worked today and re-broken as EVE's contract volume grew, at
-  double the memory for 48 runs a day. The streaming pass peaks near 150MB RSS
-  and finishes in ~4s against a 300s timeout, so the smaller ceiling is now
-  the honest one.
+- **Memory stays at 1GiB — 512MiB was tried and was wrong.** The streaming
+  parse peaks near 150MB and finishes in ~4s against a 300s timeout, which
+  looked like room to lower the ceiling. It was not: the first run on 512MiB
+  got _through_ the parse, logged its 122,030 rows, and then died at 527MiB
+  writing them. The parse was only ever half the job, and the half that was
+  measured. The rows stay resident until the snapshot is written and the write
+  encodes them on top of that, so the ceiling has to cover both.
+
+- **Chunk docs commit eight at a time, not all ~62.** `batch.set()` only
+  stores a document; `commit()` is where the Admin SDK encodes it, so a batch
+  of large documents costs a transient proportional to the whole batch — and
+  at ~370KB of row JSON each, one batch meant encoding the entire snapshot at
+  once. Firestore's own limit is 500 operations, which is why this was never
+  flagged as a page worth splitting. The write count is unchanged at ~63; only
+  the number in flight together drops.
 
 - **A reordered archive fails loudly instead of syncing nothing.** The single
   pass works only because EVE Ref lists `contracts.csv` before
