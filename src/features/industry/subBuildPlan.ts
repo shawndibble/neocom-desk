@@ -26,6 +26,7 @@
  * "Build it" modal renders.
  */
 
+import { mergeCostLines } from '@/engine/industry/mergeCostLines';
 import type { ResolvedMaterial, ResolvedSubBuild } from '@/engine/industry/materialResolution';
 import { resolvedSubBuildSeconds } from '@/engine/industry/materialResolution';
 import type { MaterialCostLine } from '@/engine/industry/types';
@@ -53,6 +54,10 @@ export interface MaterialTableRow extends MaterialCostLine {
  * the first real one wins — `null` only ever means "this occurrence is being
  * built", and a built occurrence must not blank the price of a row the plan
  * also buys outright.
+ *
+ * The per-field arithmetic itself lives in `engine/industry/mergeCostLines`,
+ * shared with the Build Group rollup, which merges these merges across a
+ * group's members — one rule, one place to get it wrong.
  */
 function mergeInto(rows: Map<number, MaterialTableRow>, material: ResolvedMaterial): void {
   const { subBuild, ...line } = material;
@@ -62,14 +67,7 @@ function mergeInto(rows: Map<number, MaterialTableRow>, material: ResolvedMateri
     return;
   }
   rows.set(material.typeID, {
-    ...existing,
-    baseQuantity: existing.baseQuantity + line.baseQuantity,
-    quantity: existing.quantity + line.quantity,
-    ownedQuantity: existing.ownedQuantity + line.ownedQuantity,
-    remainingQuantity: existing.remainingQuantity + line.remainingQuantity,
-    unitPrice: existing.unitPrice ?? line.unitPrice,
-    lineCost: existing.lineCost + line.lineCost,
-    unpriced: existing.unpriced || line.unpriced,
+    ...mergeCostLines(existing, line),
     subBuilds: subBuild ? [...existing.subBuilds, subBuild] : existing.subBuilds,
   });
 }

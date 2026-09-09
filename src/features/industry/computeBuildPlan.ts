@@ -6,7 +6,7 @@
  * see FACILITY_PRESETS.npcStation.defaultTaxPct), and never throws.
  */
 import { buildVsBuy } from '@/engine/industry/buildVsBuy';
-import { FACILITY_PRESETS, resolveRigFit } from '@/engine/industry/types';
+import { FACILITY_PRESETS, MAX_JOB_RUNS, resolveRigFit } from '@/engine/industry/types';
 import type {
   AdjustedPrices,
   BuildResult,
@@ -64,7 +64,7 @@ export function computeBuildPlan({
   recipeFor,
 }: ComputeBuildPlanInput): ComputeBuildPlanResult {
   const facility = FACILITY_PRESETS[plan.facility];
-  const runs = clampInt(plan.runs, 1, 100_000);
+  const runs = clampInt(plan.runs, 1, MAX_JOB_RUNS);
   // Reaction formulas have no material/time efficiency — the SDE carries no
   // research activity for any of them (issue #460 triage; verified against
   // industryActivity.csv), so they always run at 0/0 regardless of what a
