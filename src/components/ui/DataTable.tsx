@@ -69,7 +69,14 @@ export interface DataTableColumn<T> {
 interface DataTableProps<T> {
   columns: readonly DataTableColumn<T>[];
   rows: readonly T[];
-  rowKey: (row: T) => string | number;
+  /**
+   * Must be unique across `rows` — React reconciles on it, and duplicates
+   * leave rows from a previous render stranded in the table. `index` is
+   * there for rows that carry no identity of their own: a public contract
+   * lists the same blueprint once per copy, so 70% of BPC Search's rows
+   * collided on every field it has.
+   */
+  rowKey: (row: T, index: number) => string | number;
   /** Row-level classes, e.g. Contracts dimming expired rows with `opacity-50`. */
   rowClassName?: (row: T) => string | undefined;
   /**
@@ -313,7 +320,7 @@ export function DataTable<T>({
         </tr>
       </thead>
       <tbody role="rowgroup" className="divide-y divide-line">
-        {sortedRows.map((row) => {
+        {sortedRows.map((row, index) => {
           const focusable = Boolean(rowContextMenu) || Boolean(onRowClick);
           const tr = (
             <tr
@@ -322,13 +329,13 @@ export function DataTable<T>({
               // the only way a caller can find a specific row to scroll to
               // without this component growing a ref API — `TransactionsPanel`
               // uses it to land on the fill a notification pointed at.
-              data-row-key={rowKey(row)}
+              data-row-key={rowKey(row, index)}
               className={cx(
                 'hover:bg-panel-2',
                 onRowClick && 'cursor-pointer',
                 focusable &&
                   'focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent',
-                rowKey(row) === highlightRowKey && 'row-pulse',
+                rowKey(row, index) === highlightRowKey && 'row-pulse',
                 rowClassName?.(row)
               )}
               tabIndex={focusable ? 0 : undefined}
@@ -364,7 +371,9 @@ export function DataTable<T>({
             </tr>
           );
           return (
-            <Fragment key={rowKey(row)}>{rowContextMenu ? rowContextMenu(row, tr) : tr}</Fragment>
+            <Fragment key={rowKey(row, index)}>
+              {rowContextMenu ? rowContextMenu(row, tr) : tr}
+            </Fragment>
           );
         })}
       </tbody>

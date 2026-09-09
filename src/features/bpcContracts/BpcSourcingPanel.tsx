@@ -659,7 +659,12 @@ export function BpcSourcingPanel() {
                 label={t('bpcContracts.title')}
                 columns={columns}
                 rows={visibleRows}
-                rowKey={(row) => `${row.contractId}:${row.typeId}`}
+                // Index included deliberately: a contract lists the same
+                // blueprint once per copy, so contractId+typeId is not
+                // unique — 70% of rows in a live pull shared one, and the
+                // duplicate React keys left the previous blueprint's rows
+                // in the table beside the chosen one.
+                rowKey={(row, index) => `${row.contractId}:${row.typeId}:${index}`}
                 defaultSort={{ columnId: 'price', direction: 'asc' }}
                 onRowClick={setOpenRow}
               />
