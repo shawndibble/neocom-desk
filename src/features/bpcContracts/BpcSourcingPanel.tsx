@@ -29,6 +29,7 @@ import {
   effectivePrice,
   filterBpcContracts,
   listedBlueprintTypeOptions,
+  blueprintSearchName,
   type BlueprintOfferStats,
   type BlueprintTypeOption,
   type BpcContractRow,
@@ -39,6 +40,7 @@ import {
   type PublicBpcContractsSnapshot,
 } from '@/features/bpcContracts/syncedContracts';
 import { loadRegionName } from '@/features/bpcContracts/regionNames';
+import { BpcContractModal } from '@/features/bpcContracts/BpcContractModal';
 import { loadBlueprints } from '@/sde/loadSde';
 import { isSyncConfigured } from '@/app/syncStatus';
 import type { CachedResult } from '@/esi/cache';
@@ -284,6 +286,8 @@ export function BpcSourcingPanel() {
    * across several different blueprints.
    */
   const [selectedTypeId, setSelectedTypeId] = useState<number | null>(null);
+  /** The row whose contract detail is open, if any. */
+  const [openRow, setOpenRow] = useState<BpcContractRow | null>(null);
 
   const rows = useMemo(() => contractsResult?.data?.rows ?? [], [contractsResult]);
 
@@ -321,8 +325,8 @@ export function BpcSourcingPanel() {
   const suggestions = useMemo<BlueprintSuggestion[]>(() => {
     if (selectedTypeId !== null || uiFilter.typeQuery.trim() === '') return [];
     const matched: BlueprintSuggestion[] = [];
-    for (const option of rankedSearch(typeOptions, uiFilter.typeQuery, {
-      primary: (option) => option.name,
+    for (const option of rankedSearch(typeOptions, blueprintSearchName(uiFilter.typeQuery), {
+      primary: (option) => blueprintSearchName(option.name),
       limit: SUGGESTION_LIMIT,
     })) {
       // A blueprint with no offers left under the current filters is not a
@@ -373,8 +377,8 @@ export function BpcSourcingPanel() {
         : uiFilter.typeQuery.trim().length === 0
           ? null
           : new Set(
-              rankedSearch(typeOptions, uiFilter.typeQuery, {
-                primary: (o) => o.name,
+              rankedSearch(typeOptions, blueprintSearchName(uiFilter.typeQuery), {
+                primary: (o) => blueprintSearchName(o.name),
                 limit: TYPE_SEARCH_LIMIT,
               }).map((o) => o.typeId)
             );
@@ -531,35 +535,43 @@ export function BpcSourcingPanel() {
           )}
           <BpcFilterBar filter={uiFilter} onChange={changeFilter} regionOptions={regionOptions} />
 
+          {/* Inset on its own ground with an accent edge, because as a plain
+              list flush against the filter bar it read as more page furniture
+              and went unnoticed — the whole feature hangs on picking from it. */}
           {suggestions.length > 0 && (
-            <ul
-              aria-label={t('bpcContracts.suggestionsLabel')}
-              className="max-h-72 overflow-y-auto border-b border-line"
-            >
-              {suggestions.map((suggestion) => (
-                <li key={suggestion.typeId} className="border-b border-line last:border-b-0">
-                  <button
-                    type="button"
-                    onClick={() => selectBlueprint(suggestion)}
-                    className="flex min-h-11 w-full items-center gap-3 px-3 py-1.5 text-left text-sm hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent md:min-h-9"
-                  >
-                    <span className="min-w-0 flex-1 truncate">{suggestion.name}</span>
-                    {/* Hidden on the narrowest screens rather than wrapped: three
-                        columns in a 390px row squeezes the name, which is the
-                        one part that has to stay readable. */}
-                    <span className="hidden shrink-0 text-[0.6875rem] tabular-nums text-text-dim sm:inline">
-                      {t('bpcContracts.suggestionBestMeTe', {
-                        me: suggestion.bestMe,
-                        te: suggestion.bestTe,
-                      })}
-                    </span>
-                    <span className="shrink-0 text-[0.6875rem] tabular-nums text-text-dim">
-                      {t('bpcContracts.regionOffers', { count: suggestion.offerCount })}
-                    </span>
-                  </button>
-                </li>
-              ))}
-            </ul>
+            <div className="border-b border-line bg-panel-2 px-3 py-2">
+              <p className="pb-1.5 text-[0.6875rem] font-semibold tracking-widest text-accent uppercase">
+                {t('bpcContracts.suggestionsHeading')}
+              </p>
+              <ul
+                aria-label={t('bpcContracts.suggestionsLabel')}
+                className="max-h-72 overflow-y-auto rounded-xs border border-line-bright bg-panel"
+              >
+                {suggestions.map((suggestion) => (
+                  <li key={suggestion.typeId} className="border-b border-line last:border-b-0">
+                    <button
+                      type="button"
+                      onClick={() => selectBlueprint(suggestion)}
+                      className="flex min-h-11 w-full items-center gap-3 px-3 py-1.5 text-left text-sm hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent md:min-h-9"
+                    >
+                      <span className="min-w-0 flex-1 truncate">{suggestion.name}</span>
+                      {/* Hidden on the narrowest screens rather than wrapped: three
+                          columns in a 390px row squeezes the name, which is the
+                          one part that has to stay readable. */}
+                      <span className="hidden shrink-0 text-[0.6875rem] tabular-nums text-text-dim sm:inline">
+                        {t('bpcContracts.suggestionBestMeTe', {
+                          me: suggestion.bestMe,
+                          te: suggestion.bestTe,
+                        })}
+                      </span>
+                      <span className="shrink-0 text-[0.6875rem] tabular-nums text-text-dim">
+                        {t('bpcContracts.regionOffers', { count: suggestion.offerCount })}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
 
           {selectedName !== null && summary !== null && (
@@ -649,6 +661,7 @@ export function BpcSourcingPanel() {
                 rows={visibleRows}
                 rowKey={(row) => `${row.contractId}:${row.typeId}`}
                 defaultSort={{ columnId: 'price', direction: 'asc' }}
+                onRowClick={setOpenRow}
               />
               {!showAll && filteredRows.length > ROW_CAP && (
                 <div className="px-3 py-2">
@@ -660,6 +673,15 @@ export function BpcSourcingPanel() {
             </>
           )}
         </>
+      )}
+
+      {openRow !== null && (
+        <BpcContractModal
+          row={openRow}
+          blueprintName={blueprintNames.get(openRow.typeId) ?? `#${openRow.typeId}`}
+          regionName={regionNames.get(openRow.regionId) ?? `#${openRow.regionId}`}
+          onClose={() => setOpenRow(null)}
+        />
       )}
     </Panel>
   );

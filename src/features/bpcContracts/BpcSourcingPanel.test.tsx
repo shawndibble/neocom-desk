@@ -279,3 +279,54 @@ describe('BpcSourcingPanel', () => {
     expect(within(table).getByText('Rifter Blueprint')).toBeInTheDocument();
   });
 });
+
+describe('BpcSourcingPanel search matching', () => {
+  /**
+   * Every blueprint in the catalogue is named "… Blueprint", so a substring
+   * search over the whole name made any query that is a substring of that one
+   * shared word match all ~2,900 types — a search for "b" returned fifty
+   * unrelated blueprints, which is what a user hit in practice.
+   */
+  it('does not match every blueprint through the shared "Blueprint" word', async () => {
+    loadPublicBpcContracts.mockResolvedValue(
+      cachedSnapshot([
+        row({ contractId: 1, typeId: 638, regionId: 10000002 }),
+        row({ contractId: 2, typeId: 870, regionId: 10000043 }),
+      ])
+    );
+    const user = userEvent.setup();
+    render(<App />);
+
+    const table = await screen.findByRole('table', { name: 'BPC Search' });
+    expect(within(table).getByText('Caracal Blueprint')).toBeInTheDocument();
+
+    // "rif" reaches Rifter; it is not a substring of "Caracal Blueprint".
+    await user.type(screen.getByPlaceholderText(/search/i), 'rif');
+    expect(within(table).getByText('Rifter Blueprint')).toBeInTheDocument();
+    expect(within(table).queryByText('Caracal Blueprint')).not.toBeInTheDocument();
+
+    // "blue" is in both names but only through the shared suffix, so it must
+    // narrow to nothing rather than to everything.
+    await user.clear(screen.getByPlaceholderText(/search/i));
+    await user.type(screen.getByPlaceholderText(/search/i), 'blue');
+    expect(within(table).queryByText('Rifter Blueprint')).not.toBeInTheDocument();
+    expect(within(table).queryByText('Caracal Blueprint')).not.toBeInTheDocument();
+  });
+
+  it('still matches when the query spells out the full name', async () => {
+    loadPublicBpcContracts.mockResolvedValue(
+      cachedSnapshot([row({ contractId: 1, typeId: 638, regionId: 10000002 })])
+    );
+    const user = userEvent.setup();
+    render(<App />);
+
+    await screen.findByRole('table', { name: 'BPC Search' });
+    await user.type(screen.getByPlaceholderText(/search/i), 'Rifter Blueprint');
+
+    // Re-queried rather than reused: a mid-typing query like "Rifter B"
+    // matches nothing, which swaps the table for the empty state, so the
+    // element captured before typing is detached by the time this runs.
+    const table = await screen.findByRole('table', { name: 'BPC Search' });
+    expect(within(table).getByText('Rifter Blueprint')).toBeInTheDocument();
+  });
+});
