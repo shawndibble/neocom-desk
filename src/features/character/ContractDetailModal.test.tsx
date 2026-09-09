@@ -246,6 +246,48 @@ describe('ContractDetailModal', () => {
     expect(screen.getByTestId('location')).toHaveTextContent('/industry?product=587');
   });
 
+  it('explains the right-click menu once, not once per item list', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/universe/stations/60003760`, () => new Promise(() => {})),
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/contracts/12345/items`, () =>
+        HttpResponse.json([
+          { record_id: 1, type_id: 34, quantity: 744, is_included: true, is_singleton: false },
+          { record_id: 2, type_id: 35, quantity: 1, is_included: false, is_singleton: false },
+        ])
+      )
+    );
+    renderModal({
+      characterId: CHAR_ID,
+      contract: ITEM_EXCHANGE,
+      issuerName: 'Mero Otichoda',
+      onClose: () => {},
+    });
+
+    expect(await screen.findByRole('button', { name: 'About Included' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'About Requested' })).not.toBeInTheDocument();
+  });
+
+  it('still explains the menu when a contract only requests items', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/universe/stations/60003760`, () => new Promise(() => {})),
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/contracts/12345/items`, () =>
+        HttpResponse.json([
+          { record_id: 2, type_id: 35, quantity: 1, is_included: false, is_singleton: false },
+        ])
+      )
+    );
+    renderModal({
+      characterId: CHAR_ID,
+      contract: ITEM_EXCHANGE,
+      issuerName: 'Mero Otichoda',
+      onClose: () => {},
+    });
+
+    // The hint follows the first list actually rendered, so pinning it to
+    // Included would leave this contract's menu unexplained.
+    expect(await screen.findByRole('button', { name: 'About Requested' })).toBeInTheDocument();
+  });
+
   it('issuer name opens the shared Public Info Modal (issue #417)', () => {
     renderModal({
       characterId: CHAR_ID,

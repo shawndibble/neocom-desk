@@ -256,6 +256,11 @@ export function ContractDetailModal({
                   title={t('contracts.detailItemsIncluded')}
                   columns={itemColumns}
                   items={included}
+                  // One "?" for the pair, on whichever list comes first: both
+                  // carry the same menu, so a second identical tooltip is
+                  // noise. Not hardcoded to Included — a contract that only
+                  // requests items would then explain its menu nowhere.
+                  showContextMenuHint
                 />
               )}
               {itemColumns && (
@@ -263,6 +268,7 @@ export function ContractDetailModal({
                   title={t('contracts.detailItemsRequested')}
                   columns={itemColumns}
                   items={requested}
+                  showContextMenuHint={included.length === 0}
                 />
               )}
             </>
@@ -274,25 +280,29 @@ export function ContractDetailModal({
 
 /**
  * One "Included"/"Requested" list. Both are the same table over the same
- * columns, differing only in title and rows, so they share a component rather
- * than the block being written out twice — right-click menu, its "?" hint and
- * the narrow-screen wrapper all had to stay in step across both.
+ * columns, differing only in title, rows and which one carries the "?" hint,
+ * so they share a component rather than the block being written out twice —
+ * the right-click menu and the narrow-screen wrapper had to stay in step
+ * across both.
  */
 function ItemSection({
   title,
   columns,
   items,
+  showContextMenuHint = false,
 }: {
   title: string;
   columns: DataTableColumn<ContractItem>[];
   items: ContractItem[];
+  /** Both lists carry the same right-click menu, so only the first one rendered explains it. */
+  showContextMenuHint?: boolean;
 }) {
   if (items.length === 0) return null;
   return (
     <div>
       <h3 className="flex items-center gap-1.5 border-b border-line pb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
         {title}
-        <ContextMenuHint label={title} />
+        {showContextMenuHint && <ContextMenuHint label={title} />}
       </h3>
       <div className="overflow-x-auto">
         <DataTable
