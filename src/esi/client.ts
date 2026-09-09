@@ -4,18 +4,38 @@
  * Decoupled from auth/storage: token lookup is injected via configureEsi.
  * Every request pins X-Compatibility-Date and identifies the app via
  * X-User-Agent, per ESI guidelines.
+ *
+ * This is the one choke point every ESI call in the app passes through, which
+ * is why the app-wide error/rate budget (`./budget.ts`, issue #655) is applied
+ * here and nowhere else: a request is admitted by the gate, its response is
+ * folded back into the budget, and its in-flight permit is released before any
+ * backoff so a waiting retry cannot hold the ceiling shut behind it.
  */
 import { AuthError } from '@/auth/sso';
 import { emitEsiActivity } from './activityLog';
+import { passEsiGate, observeEsiResponse } from './budget';
+import { EsiError, EsiBudgetError } from './errors';
 import type { EsiEndpointId } from './registry';
+
+// `EsiError` lives in `./errors` so the budget can throw one without importing
+// the client back (issue #655), but this stays its canonical import path.
+export { EsiError, EsiBudgetError } from './errors';
 
 export const ESI_BASE_URL = 'https://esi.evetech.net';
 export const COMPATIBILITY_DATE = '2026-08-01';
 export const USER_AGENT = 'Neocom Desk (github.com/shawndibble/neocom-desk)';
 
-/** Single retry on 429/420; never wait longer than this, whatever the server asks. */
-const MAX_RETRY_WAIT_MS = 10_000;
-const DEFAULT_RETRY_WAIT_MS = 1_000;
+/**
+ * How long one request may take before it is abandoned.
+ *
+ * `esiFetch` had no timeout at all, which was survivable while a hung socket
+ * only stalled its own call site. It is not survivable now that every request
+ * holds one of `budget.ts`'s `ESI_MAX_IN_FLIGHT` app-wide permits: twelve hung
+ * sockets would be the app's whole ESI layer. Deliberately generous — this is
+ * the "this connection is dead" bound, not a latency target; `esi/cache.ts`'s
+ * 250ms grace race is what keeps a merely slow call off the screen.
+ */
+const REQUEST_TIMEOUT_MS = 30_000;
 
 export type GetToken = (characterId: number) => Promise<string>;
 
@@ -72,18 +92,6 @@ export function isAuthFailure(err: unknown): boolean {
   return err instanceof AuthError;
 }
 
-export class EsiError extends Error {
-  readonly status: number;
-  readonly body: unknown;
-
-  constructor(status: number, message: string, body?: unknown) {
-    super(message);
-    this.name = 'EsiError';
-    this.status = status;
-    this.body = body;
-  }
-}
-
 function buildUrl(path: string, query?: EsiFetchOptions['query'], page?: number): URL {
   const url = new URL(path.startsWith('/') ? path : `/${path}`, ESI_BASE_URL);
   if (query) {
@@ -100,29 +108,47 @@ function parsePages(response: Response): number {
   return Number.isInteger(pages) && pages > 0 ? pages : 1;
 }
 
-/** Wait time before the single retry: Retry-After (429) or error-limit reset (420), capped. */
-function retryWaitMs(response: Response): number {
-  const raw =
-    response.status === 420
-      ? response.headers.get('x-esi-error-limit-reset')
-      : response.headers.get('retry-after');
-  const seconds = raw === null ? NaN : Number(raw);
-  const ms = Number.isFinite(seconds) ? seconds * 1000 : DEFAULT_RETRY_WAIT_MS;
-  return Math.min(Math.max(ms, 0), MAX_RETRY_WAIT_MS);
-}
+/**
+ * One HTTP request, admitted by the app-wide gate and abandoned if it hangs.
+ *
+ * The permit is released in `finally`, before the caller decides anything about
+ * a retry — a retry that waited while still holding its permit would take one
+ * of twelve slots out of the app for the length of the backoff.
+ *
+ * The timeout aborts through a controller of our own rather than the caller's,
+ * so a timed-out request is distinguishable from a cancelled one: only the
+ * caller's own abort is a cancellation, and only that one is exempt from the
+ * activity log.
+ */
+async function gatedFetch(url: URL, init: RequestInit, signal?: AbortSignal): Promise<Response> {
+  const release = await passEsiGate(signal);
+  const controller = new AbortController();
+  const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
+  const abortFromTimeout = (): void =>
+    controller.abort(new EsiError(0, `ESI request timed out after ${REQUEST_TIMEOUT_MS}ms`));
+  const abortFromCaller = (): void =>
+    controller.abort(signal?.reason ?? new DOMException('Aborted', 'AbortError'));
 
-function sleep(ms: number, signal?: AbortSignal): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => resolve(), ms);
-    signal?.addEventListener(
-      'abort',
-      () => {
-        clearTimeout(timer);
-        reject(signal.reason ?? new DOMException('Aborted', 'AbortError'));
-      },
-      { once: true }
-    );
-  });
+  if (signal?.aborted) abortFromCaller();
+  signal?.addEventListener('abort', abortFromCaller, { once: true });
+  timeout.addEventListener('abort', abortFromTimeout, { once: true });
+
+  try {
+    const response = await fetch(url, { ...init, signal: controller.signal });
+    observeEsiResponse(response.status, response.headers);
+    return response;
+  } catch (err) {
+    // `fetch` rejects with its own AbortError; the reason we asked it to abort
+    // for is the honest one to surface.
+    if (err instanceof Error && err.name === 'AbortError' && controller.signal.reason) {
+      throw controller.signal.reason;
+    }
+    throw err;
+  } finally {
+    timeout.removeEventListener('abort', abortFromTimeout);
+    signal?.removeEventListener('abort', abortFromCaller);
+    release();
+  }
 }
 
 async function errorFromResponse(response: Response): Promise<EsiError> {
@@ -146,8 +172,14 @@ async function errorFromResponse(response: Response): Promise<EsiError> {
 
 /**
  * Fetch one ESI resource. Public when characterId is omitted, authenticated
- * otherwise. Retries once on 429/420, honoring Retry-After / error-limit
- * reset (capped at 10s). Throws EsiError on any other non-2xx/304 response.
+ * otherwise. Throws EsiError on any non-2xx/304 response.
+ *
+ * Throttling is the app-wide budget's job (`./budget.ts`), not this function's:
+ * every request is admitted by the gate, every response is fed back to it, and
+ * the one retry a 429/420 still gets is the gate's decision rather than a blind
+ * sleep. A caller can therefore be refused *before* a request is made, with an
+ * `EsiBudgetError` — an `EsiError` carrying 420 or 429, which `esi/cache.ts`
+ * answers from the stored row exactly as it answers a 5xx.
  */
 export async function esiFetch<T>(
   path: string,
@@ -172,10 +204,19 @@ export async function esiFetch<T>(
 
   try {
     const requestBody = body !== undefined ? JSON.stringify(body) : undefined;
-    let response = await fetch(url, { method, headers, body: requestBody, signal });
+    const init: RequestInit = { method, headers, body: requestBody };
+    let response = await gatedFetch(url, init, signal);
     if (response.status === 429 || response.status === 420) {
-      await sleep(retryWaitMs(response), signal);
-      response = await fetch(url, { method, headers, body: requestBody, signal });
+      // The response has already been folded into the budget, so re-entering
+      // the gate *is* the backoff: it waits out a short reset the server named
+      // and refuses a long one. Refused, we keep the server's own error rather
+      // than swapping in a synthetic one — this caller did reach ESI.
+      try {
+        response = await gatedFetch(url, init, signal);
+      } catch (retryErr) {
+        if (!(retryErr instanceof EsiBudgetError)) throw retryErr;
+        throw await errorFromResponse(response);
+      }
     }
 
     if (response.status === 304) {

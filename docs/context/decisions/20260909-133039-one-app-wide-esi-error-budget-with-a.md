@@ -1,0 +1,109 @@
+# Scope decisions — one app-wide ESI error budget, with a circuit that fails fast into the cache (issue #655)
+
+_Recorded 2026-09-09 · issue #655._
+
+- **The throttling policy is app-wide, and it lives at `esiFetch`.** ESI's
+  legacy error limit is 100 non-2xx/3xx responses per 60 seconds counted
+  **globally across every route** for the whole client — not per endpoint, not
+  per Character. A policy expressed anywhere but the one function every ESI call
+  passes through is therefore expressed in the wrong unit. `src/esi/budget.ts`
+  is that policy: `esiFetch` admits each request through its gate, feeds every
+  response back to it, and holds one of its permits for the length of the
+  request. No call site opts in, and no call site can opt out.
+
+- **The headers are read off every response, not only off failures.** ESI
+  returns `X-ESI-Error-Limit-Remain`/`-Reset` on successes and 304s as well, and
+  reading them only when something has already gone wrong is what leaves a
+  client blind until it is too late. This is the half of the fix that stops the
+  420 happening at all, rather than reacting to one.
+
+- **Three mechanisms, engaging in order: a ceiling, a brake, a circuit.**
+  `ESI_MAX_IN_FLIGHT` (12) bounds the _sum_ of the per-call-site fan-outs that
+  `lib/concurrency.ts` caps individually — the boot prefetch, the Corp page's
+  parallel loads, `typeNames.ts` and the per-character asset reads used to stack
+  at 10 apiece with nothing counting the total. Under
+  `ERROR_LIMIT_LOW_WATER` (30 of 100) admissions are spaced far enough apart
+  that the residual budget would last to the reset **even if every remaining
+  request errored**. A 420 or 429 shuts the circuit for the window the server
+  named, so queued and later callers read one shared verdict instead of each
+  firing its own blind retry into a closed door.
+
+- **A shut circuit fails fast into the cache; a brief one is waited out. We
+  absorb a hiccup, we do not absorb an outage.** Every wait the module imposes —
+  circuit, brake, and the queue behind the brake — is bounded by
+  `MAX_BUDGET_WAIT_MS` (5s); past it the gate refuses with an `EsiBudgetError`
+  that never touches the network. The bound is anchored on `STALE_GRACE_MS`
+  (250ms): past its freshness window `esi/cache.ts` already substitutes the
+  stored row a quarter-second in and updates the view in place, so a wait under
+  the bound is invisible on every read but a manual Refresh, while a 420's
+  minute-long reset — or a quarter-hour rate window — is an outage and must be
+  answered from disk immediately. Refusing also costs ESI nothing, so the error
+  budget actually refills instead of being nibbled at by retries.
+
+  Rejected: **waiting unconditionally.** A 60-second reset across a fan-out is a
+  page that spins for a minute and then thunders back all at once. Rejected too:
+  **failing fast always.** A `Retry-After: 2` is worth sitting out once, shared,
+  and the app would otherwise drop a whole boot prefetch over a two-second
+  hiccup.
+
+- **The accepted consequence: a caller with no stored row now gets an empty
+  view where it previously got a spinner and then data.** `esi/cache.ts` returns
+  `{ cached: null }` when the live call fails and nothing is on disk. That is
+  the right trade — the alternative is a spinner that ends in the same nothing,
+  minutes later, having deepened the outage by spending more of the budget — but
+  it is a real change in what a first-ever visit looks like during a throttle,
+  and it is recorded as one rather than left to be discovered.
+
+- **What a caller receives on success is unchanged.** `EsiBudgetError` is an
+  `EsiError` carrying 420 or 429, so `isAuthFailure` stays false, no re-auth
+  banner is painted, the read-through cache falls back exactly as it does for a
+  5xx, and `typeNames.ts`'s existing `status === 429 || status === 420` branch
+  reads it as the throttle it is.
+
+- **The circuit reopens on any 2xx/3xx, not only on its timer.** ESI discards
+  every request while the error limit is spent, so a response it actually served
+  is proof the window is over; sitting out a reset the server has already moved
+  past is pure cost.
+
+- **The brake trickles, it never clamps to zero.** This matters because PR
+  #653's `structures.ts` memoizes a forbidden citadel only on a _real_ 403 — a
+  request the gate refuses teaches it nothing. Under the brake, requests are
+  spread out, not stopped: a caller arriving after the last admission's spacing
+  has elapsed is admitted with no wait at all. So each page load still spends
+  most of a fresh 100-error window on real 403s and memoizes them, and the memo
+  converges over a small number of visits instead of being starved.
+
+- **One existing behaviour changed deliberately: the blind 10-second retry is
+  gone.** `esiFetch` used to sleep up to 10s on any 429/420 and retry once,
+  whatever the server said. The retry survives, but it is now the gate's
+  decision rather than a private sleep — it re-enters the gate, which waits out
+  a short reset and refuses a long one. `client.test.ts`'s "caps the retry wait
+  at 10 seconds" is replaced by "does not retry a wait longer than the bound",
+  which asserts the new rule: a `Retry-After: 60` is not slept on, is not
+  retried, and spends nothing further against the budget.
+
+- **`esiFetch` gets a 30-second request timeout, because the ceiling made one
+  hung socket everybody's problem.** With no ceiling, a hung request stalled
+  only its own call site; holding one of twelve app-wide permits, twelve of them
+  would be the whole ESI layer. The timeout is the "this connection is dead"
+  bound, not a latency target — `esi/cache.ts`'s 250ms grace race remains the
+  answer to a merely slow call.
+
+- **The gate is entered at the leaf, and only at the leaf.** The permit is taken
+  inside `esiFetch` after the token await and held across exactly one `fetch`;
+  the 429/420 retry releases before it waits. No permit holder ever waits on
+  another permit — `paginated.ts` acquires per page, and `src/auth` reaches SSO
+  rather than ESI — so nesting `mapWithConcurrencyLimit` (as
+  `ownedStockDetection.ts` does) cannot deadlock against the ceiling. Wrapping
+  the gate around a fan-out instead of around a request would deadlock, and is
+  the thing not to do here.
+
+- **`ESI_FANOUT_CONCURRENCY` and `mapWithConcurrencyLimit` keep their names and
+  signatures.** A dozen modules import them; the change is additive
+  (`createSemaphore`) plus a comment saying what they are not — a cap per call
+  site, whose sum is now bounded elsewhere.
+
+- **No ADR.** It would be a numbered file, and `CLAUDE.md` forbids working out
+  "the next" number for anything, precisely because parallel agents all claim
+  the same one. The reasoning above is the record; `docs/ARCHITECTURE.md`'s
+  `src/esi` row carries the map.

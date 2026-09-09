@@ -13,6 +13,13 @@ import {
 import { AuthError } from '@/auth/sso';
 import { rejectBadEsiHeaders } from './test-helpers';
 import { onEsiActivity, type ActivityEvent } from './activityLog';
+import {
+  resetEsiBudget,
+  esiBudgetSnapshot,
+  esiInFlight,
+  EsiBudgetError,
+  ESI_MAX_IN_FLIGHT,
+} from './budget';
 
 const server = setupServer();
 
@@ -20,6 +27,9 @@ beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 afterEach(() => {
   server.resetHandlers();
   configureEsi({ getToken: null });
+  // The budget is app-wide module state: a test that deliberately serves a 420
+  // would otherwise shut the circuit for every test that follows it.
+  resetEsiBudget();
 });
 afterAll(() => server.close());
 
@@ -165,29 +175,25 @@ describe('esiFetch — rate limiting', () => {
     expect(result.data).toEqual({ name: 'Test Alliance' });
   });
 
-  it('caps the retry wait at 10 seconds', async () => {
+  it('does not retry a wait longer than the bound — it fails fast into the cache instead (issue #655)', async () => {
+    // We absorb a hiccup, we do not absorb an outage: a minute-long window is
+    // answered from the cache immediately rather than by sleeping on it, and
+    // the retry that is not made spends nothing against the error budget.
     let attempts = 0;
     server.use(
       http.get(`${ESI_BASE_URL}/alliances/99000001`, () => {
         attempts += 1;
-        if (attempts === 1) {
-          return HttpResponse.json(
-            { error: 'rate limited' },
-            { status: 429, headers: { 'Retry-After': '60' } }
-          );
-        }
-        return HttpResponse.json({ name: 'Test Alliance' });
+        return HttpResponse.json(
+          { error: 'rate limited' },
+          { status: 429, headers: { 'Retry-After': '60' } }
+        );
       })
     );
 
-    const promise = esiFetch('/alliances/99000001');
-    await untilTimerScheduled();
-    await vi.advanceTimersByTimeAsync(10_000);
-    // If the wait were not capped, the 60s timer would still be pending here.
+    await expect(esiFetch('/alliances/99000001')).rejects.toMatchObject({ status: 429 });
+
+    expect(attempts).toBe(1);
     expect(vi.getTimerCount()).toBe(0);
-    const result = await promise;
-    expect(attempts).toBe(2);
-    expect(result.data).toEqual({ name: 'Test Alliance' });
   });
 
   it('retries once after 420, honoring X-ESI-Error-Limit-Reset', async () => {
@@ -236,6 +242,164 @@ describe('esiFetch — rate limiting', () => {
     await assertion;
     await expect(promise).rejects.toBeInstanceOf(EsiError);
     expect(attempts).toBe(2);
+  });
+});
+
+describe('esiFetch — app-wide error budget (issue #655)', () => {
+  it('reads the error-limit headers off a successful response, not only off a failure', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/alliances/99000001`, () =>
+        HttpResponse.json(
+          { name: 'Test Alliance' },
+          { headers: { 'X-ESI-Error-Limit-Remain': '73', 'X-ESI-Error-Limit-Reset': '41' } }
+        )
+      )
+    );
+
+    await esiFetch('/alliances/99000001');
+
+    expect(esiBudgetSnapshot().errorRemain).toBe(73);
+    expect(esiBudgetSnapshot().errorResetAt).not.toBeNull();
+  });
+
+  it('reads them off a 304 too', async () => {
+    server.use(
+      http.get(
+        `${ESI_BASE_URL}/alliances/99000001`,
+        () =>
+          new HttpResponse(null, {
+            status: 304,
+            headers: { 'X-ESI-Error-Limit-Remain': '55', 'X-ESI-Error-Limit-Reset': '12' },
+          })
+      )
+    );
+
+    await esiFetch('/alliances/99000001', { etag: '"abc"' });
+
+    expect(esiBudgetSnapshot().errorRemain).toBe(55);
+  });
+
+  it('shuts the circuit on a 420, so the rest of a fan-out never reaches the network', async () => {
+    let structureRequests = 0;
+    let mailRequests = 0;
+    server.use(
+      http.get(`${ESI_BASE_URL}/universe/structures/1`, () => {
+        structureRequests += 1;
+        return HttpResponse.json(
+          { error: 'error limited' },
+          { status: 420, headers: { 'X-ESI-Error-Limit-Reset': '45' } }
+        );
+      }),
+      http.get(`${ESI_BASE_URL}/characters/123/mail`, () => {
+        mailRequests += 1;
+        return HttpResponse.json([]);
+      })
+    );
+
+    await expect(esiFetch('/universe/structures/1')).rejects.toMatchObject({ status: 420 });
+    // The unrelated read behind it — a different route, a different Character —
+    // is the one the user's log showed being 420'd for free. It is not sent.
+    await expect(esiFetch('/characters/123/mail')).rejects.toBeInstanceOf(EsiBudgetError);
+
+    expect(structureRequests).toBe(1);
+    expect(mailRequests).toBe(0);
+  });
+
+  it('refuses with the status that shut the door, and never as an auth failure', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/universe/structures/1`, () =>
+        HttpResponse.json(
+          { error: 'error limited' },
+          { status: 420, headers: { 'X-ESI-Error-Limit-Reset': '45' } }
+        )
+      )
+    );
+    await expect(esiFetch('/universe/structures/1')).rejects.toThrow();
+
+    let caught: unknown;
+    try {
+      await esiFetch('/alliances/99000001');
+    } catch (err) {
+      caught = err;
+    }
+
+    expect(caught).toBeInstanceOf(EsiError);
+    expect((caught as EsiError).status).toBe(420);
+    // `esi/cache.ts` falls back to the stored row for anything that is not an
+    // auth failure; a shut circuit must land there, not on a re-auth banner.
+    expect(isAuthFailure(caught)).toBe(false);
+  });
+
+  it('reopens the circuit as soon as ESI answers again', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/alliances/99000001`, () =>
+        HttpResponse.json(
+          { error: 'rate limited' },
+          { status: 429, headers: { 'Retry-After': '0' } }
+        )
+      ),
+      http.get(`${ESI_BASE_URL}/alliances/99000002`, () => HttpResponse.json({ name: 'Second' }))
+    );
+
+    await expect(esiFetch('/alliances/99000001')).rejects.toThrow();
+    const result = await esiFetch<{ name: string }>('/alliances/99000002');
+
+    expect(result.data).toEqual({ name: 'Second' });
+    expect(esiBudgetSnapshot().circuitUntil).toBeNull();
+  });
+
+  it('gives its in-flight permit back on success and on failure', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/alliances/99000001`, () => HttpResponse.json({ name: 'A' })),
+      http.get(`${ESI_BASE_URL}/characters/999`, () => new HttpResponse(null, { status: 500 }))
+    );
+
+    await esiFetch('/alliances/99000001');
+    expect(esiInFlight()).toBe(0);
+    await expect(esiFetch('/characters/999')).rejects.toThrow();
+    expect(esiInFlight()).toBe(0);
+  });
+
+  it('holds the whole app to one in-flight ceiling, not one per call site', async () => {
+    let concurrent = 0;
+    let peak = 0;
+    server.use(
+      http.get(`${ESI_BASE_URL}/universe/types/:id`, async () => {
+        concurrent += 1;
+        peak = Math.max(peak, concurrent);
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        concurrent -= 1;
+        return HttpResponse.json({ name: 'Tritanium' });
+      })
+    );
+
+    // Three independent fan-outs, each already capped at its own call site.
+    await Promise.all(
+      Array.from({ length: ESI_MAX_IN_FLIGHT * 3 }, (_, i) => esiFetch(`/universe/types/${i}`))
+    );
+
+    expect(peak).toBeLessThanOrEqual(ESI_MAX_IN_FLIGHT);
+    expect(esiInFlight()).toBe(0);
+  });
+
+  it('honours an AbortSignal raised while the caller is queued at the gate', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/universe/types/:id`, async () => {
+        await new Promise((resolve) => setTimeout(resolve, 30));
+        return HttpResponse.json({ name: 'Tritanium' });
+      })
+    );
+
+    const holders = Array.from({ length: ESI_MAX_IN_FLIGHT }, (_, i) =>
+      esiFetch(`/universe/types/${i}`)
+    );
+    const controller = new AbortController();
+    const queued = esiFetch('/universe/types/999', { signal: controller.signal });
+    controller.abort();
+
+    await expect(queued).rejects.toThrow();
+    await Promise.all(holders);
+    expect(esiInFlight()).toBe(0);
   });
 });
 
