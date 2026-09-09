@@ -45,6 +45,8 @@ import {
   useSpExtractionThresholdSp,
 } from '@/features/character/spExtractionSettings';
 import { isSpExtractionReady } from '@/engine/spExtraction';
+import { maxJobSlots, type JobSlotSkills } from '@/engine/industry/jobSlots';
+import { jobSlotSkillsFromCharacterSkills } from '@/features/character/jobSlotSkills';
 import {
   availableCharacterColumns,
   useCharacterViewMode,
@@ -123,7 +125,7 @@ const COLUMN_LABEL_KEY: Record<CharacterColumnId, string> = {
   wallet: 'characters.column.wallet',
   lastSynced: 'characters.column.lastSynced',
   training: 'characters.column.training',
-  manufacturing: 'characters.column.manufacturing',
+  openJobs: 'characters.column.openJobs',
   pi: 'characters.column.pi',
   spReady: 'characters.column.spReady',
   alerts: 'characters.column.alerts',
@@ -397,6 +399,8 @@ interface CharacterRow {
   queue: QueueInfo | undefined;
   attention: AttentionEntry | undefined;
   alertCount: number;
+  /** From the same roster snapshot `stats` comes from — undefined until skills have loaded once. */
+  jobSlotSkills: JobSlotSkills | undefined;
 }
 
 /** `queueById`'s shape, built once from a roster snapshot — shared by the initial cache-only load and the "Refresh all" live reload so the two never compute it differently. */
@@ -410,6 +414,24 @@ function queueInfoMap(roster: readonly RosterEntry[], nowMs: number): Map<number
       },
     ])
   );
+}
+
+/**
+ * Job-slot skill levels from the same roster snapshot `stats` comes from —
+ * `roster.ts` already fetches `/skills` for `correctedTotalSp`, so this reads
+ * the skills row already in hand rather than fetching it a second time. A
+ * character with no cached skills row at all is simply absent, not zero:
+ * `jobSlotSkillsFromCharacterSkills([])` would otherwise misreport "no
+ * capacity" for a character whose skills just haven't loaded yet.
+ */
+function jobSlotSkillsMap(roster: readonly RosterEntry[]): Map<number, JobSlotSkills> {
+  const map = new Map<number, JobSlotSkills>();
+  for (const entry of roster) {
+    if (entry.skills?.data) {
+      map.set(entry.characterId, jobSlotSkillsFromCharacterSkills(entry.skills.data.skills));
+    }
+  }
+  return map;
 }
 
 /**
@@ -497,16 +519,34 @@ function buildColumns(
           '—'
         ),
     },
-    manufacturing: {
-      id: 'manufacturing',
-      header: t('characters.column.manufacturing'),
+    openJobs: {
+      id: 'openJobs',
+      header: t('characters.column.openJobs'),
+      headerTooltip: t('characters.openJobsHeaderTooltip'),
       align: 'right',
       className: 'tabular-nums',
-      sortValue: (row) => row.attention?.manufacturingRunning,
-      render: (row) =>
-        row.attention?.manufacturingRunning === undefined
-          ? '—'
-          : row.attention.manufacturingRunning,
+      sortValue: (row) => {
+        const counts = row.attention?.jobCounts;
+        return counts && counts.manufacturing + counts.science + counts.reaction;
+      },
+      render: (row) => {
+        const counts = row.attention?.jobCounts;
+        if (!counts) return '—';
+        const cell = `${counts.manufacturing}/${counts.science}/${counts.reaction}`;
+        const max = row.jobSlotSkills ? maxJobSlots(row.jobSlotSkills) : undefined;
+        // Native `title` rather than a custom tooltip component: it needs no
+        // extra markup per cell, and a plain "\n" is all a title attribute
+        // needs for each category to land on its own line.
+        const tooltip = max
+          ? (['manufacturing', 'science', 'reaction'] as const)
+              .map(
+                (category) =>
+                  `${t(`characters.jobSlotCategory.${category}`)}: ${counts[category]}/${max[category]}`
+              )
+              .join('\n')
+          : undefined;
+        return <span title={tooltip}>{cell}</span>;
+      },
     },
     pi: {
       id: 'pi',
@@ -631,6 +671,7 @@ export function Characters() {
   const [stats, setStats] = useState<Map<number, CharacterSortStats>>(new Map());
   const [queueById, setQueueById] = useState<Map<number, QueueInfo>>(new Map());
   const [attentionById, setAttentionById] = useState<Map<number, AttentionEntry>>(new Map());
+  const [jobSlotSkillsById, setJobSlotSkillsById] = useState<Map<number, JobSlotSkills>>(new Map());
   const [addingGroup, setAddingGroup] = useState(false);
   const [newGroupName, setNewGroupName] = useState('');
   const [search, setSearch] = useState('');
@@ -709,6 +750,7 @@ export function Characters() {
       if (cancelled) return;
       setStats(rosterSortStats(roster));
       setQueueById(queueInfoMap(roster, now));
+      setJobSlotSkillsById(jobSlotSkillsMap(roster));
     })();
     return () => {
       cancelled = true;
@@ -787,6 +829,7 @@ export function Characters() {
       ]);
       setStats(rosterSortStats(roster));
       setQueueById(queueInfoMap(roster, now));
+      setJobSlotSkillsById(jobSlotSkillsMap(roster));
       setAttentionById(new Map(attention.map((entry) => [entry.characterId, entry])));
     } finally {
       setRefreshingAll(false);
@@ -891,6 +934,7 @@ export function Characters() {
           queue: queueById.get(character.characterId),
           attention: attentionById.get(character.characterId),
           alertCount: alertCounts.get(character.characterId) ?? 0,
+          jobSlotSkills: jobSlotSkillsById.get(character.characterId),
         }));
       return (
         // Deliberate deviation from DataTable's usual `.dt-stack` collapse on

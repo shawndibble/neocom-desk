@@ -17,7 +17,7 @@ export const CHARACTER_COLUMN_IDS = [
   'wallet',
   'lastSynced',
   'training',
-  'manufacturing',
+  'openJobs',
   'pi',
   'spReady',
   'alerts',
@@ -29,7 +29,7 @@ export type CharacterColumnId = (typeof CHARACTER_COLUMN_IDS)[number];
 export const DEFAULT_VISIBLE_CHARACTER_COLUMNS: readonly CharacterColumnId[] = [
   'name',
   'training',
-  'manufacturing',
+  'openJobs',
   'pi',
   'alerts',
   'lastSynced',
