@@ -1217,6 +1217,14 @@ async function main() {
   );
 
   // --- market/stations.json: staStations -> NpcStationEntry[] ---
+  //
+  // The complete NPC station table, which is why it is read as more than a
+  // name cache (issue #655): membership in it is the definitive answer to "is
+  // this location id an NPC station or a player structure", so the character
+  // surfaces resolve station names with no ESI call and contract locations
+  // skip the station probe whose 404 they used to spend. `stationTypeID`
+  // rides along so `loadStationSummary` can fill a Build Location's facility
+  // preset from here too.
   const npcStations = [];
   {
     const rows = raw['staStations.csv'];
@@ -1227,6 +1235,7 @@ async function main() {
         id: Number(r[h.stationID]),
         name: r[h.stationName],
         systemId: Number(r[h.solarSystemID]),
+        typeId: Number(r[h.stationTypeID]),
       });
     }
     npcStations.sort((a, b) => a.id - b.id);

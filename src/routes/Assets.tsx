@@ -289,6 +289,10 @@ async function loadAssetsSnapshot(
       ];
   const [resolvedStations, resolvedStructures, resolvedSystems, resolvedOrphanParents] =
     await Promise.all([
+      // Uncapped on purpose: `location_type: 'station'` means every one of
+      // these is an NPC station, and those resolve out of the SDE snapshot
+      // with no request at all (issue #655). Capping this would slow a
+      // map lookup down, not spare ESI anything.
       Promise.all(stationIds.map((id) => loadStationName(id))),
       Promise.all(structureIds.map((id) => loadStructureName(characterId, id))),
       Promise.all(systemIds.map((id) => loadSystemName(id))),
@@ -350,6 +354,7 @@ async function loadCrossCharacterNames(
   const stationIds = [
     ...new Set(allAssets.filter((a) => a.location_type === 'station').map((a) => a.location_id)),
   ];
+  // A snapshot lookup per id, not a request per id — see `loadAssetsSnapshot`.
   const resolvedStations = await Promise.all(stationIds.map((id) => loadStationName(id)));
   stationIds.forEach((id, i) => {
     const name = resolvedStations[i];

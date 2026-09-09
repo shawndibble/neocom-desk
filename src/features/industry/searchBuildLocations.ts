@@ -3,10 +3,12 @@
  * player structures this Character can dock at.
  *
  * `GET /characters/{id}/search` is the only ESI route that finds a structure by
- * name, and it answers with ids alone, so each hit costs one further lookup —
- * public and globally cached for a station, ACL-checked and per-character
- * cached for a structure. Both are `STALE_AFTER.static` rows shared with the
- * Assets tree, so searching for the same place twice costs one request.
+ * name, and it answers with ids alone, so each hit costs one further lookup.
+ * A station's is free: `loadStationSummary` reads the SDE snapshot, which
+ * carries the type id a facility preset needs as well as the name and system
+ * (issue #655). A structure's is ACL-checked and cached per Character, a
+ * `STALE_AFTER.static` row shared with the Assets tree, so searching for the
+ * same one twice costs one request.
  *
  * `esi-search.search_structures.v1` is in the base grant, so a Character added
  * since it was added can search straight away; one added before it holds a
@@ -29,8 +31,10 @@ import {
 export const MIN_SEARCH_LENGTH = 3;
 
 /**
- * One cap across both categories, applied before any lookup: every id kept is
- * a further ESI request, and a common fragment matches dozens of places. The
+ * One cap across both categories, applied before any lookup: every structure
+ * id kept is a further ESI request, and a common fragment matches dozens of
+ * places. It still bounds the station side too, which is now a snapshot read
+ * rather than a request, because the cap is also how long the list gets. The
  * two categories are interleaved rather than concatenated, so a name matching
  * forty NPC stations cannot crowd out the structure the pilot is looking for —
  * which capping per category, then truncating after the sort, did.
