@@ -272,8 +272,15 @@ describe('diffSpExtractionReady', () => {
     return { entries, nowMs: T0 };
   }
 
-  it('fires nothing on the first-ever poll', () => {
+  it('fires on the first-ever poll if already ready (unlike characterNotTraining: this state takes months to flip, so the first poll after opting in is the pilot asking to be told)', () => {
     const next = spSnapshot([{ totalSp: FLOOR + 500_000, thresholdSp: 500_000 }]);
+    expect(diffSpExtractionReady(1, undefined, next)).toEqual([
+      { eventId: 'spExtractionReady', characterId: 1 },
+    ]);
+  });
+
+  it('fires nothing on the first-ever poll if not yet ready', () => {
+    const next = spSnapshot([{ totalSp: FLOOR + 400_000, thresholdSp: 500_000 }]);
     expect(diffSpExtractionReady(1, undefined, next)).toEqual([]);
   });
 

@@ -98,7 +98,8 @@ export function colonyAttention(
   return 'healthy';
 }
 
-const ATTENTION_RANK: Record<ColonyAttention, number> = {
+/** Exported for callers that need the same ordering outside a sort (e.g. a table column's `sortValue`) without re-deriving it. */
+export const ATTENTION_RANK: Record<ColonyAttention, number> = {
   idle: 0,
   'expiring-soon': 1,
   decayed: 2,

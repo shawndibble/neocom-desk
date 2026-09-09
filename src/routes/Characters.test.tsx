@@ -633,6 +633,42 @@ describe('Characters table view', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('the Columns picker never lets the last rendered column disappear, even when a stale spReady entry is lingering in storage', async () => {
+    // Repro: enable monitoring, check spReady (on top of the defaults),
+    // disable monitoring again (spReady stays in storage but stops
+    // rendering), then uncheck every other column one by one. The stored
+    // list still has >1 entries the whole time (spReady never leaves it),
+    // so a guard on the raw stored length alone would let the last
+    // *rendered* column vanish — this must block that last uncheck instead.
+    await useSpExtractionMonitoringEnabled.getState().setValue(true);
+    const user = userEvent.setup();
+    renderCharacters();
+    await user.click(await screen.findByRole('button', { name: 'Table' }));
+
+    await user.click(await screen.findByRole('button', { name: 'Columns' }));
+    await user.click(await screen.findByRole('menuitemcheckbox', { name: 'SP ready' }));
+    await user.keyboard('{Escape}');
+
+    await useSpExtractionMonitoringEnabled.getState().setValue(false);
+
+    for (const label of ['Alerts', 'Last synced', 'PI', 'Open jobs', 'Training']) {
+      await user.click(await screen.findByRole('button', { name: 'Columns' }));
+      await user.click(await screen.findByRole('menuitemcheckbox', { name: label }));
+      await user.keyboard('{Escape}');
+    }
+
+    // Only "Name" is left rendering. Unchecking it too must be a no-op.
+    expect(within(screen.getByRole('table')).getByText('Pilot One')).toBeInTheDocument();
+    await user.click(await screen.findByRole('button', { name: 'Columns' }));
+    const nameItem = await screen.findByRole('menuitemcheckbox', { name: 'Name' });
+    expect(nameItem).toHaveAttribute('aria-checked', 'true');
+    await user.click(nameItem);
+    await user.keyboard('{Escape}');
+
+    expect(await screen.findByRole('table')).toBeInTheDocument();
+    expect(within(screen.getByRole('table')).getByText('Pilot One')).toBeInTheDocument();
+  });
+
   it('Refresh all triggers a live pull for the whole roster, not just the active character', async () => {
     const user = userEvent.setup();
     const snapshotSpy = vi.spyOn(rosterModule, 'loadRosterSnapshot').mockResolvedValue([]);

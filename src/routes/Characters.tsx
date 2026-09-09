@@ -54,6 +54,7 @@ import {
   visibleAvailableColumns,
   type CharacterColumnId,
 } from '@/features/character/characterColumns';
+import { ATTENTION_RANK } from '@/engine/pi/colonyStatus';
 import type { ColonyAttention } from '@/engine/pi/types';
 import { deriveQueueState, type QueueState } from '@/features/skills/queueStatus';
 import { removeCharacter } from '@/features/character/removeCharacter';
@@ -103,6 +104,18 @@ const PI_ATTENTION_TONE: Record<ColonyAttention, StatChipTone> = {
   'expiring-soon': 'warning',
   decayed: 'accent',
   healthy: 'success',
+};
+
+// Same "most-needs-attention first" ordering as PI's ATTENTION_RANK, mapped
+// onto training's own tones: paused (danger) worst, then endingSoon (warning),
+// then idle/unknown (default, no distinct order between the two), then
+// training (success) last since it needs no attention at all.
+const QUEUE_STATE_RANK: Record<QueueState, number> = {
+  paused: 0,
+  endingSoon: 1,
+  idle: 2,
+  unknown: 2,
+  training: 3,
 };
 
 // A table cell's own column header already names the stat — StatChip's
@@ -401,6 +414,8 @@ interface CharacterRow {
   alertCount: number;
   /** From the same roster snapshot `stats` comes from — undefined until skills have loaded once. */
   jobSlotSkills: JobSlotSkills | undefined;
+  /** Raw `total_sp` (not `correctedTotalSp`) — see `totalSpMap`'s doc comment. */
+  totalSp: number | undefined;
 }
 
 /** `queueById`'s shape, built once from a roster snapshot — shared by the initial cache-only load and the "Refresh all" live reload so the two never compute it differently. */
@@ -430,6 +445,22 @@ function jobSlotSkillsMap(roster: readonly RosterEntry[]): Map<number, JobSlotSk
     if (entry.skills?.data) {
       map.set(entry.characterId, jobSlotSkillsFromCharacterSkills(entry.skills.data.skills));
     }
+  }
+  return map;
+}
+
+/**
+ * Raw `total_sp`, not `correctedTotalSp` — deliberately, and only for this
+ * one column. `correctedTotalSp` exists so a displayed SP total doesn't
+ * contradict a per-skill figure shown beside it (roster.ts's own comment);
+ * SP-extraction readiness needs no such agreement, and it must match what
+ * `pollDomains.ts`'s `spExtractionDomain` alerts on (also raw `total_sp`), or
+ * the table and the alert could disagree about whether a character is ready.
+ */
+function totalSpMap(roster: readonly RosterEntry[]): Map<number, number> {
+  const map = new Map<number, number>();
+  for (const entry of roster) {
+    if (entry.skills?.data) map.set(entry.characterId, entry.skills.data.total_sp);
   }
   return map;
 }
@@ -509,7 +540,7 @@ function buildColumns(
     training: {
       id: 'training',
       header: t('characters.column.training'),
-      sortValue: (row) => (row.queue ? row.queue.state : undefined),
+      sortValue: (row) => (row.queue ? QUEUE_STATE_RANK[row.queue.state] : undefined),
       render: (row) =>
         row.queue ? (
           <span className={TONE_TEXT_CLASS[QUEUE_STATE_TONE[row.queue.state]]}>
@@ -551,7 +582,10 @@ function buildColumns(
     pi: {
       id: 'pi',
       header: t('characters.column.pi'),
-      sortValue: (row) => row.attention?.piAttention ?? '',
+      sortValue: (row) =>
+        row.attention?.piAttention === undefined
+          ? undefined
+          : ATTENTION_RANK[row.attention.piAttention],
       render: (row) =>
         row.attention?.piAttention === undefined ? (
           '—'
@@ -565,12 +599,11 @@ function buildColumns(
       id: 'spReady',
       header: t('characters.column.spReady'),
       sortValue: (row) =>
-        row.stats?.skillPoints === undefined
+        row.totalSp === undefined
           ? undefined
-          : Number(isSpExtractionReady(row.stats.skillPoints, spExtractionThresholdSp)),
+          : Number(isSpExtractionReady(row.totalSp, spExtractionThresholdSp)),
       render: (row) =>
-        row.stats?.skillPoints !== undefined &&
-        isSpExtractionReady(row.stats.skillPoints, spExtractionThresholdSp) ? (
+        row.totalSp !== undefined && isSpExtractionReady(row.totalSp, spExtractionThresholdSp) ? (
           <span className={TONE_TEXT_CLASS.success}>{t('characters.spReadyYes')}</span>
         ) : (
           '—'
@@ -672,6 +705,7 @@ export function Characters() {
   const [queueById, setQueueById] = useState<Map<number, QueueInfo>>(new Map());
   const [attentionById, setAttentionById] = useState<Map<number, AttentionEntry>>(new Map());
   const [jobSlotSkillsById, setJobSlotSkillsById] = useState<Map<number, JobSlotSkills>>(new Map());
+  const [totalSpById, setTotalSpById] = useState<Map<number, number>>(new Map());
   const [addingGroup, setAddingGroup] = useState(false);
   const [newGroupName, setNewGroupName] = useState('');
   const [search, setSearch] = useState('');
@@ -751,6 +785,7 @@ export function Characters() {
       setStats(rosterSortStats(roster));
       setQueueById(queueInfoMap(roster, now));
       setJobSlotSkillsById(jobSlotSkillsMap(roster));
+      setTotalSpById(totalSpMap(roster));
     })();
     return () => {
       cancelled = true;
@@ -830,6 +865,7 @@ export function Characters() {
       setStats(rosterSortStats(roster));
       setQueueById(queueInfoMap(roster, now));
       setJobSlotSkillsById(jobSlotSkillsMap(roster));
+      setTotalSpById(totalSpMap(roster));
       setAttentionById(new Map(attention.map((entry) => [entry.characterId, entry])));
     } finally {
       setRefreshingAll(false);
@@ -840,10 +876,13 @@ export function Characters() {
     const next = visibleColumns.includes(id)
       ? visibleColumns.filter((existing) => existing !== id)
       : [...visibleColumns, id];
-    // A table with zero columns is a blank page with no explanation — the
-    // picker already can't produce an empty preference from storage
-    // (characterColumns.ts's parse), so the live control shouldn't either.
-    if (next.length === 0) return;
+    // A table with zero *rendered* columns is a blank page with no
+    // explanation — guard against the filtered/available count, not the raw
+    // stored list: `visibleColumns` can carry ids `availableCharacterColumns`
+    // currently excludes (e.g. `spReady` while monitoring is off), so a raw
+    // `next.length` check can stay non-zero while every id left actually
+    // renders nothing.
+    if (visibleAvailableColumns(next, spExtractionEnabled).length === 0) return;
     void setVisibleColumns(next);
   }
 
@@ -935,6 +974,7 @@ export function Characters() {
           attention: attentionById.get(character.characterId),
           alertCount: alertCounts.get(character.characterId) ?? 0,
           jobSlotSkills: jobSlotSkillsById.get(character.characterId),
+          totalSp: totalSpById.get(character.characterId),
         }));
       return (
         // Deliberate deviation from DataTable's usual `.dt-stack` collapse on

@@ -53,13 +53,28 @@ _Recorded 2026-09-09._
   shipping — get the skill ids or the base-slot count wrong and the whole
   column lies confidently.
 
-- **SP extraction's alert fires once per crossing, not once per poll.**
-  Mirrors the existing `characterNotTraining` event's edge-triggered shape
-  (`engine/notificationDiffs.ts`) rather than inventing a new firing rule: a
-  persistent true condition renotifies only on the transition into it, never
-  while it stays true. Every Notification Event seam this touched —
+- **SP extraction's alert fires once per crossing, not once per poll —
+  including the first poll after opt-in, if the pilot is already past
+  threshold.** Edge-triggered the same way `characterNotTraining`
+  (`engine/notificationDiffs.ts`) is, with one deliberate difference:
+  `characterNotTraining`'s `if (!prev) return []` guard exists because
+  training state flaps constantly, so a first-poll fire would flood.
+  SP-ready takes months to cross, and the first poll after a pilot turns
+  monitoring on _is_ their request to be told if they already qualify — so
+  `diffSpExtractionReady` treats a missing baseline as "not ready before",
+  not "skip this poll". Every Notification Event seam this touched —
   `events.ts`'s catalog, `pollDomains.ts`'s registry, `occurrenceKey.ts`'s
   two exhaustive switches, `notificationOptions.ts`'s route table,
   `alertGroups.ts`'s severity map — is load-bearing, not incidental; a future
   Notification Event needs all of them too, not a subset that happens to
   compile.
+
+- **The `spReady` column reads raw `total_sp`, not `correctedTotalSp`.**
+  Every other SP figure on this table (`spTotal`) shows `correctedTotalSp`
+  (queue-gain-adjusted, `roster.ts`) to agree with the per-skill numbers
+  shown elsewhere. `spReady` deliberately doesn't: it must agree instead
+  with `pollDomains.ts`'s `spExtractionDomain`, which also reads raw
+  `total_sp` — so the table's "ready" badge and the alert that fires never
+  disagree about the same character. `Characters.tsx`'s `totalSpMap` is the
+  one place that distinction is made; don't "fix" it back to
+  `row.stats.skillPoints`.
