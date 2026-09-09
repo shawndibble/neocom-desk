@@ -1,7 +1,6 @@
 ---
 name: add-missing-features
-description: Survey third-party EVE tools for capability Neocom Desk lacks, kill the weak ideas with a hostile reviewer, mock up the survivors, and publish ready-for-human tickets.
-disable-model-invocation: true
+description: Survey third-party EVE tools for capability Neocom Desk lacks — especially industry and marketing — pressure-test each candidate with a hostile reviewer, mock up the survivors, and file them as ready-for-human tickets. Fires on explicit request only: the user typing /add-missing-features.
 ---
 
 # Add Missing Features
@@ -11,12 +10,20 @@ not, bias hard toward **industry** and **marketing** (the ISK pipeline), and
 land the survivors as tickets a human will review.
 
 **This skill runs unattended.** Nobody answers questions mid-run. Every choice
-that a interactive skill would put to the user, you decide and record in the
-ticket instead. The human's review happens after the fact, on the tickets —
-which is why every ticket ships `ready-for-human` and never `ready-for-agent`.
+an interactive skill would put to the user, you decide and record in the ticket
+instead. The human reviews afterward, on the tickets — which is why every ticket
+ships `ready-for-human` and never `ready-for-agent`.
+
+`$ARGUMENTS`, if present, narrows the hunt to an area ("industry", "market",
+"hauling"). Otherwise sweep the whole ISK pipeline.
 
 Reference: [TOOLS.md](TOOLS.md) — the survey ledger of tools already looked at
 and candidates already killed. Read it in step 1; append to it in step 7.
+
+This run writes no application code. It needs **no worktree**: read the main
+checkout and leave it untouched — Shawn keeps a dev server there and another
+agent may be working in it. The mutations it makes are `gh issue create` calls
+and an appended `TOOLS.md`.
 
 ## 1. Inventory what already exists
 
@@ -25,17 +32,22 @@ wrong.** Undercut detection, order competition, realized profit, build-vs-buy,
 appraisal, PI chains, price history and reprocessing are all built. A candidate
 proposed without checking is usually a feature that shipped months ago.
 
+**Grep the domain concept, never your own word for it.** A past run proposed a
+hub-arbitrage finder on the strength of `grep arbitrage` returning nothing. It
+ships as `hubHaulGaps` in `orderExits.ts`. The app names things in `CONTEXT.md`
+vocabulary, so search that way and read the module list rather than trusting a
+keyword miss.
+
 Establish the real surface before proposing anything:
 
-- Routes: `ls src/routes/` — one file per page.
-- Engine modules: `ls src/engine/*/` — the pure calculation surface, and the
-  sharpest evidence of what is genuinely covered.
+- Routes: `ls src/routes/` — one file per page. `docs/ARCHITECTURE.md` §6 is the
+  route inventory.
+- Modules: `ls src/engine/*/` and `ls src/features/*/` — the calculation
+  surface, and the sharpest evidence of what is genuinely covered.
 - `CONTEXT.md` glossary for the vocabulary every later step must speak.
-- `docs/context/decisions/` — grep it for each candidate area. A feature
-  rejected there is settled scope, not a gap.
 
-Done when you can name, for each candidate area you are about to explore, the
-engine module that covers it or the confirmed absence of one.
+Done when you can name, for each area you are about to explore, the module that
+covers it or the confirmed absence of one.
 
 ## 2. Survey the ecosystem
 
@@ -54,25 +66,49 @@ Fuzzwork, Janice, Slipway, EVE Ref.
 A dead tool still marks a real gap — players wanted it — but it kills the
 "someone already serves this" objection, so note liveness either way.
 
-## 3. Frame candidates
+## 3. Frame candidates, then gate them on prior art
 
 Ask the question that discriminates: **what happens between "I own blueprints"
 and "I banked ISK" that the app does not cover?** "What page are we missing"
 produces weak candidates against a surface this broad; the pipeline question
 produces depth — discovery, scheduling, restocking, routing, competition decay.
 
-Produce **3–4** candidates. Each one carries, as a required field:
+Draft **3–4** candidates, then gate each one. Grep by **domain concept**, using
+`CONTEXT.md`'s vocabulary rather than your own phrasing:
+
+1. `docs/context/decisions/` — scope decisions, one file each. Filenames carry
+   the summary, so `ls | grep` on a concept usually lands it. A later decision
+   can reverse an earlier one, so read dates.
+2. `.out-of-scope/*.md` — explicitly rejected enhancements, with the reasoning
+   and what was already considered.
+3. `gh issue list --state all --search "<terms>"` — already filed, open or closed.
+
+A hit **drops the candidate**, or narrows it to the shape the decision leaves
+open. Record every drop with where you looked and what you found; a drop is a
+useful result, not a failure.
+
+Each surviving candidate carries, as required fields:
 
 - **Verdict**: expansion of an existing page, or a new page. Name the exact
-  route or engine module it extends.
+  route or module it extends.
 - **ESI backing**: the endpoints it needs, their cache TTL, and any role gate.
 - **Integration plan**: where it slots into existing navigation and data flow.
 
 ## 4. Hostile review
 
-Dispatch a sub-agent as a **hostile reviewer** whose job is to kill candidates,
-not to improve them. A reviewer that returns "all four are great" has failed;
-require it to name the candidate it would cut if only two could ship.
+Spawn a **hostile reviewer** as a fresh sub-agent (Agent tool, `subagent_type:
+"general-purpose"` — never `fork`; the adversarial value is in the cold read).
+Its job is to kill candidates, not improve them. A reviewer that returns "all of
+these are good" has failed; require it to name the one it would cut if only two
+could ship.
+
+Its prompt must carry the full candidate text, the inventory from step 1, the
+prior-art hits from step 3, and — stated in the prompt itself, since it never
+sees this file — these constraints:
+
+> This is a read-only review. Read only the candidates and the files they cite.
+> Run no tests, lint, typecheck, build, or scripts. Edit no files. Make no `gh`
+> writes.
 
 Give it this kill-bar:
 
@@ -81,72 +117,101 @@ Give it this kill-bar:
 - **Client-side reality**: the app is a local-first PWA — ESI data lives in
   Dexie per device and never syncs through the backend. Anything needing a
   server crawling ESI across all players is dead on arrival here, however good.
-- **Settled scope**: does `docs/context/decisions/` already constrain or
-  reject this? Grep it per candidate and hand the reviewer the hits. A
-  decision outranks the reviewer's own reasoning — it is what the project
-  already chose, and it is the check the reviewer cannot make unprompted.
-- **Overlap**: does an existing route or engine module already do this?
+- **Settled scope**: does a `docs/context/decisions/` file or `.out-of-scope/`
+  entry constrain this? Hand it the step 3 hits; a decision outranks the
+  reviewer's own reasoning.
+- **Overlap**: does an existing route or module already do this?
 - **Maintenance**: what breaks on the next SDE or ESI change?
 
-Carry survivors forward with the reviewer's objections attached. A candidate
-that survives with a scoped-down shape is a win; record the narrower shape.
+Require a verdict per candidate on its own line: `SHIP`, `NARROW` (state the
+narrower shape precisely), or `KILL`.
+
+**Weigh its verdicts against your own evidence.** A reviewer told to kill will
+manufacture kills, and its most common error is a true premise with a wrong
+conclusion — "ESI exposes no history for this" is true and yet would not, on its
+own, kill a feature in a Dexie-backed app that can accumulate its own series.
+Where a verdict contradicts something you verified in the repo, keep your
+evidence and record the disagreement in the ticket. Where it cites a file or a
+decision you missed, verify the citation and let it stand.
 
 ## 5. Mock up the UI-significant survivors
 
 Any survivor that adds a tab, adds a page, or reshapes an existing one gets
-mockups before it gets a ticket, constrained to the tokens and components in
-`docs/DESIGN.md` — a mockup inventing its own visual language is not an
-integration plan.
+mockups before it gets a ticket. A survivor that only deepens existing math
+skips this step.
 
-**Write each mockup as an HTML file committed to the branch**, under
-`docs/mockups/<slug>.html`, and link that path from the ticket. Unattended runs
-are where this step quietly produces nothing: an Artifact publish is approval
-gated, so in a headless run it can fail and leave the ticket with no mockup at
-all. A committed file always survives. Publishing an Artifact as well is a
-bonus when a human is driving, not the deliverable.
+Use the `design` skill, constrained to the tokens and components in
+`docs/DESIGN.md` and the primitives in `src/components/ui/` — a mockup inventing
+its own visual language is not an integration plan. Show the feature in place:
+surrounding navigation, the empty state, and the populated state. Publish it and
+link the artifact URL from the ticket, the way `.out-of-scope/` entries do.
 
-Show the feature in place: the surrounding navigation, the empty state, and the
-populated state. A survivor that only deepens existing math skips this step.
+**Also describe the layout in words in the ticket body.** The link can rot and
+an unattended run can fail to publish; a ticket whose mockup exists only as a
+URL is a ticket that may arrive empty.
 
-## 6. Publish the tickets
+## 6. File the tickets
 
-Invoke `/to-tickets`, stating both departures below in the invocation. If it
-does not appear in the invocable skill list for this run, follow its
-`<issue-template>` and create each issue with `gh issue create` instead (see
-`docs/agents/issue-tracker.md`) — the tickets are identical either way.
+Invoke `/to-tickets` for the breakdown, stating both departures below, or create
+the issues directly with `gh issue create` against `shawndibble/neocom-desk`
+(`docs/agents/issue-tracker.md`, heredoc body) — the tickets are identical
+either way.
 
-Two departures from that skill's defaults:
-
-- **Unattended** — its "quiz the user" step does not run. Nobody is there.
+- **Unattended** — the "quiz the user" step does not run. Nobody is there.
   Record the decisions it would have asked about in the ticket body instead.
-- **Label `enhancement,ready-for-human`**, never its `ready-for-agent`
-  default. Every triaged issue carries one category role and one state role
-  (`docs/agents/triage-labels.md`), so both labels go on. These are proposals a
-  human accepts before any agent builds them; `ready-for-agent` would let
-  `/next-ticket` start building unreviewed work.
+- **Labels `--label enhancement --label ready-for-human`** — every issue carries
+  one category role and one state role (`docs/agents/triage-labels.md`).
+  `ready-for-agent` would let `/next-ticket` build unreviewed proposals.
 
-Give each ticket a `## Blocked by` section reading `None` unless a candidate
-genuinely gates another — `docs/agents/issue-tracker.md` treats that section as
-the unblocked check, and a missing one is ambiguous. Write acceptance criteria
-as observable behaviour rather than an implementation checklist: these are
-unreviewed proposals, and the human may reshape the feature before any agent
-touches it.
+Ship only the survivors. If the hostile review killed three of four, file one
+ticket — never backfill to hit a target count. **Ship the narrowed shape**, not
+the shape drafted in step 3: a survivor that shrank is the process working, and
+a ticket that re-inflates it discards the review.
 
-Ship only the survivors. If the hostile review killed three of four, publish
-one ticket — never backfill to hit a target count.
+Body follows the house brief (`.claude/skills/triage/AGENT-BRIEF.md` —
+behavioural not procedural, no file paths or line numbers, testable criteria):
 
-Every ticket opens with a **TL;DR**: one or two sentences, before any other
-section, saying what the feature does and whether it is an expansion or a new
-page. A human reviewing the batch reads the TL;DR first and decides from it
-whether to read on, so it carries the decision, not a restatement of the title.
+```markdown
+> _This was generated by AI during /add-missing-features._
 
-Below the TL;DR each ticket carries the candidate's verdict, ESI backing,
-integration plan, the hostile reviewer's surviving objections, and mockup links
-where step 5 produced them.
+## TL;DR
+
+One or two sentences: what this feature does, and whether it is an expansion of
+an existing page or a new one. Readable on its own — a human triaging a batch
+reads only this before deciding whether to read on.
+
+## Agent Brief
+
+**Category:** enhancement
+**Summary:** one line
+**Prior art:** the third-party tool(s) that do this, and what they get right
+**Current behavior:** what the app does today, and the gap
+**Desired behavior:** what should happen, including edge cases
+**ESI backing:** endpoints, cache TTL, scopes or role gates
+**Integration plan:** expansion or new page, and where it slots into navigation
+**Key interfaces:** components, tokens, and types involved — named, not pathed
+**Acceptance criteria:**
+
+- [ ] testable criterion
+
+**Out of scope:** adjacent things that stay untouched
+
+**Why not delegated:** the judgement call that needs a human eye
+
+**Hostile review:** verdict, the objections raised, and how the proposal answers
+them — including any objection overruled by repo evidence
+
+**Mockups:** artifact URL, plus the layout described in words
+```
 
 ## 7. Record the survey
 
 Append this run to [TOOLS.md](TOOLS.md): the date, the tools surveyed with what
-each does, and every candidate with its outcome — shipped as ticket #N, or
-killed with the reason. The ledger is what stops the next run re-proposing what
-this one already killed.
+each does, and every candidate with its outcome — filed as issue #N, or dropped
+with the reason and where you found it. The ledger is what stops the next run
+re-proposing what this one already killed.
+
+## Report
+
+In the terminal, short: each issue URL with its hostile verdict, and the dropped
+candidates with their reasons, so the next run has a head start.
