@@ -124,6 +124,12 @@ jobs:
       # retry fails identically.
       - name: Install Playwright browsers (retried — see comment)
         run: |
+          # Chromium itself comes from Playwright's own CDN; the only thing
+          # `--with-deps` wants apt for is Ubuntu's shared libraries. The
+          # runner image ships Google's Chrome repo anyway, so `apt-get update`
+          # fetches it and fails the whole step on its bad index. Dropping the
+          # source list removes the dependency on a server we do not need.
+          sudo rm -f /etc/apt/sources.list.d/google-chrome.list || true
           for attempt in 1 2 3; do
             if npx playwright install --with-deps chromium; then exit 0; fi
             echo "::warning::playwright install failed (attempt $attempt/3), retrying"
