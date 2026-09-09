@@ -858,6 +858,8 @@
     "completing": "Completing login…",
     "errorTitle": "Login failed",
     "errorMessage": "Something went wrong signing you in. Please try again.",
+    "errorSpent": "This sign-in link has already been used, or it was opened in a different browser tab or window. Start again from Characters.",
+    "errorMismatch": "This sign-in could not be verified. Another sign-in may have started before this one finished. Start again from Characters.",
     "retry": "Try again"
   },
   "character": {

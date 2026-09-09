@@ -115,14 +115,52 @@ describe('Callback', () => {
     });
   });
 
+  it('lands on /characters when the same callback arrives a second time (#649)', async () => {
+    sessionStorage.setItem('neocom.sso.state', 'state-1');
+    sessionStorage.setItem('neocom.sso.verifier', 'verifier-1');
+    const first = renderCallback('?code=good-code&state=state-1');
+    expect(await screen.findByText('characters page')).toBeInTheDocument();
+    first.unmount();
+
+    // Switching user on EVE's login page can hand the browser the same
+    // callback URL twice. The second landing is a fresh mount with the PKCE
+    // stash already spent — it must not accuse the user of a failed login.
+    renderCallback('?code=good-code&state=state-1');
+    expect(await screen.findByText('characters page')).toBeInTheDocument();
+    expect(tokenRequests).toBe(1);
+  });
+
   it('shows an i18n error with a retry link on state mismatch', async () => {
     sessionStorage.setItem('neocom.sso.state', 'state-1');
     sessionStorage.setItem('neocom.sso.verifier', 'verifier-1');
     renderCallback('?code=good-code&state=wrong-state');
 
-    expect(await screen.findByText(/something went wrong signing you in/i)).toBeInTheDocument();
+    expect(await screen.findByText(/could not be verified/i)).toBeInTheDocument();
     expect(tokenRequests).toBe(0);
     expect(screen.getByRole('link', { name: /try again/i })).toHaveAttribute('href', '/login');
+  });
+
+  it('tells apart a spent sign-in from a failed one (#649)', async () => {
+    // No stash at all: the tab that started the login is not this one, or the
+    // link was reopened later. Distinct wording so the next bug report says
+    // which of the two happened.
+    renderCallback('?code=good-code&state=state-1');
+
+    expect(await screen.findByText(/already been used/i)).toBeInTheDocument();
+    expect(tokenRequests).toBe(0);
+  });
+
+  it('keeps the generic message when EVE rejects the code (#649)', async () => {
+    server.use(
+      http.post('https://login.eveonline.com/v2/oauth/token', () =>
+        HttpResponse.json({ error: 'invalid_grant' }, { status: 400 })
+      )
+    );
+    sessionStorage.setItem('neocom.sso.state', 'state-1');
+    sessionStorage.setItem('neocom.sso.verifier', 'verifier-1');
+    renderCallback('?code=good-code&state=state-1');
+
+    expect(await screen.findByText(/something went wrong signing you in/i)).toBeInTheDocument();
   });
 
   it('announces the error panel to screen readers', async () => {

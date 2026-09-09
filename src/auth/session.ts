@@ -29,6 +29,39 @@ const STATE_KEY = 'neocom.sso.state';
  * the baseline for grants it had nothing to do with.
  */
 const SCOPES_KEY = 'neocom.sso.scopes';
+/**
+ * The last callback this tab actually completed: `{ state, characterId }`.
+ *
+ * Not a fourth piece of the one-shot stash — it is written *after* that stash
+ * is spent, and it is what makes a repeated callback idempotent (issue #649).
+ * Switching user on EVE's login page can hand the browser the same
+ * `/callback?code=…&state=…` twice; the second landing finds the stash gone
+ * and, without this, showed a "login failed" panel over a login that had in
+ * fact succeeded.
+ *
+ * It holds no token material and cannot mint a session: `state` is a spent
+ * CSRF nonce that was in the URL bar anyway, and a match short-circuits to a
+ * Character record that already exists rather than to a token exchange.
+ */
+const COMPLETED_KEY = 'neocom.sso.completed';
+
+/** Which way a login failed, for a UI that must tell them apart (issue #649). */
+export type LoginFailureReason = 'no-login-in-progress' | 'state-mismatch';
+
+/**
+ * A login that failed before the token exchange. `AuthError` (`auth/sso.ts`)
+ * covers failures at or after it, so `reason` is absent there and the caller
+ * treats that as the generic case.
+ */
+export class LoginError extends Error {
+  constructor(
+    readonly reason: LoginFailureReason,
+    message: string
+  ) {
+    super(message);
+    this.name = 'LoginError';
+  }
+}
 
 /** Refresh when less than this remains on the access token. */
 const EXPIRY_BUFFER_MS = 60_000;
@@ -261,6 +294,28 @@ function takeRequestedScopes(): string[] | undefined {
   }
 }
 
+/**
+ * The Character a *previous* completion of this exact callback signed in, or
+ * `undefined` if this tab never completed it. See `COMPLETED_KEY`.
+ *
+ * Deliberately strict on both halves: the marker's `state` must equal the one
+ * on this callback, and the Character it names must still be on the device.
+ * A Character removed since then is a real "no login in progress" — replaying
+ * it would navigate to a Character that is no longer there.
+ */
+async function replayCompletedLogin(state: string): Promise<CharacterRecord | undefined> {
+  const raw = sessionStorage.getItem(COMPLETED_KEY);
+  if (!raw) return undefined;
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    const marker = parsed as { state?: unknown; characterId?: unknown };
+    if (marker.state !== state || typeof marker.characterId !== 'number') return undefined;
+    return await db.characters.get(marker.characterId);
+  } catch {
+    return undefined;
+  }
+}
+
 /** Handle the SSO callback: validate state, exchange code, persist character + token. */
 export async function completeLogin(
   params: { code: string; state: string },
@@ -269,14 +324,25 @@ export async function completeLogin(
   const { clientId } = resolveConfig(config);
   const expectedState = sessionStorage.getItem(STATE_KEY);
   const verifier = sessionStorage.getItem(VERIFIER_KEY);
-  if (!expectedState || !verifier) throw new Error('No login in progress');
-  if (params.state !== expectedState) throw new Error('SSO state mismatch');
+  if (!expectedState || !verifier) {
+    // The stash is one authorize round trip long by design, so "it is gone"
+    // covers both "this callback already ran" and "no login started here".
+    const already = await replayCompletedLogin(params.state);
+    if (already) return already;
+    throw new LoginError('no-login-in-progress', 'No login in progress');
+  }
+  if (params.state !== expectedState) throw new LoginError('state-mismatch', 'SSO state mismatch');
   sessionStorage.removeItem(STATE_KEY);
   sessionStorage.removeItem(VERIFIER_KEY);
   const requestedScopes = takeRequestedScopes();
 
   const tokens = await exchangeCode({ clientId, code: params.code, verifier });
-  return persistTokens(tokens, requestedScopes);
+  const character = await persistTokens(tokens, requestedScopes);
+  sessionStorage.setItem(
+    COMPLETED_KEY,
+    JSON.stringify({ state: params.state, characterId: character.characterId })
+  );
+  return character;
 }
 
 // Single-flight per character: EVE rotates refresh tokens, so two concurrent

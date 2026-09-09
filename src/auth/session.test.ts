@@ -6,6 +6,7 @@ import {
   completeLogin,
   getValidAccessToken,
   recordCharacterCorporation,
+  LoginError,
 } from './session';
 import { challengeFromVerifier } from './pkce';
 import { db, type TokenRecord } from '@/db';
@@ -153,6 +154,51 @@ describe('completeLogin', () => {
 
   it('rejects when no login is in progress', async () => {
     await expect(completeLogin({ code: 'good-code', state: 'x' }, cfg)).rejects.toThrow();
+  });
+
+  it('tags each failure with a reason the UI can tell apart (#649)', async () => {
+    await expect(completeLogin({ code: 'good-code', state: 'x' }, cfg)).rejects.toMatchObject({
+      reason: 'no-login-in-progress',
+    });
+    await startLogin(['esi-skills.read_skills.v1'], cfg);
+    await expect(
+      completeLogin({ code: 'good-code', state: 'evil-state' }, cfg)
+    ).rejects.toMatchObject({ reason: 'state-mismatch' });
+    expect(new LoginError('state-mismatch', 'x')).toBeInstanceOf(Error);
+  });
+
+  it('replays a completed login when the same callback arrives twice (#649)', async () => {
+    const url = new URL(await startLogin(['esi-skills.read_skills.v1'], cfg));
+    const state = url.searchParams.get('state')!;
+    const first = await completeLogin({ code: 'good-code', state }, cfg);
+
+    // Second landing on the same callback URL: the one-shot PKCE stash is
+    // already spent, so this is exactly the '#649' switch-user shape.
+    const second = await completeLogin({ code: 'good-code', state }, cfg);
+    expect(second).toEqual(first);
+    expect(tokenRequests).toHaveLength(1);
+  });
+
+  it('does not replay a callback whose state never completed here (#649)', async () => {
+    const url = new URL(await startLogin(['esi-skills.read_skills.v1'], cfg));
+    await completeLogin({ code: 'good-code', state: url.searchParams.get('state')! }, cfg);
+
+    await expect(
+      completeLogin({ code: 'good-code', state: 'some-other-state' }, cfg)
+    ).rejects.toMatchObject({ reason: 'no-login-in-progress' });
+    expect(tokenRequests).toHaveLength(1);
+  });
+
+  it('does not replay a completed login whose Character has since been removed (#649)', async () => {
+    const url = new URL(await startLogin(['esi-skills.read_skills.v1'], cfg));
+    const state = url.searchParams.get('state')!;
+    await completeLogin({ code: 'good-code', state }, cfg);
+    await db.characters.delete(CHAR_ID);
+
+    await expect(completeLogin({ code: 'good-code', state }, cfg)).rejects.toMatchObject({
+      reason: 'no-login-in-progress',
+    });
+    expect(tokenRequests).toHaveLength(1);
   });
 });
 
