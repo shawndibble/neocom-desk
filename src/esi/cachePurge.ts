@@ -4,9 +4,14 @@
  * Two events revoke consent for a character's scoped `esiCache` rows and must
  * take the cached copies with them: a scope removed from the granted set, and
  * a changed `ownerHash` — character sold or transferred, so the rows are a
- * different person's. Callers are `auth/session.ts` and `sync/planSync.ts`; a
- * future "remove character"/logout is the third, and there must stay exactly
- * one purge primitive.
+ * different person's. Callers are `auth/session.ts` and `sync/planSync.ts`.
+ * `features/character/removeCharacter.ts` is the third — a person choosing to
+ * drop a Character they still hold, rather than either of the above.
+ *
+ * `purgeSharedStructureCache` is a fourth, narrower primitive for a fourth
+ * event: the whole roster emptying out, not any one Character's consent
+ * changing. See its own docstring for why that needs a different trigger
+ * than the three above.
  *
  * Split from `cache.ts`, which owns the `esiCache` table
  * (docs/ARCHITECTURE.md §2), only so auth and sync can purge without
@@ -14,7 +19,11 @@
  */
 import Dexie from 'dexie';
 import { db } from '@/db';
-import { CORP_CACHE_KEY_PREFIX, GLOBAL_CACHE_CHARACTER_ID } from './cache';
+import {
+  CORP_CACHE_KEY_PREFIX,
+  GLOBAL_CACHE_CHARACTER_ID,
+  STRUCTURE_CACHE_KEY_PREFIX,
+} from './cache';
 
 /**
  * Delete every cached ESI row for one character. Returns the number deleted.
@@ -105,6 +114,47 @@ export async function purgeCorpScopedCache(characterId: number): Promise<number>
   // corporation's data on their first frame after a corp change — exactly what
   // `corpCacheKey` exists to make impossible.
   emitCachePurged(characterId);
+  return deleted;
+}
+
+/**
+ * Delete the roster-shared structure rows — the `GLOBAL_CACHE_CHARACTER_ID`
+ * name and refusal rows `features/character/structures.ts` writes once any
+ * Character resolves or exhausts a citadel (issue #669). Returns the number
+ * deleted.
+ *
+ * These are deliberately not treated as ordinary "public reference data" the
+ * way an NPC station or a universe type is, even though they share the same
+ * sentinel row — a structure's visibility is genuinely ACL-gated, and
+ * `structures.ts` shares a resolved name across Characters only because every
+ * one it tries belongs to *this* roster (its own header explains why that is
+ * not the leak-to-a-stranger the sentinel's row would otherwise be). That
+ * justification holds only as long as the roster it was true for still
+ * exists.
+ *
+ * So this is a fourth trigger, distinct from the three above: not a scope
+ * revoked, not an owner changed, not one Character removed by choice, but the
+ * roster reaching zero Characters. `removeCharacter.ts` calls this exactly
+ * then — never on every removal, which would erase names the *rest* of an
+ * intact roster still legitimately shares, and never on a scope revoke or
+ * owner change alone, which already purges that one Character's own rows and
+ * leaves everyone else's shared benefit untouched, same as before. Once the
+ * roster is empty, whoever adds a Character next has no relationship to the
+ * roster that resolved these names, and the browser must not hand them
+ * someone else's citadel names as if they were public.
+ */
+export async function purgeSharedStructureCache(): Promise<number> {
+  const upperBound = STRUCTURE_CACHE_KEY_PREFIX + String.fromCharCode(0xffff);
+  const deleted = await db.esiCache
+    .where('[characterId+key]')
+    .between(
+      [GLOBAL_CACHE_CHARACTER_ID, STRUCTURE_CACHE_KEY_PREFIX],
+      [GLOBAL_CACHE_CHARACTER_ID, upperBound],
+      true,
+      true
+    )
+    .delete();
+  emitCachePurged(GLOBAL_CACHE_CHARACTER_ID);
   return deleted;
 }
 

@@ -54,11 +54,12 @@ import {
   readCachedEntries,
   writeCached,
   GLOBAL_CACHE_CHARACTER_ID,
+  STRUCTURE_CACHE_KEY_PREFIX,
   STALE_AFTER,
 } from '@/esi/cache';
 
 function cacheKey(structureId: number): string {
-  return `structure:${structureId}`;
+  return `${STRUCTURE_CACHE_KEY_PREFIX}${structureId}`;
 }
 
 /**
@@ -76,7 +77,7 @@ function cacheKey(structureId: number): string {
  * for that long.
  */
 function forbiddenKey(structureId: number): string {
-  return `structure:${structureId}:forbidden`;
+  return `${cacheKey(structureId)}:forbidden`;
 }
 
 /**
@@ -87,7 +88,7 @@ function forbiddenKey(structureId: number): string {
  * shared row rather than under any one `characterId`.
  */
 function rosterForbiddenKey(structureId: number): string {
-  return `structure:${structureId}:roster-forbidden`;
+  return `${cacheKey(structureId)}:roster-forbidden`;
 }
 
 /**
@@ -103,6 +104,21 @@ function rosterForbiddenKey(structureId: number): string {
 const FORBIDDEN_MEMO_MS = STALE_AFTER.static;
 
 /**
+ * Shared by both the per-Character memo (`readMemo`) and the roster-wide one
+ * (`resolveViaRoster`) — one question, "is this refusal still within its
+ * window", asked the same way in both places rather than re-derived twice.
+ *
+ * A bare age comparison rather than `esi/cache.ts`'s `readFreshRow`, which is
+ * not exported and would pull the shared module into a fix local to this
+ * file. Nothing it adds applies here: a `true` row carries no `Expires`
+ * header to take the later of, and `isRefreshInvalidated` is a no-op above
+ * `STALE_AFTER.default`, which `FORBIDDEN_MEMO_MS` is.
+ */
+function isMemoFresh(fetchedAt: number): boolean {
+  return Date.now() - fetchedAt < FORBIDDEN_MEMO_MS;
+}
+
+/**
  * The stored name and the stored refusal, in one read.
  *
  * Both keys go through a single `readCachedEntries` — one purge check and one
@@ -110,12 +126,6 @@ const FORBIDDEN_MEMO_MS = STALE_AFTER.static;
  * own docstring states. It matters more here than in most places: the caller is
  * a fan-out over every distinct location on a page, which is the traffic this
  * memo exists to cut.
- *
- * The freshness test is a bare age comparison rather than `esi/cache.ts`'s
- * `readFreshRow`, which is not exported and would pull the shared module into a
- * fix local to this file. Nothing it adds applies here: a `true` row carries no
- * `Expires` header to take the later of, and `isRefreshInvalidated` is a no-op
- * above `STALE_AFTER.default`, which `FORBIDDEN_MEMO_MS` is.
  */
 async function readMemo(
   characterId: number,
@@ -129,7 +139,7 @@ async function readMemo(
   ]);
   const refusal = rows.get(refusalKey);
   return {
-    forbidden: refusal !== undefined && Date.now() - refusal.fetchedAt < FORBIDDEN_MEMO_MS,
+    forbidden: refusal !== undefined && isMemoFresh(refusal.fetchedAt),
     name: rows.get(nameKey)?.value as UniverseStructure | undefined,
   };
 }
@@ -214,7 +224,7 @@ async function resolveViaRoster(
     rosterForbiddenKey(structureId),
   ]);
   const refusal = memo.get(rosterForbiddenKey(structureId));
-  if (refusal !== undefined && Date.now() - refusal.fetchedAt < FORBIDDEN_MEMO_MS) return null;
+  if (refusal !== undefined && isMemoFresh(refusal.fetchedAt)) return null;
 
   const others = (await db.characters.toArray())
     .map((character) => character.characterId)
