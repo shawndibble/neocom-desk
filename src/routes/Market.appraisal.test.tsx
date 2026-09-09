@@ -144,7 +144,14 @@ describe('Market Appraisal tab navigation', () => {
             sellTotal: 30,
           },
         ],
-        totals: { buy: 20, sell: 30, spread: 10, unpricedRows: 0 },
+        totals: {
+          buy: 20,
+          sell: 30,
+          spread: 10,
+          unpricedRows: 0,
+          refine: 0,
+          refineUnpricedRows: 0,
+        },
       },
       unmatched: [],
     });

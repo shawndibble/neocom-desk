@@ -44,7 +44,14 @@ const APPRAISAL: Appraisal = {
       sellTotal: 4_000,
     },
   ],
-  totals: { buy: 1_345_950, sell: 1_386_400, spread: 40_450, unpricedRows: 1 },
+  totals: {
+    buy: 1_345_950,
+    sell: 1_386_400,
+    spread: 40_450,
+    unpricedRows: 1,
+    refine: 0,
+    refineUnpricedRows: 0,
+  },
 };
 
 function outcome(overrides: Partial<AppraisalOutcome> = {}): AppraisalOutcome {
@@ -109,6 +116,86 @@ describe('AppraisalPanel', () => {
     expect(screen.getByText(/1 item has no orders on one side at this hub/)).toBeInTheDocument();
   });
 
+  describe('refine-then-sell (issue #672)', () => {
+    function refineOutcome(overrides: Partial<AppraisalOutcome> = {}): AppraisalOutcome {
+      return {
+        appraisal: {
+          rows: [
+            {
+              typeId: 1230,
+              name: 'Veldspar',
+              quantity: 1000,
+              buyEach: 5,
+              sellEach: 6,
+              buyTotal: 5_000,
+              sellTotal: 6_000,
+              refineTotal: 8_000,
+              refinePricedAll: true,
+              refineUnitsLeftOver: 0,
+            },
+            {
+              typeId: 2048,
+              name: 'Damage Control II',
+              quantity: 3,
+              buyEach: 448_650,
+              sellEach: 460_800,
+              buyTotal: 1_345_950,
+              sellTotal: 1_382_400,
+            },
+          ],
+          totals: {
+            buy: 1_350_950,
+            sell: 1_388_400,
+            spread: 37_450,
+            unpricedRows: 0,
+            refine: 8_000,
+            refineUnpricedRows: 0,
+          },
+        },
+        unmatched: [],
+        ...overrides,
+      };
+    }
+
+    it('adds a refine column and total when a row carries refine data', () => {
+      renderPanel({ controller: controller({ result: refineOutcome() }) });
+      const veldsparRow = screen.getByRole('row', { name: /Veldspar/ });
+      expect(within(veldsparRow).getByText('8,000')).toBeInTheDocument();
+      expect(screen.getAllByText('Refine total').length).toBeGreaterThan(0);
+    });
+
+    it('flags the refine value with a dash on a row with no reprocessing data', () => {
+      renderPanel({ controller: controller({ result: refineOutcome() }) });
+      const dcuRow = screen.getByRole('row', { name: /Damage Control II/ });
+      expect(within(dcuRow).getByText('—')).toBeInTheDocument();
+    });
+
+    it('marks a partially priced refine value', () => {
+      const partial = refineOutcome();
+      partial.appraisal.rows[0].refinePricedAll = false;
+      renderPanel({ controller: controller({ result: partial }) });
+      const veldsparRow = screen.getByRole('row', { name: /Veldspar/ });
+      expect(within(veldsparRow).getByTitle(/no price at this hub/)).toBeInTheDocument();
+    });
+
+    it('omits the refine column entirely with no active Character', () => {
+      renderPanel({ controller: controller({ result: outcome() }) });
+      expect(screen.queryAllByText('Refine total')).toHaveLength(0);
+    });
+
+    /**
+     * Regression: the buy-total highlight must never fire on a row with
+     * nothing to compare against — a row with no refine value is not a
+     * winner just because `refineBeatsSellAsIs` defaults to false for it.
+     */
+    it('does not bold the buy total on a row with no refine comparison', () => {
+      renderPanel({ controller: controller({ result: refineOutcome() }) });
+      const dcuRow = screen.getByRole('row', { name: /Damage Control II/ });
+      const buyCell = within(dcuRow).getByText('1,345,950');
+      expect(buyCell.className).not.toContain('text-accent');
+    });
+  });
+
   it('reports unmatched lines beside the paste box, by line number', () => {
     renderPanel({
       controller: controller({
@@ -165,7 +252,17 @@ describe('AppraisalPanel', () => {
     renderPanel({
       controller: controller({
         result: outcome({
-          appraisal: { rows: [], totals: { buy: 0, sell: 0, spread: 0, unpricedRows: 0 } },
+          appraisal: {
+            rows: [],
+            totals: {
+              buy: 0,
+              sell: 0,
+              spread: 0,
+              unpricedRows: 0,
+              refine: 0,
+              refineUnpricedRows: 0,
+            },
+          },
           unmatched: [{ name: 'Nope', lines: [1] }],
         }),
       }),

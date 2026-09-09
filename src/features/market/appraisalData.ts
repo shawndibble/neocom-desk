@@ -12,17 +12,38 @@
  * aggregates are per-**station**, which is why an appraisal is quoted at a
  * Trade Hub rather than under the Browser's full Location Mode — a Region
  * appraisal would be one paginated ESI order-book call per pasted item.
+ *
+ * Refine-then-sell (issue #672) is threaded in here, not the engine: only
+ * this layer may reach Dexie (`loadCorrectedSkills`) or the SDE
+ * (`loadReprocessing`, 1.4 MB). `characterId` is null with no active
+ * Character, in which case neither is fetched at all, and every row's
+ * `refine` stays undefined — the page behaves exactly as it did before this
+ * issue. The one skill this app has no mapping for — ore/ice's own
+ * specialisation skills (Veldspar Processing and friends), as opposed to
+ * Scrapmetal Processing which the existing `orderExits.ts` comparison uses
+ * for modules and ships — is deliberately passed as level 0 rather than
+ * guessed, the same "state the assumption, don't fold in a guess" rule
+ * `reprocessing.ts` already applies to the NPC station rate.
  */
-import { buildAppraisal, type Appraisal, type AppraisalItem } from '@/engine/market/appraisal';
+import {
+  buildAppraisal,
+  computeAppraisalRefine,
+  type Appraisal,
+  type AppraisalItem,
+} from '@/engine/market/appraisal';
 import {
   matchAppraisalEntries,
   type AppraisalCatalogue,
   type AppraisalUnmatched,
 } from '@/engine/market/appraisalMatch';
 import { parseAppraisalPaste } from '@/engine/market/appraisalPaste';
+import { SKILL_IDS } from '@/engine/industry/types';
+import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
 import type { TradeHub } from '@/market/hubs';
 import { getHubPrices, invalidateHubPrices } from '@/market/prices';
 import { loadMarketTypes } from '@/sde/loadMarketSde';
+import { loadReprocessing } from '@/sde/loadSde';
+import type { ReprocessingType } from '@/sde/types';
 
 export interface AppraisalOutcome {
   appraisal: Appraisal;
@@ -72,32 +93,93 @@ export interface AppraiseOptions {
 }
 
 /**
+ * The active Character's reprocessing skills, resolved to `computeAppraisalRefine`'s
+ * input shape. `specialisationLevel` is always 0 — see the module doc comment.
+ */
+async function loadReprocessingSkills(characterId: number) {
+  const corrected = await loadCorrectedSkills(characterId, Date.now());
+  return {
+    reprocessingLevel: corrected.trained.get(SKILL_IDS.reprocessing)?.level ?? 0,
+    reprocessingEfficiencyLevel:
+      corrected.trained.get(SKILL_IDS.reprocessingEfficiency)?.level ?? 0,
+    specialisationLevel: 0,
+  };
+}
+
+/**
  * Parse, resolve and price a paste at `hub`. Throws only if the catalogue
  * itself cannot be loaded — an unreachable price source degrades to null
  * prices per type, which the table renders as a dash rather than as free.
+ *
+ * `characterId` is null with no active Character — the refine comparison is
+ * then never computed, and `reprocessing.json` is never fetched.
  */
 export async function appraisePaste(
   text: string,
   hub: TradeHub,
   pricePercent: number,
+  characterId: number | null = null,
   { force = false }: AppraiseOptions = {}
 ): Promise<AppraisalOutcome> {
   const entries = parseAppraisalPaste(text);
   const catalogue = await loadAppraisalCatalogue();
   const { matched, unmatched } = matchAppraisalEntries(entries, catalogue);
 
+  const [reprocessingMap, skills] =
+    characterId === null
+      ? [null, null]
+      : await Promise.all([loadReprocessing(), loadReprocessingSkills(characterId)]);
+
+  const reprocessingByTypeId = new Map<number, ReprocessingType>();
+  if (reprocessingMap) {
+    for (const match of matched) {
+      const entry = reprocessingMap[String(match.typeId)];
+      if (entry) reprocessingByTypeId.set(match.typeId, entry);
+    }
+  }
+
+  const materialTypeIds = [
+    ...new Set(
+      [...reprocessingByTypeId.values()].flatMap((entry) => entry.materials.map((m) => m.typeID))
+    ),
+  ];
   const typeIds = matched.map((match) => match.typeId);
-  if (force) invalidateHubPrices(hub.stationId, typeIds);
-  const prices = await getHubPrices(hub, typeIds);
+  const allTypeIds = [...new Set([...typeIds, ...materialTypeIds])];
+  if (force) invalidateHubPrices(hub.stationId, allTypeIds);
+  const prices = await getHubPrices(hub, allTypeIds);
 
   const items: AppraisalItem[] = matched.map((match) => {
     const aggregate = prices.get(match.typeId);
+    const reprocessing = reprocessingByTypeId.get(match.typeId);
+    const refine =
+      reprocessing && skills
+        ? computeAppraisalRefine({
+            quantity: match.quantity,
+            reprocessing: {
+              portionSize: reprocessing.portionSize,
+              materials: reprocessing.materials.map((m) => ({
+                typeId: m.typeID,
+                quantity: m.quantity,
+              })),
+            },
+            skills,
+            materialPrices: Object.fromEntries(
+              reprocessing.materials
+                .map((m): [number, number | undefined] => [
+                  m.typeID,
+                  prices.get(m.typeID)?.buyMax ?? undefined,
+                ])
+                .filter((entry): entry is [number, number] => entry[1] !== undefined)
+            ),
+          })
+        : undefined;
     return {
       typeId: match.typeId,
       name: match.name,
       quantity: match.quantity,
       buy: aggregate?.buyMax ?? null,
       sell: aggregate?.sellMin ?? null,
+      ...(refine ? { refine } : {}),
     };
   });
 
