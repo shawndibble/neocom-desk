@@ -58,8 +58,9 @@ export interface EftFit {
 // bare "[Ship]" for an unnamed fit, and losing the hull over a missing
 // nickname costs the pilot the one name they always care about (issue #630).
 // The ship group excludes commas so "[Rifter, Kite, cheap]" still splits at
-// the first one, and excludes a leading space so "[ , Max Hacker]" stays a
-// header error instead of a hull named " ". The fit group stays permissive
+// the first one, and excludes a leading space so "[ , Max Hacker]" is a
+// header error rather than the whitespace hull the old regex read it as. The
+// fit group stays permissive
 // (`.*?`) so a bracketed fit name like "[Rifter, [PVP]]" survives.
 const HEADER = /^\[\s*([^\s,\]][^,\]]*?)\s*(?:,\s*(.*?)\s*)?\]$/;
 const EMPTY_SLOT = /^\[Empty\s+.+\s+slot\]$/i;
@@ -89,7 +90,7 @@ export function parseEftFit(text: string): EftFit {
     errors.push({
       line: headerIndex === -1 ? 1 : headerIndex + 1,
       text: headerLine,
-      reason: 'invalid or missing fit header, expected "[Ship Name, Fit Name]"',
+      reason: 'invalid or missing fit header, expected "[Ship Name]" or "[Ship Name, Fit Name]"',
     });
   }
 

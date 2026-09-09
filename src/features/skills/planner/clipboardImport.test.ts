@@ -201,7 +201,7 @@ describe('previewClipboardImport: EFT fit', () => {
       {
         line: 1,
         text: '[, Max Hacker]',
-        reason: 'invalid or missing fit header, expected "[Ship Name, Fit Name]"',
+        reason: 'invalid or missing fit header, expected "[Ship Name]" or "[Ship Name, Fit Name]"',
       },
     ]);
   });

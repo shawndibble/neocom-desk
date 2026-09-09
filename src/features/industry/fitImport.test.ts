@@ -2,7 +2,12 @@ import { describe, expect, it } from 'vitest';
 import type { FitToBuildPlansResult } from '@/engine/import/fitToBuildPlans';
 import { DEFAULT_FACILITY_DEFAULTS } from './facilityDefaults';
 import type { BlueprintCatalog, BlueprintCatalogEntry } from './blueprintCatalog';
-import { fitBlueprintLookup, fitImportPlans, previewFitImport } from './fitImport';
+import {
+  fitBlueprintLookup,
+  fitImportGroupName,
+  fitImportPlans,
+  previewFitImport,
+} from './fitImport';
 
 const BUZZARD_BP = 11194;
 const BUZZARD = 11192;
@@ -155,5 +160,41 @@ describe('fitImportPlans', () => {
       }
     );
     expect(plans.map((p) => p.name)).toEqual(['Scourge Fury Heavy Missile']);
+  });
+});
+
+describe('fitImportGroupName', () => {
+  const labels = {
+    withHull: (fit: string, ship: string) => `${fit} — ${ship}`,
+    untitled: 'New group',
+  };
+  const base = { hull: null, items: [], skipped: [], excludedCharges: [], headerFailed: false };
+  const hull = {
+    blueprintTypeID: 1,
+    productTypeID: 2,
+    productName: 'Buzzard',
+    quantity: 1,
+    runs: 1,
+    spare: 0,
+  };
+
+  it('names the group after both header names when it has both', () => {
+    const preview: FitToBuildPlansResult = { ...base, hull, groupName: 'Max Hacker' };
+    expect(fitImportGroupName(preview, labels)).toBe('Max Hacker — Buzzard');
+  });
+
+  it('falls back to the hull alone after a bare [Ship] header', () => {
+    const preview: FitToBuildPlansResult = { ...base, hull, groupName: null };
+    expect(fitImportGroupName(preview, labels)).toBe('Buzzard');
+  });
+
+  it('falls back to the fit name alone when the hull has no blueprint', () => {
+    const preview: FitToBuildPlansResult = { ...base, groupName: 'Max Hacker' };
+    expect(fitImportGroupName(preview, labels)).toBe('Max Hacker');
+  });
+
+  it('falls back to the generic name when the header could not be read', () => {
+    const preview: FitToBuildPlansResult = { ...base, groupName: null, headerFailed: true };
+    expect(fitImportGroupName(preview, labels)).toBe('New group');
   });
 });

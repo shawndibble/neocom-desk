@@ -124,7 +124,7 @@ describe('parseEftFit', () => {
       {
         line: 1,
         text: '',
-        reason: 'invalid or missing fit header, expected "[Ship Name, Fit Name]"',
+        reason: 'invalid or missing fit header, expected "[Ship Name]" or "[Ship Name, Fit Name]"',
       },
     ]);
   });
@@ -138,7 +138,7 @@ describe('parseEftFit', () => {
       {
         line: 1,
         text: 'not a fit',
-        reason: 'invalid or missing fit header, expected "[Ship Name, Fit Name]"',
+        reason: 'invalid or missing fit header, expected "[Ship Name]" or "[Ship Name, Fit Name]"',
       },
     ]);
   });
