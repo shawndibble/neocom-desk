@@ -207,12 +207,4 @@ describe('BpcContractModal — Build Plan context menu', () => {
     const item = await screen.findByRole('menuitem', { name: 'No blueprint options' });
     expect(item).toHaveAttribute('data-disabled');
   });
-
-  it('explains the right-click on the contents heading', async () => {
-    renderModal();
-
-    expect(
-      await screen.findByRole('button', { name: 'About Everything on this contract' })
-    ).toBeInTheDocument();
-  });
 });

@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
-  ContextMenuHint,
   DataAgeBadge,
   DataTable,
   EmptyState,
@@ -507,15 +506,12 @@ export function BpcSourcingPanel() {
         )
       }
       actions={
-        <>
-          <IconButton
-            icon={<Icon.Refresh />}
-            label={t('bpcContracts.refresh')}
-            onClick={refresh}
-            disabled={loading}
-          />
-          <ContextMenuHint label={t('bpcContracts.title')} />
-        </>
+        <IconButton
+          icon={<Icon.Refresh />}
+          label={t('bpcContracts.refresh')}
+          onClick={refresh}
+          disabled={loading}
+        />
       }
     >
       {loading && !data ? (

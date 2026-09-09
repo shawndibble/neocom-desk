@@ -4,7 +4,6 @@ import { useHighlightParam } from '@/lib/useHighlightParam';
 import { useLiveQuery } from 'dexie-react-hooks';
 import {
   Caret,
-  ContextMenuHint,
   DataAgeBadge,
   DataTable,
   EmptyState,
@@ -605,7 +604,6 @@ export function ActiveJobsPanel({
               onClick={() => setExpanded((open) => !open)}
             />
           )}
-          <ContextMenuHint label={t('industry.jobsTitle')} />
         </span>
       }
       // Nothing renders below with the list folded and no per-character note

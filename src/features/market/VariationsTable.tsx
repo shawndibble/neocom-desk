@@ -9,7 +9,7 @@ import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/Button';
 import { DataTable, type DataTableColumn } from '@/components/ui/DataTable';
-import { ContextMenuHint, IconButton } from '@/components/ui';
+import { IconButton } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { downloadCsv } from '@/lib/downloadCsv';
 import { formatIsk } from '@/lib/isk';
@@ -150,7 +150,6 @@ export function VariationsTable({
           <Button size="sm" onClick={onCompare}>
             {t('market.variations.compare')}
           </Button>
-          <ContextMenuHint label={t('market.variations.title')} />
         </span>
       </div>
       {truncated && (

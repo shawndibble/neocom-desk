@@ -2,7 +2,6 @@ import { useMemo, useState, type ReactElement } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
-  ContextMenuHint,
   DataAgeBadge,
   DataTable,
   EmptyState,
@@ -232,15 +231,12 @@ export function Contacts() {
         title={t('contacts.title')}
         meta={contactsResult && <DataAgeBadge date={contactsResult.fetchedAt} />}
         actions={
-          <>
-            <IconButton
-              icon={<Icon.Refresh />}
-              label={t('contacts.refresh')}
-              onClick={refresh}
-              disabled={loading}
-            />
-            <ContextMenuHint label={t('contacts.title')} />
-          </>
+          <IconButton
+            icon={<Icon.Refresh />}
+            label={t('contacts.refresh')}
+            onClick={refresh}
+            disabled={loading}
+          />
         }
       />
 

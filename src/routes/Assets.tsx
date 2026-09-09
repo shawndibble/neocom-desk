@@ -5,7 +5,6 @@ import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import {
   Button,
-  ContextMenuHint,
   DataAgeBadge,
   EmptyState,
   IconButton,
@@ -1448,7 +1447,6 @@ export function Assets() {
                 disabled={loading}
                 onClick={refresh}
               />
-              <ContextMenuHint label={t('assets.title')} />
             </div>
           </>
         }
