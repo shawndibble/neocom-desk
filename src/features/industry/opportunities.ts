@@ -23,7 +23,15 @@ import {
   type DetectedOwnedStockMap,
 } from '@/engine/industry/ownedStock';
 import type { OwnedStockSource } from '@/engine/industry/ownedStock';
-import type { BuildResult, MaterialSourcingMap, SkillLevels } from '@/engine/industry/types';
+import {
+  FACILITY_PRESETS,
+  resolveRigFit,
+  type BuildResult,
+  type MaterialSourcingMap,
+  type SkillLevels,
+} from '@/engine/industry/types';
+import { autoBuildHere } from '@/engine/industry/autoMakeOrBuy';
+import type { MaterialRecipe } from '@/engine/industry/makeOrBuy';
 import {
   rankOpportunities,
   type OrderDepthLevel,
@@ -108,7 +116,9 @@ function ownedMaterialSourcing(
 export function planForOpportunityCandidate(
   candidate: OpportunityCandidate,
   facilityDefaults: FacilityDefaults,
-  materialSourcing: MaterialSourcingMap
+  materialSourcing: MaterialSourcingMap,
+  /** Auto-picked build-vs-buy materials (issue #652) carried onto the seeded plan verbatim. */
+  buildHere?: readonly number[]
 ) {
   const { blueprint } = candidate;
   // A BPC prices at its own remaining runs; a BPO (runs === -1, unlimited)
@@ -126,6 +136,7 @@ export function planForOpportunityCandidate(
       facilityDefaults,
       {
         runs,
+        ...(buildHere !== undefined && buildHere.length > 0 ? { buildHere: [...buildHere] } : {}),
       }
     ),
     materialSourcing,
@@ -139,10 +150,19 @@ export interface UnrankedOpportunityRow {
   sellDepthIsk: number | null;
   /** The owned-materials claim this row was priced with — reused verbatim by `planForOpportunityCandidate` so a seeded plan's cost matches what justified picking it. */
   materialSourcing: MaterialSourcingMap;
+  /** Materials the auto make-or-buy depth pass (issue #652) chose to build; empty at depth 0. Reused verbatim by `planForOpportunityCandidate` for the same reason as `materialSourcing`. */
+  buildHere: number[];
 }
 
 export interface OpportunityRow extends UnrankedOpportunityRow {
   orderDepth: OrderDepthLevel;
+}
+
+/** What produces a material, for the auto make-or-buy depth pass and for costing whatever it picks. */
+export interface OpportunityAutoBuildOptions {
+  recipeFor: (typeID: number) => MaterialRecipe | null;
+  /** 0-3; 0 reproduces issue #642's plain behavior (nothing auto-built). */
+  depth: number;
 }
 
 /** Prices one candidate against an already-fetched snapshot. Null only when the plan cannot be built at all (an engine-level throw `computeBuildPlan` already guards). */
@@ -151,19 +171,45 @@ export function computeOpportunityRow(
   snapshot: MarketSnapshot,
   facilityDefaults: FacilityDefaults,
   skills: SkillLevels,
-  stock: DetectedOwnedStockMap
+  stock: DetectedOwnedStockMap,
+  autoBuild: OpportunityAutoBuildOptions
 ): UnrankedOpportunityRow | null {
   const blueprint = toIndustryBlueprint(candidate.catalogEntry.blueprint);
   const materialSourcing = ownedMaterialSourcing(candidate.catalogEntry.blueprint.materials, stock);
-  const plan = planForOpportunityCandidate(candidate, facilityDefaults, materialSourcing);
+  const basePlan = planForOpportunityCandidate(candidate, facilityDefaults, materialSourcing);
+
+  const systemCostIndex = snapshot.systemCostIndex ?? 0;
+  const adjustedPrices = snapshot.adjustedPrices ?? {};
+  const buildHere = [
+    ...autoBuildHere(blueprint, basePlan.me, {
+      recipeFor: autoBuild.recipeFor,
+      depth: autoBuild.depth,
+      // The plan's real run count, not 1 — per-job rounding means a verdict
+      // decided at the wrong scale can disagree with what `computeBuildPlan`
+      // actually bills once this set becomes the plan's `buildHere`.
+      runs: basePlan.runs,
+      ctx: {
+        facility: FACILITY_PRESETS[basePlan.facility],
+        rigFit: resolveRigFit(basePlan),
+        security: basePlan.security,
+        facilityTaxPct: basePlan.facilityTaxPct,
+        systemCostIndex,
+        adjustedPrices,
+        materialPrices: snapshot.hubPrices,
+        skills,
+      },
+    }),
+  ];
+  const plan = buildHere.length > 0 ? { ...basePlan, buildHere } : basePlan;
 
   const { result } = computeBuildPlan({
     plan,
     blueprint,
-    systemCostIndex: snapshot.systemCostIndex ?? 0,
-    adjustedPrices: snapshot.adjustedPrices ?? {},
+    systemCostIndex,
+    adjustedPrices,
     hubPrices: snapshot.hubPrices,
     skills,
+    recipeFor: autoBuild.recipeFor,
   });
   if (!result) return null;
 
@@ -173,7 +219,7 @@ export function computeOpportunityRow(
   const sellDepthIsk =
     sellPrice !== undefined && sellVolume !== undefined ? sellPrice * sellVolume : null;
 
-  return { candidate, result, sellDepthIsk, materialSourcing };
+  return { candidate, result, sellDepthIsk, materialSourcing, buildHere };
 }
 
 /** Sorts and classifies through the tested engine module, then re-attaches each row's own candidate/result. */
@@ -214,16 +260,21 @@ export function detectOpportunityStock(
 
 /**
  * A batch's identity for the "don't auto-recalculate above 10 blueprints"
- * cache (issue #642): which owned-blueprint entities, at which hub. Content-
- * keyed rather than array-identity-keyed so a re-render with a fresh
- * `candidates` array reference (the panel recomputes it from Dexie/ESI data
- * on every render) does not read as "a different batch."
+ * cache (issue #642): which owned-blueprint entities, at which hub, at which
+ * auto make-or-buy depth (issue #652) — a depth change picks different
+ * materials to build, so it must read as a different batch the same way a
+ * hub change does, or a cached batch above the threshold would keep serving
+ * rows priced at the depth it was first computed with. Content-keyed rather
+ * than array-identity-keyed so a re-render with a fresh `candidates` array
+ * reference (the panel recomputes it from Dexie/ESI data on every render)
+ * does not read as "a different batch."
  */
 export function opportunitiesCacheKey(
   candidates: readonly OpportunityCandidate[],
-  hub: TradeHub
+  hub: TradeHub,
+  autoBuildDepth: number
 ): string {
-  return `${hub.id}:${candidates
+  return `${hub.id}:${autoBuildDepth}:${candidates
     .map((c) => c.id)
     .sort()
     .join(',')}`;

@@ -25,9 +25,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { SkillLevels } from '@/engine/industry/types';
 import type { PiData } from '@/sde/types';
 import type { TradeHub } from '@/market/hubs';
+import type { CharacterBlueprint } from '@/esi/endpoints';
 import type { FacilityDefaults } from './facilityDefaults';
 import type { BlueprintCatalog } from './blueprintCatalog';
 import { loadMarketSnapshots } from './marketData';
+import { recipeForLookup } from './recipes';
 import type { OwnedStockSnapshot } from './ownedStockDetection';
 import {
   autoRecalculates,
@@ -53,6 +55,12 @@ export interface UseOpportunitiesArgs {
   facilityDefaults: FacilityDefaults;
   skills: SkillLevels;
   ownedStockSnapshot: OwnedStockSnapshot;
+  /** Every owned blueprint by character (issue #652), so a sub-build the auto pass picks quotes at a researched copy's real ME where the pilot owns one. */
+  ownedByCharacter: ReadonlyMap<number, readonly CharacterBlueprint[]>;
+  /** 0-3; 0 reproduces issue #642's plain behavior (nothing auto-built). */
+  autoBuildDepth: number;
+  /** ME to quote an auto-picked sub-build at when the pilot owns no copy of its blueprint — same preference `BuildPlanDetail.tsx` uses. */
+  assumedMe: number;
 }
 
 export interface UseOpportunitiesResult {
@@ -84,6 +92,9 @@ export function useOpportunities({
   facilityDefaults,
   skills,
   ownedStockSnapshot,
+  ownedByCharacter,
+  autoBuildDepth,
+  assumedMe,
 }: UseOpportunitiesArgs): UseOpportunitiesResult {
   const [state, setState] = useState<OpportunitiesState>(EMPTY_STATE);
   const [refreshToken, setRefreshToken] = useState(0);
@@ -94,7 +105,10 @@ export function useOpportunities({
   });
 
   const manualRefreshOnly = !autoRecalculates(candidates.length);
-  const key = useMemo(() => opportunitiesCacheKey(candidates, hub), [candidates, hub]);
+  const key = useMemo(
+    () => opportunitiesCacheKey(candidates, hub, autoBuildDepth),
+    [candidates, hub, autoBuildDepth]
+  );
 
   useEffect(() => {
     const currentCandidates = candidatesRef.current;
@@ -136,7 +150,16 @@ export function useOpportunities({
       for (let i = 0; i < currentCandidates.length; i += CHUNK_SIZE) {
         if (cancelled) return;
         for (const candidate of currentCandidates.slice(i, i + CHUNK_SIZE)) {
-          const row = computeOpportunityRow(candidate, snapshot, facilityDefaults, skills, stock);
+          const recipeFor = recipeForLookup({
+            catalog,
+            pi,
+            ownedBlueprints: ownedByCharacter.get(candidate.characterId) ?? [],
+            assumedMeForUnowned: assumedMe,
+          });
+          const row = computeOpportunityRow(candidate, snapshot, facilityDefaults, skills, stock, {
+            recipeFor,
+            depth: autoBuildDepth,
+          });
           if (row) unranked.push(row);
         }
         const done = Math.min(i + CHUNK_SIZE, currentCandidates.length);
@@ -170,6 +193,9 @@ export function useOpportunities({
     facilityDefaults,
     skills,
     ownedStockSnapshot,
+    ownedByCharacter,
+    autoBuildDepth,
+    assumedMe,
     refreshToken,
     manualRefreshOnly,
   ]);

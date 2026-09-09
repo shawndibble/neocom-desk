@@ -23,6 +23,11 @@ import {
   InfoTooltip,
   Modal,
   Panel,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
   Spinner,
   StatChip,
   type DataTableColumn,
@@ -50,6 +55,11 @@ import { formatPercent } from './format';
 import type { OwnedStockSnapshot } from './ownedStockDetection';
 import { buildOpportunityCandidates, type OpportunityRow } from './opportunities';
 import { useOpportunities } from './useOpportunities';
+import { useAssumedMe } from './assumedMe';
+import { MAX_AUTO_BUILD_DEPTH } from '@/engine/industry/autoMakeOrBuy';
+
+const AUTO_BUILD_DEPTH_OPTIONS = Array.from({ length: MAX_AUTO_BUILD_DEPTH + 1 }, (_, i) => i);
+const DEFAULT_AUTO_BUILD_DEPTH = 1;
 
 interface OpportunitiesPanelProps {
   catalog: BlueprintCatalog;
@@ -159,6 +169,16 @@ export function OpportunitiesPanel({
     [ownedByCharacter, characterNames, catalog]
   );
 
+  const [autoBuildDepth, setAutoBuildDepth] = useState(DEFAULT_AUTO_BUILD_DEPTH);
+  // Same setting BuildPlanDetail.tsx uses for an owned-blueprint's unowned
+  // sub-builds — an auto-picked build quotes at the pilot's own assumption,
+  // not a hard 0, the same way a hand-ticked one would.
+  const assumedMe = useAssumedMe((state) => state.value);
+  const hydrateAssumedMe = useAssumedMe((state) => state.hydrate);
+  useEffect(() => {
+    void hydrateAssumedMe();
+  }, [hydrateAssumedMe]);
+
   const { rows, loading, progress, manualRefreshOnly, refresh } = useOpportunities({
     candidates,
     catalog,
@@ -167,6 +187,9 @@ export function OpportunitiesPanel({
     facilityDefaults,
     skills,
     ownedStockSnapshot,
+    ownedByCharacter,
+    autoBuildDepth,
+    assumedMe,
   });
 
   const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(new Set());
@@ -281,7 +304,19 @@ export function OpportunitiesPanel({
       align: 'right',
       className: 'tabular-nums',
       sortValue: (row) => row.result.marginPct ?? undefined,
-      render: (row) => numericCell(row.result.marginPct, formatPercent, unknown),
+      render: (row) => (
+        <span className="flex items-center justify-end gap-1">
+          {numericCell(row.result.marginPct, formatPercent, unknown)}
+          {row.buildHere.length > 0 && (
+            <InfoTooltip
+              label={t('industry.opportunitiesAutoBuildBadgeFor', {
+                name: row.candidate.catalogEntry.productName,
+              })}
+              content={t('industry.opportunitiesAutoBuildBadge')}
+            />
+          )}
+        </span>
+      ),
     },
     {
       id: 'duration',
@@ -327,20 +362,39 @@ export function OpportunitiesPanel({
     },
   ];
 
-  const meta =
-    showCharacterFilter || oldestFetchedAt ? (
-      <span className="flex flex-wrap items-center gap-2">
-        {showCharacterFilter && (
-          <CharacterFilterControl
-            characters={characterCandidates}
-            activeCharacterId={activeCharacterId}
-            value={characterFilter}
-            onChange={setCharacterFilter}
-          />
-        )}
-        {oldestFetchedAt && <DataAgeBadge date={oldestFetchedAt} />}
+  const meta = (
+    <span className="flex flex-wrap items-center gap-2">
+      {showCharacterFilter && (
+        <CharacterFilterControl
+          characters={characterCandidates}
+          activeCharacterId={activeCharacterId}
+          value={characterFilter}
+          onChange={setCharacterFilter}
+        />
+      )}
+      <span className="flex items-center gap-1.5 text-xs text-text-dim">
+        <span className="whitespace-nowrap">{t('industry.opportunitiesAutoBuildDepthLabel')}</span>
+        <Select
+          value={String(autoBuildDepth)}
+          onValueChange={(value) => setAutoBuildDepth(Number(value))}
+        >
+          <SelectTrigger size="sm" aria-label={t('industry.opportunitiesAutoBuildDepthLabel')}>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {AUTO_BUILD_DEPTH_OPTIONS.map((depth) => (
+              <SelectItem key={depth} value={String(depth)}>
+                {depth === 0
+                  ? t('industry.opportunitiesAutoBuildDepthOff')
+                  : t('industry.opportunitiesAutoBuildDepthLevels', { count: depth })}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </span>
-    ) : undefined;
+      {oldestFetchedAt && <DataAgeBadge date={oldestFetchedAt} />}
+    </span>
+  );
 
   const showProgress = loading && progress.total > 0;
 
