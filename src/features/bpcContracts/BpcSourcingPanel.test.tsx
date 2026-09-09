@@ -330,3 +330,41 @@ describe('BpcSourcingPanel search matching', () => {
     expect(within(table).getByText('Rifter Blueprint')).toBeInTheDocument();
   });
 });
+
+describe('BpcSourcingPanel row identity', () => {
+  /**
+   * A contract routinely lists the same blueprint on several item lines — one
+   * per copy — so `contractId:typeId` is not unique. Measured against a live
+   * EVE Ref pull, 70% of rows shared a key with another row and one key
+   * repeated 528 times. React cannot reconcile a changing list under
+   * duplicate keys, which left rows from the previous render in the table:
+   * picking a blueprint showed its offers *alongside* unrelated ones, while
+   * the summary above (computed from data, not the DOM) read correctly.
+   *
+   * Every other fixture here gives each row its own contractId, which is why
+   * nothing caught this.
+   */
+  it('drops the previous blueprint rows when a contract repeats one type', async () => {
+    loadPublicBpcContracts.mockResolvedValue(
+      cachedSnapshot([
+        // One contract, the same blueprint four times — four identical keys.
+        row({ contractId: 1, typeId: 638, price: 1_000_000 }),
+        row({ contractId: 1, typeId: 638, price: 1_000_000 }),
+        row({ contractId: 1, typeId: 638, price: 1_000_000 }),
+        row({ contractId: 1, typeId: 638, price: 1_000_000 }),
+        row({ contractId: 2, typeId: 870, price: 9_000_000 }),
+      ])
+    );
+    const user = userEvent.setup();
+    render(<App />);
+
+    const table = await screen.findByRole('table', { name: 'BPC Search' });
+    expect(within(table).getAllByText('Rifter Blueprint')).toHaveLength(4);
+
+    await user.type(screen.getByPlaceholderText(/search/i), 'Caracal');
+    const narrowed = await screen.findByRole('table', { name: 'BPC Search' });
+
+    expect(within(narrowed).getByText('Caracal Blueprint')).toBeInTheDocument();
+    expect(within(narrowed).queryByText('Rifter Blueprint')).not.toBeInTheDocument();
+  });
+});
