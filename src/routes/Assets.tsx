@@ -289,6 +289,12 @@ async function loadAssetsSnapshot(
       ];
   const [resolvedStations, resolvedStructures, resolvedSystems, resolvedOrphanParents] =
     await Promise.all([
+      // Uncapped on purpose: `location_type: 'station'` means every one of
+      // these is an NPC station, and those resolve out of the SDE snapshot
+      // with no request at all (issue #655), so capping would slow a map
+      // lookup down rather than spare ESI anything. It reverts to a request
+      // per id only when the snapshot cannot be read — rare, and the fallback
+      // is what keeps names working when the file cannot be fetched.
       Promise.all(stationIds.map((id) => loadStationName(id))),
       Promise.all(structureIds.map((id) => loadStructureName(characterId, id))),
       Promise.all(systemIds.map((id) => loadSystemName(id))),
@@ -350,6 +356,7 @@ async function loadCrossCharacterNames(
   const stationIds = [
     ...new Set(allAssets.filter((a) => a.location_type === 'station').map((a) => a.location_id)),
   ];
+  // A snapshot lookup per id, not a request per id — see `loadAssetsSnapshot`.
   const resolvedStations = await Promise.all(stationIds.map((id) => loadStationName(id)));
   stationIds.forEach((id, i) => {
     const name = resolvedStations[i];

@@ -23,8 +23,11 @@ vi.mock('@/sde/loadSde', () => ({
   loadBlueprints: vi.fn(async (): Promise<BlueprintMap> => BLUEPRINTS),
 }));
 
-vi.mock('@/features/character/stations', () => ({
-  loadStationName: vi.fn(async () => 'Jita IV - Moon 4'),
+const loadContractLocationName =
+  vi.fn<(characterId: number, locationId: number) => Promise<string | null>>();
+vi.mock('@/features/character/contractLocationName', () => ({
+  loadContractLocationName: (characterId: number, locationId: number) =>
+    loadContractLocationName(characterId, locationId),
 }));
 
 vi.mock('@/features/character/typeNames', () => ({
@@ -66,11 +69,14 @@ function LocationProbe() {
   return <div data-testid="location">{`${location.pathname}${location.search}`}</div>;
 }
 
-function renderModal() {
+const CHARACTER_ID = 91;
+
+function renderModal(row: BpcContractRow = ROW) {
   return render(
     <MemoryRouter initialEntries={['/industry?tab=sourcing']}>
       <BpcContractModal
-        row={ROW}
+        row={row}
+        characterId={CHARACTER_ID}
         blueprintName="Rifter Blueprint"
         regionName="The Forge"
         onClose={() => {}}
@@ -81,6 +87,8 @@ function renderModal() {
 }
 
 beforeEach(() => {
+  loadContractLocationName.mockReset();
+  loadContractLocationName.mockResolvedValue('Jita IV - Moon 4');
   loadPublicContractItems.mockReset();
   loadPublicContractItems.mockResolvedValue(
     items([
@@ -97,6 +105,31 @@ beforeEach(() => {
       { record_id: 2, type_id: 34, quantity: 744, is_included: true },
     ])
   );
+});
+
+describe('BpcContractModal — where the contract is', () => {
+  it('names a contract sitting in a player structure (issue #655 item F)', async () => {
+    // This used to call `loadStationName` with no structure fallback at all,
+    // so a citadel contract rendered "Unknown location" forever — and spent a
+    // 404 on every open discovering that.
+    loadContractLocationName.mockResolvedValue('1DQ1-A - 1-st Imperial Palace');
+    const structureRow: BpcContractRow = { ...ROW, locationId: 1022734985679 };
+
+    renderModal(structureRow);
+
+    expect(await screen.findByText('1DQ1-A - 1-st Imperial Palace')).toBeInTheDocument();
+    expect(loadContractLocationName).toHaveBeenCalledWith(CHARACTER_ID, 1022734985679);
+  });
+
+  it('falls back to the id when the location resolves to nothing', async () => {
+    // A structure outside this character's ACL: `null` means "don't know",
+    // and the id is the only honest thing left to show.
+    loadContractLocationName.mockResolvedValue(null);
+
+    renderModal();
+
+    expect(await screen.findByText('Unknown location (#60003760)')).toBeInTheDocument();
+  });
 });
 
 describe('BpcContractModal — Build Plan context menu', () => {

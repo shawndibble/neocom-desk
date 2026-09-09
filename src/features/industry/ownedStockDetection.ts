@@ -101,6 +101,11 @@ export async function resolveStockLocationNames(
   };
 
   await Promise.all([
+    // Stations are a snapshot lookup, not a request (issue #655): `stationIds`
+    // holds only `location_type: 'station'` placements, and `stations.json` is
+    // the whole NPC station table. Structures below still need the cap. (An
+    // unreadable snapshot does put a request back behind each station id —
+    // the fallback that keeps names working when the file can't be fetched.)
     ...[...stationIds].map(async (id) => record(id, await safeName(() => loadStationName(id)))),
     ...[...systemIds].map(async (id) => record(id, await safeName(() => loadSystemName(id)))),
     mapWithConcurrencyLimit(

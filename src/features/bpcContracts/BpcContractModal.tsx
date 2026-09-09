@@ -6,6 +6,15 @@
  * cannot answer. Item lines come from the public ESI route, which needs no
  * scope — the character-scoped one the Contracts page uses cannot serve these
  * at all, since no character here is party to them.
+ *
+ * Where the contract *is*, though, does need a character: a public contract is
+ * as likely to sit in a player structure as an NPC station, and
+ * `/universe/structures/{id}` is ACL-checked per character. So the location
+ * goes through `loadContractLocationName` — the same station-or-structure
+ * resolution the personal Contracts view uses — under the active Character
+ * (issue #655 item F). Before that this called `loadStationName` alone, so a
+ * contract in a citadel showed no name at all and spent a 404 per open
+ * discovering it.
  */
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -13,7 +22,7 @@ import { ContextMenuHint, EmptyState, Modal, Spinner, StatChip } from '@/compone
 import { formatIsk } from '@/lib/isk';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
-import { loadStationName } from '@/features/character/stations';
+import { loadContractLocationName } from '@/features/character/contractLocationName';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { loadPublicContractItems } from '@/features/bpcContracts/publicContractItems';
 import { BuildPlanContextMenu } from '@/features/industry/BuildPlanContextMenu';
@@ -23,6 +32,12 @@ import type { BpcContractRow } from '@/engine/contracts/bpcSearch';
 
 export interface BpcContractModalProps {
   row: BpcContractRow;
+  /**
+   * Whose token resolves a player-structure location. BPC Search itself is not
+   * per-Character — it reads one shared snapshot — but the structure endpoint
+   * behind the location is, and its ACL is per Character.
+   */
+  characterId: number;
   blueprintName: string;
   regionName: string;
   onClose: () => void;
@@ -35,26 +50,27 @@ interface ItemsState {
 
 export function BpcContractModal({
   row,
+  characterId,
   blueprintName,
   regionName,
   onClose,
 }: BpcContractModalProps) {
   const { t } = useTranslation();
   const timeZone = useTimeZone();
-  const [station, setStation] = useState<string | null | undefined>(undefined);
+  const [location, setLocation] = useState<string | null | undefined>(undefined);
   const [items, setItems] = useState<ItemsState | null | undefined>(undefined);
 
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      setStation(undefined);
-      const name = await loadStationName(row.locationId);
-      if (!cancelled) setStation(name);
+      setLocation(undefined);
+      const name = await loadContractLocationName(characterId, row.locationId);
+      if (!cancelled) setLocation(name);
     })();
     return () => {
       cancelled = true;
     };
-  }, [row.locationId]);
+  }, [characterId, row.locationId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -94,12 +110,12 @@ export function BpcContractModal({
         <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-sm">
           <dt className="text-text-dim">{t('bpcContracts.regionColumn')}</dt>
           <dd className="truncate">{regionName}</dd>
-          <dt className="text-text-dim">{t('bpcContracts.stationLabel')}</dt>
+          <dt className="text-text-dim">{t('bpcContracts.locationLabel')}</dt>
           <dd className="truncate">
-            {station === undefined ? (
+            {location === undefined ? (
               <Spinner />
             ) : (
-              (station ?? t('bpcContracts.unknownStation', { id: row.locationId }))
+              (location ?? t('bpcContracts.unknownLocation', { id: row.locationId }))
             )}
           </dd>
           <dt className="text-text-dim">{t('bpcContracts.expiresColumn')}</dt>

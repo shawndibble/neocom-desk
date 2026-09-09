@@ -1,26 +1,38 @@
 /**
  * A contract's `start_location_id`/`end_location_id` carry no `location_type`
  * the way an asset or clone row does (round 7/14 precedent), so there is
- * nothing to branch on up front. Both `loadStationName` and `loadStructureName`
- * already resolve a lookup failure to `null` rather than throwing (offline,
- * 404, ACL 403), so trying the station endpoint first and falling back to the
- * structure endpoint is a safe, cheap way to cover both id spaces without a
- * magic-number id-range heuristic.
+ * nothing in the response to branch on up front. This used to probe the
+ * station endpoint and fall back to the structure one — and nothing caches the
+ * probe's 404, so a contract at a player structure (where it was always going
+ * to 404) spent a fresh round trip on every open re-learning that this id is
+ * not a station, against the same 100-errors-per-minute ESI budget everything
+ * else shares.
  *
- * The *answer* is cached, not just the two lookups behind it. Those cache
- * their successes, but nothing caches the station probe's 404 — so for a
- * contract at a player structure (where the probe is always going to 404)
- * every open of the detail modal spent a fresh round trip re-learning that
- * this id is not a station. Caching the resolved name collapses a reopen to
- * one Dexie read and no request at all, for both id spaces.
+ * The SDE snapshot removes that probe (issue #655). `stations.json` is the
+ * complete `staStations` table, so membership in it *is* the missing
+ * `location_type`: an id it holds is an NPC station, named on the spot with no
+ * request; an id it has loaded and does not hold is a player structure, so the
+ * lookup goes straight to `/universe/structures/{id}`. No magic-number id
+ * range is involved — the discriminator is the table itself.
  *
- * Per character, not under the global sentinel, because a structure name is
- * ACL-gated and `structures.ts` must not leak one to a character not on that
- * ACL. An unresolvable location (offline, or a structure this character can't
- * see into) caches nothing and is retried on the next open, which is the
- * honest outcome: `null` here means "don't know", never "has no name".
+ * When the snapshot cannot be read at all (a first offline visit — it is
+ * outside the install precache on purpose, CONTEXT.md round 10)
+ * `lookupNpcStation` says so rather than answering "not a station", and this
+ * falls back to the original station-then-structure probe. Both
+ * `loadStationName` and `loadStructureName` resolve a lookup failure to `null`
+ * rather than throwing (offline, 404, ACL 403), which is what makes trying
+ * both safe.
+ *
+ * The *answer* is cached, not just the lookups behind it, so a reopen collapses
+ * to one Dexie read for both id spaces. Per character, not under the global
+ * sentinel, because a structure name is ACL-gated and `structures.ts` must not
+ * leak one to a character not on that ACL. An unresolvable location (offline,
+ * or a structure this character can't see into) caches nothing and is retried
+ * on the next open, which is the honest outcome: `null` here means "don't
+ * know", never "has no name".
  */
 import { loadWithCache, STALE_AFTER } from '@/esi/cache';
+import { lookupNpcStation } from '@/sde/npcStations';
 import { loadStationName } from './stations';
 import { loadStructureName } from './structures';
 
@@ -36,6 +48,11 @@ export async function loadContractLocationName(
     characterId,
     cacheKey(locationId),
     async () => {
+      const snapshot = await lookupNpcStation(locationId);
+      if (snapshot) return snapshot.name;
+      // Loaded, and this id is not in it: a player structure, definitively.
+      if (snapshot === null) return loadStructureName(characterId, locationId);
+      // No snapshot to decide with — the pre-#655 probe order.
       const stationName = await loadStationName(locationId);
       if (stationName) return stationName;
       return loadStructureName(characterId, locationId);

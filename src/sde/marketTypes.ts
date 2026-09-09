@@ -32,6 +32,13 @@ export interface NpcStationEntry {
   id: number;
   name: string;
   systemId: number;
+  /**
+   * `staStations.stationTypeID`, carried so `loadStationSummary` can fill a
+   * Build Location's facility preset without an ESI call (issue #655).
+   * Optional because a snapshot built before that change simply has no such
+   * field — a caller must fall back rather than read `undefined` as a type id.
+   */
+  typeId?: number;
 }
 
 /** One entry in public/data/market/regions.json — a region probed to actually carry orders. */

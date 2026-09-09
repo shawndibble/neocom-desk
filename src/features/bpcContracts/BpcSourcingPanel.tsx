@@ -698,6 +698,10 @@ export function BpcSourcingPanel() {
       {openRow !== null && (
         <BpcContractModal
           row={openRow}
+          // Non-null past the `activeCharacterId === null` guard above; the
+          // modal needs one to resolve a player-structure location, whose ACL
+          // is per Character (#655 item F).
+          characterId={activeCharacterId}
           blueprintName={blueprintNames.get(openRow.typeId) ?? `#${openRow.typeId}`}
           regionName={regionNames.get(openRow.regionId) ?? `#${openRow.regionId}`}
           onClose={() => setOpenRow(null)}
