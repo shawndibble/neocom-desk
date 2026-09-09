@@ -81,6 +81,10 @@ Give it this kill-bar:
 - **Client-side reality**: the app is a local-first PWA — ESI data lives in
   Dexie per device and never syncs through the backend. Anything needing a
   server crawling ESI across all players is dead on arrival here, however good.
+- **Settled scope**: does `docs/context/decisions/` already constrain or
+  reject this? Grep it per candidate and hand the reviewer the hits. A
+  decision outranks the reviewer's own reasoning — it is what the project
+  already chose, and it is the check the reviewer cannot make unprompted.
 - **Overlap**: does an existing route or engine module already do this?
 - **Maintenance**: what breaks on the next SDE or ESI change?
 
@@ -90,9 +94,16 @@ that survives with a scoped-down shape is a win; record the narrower shape.
 ## 5. Mock up the UI-significant survivors
 
 Any survivor that adds a tab, adds a page, or reshapes an existing one gets
-mockups before it gets a ticket. Use the `design` skill, constrained to the
-tokens and components in `docs/DESIGN.md` — a mockup inventing its own visual
-language is not an integration plan.
+mockups before it gets a ticket, constrained to the tokens and components in
+`docs/DESIGN.md` — a mockup inventing its own visual language is not an
+integration plan.
+
+**Write each mockup as an HTML file committed to the branch**, under
+`docs/mockups/<slug>.html`, and link that path from the ticket. Unattended runs
+are where this step quietly produces nothing: an Artifact publish is approval
+gated, so in a headless run it can fail and leave the ticket with no mockup at
+all. A committed file always survives. Publishing an Artifact as well is a
+bonus when a human is driving, not the deliverable.
 
 Show the feature in place: the surrounding navigation, the empty state, and the
 populated state. A survivor that only deepens existing math skips this step.
