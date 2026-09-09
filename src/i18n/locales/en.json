@@ -2824,7 +2824,7 @@
           "notificationFeed": "Your Alerts.",
           "notificationFeedNote": "Ones you have already been shown, so another device can catch up on what it missed. Kept for 30 days.",
           "settings": "The settings you chose on this page.",
-          "settingsNote": "Your notification preferences, the PI customs rates you overrode, your industry build groups, the defaults every page starts from — trade hub, industry facility, assumed ME, the PI expiring-soon window, the corp dark threshold, and the default characters shown — and the appraisal price percentage you set on the Market page. Nothing else on this page leaves your device."
+          "settingsNote": "Your notification preferences, the PI customs rates you overrode, your industry build groups, the defaults every page starts from — trade hub, industry facility, assumed ME and assumed TE, the PI expiring-soon window, the corp dark threshold, and the default characters shown — and the appraisal price percentage you set on the Market page. Nothing else on this page leaves your device."
         },
         "local": {
           "title": "Kept on this device only",
@@ -2956,7 +2956,9 @@
     "facilityTaxLabel": "Facility tax (%)",
     "facilityTaxHint": "What the structure owner charges. Leave blank to use the standard rate.",
     "assumedMeLabel": "Assumed ME for blueprints you don’t own",
-    "assumedMeHint": "Sub-builds are quoted at this ME. A blueprint you do own always uses its real ME instead.",
+    "assumedMeHint": "New plans and sub-builds are quoted at this ME. A blueprint you do own always uses its real ME instead.",
+    "assumedTeLabel": "Assumed TE for blueprints you don’t own",
+    "assumedTeHint": "New plans start at this TE — an invented copy comes out at TE 4. A blueprint you do own always uses its real TE instead. Sub-builds are still timed at TE 0.",
     "piExpiringLabel": "Warn me an extractor is expiring",
     "piExpiringHint": "How far ahead the Colonies list flags an extractor — and sorts it to the top.",
     "defaultCharacterFilterLabel": "Default characters shown",

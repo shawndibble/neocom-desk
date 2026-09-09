@@ -22,6 +22,7 @@ import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeFormat, DEFAULT_TIME_FORMAT, TIME_FORMAT_SETTING_KEY } from '@/lib/timeFormat';
 import { useMarketHub } from '@/features/market/hub';
 import { useAssumedMe, ASSUMED_ME_SETTING_KEY } from '@/features/industry/assumedMe';
+import { useAssumedTe, ASSUMED_TE_SETTING_KEY } from '@/features/industry/assumedTe';
 import {
   useFacilityDefaults,
   DEFAULT_FACILITY_DEFAULTS,
@@ -79,6 +80,7 @@ beforeEach(async () => {
   useTimeFormat.setState({ value: DEFAULT_TIME_FORMAT, hydrated: false });
   useMarketHub.setState({ value: 'jita', hydrated: false });
   useAssumedMe.setState({ value: 0, hydrated: false });
+  useAssumedTe.setState({ value: 0, hydrated: false });
   useFacilityDefaults.setState({ value: DEFAULT_FACILITY_DEFAULTS, hydrated: false });
   useExpiringWindowHours.setState({ value: 24, hydrated: false });
   useDarkThreshold.setState({ value: 30, hydrated: false });
@@ -768,6 +770,30 @@ describe('Settings defaults', () => {
     await waitFor(async () => {
       expect((await db.settings.get(ASSUMED_ME_SETTING_KEY))?.value).toBe(10);
     });
+  });
+
+  it('clamps the assumed TE into the range the engine accepts', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByRole('heading', { level: 1, name: /settings/i });
+
+    const input = await screen.findByLabelText(/assumed te/i);
+    await user.clear(input);
+    await user.type(input, '99');
+
+    // TE researches twice as deep as ME — `engine/industry/time.ts` throws
+    // outside 0..20, so 20 is the ceiling here, not ME's 10.
+    await waitFor(async () => {
+      expect((await db.settings.get(ASSUMED_TE_SETTING_KEY))?.value).toBe(20);
+    });
+  });
+
+  it('shows the stored assumed TE on a cold load, not the default', async () => {
+    await db.settings.put({ key: ASSUMED_TE_SETTING_KEY, value: 4 });
+    render(<App />);
+    await screen.findByRole('heading', { level: 1, name: /settings/i });
+
+    expect(await screen.findByLabelText(/assumed te/i)).toHaveValue(4);
   });
 
   it('hides rig and tax for an NPC station, which fits neither', async () => {

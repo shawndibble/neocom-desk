@@ -37,13 +37,22 @@ export function mostRecentlyUpdatedPlan(
 export interface NewBuildPlanOverrides {
   runs?: number;
   /**
-   * ME/TE for a blueprint the character does not own a copy of. Fit Import
+   * ME for a blueprint the character does not own a copy of. Fit Import
    * passes the assumed-ME preference here: most of a T2 fit needs an invented
    * BPC, and quoting all of it at ME0 overstates the group's material cost.
    * An owned copy still wins, the same precedence `materialEfficiencyFor`
    * applies to sub-jobs.
    */
   assumedMe?: number;
+  /**
+   * TE for a blueprint the character does not own a copy of (issue #634), from
+   * the preference beside the ME one. Separate rather than packed with it: the
+   * pair a real invented BPC carries is ME2 / TE4, so one number cannot
+   * answer for both, and material cost and job time are different questions a
+   * pilot may want answered differently. Same precedence — an owned copy's
+   * real TE wins.
+   */
+  assumedTe?: number;
   buildGroupId?: string;
   /**
    * Overrides `Date.now()`. Fit Import stamps the hull highest in the batch:
@@ -103,6 +112,7 @@ export function newBuildPlan(
   // An owned blueprint's real research always wins over the assumed value —
   // the assumption exists to fill the gap where there is nothing to read.
   const assumedMe = overrides.assumedMe ?? 0;
+  const assumedTe = overrides.assumedTe ?? 0;
   return {
     id: crypto.randomUUID(),
     characterId,
@@ -110,7 +120,7 @@ export function newBuildPlan(
     blueprintTypeID: entry.blueprintTypeID,
     runs: overrides.runs ?? 1,
     me: owned?.material_efficiency ?? assumedMe,
-    te: owned?.time_efficiency ?? 0,
+    te: owned?.time_efficiency ?? assumedTe,
     facility: facilityConfig.facility,
     rigFit: facilityConfig.rigFit,
     security: defaultsFrom?.security ?? 'highsec',

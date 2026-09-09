@@ -105,7 +105,7 @@ describe('fitImportPlans', () => {
     CATALOG
   );
 
-  function build(assumedMe = 2) {
+  function build(assumedMe = 2, assumedTe = 4) {
     return fitImportPlans(preview, {
       characterId: 1,
       catalog: CATALOG,
@@ -113,6 +113,7 @@ describe('fitImportPlans', () => {
       defaultsFrom: null,
       facilityDefaults: DEFAULT_FACILITY_DEFAULTS,
       assumedMe,
+      assumedTe,
       buildGroupId: 'g1',
     });
   }
@@ -146,6 +147,14 @@ describe('fitImportPlans', () => {
     expect(build(0).every((p) => p.me === 0)).toBe(true);
   });
 
+  it('seeds TE from the assumed-TE preference rather than 0 (#634)', () => {
+    // The same members, and the same reason on the other axis: at TE0 the
+    // group's job time — and the ISK/hour read off it — is wrong by the
+    // research a real invented BPC comes with.
+    expect(build(2, 4).every((p) => p.te === 4)).toBe(true);
+    expect(build(2, 0).every((p) => p.te === 0)).toBe(true);
+  });
+
   it('skips a candidate whose blueprint has left the catalog', () => {
     const plans = fitImportPlans(
       { ...preview, hull: { ...preview.hull!, blueprintTypeID: 999999 } },
@@ -156,6 +165,7 @@ describe('fitImportPlans', () => {
         defaultsFrom: null,
         facilityDefaults: DEFAULT_FACILITY_DEFAULTS,
         assumedMe: 0,
+        assumedTe: 0,
         buildGroupId: 'g1',
       }
     );
