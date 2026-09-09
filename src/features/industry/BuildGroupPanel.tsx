@@ -2,11 +2,12 @@
  * A **Build Group** opened as one thing: every member's materials merged and
  * its costs summed (issue #626, "Group Rollup" in CONTEXT.md).
  *
- * Prices its members through `useComparedBuildResults`, which already fans out
- * one independent `BuildResult` per plan under `ESI_FANOUT_CONCURRENCY` with
- * per-plan error isolation — the same job Compare does. A second fetch path
- * for the same question would be one more place for a member to be priced
- * differently here than on its own page.
+ * Prices its members through `useComparedBuildResults`, which computes one
+ * independent `BuildResult` per plan with per-plan error isolation, off a
+ * single batched price fetch shared by every member at the same hub (issue
+ * #628) — the same job Compare does. A second fetch path for the same
+ * question would be one more place for a member to be priced differently
+ * here than on its own page.
  *
  * A forward estimate, and it says so: Production Runs carry no group and
  * outlive their plans by design, so "what did this fit actually cost" is a

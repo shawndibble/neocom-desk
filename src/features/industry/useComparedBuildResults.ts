@@ -6,23 +6,27 @@
  * doesn't restart every fetch, a value-stable key to gate the effect, and a
  * synchronous "loading" placeholder row per plan before any fetch settles.
  *
- * Concurrency is bounded the same way `SkillCompare.tsx` bounds its own
- * per-character fan-out (`ESI_FANOUT_CONCURRENCY`). Each plan is priced
- * independently, so one plan's failure (missing blueprint, or a
- * snapshot/compute error) never drops it from the result — it reports its own
+ * Every plan's prices come out of **one** `loadMarketSnapshots` call, which
+ * unions the type ids of plans sharing a hub into a single fetch (issue #628).
+ * A 25-member Build Group is single-hub by construction, so it costs one
+ * Fuzzwork request rather than 25 — the per-plan loop this replaced bounded
+ * concurrency (`ESI_FANOUT_CONCURRENCY`) but not the number of requests.
+ *
+ * Independence survives the batching: each plan is priced from its own
+ * promise, so one plan's failure (missing blueprint, or a snapshot/compute
+ * error) never drops it or any sibling from the result — it reports its own
  * row with `error` set instead, same as the acceptance criteria for #453.
  */
 import { useEffect, useRef, useState } from 'react';
 import i18n from '@/i18n';
 import type { BuildPlanRecord } from '@/db';
 import { industryActivityOf } from '@/engine/industry/types';
-import type { BuildResult, SkillLevels } from '@/engine/industry/types';
+import type { BuildResult, IndustryBlueprint, SkillLevels } from '@/engine/industry/types';
 import type { PiData } from '@/sde/types';
-import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import { toIndustryBlueprint, type BlueprintCatalog } from './blueprintCatalog';
 import { computeBuildPlan } from './computeBuildPlan';
-import { loadMarketSnapshot } from './marketData';
+import { loadMarketSnapshots, type MarketSnapshot, type MarketSnapshotRequest } from './marketData';
 import { materialPricesFor } from './priceBasis';
 import { buildPlanTypeIds } from './recipes';
 
@@ -45,6 +49,12 @@ export interface UseComparedBuildResultsArgs {
   skills: SkillLevels;
 }
 
+/** A plan resolved far enough to ask for prices. Null for one with no blueprint. */
+interface PricedPlan {
+  blueprint: IndustryBlueprint;
+  request: MarketSnapshotRequest;
+}
+
 function productNameFor(plan: BuildPlanRecord, catalog: BlueprintCatalog): string {
   return catalog.byBlueprintTypeID.get(plan.blueprintTypeID)?.productName ?? plan.name;
 }
@@ -61,10 +71,35 @@ function placeholderRow(plan: BuildPlanRecord, catalog: BlueprintCatalog): Compa
   };
 }
 
+/**
+ * Resolves what a plan needs priced, before any fetch — the type ids have to
+ * be known up front for `loadMarketSnapshots` to union them across a hub.
+ */
+function priceablePlan(
+  plan: BuildPlanRecord,
+  catalog: BlueprintCatalog,
+  pi: PiData | null
+): PricedPlan | null {
+  const entry = catalog.byBlueprintTypeID.get(plan.blueprintTypeID);
+  if (!entry) return null;
+
+  const blueprint = toIndustryBlueprint(entry.blueprint);
+  return {
+    blueprint,
+    request: {
+      hub: getTradeHub(plan.hubId) ?? DEFAULT_TRADE_HUB,
+      typeIds: buildPlanTypeIds(blueprint, { catalog, pi }),
+      costIndexSystemId: plan.buildSystemId,
+      activity: industryActivityOf(blueprint),
+    },
+  };
+}
+
 async function computeRow(
   plan: BuildPlanRecord,
   catalog: BlueprintCatalog,
-  pi: PiData | null,
+  priced: PricedPlan | null,
+  snapshot: Promise<MarketSnapshot> | null,
   skills: SkillLevels
 ): Promise<ComparedBuildRow> {
   const base = {
@@ -75,28 +110,19 @@ async function computeRow(
     loading: false,
   };
 
-  const entry = catalog.byBlueprintTypeID.get(plan.blueprintTypeID) ?? null;
-  if (!entry) {
+  if (!priced || !snapshot) {
     return { ...base, result: null, error: i18n.t('industry.blueprintMissing') };
   }
 
-  const blueprint = toIndustryBlueprint(entry.blueprint);
-  const hub = getTradeHub(plan.hubId) ?? DEFAULT_TRADE_HUB;
-
   try {
-    const snapshot = await loadMarketSnapshot(
-      hub,
-      buildPlanTypeIds(blueprint, { catalog, pi }),
-      plan.buildSystemId,
-      industryActivityOf(blueprint)
-    );
+    const snap = await snapshot;
     const { result, error } = computeBuildPlan({
       plan,
-      blueprint,
-      systemCostIndex: snapshot.systemCostIndex ?? 0,
-      adjustedPrices: snapshot.adjustedPrices ?? {},
-      hubPrices: snapshot.hubPrices,
-      materialPrices: materialPricesFor(snapshot, plan.materialPriceBasis),
+      blueprint: priced.blueprint,
+      systemCostIndex: snap.systemCostIndex ?? 0,
+      adjustedPrices: snap.adjustedPrices ?? {},
+      hubPrices: snap.hubPrices,
+      materialPrices: materialPricesFor(snap, plan.materialPriceBasis),
       skills,
     });
     return { ...base, result, error };
@@ -132,11 +158,21 @@ export function useComparedBuildResults({
     let cancelled = false;
     setRows(currentPlans.map((plan) => placeholderRow(plan, catalog)));
 
-    void mapWithConcurrencyLimit(currentPlans, ESI_FANOUT_CONCURRENCY, async (plan) => {
-      const row = await computeRow(plan, catalog, pi, skills);
-      if (cancelled) return;
-      setRows((prev) => prev.map((r) => (r.planId === plan.id ? row : r)));
-    });
+    const priced = currentPlans.map((plan) => priceablePlan(plan, catalog, pi));
+    const snapshots = loadMarketSnapshots(priced.flatMap((p) => (p ? [p.request] : [])));
+
+    // Snapshots come back in request order, and plans with no blueprint
+    // contributed no request — so walk the plans in order and hand each
+    // priceable one the next snapshot.
+    let nextSnapshot = 0;
+    for (const [index, plan] of currentPlans.entries()) {
+      const planPriced = priced[index] ?? null;
+      const snapshot = planPriced ? (snapshots[nextSnapshot++] ?? null) : null;
+      void computeRow(plan, catalog, planPriced, snapshot, skills).then((row) => {
+        if (cancelled) return;
+        setRows((prev) => prev.map((r) => (r.planId === plan.id ? row : r)));
+      });
+    }
 
     return () => {
       cancelled = true;

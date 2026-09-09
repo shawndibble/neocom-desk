@@ -403,11 +403,12 @@ makes groups fully usable with no dragging; and Compare → icon.
 - Group-aware Compare (comparing two groups as units).
 - Group-level settings (pinned hub, shared facility).
 - Mixed-hub multibuy reconciliation — PR 1 declines and names the hubs.
-- Batched market snapshots per hub. `useComparedBuildResults` calls
-  `loadMarketSnapshot` **once per plan** (`useComparedBuildResults.ts:87-92`),
-  and `ESI_FANOUT_CONCURRENCY` bounds concurrency, not total requests — so a
-  25-member group on one hub issues 25 snapshot fetches where one unioned fetch
-  would do.
+- ~~Batched market snapshots per hub.~~ Landed after PR 1 (issue #628):
+  `useComparedBuildResults` now makes one `loadMarketSnapshots` call for the
+  whole set, which unions the type ids of every plan sharing a hub into one
+  fetch. It used to call `loadMarketSnapshot` once per plan, and
+  `ESI_FANOUT_CONCURRENCY` bounds concurrency, not total requests — so a
+  25-member group on one hub issued 25 snapshot fetches where one does.
 - Relaxing `HEADER` to accept a bare `[Ship]`.
 
 ## i18n
