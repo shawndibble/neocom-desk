@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
+  ContextMenuHint,
   DataAgeBadge,
   DataTable,
   EmptyState,
@@ -41,6 +42,7 @@ import {
 } from '@/features/bpcContracts/syncedContracts';
 import { loadRegionName } from '@/features/bpcContracts/regionNames';
 import { BpcContractModal } from '@/features/bpcContracts/BpcContractModal';
+import { BuildPlanContextMenu } from '@/features/industry/BuildPlanContextMenu';
 import { loadBlueprints } from '@/sde/loadSde';
 import { isSyncConfigured } from '@/app/syncStatus';
 import type { CachedResult } from '@/esi/cache';
@@ -505,12 +507,15 @@ export function BpcSourcingPanel() {
         )
       }
       actions={
-        <IconButton
-          icon={<Icon.Refresh />}
-          label={t('bpcContracts.refresh')}
-          onClick={refresh}
-          disabled={loading}
-        />
+        <>
+          <IconButton
+            icon={<Icon.Refresh />}
+            label={t('bpcContracts.refresh')}
+            onClick={refresh}
+            disabled={loading}
+          />
+          <ContextMenuHint label={t('bpcContracts.title')} />
+        </>
       }
     >
       {loading && !data ? (
@@ -667,6 +672,9 @@ export function BpcSourcingPanel() {
                 rowKey={(row, index) => `${row.contractId}:${row.typeId}:${index}`}
                 defaultSort={{ columnId: 'price', direction: 'asc' }}
                 onRowClick={setOpenRow}
+                rowContextMenu={(row, tr) => (
+                  <BuildPlanContextMenu typeId={row.typeId} trigger={tr} />
+                )}
               />
               {!showAll && filteredRows.length > ROW_CAP && (
                 <div className="px-3 py-2">

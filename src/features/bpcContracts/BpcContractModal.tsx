@@ -9,13 +9,14 @@
  */
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { EmptyState, Modal, Spinner, StatChip } from '@/components/ui';
+import { ContextMenuHint, EmptyState, Modal, Spinner, StatChip } from '@/components/ui';
 import { formatIsk } from '@/lib/isk';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
 import { loadStationName } from '@/features/character/stations';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { loadPublicContractItems } from '@/features/bpcContracts/publicContractItems';
+import { BuildPlanContextMenu } from '@/features/industry/BuildPlanContextMenu';
 import type { PublicContractItem } from '@/esi/endpoints';
 import type { BpcContractRow } from '@/engine/contracts/bpcSearch';
 
@@ -107,8 +108,9 @@ export function BpcContractModal({
         </dl>
 
         <div>
-          <p className="pb-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+          <p className="flex items-center gap-1.5 pb-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
             {t('bpcContracts.contentsHeading')}
+            <ContextMenuHint label={t('bpcContracts.contentsHeading')} />
           </p>
           {items === undefined ? (
             <Spinner />
@@ -117,34 +119,43 @@ export function BpcContractModal({
           ) : (
             <ul className="flex flex-col gap-1">
               {items.list.map((item) => (
-                <li
+                <BuildPlanContextMenu
                   key={item.record_id}
-                  className="flex items-baseline gap-2 rounded-xs border border-line bg-panel-2 px-2.5 py-1.5 text-sm"
-                >
-                  <span className="min-w-0 flex-1 truncate">
-                    {items.typeNames.get(item.type_id) ?? `#${item.type_id}`}
-                    {/* A line the issuer *wants* rather than offers: an
+                  typeId={item.type_id}
+                  trigger={
+                    <li
+                      // Focusable so the menu is reachable by keyboard
+                      // (Shift+F10 / the Menu key), the same treatment
+                      // `DataTable` gives a row it wraps in one.
+                      tabIndex={0}
+                      className="flex items-baseline gap-2 rounded-xs border border-line bg-panel-2 px-2.5 py-1.5 text-sm"
+                    >
+                      <span className="min-w-0 flex-1 truncate">
+                        {items.typeNames.get(item.type_id) ?? `#${item.type_id}`}
+                        {/* A line the issuer *wants* rather than offers: an
                         item_exchange contract can ask for one item and give
                         another, and a buyer reading a bundle needs the two
                         told apart. */}
-                    {!item.is_included && (
-                      <span className="pl-2 text-[0.6875rem] text-warning uppercase">
-                        {t('bpcContracts.requestedItem')}
+                        {!item.is_included && (
+                          <span className="pl-2 text-[0.6875rem] text-warning uppercase">
+                            {t('bpcContracts.requestedItem')}
+                          </span>
+                        )}
                       </span>
-                    )}
-                  </span>
-                  {item.is_blueprint_copy && (
-                    <span className="shrink-0 text-[0.6875rem] tabular-nums text-text-dim">
-                      {t('bpcContracts.itemMeTe', {
-                        me: item.material_efficiency ?? 0,
-                        te: item.time_efficiency ?? 0,
-                      })}
-                      {item.runs !== undefined &&
-                        ` · ${t('bpcContracts.runsShort', { runs: item.runs })}`}
-                    </span>
-                  )}
-                  <span className="shrink-0 tabular-nums">×{item.quantity}</span>
-                </li>
+                      {item.is_blueprint_copy && (
+                        <span className="shrink-0 text-[0.6875rem] tabular-nums text-text-dim">
+                          {t('bpcContracts.itemMeTe', {
+                            me: item.material_efficiency ?? 0,
+                            te: item.time_efficiency ?? 0,
+                          })}
+                          {item.runs !== undefined &&
+                            ` · ${t('bpcContracts.runsShort', { runs: item.runs })}`}
+                        </span>
+                      )}
+                      <span className="shrink-0 tabular-nums">×{item.quantity}</span>
+                    </li>
+                  }
+                />
               ))}
             </ul>
           )}
