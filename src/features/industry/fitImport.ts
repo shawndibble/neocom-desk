@@ -109,6 +109,8 @@ export interface FitImportPlanContext {
   facilityDefaults: FacilityDefaults;
   /** ME to quote a blueprint the character owns no copy of — `sync.industryAssumedMe`. */
   assumedMe: number;
+  /** TE for the same blueprints, from `sync.industryAssumedTe` (issue #634). */
+  assumedTe: number;
   buildGroupId: string;
 }
 
@@ -147,6 +149,7 @@ export function fitImportPlans(
       {
         runs: candidate.runs,
         assumedMe: context.assumedMe,
+        assumedTe: context.assumedTe,
         buildGroupId: context.buildGroupId,
         updatedAt,
       }

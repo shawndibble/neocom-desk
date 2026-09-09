@@ -62,6 +62,7 @@ import { BuildGroupPanel } from '@/features/industry/BuildGroupPanel';
 import { FitImportDialog } from '@/features/industry/FitImportDialog';
 import { fitImportGroupName, fitImportPlans } from '@/features/industry/fitImport';
 import { useAssumedMe } from '@/features/industry/assumedMe';
+import { useAssumedTe } from '@/features/industry/assumedTe';
 import type { FitToBuildPlansResult } from '@/engine/import/fitToBuildPlans';
 
 /**
@@ -173,11 +174,14 @@ export function Industry() {
   const setExpandedGroups = useExpandedGroups((state) => state.setValue);
   const assumedMe = useAssumedMe((state) => state.value);
   const hydrateAssumedMe = useAssumedMe((state) => state.hydrate);
+  const assumedTe = useAssumedTe((state) => state.value);
+  const hydrateAssumedTe = useAssumedTe((state) => state.hydrate);
   useEffect(() => {
     void hydrateBuildGroups();
     void hydrateExpandedGroups();
     void hydrateAssumedMe();
-  }, [hydrateBuildGroups, hydrateExpandedGroups, hydrateAssumedMe]);
+    void hydrateAssumedTe();
+  }, [hydrateBuildGroups, hydrateExpandedGroups, hydrateAssumedMe, hydrateAssumedTe]);
 
   const [selection, setSelection] = useState<DetailSelection>(NO_SELECTION);
   // Read back as the three things the pane below actually asks about. The tag
@@ -267,17 +271,17 @@ export function Industry() {
         owned,
         mostRecentlyUpdatedPlan(plans),
         facilityDefaults,
-        // The same assumed ME Fit Import seeds its plans with (#626). Passed
-        // here too so one blueprint cannot start at two different ME values
-        // depending on whether it was picked or imported; an owned copy still
-        // wins on both paths.
-        { assumedMe }
+        // The same assumed ME and TE Fit Import seeds its plans with (#626,
+        // #634). Passed here too so one blueprint cannot start at two
+        // different research levels depending on whether it was picked or
+        // imported; an owned copy still wins on both paths.
+        { assumedMe, assumedTe }
       );
       await db.buildPlans.add(plan);
       scheduleSync(activeCharacterId);
       return plan.id;
     },
-    [activeCharacterId, ownedBlueprints, plans, facilityDefaults, assumedMe]
+    [activeCharacterId, ownedBlueprints, plans, facilityDefaults, assumedMe, assumedTe]
   );
 
   // The Market Browser's item context menu "jump to a Build Plan" action
@@ -664,6 +668,7 @@ export function Industry() {
       defaultsFrom: mostRecentlyUpdatedPlan(plans),
       facilityDefaults,
       assumedMe,
+      assumedTe,
       buildGroupId: groupId,
     });
     if (newPlans.length === 0) return;
