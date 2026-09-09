@@ -75,6 +75,14 @@ export function industryActivityOf(blueprint: IndustryBlueprint): IndustryActivi
   return blueprint.activity ?? 'manufacturing';
 }
 
+/**
+ * Most runs one job may be installed for. `computeBuildPlan` clamps to this
+ * before computing anything, so anything that *creates* a plan clamps to the
+ * same number — otherwise a stored 2,000,000 displays as itself while every
+ * figure on the page came from the clamp.
+ */
+export const MAX_JOB_RUNS = 100_000;
+
 export type RigLevel = 'none' | 't1' | 't2';
 
 /** Security band of the facility's solar system. Wormholes count as nullsec. */

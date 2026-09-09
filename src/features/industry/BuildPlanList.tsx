@@ -1,4 +1,4 @@
-import { Fragment, useState } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -50,6 +50,50 @@ interface BuildPlanListProps {
   onOpenFitImport: () => void;
 }
 
+/**
+ * The inline rename both a plan row and a group header use: commit on Enter or
+ * blur, abandon on Escape, and never store a blank name.
+ *
+ * Rendered only while renaming, so it re-reads `value` on each open and needs
+ * no reset path of its own — which is what the two hand-rolled copies of this
+ * were spending their `else setDraftName(...)` branch on.
+ */
+function RenameField({
+  value,
+  label,
+  onRename,
+  onDone,
+}: {
+  value: string;
+  label: string;
+  onRename: (name: string) => void;
+  onDone: () => void;
+}) {
+  const [draft, setDraft] = useState(value);
+
+  function commit() {
+    onDone();
+    const name = draft.trim();
+    if (name && name !== value) onRename(name);
+  }
+
+  return (
+    <TextInput
+      size="sm"
+      autoFocus
+      value={draft}
+      aria-label={label}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') commit();
+        if (e.key === 'Escape') onDone();
+      }}
+      className="flex-1"
+    />
+  );
+}
+
 type PlanRowProps = {
   plan: BuildPlanRecord;
   active: boolean;
@@ -78,14 +122,6 @@ function PlanRow({
 }: PlanRowProps) {
   const { t } = useTranslation();
   const [renaming, setRenaming] = useState(false);
-  const [draftName, setDraftName] = useState(plan.name);
-
-  function commitRename() {
-    setRenaming(false);
-    const name = draftName.trim();
-    if (name && name !== plan.name) onRename(plan.id, name);
-    else setDraftName(plan.name);
-  }
 
   return (
     <li
@@ -103,21 +139,11 @@ function PlanRow({
         />
       )}
       {renaming ? (
-        <TextInput
-          size="sm"
-          autoFocus
-          value={draftName}
-          aria-label={t('industry.rename')}
-          onChange={(e) => setDraftName(e.target.value)}
-          onBlur={commitRename}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') commitRename();
-            if (e.key === 'Escape') {
-              setDraftName(plan.name);
-              setRenaming(false);
-            }
-          }}
-          className="flex-1"
+        <RenameField
+          value={plan.name}
+          label={t('industry.rename')}
+          onRename={(name) => onRename(plan.id, name)}
+          onDone={() => setRenaming(false)}
         />
       ) : (
         <button
@@ -219,14 +245,6 @@ function GroupHeader({
 }) {
   const { t } = useTranslation();
   const [renaming, setRenaming] = useState(false);
-  const [draftName, setDraftName] = useState(group.name);
-
-  function commitRename() {
-    setRenaming(false);
-    const name = draftName.trim();
-    if (name && name !== group.name) onRename(name);
-    else setDraftName(group.name);
-  }
 
   return (
     <li
@@ -258,21 +276,11 @@ function GroupHeader({
         onClick={onToggle}
       />
       {renaming ? (
-        <TextInput
-          size="sm"
-          autoFocus
-          value={draftName}
-          aria-label={t('industry.renameGroup')}
-          onChange={(e) => setDraftName(e.target.value)}
-          onBlur={commitRename}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') commitRename();
-            if (e.key === 'Escape') {
-              setDraftName(group.name);
-              setRenaming(false);
-            }
-          }}
-          className="flex-1"
+        <RenameField
+          value={group.name}
+          label={t('industry.renameGroup')}
+          onRename={onRename}
+          onDone={() => setRenaming(false)}
         />
       ) : (
         <button
@@ -332,12 +340,27 @@ export function BuildPlanList({
 }: BuildPlanListProps) {
   const { t } = useTranslation();
 
+  // One pass, rather than a `filter` per group plus a `some` per plan.
+  //
   // A plan whose group is gone — deleted here, or a sync race delivering the
-  // plan before the settings blob — renders as an ordinary ungrouped plan
-  // rather than vanishing from the list.
-  const ungrouped = plans.filter(
-    (plan) => plan.buildGroupId === undefined || !groups.some((g) => g.id === plan.buildGroupId)
-  );
+  // plan before the settings blob — falls into `ungrouped` and renders as an
+  // ordinary plan rather than vanishing from the list.
+  const { membersByGroup, ungrouped } = useMemo(() => {
+    const known = new Set(groups.map((group) => group.id));
+    const byGroup = new Map<string, BuildPlanRecord[]>();
+    const loose: BuildPlanRecord[] = [];
+    for (const plan of plans) {
+      const groupId = plan.buildGroupId;
+      if (groupId === undefined || !known.has(groupId)) {
+        loose.push(plan);
+        continue;
+      }
+      const members = byGroup.get(groupId);
+      if (members) members.push(plan);
+      else byGroup.set(groupId, [plan]);
+    }
+    return { membersByGroup: byGroup, ungrouped: loose };
+  }, [plans, groups]);
 
   function rowProps(plan: BuildPlanRecord) {
     return {
@@ -422,7 +445,7 @@ export function BuildPlanList({
               not a nested `ul` per group: a nested list announces "list, 1
               item" before every single plan. */}
           {groups.map((group) => {
-            const members = plans.filter((plan) => plan.buildGroupId === group.id);
+            const members = membersByGroup.get(group.id) ?? [];
             const selectedCount = members.filter((p) => compareSelectedIds.has(p.id)).length;
             return (
               <Fragment key={group.id}>

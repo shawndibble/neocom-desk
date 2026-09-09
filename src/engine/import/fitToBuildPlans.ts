@@ -31,10 +31,8 @@
  * does not cover.
  */
 
+import { MAX_JOB_RUNS } from '../industry/types';
 import type { EftFit, EftItem } from './eftFit';
-
-/** Runs cap, matching `computeBuildPlan`'s own clamp — see `runsFor`. */
-const MAX_RUNS = 100_000;
 
 /** What the caller's blueprint catalog has to answer for one item name. */
 export interface FitBlueprintResolution {
@@ -87,10 +85,13 @@ export interface FitToBuildPlansResult {
   skipped: FitSkippedItem[];
   /** Charges withheld by default, so the dialog can say so. Empty when `includeCharges`. */
   excludedCharges: FitSkippedItem[];
-  /** The fit name from the `[Ship, Fit]` header, or null when it failed to parse. */
+  /**
+   * The fit name from the `[Ship, Fit]` header, or null when it could not be
+   * read — which also means no `hull`, since the parser writes both header
+   * names together or neither. Callers test this rather than a second
+   * `headerFailed` flag that could only ever say the same thing.
+   */
   groupName: string | null;
-  /** True when the header was unreadable, which also means no hull. */
-  headerFailed: boolean;
 }
 
 export interface FitToBuildPlansOptions {
@@ -105,7 +106,7 @@ export interface FitToBuildPlansOptions {
 }
 
 /**
- * Whole runs to make `quantity`, clamped exactly as the plan itself will be.
+ * Whole runs to make `quantity`, clamped exactly as the plan itself will be (`MAX_JOB_RUNS`).
  *
  * `computeBuildPlan` clamps runs to [1, 100_000] before computing anything, so
  * a larger number stored here would *display* as itself while every figure on
@@ -114,7 +115,7 @@ export interface FitToBuildPlansOptions {
  */
 function runsFor(quantity: number, unitsPerRun: number): number {
   const perRun = unitsPerRun > 0 ? unitsPerRun : 1;
-  return Math.min(MAX_RUNS, Math.max(1, Math.ceil(quantity / perRun)));
+  return Math.min(MAX_JOB_RUNS, Math.max(1, Math.ceil(quantity / perRun)));
 }
 
 function candidateFor(resolution: FitBlueprintResolution, quantity: number): FitBuildCandidate {
@@ -199,6 +200,5 @@ export function fitToBuildPlans(
     skipped: [...skipped.values()],
     excludedCharges: [...excludedCharges.values()],
     groupName: headerFailed ? null : fit.fitName,
-    headerFailed,
   };
 }

@@ -1,10 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  isGroupExpanded,
-  parseExpandedGroups,
-  withGroupExpanded,
-  type ExpandedGroupsValue,
-} from './expandedGroups';
+import { parseExpandedGroups, withGroupExpanded, type ExpandedGroupsValue } from './expandedGroups';
 
 describe('parseExpandedGroups', () => {
   it('reads a well-formed per-Character map', () => {
@@ -20,21 +15,6 @@ describe('parseExpandedGroups', () => {
   it('drops damaged entries without losing the others', () => {
     const raw = { 1: ['g1', 42, ''], 2: 'not an array', notANumber: ['g9'] };
     expect(parseExpandedGroups(raw)).toEqual({ 1: ['g1'] });
-  });
-});
-
-describe('isGroupExpanded', () => {
-  it('is false for a group nobody has opened — collapsed is the default', () => {
-    // The whole reason expanded ids are stored rather than collapsed ones: a
-    // group synced in from another device has no entry here, and must arrive
-    // collapsed rather than unfolding a 25-plan fit on this screen.
-    expect(isGroupExpanded({}, 1, 'g1')).toBe(false);
-  });
-
-  it('is true only for that Character', () => {
-    const value: ExpandedGroupsValue = { 1: ['g1'] };
-    expect(isGroupExpanded(value, 1, 'g1')).toBe(true);
-    expect(isGroupExpanded(value, 2, 'g1')).toBe(false);
   });
 });
 

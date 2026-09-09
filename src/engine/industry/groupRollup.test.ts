@@ -67,7 +67,6 @@ describe('rollUpBuildGroup — totals', () => {
       member({ planId: 'b', result: result({ totalCost: 300 }) }),
     ]);
     expect(rollup.totalCost).toBe(405);
-    expect(rollup.memberCount).toBe(2);
   });
 
   it('reports job fees as top-level only, since sub-job fees are already inside materialCost', () => {
@@ -106,25 +105,25 @@ describe('rollUpBuildGroup — totals', () => {
     ).toBeNull();
   });
 
-  it('is unpriceable when any single member is, and unions the blocking types', () => {
+  it('is unpriceable when any single member is', () => {
+    // One bad member taints the total: every figure below it is an
+    // understatement, so the flag has to survive members that priced fine.
     const rollup = rollUpBuildGroup([
-      member({ planId: 'a', result: result({ unpriceable: true, unpricedMaterials: [34] }) }),
-      member({ planId: 'b', result: result({ unpricedMaterials: [35] }) }),
+      member({ planId: 'a', result: result({ unpriceable: true }) }),
+      member({ planId: 'b', result: result() }),
     ]);
     expect(rollup.unpriceable).toBe(true);
-    expect(rollup.unpricedMaterials.sort()).toEqual([34, 35]);
   });
 
   it('totals an empty group to zero rather than throwing', () => {
     const rollup = rollUpBuildGroup([]);
     expect(rollup.totalCost).toBe(0);
-    expect(rollup.memberCount).toBe(0);
     expect(rollup.shoppingMaterials).toEqual([]);
   });
 });
 
 describe('rollUpBuildGroup — material merging', () => {
-  it('merges one material across members and records who wants it', () => {
+  it('merges one material across members', () => {
     const rollup = rollUpBuildGroup([
       member({ planId: 'a', shoppingMaterials: [line(34, 100)] }),
       member({ planId: 'b', shoppingMaterials: [line(34, 50), line(35, 20)] }),
@@ -132,7 +131,9 @@ describe('rollUpBuildGroup — material merging', () => {
     const trit = rollup.shoppingMaterials.find((m) => m.typeID === 34);
     expect(trit?.quantity).toBe(150);
     expect(trit?.remainingQuantity).toBe(150);
-    expect(trit?.planIds).toEqual(['a', 'b']);
+    // Merged as-rounded: each member's job already rounded its own use, so a
+    // merged quantity is a sum and never a re-derivation from combined runs.
+    expect(trit?.baseQuantity).toBe(150);
     expect(rollup.shoppingMaterials.find((m) => m.typeID === 35)?.quantity).toBe(20);
   });
 

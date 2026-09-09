@@ -36,6 +36,7 @@
  * cost once built.
  */
 
+import { mergeCostLines } from './mergeCostLines';
 import type { BuildResult, MaterialCostLine } from './types';
 
 /** One Build Plan's contribution to its group's totals. */
@@ -51,38 +52,15 @@ export interface BuildGroupMember {
   tableMaterials: readonly MaterialCostLine[];
 }
 
-/** One material summed across every member that wants it. */
-export interface GroupMaterialLine {
-  typeID: number;
-  /** Units the group consumes in total, before owned stock. */
-  quantity: number;
-  /** Units the members between them record as already owned. */
-  ownedQuantity: number;
-  /** Units still to acquire — the sum of the members' own remainders. */
-  remainingQuantity: number;
-  /**
-   * The first real unit price any member had for this type.
-   *
-   * A price is a property of the type, not of where it was consumed, and
-   * `null` only ever means "this member is building it" — so a built
-   * occurrence must not blank the price of a row another member buys
-   * outright. Same rule `subBuildPlan.ts`'s own merge follows.
-   */
-  unitPrice: number | null;
-  /** Summed line costs. Owned units are free, so this prices the remainder. */
-  lineCost: number;
-  /** True when any contributing member could not price its remainder. */
-  unpriced: boolean;
-  /** Which members want it, in first-appearance order — so a row can name them. */
-  planIds: string[];
-}
-
 export interface BuildGroupRollup {
-  memberCount: number;
-  /** The buy list: merged purchasable leaves. */
-  shoppingMaterials: GroupMaterialLine[];
+  /**
+   * The buy list: merged purchasable leaves. An ordinary `MaterialCostLine` —
+   * a merged line is the same shape as the lines merged into it, and every
+   * field means there what it means on one member.
+   */
+  shoppingMaterials: MaterialCostLine[];
   /** The display table: merged whole tree, built rows kept. */
-  tableMaterials: GroupMaterialLine[];
+  tableMaterials: MaterialCostLine[];
   /** Sum of member `materialCost` — each already includes its own sub-job fees. */
   materialCost: number;
   /**
@@ -101,8 +79,6 @@ export interface BuildGroupRollup {
    * slots are not modelled, so this is oven time rather than elapsed time.
    */
   seconds: number;
-  /** Union of the members' blocking types. */
-  unpricedMaterials: number[];
   /** True when any member is unpriceable. One bad member taints the total. */
   unpriceable: boolean;
   /** Distinct member hubs, in first-appearance order. */
@@ -128,37 +104,12 @@ export interface RollUpBuildGroupOptions {
 function mergeMaterials(
   members: readonly BuildGroupMember[],
   pick: (m: BuildGroupMember) => readonly MaterialCostLine[]
-): GroupMaterialLine[] {
-  const merged = new Map<number, GroupMaterialLine>();
+): MaterialCostLine[] {
+  const merged = new Map<number, MaterialCostLine>();
   for (const member of members) {
     for (const material of pick(member)) {
       const existing = merged.get(material.typeID);
-      if (!existing) {
-        merged.set(material.typeID, {
-          typeID: material.typeID,
-          quantity: material.quantity,
-          ownedQuantity: material.ownedQuantity,
-          remainingQuantity: material.remainingQuantity,
-          unitPrice: material.unitPrice,
-          lineCost: material.lineCost,
-          unpriced: material.unpriced,
-          planIds: [member.planId],
-        });
-        continue;
-      }
-      // Summed as each member's own job rounded them. EVE rounds material use
-      // once per job, so two jobs each wanting 4.5 units cost 5 + 5, not 9 —
-      // a merged quantity must never be re-derived from a combined run count.
-      existing.quantity += material.quantity;
-      existing.ownedQuantity += material.ownedQuantity;
-      existing.remainingQuantity += material.remainingQuantity;
-      existing.unitPrice = existing.unitPrice ?? material.unitPrice;
-      existing.lineCost += material.lineCost;
-      // One member unable to price its remainder makes the merged line's cost
-      // an understatement, so the flag travels up rather than being averaged
-      // away by members that priced fine.
-      existing.unpriced = existing.unpriced || material.unpriced;
-      if (!existing.planIds.includes(member.planId)) existing.planIds.push(member.planId);
+      merged.set(material.typeID, existing ? mergeCostLines(existing, material) : { ...material });
     }
   }
   return [...merged.values()];
@@ -175,8 +126,6 @@ export function rollUpBuildGroup(
   for (const member of members) {
     if (!hubIds.includes(member.hubId)) hubIds.push(member.hubId);
   }
-
-  const unpricedMaterials = [...new Set(members.flatMap((m) => m.result.unpricedMaterials))];
 
   // Sum only while every member has a price: one null makes the total
   // unknowable, and a partial sum presented as a whole is worse than none.
@@ -200,7 +149,6 @@ export function rollUpBuildGroup(
     : [];
 
   return {
-    memberCount: members.length,
     shoppingMaterials,
     tableMaterials,
     materialCost: members.reduce((sum, m) => sum + m.result.materialCost, 0),
@@ -208,7 +156,6 @@ export function rollUpBuildGroup(
     totalCost: members.reduce((sum, m) => sum + m.result.totalCost, 0),
     buyCost,
     seconds: members.reduce((sum, m) => sum + m.result.seconds, 0),
-    unpricedMaterials,
     unpriceable: members.some((m) => m.result.unpriceable),
     hubIds,
     // An empty group has no mixture to warn about, but also nothing to paste;

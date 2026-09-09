@@ -36,8 +36,10 @@ function nameIndexFor(catalog: BlueprintCatalog): Map<string, number> {
   const cached = nameIndexes.get(catalog);
   if (cached) return cached;
   const index = new Map<string, number>();
-  for (const [idStr, info] of Object.entries(catalog.typesById)) {
-    const key = info.name.toLowerCase();
+  // `for...in` rather than `Object.entries`, which would materialize a pair
+  // array for every type in the SDE — thousands — to build one map.
+  for (const idStr in catalog.typesById) {
+    const key = catalog.typesById[idStr].name.toLowerCase();
     // First wins, like `byProductTypeID` — the SDE has no duplicate item names
     // in practice, and a later collision must not shadow a real product.
     if (!index.has(key)) index.set(key, Number(idStr));
@@ -104,11 +106,13 @@ function entryFor(
 /**
  * The Build Plans a preview turns into, hull first.
  *
- * The hull is stamped one millisecond newer than every other member, so
- * `mostRecentlyUpdatedPlan`'s strict `>` resolves the whole batch to the ship
- * rather than to whichever member Dexie happens to return first — otherwise
- * the settings the pilot's next hand-made plan inherits come from a random
- * rig (issue #456).
+ * Stamped newest-first from `Date.now()`, so `mostRecentlyUpdatedPlan`'s
+ * strict `>` resolves the batch to the ship rather than to whichever member
+ * Dexie happens to return first — otherwise the settings the pilot's next
+ * hand-made plan inherits come from a random rig (issue #456). Stepping
+ * *back* rather than nudging the hull forward: `Date.now()` is the newest any
+ * of them may honestly claim, and it makes every member deterministic instead
+ * of only the hull's boundary.
  */
 export function fitImportPlans(
   preview: FitToBuildPlansResult,
@@ -134,11 +138,11 @@ export function fitImportPlans(
   };
 
   const plans: BuildPlanRecord[] = [];
-  const hull = preview.hull ? make(preview.hull, now + 1) : null;
+  const hull = preview.hull ? make(preview.hull, now) : null;
   if (hull) plans.push(hull);
-  for (const candidate of preview.items) {
-    const plan = make(candidate, now);
+  preview.items.forEach((candidate, index) => {
+    const plan = make(candidate, now - 1 - index);
     if (plan) plans.push(plan);
-  }
+  });
   return plans;
 }

@@ -17,11 +17,11 @@ import { useTranslation } from 'react-i18next';
 import { Button, EmptyState, Panel, Spinner } from '@/components/ui';
 import type { BuildPlanRecord } from '@/db';
 import { rollUpBuildGroup, type BuildGroupMember } from '@/engine/industry/groupRollup';
-import type { SkillLevels } from '@/engine/industry/types';
+import type { BuildResult, MaterialCostLine, SkillLevels } from '@/engine/industry/types';
 import { writeToClipboard } from '@/lib/clipboard';
 import { formatDuration } from '@/lib/duration';
 import { formatIsk } from '@/lib/isk';
-import { TRADE_HUBS } from '@/market/hubs';
+import { getTradeHub } from '@/market/hubs';
 import type { PiData } from '@/sde/types';
 import { nameForType, toIndustryBlueprint, type BlueprintCatalog } from './blueprintCatalog';
 import type { BuildGroup } from './buildGroups';
@@ -30,6 +30,35 @@ import { hasShoppingList, shoppingListText } from './shoppingList';
 import { materialTableRows, shoppingListMaterials } from './subBuildPlan';
 import { useComparedBuildResults } from './useComparedBuildResults';
 import { useDetectedOwnedStock } from './useDetectedOwnedStock';
+
+/**
+ * Each member's resolved tree, flattened the two ways the rollup needs.
+ *
+ * `useComparedBuildResults` settles one plan at a time, so `rows` gets a fresh
+ * identity once per member — and without this every already-settled member was
+ * re-flattened on each settle. A 25-member fit did ~650 material-tree walks to
+ * do 25 members' work.
+ *
+ * Module-level and keyed on the `BuildResult` itself: a result is replaced
+ * wholesale when its plan is repriced, so a cache entry is valid exactly as
+ * long as the object it hangs off, and dies with it. Deliberately not
+ * `useRef(new WeakMap())`, which allocates a map per render to throw away.
+ */
+const flattenedByResult = new WeakMap<
+  BuildResult,
+  { shopping: MaterialCostLine[]; table: MaterialCostLine[] }
+>();
+
+function flattenOnce(result: BuildResult) {
+  const cached = flattenedByResult.get(result);
+  if (cached) return cached;
+  const flattened = {
+    shopping: shoppingListMaterials(result.materials),
+    table: materialTableRows(result.materials),
+  };
+  flattenedByResult.set(result, flattened);
+  return flattened;
+}
 
 interface BuildGroupPanelProps {
   group: BuildGroup;
@@ -63,14 +92,15 @@ export function BuildGroupPanel({
       // nothing rather than contributing zeroes — a total that silently counts
       // a failed member as free is worse than one that says it is incomplete.
       if (!plan || !row.result) return [];
+      const flattened = flattenOnce(row.result);
       return [
         {
           planId: row.planId,
           planName: row.planName,
           hubId: plan.hubId,
           result: row.result,
-          shoppingMaterials: shoppingListMaterials(row.result.materials),
-          tableMaterials: materialTableRows(row.result.materials),
+          shoppingMaterials: flattened.shopping,
+          tableMaterials: flattened.table,
         },
       ];
     });
@@ -109,6 +139,7 @@ export function BuildGroupPanel({
     [members, detectedOwnedStock]
   );
 
+  const rowByPlanId = useMemo(() => new Map(rows.map((row) => [row.planId, row])), [rows]);
   const loading = rows.some((row) => row.loading);
   const failed = rows.filter((row) => row.error !== null);
   const canCopy = rollup.singleHub && hasShoppingList(rollup.shoppingMaterials);
@@ -186,9 +217,7 @@ export function BuildGroupPanel({
               // `systemName`, which hubs.ts keeps for exactly this — the full
               // station name ("Jita IV - Moon 4 - Caldari Navy Assembly
               // Plant") would bury the sentence it appears in.
-              hubs: rollup.hubIds
-                .map((id) => TRADE_HUBS.find((hub) => hub.id === id)?.systemName ?? id)
-                .join(', '),
+              hubs: rollup.hubIds.map((id) => getTradeHub(id)?.systemName ?? id).join(', '),
             })}
           </p>
         )}
@@ -214,7 +243,7 @@ export function BuildGroupPanel({
       <Panel title={t('industry.groupMembers')} padded={false}>
         <ul className="divide-y divide-line text-xs">
           {plans.map((plan) => {
-            const row = rows.find((r) => r.planId === plan.id);
+            const row = rowByPlanId.get(plan.id);
             return (
               <li key={plan.id}>
                 <button

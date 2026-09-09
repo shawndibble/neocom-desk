@@ -191,9 +191,10 @@ describe('fitToBuildPlans — merging and degenerate headers', () => {
     // shipName and fitName are written together or not at all, so a header
     // that fails to parse costs the hull too — surfaced, never silent.
     const result = fitToBuildPlans(parseEftFit('Inertial Stabilizers II'), lookup);
+    // One signal, not two: the parser writes both header names together or
+    // neither, so a null group name already says the hull is missing.
     expect(result.hull).toBeNull();
     expect(result.groupName).toBeNull();
-    expect(result.headerFailed).toBe(true);
   });
 
   it('counts a skipped item named on several lines once, with the total', () => {

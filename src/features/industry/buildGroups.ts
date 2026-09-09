@@ -33,10 +33,25 @@
  * `CustomsOverrides` — the local settings read is unfiltered across Characters,
  * so one key has to carry all of them.
  *
+ * ## Writing a group and its membership together
+ *
+ * A group's existence lives here and its membership lives on the plans, so
+ * creating or deleting one is two writes that cannot be atomic. One rule keeps
+ * every intermediate state legible, and both callers in `routes/Industry.tsx`
+ * follow it even though it makes their write orders opposite:
+ *
+ * **The group outlives the membership pointing at it** — created before its
+ * plans, removed after they have let go. Each half is already a first-class
+ * state on its own: an empty group is exactly what sits on screen between
+ * "create" and the first plan moved in, and a plan whose group is missing
+ * renders as an ordinary ungrouped plan. So a torn write shows one of those
+ * two rather than anything the list cannot draw.
+ *
  * Everything below is pure. The Dexie read and the `setSyncedSetting` write
  * live in the store at the bottom, the same split `customsOverride.ts` uses.
  */
 
+import { coerceArrayEntry, parseCharacterKeyedRecord } from '@/lib/characterKeyedRecord';
 import { createSyncedSetting } from '@/lib/useSyncedSetting';
 
 export const SYNCED_BUILD_GROUPS_KEY = 'sync.industryBuildGroups';
@@ -74,18 +89,7 @@ function usableGroup(value: unknown): value is BuildGroup {
  * row the pilot cannot tell from a bug — so neither is kept.
  */
 export function parseBuildGroups(raw: unknown): BuildGroupsValue {
-  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return {};
-  const out: BuildGroupsValue = {};
-  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
-    const characterId = Number(key);
-    if (!Number.isInteger(characterId) || characterId <= 0) continue;
-    if (!Array.isArray(value)) continue;
-    const groups = value.filter(usableGroup);
-    // An entry that survives validation with nothing in it is stored as
-    // nothing, so "had groups once" and "never had any" are the same value.
-    if (groups.length > 0) out[characterId] = groups;
-  }
-  return out;
+  return parseCharacterKeyedRecord(raw, (value) => coerceArrayEntry(value, usableGroup)) ?? {};
 }
 
 /** One Character's groups, lowest `order` first. */

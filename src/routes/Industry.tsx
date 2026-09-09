@@ -63,6 +63,28 @@ import { fitImportPlans } from '@/features/industry/fitImport';
 import { useAssumedMe } from '@/features/industry/assumedMe';
 import type { FitToBuildPlansResult } from '@/engine/import/fitToBuildPlans';
 
+/**
+ * What the detail pane is showing.
+ *
+ * One value rather than a plan id, a group id and a `comparing` boolean kept
+ * mutually exclusive by hand: the invariant used to be re-stated at every site
+ * that changed any of them, and one that forgot (creating a plan while a group
+ * was open) left two selections live, so the new plan silently did not open.
+ * Making the states alternatives of one type removes the invariant rather than
+ * restating it.
+ *
+ * Compare *mode* — the row checkboxes — is deliberately not in here. It is
+ * orthogonal: the checkboxes stay up while the table is closed, which is the
+ * whole "check some, then open" flow.
+ */
+type DetailSelection =
+  | { kind: 'none' }
+  | { kind: 'plan'; planId: string }
+  | { kind: 'group'; groupId: string }
+  | { kind: 'compare' };
+
+const NO_SELECTION: DetailSelection = { kind: 'none' };
+
 /** Build Plan manager: create (via blueprint search)/duplicate/delete/rename plans, edit the selected one. */
 export function Industry() {
   const { t } = useTranslation();
@@ -128,13 +150,14 @@ export function Industry() {
     void hydrateAssumedMe();
   }, [hydrateBuildGroups, hydrateExpandedGroups, hydrateAssumedMe]);
 
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  // The third kind of selection this pane can hold, beside a plan and the
-  // comparison table (issue #626). Kept apart from `selectedId` rather than
-  // folded into it: a plan id and a group id are not interchangeable, and
-  // `lastOpenedPlan` matches whatever it is given against the Character's own
-  // plans — filing a group id there would be dead weight for ever.
-  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
+  const [selection, setSelection] = useState<DetailSelection>(NO_SELECTION);
+  // Read back as the three things the pane below actually asks about. The tag
+  // is what keeps a group id out of `lastOpenedPlan`, which matches whatever
+  // it is given against the Character's own plans and would hold a group id
+  // as dead weight for ever.
+  const selectedId = selection.kind === 'plan' ? selection.planId : null;
+  const selectedGroupId = selection.kind === 'group' ? selection.groupId : null;
+  const comparing = selection.kind === 'compare';
   const [fitImportOpen, setFitImportOpen] = useState(false);
   // Only ever set for a group that still has members: deleting an empty one
   // destroys nothing, and a dialog asking about plans it does not have would
@@ -170,7 +193,6 @@ export function Industry() {
   // does that.
   const [compareMode, setCompareMode] = useState(false);
   const [compareSelectedIds, setCompareSelectedIds] = useState<ReadonlySet<string>>(new Set());
-  const [comparing, setComparing] = useState(false);
 
   useEffect(() => {
     if (activeCharacterId === null) return;
@@ -250,11 +272,7 @@ export function Industry() {
   // rather than in the effect, which React's set-state-in-effect check flags
   // as cascading-render risk for exactly this shape.
   if (pendingExistingPlan && selectedId !== pendingExistingPlan.id) {
-    // Clears the group first, the same discipline `openRunFromRecords` applies
-    // to Compare: leaving both live would render the group's rollup while the
-    // URL insisted a plan was open.
-    setSelectedGroupId(null);
-    setSelectedId(pendingExistingPlan.id);
+    setSelection({ kind: 'plan', planId: pendingExistingPlan.id });
   }
 
   // Creating a missing plan is a real side effect (a Dexie write), so it
@@ -299,8 +317,7 @@ export function Industry() {
     : null;
 
   if (materialPlan && selectedId !== materialPlan.id) {
-    setSelectedGroupId(null);
-    setSelectedId(materialPlan.id);
+    setSelection({ kind: 'plan', planId: materialPlan.id });
   }
 
   useEffect(() => {
@@ -318,7 +335,7 @@ export function Industry() {
     // A group is showing, so the first-plan fallback below must not also pick
     // a plan — it would mark a row selected under the group's own rollup and
     // fetch market prices for a plan nobody opened.
-    if (selectedGroupId !== null) return null;
+    if (selection.kind === 'group') return null;
     if (selectedId && plans.some((p) => p.id === selectedId)) return selectedId;
     // Nothing until the memory has been read: the settings row and the Dexie
     // plan query race, and taking the first-plan fallback before the answer
@@ -330,7 +347,7 @@ export function Industry() {
       activeCharacterId === null ? null : lastOpenedPlanFor(lastOpened, activeCharacterId);
     if (remembered && plans.some((p) => p.id === remembered)) return remembered;
     return plans[0]?.id ?? null;
-  }, [plans, selectedId, selectedGroupId, lastOpened, lastOpenedHydrated, activeCharacterId]);
+  }, [plans, selection, selectedId, lastOpened, lastOpenedHydrated, activeCharacterId]);
 
   const selectedPlan = useMemo(
     () => plans?.find((p) => p.id === effectiveSelectedId) ?? null,
@@ -389,9 +406,8 @@ export function Industry() {
   // a separate screen, so opening it on a narrow screen must navigate away
   // from the list exactly like picking a plan does.
   const isDesktop = useIsDesktop();
-  const detailVisible = isDesktop || selectedId !== null || comparing || selectedGroupId !== null;
-  const showBackControl =
-    !isDesktop && (selectedId !== null || comparing || selectedGroupId !== null);
+  const detailVisible = isDesktop || selection.kind !== 'none';
+  const showBackControl = !isDesktop && selection.kind !== 'none';
 
   if (!hydrated) {
     return (
@@ -413,7 +429,7 @@ export function Industry() {
     };
     await db.buildPlans.add(copy);
     scheduleSync(activeCharacterId);
-    setSelectedId(copy.id);
+    selectPlan(copy.id);
   }
 
   async function handleDelete(id: string) {
@@ -493,7 +509,7 @@ export function Industry() {
       // closes the table — the single exit path "Cancel" and "Done" share.
       if (wasOn) {
         setCompareSelectedIds(new Set());
-        setComparing(false);
+        setSelection((current) => (current.kind === 'compare' ? NO_SELECTION : current));
       }
       return !wasOn;
     });
@@ -508,17 +524,14 @@ export function Industry() {
     });
   }
 
-  /** Opens one plan, standing down any group rollup that was showing. */
-  function selectPlan(id: string) {
-    setSelectedGroupId(null);
-    setSelectedId(id);
+  function selectPlan(planId: string) {
+    setSelection({ kind: 'plan', planId });
   }
 
-  /** Opens a group's rollup. Exits Compare first, which the detail pane checks before either. */
+  /** Opens a group's rollup, and stands the row checkboxes down with it. */
   function selectGroup(groupId: string) {
-    exitCompare();
-    setSelectedId(null);
-    setSelectedGroupId(groupId);
+    clearCompareMode();
+    setSelection({ kind: 'group', groupId });
   }
 
   async function setGroupExpanded(groupId: string, expanded: boolean) {
@@ -545,13 +558,6 @@ export function Industry() {
     await setBuildGroups(renameBuildGroup(buildGroups, activeCharacterId, groupId, name));
   }
 
-  /**
-   * Deleting a group orphans its plans; it never cascades.
-   *
-   * A Build Plan is worth more than its membership — the same call
-   * `markBuildPlanDeleted` makes about Production Runs, which it deliberately
-   * does not cascade to either. The members reappear in the ungrouped list.
-   */
   /** Asks first, but only when there are plans for the question to be about. */
   function requestDeleteGroup(groupId: string) {
     if (membersOfGroup(groupId).length === 0) void handleDeleteGroup(groupId);
@@ -568,6 +574,8 @@ export function Industry() {
   async function handleDeleteGroup(groupId: string) {
     if (activeCharacterId === null) return;
     setDeletingGroupId(null);
+    // Membership goes first and the group's own record last: the group
+    // outlives what points at it (see `buildGroups.ts`).
     const members = membersOfGroup(groupId);
     if (members.length > 0) {
       const now = Date.now();
@@ -584,7 +592,7 @@ export function Industry() {
       scheduleSync(activeCharacterId);
     }
     await setBuildGroups(removeBuildGroup(buildGroups, activeCharacterId, groupId));
-    if (selectedGroupId === groupId) setSelectedGroupId(null);
+    if (selectedGroupId === groupId) setSelection(NO_SELECTION);
   }
 
   /** Moves one plan between groups, or out of every group when `groupId` is null. */
@@ -630,6 +638,9 @@ export function Industry() {
       buildGroupId: groupId,
     });
     if (newPlans.length === 0) return;
+    // The group's record is written before its plans, the same rule the delete
+    // path follows from the other end (see `buildGroups.ts`).
+    //
     // The ship goes into the stored name rather than being derived from the
     // members later: nothing marks which plan is the hull, and any ordering
     // that stood in for one (insertion order, newest `updatedAt`) names a
@@ -651,10 +662,14 @@ export function Industry() {
     selectGroup(groupId);
   }
 
-  function exitCompare() {
-    setComparing(false);
+  function clearCompareMode() {
     setCompareMode(false);
     setCompareSelectedIds(new Set());
+  }
+
+  function exitCompare() {
+    clearCompareMode();
+    setSelection(NO_SELECTION);
   }
 
   /**
@@ -735,7 +750,7 @@ export function Industry() {
                   onSelect={selectPlan}
                   onCreate={(entry) =>
                     void createPlan(entry).then((id) => {
-                      if (id) setSelectedId(id);
+                      if (id) selectPlan(id);
                     })
                   }
                   onDuplicate={(id) => void handleDuplicate(id)}
@@ -745,7 +760,7 @@ export function Industry() {
                   compareSelectedIds={compareSelectedIds}
                   onToggleCompareMode={toggleCompareMode}
                   onToggleCompareSelected={toggleCompareSelected}
-                  onOpenCompare={() => setComparing(true)}
+                  onOpenCompare={() => setSelection({ kind: 'compare' })}
                   groups={groups}
                   expandedGroupIds={expandedGroupIds}
                   selectedGroupId={detailVisible ? selectedGroupId : null}
@@ -767,8 +782,7 @@ export function Industry() {
                     size="sm"
                     onClick={() => {
                       if (comparing) exitCompare();
-                      else if (selectedGroupId !== null) setSelectedGroupId(null);
-                      else setSelectedId(null);
+                      else setSelection(NO_SELECTION);
                     }}
                   >
                     {t('industry.backToList')}

@@ -23,6 +23,7 @@
  * is scoped to the active Character, and one flat set would be overwritten by
  * whichever Character was looked at last.
  */
+import { coerceArrayEntry, parseCharacterKeyedRecord } from '@/lib/characterKeyedRecord';
 import { createLocalSetting } from '@/lib/useLocalSetting';
 
 /** characterId (as an object key) -> the ids of that Character's open groups. */
@@ -32,20 +33,9 @@ export const EXPANDED_GROUPS_KEY = 'industryExpandedGroups';
 
 /** Exported for its test — the store below is the only other caller. */
 export function parseExpandedGroups(raw: unknown): ExpandedGroupsValue | null {
-  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return null;
-  const parsed: ExpandedGroupsValue = {};
-  for (const [characterId, ids] of Object.entries(raw)) {
-    // A damaged or hand-edited row loses only the entries that are damaged,
-    // rather than every Character's open groups at once.
-    if (!Array.isArray(ids)) continue;
-    const id = Number(characterId);
-    if (!Number.isInteger(id)) continue;
-    const usable = ids.filter(
-      (value): value is string => typeof value === 'string' && value !== ''
-    );
-    if (usable.length > 0) parsed[id] = usable;
-  }
-  return parsed;
+  return parseCharacterKeyedRecord(raw, (ids) =>
+    coerceArrayEntry(ids, (id): id is string => typeof id === 'string' && id !== '')
+  );
 }
 
 export const useExpandedGroups = createLocalSetting<ExpandedGroupsValue>({
@@ -53,15 +43,6 @@ export const useExpandedGroups = createLocalSetting<ExpandedGroupsValue>({
   defaultValue: {},
   parse: parseExpandedGroups,
 });
-
-/** Whether one Character has this group open. Unknown means collapsed. */
-export function isGroupExpanded(
-  value: ExpandedGroupsValue,
-  characterId: number,
-  groupId: string
-): boolean {
-  return value[characterId]?.includes(groupId) ?? false;
-}
 
 /** The value with one group's open/closed state flipped — other Characters untouched. */
 export function withGroupExpanded(
