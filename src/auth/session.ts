@@ -18,17 +18,98 @@ export interface SsoConfig {
   redirectUri?: string;
 }
 
+/** Key prefix for a Pending Login; the rest of the key is its `state`. */
+const PKCE_PREFIX = 'neocom.sso.pkce.';
+
+/**
+ * Legacy single-slot keys, read but never written. A login that left for SSO
+ * before this deploy comes back to a tab holding only these; dropping them
+ * would fail every login in flight at release.
+ */
 const VERIFIER_KEY = 'neocom.sso.verifier';
 const STATE_KEY = 'neocom.sso.state';
-/**
- * What the authorize URL asked SSO for, stashed for the callback to read.
- *
- * Alongside the PKCE verifier because it has the same lifetime — one authorize
- * round trip, this tab only — and the same failure mode if it outlives one:
- * `purgeCacheIfConsentChangedOrPending` would go on treating a stale request as
- * the baseline for grants it had nothing to do with.
- */
 const SCOPES_KEY = 'neocom.sso.scopes';
+
+/**
+ * What the most recent `startLogin` asked for, kept so a failed callback can
+ * restart *that* login rather than a different one.
+ *
+ * `/callback` serves every entry point — Add Character, a `ScopeGate`, a corp
+ * grant — and they ask for different scopes. Retrying a failed corp grant as a
+ * plain re-auth would succeed while silently not granting corp access, the
+ * quiet-downgrade `loginFlow` exists to avoid. Outlives the Pending Login it
+ * describes, because the failure it serves is precisely the one where that
+ * entry is gone.
+ */
+const INTENT_KEY = 'neocom.sso.intent';
+
+/**
+ * How long a Pending Login stays usable, and how many may exist at once — a
+ * per-state store grows where a single slot could not. Both are generous next
+ * to a round trip measured in seconds; they exist so an abandoned login is
+ * forgotten rather than kept for the life of the tab. The TTL is enforced on
+ * read as well as on prune, so it holds in a tab that starts no further login.
+ */
+const PENDING_TTL_MS = 15 * 60_000;
+const MAX_PENDING = 5;
+
+/**
+ * How many times a failed callback may restart the sign-in by itself.
+ *
+ * One. The retry leaves for SSO and comes back to `/callback`, so an
+ * unbudgeted one is a redirect loop between the app and EVE — invisible to the
+ * user and impossible to interrupt. Counted in storage, not in a ref, because
+ * the retry is a full page load.
+ */
+const RETRY_KEY = 'neocom.sso.autoRetries';
+const MAX_AUTO_RETRIES = 1;
+
+/**
+ * One authorize round trip this tab has started and not yet finished.
+ *
+ * Stored under its own `state` rather than in one shared slot, because a
+ * shared slot is a race (issue #649): `startLogin` writes the stash and only
+ * then does the browser leave for `login.eveonline.com`, so a second press
+ * landing in that gap overwrote the verifier the first, already-committing
+ * navigation was about to use. SSO then came back with a `state` this tab no
+ * longer recognised and the login died. Keyed by `state`, both round trips
+ * stay valid and whichever returns is the one that completes.
+ */
+interface PendingLogin {
+  verifier: string;
+  /**
+   * What this round trip asked SSO for, or `undefined` for "unknown".
+   *
+   * Not the same as "asked for nothing": `purgeCacheIfConsentChangedOrPending`
+   * treats `undefined` as no baseline and falls back to the stored grant, which
+   * still catches a revocation, whereas an empty list would assert the app
+   * asked for nothing and quietly disable revocation-driven purging. Anything
+   * unreadable therefore answers `undefined`, the conservative reading.
+   */
+  scopes: string[] | undefined;
+  createdAt: number;
+}
+
+/**
+ * Which way a login failed. The callback route recovers from these rather
+ * than dead-ending on them, and words them apart when it cannot (issue #649).
+ */
+export type LoginFailureReason = 'no-login-in-progress' | 'state-mismatch';
+
+/**
+ * A login that failed before the token exchange. `AuthError` (`auth/sso.ts`)
+ * covers failures at or after it, so `reason` is absent there and the caller
+ * treats that as the generic case.
+ */
+export class LoginError extends Error {
+  constructor(
+    readonly reason: LoginFailureReason,
+    message: string
+  ) {
+    super(message);
+    this.name = 'LoginError';
+  }
+}
 
 /** Refresh when less than this remains on the access token. */
 const EXPIRY_BUFFER_MS = 60_000;
@@ -40,14 +121,17 @@ function resolveConfig(config?: SsoConfig): { clientId: string; redirectUri: str
   };
 }
 
-/** Stash PKCE verifier + state and return the URL to redirect the user to. */
+/** Stash this round trip's PKCE verifier under its `state` and return the URL. */
 export async function startLogin(scopes: string[], config?: SsoConfig): Promise<string> {
   const { clientId, redirectUri } = resolveConfig(config);
   const verifier = generateVerifier();
   const state = generateVerifier(); // independent 32-byte random value
-  sessionStorage.setItem(VERIFIER_KEY, verifier);
-  sessionStorage.setItem(STATE_KEY, state);
-  sessionStorage.setItem(SCOPES_KEY, JSON.stringify(scopes));
+  const pending: PendingLogin = { verifier, scopes, createdAt: Date.now() };
+  // Prune first: at quota, the write below would otherwise fail for room that
+  // pruning was about to free. `state` is not yet written, so nothing is lost.
+  prunePendingLogins(state);
+  writeStorage(PKCE_PREFIX + state, JSON.stringify(pending));
+  writeStorage(INTENT_KEY, JSON.stringify(scopes));
   return buildAuthorizeUrl({
     clientId,
     redirectUri,
@@ -238,27 +322,169 @@ export async function recordCharacterCorporation(
 }
 
 /**
- * What `startLogin` asked for, or `undefined` if this tab has no record of it.
- *
- * `undefined` is not "asked for nothing" — it is "unknown", and the purge falls
- * back to comparing against the stored grant, exactly as it did before #295.
- * Anything unreadable (cleared storage, a hand-edited or truncated value)
- * answers `undefined` for the same reason: the conservative reading is the one
- * that still catches a revocation.
+ * Every storage write here is best-effort. Storage can be full, or blocked
+ * outright (private-mode webviews, "block site data"), and a throw from
+ * `setItem` must not be what fails an otherwise good login.
  */
-function takeRequestedScopes(): string[] | undefined {
-  const raw = sessionStorage.getItem(SCOPES_KEY);
-  sessionStorage.removeItem(SCOPES_KEY);
-  if (raw === null) return undefined;
+function writeStorage(key: string, value: string): void {
   try {
-    const parsed: unknown = JSON.parse(raw);
-    if (!Array.isArray(parsed) || !parsed.every((scope) => typeof scope === 'string')) {
-      return undefined;
+    sessionStorage.setItem(key, value);
+  } catch {
+    // A login that cannot stash cannot complete, but it fails at the callback
+    // with a real reason rather than here with a storage exception.
+  }
+}
+
+/** `null` for both "absent" and "unreadable" — neither can complete a login. */
+function readStorage(key: string): string | null {
+  try {
+    return sessionStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function removeStorage(key: string): void {
+  try {
+    sessionStorage.removeItem(key);
+  } catch {
+    // Nothing to do; the entry is bounded by TTL and MAX_PENDING anyway.
+  }
+}
+
+/** Keys of every pending round trip in this tab. */
+function pendingKeys(): string[] {
+  const keys: string[] = [];
+  try {
+    for (let i = 0; i < sessionStorage.length; i += 1) {
+      const key = sessionStorage.key(i);
+      if (key?.startsWith(PKCE_PREFIX)) keys.push(key);
     }
-    return parsed;
+  } catch {
+    return [];
+  }
+  return keys;
+}
+
+/** `expired` is separate so `prunePendingLogins` can tell "gone" from "stale". */
+function readPendingLogin(key: string, allowExpired = false): PendingLogin | undefined {
+  const raw = readStorage(key);
+  if (raw === null) return undefined;
+  let parsed: Partial<PendingLogin>;
+  try {
+    parsed = JSON.parse(raw) as Partial<PendingLogin>;
   } catch {
     return undefined;
   }
+  if (typeof parsed.verifier !== 'string') return undefined;
+  const createdAt = typeof parsed.createdAt === 'number' ? parsed.createdAt : 0;
+  if (!allowExpired && Date.now() - createdAt > PENDING_TTL_MS) return undefined;
+  return { verifier: parsed.verifier, scopes: asScopes(parsed.scopes), createdAt };
+}
+
+/** Drop expired round trips, then the oldest beyond `MAX_PENDING`. `keep` is never dropped. */
+function prunePendingLogins(keep: string): void {
+  const now = Date.now();
+  const keepKey = PKCE_PREFIX + keep;
+  const live: { key: string; createdAt: number }[] = [];
+  for (const key of pendingKeys()) {
+    if (key === keepKey) continue;
+    const pending = readPendingLogin(key, true);
+    if (!pending || now - pending.createdAt > PENDING_TTL_MS) {
+      removeStorage(key);
+      continue;
+    }
+    live.push({ key, createdAt: pending.createdAt });
+  }
+  live.sort((a, b) => b.createdAt - a.createdAt);
+  for (const stale of live.slice(MAX_PENDING - 1)) removeStorage(stale.key);
+}
+
+/**
+ * The legacy single-slot stash, for a login that left before this deploy.
+ * Read once and cleared whatever the outcome — it cannot serve a second
+ * callback, and leaving it would shadow the per-state store.
+ */
+function takeLegacyPending(state: string): PendingLogin | undefined {
+  const expectedState = readStorage(STATE_KEY);
+  const verifier = readStorage(VERIFIER_KEY);
+  // Compared before it is cleared: a stray callback must not destroy a legacy
+  // login still in flight, which is the only kind this path exists to finish.
+  if (!expectedState || !verifier || expectedState !== state) return undefined;
+  const rawScopes = readStorage(SCOPES_KEY);
+  removeStorage(STATE_KEY);
+  removeStorage(VERIFIER_KEY);
+  removeStorage(SCOPES_KEY);
+  return { verifier, scopes: parseScopes(rawScopes), createdAt: 0 };
+}
+
+/** Anything that is not a list of strings reads as "unknown" — see `PendingLogin`. */
+function asScopes(value: unknown): string[] | undefined {
+  return Array.isArray(value) && value.every((scope) => typeof scope === 'string')
+    ? value
+    : undefined;
+}
+
+function parseScopes(raw: string | null): string[] | undefined {
+  if (raw === null) return undefined;
+  try {
+    return asScopes(JSON.parse(raw));
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * What a retry should ask SSO for, or `undefined` if this tab has no record of
+ * a login to retry.
+ *
+ * The union of every live Pending Login first, and only then the single
+ * `INTENT_KEY` slot. That slot holds the *most recent* request, so with two
+ * round trips open at once — an Add Character and a corp grant, say — it
+ * describes whichever started last, and retrying the other from it could ask
+ * for less than it originally did. Under-asking is the failure that matters:
+ * SSO issues a token carrying exactly what was requested, so a dropped scope
+ * is a grant silently thrown away. Where a round trip is still live its own
+ * scopes are exact, and the union cannot narrow any of them.
+ */
+export function scopesForRetry(): string[] | undefined {
+  const live = pendingKeys().flatMap((key) => readPendingLogin(key)?.scopes ?? []);
+  if (live.length > 0) return [...new Set(live)];
+  return parseScopes(readStorage(INTENT_KEY));
+}
+
+/**
+ * Spend one automatic-restart attempt, or `false` when none is left.
+ *
+ * No storage means no automatic retry: failing closed costs one manual press,
+ * failing open risks the loop `RETRY_KEY` exists to bound.
+ */
+export function takeRetryBudget(): boolean {
+  const spent = Number(readStorage(RETRY_KEY) ?? '0');
+  if (!(spent < MAX_AUTO_RETRIES)) return false;
+  const before = readStorage(RETRY_KEY);
+  writeStorage(RETRY_KEY, String(spent + 1));
+  return readStorage(RETRY_KEY) !== before;
+}
+
+/** Give back the automatic restarts — a user-initiated retry is not one. */
+export function clearRetryBudget(): void {
+  removeStorage(RETRY_KEY);
+}
+
+/**
+ * Forget what there was to retry. Used on success, and on a cancelled sign-in
+ * — where clearing the *budget* instead would re-arm the automatic restart and
+ * leave the intent behind as fuel for it.
+ */
+export function clearLoginIntent(): void {
+  removeStorage(INTENT_KEY);
+}
+
+/** Forget the last login's intent and its retries — call once it has succeeded. */
+export function clearLoginRecovery(): void {
+  clearLoginIntent();
+  removeStorage(RETRY_KEY);
 }
 
 /** Handle the SSO callback: validate state, exchange code, persist character + token. */
@@ -267,16 +493,21 @@ export async function completeLogin(
   config?: SsoConfig
 ): Promise<CharacterRecord> {
   const { clientId } = resolveConfig(config);
-  const expectedState = sessionStorage.getItem(STATE_KEY);
-  const verifier = sessionStorage.getItem(VERIFIER_KEY);
-  if (!expectedState || !verifier) throw new Error('No login in progress');
-  if (params.state !== expectedState) throw new Error('SSO state mismatch');
-  sessionStorage.removeItem(STATE_KEY);
-  sessionStorage.removeItem(VERIFIER_KEY);
-  const requestedScopes = takeRequestedScopes();
+  const key = PKCE_PREFIX + params.state;
+  const pending = readPendingLogin(key) ?? takeLegacyPending(params.state);
+  if (!pending) {
+    // Told apart for the user's sake: another round trip still pending means
+    // this callback lost a race, whereas none at all means the stash is spent
+    // or this tab never started a login.
+    throw pendingKeys().length > 0
+      ? new LoginError('state-mismatch', 'SSO state mismatch')
+      : new LoginError('no-login-in-progress', 'No login in progress');
+  }
+  // One-shot: the code is single-use, so a second callback must not re-exchange.
+  removeStorage(key);
 
-  const tokens = await exchangeCode({ clientId, code: params.code, verifier });
-  return persistTokens(tokens, requestedScopes);
+  const tokens = await exchangeCode({ clientId, code: params.code, verifier: pending.verifier });
+  return persistTokens(tokens, pending.scopes);
 }
 
 // Single-flight per character: EVE rotates refresh tokens, so two concurrent

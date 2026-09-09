@@ -858,6 +858,9 @@
     "completing": "Completing login…",
     "errorTitle": "Login failed",
     "errorMessage": "Something went wrong signing you in. Please try again.",
+    "errorSpent": "This sign-in link has already been used, or it was opened in a different browser tab or window. Start the sign-in again.",
+    "errorMismatch": "This sign-in could not be verified. Another sign-in may have started before this one finished. Start the sign-in again.",
+    "errorDenied": "Sign-in was cancelled on the EVE Online page. Nothing was added.",
     "retry": "Try again"
   },
   "character": {

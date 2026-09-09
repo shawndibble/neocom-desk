@@ -63,13 +63,21 @@ External dependencies: `esi.evetech.net`, `login.eveonline.com`,
 ## 3. Data flows
 
 **SSO login (PKCE)**
-`app/loginFlow.beginEveLogin` → `auth/session.startLogin` stashes PKCE
-verifier+state in `sessionStorage`, redirects to `login.eveonline.com` →
+`app/loginFlow.beginEveLogin` → `auth/session.startLogin` stashes one
+**Pending Login** per round trip in `sessionStorage` — `neocom.sso.pkce.<state>`
+holding `{ verifier, scopes, createdAt }`, so two racing presses cannot clobber
+each other's verifier (#649) — redirects to `login.eveonline.com` →
 `routes/Callback.tsx` → `auth/session.completeLogin` validates state,
 exchanges code, decodes the JWT (`auth/jwt`), writes `CharacterRecord` +
 `TokenRecord` (refresh token) to Dexie. Later ESI calls go through
 `auth/session.getValidAccessToken` (single-flight refresh, buffer 60s before
-expiry) → `esi/client.configureEsi`'s injected `getToken`.
+expiry) → `esi/client.configureEsi`'s injected `getToken`. A callback that
+cannot complete does not dead-end: `app/loginFlow.retryLastLoginOnce` restarts
+the sign-in asking for what a live Pending Login (else `neocom.sso.intent`)
+asked for, so a corp grant is not retried as a plain re-auth, under a budget in
+`neocom.sso.autoRetries` that stops it looping between the app and SSO. Only
+then does a panel appear, worded per failure, with a button that restarts the
+sign-in. A `?error=` from SSO (a cancelled sign-in) is terminal.
 
 **ESI read-through cache**
 Pattern: try live `esiFetch` → on success, write `db.esiCache` (keyed
