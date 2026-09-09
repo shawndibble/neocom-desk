@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { db } from '@/db';
@@ -158,6 +158,25 @@ describe('BpcSourcingPanel', () => {
     render(<App />);
 
     expect(await screen.findByText("Public BPC search isn't available")).toBeInTheDocument();
+  });
+
+  it('right-clicking a row starts a Build Plan for the item the blueprint makes', async () => {
+    loadPublicBpcContracts.mockResolvedValue(
+      cachedSnapshot([row({ contractId: 1, typeId: 638, regionId: 10000002 })])
+    );
+    render(<App />);
+
+    const table = await screen.findByRole('table', { name: 'BPC Search' });
+    fireEvent.contextMenu(within(table).getByText('Rifter Blueprint'));
+
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Build Plan' }));
+
+    // 587 (Rifter), not 638 (its blueprint): Industry resolves `?product=` via
+    // the catalog's `byProductTypeID`, so handing it the blueprint's own
+    // typeID would silently create nothing.
+    await waitFor(() => {
+      expect(window.location.search).toContain('product=587');
+    });
   });
 
   it('still lands on the sourcing tab from the old /bpc-contracts link', async () => {
