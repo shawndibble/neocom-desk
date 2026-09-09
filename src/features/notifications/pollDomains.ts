@@ -15,7 +15,14 @@
  * the entry literal is fully type-checked while the loop that drives all of
  * them needs no per-domain branch.
  */
-import { loadCharacterSkillQueueWithStatus } from '@/features/skills/data';
+import {
+  loadCharacterSkillQueueWithStatus,
+  loadCharacterSkillsWithStatus,
+} from '@/features/skills/data';
+import {
+  useSpExtractionMonitoringEnabled,
+  useSpExtractionThresholdSp,
+} from '@/features/character/spExtractionSettings';
 import { loadCharacterIndustryJobs } from '@/features/industry/jobs';
 import { loadCharacterPlanets, loadAllColonyDetails } from '@/features/pi/data';
 import { extractorProgramsFromPins } from '@/features/pi/adapters';
@@ -51,6 +58,7 @@ import type {
 import {
   runSkillQueueNotificationDiffs,
   SKILL_QUEUE_NOTIFICATION_DIFFS,
+  diffSpExtractionReady,
   diffIndustryJobComplete,
   diffPlanetaryExtractionDone,
   diffPlanetaryExtractorExpiring,
@@ -71,6 +79,9 @@ import {
   type SkillQueueEntrySnapshot,
   type SkillQueueSnapshot,
   type SkillQueueNotificationEventId,
+  type SpExtractionEntrySnapshot,
+  type SpExtractionSnapshot,
+  type SpExtractionFire,
   type IndustryJobSnapshot,
   type IndustryJobEntrySnapshot,
   type IndustryJobNotificationFire,
@@ -165,6 +176,7 @@ async function universeTypeName(typeId: number): Promise<string | null> {
 /** Every fire any registered diff can produce. */
 export type AnyNotificationFire =
   | NotificationFire
+  | SpExtractionFire
   | IndustryJobNotificationFire
   | PlanetaryNotificationFire
   | MailNotificationFire
@@ -393,6 +405,53 @@ export const skillQueueDomain = defineDomain<SkillQueueEntry, SkillQueueSnapshot
     },
   }
 );
+
+/* -------------------------------------------------------------------------- */
+/* SP extraction (grilling session, 2026-09-09)                               */
+/* -------------------------------------------------------------------------- */
+
+function isSpExtractionEntrySnapshot(raw: unknown): raw is SpExtractionEntrySnapshot {
+  if (typeof raw !== 'object' || raw === null) return false;
+  const r = raw as Record<string, unknown>;
+  return typeof r.totalSp === 'number' && typeof r.thresholdSp === 'number';
+}
+
+/** Re-read every poll, same reasoning as `currentThresholds` below: AC4's "without a reload" needs the live value, not a value captured at store-creation time. */
+async function currentSpExtractionEnabled(): Promise<boolean> {
+  await useSpExtractionMonitoringEnabled.getState().hydrate();
+  return useSpExtractionMonitoringEnabled.getState().value;
+}
+
+async function currentSpExtractionThresholdSp(): Promise<number> {
+  await useSpExtractionThresholdSp.getState().hydrate();
+  return useSpExtractionThresholdSp.getState().value;
+}
+
+export const spExtractionDomain = defineDomain<
+  SpExtractionEntrySnapshot,
+  SpExtractionSnapshot,
+  SpExtractionFire
+>({
+  id: 'spExtraction',
+  eventIds: ['spExtractionReady'],
+  stateKey: 'notifications.pollerState.spExtraction',
+  entriesKey: 'entries',
+  isEntry: isSpExtractionEntrySnapshot,
+  load: async (characterId) => {
+    // The opt-in gate: skipped entirely (no ESI call at all) unless the
+    // pilot has turned monitoring on, matching `corpContextFor`'s "err
+    // toward not calling the endpoint" precedent above.
+    if (!(await currentSpExtractionEnabled())) return null;
+    const result = await loadCharacterSkillsWithStatus(characterId);
+    if (result.needsReauth || result.cached === null) return null;
+    const thresholdSp = await currentSpExtractionThresholdSp();
+    // Exactly one entry — see SpExtractionSnapshot's doc comment for why it's
+    // an array at all.
+    return [{ totalSp: result.cached.data.total_sp, thresholdSp }];
+  },
+  toSnapshot: (entries, nowMs) => ({ entries: [...entries], nowMs }),
+  diffs: [gatedOn('spExtractionReady', diffSpExtractionReady)],
+});
 
 /* -------------------------------------------------------------------------- */
 /* Industry jobs                                                               */
@@ -1150,6 +1209,7 @@ export const corpWalletDomain = defineDomain<
  */
 export const POLL_DOMAINS: readonly PollDomain[] = [
   skillQueueDomain,
+  spExtractionDomain,
   industryJobDomain,
   colonyDomain,
   mailDomain,

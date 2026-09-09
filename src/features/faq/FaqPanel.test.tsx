@@ -52,6 +52,8 @@ const SETTING_KEY_TO_PHRASE: Readonly<Record<string, RegExp>> = {
   'sync.piExpiringSoonHours': /expiring-soon window/i,
   'sync.corpDarkAfterDays': /dark threshold/i,
   'sync.defaultCharacterFilter': /default characters shown/i,
+  'sync.spExtractionMonitoringEnabled': /SP Extraction monitoring is on/i,
+  'sync.spExtractionThresholdSp': /SP threshold you set/i,
 };
 
 function syncedItemIds(): Set<string> {

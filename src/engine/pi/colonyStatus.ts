@@ -98,12 +98,29 @@ export function colonyAttention(
   return 'healthy';
 }
 
-const ATTENTION_RANK: Record<ColonyAttention, number> = {
+/** Exported for callers that need the same ordering outside a sort (e.g. a table column's `sortValue`) without re-deriving it. */
+export const ATTENTION_RANK: Record<ColonyAttention, number> = {
   idle: 0,
   'expiring-soon': 1,
   decayed: 2,
   healthy: 3,
 };
+
+// `decayed` is deliberately not `warning`: it would then be indistinguishable
+// at a glance from `expiring-soon`, which is the more urgent call. `accent`
+// reads as "worth a look", which is all the flag claims to be.
+//
+// Plain string literals rather than `StatChipTone` (the UI layer's type) —
+// this stays an engine module with no import from `components/ui`. Every
+// value here is one of `StatChipTone`'s members, so a UI caller can index a
+// `Record<StatChipTone, ...>` with it directly without a cast.
+export const ATTENTION_TONE: Record<ColonyAttention, 'danger' | 'warning' | 'accent' | 'success'> =
+  {
+    idle: 'danger',
+    'expiring-soon': 'warning',
+    decayed: 'accent',
+    healthy: 'success',
+  };
 
 /**
  * Colonies needing attention first: idle, then soonest-expiring, then decayed

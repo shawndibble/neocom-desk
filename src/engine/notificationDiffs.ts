@@ -17,6 +17,7 @@
  */
 import { colonyStatus } from './pi/colonyStatus';
 import { diffRoster } from './corp/members';
+import { isSpExtractionReady } from './spExtraction';
 
 export interface SkillQueueEntrySnapshot {
   skillId: number;
@@ -128,6 +129,56 @@ export function diffCharacterNotTraining(
   return [
     { eventId: 'characterNotTraining', characterId, skillId: null, level: null, finishMs: null },
   ];
+}
+
+/* -------------------------------------------------------------------------- */
+/* SP extraction                                                              */
+/* -------------------------------------------------------------------------- */
+
+export interface SpExtractionEntrySnapshot {
+  totalSp: number;
+  /**
+   * Baked in at fetch time (`pollDomains.ts`'s `spExtractionDomain`), same as
+   * `walletDomain`'s `thresholdIsk` below — a preference read at the impure
+   * boundary, never here.
+   */
+  thresholdSp: number;
+}
+
+/** Exactly one entry, always — one Character has one total SP. An array only to fit the registry's `{ nowMs, entries: T[] }` snapshot shape (`pollerState.ts`). */
+export interface SpExtractionSnapshot {
+  entries: readonly SpExtractionEntrySnapshot[];
+  nowMs: number;
+}
+
+export interface SpExtractionFire {
+  eventId: 'spExtractionReady';
+  characterId: number;
+}
+
+/**
+ * Fires when extractable SP crosses the pilot's threshold
+ * (`engine/spExtraction.ts`'s `isSpExtractionReady`), edge-triggered the same
+ * way `diffCharacterNotTraining` above is: a pilot who lets spare SP pile up
+ * for months must not be renotified every poll in between — only once, when
+ * it first crosses.
+ *
+ * Deliberately *not* `characterNotTraining`'s `if (!prev) return []` shape:
+ * that guard exists because training state flaps constantly, so a first-poll
+ * fire would flood. SP-ready takes months to cross, and the first poll after
+ * a pilot opts into monitoring *is* their request to be told if they already
+ * qualify — so an absent baseline reads as "not ready before", not "skip".
+ */
+export function diffSpExtractionReady(
+  characterId: number,
+  prev: SpExtractionSnapshot | undefined,
+  next: SpExtractionSnapshot
+): SpExtractionFire[] {
+  const current = next.entries[0];
+  if (!current || !isSpExtractionReady(current.totalSp, current.thresholdSp)) return [];
+  const before = prev?.entries[0];
+  if (before && isSpExtractionReady(before.totalSp, before.thresholdSp)) return [];
+  return [{ eventId: 'spExtractionReady', characterId }];
 }
 
 export interface IndustryJobEntrySnapshot {

@@ -19,6 +19,18 @@ import {
   useStarredCharacters,
 } from '@/features/character/starredCharacters';
 import { FONT_SCALE_KEY, useFontScale } from '@/lib/fontScale';
+import {
+  DEFAULT_VISIBLE_CHARACTER_COLUMNS,
+  useCharacterViewMode,
+  useVisibleCharacterColumns,
+} from '@/features/character/characterColumns';
+import {
+  DEFAULT_SP_EXTRACTION_THRESHOLD_SP,
+  useSpExtractionMonitoringEnabled,
+  useSpExtractionThresholdSp,
+} from '@/features/character/spExtractionSettings';
+import * as rosterModule from '@/features/character/roster';
+import * as rosterAttentionModule from '@/features/character/rosterAttention';
 import { Characters } from './Characters';
 
 vi.mock('@/app/loginFlow', () => ({
@@ -77,6 +89,16 @@ beforeEach(async () => {
   useOverviewGroups.setState({ value: { groups: [], updatedAt: 0 }, hydrated: false });
   useStarredCharacters.setState({ value: NO_STARRED_CHARACTERS, hydrated: false });
   useFontScale.setState({ value: 1, hydrated: false });
+  useCharacterViewMode.setState({ value: 'card', hydrated: false });
+  useVisibleCharacterColumns.setState({
+    value: DEFAULT_VISIBLE_CHARACTER_COLUMNS,
+    hydrated: false,
+  });
+  useSpExtractionMonitoringEnabled.setState({ value: false, hydrated: false });
+  useSpExtractionThresholdSp.setState({
+    value: DEFAULT_SP_EXTRACTION_THRESHOLD_SP,
+    hydrated: false,
+  });
   await db.characters.bulkPut([
     { characterId: 91, name: 'Pilot One', ownerHash: 'oh-1', addedAt: 1 },
     { characterId: 92, name: 'Pilot Two', ownerHash: 'oh-2', addedAt: 2 },
@@ -544,3 +566,127 @@ async function waitForSettingsValue(
     { timeout: timeoutMs }
   );
 }
+
+describe('Characters table view', () => {
+  it('defaults to card view', async () => {
+    renderCharacters();
+    expect(await screen.findByRole('button', { name: 'Cards' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+  });
+
+  it('switching to Table view renders a real table with a header row and every character as a row', async () => {
+    const user = userEvent.setup();
+    renderCharacters();
+    await user.click(await screen.findByRole('button', { name: 'Table' }));
+
+    const table = await screen.findByRole('table');
+    expect(within(table).getByRole('columnheader', { name: /name/i })).toBeInTheDocument();
+    expect(within(table).getByText('Pilot One')).toBeInTheDocument();
+    expect(within(table).getByText('Pilot Two')).toBeInTheDocument();
+  });
+
+  it('clicking a table row selects that character and navigates to /overview, same as a card', async () => {
+    const user = userEvent.setup();
+    renderCharacters();
+    await user.click(await screen.findByRole('button', { name: 'Table' }));
+    await user.click(await screen.findByText('Pilot One'));
+
+    expect(await screen.findByText('overview page')).toBeInTheDocument();
+    expect(useActiveCharacter.getState().activeCharacterId).toBe(91);
+  });
+
+  it('the Columns picker adds and removes columns from the table, and persists the choice device-locally', async () => {
+    const user = userEvent.setup();
+    renderCharacters();
+    await user.click(await screen.findByRole('button', { name: 'Table' }));
+
+    // Wallet isn't one of the default-visible columns.
+    expect(
+      within(screen.getByRole('table')).queryByRole('columnheader', { name: /wallet/i })
+    ).not.toBeInTheDocument();
+
+    await user.click(await screen.findByRole('button', { name: 'Columns' }));
+    await user.click(await screen.findByRole('menuitemcheckbox', { name: 'Wallet' }));
+    // The menu stays open on purpose (multi-select — see the component's own
+    // comment), and Radix marks the rest of the page aria-hidden while it's
+    // open, which hides the table from every role query below. Close it
+    // first, the way a real reader would before looking back at the table.
+    await user.keyboard('{Escape}');
+
+    expect(
+      within(screen.getByRole('table')).getByRole('columnheader', { name: /wallet/i })
+    ).toBeInTheDocument();
+    await waitForSettingsValue(
+      'charactersVisibleColumns',
+      (value) => Array.isArray(value) && value.includes('wallet')
+    );
+
+    // Toggling it back off removes the column again.
+    await user.click(await screen.findByRole('button', { name: 'Columns' }));
+    await user.click(await screen.findByRole('menuitemcheckbox', { name: 'Wallet' }));
+    await user.keyboard('{Escape}');
+    expect(
+      within(screen.getByRole('table')).queryByRole('columnheader', { name: /wallet/i })
+    ).not.toBeInTheDocument();
+  });
+
+  it('the Columns picker never lets the last rendered column disappear, even when a stale spReady entry is lingering in storage', async () => {
+    // Repro: enable monitoring, check spReady (on top of the defaults),
+    // disable monitoring again (spReady stays in storage but stops
+    // rendering), then uncheck every other column one by one. The stored
+    // list still has >1 entries the whole time (spReady never leaves it),
+    // so a guard on the raw stored length alone would let the last
+    // *rendered* column vanish — this must block that last uncheck instead.
+    await useSpExtractionMonitoringEnabled.getState().setValue(true);
+    const user = userEvent.setup();
+    renderCharacters();
+    await user.click(await screen.findByRole('button', { name: 'Table' }));
+
+    await user.click(await screen.findByRole('button', { name: 'Columns' }));
+    await user.click(await screen.findByRole('menuitemcheckbox', { name: 'SP ready' }));
+    await user.keyboard('{Escape}');
+
+    await useSpExtractionMonitoringEnabled.getState().setValue(false);
+
+    for (const label of ['Alerts', 'Last synced', 'PI', 'Open jobs', 'Training']) {
+      await user.click(await screen.findByRole('button', { name: 'Columns' }));
+      await user.click(await screen.findByRole('menuitemcheckbox', { name: label }));
+      await user.keyboard('{Escape}');
+    }
+
+    // Only "Name" is left rendering. Unchecking it too must be a no-op.
+    expect(within(screen.getByRole('table')).getByText('Pilot One')).toBeInTheDocument();
+    await user.click(await screen.findByRole('button', { name: 'Columns' }));
+    const nameItem = await screen.findByRole('menuitemcheckbox', { name: 'Name' });
+    expect(nameItem).toHaveAttribute('aria-checked', 'true');
+    await user.click(nameItem);
+    await user.keyboard('{Escape}');
+
+    expect(await screen.findByRole('table')).toBeInTheDocument();
+    expect(within(screen.getByRole('table')).getByText('Pilot One')).toBeInTheDocument();
+  });
+
+  it('Refresh all triggers a live pull for the whole roster, not just the active character', async () => {
+    const user = userEvent.setup();
+    const snapshotSpy = vi.spyOn(rosterModule, 'loadRosterSnapshot').mockResolvedValue([]);
+    const attentionSpy = vi
+      .spyOn(rosterAttentionModule, 'loadRosterAttention')
+      .mockResolvedValue([]);
+
+    try {
+      renderCharacters();
+      await user.click(await screen.findByRole('button', { name: /refresh all/i }));
+
+      await waitFor(() => {
+        expect(snapshotSpy).toHaveBeenCalledWith({ live: true });
+        expect(attentionSpy).toHaveBeenCalledWith({ live: true });
+      });
+    } finally {
+      snapshotSpy.mockRestore();
+      attentionSpy.mockRestore();
+    }
+  });
+});

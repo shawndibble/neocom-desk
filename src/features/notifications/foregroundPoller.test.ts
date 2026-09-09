@@ -245,15 +245,17 @@ function baseDeps(overrides: Partial<PollDependencies> & DomainOverrides = {}): 
     wallet: loadWalletJournal,
     marketOrders: loadMarketOrders,
     eveNotification: loadEveNotifications,
-    // Corp domains (issue #299): no dedicated overrides here — their
-    // load/diff behaviour is covered in pollDomains.test.ts and
-    // notificationDiffs.test.ts, so a bare "nothing to fetch" default is
-    // enough to keep the generic delivery-loop cases above from tripping
-    // over a ninth-and-up registry entry they know nothing about.
+    // Corp domains (issue #299) and spExtraction (grilling session,
+    // 2026-09-09): no dedicated overrides here — their load/diff behaviour is
+    // covered in pollDomains.test.ts and notificationDiffs.test.ts, so a bare
+    // "nothing to fetch" default is enough to keep the generic delivery-loop
+    // cases above from tripping over a later registry entry they know
+    // nothing about.
     structureFuel: async () => [],
     corpIndustryJobs: async () => [],
     corpRoster: async () => [],
     corpWallet: async () => [],
+    spExtraction: async () => [],
   };
   const states: Record<string, DomainPollState> = {
     skillQueue: domainState(prevState, saveState),
@@ -269,6 +271,7 @@ function baseDeps(overrides: Partial<PollDependencies> & DomainOverrides = {}): 
     corpIndustryJobs: domainState(undefined, undefined),
     corpRoster: domainState(undefined, undefined),
     corpWallet: domainState(undefined, undefined),
+    spExtraction: domainState(undefined, undefined),
   };
 
   return {
