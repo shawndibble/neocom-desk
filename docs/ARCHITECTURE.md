@@ -247,9 +247,13 @@ build-vs-buy verdict). Never throws — computation errors surface as
 
 **SDE build-time pipeline**
 `scripts/build-sde.mjs` downloads Fuzzwork SDE CSVs (`invTypes`, `invGroups`,
-`dgmTypeAttributes`, `industryActivity*`) into a gitignored repo-local cache,
-emits slim `public/data/{skills,blueprints,types}.json`. Runtime never fetches
-CSVs — `src/sde/loadSde.ts` fetches+memoizes the built JSON once per session.
+`dgmTypeAttributes`, `industryActivity*`, `mapRegions`, `mapSolarSystems`,
+`staStations`, ...) into a gitignored repo-local cache, emits slim
+`public/data/{skills,blueprints,types,reprocessing,pi,...}.json` plus the
+lazily fetched `public/data/market/*.json` catalogue (market groups/types,
+solar systems, NPC stations, market regions, attributes, variations). Runtime
+never fetches CSVs — `src/sde/loadSde.ts` and `src/sde/loadMarketSde.ts`
+fetch+memoize the built JSON once per session.
 
 ## 4. Invariants & gotchas
 

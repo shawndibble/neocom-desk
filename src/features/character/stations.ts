@@ -71,7 +71,10 @@ export async function loadStationSummary(
   stationId: number
 ): Promise<{ name: string; systemId: number; typeId: number } | null> {
   const snapshot = await lookupNpcStation(stationId);
-  if (snapshot?.typeId !== undefined) {
+  // `typeof`, not `!== undefined`: JSON has no `undefined`, so a snapshot that
+  // ever emitted a blank type id would carry `null` here, and `null` would
+  // pass an `!== undefined` guard straight through as a type id.
+  if (snapshot && typeof snapshot.typeId === 'number') {
     return { name: snapshot.name, systemId: snapshot.systemId, typeId: snapshot.typeId };
   }
   const station = await loadStation(stationId);

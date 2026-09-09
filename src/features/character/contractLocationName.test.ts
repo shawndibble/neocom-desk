@@ -68,7 +68,24 @@ describe('loadContractLocationName', () => {
     expect(await loadContractLocationName(CHAR_ID, 1000000000001)).toBe('Tycho Brahe 18 HQ');
   });
 
-  it('still resolves a station the snapshot predates, via the fallback probe', async () => {
+  it('judges a station the loaded snapshot predates to be a structure, and says so', async () => {
+    // Deliberate, and the accepted cost of the discriminator: a station CCP
+    // added since the last `npm run sde:build` is absent from the table, so
+    // this path calls the structure endpoint, gets nothing, and reports "don't
+    // know". Probing the station endpoint as a last resort would fire on every
+    // contract in a structure the Character cannot see into — the common case
+    // for public contracts — to rescue a case that self-heals on the next SDE
+    // build. Pinned here so it is a decision, not a surprise.
+    server.use(
+      http.get(`${ESI_BASE_URL}/universe/structures/60099999`, () =>
+        HttpResponse.json({ error: 'Forbidden' }, { status: 403 })
+      )
+    );
+
+    expect(await loadContractLocationName(CHAR_ID, 60099999)).toBeNull();
+  });
+
+  it('still resolves a station the snapshot predates when the snapshot is unreadable', async () => {
     loadNpcStations.mockRejectedValue(new Error('offline'));
     server.use(
       http.get(`${ESI_BASE_URL}/universe/stations/60099999`, () =>

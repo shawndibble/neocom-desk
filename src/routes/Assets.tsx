@@ -291,8 +291,10 @@ async function loadAssetsSnapshot(
     await Promise.all([
       // Uncapped on purpose: `location_type: 'station'` means every one of
       // these is an NPC station, and those resolve out of the SDE snapshot
-      // with no request at all (issue #655). Capping this would slow a
-      // map lookup down, not spare ESI anything.
+      // with no request at all (issue #655), so capping would slow a map
+      // lookup down rather than spare ESI anything. It reverts to a request
+      // per id only when the snapshot cannot be read — rare, and the fallback
+      // is what keeps names working when the file cannot be fetched.
       Promise.all(stationIds.map((id) => loadStationName(id))),
       Promise.all(structureIds.map((id) => loadStructureName(characterId, id))),
       Promise.all(systemIds.map((id) => loadSystemName(id))),

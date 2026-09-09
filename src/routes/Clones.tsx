@@ -90,7 +90,8 @@ async function loadClonesSnapshot(
   const [resolvedStations, resolvedStructures] = await Promise.all([
     // Every id here is an NPC station by `location_type`, and those come out
     // of the SDE snapshot rather than ESI (issue #655) — a map lookup per id,
-    // so there is no fan-out left to cap.
+    // so there is nothing worth capping. Only an unreadable snapshot puts a
+    // request back behind each id; see `loadAssetsSnapshot` for the same note.
     Promise.all(stationIds.map((id) => loadStationName(id))),
     // A 403 here means the structure is outside this character's ACL, not a
     // revoked scope — loadStructureName already narrows that so it never

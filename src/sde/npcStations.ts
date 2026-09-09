@@ -35,8 +35,12 @@ let index: Promise<ReadonlyMap<number, NpcStationEntry> | null> | null = null;
  * The snapshot keyed by station id, or `null` when it could not be read.
  * Memoized per session; a failure is not memoized, so a later visit that can
  * reach the file still gets it (same trade as `loadMarketSde`'s own `cached`).
+ *
+ * Module-local: `lookupNpcStation` is the whole interface, and an exported
+ * index would invite callers to do their own membership arithmetic on it —
+ * which is precisely the three-valued decision this module exists to own.
  */
-export function loadNpcStationsById(): Promise<ReadonlyMap<number, NpcStationEntry> | null> {
+function loadNpcStationsById(): Promise<ReadonlyMap<number, NpcStationEntry> | null> {
   index ??= loadNpcStations()
     .then((entries): ReadonlyMap<number, NpcStationEntry> => {
       const map = new Map<number, NpcStationEntry>();

@@ -1231,12 +1231,20 @@ async function main() {
     const h = indexHeader(rows);
     for (let i = 1; i < rows.length; i++) {
       const r = rows[i];
-      npcStations.push({
+      const entry = {
         id: Number(r[h.stationID]),
         name: r[h.stationName],
         systemId: Number(r[h.solarSystemID]),
-        typeId: Number(r[h.stationTypeID]),
-      });
+      };
+      // `num()` rather than a bare `Number()`: a blank column would write
+      // `NaN`, which `JSON.stringify` emits as `null` — and `null` is not
+      // `undefined`, so `loadStationSummary`'s "no typeId, ask ESI" guard
+      // would pass it straight through as a type id. Leaving the key off
+      // instead reproduces the pre-#655 snapshot shape, which callers already
+      // fall back on.
+      const typeId = num(r[h.stationTypeID]);
+      if (typeId !== null && Number.isFinite(typeId)) entry.typeId = typeId;
+      npcStations.push(entry);
     }
     npcStations.sort((a, b) => a.id - b.id);
   }
