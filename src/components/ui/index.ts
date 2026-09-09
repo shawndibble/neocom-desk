@@ -44,7 +44,6 @@ export {
   ContextMenuSubTrigger,
   ContextMenuSubContent,
 } from './ContextMenu';
-export { ContextMenuHint } from './ContextMenuHint';
 export { Popover, PopoverContent, PopoverTrigger } from './Popover';
 export {
   DropdownMenu,
