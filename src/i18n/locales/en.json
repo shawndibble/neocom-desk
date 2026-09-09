@@ -554,6 +554,7 @@
     "toggleGroup": "Show or hide the plans in {{name}}",
     "moveToGroup": "Move to group",
     "removeFromGroup": "No group",
+    "dragToGroup": "Drag onto a group to move this plan into it",
     "groupMembers": "Plans in this group",
     "groupMemberCount_one": "{{count}} plan",
     "groupMemberCount_other": "{{count}} plans",

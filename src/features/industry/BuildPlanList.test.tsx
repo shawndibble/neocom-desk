@@ -300,3 +300,74 @@ describe('BuildPlanList: build groups (#626)', () => {
     expect(onToggleCompareSelected).not.toHaveBeenCalledWith('a');
   });
 });
+
+// What a drop *means* lives in `groupDrop.test.ts` — pure, and every branch of
+// it. Simulating a real dnd-kit drag here would be measuring jsdom's zero-sized
+// rects against a 4px activation distance, which tests the harness rather than
+// the list. So these cover the rendered contract only: the handle is there, and
+// it is deliberately not the accessibility path.
+describe('BuildPlanList: dragging a plan into a group (#627)', () => {
+  const HANDLE_TITLE = 'Drag onto a group to move this plan into it';
+  const GROUPS = [{ id: 'g1', name: 'Buzzard fit', order: 0 }];
+  const PLANS = [
+    plan({ id: 'a', name: 'Buzzard', buildGroupId: 'g1' }),
+    plan({ id: 'c', name: 'Rokh' }),
+  ];
+
+  function renderDraggable(overrides: Record<string, unknown> = {}) {
+    return render(
+      <BuildPlanList
+        plans={PLANS}
+        catalog={EMPTY_CATALOG}
+        selectedId={null}
+        onSelect={() => {}}
+        onCreate={() => {}}
+        onDuplicate={() => {}}
+        onDelete={() => {}}
+        onRename={() => {}}
+        {...NOOP_COMPARE_PROPS}
+        {...NOOP_GROUP_PROPS}
+        groups={GROUPS}
+        expandedGroupIds={new Set(['g1'])}
+        {...overrides}
+      />
+    );
+  }
+
+  it('gives every plan row a drag handle', () => {
+    renderDraggable();
+    expect(screen.getAllByTitle(HANDLE_TITLE)).toHaveLength(2);
+  });
+
+  it('keeps the handle out of the tab order and hidden from assistive tech', () => {
+    // Keyboard dragging would step a flat 25px per arrow press and announce
+    // raw droppable ids; the per-row menu reaches the same destinations
+    // properly, so the handle is pointer-only on purpose.
+    renderDraggable();
+    for (const handle of screen.getAllByTitle(HANDLE_TITLE)) {
+      expect(handle).toHaveAttribute('aria-hidden', 'true');
+      expect(handle).toHaveAttribute('tabindex', '-1');
+      // Without this a touch-drag scrolls the list instead of dragging (#408).
+      expect(handle).toHaveClass('touch-none');
+    }
+  });
+
+  it('still offers "Move to group" on every row, which is the keyboard path', () => {
+    renderDraggable();
+    expect(screen.getByRole('button', { name: 'Move to group Rokh' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Move to group Buzzard' })).toBeInTheDocument();
+  });
+
+  it('renders no drag overlay while nothing is being dragged', () => {
+    // The overlay repeats the dragged plan's name, so an always-mounted one
+    // would put a second copy of that text in the document.
+    renderDraggable();
+    expect(screen.getAllByText('Rokh')).toHaveLength(1);
+  });
+
+  it('leaves a collapsed group its header row, the only thing a drop can land on', () => {
+    renderDraggable({ expandedGroupIds: new Set<string>() });
+    expect(screen.getByText('Buzzard fit')).toBeInTheDocument();
+    expect(screen.queryByText('Buzzard')).not.toBeInTheDocument();
+  });
+});

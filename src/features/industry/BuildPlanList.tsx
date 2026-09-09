@@ -1,6 +1,23 @@
 import { Fragment, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
+  DndContext,
+  DragOverlay,
+  MeasuringStrategy,
+  PointerSensor,
+  closestCorners,
+  pointerWithin,
+  rectIntersection,
+  useDraggable,
+  useDroppable,
+  useSensor,
+  useSensors,
+  type CollisionDetection,
+  type DragEndEvent,
+  type DragOverEvent,
+  type DragStartEvent,
+} from '@dnd-kit/core';
+import {
   Button,
   Caret,
   DropdownMenu,
@@ -16,7 +33,42 @@ import * as Icon from '@/components/ui/icons';
 import type { BuildPlanRecord } from '@/db';
 import { BlueprintPicker } from './BlueprintPicker';
 import type { BuildGroup } from './buildGroups';
+import {
+  dropTargetGroupId,
+  groupDropId,
+  planDropId,
+  planIdFromDropId,
+  resolveGroupDrop,
+} from './groupDrop';
 import type { BlueprintCatalog, BlueprintCatalogEntry } from './blueprintCatalog';
+
+/**
+ * Hand-composed, because `closestCenter` — what both existing dnd lists use —
+ * is wrong for dropping *into* a container (#627). It scores by distance
+ * between droppable centres, so a ~28px group header sitting among ~40px plan
+ * rows loses to its neighbours from most pointer positions the pilot would
+ * call "on the header".
+ *
+ * The order is dnd-kit's own recommendation for multi-container lists:
+ *
+ * 1. `pointerWithin` — the pointer is literally inside a droppable. Exact, and
+ *    the answer whenever the pilot is aiming at a specific row.
+ * 2. `rectIntersection` — nothing under the pointer, but the dragged rect
+ *    overlaps something. Covers a drag whose pointer has run past the list
+ *    edge while the row is still over it.
+ * 3. `closestCorners` — nothing overlaps either. Also the *first* usable step
+ *    for any drag with no pointer coordinates at all, which is why the chain
+ *    exists rather than `pointerWithin` alone.
+ */
+const collisionDetection: CollisionDetection = (args) => {
+  const pointerHits = pointerWithin(args);
+  if (pointerHits.length > 0) return pointerHits;
+  const rectHits = rectIntersection(args);
+  return rectHits.length > 0 ? rectHits : closestCorners(args);
+};
+
+/** A drop target the pointer is currently resolving to. */
+const DROP_TARGET_CLASS = 'bg-accent/10 outline-2 -outline-offset-2 outline-accent-dim';
 
 interface BuildPlanListProps {
   plans: readonly BuildPlanRecord[];
@@ -122,13 +174,45 @@ function PlanRow({
 }: PlanRowProps) {
   const { t } = useTranslation();
   const [renaming, setRenaming] = useState(false);
+  // One id for both roles, the way `useSortable` registers its own: a row is
+  // the thing being dragged *and* a target meaning "into whatever group this
+  // row is in", which is how an expanded group's body accepts a drop rather
+  // than only its header.
+  const dropId = planDropId(plan.id);
+  const { setNodeRef: setDropRef, isOver } = useDroppable({ id: dropId });
+  const { setNodeRef: setDragRef, listeners, isDragging } = useDraggable({ id: dropId });
 
   return (
     <li
+      ref={(node) => {
+        setDropRef(node);
+        setDragRef(node);
+      }}
       className={`flex items-center gap-2 border-b border-line py-1.5 pr-2 text-xs last:border-b-0 ${
         indented ? 'pl-6' : 'pl-2'
-      } ${active ? 'bg-panel-2' : ''}`}
+      } ${active ? 'bg-panel-2' : ''} ${isDragging ? 'opacity-40' : ''} ${
+        isOver && !isDragging ? DROP_TARGET_CLASS : ''
+      }`}
     >
+      {/* Deliberately not focusable and hidden from assistive tech. Keyboard
+          dragging here would step the row a flat 25px per arrow press —
+          `sortableKeyboardCoordinates` needs a sort order this list does not
+          have — and announce raw droppable ids. The "Move to group" menu two
+          controls along reaches every destination this handle does, from the
+          keyboard, which is the pointer alternative that matters (WCAG 2.5.7).
+
+          `distance: 4` on the sensor and `touch-none` here are both load-
+          bearing, for the reasons EntryList.tsx's copy spells out (#408). */}
+      <button
+        type="button"
+        tabIndex={-1}
+        aria-hidden="true"
+        {...listeners}
+        title={t('industry.dragToGroup')}
+        className="shrink-0 cursor-grab touch-none px-1 text-text-faint hover:text-text"
+      >
+        ⠿
+      </button>
       {compareMode && (
         <input
           type="checkbox"
@@ -222,6 +306,7 @@ function GroupHeader({
   memberCount,
   expanded,
   active,
+  dropActive,
   compareMode,
   membersSelected,
   onToggle,
@@ -234,6 +319,8 @@ function GroupHeader({
   memberCount: number;
   expanded: boolean;
   active: boolean;
+  /** A dragged plan currently resolves to this group — including via one of its member rows. */
+  dropActive: boolean;
   compareMode: boolean;
   /** 'all' | 'some' | 'none' — drives the header checkbox's indeterminate state. */
   membersSelected: 'all' | 'some' | 'none';
@@ -245,12 +332,16 @@ function GroupHeader({
 }) {
   const { t } = useTranslation();
   const [renaming, setRenaming] = useState(false);
+  // A collapsed group renders no member rows at all, so this header is the
+  // only rect its group has — the case #627 exists for.
+  const { setNodeRef } = useDroppable({ id: groupDropId(group.id) });
 
   return (
     <li
+      ref={setNodeRef}
       className={`flex items-center gap-2 border-b border-line px-2 py-1.5 text-xs ${
         active ? 'bg-panel-2' : ''
-      }`}
+      } ${dropActive ? DROP_TARGET_CLASS : ''}`}
     >
       {/* Compare's checkbox only ever renders on a *visible* row, so a
           collapsed group's members are unreachable without this — it selects
@@ -312,7 +403,7 @@ function GroupHeader({
   );
 }
 
-/** Build Plan CRUD list: create via blueprint search, select, duplicate, delete, rename inline. Owns Compare mode's row checkboxes (issue #453) and the Build Group rows (issue #626) — the comparison and the group rollup both render in `Industry.tsx`'s detail pane. */
+/** Build Plan CRUD list: create via blueprint search, select, duplicate, delete, rename inline. Owns Compare mode's row checkboxes (issue #453) and the Build Group rows (issue #626) — the comparison and the group rollup both render in `Industry.tsx`'s detail pane. A plan row can be dragged onto a group header or another group's row to move it (issue #627); `groupDrop.ts` decides what a drop meant. */
 export function BuildPlanList({
   plans,
   catalog,
@@ -339,28 +430,75 @@ export function BuildPlanList({
   onOpenFitImport,
 }: BuildPlanListProps) {
   const { t } = useTranslation();
+  const sensors = useSensors(
+    // A bare PointerSensor starts dragging on the first pixel of pointer
+    // movement, which fires from ordinary jitter on a click and fights a tap
+    // on touch — every row here has four tap targets sitting beside the
+    // handle. EntryList.tsx settled on the same constraint for the same
+    // reason (#408).
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } })
+  );
+  /** The plan under the pointer mid-drag, for the overlay. */
+  const [draggingPlanId, setDraggingPlanId] = useState<string | null>(null);
+  /** Where a drop would land right now: a group id, null for ungrouped, undefined for nowhere. */
+  const [dropGroupId, setDropGroupId] = useState<string | null | undefined>(undefined);
 
   // One pass, rather than a `filter` per group plus a `some` per plan.
   //
   // A plan whose group is gone — deleted here, or a sync race delivering the
   // plan before the settings blob — falls into `ungrouped` and renders as an
   // ordinary plan rather than vanishing from the list.
-  const { membersByGroup, ungrouped } = useMemo(() => {
+  //
+  // `groupOfPlan` comes out of this same pass rather than off `buildGroupId`
+  // directly, so drop resolution answers "which group does this row look like
+  // it is in" — the question the pilot is actually asking mid-drag.
+  const { membersByGroup, ungrouped, groupOfPlan } = useMemo(() => {
     const known = new Set(groups.map((group) => group.id));
     const byGroup = new Map<string, BuildPlanRecord[]>();
     const loose: BuildPlanRecord[] = [];
+    const ofPlan = new Map<string, string>();
     for (const plan of plans) {
       const groupId = plan.buildGroupId;
       if (groupId === undefined || !known.has(groupId)) {
         loose.push(plan);
         continue;
       }
+      ofPlan.set(plan.id, groupId);
       const members = byGroup.get(groupId);
       if (members) members.push(plan);
       else byGroup.set(groupId, [plan]);
     }
-    return { membersByGroup: byGroup, ungrouped: loose };
+    return { membersByGroup: byGroup, ungrouped: loose, groupOfPlan: ofPlan };
   }, [plans, groups]);
+
+  const draggingPlan =
+    draggingPlanId === null ? undefined : plans.find((p) => p.id === draggingPlanId);
+
+  function overId(over: { id: string | number } | null) {
+    return over === null ? null : String(over.id);
+  }
+
+  function handleDragStart(event: DragStartEvent) {
+    setDraggingPlanId(planIdFromDropId(String(event.active.id)));
+  }
+
+  function handleDragOver(event: DragOverEvent) {
+    setDropGroupId(dropTargetGroupId(overId(event.over), groupOfPlan));
+  }
+
+  function endDrag() {
+    setDraggingPlanId(null);
+    setDropGroupId(undefined);
+  }
+
+  function handleDragEnd(event: DragEndEvent) {
+    const move = resolveGroupDrop(String(event.active.id), overId(event.over), groupOfPlan);
+    endDrag();
+    // A drop that changes nothing — back into the same group, onto itself, or
+    // outside the list — is not written: `handleMovePlan` bumps `updatedAt`
+    // and schedules a sync, which a no-op move has no business doing.
+    if (move) onMovePlan(move.planId, move.groupId);
+  }
 
   function rowProps(plan: BuildPlanRecord) {
     return {
@@ -437,55 +575,87 @@ export function BuildPlanList({
           className="py-6"
         />
       ) : (
-        // The scroller is the row list alone, not the whole pane: the heading
-        // and the blueprint picker stay put while a long plan list scrolls
-        // under them, same as Mail's list.
-        <ul className="max-h-[28rem] overflow-y-auto rounded-xs border border-line">
-          {/* A group's header and its members are siblings in this one list,
-              not a nested `ul` per group: a nested list announces "list, 1
-              item" before every single plan. */}
-          {groups.map((group) => {
-            const members = membersByGroup.get(group.id) ?? [];
-            const selectedCount = members.filter((p) => compareSelectedIds.has(p.id)).length;
-            return (
-              <Fragment key={group.id}>
-                <GroupHeader
-                  group={group}
-                  memberCount={members.length}
-                  expanded={expandedGroupIds.has(group.id)}
-                  active={group.id === selectedGroupId}
-                  compareMode={compareMode}
-                  membersSelected={
-                    members.length > 0 && selectedCount === members.length
-                      ? 'all'
-                      : selectedCount > 0
-                        ? 'some'
-                        : 'none'
-                  }
-                  onToggle={() => onToggleGroup(group.id)}
-                  onSelect={() => onSelectGroup(group.id)}
-                  onRename={(name) => onRenameGroup(group.id, name)}
-                  onDelete={() => onDeleteGroup(group.id)}
-                  onToggleAllMembers={(selected) => {
-                    // Toggled one row at a time, through the very callback a
-                    // row's own checkbox uses, so the header can never write a
-                    // selection the rows disagree with.
-                    for (const member of members) {
-                      if (compareSelectedIds.has(member.id) !== selected) {
-                        onToggleCompareSelected(member.id);
-                      }
+        <DndContext
+          sensors={sensors}
+          collisionDetection={collisionDetection}
+          onDragStart={handleDragStart}
+          onDragOver={handleDragOver}
+          onDragEnd={handleDragEnd}
+          onDragCancel={endDrag}
+          // Droppable rects are measured once at drag start by default, and
+          // this list reflows *during* a drag: dropping expands the target
+          // group (Industry.tsx), and the underlying `useLiveQuery` can
+          // deliver a changed plan set at any moment. Every rect below the
+          // change would otherwise be stale for the rest of the drag.
+          measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}
+          // Wider edge threshold and stronger acceleration than dnd-kit's
+          // default, matching EntryList.tsx: the list below is a capped-height
+          // scroller (#408's shape), and the default threshold leaves too
+          // little room near its edges to start autoscrolling before the
+          // pointer runs out of list.
+          autoScroll={{ threshold: { x: 0.2, y: 0.25 }, acceleration: 20 }}
+        >
+          {/* The scroller is the row list alone, not the whole pane: the heading
+              and the blueprint picker stay put while a long plan list scrolls
+              under them, same as Mail's list. */}
+          <ul className="max-h-[28rem] overflow-y-auto rounded-xs border border-line">
+            {/* A group's header and its members are siblings in this one list,
+                not a nested `ul` per group: a nested list announces "list, 1
+                item" before every single plan. */}
+            {groups.map((group) => {
+              const members = membersByGroup.get(group.id) ?? [];
+              const selectedCount = members.filter((p) => compareSelectedIds.has(p.id)).length;
+              return (
+                <Fragment key={group.id}>
+                  <GroupHeader
+                    group={group}
+                    memberCount={members.length}
+                    expanded={expandedGroupIds.has(group.id)}
+                    active={group.id === selectedGroupId}
+                    dropActive={dropGroupId === group.id}
+                    compareMode={compareMode}
+                    membersSelected={
+                      members.length > 0 && selectedCount === members.length
+                        ? 'all'
+                        : selectedCount > 0
+                          ? 'some'
+                          : 'none'
                     }
-                  }}
-                />
-                {expandedGroupIds.has(group.id) &&
-                  members.map((plan) => <PlanRow key={plan.id} {...rowProps(plan)} indented />)}
-              </Fragment>
-            );
-          })}
-          {ungrouped.map((plan) => (
-            <PlanRow key={plan.id} {...rowProps(plan)} />
-          ))}
-        </ul>
+                    onToggle={() => onToggleGroup(group.id)}
+                    onSelect={() => onSelectGroup(group.id)}
+                    onRename={(name) => onRenameGroup(group.id, name)}
+                    onDelete={() => onDeleteGroup(group.id)}
+                    onToggleAllMembers={(selected) => {
+                      // Toggled one row at a time, through the very callback a
+                      // row's own checkbox uses, so the header can never write a
+                      // selection the rows disagree with.
+                      for (const member of members) {
+                        if (compareSelectedIds.has(member.id) !== selected) {
+                          onToggleCompareSelected(member.id);
+                        }
+                      }
+                    }}
+                  />
+                  {expandedGroupIds.has(group.id) &&
+                    members.map((plan) => <PlanRow key={plan.id} {...rowProps(plan)} indented />)}
+                </Fragment>
+              );
+            })}
+            {ungrouped.map((plan) => (
+              <PlanRow key={plan.id} {...rowProps(plan)} />
+            ))}
+          </ul>
+          {/* Name only, not a copy of the row: a second set of the row's
+              labelled buttons would put duplicate accessible names in the
+              document for as long as the drag lasts. */}
+          <DragOverlay>
+            {draggingPlan && (
+              <div className="rounded-xs border border-accent-dim bg-panel-2 px-2 py-1.5 text-xs">
+                {draggingPlan.name}
+              </div>
+            )}
+          </DragOverlay>
+        </DndContext>
       )}
     </div>
   );
