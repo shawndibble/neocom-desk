@@ -17,9 +17,10 @@
  *
  * The name/ship/location resolution below is the other half of this module.
  * AC3 is a bound on *calls*, not on ids: a 200-member corp must not fan out to
- * 200 requests, so characters and NPC locations go through the bulk resolvers
- * and Upwell structures are deduplicated down to the handful a corp actually
- * docks in.
+ * 200 requests, so characters and NPC locations go through the bulk resolvers,
+ * and Upwell structures — which have no bulk endpoint — are deduplicated and
+ * then rate-capped, because deduplication alone bounds nothing for a corp that
+ * is genuinely spread across a hundred citadels (issue #655).
  */
 import {
   getCorporationMembers,
@@ -31,6 +32,7 @@ import { resolveNames } from '@/features/character/names';
 import { loadStructureName } from '@/features/character/structures';
 import { loadTypeNames } from '@/features/character/typeNames';
 import type { MemberActivity } from '@/engine/corp/members';
+import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
 import { loadCorpPaginatedWithCacheStatus, loadCorpWithCacheStatus } from './corpRead';
 
 export const KEYS = {
@@ -132,8 +134,17 @@ async function resolveEntityNames(ids: readonly number[]): Promise<Map<number, s
 /**
  * Location names for the distinct places the roster is standing in.
  *
- * Deduplicated first, which is what makes this bounded in practice: two hundred
- * members share a home structure and a trade hub, not two hundred addresses.
+ * Deduplication cuts the count but does not bound it: this used to claim that
+ * two hundred members share a home structure and a trade hub rather than two
+ * hundred addresses, and issue #655 is what a corp spread across nullsec does
+ * to that assumption — a hundred distinct citadels, each its own
+ * `/universe/structures/{id}` because Upwell structures have no bulk endpoint.
+ * Worse, a structure the reading Character is off the ACL of answers 403, and
+ * ESI counts non-2xx responses against a global 100-per-minute error budget,
+ * so an uncapped fan-out here 420s every other request the app makes, for
+ * every Character. Hence the same `ESI_FANOUT_CONCURRENCY` cap
+ * `features/corp/assets.ts` took in issue #420; the roster was missed then.
+ *
  * A structure the reading Character is not on the ACL for resolves to nothing
  * and the view falls back to the raw id, exactly as Assets does.
  */
@@ -146,12 +157,10 @@ async function resolveLocationNames(
   const bulkIds = unique.filter((id) => id < UPWELL_STRUCTURE_ID_FLOOR);
 
   const names = await resolveEntityNames(bulkIds);
-  const structureNames = await Promise.all(
-    structureIds.map(async (id) => [id, await loadStructureName(characterId, id)] as const)
-  );
-  for (const [id, name] of structureNames) {
+  await mapWithConcurrencyLimit(structureIds, ESI_FANOUT_CONCURRENCY, async (id) => {
+    const name = await loadStructureName(characterId, id);
     if (name !== null) names.set(id, name);
-  }
+  });
   return names;
 }
 
