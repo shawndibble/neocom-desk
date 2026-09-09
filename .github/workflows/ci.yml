@@ -6,12 +6,16 @@ on:
   pull_request:
     branches: [main]
 
+# Superseding a PR's checks is free; superseding a deploy is not. A second
+# merge landing mid-deploy used to cancel the first outright, which is how
+# two main runs ended up `cancelled` rather than deployed.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   validate:
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -33,6 +37,7 @@ jobs:
       - run: npm test --prefix functions
 
   test:
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -44,9 +49,14 @@ jobs:
       - run: npm run test:run
 
   deploy:
-    needs: [validate, test]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
+    # One Pages deploy at a time, queued rather than cancelled — the
+    # environment is a single shared resource and a half-applied deploy is
+    # worse than a slow one.
+    concurrency:
+      group: pages
+      cancel-in-progress: false
     permissions:
       pages: write
       id-token: write
@@ -77,13 +87,24 @@ jobs:
           SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
       - uses: actions/configure-pages@v5
+      # Named per attempt, and deploy-pages told which to read. Artifacts
+      # persist across attempts within a run, so a re-run of this job used to
+      # upload a second `github-pages` alongside the first and deploy-pages
+      # then refused with "Multiple artifacts named github-pages ... count is
+      # 2". That turned any transient failure here — an OIDC token timeout,
+      # say — into one that could not be cleared by re-running, which is the
+      # first thing anyone tries.
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
+          name: github-pages-${{ github.run_attempt }}
       - uses: actions/deploy-pages@v4
         id: deployment
+        with:
+          artifact_name: github-pages-${{ github.run_attempt }}
 
   e2e:
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
