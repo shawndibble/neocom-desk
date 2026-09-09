@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -58,6 +58,8 @@ type PlanRowProps = {
   onToggleCompareSelected: (id: string) => void;
   groups: readonly BuildGroup[];
   onMovePlan: (planId: string, groupId: string | null) => void;
+  /** Set on a row sitting under its group's header, to step it in from the ungrouped ones. */
+  indented?: boolean;
 } & Pick<BuildPlanListProps, 'onSelect' | 'onDuplicate' | 'onDelete' | 'onRename'>;
 
 function PlanRow({
@@ -72,6 +74,7 @@ function PlanRow({
   onToggleCompareSelected,
   groups,
   onMovePlan,
+  indented = false,
 }: PlanRowProps) {
   const { t } = useTranslation();
   const [renaming, setRenaming] = useState(false);
@@ -86,9 +89,9 @@ function PlanRow({
 
   return (
     <li
-      className={`flex items-center gap-2 border-b border-line px-2 py-1.5 text-xs last:border-b-0 ${
-        active ? 'bg-panel-2' : ''
-      }`}
+      className={`flex items-center gap-2 border-b border-line py-1.5 pr-2 text-xs last:border-b-0 ${
+        indented ? 'pl-6' : 'pl-2'
+      } ${active ? 'bg-panel-2' : ''}`}
     >
       {compareMode && (
         <input
@@ -191,24 +194,28 @@ function PlanRow({
 function GroupHeader({
   group,
   memberCount,
-  leadName,
   expanded,
   active,
+  compareMode,
+  membersSelected,
   onToggle,
   onSelect,
   onRename,
   onDelete,
+  onToggleAllMembers,
 }: {
   group: BuildGroup;
   memberCount: number;
-  /** The group's first member — the hull, for an imported fit. */
-  leadName: string | null;
   expanded: boolean;
   active: boolean;
+  compareMode: boolean;
+  /** 'all' | 'some' | 'none' — drives the header checkbox's indeterminate state. */
+  membersSelected: 'all' | 'some' | 'none';
   onToggle: () => void;
   onSelect: () => void;
   onRename: (name: string) => void;
   onDelete: () => void;
+  onToggleAllMembers: (selected: boolean) => void;
 }) {
   const { t } = useTranslation();
   const [renaming, setRenaming] = useState(false);
@@ -221,26 +228,35 @@ function GroupHeader({
     else setDraftName(group.name);
   }
 
-  // Two groups may share a name, so the name alone cannot tell one "Delete
-  // PvE" button from another. The ship is what distinguishes them on screen,
-  // so it goes into the accessible name too.
-  const describedName = leadName ? `${group.name}, ${leadName}` : group.name;
-
   return (
     <li
       className={`flex items-center gap-2 border-b border-line px-2 py-1.5 text-xs ${
         active ? 'bg-panel-2' : ''
       }`}
     >
-      <button
-        type="button"
+      {/* Compare's checkbox only ever renders on a *visible* row, so a
+          collapsed group's members are unreachable without this — it selects
+          every member at once rather than making the pilot expand first. */}
+      {compareMode && (
+        <input
+          type="checkbox"
+          checked={membersSelected === 'all'}
+          ref={(el) => {
+            if (el) el.indeterminate = membersSelected === 'some';
+          }}
+          onChange={() => onToggleAllMembers(membersSelected !== 'all')}
+          aria-label={t('industry.selectGroupMembers', { name: group.name })}
+          className="size-4 shrink-0 cursor-pointer accent-accent"
+        />
+      )}
+      <IconButton
+        size="sm"
+        variant="plain"
+        icon={<Caret expanded={expanded} />}
+        label={t('industry.toggleGroup', { name: group.name })}
         aria-expanded={expanded}
         onClick={onToggle}
-        aria-label={t('industry.toggleGroup', { name: describedName })}
-        className="shrink-0"
-      >
-        <Caret expanded={expanded} />
-      </button>
+      />
       {renaming ? (
         <TextInput
           size="sm"
@@ -263,26 +279,23 @@ function GroupHeader({
           type="button"
           onClick={onSelect}
           onDoubleClick={() => setRenaming(true)}
-          className="flex flex-1 items-baseline gap-2 truncate text-left"
+          className="flex-1 truncate text-left font-semibold"
         >
-          <span className="truncate font-semibold">{group.name}</span>
-          {/* The ship is otherwise invisible exactly when it is most wanted —
-              a collapsed group hides every member it has. */}
-          {leadName && <span className="truncate text-text-dim">{leadName}</span>}
+          {group.name}
         </button>
       )}
       <span className="shrink-0 tabular-nums text-text-dim">{memberCount}</span>
       <IconButton
         size="sm"
         icon={<Icon.Rename />}
-        label={`${t('industry.renameGroup')} ${describedName}`}
+        label={`${t('industry.renameGroup')} ${group.name}`}
         tooltip={t('industry.renameGroup')}
         onClick={() => setRenaming(true)}
       />
       <IconButton
         size="sm"
         icon={<Icon.Close />}
-        label={`${t('industry.deleteGroup')} ${describedName}`}
+        label={`${t('industry.deleteGroup')} ${group.name}`}
         tooltip={t('industry.deleteGroup')}
         tone="danger"
         onClick={onDelete}
@@ -405,33 +418,45 @@ export function BuildPlanList({
         // and the blueprint picker stay put while a long plan list scrolls
         // under them, same as Mail's list.
         <ul className="max-h-[28rem] overflow-y-auto rounded-xs border border-line">
+          {/* A group's header and its members are siblings in this one list,
+              not a nested `ul` per group: a nested list announces "list, 1
+              item" before every single plan. */}
           {groups.map((group) => {
             const members = plans.filter((plan) => plan.buildGroupId === group.id);
-            const expanded = expandedGroupIds.has(group.id);
+            const selectedCount = members.filter((p) => compareSelectedIds.has(p.id)).length;
             return (
-              <li key={group.id}>
-                <ul>
-                  <GroupHeader
-                    group={group}
-                    memberCount={members.length}
-                    leadName={members[0]?.name ?? null}
-                    expanded={expanded}
-                    active={group.id === selectedGroupId}
-                    onToggle={() => onToggleGroup(group.id)}
-                    onSelect={() => onSelectGroup(group.id)}
-                    onRename={(name) => onRenameGroup(group.id, name)}
-                    onDelete={() => onDeleteGroup(group.id)}
-                  />
-                  {expanded &&
-                    members.map((plan) => (
-                      <li key={plan.id} className="list-none pl-4">
-                        <ul>
-                          <PlanRow {...rowProps(plan)} />
-                        </ul>
-                      </li>
-                    ))}
-                </ul>
-              </li>
+              <Fragment key={group.id}>
+                <GroupHeader
+                  group={group}
+                  memberCount={members.length}
+                  expanded={expandedGroupIds.has(group.id)}
+                  active={group.id === selectedGroupId}
+                  compareMode={compareMode}
+                  membersSelected={
+                    members.length > 0 && selectedCount === members.length
+                      ? 'all'
+                      : selectedCount > 0
+                        ? 'some'
+                        : 'none'
+                  }
+                  onToggle={() => onToggleGroup(group.id)}
+                  onSelect={() => onSelectGroup(group.id)}
+                  onRename={(name) => onRenameGroup(group.id, name)}
+                  onDelete={() => onDeleteGroup(group.id)}
+                  onToggleAllMembers={(selected) => {
+                    // Toggled one row at a time, through the very callback a
+                    // row's own checkbox uses, so the header can never write a
+                    // selection the rows disagree with.
+                    for (const member of members) {
+                      if (compareSelectedIds.has(member.id) !== selected) {
+                        onToggleCompareSelected(member.id);
+                      }
+                    }
+                  }}
+                />
+                {expandedGroupIds.has(group.id) &&
+                  members.map((plan) => <PlanRow key={plan.id} {...rowProps(plan)} indented />)}
+              </Fragment>
             );
           })}
           {ungrouped.map((plan) => (

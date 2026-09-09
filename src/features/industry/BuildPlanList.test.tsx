@@ -207,7 +207,7 @@ describe('BuildPlanList: compare mode (#453)', () => {
 });
 
 describe('BuildPlanList: build groups (#626)', () => {
-  const GROUPS = [{ id: 'g1', name: "Loru's Max Hacker", order: 0 }];
+  const GROUPS = [{ id: 'g1', name: "Loru's Max Hacker — Buzzard", order: 0 }];
   const PLANS = [
     plan({ id: 'a', name: 'Buzzard', buildGroupId: 'g1' }),
     plan({ id: 'b', name: 'Data Analyzer II', buildGroupId: 'g1' }),
@@ -233,14 +233,22 @@ describe('BuildPlanList: build groups (#626)', () => {
     );
   }
 
-  it('collapses a group by default, hiding its members but naming the ship and the count', () => {
+  it('collapses a group by default, showing its count but none of its members', () => {
     renderGrouped();
-    expect(screen.getByText("Loru's Max Hacker")).toBeInTheDocument();
-    // The hull names the row precisely because a collapsed group shows no
-    // members at all — it is the one thing the pilot scans for.
-    expect(screen.getByText('Buzzard')).toBeInTheDocument();
-    expect(screen.queryByText('Data Analyzer II')).not.toBeInTheDocument();
+    expect(screen.getByText("Loru's Max Hacker — Buzzard")).toBeInTheDocument();
     expect(screen.getByText('2')).toBeInTheDocument();
+    expect(screen.queryByText('Data Analyzer II')).not.toBeInTheDocument();
+  });
+
+  it('names the ship from the stored group name, not from whichever member sorts first', () => {
+    // Nothing marks which plan is the hull, and every ordering that could
+    // stand in for one (insertion order, newest updatedAt) names a different
+    // plan the moment a member is edited. So Fit Import puts the ship in the
+    // name and the list never derives it.
+    renderGrouped();
+    expect(
+      screen.getByRole('button', { name: "Delete group Loru's Max Hacker — Buzzard" })
+    ).toBeInTheDocument();
   });
 
   it('shows the members once expanded', () => {
@@ -264,18 +272,31 @@ describe('BuildPlanList: build groups (#626)', () => {
   it('toggles a group from its caret', async () => {
     const onToggleGroup = vi.fn();
     renderGrouped({ onToggleGroup });
-    await userEvent.click(
-      screen.getByRole('button', { name: /Show or hide the plans in Loru's Max Hacker/ })
-    );
+    await userEvent.click(screen.getByRole('button', { name: /Show or hide the plans in/ }));
     expect(onToggleGroup).toHaveBeenCalledWith('g1');
   });
 
-  it('distinguishes two same-named groups by ship in the delete button’s accessible name', () => {
-    // Groups are id-keyed and may share a name, so "Delete PvE" twice would
-    // leave a screen-reader user unable to tell which one they are on.
-    renderGrouped();
-    expect(
-      screen.getByRole('button', { name: "Delete group Loru's Max Hacker, Buzzard" })
-    ).toBeInTheDocument();
+  it('selects every member of a collapsed group at once in compare mode', async () => {
+    // A row checkbox only renders on a visible row, so without this a
+    // collapsed group's plans cannot be compared at all.
+    const onToggleCompareSelected = vi.fn();
+    renderGrouped({ compareMode: true, onToggleCompareSelected });
+    await userEvent.click(screen.getByRole('checkbox', { name: /Select every plan in/ }));
+    expect(onToggleCompareSelected).toHaveBeenCalledWith('a');
+    expect(onToggleCompareSelected).toHaveBeenCalledWith('b');
+    expect(onToggleCompareSelected).not.toHaveBeenCalledWith('c');
+  });
+
+  it('leaves an already-fully-selected group alone when unticked', async () => {
+    const onToggleCompareSelected = vi.fn();
+    renderGrouped({
+      compareMode: true,
+      compareSelectedIds: new Set(['a']),
+      onToggleCompareSelected,
+    });
+    // Partly selected, so the header ticks the rest rather than clearing.
+    await userEvent.click(screen.getByRole('checkbox', { name: /Select every plan in/ }));
+    expect(onToggleCompareSelected).toHaveBeenCalledWith('b');
+    expect(onToggleCompareSelected).not.toHaveBeenCalledWith('a');
   });
 });

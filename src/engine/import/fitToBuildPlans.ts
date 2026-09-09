@@ -3,8 +3,9 @@
  * (issue #626, "Fit Import" in CONTEXT.md).
  *
  * The counterpart of `fitToSkills.ts`: same input, same injected-lookup shape,
- * same never-throws contract — but it answers "what do I have to build" rather
- * than "what do I have to train". Pure, like everything in `src/engine`: the
+ * and the same promise that no *input* can make it throw — a malformed fit,
+ * an unresolvable name and a missing header all come back as data. It answers
+ * "what do I have to build" rather than "what do I have to train". Pure, like everything in `src/engine`: the
  * caller adapts the blueprint catalog to `FitBlueprintLookup` at the boundary.
  *
  * ## One aggregation pass, not two
@@ -187,12 +188,13 @@ export function fitToBuildPlans(
 
   return {
     hull: hullResolution ? candidateFor(hullResolution, 1) : null,
-    items: order.map((id) => {
+    // `order` only ever gains an id that `resolved` was given in the same
+    // statement, so every lookup here hits. Filtered rather than asserted:
+    // this module promises callers that no input can make it throw, and an
+    // invariant of its own is not worth breaking that promise over.
+    items: order.flatMap((id) => {
       const entry = resolved.get(id);
-      // Present by construction: `order` only ever gains an id `resolved` was
-      // just given.
-      if (!entry) throw new Error(`missing aggregation entry for blueprint ${id}`);
-      return candidateFor(entry.resolution, entry.quantity);
+      return entry ? [candidateFor(entry.resolution, entry.quantity)] : [];
     }),
     skipped: [...skipped.values()],
     excludedCharges: [...excludedCharges.values()],

@@ -117,6 +117,7 @@ export function Industry() {
   const hydrateBuildGroups = useBuildGroups((state) => state.hydrate);
   const setBuildGroups = useBuildGroups((state) => state.setValue);
   const expandedGroups = useExpandedGroups((state) => state.value);
+  const expandedGroupsHydrated = useExpandedGroups((state) => state.hydrated);
   const hydrateExpandedGroups = useExpandedGroups((state) => state.hydrate);
   const setExpandedGroups = useExpandedGroups((state) => state.setValue);
   const assumedMe = useAssumedMe((state) => state.value);
@@ -214,13 +215,18 @@ export function Industry() {
         entry,
         owned,
         mostRecentlyUpdatedPlan(plans),
-        facilityDefaults
+        facilityDefaults,
+        // The same assumed ME Fit Import seeds its plans with (#626). Passed
+        // here too so one blueprint cannot start at two different ME values
+        // depending on whether it was picked or imported; an owned copy still
+        // wins on both paths.
+        { assumedMe }
       );
       await db.buildPlans.add(plan);
       scheduleSync(activeCharacterId);
       return plan.id;
     },
-    [activeCharacterId, ownedBlueprints, plans, facilityDefaults]
+    [activeCharacterId, ownedBlueprints, plans, facilityDefaults, assumedMe]
   );
 
   // The Market Browser's item context menu "jump to a Build Plan" action
@@ -364,9 +370,13 @@ export function Industry() {
     () => groups.find((g) => g.id === selectedGroupId) ?? null,
     [groups, selectedGroupId]
   );
+  const membersOfGroup = useCallback(
+    (groupId: string) => plans?.filter((p) => p.buildGroupId === groupId) ?? [],
+    [plans]
+  );
   const selectedGroupPlans = useMemo(
-    () => plans?.filter((p) => p.buildGroupId === selectedGroupId) ?? [],
-    [plans, selectedGroupId]
+    () => (selectedGroupId === null ? [] : membersOfGroup(selectedGroupId)),
+    [membersOfGroup, selectedGroupId]
   );
 
   // Narrow screens show one column at a time (CONTEXT.md round 25); matches
@@ -542,26 +552,34 @@ export function Industry() {
    * `markBuildPlanDeleted` makes about Production Runs, which it deliberately
    * does not cascade to either. The members reappear in the ungrouped list.
    */
-  /** Asks first, but only when there are plans to say something about. */
+  /** Asks first, but only when there are plans for the question to be about. */
   function requestDeleteGroup(groupId: string) {
-    const members = plans?.filter((p) => p.buildGroupId === groupId) ?? [];
-    if (members.length === 0) void handleDeleteGroup(groupId);
+    if (membersOfGroup(groupId).length === 0) void handleDeleteGroup(groupId);
     else setDeletingGroupId(groupId);
   }
 
+  /**
+   * Deleting a group orphans its plans; it never cascades.
+   *
+   * A Build Plan is worth more than its membership — the same call
+   * `markBuildPlanDeleted` makes about Production Runs, which it deliberately
+   * does not cascade to either. The members reappear in the ungrouped list.
+   */
   async function handleDeleteGroup(groupId: string) {
     if (activeCharacterId === null) return;
     setDeletingGroupId(null);
-    const members = plans?.filter((p) => p.buildGroupId === groupId) ?? [];
+    const members = membersOfGroup(groupId);
     if (members.length > 0) {
+      const now = Date.now();
       await db.transaction('rw', db.buildPlans, async () => {
-        for (const member of members) {
-          const stored = await db.buildPlans.get(member.id);
-          if (!stored) continue;
-          const orphaned = { ...stored, updatedAt: Date.now() };
-          delete orphaned.buildGroupId;
-          await db.buildPlans.put(orphaned);
-        }
+        const stored = await db.buildPlans.bulkGet(members.map((m) => m.id));
+        const orphaned = stored.flatMap((plan) => {
+          if (!plan) return [];
+          const next = { ...plan, updatedAt: now };
+          delete next.buildGroupId;
+          return [next];
+        });
+        await db.buildPlans.bulkPut(orphaned);
       });
       scheduleSync(activeCharacterId);
     }
@@ -612,12 +630,20 @@ export function Industry() {
       buildGroupId: groupId,
     });
     if (newPlans.length === 0) return;
-    await setBuildGroups(
-      addBuildGroup(buildGroups, activeCharacterId, {
-        id: groupId,
-        name: preview.groupName ?? t('industry.newGroupName'),
-      })
-    );
+    // The ship goes into the stored name rather than being derived from the
+    // members later: nothing marks which plan is the hull, and any ordering
+    // that stood in for one (insertion order, newest `updatedAt`) names a
+    // different plan the moment the pilot edits a member.
+    const name =
+      preview.groupName === null
+        ? t('industry.newGroupName')
+        : preview.hull
+          ? t('industry.fitImportGroupName', {
+              fit: preview.groupName,
+              ship: preview.hull.productName,
+            })
+          : preview.groupName;
+    await setBuildGroups(addBuildGroup(buildGroups, activeCharacterId, { id: groupId, name }));
     await db.buildPlans.bulkAdd(newPlans);
     scheduleSync(activeCharacterId);
     await setGroupExpanded(groupId, true);
@@ -668,7 +694,7 @@ export function Industry() {
         </Panel>
       )}
 
-      {!plans || !catalog || !buildGroupsHydrated ? (
+      {!plans || !catalog || !buildGroupsHydrated || !expandedGroupsHydrated ? (
         <div className="flex justify-center py-16">
           <Spinner label={t('common.loading')} />
         </div>

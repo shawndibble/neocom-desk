@@ -96,7 +96,7 @@ export function FitImportDialog({ catalog, onApply, onClose }: FitImportDialogPr
             )}
 
             <div>
-              <p className="font-semibold text-text-dim uppercase">
+              <p className="font-semibold tracking-widest text-text-dim uppercase">
                 {t('industry.fitImportWillCreate')}
               </p>
               {planCount === 0 ? (
@@ -127,7 +127,7 @@ export function FitImportDialog({ catalog, onApply, onClose }: FitImportDialogPr
 
             {preview.skipped.length > 0 && (
               <div>
-                <p className="font-semibold text-warning uppercase">
+                <p className="font-semibold tracking-widest text-warning uppercase">
                   {t('industry.fitImportSkipped')}
                 </p>
                 <ul className="mt-1 max-h-32 overflow-y-auto">
@@ -142,7 +142,7 @@ export function FitImportDialog({ catalog, onApply, onClose }: FitImportDialogPr
 
             {preview.excludedCharges.length > 0 && (
               <div>
-                <p className="font-semibold text-warning uppercase">
+                <p className="font-semibold tracking-widest text-warning uppercase">
                   {t('industry.fitImportCharges')}
                 </p>
                 <ul className="mt-1">

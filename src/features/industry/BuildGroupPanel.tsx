@@ -16,12 +16,12 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, EmptyState, Panel, Spinner } from '@/components/ui';
 import type { BuildPlanRecord } from '@/db';
-import { detectOwnedStock } from '@/engine/industry/ownedStock';
 import { rollUpBuildGroup, type BuildGroupMember } from '@/engine/industry/groupRollup';
 import type { SkillLevels } from '@/engine/industry/types';
 import { writeToClipboard } from '@/lib/clipboard';
 import { formatDuration } from '@/lib/duration';
 import { formatIsk } from '@/lib/isk';
+import { TRADE_HUBS } from '@/market/hubs';
 import type { PiData } from '@/sde/types';
 import { nameForType, toIndustryBlueprint, type BlueprintCatalog } from './blueprintCatalog';
 import type { BuildGroup } from './buildGroups';
@@ -29,6 +29,7 @@ import type { OwnedStockSnapshot } from './ownedStockDetection';
 import { hasShoppingList, shoppingListText } from './shoppingList';
 import { materialTableRows, shoppingListMaterials } from './subBuildPlan';
 import { useComparedBuildResults } from './useComparedBuildResults';
+import { useDetectedOwnedStock } from './useDetectedOwnedStock';
 
 interface BuildGroupPanelProps {
   group: BuildGroup;
@@ -75,26 +76,33 @@ export function BuildGroupPanel({
     });
   }, [rows, plans]);
 
-  // Keyed on the members' *blueprint* material types, never on the computed
-  // cost lines: those get a fresh array identity on every runs/ME keystroke,
-  // and an asset list runs to tens of thousands of rows per Character. Same
-  // reasoning as `useDetectedOwnedStock`'s own memo.
+  // The members' *blueprint* material types, never the computed cost lines:
+  // those get a fresh array identity on every runs/ME keystroke, and an asset
+  // list runs to tens of thousands of rows per Character. Sorted, so the array
+  // identity the detection hook memoizes on survives a reordering of `plans`.
   const materialTypeIds = useMemo(() => {
     const ids = new Set<number>();
     for (const plan of plans) {
       const entry = catalog.byBlueprintTypeID.get(plan.blueprintTypeID);
       if (!entry) continue;
-      for (const material of toIndustryBlueprint(entry.blueprint).materials)
+      for (const material of toIndustryBlueprint(entry.blueprint).materials) {
         ids.add(material.typeID);
+      }
     }
-    return ids;
+    return [...ids].sort((a, b) => a - b);
   }, [plans, catalog]);
 
-  const detectedOwnedStock = useMemo(() => {
-    if (ownedStockSnapshot.sources.length === 0 || materialTypeIds.size === 0) return undefined;
-    const detected = detectOwnedStock(ownedStockSnapshot.sources, materialTypeIds);
-    return new Map([...detected].map(([typeID, stock]) => [typeID, stock.quantity]));
-  }, [ownedStockSnapshot, materialTypeIds]);
+  // The very detection a single plan's own page runs, over the union of the
+  // group's materials — reused rather than re-derived, so a group and its
+  // members can never hold two opinions about what the hangar contains.
+  const detected = useDetectedOwnedStock(ownedStockSnapshot, materialTypeIds);
+  const detectedOwnedStock = useMemo(
+    () =>
+      detected.stock.size === 0
+        ? undefined
+        : new Map([...detected.stock].map(([typeID, stock]) => [typeID, stock.quantity])),
+    [detected.stock]
+  );
 
   const rollup = useMemo(
     () => rollUpBuildGroup(members, { detectedOwnedStock }),
@@ -158,13 +166,30 @@ export function BuildGroupPanel({
             <dt className="text-text-dim">{t('industry.groupJobTime')}</dt>
             <dd className="tabular-nums">{formatDuration(rollup.seconds)}</dd>
           </div>
+          {/* What the same fit costs bought outright — the group's own
+              Acquisition Verdict, and the comparison a pilot pasting a fit is
+              actually making. Null when any member's product is unpriced,
+              because a partial sum shown as a whole is worse than none. */}
+          <div>
+            <dt className="text-text-dim">{t('industry.groupBuyCost')}</dt>
+            <dd className="tabular-nums">
+              {rollup.buyCost === null ? t('industry.unpriced') : formatIsk(rollup.buyCost)}
+            </dd>
+          </div>
         </dl>
 
         <p className="mt-2 text-xs text-text-dim">{t('industry.groupEstimateNote')}</p>
 
         {!rollup.singleHub && (
           <p role="alert" className="mt-2 text-xs text-warning">
-            {t('industry.groupMixedHubs', { hubs: rollup.hubIds.join(', ') })}
+            {t('industry.groupMixedHubs', {
+              // `systemName`, which hubs.ts keeps for exactly this — the full
+              // station name ("Jita IV - Moon 4 - Caldari Navy Assembly
+              // Plant") would bury the sentence it appears in.
+              hubs: rollup.hubIds
+                .map((id) => TRADE_HUBS.find((hub) => hub.id === id)?.systemName ?? id)
+                .join(', '),
+            })}
           </p>
         )}
         {rollup.unpriceable && (
@@ -208,16 +233,24 @@ export function BuildGroupPanel({
         </ul>
       </Panel>
 
-      <Panel title={t('industry.groupShoppingList')} padded={false}>
-        {rollup.shoppingMaterials.length === 0 ? (
+      {/* The whole merge, built materials included — `tableMaterials`, not the
+          buy list. The two are only the same where no member builds anything,
+          and mixing them into one number double-counts the moment one member
+          buys what another member's sub-job also consumes. The copy control
+          above pastes `shoppingMaterials`, which is the leaves alone. */}
+      <Panel title={t('industry.groupMaterials')} padded={false}>
+        {rollup.tableMaterials.length === 0 ? (
           <EmptyState title={t('industry.groupNothingToBuy')} className="py-6" />
         ) : (
           <ul className="divide-y divide-line text-xs">
-            {rollup.shoppingMaterials.map((material) => (
+            {rollup.tableMaterials.map((material) => (
               <li key={material.typeID} className="flex justify-between gap-2 px-2.5 py-1.5">
                 <span className="truncate">{nameForType(catalog, material.typeID)}</span>
                 <span className="shrink-0 tabular-nums text-text-dim">
-                  {material.remainingQuantity.toLocaleString()}
+                  {t('industry.groupMaterialNeed', {
+                    quantity: material.quantity.toLocaleString(),
+                    remaining: material.remainingQuantity.toLocaleString(),
+                  })}
                   {material.unpriced ? ` · ${t('industry.unpriced')}` : ''}
                 </span>
               </li>
