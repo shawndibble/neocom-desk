@@ -533,7 +533,7 @@ export function Market() {
 
   // Held here rather than inside `AppraisalPanel` so a pasted list survives a
   // trip to the Browser tab, and so the header's refresh button can drive it.
-  const appraisal = useAppraisal(effectiveHub, pricePercent);
+  const appraisal = useAppraisal(effectiveHub, pricePercent, activeCharacterId);
 
   const [orderBookResult, setOrderBookResult] = useState<OrderBookResult | null>(null);
   const [orderBookLoading, setOrderBookLoading] = useState(false);

@@ -41,7 +41,11 @@ export interface AppraisalController {
   refresh: () => void;
 }
 
-export function useAppraisal(hub: TradeHub, pricePercent: number): AppraisalController {
+export function useAppraisal(
+  hub: TradeHub,
+  pricePercent: number,
+  characterId: number | null
+): AppraisalController {
   const [text, setText] = useState('');
   const [submitted, setSubmitted] = useState('');
   const [result, setResult] = useState<AppraisalOutcome | null>(null);
@@ -68,7 +72,7 @@ export function useAppraisal(hub: TradeHub, pricePercent: number): AppraisalCont
       setLoading(true);
       setFailed(false);
       try {
-        const outcome = await appraisePaste(submitted, hub, pricePercent, { force });
+        const outcome = await appraisePaste(submitted, hub, pricePercent, characterId, { force });
         if (cancelled) return;
         setResult(outcome);
       } catch {
@@ -84,7 +88,7 @@ export function useAppraisal(hub: TradeHub, pricePercent: number): AppraisalCont
     return () => {
       cancelled = true;
     };
-  }, [submitted, hub, pricePercent, forceTick]);
+  }, [submitted, hub, pricePercent, characterId, forceTick]);
 
   const appraise = useCallback(() => {
     // Guarded rather than left to the effect: an empty submit would otherwise

@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { buildAppraisal, type AppraisalItem } from '@/engine/market/appraisal';
+import {
+  buildAppraisal,
+  computeAppraisalRefine,
+  type AppraisalItem,
+} from '@/engine/market/appraisal';
+import { BASE_STATION_REPROCESSING_RATE } from '@/engine/industry/reprocessing';
+
+const NO_SKILLS = { reprocessingLevel: 0, reprocessingEfficiencyLevel: 0, specialisationLevel: 0 };
 
 const damageControl: AppraisalItem = {
   typeId: 2048,
@@ -112,11 +119,111 @@ describe('buildAppraisal', () => {
   it('totals to zero for an empty list', () => {
     const { rows, totals } = buildAppraisal([], 90);
     expect(rows).toEqual([]);
-    expect(totals).toEqual({ buy: 0, sell: 0, spread: 0, unpricedRows: 0 });
+    expect(totals).toEqual({
+      buy: 0,
+      sell: 0,
+      spread: 0,
+      unpricedRows: 0,
+      refine: 0,
+      refineUnpricedRows: 0,
+    });
   });
 
   it('preserves the order it was given', () => {
     const { rows } = buildAppraisal([tritanium, damageControl], 90);
     expect(rows.map((row) => row.name)).toEqual(['Tritanium', 'Damage Control II']);
+  });
+
+  describe('refine-then-sell', () => {
+    it('leaves a row with no reprocessing data without a refine value', () => {
+      const { rows, totals } = buildAppraisal([damageControl], 100);
+      expect(rows[0].refineTotal).toBeUndefined();
+      expect(rows[0].refinePricedAll).toBeUndefined();
+      expect(totals.refine).toBe(0);
+      expect(totals.refineUnpricedRows).toBe(0);
+    });
+
+    it('scales the refine value by the price percent, same as the other totals', () => {
+      const ore: AppraisalItem = {
+        ...tritanium,
+        refine: { valueAtFullPrice: 1000, pricedAll: true, unitsLeftOver: 0 },
+      };
+      const { rows, totals } = buildAppraisal([ore], 90);
+      expect(rows[0].refineTotal).toBeCloseTo(900, 6);
+      expect(totals.refine).toBeCloseTo(900, 6);
+    });
+
+    it('carries the partial-pricing and leftover-units signal onto the row', () => {
+      const ore: AppraisalItem = {
+        ...tritanium,
+        refine: { valueAtFullPrice: 500, pricedAll: false, unitsLeftOver: 3 },
+      };
+      const { rows, totals } = buildAppraisal([ore], 100);
+      expect(rows[0].refinePricedAll).toBe(false);
+      expect(rows[0].refineUnitsLeftOver).toBe(3);
+      expect(totals.refineUnpricedRows).toBe(1);
+    });
+
+    it('sums the refine total only over rows carrying reprocessing data', () => {
+      const ore: AppraisalItem = {
+        ...tritanium,
+        refine: { valueAtFullPrice: 500, pricedAll: true, unitsLeftOver: 0 },
+      };
+      const { totals } = buildAppraisal([damageControl, ore], 100);
+      expect(totals.refine).toBe(500);
+    });
+  });
+});
+
+describe('computeAppraisalRefine', () => {
+  const veldspar = {
+    portionSize: 100,
+    materials: [{ typeId: 34, quantity: 415 }],
+  };
+
+  it('is undefined when the type carries no reprocessing data', () => {
+    expect(
+      computeAppraisalRefine({
+        quantity: 1000,
+        reprocessing: undefined,
+        skills: NO_SKILLS,
+        materialPrices: {},
+      })
+    ).toBeUndefined();
+  });
+
+  it('refines the pasted quantity at the station base rate with no skills trained', () => {
+    const refine = computeAppraisalRefine({
+      quantity: 1000,
+      reprocessing: veldspar,
+      skills: NO_SKILLS,
+      materialPrices: { 34: 5 },
+    });
+    // 10 batches x floor(415 x 10 x 0.5) Tritanium x 5 ISK
+    expect(refine).toEqual({
+      valueAtFullPrice: Math.floor(415 * 10 * BASE_STATION_REPROCESSING_RATE) * 5,
+      pricedAll: true,
+      unitsLeftOver: 0,
+    });
+  });
+
+  it('reports a part-portion quantity as zero units refined, not omitted', () => {
+    const refine = computeAppraisalRefine({
+      quantity: 50,
+      reprocessing: veldspar,
+      skills: NO_SKILLS,
+      materialPrices: { 34: 5 },
+    });
+    expect(refine).toEqual({ valueAtFullPrice: 0, pricedAll: true, unitsLeftOver: 50 });
+  });
+
+  it('flags an unpriced output material rather than pricing it as free', () => {
+    const refine = computeAppraisalRefine({
+      quantity: 1000,
+      reprocessing: veldspar,
+      skills: NO_SKILLS,
+      materialPrices: {},
+    });
+    expect(refine).toEqual({ valueAtFullPrice: 0, pricedAll: false, unitsLeftOver: 0 });
   });
 });

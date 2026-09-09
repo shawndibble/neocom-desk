@@ -60,6 +60,26 @@ function iskCell(value: number | null, decimals: 'auto' | 0): string {
   return decimals === 'auto' ? formatIskAuto(value) : formatIsk(value);
 }
 
+/**
+ * "Sell-as-is" is `buyTotal` in this engine's own vocabulary — what the list
+ * fetches sold into buy orders right now (`market.appraisal.buyTotalHelp`) —
+ * so that is what the refine-then-sell comparison is judged against, the
+ * same axis `orderExits.ts` prices its own refine exit on.
+ */
+function refineBeatsSellAsIs(row: AppraisalRow): boolean {
+  return row.refineTotal !== undefined && row.buyTotal !== null && row.refineTotal > row.buyTotal;
+}
+
+/** Bolds a total only when it actually won a real comparison — never on a row with nothing to compare against. */
+function comparisonCell(text: string, highlighted: boolean, suffix?: ReactElement | false) {
+  return (
+    <span className={highlighted ? 'font-semibold text-accent' : undefined}>
+      {text}
+      {suffix}
+    </span>
+  );
+}
+
 export function AppraisalPanel({
   controller,
   pricePercent,
@@ -142,7 +162,11 @@ export function AppraisalPanel({
       header: t('market.appraisal.columnBuyTotal'),
       align: 'right',
       className: 'whitespace-nowrap tabular-nums',
-      render: (row) => iskCell(row.buyTotal, 0),
+      render: (row) =>
+        comparisonCell(
+          iskCell(row.buyTotal, 0),
+          row.refineTotal !== undefined && !refineBeatsSellAsIs(row)
+        ),
       sortValue: (row) => row.buyTotal ?? undefined,
     },
     {
@@ -158,6 +182,35 @@ export function AppraisalPanel({
   const rows = result?.appraisal.rows ?? [];
   const totals = result?.appraisal.totals;
   const unmatched = result?.unmatched ?? [];
+  // Undefined per row when the type has no reprocessing data at all — the
+  // column only earns its place on screen when at least one row has
+  // something to show, which is also exactly when there is nothing to show
+  // with no active Character (`appraisalData.ts` never sets `refine` then).
+  const hasRefine = rows.some((row) => row.refineTotal !== undefined);
+  if (hasRefine) {
+    columns.push({
+      id: 'refineTotal',
+      header: t('market.appraisal.columnRefineTotal'),
+      align: 'right',
+      className: 'whitespace-nowrap tabular-nums',
+      render: (row) =>
+        row.refineTotal === undefined
+          ? '—'
+          : comparisonCell(
+              iskCell(row.refineTotal, 0),
+              refineBeatsSellAsIs(row),
+              row.refinePricedAll === false && (
+                <span
+                  className="ml-0.5 text-warning"
+                  title={t('market.appraisal.refinePartialHint')}
+                >
+                  *
+                </span>
+              )
+            ),
+      sortValue: (row) => row.refineTotal ?? undefined,
+    });
+  }
 
   // The same menu the tree, the Quickbar and the Variations table carry — an
   // appraised row is an item like any other, and every action on it applies.
@@ -338,6 +391,13 @@ export function AppraisalPanel({
                   <span className={iskToneClass(totals.spread)}>{formatIsk(totals.spread)}</span>
                 }
               />
+              {hasRefine && (
+                <StatChip
+                  label={t('market.appraisal.refineTotal')}
+                  value={formatIsk(totals.refine)}
+                  tooltip={t('market.appraisal.refineTotalHelp')}
+                />
+              )}
               <StatChip label={t('market.appraisal.items')} value={rows.length} />
               {loading && <Spinner label={t('common.loading')} size="sm" />}
             </div>
@@ -345,6 +405,11 @@ export function AppraisalPanel({
             {totals.unpricedRows > 0 && (
               <p className="border-b border-line px-3 py-2 text-[0.6875rem] text-warning">
                 {t('market.appraisal.unpriced', { count: totals.unpricedRows })}
+              </p>
+            )}
+            {totals.refineUnpricedRows > 0 && (
+              <p className="border-b border-line px-3 py-2 text-[0.6875rem] text-warning">
+                {t('market.appraisal.refineUnpriced', { count: totals.refineUnpricedRows })}
               </p>
             )}
 

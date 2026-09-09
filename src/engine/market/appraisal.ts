@@ -22,7 +22,36 @@
  *   first, so a whole-ISK price at a whole percentage lands exactly rather
  *   than a binary fraction below it. Everything else is left at full
  *   precision and rounded once, at the edge, by `formatIsk`.
+ *
+ * Refine-then-sell (issue #672) rides alongside the sell-as-is figures on the
+ * same rows and totals, rather than as a parallel `Appraisal`, so the two are
+ * always compared over the same priced quantity. It reuses
+ * `src/engine/industry/reprocessing.ts` wholesale — this module supplies only
+ * `computeAppraisalRefine`, the glue that turns one resolved item plus a
+ * character's skills and material prices into the same
+ * `{ total, pricedAll }` shape `reprocessingValue` already established, so
+ * `buildAppraisal` can scale and total it exactly like buy/sell. A type with
+ * no reprocessing data carries no `refine` field at all, distinguishing "no
+ * comparison exists" from "the comparison is worth nothing" (a part-portion
+ * quantity, which is a real, reportable zero).
  */
+import {
+  reprocessingEfficiency,
+  reprocessingValue,
+  reprocessingYield,
+  type ReprocessingMaterial,
+  type ReprocessingSkills,
+} from '@/engine/industry/reprocessing';
+
+/** Refine-then-sell value for one item's full pasted quantity, at 100% price. */
+export interface AppraisalRefine {
+  /** What the priced output materials fetch. Never counts an unpriced material as free. */
+  valueAtFullPrice: number;
+  /** False when at least one output material had no price at this hub. */
+  pricedAll: boolean;
+  /** Units that could not fill a whole reprocessing portion, and so refined into nothing. */
+  unitsLeftOver: number;
+}
 
 /** One resolved, priced item to appraise. Prices are per unit, at 100%. */
 export interface AppraisalItem {
@@ -33,6 +62,8 @@ export interface AppraisalItem {
   buy: number | null;
   /** Best sell order price, or null where nobody is selling. */
   sell: number | null;
+  /** Undefined when this type carries no reprocessing data at all. */
+  refine?: AppraisalRefine;
 }
 
 export interface AppraisalRow {
@@ -43,6 +74,10 @@ export interface AppraisalRow {
   sellEach: number | null;
   buyTotal: number | null;
   sellTotal: number | null;
+  /** Undefined when this type carries no reprocessing data at all. */
+  refineTotal?: number;
+  refinePricedAll?: boolean;
+  refineUnitsLeftOver?: number;
 }
 
 export interface AppraisalTotals {
@@ -54,6 +89,10 @@ export interface AppraisalTotals {
   spread: number;
   /** Rows missing a price on at least one side, so the totals are a subset. */
   unpricedRows: number;
+  /** Summed over rows carrying reprocessing data, whatever their pricing. */
+  refine: number;
+  /** Rows with reprocessing data where at least one output material had no price. */
+  refineUnpricedRows: number;
 }
 
 export interface Appraisal {
@@ -71,6 +110,8 @@ export function buildAppraisal(items: readonly AppraisalItem[], pricePercent: nu
   let buy = 0;
   let sell = 0;
   let unpricedRows = 0;
+  let refine = 0;
+  let refineUnpricedRows = 0;
 
   for (const item of items) {
     const buyEach = scale(item.buy, pricePercent);
@@ -82,6 +123,17 @@ export function buildAppraisal(items: readonly AppraisalItem[], pricePercent: nu
     if (sellTotal !== null) sell += sellTotal;
     if (buyTotal === null || sellTotal === null) unpricedRows += 1;
 
+    let refineTotal: number | undefined;
+    let refinePricedAll: boolean | undefined;
+    let refineUnitsLeftOver: number | undefined;
+    if (item.refine) {
+      refineTotal = (item.refine.valueAtFullPrice * pricePercent) / 100;
+      refinePricedAll = item.refine.pricedAll;
+      refineUnitsLeftOver = item.refine.unitsLeftOver;
+      refine += refineTotal;
+      if (!refinePricedAll) refineUnpricedRows += 1;
+    }
+
     rows.push({
       typeId: item.typeId,
       name: item.name,
@@ -90,8 +142,63 @@ export function buildAppraisal(items: readonly AppraisalItem[], pricePercent: nu
       sellEach,
       buyTotal,
       sellTotal,
+      refineTotal,
+      refinePricedAll,
+      refineUnitsLeftOver,
     });
   }
 
-  return { rows, totals: { buy, sell, spread: sell - buy, unpricedRows } };
+  return {
+    rows,
+    totals: { buy, sell, spread: sell - buy, unpricedRows, refine, refineUnpricedRows },
+  };
+}
+
+/** What one item's reprocessing data looks like, resolved from the SDE bake. */
+export interface AppraisalReprocessingEntry {
+  portionSize: number;
+  materials: readonly ReprocessingMaterial[];
+}
+
+export interface ComputeAppraisalRefineInput {
+  /** Units of the item pasted, refined together the same way `reprocessingYield` batches them. */
+  quantity: number;
+  /** Undefined when the type carries no reprocessing data at all. */
+  reprocessing: AppraisalReprocessingEntry | undefined;
+  skills: ReprocessingSkills;
+  /** materialTypeId -> ISK a unit at the appraisal's Trade Hub. */
+  materialPrices: Readonly<Record<number, number>>;
+}
+
+/**
+ * The per-row refine comparison: the pasted quantity, refined with the
+ * character's own skills at the assumed NPC-station rate, priced at the
+ * appraisal's hub — deliberately not the station-priced comparison
+ * `orderExits.ts` makes for one open order, since an Appraisal is quoted at a
+ * Trade Hub rather than wherever the pasted stock happens to sit.
+ *
+ * Undefined in, undefined out: a type with no reprocessing data has no
+ * comparison to show, which is different from a comparison that resolves to
+ * zero (a part-portion quantity — `reprocessingYield`'s own discipline).
+ */
+export function computeAppraisalRefine({
+  quantity,
+  reprocessing,
+  skills,
+  materialPrices,
+}: ComputeAppraisalRefineInput): AppraisalRefine | undefined {
+  if (!reprocessing) return undefined;
+  const efficiency = reprocessingEfficiency(skills);
+  const yielded = reprocessingYield({
+    portionSize: reprocessing.portionSize,
+    materials: reprocessing.materials,
+    units: quantity,
+    efficiency,
+  });
+  const value = reprocessingValue(yielded.outputs, materialPrices);
+  return {
+    valueAtFullPrice: value.total,
+    pricedAll: value.pricedAll,
+    unitsLeftOver: yielded.unitsLeftOver,
+  };
 }
