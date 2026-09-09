@@ -76,6 +76,14 @@ export function industryActivityOf(blueprint: IndustryBlueprint): IndustryActivi
 }
 
 /**
+ * Most runs one job may be installed for. `computeBuildPlan` clamps to this
+ * before computing anything, so anything that *creates* a plan clamps to the
+ * same number — otherwise a stored 2,000,000 displays as itself while every
+ * figure on the page came from the clamp.
+ */
+export const MAX_JOB_RUNS = 100_000;
+
+/**
  * Pre-issue-#609 single-tier rig model: one tier value read into both the ME
  * and TE bonus tables at once — which is what a structure with one ME rig and
  * one TE rig of the same tier actually produces, but gave no way to fit only

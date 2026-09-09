@@ -77,6 +77,6 @@ export const TRADE_HUBS: readonly TradeHub[] = [
 /** Default Trade Hub for a fresh Build Plan (CONTEXT.md: "Jita 4-4 (default)"). */
 export const DEFAULT_TRADE_HUB: TradeHub = TRADE_HUBS[0];
 
-export function getTradeHub(id: TradeHub['id']): TradeHub | undefined {
+export function getTradeHub(id: string): TradeHub | undefined {
   return TRADE_HUBS.find((hub) => hub.id === id);
 }

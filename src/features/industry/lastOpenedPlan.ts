@@ -13,6 +13,7 @@
  * and synced away) needs no cleanup: `Industry.tsx` only adopts an id that is
  * still in the Character's own plans.
  */
+import { parseCharacterKeyedRecord } from '@/lib/characterKeyedRecord';
 import { createLocalSetting } from '@/lib/useLocalSetting';
 
 /** characterId (as an object key) -> Build Plan id. */
@@ -22,17 +23,7 @@ export const LAST_OPENED_PLAN_KEY = 'industryLastOpenedPlan';
 
 /** Exported for its test — the store below is the only other caller. */
 export function parseLastOpenedPlan(raw: unknown): LastOpenedPlanValue | null {
-  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return null;
-  const parsed: LastOpenedPlanValue = {};
-  for (const [characterId, planId] of Object.entries(raw)) {
-    // A damaged or hand-edited row loses only the entries that are damaged,
-    // rather than every Character's memory at once.
-    if (typeof planId !== 'string') continue;
-    const id = Number(characterId);
-    if (!Number.isInteger(id)) continue;
-    parsed[id] = planId;
-  }
-  return parsed;
+  return parseCharacterKeyedRecord(raw, (planId) => (typeof planId === 'string' ? planId : null));
 }
 
 export const useLastOpenedPlan = createLocalSetting<LastOpenedPlanValue>({

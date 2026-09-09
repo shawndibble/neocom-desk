@@ -73,10 +73,23 @@
 // no control clears it), so the tombstone-expiry edge does not bite this one
 // either. No `legacyKey`: the preference is new, with no device-local life to
 // seed from.
+// sync.industryBuildGroups (issue #626): a blob like the two above, and for
+// the same reason — the key space is unbounded (one entry per Build Group, per
+// Character), so one key per group is not expressible against an exact-match
+// allow-list. Holds only each group's id, name and order; which plans are in
+// it lives on `BuildPlanRecord.buildGroupId`, so the LWW clobber this shape
+// accepts can cost a name or an ordinal and never a plan's membership.
+//
+// Never deleted via deleteSyncedSetting either: deleting a group removes an
+// entry from the blob and rewrites it, so the key itself outlives every group
+// it ever held and the tombstone-expiry edge above does not bite it. That is
+// also why a group deleted on a laptop left offline for a month cannot
+// resurrect the way a per-document collection's would.
 export const SYNCED_SETTING_KEYS: readonly string[] = [
   'sync.corpDarkAfterDays',
   'sync.defaultCharacterFilter',
   'sync.industryAssumedMe',
+  'sync.industryBuildGroups',
   'sync.industryFacilityDefaults',
   'sync.marketHub',
   'sync.marketPricePercent',

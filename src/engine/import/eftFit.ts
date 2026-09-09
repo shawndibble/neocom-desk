@@ -29,6 +29,21 @@ export interface EftParseError {
 export interface EftItem {
   name: string;
   quantity: number;
+  /**
+   * Set only on the charge half of a "Module Name, Charge Name" line — the
+   * ammo a module was left loaded with, never a module or a cargo line.
+   *
+   * Additive, and deliberately does not change how many items a fit produces:
+   * `fitToSkills` and `clipboardImport` both read `name` alone, and the latter
+   * counts *lines* to build its "Unknown item xN" warning, so any change to
+   * this parser's cardinality would silently alter a shipped warning. A flag
+   * on an unchanged item list cannot.
+   *
+   * Fit Import (issue #626) needs it because EFT gives a loaded charge its
+   * module line's quantity: eight launchers yields "8", which counts launchers
+   * rather than missiles and is a production quantity under no reading at all.
+   */
+  isCharge?: true;
 }
 
 export interface EftFit {
@@ -81,7 +96,7 @@ export function parseEftFit(text: string): EftFit {
       continue;
     }
     items.push({ name: modulePart, quantity });
-    if (chargePart) items.push({ name: chargePart, quantity });
+    if (chargePart) items.push({ name: chargePart, quantity, isCharge: true });
   }
 
   return { shipName, fitName, items, errors };

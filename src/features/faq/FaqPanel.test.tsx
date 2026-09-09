@@ -47,6 +47,7 @@ const SETTING_KEY_TO_PHRASE: Readonly<Record<string, RegExp>> = {
   'sync.marketPricePercent': /appraisal price percentage/i,
   'sync.industryFacilityDefaults': /industry facility/i,
   'sync.industryAssumedMe': /assumed ME/,
+  'sync.industryBuildGroups': /industry build groups/i,
   'sync.piExpiringSoonHours': /expiring-soon window/i,
   'sync.corpDarkAfterDays': /dark threshold/i,
   'sync.defaultCharacterFilter': /default characters shown/i,
