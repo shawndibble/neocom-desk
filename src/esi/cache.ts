@@ -37,6 +37,23 @@ export interface StatusResult<T> {
 export const GLOBAL_CACHE_CHARACTER_ID = 0;
 
 /**
+ * Prefix for `features/character/structures.ts`'s cache keys — both its
+ * per-character rows (`structure:{id}`, `structure:{id}:forbidden`) and,
+ * since issue #669, the rows it mirrors under `GLOBAL_CACHE_CHARACTER_ID`
+ * once any Character in the roster resolves or exhausts a citadel
+ * (`structure:{id}`, `structure:{id}:roster-forbidden`).
+ *
+ * Defined here, not in `structures.ts`, so `cachePurge.purgeSharedStructureCache`
+ * can range-delete exactly this prefix under the sentinel without `src/esi`
+ * (lower-level than `src/features`, per docs/ARCHITECTURE.md) importing back
+ * from a feature module. A structure's visibility is genuinely ACL-gated, so
+ * unlike the truly public rows this sentinel otherwise holds (universe
+ * types/names, stations), these have exactly one purge path — the whole
+ * roster being cleared — rather than none; see `purgeSharedStructureCache`.
+ */
+export const STRUCTURE_CACHE_KEY_PREFIX = 'structure:';
+
+/**
  * Marks a cache row as owned by a *corporation* rather than by the character
  * whose token fetched it. Read by `cachePurge.purgeCorpScopedCache`, which
  * range-deletes exactly this prefix when a character changes corp — see there

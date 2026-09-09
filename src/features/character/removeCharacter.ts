@@ -11,7 +11,7 @@
 // needs its own explicit entry point.
 
 import { db } from '@/db';
-import { purgeCharacterCacheOrSuppress } from '@/esi/cachePurge';
+import { purgeCharacterCacheOrSuppress, purgeSharedStructureCache } from '@/esi/cachePurge';
 import { clearCharacterSyncBookkeeping, purgeCharacterRemoteDataOrDefer } from '@/sync';
 import { refreshAppBadge } from '@/features/notifications/appBadge';
 import { deleteFeedForCharacter } from '@/features/notifications/feed';
@@ -58,6 +58,12 @@ export async function removeCharacter(
   await clearCharacterSyncBookkeeping(characterId);
   await refreshAppBadge();
   await purgeCharacterCacheOrSuppress(characterId);
+  // Not part of that purge: the shared rows aren't this Character's own —
+  // they survive as long as the roster does, and only stop being that
+  // roster's own knowledge once nobody in it is left (esi/cachePurge.ts).
+  if ((await db.characters.count()) === 0) {
+    await purgeSharedStructureCache();
+  }
 
   const { activeCharacterId, setActiveCharacter, clearActiveCharacter } =
     useActiveCharacter.getState();

@@ -8,6 +8,7 @@ import {
   purgeCharacterCache,
   purgeCharacterCacheOrSuppress,
   purgeCorpScopedCache,
+  purgeSharedStructureCache,
 } from './cachePurge';
 
 const CHAR_ID = 91;
@@ -289,5 +290,61 @@ describe('purgeCorpScopedCache', () => {
     await expect(purgeCorpScopedCache(CHAR_ID)).resolves.toBe(0);
 
     expect(await keysFor(CHAR_ID)).toEqual(['skills']);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The roster emptying out (issue #669's follow-up). A structure name shared
+// across the roster is not the sentinel's usual public reference data, so it
+// has exactly one purge trigger: nobody left in the roster to have shared it.
+// ---------------------------------------------------------------------------
+
+describe('purgeSharedStructureCache', () => {
+  it('deletes every shared structure row under the sentinel, whatever suffix it carries', async () => {
+    await seed(GLOBAL_CACHE_CHARACTER_ID, 'structure:1000000000001');
+    await seed(GLOBAL_CACHE_CHARACTER_ID, 'structure:1000000000002:roster-forbidden');
+
+    const deleted = await purgeSharedStructureCache();
+
+    expect(deleted).toBe(2);
+    expect(await keysFor(GLOBAL_CACHE_CHARACTER_ID)).toEqual([]);
+  });
+
+  it('spares every OTHER global row — genuinely public reference data has no purge trigger', async () => {
+    await seed(GLOBAL_CACHE_CHARACTER_ID, 'type:587');
+    await seed(GLOBAL_CACHE_CHARACTER_ID, 'name:1000035');
+    await seed(GLOBAL_CACHE_CHARACTER_ID, 'station:60003760');
+    await seed(GLOBAL_CACHE_CHARACTER_ID, 'structure:1000000000001');
+    // A key merely starting with the same letters must not fall inside the
+    // range — same discriminating case `purgeCorpScopedCache`'s own test
+    // makes for `corp:` vs. `corporation-history`.
+    await seed(GLOBAL_CACHE_CHARACTER_ID, 'structured-data-probe');
+
+    await purgeSharedStructureCache();
+
+    expect((await keysFor(GLOBAL_CACHE_CHARACTER_ID)).sort()).toEqual([
+      'name:1000035',
+      'station:60003760',
+      'structured-data-probe',
+      'type:587',
+    ]);
+  });
+
+  it('spares a real Character’s own structure rows — those are purged by purgeCharacterCache instead', async () => {
+    await seed(CHAR_ID, 'structure:1000000000001');
+    await seed(CHAR_ID, 'structure:1000000000001:forbidden');
+    await seed(GLOBAL_CACHE_CHARACTER_ID, 'structure:1000000000001');
+
+    await purgeSharedStructureCache();
+
+    expect((await keysFor(CHAR_ID)).sort()).toEqual([
+      'structure:1000000000001',
+      'structure:1000000000001:forbidden',
+    ]);
+    expect(await keysFor(GLOBAL_CACHE_CHARACTER_ID)).toEqual([]);
+  });
+
+  it('is a no-op when nothing shared is cached', async () => {
+    await expect(purgeSharedStructureCache()).resolves.toBe(0);
   });
 });

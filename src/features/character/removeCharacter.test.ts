@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { db } from '@/db';
+import { GLOBAL_CACHE_CHARACTER_ID } from '@/esi/cache';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { removeCharacter } from './removeCharacter';
 
@@ -180,5 +181,38 @@ describe('removeCharacter', () => {
     await removeCharacter(1, true);
 
     expect(useActiveCharacter.getState().activeCharacterId).toBe(2);
+  });
+
+  it('purges the roster-shared structure cache once the last Character is removed', async () => {
+    await seedCharacter(1);
+    await db.esiCache.put({
+      characterId: GLOBAL_CACHE_CHARACTER_ID,
+      key: 'structure:1000000000001',
+      value: { name: 'Shared By The Roster' },
+      fetchedAt: 1,
+    });
+
+    await removeCharacter(1, true);
+
+    expect(
+      await db.esiCache.get([GLOBAL_CACHE_CHARACTER_ID, 'structure:1000000000001'])
+    ).toBeUndefined();
+  });
+
+  it('leaves the shared structure cache intact while another Character remains in the roster', async () => {
+    await seedCharacter(1);
+    await seedCharacter(2);
+    await db.esiCache.put({
+      characterId: GLOBAL_CACHE_CHARACTER_ID,
+      key: 'structure:1000000000001',
+      value: { name: 'Shared By The Roster' },
+      fetchedAt: 1,
+    });
+
+    await removeCharacter(1, true);
+
+    expect(
+      (await db.esiCache.get([GLOBAL_CACHE_CHARACTER_ID, 'structure:1000000000001']))?.value
+    ).toEqual({ name: 'Shared By The Roster' });
   });
 });
