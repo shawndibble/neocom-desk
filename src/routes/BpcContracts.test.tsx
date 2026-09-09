@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { db } from '@/db';
@@ -22,10 +22,13 @@ vi.mock('virtual:pwa-register/react', () => ({
   }),
 }));
 
+// `loadPi` is here for the Build Plan context menu's test alone: selecting the
+// action really navigates to Industry, which loads PI data on mount.
 vi.mock('@/sde/loadSde', () => ({
   loadSkills: vi.fn(async () => []),
   loadTypes: vi.fn(async () => ({})),
   loadBlueprints: vi.fn(async (): Promise<BlueprintMap> => BLUEPRINTS),
+  loadPi: vi.fn(async () => ({ schematics: {}, raw: [] })),
 }));
 
 vi.mock('@/app/syncStatus', async (importOriginal) => {
@@ -148,6 +151,26 @@ describe('BpcContracts', () => {
     render(<App />);
 
     expect(await screen.findByText('No public BPC listings synced yet')).toBeInTheDocument();
+  });
+
+  it('right-clicking a row starts a Build Plan for the item the blueprint makes', async () => {
+    loadPublicBpcContracts.mockResolvedValue(
+      cachedSnapshot([row({ contractId: 1, typeId: 638, regionId: 10000002 })])
+    );
+    render(<App />);
+
+    const table = await screen.findByRole('table', { name: 'BPC Search' });
+    fireEvent.contextMenu(within(table).getByText('Rifter Blueprint'));
+
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Start a Build Plan' }));
+
+    // 587 (Rifter), not 638 (its blueprint): Industry resolves `?product=` via
+    // the catalog's `byProductTypeID`, so handing it the blueprint's own
+    // typeID would silently create nothing.
+    await waitFor(() => {
+      expect(window.location.pathname).toBe('/industry');
+      expect(window.location.search).toBe('?product=587');
+    });
   });
 
   it('shows a not-configured empty state rather than an empty table when sync is unavailable', async () => {

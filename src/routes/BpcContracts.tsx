@@ -3,6 +3,7 @@ import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
+  ContextMenuHint,
   DataAgeBadge,
   DataTable,
   EmptyState,
@@ -34,6 +35,7 @@ import {
   type PublicBpcContractsSnapshot,
 } from '@/features/bpcContracts/syncedContracts';
 import { loadRegionName } from '@/features/bpcContracts/regionNames';
+import { BuildPlanContextMenu } from '@/features/industry/BuildPlanContextMenu';
 import { loadBlueprints } from '@/sde/loadSde';
 import { isSyncConfigured } from '@/app/syncStatus';
 import type { CachedResult } from '@/esi/cache';
@@ -372,12 +374,15 @@ export function BpcContracts() {
           )
         }
         actions={
-          <IconButton
-            icon={<Icon.Refresh />}
-            label={t('bpcContracts.refresh')}
-            onClick={refresh}
-            disabled={loading}
-          />
+          <>
+            <IconButton
+              icon={<Icon.Refresh />}
+              label={t('bpcContracts.refresh')}
+              onClick={refresh}
+              disabled={loading}
+            />
+            <ContextMenuHint label={t('bpcContracts.title')} />
+          </>
         }
       />
 
@@ -412,6 +417,9 @@ export function BpcContracts() {
                 rows={visibleRows}
                 rowKey={(row) => `${row.contractId}:${row.typeId}`}
                 defaultSort={{ columnId: 'price', direction: 'asc' }}
+                rowContextMenu={(row, tr) => (
+                  <BuildPlanContextMenu typeId={row.typeId} trigger={tr} />
+                )}
               />
               {!showAll && filteredRows.length > ROW_CAP && (
                 <div className="px-3 py-2">

@@ -300,6 +300,11 @@
   },
   "industry": {
     "title": "Build Plans",
+    "contextMenu": {
+      "startBuildPlan": "Start a Build Plan",
+      "startBuildPlanChecking": "Start a Build Plan (checking…)",
+      "notBuildable": "Nothing to build from this item"
+    },
     "copySuffix": "{{name}} (copy)",
     "duplicate": "Duplicate",
     "delete": "Delete",
