@@ -39,6 +39,7 @@ import {
   CheckCircle,
   Clipboard,
   Copy,
+  DotsSixVertical,
   DotsThreeVertical,
   DownloadSimple,
   EnvelopeSimple,
@@ -177,6 +178,12 @@ export const SeverityClear = withWeight(CheckCircle);
 export const Close = withWeight(X);
 /** Edit a name in place — the rename affordance on a saved-plan row. */
 export const Rename = withWeight(PencilSimple);
+/**
+ * Grab a row to drag it. The six-dot grip is the near-universal handle mark,
+ * and DESIGN.md §5 wants an SVG here rather than the `⠿` braille dingbat the
+ * older drag lists spell it with.
+ */
+export const DragHandle = withWeight(DotsSixVertical);
 /** Copy a saved plan to a new one. */
 export const Duplicate = withWeight(Copy);
 /** Put text on the clipboard — the same glyph as `Duplicate`, named for the other sense of "copy". */

@@ -33,13 +33,7 @@ import * as Icon from '@/components/ui/icons';
 import type { BuildPlanRecord } from '@/db';
 import { BlueprintPicker } from './BlueprintPicker';
 import type { BuildGroup } from './buildGroups';
-import {
-  dropTargetGroupId,
-  groupDropId,
-  planDropId,
-  planIdFromDropId,
-  resolveGroupDrop,
-} from './groupDrop';
+import { groupDropId, planDropId, planIdFromDropId, resolveGroupDrop } from './groupDrop';
 import type { BlueprintCatalog, BlueprintCatalogEntry } from './blueprintCatalog';
 
 /**
@@ -67,8 +61,15 @@ const collisionDetection: CollisionDetection = (args) => {
   return rectHits.length > 0 ? rectHits : closestCorners(args);
 };
 
-/** A drop target the pointer is currently resolving to. */
-const DROP_TARGET_CLASS = 'bg-accent/10 outline-2 -outline-offset-2 outline-accent-dim';
+/** A drop that lands the plan *in* a group: accent, the app's "this is the live target" colour. */
+const DROP_INTO_CLASS = 'bg-accent/10 outline-2 -outline-offset-2 outline-accent-dim';
+/**
+ * A drop that takes the plan *out* of every group. Deliberately not the accent
+ * treatment: leaving is the absence of a destination, and drawing it as one
+ * more would lose the only distinction `groupDrop.ts` works to keep — a plain
+ * dashed hairline reads as "no group" rather than as another group.
+ */
+const DROP_OUT_CLASS = 'outline-2 -outline-offset-2 outline-dashed outline-line-bright';
 
 interface BuildPlanListProps {
   plans: readonly BuildPlanRecord[];
@@ -154,6 +155,8 @@ type PlanRowProps = {
   onToggleCompareSelected: (id: string) => void;
   groups: readonly BuildGroup[];
   onMovePlan: (planId: string, groupId: string | null) => void;
+  /** What a drop on this row would do right now, or null when it would do nothing — see `dropTarget` in the list. */
+  dropKind: 'into' | 'out' | null;
   /** Set on a row sitting under its group's header, to step it in from the ungrouped ones. */
   indented?: boolean;
 } & Pick<BuildPlanListProps, 'onSelect' | 'onDuplicate' | 'onDelete' | 'onRename'>;
@@ -170,6 +173,7 @@ function PlanRow({
   onToggleCompareSelected,
   groups,
   onMovePlan,
+  dropKind,
   indented = false,
 }: PlanRowProps) {
   const { t } = useTranslation();
@@ -179,7 +183,7 @@ function PlanRow({
   // row is in", which is how an expanded group's body accepts a drop rather
   // than only its header.
   const dropId = planDropId(plan.id);
-  const { setNodeRef: setDropRef, isOver } = useDroppable({ id: dropId });
+  const { setNodeRef: setDropRef } = useDroppable({ id: dropId });
   const { setNodeRef: setDragRef, listeners, isDragging } = useDraggable({ id: dropId });
 
   return (
@@ -191,28 +195,39 @@ function PlanRow({
       className={`flex items-center gap-2 border-b border-line py-1.5 pr-2 text-xs last:border-b-0 ${
         indented ? 'pl-6' : 'pl-2'
       } ${active ? 'bg-panel-2' : ''} ${isDragging ? 'opacity-40' : ''} ${
-        isOver && !isDragging ? DROP_TARGET_CLASS : ''
+        dropKind === 'into' ? DROP_INTO_CLASS : dropKind === 'out' ? DROP_OUT_CLASS : ''
       }`}
     >
-      {/* Deliberately not focusable and hidden from assistive tech. Keyboard
+      {/* No groups yet means every drop is a no-op, and a grab cursor on a row
+          nothing will accept is a lie — so the handle appears with the first
+          group. The list still renders inside a DndContext either way, which
+          keeps the hooks above unconditional.
+
+          Deliberately not focusable and hidden from assistive tech. Keyboard
           dragging here would step the row a flat 25px per arrow press —
           `sortableKeyboardCoordinates` needs a sort order this list does not
           have — and announce raw droppable ids. The "Move to group" menu two
           controls along reaches every destination this handle does, from the
           keyboard, which is the pointer alternative that matters (WCAG 2.5.7).
 
+          The `title` is a pointer-only hint on a pointer-only control rather
+          than a `Tooltip`, which would put it back in the accessibility tree
+          this element is deliberately out of.
+
           `distance: 4` on the sensor and `touch-none` here are both load-
           bearing, for the reasons EntryList.tsx's copy spells out (#408). */}
-      <button
-        type="button"
-        tabIndex={-1}
-        aria-hidden="true"
-        {...listeners}
-        title={t('industry.dragToGroup')}
-        className="shrink-0 cursor-grab touch-none px-1 text-text-faint hover:text-text"
-      >
-        ⠿
-      </button>
+      {groups.length > 0 && (
+        <button
+          type="button"
+          tabIndex={-1}
+          aria-hidden="true"
+          {...listeners}
+          title={t('industry.dragToGroup')}
+          className="shrink-0 cursor-grab touch-none px-1 text-text-faint hover:text-text"
+        >
+          <Icon.DragHandle />
+        </button>
+      )}
       {compareMode && (
         <input
           type="checkbox"
@@ -341,7 +356,7 @@ function GroupHeader({
       ref={setNodeRef}
       className={`flex items-center gap-2 border-b border-line px-2 py-1.5 text-xs ${
         active ? 'bg-panel-2' : ''
-      } ${dropActive ? DROP_TARGET_CLASS : ''}`}
+      } ${dropActive ? DROP_INTO_CLASS : ''}`}
     >
       {/* Compare's checkbox only ever renders on a *visible* row, so a
           collapsed group's members are unreachable without this — it selects
@@ -438,10 +453,22 @@ export function BuildPlanList({
     // reason (#408).
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } })
   );
-  /** The plan under the pointer mid-drag, for the overlay. */
+  /** The plan being dragged, for the overlay. */
   const [draggingPlanId, setDraggingPlanId] = useState<string | null>(null);
-  /** Where a drop would land right now: a group id, null for ungrouped, undefined for nowhere. */
-  const [dropGroupId, setDropGroupId] = useState<string | null | undefined>(undefined);
+  /**
+   * The drop the pointer is currently offering, or null when it is offering
+   * none — which includes hovering the dragged plan's *own* group, since that
+   * drop would change nothing.
+   *
+   * Resolved through `resolveGroupDrop`, the same function `onDragEnd` writes
+   * from, so the highlight can never promise a move the drop then discards.
+   * `overId` is kept alongside the group so the row under the pointer and the
+   * group header it belongs to can light up together.
+   */
+  const [dropTarget, setDropTarget] = useState<{
+    overId: string;
+    groupId: string | null;
+  } | null>(null);
 
   // One pass, rather than a `filter` per group plus a `some` per plan.
   //
@@ -474,7 +501,8 @@ export function BuildPlanList({
   const draggingPlan =
     draggingPlanId === null ? undefined : plans.find((p) => p.id === draggingPlanId);
 
-  function overId(over: { id: string | number } | null) {
+  /** dnd-kit ids are `string | number`; every id this list registers is a string. */
+  function droppableIdOf(over: { id: string | number } | null) {
     return over === null ? null : String(over.id);
   }
 
@@ -483,16 +511,18 @@ export function BuildPlanList({
   }
 
   function handleDragOver(event: DragOverEvent) {
-    setDropGroupId(dropTargetGroupId(overId(event.over), groupOfPlan));
+    const over = droppableIdOf(event.over);
+    const move = resolveGroupDrop(String(event.active.id), over, groupOfPlan);
+    setDropTarget(move === null || over === null ? null : { overId: over, groupId: move.groupId });
   }
 
   function endDrag() {
     setDraggingPlanId(null);
-    setDropGroupId(undefined);
+    setDropTarget(null);
   }
 
   function handleDragEnd(event: DragEndEvent) {
-    const move = resolveGroupDrop(String(event.active.id), overId(event.over), groupOfPlan);
+    const move = resolveGroupDrop(String(event.active.id), droppableIdOf(event.over), groupOfPlan);
     endDrag();
     // A drop that changes nothing — back into the same group, onto itself, or
     // outside the list — is not written: `handleMovePlan` bumps `updatedAt`
@@ -501,9 +531,15 @@ export function BuildPlanList({
   }
 
   function rowProps(plan: BuildPlanRecord) {
+    const hovered = dropTarget !== null && dropTarget.overId === planDropId(plan.id);
     return {
       plan,
       active: plan.id === selectedId,
+      dropKind: !hovered
+        ? null
+        : dropTarget.groupId === null
+          ? ('out' as const)
+          : ('into' as const),
       onSelect,
       onDuplicate,
       onDelete,
@@ -612,7 +648,7 @@ export function BuildPlanList({
                     memberCount={members.length}
                     expanded={expandedGroupIds.has(group.id)}
                     active={group.id === selectedGroupId}
-                    dropActive={dropGroupId === group.id}
+                    dropActive={dropTarget?.groupId === group.id}
                     compareMode={compareMode}
                     membersSelected={
                       members.length > 0 && selectedCount === members.length

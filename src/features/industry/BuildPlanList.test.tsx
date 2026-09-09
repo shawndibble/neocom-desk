@@ -339,6 +339,13 @@ describe('BuildPlanList: dragging a plan into a group (#627)', () => {
     expect(screen.getAllByTitle(HANDLE_TITLE)).toHaveLength(2);
   });
 
+  it('offers no handle at all until there is a group to drag into', () => {
+    // With no groups every drop resolves to the plan's own (absent) group, so
+    // a grab cursor would be advertising a move that cannot happen.
+    renderDraggable({ groups: [] });
+    expect(screen.queryByTitle(HANDLE_TITLE)).not.toBeInTheDocument();
+  });
+
   it('keeps the handle out of the tab order and hidden from assistive tech', () => {
     // Keyboard dragging would step a flat 25px per arrow press and announce
     // raw droppable ids; the per-row menu reaches the same destinations

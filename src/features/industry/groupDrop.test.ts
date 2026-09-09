@@ -1,11 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  dropTargetGroupId,
-  groupDropId,
-  planDropId,
-  planIdFromDropId,
-  resolveGroupDrop,
-} from './groupDrop';
+import { groupDropId, planDropId, planIdFromDropId, resolveGroupDrop } from './groupDrop';
 
 /** planId -> its group. Absent means ungrouped, exactly as the list renders it. */
 const GROUPS = new Map([
@@ -34,27 +28,27 @@ describe('drop ids', () => {
   });
 });
 
-describe('dropTargetGroupId', () => {
-  it('lands in the group whose header was dropped on — the collapsed-group case', () => {
-    expect(dropTargetGroupId(groupDropId('fleet'), GROUPS)).toBe('fleet');
-  });
-
-  it('lands in the group owning the plan row dropped on', () => {
-    expect(dropTargetGroupId(planDropId('drake'), GROUPS)).toBe('spare');
-  });
-
-  it('lands nowhere — null, not undefined — on an ungrouped plan row', () => {
-    expect(dropTargetGroupId(planDropId('loner'), GROUPS)).toBeNull();
-  });
-
-  it('reports no target at all when the drop missed every droppable', () => {
-    expect(dropTargetGroupId(null, GROUPS)).toBeUndefined();
-    expect(dropTargetGroupId(undefined, GROUPS)).toBeUndefined();
-    expect(dropTargetGroupId('some-other-widget', GROUPS)).toBeUndefined();
-  });
-});
-
 describe('resolveGroupDrop', () => {
+  it('moves an ungrouped plan into the group whose header was dropped on', () => {
+    // The collapsed-group case: a collapsed group renders no member rows, so
+    // its header is the only rect a drop can land on.
+    expect(resolveGroupDrop(planDropId('loner'), groupDropId('fleet'), GROUPS)).toEqual({
+      planId: 'loner',
+      groupId: 'fleet',
+    });
+  });
+
+  it('moves a plan into the group owning the row it was dropped on', () => {
+    expect(resolveGroupDrop(planDropId('drake'), planDropId('raven'), GROUPS)).toEqual({
+      planId: 'drake',
+      groupId: 'fleet',
+    });
+  });
+
+  it('ignores a drop on something that is not one of this list’s targets', () => {
+    expect(resolveGroupDrop(planDropId('raven'), 'some-other-widget', GROUPS)).toBeNull();
+  });
+
   it('moves an ungrouped plan into the group it was dropped on', () => {
     expect(resolveGroupDrop(planDropId('loner'), groupDropId('fleet'), GROUPS)).toEqual({
       planId: 'loner',

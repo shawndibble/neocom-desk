@@ -55,7 +55,7 @@ export function planIdFromDropId(id: string): string | null {
  * group no longer exists reads as ungrouped here exactly as it looks on
  * screen.
  */
-export function dropTargetGroupId(
+function dropTargetGroupId(
   overId: string | null | undefined,
   groupOfPlan: ReadonlyMap<string, string>
 ): string | null | undefined {
