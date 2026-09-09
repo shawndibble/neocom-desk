@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { http, HttpResponse } from 'msw';
@@ -30,7 +30,9 @@ import {
   useSpExtractionThresholdSp,
 } from '@/features/character/spExtractionSettings';
 import * as rosterModule from '@/features/character/roster';
+import type { RosterEntry } from '@/features/character/roster';
 import * as rosterAttentionModule from '@/features/character/rosterAttention';
+import type { AttentionEntry } from '@/features/character/rosterAttention';
 import { Characters } from './Characters';
 
 vi.mock('@/app/loginFlow', () => ({
@@ -111,6 +113,10 @@ function renderCharacters() {
       <Routes>
         <Route path="/characters" element={<Characters />} />
         <Route path="/overview" element={<div>overview page</div>} />
+        <Route path="/skills/trained" element={<div>skills page</div>} />
+        <Route path="/industry" element={<div>industry page</div>} />
+        <Route path="/planetary-industry" element={<div>pi page</div>} />
+        <Route path="/alerts" element={<div>alerts page</div>} />
       </Routes>
     </MemoryRouter>
   );
@@ -651,7 +657,16 @@ describe('Characters table view', () => {
 
     await useSpExtractionMonitoringEnabled.getState().setValue(false);
 
-    for (const label of ['Alerts', 'Last synced', 'PI', 'Open jobs', 'Training']) {
+    for (const label of [
+      'Alerts',
+      'Last synced',
+      'PI',
+      'Manufacturing',
+      'Science',
+      'Reactions',
+      'Training',
+      'Starred',
+    ]) {
       await user.click(await screen.findByRole('button', { name: 'Columns' }));
       await user.click(await screen.findByRole('menuitemcheckbox', { name: label }));
       await user.keyboard('{Escape}');
@@ -688,5 +703,110 @@ describe('Characters table view', () => {
       snapshotSpy.mockRestore();
       attentionSpy.mockRestore();
     }
+  });
+
+  it('an Open Jobs column shows free slots (max minus running), not the running count', async () => {
+    // Pilot One: Mass Production II (skill_id 3387) -> 1 base + 2 = 3 manufacturing
+    // slots. One manufacturing job running -> 2 open. The old bug showed the
+    // running count (1) here; this pins the fixed "denominator - numerator" math.
+    const roster: RosterEntry[] = [
+      {
+        characterId: 91,
+        name: 'Pilot One',
+        wallet: null,
+        queue: null,
+        correctedTotalSp: 1_000_000,
+        skills: {
+          data: {
+            total_sp: 1_000_000,
+            skills: [
+              {
+                skill_id: 3387,
+                trained_skill_level: 2,
+                active_skill_level: 2,
+                skillpoints_in_skill: 0,
+              },
+            ],
+          },
+          fetchedAt: new Date(),
+          fromCache: true,
+          truncated: false,
+        },
+      },
+    ];
+    const attention: AttentionEntry[] = [
+      {
+        characterId: 91,
+        jobCounts: { manufacturing: 1, science: 0, reaction: 0 },
+        jobCountsFetchedAt: new Date(),
+        piAttention: undefined,
+        piFetchedAt: null,
+      },
+    ];
+    const snapshotSpy = vi.spyOn(rosterModule, 'loadRosterSnapshot').mockResolvedValue(roster);
+    const attentionSpy = vi
+      .spyOn(rosterAttentionModule, 'loadRosterAttention')
+      .mockResolvedValue(attention);
+
+    try {
+      const user = userEvent.setup();
+      renderCharacters();
+      await user.click(await screen.findByRole('button', { name: 'Table' }));
+
+      const table = await screen.findByRole('table');
+      const mfgHeader = within(table).getByRole('columnheader', { name: 'Manufacturing' });
+      const mfgIndex = within(table).getAllByRole('columnheader').indexOf(mfgHeader);
+      const pilotRow = within(table).getByText('Pilot One').closest('tr');
+      if (!pilotRow) throw new Error('expected a Pilot One row');
+      const mfgCell = within(pilotRow).getAllByRole('cell')[mfgIndex];
+      expect(within(mfgCell).getByText('2')).toBeInTheDocument();
+    } finally {
+      snapshotSpy.mockRestore();
+      attentionSpy.mockRestore();
+    }
+  });
+
+  it('the Starred column toggles the pinned star without navigating the row', async () => {
+    const user = userEvent.setup();
+    renderCharacters();
+    await user.click(await screen.findByRole('button', { name: 'Table' }));
+
+    await user.click(await screen.findByRole('button', { name: 'Star Pilot One' }));
+
+    await waitForSettingsValue(
+      STARRED_CHARACTERS_SETTING_KEY,
+      (value) => Array.isArray(value) && value.includes(91)
+    );
+    // Toggling the star must not also fire the row's own click-to-navigate.
+    expect(screen.queryByText('overview page')).not.toBeInTheDocument();
+  });
+
+  describe('row context menu', () => {
+    it('offers Overview, Skill training, Industry, PI, and Alerts for the row under the pointer', async () => {
+      renderCharacters();
+      await userEvent.setup().click(await screen.findByRole('button', { name: 'Table' }));
+
+      const row = (await screen.findByText('Pilot One')).closest('tr');
+      if (!row) throw new Error('expected a Pilot One row');
+      fireEvent.contextMenu(row);
+
+      for (const label of ['Overview', 'Skills', 'Industry', 'PI', 'Alerts']) {
+        expect(screen.getByRole('menuitem', { name: label })).toBeInTheDocument();
+      }
+    });
+
+    it('picking a destination switches the active character and navigates there', async () => {
+      renderCharacters();
+      await userEvent.setup().click(await screen.findByRole('button', { name: 'Table' }));
+
+      const row = (await screen.findByText('Pilot Two')).closest('tr');
+      if (!row) throw new Error('expected a Pilot Two row');
+      fireEvent.contextMenu(row);
+
+      fireEvent.click(await screen.findByRole('menuitem', { name: 'Industry' }));
+
+      expect(await screen.findByText('industry page')).toBeInTheDocument();
+      expect(useActiveCharacter.getState().activeCharacterId).toBe(92);
+    });
   });
 });

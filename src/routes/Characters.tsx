@@ -29,6 +29,7 @@ import {
   StatChip,
   STAT_CHIP_TONE_TEXT_CLASS,
   TextInput,
+  Tooltip,
   type DataTableColumn,
   type StatChipTone,
 } from '@/components/ui';
@@ -46,7 +47,7 @@ import {
   useSpExtractionThresholdSp,
 } from '@/features/character/spExtractionSettings';
 import { isSpExtractionReady } from '@/engine/spExtraction';
-import { maxJobSlots, type JobSlotSkills } from '@/engine/industry/jobSlots';
+import { maxJobSlots, type JobSlotCategory, type JobSlotSkills } from '@/engine/industry/jobSlots';
 import { jobSlotSkillsFromCharacterSkills } from '@/features/character/jobSlotSkills';
 import {
   availableCharacterColumns,
@@ -58,6 +59,7 @@ import {
 import { ATTENTION_RANK, ATTENTION_TONE as PI_ATTENTION_TONE } from '@/engine/pi/colonyStatus';
 import { deriveQueueState, type QueueState } from '@/features/skills/queueStatus';
 import { removeCharacter } from '@/features/character/removeCharacter';
+import { CharacterRowContextMenu } from '@/features/character/CharacterRowContextMenu';
 import { updateGroups, useOverviewGroups } from '@/features/character/overviewGroups';
 import {
   isCharacterStarred,
@@ -385,6 +387,7 @@ interface CharacterRow {
   jobSlotSkills: JobSlotSkills | undefined;
   /** Raw `total_sp` (not `correctedTotalSp`) — see `totalSpMap`'s doc comment. */
   totalSp: number | undefined;
+  starred: boolean;
 }
 
 /** `queueById`'s shape, built once from a roster snapshot — shared by the initial cache-only load and the "Refresh all" live reload so the two never compute it differently. */
@@ -435,13 +438,57 @@ function totalSpMap(roster: readonly RosterEntry[]): Map<number, number> {
 }
 
 /**
+ * One `manufacturing`/`science`/`reaction` job-slot column — three of these,
+ * not one combined column, so each category gets its own header-click sort
+ * (`DataTable` sorts one `sortValue` per column; a pilot who wants "who's out
+ * of reaction slots" specifically couldn't ask that of a single merged
+ * column). The number shown is *open* (free) slots — `max - running` — not
+ * the running count: "Open jobs" names how much room is left, and reading it
+ * as "jobs currently open/running" would say the opposite of what a pilot
+ * checking for spare capacity wants to know. `max` comes from
+ * `jobSlotSkills` (trained skills), `running` from `attention.jobCounts`
+ * (live industry jobs) — either missing means unknown, not zero.
+ */
+function openJobsColumn(
+  id: CharacterColumnId,
+  category: JobSlotCategory,
+  t: (key: string, options?: Record<string, unknown>) => string
+): DataTableColumn<CharacterRow> {
+  return {
+    id,
+    header: t(`characters.jobSlotCategory.${category}`),
+    sortValue: (row) => {
+      const running = row.attention?.jobCounts?.[category];
+      const max = row.jobSlotSkills ? maxJobSlots(row.jobSlotSkills)[category] : undefined;
+      return running === undefined || max === undefined ? undefined : max - running;
+    },
+    render: (row) => {
+      const running = row.attention?.jobCounts?.[category];
+      const max = row.jobSlotSkills ? maxJobSlots(row.jobSlotSkills)[category] : undefined;
+      if (running === undefined || max === undefined) return '—';
+      const open = max - running;
+      // Red at zero spare slots, yellow below half spare, plain text
+      // otherwise — a graduated "how much room is left" read using the same
+      // tone tokens as every other column, not a one-off continuous colour.
+      const tone = open === 0 ? 'text-danger' : open / max < 0.5 ? 'text-warning' : 'text-text';
+      return (
+        <Tooltip content={t('characters.openJobsTooltip', { used: running, max })}>
+          <span className={tone}>{open}</span>
+        </Tooltip>
+      );
+    },
+  };
+}
+
+/**
  * Every column the table can show, keyed by id — the picker offers a subset
  * of these keys, and the table renders whichever the pilot has checked, in
  * this record's own order (not the order they were picked in).
  */
 function buildColumns(
   t: (key: string, options?: Record<string, unknown>) => string,
-  spExtractionThresholdSp: number
+  spExtractionThresholdSp: number,
+  onToggleStarred: (characterId: number) => void
 ): Record<CharacterColumnId, DataTableColumn<CharacterRow>> {
   return {
     name: {
@@ -510,35 +557,9 @@ function buildColumns(
           '—'
         ),
     },
-    openJobs: {
-      id: 'openJobs',
-      header: t('characters.column.openJobs'),
-      headerTooltip: t('characters.openJobsHeaderTooltip'),
-      align: 'right',
-      className: 'tabular-nums',
-      sortValue: (row) => {
-        const counts = row.attention?.jobCounts;
-        return counts && counts.manufacturing + counts.science + counts.reaction;
-      },
-      render: (row) => {
-        const counts = row.attention?.jobCounts;
-        if (!counts) return '—';
-        const cell = `${counts.manufacturing}/${counts.science}/${counts.reaction}`;
-        const max = row.jobSlotSkills ? maxJobSlots(row.jobSlotSkills) : undefined;
-        // Native `title` rather than a custom tooltip component: it needs no
-        // extra markup per cell, and a plain "\n" is all a title attribute
-        // needs for each category to land on its own line.
-        const tooltip = max
-          ? (['manufacturing', 'science', 'reaction'] as const)
-              .map(
-                (category) =>
-                  `${t(`characters.jobSlotCategory.${category}`)}: ${counts[category]}/${max[category]}`
-              )
-              .join('\n')
-          : undefined;
-        return <span title={tooltip}>{cell}</span>;
-      },
-    },
+    openJobsManufacturing: openJobsColumn('openJobsManufacturing', 'manufacturing', t),
+    openJobsScience: openJobsColumn('openJobsScience', 'science', t),
+    openJobsReaction: openJobsColumn('openJobsReaction', 'reaction', t),
     pi: {
       id: 'pi',
       header: t('characters.column.pi'),
@@ -581,6 +602,28 @@ function buildColumns(
         ) : (
           '—'
         ),
+    },
+    starred: {
+      id: 'starred',
+      header: t('characters.column.starred'),
+      align: 'right',
+      sortValue: (row) => Number(row.starred),
+      // Row click navigates to Overview (see the table's `onRowClick`) — this
+      // button must not also fire that when toggling the star, so it stops
+      // the click before it bubbles to the `<tr>`.
+      render: (row) => (
+        <span onClick={(event) => event.stopPropagation()}>
+          <IconButton
+            size="sm"
+            icon={<Icon.Pin weight={row.starred ? 'fill' : 'light'} />}
+            label={t(row.starred ? 'characters.unstar' : 'characters.star', {
+              name: row.character.name,
+            })}
+            pressed={row.starred}
+            onClick={() => onToggleStarred(row.character.characterId)}
+          />
+        </span>
+      ),
     },
   };
 }
@@ -691,10 +734,11 @@ export function Characters() {
     [characters]
   );
 
-  const columnsById = useMemo(
-    () => buildColumns(t, spExtractionThreshold),
-    [t, spExtractionThreshold]
-  );
+  // Not `useMemo`: `handleToggleStar` below closes over `starred`/`setStarred`
+  // and is a fresh function every render anyway, so a memoized wrapper here
+  // would just recompute every render regardless — `buildColumns` itself is
+  // cheap (a handful of object literals, no per-character work).
+  const columnsById = buildColumns(t, spExtractionThreshold, (id) => void handleToggleStar(id));
   const availableColumnIds = availableCharacterColumns(spExtractionEnabled);
   // `id` is already known available here, so this is just "is it checked" —
   // `visibleAvailableColumns` (below, `handleToggleColumn`'s own zero-columns
@@ -941,6 +985,7 @@ export function Characters() {
           alertCount: alertCounts.get(character.characterId) ?? 0,
           jobSlotSkills: jobSlotSkillsById.get(character.characterId),
           totalSp: totalSpById.get(character.characterId),
+          starred: isCharacterStarred(starred, character.characterId),
         }));
       return (
         // Deliberate deviation from DataTable's usual `.dt-stack` collapse on
@@ -955,6 +1000,11 @@ export function Characters() {
             label={t('characters.title')}
             responsive="table"
             onRowClick={(row) => void select(row.character.characterId)}
+            rowContextMenu={(row, tr) => (
+              <CharacterRowContextMenu characterId={row.character.characterId}>
+                {tr}
+              </CharacterRowContextMenu>
+            )}
           />
         </div>
       );
