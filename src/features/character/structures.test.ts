@@ -141,6 +141,39 @@ describe('loadStructureName', () => {
     expect(requests).toBe(1);
   });
 
+  it('does not memoize a roster-wide refusal when a fallback Character only failed transiently', async () => {
+    await seedCharacter(CHARACTER_ID);
+    await seedCharacter(OTHER_CHARACTER_ID);
+    let requests = 0;
+    server.use(
+      http.get(`${ESI_BASE_URL}/universe/structures/1000000000013`, ({ request }) => {
+        requests += 1;
+        const auth = request.headers.get('authorization') ?? '';
+        // The asking Character is confirmed off the ACL; the fallback
+        // Character's own attempt is inconclusive (a network blip), never a
+        // real answer about whether it can see the structure.
+        return auth.includes(String(OTHER_CHARACTER_ID))
+          ? HttpResponse.error()
+          : HttpResponse.json({ error: 'Forbidden' }, { status: 403 });
+      })
+    );
+    configureEsi({
+      getToken: vi.fn(async (characterId: number) => `tok-${characterId}`),
+    });
+
+    expect(await loadStructureName(CHARACTER_ID, 1000000000013)).toBeNull();
+    expect(requests).toBe(2);
+    expect(await db.esiCache.get([0, 'structure:1000000000013:roster-forbidden'])).toBeUndefined();
+
+    // Asked again: the inconclusive attempt was not memoized, so the fallback
+    // Character is tried again rather than a citadel it could actually see
+    // staying hidden for a day over one blip. (The asking Character itself
+    // makes no new request here — its own 403 from moments ago is still
+    // within its own same-day memo.)
+    expect(await loadStructureName(CHARACTER_ID, 1000000000013)).toBeNull();
+    expect(requests).toBe(3);
+  });
+
   it('returns null on a 403 (not on the ACL) WITHOUT signalling a re-auth failure', async () => {
     server.use(
       http.get(`${ESI_BASE_URL}/universe/structures/1000000000002`, () =>

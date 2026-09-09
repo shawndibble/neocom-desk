@@ -199,7 +199,12 @@ async function loadOwnStructure(
  * next ask — by this Character or any other — skips the sweep entirely until
  * that memo lapses. Without it, a citadel none of the roster can see would be
  * swept again every time a *different* Character happened to hit it first
- * that day.
+ * that day. That memo is written only when every other Character came back a
+ * *confirmed* 403 — never when one merely produced no answer (a timeout, a
+ * 5xx, or the app-wide budget gate refusing that particular call). Writing it
+ * on an inconclusive attempt would risk hiding a citadel some Character can
+ * actually see for a full day, over nothing worse than a blip that would have
+ * resolved on the very next visit.
  */
 async function resolveViaRoster(
   askingCharacterId: number,
@@ -215,12 +220,16 @@ async function resolveViaRoster(
     .map((character) => character.characterId)
     .filter((characterId) => characterId !== askingCharacterId);
 
+  let everyOtherConfirmedForbidden = others.length > 0;
   for (const characterId of others) {
-    const { structure } = await loadOwnStructure(characterId, structureId);
+    const { structure, forbidden } = await loadOwnStructure(characterId, structureId);
     if (structure) return structure;
+    if (!forbidden) everyOtherConfirmedForbidden = false;
   }
 
-  await writeCached(GLOBAL_CACHE_CHARACTER_ID, rosterForbiddenKey(structureId), true, Date.now());
+  if (everyOtherConfirmedForbidden) {
+    await writeCached(GLOBAL_CACHE_CHARACTER_ID, rosterForbiddenKey(structureId), true, Date.now());
+  }
   return null;
 }
 
