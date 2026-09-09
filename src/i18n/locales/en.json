@@ -2077,7 +2077,11 @@
     "detailQuantity": "Qty",
     "detailNoItems": "No item data for this contract",
     "statusFilterLabel": "Status",
-    "typeFilterLabel": "Contract type"
+    "typeFilterLabel": "Contract type",
+    "contextMenu": {
+      "copyTitle": "Copy title",
+      "copyContractId": "Copy Contract ID"
+    }
   },
   "bpcContracts": {
     "title": "BPC Search",
