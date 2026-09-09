@@ -220,6 +220,42 @@ describe('completeLogin', () => {
     expect(await db.characters.count()).toBe(1);
   });
 
+  it('stops replaying after a few repeats rather than spinning (#649)', async () => {
+    const url = new URL(await startLogin(['esi-skills.read_skills.v1'], cfg));
+    const state = url.searchParams.get('state')!;
+    await completeLogin({ code: 'good-code', state }, cfg);
+
+    // Three repeats is already well past one browser redelivering one
+    // callback; the fourth gets the honest error instead of a fourth replay.
+    for (let i = 0; i < 3; i += 1) {
+      expect((await completeLogin({ code: 'good-code', state }, cfg)).characterId).toBe(CHAR_ID);
+    }
+    await expect(completeLogin({ code: 'good-code', state }, cfg)).rejects.toMatchObject({
+      reason: 'no-login-in-progress',
+    });
+
+    // The breaker latches: the marker is gone, so it cannot re-arm itself.
+    expect(sessionStorage.getItem('neocom.sso.completed')).toBeNull();
+    expect(tokenRequests).toHaveLength(1);
+  });
+
+  it('does not replay a callback older than the replay window (#649)', async () => {
+    const url = new URL(await startLogin(['esi-skills.read_skills.v1'], cfg));
+    const state = url.searchParams.get('state')!;
+    await completeLogin({ code: 'good-code', state }, cfg);
+
+    const marker = JSON.parse(sessionStorage.getItem('neocom.sso.completed')!) as {
+      completedAt: number;
+    };
+    marker.completedAt = Date.now() - 6 * 60_000;
+    sessionStorage.setItem('neocom.sso.completed', JSON.stringify(marker));
+
+    await expect(completeLogin({ code: 'good-code', state }, cfg)).rejects.toMatchObject({
+      reason: 'no-login-in-progress',
+    });
+    expect(sessionStorage.getItem('neocom.sso.completed')).toBeNull();
+  });
+
   it('does not replay a completed login whose Character has since been removed (#649)', async () => {
     const url = new URL(await startLogin(['esi-skills.read_skills.v1'], cfg));
     const state = url.searchParams.get('state')!;

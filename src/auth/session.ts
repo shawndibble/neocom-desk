@@ -45,6 +45,22 @@ const SCOPES_KEY = 'neocom.sso.scopes';
  */
 const COMPLETED_KEY = 'neocom.sso.completed';
 
+/**
+ * Circuit breaker on the replay above. A marker that never expires is a
+ * short-circuit that never expires with it: reopening a months-old callback
+ * URL in the same tab would silently "succeed", and anything re-delivering
+ * `/callback` in a tight cycle would be replayed without bound.
+ *
+ * The window is what a legitimate re-delivery needs — the switch-user round
+ * trip lands again in seconds — and the count is the breaker proper, since a
+ * window alone still permits unlimited replays inside it. Tripping either one
+ * clears the marker for good and hands the user the honest "already used"
+ * error, which is the correct answer once a repeat has stopped looking like
+ * one browser redelivering one callback.
+ */
+const REPLAY_WINDOW_MS = 5 * 60_000;
+const MAX_REPLAYS = 3;
+
 /** Which way a login failed, for a UI that must tell them apart (issue #649). */
 export type LoginFailureReason = 'no-login-in-progress' | 'state-mismatch';
 
@@ -307,10 +323,25 @@ async function replayCompletedLogin(state: string): Promise<CharacterRecord | un
   const raw = sessionStorage.getItem(COMPLETED_KEY);
   if (!raw) return undefined;
   try {
-    const parsed: unknown = JSON.parse(raw);
-    const marker = parsed as { state?: unknown; characterId?: unknown };
+    const marker = JSON.parse(raw) as {
+      state?: unknown;
+      characterId?: unknown;
+      completedAt?: unknown;
+      replays?: unknown;
+    };
     if (marker.state !== state || typeof marker.characterId !== 'number') return undefined;
-    return await db.characters.get(marker.characterId);
+
+    const completedAt = typeof marker.completedAt === 'number' ? marker.completedAt : 0;
+    const replays = typeof marker.replays === 'number' ? marker.replays : MAX_REPLAYS;
+    if (Date.now() - completedAt > REPLAY_WINDOW_MS || replays >= MAX_REPLAYS) {
+      sessionStorage.removeItem(COMPLETED_KEY);
+      return undefined;
+    }
+
+    const character = await db.characters.get(marker.characterId);
+    if (!character) return undefined;
+    sessionStorage.setItem(COMPLETED_KEY, JSON.stringify({ ...marker, replays: replays + 1 }));
+    return character;
   } catch {
     return undefined;
   }
@@ -340,7 +371,12 @@ export async function completeLogin(
   const character = await persistTokens(tokens, requestedScopes);
   sessionStorage.setItem(
     COMPLETED_KEY,
-    JSON.stringify({ state: params.state, characterId: character.characterId })
+    JSON.stringify({
+      state: params.state,
+      characterId: character.characterId,
+      completedAt: Date.now(),
+      replays: 0,
+    })
   );
   return character;
 }

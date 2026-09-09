@@ -49,6 +49,19 @@ _Recorded 2026-09-09 · issue #649._
   completed one would be the wrong Character. The switch-user sequence never
   hits it — nothing calls `startLogin` between the two landings.
 
+- **The replay is bounded by a window and a count, and the breaker latches.**
+  Five minutes and three replays. A marker that never expires is a
+  short-circuit that never expires with it — a months-old callback URL
+  reopened in the same tab would silently "succeed", and anything redelivering
+  `/callback` in a cycle would be replayed without bound. The count is the
+  breaker proper: a window alone still permits unlimited replays inside it.
+  Tripping either clears the marker for good, so the honest "already used"
+  error is what a repeat gets once it has stopped looking like one browser
+  redelivering one callback. Checked first: no navigation cycle exists to feed
+  such a loop today — `RequireCharacter` gates on Character _count_, not on an
+  active Character, so the `/characters` the replay lands on never bounces
+  back to `/login`, and nothing in the app navigates to `/callback`.
+
 - **The `state` check was not relaxed, and must not be.** #649 came from an
   outside reporter who suggested `state` itself was the fault. Treated as a
   hypothesis to test, not a fix to apply: relaxing state validation is exactly
