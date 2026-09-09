@@ -2,11 +2,12 @@
  * A **Build Group** opened as one thing: every member's materials merged and
  * its costs summed (issue #626, "Group Rollup" in CONTEXT.md).
  *
- * Prices its members through `useComparedBuildResults`, which already fans out
- * one independent `BuildResult` per plan under `ESI_FANOUT_CONCURRENCY` with
- * per-plan error isolation — the same job Compare does. A second fetch path
- * for the same question would be one more place for a member to be priced
- * differently here than on its own page.
+ * Prices its members through `useComparedBuildResults`, which computes one
+ * independent `BuildResult` per plan with per-plan error isolation, off a
+ * single batched price fetch shared by every member at the same hub (issue
+ * #628) — the same job Compare does. A second fetch path for the same
+ * question would be one more place for a member to be priced differently
+ * here than on its own page.
  *
  * A forward estimate, and it says so: Production Runs carry no group and
  * outlive their plans by design, so "what did this fit actually cost" is a
@@ -34,10 +35,12 @@ import { useDetectedOwnedStock } from './useDetectedOwnedStock';
 /**
  * Each member's resolved tree, flattened the two ways the rollup needs.
  *
- * `useComparedBuildResults` settles one plan at a time, so `rows` gets a fresh
- * identity once per member — and without this every already-settled member was
- * re-flattened on each settle. A 25-member fit did ~650 material-tree walks to
- * do 25 members' work.
+ * `useComparedBuildResults` settles each member into `rows` on its own, so
+ * `rows` gets a fresh identity per settle — and without this every
+ * already-settled member was re-flattened on each one. A 25-member fit did
+ * ~650 material-tree walks to do 25 members' work. Members sharing a hub now
+ * share one fetch and so tend to settle together, which shortens that run but
+ * does not remove it: a mixed-hub group still settles hub by hub.
  *
  * Module-level and keyed on the `BuildResult` itself: a result is replaced
  * wholesale when its plan is repriced, so a cache entry is valid exactly as
