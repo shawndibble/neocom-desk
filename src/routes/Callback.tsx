@@ -3,8 +3,8 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { addCharacter } from '@/features/character/addCharacter';
 import { LoginError, type LoginFailureReason } from '@/auth/session';
-import { beginAddCharacterLogin } from '@/app/loginFlow';
-import { db } from '@/db';
+import { beginAddCharacterLogin, retryLastLogin } from '@/app/loginFlow';
+import { clearLoginIntent } from '@/auth/session';
 import { Button, Panel, Spinner } from '@/components/ui';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 
@@ -41,12 +41,25 @@ function clearRetryBudget(): void {
   }
 }
 
+/**
+ * SSO refused rather than the exchange failing — `?error=` on the callback.
+ * Carried as a throw so it joins the one failure path, and marked terminal
+ * there: the commonest cause is the user pressing Cancel.
+ */
+class SsoRejection extends Error {
+  constructor(readonly code: string) {
+    super(`SSO returned ${code}`);
+    this.name = 'SsoRejection';
+  }
+}
+
 /** Which wording the panel shows; `null` while the callback is still working. */
-type ErrorKind = LoginFailureReason | 'generic' | null;
+type ErrorKind = LoginFailureReason | 'denied' | 'generic' | null;
 
 const MESSAGE_KEY: Record<Exclude<ErrorKind, null>, string> = {
   'no-login-in-progress': 'callback.errorSpent',
   'state-mismatch': 'callback.errorMismatch',
+  denied: 'callback.errorDenied',
   generic: 'callback.errorMessage',
 };
 
@@ -55,17 +68,25 @@ const MESSAGE_KEY: Record<Exclude<ErrorKind, null>, string> = {
  * `addCharacter` consumes the one-time PKCE stash, so a ref guards against
  * React 19 StrictMode running the effect twice.
  *
- * A failure here is recovered from, not reported. #649 arrived as a dead end:
- * a panel whose only control led to `/login`, which bounces straight back to
- * `/characters` for anyone who already has one, so the user could neither see
- * what happened nor get out of it. In order, a failure now: restarts the
- * sign-in once by itself; failing that, falls back to the Characters list if
- * this device has any; and only with neither available shows the panel — which
- * now restarts the sign-in directly instead of linking somewhere that cannot.
+ * A failure here is recovered from, not merely reported. #649 arrived as a
+ * dead end: a panel whose only control led to `/login`, which bounces straight
+ * back to `/characters` for anyone who already has one, so the user could
+ * neither see what happened nor get out of it. A failure now restarts the
+ * sign-in once by itself, asking for what the original one asked for; only
+ * when that is spent does the panel appear, and its button restarts the
+ * sign-in directly rather than linking somewhere that cannot.
  *
- * The wording is per failure so the panel says which of the three happened,
- * and never carries the thrown Error's own text, which may hold an ESI/PKCE
- * internal detail.
+ * The panel is not skipped for a user who already has Characters. Landing them
+ * on `/characters` would hide the fact that the Character they were adding is
+ * not there — the failure is the thing they need to see.
+ *
+ * A `?error=` from SSO is terminal, never retried: the commonest one is the
+ * user pressing Cancel, and bouncing them straight back to EVE is the opposite
+ * of honouring it.
+ *
+ * The wording is per failure so the panel says which one happened, and never
+ * carries the thrown Error's own text, which may hold an ESI/PKCE internal
+ * detail.
  */
 export function Callback() {
   const { t } = useTranslation();
@@ -80,30 +101,28 @@ export function Callback() {
     const params = new URLSearchParams(search);
     const code = params.get('code');
     const state = params.get('state');
+    const ssoError = params.get('error');
     Promise.resolve()
       .then(() => {
+        if (ssoError) throw new SsoRejection(ssoError);
         if (!code || !state) throw new Error('missing code or state param');
         return addCharacter({ code, state });
       })
       .then(async (character) => {
         clearRetryBudget();
+        clearLoginIntent();
         // First login becomes the active character automatically.
         const { activeCharacterId, setActiveCharacter } = useActiveCharacter.getState();
         if (activeCharacterId === null) await setActiveCharacter(character.characterId);
         navigate('/characters', { replace: true });
       })
       .catch(async (err: unknown) => {
-        if (takeRetryBudget()) {
-          await beginAddCharacterLogin();
+        if (err instanceof SsoRejection) {
+          clearRetryBudget();
+          setErrorKind(err.code === 'access_denied' ? 'denied' : 'generic');
           return;
         }
-        // `count` before the panel: a Character on the device means the list is
-        // a better answer than an error, whatever went wrong with this grant.
-        const known = await db.characters.count().catch(() => 0);
-        if (known > 0) {
-          navigate('/characters', { replace: true });
-          return;
-        }
+        if (takeRetryBudget() && (await retryLastLogin())) return;
         setErrorKind(err instanceof LoginError ? err.reason : 'generic');
       });
   }, [search, navigate]);
@@ -124,7 +143,11 @@ export function Callback() {
               size="sm"
               onClick={() => {
                 clearRetryBudget();
-                void beginAddCharacterLogin();
+                // Falls back to Add Character only when this tab has no record
+                // of what the failed login was for.
+                void retryLastLogin().then((restarted) => {
+                  if (!restarted) return beginAddCharacterLogin();
+                });
               }}
             >
               {t('callback.retry')}

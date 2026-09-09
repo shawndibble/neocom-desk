@@ -52,12 +52,34 @@ const SCOPES_KEY = 'neocom.sso.scopes';
  * exist so an abandoned login is eventually forgotten rather than kept for the
  * life of the tab.
  */
+/**
+ * What the most recent `startLogin` asked for, kept so a failed callback can
+ * restart *that* login rather than a different one.
+ *
+ * `/callback` serves every entry point — Add Character, a `ScopeGate`, a corp
+ * grant — and they ask for different scopes. Retrying a failed corp grant as a
+ * plain re-auth would succeed while silently not granting corp access, the
+ * quiet-downgrade `loginFlow` exists to avoid. Outlives the Pending Login it
+ * describes, because the failure it serves is precisely the one where that
+ * entry is gone.
+ */
+const INTENT_KEY = 'neocom.sso.intent';
+
 const PENDING_TTL_MS = 15 * 60_000;
 const MAX_PENDING = 5;
 
 interface PendingLogin {
   verifier: string;
-  scopes: string[];
+  /**
+   * What this round trip asked SSO for, or `undefined` for "unknown".
+   *
+   * Not the same as "asked for nothing": `purgeCacheIfConsentChangedOrPending`
+   * treats `undefined` as no baseline and falls back to the stored grant, which
+   * still catches a revocation, whereas an empty list would assert the app
+   * asked for nothing and quietly disable revocation-driven purging. Anything
+   * unreadable therefore answers `undefined`, the conservative reading.
+   */
+  scopes: string[] | undefined;
   createdAt: number;
 }
 
@@ -99,6 +121,7 @@ export async function startLogin(scopes: string[], config?: SsoConfig): Promise<
   const state = generateVerifier(); // independent 32-byte random value
   const pending: PendingLogin = { verifier, scopes, createdAt: Date.now() };
   writeStorage(PKCE_PREFIX + state, JSON.stringify(pending));
+  writeStorage(INTENT_KEY, JSON.stringify(scopes));
   prunePendingLogins(state);
   return buildAuthorizeUrl({
     clientId,
@@ -384,18 +407,33 @@ function takeLegacyPending(state: string): PendingLogin | undefined {
   return { verifier, scopes: parseScopes(rawScopes), createdAt: 0 };
 }
 
-/** Anything that is not a list of strings reads as "asked for nothing known". */
-function asScopes(value: unknown): string[] {
-  return Array.isArray(value) && value.every((scope) => typeof scope === 'string') ? value : [];
+/** Anything that is not a list of strings reads as "unknown" — see `PendingLogin`. */
+function asScopes(value: unknown): string[] | undefined {
+  return Array.isArray(value) && value.every((scope) => typeof scope === 'string')
+    ? value
+    : undefined;
 }
 
-function parseScopes(raw: string | null): string[] {
-  if (raw === null) return [];
+function parseScopes(raw: string | null): string[] | undefined {
+  if (raw === null) return undefined;
   try {
     return asScopes(JSON.parse(raw));
   } catch {
-    return [];
+    return undefined;
   }
+}
+
+/**
+ * The scopes the most recent login asked for, or `undefined` if this tab has
+ * not started one. See `INTENT_KEY`.
+ */
+export function lastLoginScopes(): string[] | undefined {
+  return parseScopes(readStorage(INTENT_KEY));
+}
+
+/** Forget the last login's intent — call once it has succeeded. */
+export function clearLoginIntent(): void {
+  removeStorage(INTENT_KEY);
 }
 
 /** Handle the SSO callback: validate state, exchange code, persist character + token. */

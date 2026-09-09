@@ -66,6 +66,12 @@ function stashLogin(state: string): void {
     `neocom.sso.pkce.${state}`,
     JSON.stringify({ verifier: 'verifier-1', scopes: [], createdAt: Date.now() })
   );
+  sessionStorage.setItem('neocom.sso.intent', JSON.stringify([]));
+}
+
+/** What `startLogin` leaves behind so a failed callback can restart the same login. */
+function stashIntent(scopes: string[] = []): void {
+  sessionStorage.setItem('neocom.sso.intent', JSON.stringify(scopes));
 }
 
 function renderCallback(search: string) {
@@ -129,8 +135,9 @@ describe('Callback', () => {
   });
 
   it('restarts the sign-in once rather than dead-ending (#649)', async () => {
-    // Nothing stashed: this callback cannot complete. The user asked not to be
+    // No Pending Login: this callback cannot complete. The user asked not to be
     // shown a panel they cannot act on, so the route retries by itself.
+    stashIntent();
     renderCallback('?code=good-code&state=state-1');
 
     await vi.waitFor(() => expect(assignLocation).toHaveBeenCalledTimes(1));
@@ -142,13 +149,45 @@ describe('Callback', () => {
     // The retry leaves for SSO and comes back here; unbudgeted, that is a
     // redirect loop between the app and EVE that the user cannot interrupt.
     sessionStorage.setItem('neocom.sso.autoRetries', '1');
+    stashIntent();
     renderCallback('?code=good-code&state=state-1');
 
     expect(await screen.findByRole('alert')).toBeInTheDocument();
     expect(assignLocation).not.toHaveBeenCalled();
   });
 
-  it('falls back to the Characters list when the device has one (#649)', async () => {
+  it('restarts the login that was actually asked for, not a plain re-auth (#649)', async () => {
+    // /callback serves every entry point. Retrying a corp grant as a base
+    // re-auth would succeed while silently not granting corp access.
+    stashIntent(['esi-skills.read_skills.v1', 'esi-corporations.read_divisions.v1']);
+    renderCallback('?code=good-code&state=state-1');
+
+    await vi.waitFor(() => expect(assignLocation).toHaveBeenCalledTimes(1));
+    const scope = new URL(String(vi.mocked(assignLocation).mock.calls[0][0])).searchParams.get(
+      'scope'
+    );
+    expect(scope).toContain('esi-corporations.read_divisions.v1');
+  });
+
+  it('does not retry when this tab has no record of what the login was for (#649)', async () => {
+    renderCallback('?code=good-code&state=state-1');
+
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+    expect(assignLocation).not.toHaveBeenCalled();
+  });
+
+  it('treats a cancelled sign-in as final rather than bouncing back to EVE (#649)', async () => {
+    stashIntent();
+    renderCallback('?error=access_denied&error_description=user+cancelled&state=state-1');
+
+    expect(await screen.findByText(/cancelled on the eve online page/i)).toBeInTheDocument();
+    expect(assignLocation).not.toHaveBeenCalled();
+    expect(tokenRequests).toBe(0);
+  });
+
+  it('still reports the failure to a user who already has Characters (#649)', async () => {
+    // Landing them on /characters would hide that the Character they were
+    // adding is not there — the failure is the thing they need to see.
     await db.characters.put({
       characterId: 90_000_001,
       name: 'Existing Pilot',
@@ -156,23 +195,25 @@ describe('Callback', () => {
       addedAt: 1,
     });
     sessionStorage.setItem('neocom.sso.autoRetries', '1');
+    stashIntent();
     renderCallback('?code=good-code&state=state-1');
 
-    expect(await screen.findByText('characters page')).toBeInTheDocument();
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
   });
 
-  it('a successful login clears the retry budget (#649)', async () => {
+  it('a successful login clears the retry budget and the intent (#649)', async () => {
     sessionStorage.setItem('neocom.sso.autoRetries', '1');
     stashLogin('state-1');
     renderCallback('?code=good-code&state=state-1');
 
     expect(await screen.findByText('characters page')).toBeInTheDocument();
     expect(sessionStorage.getItem('neocom.sso.autoRetries')).toBeNull();
+    expect(sessionStorage.getItem('neocom.sso.intent')).toBeNull();
   });
 
   it('the panel restarts the sign-in instead of linking somewhere that cannot (#649)', async () => {
     sessionStorage.setItem('neocom.sso.autoRetries', '1');
+    stashIntent();
     renderCallback('?code=good-code&state=state-1');
 
     await userEvent.click(await screen.findByRole('button', { name: /try again/i }));
@@ -183,6 +224,7 @@ describe('Callback', () => {
   it('words a lost race apart from a spent link (#649)', async () => {
     // A second round trip still pending means this callback lost a race.
     sessionStorage.setItem('neocom.sso.autoRetries', '1');
+    stashIntent();
     stashLogin('other-state');
     renderCallback('?code=good-code&state=state-1');
 
@@ -192,6 +234,7 @@ describe('Callback', () => {
 
   it('tells apart a spent sign-in from a failed one (#649)', async () => {
     sessionStorage.setItem('neocom.sso.autoRetries', '1');
+    stashIntent();
     renderCallback('?code=good-code&state=state-1');
 
     expect(await screen.findByText(/already been used/i)).toBeInTheDocument();
@@ -213,6 +256,7 @@ describe('Callback', () => {
 
   it('announces the error panel to screen readers', async () => {
     sessionStorage.setItem('neocom.sso.autoRetries', '1');
+    stashIntent();
     renderCallback('?code=good-code&state=state-1');
 
     expect(await screen.findByRole('alert')).toBeInTheDocument();
@@ -220,6 +264,7 @@ describe('Callback', () => {
 
   it('shows an error when code/state params are missing', async () => {
     sessionStorage.setItem('neocom.sso.autoRetries', '1');
+    stashIntent();
     renderCallback('');
     expect(await screen.findByRole('button', { name: /try again/i })).toBeInTheDocument();
   });

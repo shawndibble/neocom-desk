@@ -492,6 +492,25 @@ async function refresh(claims: { scp?: string[]; owner?: string }): Promise<void
 }
 
 describe('persistTokens: cache purge on scope revoke', () => {
+  it('an unreadable Requested Scopes reads as unknown, not as "asked for nothing" (#649)', async () => {
+    // "Unknown" falls back to comparing against the stored grant, which still
+    // catches the revocation. An empty list would assert the app asked for
+    // nothing, and quietly disable revocation-driven purging altogether.
+    await seedPriorLogin({ scopes: [SKILLS, MAIL, WALLET] });
+    await seedCache(CHAR_ID, 'mail:headers');
+
+    respondWith({ scp: [SKILLS, WALLET] }); // mail revoked
+    const url = new URL(await startLogin([SKILLS, MAIL, WALLET], cfg));
+    const state = url.searchParams.get('state')!;
+    const key = `neocom.sso.pkce.${state}`;
+    const entry = JSON.parse(sessionStorage.getItem(key)!) as Record<string, unknown>;
+    sessionStorage.setItem(key, JSON.stringify({ ...entry, scopes: 'not-a-list' }));
+
+    await completeLogin({ code: 'good-code', state }, cfg);
+
+    expect(await cachedKeys(CHAR_ID)).toEqual([]);
+  });
+
   it('purges the character cache when the new grant is NARROWER (scope revoked)', async () => {
     await seedPriorLogin({ scopes: [SKILLS, MAIL, WALLET] });
     await seedCache(CHAR_ID, 'mail:headers');

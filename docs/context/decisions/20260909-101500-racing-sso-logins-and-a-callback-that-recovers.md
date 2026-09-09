@@ -25,12 +25,30 @@ _Recorded 2026-09-09 · issue #649._
   since one authorize request can yield more than one code, so a marker keyed
   on `state` alone could hand back the wrong Character silently.
 
-- **A failed callback recovers; it does not report.** In order: restart the
-  sign-in once by itself, else fall back to `/characters` when the device has a
-  Character, else show the panel. The old panel was a dead end — its only
+- **A failed callback recovers before it reports.** Restart the sign-in once by
+  itself; only when that is spent does the panel appear, and its button
+  restarts the sign-in directly. The old panel was a dead end — its only
   control led to `/login`, which `Navigate`s straight back to `/characters` for
   anyone who already has one, so the user could neither see what happened nor
-  get out of it. The panel's button now restarts the sign-in directly.
+  get out of it.
+
+- **The panel is not skipped for a user who already has Characters.** An
+  earlier revision fell back to `/characters` whenever the device had one,
+  which reads as success and hides the fact that the Character being added is
+  not in the list. It would also have denied #649's reporter — who has
+  Characters — the one signal that says which failure they hit.
+
+- **The retry asks for what the original login asked for.** `startLogin`
+  records the request in `neocom.sso.intent`; the retry replays it. `/callback`
+  serves every entry point — Add Character, a `ScopeGate`, a corp grant — and
+  they ask for different scopes, so retrying a failed corp grant as a plain
+  re-auth would succeed while silently not granting corp access, the quiet
+  downgrade `loginFlow` exists to avoid. No recorded intent means no automatic
+  retry rather than a guess.
+
+- **An SSO `?error=` is terminal.** The commonest one is the user pressing
+  Cancel on EVE's page; retrying it bounces them straight back to EVE, which is
+  the opposite of honouring it. It gets its own wording and no retry.
 
 - **The automatic restart is budgeted, and the budget survives a page load.**
   One retry, counted in `sessionStorage` (`neocom.sso.autoRetries`), cleared on
@@ -68,6 +86,14 @@ _Recorded 2026-09-09 · issue #649._
   token endpoint and writes nothing; `session.test.ts` pins that by name. The
   hypothesis is also simply false: `state` is independent `generateVerifier()`
   output encoding nothing, and the one in the report round-tripped intact.
+
+- **Requested Scopes keep their "unknown" reading.** A Pending Login's `scopes`
+  is `string[] | undefined`, and anything unreadable answers `undefined`, not
+  `[]`. `purgeCacheIfConsentChangedOrPending` treats `undefined` as "no
+  baseline" and falls back to the stored grant, which still catches a
+  revocation; `[]` would assert the app asked for nothing and quietly disable
+  revocation-driven purging. An intermediate revision of this branch lost that
+  distinction, which is why it is pinned by its own test.
 
 - **Storage writes are best-effort throughout.** `setItem` throws in
   private-mode webviews and under "block site data". A throw must not be what

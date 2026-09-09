@@ -1,5 +1,5 @@
 // Kicks off EVE SSO: stash PKCE state, then leave the app for login.eveonline.com.
-import { startLogin } from '@/auth/session';
+import { startLogin, lastLoginScopes } from '@/auth/session';
 import { SCOPES, scopesForGroup } from '@/esi/scopes';
 import type { ScopeGroup } from '@/esi/registry';
 import { db } from '@/db';
@@ -92,4 +92,19 @@ export async function beginEveLogin(options: EveLoginOptions = {}): Promise<void
  */
 export async function beginAddCharacterLogin(): Promise<void> {
   assignLocation(await startLogin(await requestedScopes(null, [])));
+}
+
+/**
+ * Restart whatever login this tab last began, asking for the same scopes.
+ *
+ * `false` when this tab has no record of one, which is the honest answer: the
+ * callback route cannot tell an Add Character from a corp grant, and guessing
+ * would retry a scope grant as a plain re-auth — succeeding while silently not
+ * granting what was asked for.
+ */
+export async function retryLastLogin(): Promise<boolean> {
+  const scopes = lastLoginScopes();
+  if (!scopes) return false;
+  assignLocation(await startLogin(scopes));
+  return true;
 }

@@ -73,9 +73,11 @@ exchanges code, decodes the JWT (`auth/jwt`), writes `CharacterRecord` +
 `auth/session.getValidAccessToken` (single-flight refresh, buffer 60s before
 expiry) → `esi/client.configureEsi`'s injected `getToken`. A completed
 callback that cannot complete does not dead-end: `routes/Callback.tsx` restarts
-the sign-in once (budget in `neocom.sso.autoRetries`, so it cannot loop between
-the app and SSO), else falls back to `/characters` when the device has one, and
-only then shows a panel — worded by the `LoginError` `reason`.
+the sign-in once — reusing `neocom.sso.intent`, so a corp grant is not retried
+as a plain re-auth — under a budget in `neocom.sso.autoRetries` that stops it
+looping between the app and SSO. Only then does a panel appear, worded by the
+`LoginError` `reason`, with a button that restarts the sign-in. A `?error=`
+from SSO (a cancelled sign-in) is terminal and never retried.
 
 **ESI read-through cache**
 Pattern: try live `esiFetch` → on success, write `db.esiCache` (keyed
