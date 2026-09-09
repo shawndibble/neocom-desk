@@ -632,6 +632,37 @@ describe('Wallet', () => {
       );
     }
 
+    it('renders no character filter for an account with one Character — nothing for it to change', async () => {
+      // Deliberately no `seedSecondCharacter()`: the outer beforeEach leaves
+      // exactly one pilot in Dexie.
+      render(<App />);
+
+      expect(await screen.findByText(/4,500\.00/)).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'This character' })).toBeNull();
+    });
+
+    it('puts the character filter in the balance panel header, and keeps it there across the panel swap', async () => {
+      const user = userEvent.setup();
+      await seedSecondCharacter();
+      render(<App />);
+
+      // In the panel's own title bar, not a bare row floating above it.
+      await screen.findByText(/4,500\.00/);
+      const balanceHeader = screen.getByRole('heading', { name: 'Balance' }).closest('header');
+      expect(balanceHeader).not.toBeNull();
+      await user.click(within(balanceHeader!).getByRole('button', { name: 'This character' }));
+      await user.click(await screen.findByRole('menuitem', { name: 'All characters' }));
+
+      // The panel below swaps to the per-character table; the picker rides
+      // along into that panel's header rather than being left behind.
+      const wideHeader = (
+        await screen.findByRole('heading', { name: 'Balance by character' })
+      ).closest('header');
+      expect(
+        within(wideHeader!).getByRole('button', { name: 'All characters' })
+      ).toBeInTheDocument();
+    });
+
     it("shows only the active character's balance by default — no picker-driven fetch", async () => {
       await seedSecondCharacter();
       render(<App />);

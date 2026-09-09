@@ -18,6 +18,12 @@
  * OAuth grant everywhere else in this app (`ESI_REGISTRY[...].scope`,
  * `routeScopes.ts`), and reusing the word here would read as a third,
  * unrelated meaning.
+ *
+ * On a page it goes in its panel's `meta` slot, beside the title, and a
+ * caller with one Character to offer doesn't render it at all — see
+ * `docs/context/decisions/20260908-192806-the-character-filter-rides-in-the-panel-header.md`.
+ * Settings is the exception on both counts: its copy is an account-level
+ * default, not a filter over anything on screen.
  */
 import { useTranslation } from 'react-i18next';
 import {
