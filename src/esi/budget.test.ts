@@ -148,8 +148,33 @@ describe('observeBudget — the circuit', () => {
       headers: headers({ 'retry-after': '5' }),
       now: NOW,
     });
-    const recovered = observeBudget(shut, { status: 304, headers: headers({}), now: NOW + 100 });
+    const recovered = observeBudget(shut, {
+      status: 304,
+      headers: headers({}),
+      now: NOW + 100,
+      startedAt: NOW + 50,
+    });
     expect(recovered.circuitUntil).toBeNull();
+  });
+
+  it('is NOT reopened by a straggler that was already on the wire when it shut', () => {
+    // Up to `ESI_MAX_IN_FLIGHT - 1` peers are mid-flight when a 420 lands. One
+    // of them answering 200 only says ESI was fine when *it* was sent — a
+    // moment the 420 has since contradicted. Believing it hands the whole
+    // fan-out back its open door immediately.
+    const shut = observeBudget(INITIAL_BUDGET, {
+      status: 420,
+      headers: headers({ 'x-esi-error-limit-reset': '45' }),
+      now: NOW,
+    });
+    const straggler = observeBudget(shut, {
+      status: 200,
+      headers: headers({}),
+      now: NOW + 20,
+      startedAt: NOW - 500,
+    });
+    expect(straggler.circuitUntil).toBe(NOW + 45_000);
+    expect(planRequest(straggler, NOW + 20).plan.kind).toBe('refuse');
   });
 
   it('leaves a shut circuit shut on a 4xx that is not a throttle', () => {
@@ -184,10 +209,14 @@ describe('planRequest — a healthy budget', () => {
     expect(plan).toEqual({ kind: 'go', waitMs: 0 });
   });
 
-  it('does not advance the admission cursor into the future when it is not spacing', () => {
-    const { state } = planRequest(healthy(), NOW);
-    const { plan } = planRequest(state, NOW);
+  it('leaves no trace at all when the budget is healthy', () => {
+    // A cursor moved on the healthy path is a cursor a wall-clock move can
+    // strand, holding back requests nothing was ever holding back.
+    const before = healthy();
+    const { state, plan } = planRequest(before, NOW);
     expect(plan).toEqual({ kind: 'go', waitMs: 0 });
+    expect(state).toBe(before);
+    expect(planRequest(state, NOW).plan).toEqual({ kind: 'go', waitMs: 0 });
   });
 });
 
@@ -270,6 +299,22 @@ describe('planRequest — braking before the budget is gone', () => {
     expect(plans[4].kind).toBe('refuse');
   });
 
+  it('calls a queue refusal pacing — no circuit shut, so no 420 to claim', () => {
+    // The alternative is inventing a status ESI never sent, which
+    // `features/character/typeNames.ts` would read as a real throttle and
+    // answer by fanning out a thousand per-id lookups.
+    let state = observeBudget(INITIAL_BUDGET, {
+      status: 403,
+      headers: headers({ 'x-esi-error-limit-remain': '10', 'x-esi-error-limit-reset': '20' }),
+      now: NOW,
+    });
+    for (let i = 0; i < 3; i += 1) state = planRequest(state, NOW).state;
+    const { plan } = planRequest(state, NOW);
+    expect(plan.kind).toBe('refuse');
+    expect(plan.kind === 'refuse' && plan.reason).toBe('pacing');
+    expect(state.circuitUntil).toBeNull();
+  });
+
   it('keeps trickling rather than clamping to zero, so a refusal never starves what a 403 teaches', () => {
     // `features/character/structures.ts` (PR #653) only memoizes a *real* 403;
     // a request the gate refuses teaches it nothing. So the brake must always
@@ -299,7 +344,7 @@ describe('planRequest — a shut circuit', () => {
     expect(plan).toEqual({ kind: 'go', waitMs: 1000 });
   });
 
-  it('refuses a reset longer than the bounded wait, naming the status that shut it', () => {
+  it('refuses a reset longer than the bounded wait, naming the limit that shut it', () => {
     const shut = observeBudget(INITIAL_BUDGET, {
       status: 420,
       headers: headers({ 'x-esi-error-limit-reset': '45' }),
@@ -307,8 +352,18 @@ describe('planRequest — a shut circuit', () => {
     });
     const { plan } = planRequest(shut, NOW);
     expect(plan.kind).toBe('refuse');
-    expect(plan.kind === 'refuse' && plan.status).toBe(420);
+    expect(plan.kind === 'refuse' && plan.reason).toBe('errorLimit');
     expect(plan.kind === 'refuse' && plan.retryAfterMs).toBe(45_000);
+  });
+
+  it('calls a 429 the rate limit, not the error limit', () => {
+    const shut = observeBudget(INITIAL_BUDGET, {
+      status: 429,
+      headers: headers({ 'retry-after': '600' }),
+      now: NOW,
+    });
+    const { plan } = planRequest(shut, NOW);
+    expect(plan.kind === 'refuse' && plan.reason).toBe('rateLimit');
   });
 
   it('never waits longer than the bound, whatever the server named', () => {
@@ -393,7 +448,13 @@ describe('the app-wide gate', () => {
   it('refuses a fresh call while the circuit is shut, without touching the network', async () => {
     observeEsiResponse(420, headers({ 'x-esi-error-limit-reset': '60' }));
     await expect(passEsiGate()).rejects.toBeInstanceOf(EsiBudgetError);
-    await expect(passEsiGate()).rejects.toMatchObject({ status: 420 });
+    // Status 0, not 420: no request was made, so ESI said nothing.
+    await expect(passEsiGate()).rejects.toMatchObject({ status: 0, reason: 'errorLimit' });
+  });
+
+  it('rejects a caller whose signal is already aborted, rather than sitting out the wait', async () => {
+    observeEsiResponse(429, headers({ 'retry-after': '3' }));
+    await expect(passEsiGate(AbortSignal.abort())).rejects.toThrow();
   });
 
   it('is reset to a clean slate by resetEsiBudget, so one test cannot shut the next', async () => {

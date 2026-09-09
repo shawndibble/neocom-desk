@@ -14,12 +14,12 @@
 import { AuthError } from '@/auth/sso';
 import { emitEsiActivity } from './activityLog';
 import { passEsiGate, observeEsiResponse } from './budget';
-import { EsiError, EsiBudgetError } from './errors';
+import { EsiError, EsiBudgetError, EsiTimeoutError } from './errors';
 import type { EsiEndpointId } from './registry';
 
 // `EsiError` lives in `./errors` so the budget can throw one without importing
 // the client back (issue #655), but this stays its canonical import path.
-export { EsiError, EsiBudgetError } from './errors';
+export { EsiError, EsiBudgetError, EsiTimeoutError } from './errors';
 
 export const ESI_BASE_URL = 'https://esi.evetech.net';
 export const COMPATIBILITY_DATE = '2026-08-01';
@@ -108,45 +108,70 @@ function parsePages(response: Response): number {
   return Number.isInteger(pages) && pages > 0 ? pages : 1;
 }
 
+interface RequestScope {
+  /** Aborts when the caller cancels, or when the request runs out of time. */
+  readonly signal: AbortSignal;
+  dispose(): void;
+}
+
 /**
- * One HTTP request, admitted by the app-wide gate and abandoned if it hangs.
+ * The lifetime of one `esiFetch` call: the caller's cancellation and the
+ * timeout, folded into one signal.
+ *
+ * It spans the **whole** call, retry and body read included, not just the
+ * `fetch`. `fetch` ties the response's body stream to the signal it was given,
+ * so a scope that ended when the headers arrived would leave `response.json()`
+ * on a slow body uncancellable and untimed — which is how the caller's
+ * `AbortSignal` behaved before this existed.
+ *
+ * The timeout aborts through a controller of our own rather than the caller's,
+ * so a request that ran out of time stays distinguishable from one the caller
+ * cancelled: only a cancellation is exempt from the activity log.
+ */
+function openRequestScope(caller?: AbortSignal): RequestScope {
+  const controller = new AbortController();
+  const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
+  const onTimeout = (): void => controller.abort(new EsiTimeoutError(REQUEST_TIMEOUT_MS));
+  const onCaller = (): void =>
+    controller.abort(caller?.reason ?? new DOMException('Aborted', 'AbortError'));
+
+  if (caller?.aborted) onCaller();
+  caller?.addEventListener('abort', onCaller, { once: true });
+  timeout.addEventListener('abort', onTimeout, { once: true });
+
+  return {
+    signal: controller.signal,
+    dispose() {
+      timeout.removeEventListener('abort', onTimeout);
+      caller?.removeEventListener('abort', onCaller);
+    },
+  };
+}
+
+/**
+ * One HTTP request, admitted by the app-wide gate.
  *
  * The permit is released in `finally`, before the caller decides anything about
  * a retry — a retry that waited while still holding its permit would take one
- * of twelve slots out of the app for the length of the backoff.
+ * of `ESI_MAX_IN_FLIGHT` slots out of the app for the length of the backoff.
  *
- * The timeout aborts through a controller of our own rather than the caller's,
- * so a timed-out request is distinguishable from a cancelled one: only the
- * caller's own abort is a cancellation, and only that one is exempt from the
- * activity log.
+ * The response is timestamped with when it was *sent*, not when it arrived: the
+ * budget uses that to tell a genuine recovery from a straggler that was already
+ * on the wire when the circuit shut.
  */
-async function gatedFetch(url: URL, init: RequestInit, signal?: AbortSignal): Promise<Response> {
+async function gatedFetch(url: URL, init: RequestInit, signal: AbortSignal): Promise<Response> {
   const release = await passEsiGate(signal);
-  const controller = new AbortController();
-  const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
-  const abortFromTimeout = (): void =>
-    controller.abort(new EsiError(0, `ESI request timed out after ${REQUEST_TIMEOUT_MS}ms`));
-  const abortFromCaller = (): void =>
-    controller.abort(signal?.reason ?? new DOMException('Aborted', 'AbortError'));
-
-  if (signal?.aborted) abortFromCaller();
-  signal?.addEventListener('abort', abortFromCaller, { once: true });
-  timeout.addEventListener('abort', abortFromTimeout, { once: true });
-
+  const startedAt = Date.now();
   try {
-    const response = await fetch(url, { ...init, signal: controller.signal });
-    observeEsiResponse(response.status, response.headers);
+    const response = await fetch(url, { ...init, signal });
+    observeEsiResponse(response.status, response.headers, startedAt);
     return response;
   } catch (err) {
-    // `fetch` rejects with its own AbortError; the reason we asked it to abort
-    // for is the honest one to surface.
-    if (err instanceof Error && err.name === 'AbortError' && controller.signal.reason) {
-      throw controller.signal.reason;
-    }
+    // Runtimes disagree on whether `fetch` rejects with the abort *reason* or a
+    // generic AbortError; the reason we asked it to abort for is the honest one.
+    if (err instanceof Error && err.name === 'AbortError' && signal.reason) throw signal.reason;
     throw err;
   } finally {
-    timeout.removeEventListener('abort', abortFromTimeout);
-    signal?.removeEventListener('abort', abortFromCaller);
     release();
   }
 }
@@ -202,17 +227,18 @@ export async function esiFetch<T>(
     headers.Authorization = `Bearer ${await tokenProvider(characterId)}`;
   }
 
+  const scope = openRequestScope(signal);
   try {
     const requestBody = body !== undefined ? JSON.stringify(body) : undefined;
     const init: RequestInit = { method, headers, body: requestBody };
-    let response = await gatedFetch(url, init, signal);
+    let response = await gatedFetch(url, init, scope.signal);
     if (response.status === 429 || response.status === 420) {
       // The response has already been folded into the budget, so re-entering
       // the gate *is* the backoff: it waits out a short reset the server named
       // and refuses a long one. Refused, we keep the server's own error rather
       // than swapping in a synthetic one — this caller did reach ESI.
       try {
-        response = await gatedFetch(url, init, signal);
+        response = await gatedFetch(url, init, scope.signal);
       } catch (retryErr) {
         if (!(retryErr instanceof EsiBudgetError)) throw retryErr;
         throw await errorFromResponse(response);
@@ -247,8 +273,15 @@ export async function esiFetch<T>(
     // check, not `instanceof DOMException`: msw/undici don't agree on the
     // concrete error class, only on `name`.
     if (err instanceof Error && err.name === 'AbortError') throw err;
+    // Nor did a request the budget declined to send: no route was called, so
+    // there is no ESI activity to show. Logging one would fill `/settings`
+    // with errors during a throttle, for zero traffic — the same reasoning
+    // that exempts a cancellation.
+    if (err instanceof EsiBudgetError) throw err;
     recordEsiActivity(endpointId, characterId, outcomeForError(err));
     throw err;
+  } finally {
+    scope.dispose();
   }
 }
 

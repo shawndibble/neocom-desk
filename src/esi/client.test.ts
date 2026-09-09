@@ -305,7 +305,7 @@ describe('esiFetch — app-wide error budget (issue #655)', () => {
     expect(mailRequests).toBe(0);
   });
 
-  it('refuses with the status that shut the door, and never as an auth failure', async () => {
+  it('refuses with a status of 0 — no request was made, so ESI said nothing', async () => {
     server.use(
       http.get(`${ESI_BASE_URL}/universe/structures/1`, () =>
         HttpResponse.json(
@@ -324,10 +324,40 @@ describe('esiFetch — app-wide error budget (issue #655)', () => {
     }
 
     expect(caught).toBeInstanceOf(EsiError);
-    expect((caught as EsiError).status).toBe(420);
+    // Not 420: reporting a status ESI never sent would make
+    // `features/character/typeNames.ts` answer a spent budget by fanning out a
+    // thousand per-id lookups. `reason` carries which limit is holding.
+    expect((caught as EsiError).status).toBe(0);
+    expect(caught).toMatchObject({ reason: 'errorLimit' });
     // `esi/cache.ts` falls back to the stored row for anything that is not an
     // auth failure; a shut circuit must land there, not on a re-auth banner.
     expect(isAuthFailure(caught)).toBe(false);
+  });
+
+  it('logs no activity for a request it declined to send', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/universe/structures/1`, () =>
+        HttpResponse.json(
+          { error: 'error limited' },
+          { status: 420, headers: { 'X-ESI-Error-Limit-Reset': '45' } }
+        )
+      )
+    );
+    await expect(
+      esiFetch('/universe/structures/1', { endpointId: 'getUniverseStructure' })
+    ).rejects.toThrow();
+
+    const events: ActivityEvent[] = [];
+    const unsubscribe = onEsiActivity((event) => events.push(event));
+    await expect(
+      esiFetch('/characters/123/mail', { endpointId: 'getCharacterMailHeaders' })
+    ).rejects.toBeInstanceOf(EsiBudgetError);
+
+    // No route was called, so there is no ESI activity — the same reasoning
+    // that exempts a cancelled load. Otherwise /settings fills with errors for
+    // zero traffic during a throttle.
+    expect(events).toEqual([]);
+    unsubscribe();
   });
 
   it('reopens the circuit as soon as ESI answers again', async () => {

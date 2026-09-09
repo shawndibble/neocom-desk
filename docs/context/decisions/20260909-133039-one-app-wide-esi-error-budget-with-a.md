@@ -29,7 +29,7 @@ _Recorded 2026-09-09 · issue #655._
   firing its own blind retry into a closed door.
 
 - **A shut circuit fails fast into the cache; a brief one is waited out. We
-  absorb a hiccup, we do not absorb an outage.** Every wait the module imposes —
+  absorb a hiccup, we do not absorb an outage.** Every **policy** wait —
   circuit, brake, and the queue behind the brake — is bounded by
   `MAX_BUDGET_WAIT_MS` (5s); past it the gate refuses with an `EsiBudgetError`
   that never touches the network. The bound is anchored on `STALE_GRACE_MS`
@@ -46,6 +46,15 @@ _Recorded 2026-09-09 · issue #655._
   and the app would otherwise drop a whole boot prefetch over a two-second
   hiccup.
 
+- **Queueing for one of the ceiling's permits is throughput, not policy, and is
+  deliberately not refused.** Bounding it too would drop a boot prefetch merely
+  because the app is busy on a slow connection, and the same queue already
+  existed inside every `mapWithConcurrencyLimit` — the ceiling only moved it
+  somewhere it can be seen. It ends when a permit frees, when the caller's
+  signal fires, or, worst case, when the holders ahead hit the request timeout
+  below. Meanwhile `esi/cache.ts`'s 250ms grace has already put rows on screen,
+  so a queued request is not a spinner.
+
 - **The accepted consequence: a caller with no stored row now gets an empty
   view where it previously got a spinner and then data.** `esi/cache.ts` returns
   `{ cached: null }` when the live call fails and nothing is on disk. That is
@@ -54,16 +63,35 @@ _Recorded 2026-09-09 · issue #655._
   it is a real change in what a first-ever visit looks like during a throttle,
   and it is recorded as one rather than left to be discovered.
 
-- **What a caller receives on success is unchanged.** `EsiBudgetError` is an
-  `EsiError` carrying 420 or 429, so `isAuthFailure` stays false, no re-auth
-  banner is painted, the read-through cache falls back exactly as it does for a
-  5xx, and `typeNames.ts`'s existing `status === 429 || status === 420` branch
-  reads it as the throttle it is.
+- **A refusal reports `status: 0`, not 420 or 429 — nothing was sent, so ESI
+  said nothing.** It is still an `EsiError` and still never 401/403, so
+  `isAuthFailure` stays false, no re-auth banner is painted, the read-through
+  cache falls back exactly as it does for a 5xx, and what a caller receives on
+  success is unchanged. But it must not borrow a status ESI never returned:
+  `status` is the one field callers read as "what did ESI say", and
+  `features/character/typeNames.ts` acts on precisely that — it answers a
+  429/420 by fanning out up to a thousand per-id lookups, which is the last
+  thing a spent budget wants (that amplifier is item D's own subject).
+  `EsiBudgetError` carries `reason` (`errorLimit` / `rateLimit` / `pacing`) and
+  `retryAfterMs` instead: richer than a status, and true. A queue held back by
+  the brake reports `pacing`, because no circuit shut and claiming one would be
+  a story about a 420 that never happened. The same reasoning gives a timed-out
+  request `status: 0` via `EsiTimeoutError`.
 
-- **The circuit reopens on any 2xx/3xx, not only on its timer.** ESI discards
-  every request while the error limit is spent, so a response it actually served
-  is proof the window is over; sitting out a reset the server has already moved
-  past is pure cost.
+- **A refusal is not logged as ESI activity.** No route was called, so there is
+  nothing to show — the same reasoning that already exempts a cancelled load.
+  Logging it would fill `/settings`' activity list with errors during a
+  throttle, for zero traffic.
+
+- **The circuit reopens on a 2xx/3xx, but only from a request that started after
+  it shut.** ESI discards every request while the error limit is spent, so a
+  response it actually served is proof the window is over, and sitting out a
+  reset the server has already moved past is pure cost. The qualifier is the
+  whole point though: up to `ESI_MAX_IN_FLIGHT - 1` peers were already on the
+  wire when the 420 landed, and one of them answering 200 says only that ESI was
+  fine when _it_ was sent — a moment the 420 has since contradicted. Without the
+  start-time check the circuit is reopened by its own stragglers, immediately,
+  in exactly the storm it exists for.
 
 - **The brake trickles, it never clamps to zero.** This matters because PR
   #653's `structures.ts` memoizes a forbidden citadel only on a _real_ 403 — a

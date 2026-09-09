@@ -22,12 +22,16 @@
  * 1. **A ceiling.** `ESI_MAX_IN_FLIGHT` permits, held across one HTTP request,
  *    shared by every call site. `lib/concurrency.ts`'s per-call-site caps still
  *    apply; this bounds their *sum*.
- * 2. **A brake.** Every response — success, 304 and failure alike — carries
- *    `X-ESI-Error-Limit-Remain`/`-Reset`, and successes carry them too. Once
- *    the remaining budget falls under `ERROR_LIMIT_LOW_WATER`, admissions are
- *    spaced far enough apart that the residual would last to the reset *even if
- *    every remaining request errored*. This is the half that keeps the 420 from
- *    ever happening.
+ * 2. **A brake.** `X-ESI-Error-Limit-Remain`/`-Reset` come back on a success and
+ *    a 304 as well as on a failure, and all three are read — a client that
+ *    looks only when something has already gone wrong is blind until it is too
+ *    late. Once the remaining budget falls under `ERROR_LIMIT_LOW_WATER`,
+ *    admissions are spaced far enough apart that the residual would last to the
+ *    reset *even if every remaining request errored*. This is the half that
+ *    keeps the 420 from ever happening. It **spreads requests out, it never
+ *    stops them** — `features/character/structures.ts` learns which citadels are
+ *    forbidden only from real 403s, so a gate that clamped to zero at the first
+ *    sign of trouble would starve that memo and keep the storm alive forever.
  * 3. **A circuit.** A 420 or 429 shuts the door for the window the server
  *    named. Queued and subsequent callers read that one shared verdict instead
  *    of each firing its own blind retry into a closed door.
@@ -43,6 +47,11 @@
  * of a second or two is invisible, while a 45-second 420 window is an outage
  * and must be answered from disk immediately. Refusing also costs ESI nothing,
  * so the error budget actually refills instead of being nibbled at by retries.
+ *
+ * That bound covers the three **policy** waits — circuit, brake, and the queue
+ * behind the brake. Queueing for one of the ceiling's permits is throughput
+ * rather than policy and is deliberately not refused; `passEsiGate` says why,
+ * and what ends it.
  *
  * The accepted consequence: a caller with **no** stored row gets
  * `{ cached: null }` — an empty view where it would previously have shown a
@@ -64,7 +73,7 @@
  * policy is unit-tested without timers.
  */
 import { createSemaphore, type Release } from '@/lib/concurrency';
-import { EsiBudgetError, type ThrottleStatus } from './errors';
+import { EsiBudgetError, type ThrottleStatus, type BudgetRefusal } from './errors';
 
 /**
  * Requests in flight to ESI across the whole app. Deliberately a little above
@@ -85,9 +94,10 @@ export const ERROR_LIMIT_LOW_WATER = 30;
 export const MAX_REQUEST_SPACING_MS = 2000;
 
 /**
- * The bound on every wait this module imposes — the circuit's, the brake's and
- * the queue behind the brake, added together. Past it the gate refuses instead
- * of holding on.
+ * The bound on every **policy** wait — the circuit's, the brake's and the queue
+ * behind the brake, added together. Past it the gate refuses instead of holding
+ * on. (Queueing for a permit is throughput, not policy; `passEsiGate` says why
+ * that one is not refused and what ends it.)
  *
  * Five seconds is where "a hiccup" stops and "an outage" starts, for this app.
  * A brief 429 names a `Retry-After` of a second or three and is worth sitting
@@ -109,7 +119,7 @@ export const DEFAULT_RATE_WINDOW_MS = 1000;
 /** Ceiling on a server-named reset, so one absurd header cannot wedge the app for a day. */
 export const MAX_CIRCUIT_MS = 5 * 60_000;
 
-export type { ThrottleStatus } from './errors';
+export type { ThrottleStatus, BudgetRefusal } from './errors';
 export { EsiBudgetError } from './errors';
 
 export interface BudgetState {
@@ -123,8 +133,16 @@ export interface BudgetState {
   readonly rateResetAt: number | null;
   /** Epoch ms the circuit reopens, or null when it is not shut. */
   readonly circuitUntil: number | null;
-  /** Which status shut it — reported back to callers so the refusal is honest. */
+  /** Which status shut it — 420 the error limit, 429 the rate limit. */
   readonly circuitStatus: ThrottleStatus | null;
+  /**
+   * When the circuit was shut. Only a response to a request that *started*
+   * after this can reopen it: up to `ESI_MAX_IN_FLIGHT - 1` peers were already
+   * on the wire when the 420 landed, and one of them answering 200 says only
+   * that ESI was fine when that request was made — a moment the 420 has since
+   * contradicted. Without this the circuit is reopened by its own stragglers.
+   */
+  readonly circuitShutAt: number | null;
   /**
    * Earliest instant the next request may be admitted. Only moves ahead of
    * `now` while the brake is on; it is what turns a per-request spacing into an
@@ -141,13 +159,17 @@ export const INITIAL_BUDGET: BudgetState = {
   rateResetAt: null,
   circuitUntil: null,
   circuitStatus: null,
+  circuitShutAt: null,
   nextAdmissionAt: 0,
 };
 
 export interface ObservedResponse {
   readonly status: number;
   readonly headers: Headers;
+  /** When the response arrived. */
   readonly now: number;
+  /** When its request was sent. Defaults to `now` for callers with no clock of their own. */
+  readonly startedAt?: number;
 }
 
 /** Header value as a finite, non-negative number, or null when absent/garbage. */
@@ -193,6 +215,7 @@ export function observeBudget(state: BudgetState, response: ObservedResponse): B
       ...next,
       circuitUntil: errorResetAt ?? now + DEFAULT_ERROR_WINDOW_MS,
       circuitStatus: 420,
+      circuitShutAt: now,
     };
   } else if (status === 429) {
     const retryAfter = resetInstant(numericHeader(headers, 'retry-after'), now);
@@ -200,16 +223,26 @@ export function observeBudget(state: BudgetState, response: ObservedResponse): B
       ...next,
       circuitUntil: retryAfter ?? rateResetAt ?? now + DEFAULT_RATE_WINDOW_MS,
       circuitStatus: 429,
+      circuitShutAt: now,
     };
-  } else if (status < 400) {
+  } else if (status < 400 && startedAfterTheShut(next, response)) {
     // ESI discards every request while the error limit is spent, so an answer
     // it actually served is proof the window is over. Reopening on it beats
     // sitting out a reset the server has already moved past. A 4xx/5xx proves
     // nothing of the sort — it is exactly what the budget is counting.
-    next = { ...next, circuitUntil: null, circuitStatus: null };
+    next = { ...next, circuitUntil: null, circuitStatus: null, circuitShutAt: null };
   }
 
   return next;
+}
+
+/**
+ * Whether a success is evidence about *now*, or just a straggler that was
+ * already on the wire when the door shut and cannot speak for what came after.
+ */
+function startedAfterTheShut(state: BudgetState, response: ObservedResponse): boolean {
+  if (state.circuitShutAt === null) return true;
+  return (response.startedAt ?? response.now) >= state.circuitShutAt;
 }
 
 /** What the gate has decided about one request. */
@@ -217,7 +250,7 @@ export type RequestPlan =
   /** Go ahead, after waiting `waitMs` (0 on a healthy budget). Never above the bound. */
   | { readonly kind: 'go'; readonly waitMs: number }
   /** Do not go at all: the wait would exceed the bound. */
-  | { readonly kind: 'refuse'; readonly status: ThrottleStatus; readonly retryAfterMs: number };
+  | { readonly kind: 'refuse'; readonly reason: BudgetRefusal; readonly retryAfterMs: number };
 
 /**
  * How far apart admissions must be for one budget's remainder to last until its
@@ -255,6 +288,12 @@ function believable(instant: number, now: number): number {
   return instant - now > CLOCK_JUMP_HORIZON_MS ? now : instant;
 }
 
+/** Which limit is holding a refused request — never a status ESI did not send. */
+function refusalReason(state: BudgetState, shutUntil: number): BudgetRefusal {
+  if (shutUntil === 0 || state.circuitStatus === null) return 'pacing';
+  return state.circuitStatus === 429 ? 'rateLimit' : 'errorLimit';
+}
+
 /**
  * Decide — purely — whether this request may go, and reserve its slot.
  *
@@ -280,7 +319,10 @@ export function planRequest(
     return {
       plan: {
         kind: 'refuse',
-        status: state.circuitStatus ?? 420,
+        // What is actually holding this request. A queue behind the brake is
+        // `pacing` — no circuit has shut, and claiming one would be a story
+        // about a 420 that never happened.
+        reason: refusalReason(state, shutUntil),
         retryAfterMs: waitMs,
       },
       // No slot is reserved for a request that is not going to be made, so a
@@ -289,9 +331,14 @@ export function planRequest(
     };
   }
 
+  const spacing = spacingMs(state, now);
   return {
     plan: { kind: 'go', waitMs },
-    state: { ...state, nextAdmissionAt: earliest + spacingMs(state, now) },
+    // Only the brake keeps a queue, so only the brake moves the cursor. On a
+    // healthy budget this function leaves no trace at all, which is what keeps
+    // a wall-clock move from stranding a cursor that was never holding anyone
+    // back in the first place.
+    state: spacing > 0 ? { ...state, nextAdmissionAt: earliest + spacing } : state,
   };
 }
 
@@ -301,9 +348,13 @@ export function planRequest(
 let budget: BudgetState = INITIAL_BUDGET;
 let semaphore = createSemaphore(ESI_MAX_IN_FLIGHT);
 
-/** Fold a real response into the app-wide budget. */
-export function observeEsiResponse(status: number, headers: Headers): void {
-  budget = observeBudget(budget, { status, headers, now: Date.now() });
+/**
+ * Fold a real response into the app-wide budget. `startedAt` is when its
+ * request went out — a success only reopens the circuit if it began after the
+ * shut, since a straggler already on the wire says nothing about now.
+ */
+export function observeEsiResponse(status: number, headers: Headers, startedAt?: number): void {
+  budget = observeBudget(budget, { status, headers, now: Date.now(), startedAt });
 }
 
 /** The budget as it stands. Diagnostics and tests only — never a control flow input. */
@@ -325,7 +376,14 @@ export function resetEsiBudget(): void {
   semaphore = createSemaphore(ESI_MAX_IN_FLIGHT);
 }
 
+function aborted(signal: AbortSignal): unknown {
+  return signal.reason ?? new DOMException('Aborted', 'AbortError');
+}
+
 function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+  // Checked first: adding a listener to an already-aborted signal never fires,
+  // which would sit out the whole wait before anyone noticed the cancellation.
+  if (signal?.aborted) return Promise.reject(aborted(signal));
   if (ms <= 0) return Promise.resolve();
   return new Promise((resolve, reject) => {
     const timer = setTimeout(resolve, ms);
@@ -333,7 +391,7 @@ function sleep(ms: number, signal?: AbortSignal): Promise<void> {
       'abort',
       () => {
         clearTimeout(timer);
-        reject(signal.reason ?? new DOMException('Aborted', 'AbortError'));
+        reject(aborted(signal));
       },
       { once: true }
     );
@@ -348,11 +406,22 @@ function sleep(ms: number, signal?: AbortSignal): Promise<void> {
  *
  * Rejects with `EsiBudgetError` when the budget is spent for longer than the
  * bounded wait, and with the signal's reason if the caller aborts.
+ *
+ * Two waits happen here and they are bounded differently. The **policy** wait —
+ * circuit, brake, and the queue behind the brake — is capped at
+ * `MAX_BUDGET_WAIT_MS` and refused past it, because holding a view for an
+ * outage is worse than answering it from disk. Queueing for a permit is not a
+ * policy wait but **throughput**, and it is deliberately not refused: dropping
+ * work because the app is merely busy would lose a prefetch on a slow
+ * connection for no gain, and the same queue already existed inside every
+ * `mapWithConcurrencyLimit`. It ends when a permit frees, when the caller's
+ * signal fires, or — in the worst case — when the holders ahead hit
+ * `client.ts`'s request timeout, which is the reason that timeout exists.
  */
 export async function passEsiGate(signal?: AbortSignal): Promise<Release> {
   const { plan, state } = planRequest(budget, Date.now());
   budget = state;
-  if (plan.kind === 'refuse') throw new EsiBudgetError(plan.status, plan.retryAfterMs);
+  if (plan.kind === 'refuse') throw new EsiBudgetError(plan.reason, plan.retryAfterMs);
   // Waited once, then acted on. Re-planning here would loop under a clock the
   // caller cannot advance (and, in tests, one that does not move at all).
   await sleep(plan.waitMs, signal);
