@@ -4,6 +4,7 @@ import {
   getCharacterMail,
   getCharacterMailLabels,
   getCharacterMailingLists,
+  putCharacterMail,
   type MailHeader,
   type MailBody,
   type MailLabels,
@@ -110,8 +111,18 @@ export function loadMailBody(
     characterId,
     KEYS.body(mailId),
     async () => (await getCharacterMail(characterId, mailId)).data,
-    // A delivered mail's body never changes. Read-only app, so not even the
-    // `read` flag moves it — that lives on the header.
+    // A delivered mail's body never changes. Not even the `read` flag moves
+    // it — that lives on the header, and its write goes through ESI, not
+    // through this cache, so a stale body is never the reason it drifts.
     { staleAfterMs: STALE_AFTER.static }
   );
+}
+
+/** Pushes the "read" write to ESI, alongside the session-local mark-read that always happens regardless. Errors are swallowed — nothing for a caller to react to, just another chance next time this mail reopens. */
+export async function markMailReadOnEsi(characterId: number, mailId: number): Promise<void> {
+  try {
+    await putCharacterMail(characterId, mailId, { read: true });
+  } catch {
+    // swallowed — see docblock
+  }
 }

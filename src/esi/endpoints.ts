@@ -632,6 +632,24 @@ export function getCharacterMailingLists(
   });
 }
 
+// --- PUT /characters/{character_id}/mail/{mail_id}/ (esi-mail.organize_mail.v1) ---
+
+/** The app's one ESI write: marks a mail read (or unread). Answers 204 No Content on success. */
+export function putCharacterMail(
+  characterId: number,
+  mailId: number,
+  update: { read: boolean },
+  options: { signal?: AbortSignal } = {}
+): Promise<EsiResult<void>> {
+  return esiFetch<void>(`/characters/${characterId}/mail/${mailId}/`, {
+    ...options,
+    characterId,
+    method: 'PUT',
+    body: update,
+    endpointId: 'putCharacterMail',
+  });
+}
+
 // --- GET /characters/{character_id}/notifications (esi-characters.read_notifications.v1) ---
 
 /**

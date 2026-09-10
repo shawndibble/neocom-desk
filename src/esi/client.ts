@@ -71,8 +71,8 @@ export interface EsiFetchOptions {
   etag?: string;
   signal?: AbortSignal;
   /** HTTP method; defaults to GET. */
-  method?: 'GET' | 'POST';
-  /** JSON-serialized as the request body when `method` is 'POST'. */
+  method?: 'GET' | 'POST' | 'PUT';
+  /** JSON-serialized as the request body when `method` is 'POST' or 'PUT'. */
   body?: unknown;
   /**
    * Identifies the call for the activity log (issue #32). Every
@@ -261,7 +261,10 @@ export async function esiFetch<T>(
       }
     }
 
-    if (response.status === 304) {
+    // 304 (cache revalidation) and 204 (a write's empty response, e.g. the
+    // mail-read PUT) both carry no body — `.json()` on either throws, not a
+    // real failure.
+    if (response.status === 304 || response.status === 204) {
       recordEsiActivity(endpointId, characterId, 'success');
       return {
         data: null,

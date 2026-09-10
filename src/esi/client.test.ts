@@ -503,6 +503,57 @@ describe('esiFetch — POST (BUG #12)', () => {
   });
 });
 
+describe('esiFetch — PUT (issue #741)', () => {
+  it('sends a JSON body with Content-Type and the standard compat/user-agent headers', async () => {
+    let captured: Headers | null = null;
+    let body: unknown;
+    server.use(
+      http.put(`${ESI_BASE_URL}/characters/1/mail/2/`, async ({ request }) => {
+        captured = request.headers;
+        body = await request.json();
+        return new HttpResponse(null, { status: 204 });
+      })
+    );
+
+    await esiFetch<void>('/characters/1/mail/2/', { method: 'PUT', body: { read: true } });
+
+    expect(body).toEqual({ read: true });
+    const headers = captured as Headers | null;
+    expect(headers?.get('content-type')).toContain('application/json');
+    expect(headers?.get('x-compatibility-date')).toBe(COMPATIBILITY_DATE);
+    expect(headers?.get('x-user-agent')).toBe(USER_AGENT);
+  });
+
+  it('resolves with null data on a 204 No Content response instead of throwing on the empty body', async () => {
+    server.use(
+      http.put(
+        `${ESI_BASE_URL}/characters/1/mail/2/`,
+        () => new HttpResponse(null, { status: 204 })
+      )
+    );
+
+    const result = await esiFetch<void>('/characters/1/mail/2/', {
+      method: 'PUT',
+      body: { read: true },
+    });
+
+    expect(result.data).toBeNull();
+  });
+
+  it('throws a typed EsiError on a PUT error response', async () => {
+    server.use(
+      http.put(
+        `${ESI_BASE_URL}/characters/1/mail/2/`,
+        () => new HttpResponse(null, { status: 403 })
+      )
+    );
+
+    await expect(
+      esiFetch('/characters/1/mail/2/', { method: 'PUT', body: { read: true } })
+    ).rejects.toMatchObject({ status: 403 });
+  });
+});
+
 describe('esiFetch — POST rate limiting (BUG #12)', () => {
   beforeEach(() => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });

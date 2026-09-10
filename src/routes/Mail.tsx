@@ -21,6 +21,7 @@ import {
   loadMailLabels,
   loadMailingLists,
   loadMoreMailHeaders,
+  markMailReadOnEsi,
 } from '@/features/character/mail';
 import type { CachedResult } from '@/esi/cache';
 import { resolveNames } from '@/features/character/names';
@@ -166,12 +167,9 @@ export function Mail() {
   }
 
   const [selectedId, setSelectedId] = useState<number | null>(null);
-  // Session-only local "mark read" (issue #416): never written to ESI — this
-  // app has no mail write scope at all. Dims a mail the same way ESI's own
-  // `is_read` does; never reset, so it survives a manual refresh and only
-  // resets on an actual page reload, same tier as the ESI-derived read flag
-  // it's layered on top of. Set on selection (opening a mail), not toggled —
-  // there is no manual mark-unread control.
+  // Local "mark read" state, applied instantly on selection so the dim never
+  // waits on the network — independent of `markMailReadOnEsi`'s own write
+  // below. Set on selection, not toggled — no manual mark-unread control.
   const [locallyReadIds, setLocallyReadIds] = useState<ReadonlySet<number>>(new Set());
   const [hideRead, setHideRead] = useState(false);
   function markLocalRead(mailId: number) {
@@ -502,6 +500,12 @@ export function Mail() {
                           onClick={() => {
                             setSelectedId(header.mail_id);
                             markLocalRead(header.mail_id);
+                            // Gated on ESI's flag, not `isRead` (which also covers
+                            // local state) — a failed write must get another
+                            // chance on every reopen, not just the next reload.
+                            if (!header.is_read) {
+                              void markMailReadOnEsi(activeCharacterId, header.mail_id);
+                            }
                           }}
                           // `aria-current={false}` renders the string "false",
                           // which is a valid token meaning "not current" — so

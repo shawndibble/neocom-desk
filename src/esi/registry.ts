@@ -137,6 +137,10 @@ export const ESI_REGISTRY = {
     route: '/characters/{character_id}/mail/lists',
     scope: 'esi-mail.read_mail.v1',
   },
+  putCharacterMail: {
+    route: '/characters/{character_id}/mail/{mail_id}/',
+    scope: 'esi-mail.organize_mail.v1',
+  },
   getCharacterNotifications: {
     route: '/characters/{character_id}/notifications',
     scope: 'esi-characters.read_notifications.v1',

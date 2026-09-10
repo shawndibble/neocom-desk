@@ -11,13 +11,13 @@ import { Login } from './Login';
 vi.mock('@/app/navigation', () => ({ assignLocation: vi.fn() }));
 
 /**
- * Every scope in the Base Grant, against the words `login.permissionsHint`
+ * Every read scope in the Base Grant, against the words `login.permissionsHint`
  * discloses it with. Hand-maintained on purpose: only a person can decide how
  * a new scope should be described to someone deciding whether to grant it.
  * Two scopes may share a phrase where the disclosure honestly is the same
  * (`read_clones`/`read_implants`), but a scope may never be absent.
  */
-const BASE_GRANT_PHRASES: Record<string, string> = {
+const READ_ONLY_PHRASES: Record<string, string> = {
   'esi-skills.read_skills.v1': 'skills and training queue',
   'esi-skills.read_skillqueue.v1': 'skills and training queue',
   'esi-clones.read_clones.v1': 'clones and implants',
@@ -39,6 +39,16 @@ const BASE_GRANT_PHRASES: Record<string, string> = {
   'esi-characters.read_contacts.v1': 'contacts',
   'esi-characters.read_loyalty.v1': 'loyalty points',
   'esi-location.read_location.v1': 'current location',
+};
+
+/** The one Base Grant scope that's a write, not a read — its disclosure goes in its own fine-print line, not the "read-only access" sentence, which it would otherwise contradict. */
+const WRITE_SCOPE_PHRASES: Record<string, string> = {
+  'esi-mail.organize_mail.v1': 'marks it read in EVE',
+};
+
+const BASE_GRANT_PHRASES: Record<string, string> = {
+  ...READ_ONLY_PHRASES,
+  ...WRITE_SCOPE_PHRASES,
 };
 
 function renderLogin() {
@@ -202,8 +212,19 @@ describe('Login', () => {
     ).toBeInTheDocument();
 
     const permissions = screen.getByText(/signing in grants read-only access/i);
-    for (const phrase of new Set(Object.values(BASE_GRANT_PHRASES))) {
+    for (const phrase of new Set(Object.values(READ_ONLY_PHRASES))) {
       expect(permissions).toHaveTextContent(phrase);
+    }
+  });
+
+  it('discloses the one write scope in its own fine-print line, not the read-only sentence', async () => {
+    renderLogin();
+    await screen.findByRole('heading', { name: /read-only, and it stays that way/i });
+
+    const permissions = screen.getByText(/signing in grants read-only access/i);
+    for (const phrase of Object.values(WRITE_SCOPE_PHRASES)) {
+      expect(permissions).not.toHaveTextContent(phrase);
+      expect(screen.getByText(new RegExp(phrase, 'i'))).toBeInTheDocument();
     }
   });
 
