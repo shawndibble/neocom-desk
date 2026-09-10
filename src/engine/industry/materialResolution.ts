@@ -78,6 +78,20 @@ export interface ResolveMaterialOptions {
   materialPrices: HubPrices;
   sourcing: MaterialSourcingMap | undefined;
   ctx: SubBuildContext;
+  /**
+   * Where a reaction-produced material's own sub-build runs (issue #698's
+   * Reaction Location) — used instead of `ctx` whenever the material being
+   * resolved is itself a reaction, at any depth. Falls back to `ctx` when
+   * absent, which is what a reaction-activity plan does (it reuses its own
+   * top-level facility for a nested reaction sub-build rather than needing a
+   * second one). Deliberately never merged into `ctx` for the recursive
+   * call: a manufacturing material nested beneath a reaction one must still
+   * cost against `ctx`, not `reactionCtx` — see `resolveSubBuild`, which
+   * takes the resolved context as its own parameter rather than folding it
+   * into `opts`, so this field and `ctx` both stay exactly as the caller set
+   * them all the way down the tree.
+   */
+  reactionCtx?: SubBuildContext;
   /** Ancestor typeIDs already being built on this branch — cycle guard. */
   visited?: ReadonlySet<number>;
   depth?: number;
@@ -167,8 +181,12 @@ export function resolveMaterial(
     !visited.has(material.typeID);
   const recipe = eligible ? recipeFor(material.typeID) : null;
 
-  if (recipe?.method === 'manufacturing') {
-    const sub = resolveSubBuild(material.typeID, remainingQuantity, recipe.blueprint, recipe.me, {
+  if (recipe?.method === 'manufacturing' || recipe?.method === 'reaction') {
+    const me = recipe.method === 'manufacturing' ? recipe.me : 0;
+    // The reaction branch's own context, never folded into `opts.ctx` — see
+    // the `reactionCtx` doc comment above.
+    const subCtx = recipe.method === 'reaction' ? (opts.reactionCtx ?? opts.ctx) : opts.ctx;
+    const sub = resolveSubBuild(material.typeID, remainingQuantity, recipe.blueprint, me, subCtx, {
       ...opts,
       visited: new Set([...visited, material.typeID]),
       depth: depth + 1,
@@ -199,15 +217,25 @@ export function resolveMaterial(
   };
 }
 
-/** Plans one level's job, then resolves what it consumes — recursively. `null` mirrors `planSubBuild`'s own "nothing to plan" and error cases. */
+/**
+ * Plans one level's job, then resolves what it consumes — recursively. `null`
+ * mirrors `planSubBuild`'s own "nothing to plan" and error cases.
+ *
+ * `ctx` is this level's own resolved context (the caller already chose
+ * between `opts.ctx` and `opts.reactionCtx`); `opts` itself is passed through
+ * unchanged to every recursive `resolveMaterial` call below so a descendant
+ * of a different method still gets to make that same choice for itself,
+ * rather than inheriting whichever context this level happened to use.
+ */
 function resolveSubBuild(
   typeID: number,
   needed: number,
   blueprint: IndustryBlueprint,
   me: number,
+  ctx: SubBuildContext,
   opts: ResolveMaterialOptions
 ): ResolvedSubBuild | null {
-  const sub = planSubBuild({ typeID, remainingQuantity: needed }, blueprint, me, opts.ctx);
+  const sub = planSubBuild({ typeID, remainingQuantity: needed }, blueprint, me, ctx);
   if (!sub) return null;
 
   const inputs = sub.inputs.map((input) => resolveMaterial(input, opts));

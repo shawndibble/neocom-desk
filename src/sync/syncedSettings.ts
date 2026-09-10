@@ -115,6 +115,7 @@ export const SYNCED_SETTING_KEYS: readonly string[] = [
   'sync.industryAssumedTe',
   'sync.industryBuildGroups',
   'sync.industryFacilityDefaults',
+  'sync.industryReactionFacilityDefaults',
   'sync.marketHub',
   'sync.marketPricePercent',
   'sync.notificationFeedPrefs',

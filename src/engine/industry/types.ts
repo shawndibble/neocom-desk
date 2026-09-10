@@ -389,6 +389,19 @@ export interface FacilityContext {
   security: SecurityBand;
 }
 
+/**
+ * Where a reaction sub-job runs, independent of the plan's own manufacturing
+ * facility (issue #698's Reaction Location) — the plan's own context is never
+ * a valid stand-in, since an engineering complex cannot host a reaction and a
+ * refinery's rig table uses its own security multiplier
+ * (`REACTION_RIG_SECURITY_MULTIPLIER`). Absent means no Reaction Location is
+ * configured, which callers fall back from rather than treat as an error.
+ */
+export interface ReactionFacilityContext extends FacilityContext {
+  facilityTaxPct?: number;
+  systemCostIndex: number;
+}
+
 /** ESI adjusted prices (/markets/prices/): typeID -> adjusted_price. */
 export type AdjustedPrices = Record<number, number>;
 
@@ -441,6 +454,14 @@ export interface IndustryInputs {
    * blueprint catalog or pi.json itself.
    */
   recipeFor?: (typeID: number) => MaterialRecipe | null;
+  /**
+   * Where a reaction-produced material's own sub-build runs, when Include
+   * Reactions is on for this (manufacturing-activity) plan — the Reaction
+   * Location. Absent for a reaction-activity plan, which reuses this
+   * `IndustryInputs`' own facility/rigFit/security for a nested reaction
+   * sub-build instead (see `resolveMaterial`'s `reactionCtx` fallback).
+   */
+  reactionFacility?: ReactionFacilityContext;
 }
 
 export interface JobFeeBreakdown {
