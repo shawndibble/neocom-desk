@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import type { BuildPlanRecord } from '@/db';
@@ -359,10 +359,24 @@ describe('BuildPlanList: dragging a plan into a group (#627)', () => {
     }
   });
 
-  it('still offers "Move to group" on every row, which is the keyboard path', () => {
+  it('keeps only Delete visible per row, moving move-to-group into the row context menu', () => {
     renderDraggable();
-    expect(screen.getByRole('button', { name: 'Move to group Rokh' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Move to group Buzzard' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Move to group/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Delete Rokh' })).toBeInTheDocument();
+  });
+
+  it('opens "Move to group" from the row context menu, reachable via focus + the native menu key', () => {
+    // The row's name button is a real tab stop, so Shift+F10 / the Menu key —
+    // which the browser turns into a `contextmenu` event on whatever has
+    // focus — reaches it without a mouse. Tests fake that translation the
+    // same way `ContextMenu.test.tsx` does: focus, then `fireEvent.contextMenu`.
+    renderDraggable();
+    const target = screen.getByText('Rokh');
+    target.focus();
+    fireEvent.contextMenu(target);
+    expect(screen.getByRole('menuitem', { name: 'Move to group' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Rename' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Duplicate' })).toBeInTheDocument();
   });
 
   it('renders no drag overlay while nothing is being dragged', () => {
