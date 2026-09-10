@@ -81,8 +81,10 @@ import {
   characterEventThresholds,
   withCharacterEventThreshold,
   STRUCTURE_FUEL_LOW_DAY_OPTIONS,
+  EXTRACTOR_EXPIRING_LEAD_HOUR_OPTIONS,
   type CharacterEventThresholds,
 } from './preferences';
+import { runForegroundPoll, liveDependencies } from './foregroundPoller';
 import {
   isEventEnabledFor,
   isEveTypeEnabledFor,
@@ -639,6 +641,21 @@ const CharacterNotificationSection = memo(function CharacterNotificationSection(
   // over a `prefsValue` prop — see this component's props doc for why.
   const currentValue = () => useNotificationPreferences.getState().value;
 
+  /**
+   * `registerDeviceForWebPush` replaces the backend's whole stored
+   * Projection for a Character on every poll tick (issue #358), so a
+   * lead-time change or an off-toggle otherwise leaves a stale Scheduled
+   * Push live until the next ~5-minute tick catches up (issue #750). This
+   * re-runs the full Foreground Poller — the only thing in the codebase
+   * that assembles one Character's whole Projection correctly — rather
+   * than uploading just this domain's rows, which would silently wipe
+   * every other domain's pending push for every other Character too.
+   * `runForegroundPoll`'s own in-flight guard makes firing it here safe.
+   */
+  const triggerExtractorReupload = () => {
+    void runForegroundPoll(liveDependencies());
+  };
+
   return (
     <div className="rounded-xs border border-line bg-panel/85 backdrop-blur-sm">
       {/* Select-all is a sibling of the expand toggle, not nested inside its
@@ -742,14 +759,18 @@ const CharacterNotificationSection = memo(function CharacterNotificationSection(
                             !hasScope ? 'scope' : capabilityMissing ? 'capability' : null
                           }
                           checked={isEventEnabledFor(prefs, eventId, channel)}
-                          onToggle={() =>
+                          onToggle={() => {
+                            const wasEnabled = isEventEnabledFor(prefs, eventId, channel);
                             void toggleEventChannelPref(
                               character.characterId,
                               currentValue(),
                               eventId,
                               channel
-                            )
-                          }
+                            );
+                            if (eventId === 'planetaryExtractorExpiring' && wasEnabled) {
+                              triggerExtractorReupload();
+                            }
+                          }}
                         />
                       ))}
                     </div>
@@ -767,6 +788,50 @@ const CharacterNotificationSection = memo(function CharacterNotificationSection(
                     <p className="border-t border-line bg-panel/60 px-6 py-1.5 text-[0.6875rem] text-text-dim">
                       {t('settings.notifications.extractorExpiringHint')}
                     </p>
+                  )}
+                  {/*
+                    Extractor lead time's inline threshold control (issue
+                    #750), same pattern as structure fuel's below — the
+                    fixed 24h/12h warning pair is gone, replaced by this one
+                    configured value both delivery channels read.
+                  */}
+                  {eventId === 'planetaryExtractorExpiring' && rowEnabled && (
+                    <div className="border-t border-line bg-panel/60 px-6 py-1.5">
+                      <label className="flex items-center gap-2 text-[0.6875rem] text-text-dim">
+                        {t('settings.notifications.extractorExpiringLeadTimeLabel')}
+                        <Select
+                          value={String(thresholds.extractorExpiringLeadHours)}
+                          onValueChange={(value) => {
+                            void updatePrefs(
+                              character.characterId,
+                              withCharacterEventThreshold(
+                                currentValue(),
+                                character.characterId,
+                                'extractorExpiringLeadHours',
+                                Number(value)
+                              )
+                            );
+                            triggerExtractorReupload();
+                          }}
+                        >
+                          <SelectTrigger
+                            size="sm"
+                            aria-label={t('settings.notifications.extractorExpiringLeadTimeLabel')}
+                          >
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {EXTRACTOR_EXPIRING_LEAD_HOUR_OPTIONS.map((hours) => (
+                              <SelectItem key={hours} value={String(hours)}>
+                                {t('settings.notifications.extractorExpiringLeadTimeOption', {
+                                  count: hours,
+                                })}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </label>
+                    </div>
                   )}
                   {/*
                     Structure fuel's inline threshold control

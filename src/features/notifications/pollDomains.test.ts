@@ -373,9 +373,10 @@ describe('projection wiring', () => {
           {
             pinId: 1,
             expiryTimeMs: Date.parse('2026-09-07T12:00:00Z'),
+            thresholdMs: 21_600_000,
             installTimeMs: Date.parse('2026-09-05T12:00:00Z'),
           },
-          { pinId: 2, expiryTimeMs: Date.parse('2026-09-07T18:00:00Z') },
+          { pinId: 2, expiryTimeMs: Date.parse('2026-09-07T18:00:00Z'), thresholdMs: 21_600_000 },
         ],
       },
     ]);

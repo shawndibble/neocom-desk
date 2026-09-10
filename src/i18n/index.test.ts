@@ -79,7 +79,7 @@ describe('notifications.fired.* — live i18next path agrees with projection.ts'
     const colonies = [
       {
         planetId: 1,
-        extractors: [{ pinId: 1, expiryTimeMs }],
+        extractors: [{ pinId: 1, expiryTimeMs, thresholdMs: 6 * HOUR_MS }],
       },
     ];
     const rows = projectColonies(1, 'Kestrel', colonies, new Map([[1, 'Amarr Prime III']]), T0);

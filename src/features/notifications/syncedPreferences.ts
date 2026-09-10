@@ -79,6 +79,9 @@ function extractThresholds(raw: CharacterEventThresholds | undefined): Character
   const result: CharacterEventThresholds = {};
   if (raw?.structureFuelLowDays !== undefined)
     result.structureFuelLowDays = raw.structureFuelLowDays;
+  if (raw?.extractorExpiringLeadHours !== undefined) {
+    result.extractorExpiringLeadHours = raw.extractorExpiringLeadHours;
+  }
   if (raw?.corpWalletBalanceFloorIsk !== undefined) {
     result.corpWalletBalanceFloorIsk = raw.corpWalletBalanceFloorIsk;
   }
@@ -143,6 +146,7 @@ function isThresholds(raw: unknown): raw is CharacterEventThresholds {
   const r = raw as Record<string, unknown>;
   return (
     isOptionalFiniteNumber(r.structureFuelLowDays) &&
+    isOptionalFiniteNumber(r.extractorExpiringLeadHours) &&
     isOptionalFiniteNumber(r.corpWalletBalanceFloorIsk) &&
     isOptionalFiniteNumber(r.corpWalletTransactionCeilingIsk) &&
     isOptionalFiniteNumber(r.walletBalanceChangedThresholdIsk)

@@ -86,6 +86,8 @@ export interface NotificationPreferencesValue {
 export interface CharacterEventThresholds {
   /** Days of fuel remaining that trigger `structureFuelLow` — one of `STRUCTURE_FUEL_LOW_DAY_OPTIONS`. */
   structureFuelLowDays?: number;
+  /** Hours before an extractor's `expiry_time` that trigger `planetaryExtractorExpiring` (issue #750) — one of `EXTRACTOR_EXPIRING_LEAD_HOUR_OPTIONS`. */
+  extractorExpiringLeadHours?: number;
   /** ISK balance at or under which `corpWalletThreshold` fires its `balanceBelow` half. */
   corpWalletBalanceFloorIsk?: number;
   /** ISK amount a single journal entry must exceed to fire `corpWalletThreshold`'s `transactionAbove` half. */
@@ -97,8 +99,12 @@ export interface CharacterEventThresholds {
 /** The three lead times `structureFuelLow`'s inline control offers (issue #299) — CCP's own alert fires separately and later. */
 export const STRUCTURE_FUEL_LOW_DAY_OPTIONS: readonly number[] = [7, 3, 1];
 
+/** The lead times `planetaryExtractorExpiring`'s inline control offers (issue #750), replacing the old fixed 24h/12h pair. */
+export const EXTRACTOR_EXPIRING_LEAD_HOUR_OPTIONS: readonly number[] = [24, 12, 6, 1];
+
 /** A week's warning is the issue's own justification: "a director planning a fuel run wants a week's warning." */
 export const DEFAULT_STRUCTURE_FUEL_LOW_DAYS = 7;
+export const DEFAULT_EXTRACTOR_EXPIRING_LEAD_HOURS = 6;
 export const DEFAULT_CORP_WALLET_BALANCE_FLOOR_ISK = 50_000_000;
 export const DEFAULT_CORP_WALLET_TRANSACTION_CEILING_ISK = 100_000_000;
 export const DEFAULT_WALLET_BALANCE_CHANGED_THRESHOLD_ISK = 1_000_000;
@@ -161,6 +167,7 @@ function isCharacterEventThresholds(raw: unknown): raw is CharacterEventThreshol
   const r = raw as Record<string, unknown>;
   return (
     isOptionalFiniteNumber(r.structureFuelLowDays) &&
+    isOptionalFiniteNumber(r.extractorExpiringLeadHours) &&
     isOptionalFiniteNumber(r.corpWalletBalanceFloorIsk) &&
     isOptionalFiniteNumber(r.corpWalletTransactionCeilingIsk) &&
     isOptionalFiniteNumber(r.walletBalanceChangedThresholdIsk)
@@ -466,6 +473,8 @@ export function characterEventThresholds(
   const raw = value.thresholdsByCharacter?.[characterId] ?? {};
   return {
     structureFuelLowDays: raw.structureFuelLowDays ?? DEFAULT_STRUCTURE_FUEL_LOW_DAYS,
+    extractorExpiringLeadHours:
+      raw.extractorExpiringLeadHours ?? DEFAULT_EXTRACTOR_EXPIRING_LEAD_HOURS,
     corpWalletBalanceFloorIsk:
       raw.corpWalletBalanceFloorIsk ?? DEFAULT_CORP_WALLET_BALANCE_FLOOR_ISK,
     corpWalletTransactionCeilingIsk:

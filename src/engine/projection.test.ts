@@ -11,7 +11,6 @@ import {
 } from './projection';
 import { occurrenceKey } from './occurrenceKey';
 import type { NotificationFire, EveNotificationEntrySnapshot } from './notificationDiffs';
-import { EXTRACTOR_EXPIRY_WARNING_MS } from './notificationDiffs';
 import { SHARED_NOTIFICATION_WORDING } from './notificationWording';
 
 const T0 = 1_700_000_000_000;
@@ -183,8 +182,8 @@ describe('projectColonies', () => {
       {
         planetId: 40000001,
         extractors: [
-          { pinId: 1, expiryTimeMs: T0 + 30 * HOUR_MS },
-          { pinId: 2, expiryTimeMs: T0 + 10 * HOUR_MS },
+          { pinId: 1, expiryTimeMs: T0 + 30 * HOUR_MS, thresholdMs: 6 * HOUR_MS },
+          { pinId: 2, expiryTimeMs: T0 + 10 * HOUR_MS, thresholdMs: 6 * HOUR_MS },
         ],
       },
     ];
@@ -200,7 +199,10 @@ describe('projectColonies', () => {
     // 0010). The live path keeps SHARED_NOTIFICATION_WORDING's "has stopped",
     // which it has actually observed.
     const colonies = [
-      { planetId: 40000001, extractors: [{ pinId: 1, expiryTimeMs: T0 + HOUR_MS }] },
+      {
+        planetId: 40000001,
+        extractors: [{ pinId: 1, expiryTimeMs: T0 + HOUR_MS, thresholdMs: 6 * HOUR_MS }],
+      },
     ];
     const rows = projectColonies(7, 'Kestrel', colonies, new Map([[40000001, 'Amarr III']]), T0);
     const extractionDone = rows.find((r) => r.eventId === 'planetaryExtractionDone');
@@ -216,7 +218,10 @@ describe('projectColonies', () => {
 
   it('states planetaryExtractorExpiring as a prediction, never as an observation', () => {
     const colonies = [
-      { planetId: 40000001, extractors: [{ pinId: 1, expiryTimeMs: T0 + 20 * HOUR_MS }] },
+      {
+        planetId: 40000001,
+        extractors: [{ pinId: 1, expiryTimeMs: T0 + 20 * HOUR_MS, thresholdMs: 12 * HOUR_MS }],
+      },
     ];
     const rows = projectColonies(7, 'Kestrel', colonies, new Map([[40000001, 'Amarr III']]), T0);
     const expiring = rows.find((r) => r.eventId === 'planetaryExtractorExpiring');
@@ -228,21 +233,17 @@ describe('projectColonies', () => {
     expect(expiring?.title.toLowerCase()).toContain('due to');
   });
 
-  it('projects up to two planetaryExtractorExpiring rows per extractor, one per lead-time window', () => {
-    expect(EXTRACTOR_EXPIRY_WARNING_MS).toEqual([24 * HOUR_MS, 12 * HOUR_MS]);
+  it('projects exactly one planetaryExtractorExpiring row per extractor, at its own configured lead time', () => {
     const colonies = [
       {
         planetId: 40000001,
-        extractors: [{ pinId: 1, expiryTimeMs: T0 + 20 * HOUR_MS }],
+        extractors: [{ pinId: 1, expiryTimeMs: T0 + 20 * HOUR_MS, thresholdMs: 6 * HOUR_MS }],
       },
     ];
     const rows = projectColonies(7, 'Kestrel', colonies, new Map(), T0);
     const expiring = rows.filter((r) => r.eventId === 'planetaryExtractorExpiring');
     expect(expiring).toHaveLength(1);
-    expect(expiring[0].fireAt).toEqual(T0 + 20 * HOUR_MS - 12 * HOUR_MS);
-    // Two distinct occurrences must key distinctly even though they share a pin.
-    const keys = new Set(expiring.map((r) => r.occurrenceKey));
-    expect(keys.size).toEqual(expiring.length);
+    expect(expiring[0].fireAt).toEqual(T0 + 20 * HOUR_MS - 6 * HOUR_MS);
   });
 
   it('produces no rows for a colony with no extractors', () => {
