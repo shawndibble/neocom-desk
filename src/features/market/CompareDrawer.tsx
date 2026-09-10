@@ -223,14 +223,13 @@ export function CompareDrawer({
               <Button size="sm" onClick={clearSet}>
                 {t('market.compare.clearAll')}
               </Button>
-              <button
-                type="button"
+              <IconButton
+                size="sm"
+                variant="plain"
+                icon={<Icon.Close />}
+                label={t('common.close')}
                 onClick={close}
-                aria-label={t('common.close')}
-                className="rounded-xs px-1.5 py-0.5 text-text-dim transition-colors hover:bg-panel-2 hover:text-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-              >
-                <span aria-hidden="true">×</span>
-              </button>
+              />
             </div>
           </header>
           <div className="min-h-0 flex-1 overflow-y-auto">

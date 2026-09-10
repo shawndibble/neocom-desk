@@ -59,10 +59,10 @@ const STATUS_TONE: Record<Contract['status'], string> = {
   finished_issuer: 'text-success',
   finished_contractor: 'text-success',
   finished: 'text-success',
-  cancelled: 'text-text-faint',
+  cancelled: 'text-text-dim',
   rejected: 'text-danger',
   failed: 'text-danger',
-  deleted: 'text-text-faint',
+  deleted: 'text-text-dim',
   reversed: 'text-danger',
 };
 
