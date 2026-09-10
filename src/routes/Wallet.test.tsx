@@ -202,6 +202,7 @@ describe('Wallet', () => {
       scopes: [
         'esi-wallet.read_character_wallet.v1',
         'esi-characters.read_loyalty.v1',
+        'esi-characters.read_corporation_roles.v1',
         'esi-wallet.read_corporation_wallets.v1',
         'esi-corporations.read_divisions.v1',
       ],
@@ -224,9 +225,15 @@ describe('Wallet', () => {
     window.history.pushState({}, '', '/wallet?owner=corporation&division=3');
     render(<App />);
 
-    expect(await screen.findByRole('button', { name: 'Corporation' })).toHaveAttribute(
-      'aria-pressed',
-      'true'
+    // The corp switch mounts as soon as `useCorpAccess` reaches `ready`, but
+    // resolving `ready` now takes an extra render pass (granted scopes load,
+    // then the roles fetch fires once the roles scope is confirmed present) —
+    // one more hop than `findByRole` alone reliably waits out.
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Corporation' })).toHaveAttribute(
+        'aria-pressed',
+        'true'
+      )
     );
     expect(await screen.findByRole('combobox', { name: 'Wallet division' })).toHaveTextContent(
       'SRP'
@@ -256,6 +263,7 @@ describe('Wallet', () => {
       scopes: [
         'esi-wallet.read_character_wallet.v1',
         'esi-characters.read_loyalty.v1',
+        'esi-characters.read_corporation_roles.v1',
         'esi-wallet.read_corporation_wallets.v1',
         'esi-corporations.read_divisions.v1',
       ],
@@ -514,6 +522,7 @@ describe('Wallet', () => {
         scopes: [
           'esi-wallet.read_character_wallet.v1',
           'esi-characters.read_loyalty.v1',
+          'esi-characters.read_corporation_roles.v1',
           'esi-wallet.read_corporation_wallets.v1',
           'esi-corporations.read_divisions.v1',
         ],
