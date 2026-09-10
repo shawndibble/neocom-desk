@@ -60,6 +60,7 @@ import {
   compareStations,
   collectItemIds,
   collectStationItemIds,
+  totalEstimatedValue,
   type AssetTreeNode,
   type AssetTreeStation,
   type StationSortField,
@@ -930,6 +931,8 @@ export function Assets() {
     ]
   );
 
+  const totalValue = useMemo(() => totalEstimatedValue(sortedTree), [sortedTree]);
+
   const resolved = useMemo(
     () => resolveAssetPath(sortedTree, pathStationId, pathSegments),
     [sortedTree, pathStationId, pathSegments]
@@ -1702,6 +1705,9 @@ export function Assets() {
                 <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-line bg-panel-2 px-3 py-1.5">
                   <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
                     {t('assets.section.locationCount', { count: sortedTree.length })}
+                  </span>
+                  <span className="text-[0.6875rem] tabular-nums text-isk-pos">
+                    {t('assets.section.totalValue', { value: formatIsk(totalValue) })}
                   </span>
                   {/* flex-wrap (issue #415): on a narrow phone the two Selects no
                       longer share one row with no priority order — Sort stays put
