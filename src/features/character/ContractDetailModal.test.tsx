@@ -56,6 +56,15 @@ const ITEM_EXCHANGE_OUTSTANDING: Contract = {
   date_completed: undefined,
 };
 
+const AUCTION_OUTSTANDING: Contract = {
+  ...ITEM_EXCHANGE,
+  type: 'auction',
+  status: 'outstanding',
+  date_completed: undefined,
+  price: undefined,
+  buyout: 18_205_203,
+};
+
 const COURIER: Contract = {
   contract_id: 999,
   issuer_id: 500001,
@@ -293,6 +302,29 @@ describe('ContractDetailModal', () => {
       expect(await screen.findByText('Market value at Jita (sell orders)')).toBeInTheDocument();
       expect(screen.getByText('4,092.00')).toBeInTheDocument(); // 744 * 5.5
       expect(screen.queryByText(/unpriced/)).not.toBeInTheDocument();
+    });
+
+    it('also shows a market-value total for an outstanding auction contract', async () => {
+      pricesMock.getHubPrices.mockResolvedValue(
+        new Map([[34, { sellMin: 5.5, buyMax: 5, sellVolume: 0, buyVolume: 0 }]])
+      );
+      server.use(
+        http.get(`${ESI_BASE_URL}/universe/stations/60003760`, () => new Promise(() => {})),
+        http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/contracts/12345/items`, () =>
+          HttpResponse.json([
+            { record_id: 1, type_id: 34, quantity: 744, is_included: true, is_singleton: false },
+          ])
+        )
+      );
+      renderModal({
+        characterId: CHAR_ID,
+        contract: AUCTION_OUTSTANDING,
+        issuerName: 'Mero Otichoda',
+        onClose: () => {},
+      });
+
+      expect(await screen.findByText('Market value at Jita (sell orders)')).toBeInTheDocument();
+      expect(screen.getByText('4,092.00')).toBeInTheDocument(); // 744 * 5.5
     });
 
     it('flags unpriced lines instead of treating them as free, and leaves them out of the total', async () => {

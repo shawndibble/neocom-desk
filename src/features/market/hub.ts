@@ -9,8 +9,12 @@
  * the Payee record; this one is a viewing preference and Moon Mining never
  * reads it.
  *
- * Local to this feature (unlike `useActiveCharacter`, no other view reads it)
- * so it lives here rather than in `src/stores/`.
+ * Lives here rather than in `src/stores/` because it originated as, and still
+ * primarily is, the Market Browser's own preference — other features (the
+ * Contracts detail modal's market-value figure, issue #717; LP Store) import
+ * it from here rather than each holding a duplicate hub preference of their
+ * own, the same way they already share `src/market/hubs.ts`'s `TradeHub`
+ * list.
  */
 import { createSyncedSetting } from '@/lib/useSyncedSetting';
 import { DEFAULT_TRADE_HUB, getTradeHub, type TradeHub } from '@/market/hubs';
