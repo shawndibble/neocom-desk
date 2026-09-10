@@ -21,9 +21,10 @@ function renderApp() {
   );
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   useAuthFailure.setState({ failure: null });
   useActiveCharacter.setState({ activeCharacterId: CHARACTER_ID, hydrated: true });
+  await db.characters.clear();
 });
 
 describe('AuthFailureRedirect', () => {
