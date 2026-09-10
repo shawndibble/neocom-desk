@@ -66,16 +66,18 @@ import {
 import {
   addBuildGroup,
   buildGroupsFor,
-  removeBuildGroup,
   renameBuildGroup,
   useBuildGroups,
   withGroupCraftSweepDefault,
   withGroupOwnedStock,
   withGroupOwnedStockScope,
-  withGroupSnapshot,
   type BuildGroupSnapshot,
 } from '@/features/industry/buildGroups';
-import { retargetPatch } from '@/features/industry/retargetPatch';
+import {
+  deleteBuildGroup,
+  moveBuildPlanToGroup,
+  retargetBuildGroup,
+} from '@/features/industry/buildGroupActions';
 import { useExpandedGroups, withGroupExpanded } from '@/features/industry/expandedGroups';
 import { BuildGroupPanel } from '@/features/industry/BuildGroupPanel';
 import { applyGroupCraftSweep } from '@/features/industry/craftSweepGroup';
@@ -694,45 +696,18 @@ export function Industry() {
   async function handleDeleteGroup(groupId: string) {
     if (activeCharacterId === null) return;
     setDeletingGroupId(null);
-    // Membership goes first and the group's own record last: the group
-    // outlives what points at it (see `buildGroups.ts`).
-    const members = membersOfGroup(groupId);
-    if (members.length > 0) {
-      const now = Date.now();
-      await db.transaction('rw', db.buildPlans, async () => {
-        const stored = await db.buildPlans.bulkGet(members.map((m) => m.id));
-        const orphaned = stored.flatMap((plan) => {
-          if (!plan) return [];
-          const next = { ...plan, updatedAt: now };
-          delete next.buildGroupId;
-          return [next];
-        });
-        await db.buildPlans.bulkPut(orphaned);
-      });
-      scheduleSync(activeCharacterId);
-    }
-    await setBuildGroups(removeBuildGroup(buildGroups, activeCharacterId, groupId));
+    await deleteBuildGroup(groupId, membersOfGroup(groupId), {
+      characterId: activeCharacterId,
+      buildGroups,
+      setBuildGroups,
+    });
     if (selectedGroupId === groupId) setSelection(NO_SELECTION);
   }
 
   /** Moves one plan between groups, or out of every group when `groupId` is null. */
   async function handleMovePlan(planId: string, groupId: string | null) {
     if (activeCharacterId === null) return;
-    await db.transaction('rw', db.buildPlans, async () => {
-      const stored = await db.buildPlans.get(planId);
-      if (!stored) return;
-      // Read-modify-write inside the transaction, never a whole-record put
-      // built on a render's closure — that reverts every field the caller did
-      // not mention, which is how `buildHere` used to get wiped.
-      const moved = { ...stored, updatedAt: Date.now() };
-      // Deleted rather than set to undefined: Firestore rejects undefined at
-      // any depth, and `toRemoteDoc` omits the key on `undefined` anyway, so
-      // an absent key is the one shape both stores agree on.
-      if (groupId === null) delete moved.buildGroupId;
-      else moved.buildGroupId = groupId;
-      await db.buildPlans.put(moved);
-    });
-    scheduleSync(activeCharacterId);
+    await moveBuildPlanToGroup(planId, groupId, activeCharacterId);
     // Into a collapsed group the plan would simply vanish from the list, so
     // the move opens its destination.
     if (groupId !== null) await setGroupExpanded(groupId, true);
@@ -740,13 +715,8 @@ export function Industry() {
 
   /**
    * Applies a Retarget group's chosen hub/facility/security/build-system to
-   * every checked member plan (issue #632), and keeps the group's own
-   * snapshot in step so the quick-fill link and the next Retarget both start
-   * from what was actually applied — not merely what the form last held.
-   *
-   * A plain bulk write, not a second source of truth: each patched plan owns
-   * its own values from here on, same as any manual edit (see
-   * `retargetPatch.ts` and the #626 decision).
+   * every checked member plan (issue #632). See `buildGroupActions.ts` for
+   * the write itself.
    */
   async function handleRetargetGroup(
     groupId: string,
@@ -754,18 +724,11 @@ export function Industry() {
     planIds: readonly string[]
   ) {
     if (activeCharacterId === null) return;
-    const snapshot: BuildGroupSnapshot = { ...target, appliedAt: Date.now() };
-    if (planIds.length > 0) {
-      const patch = retargetPatch(snapshot);
-      await db.transaction('rw', db.buildPlans, async () => {
-        const stored = await db.buildPlans.bulkGet([...planIds]);
-        const now = Date.now();
-        const updated = stored.flatMap((p) => (p ? [{ ...p, ...patch, updatedAt: now }] : []));
-        await db.buildPlans.bulkPut(updated);
-      });
-      scheduleSync(activeCharacterId);
-    }
-    await setBuildGroups(withGroupSnapshot(buildGroups, activeCharacterId, groupId, snapshot));
+    await retargetBuildGroup(groupId, target, planIds, {
+      characterId: activeCharacterId,
+      buildGroups,
+      setBuildGroups,
+    });
   }
 
   /**
