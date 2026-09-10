@@ -311,7 +311,7 @@ export function OpportunitiesPanel({
       className: 'tabular-nums',
       sortValue: (row) => row.result.marginPct ?? undefined,
       render: (row) => (
-        <span className="flex items-center justify-end gap-1">
+        <span className="flex items-center sm:justify-end gap-1">
           {numericCell(row.result.marginPct, formatPercent, unknown)}
           {row.buildHere.length > 0 && (
             <InfoTooltip
