@@ -106,8 +106,8 @@ export function toBoardExtractions(
  * `productNames` comes from the shared type-name lookup; a job whose product
  * type has not resolved (or an activity with no product, such as research)
  * falls back to its blueprint's name and then to the job id. The engine filters
- * on `status` — that is a ranking decision, not a shape one — so every job is
- * handed over.
+ * on `status` and elapsed end time — that is a ranking decision, not a shape
+ * one — so every job is handed over.
  */
 export function toBoardJobs(
   jobs: readonly CorporationIndustryJob[],
