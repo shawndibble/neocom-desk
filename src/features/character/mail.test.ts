@@ -239,4 +239,51 @@ describe('markMailReadOnEsi', () => {
       unsubscribe();
     }
   });
+
+  it('patches the cached header list so is_read survives a reload', async () => {
+    const headers = [
+      { mail_id: 7, subject: 'Hi', is_read: false },
+      { mail_id: 8, subject: 'Other', is_read: false },
+    ];
+    await db.esiCache.put({
+      characterId: CHAR_ID,
+      key: 'mail:headers',
+      value: headers,
+      fetchedAt: Date.now(),
+    });
+    server.use(
+      http.put(
+        `${ESI_BASE_URL}/characters/${CHAR_ID}/mail/7/`,
+        () => new HttpResponse(null, { status: 204 })
+      )
+    );
+
+    await markMailReadOnEsi(CHAR_ID, 7);
+
+    const cached = (await db.esiCache.get([CHAR_ID, 'mail:headers']))?.value as typeof headers;
+    expect(cached).toEqual([
+      { mail_id: 7, subject: 'Hi', is_read: true },
+      { mail_id: 8, subject: 'Other', is_read: false },
+    ]);
+  });
+
+  it('leaves the cached header list alone when the write fails', async () => {
+    const headers = [{ mail_id: 7, subject: 'Hi', is_read: false }];
+    await db.esiCache.put({
+      characterId: CHAR_ID,
+      key: 'mail:headers',
+      value: headers,
+      fetchedAt: Date.now(),
+    });
+    server.use(
+      http.put(`${ESI_BASE_URL}/characters/${CHAR_ID}/mail/7/`, () =>
+        HttpResponse.json({ error: 'missing scope' }, { status: 403 })
+      )
+    );
+
+    await markMailReadOnEsi(CHAR_ID, 7);
+
+    const cached = (await db.esiCache.get([CHAR_ID, 'mail:headers']))?.value;
+    expect(cached).toEqual(headers);
+  });
 });
