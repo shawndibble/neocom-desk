@@ -13,6 +13,7 @@ function controller(overrides: Partial<AppraisalController> = {}): AppraisalCont
   return {
     text: '',
     setText: vi.fn(),
+    appraiseText: vi.fn(),
     result: null,
     compare: null,
     loading: false,
@@ -149,6 +150,14 @@ describe('AppraisalPanel', () => {
           within(table).getByRole('row', { name: new RegExp(hub.systemName) })
         ).toBeInTheDocument();
       }
+    });
+
+    it('is expanded on mount when opened via defaultCompareExpanded (issue #726)', () => {
+      renderPanel({
+        controller: controller({ result: outcome(), compare: COMPARE_ROWS }),
+        defaultCompareExpanded: true,
+      });
+      expect(screen.getByRole('table', { name: 'Compare hubs' })).toBeInTheDocument();
     });
 
     it('shows a dash, not a zero, for a hub with no orders on a side', async () => {

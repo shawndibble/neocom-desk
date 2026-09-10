@@ -201,6 +201,7 @@ export interface QuickbarListProps {
   onRemove: (typeId: number) => void;
   onReorder: (activeTypeId: number, overTypeId: number) => void;
   onSetTarget: (typeId: number, target: QuickbarTarget) => void;
+  onViewInAppraisal: () => void;
 }
 
 export function QuickbarList({
@@ -210,6 +211,7 @@ export function QuickbarList({
   onRemove,
   onReorder,
   onSetTarget,
+  onViewInAppraisal,
 }: QuickbarListProps) {
   const { t } = useTranslation();
   const sensors = useSensors(
@@ -224,9 +226,18 @@ export function QuickbarList({
 
   return (
     <div className="mt-3 border-t border-line pt-2">
-      <h2 className="pb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-        {t('market.quickbar.title')}
-      </h2>
+      <div className="flex items-center justify-between pb-1">
+        <h2 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+          {t('market.quickbar.title')}
+        </h2>
+        <IconButton
+          size="sm"
+          icon={<Icon.Market />}
+          label={t('market.quickbar.viewInAppraisal')}
+          onClick={onViewInAppraisal}
+          disabled={items.length === 0}
+        />
+      </div>
       {items.length === 0 ? (
         <p className="pt-1 text-xs text-text-dim">{t('market.quickbar.empty')}</p>
       ) : (

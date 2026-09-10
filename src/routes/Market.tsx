@@ -67,7 +67,11 @@ import { PriceHistoryPanel } from '@/features/market/PriceHistoryPanel';
 import { getVariationRows } from '@/features/market/variations';
 import { VariationsTable } from '@/features/market/VariationsTable';
 import { VariationsCompareModal } from '@/features/market/VariationsCompareModal';
-import { removeQuickbarItem, reorderQuickbarItems } from '@/features/market/quickbar';
+import {
+  quickbarToPasteText,
+  removeQuickbarItem,
+  reorderQuickbarItems,
+} from '@/features/market/quickbar';
 import { useQuickbar } from '@/features/market/useQuickbar';
 import {
   splitOrderBook,
@@ -319,8 +323,16 @@ export function Market() {
   const [section, setSection] = useState<MarketSection>(() =>
     parseMarketSection(searchParams.get('section'))
   );
-  function handleSectionChange(next: MarketSection) {
+  // Issue #726: true only immediately after the Quickbar's "View in
+  // Appraisal" action, so the panel mounts with its Compare Hubs section
+  // already open instead of collapsed.
+  const [expandCompareOnAppraisal, setExpandCompareOnAppraisal] = useState(false);
+  // `expandCompare` defaults false so every ordinary tab switch clears it —
+  // only `handleViewQuickbarInAppraisal` passes `true`, and only that call's
+  // own value should reach the next `AppraisalPanel` mount.
+  function handleSectionChange(next: MarketSection, expandCompare = false) {
     setSection(next);
+    setExpandCompareOnAppraisal(expandCompare);
     setSearchParams(
       (prev) => {
         const params = new URLSearchParams(prev);
@@ -366,6 +378,13 @@ export function Market() {
   }
   function handleReorderQuickbar(activeTypeId: number, overTypeId: number) {
     void writeQuickbar(reorderQuickbarItems(quickbarItems, activeTypeId, overTypeId));
+  }
+
+  // Issue #726: sends the Quickbar's contents into Appraisal, landing
+  // directly on the multi-hub view (#689) rather than a collapsed one.
+  function handleViewQuickbarInAppraisal() {
+    appraisal.appraiseText(quickbarToPasteText(quickbarItems));
+    handleSectionChange('appraisal', true);
   }
 
   // Item Detail (CONTEXT.md round 6): opened from the item context menu
@@ -1267,6 +1286,7 @@ export function Market() {
           onAddToQuickbar={handleAddToQuickbar}
           quickbarAvailable={activeCharacterId !== null}
           onShowInfo={handleShowInfo}
+          defaultCompareExpanded={expandCompareOnAppraisal}
         />
       )}
 
@@ -1337,6 +1357,7 @@ export function Market() {
               onRemove={handleRemoveFromQuickbar}
               onReorder={handleReorderQuickbar}
               onSetTarget={handleSetQuickbarTarget}
+              onViewInAppraisal={handleViewQuickbarInAppraisal}
             />
           </Panel>
 

@@ -40,6 +40,16 @@ export function reorderQuickbarItems(
 }
 
 /**
+ * Formats the Quickbar's contents the same way a manual multibuy paste would
+ * (issue #726), for handoff into Appraisal's paste box. `QuickbarItem` carries
+ * no quantity, so each line is a bare name — `parseAppraisalPaste` already
+ * treats a bare name as a stack of one.
+ */
+export function quickbarToPasteText(items: readonly QuickbarItem[]): string {
+  return items.map((item) => item.name).join('\n');
+}
+
+/**
  * Sets or clears a Quickbar item's price alert target (issue #680). `null`
  * clears both fields rather than leaving a stale price behind — the only way
  * to stop a target's alerts is to remove it or replace it outright, never to

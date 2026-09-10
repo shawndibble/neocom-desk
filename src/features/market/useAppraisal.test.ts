@@ -176,6 +176,24 @@ describe('useAppraisal', () => {
     expect(result.current.text).toBe('Tritanium 5');
   });
 
+  /**
+   * `setText` then `appraise()` in the same handler would submit the text
+   * from *before* the pending `setText`, since `appraise` closes over the
+   * hook's own `text` state — the Quickbar-to-Appraisal handoff (#726) needs
+   * a single call that submits a given string directly.
+   */
+  it('submits given text directly via appraiseText', async () => {
+    const { result } = renderHook(() => useAppraisal(DEFAULT_TRADE_HUB, 90, null));
+
+    act(() => result.current.appraiseText('Tritanium\nRifter'));
+
+    expect(result.current.text).toBe('Tritanium\nRifter');
+    await waitFor(() => expect(result.current.result).not.toBeNull());
+    expect(appraisePaste).toHaveBeenCalledWith('Tritanium\nRifter', DEFAULT_TRADE_HUB, 90, null, {
+      force: false,
+    });
+  });
+
   it('retries after a failure when Appraise is pressed again', async () => {
     appraisePaste.mockRejectedValueOnce(new Error('catalogue down'));
     const { result } = renderHook(() => useAppraisal(DEFAULT_TRADE_HUB, 90, null));
