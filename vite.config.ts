@@ -44,6 +44,7 @@ const DOM_TS_TESTS = [
   'src/features/corp/useCorpSnapshot.test.ts',
   'src/features/industry/useComparedBuildResults.test.ts',
   'src/features/industry/useDetectedOwnedStock.test.ts',
+  'src/features/industry/useMarketSnapshot.test.ts',
   'src/features/market/useAppraisal.test.ts',
   'src/features/market/useCompareRows.test.ts',
   // sessionStorage / localStorage

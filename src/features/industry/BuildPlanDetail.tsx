@@ -50,8 +50,8 @@ import { nameForType, toIndustryBlueprint, type BlueprintCatalog } from './bluep
 import { findOwnedBlueprint } from './data';
 import { computeBuildPlan } from './computeBuildPlan';
 import { buildPlanTypeIds, recipeForLookup } from './recipes';
-import { loadMarketSnapshot, type MarketSnapshot } from './marketData';
 import { materialPriceBasisOf, materialPricesFor } from './priceBasis';
+import { useMarketSnapshot } from './useMarketSnapshot';
 import { formatDuration } from '@/lib/duration';
 import { downloadCsv } from '@/lib/downloadCsv';
 import { writeToClipboard } from '@/lib/clipboard';
@@ -245,14 +245,7 @@ export function BuildPlanDetail({
     void hydrateAssumedMe();
   }, [hydrateAssumedMe]);
 
-  const [snapshot, setSnapshot] = useState<MarketSnapshot | null>(null);
-  const [fetchedAt, setFetchedAt] = useState<Date | null>(null);
   const [refreshTick, setRefreshTick] = useState(0);
-  // Distinct from `pricesReady` below: that one collapses "still fetching"
-  // and "the live ESI call failed" into the same false, which used to flash
-  // the "prices unavailable" warning on every fresh load before the first
-  // response landed.
-  const [pricesLoading, setPricesLoading] = useState(true);
   /**
    * What the shopping-list button says right now. A clipboard write leaves
    * nothing on screen to look at, so the control has to report itself —
@@ -271,10 +264,6 @@ export function BuildPlanDetail({
   const costsExpanded = costsOpen ?? isDesktop;
   const [breakdownOpen, setBreakdownOpen] = useState(false);
   const [logRequest, setLogRequest] = useState(0);
-  // Reset to loading the instant a new fetch is due (hub/typeIds/manual
-  // refresh), in the same commit rather than the effect's next tick — same
-  // derived-and-cleared-during-render shape as PlanEditor's stale-result
-  // clear above.
   // One source for both the index that is fetched and the name that labels it,
   // so the two can never disagree. A plan holding only half the pair (an id
   // with no name, or the reverse) builds at its hub — see `BuildPlanRecord`.
@@ -302,30 +291,15 @@ export function BuildPlanDetail({
     onDerivedFix({ security })
   );
 
-  const snapshotKey = `${hub.id}:${buildSystem?.id ?? hub.systemId}:${typeIds.join(',')}:${refreshTick}`;
-  const [prevSnapshotKey, setPrevSnapshotKey] = useState(snapshotKey);
-  if (prevSnapshotKey !== snapshotKey) {
-    setPrevSnapshotKey(snapshotKey);
-    setPricesLoading(true);
-  }
-
-  useEffect(() => {
-    if (!blueprint || typeIds.length === 0) return;
-    let cancelled = false;
-    void loadMarketSnapshot(hub, typeIds, buildSystem?.id, activity).then((snap) => {
-      if (cancelled) return;
-      setSnapshot(snap);
-      setFetchedAt(new Date());
-      setPricesLoading(false);
-    });
-    return () => {
-      cancelled = true;
-    };
-    // typeIds/blueprint are stable references keyed off `entry` (the catalog Map holds one
-    // entry per blueprintTypeID), so this only refires on a real hub, build-system or
-    // blueprint change, plus the manual-refresh tick. `catalog`/`pi` land together in one
-    // state update on the route, so widening typeIds above cannot make this fire twice.
-  }, [hub, typeIds, blueprint, refreshTick, buildSystem?.id, activity]);
+  // Distinct from `pricesReady` below: that one collapses "still fetching"
+  // and "the live ESI call failed" into the same false, which used to flash
+  // the "prices unavailable" warning on every fresh load before the first
+  // response landed.
+  const {
+    snapshot,
+    fetchedAt,
+    loading: pricesLoading,
+  } = useMarketSnapshot(hub, typeIds, buildSystem?.id, activity, refreshTick);
 
   const ownedMatch = useMemo(
     () => findOwnedBlueprint(ownedBlueprints, plan.blueprintTypeID),

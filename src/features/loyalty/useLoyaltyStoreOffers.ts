@@ -14,7 +14,7 @@ import { useMarketHub } from '@/features/market/hub';
 import { getTradeHub, DEFAULT_TRADE_HUB, type TradeHub } from '@/market/hubs';
 import { loadLoyaltyStoreOffers, loadCorporationName } from './store';
 import { loadBlueprintCatalog, type BlueprintCatalog } from '@/features/industry/blueprintCatalog';
-import { loadMarketSnapshot, type MarketSnapshot } from '@/features/industry/marketData';
+import { useMarketSnapshot } from '@/features/industry/useMarketSnapshot';
 import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
 import { loadCharacterLoyaltyPoints } from '@/features/character/loyalty';
 import { loadTypeNames } from '@/features/character/typeNames';
@@ -57,7 +57,6 @@ export function useLoyaltyStoreOffers(corporationId: number): LoyaltyStoreResult
   const [catalog, setCatalog] = useState<BlueprintCatalog | null>(null);
   const [playerLp, setPlayerLp] = useState(0);
   const [skills, setSkills] = useState<SkillLevels>({});
-  const [snapshot, setSnapshot] = useState<MarketSnapshot | null>(null);
   const [itemNames, setItemNames] = useState<ReadonlyMap<number, string>>(new Map());
   const [useOwnMaterialsFor, setUseOwnMaterialsFor] = useState<ReadonlySet<number>>(new Set());
 
@@ -171,19 +170,10 @@ export function useLoyaltyStoreOffers(corporationId: number): LoyaltyStoreResult
     return map;
   }, [stock, materialTypeIds]);
 
-  useEffect(() => {
-    if (!hubHydrated || typeIds.length === 0) return;
-    let cancelled = false;
-    void loadMarketSnapshot(hub, typeIds).then((snap) => {
-      if (!cancelled) setSnapshot(snap);
-    });
-    return () => {
-      cancelled = true;
-    };
-    // `hub` is a plain object recomputed every render from `hubId`; keying off
-    // `hubId` (not `hub`) is what keeps this from refetching every render.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hubId, hubHydrated, typeIds]);
+  // Withheld until the market hub setting hydrates — `useMarketSnapshot`
+  // skips fetching whenever it's handed no type ids, same as the empty-list
+  // case below it.
+  const { snapshot } = useMarketSnapshot(hub, hubHydrated ? typeIds : []);
 
   const rows = useMemo(() => {
     if (!offers || !catalog || !snapshot) return [];
