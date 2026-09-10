@@ -21,7 +21,8 @@ import {
 import { comparePriceToToday, type PriceDivergence } from '@/engine/miningTax/priceDivergence';
 import { sortPriceHistory } from '@/engine/market/priceHistory';
 import type { ReprocessingSkills } from '@/engine/industry/reprocessing';
-import { loadPriceHistory } from '@/features/market/priceHistory';
+import { loadPriceHistory, type PriceHistoryResult } from '@/features/market/priceHistory';
+import { EsiError } from '@/esi/errors';
 import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
 import { SKILL_IDS } from '@/engine/industry/types';
 import { loadCompressedOreTypeIds, loadReprocessing } from '@/sde/loadSde';
@@ -148,12 +149,30 @@ export async function loadMiningYieldSnapshot(): Promise<MiningYieldSnapshot> {
   const pricingTypeIds = [...new Set(rawTypeIds.map(pricingTypeId))];
   const historyTypeIds = [...new Set([...pricingTypeIds, ...materialTypeIds])];
 
-  const histories = await Promise.all(
+  // Some type_ids in this union (e.g. non-tradable ore/ice variants like
+  // Banidine/Augumene) 400 from ESI's /markets/{region}/history — a real,
+  // honest "not tradable" answer (esiFetch has already retried anything
+  // transient before this catch ever sees it, same reasoning as
+  // typeNames.ts's 404-only narrowing). Only that specific, expected
+  // rejection is tolerated per id — the same "missing = 0 contribution, not
+  // thrown" convention `valueMiningYield` already uses. Anything else (a
+  // budget refusal, a 5xx, a timeout) still fails the whole snapshot rather
+  // than being silently priced as "not tradable".
+  const historyAttempts = await Promise.allSettled(
     historyTypeIds.map(
       async (typeId) =>
         [typeId, await loadPriceHistory(DEFAULT_TRADE_HUB.regionId, typeId)] as const
     )
   );
+  const histories: (readonly [number, PriceHistoryResult])[] = [];
+  for (const attempt of historyAttempts) {
+    if (attempt.status === 'fulfilled') {
+      histories.push(attempt.value);
+      continue;
+    }
+    if (attempt.reason instanceof EsiError && attempt.reason.status === 400) continue;
+    throw attempt.reason;
+  }
   const priceByTypeAndDate = new Map<number, Map<string, number>>();
   const latestPriceByType = new Map<number, number>();
   for (const [typeId, result] of histories) {
