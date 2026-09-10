@@ -73,11 +73,10 @@ export interface OwnedBlueprintInput {
 }
 
 /**
- * One row in BPC Search's unified results (issue #739), whichever source it
- * came from. Common fields sit at the top level so a table column can read
- * `row.me`/`row.te`/etc. without narrowing first; a contract-sourced row also
- * carries the original `BpcContractRow` so contract-only UI (the detail
- * modal, the build-plan context menu's seed) has it without re-deriving it.
+ * One row in BPC Search's unified results. Common fields sit at the top level
+ * so a column can read `row.me`/`row.te` without narrowing; a contract row
+ * also carries the original `BpcContractRow` for contract-only UI (the detail
+ * modal, the build-plan seed) to use without re-deriving it.
  */
 export type BpcSearchRow =
   | {
@@ -111,6 +110,11 @@ export function contractRowToSearchRow(row: BpcContractRow): BpcSearchRow {
   };
 }
 
+/** The contract row behind a search row, or `null` for an owned one — the single narrowing every contract-only column/action shares instead of re-checking `row.source` itself. */
+export function asContract(row: BpcSearchRow): BpcContractRow | null {
+  return row.source === 'contract' ? row.contract : null;
+}
+
 export function ownedBlueprintToSearchRow(bp: OwnedBlueprintInput): BpcSearchRow {
   return {
     source: 'owned',
@@ -118,21 +122,20 @@ export function ownedBlueprintToSearchRow(bp: OwnedBlueprintInput): BpcSearchRow
     me: bp.me,
     te: bp.te,
     runs: bp.runs,
-    quantity: bp.quantity,
+    // ESI's quantity is a real count only when positive — a single original
+    // is -1, a single copy is -2 (unlike `runs`'s -1, this sentinel means
+    // nothing beyond "one") — normalized here, not left for every reader.
+    quantity: bp.quantity > 0 ? bp.quantity : 1,
     itemId: bp.itemId,
   };
 }
 
 /**
- * Filters unified rows (issue #739) — a sibling of `filterBpcContracts`, kept
- * separate rather than sharing its predicate so the original, already-tested
- * contract-only filter path stays untouched (per the ticket's "do not alter
- * contract-side matching logic"). Region and price have no owned-blueprint
- * equivalent in this app's model: a region filter excludes an owned row
- * outright (there is nothing to match against), while a price ceiling never
- * excludes one (an owned item is not for sale, so no price can disqualify
- * it) — the same "unknown must not disqualify" stance `filterBpcContracts`
- * already takes for a no-buyout auction.
+ * Filters unified rows — a sibling of `filterBpcContracts`, kept separate so
+ * the original contract-only filter path stays untouched. Region excludes an
+ * owned row outright (nothing to match); price never does (not for sale, so
+ * nothing can disqualify it) — the same stance `filterBpcContracts` already
+ * takes for a no-buyout auction's unknown eventual price.
  */
 export function filterBpcSearchRows(
   rows: readonly BpcSearchRow[],

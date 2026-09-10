@@ -24,6 +24,7 @@ import {
 import * as Icon from '@/components/ui/icons';
 import {
   EMPTY_BPC_SEARCH_FILTER,
+  asContract,
   blueprintOfferStats,
   bpcPriceSummary,
   cheapestByRegion,
@@ -65,13 +66,7 @@ interface Snapshot {
   syncConfigured: boolean;
   blueprintNames: Map<number, string>;
   regionNames: Map<number, string>;
-  /**
-   * A 401/403 fetching these resolves to an empty list here rather than a
-   * distinct reauth state — Industry's own top-level `blueprintsNeedsReauth`
-   * banner (fed by this same `loadCharacterBlueprints` call) already tells
-   * the player to log in again on every tab, this one included, so a second
-   * banner scoped to Owned would only repeat it.
-   */
+  /** A 401/403 fetching these just resolves empty — Industry's own top-level banner (same `loadCharacterBlueprints` call) already covers re-login on every tab. */
   ownedBlueprints: CharacterBlueprint[];
 }
 
@@ -92,8 +87,8 @@ async function loadBpcContractsSnapshot(
   const [contractsResult, blueprintMap, ownedResult] = await Promise.all([
     loadPublicBpcContracts(characterId),
     loadBlueprints(),
-    // Same data path Industry's build-plan prefill already uses (issue
-    // #739) — not a second ESI call for the same thing.
+    // Same data path Industry's build-plan prefill already uses — not a
+    // second ESI call for the same thing.
     loadCharacterBlueprints(characterId),
   ]);
   const blueprintNames = new Map(
@@ -304,7 +299,7 @@ export function BpcSourcingPanel() {
 
   const [uiFilter, setUiFilter] = useState<UiFilter>(EMPTY_UI_FILTER);
   const [showAll, setShowAll] = useState(false);
-  /** Both on by default (issue #739): an existing user must keep seeing today's contract results, plus their owned blueprints, not a narrower default. */
+  /** Both on by default: an existing user must keep seeing today's contract results, plus their owned blueprints, not a narrower default. */
   const [sources, setSources] = useState<ReadonlySet<BpcSearchSource>>(
     () => new Set<BpcSearchSource>(['contract', 'owned'])
   );
@@ -331,18 +326,16 @@ export function BpcSourcingPanel() {
 
   const rows = useMemo(() => contractsResult?.data?.rows ?? [], [contractsResult]);
 
-  // Merges in owned blueprints' typeIds so free-text search narrows an
-  // Owned-only result even for a type with no current contract listing —
-  // the autocomplete dropdown below stays contract-offer-flavored, but the
-  // underlying type search this feeds does not.
-  const typeOptions = useMemo(
-    () =>
-      listedBlueprintTypeOptions(
-        [...rows, ...ownedBlueprints.map((bp) => ({ typeId: bp.type_id }))],
-        blueprintNames
-      ),
-    [rows, ownedBlueprints, blueprintNames]
-  );
+  // Merges in owned typeIds, gated on the Owned toggle, so free-text search
+  // narrows an Owned-only result even without a contract listing — but never
+  // displaces a real contract match out of the ranked window when Owned is
+  // off. The autocomplete dropdown below stays contract-offer-flavored either way.
+  const typeOptions = useMemo(() => {
+    const ownedTypeIds = sources.has('owned')
+      ? ownedBlueprints.map((bp) => ({ typeId: bp.type_id }))
+      : [];
+    return listedBlueprintTypeOptions([...rows, ...ownedTypeIds], blueprintNames);
+  }, [rows, ownedBlueprints, sources, blueprintNames]);
 
   /**
    * Every filter *except* the blueprint itself. Suggestions are counted
@@ -436,9 +429,13 @@ export function BpcSourcingPanel() {
     return { ...nonTypeFilter, typeIds };
   }, [nonTypeFilter, uiFilter.typeQuery, typeOptions, selectedTypeId]);
 
-  // Untouched from before this ticket: the contracts-only path must match
-  // today's exact behavior regardless of the source toggle below it.
+  // This filter path stays exactly as it was pre-multiselect — the source
+  // toggle below only gates what gets merged in alongside it.
   const filteredRows = useMemo(() => filterBpcContracts(rows, engineFilter), [rows, engineFilter]);
+  const contractSearchRows = useMemo(
+    () => filteredRows.map(contractRowToSearchRow),
+    [filteredRows]
+  );
 
   const ownedSearchRows = useMemo(
     () =>
@@ -459,12 +456,17 @@ export function BpcSourcingPanel() {
     [ownedSearchRows, engineFilter]
   );
 
-  /** The unified result list actually shown, built from whichever source(s) are toggled on. */
+  /**
+   * Built from whichever source(s) are toggled on. Owned rows lead: the
+   * synced contract snapshot can run to six figures while owned blueprints
+   * number in the dozens, so contracts-first would let them fill `ROW_CAP`
+   * and push every owned row out of the default (not-`showAll`) view.
+   */
   const displayRows = useMemo<BpcSearchRow[]>(() => {
-    const contractRows = sources.has('contract') ? filteredRows.map(contractRowToSearchRow) : [];
+    const contractRows = sources.has('contract') ? contractSearchRows : [];
     const ownedRows = sources.has('owned') ? filteredOwnedRows : [];
-    return [...contractRows, ...ownedRows];
-  }, [sources, filteredRows, filteredOwnedRows]);
+    return [...ownedRows, ...contractRows];
+  }, [sources, contractSearchRows, filteredOwnedRows]);
   const visibleRows = showAll ? displayRows : displayRows.slice(0, ROW_CAP);
 
   // Both summarise `filteredRows`, not every row of the chosen blueprint, so
@@ -523,8 +525,7 @@ export function BpcSourcingPanel() {
         align: 'right',
         className: 'tabular-nums',
         sortValue: (row) => row.runs,
-        // -1 is a BPO original, not "negative one run" — it offers unlimited
-        // runs, so it reads as ∞ rather than a nonsensical negative count.
+        // A BPO's -1 renders as ∞, not a nonsensical negative count.
         render: (row) => (row.runs === -1 ? t('bpcContracts.unlimitedRuns') : row.runs),
       },
       {
@@ -544,13 +545,14 @@ export function BpcSourcingPanel() {
         // Ref's CSV carries a buyout on non-auction contracts too whenever the
         // field parses, so an item_exchange row with `buyout: 0` sorted to the
         // top of the table while rendering — and now summarising — at its real
-        // price. One expression across the sort, the cell and the chips.
-        // An owned row has no price at all — it sorts last under the
-        // ascending default rather than implying it is the cheapest.
-        sortValue: (row) => (row.source === 'contract' ? effectivePrice(row.contract) : Infinity),
+        // price. Owned rows sort last (Infinity) rather than reading as cheapest.
+        sortValue: (row) => {
+          const contract = asContract(row);
+          return contract ? effectivePrice(contract) : Infinity;
+        },
         render: (row) => {
-          if (row.source === 'owned') return t('bpcContracts.notApplicable');
-          const contract = row.contract;
+          const contract = asContract(row);
+          if (!contract) return t('bpcContracts.notApplicable');
           return contract.isAuction
             ? contract.buyout !== undefined
               ? t('bpcContracts.buyout', { price: formatIsk(contract.buyout, 2) })
@@ -561,24 +563,30 @@ export function BpcSourcingPanel() {
       {
         id: 'region',
         header: t('bpcContracts.regionColumn'),
-        sortValue: (row) =>
-          row.source === 'contract'
-            ? (regionNames.get(row.contract.regionId) ?? `#${row.contract.regionId}`)
-            : '',
-        render: (row) =>
-          row.source === 'contract'
-            ? (regionNames.get(row.contract.regionId) ?? `#${row.contract.regionId}`)
-            : t('bpcContracts.notApplicable'),
+        sortValue: (row) => {
+          const contract = asContract(row);
+          return contract ? (regionNames.get(contract.regionId) ?? `#${contract.regionId}`) : '';
+        },
+        render: (row) => {
+          const contract = asContract(row);
+          return contract
+            ? (regionNames.get(contract.regionId) ?? `#${contract.regionId}`)
+            : t('bpcContracts.notApplicable');
+        },
       },
       {
         id: 'expires',
         header: t('bpcContracts.expiresColumn'),
         className: 'whitespace-nowrap text-text-dim',
-        sortValue: (row) => (row.source === 'contract' ? row.contract.dateExpired : 0),
-        render: (row) =>
-          row.source === 'contract'
-            ? formatTimestamp(new Date(row.contract.dateExpired), timeZone)
-            : t('bpcContracts.notApplicable'),
+        // Infinity sorts an owned row last, same as price, rather than epoch 0
+        // reading as "expires soonest."
+        sortValue: (row) => asContract(row)?.dateExpired ?? Infinity,
+        render: (row) => {
+          const contract = asContract(row);
+          return contract
+            ? formatTimestamp(new Date(contract.dateExpired), timeZone)
+            : t('bpcContracts.notApplicable');
+        },
       },
     ],
     [t, blueprintNames, regionNames, timeZone]
@@ -642,10 +650,8 @@ export function BpcSourcingPanel() {
           )}
           <BpcFilterBar filter={uiFilter} onChange={changeFilter} regionOptions={regionOptions} />
 
-          <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2">
-            <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-              {t('bpcContracts.sourceLabel')}
-            </span>
+          <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2 text-xs">
+            <span className="text-text-dim">{t('bpcContracts.sourceLabel')}</span>
             <FilterChip
               label={t('bpcContracts.sourceContracts')}
               selected={sources.has('contract')}
@@ -796,16 +802,13 @@ export function BpcSourcingPanel() {
                     : `owned:${row.itemId}`
                 }
                 defaultSort={{ columnId: 'price', direction: 'asc' }}
-                onRowClick={(row) => {
-                  // No contract exists for an owned row — nothing to open.
-                  if (row.source === 'contract') setOpenRow(row.contract);
-                }}
+                // No contract exists for an owned row — nothing to open.
+                onRowClick={(row) => setOpenRow(asContract(row))}
                 rowContextMenu={(row, tr) => (
-                  // The Offer's own research and run count, not the
-                  // defaults: a pilot shopping a 10/20 five-run copy wants to
-                  // see what *that* copy builds (#637). A BPO's -1 "runs" is
-                  // not a real run count to seed a build with, so it falls
-                  // back to the unseeded default instead of a fabricated one.
+                  // The Offer's own ME/TE/runs, not the defaults, so a pilot
+                  // shopping a specific copy sees what *that* copy builds. A
+                  // BPO's -1 runs falls back to the unseeded default instead
+                  // of a fabricated run count.
                   <BuildPlanContextMenu
                     typeId={row.typeId}
                     seed={row.runs === -1 ? null : { me: row.me, te: row.te, runs: row.runs }}

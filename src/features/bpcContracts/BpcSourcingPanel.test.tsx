@@ -472,6 +472,28 @@ describe('BpcSourcingPanel source multiselect', () => {
     expect(within(table).getAllByText('Owned')).toHaveLength(1);
   });
 
+  /**
+   * The synced contract snapshot can run to six figures (ADR 0013), while a
+   * character's owned blueprints realistically number in the dozens. If the
+   * unified list concatenated contracts before owned rows, a > ROW_CAP
+   * contract set would silently push every owned row past the default
+   * (not-"show all") slice.
+   */
+  it('shows an owned row even when far more contract rows exist than the default row cap', async () => {
+    loadPublicBpcContracts.mockResolvedValue(
+      cachedSnapshot(
+        Array.from({ length: 60 }, (_, i) => row({ contractId: i + 1, typeId: 638, price: i }))
+      )
+    );
+    loadCharacterBlueprints.mockResolvedValue(
+      ownedResult([ownedBlueprint({ item_id: 1, type_id: 870 })])
+    );
+    render(<App />);
+
+    const table = await screen.findByRole('table', { name: 'BPC Search' });
+    expect(within(table).getByText('Caracal Blueprint')).toBeInTheDocument();
+  });
+
   it('renders an owned BPO original (runs -1) as unlimited runs, not -1', async () => {
     loadPublicBpcContracts.mockResolvedValue(cachedSnapshot([]));
     loadCharacterBlueprints.mockResolvedValue(
@@ -485,9 +507,8 @@ describe('BpcSourcingPanel source multiselect', () => {
   });
 
   it('shows no owned rows, not a crash, when the blueprints scope needs re-login', async () => {
-    // Industry's own page-level banner (fed by the same `loadCharacterBlueprints`
-    // call) already tells the player to log in again on every tab — this
-    // panel does not duplicate it, just shows nothing under Owned.
+    // Reauth messaging is Industry's page-level banner's job — assert Owned
+    // just goes empty here.
     loadPublicBpcContracts.mockResolvedValue(cachedSnapshot([row({ contractId: 1, typeId: 638 })]));
     loadCharacterBlueprints.mockResolvedValue(ownedResult([], true));
     const user = userEvent.setup();

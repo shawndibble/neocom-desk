@@ -160,6 +160,23 @@ describe('ownedBlueprintToSearchRow', () => {
       itemId: 42,
     });
   });
+
+  /**
+   * ESI's `quantity` is a count only when positive — a single original comes
+   * back as -1 and a single copy as -2. Rendering either sentinel as-is would
+   * show "-2 owned" for one blueprint, so both normalize to the real count: 1.
+   */
+  it("normalizes ESI's single-original sentinel (-1) to a quantity of 1", () => {
+    expect(ownedBlueprintToSearchRow(ownedInput({ quantity: -1 })).quantity).toBe(1);
+  });
+
+  it("normalizes ESI's single-copy sentinel (-2) to a quantity of 1", () => {
+    expect(ownedBlueprintToSearchRow(ownedInput({ quantity: -2 })).quantity).toBe(1);
+  });
+
+  it('keeps a real stack count as-is', () => {
+    expect(ownedBlueprintToSearchRow(ownedInput({ quantity: 4 })).quantity).toBe(4);
+  });
 });
 
 describe('filterBpcSearchRows', () => {
