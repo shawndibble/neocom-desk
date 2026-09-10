@@ -23,9 +23,20 @@
  * (`features/notifications/ForegroundNotificationPoller.tsx`, issue #172)
  * reads these same toggles to decide what to fire; further Notification
  * Events land here as later tickets add their pollers (CONTEXT.md round 20).
- */ import { useEffect, useMemo, useRef, useState } from 'react';
+ *
+ * Issue #740: a ~50-Character roster with several sections expanded used to
+ * mount every one of their ~90 checkboxes at once, and any state change
+ * (including a keystroke in the search box) re-rendered every expanded
+ * Character's full row set. Below, one virtualized row per Character
+ * (`@tanstack/react-virtual`, the same library `Assets.tsx` uses for a
+ * comparable large-list case) windows the section list so only the
+ * Characters actually on screen mount, and `CharacterNotificationSection` is
+ * memoized so an edit to one Character's preferences doesn't force React to
+ * re-diff every other Character's rows.
+ */ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import {
   Button,
   Panel,
@@ -69,6 +80,7 @@ import {
   characterEventThresholds,
   withCharacterEventThreshold,
   STRUCTURE_FUEL_LOW_DAY_OPTIONS,
+  type NotificationPreferencesValue,
 } from './preferences';
 import {
   isEventEnabledFor,
@@ -82,8 +94,13 @@ import {
 } from './eventSelection';
 import { eveTypeLabel } from './eveTypeLabel';
 import { filterNotificationSections } from './notificationSearch';
+import { estimateCharacterSectionHeight } from './notificationRows';
 import { parseIskAmount, formatIsk } from '@/lib/isk';
 import { refreshAppBadge } from './appBadge';
+import {
+  useViewportBoundedHeight,
+  VIEWPORT_BOUNDED_BOTTOM_GAP_PX,
+} from '@/lib/useViewportBoundedHeight';
 import {
   useNotificationPermission,
   useNotificationPromptState,
@@ -108,6 +125,9 @@ const EVENT_BY_ID = new Map(NOTIFICATION_EVENTS.map((event) => [event.id, event]
  * used to read "App" and "List", neither of which said what it delivered.
  */
 const CHANNEL_COLUMNS = 'grid shrink-0 grid-cols-[4.25rem_4.25rem] justify-items-center';
+
+/** Stable identity for a Character with no token row yet, so it doesn't itself break `CharacterNotificationSection`'s memo. */
+const EMPTY_SCOPES: ReadonlySet<string> = new Set();
 
 /**
  * Events whose whole row is delivered by Scheduled Push — the ones that carry
@@ -209,14 +229,16 @@ export function NotificationsPanel() {
     setExpandedCharacterIds((prev) => new Set(prev).add(activeCharacterId));
   }, [activeCharacterId]);
 
-  function toggleExpanded(characterId: number) {
+  // useCallback (issue #740): a stable reference, not a fresh function every
+  // render, so it doesn't itself break `CharacterNotificationSection`'s memo.
+  const toggleExpanded = useCallback((characterId: number) => {
     setExpandedCharacterIds((prev) => {
       const next = new Set(prev);
       if (next.has(characterId)) next.delete(characterId);
       else next.add(characterId);
       return next;
     });
-  }
+  }, []);
 
   const scopesByCharacterId = useMemo(() => {
     const map = new Map<number, ReadonlySet<string>>();
@@ -306,6 +328,73 @@ export function NotificationsPanel() {
   // whose only channel is the feed with no way to configure it — and the
   // Overview's own "Settings" link landing on a dead end.
   const browserBlocked = notificationsBlocked(permission);
+
+  const visibleCharacters = useMemo(
+    () =>
+      searching
+        ? characterList.filter((c) => filterResult!.visibleCharacterIds.has(c.characterId))
+        : characterList,
+    [characterList, searching, filterResult]
+  );
+
+  /**
+   * One virtualized row per Character (issue #740): only the sections
+   * actually on screen mount, regardless of roster size. `estimateSize`
+   * reuses the exact same conditional-row walk the section below renders
+   * (`estimateCharacterSectionHeight`), so the estimate tracks what's really
+   * about to render rather than guessing a flat height.
+   */
+  const scrollElRef = useRef<HTMLDivElement>(null);
+  const [viewportHeightRef, viewportBoundedMaxHeight] = useViewportBoundedHeight(
+    VIEWPORT_BOUNDED_BOTTOM_GAP_PX
+  );
+  // Both refs need the same node: the virtualizer reads it imperatively via
+  // `getScrollElement`, and `useViewportBoundedHeight` measures it (a
+  // callback ref, not a `.current` object, since it has to re-fire once the
+  // node actually mounts).
+  const scrollParentRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      scrollElRef.current = node;
+      viewportHeightRef(node);
+    },
+    [viewportHeightRef]
+  );
+  // React Compiler isn't enabled in this build (no babel plugin configured);
+  // this is eslint-plugin-react-hooks flagging TanStack Virtual's returned
+  // functions as unsafe to memoize *if* the compiler is ever turned on
+  // (same suppression `Assets.tsx`'s virtualizer uses).
+  // eslint-disable-next-line react-hooks/incompatible-library
+  const rowVirtualizer = useVirtualizer({
+    count: visibleCharacters.length,
+    getScrollElement: () => scrollElRef.current,
+    estimateSize: (index) => {
+      const character = visibleCharacters[index];
+      const expanded = searching || expandedCharacterIds.has(character.characterId);
+      const visibleEventIds: readonly NotificationEventId[] = searching
+        ? [...(filterResult!.visibleEventIdsByCharacter.get(character.characterId) ?? [])]
+        : NOTIFICATION_EVENT_IDS;
+      const grantedScopes = scopesByCharacterId.get(character.characterId) ?? new Set<string>();
+      const characterCapabilities = capabilitiesByCharacterId.get(character.characterId);
+      const hasScope = (eventId: NotificationEventId) => {
+        const def = eventDef(eventId);
+        return def.scope === undefined || grantedScopes.has(def.scope);
+      };
+      const rowEnabledFor = (eventId: NotificationEventId) => {
+        const def = eventDef(eventId);
+        const capabilityHeld =
+          def.corpCapability === undefined || (characterCapabilities?.[def.corpCapability] ?? true);
+        return hasScope(eventId) && capabilityHeld;
+      };
+      return estimateCharacterSectionHeight({
+        expanded,
+        visibleEventIds,
+        rowEnabledFor,
+        hasEveNotificationScope: hasScope('eveNotification'),
+      });
+    },
+    getItemKey: (index) => visibleCharacters[index].characterId,
+    overscan: 5,
+  });
 
   return (
     <Panel title={t('settings.notificationsTitle')}>
@@ -417,449 +506,61 @@ export function NotificationsPanel() {
             {searching && filterResult.visibleCharacterIds.size === 0 ? (
               <EmptyState title={t('settings.notifications.noResults')} className="py-8" />
             ) : (
-              characterList.map((character) => {
-                if (searching && !filterResult.visibleCharacterIds.has(character.characterId)) {
-                  return null;
+              <div
+                ref={scrollParentRef}
+                data-virtual-scroll-root
+                aria-label={t('settings.notificationsTitle')}
+                className="overflow-y-auto"
+                style={
+                  viewportBoundedMaxHeight !== null
+                    ? { maxHeight: viewportBoundedMaxHeight }
+                    : undefined
                 }
-                const expanded = searching || expandedCharacterIds.has(character.characterId);
-                const visibleEventIds: readonly NotificationEventId[] = searching
-                  ? [...(filterResult.visibleEventIdsByCharacter.get(character.characterId) ?? [])]
-                  : NOTIFICATION_EVENT_IDS;
-                const grantedScopes = scopesByCharacterId.get(character.characterId) ?? new Set();
-                const characterCapabilities = capabilitiesByCharacterId.get(character.characterId);
-                // A capability not yet resolved reads as held (see the
-                // capability effect's own doc comment) — never a false lock
-                // while the roles read is still in flight.
-                function hasCapability(def: NotificationEventDef): boolean {
-                  return (
-                    def.corpCapability === undefined ||
-                    (characterCapabilities?.[def.corpCapability] ?? true)
-                  );
-                }
-                const togglableEventIds = visibleEventIds.filter((eventId) => {
-                  const def = eventDef(eventId);
-                  return (
-                    (def.scope === undefined || grantedScopes.has(def.scope)) && hasCapability(def)
-                  );
-                });
-                const prefs = characterEventPrefs(prefsValue, character.characterId);
-                const eveTypePrefs = characterEveTypePrefs(prefsValue, character.characterId);
-                const thresholds = characterEventThresholds(prefsValue, character.characterId);
-
-                return (
-                  <div
-                    key={character.characterId}
-                    className="rounded-xs border border-line bg-panel/85 backdrop-blur-sm"
-                  >
-                    {/* Select-all is a sibling of the expand toggle, not nested inside its
-                        <button> — an interactive control inside a <button> is invalid HTML
-                        and would fold both accessible names together for screen readers. */}
-                    <div
-                      className={`flex min-h-8 items-center gap-2 px-2.5 py-1.5 ${expanded ? 'border-b border-line' : ''}`}
-                    >
-                      <button
-                        type="button"
-                        aria-expanded={expanded}
-                        onClick={() => toggleExpanded(character.characterId)}
-                        className="flex min-w-0 flex-1 items-center gap-1.5 text-left text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase hover:text-text focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
+              >
+                <div
+                  role="presentation"
+                  style={{ height: rowVirtualizer.getTotalSize(), position: 'relative' }}
+                >
+                  {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                    const character = visibleCharacters[virtualRow.index];
+                    const expanded = searching || expandedCharacterIds.has(character.characterId);
+                    const visibleEventIds: readonly NotificationEventId[] = searching
+                      ? [
+                          ...(filterResult.visibleEventIdsByCharacter.get(character.characterId) ??
+                            []),
+                        ]
+                      : NOTIFICATION_EVENT_IDS;
+                    return (
+                      <div
+                        key={virtualRow.key}
+                        data-index={virtualRow.index}
+                        style={{
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          width: '100%',
+                          transform: `translateY(${virtualRow.start}px)`,
+                        }}
                       >
-                        <span aria-hidden="true" className="w-3 shrink-0 text-text-faint">
-                          {expanded ? '▾' : '▸'}
-                        </span>
-                        <span className="min-w-0 truncate normal-case">{character.name}</span>
-                      </button>
-                      {/* One select-all per column, in the same grid track as
-                          the checkboxes below so each sits over its own column. */}
-                      <div className={CHANNEL_COLUMNS}>
-                        {NOTIFICATION_CHANNELS.map((channel) => (
-                          <SelectionCheckbox
-                            key={channel}
-                            state={selectionStateForEvents(togglableEventIds, prefs, channel)}
-                            onToggle={() =>
-                              void toggleAllEventsChannelPref(
-                                character.characterId,
-                                prefsValue,
-                                togglableEventIds,
-                                channel
-                              )
-                            }
-                            label={t(`settings.notifications.selectAll.${channel}`, {
-                              character: character.name,
-                            })}
-                          />
-                        ))}
+                        <CharacterNotificationSection
+                          character={character}
+                          expanded={expanded}
+                          visibleEventIds={visibleEventIds}
+                          grantedScopes={
+                            scopesByCharacterId.get(character.characterId) ?? EMPTY_SCOPES
+                          }
+                          characterCapabilities={capabilitiesByCharacterId.get(
+                            character.characterId
+                          )}
+                          prefsValue={prefsValue}
+                          browserBlocked={browserBlocked}
+                          onToggleExpanded={toggleExpanded}
+                        />
                       </div>
-                    </div>
-                    {expanded && (
-                      <div className="bg-panel-2">
-                        {/* Column captions, aligned to the same two tracks the
-                            rows below use — an event can raise a browser
-                            notification without joining the Overview list, or
-                            the reverse. */}
-                        <div className="flex items-center justify-between gap-3 border-b border-line px-3 py-1.5">
-                          <span className="sr-only">{t('settings.notifications.columnEvent')}</span>
-                          <span aria-hidden="true" className="flex-1" />
-                          <div className={CHANNEL_COLUMNS}>
-                            {NOTIFICATION_CHANNELS.map((channel) => (
-                              <Tooltip
-                                key={channel}
-                                content={t(`settings.notifications.columnHint.${channel}`)}
-                                openOnTap
-                              >
-                                {/* `tabIndex` because a Tooltip's trigger has to
-                                    be focusable to be read without a pointer
-                                    (`components/ui/Tooltip.tsx`, ADR 0008), and
-                                    the dotted underline is what says there is
-                                    something to read. Uppercase micro-heading
-                                    per docs/DESIGN.md §2, matching the Family
-                                    headers further down. */}
-                                <span
-                                  tabIndex={0}
-                                  className="cursor-help text-[0.6875rem] leading-tight font-semibold tracking-wide text-text-dim uppercase underline decoration-dotted decoration-text-dim/50 underline-offset-2"
-                                >
-                                  {t(`settings.notifications.column.${channel}`)}
-                                </span>
-                              </Tooltip>
-                            ))}
-                          </div>
-                        </div>
-                        <ul className="divide-y divide-line">
-                          {visibleEventIds.map((eventId) => {
-                            const def = eventDef(eventId);
-                            const hasScope =
-                              def.scope === undefined || grantedScopes.has(def.scope);
-                            const capabilityMissing = !hasCapability(def);
-                            const rowEnabled = hasScope && !capabilityMissing;
-                            const eventLabel = t(def.labelKey);
-                            return (
-                              <li key={eventId}>
-                                <div className="flex items-center justify-between gap-3 px-3 py-2 text-xs">
-                                  <span className="flex min-w-0 items-center gap-1.5">
-                                    <span className={rowEnabled ? 'text-text' : 'text-text-faint'}>
-                                      {eventLabel}
-                                    </span>
-                                    {PUSH_BADGED_EVENT_IDS.has(eventId) && <ScheduledPushBadge />}
-                                  </span>
-                                  <div className={CHANNEL_COLUMNS}>
-                                    {NOTIFICATION_CHANNELS.map((channel) => (
-                                      <ChannelCheckbox
-                                        key={channel}
-                                        channel={channel}
-                                        eventLabel={eventLabel}
-                                        enabled={
-                                          rowEnabled && !(channel === 'browser' && browserBlocked)
-                                        }
-                                        disabledReason={
-                                          !hasScope
-                                            ? 'scope'
-                                            : capabilityMissing
-                                              ? 'capability'
-                                              : null
-                                        }
-                                        checked={isEventEnabledFor(prefs, eventId, channel)}
-                                        onToggle={() =>
-                                          void toggleEventChannelPref(
-                                            character.characterId,
-                                            prefsValue,
-                                            eventId,
-                                            channel
-                                          )
-                                        }
-                                      />
-                                    ))}
-                                  </div>
-                                </div>
-                                {/*
-                                  Delivery disclosure for the lead-time
-                                  warning (issue #310 AC5; wording updated for
-                                  Scheduled Push, issue #358, CONTEXT.md round
-                                  45). Not gated on `hasScope`: what bounds
-                                  this one now is the 72-hour Projection
-                                  Horizon, not the character's grants, so the
-                                  caveat is true before authorization too.
-                                */}
-                                {eventId === 'planetaryExtractorExpiring' && (
-                                  <p className="border-t border-line bg-panel/60 px-6 py-1.5 text-[0.6875rem] text-text-dim">
-                                    {t('settings.notifications.extractorExpiringHint')}
-                                  </p>
-                                )}
-                                {/*
-                                  Structure fuel's inline threshold control
-                                  (issue #299, AC4) — the first Notification
-                                  Event with a setting of its own rather than
-                                  a plain on/off. Persisted per Character and
-                                  per device (`preferences.ts`), and re-read
-                                  by the poller every 5-minute tick, which is
-                                  what "takes effect without a reload" means
-                                  here (CONTEXT.md round 43).
-                                */}
-                                {eventId === 'structureFuelLow' && rowEnabled && (
-                                  <div className="border-t border-line bg-panel/60 px-6 py-1.5">
-                                    <label className="flex items-center gap-2 text-[0.6875rem] text-text-dim">
-                                      {t('settings.notifications.structureFuelLowThresholdLabel')}
-                                      <Select
-                                        value={String(thresholds.structureFuelLowDays)}
-                                        onValueChange={(value) =>
-                                          void updatePrefs(
-                                            character.characterId,
-                                            withCharacterEventThreshold(
-                                              prefsValue,
-                                              character.characterId,
-                                              'structureFuelLowDays',
-                                              Number(value)
-                                            )
-                                          )
-                                        }
-                                      >
-                                        <SelectTrigger
-                                          size="sm"
-                                          aria-label={t(
-                                            'settings.notifications.structureFuelLowThresholdLabel'
-                                          )}
-                                        >
-                                          <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                          {STRUCTURE_FUEL_LOW_DAY_OPTIONS.map((days) => (
-                                            <SelectItem key={days} value={String(days)}>
-                                              {t(
-                                                'settings.notifications.structureFuelLowThresholdOption',
-                                                {
-                                                  count: days,
-                                                }
-                                              )}
-                                            </SelectItem>
-                                          ))}
-                                        </SelectContent>
-                                      </Select>
-                                    </label>
-                                    {/*
-                                      Issue #299's own words: "say so in the
-                                      UI, so nobody reads it as a second copy
-                                      of the EVE alert." CCP's own
-                                      StructureFuelAlert fires later, at its
-                                      own fixed point — this is additive
-                                      early warning, not a duplicate.
-                                    */}
-                                    <p className="mt-1 text-[0.6875rem] text-text-faint">
-                                      {t('settings.notifications.structureFuelLowNotDuplicateHint')}
-                                    </p>
-                                  </div>
-                                )}
-                                {/*
-                                  walletBalanceChanged's inline threshold
-                                  control — the minimum absolute ISK change a
-                                  single wallet journal entry must reach to
-                                  fire, same persistence and input widget as
-                                  structure fuel's and corp wallet's controls
-                                  above. Accepts shorthand ("10.5m",
-                                  "10,500,000", "10500000") via
-                                  `parseIskAmount`.
-                                */}
-                                {eventId === 'walletBalanceChanged' && rowEnabled && (
-                                  <div className="border-t border-line bg-panel/60 px-6 py-1.5">
-                                    <ThresholdAmountInput
-                                      id={`wallet-balance-changed-threshold-${character.characterId}`}
-                                      label={t(
-                                        'settings.notifications.walletBalanceChangedThresholdLabel'
-                                      )}
-                                      value={thresholds.walletBalanceChangedThresholdIsk}
-                                      onCommit={(amount) =>
-                                        void updatePrefs(
-                                          character.characterId,
-                                          withCharacterEventThreshold(
-                                            prefsValue,
-                                            character.characterId,
-                                            'walletBalanceChangedThresholdIsk',
-                                            amount
-                                          )
-                                        )
-                                      }
-                                    />
-                                    <p className="mt-1 text-[0.6875rem] text-text-faint">
-                                      {t(
-                                        'settings.notifications.walletBalanceChangedThresholdHint'
-                                      )}
-                                    </p>
-                                  </div>
-                                )}
-                                {/*
-                                  Corp wallet's two independent thresholds
-                                  (issue #299, AC4) — a division balance floor
-                                  and a single-transaction ceiling, either of
-                                  which fires. Same persistence as the fuel
-                                  control above.
-                                */}
-                                {eventId === 'corpWalletThreshold' && rowEnabled && (
-                                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-line bg-panel/60 px-6 py-1.5">
-                                    <ThresholdAmountInput
-                                      id={`corp-wallet-floor-${character.characterId}`}
-                                      label={t(
-                                        'settings.notifications.corpWalletBalanceFloorLabel'
-                                      )}
-                                      value={thresholds.corpWalletBalanceFloorIsk}
-                                      onCommit={(amount) =>
-                                        void updatePrefs(
-                                          character.characterId,
-                                          withCharacterEventThreshold(
-                                            prefsValue,
-                                            character.characterId,
-                                            'corpWalletBalanceFloorIsk',
-                                            amount
-                                          )
-                                        )
-                                      }
-                                    />
-                                    <ThresholdAmountInput
-                                      id={`corp-wallet-ceiling-${character.characterId}`}
-                                      label={t(
-                                        'settings.notifications.corpWalletTransactionCeilingLabel'
-                                      )}
-                                      value={thresholds.corpWalletTransactionCeilingIsk}
-                                      onCommit={(amount) =>
-                                        void updatePrefs(
-                                          character.characterId,
-                                          withCharacterEventThreshold(
-                                            prefsValue,
-                                            character.characterId,
-                                            'corpWalletTransactionCeilingIsk',
-                                            amount
-                                          )
-                                        )
-                                      }
-                                    />
-                                  </div>
-                                )}
-                                {/*
-                                  The honesty requirement (issue #299): these
-                                  five events are best-effort, no server push.
-                                  Attached per row, not once per section, so
-                                  it survives a search that narrows a
-                                  character's section to a single corp row.
-                                */}
-                                {CORP_EVENT_IDS.has(eventId) && (
-                                  <p className="border-t border-line bg-panel/60 px-6 py-1.5 text-[0.6875rem] text-text-dim">
-                                    {t('settings.notifications.corpEventBestEffortHint')}
-                                  </p>
-                                )}
-                                {/*
-                                  Per-type opt-out underneath the single
-                                  eveNotification event (issue #274, AC3).
-                                  Enumerated from the closed allow-list,
-                                  grouped by Notification Family (issue #352),
-                                  rather than discovered from the feed, so
-                                  every type is toggle-able immediately rather
-                                  than only after it has fired once.
-                                */}
-                                {eventId === 'eveNotification' && hasScope && (
-                                  <div className="border-t border-line bg-panel/60 pl-3">
-                                    <p className="px-3 py-1.5 text-[0.6875rem] text-text-dim">
-                                      {t('settings.notifications.eveTypesHint')}
-                                    </p>
-                                    {NOTIFICATION_FAMILIES.map((family) => {
-                                      const familyTypes = eveTypesByFamily(family);
-                                      if (familyTypes.length === 0) return null;
-                                      const familyLabel = t(
-                                        `settings.notifications.family.${family}`
-                                      );
-                                      return (
-                                        <div key={family}>
-                                          <div className="flex items-center justify-between gap-3 border-t border-line/60 bg-panel/40 px-3 py-1">
-                                            <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                                              {familyLabel}
-                                            </span>
-                                            <div className={CHANNEL_COLUMNS}>
-                                              {NOTIFICATION_CHANNELS.map((channel) => (
-                                                <SelectionCheckbox
-                                                  key={channel}
-                                                  state={selectionStateForEveTypes(
-                                                    familyTypes,
-                                                    eveTypePrefs,
-                                                    channel
-                                                  )}
-                                                  onToggle={() =>
-                                                    void toggleAllEveTypesChannelPref(
-                                                      character.characterId,
-                                                      prefsValue,
-                                                      familyTypes,
-                                                      channel
-                                                    )
-                                                  }
-                                                  label={t(
-                                                    `settings.notifications.selectAllFamily.${channel}`,
-                                                    { family: familyLabel }
-                                                  )}
-                                                />
-                                              ))}
-                                            </div>
-                                          </div>
-                                          <ul className="divide-y divide-line/60">
-                                            {familyTypes.map((type) => {
-                                              // ESI's own `CamelCase` identifier is what
-                                              // used to label these rows. It named the
-                                              // type without saying what it was.
-                                              const typeLabel = eveTypeLabel(t, type);
-                                              return (
-                                                <li
-                                                  key={type}
-                                                  className="flex items-center justify-between gap-3 px-3 py-1.5 text-xs"
-                                                >
-                                                  {/* `title` for the same reason
-                                                      `DataAgePanel` uses one: the
-                                                      label truncates on a narrow
-                                                      screen, and now that it says
-                                                      something, the cut-off half
-                                                      is worth recovering. */}
-                                                  <span
-                                                    className="truncate text-text-dim"
-                                                    title={typeLabel}
-                                                  >
-                                                    {typeLabel}
-                                                  </span>
-                                                  <div className={CHANNEL_COLUMNS}>
-                                                    {NOTIFICATION_CHANNELS.map((channel) => (
-                                                      <ChannelCheckbox
-                                                        key={channel}
-                                                        channel={channel}
-                                                        eventLabel={typeLabel}
-                                                        enabled={
-                                                          !(channel === 'browser' && browserBlocked)
-                                                        }
-                                                        disabledReason={null}
-                                                        checked={isEveTypeEnabledFor(
-                                                          eveTypePrefs,
-                                                          type,
-                                                          channel
-                                                        )}
-                                                        onToggle={() =>
-                                                          void toggleEveTypeChannelPref(
-                                                            character.characterId,
-                                                            prefsValue,
-                                                            type,
-                                                            channel
-                                                          )
-                                                        }
-                                                      />
-                                                    ))}
-                                                  </div>
-                                                </li>
-                                              );
-                                            })}
-                                          </ul>
-                                        </div>
-                                      );
-                                    })}
-                                  </div>
-                                )}
-                              </li>
-                            );
-                          })}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-                );
-              })
+                    );
+                  })}
+                </div>
+              </div>
             )}
           </>
         )}
@@ -867,6 +568,432 @@ export function NotificationsPanel() {
     </Panel>
   );
 }
+
+interface CharacterNotificationSectionProps {
+  character: { characterId: number; name: string };
+  expanded: boolean;
+  visibleEventIds: readonly NotificationEventId[];
+  grantedScopes: ReadonlySet<string>;
+  characterCapabilities: CorpCapabilities | undefined;
+  prefsValue: NotificationPreferencesValue;
+  browserBlocked: boolean;
+  onToggleExpanded: (characterId: number) => void;
+}
+
+/**
+ * One Character's collapsible Notifications section — exactly the markup
+ * the panel's old inline `.map` rendered, just extracted so it can be
+ * `memo`-wrapped (issue #740, the brief's "independently memoizable" row
+ * unit) and windowed by `NotificationsPanel`'s virtualizer instead of every
+ * Character mounting its full ~90-checkbox content unconditionally.
+ */
+const CharacterNotificationSection = memo(function CharacterNotificationSection({
+  character,
+  expanded,
+  visibleEventIds,
+  grantedScopes,
+  characterCapabilities,
+  prefsValue,
+  browserBlocked,
+  onToggleExpanded,
+}: CharacterNotificationSectionProps) {
+  const { t } = useTranslation();
+
+  // A capability not yet resolved reads as held (see the capability effect's
+  // own doc comment in `NotificationsPanel`) — never a false lock while the
+  // roles read is still in flight.
+  function hasCapability(def: NotificationEventDef): boolean {
+    return (
+      def.corpCapability === undefined || (characterCapabilities?.[def.corpCapability] ?? true)
+    );
+  }
+  const togglableEventIds = visibleEventIds.filter((eventId) => {
+    const def = eventDef(eventId);
+    return (def.scope === undefined || grantedScopes.has(def.scope)) && hasCapability(def);
+  });
+  const prefs = characterEventPrefs(prefsValue, character.characterId);
+  const eveTypePrefs = characterEveTypePrefs(prefsValue, character.characterId);
+  const thresholds = characterEventThresholds(prefsValue, character.characterId);
+
+  return (
+    <div className="rounded-xs border border-line bg-panel/85 backdrop-blur-sm">
+      {/* Select-all is a sibling of the expand toggle, not nested inside its
+          <button> — an interactive control inside a <button> is invalid HTML
+          and would fold both accessible names together for screen readers. */}
+      <div
+        className={`flex min-h-8 items-center gap-2 px-2.5 py-1.5 ${expanded ? 'border-b border-line' : ''}`}
+      >
+        <button
+          type="button"
+          aria-expanded={expanded}
+          onClick={() => onToggleExpanded(character.characterId)}
+          className="flex min-w-0 flex-1 items-center gap-1.5 text-left text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase hover:text-text focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
+        >
+          <span aria-hidden="true" className="w-3 shrink-0 text-text-faint">
+            {expanded ? '▾' : '▸'}
+          </span>
+          <span className="min-w-0 truncate normal-case">{character.name}</span>
+        </button>
+        {/* One select-all per column, in the same grid track as
+            the checkboxes below so each sits over its own column. */}
+        <div className={CHANNEL_COLUMNS}>
+          {NOTIFICATION_CHANNELS.map((channel) => (
+            <SelectionCheckbox
+              key={channel}
+              state={selectionStateForEvents(togglableEventIds, prefs, channel)}
+              onToggle={() =>
+                void toggleAllEventsChannelPref(
+                  character.characterId,
+                  prefsValue,
+                  togglableEventIds,
+                  channel
+                )
+              }
+              label={t(`settings.notifications.selectAll.${channel}`, {
+                character: character.name,
+              })}
+            />
+          ))}
+        </div>
+      </div>
+      {expanded && (
+        <div className="bg-panel-2">
+          {/* Column captions, aligned to the same two tracks the
+              rows below use — an event can raise a browser
+              notification without joining the Overview list, or
+              the reverse. */}
+          <div className="flex items-center justify-between gap-3 border-b border-line px-3 py-1.5">
+            <span className="sr-only">{t('settings.notifications.columnEvent')}</span>
+            <span aria-hidden="true" className="flex-1" />
+            <div className={CHANNEL_COLUMNS}>
+              {NOTIFICATION_CHANNELS.map((channel) => (
+                <Tooltip
+                  key={channel}
+                  content={t(`settings.notifications.columnHint.${channel}`)}
+                  openOnTap
+                >
+                  {/* `tabIndex` because a Tooltip's trigger has to
+                      be focusable to be read without a pointer
+                      (`components/ui/Tooltip.tsx`, ADR 0008), and
+                      the dotted underline is what says there is
+                      something to read. Uppercase micro-heading
+                      per docs/DESIGN.md §2, matching the Family
+                      headers further down. */}
+                  <span
+                    tabIndex={0}
+                    className="cursor-help text-[0.6875rem] leading-tight font-semibold tracking-wide text-text-dim uppercase underline decoration-dotted decoration-text-dim/50 underline-offset-2"
+                  >
+                    {t(`settings.notifications.column.${channel}`)}
+                  </span>
+                </Tooltip>
+              ))}
+            </div>
+          </div>
+          <ul className="divide-y divide-line">
+            {visibleEventIds.map((eventId) => {
+              const def = eventDef(eventId);
+              const hasScope = def.scope === undefined || grantedScopes.has(def.scope);
+              const capabilityMissing = !hasCapability(def);
+              const rowEnabled = hasScope && !capabilityMissing;
+              const eventLabel = t(def.labelKey);
+              return (
+                <li key={eventId}>
+                  <div className="flex items-center justify-between gap-3 px-3 py-2 text-xs">
+                    <span className="flex min-w-0 items-center gap-1.5">
+                      <span className={rowEnabled ? 'text-text' : 'text-text-faint'}>
+                        {eventLabel}
+                      </span>
+                      {PUSH_BADGED_EVENT_IDS.has(eventId) && <ScheduledPushBadge />}
+                    </span>
+                    <div className={CHANNEL_COLUMNS}>
+                      {NOTIFICATION_CHANNELS.map((channel) => (
+                        <ChannelCheckbox
+                          key={channel}
+                          channel={channel}
+                          eventLabel={eventLabel}
+                          enabled={rowEnabled && !(channel === 'browser' && browserBlocked)}
+                          disabledReason={
+                            !hasScope ? 'scope' : capabilityMissing ? 'capability' : null
+                          }
+                          checked={isEventEnabledFor(prefs, eventId, channel)}
+                          onToggle={() =>
+                            void toggleEventChannelPref(
+                              character.characterId,
+                              prefsValue,
+                              eventId,
+                              channel
+                            )
+                          }
+                        />
+                      ))}
+                    </div>
+                  </div>
+                  {/*
+                    Delivery disclosure for the lead-time
+                    warning (issue #310 AC5; wording updated for
+                    Scheduled Push, issue #358, CONTEXT.md round
+                    45). Not gated on `hasScope`: what bounds
+                    this one now is the 72-hour Projection
+                    Horizon, not the character's grants, so the
+                    caveat is true before authorization too.
+                  */}
+                  {eventId === 'planetaryExtractorExpiring' && (
+                    <p className="border-t border-line bg-panel/60 px-6 py-1.5 text-[0.6875rem] text-text-dim">
+                      {t('settings.notifications.extractorExpiringHint')}
+                    </p>
+                  )}
+                  {/*
+                    Structure fuel's inline threshold control
+                    (issue #299, AC4) — the first Notification
+                    Event with a setting of its own rather than
+                    a plain on/off. Persisted per Character and
+                    per device (`preferences.ts`), and re-read
+                    by the poller every 5-minute tick, which is
+                    what "takes effect without a reload" means
+                    here (CONTEXT.md round 43).
+                  */}
+                  {eventId === 'structureFuelLow' && rowEnabled && (
+                    <div className="border-t border-line bg-panel/60 px-6 py-1.5">
+                      <label className="flex items-center gap-2 text-[0.6875rem] text-text-dim">
+                        {t('settings.notifications.structureFuelLowThresholdLabel')}
+                        <Select
+                          value={String(thresholds.structureFuelLowDays)}
+                          onValueChange={(value) =>
+                            void updatePrefs(
+                              character.characterId,
+                              withCharacterEventThreshold(
+                                prefsValue,
+                                character.characterId,
+                                'structureFuelLowDays',
+                                Number(value)
+                              )
+                            )
+                          }
+                        >
+                          <SelectTrigger
+                            size="sm"
+                            aria-label={t('settings.notifications.structureFuelLowThresholdLabel')}
+                          >
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {STRUCTURE_FUEL_LOW_DAY_OPTIONS.map((days) => (
+                              <SelectItem key={days} value={String(days)}>
+                                {t('settings.notifications.structureFuelLowThresholdOption', {
+                                  count: days,
+                                })}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </label>
+                      {/*
+                        Issue #299's own words: "say so in the
+                        UI, so nobody reads it as a second copy
+                        of the EVE alert." CCP's own
+                        StructureFuelAlert fires later, at its
+                        own fixed point — this is additive
+                        early warning, not a duplicate.
+                      */}
+                      <p className="mt-1 text-[0.6875rem] text-text-faint">
+                        {t('settings.notifications.structureFuelLowNotDuplicateHint')}
+                      </p>
+                    </div>
+                  )}
+                  {/*
+                    walletBalanceChanged's inline threshold
+                    control — the minimum absolute ISK change a
+                    single wallet journal entry must reach to
+                    fire, same persistence and input widget as
+                    structure fuel's and corp wallet's controls
+                    above. Accepts shorthand ("10.5m",
+                    "10,500,000", "10500000") via
+                    `parseIskAmount`.
+                  */}
+                  {eventId === 'walletBalanceChanged' && rowEnabled && (
+                    <div className="border-t border-line bg-panel/60 px-6 py-1.5">
+                      <ThresholdAmountInput
+                        id={`wallet-balance-changed-threshold-${character.characterId}`}
+                        label={t('settings.notifications.walletBalanceChangedThresholdLabel')}
+                        value={thresholds.walletBalanceChangedThresholdIsk}
+                        onCommit={(amount) =>
+                          void updatePrefs(
+                            character.characterId,
+                            withCharacterEventThreshold(
+                              prefsValue,
+                              character.characterId,
+                              'walletBalanceChangedThresholdIsk',
+                              amount
+                            )
+                          )
+                        }
+                      />
+                      <p className="mt-1 text-[0.6875rem] text-text-faint">
+                        {t('settings.notifications.walletBalanceChangedThresholdHint')}
+                      </p>
+                    </div>
+                  )}
+                  {/*
+                    Corp wallet's two independent thresholds
+                    (issue #299, AC4) — a division balance floor
+                    and a single-transaction ceiling, either of
+                    which fires. Same persistence as the fuel
+                    control above.
+                  */}
+                  {eventId === 'corpWalletThreshold' && rowEnabled && (
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-line bg-panel/60 px-6 py-1.5">
+                      <ThresholdAmountInput
+                        id={`corp-wallet-floor-${character.characterId}`}
+                        label={t('settings.notifications.corpWalletBalanceFloorLabel')}
+                        value={thresholds.corpWalletBalanceFloorIsk}
+                        onCommit={(amount) =>
+                          void updatePrefs(
+                            character.characterId,
+                            withCharacterEventThreshold(
+                              prefsValue,
+                              character.characterId,
+                              'corpWalletBalanceFloorIsk',
+                              amount
+                            )
+                          )
+                        }
+                      />
+                      <ThresholdAmountInput
+                        id={`corp-wallet-ceiling-${character.characterId}`}
+                        label={t('settings.notifications.corpWalletTransactionCeilingLabel')}
+                        value={thresholds.corpWalletTransactionCeilingIsk}
+                        onCommit={(amount) =>
+                          void updatePrefs(
+                            character.characterId,
+                            withCharacterEventThreshold(
+                              prefsValue,
+                              character.characterId,
+                              'corpWalletTransactionCeilingIsk',
+                              amount
+                            )
+                          )
+                        }
+                      />
+                    </div>
+                  )}
+                  {/*
+                    The honesty requirement (issue #299): these
+                    five events are best-effort, no server push.
+                    Attached per row, not once per section, so
+                    it survives a search that narrows a
+                    character's section to a single corp row.
+                  */}
+                  {CORP_EVENT_IDS.has(eventId) && (
+                    <p className="border-t border-line bg-panel/60 px-6 py-1.5 text-[0.6875rem] text-text-dim">
+                      {t('settings.notifications.corpEventBestEffortHint')}
+                    </p>
+                  )}
+                  {/*
+                    Per-type opt-out underneath the single
+                    eveNotification event (issue #274, AC3).
+                    Enumerated from the closed allow-list,
+                    grouped by Notification Family (issue #352),
+                    rather than discovered from the feed, so
+                    every type is toggle-able immediately rather
+                    than only after it has fired once.
+                  */}
+                  {eventId === 'eveNotification' && hasScope && (
+                    <div className="border-t border-line bg-panel/60 pl-3">
+                      <p className="px-3 py-1.5 text-[0.6875rem] text-text-dim">
+                        {t('settings.notifications.eveTypesHint')}
+                      </p>
+                      {NOTIFICATION_FAMILIES.map((family) => {
+                        const familyTypes = eveTypesByFamily(family);
+                        if (familyTypes.length === 0) return null;
+                        const familyLabel = t(`settings.notifications.family.${family}`);
+                        return (
+                          <div key={family}>
+                            <div className="flex items-center justify-between gap-3 border-t border-line/60 bg-panel/40 px-3 py-1">
+                              <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                                {familyLabel}
+                              </span>
+                              <div className={CHANNEL_COLUMNS}>
+                                {NOTIFICATION_CHANNELS.map((channel) => (
+                                  <SelectionCheckbox
+                                    key={channel}
+                                    state={selectionStateForEveTypes(
+                                      familyTypes,
+                                      eveTypePrefs,
+                                      channel
+                                    )}
+                                    onToggle={() =>
+                                      void toggleAllEveTypesChannelPref(
+                                        character.characterId,
+                                        prefsValue,
+                                        familyTypes,
+                                        channel
+                                      )
+                                    }
+                                    label={t(`settings.notifications.selectAllFamily.${channel}`, {
+                                      family: familyLabel,
+                                    })}
+                                  />
+                                ))}
+                              </div>
+                            </div>
+                            <ul className="divide-y divide-line/60">
+                              {familyTypes.map((type) => {
+                                // ESI's own `CamelCase` identifier is what
+                                // used to label these rows. It named the
+                                // type without saying what it was.
+                                const typeLabel = eveTypeLabel(t, type);
+                                return (
+                                  <li
+                                    key={type}
+                                    className="flex items-center justify-between gap-3 px-3 py-1.5 text-xs"
+                                  >
+                                    {/* `title` for the same reason
+                                        `DataAgePanel` uses one: the
+                                        label truncates on a narrow
+                                        screen, and now that it says
+                                        something, the cut-off half
+                                        is worth recovering. */}
+                                    <span className="truncate text-text-dim" title={typeLabel}>
+                                      {typeLabel}
+                                    </span>
+                                    <div className={CHANNEL_COLUMNS}>
+                                      {NOTIFICATION_CHANNELS.map((channel) => (
+                                        <ChannelCheckbox
+                                          key={channel}
+                                          channel={channel}
+                                          eventLabel={typeLabel}
+                                          enabled={!(channel === 'browser' && browserBlocked)}
+                                          disabledReason={null}
+                                          checked={isEveTypeEnabledFor(eveTypePrefs, type, channel)}
+                                          onToggle={() =>
+                                            void toggleEveTypeChannelPref(
+                                              character.characterId,
+                                              prefsValue,
+                                              type,
+                                              channel
+                                            )
+                                          }
+                                        />
+                                      ))}
+                                    </div>
+                                  </li>
+                                );
+                              })}
+                            </ul>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+});
 
 /**
  * The "arrives with the app closed" mark on a Scheduled Push event's row.
