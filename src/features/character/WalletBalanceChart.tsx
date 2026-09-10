@@ -82,7 +82,7 @@ export default function WalletBalanceChart({ points, trend, timeZone }: WalletBa
     <div>
       <div role="img" aria-label={t('wallet.balanceHistoryChartLabel')} className="h-64 w-full">
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+          <LineChart data={chartData} margin={{ top: 8, right: 8, left: 8, bottom: 0 }}>
             <CartesianGrid stroke="var(--color-line)" strokeDasharray="3 3" />
             <XAxis
               dataKey="dateLabel"
@@ -92,7 +92,7 @@ export default function WalletBalanceChart({ points, trend, timeZone }: WalletBa
             <YAxis
               stroke="var(--color-text-dim)"
               tick={{ fontSize: 11, fill: 'var(--color-text-dim)' }}
-              width={70}
+              width={95}
               tickFormatter={(value: number) => formatIsk(value, 0)}
             />
             <Tooltip content={(props) => <BalanceTooltip {...props} />} />

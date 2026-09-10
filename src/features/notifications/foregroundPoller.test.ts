@@ -551,7 +551,10 @@ describe('runForegroundPoll', () => {
     const deps = baseDeps({
       grantedScopes: async () => new Set([SKILLQUEUE_SCOPE, PLANETS_SCOPE]),
       loadColonyExtractors: async () => [
-        { planetId: 40000001, extractors: [{ pinId: 1, expiryTimeMs: 2000 }] },
+        {
+          planetId: 40000001,
+          extractors: [{ pinId: 1, expiryTimeMs: 2000, thresholdMs: 21_600_000 }],
+        },
       ],
       saveColonyState: async (state) => {
         savedColonies = state;
@@ -561,7 +564,10 @@ describe('runForegroundPoll', () => {
     expect(deps.notify).not.toHaveBeenCalled();
     expect(savedColonies).not.toBeNull();
     expect(savedColonies![CHAR.characterId].colonies).toEqual([
-      { planetId: 40000001, extractors: [{ pinId: 1, expiryTimeMs: 2000 }] },
+      {
+        planetId: 40000001,
+        extractors: [{ pinId: 1, expiryTimeMs: 2000, thresholdMs: 21_600_000 }],
+      },
     ]);
   });
 
@@ -569,7 +575,12 @@ describe('runForegroundPoll', () => {
     let now = 1000;
     let savedColonies: ColonyPollerState = {
       [CHAR.characterId]: {
-        colonies: [{ planetId: 40000001, extractors: [{ pinId: 1, expiryTimeMs: 2000 }] }],
+        colonies: [
+          {
+            planetId: 40000001,
+            extractors: [{ pinId: 1, expiryTimeMs: 2000, thresholdMs: 21_600_000 }],
+          },
+        ],
         nowMs: now,
       },
     };
@@ -582,7 +593,10 @@ describe('runForegroundPoll', () => {
         savedColonies = state;
       },
       loadColonyExtractors: async () => [
-        { planetId: 40000001, extractors: [{ pinId: 1, expiryTimeMs: 2000 }] },
+        {
+          planetId: 40000001,
+          extractors: [{ pinId: 1, expiryTimeMs: 2000, thresholdMs: 21_600_000 }],
+        },
       ],
       notify,
     });
@@ -609,7 +623,12 @@ describe('runForegroundPoll', () => {
     let now = 1000;
     let savedColonies: ColonyPollerState = {
       [CHAR.characterId]: {
-        colonies: [{ planetId: 40000001, extractors: [{ pinId: 1, expiryTimeMs: OLD_EXPIRY }] }],
+        colonies: [
+          {
+            planetId: 40000001,
+            extractors: [{ pinId: 1, expiryTimeMs: OLD_EXPIRY, thresholdMs: 21_600_000 }],
+          },
+        ],
         nowMs: now,
       },
     };
@@ -624,7 +643,14 @@ describe('runForegroundPoll', () => {
       loadColonyExtractors: async () => [
         {
           planetId: 40000001,
-          extractors: [{ pinId: 1, expiryTimeMs: 900_000, installTimeMs: OLD_EXPIRY - 1 }],
+          extractors: [
+            {
+              pinId: 1,
+              expiryTimeMs: 900_000,
+              thresholdMs: 21_600_000,
+              installTimeMs: OLD_EXPIRY - 1,
+            },
+          ],
         },
       ],
       retractFromFeed,
@@ -642,7 +668,10 @@ describe('runForegroundPoll', () => {
     const deps = baseDeps({
       grantedScopes: async () => new Set([SKILLQUEUE_SCOPE, PLANETS_SCOPE]),
       loadColonyExtractors: async () => [
-        { planetId: 40000001, extractors: [{ pinId: 1, expiryTimeMs: 900_000 }] },
+        {
+          planetId: 40000001,
+          extractors: [{ pinId: 1, expiryTimeMs: 900_000, thresholdMs: 21_600_000 }],
+        },
       ],
       retractFromFeed,
     });
@@ -1810,7 +1839,7 @@ describe('runForegroundPoll Scheduled Push upload (issue #358)', () => {
     // relies on `enabledEvents`, and the projection upload must apply the
     // same filter rather than uploading a disabled event's row anyway.
     const now = 1_000_000;
-    const expiryTimeMs = now + 20 * 3_600_000; // 20h out: extractionDone in horizon, and the 12h-lead extractorExpiring threshold in horizon too
+    const expiryTimeMs = now + 20 * 3_600_000; // 20h out: extractionDone in horizon, and the configured lead time's fire in horizon too
     const uploadProjection = vi.fn<PollDependencies['uploadProjection']>(async () => {});
     const deps = baseDeps({
       now: () => now,
@@ -1820,7 +1849,7 @@ describe('runForegroundPoll Scheduled Push upload (issue #358)', () => {
         planetaryExtractionDone: false,
       }),
       loadColonyExtractors: async () => [
-        { planetId: 4001, extractors: [{ pinId: 9001, expiryTimeMs }] },
+        { planetId: 4001, extractors: [{ pinId: 9001, expiryTimeMs, thresholdMs: 21_600_000 }] },
       ],
       uploadProjection,
     });

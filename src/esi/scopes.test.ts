@@ -37,7 +37,6 @@ describe('SCOPES', () => {
         'esi-characters.read_loyalty.v1',
         'esi-location.read_location.v1',
         'esi-characters.read_notifications.v1',
-        'esi-characters.read_corporation_roles.v1',
         'esi-search.search_structures.v1',
         'esi-industry.read_character_mining.v1',
       ].sort()
@@ -80,6 +79,7 @@ describe('scopesForGroup', () => {
         'esi-industry.read_corporation_mining.v1',
         'esi-industry.read_corporation_jobs.v1',
         'esi-assets.read_corporation_assets.v1',
+        'esi-characters.read_corporation_roles.v1',
       ].sort()
     );
   });
