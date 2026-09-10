@@ -3145,7 +3145,6 @@
       "exportHint": "Download every character on this device — including sign-in tokens — as one password-encrypted file. Import it on another device to add these characters there without re-doing EVE SSO for each one.",
       "passwordWarning": "The password is the only protection on this file — anyone who has both the file and the password can sign in as these characters. Choose one you can remember; there is no recovery if you lose it.",
       "passwordLabel": "Password",
-      "confirmPasswordLabel": "Confirm password",
       "exportButton": "Download backup",
       "exportDone": "Backup downloaded.",
       "exportError": "Couldn't create the backup. Try again.",

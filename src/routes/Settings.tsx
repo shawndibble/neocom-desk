@@ -286,17 +286,15 @@ function DataAgePanel() {
 function ExportPanel() {
   const { t } = useTranslation();
   const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
   const [status, setStatus] = useState<'idle' | 'exporting' | 'done' | 'error'>('idle');
 
-  const canExport = password.length > 0 && password === confirmPassword;
+  const canExport = password.length > 0;
 
   async function handleExport() {
     setStatus('exporting');
     try {
       await exportBackupToFile(password);
       setPassword('');
-      setConfirmPassword('');
       setStatus('done');
       setTimeout(() => setStatus('idle'), 2000);
     } catch {
@@ -316,14 +314,6 @@ function ExportPanel() {
           placeholder={t('settings.backup.passwordLabel')}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-        />
-        <TextInput
-          type="password"
-          autoComplete="new-password"
-          aria-label={t('settings.backup.confirmPasswordLabel')}
-          placeholder={t('settings.backup.confirmPasswordLabel')}
-          value={confirmPassword}
-          onChange={(e) => setConfirmPassword(e.target.value)}
         />
         <Button
           size="sm"
