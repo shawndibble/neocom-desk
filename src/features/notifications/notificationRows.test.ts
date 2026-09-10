@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest';
 import type { NotificationEventId } from './events';
 import {
   estimateCharacterSectionHeight,
-  isCorpEventId,
   type CharacterSectionHeightInput,
 } from './notificationRows';
 
@@ -23,21 +22,6 @@ function input(overrides: Partial<CharacterSectionHeightInput> = {}): CharacterS
     ...overrides,
   };
 }
-
-describe('isCorpEventId', () => {
-  it('is true for exactly the five corp events (issue #299)', () => {
-    for (const id of [
-      'structureFuelLow',
-      'corpIndustryJobReady',
-      'corpMemberJoined',
-      'corpMemberLeft',
-      'corpWalletThreshold',
-    ] as const) {
-      expect(isCorpEventId(id)).toBe(true);
-    }
-    expect(isCorpEventId(ORDINARY)).toBe(false);
-  });
-});
 
 describe('estimateCharacterSectionHeight', () => {
   it('a collapsed Character is just the header, regardless of how many events it has', () => {

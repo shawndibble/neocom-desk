@@ -59,6 +59,7 @@ import {
   NOTIFICATION_EVENTS,
   NOTIFICATION_EVENT_IDS,
   eventLabelKey,
+  isCorpEventId,
   type NotificationEventDef,
   type NotificationEventId,
 } from './events';
@@ -80,7 +81,7 @@ import {
   characterEventThresholds,
   withCharacterEventThreshold,
   STRUCTURE_FUEL_LOW_DAY_OPTIONS,
-  type NotificationPreferencesValue,
+  type CharacterEventThresholds,
 } from './preferences';
 import {
   isEventEnabledFor,
@@ -91,6 +92,8 @@ import {
   NOTIFICATION_FAMILIES,
   eveTypesByFamily,
   type NotificationChannel,
+  type EventEnabledMap,
+  type EveTypeEnabledMap,
 } from './eventSelection';
 import { eveTypeLabel } from './eveTypeLabel';
 import { filterNotificationSections } from './notificationSearch';
@@ -146,21 +149,34 @@ const PUSH_BADGED_EVENT_IDS: ReadonlySet<NotificationEventId> = new Set(
   PROJECTABLE_EVENT_IDS.filter((id) => id !== 'eveNotification')
 );
 
-/**
- * Every corp event (issue #299) — used to attach the best-effort disclosure
- * to each, since search can narrow a section to just one row. Derived from
- * `corpCapability` rather than hand-listed, so a future corp event picks up
- * the disclosure by virtue of carrying that field, not by also being added
- * here.
- */
-const CORP_EVENT_IDS: ReadonlySet<NotificationEventId> = new Set(
-  NOTIFICATION_EVENTS.filter((event) => event.corpCapability !== undefined).map((event) => event.id)
-);
-
 function eventDef(eventId: NotificationEventId): NotificationEventDef {
   const def = EVENT_BY_ID.get(eventId);
   if (!def) throw new Error(`Unknown Notification Event id: ${eventId}`);
   return def;
+}
+
+/**
+ * One Character's scope/capability read for one event (issue #740) — the
+ * single place both the virtualizer's `estimateSize` and
+ * `CharacterNotificationSection`'s render read this from, so the two can't
+ * drift into disagreeing about which rows a Character's section actually
+ * has (they used to each reimplement this independently).
+ */
+function characterEventRowState(
+  eventId: NotificationEventId,
+  grantedScopes: ReadonlySet<string>,
+  characterCapabilities: CorpCapabilities | undefined
+): { hasScope: boolean; capabilityMissing: boolean; rowEnabled: boolean } {
+  const def = eventDef(eventId);
+  const hasScope = def.scope === undefined || grantedScopes.has(def.scope);
+  // A capability not yet resolved reads as held (see the capability
+  // effect's own doc comment below) — never a false lock while the roles
+  // read is still in flight.
+  const capabilityMissing = !(
+    def.corpCapability === undefined ||
+    (characterCapabilities?.[def.corpCapability] ?? true)
+  );
+  return { hasScope, capabilityMissing, rowEnabled: hasScope && !capabilityMissing };
 }
 
 export function NotificationsPanel() {
@@ -373,23 +389,18 @@ export function NotificationsPanel() {
       const visibleEventIds: readonly NotificationEventId[] = searching
         ? [...(filterResult!.visibleEventIdsByCharacter.get(character.characterId) ?? [])]
         : NOTIFICATION_EVENT_IDS;
-      const grantedScopes = scopesByCharacterId.get(character.characterId) ?? new Set<string>();
+      const grantedScopes = scopesByCharacterId.get(character.characterId) ?? EMPTY_SCOPES;
       const characterCapabilities = capabilitiesByCharacterId.get(character.characterId);
-      const hasScope = (eventId: NotificationEventId) => {
-        const def = eventDef(eventId);
-        return def.scope === undefined || grantedScopes.has(def.scope);
-      };
-      const rowEnabledFor = (eventId: NotificationEventId) => {
-        const def = eventDef(eventId);
-        const capabilityHeld =
-          def.corpCapability === undefined || (characterCapabilities?.[def.corpCapability] ?? true);
-        return hasScope(eventId) && capabilityHeld;
-      };
       return estimateCharacterSectionHeight({
         expanded,
         visibleEventIds,
-        rowEnabledFor,
-        hasEveNotificationScope: hasScope('eveNotification'),
+        rowEnabledFor: (eventId) =>
+          characterEventRowState(eventId, grantedScopes, characterCapabilities).rowEnabled,
+        hasEveNotificationScope: characterEventRowState(
+          'eveNotification',
+          grantedScopes,
+          characterCapabilities
+        ).hasScope,
       });
     },
     getItemKey: (index) => visibleCharacters[index].characterId,
@@ -552,7 +563,9 @@ export function NotificationsPanel() {
                           characterCapabilities={capabilitiesByCharacterId.get(
                             character.characterId
                           )}
-                          prefsValue={prefsValue}
+                          prefs={characterEventPrefs(prefsValue, character.characterId)}
+                          eveTypePrefs={characterEveTypePrefs(prefsValue, character.characterId)}
+                          thresholds={characterEventThresholds(prefsValue, character.characterId)}
                           browserBlocked={browserBlocked}
                           onToggleExpanded={toggleExpanded}
                         />
@@ -575,7 +588,22 @@ interface CharacterNotificationSectionProps {
   visibleEventIds: readonly NotificationEventId[];
   grantedScopes: ReadonlySet<string>;
   characterCapabilities: CorpCapabilities | undefined;
-  prefsValue: NotificationPreferencesValue;
+  /**
+   * This Character's own slice of the store (issue #740) — not the whole
+   * `NotificationPreferencesValue`. `preferences.ts`'s writes replace
+   * `perCharacter` with a shallow copy, so an edit to a *different*
+   * Character leaves this Character's own `perCharacter[id]` entry at the
+   * exact same object reference; passing the whole store value here instead
+   * would give every mounted section a new prop on every edit, defeating
+   * this component's `memo` for the very "one Character's edit shouldn't
+   * re-diff the others" case it exists for. The write handlers below still
+   * need the *current* full value at click time — they read
+   * `useNotificationPreferences.getState().value` directly rather than
+   * closing over a prop, so accepting one doesn't leak back in here.
+   */
+  prefs: EventEnabledMap;
+  eveTypePrefs: EveTypeEnabledMap;
+  thresholds: Required<CharacterEventThresholds>;
   browserBlocked: boolean;
   onToggleExpanded: (characterId: number) => void;
 }
@@ -593,27 +621,20 @@ const CharacterNotificationSection = memo(function CharacterNotificationSection(
   visibleEventIds,
   grantedScopes,
   characterCapabilities,
-  prefsValue,
+  prefs,
+  eveTypePrefs,
+  thresholds,
   browserBlocked,
   onToggleExpanded,
 }: CharacterNotificationSectionProps) {
   const { t } = useTranslation();
 
-  // A capability not yet resolved reads as held (see the capability effect's
-  // own doc comment in `NotificationsPanel`) — never a false lock while the
-  // roles read is still in flight.
-  function hasCapability(def: NotificationEventDef): boolean {
-    return (
-      def.corpCapability === undefined || (characterCapabilities?.[def.corpCapability] ?? true)
-    );
-  }
-  const togglableEventIds = visibleEventIds.filter((eventId) => {
-    const def = eventDef(eventId);
-    return (def.scope === undefined || grantedScopes.has(def.scope)) && hasCapability(def);
-  });
-  const prefs = characterEventPrefs(prefsValue, character.characterId);
-  const eveTypePrefs = characterEveTypePrefs(prefsValue, character.characterId);
-  const thresholds = characterEventThresholds(prefsValue, character.characterId);
+  const togglableEventIds = visibleEventIds.filter(
+    (eventId) => characterEventRowState(eventId, grantedScopes, characterCapabilities).rowEnabled
+  );
+  // Every write reads the store fresh at click time rather than closing
+  // over a `prefsValue` prop — see this component's props doc for why.
+  const currentValue = () => useNotificationPreferences.getState().value;
 
   return (
     <div className="rounded-xs border border-line bg-panel/85 backdrop-blur-sm">
@@ -644,7 +665,7 @@ const CharacterNotificationSection = memo(function CharacterNotificationSection(
               onToggle={() =>
                 void toggleAllEventsChannelPref(
                   character.characterId,
-                  prefsValue,
+                  currentValue(),
                   togglableEventIds,
                   channel
                 )
@@ -692,9 +713,11 @@ const CharacterNotificationSection = memo(function CharacterNotificationSection(
           <ul className="divide-y divide-line">
             {visibleEventIds.map((eventId) => {
               const def = eventDef(eventId);
-              const hasScope = def.scope === undefined || grantedScopes.has(def.scope);
-              const capabilityMissing = !hasCapability(def);
-              const rowEnabled = hasScope && !capabilityMissing;
+              const { hasScope, capabilityMissing, rowEnabled } = characterEventRowState(
+                eventId,
+                grantedScopes,
+                characterCapabilities
+              );
               const eventLabel = t(def.labelKey);
               return (
                 <li key={eventId}>
@@ -719,7 +742,7 @@ const CharacterNotificationSection = memo(function CharacterNotificationSection(
                           onToggle={() =>
                             void toggleEventChannelPref(
                               character.characterId,
-                              prefsValue,
+                              currentValue(),
                               eventId,
                               channel
                             )
@@ -762,7 +785,7 @@ const CharacterNotificationSection = memo(function CharacterNotificationSection(
                             void updatePrefs(
                               character.characterId,
                               withCharacterEventThreshold(
-                                prefsValue,
+                                currentValue(),
                                 character.characterId,
                                 'structureFuelLowDays',
                                 Number(value)
@@ -820,7 +843,7 @@ const CharacterNotificationSection = memo(function CharacterNotificationSection(
                           void updatePrefs(
                             character.characterId,
                             withCharacterEventThreshold(
-                              prefsValue,
+                              currentValue(),
                               character.characterId,
                               'walletBalanceChangedThresholdIsk',
                               amount
@@ -850,7 +873,7 @@ const CharacterNotificationSection = memo(function CharacterNotificationSection(
                           void updatePrefs(
                             character.characterId,
                             withCharacterEventThreshold(
-                              prefsValue,
+                              currentValue(),
                               character.characterId,
                               'corpWalletBalanceFloorIsk',
                               amount
@@ -866,7 +889,7 @@ const CharacterNotificationSection = memo(function CharacterNotificationSection(
                           void updatePrefs(
                             character.characterId,
                             withCharacterEventThreshold(
-                              prefsValue,
+                              currentValue(),
                               character.characterId,
                               'corpWalletTransactionCeilingIsk',
                               amount
@@ -883,7 +906,7 @@ const CharacterNotificationSection = memo(function CharacterNotificationSection(
                     it survives a search that narrows a
                     character's section to a single corp row.
                   */}
-                  {CORP_EVENT_IDS.has(eventId) && (
+                  {isCorpEventId(eventId) && (
                     <p className="border-t border-line bg-panel/60 px-6 py-1.5 text-[0.6875rem] text-text-dim">
                       {t('settings.notifications.corpEventBestEffortHint')}
                     </p>
@@ -924,7 +947,7 @@ const CharacterNotificationSection = memo(function CharacterNotificationSection(
                                     onToggle={() =>
                                       void toggleAllEveTypesChannelPref(
                                         character.characterId,
-                                        prefsValue,
+                                        currentValue(),
                                         familyTypes,
                                         channel
                                       )
@@ -968,7 +991,7 @@ const CharacterNotificationSection = memo(function CharacterNotificationSection(
                                           onToggle={() =>
                                             void toggleEveTypeChannelPref(
                                               character.characterId,
-                                              prefsValue,
+                                              currentValue(),
                                               type,
                                               channel
                                             )

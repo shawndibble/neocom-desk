@@ -20,20 +20,7 @@
  * Character's expanded content actually produces.
  */
 import { NOTIFICATION_FAMILIES, eveTypesByFamily } from './eventSelection';
-import type { NotificationEventId } from './events';
-
-/** Every corp event (issue #299) — the ones that get the best-effort disclosure row. */
-const CORP_EVENT_ID_SET: ReadonlySet<NotificationEventId> = new Set([
-  'structureFuelLow',
-  'corpIndustryJobReady',
-  'corpMemberJoined',
-  'corpMemberLeft',
-  'corpWalletThreshold',
-]);
-
-export function isCorpEventId(eventId: NotificationEventId): boolean {
-  return CORP_EVENT_ID_SET.has(eventId);
-}
+import { isCorpEventId, type NotificationEventId } from './events';
 
 export interface CharacterSectionHeightInput {
   expanded: boolean;
@@ -58,17 +45,23 @@ type InternalRowKind =
   | 'eve-family-header'
   | 'eve-type';
 
-/** Same fixed per-kind estimates `Assets.tsx`'s `estimateRowHeight` uses, sized to this panel's rows instead. */
+/**
+ * Same fixed per-kind estimates `Assets.tsx`'s `estimateRowHeight` uses,
+ * sized to this panel's rows instead. The three hint rows carry a full
+ * sentence of prose (e.g. `extractorExpiringHint`), not a compact caption —
+ * sized to wrap two lines rather than one, since there's no `measureElement`
+ * here to correct an under-estimate later.
+ */
 const ROW_HEIGHT: Record<InternalRowKind, number> = {
   'character-header': 32,
   'column-captions': 26,
   event: 33,
-  'extractor-hint': 30,
+  'extractor-hint': 48,
   'fuel-threshold': 52,
   'wallet-threshold': 52,
   'corp-wallet-threshold': 44,
-  'corp-best-effort-hint': 30,
-  'eve-types-hint': 30,
+  'corp-best-effort-hint': 42,
+  'eve-types-hint': 42,
   'eve-family-header': 30,
   'eve-type': 33,
 };

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { ESI_REGISTRY } from '@/esi/registry';
-import { NOTIFICATION_EVENTS, NOTIFICATION_EVENT_IDS } from './events';
+import { NOTIFICATION_EVENTS, NOTIFICATION_EVENT_IDS, isCorpEventId } from './events';
 import { isEventEnabledFor, isEveTypeEnabledFor } from './eventSelection';
 
 describe('NOTIFICATION_EVENTS', () => {
@@ -131,5 +131,20 @@ describe('NOTIFICATION_EVENTS', () => {
     const event = NOTIFICATION_EVENTS.find((e) => e.id === 'priceAlertTriggered');
     expect(event?.scope).toBeUndefined();
     expect(event?.corpCapability).toBeUndefined();
+  });
+});
+
+describe('isCorpEventId', () => {
+  it('is true for exactly the five corp events (issue #299)', () => {
+    for (const id of [
+      'structureFuelLow',
+      'corpIndustryJobReady',
+      'corpMemberJoined',
+      'corpMemberLeft',
+      'corpWalletThreshold',
+    ] as const) {
+      expect(isCorpEventId(id)).toBe(true);
+    }
+    expect(isCorpEventId('newMail')).toBe(false);
   });
 });
