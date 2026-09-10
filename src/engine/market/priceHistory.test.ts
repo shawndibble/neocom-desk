@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { sortPriceHistory, filterPriceHistoryRange, summarizePriceHistory } from './priceHistory';
+import {
+  sortPriceHistory,
+  filterPriceHistoryRange,
+  summarizePriceHistory,
+  movingAverage,
+} from './priceHistory';
 
 describe('sortPriceHistory', () => {
   it('sorts points chronologically by date', () => {
@@ -81,5 +86,62 @@ describe('summarizePriceHistory', () => {
 
   it('returns null for an empty range rather than a fabricated zero', () => {
     expect(summarizePriceHistory([])).toBeNull();
+  });
+});
+
+describe('movingAverage', () => {
+  const points = [
+    { date: '2026-01-01', average: 10, volume: 1 },
+    { date: '2026-01-02', average: 20, volume: 1 },
+    { date: '2026-01-03', average: 30, volume: 1 },
+    { date: '2026-01-04', average: 40, volume: 1 },
+    { date: '2026-01-05', average: 50, volume: 1 },
+  ];
+
+  it('omits points until enough real history fills the window', () => {
+    expect(movingAverage(points, 3).map((p) => p.date)).toEqual([
+      '2026-01-03',
+      '2026-01-04',
+      '2026-01-05',
+    ]);
+  });
+
+  it('averages exactly the trailing window of days, not the whole series', () => {
+    expect(movingAverage(points, 3)).toEqual([
+      { date: '2026-01-03', average: 20 },
+      { date: '2026-01-04', average: 30 },
+      { date: '2026-01-05', average: 40 },
+    ]);
+  });
+
+  it('returns every point when the window is 1', () => {
+    expect(movingAverage(points, 1).map((p) => p.average)).toEqual([10, 20, 30, 40, 50]);
+  });
+
+  it('returns an empty array when the series has fewer points than the window', () => {
+    expect(movingAverage(points, 10)).toEqual([]);
+  });
+
+  it('returns an empty array for an empty series', () => {
+    expect(movingAverage([], 7)).toEqual([]);
+  });
+
+  it('does not mutate the input array', () => {
+    const original = [...points];
+    movingAverage(points, 3);
+    expect(points).toEqual(original);
+  });
+});
+
+describe('filterPriceHistoryRange with a moving-average series', () => {
+  it('filters moving-average points by date the same way it filters price points', () => {
+    const maPoints = [
+      { date: '2026-01-01', average: 15 },
+      { date: '2026-02-28', average: 25 },
+    ];
+    const now = new Date('2026-03-01T00:00:00Z');
+    expect(filterPriceHistoryRange(maPoints, '7d', now)).toEqual([
+      { date: '2026-02-28', average: 25 },
+    ]);
   });
 });

@@ -2690,7 +2690,8 @@
       "summaryHi": "High",
       "summaryLo": "Low",
       "summaryMedian": "Median",
-      "summaryNone": "No data in this range"
+      "summaryNone": "No data in this range",
+      "movingAverage": "Moving average"
     },
     "compare": {
       "handle": "Compare ({{count}})",

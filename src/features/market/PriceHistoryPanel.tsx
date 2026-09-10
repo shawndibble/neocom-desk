@@ -14,10 +14,20 @@ import { formatIsk } from '@/lib/isk';
 import {
   filterPriceHistoryRange,
   summarizePriceHistory,
+  movingAverage,
   PRICE_HISTORY_RANGES,
   type MarketHistoryPoint,
   type PriceHistoryRange,
 } from '@/engine/market/priceHistory';
+
+/**
+ * A 7-day window on the 7d range itself collapses to a single point —
+ * restating the hi/lo/median summary as a line rather than showing a trend.
+ * Use a shorter window there instead of hiding the line entirely.
+ */
+function movingAverageWindowDays(range: PriceHistoryRange): number {
+  return range === '7d' ? 3 : 7;
+}
 import { usePriceHistoryRange } from './priceHistoryRangePref';
 
 /**
@@ -136,6 +146,17 @@ function RangedHistory({ points, range, onRangeChange, itemName, now }: RangedHi
     [points, range, now]
   );
   const summary = useMemo(() => summarizePriceHistory(filtered), [filtered]);
+  // Computed over the full unfiltered `points`, then sliced to `range` —
+  // computing it over `filtered` instead would understate the window for
+  // the first days of any range that don't have `windowDays` prior days
+  // inside the filtered slice, even though real history for them exists.
+  const filteredMovingAverage = useMemo(() => {
+    const windowDays = movingAverageWindowDays(range);
+    const fullMovingAverage = movingAverage(points, windowDays);
+    return now
+      ? filterPriceHistoryRange(fullMovingAverage, range, now)
+      : filterPriceHistoryRange(fullMovingAverage, range);
+  }, [points, range, now]);
 
   return (
     <div>
@@ -173,7 +194,11 @@ function RangedHistory({ points, range, onRangeChange, itemName, now }: RangedHi
         </Select>
       </div>
       <Suspense fallback={<ChartFallback label={t('common.loading')} />}>
-        <LazyPriceHistoryChart points={filtered} itemName={itemName} />
+        <LazyPriceHistoryChart
+          points={filtered}
+          itemName={itemName}
+          movingAverage={filteredMovingAverage}
+        />
       </Suspense>
     </div>
   );
