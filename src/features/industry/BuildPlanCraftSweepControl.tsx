@@ -33,12 +33,13 @@ interface BuildPlanCraftSweepControlProps {
  * for reselecting its already-shown value though (Radix's own
  * `useControllableState`, same as a native `<select>`) — so the default
  * Cost-effective sweep would otherwise be unreachable for anyone who never
- * touches the dropdown. The icon-only re-run button beside it covers that:
- * one press, no label, no confirmation — a lighter affordance than the
- * group control's labeled Apply behind a confirm dialog, but still an
- * explicit press, on direct instruction after that gap surfaced. The Sweep
- * Strategy select and Craft Scope chips are the pieces genuinely shared
- * with the group control — `craftSweepShared.tsx`.
+ * touches the dropdown. The icon-only re-run button beside it (`Icon.Run` —
+ * deliberately not `Icon.Refresh`, which means "re-fetch from ESI" and
+ * fetches nothing here) covers that: one press, no label, no confirmation —
+ * a lighter affordance than the group control's labeled Apply behind a
+ * confirm dialog, but still an explicit press, on direct instruction after
+ * that gap surfaced. The Sweep Strategy select and Craft Scope chips are the
+ * pieces genuinely shared with the group control — `craftSweepShared.tsx`.
  *
  * Craft Scope's Reactions chip lights up exactly when `scope` includes it
  * (issue #698 — Include Reactions on, or the plan's own activity is a
@@ -72,7 +73,7 @@ export function BuildPlanCraftSweepControl({
       <CraftScopeChips scope={scope} includePlanetary={false} />
       <IconButton
         size="sm"
-        icon={<Icon.Refresh />}
+        icon={<Icon.Run />}
         label={t('industry.craftSweepApply')}
         onClick={() => onApply({ strategy })}
         disabled={!canApply}

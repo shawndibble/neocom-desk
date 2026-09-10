@@ -65,6 +65,7 @@ import {
   Package,
   PencilSimple,
   Planet,
+  Play,
   Plus,
   Prohibit,
   Queue,
@@ -131,6 +132,8 @@ export const Descending = withWeight(ArrowDown);
 export const Refresh = withWeight(ArrowClockwise);
 /** Puts a field back to the value it would have had if nobody had touched it. Deliberately not `Refresh`, which fetches new data — these sit two controls apart on the Industry panel. */
 export const Revert = withWeight(ArrowCounterClockwise);
+/** Runs a local calculation right now — no fetch involved. Deliberately not `Refresh`, which re-fetches from ESI. */
+export const Run = withWeight(Play);
 /** Download the current view as CSV. */
 export const Download = withWeight(DownloadSimple);
 /** Search / filter. */

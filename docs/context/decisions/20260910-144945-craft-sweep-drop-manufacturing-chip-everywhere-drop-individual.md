@@ -15,7 +15,7 @@ _Recorded 2026-09-10 · issue #778._
   has.
 
 - **The single-plan control keeps a small icon-only re-run button
-  (`Icon.Refresh`, `IconButton`) beside the select, despite dropping the
+  (`Icon.Run`, `IconButton`) beside the select, despite dropping the
   labeled Apply button above.** A controlled `<select>` — Radix's own or a
   native one — never fires a change event for reselecting its
   already-shown value (`useControllableState`'s `if (value2 !== prop)`
@@ -25,7 +25,10 @@ _Recorded 2026-09-10 · issue #778._
   unreachable too. The icon button has no confirmation and no visible
   label — it stays far lighter than the group control's Apply-behind-a-
   confirm — but it is a genuine, if quiet, explicit press. On direct
-  instruction once this gap surfaced during implementation.
+  instruction once this gap surfaced during implementation. `Icon.Run` is a
+  new export (`icons.tsx`), deliberately not `Icon.Refresh` — that glyph is
+  documented as "re-fetch from ESI," and this button fetches nothing; it
+  re-runs a local calculation.
 
 - **`CraftScopeChips` (`craftSweepShared.tsx`) drops the Manufacturing chip
   entirely, on both surfaces.** `craftScope()` always includes
