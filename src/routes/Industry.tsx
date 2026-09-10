@@ -18,7 +18,7 @@ import {
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { beginEveLogin } from '@/app/loginFlow';
 import { useIsDesktop } from '@/lib/useIsDesktop';
-import type { MaterialSourcing, SkillLevels } from '@/engine/industry/types';
+import type { MaterialSourcing, OwnedStockScope, SkillLevels } from '@/engine/industry/types';
 import type { SweepStrategy } from '@/engine/industry/autoMakeOrBuy';
 import type { DepthChoice } from '@/features/industry/CraftSweepControl';
 import type { CharacterBlueprint } from '@/esi/endpoints';
@@ -70,6 +70,8 @@ import {
   renameBuildGroup,
   useBuildGroups,
   withGroupCraftSweepDefault,
+  withGroupOwnedStock,
+  withGroupOwnedStockScope,
   withGroupSnapshot,
   type BuildGroupSnapshot,
 } from '@/features/industry/buildGroups';
@@ -811,6 +813,21 @@ export function Industry() {
     scheduleSync(activeCharacterId);
   }
 
+  /** Group Owned Overlay (issue #697): writes the group's own owned-stock ledger wholesale. */
+  async function handleGroupOwnedStockChange(groupId: string, ownedStock: Record<number, number>) {
+    if (activeCharacterId === null) return;
+    await setBuildGroups(withGroupOwnedStock(buildGroups, activeCharacterId, groupId, ownedStock));
+  }
+
+  /** @see handleGroupOwnedStockChange */
+  async function handleGroupOwnedStockScopeChange(
+    groupId: string,
+    scope: OwnedStockScope | undefined
+  ) {
+    if (activeCharacterId === null) return;
+    await setBuildGroups(withGroupOwnedStockScope(buildGroups, activeCharacterId, groupId, scope));
+  }
+
   /** Creates a group and one plan per buildable item in a pasted fit, then opens it. */
   async function handleFitImport(preview: FitToBuildPlansResult) {
     if (activeCharacterId === null || !catalog) return;
@@ -1017,6 +1034,12 @@ export function Industry() {
                       }
                       onCraftSweep={(options) =>
                         handleCraftSweepGroup(selectedGroup.id, selectedGroupPlans, options)
+                      }
+                      onOwnedStockChange={(ownedStock) =>
+                        void handleGroupOwnedStockChange(selectedGroup.id, ownedStock)
+                      }
+                      onOwnedStockScopeChange={(scope) =>
+                        void handleGroupOwnedStockScopeChange(selectedGroup.id, scope)
                       }
                     />
                   ) : comparing ? (

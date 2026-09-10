@@ -51,7 +51,12 @@
  * live in the store at the bottom, the same split `customsOverride.ts` uses.
  */
 
-import { FACILITY_PRESETS, type FacilityKind, type SecurityBand } from '@/engine/industry/types';
+import {
+  FACILITY_PRESETS,
+  type FacilityKind,
+  type OwnedStockScope,
+  type SecurityBand,
+} from '@/engine/industry/types';
 import type { SweepStrategy } from '@/engine/industry/autoMakeOrBuy';
 import { coerceArrayEntry, parseCharacterKeyedRecord } from '@/lib/characterKeyedRecord';
 import { createSyncedSetting } from '@/lib/useSyncedSetting';
@@ -113,6 +118,21 @@ export interface BuildGroup {
   snapshot?: BuildGroupSnapshot;
   /** @see BuildGroupCraftSweepDefault */
   craftSweepDefault?: BuildGroupCraftSweepDefault;
+  /**
+   * The Group Owned Overlay's ledger (issue #697): units of each material
+   * typeID the group itself owns, keyed by typeID. Manual entry or ESI-detect
+   * (see `ownedStockScope`), independent of any member's own per-plan
+   * `materialSourcing.ownedQuantity` — see `CONTEXT.md`'s "Group Owned
+   * Overlay". Display-only: read by `rollUpBuildGroup`'s `ownedStock` option,
+   * never written back into a member plan.
+   */
+  ownedStock?: Record<number, number>;
+  /**
+   * Which locations count toward `ownedStock`'s own "use detected" totals —
+   * the same `OwnedStockScope` shape a Build Plan's own owned-stock entry
+   * uses, scoped here to the group instead of one plan.
+   */
+  ownedStockScope?: OwnedStockScope;
 }
 
 /** Every Character's groups, in one value — see the module comment. */
@@ -146,9 +166,47 @@ function usableCraftSweepDefault(value: unknown): value is BuildGroupCraftSweepD
   );
 }
 
+const LOCATION_TYPES = new Set(['station', 'solar_system', 'item', 'other']);
+
+function usableOwnedStockLocation(value: unknown): boolean {
+  if (typeof value !== 'object' || value === null) return false;
+  const { characterId, locationId, locationType } = value as Record<string, unknown>;
+  return (
+    typeof characterId === 'number' &&
+    Number.isFinite(characterId) &&
+    typeof locationId === 'number' &&
+    Number.isFinite(locationId) &&
+    typeof locationType === 'string' &&
+    LOCATION_TYPES.has(locationType)
+  );
+}
+
+function usableOwnedStockScope(value: unknown): value is OwnedStockScope {
+  if (typeof value !== 'object' || value === null) return false;
+  const { mode, locations } = value as { mode?: unknown; locations?: unknown };
+  if (mode === 'everywhere') return true;
+  return (
+    mode === 'selected' && Array.isArray(locations) && locations.every(usableOwnedStockLocation)
+  );
+}
+
+/** Every value a positive-or-zero, finite quantity — same clamp `MaterialSourcing.ownedQuantity` gets, applied to every key at once. */
+function usableOwnedStock(value: unknown): value is Record<number, number> {
+  if (typeof value !== 'object' || value === null) return false;
+  return Object.entries(value as Record<string, unknown>).every(
+    ([key, quantity]) =>
+      key !== '' &&
+      Number.isFinite(Number(key)) &&
+      typeof quantity === 'number' &&
+      Number.isFinite(quantity) &&
+      quantity >= 0
+  );
+}
+
 function usableGroup(value: unknown): value is BuildGroup {
   if (typeof value !== 'object' || value === null) return false;
-  const { id, name, order, snapshot, craftSweepDefault } = value as Partial<BuildGroup>;
+  const { id, name, order, snapshot, craftSweepDefault, ownedStock, ownedStockScope } =
+    value as Partial<BuildGroup>;
   return (
     typeof id === 'string' &&
     id !== '' &&
@@ -157,7 +215,9 @@ function usableGroup(value: unknown): value is BuildGroup {
     typeof order === 'number' &&
     Number.isFinite(order) &&
     (snapshot === undefined || usableSnapshot(snapshot)) &&
-    (craftSweepDefault === undefined || usableCraftSweepDefault(craftSweepDefault))
+    (craftSweepDefault === undefined || usableCraftSweepDefault(craftSweepDefault)) &&
+    (ownedStock === undefined || usableOwnedStock(ownedStock)) &&
+    (ownedStockScope === undefined || usableOwnedStockScope(ownedStockScope))
   );
 }
 
@@ -287,6 +347,46 @@ export function withGroupCraftSweepDefault(
     value,
     characterId,
     existing.map((g) => (g.id === groupId ? { ...g, craftSweepDefault } : g))
+  );
+}
+
+/**
+ * The value with one group's owned-stock ledger set (or replaced). Same
+ * no-op-for-a-missing-group guard as `withGroupSnapshot`.
+ */
+export function withGroupOwnedStock(
+  value: BuildGroupsValue,
+  characterId: number,
+  groupId: string,
+  ownedStock: Record<number, number>
+): BuildGroupsValue {
+  const existing = buildGroupsFor(value, characterId);
+  if (!existing.some((g) => g.id === groupId)) return value;
+  return withBuildGroups(
+    value,
+    characterId,
+    existing.map((g) => (g.id === groupId ? { ...g, ownedStock } : g))
+  );
+}
+
+/**
+ * The value with one group's owned-stock ledger scope set (or cleared back to
+ * the "everywhere" default — the same `undefined`-means-absent contract
+ * `OwnedStockScopeControl` already keeps for a plan's own scope). Same
+ * no-op-for-a-missing-group guard as `withGroupSnapshot`.
+ */
+export function withGroupOwnedStockScope(
+  value: BuildGroupsValue,
+  characterId: number,
+  groupId: string,
+  ownedStockScope: OwnedStockScope | undefined
+): BuildGroupsValue {
+  const existing = buildGroupsFor(value, characterId);
+  if (!existing.some((g) => g.id === groupId)) return value;
+  return withBuildGroups(
+    value,
+    characterId,
+    existing.map((g) => (g.id === groupId ? { ...g, ownedStockScope } : g))
   );
 }
 

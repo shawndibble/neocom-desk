@@ -43,6 +43,13 @@ export interface ComparedBuildRow {
   runs: number;
   loading: boolean;
   result: BuildResult | null;
+  /**
+   * The same plan resolved a second time with owned-stock deduction
+   * disabled — null unless `computeGroupResult` was requested (issue #697's
+   * Group Owned Overlay needs this; nothing else does, so it stays opt-in
+   * rather than doubling every caller's compute cost).
+   */
+  groupResult: BuildResult | null;
   /** Null once resolved successfully; a message when the plan couldn't be priced. */
   error: string | null;
 }
@@ -54,6 +61,8 @@ export interface UseComparedBuildResultsArgs {
   pi: PiData | null;
   ownedBlueprints: readonly CharacterBlueprint[];
   skills: SkillLevels;
+  /** @see ComparedBuildRow.groupResult */
+  computeGroupResult?: boolean;
 }
 
 /** A plan resolved far enough to ask for prices — what a snapshot request needs. */
@@ -80,6 +89,7 @@ function placeholderRow(plan: BuildPlanRecord, catalog: BlueprintCatalog): Compa
     runs: plan.runs,
     loading: true,
     result: null,
+    groupResult: null,
     error: null,
   };
 }
@@ -118,7 +128,8 @@ async function computeRow(
   catalog: BlueprintCatalog,
   priced: PricedPlan | null,
   skills: SkillLevels,
-  recipeFor: (typeID: number) => MaterialRecipe | null
+  recipeFor: (typeID: number) => MaterialRecipe | null,
+  computeGroupResult: boolean
 ): Promise<ComparedBuildRow> {
   const base = {
     planId: plan.id,
@@ -129,13 +140,12 @@ async function computeRow(
   };
 
   if (!priced) {
-    return { ...base, result: null, error: i18n.t('industry.blueprintMissing') };
+    return { ...base, result: null, groupResult: null, error: i18n.t('industry.blueprintMissing') };
   }
 
   try {
     const snap = await priced.snapshot;
-    const { result, error } = computeBuildPlan({
-      plan,
+    const common = {
       blueprint: priced.blueprint,
       systemCostIndex: snap.systemCostIndex ?? 0,
       adjustedPrices: snap.adjustedPrices ?? {},
@@ -143,10 +153,33 @@ async function computeRow(
       materialPrices: materialPricesFor(snap, plan.materialPriceBasis),
       skills,
       recipeFor,
-    });
-    return { ...base, result, error };
+    };
+    const { result, error } = computeBuildPlan({ plan, ...common });
+    // Same snapshot, priced a second time with owned-stock deduction
+    // disabled — the Group Owned Overlay (issue #697) needs each member's
+    // tree re-resolved this way; a member's own row above is untouched. Its
+    // own error surfaces on the row too (only reachable when the primary
+    // call above succeeded, since `error` already wins otherwise) — a member
+    // whose group computation alone failed must not silently vanish from the
+    // rollup with no explanation, the same "report your own row" contract
+    // every other failure mode here keeps.
+    let groupResult: BuildResult | null = null;
+    let groupError: string | null = null;
+    if (computeGroupResult) {
+      ({ result: groupResult, error: groupError } = computeBuildPlan({
+        plan,
+        ...common,
+        ignoreOwnedStock: true,
+      }));
+    }
+    return { ...base, result, groupResult, error: error ?? groupError };
   } catch (err) {
-    return { ...base, result: null, error: err instanceof Error ? err.message : String(err) };
+    return {
+      ...base,
+      result: null,
+      groupResult: null,
+      error: err instanceof Error ? err.message : String(err),
+    };
   }
 }
 
@@ -156,6 +189,7 @@ export function useComparedBuildResults({
   pi,
   ownedBlueprints,
   skills,
+  computeGroupResult = false,
 }: UseComparedBuildResultsArgs): ComparedBuildRow[] {
   const [rows, setRows] = useState<ComparedBuildRow[]>([]);
 
@@ -216,7 +250,7 @@ export function useComparedBuildResults({
       const priced = entry
         ? { blueprint: entry.blueprint, snapshot: snapshotByRequest.get(entry.request)! }
         : null;
-      void computeRow(plan, catalog, priced, skills, recipeFor).then((row) => {
+      void computeRow(plan, catalog, priced, skills, recipeFor, computeGroupResult).then((row) => {
         if (cancelled) return;
         setRows((prev) => prev.map((r) => (r.planId === plan.id ? row : r)));
       });
@@ -225,7 +259,16 @@ export function useComparedBuildResults({
     return () => {
       cancelled = true;
     };
-  }, [plansKey, catalog, pi, ownedBlueprints, assumedMe, assumedMeHydrated, skills]);
+  }, [
+    plansKey,
+    catalog,
+    pi,
+    ownedBlueprints,
+    assumedMe,
+    assumedMeHydrated,
+    skills,
+    computeGroupResult,
+  ]);
 
   return rows;
 }

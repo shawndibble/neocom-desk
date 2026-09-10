@@ -135,10 +135,15 @@ function result(materials: MaterialCostLine[]): BuildResult {
 }
 
 function row(planId: string, materials: MaterialCostLine[]): ComparedBuildRow {
+  const builtResult = result(materials);
   return {
     planId,
     planName: `Plan ${planId}`,
-    result: result(materials),
+    result: builtResult,
+    // The rollup reads `groupResult` (issue #697) — these fixtures have no
+    // owned-stock ledger in play, so the owned-disabled tree is the same
+    // materials the plan-level `result` already carries.
+    groupResult: builtResult,
     loading: false,
     error: null,
   } as ComparedBuildRow;
@@ -167,6 +172,7 @@ function renderPanel(
       depth: number;
       depthChoice: DepthChoice;
     }) => Promise<void>;
+    onOwnedStockChange?: (ownedStock: Record<number, number>) => void;
   } = {}
 ) {
   render(
@@ -181,6 +187,8 @@ function renderPanel(
       onCraftSweep={overrides.onCraftSweep ?? (() => Promise.resolve())}
       onOpenPlan={() => {}}
       onRetarget={() => {}}
+      onOwnedStockChange={overrides.onOwnedStockChange ?? (() => {})}
+      onOwnedStockScopeChange={() => {}}
     />
   );
 }
@@ -326,5 +334,23 @@ describe('BuildGroupPanel — Craft Sweep (issue #696)', () => {
         'This will overwrite manufacturing choices on 1 plan in this group — continue?'
       )
     ).toBeTruthy();
+  });
+});
+
+describe('BuildGroupPanel — Group Owned Overlay (issue #697)', () => {
+  it('commits a typed owned quantity into the group ledger, leaving the rest of it alone', async () => {
+    const user = userEvent.setup();
+    mockedUseComparedBuildResults.mockReturnValue([row('a', [material(34, 100)])]);
+    const onOwnedStockChange = vi.fn();
+    renderPanel([plan('a', 'jita')], {
+      group: { ...GROUP, ownedStock: { 35: 7 } },
+      onOwnedStockChange,
+    });
+
+    const input = screen.getByRole('textbox', { name: 'Owned quantity of Tritanium' });
+    await user.type(input, '50');
+    await user.tab();
+
+    expect(onOwnedStockChange).toHaveBeenCalledWith({ 35: 7, 34: 50 });
   });
 });

@@ -6,6 +6,7 @@
  * see FACILITY_PRESETS.npcStation.defaultTaxPct), and never throws.
  */
 import { buildVsBuy } from '@/engine/industry/buildVsBuy';
+import { withoutOwnedQuantities } from '@/engine/industry/materialResolution';
 import { FACILITY_PRESETS, MAX_JOB_RUNS, resolveRigFit } from '@/engine/industry/types';
 import type {
   AdjustedPrices,
@@ -41,6 +42,13 @@ export interface ComputeBuildPlanInput {
   skills: SkillLevels;
   /** What produces a material, for anything `plan.buildHere` might name at any depth. */
   recipeFor?: (typeID: number) => MaterialRecipe | null;
+  /**
+   * Resolves the tree as if the plan owned nothing (issue #697's Group Owned
+   * Overlay): `plan.materialSourcing`'s `ownedQuantity`s are stripped before
+   * the engine sees them, `overridePrice`s kept. The plan record itself is
+   * never touched — this only shapes what gets passed to `buildVsBuy`.
+   */
+  ignoreOwnedStock?: boolean;
 }
 
 export interface ComputeBuildPlanResult {
@@ -62,6 +70,7 @@ export function computeBuildPlan({
   materialPrices,
   skills,
   recipeFor,
+  ignoreOwnedStock,
 }: ComputeBuildPlanInput): ComputeBuildPlanResult {
   const facility = FACILITY_PRESETS[plan.facility];
   const runs = clampInt(plan.runs, 1, MAX_JOB_RUNS);
@@ -89,7 +98,9 @@ export function computeBuildPlan({
       adjustedPrices,
       hubPrices,
       materialPrices,
-      materialSourcing: plan.materialSourcing,
+      materialSourcing: ignoreOwnedStock
+        ? withoutOwnedQuantities(plan.materialSourcing)
+        : plan.materialSourcing,
       skills,
       buildHere: plan.buildHere,
       recipeFor,
