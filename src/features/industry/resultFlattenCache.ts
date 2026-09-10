@@ -10,11 +10,12 @@
  * exactly as long as the object it hangs off, and dies with it.
  */
 import type { BuildResult, MaterialCostLine } from '@/engine/industry/types';
-import { materialTableRows, shoppingListMaterials } from './subBuildPlan';
+import { materialTableRows, shoppingListMaterials, type MaterialTableRow } from './subBuildPlan';
 
 export interface FlattenedBuildResult {
   shopping: MaterialCostLine[];
-  table: MaterialCostLine[];
+  /** `subBuilds` intact — a caller that needs to know which rows are built reads it here. */
+  table: MaterialTableRow[];
 }
 
 const flattenedByResult = new WeakMap<BuildResult, FlattenedBuildResult>();
