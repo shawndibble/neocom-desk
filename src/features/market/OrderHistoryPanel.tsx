@@ -5,6 +5,7 @@ import {
   DataAgeBadge,
   DataTable,
   EmptyState,
+  FilterBar,
   FilterChip,
   IconButton,
   Panel,
@@ -25,6 +26,12 @@ import { downloadCsv } from '@/lib/downloadCsv';
 import { orderHistoryCsvColumns } from '@/features/character/ordersCsv';
 import type { MarketOrderHistory } from '@/esi/endpoints';
 import { HistoryViewSelect, type HistoryView } from './HistoryViewSelect';
+import {
+  activeHistoryFilterCount,
+  EMPTY_HISTORY_FILTER,
+  filterHistory,
+  type HistoryFilter,
+} from './orderHistoryFilter';
 
 /** Stable identity, so the fallback doesn't invalidate the column memo every render. */
 const NO_TYPE_NAMES: ReadonlyMap<number, string> = new Map();
@@ -54,29 +61,6 @@ async function loadOrderHistorySnapshot(
   return { historyResult, historyNeedsReauth, historyTruncated, typeNames };
 }
 
-interface HistoryFilter {
-  text: string;
-  side: 'buy' | 'sell' | null;
-  state: MarketOrderHistory['state'] | null;
-}
-
-const EMPTY_HISTORY_FILTER: HistoryFilter = { text: '', side: null, state: null };
-
-function filterHistory(
-  history: readonly MarketOrderHistory[],
-  filter: HistoryFilter,
-  typeNames: ReadonlyMap<number, string>
-): MarketOrderHistory[] {
-  const query = filter.text.trim().toLowerCase();
-  return history.filter((order) => {
-    if (filter.side === 'buy' && !order.is_buy_order) return false;
-    if (filter.side === 'sell' && order.is_buy_order) return false;
-    if (filter.state && order.state !== filter.state) return false;
-    if (query && !(typeNames.get(order.type_id) ?? '').toLowerCase().includes(query)) return false;
-    return true;
-  });
-}
-
 interface HistoryFilterBarProps {
   filter: HistoryFilter;
   onChange: (filter: HistoryFilter) => void;
@@ -86,38 +70,49 @@ interface HistoryFilterBarProps {
 function HistoryFilterBar({ filter, onChange }: HistoryFilterBarProps) {
   const { t } = useTranslation();
   return (
-    <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2">
-      <SearchInput
-        value={filter.text}
-        onChange={(event) => onChange({ ...filter, text: event.target.value })}
-        placeholder={t('orders.searchPlaceholder')}
-        className="min-w-48 flex-1"
-      />
-      <FilterChip
-        label={t('orders.buy')}
-        selected={filter.side === 'buy'}
-        onToggle={() => onChange({ ...filter, side: filter.side === 'buy' ? null : 'buy' })}
-      />
-      <FilterChip
-        label={t('orders.sell')}
-        selected={filter.side === 'sell'}
-        onToggle={() => onChange({ ...filter, side: filter.side === 'sell' ? null : 'sell' })}
-      />
-      <FilterChip
-        label={t('orders.stateExpired')}
-        selected={filter.state === 'expired'}
-        onToggle={() =>
-          onChange({ ...filter, state: filter.state === 'expired' ? null : 'expired' })
-        }
-      />
-      <FilterChip
-        label={t('orders.stateCancelled')}
-        selected={filter.state === 'cancelled'}
-        onToggle={() =>
-          onChange({ ...filter, state: filter.state === 'cancelled' ? null : 'cancelled' })
-        }
-      />
-    </div>
+    <FilterBar
+      value={filter}
+      onChange={onChange}
+      activeCount={activeHistoryFilterCount(filter)}
+      className="border-b border-line px-3 py-2"
+      search={
+        <SearchInput
+          value={filter.text}
+          onChange={(event) => onChange({ ...filter, text: event.target.value })}
+          placeholder={t('orders.searchPlaceholder')}
+          className="min-w-48 flex-1"
+        />
+      }
+    >
+      {(draft, setDraft) => (
+        <>
+          <FilterChip
+            label={t('orders.buy')}
+            selected={draft.side === 'buy'}
+            onToggle={() => setDraft({ ...draft, side: draft.side === 'buy' ? null : 'buy' })}
+          />
+          <FilterChip
+            label={t('orders.sell')}
+            selected={draft.side === 'sell'}
+            onToggle={() => setDraft({ ...draft, side: draft.side === 'sell' ? null : 'sell' })}
+          />
+          <FilterChip
+            label={t('orders.stateExpired')}
+            selected={draft.state === 'expired'}
+            onToggle={() =>
+              setDraft({ ...draft, state: draft.state === 'expired' ? null : 'expired' })
+            }
+          />
+          <FilterChip
+            label={t('orders.stateCancelled')}
+            selected={draft.state === 'cancelled'}
+            onToggle={() =>
+              setDraft({ ...draft, state: draft.state === 'cancelled' ? null : 'cancelled' })
+            }
+          />
+        </>
+      )}
+    </FilterBar>
   );
 }
 
