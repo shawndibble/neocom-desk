@@ -1,6 +1,6 @@
-# Scope decisions — Industry build plan list also scrolls with the page, not inside itself (issue #737)
+# Scope decisions — Industry build plan list also scrolls with the page, not inside itself
 
-_Recorded 2026-09-10 · issue #737._
+_Recorded 2026-09-10._
 
 - **The Build Plan list pane no longer gets its own `max-h-[28rem]`
   `overflow-y-auto` inner scroller either.** This reverses the "the list
