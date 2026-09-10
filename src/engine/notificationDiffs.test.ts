@@ -22,6 +22,9 @@ import {
   diffCorpMemberJoined,
   diffCorpMemberLeft,
   diffCorpWalletThreshold,
+  diffPriceAlertTriggered,
+  type PriceAlertEntrySnapshot,
+  type PriceAlertSnapshot,
   type SkillQueueEntrySnapshot,
   type SkillQueueSnapshot,
   type IndustryJobEntrySnapshot,
@@ -1825,5 +1828,123 @@ describe('diffCorpWalletThreshold', () => {
     const prev = corpWalletSnapshot([walletDivision({ division: 2, journal: [] })], T0);
     const next = corpWalletSnapshot([walletDivision({ division: 2, journal: [] })], T0 + FIVE_MIN);
     expect(diffCorpWalletThreshold(7, prev, next)).toEqual([]);
+  });
+});
+
+function priceAlertEntry(
+  overrides: Partial<PriceAlertEntrySnapshot> & Pick<PriceAlertEntrySnapshot, 'typeId'>
+): PriceAlertEntrySnapshot {
+  return {
+    name: 'Tritanium',
+    targetPrice: 5,
+    direction: 'above',
+    price: null,
+    ...overrides,
+  };
+}
+
+function priceAlertSnapshot(
+  entries: readonly PriceAlertEntrySnapshot[],
+  nowMs: number
+): PriceAlertSnapshot {
+  return { entries, nowMs };
+}
+
+describe('diffPriceAlertTriggered', () => {
+  it('fires nothing on the first-ever poll', () => {
+    const next = priceAlertSnapshot([priceAlertEntry({ typeId: 34, price: 10 })], T0);
+    expect(diffPriceAlertTriggered(1, undefined, next)).toEqual([]);
+  });
+
+  it('fires when the price newly crosses at/above the target', () => {
+    const prev = priceAlertSnapshot([priceAlertEntry({ typeId: 34, price: 4 })], T0);
+    const next = priceAlertSnapshot([priceAlertEntry({ typeId: 34, price: 6 })], T0 + FIVE_MIN);
+    expect(diffPriceAlertTriggered(7, prev, next)).toEqual([
+      {
+        eventId: 'priceAlertTriggered',
+        characterId: 7,
+        typeId: 34,
+        name: 'Tritanium',
+        price: 6,
+        targetPrice: 5,
+        direction: 'above',
+      },
+    ]);
+  });
+
+  it('fires when the price newly crosses at/below the target', () => {
+    const prev = priceAlertSnapshot(
+      [priceAlertEntry({ typeId: 34, direction: 'below', targetPrice: 5, price: 6 })],
+      T0
+    );
+    const next = priceAlertSnapshot(
+      [priceAlertEntry({ typeId: 34, direction: 'below', targetPrice: 5, price: 4 })],
+      T0 + FIVE_MIN
+    );
+    expect(diffPriceAlertTriggered(7, prev, next)).toEqual([
+      {
+        eventId: 'priceAlertTriggered',
+        characterId: 7,
+        typeId: 34,
+        name: 'Tritanium',
+        price: 4,
+        targetPrice: 5,
+        direction: 'below',
+      },
+    ]);
+  });
+
+  it('does not fire while the price has not yet crossed the target', () => {
+    const prev = priceAlertSnapshot([priceAlertEntry({ typeId: 34, price: 3 })], T0);
+    const next = priceAlertSnapshot([priceAlertEntry({ typeId: 34, price: 4 })], T0 + FIVE_MIN);
+    expect(diffPriceAlertTriggered(7, prev, next)).toEqual([]);
+  });
+
+  it('does not re-fire for a target already crossed as of the previous poll', () => {
+    const prev = priceAlertSnapshot([priceAlertEntry({ typeId: 34, price: 6 })], T0);
+    const next = priceAlertSnapshot([priceAlertEntry({ typeId: 34, price: 7 })], T0 + FIVE_MIN);
+    expect(diffPriceAlertTriggered(7, prev, next)).toEqual([]);
+  });
+
+  it('fires for a target discovered already crossed (new to this poll)', () => {
+    const prev = priceAlertSnapshot([], T0);
+    const next = priceAlertSnapshot([priceAlertEntry({ typeId: 34, price: 6 })], T0 + FIVE_MIN);
+    expect(diffPriceAlertTriggered(7, prev, next)).toEqual([
+      expect.objectContaining({ typeId: 34, price: 6 }),
+    ]);
+  });
+
+  it('skips an item with no hub price rather than firing a false alert (AC4)', () => {
+    const prev = priceAlertSnapshot([priceAlertEntry({ typeId: 34, price: null })], T0);
+    const next = priceAlertSnapshot([priceAlertEntry({ typeId: 34, price: null })], T0 + FIVE_MIN);
+    expect(diffPriceAlertTriggered(7, prev, next)).toEqual([]);
+  });
+
+  it('re-fires when the target price is edited, even though the old target already fired (AC: editing stops the old target, not the item)', () => {
+    const prev = priceAlertSnapshot(
+      [priceAlertEntry({ typeId: 34, targetPrice: 5, price: 6 })],
+      T0
+    );
+    const next = priceAlertSnapshot(
+      [priceAlertEntry({ typeId: 34, targetPrice: 10, price: 12 })],
+      T0 + FIVE_MIN
+    );
+    expect(diffPriceAlertTriggered(7, prev, next)).toEqual([
+      expect.objectContaining({ typeId: 34, targetPrice: 10, price: 12 }),
+    ]);
+  });
+
+  it('re-fires when the direction is edited, even though the old direction already fired', () => {
+    const prev = priceAlertSnapshot(
+      [priceAlertEntry({ typeId: 34, direction: 'above', targetPrice: 5, price: 6 })],
+      T0
+    );
+    const next = priceAlertSnapshot(
+      [priceAlertEntry({ typeId: 34, direction: 'below', targetPrice: 5, price: 4 })],
+      T0 + FIVE_MIN
+    );
+    expect(diffPriceAlertTriggered(7, prev, next)).toEqual([
+      expect.objectContaining({ typeId: 34, direction: 'below' }),
+    ]);
   });
 });

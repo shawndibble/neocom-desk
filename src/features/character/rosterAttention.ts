@@ -29,6 +29,7 @@ import { extractorProgramsFromPins } from '@/features/pi/adapters';
 import { colonyAttention, colonyStatus, sortColoniesByAttention } from '@/engine/pi/colonyStatus';
 import type { ColonyAttention, ColonyStatus } from '@/engine/pi/types';
 import { runningJobCountsByCategory, type JobSlotCategory } from '@/engine/industry/jobSlots';
+import { toJobSlotJobs } from '@/features/character/jobSlotSkills';
 
 const JOBS_SCOPE = ESI_REGISTRY.getCharacterIndustryJobs.scope;
 const PLANETS_SCOPE = ESI_REGISTRY.getCharacterPlanets.scope;
@@ -59,11 +60,6 @@ function emptyEntry(characterId: number): AttentionEntry {
     piSoonestExpiryMs: undefined,
     piFetchedAt: null,
   };
-}
-
-/** `IndustryJob[]` -> `engine/industry/jobSlots.ts`'s named shape, the ESI/engine boundary adaptation. */
-function toJobSlotJobs(jobs: readonly IndustryJob[]) {
-  return jobs.map((job) => ({ activityId: job.activity_id, endMs: Date.parse(job.end_date) }));
 }
 
 async function grantedScopesByCharacter(

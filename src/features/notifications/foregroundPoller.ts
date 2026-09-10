@@ -165,7 +165,11 @@ function reachesAnyChannel(
   );
 }
 
-/** Which of a set of candidate events this character is eligible for right now: has the scope, and reaches at least one live channel. */
+/**
+ * Which of a set of candidate events this character is eligible for right
+ * now: has the scope (or, for `priceAlertTriggered`, needs none at all — see
+ * `NotificationEventDef.scope`), and reaches at least one live channel.
+ */
 function enabledEventsFor(
   eventIds: readonly NotificationEventId[],
   scopes: ReadonlySet<string>,
@@ -175,7 +179,8 @@ function enabledEventsFor(
   const enabled = new Set<NotificationEventId>();
   for (const eventId of eventIds) {
     const scope = SCOPE_BY_EVENT.get(eventId);
-    if (scope && scopes.has(scope) && reachesAnyChannel(eventPrefs, eventId, channels)) {
+    const hasScope = scope === undefined || scopes.has(scope);
+    if (hasScope && reachesAnyChannel(eventPrefs, eventId, channels)) {
       enabled.add(eventId);
     }
   }
@@ -366,12 +371,22 @@ async function runForegroundPollOnce(deps: PollDependencies): Promise<void> {
 
   // `run.next` still holds the baseline every diff above compared against; it
   // is only advanced now that every character has been diffed.
+  const touchedRuns = new Set<DomainRun>();
   for (const update of updates) {
     for (const [run, snapshot] of update.snapshots) {
       run.next = withCharacterSnapshot(run.next, update.characterId, snapshot);
+      touchedRuns.add(run);
     }
   }
-  await Promise.all(runs.map((run) => run.state.save(run.next)));
+  // Only the domains some character's fetch actually reached this poll — not
+  // every registered domain. Before `priceAlertTriggered` (issue #680), every
+  // domain needed a scope, so `updates.length > 0` almost always meant every
+  // fetched domain belonged to the same handful of characters; now that one
+  // domain needs no scope at all, it alone can make `updates` non-empty on a
+  // poll where every other domain was skipped (no scope, truncated load,
+  // etc.) — saving `runs` unconditionally would then rewrite every other
+  // domain's untouched baseline back to Dexie on every single poll.
+  await Promise.all([...touchedRuns].map((run) => run.state.save(run.next)));
 
   const charactersById = new Map(characters.map((c) => [c.characterId, c]));
   for (const update of updates) {
@@ -664,6 +679,16 @@ async function notificationText(
         character: character.name,
         division: fire.division,
         amount: formatIsk(Math.abs(fire.amount), 2),
+      }),
+    };
+  }
+  if (fire.eventId === 'priceAlertTriggered') {
+    return {
+      title: i18n.t('notifications.fired.priceAlertTriggered.title'),
+      body: i18n.t(`notifications.fired.priceAlertTriggered.${fire.direction}Body`, {
+        item: fire.name,
+        price: formatIsk(fire.price, 2),
+        target: formatIsk(fire.targetPrice, 2),
       }),
     };
   }

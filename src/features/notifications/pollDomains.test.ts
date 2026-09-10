@@ -14,9 +14,13 @@ import {
   corpIndustryJobDomain,
   corpRosterDomain,
   corpWalletDomain,
+  priceAlertDomain,
   gatedOn,
   deriveMarketOrderEntries,
 } from './pollDomains';
+import { getHubPrices } from '@/market/prices';
+import { useMarketHub } from '@/features/market/hub';
+import { getTradeHub } from '@/market/hubs';
 import {
   useNotificationPreferences,
   DEFAULT_NOTIFICATION_PREFERENCES,
@@ -82,6 +86,7 @@ vi.mock('@/features/pi/data', () => ({
   loadCharacterPlanets: vi.fn(),
   loadAllColonyDetails: vi.fn(),
 }));
+vi.mock('@/market/prices', () => ({ getHubPrices: vi.fn() }));
 
 function statusResult<T>(data: T, truncated: boolean): StatusResult<T> {
   return {
@@ -768,6 +773,64 @@ describe('corp domains', () => {
         balanceFloorIsk: 50_000_000,
         transactionCeilingIsk: 100_000_000,
       },
+    ]);
+  });
+});
+
+describe('priceAlertDomain', () => {
+  beforeEach(async () => {
+    vi.mocked(getHubPrices).mockReset();
+    await db.quickbars.clear();
+    useMarketHub.setState({ value: 'jita', hydrated: true });
+  });
+
+  it('fetches no prices and loads no entries when nothing in Quickbar has a target', async () => {
+    await db.quickbars.put({
+      id: '1',
+      characterId: 1,
+      items: [{ typeId: 34, name: 'Tritanium' }],
+      updatedAt: 0,
+    });
+    expect(await priceAlertDomain.load(1)).toEqual([]);
+    expect(getHubPrices).not.toHaveBeenCalled();
+  });
+
+  it('loads no entries when the Character has no Quickbar record at all', async () => {
+    expect(await priceAlertDomain.load(1)).toEqual([]);
+    expect(getHubPrices).not.toHaveBeenCalled();
+  });
+
+  it('prices only the Quickbar items carrying a target, at the current hub', async () => {
+    await db.quickbars.put({
+      id: '1',
+      characterId: 1,
+      items: [
+        { typeId: 34, name: 'Tritanium', targetPrice: 5, targetDirection: 'above' },
+        { typeId: 35, name: 'Pyerite' },
+      ],
+      updatedAt: 0,
+    });
+    vi.mocked(getHubPrices).mockResolvedValue(
+      new Map([[34, { sellMin: 6, buyMax: 4, sellVolume: 1, buyVolume: 1 }]])
+    );
+    const entries = await priceAlertDomain.load(1);
+    expect(entries).toEqual([
+      { typeId: 34, name: 'Tritanium', targetPrice: 5, direction: 'above', price: 6 },
+    ]);
+    expect(getHubPrices).toHaveBeenCalledWith(getTradeHub('jita'), [34]);
+  });
+
+  it('carries a null price rather than guessing one, when the hub has no aggregate for the type (AC4)', async () => {
+    await db.quickbars.put({
+      id: '1',
+      characterId: 1,
+      items: [{ typeId: 34, name: 'Tritanium', targetPrice: 5, targetDirection: 'above' }],
+      updatedAt: 0,
+    });
+    vi.mocked(getHubPrices).mockResolvedValue(new Map());
+    const entries = await priceAlertDomain.load(1);
+    expect(entries).toEqual([
+      { typeId: 34, name: 'Tritanium', targetPrice: 5, direction: 'above', price: null },
     ]);
   });
 });

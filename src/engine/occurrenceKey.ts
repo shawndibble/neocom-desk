@@ -49,6 +49,7 @@ import type {
   CorpMemberLeftFire,
   CorpWalletThresholdFire,
   StructureReinforcementExitFire,
+  PriceAlertTriggeredFire,
 } from './notificationDiffs';
 
 /**
@@ -76,7 +77,8 @@ export type OccurrenceFire =
   | CorpMemberJoinedFire
   | CorpMemberLeftFire
   | CorpWalletThresholdFire
-  | StructureReinforcementExitFire;
+  | StructureReinforcementExitFire
+  | PriceAlertTriggeredFire;
 
 const DAY_MS = 86_400_000;
 
@@ -132,6 +134,12 @@ export function occurrenceKey(fire: OccurrenceFire, nowMs: number): string {
       return fire.kind === 'transactionAbove'
         ? [characterId, fire.eventId, fire.kind, fire.division, fire.journalEntryId].join(':')
         : [characterId, fire.eventId, fire.kind, fire.division, dayBucket(nowMs)].join(':');
+    // The re-fire identity `diffPriceAlertTriggered` itself diffs against
+    // (`20260909-192510-quickbar-price-alerts-re-arm-key-hub-price.md`): an
+    // edited target price or direction is a distinct occurrence, not a
+    // re-observation of the old one.
+    case 'priceAlertTriggered':
+      return [characterId, fire.eventId, fire.typeId, fire.targetPrice, fire.direction].join(':');
     default: {
       const exhaustive: never = fire;
       throw new Error(`occurrenceKey: unhandled Notification Event ${JSON.stringify(exhaustive)}`);
@@ -186,6 +194,10 @@ export function occurrenceFiredAt(fire: OccurrenceFire, nowMs: number): number {
     case 'corpMemberJoined':
     case 'corpMemberLeft':
     case 'corpWalletThreshold':
+    // A price crossing has no timestamp of its own (issue #680) — Fuzzwork's
+    // aggregate carries no "as of" time finer than the poll that read it.
+    // falls through
+    case 'priceAlertTriggered':
       return nowMs;
     default: {
       const exhaustive: never = fire;

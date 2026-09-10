@@ -45,7 +45,7 @@ import { DEFAULT_TRADE_HUB } from '@/market/hubs';
 import { PriceHistoryPanel } from '@/features/market/PriceHistoryPanel';
 import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
 import {
-  resolveCharacterFilter,
+  useResolvedCharacterFilter,
   type CharacterFilterValue,
 } from '@/features/character/characterFilterValue';
 import type { BlueprintCatalog } from './blueprintCatalog';
@@ -116,23 +116,13 @@ export function OpportunitiesPanel({
   );
 
   const [characterFilter, setCharacterFilter] = useState<CharacterFilterValue>('current');
-  // Memoized rather than re-resolved every render like the other
-  // `CharacterFilterControl` call sites: `'current'` resolves to a *fresh*
-  // `Set` each call, and here that identity reaches `characterIds` and through
-  // it the blueprint-loading effect's dep array — so the effect re-fired on
-  // every commit and render -> effect -> setState never settled, until React
-  // threw "Maximum update depth exceeded" (error #185).
-  //
-  // What makes this site fatal is the *effect*, not the dep array: both
-  // `ActiveJobsPanel` and `Wallet` also drop their resolved filter into
-  // `useMemo` deps, so those memos recompute on every render — waste, since
-  // they end up memoizing nothing, but no `setState` follows them and nothing
-  // loops. Any new call site that routes a resolved filter into an effect
-  // needs this same memo.
-  const resolvedCharacterIds = useMemo(
-    () => resolveCharacterFilter(characterFilter, activeCharacterId),
-    [characterFilter, activeCharacterId]
-  );
+  // `useResolvedCharacterFilter`, not the raw `resolveCharacterFilter`: this
+  // panel's resolved filter feeds `characterIds` and through it the
+  // blueprint-loading effect's dep array below, and the raw function
+  // allocates a fresh `Set` per call for `'current'` — routing that
+  // unmemoized identity into an effect dep array is exactly what caused an
+  // infinite render loop here before (issue #675, React error #185).
+  const resolvedCharacterIds = useResolvedCharacterFilter(characterFilter, activeCharacterId);
   const characterIds = useMemo(
     () =>
       resolvedCharacterIds === 'all'

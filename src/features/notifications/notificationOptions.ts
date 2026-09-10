@@ -68,6 +68,11 @@ export const NOTIFICATION_ROUTES: Record<NotificationEventId, string> = {
   corpMemberJoined: '/corp/members',
   corpMemberLeft: '/corp/members',
   corpWalletThreshold: '/corp',
+  // `notificationUrlForSubject` adds `?type=` below — Market Browser's own
+  // item-selection param (`engine/market/urlState.ts`'s `buildMarketParams`),
+  // not `HIGHLIGHT_PARAM`: Market Browser selects an item by that param on
+  // load rather than pulsing a table row.
+  priceAlertTriggered: '/market',
 };
 
 export const NOTIFICATION_FALLBACK_ROUTE = '/alerts';
@@ -168,6 +173,12 @@ const SUBJECT_ROUTES: Partial<Record<NotificationEventId, SubjectRoute>> = {
   industryJobComplete: { subjectOf: (fire) => fire.jobId, url: highlightRow },
   // The new member's roster row.
   corpMemberJoined: { subjectOf: (fire) => fire.memberCharacterId, url: highlightRow },
+  // The item itself, selected via Market Browser's own `?type=` param rather
+  // than a pulsed table row — there is no table on arrival to pulse.
+  priceAlertTriggered: {
+    subjectOf: (fire) => fire.typeId,
+    url: (base, subjectId) => withParam(base, 'type', String(subjectId)),
+  },
 };
 
 /**

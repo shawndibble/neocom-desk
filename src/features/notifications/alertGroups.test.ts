@@ -103,6 +103,10 @@ describe('alertSeverity', () => {
     expect(alertSeverity({ kind: 'event', eventId: 'marketOrderFilled' })).toBe('clear');
   });
 
+  it('treats a crossed price target as news, like a filled order', () => {
+    expect(alertSeverity({ kind: 'event', eventId: 'priceAlertTriggered' })).toBe('clear');
+  });
+
   it('puts something that stopped happening above something that finished', () => {
     // Nothing training is a standing fault; a level completing is an FYI.
     expect(alertSeverity({ kind: 'event', eventId: 'characterNotTraining' })).toBe('warning');

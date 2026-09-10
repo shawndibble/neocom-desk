@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import type { ReactElement } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useHighlightParam } from '@/lib/useHighlightParam';
@@ -21,6 +22,7 @@ import {
 import * as Icon from '@/components/ui/icons';
 import { beginEveLogin } from '@/app/loginFlow';
 import { loadContracts } from '@/features/character/contracts';
+import { ContractContextMenu } from '@/features/character/ContractContextMenu';
 import { ContractDetailModal } from '@/features/character/ContractDetailModal';
 import { IssuerLink } from '@/features/character/IssuerLink';
 import { CONTRACT_STATUS_KEY, CONTRACT_TYPE_KEY } from '@/features/character/contractLabels';
@@ -162,6 +164,10 @@ function ContractsFilterBar({
       )}
     </FilterBar>
   );
+}
+
+function contractRowContextMenu(contract: Contract, tr: ReactElement) {
+  return <ContractContextMenu contract={contract}>{tr}</ContractContextMenu>;
 }
 
 /** Contracts: table with status chips, stale offers dimmed, detail on click. Read-only, cached for offline. */
@@ -363,6 +369,7 @@ export function Contracts() {
                 rowKey={(contract) => contract.contract_id}
                 highlightRowKey={highlightedContractId}
                 rowClassName={(contract) => (isStale(contract) ? 'opacity-50' : undefined)}
+                rowContextMenu={contractRowContextMenu}
               />
               {!showAll && filteredContracts.length > ROW_CAP && (
                 <div className="px-3 py-2">

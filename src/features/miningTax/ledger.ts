@@ -13,6 +13,7 @@ import { getCharacterMining } from '@/esi/endpoints';
 import { loadPaginatedWithCacheStatus, type StatusResult } from '@/esi/cache';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
 import { groupMiningLedger } from '@/engine/miningTax/groupLedger';
+import { groupMiningYield, type MiningYieldEntry } from '@/engine/miningTax/yieldGrouping';
 import type { MiningLedgerEntry, MiningLedgerRow } from '@/engine/miningTax/types';
 import { loadMoonOreTypeIds, loadOreAndIceTypeIds } from '@/sde/loadSde';
 import { loadManualIgnoredTypeIds, loadManualMoonOreTypeIds } from './typeOverrides';
@@ -90,6 +91,57 @@ export async function loadAllCharacterLedgers(): Promise<CharacterMiningLedger[]
         cached.data.filter((row) => !oreAndIceSet.has(row.type_id)).map((row) => row.type_id)
       ),
     ].sort((a, b) => a - b);
+  });
+
+  return results;
+}
+
+export interface CharacterMiningYield {
+  characterId: number;
+  characterName: string;
+  /** Every ore/ice entry, moon ore included — the Mining Yield Overview tab (issue #671), unfiltered by `groupMiningLedger`'s moon-ore-only allowlist. */
+  entries: MiningYieldEntry[];
+  needsReauth: boolean;
+  fetchedAt: Date | null;
+  fromCache: boolean;
+}
+
+/**
+ * Every tracked character's Mining Yield entries at once — the Overview
+ * tab's data (issue #671), distinct from `loadAllCharacterLedgers`'s
+ * moon-ore-only entries even though both read the same cached ledger rows
+ * (`loadMiningLedger`, so this costs no extra ESI call when the Tax tab has
+ * already loaded this refresh). Same allowlist union and fan-out shape as
+ * `loadAllCharacterLedgers`; see that function's doc for why "ignored"
+ * type_ids still count here.
+ */
+export async function loadAllCharacterYields(): Promise<CharacterMiningYield[]> {
+  const characters: CharacterRecord[] = await db.characters.toArray();
+  if (characters.length === 0) return [];
+
+  const [oreAndIceTypeIds, manualMoonOreOverrides, manualIgnored] = await Promise.all([
+    loadOreAndIceTypeIds(),
+    loadManualMoonOreTypeIds(),
+    loadManualIgnoredTypeIds(),
+  ]);
+  const oreAndIceSet = new Set([...oreAndIceTypeIds, ...manualMoonOreOverrides, ...manualIgnored]);
+
+  const results: CharacterMiningYield[] = characters.map((c) => ({
+    characterId: c.characterId,
+    characterName: c.name,
+    entries: [],
+    needsReauth: false,
+    fetchedAt: null,
+    fromCache: true,
+  }));
+
+  await mapWithConcurrencyLimit(results, ESI_FANOUT_CONCURRENCY, async (result) => {
+    const { cached, needsReauth } = await loadMiningLedger(result.characterId);
+    result.needsReauth = needsReauth;
+    if (!cached) return;
+    result.fetchedAt = cached.fetchedAt;
+    result.fromCache = cached.fromCache;
+    result.entries = groupMiningYield(cached.data, result.characterId, oreAndIceSet);
   });
 
   return results;

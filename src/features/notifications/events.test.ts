@@ -24,6 +24,7 @@ describe('NOTIFICATION_EVENTS', () => {
       'corpMemberJoined',
       'corpMemberLeft',
       'corpWalletThreshold',
+      'priceAlertTriggered',
     ]);
   });
 
@@ -117,5 +118,18 @@ describe('NOTIFICATION_EVENTS', () => {
     // feed-on/browser-off, not both-on.
     expect(isEveTypeEnabledFor({}, 'BillOutOfMoneyMsg', 'browser')).toBe(false);
     expect(isEveTypeEnabledFor({}, 'BillOutOfMoneyMsg', 'feed')).toBe(true);
+  });
+
+  /**
+   * priceAlertTriggered (issue #680) needs no ESI OAuth scope at all —
+   * pricing is the public Fuzzwork aggregate path and the Quickbar list is
+   * local Dexie data — so it is the one event this catalog leaves `scope`
+   * unset for, rather than borrowing an unrelated scope as a fake gate
+   * (`20260909-192510-quickbar-price-alerts-re-arm-key-hub-price.md`).
+   */
+  it('gives priceAlertTriggered no scope, since it needs no ESI grant', () => {
+    const event = NOTIFICATION_EVENTS.find((e) => e.id === 'priceAlertTriggered');
+    expect(event?.scope).toBeUndefined();
+    expect(event?.corpCapability).toBeUndefined();
   });
 });

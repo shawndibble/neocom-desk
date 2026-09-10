@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { db } from '@/db';
-import { loadAllCharacterLedgers } from './ledger';
+import { loadAllCharacterLedgers, loadAllCharacterYields } from './ledger';
 import { tagAsIgnored, tagAsMoonOre } from './typeOverrides';
 
 const MOON_ORE = 45490; // Zeolites
@@ -135,5 +135,82 @@ describe('loadAllCharacterLedgers', () => {
     const [ledger] = await loadAllCharacterLedgers();
     expect(ledger.entries).toEqual([]);
     expect(ledger.fetchedAt).toBeNull();
+  });
+});
+
+describe('loadAllCharacterYields', () => {
+  it('returns [] when no characters are tracked', async () => {
+    expect(await loadAllCharacterYields()).toEqual([]);
+  });
+
+  it('groups both moon ore and ordinary ore into entries, unlike the moon-ore-only ledger', async () => {
+    await seedCharacter(CHAR_A, 'Pilot A');
+    await seedLedger(CHAR_A, [
+      { date: '2026-09-04', quantity: 100, solar_system_id: 1, type_id: MOON_ORE },
+      { date: '2026-09-04', quantity: 500, solar_system_id: 1, type_id: ORDINARY_ORE },
+    ]);
+
+    const [yield_] = await loadAllCharacterYields();
+
+    expect(yield_.entries).toEqual([
+      {
+        characterId: CHAR_A,
+        date: '2026-09-04',
+        solarSystemId: 1,
+        oreLines: [
+          { typeId: ORDINARY_ORE, quantity: 500 },
+          { typeId: MOON_ORE, quantity: 100 },
+        ],
+      },
+    ]);
+  });
+
+  it('drops a type_id recognized by neither the ore/ice allowlist nor a manual tag', async () => {
+    await seedCharacter(CHAR_A, 'Pilot A');
+    await seedLedger(CHAR_A, [
+      { date: '2026-09-04', quantity: 100, solar_system_id: 1, type_id: ORDINARY_ORE },
+      { date: '2026-09-04', quantity: 1, solar_system_id: 1, type_id: UNKNOWN_TYPE },
+    ]);
+
+    const [yield_] = await loadAllCharacterYields();
+
+    expect(yield_.entries[0].oreLines).toEqual([{ typeId: ORDINARY_ORE, quantity: 100 }]);
+  });
+
+  it('includes an "ignored" manual tag, since Ignore means ordinary ore/ice, not junk', async () => {
+    await seedCharacter(CHAR_A, 'Pilot A');
+    await seedLedger(CHAR_A, [
+      { date: '2026-09-04', quantity: 1, solar_system_id: 1, type_id: UNKNOWN_TYPE },
+    ]);
+    await tagAsIgnored(UNKNOWN_TYPE);
+
+    const [yield_] = await loadAllCharacterYields();
+
+    expect(yield_.entries).toEqual([
+      {
+        characterId: CHAR_A,
+        date: '2026-09-04',
+        solarSystemId: 1,
+        oreLines: [{ typeId: UNKNOWN_TYPE, quantity: 1 }],
+      },
+    ]);
+  });
+
+  it('reads every tracked character independently, one yield each', async () => {
+    await seedCharacter(CHAR_A, 'Pilot A');
+    await seedCharacter(CHAR_B, 'Pilot B');
+    await seedLedger(CHAR_A, [
+      { date: '2026-09-04', quantity: 10, solar_system_id: 1, type_id: ORDINARY_ORE },
+    ]);
+    await seedLedger(CHAR_B, [
+      { date: '2026-09-05', quantity: 20, solar_system_id: 2, type_id: MOON_ORE },
+    ]);
+
+    const yields = await loadAllCharacterYields();
+
+    const a = yields.find((y) => y.characterId === CHAR_A);
+    const b = yields.find((y) => y.characterId === CHAR_B);
+    expect(a?.entries[0].oreLines).toEqual([{ typeId: ORDINARY_ORE, quantity: 10 }]);
+    expect(b?.entries[0].oreLines).toEqual([{ typeId: MOON_ORE, quantity: 20 }]);
   });
 });

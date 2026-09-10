@@ -25,6 +25,7 @@ import {
   getCharacterMailHeaders,
   getCharacterMail,
   postUniverseNames,
+  postCharactersAffiliation,
   getCharacterCalendar,
   getCharacterCalendarEvent,
   getCharacterContracts,
@@ -654,6 +655,67 @@ describe('postUniverseNames', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe('postCharactersAffiliation', () => {
+  it('POSTs the id array and returns corp/alliance affiliations, sending the ESI headers', async () => {
+    let capturedBody: unknown;
+    let capturedHeaders: Headers | null = null;
+    server.use(
+      http.post(`${ESI_BASE_URL}/characters/affiliation`, async ({ request }) => {
+        const bad = rejectBadEsiHeaders(request);
+        if (bad) return bad;
+        capturedHeaders = request.headers;
+        capturedBody = await request.json();
+        return HttpResponse.json([
+          { character_id: 95465499, corporation_id: 1001, alliance_id: 2001 },
+        ]);
+      })
+    );
+
+    const affiliations = await postCharactersAffiliation([95465499]);
+
+    expect(affiliations).toEqual([
+      { character_id: 95465499, corporation_id: 1001, alliance_id: 2001 },
+    ]);
+    expect(capturedBody).toEqual([95465499]);
+    const headers = capturedHeaders as Headers | null;
+    expect(headers?.get('content-type')).toContain('application/json');
+  });
+
+  it('returns an empty array without a request when given no ids', async () => {
+    let called = false;
+    server.use(
+      http.post(`${ESI_BASE_URL}/characters/affiliation`, () => {
+        called = true;
+        return HttpResponse.json([]);
+      })
+    );
+
+    const affiliations = await postCharactersAffiliation([]);
+
+    expect(affiliations).toEqual([]);
+    expect(called).toBe(false);
+  });
+
+  it('splits more than 1000 ids across multiple requests', async () => {
+    const ids = Array.from({ length: 1500 }, (_, i) => i + 1);
+    const receivedBatchSizes: number[] = [];
+    server.use(
+      http.post(`${ESI_BASE_URL}/characters/affiliation`, async ({ request }) => {
+        const body = (await request.json()) as number[];
+        receivedBatchSizes.push(body.length);
+        return HttpResponse.json(
+          body.map((characterId) => ({ character_id: characterId, corporation_id: 1001 }))
+        );
+      })
+    );
+
+    const affiliations = await postCharactersAffiliation(ids);
+
+    expect(receivedBatchSizes).toEqual([1000, 500]);
+    expect(affiliations).toHaveLength(1500);
   });
 });
 

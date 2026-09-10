@@ -1081,6 +1081,92 @@ export function diffStructureFuelLow(
 }
 
 /* -------------------------------------------------------------------------- */
+/* Quickbar: price alerts                                                     */
+/* -------------------------------------------------------------------------- */
+
+export interface PriceAlertEntrySnapshot {
+  typeId: number;
+  name: string;
+  targetPrice: number;
+  direction: 'above' | 'below';
+  /** Null when the hub carries no price for this type — never guessed (issue #680 AC4). */
+  price: number | null;
+}
+
+export interface PriceAlertSnapshot {
+  entries: readonly PriceAlertEntrySnapshot[];
+  nowMs: number;
+}
+
+export interface PriceAlertTriggeredFire {
+  eventId: 'priceAlertTriggered';
+  characterId: number;
+  typeId: number;
+  name: string;
+  price: number;
+  targetPrice: number;
+  direction: 'above' | 'below';
+}
+
+function priceAlertCrossed(entry: PriceAlertEntrySnapshot): boolean {
+  if (entry.price === null) return false;
+  return entry.direction === 'above'
+    ? entry.price >= entry.targetPrice
+    : entry.price <= entry.targetPrice;
+}
+
+/**
+ * Fires per Quickbar item whose hub price has newly crossed its target
+ * (issue #680), on `diffStructureFuelLow`'s edge-trigger precedent rather
+ * than `diffIndustryJobComplete`'s "newly in the past" shape: a crossing
+ * stays true for as long as the price holds there, so an edge-trigger is
+ * required or every later poll would re-fire.
+ *
+ * Re-fire identity is `(typeId, targetPrice, direction)`
+ * (`20260909-192510-quickbar-price-alerts-re-arm-key-hub-price.md`), not a
+ * separate "already fired" flag: "was it already crossed, and so already
+ * reported" is judged against the previous poll's entry for the *same*
+ * tuple, so editing the target price or direction — which changes the
+ * tuple — is indistinguishable from a genuinely new, unobserved target and
+ * fires again on its own crossing rather than staying silent because the
+ * old target once fired.
+ *
+ * An item with no counterpart in `prev` (new to this poll, or a stale
+ * target that changed) is treated as not-previously-crossed, so one
+ * discovered already past its target still fires once. An item with no hub
+ * price (`price: null`) never fires (AC4).
+ */
+export function diffPriceAlertTriggered(
+  characterId: number,
+  prev: PriceAlertSnapshot | undefined,
+  next: PriceAlertSnapshot
+): PriceAlertTriggeredFire[] {
+  if (!prev) return [];
+  const prevByType = new Map(prev.entries.map((entry) => [entry.typeId, entry]));
+  const fires: PriceAlertTriggeredFire[] = [];
+  for (const entry of next.entries) {
+    if (entry.price === null) continue;
+    if (!priceAlertCrossed(entry)) continue;
+    const prevEntry = prevByType.get(entry.typeId);
+    const sameTarget =
+      prevEntry !== undefined &&
+      prevEntry.targetPrice === entry.targetPrice &&
+      prevEntry.direction === entry.direction;
+    if (sameTarget && priceAlertCrossed(prevEntry)) continue;
+    fires.push({
+      eventId: 'priceAlertTriggered',
+      characterId,
+      typeId: entry.typeId,
+      name: entry.name,
+      price: entry.price,
+      targetPrice: entry.targetPrice,
+      direction: entry.direction,
+    });
+  }
+  return fires;
+}
+
+/* -------------------------------------------------------------------------- */
 /* Corp: industry jobs                                                        */
 /* -------------------------------------------------------------------------- */
 

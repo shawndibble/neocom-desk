@@ -5,6 +5,14 @@
  */
 import type { QuickbarItem } from '@/db';
 
+/** A Quickbar item's price alert target, or `null` to clear one (issue #680). */
+export type QuickbarTarget = { price: number; direction: 'above' | 'below' } | null;
+
+/** Whether a Quickbar item carries a price alert target — the one check every reader shares, rather than each re-deriving it from the pair of optional fields. */
+export function hasQuickbarTarget(item: QuickbarItem): boolean {
+  return item.targetPrice !== undefined && item.targetDirection !== undefined;
+}
+
 export function addQuickbarItem(
   items: readonly QuickbarItem[],
   item: QuickbarItem
@@ -29,4 +37,24 @@ export function reorderQuickbarItems(
   const [moved] = next.splice(activeIndex, 1);
   next.splice(overIndex, 0, moved);
   return next;
+}
+
+/**
+ * Sets or clears a Quickbar item's price alert target (issue #680). `null`
+ * clears both fields rather than leaving a stale price behind — the only way
+ * to stop a target's alerts is to remove it or replace it outright, never to
+ * edit one field independently of the other.
+ */
+export function setQuickbarItemTarget(
+  items: readonly QuickbarItem[],
+  typeId: number,
+  target: QuickbarTarget
+): QuickbarItem[] {
+  return items.map((item) => {
+    if (item.typeId !== typeId) return item;
+    if (target === null) {
+      return { typeId: item.typeId, name: item.name };
+    }
+    return { ...item, targetPrice: target.price, targetDirection: target.direction };
+  });
 }
