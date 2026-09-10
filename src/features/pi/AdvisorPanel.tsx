@@ -89,7 +89,7 @@ import { useAltColonies } from './altColoniesPref';
 import { colonyStopTierAdvice } from './stopTierModel';
 import { colonyNetwork } from './networkModel';
 import { NetworkPanel } from './NetworkPanel';
-import { ColonyDirectives, StopTierRow } from './ColonyActions';
+import { ColonyDirectives, StopTierCardHint, StopTierRow } from './ColonyActions';
 import { ColonyDetail } from './ColonyDetailModal';
 import { useColonyPlan } from './colonyPlan';
 import { DirectiveRow, EstimateBadge, LoadMeter, SectionLabel } from './DirectiveRow';
@@ -687,6 +687,7 @@ function BuiltCard({ onOpenDetails, ...props }: ColonyCardProps & { onOpenDetail
         <div className="mt-auto space-y-2 border-t border-line pt-2.5">
           <SectionLabel>{t('piAdvisor.stopTierLabel')}</SectionLabel>
           <StopTierRow result={stopTier} extractedPerHour={colony.extractedPerHour} />
+          <StopTierCardHint result={stopTier} extractedPerHour={colony.extractedPerHour} />
         </div>
       </>
     </PlanetCard>
