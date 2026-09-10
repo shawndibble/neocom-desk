@@ -246,3 +246,61 @@ features it names explicitly ("multi-hub buy/sell price comparisons",
 "wallet balance trends"). If a future run runs dry on fresh candidates,
 re-reading EQM's full feature list against the current app state first is
 likely higher-yield than another cold forum sweep.
+
+## 2026-09-10 (fourth run)
+
+**Local checkout was 29 commits behind origin/main at the start of this run**
+(the third run's own #690/#689/#671 fixes, plus Craft Sweep, Group Owned
+Overlay, and a PI Advisor fix had all merged since). All inventory and
+prior-art checks in this run were redone against `origin/main` (via
+`git show origin/main:<path>`, never the stale local working tree) after
+`git fetch origin main` surfaced the drift — worth checking `git status -sb`
+for a `[behind N]` marker at the start of every future run before trusting
+local `grep`/`ls` results, since a stale checkout reintroduces exactly the
+"proposed a feature that shipped months ago" failure mode this skill exists
+to avoid.
+
+Forum category JSON re-fetched: still 30 threads, no growth since the third
+run. New threads read this run beyond the already-logged table: **EveLens**
+(a modern EVEMon rebuild — skill planning/training, plus a "Skill Farm
+Dashboard" for PLEX/extractor ISK/hr projections) and **EVEAIO** (a bug-bounty
+preview post with no feature list disclosed in the forum thread itself).
+Everything else in the listing (EVE Crews, Nexum, EveWebMail, EVE-NAV,
+Capsuleers.app, Wayfinder, Atlas, MISMAPS/MISKILLZ, NPC Sites Help, Fly Safe,
+WHMapper, Socketkill, PEARL, EVE Hacking Simulator) is mapping, intel,
+fitting-sim, or crew-simulator territory with no industry/market surface —
+skimmed by thread title only, not researched.
+
+### Already covered — proposed nothing beyond prior runs
+
+EveLens' "Skill Farm Dashboard" (ISK/hr from PLEX/extractor pricing) is
+prior-art confirmation of run 2's already-killed "Skill Extractor ISK/hr
+comparison" candidate — still narrow-reach (multi-account SP arbitrage), no
+new consideration needed. LP Store offers are already ranked by ISK/LP
+(`offerProfit.ts`) — EveLens/EQM raised nothing new there. Confirmed still
+absent and NOT proposed (failed the ESI-reality gate before drafting): asset
+"staleness"/idle-inventory detection — the assets endpoint carries no
+acquisition or last-touched timestamp, so "this sat unused for 60 days" has
+no ESI backing to compute from.
+
+### Candidates this run
+
+| Candidate                                                          | Verdict | Outcome                                                                                                                                                                                                                                                                                                                                                                                        |
+| ------------------------------------------------------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Industry: chart realized profit over time on the Production Log    | SHIP    | Filed as #711. Exact structural mirror of #690's Wallet balance chart (pure bucketing fn + lazy Recharts component), applied to `ProductionRunRecord`s instead of wallet-journal entries. Zero new ESI — all local Dexie state.                                                                                                                                                              |
+| Assets: total portfolio value across all locations                 | SHIP    | Filed as #712. Per-item/per-station value was already computed and sortable but never summed into one figure. Reviewer confirmed genuinely absent (including on Overview) and flagged Overview's `SummaryStrip.tsx` "one number in two places" discipline as the reason this stays Assets-only, not duplicated.                                                                            |
+| Open Orders: surface sell-through as an inline column               | NARROW  | Filed as #713, narrowed from an always-populated eager column to a progressive one filled by the existing `checkGroupDeeper` fan-out. The eager shape was rejected: `20260906-155913-open-orders-reads-as-a-worklist.md` already deliberately split eager-vs-on-demand fetching on this exact page for cost reasons, and an eager `daysToClear` column would have reopened that.           |
+| Corp Wallet: extend the balance-over-time chart to corp divisions  | KILL    | Dropped after hostile review. Engineering lift is small and reuses #690's own `balanceHistory.ts` verbatim, but reach is narrow — only characters with `Accountant`/`Junior_Accountant` corp roles. #690's own ticket had already explicitly named this as a deferred fast-follow, not bundled; this run's reviewer resolved that deferral as a cut rather than a ship, on reach grounds. |
+
+**Lesson for the next run.** Three genuine "engine exists, only one caller"
+gaps turned up again this run (`sellThrough` in the modal only,
+`WalletBalanceChart` in the personal branch only) — worth treating "grep the
+engine's callers, not just its existence" (a lesson from the second run) as a
+standing first move, not a one-off. Also: a candidate that's structurally
+identical to a ticket that shipped hours earlier in the same day (#711 vs.
+#690) is still worth filing if the underlying data genuinely differs (local
+Dexie production records vs. ESI wallet journal) — pattern reuse is not the
+same as duplicate scope. Separately: this run's local main checkout was 29
+commits stale at the start — always `git fetch origin main` and diff
+`HEAD..origin/main` before trusting the working tree for inventory or
+prior-art checks.
