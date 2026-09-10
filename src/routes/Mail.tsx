@@ -502,8 +502,13 @@ export function Mail() {
                           onClick={() => {
                             setSelectedId(header.mail_id);
                             markLocalRead(header.mail_id);
-                            // Already known read (ESI or this session) — no write needed.
-                            if (!isRead) void markMailReadOnEsi(activeCharacterId, header.mail_id);
+                            // Gated on ESI's own flag, not `isRead` (which also
+                            // includes this session's local mark) — a write that
+                            // failed must get another chance on every reopen, not
+                            // just on the next full reload.
+                            if (!header.is_read) {
+                              void markMailReadOnEsi(activeCharacterId, header.mail_id);
+                            }
                           }}
                           // `aria-current={false}` renders the string "false",
                           // which is a valid token meaning "not current" — so

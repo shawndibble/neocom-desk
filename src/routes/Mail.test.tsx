@@ -516,6 +516,30 @@ describe('Mail', () => {
     expect(capturedBody).toEqual({ read: true });
   });
 
+  it('retries the write on every reopen within the session, not only on a fresh page load', async () => {
+    // A failed write must get another chance "next time the mail is
+    // touched" (issue #741's acceptance criteria) — not only once the whole
+    // component remounts. `header.is_read` (from the unmocked ESI list,
+    // still `false` here) is what gates the write, not local session state.
+    let requestCount = 0;
+    server.use(
+      http.put(`https://esi.evetech.net/characters/${CHAR_ID}/mail/1/`, () => {
+        requestCount += 1;
+        return new HttpResponse(null, { status: 204 });
+      })
+    );
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(await screen.findByText('Fleet up!'));
+    await waitFor(() => expect(requestCount).toBe(1));
+
+    await user.click(screen.getByRole('button', { name: 'Back' }));
+    await user.click(await screen.findByText('Fleet up!'));
+
+    await waitFor(() => expect(requestCount).toBe(2));
+  });
+
   it('does not write to ESI for a mail ESI already reports read', async () => {
     let requestCount = 0;
     server.use(
