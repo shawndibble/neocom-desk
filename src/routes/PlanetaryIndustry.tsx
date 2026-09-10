@@ -622,7 +622,7 @@ function ColonyRow({
             <span className="min-w-0 flex-1 truncate text-xs text-text-dim sm:w-40 sm:shrink-0 sm:flex-none">
               {productLabel}
             </span>
-            <span className="shrink-0 text-xs text-text-faint tabular-nums">
+            <span className="shrink-0 text-xs text-text-dim tabular-nums">
               {t('pi.pinCount', { count: planet.num_pins })}
             </span>
             <Caret expanded={expanded} />

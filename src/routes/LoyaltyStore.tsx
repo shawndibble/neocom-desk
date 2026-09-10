@@ -95,7 +95,7 @@ function OfferDetail({
     <div className="flex flex-col gap-4">
       <div>
         <h3 className="text-base font-medium text-text">{displayName}</h3>
-        {row.isBlueprint && <p className="text-xs text-text-faint">{row.itemName}</p>}
+        {row.isBlueprint && <p className="text-xs text-text-dim">{row.itemName}</p>}
       </div>
 
       <div className="flex flex-wrap gap-2">

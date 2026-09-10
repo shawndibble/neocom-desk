@@ -1663,7 +1663,7 @@ export function Assets() {
                       {crumbs.length > 0 ? crumbs[crumbs.length - 1].label : ''}
                     </span>
                     {crumbs.length > 1 && (
-                      <span className="flex min-w-0 items-center gap-1 truncate text-[0.6875rem] text-text-faint">
+                      <span className="flex min-w-0 items-center gap-1 truncate text-[0.6875rem] text-text-dim">
                         {crumbs.slice(0, -1).map((crumb, index) => (
                           <span key={crumb.href} className="flex min-w-0 items-center gap-1">
                             {index > 0 && <span aria-hidden="true">›</span>}
