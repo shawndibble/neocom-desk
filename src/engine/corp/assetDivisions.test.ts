@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import {
+  buildCorpAssetTree,
   corpAssetGroupId,
-  filterCorpAssetGroups,
-  groupCorpAssets,
   HANGAR_DIVISIONS,
+  type CorpAssetInput,
 } from './assetDivisions';
 
 describe('corpAssetGroupId', () => {
@@ -31,30 +31,35 @@ describe('corpAssetGroupId', () => {
   });
 });
 
-const asset = (overrides: Partial<Parameters<typeof groupCorpAssets>[0][number]>) => ({
-  itemId: 1,
+const asset = (
+  overrides: Partial<CorpAssetInput> & Pick<CorpAssetInput, 'itemId'>
+): CorpAssetInput => ({
   typeId: 100,
   quantity: 1,
   locationId: 60003760,
+  locationType: 'other',
   locationFlag: 'CorpSAG1',
   ...overrides,
 });
 
-describe('groupCorpAssets', () => {
+describe('buildCorpAssetTree', () => {
   it('always returns all seven hangar divisions, even when empty', () => {
-    const groups = groupCorpAssets([]);
-    const divisionIds = groups.map((g) => g.id);
-    expect(divisionIds).toEqual([...HANGAR_DIVISIONS]);
-    expect(groups.every((g) => g.rows.length === 0)).toBe(true);
+    const groups = buildCorpAssetTree([]);
+    expect(groups.map((g) => g.id)).toEqual([...HANGAR_DIVISIONS]);
+    expect(groups.every((g) => g.children.length === 0)).toBe(true);
   });
 
-  it('sorts rows into the division their location_flag names', () => {
-    const groups = groupCorpAssets([
+  it('sorts assets into the division their location_flag names', () => {
+    const groups = buildCorpAssetTree([
       asset({ itemId: 1, locationFlag: 'CorpSAG3' }),
       asset({ itemId: 2, locationFlag: 'CorpSAG1' }),
     ]);
-    expect(groups.find((g) => g.id === 1)?.rows.map((r) => r.itemId)).toEqual([2]);
-    expect(groups.find((g) => g.id === 3)?.rows.map((r) => r.itemId)).toEqual([1]);
+    expect(groups.find((g) => g.id === 1)?.children).toEqual([
+      { kind: 'item', asset: expect.objectContaining({ item_id: 2 }) },
+    ]);
+    expect(groups.find((g) => g.id === 3)?.children).toEqual([
+      { kind: 'item', asset: expect.objectContaining({ item_id: 1 }) },
+    ]);
   });
 
   /**
@@ -64,10 +69,10 @@ describe('groupCorpAssets', () => {
    * the seven divisions.
    */
   it('adds the special-flag groups only when they hold something, in a fixed order', () => {
-    const empty = groupCorpAssets([asset({ locationFlag: 'CorpSAG1' })]);
+    const empty = buildCorpAssetTree([asset({ itemId: 1, locationFlag: 'CorpSAG1' })]);
     expect(empty.map((g) => g.id)).toEqual([...HANGAR_DIVISIONS]);
 
-    const withExtras = groupCorpAssets([
+    const withExtras = buildCorpAssetTree([
       asset({ itemId: 1, locationFlag: 'AssetSafety' }),
       asset({ itemId: 2, locationFlag: 'OfficeFolder' }),
       asset({ itemId: 3, locationFlag: 'CorpSAG1' }),
@@ -79,50 +84,39 @@ describe('groupCorpAssets', () => {
     ]);
   });
 
-  it('buckets an unrecognised flag under other instead of dropping the row', () => {
-    const groups = groupCorpAssets([asset({ itemId: 9, locationFlag: 'SomeFutureFlag' })]);
+  it('buckets an unrecognised flag under other instead of dropping the asset', () => {
+    const groups = buildCorpAssetTree([asset({ itemId: 9, locationFlag: 'SomeFutureFlag' })]);
     const other = groups.find((g) => g.id === 'other');
-    expect(other?.rows.map((r) => r.itemId)).toEqual([9]);
-  });
-
-  it('drops locationFlag from the row shape once it has decided the bucket', () => {
-    const groups = groupCorpAssets([asset({ itemId: 5, quantity: 3, locationId: 60003760 })]);
-    const row = groups.find((g) => g.id === 1)?.rows[0];
-    expect(row).toEqual({ itemId: 5, typeId: 100, quantity: 3, locationId: 60003760 });
-  });
-});
-
-describe('filterCorpAssetGroups', () => {
-  const typeNames = new Map([
-    [100, 'Tritanium'],
-    [200, 'Pyerite'],
-  ]);
-
-  it('returns every group unchanged when the query is empty', () => {
-    const groups = groupCorpAssets([asset({ itemId: 1, locationFlag: 'CorpSAG1' })]);
-    expect(filterCorpAssetGroups(groups, typeNames, '')).toEqual(groups);
-    expect(filterCorpAssetGroups(groups, typeNames, '   ')).toEqual(groups);
-  });
-
-  it('keeps only rows whose resolved name matches the query, case-insensitively', () => {
-    const groups = groupCorpAssets([
-      asset({ itemId: 1, typeId: 100, locationFlag: 'CorpSAG1' }),
-      asset({ itemId: 2, typeId: 200, locationFlag: 'CorpSAG1' }),
+    expect(other?.children).toEqual([
+      { kind: 'item', asset: expect.objectContaining({ item_id: 9 }) },
     ]);
-    const filtered = filterCorpAssetGroups(groups, typeNames, 'TRI');
-    expect(filtered.find((g) => g.id === 1)?.rows.map((r) => r.itemId)).toEqual([1]);
   });
 
-  it('matches against the raw-id fallback when the type name has not resolved', () => {
-    const groups = groupCorpAssets([asset({ itemId: 1, typeId: 999, locationFlag: 'CorpSAG1' })]);
-    const filtered = filterCorpAssetGroups(groups, new Map(), '999');
-    expect(filtered.find((g) => g.id === 1)?.rows.map((r) => r.itemId)).toEqual([1]);
+  it('nests a container placed in a division rather than flag-bucketing its contents separately', () => {
+    const groups = buildCorpAssetTree([
+      asset({ itemId: 10, typeId: 650, locationFlag: 'CorpSAG1' }),
+      asset({
+        itemId: 11,
+        quantity: 3,
+        locationId: 10,
+        locationType: 'item',
+        locationFlag: 'Unlocked',
+      }),
+    ]);
+    const division1 = groups.find((g) => g.id === 1);
+    expect(division1?.children).toEqual([
+      expect.objectContaining({
+        kind: 'container',
+        children: [{ kind: 'item', asset: expect.objectContaining({ item_id: 11 }) }],
+      }),
+    ]);
   });
 
-  it('never drops a group entirely — an unmatched division just ends up with no rows', () => {
-    const groups = groupCorpAssets([asset({ itemId: 1, typeId: 100, locationFlag: 'CorpSAG1' })]);
-    const filtered = filterCorpAssetGroups(groups, typeNames, 'nothing matches this');
-    expect(filtered.map((g) => g.id)).toEqual(groups.map((g) => g.id));
-    expect(filtered.find((g) => g.id === 1)?.rows).toEqual([]);
+  it('prices leaf assets from the supplied price map', () => {
+    const groups = buildCorpAssetTree(
+      [asset({ itemId: 1, typeId: 100, quantity: 10 })],
+      new Map([[100, 5]])
+    );
+    expect(groups.find((g) => g.id === 1)?.estimatedValue).toBe(50);
   });
 });

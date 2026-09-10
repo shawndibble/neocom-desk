@@ -42,6 +42,41 @@ function childrenOf(node: AssetTreeNode): readonly AssetTreeNode[] {
   return node.kind === 'item' ? [] : node.children;
 }
 
+export interface AssetTreeWalkResult {
+  trail: readonly AssetTreeNode[];
+  children: readonly AssetTreeNode[];
+  unresolved: readonly string[];
+}
+
+/**
+ * Walks `segments` down from a level's starting `children`, stopping at the
+ * first segment the tree cannot match and reporting that segment and
+ * everything after it as unresolved. The part of path resolution that has
+ * nothing to do with *how* a caller names its top level (a station id for
+ * `/assets`, a division/flag group id for `/corp/assets` — see
+ * `engine/corp/assetPath.ts`) — both share this walk and its unresolved-segment
+ * contract.
+ */
+export function walkAssetTreeSegments(
+  startChildren: readonly AssetTreeNode[],
+  segments: readonly string[]
+): AssetTreeWalkResult {
+  const trail: AssetTreeNode[] = [];
+  let children: readonly AssetTreeNode[] = startChildren;
+
+  for (let index = 0; index < segments.length; index += 1) {
+    const segment = segments[index];
+    const match = children.find((node) => assetNodeSegment(node) === segment);
+    if (!match) {
+      return { trail, children, unresolved: segments.slice(index) };
+    }
+    trail.push(match);
+    children = childrenOf(match);
+  }
+
+  return { trail, children, unresolved: [] };
+}
+
 /**
  * Walks `segments` down from `stationId`, stopping at the first segment the
  * tree cannot match and reporting that segment and everything after it as
@@ -60,20 +95,8 @@ export function resolveAssetPath(
   // truer answer to a stale link than a root listing that looks like success.
   if (!station) return { ...ROOT, unresolved: [String(stationId), ...segments] };
 
-  const trail: AssetTreeNode[] = [];
-  let children: readonly AssetTreeNode[] = station.children;
-
-  for (let index = 0; index < segments.length; index += 1) {
-    const segment = segments[index];
-    const match = children.find((node) => assetNodeSegment(node) === segment);
-    if (!match) {
-      return { station, trail, children, unresolved: segments.slice(index) };
-    }
-    trail.push(match);
-    children = childrenOf(match);
-  }
-
-  return { station, trail, children, unresolved: [] };
+  const { trail, children, unresolved } = walkAssetTreeSegments(station.children, segments);
+  return { station, trail, children, unresolved };
 }
 
 export interface ParsedAssetPath {

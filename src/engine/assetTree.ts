@@ -120,6 +120,17 @@ interface BuildContext {
   visited: Set<number>;
 }
 
+/** Every asset keyed by the `location_id` it sits in — the child lookup `buildNode`'s recursion walks, shared by `buildAssetTree` and `buildAssetGroups`. */
+function childrenByLocationId(assets: readonly EngineAsset[]): Map<number, EngineAsset[]> {
+  const map = new Map<number, EngineAsset[]>();
+  for (const a of assets) {
+    const list = map.get(a.location_id) ?? [];
+    list.push(a);
+    map.set(a.location_id, list);
+  }
+  return map;
+}
+
 /** This node's own quantity/value, not counting its children — 0 for bays, which own nothing themselves. */
 function ownValue(ctx: BuildContext, asset: EngineAsset): number {
   return asset.quantity * (ctx.priceByTypeId.get(asset.type_id) ?? 0);
@@ -236,18 +247,115 @@ function groupByLocationId(assets: readonly EngineAsset[]): Map<number, RootGrou
   return groups;
 }
 
+/**
+ * A named bucket of top-level roots, alongside `AssetTreeStation`'s
+ * location-keyed one — corp assets group by `location_flag` (division)
+ * rather than by physical location, but need the same container/bay/item
+ * recursion beneath each root, so this shares `buildNode`/`sumNodes` rather
+ * than re-implementing them (issue #779, reversing round 41/44's "no shared
+ * level" reasoning the same way a bay node already does for a ship's cargo
+ * hold: grouped by kind, not by `item_id`).
+ */
+export interface AssetTreeGroup<Id> {
+  id: Id;
+  children: AssetTreeNode[];
+  itemCount: number;
+  estimatedValue: number;
+}
+
+/**
+ * Groups every root asset (`location_type !== 'item'`, i.e. not nested inside
+ * another owned asset — same test `buildAssetTree`'s own root pass uses) by
+ * `groupIdFor`, then builds each group's contents with the same recursive
+ * container/ship/bay logic a station uses. `order` fixes the result's
+ * iteration order; an id in `alwaysInclude` appears even with zero roots, any
+ * other id in `order` only appears when at least one root lands in it. An id
+ * `groupIdFor` produces that isn't in `order` is dropped — callers must make
+ * `groupIdFor` total over `order` (division grouping already has an `other`
+ * catch-all for exactly this).
+ *
+ * Also promotes the same two edge cases `buildAssetTree`'s own three-pass
+ * structure exists for, so a paginated/partial fetch can't silently drop
+ * assets here either: an `'item'`-typed asset whose parent has no row in
+ * this fetch at all (most often a structure ESI never returns an asset row
+ * for), and anything left over inside an isolated cycle. Both are promoted
+ * to a root of their own, grouped by `groupIdFor` on the orphan/cycle asset
+ * itself — there is no location axis here to group them under the way
+ * `buildAssetTree` groups orphans by `location_id`.
+ */
+export function buildAssetGroups<Id>(
+  assets: readonly EngineAsset[],
+  order: readonly Id[],
+  alwaysInclude: ReadonlySet<Id>,
+  groupIdFor: (asset: EngineAsset) => Id,
+  priceByTypeId: ReadonlyMap<number, number> = new Map()
+): AssetTreeGroup<Id>[] {
+  const ctx: BuildContext = {
+    childrenByLocationId: childrenByLocationId(assets),
+    priceByTypeId,
+    visited: new Set(),
+  };
+
+  const childrenById = new Map<Id, AssetTreeNode[]>();
+  const pushRoot = (id: Id, asset: EngineAsset) => {
+    const list = childrenById.get(id) ?? [];
+    list.push(buildNode(ctx, asset, new Set()));
+    childrenById.set(id, list);
+  };
+
+  // Real roots first — populates ctx.visited exactly as buildAssetTree's own
+  // first pass does, which the two rescue passes below both read.
+  for (const a of assets) {
+    if (a.location_type !== 'item') pushRoot(groupIdFor(a), a);
+  }
+
+  const presentItemIds = new Set(assets.map((a) => a.item_id));
+  const unreached = (a: EngineAsset) => a.location_type === 'item' && !ctx.visited.has(a.item_id);
+
+  // Orphans proper: an 'item'-typed asset whose parent has no row in this
+  // list at all (buildAssetTree's own comment on its absentParentGroups pass
+  // explains why this happens). Requiring the parent to be *absent* keeps
+  // this pass order-independent the same way it does there: no two such
+  // assets can be ancestor/descendant of each other.
+  for (const a of assets) {
+    if (unreached(a) && !presentItemIds.has(a.location_id)) pushRoot(groupIdFor(a), a);
+  }
+
+  // Anything still unreached sits in or under an isolated cycle — promote
+  // rather than drop, same as buildAssetTree's third pass. `unreached` reads
+  // ctx.visited live, so a cycle-mate promoted earlier in this same loop
+  // already covers the rest of its cycle by the time this reaches it.
+  for (const a of assets) {
+    if (unreached(a)) pushRoot(groupIdFor(a), a);
+  }
+
+  const groups: AssetTreeGroup<Id>[] = [];
+  for (const id of order) {
+    const children = childrenById.get(id);
+    if (children && children.length > 0) {
+      const { itemCount, estimatedValue } = sumNodes(ctx, children);
+      groups.push({ id, children, itemCount, estimatedValue });
+    } else if (alwaysInclude.has(id)) {
+      groups.push({ id, children: [], itemCount: 0, estimatedValue: 0 });
+    }
+  }
+  return groups;
+}
+
+/** Every leaf `item_id` under a group, across all of its top-level children — the `buildAssetGroups` twin of `collectStationItemIds`. */
+export function collectGroupItemIds<Id>(group: AssetTreeGroup<Id>): number[] {
+  return group.children.flatMap(collectItemIds);
+}
+
 export function buildAssetTree(
   assets: readonly EngineAsset[],
   priceByTypeId: ReadonlyMap<number, number> = new Map()
 ): AssetTreeStation[] {
-  const childrenByLocationId = new Map<number, EngineAsset[]>();
-  for (const a of assets) {
-    const list = childrenByLocationId.get(a.location_id) ?? [];
-    list.push(a);
-    childrenByLocationId.set(a.location_id, list);
-  }
-
-  const ctx: BuildContext = { childrenByLocationId, priceByTypeId, visited: new Set() };
+  const ctx: BuildContext = {
+    childrenByLocationId: childrenByLocationId(assets),
+    priceByTypeId,
+    visited: new Set(),
+  };
   const buildStation = (locationId: number, group: RootGroup): AssetTreeStation => {
     const children = group.roots.map((a) => buildNode(ctx, a, new Set()));
     const { itemCount, estimatedValue } = sumNodes(ctx, children);

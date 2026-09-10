@@ -102,6 +102,7 @@ const ROUTE_ELEMENTS = {
   '/corp': <Corp />,
   '/corp/members': <CorpMembers />,
   '/corp/assets': <CorpAssets />,
+  '/corp/assets/*': <CorpAssets />,
   '/assets': <Assets />,
   '/assets/*': <Assets />,
   '/mail': <Mail />,

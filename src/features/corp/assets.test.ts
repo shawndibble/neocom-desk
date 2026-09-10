@@ -147,10 +147,24 @@ describe('loadCorporationAssets', () => {
 });
 
 describe('toCorpAssetInputs', () => {
-  it('adapts ESI snake_case rows into the engine-native shape groupCorpAssets takes', () => {
+  it('adapts ESI snake_case rows into the engine-native shape buildCorpAssetTree takes', () => {
     expect(toCorpAssetInputs(ASSETS)).toEqual([
-      { itemId: 1001, typeId: 34, quantity: 5000, locationId: 60003760, locationFlag: 'CorpSAG1' },
-      { itemId: 1002, typeId: 35, quantity: 20, locationId: 60003760, locationFlag: 'CorpSAG7' },
+      {
+        itemId: 1001,
+        typeId: 34,
+        quantity: 5000,
+        locationId: 60003760,
+        locationType: 'other',
+        locationFlag: 'CorpSAG1',
+      },
+      {
+        itemId: 1002,
+        typeId: 35,
+        quantity: 20,
+        locationId: 60003760,
+        locationType: 'other',
+        locationFlag: 'CorpSAG7',
+      },
     ]);
   });
 });

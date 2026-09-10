@@ -114,6 +114,10 @@ export const ROUTE_REQUIREMENTS = {
    * grant.
    */
   '/corp/assets': UNGATED,
+  // The drill-down's deeper levels (issue #779), same reasoning as
+  // `/assets/*` below: every level renders the same component off the same
+  // gate, so it gates identically.
+  '/corp/assets/*': UNGATED,
 
   // One scope each, so a missing grant leaves the page with literally nothing
   // to show.

@@ -1,10 +1,9 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
-import { render, screen, waitFor, within, fireEvent } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import '@/i18n';
 import { useActiveCharacter } from '@/stores/activeCharacter';
-import { db } from '@/db';
 import type { CachedResult, StatusResult } from '@/esi/cache';
 import { NO_CORP_CAPABILITIES, type CorpCapabilities } from '@/engine/corpRoles';
 import {
@@ -12,10 +11,6 @@ import {
   type CorpAccess,
   type CorpAccessState,
 } from '@/features/corp/useCorpAccess';
-import {
-  NO_EXPANDED_DIVISIONS,
-  useCorpAssetsExpanded,
-} from '@/features/corp/assetsExpandPreference';
 import type { CorporationAsset, CorporationDivisions } from '@/esi/endpoints';
 import * as boardData from '@/features/corp/boardData';
 import * as corpAssets from '@/features/corp/assets';
@@ -78,10 +73,13 @@ function asset(overrides: Partial<CorporationAsset> & { item_id: number }): Corp
   };
 }
 
-function renderAssets() {
+function renderAssets(initialEntry = '/corp/assets') {
   return render(
-    <MemoryRouter initialEntries={['/corp/assets']}>
-      <CorpAssets />
+    <MemoryRouter initialEntries={[initialEntry]}>
+      <Routes>
+        <Route path="/corp/assets" element={<CorpAssets />} />
+        <Route path="/corp/assets/*" element={<CorpAssets />} />
+      </Routes>
     </MemoryRouter>
   );
 }
@@ -89,18 +87,13 @@ function renderAssets() {
 /** Renders, then waits for the division list to have replaced the loading spinner. */
 async function divisionList(): Promise<HTMLElement> {
   renderAssets();
-  return waitFor(() => screen.getByRole('button', { name: /Division 1/ }));
+  return waitFor(() => screen.getByRole('link', { name: /Division 1/ }));
 }
 
-beforeEach(async () => {
+beforeEach(() => {
   vi.clearAllMocks();
   vi.setSystemTime(NOW);
-  // The expand-state store persists to `db.settings` (issue #420); clearing
-  // the table, not just the in-memory store, keeps one test's toggles from
-  // being read back by the next test's `hydrate()`.
-  await db.settings.clear();
   useActiveCharacter.setState({ activeCharacterId: CHARACTER_ID, hydrated: true });
-  useCorpAssetsExpanded.setState({ value: NO_EXPANDED_DIVISIONS, hydrated: false });
 
   mocked.loadCorporationId.mockResolvedValue(CORPORATION_ID);
   mocked.loadCorporationAssets.mockResolvedValue(cached([asset({ item_id: 1 })]));
@@ -128,7 +121,7 @@ describe('access (AC2)', () => {
     mockedAccess.mockReturnValue(accessOf('ready', { canReadWallet: true }));
     renderAssets();
     expect(await screen.findByText('Corp assets need Director')).toBeInTheDocument();
-    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
     expect(mocked.loadCorporationAssets).not.toHaveBeenCalled();
   });
 
@@ -151,7 +144,7 @@ describe('division layout (AC1)', () => {
     await divisionList();
     for (let division = 1; division <= 7; division += 1) {
       expect(
-        screen.getByRole('button', { name: new RegExp(`Division ${division}`) })
+        screen.getByRole('link', { name: new RegExp(`Division ${division}`) })
       ).toBeInTheDocument();
     }
   });
@@ -161,24 +154,22 @@ describe('division layout (AC1)', () => {
       cached<CorporationDivisions>({ hangar: [{ division: 1, name: 'SRP' }] })
     );
     renderAssets();
-    expect(await screen.findByRole('button', { name: /SRP/ })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Division 1/ })).not.toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: /SRP/ })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Division 1/ })).not.toBeInTheDocument();
   });
 
-  it('lists an asset’s resolved item name, quantity and location inside its own division', async () => {
+  it('drills into a division and lists its resolved item name, quantity and location', async () => {
     mocked.loadCorporationAssets.mockResolvedValue(
       cached([asset({ item_id: 1, quantity: 5000, location_flag: 'CorpSAG3' })])
     );
+    const user = userEvent.setup();
     renderAssets();
-    const header = await screen.findByRole('button', { name: /Division 3/ });
-    await userEvent.setup().click(header);
-    const table = await screen.findByRole('table', { name: /Division 3 assets/ });
-    expect(within(table).getByText('Tritanium')).toBeInTheDocument();
-    expect(within(table).getByText('5,000')).toBeInTheDocument();
-    expect(within(table).getByText('Jita IV - Moon 4')).toBeInTheDocument();
+    await user.click(await screen.findByRole('link', { name: /Division 3/ }));
+    expect(await screen.findByText('Tritanium')).toBeInTheDocument();
+    expect(screen.getByText('×5,000')).toBeInTheDocument();
   });
 
-  it('keeps a division’s rows out of a different division’s table', async () => {
+  it('keeps a division’s items out of a different division’s listing', async () => {
     mocked.loadCorporationAssets.mockResolvedValue(
       cached([
         asset({ item_id: 1, location_flag: 'CorpSAG1' }),
@@ -194,24 +185,22 @@ describe('division layout (AC1)', () => {
     });
     const user = userEvent.setup();
     renderAssets();
-    await user.click(await screen.findByRole('button', { name: /Division 1/ }));
-    await user.click(await screen.findByRole('button', { name: /Division 7/ }));
+    await user.click(await screen.findByRole('link', { name: /Division 1/ }));
+    expect(await screen.findByText('Tritanium')).toBeInTheDocument();
+    expect(screen.queryByText('Pyerite')).not.toBeInTheDocument();
 
-    const division1Table = await screen.findByRole('table', { name: /Division 1 assets/ });
-    const division7Table = await screen.findByRole('table', { name: /Division 7 assets/ });
-    expect(within(division1Table).getByText('Tritanium')).toBeInTheDocument();
-    expect(within(division1Table).queryByText('Pyerite')).not.toBeInTheDocument();
-    expect(within(division7Table).getByText('Pyerite')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Back one level' }));
+    await user.click(await screen.findByRole('link', { name: /Division 7/ }));
+    expect(await screen.findByText('Pyerite')).toBeInTheDocument();
+    expect(screen.queryByText('Tritanium')).not.toBeInTheDocument();
   });
 
-  it('falls back to the raw id when an item or location name will not resolve', async () => {
+  it('falls back to the raw id when an item name will not resolve', async () => {
     mocked.loadCorpAssetLabels.mockResolvedValue({ types: new Map(), locations: new Map() });
     const user = userEvent.setup();
     renderAssets();
-    await user.click(await screen.findByRole('button', { name: /Division 1/ }));
-    const table = await screen.findByRole('table', { name: /Division 1 assets/ });
-    expect(within(table).getByText('#34')).toBeInTheDocument();
-    expect(within(table).getByText('#60003760')).toBeInTheDocument();
+    await user.click(await screen.findByRole('link', { name: /Division 1/ }));
+    expect(await screen.findByText('Type #34')).toBeInTheDocument();
   });
 });
 
@@ -221,15 +210,15 @@ describe('special flag groups (AC3)', () => {
       cached([asset({ item_id: 1, location_flag: 'AssetSafety' })])
     );
     await divisionList();
-    expect(screen.getByRole('button', { name: /Asset Safety/ })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Asset Safety/ })).toBeInTheDocument();
   });
 
   it('shows none of the four flag groups when nothing sits in them', async () => {
     await divisionList();
-    expect(screen.queryByRole('button', { name: /Office/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Deliveries/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Impounded/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Asset Safety/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Office/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Deliveries/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Impounded/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Asset Safety/ })).not.toBeInTheDocument();
   });
 
   /**
@@ -243,7 +232,7 @@ describe('special flag groups (AC3)', () => {
       cached([asset({ item_id: 1, location_flag: 'SomeFutureFlag' })])
     );
     await divisionList();
-    expect(screen.getByRole('button', { name: /Other/ })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Other/ })).toBeInTheDocument();
   });
 });
 
@@ -271,7 +260,7 @@ describe('truncation (AC4)', () => {
   });
 });
 
-describe('manual refresh keeps the asset list visible (issue #418)', () => {
+describe('manual refresh keeps the division list visible (issue #418)', () => {
   it('does not blank the division list while a refresh is in flight', async () => {
     await divisionList();
 
@@ -283,11 +272,11 @@ describe('manual refresh keeps the asset list visible (issue #418)', () => {
     );
 
     await userEvent.setup().click(screen.getByRole('button', { name: 'Refresh corp assets' }));
-    expect(screen.getByRole('button', { name: /Division 1/ })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Division 1/ })).toBeInTheDocument();
 
     resolveSecondFetch(cached([asset({ item_id: 1 })]));
     await waitFor(() => expect(mocked.loadCorporationAssets).toHaveBeenCalledTimes(2));
-    expect(screen.getByRole('button', { name: /Division 1/ })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Division 1/ })).toBeInTheDocument();
   });
 });
 
@@ -297,7 +286,7 @@ describe('failed vs. genuinely empty reads', () => {
     renderAssets();
     expect(await screen.findByText('Could not load corp assets')).toBeInTheDocument();
     expect(screen.queryByText('No corporation assets')).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Division 1/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Division 1/ })).not.toBeInTheDocument();
   });
 
   /** AC5: "no access", "read failed" and "empty" must not share one generic message. */
@@ -314,17 +303,18 @@ describe('failed vs. genuinely empty reads', () => {
     mocked.loadCorporationAssets.mockResolvedValue(cached([]));
     renderAssets();
     expect(await screen.findByText('No corporation assets')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Division 1/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Division 1/ })).not.toBeInTheDocument();
   });
 });
 
 describe('row context menu (issue #420)', () => {
   it('offers View in Market and Copy name on an asset row, with no Build Plan lookup', async () => {
+    const user = userEvent.setup();
     renderAssets();
-    await userEvent.setup().click(await screen.findByRole('button', { name: /Division 1/ }));
-    const row = (await screen.findByText('Tritanium')).closest('tr');
-    if (!row) throw new Error('expected a Tritanium row');
-    fireEvent.contextMenu(row);
+    await user.click(await screen.findByRole('link', { name: /Division 1/ }));
+    const item = await screen.findByText('Tritanium');
+    item.focus();
+    fireEvent.contextMenu(item);
 
     expect(screen.getByRole('menuitem', { name: 'View in Market' })).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: 'Copy name' })).toBeInTheDocument();
@@ -335,7 +325,7 @@ describe('row context menu (issue #420)', () => {
   });
 });
 
-describe('search (issue #420)', () => {
+describe('search (issue #779)', () => {
   beforeEach(() => {
     mocked.loadCorporationAssets.mockResolvedValue(
       cached([
@@ -352,16 +342,9 @@ describe('search (issue #420)', () => {
     });
   });
 
-  /**
-   * The bug a naive "filter rows inside whatever's expanded" implementation
-   * has: every division starts collapsed (no expand state persisted yet),
-   * so a search would show nothing at all unless the user had already opened
-   * the matching division by hand. A search box that only works after
-   * manually finding the division first isn't filtering "across divisions".
-   */
-  it('surfaces a match from a fully collapsed start, with no division opened by hand', async () => {
+  it('finds a match across every division from the root, with no division opened by hand', async () => {
     renderAssets();
-    await screen.findByRole('button', { name: /Division 1/ });
+    await screen.findByRole('link', { name: /Division 1/ });
     expect(screen.queryByText('Tritanium')).not.toBeInTheDocument();
 
     await userEvent.setup().type(screen.getByPlaceholderText('Search items…'), 'tri');
@@ -370,15 +353,7 @@ describe('search (issue #420)', () => {
     expect(screen.queryByText('Pyerite')).not.toBeInTheDocument();
   });
 
-  it('filters items across divisions by resolved name', async () => {
-    renderAssets();
-    await userEvent.setup().type(await screen.findByPlaceholderText('Search items…'), 'tri');
-
-    expect(await screen.findByText('Tritanium')).toBeInTheDocument();
-    expect(screen.queryByText('Pyerite')).not.toBeInTheDocument();
-  });
-
-  it('clearing the search returns to the persisted collapse state rather than leaving everything open', async () => {
+  it('clearing the search returns to the division root', async () => {
     const user = userEvent.setup();
     renderAssets();
     const search = await screen.findByPlaceholderText('Search items…');
@@ -388,17 +363,21 @@ describe('search (issue #420)', () => {
     await user.clear(search);
 
     await waitFor(() => expect(screen.queryByText('Tritanium')).not.toBeInTheDocument());
+    expect(screen.getByRole('link', { name: /Division 1/ })).toBeInTheDocument();
   });
 });
 
-describe('persisted expand state (issue #420)', () => {
-  it('keeps a division expanded across a remount instead of resetting to fully collapsed', async () => {
-    const { unmount } = renderAssets();
-    await userEvent.setup().click(await screen.findByRole('button', { name: /Division 1/ }));
-    expect(await screen.findByRole('table', { name: /Division 1 assets/ })).toBeInTheDocument();
-    unmount();
+describe('URL drill-down (issue #779)', () => {
+  it('lands directly on a division from its URL, without visiting the root first', async () => {
+    mocked.loadCorporationAssets.mockResolvedValue(
+      cached([asset({ item_id: 1, location_flag: 'CorpSAG3' })])
+    );
+    renderAssets('/corp/assets/3');
+    expect(await screen.findByText('Tritanium')).toBeInTheDocument();
+  });
 
-    renderAssets();
-    expect(await screen.findByRole('table', { name: /Division 1 assets/ })).toBeInTheDocument();
+  it('reports a stale/unknown segment instead of crashing or silently redirecting', async () => {
+    renderAssets('/corp/assets/1/i:999');
+    expect(await screen.findByText('This location is gone')).toBeInTheDocument();
   });
 });

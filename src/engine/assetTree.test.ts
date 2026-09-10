@@ -1,11 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import {
+  buildAssetGroups,
   buildAssetTree,
   compareStations,
   collectItemIds,
   collectStationItemIds,
   totalEstimatedValue,
   type AssetTreeContainerNode,
+  type AssetTreeNode,
   type AssetTreeStation,
   type EngineAsset,
   type StationSortContext,
@@ -500,4 +502,150 @@ describe('compareStations', () => {
       expect(sorted.map((s) => s.locationId)).toEqual([1, 2]);
     }
   );
+});
+
+describe('buildAssetGroups', () => {
+  type Division = 1 | 2 | 3 | 'other';
+  const DIVISIONS: readonly Division[] = [1, 2, 3, 'other'];
+  const ALWAYS: ReadonlySet<Division> = new Set([1, 2, 3]);
+  const flagAsset = (
+    overrides: Partial<EngineAsset> & Pick<EngineAsset, 'item_id'>
+  ): EngineAsset => ({
+    type_id: 34,
+    quantity: 1,
+    location_id: 60003760,
+    location_type: 'other',
+    location_flag: 'CorpSAG1',
+    ...overrides,
+  });
+  const groupIdFor = (a: EngineAsset): Division => {
+    const match = /^CorpSAG([1-3])$/.exec(a.location_flag);
+    return match ? (Number(match[1]) as Division) : 'other';
+  };
+
+  it('always includes every division, even empty, in fixed order', () => {
+    const groups = buildAssetGroups([], DIVISIONS, ALWAYS, groupIdFor);
+    expect(groups.map((g) => g.id)).toEqual([1, 2, 3]);
+    expect(groups.every((g) => g.children.length === 0)).toBe(true);
+  });
+
+  it('sorts roots into the division their location_flag names', () => {
+    const groups = buildAssetGroups(
+      [
+        flagAsset({ item_id: 1, location_flag: 'CorpSAG2' }),
+        flagAsset({ item_id: 2, location_flag: 'CorpSAG1' }),
+      ],
+      DIVISIONS,
+      ALWAYS,
+      groupIdFor
+    );
+    expect(groups.find((g) => g.id === 1)?.children).toEqual([
+      { kind: 'item', asset: expect.objectContaining({ item_id: 2 }) },
+    ]);
+    expect(groups.find((g) => g.id === 2)?.children).toEqual([
+      { kind: 'item', asset: expect.objectContaining({ item_id: 1 }) },
+    ]);
+  });
+
+  it('adds a non-always-included id only when it holds something, after the fixed set', () => {
+    const empty = buildAssetGroups(
+      [flagAsset({ item_id: 1, location_flag: 'CorpSAG1' })],
+      DIVISIONS,
+      ALWAYS,
+      groupIdFor
+    );
+    expect(empty.map((g) => g.id)).toEqual([1, 2, 3]);
+
+    const withOther = buildAssetGroups(
+      [
+        flagAsset({ item_id: 1, location_flag: 'CorpSAG1' }),
+        flagAsset({ item_id: 2, location_flag: 'SomeFutureFlag' }),
+      ],
+      DIVISIONS,
+      ALWAYS,
+      groupIdFor
+    );
+    expect(withOther.map((g) => g.id)).toEqual([1, 2, 3, 'other']);
+  });
+
+  it('recurses into a container root the same way a station does, nesting its contents rather than flag-bucketing them separately', () => {
+    const groups = buildAssetGroups(
+      [
+        flagAsset({ item_id: 10, type_id: 650, location_flag: 'CorpSAG1' }), // container root
+        flagAsset({
+          item_id: 11,
+          quantity: 50,
+          location_id: 10,
+          location_type: 'item',
+          location_flag: 'Unlocked',
+        }), // nested inside it
+      ],
+      DIVISIONS,
+      ALWAYS,
+      groupIdFor
+    );
+    const division1 = groups.find((g) => g.id === 1);
+    expect(division1?.children).toEqual([
+      expect.objectContaining({
+        kind: 'container',
+        children: [{ kind: 'item', asset: expect.objectContaining({ item_id: 11 }) }],
+      }),
+    ]);
+    // The container's own quantity (1) plus its nested contents (50).
+    expect(division1?.itemCount).toBe(51);
+  });
+
+  /** Every asset's own `item_id`, whether it ended up a leaf or a container/ship/bay's own node. */
+  function collectAllItemIds(node: AssetTreeNode): number[] {
+    if (node.kind === 'bay') return node.children.flatMap(collectAllItemIds);
+    if (node.kind === 'item') return [node.asset.item_id];
+    return [node.asset.item_id, ...node.children.flatMap(collectAllItemIds)];
+  }
+
+  it('rescues an orphan whose parent has no row in this fetch, rather than dropping it', () => {
+    // item_id 4 is 'item'-typed pointing at location_id 3, but nothing with
+    // item_id 3 exists in this asset list — the structure-not-returned case
+    // buildAssetTree's own absentParentGroups pass exists for.
+    const groups = buildAssetGroups(
+      [flagAsset({ item_id: 4, location_id: 3, location_type: 'item', location_flag: 'CorpSAG2' })],
+      DIVISIONS,
+      ALWAYS,
+      groupIdFor
+    );
+    expect(groups.find((g) => g.id === 2)?.children).toEqual([
+      { kind: 'item', asset: expect.objectContaining({ item_id: 4 }) },
+    ]);
+  });
+
+  it('never drops an asset: every input item_id is reachable from exactly one group', () => {
+    const assets = [
+      flagAsset({ item_id: 1, location_flag: 'CorpSAG1' }),
+      flagAsset({ item_id: 2, location_flag: 'CorpSAG2' }),
+      flagAsset({ item_id: 3, type_id: 650, location_flag: 'CorpSAG3' }), // container root
+      flagAsset({ item_id: 4, location_id: 3, location_type: 'item', location_flag: 'Unlocked' }), // nested
+      flagAsset({ item_id: 5, location_flag: 'SomeFutureFlag' }), // falls into 'other'
+      flagAsset({ item_id: 6, location_id: 999, location_type: 'item', location_flag: 'CorpSAG1' }), // orphan: parent absent
+    ];
+    const groups = buildAssetGroups(assets, DIVISIONS, ALWAYS, groupIdFor);
+    const reachable = groups.flatMap((g) => g.children.flatMap(collectAllItemIds));
+    expect(new Set(reachable)).toEqual(new Set(assets.map((a) => a.item_id)));
+    expect(reachable).toHaveLength(assets.length);
+  });
+
+  /**
+   * `buildNode`'s ancestor guard cuts a cycle by turning the closing edge into
+   * a duplicate leaf stub (same mechanism `buildAssetTree` itself relies on)
+   * — so a cycle's members are promoted rather than dropped, but can appear
+   * more than once in the result. This only checks "not dropped", not
+   * "exactly once", since the duplicate is inherent to that shared cut.
+   */
+  it('promotes an isolated cycle rather than dropping its members', () => {
+    const assets = [
+      flagAsset({ item_id: 7, location_id: 8, location_type: 'item', location_flag: 'CorpSAG2' }),
+      flagAsset({ item_id: 8, location_id: 7, location_type: 'item', location_flag: 'CorpSAG2' }),
+    ];
+    const groups = buildAssetGroups(assets, DIVISIONS, ALWAYS, groupIdFor);
+    const reachable = new Set(groups.flatMap((g) => g.children.flatMap(collectAllItemIds)));
+    expect(reachable).toEqual(new Set([7, 8]));
+  });
 });
