@@ -126,6 +126,9 @@ export default function PriceHistoryChart({
               width={GROUPED_NUMBER_Y_AXIS_WIDTH}
               tickFormatter={(value: number) => formatIsk(value, 0)}
             />
+            {/* formatVolume shares formatIsk's comma-grouped-integer shape, so the
+                same gutter width applies; margin.right was already 8 (unlike the
+                margin.left: 0 that #764 had to fix), so only width needs widening here. */}
             <YAxis
               yAxisId="volume"
               orientation="right"
