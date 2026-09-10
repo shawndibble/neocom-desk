@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, within, fireEvent } from '@testing-library/react';
+import { render, screen, within, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { http, HttpResponse } from 'msw';
@@ -30,6 +30,11 @@ const NOW = new Date('2026-08-29T12:00:00Z');
 
 const server = setupServer();
 
+/** Any character's `/skills` — the job-slot header (#679) reads this for every render, so a default with no trained slot skills keeps the rest of this file's tests unconcerned with it. */
+function skillsUrl(characterId: number | string = ':characterId') {
+  return `${ESI_BASE_URL}/characters/${characterId}/skills`;
+}
+
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 beforeEach(async () => {
   configureEsi({ getToken: vi.fn(async () => 'tok') });
@@ -38,6 +43,7 @@ beforeEach(async () => {
   // make the cross-character block's assertions pass or fail for the wrong
   // reason (`Settings.test.tsx`'s precedent).
   useDefaultCharacterFilter.setState({ value: 'current', hydrated: false });
+  server.use(http.get(skillsUrl(), () => HttpResponse.json({ skills: [], total_sp: 0 })));
 });
 afterEach(() => {
   server.resetHandlers();
@@ -872,5 +878,160 @@ describe('ActiveJobsPanel: cross-character view (issue #607)', () => {
     const table = screen.getByRole('table', { name: 'Active jobs' });
     expect(within(table).getByText('Pilot One')).toBeInTheDocument();
     expect(within(table).getByText('Pilot Two')).toBeInTheDocument();
+  });
+
+  it('sums open manufacturing slots across both characters once "All characters" is picked (issue #679)', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(NOW);
+    await seedSecondCharacter();
+    // Pilot One: Mass Production III -> 1 + 3 = 4 max, 1 running (seeded job) -> 3 open.
+    server.use(
+      http.get(skillsUrl(CHAR_ID), () =>
+        HttpResponse.json({
+          skills: [
+            {
+              skill_id: 3387,
+              trained_skill_level: 3,
+              active_skill_level: 3,
+              skillpoints_in_skill: 1,
+            },
+          ],
+          total_sp: 1,
+        })
+      ),
+      // Pilot Two: Mass Production I -> 1 + 1 = 2 max, 1 running (seeded job) -> 1 open.
+      http.get(skillsUrl(CHAR_B), () =>
+        HttpResponse.json({
+          skills: [
+            {
+              skill_id: 3387,
+              trained_skill_level: 1,
+              active_skill_level: 1,
+              skillpoints_in_skill: 1,
+            },
+          ],
+          total_sp: 1,
+        })
+      )
+    );
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+    const { container } = render(
+      <MemoryRouter>
+        <ActiveJobsPanel
+          characterId={CHAR_ID}
+          onAddToQuickbar={() => {}}
+          quickbarAvailable={true}
+          onShowInfo={() => {}}
+        />
+      </MemoryRouter>
+    );
+
+    // Solo: only Pilot One counts (3 open manufacturing).
+    await screen.findByRole('button', { name: 'This character' });
+    await waitFor(() => {
+      expect(container.querySelector('.cursor-help')!.textContent).toBe('3/1/1');
+    });
+
+    await user.click(screen.getByRole('button', { name: 'This character' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'All characters' }));
+
+    // Both: 4+2=6 max, 2 running -> 4 open. Science/reaction stay at the
+    // untrained 1/1 for both characters (base slot only), summed to 2/2.
+    await waitFor(() => {
+      expect(container.querySelector('.cursor-help')!.textContent).toBe('4/2/2');
+    });
+  });
+});
+
+describe('ActiveJobsPanel: open job-slot header (issue #679)', () => {
+  const jobId = (n: number) => 500 + n;
+
+  function job(activityId: number, jobIdNum: number) {
+    return {
+      job_id: jobId(jobIdNum),
+      activity_id: activityId,
+      blueprint_type_id: 100,
+      facility_id: 60003760,
+      station_id: 60003760,
+      runs: 1,
+      start_date: new Date(NOW.getTime() - 30 * 60_000).toISOString(),
+      end_date: new Date(NOW.getTime() + 30 * 60_000).toISOString(),
+      status: 'active',
+    };
+  }
+
+  function skillsResponse(levels: Partial<Record<number, number>>) {
+    return {
+      skills: Object.entries(levels).map(([skillId, level]) => ({
+        skill_id: Number(skillId),
+        trained_skill_level: level,
+        active_skill_level: level,
+        skillpoints_in_skill: 1,
+      })),
+      total_sp: 1,
+    };
+  }
+
+  it('shows per-category open counts with per-category tone, and the open/max breakdown on the tooltip', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(NOW);
+    // Manufacturing: Mass Production III -> 1+3=4 max, 3 running -> 1 open (25% open, plain).
+    // Science: no skill -> 1 max, 0 running -> 1 open (fully idle, danger).
+    // Reaction: Mass Reactions I -> 1+1=2 max, 1 running -> 1 open (50% open, warning).
+    server.use(
+      http.get(skillsUrl(CHAR_ID), () => HttpResponse.json(skillsResponse({ 3387: 3, 45748: 1 }))),
+      http.get(jobsUrl(), () => HttpResponse.json([job(1, 1), job(1, 2), job(1, 3), job(11, 4)]))
+    );
+
+    const { container } = render(
+      <MemoryRouter>
+        <ActiveJobsPanel
+          characterId={CHAR_ID}
+          onAddToQuickbar={() => {}}
+          quickbarAvailable={true}
+          onShowInfo={() => {}}
+        />
+      </MemoryRouter>
+    );
+
+    await screen.findByRole('button', { name: 'Show job list' });
+    const summaryEls = await screen.findAllByText('1');
+    // Exactly manufacturing/science/reaction, in that order — proven by tone.
+    expect(summaryEls).toHaveLength(3);
+    expect(summaryEls[0]).toHaveClass('text-text');
+    expect(summaryEls[1]).toHaveClass('text-danger');
+    expect(summaryEls[2]).toHaveClass('text-warning');
+
+    const summaryTrigger = container.querySelector('.cursor-help')!;
+    expect(summaryTrigger.textContent).toBe('1/1/1');
+    fireEvent.focus(summaryTrigger);
+    expect(screen.getByRole('tooltip')).toHaveTextContent('Mfg 1/4 · Sci 1/1 · Rxn 1/2');
+  });
+
+  it('renders "—" per category, never a guessed number, when skills are not cached and ESI is unreachable', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(NOW);
+    server.use(
+      http.get(skillsUrl(CHAR_ID), () => HttpResponse.error()),
+      http.get(jobsUrl(), () => HttpResponse.json([]))
+    );
+
+    const { container } = render(
+      <MemoryRouter>
+        <ActiveJobsPanel
+          characterId={CHAR_ID}
+          onAddToQuickbar={() => {}}
+          quickbarAvailable={true}
+          onShowInfo={() => {}}
+        />
+      </MemoryRouter>
+    );
+
+    await screen.findByText('None');
+    const summaryTrigger = container.querySelector('.cursor-help')!;
+    expect(summaryTrigger.textContent).toBe('—/—/—');
+    fireEvent.focus(summaryTrigger);
+    expect(screen.getByRole('tooltip')).toHaveTextContent('Mfg — · Sci — · Rxn —');
   });
 });

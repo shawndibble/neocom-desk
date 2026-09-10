@@ -3,7 +3,9 @@ import {
   maxJobSlots,
   jobSlotCategory,
   runningJobCountsByCategory,
+  aggregateJobSlotSummary,
   type JobSlotSkills,
+  type JobSlotCharacterInput,
 } from './jobSlots';
 
 const NO_SKILLS: JobSlotSkills = {
@@ -98,5 +100,53 @@ describe('runningJobCountsByCategory', () => {
       science: 0,
       reaction: 0,
     });
+  });
+});
+
+describe('aggregateJobSlotSummary', () => {
+  const NOW = 1_700_000_000_000;
+
+  function job(activityId: number, endMs: number) {
+    return { activityId, endMs };
+  }
+
+  const skills = (massProduction: number): JobSlotSkills => ({
+    ...NO_SKILLS,
+    massProduction,
+  });
+
+  it('is undefined for every category with no characters', () => {
+    expect(aggregateJobSlotSummary([], NOW)).toEqual({
+      manufacturing: undefined,
+      science: undefined,
+      reaction: undefined,
+    });
+  });
+
+  it('sums open/max across characters with known skills and jobs', () => {
+    const characters: JobSlotCharacterInput[] = [
+      // 1 base + 4 trained = 5 max, 1 running -> 4 open.
+      { skills: skills(4), jobs: [job(1, NOW + 1000)] },
+      // 1 base + 2 trained = 3 max, 0 running -> 3 open.
+      { skills: skills(2), jobs: [] },
+    ];
+    expect(aggregateJobSlotSummary(characters, NOW).manufacturing).toEqual({ open: 7, max: 8 });
+  });
+
+  it('excludes a character missing skills or jobs from the sum rather than guessing zero', () => {
+    const characters: JobSlotCharacterInput[] = [
+      { skills: skills(4), jobs: [] }, // 5 max, 0 running -> 5 open.
+      { skills: undefined, jobs: [] }, // skills unknown: excluded entirely.
+      { skills: skills(0), jobs: undefined }, // jobs unknown: excluded entirely.
+    ];
+    expect(aggregateJobSlotSummary(characters, NOW).manufacturing).toEqual({ open: 5, max: 5 });
+  });
+
+  it('is undefined for a category when every character is missing data for it', () => {
+    const characters: JobSlotCharacterInput[] = [
+      { skills: undefined, jobs: [] },
+      { skills: skills(1), jobs: undefined },
+    ];
+    expect(aggregateJobSlotSummary(characters, NOW).manufacturing).toBeUndefined();
   });
 });

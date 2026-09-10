@@ -20,6 +20,13 @@
 
 export type JobSlotCategory = 'manufacturing' | 'science' | 'reaction';
 
+/** Display order every job-slot readout in the app follows. */
+export const JOB_SLOT_CATEGORIES: readonly JobSlotCategory[] = [
+  'manufacturing',
+  'science',
+  'reaction',
+];
+
 /** Active levels of the six skills that grant extra job slots. */
 export interface JobSlotSkills {
   massProduction: number;
@@ -80,4 +87,46 @@ export function runningJobCountsByCategory(
     if (category) counts[category] += 1;
   }
   return counts;
+}
+
+/** One character's job-slot inputs, adapted to this module's shapes. Either field undefined: not loaded/known for this character yet. */
+export interface JobSlotCharacterInput {
+  skills: JobSlotSkills | undefined;
+  jobs: readonly JobSlotJob[] | undefined;
+}
+
+/**
+ * Open/max slot counts per category, summed across every character passed
+ * in. A character missing skills or jobs data for a category simply doesn't
+ * contribute to that category's sum — never guessed as zero — so one
+ * not-yet-loaded alt in a multi-character selection doesn't blank out
+ * everyone else's known capacity. A category comes back undefined only when
+ * *no* character in the set has both pieces known for it.
+ */
+export function aggregateJobSlotSummary(
+  characters: readonly JobSlotCharacterInput[],
+  nowMs: number
+): Record<JobSlotCategory, { open: number; max: number } | undefined> {
+  const totals: Record<JobSlotCategory, { open: number; max: number }> = {
+    manufacturing: { open: 0, max: 0 },
+    science: { open: 0, max: 0 },
+    reaction: { open: 0, max: 0 },
+  };
+  let anyKnown = false;
+
+  for (const character of characters) {
+    if (character.skills === undefined || character.jobs === undefined) continue;
+    anyKnown = true;
+    const max = maxJobSlots(character.skills);
+    const running = runningJobCountsByCategory(character.jobs, nowMs);
+    for (const category of JOB_SLOT_CATEGORIES) {
+      totals[category].open += max[category] - running[category];
+      totals[category].max += max[category];
+    }
+  }
+
+  if (!anyKnown) {
+    return { manufacturing: undefined, science: undefined, reaction: undefined };
+  }
+  return totals;
 }

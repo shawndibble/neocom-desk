@@ -12,6 +12,7 @@ import {
   Panel,
   ReauthBanner,
   Spinner,
+  Tooltip,
   type DataTableColumn,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
@@ -40,6 +41,18 @@ import { formatEveDateTime } from '@/lib/eveTime';
 import { downloadCsv } from '@/lib/downloadCsv';
 import { jobsCsvColumns } from './jobsCsv';
 import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
+import { mapWithConcurrencyLimit, ESI_FANOUT_CONCURRENCY } from '@/lib/concurrency';
+import { loadCharacterSkills } from '@/features/skills/data';
+import {
+  jobSlotSkillsFromCharacterSkills,
+  toJobSlotJobs,
+} from '@/features/character/jobSlotSkills';
+import {
+  aggregateJobSlotSummary,
+  JOB_SLOT_CATEGORIES,
+  type JobSlotSkills,
+  type JobSlotCharacterInput,
+} from '@/engine/industry/jobSlots';
 import { useCorpOwner } from '@/features/corp/owner';
 import { OwnerSwitch } from '@/features/corp/OwnerSwitch';
 import { useCorpSnapshot } from '@/features/corp/useCorpSnapshot';
@@ -68,6 +81,8 @@ interface ActiveJobsPanelProps {
 interface Snapshot {
   result: JobsLoadResult;
   types: TypeMap;
+  /** Undefined: skills not cached/fetched yet — the job-slot header reads this as "unknown", never a guessed 0. */
+  skills: JobSlotSkills | undefined;
 }
 
 /** Countdown recompute cadence; coarse (minutes granularity display) so 30s is plenty fresh. */
@@ -75,16 +90,21 @@ const TICK_MS = 30_000;
 
 async function loadActiveJobsSnapshot(characterId: number): Promise<Snapshot> {
   try {
-    const [result, types] = await Promise.all([
+    const [result, types, skillsResult] = await Promise.all([
       loadCharacterIndustryJobs(characterId),
       loadTypes(),
+      loadCharacterSkills(characterId),
     ]);
-    return { result, types };
+    return {
+      result,
+      types,
+      skills: skillsResult ? jobSlotSkillsFromCharacterSkills(skillsResult.data.skills) : undefined,
+    };
   } catch {
     // `loadTypes()` throws when the SDE fetch fails. Resolving with an empty
     // snapshot rather than rejecting is what clears the spinner — a rejected
     // load would strand the panel with no data-cached branch to fall into.
-    return { result: { cached: null, needsReauth: false }, types: {} };
+    return { result: { cached: null, needsReauth: false }, types: {}, skills: undefined };
   }
 }
 
@@ -170,11 +190,16 @@ export function ActiveJobsPanel({
   }
 
   const resolvedJobsFilter = useResolvedCharacterFilter(jobsCharacterFilter, characterId);
-  const showingAllJobs =
-    !showingCorp &&
-    (resolvedJobsFilter === 'all' ||
-      resolvedJobsFilter.size !== 1 ||
-      !resolvedJobsFilter.has(characterId));
+  // Whether the resolved filter needs more than "my own" jobs — decoupled
+  // from the Corp Jobs toggle below because the job-slot header readout
+  // (issue #679) must follow this filter's character set even while Corp
+  // Jobs is showing: it always reports *personal* capacity, never the corp
+  // list's jobs.
+  const needsJobSlotFanOut =
+    resolvedJobsFilter === 'all' ||
+    resolvedJobsFilter.size !== 1 ||
+    !resolvedJobsFilter.has(characterId);
+  const showingAllJobs = !showingCorp && needsJobSlotFanOut;
 
   const allCharacters = useLiveQuery(() => db.characters.toArray(), [], []);
   const jobsFilterCandidates = useMemo(
@@ -197,7 +222,7 @@ export function ActiveJobsPanel({
   const [jobsFanOut, setJobsFanOut] = useState<JobsFanOutSnapshot | null>(null);
   const [jobsFanOutRefreshCount, setJobsFanOutRefreshCount] = useState(0);
   useEffect(() => {
-    if (!showingAllJobs) return;
+    if (!needsJobSlotFanOut) return;
     let cancelled = false;
     void loadAllCharactersIndustryJobs().then((snapshot) => {
       if (!cancelled) setJobsFanOut(snapshot);
@@ -205,9 +230,42 @@ export function ActiveJobsPanel({
     return () => {
       cancelled = true;
     };
-  }, [showingAllJobs, jobsFanOutRefreshCount]);
+  }, [needsJobSlotFanOut, jobsFanOutRefreshCount]);
   const refreshJobsFanOut = useCallback(() => setJobsFanOutRefreshCount((c) => c + 1), []);
   const jobsFanOutLoading = jobsFanOut === null;
+
+  // Skills for the job-slot header's max-per-category, for every character
+  // the resolved filter names beyond the current one — the single-character
+  // path below reuses `data.skills` (already loaded alongside its jobs) and
+  // never reaches here. No new poll: this fires on the same triggers as the
+  // jobs fan-out above, not its own interval.
+  const [jobsFanOutSkills, setJobsFanOutSkills] = useState<ReadonlyMap<number, JobSlotSkills>>(
+    new Map()
+  );
+  useEffect(() => {
+    if (!needsJobSlotFanOut) return;
+    const ids =
+      resolvedJobsFilter === 'all'
+        ? jobsFilterCandidates.map((c) => c.characterId)
+        : [...resolvedJobsFilter];
+    let cancelled = false;
+    const skillsById = new Map<number, JobSlotSkills>();
+    // No per-character try/catch here (unlike `rosterAttention.ts`'s fan-out,
+    // which wraps each request explicitly): `loadCharacterSkills` ->
+    // `loadWithCache` already swallows a failed fetch internally and
+    // resolves `null` rather than rejecting, so one character's failure
+    // can't sink the others or this `Promise.all` — it just leaves that
+    // character out of `skillsById`, read as "unknown" below.
+    void mapWithConcurrencyLimit(ids, ESI_FANOUT_CONCURRENCY, async (id) => {
+      const result = await loadCharacterSkills(id);
+      if (result) skillsById.set(id, jobSlotSkillsFromCharacterSkills(result.data.skills));
+    }).then(() => {
+      if (!cancelled) setJobsFanOutSkills(skillsById);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [needsJobSlotFanOut, resolvedJobsFilter, jobsFilterCandidates, jobsFanOutRefreshCount]);
 
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), TICK_MS);
@@ -248,6 +306,29 @@ export function ActiveJobsPanel({
         (entry) => resolvedJobsFilter === 'all' || resolvedJobsFilter.has(entry.characterId)
       ),
     [jobsFanOut, resolvedJobsFilter]
+  );
+  // Always *personal* jobs + skills, regardless of `showingCorp` (issue
+  // #679's header readout) — the single-character branch reuses `data`
+  // (loaded unconditionally above), the multi-character branch reuses the
+  // fan-out state above, gated on the same `needsJobSlotFanOut` that drives
+  // both.
+  const jobSlotCharacterInputs = useMemo<JobSlotCharacterInput[]>(() => {
+    if (needsJobSlotFanOut) {
+      return jobsFanOutSelectedEntries.map((entry) => ({
+        skills: jobsFanOutSkills.get(entry.characterId),
+        jobs: entry.result.cached ? toJobSlotJobs(entry.result.cached.data) : undefined,
+      }));
+    }
+    return [
+      {
+        skills: data?.skills,
+        jobs: data?.result.cached ? toJobSlotJobs(data.result.cached.data) : undefined,
+      },
+    ];
+  }, [needsJobSlotFanOut, jobsFanOutSelectedEntries, jobsFanOutSkills, data]);
+  const jobSlotSummary = useMemo(
+    () => aggregateJobSlotSummary(jobSlotCharacterInputs, now),
+    [jobSlotCharacterInputs, now]
   );
   const jobsFanOutSkipped = useMemo(
     () =>
@@ -489,6 +570,53 @@ export function ActiveJobsPanel({
   };
 
   /**
+   * Open manufacturing/science/reaction slots for the panel's current
+   * character-filter selection (issue #679) — always visible, since it's
+   * meant for a one-glance read alongside the fold summary. A dashed
+   * underline expands to the open/max breakdown per category on hover/focus,
+   * same tooltip idiom `Characters.tsx`'s `openJobsColumn` already uses. Tone
+   * is per-category, not on the group as a whole: one idle pool is worth
+   * flagging even when the other two are busy.
+   */
+  const jobSlotSummaryElement = (
+    <Tooltip
+      content={JOB_SLOT_CATEGORIES.map((category) => {
+        const entry = jobSlotSummary[category];
+        const label = t(`characters.jobSlotCategory.${category}`);
+        return entry
+          ? t('industry.jobSlotBreakdown', {
+              category: label,
+              open: entry.open,
+              max: entry.max,
+            })
+          : t('industry.jobSlotBreakdownUnknown', { category: label });
+      }).join(' · ')}
+    >
+      <span
+        tabIndex={0}
+        className="flex cursor-help items-center gap-1 text-xs tabular-nums underline decoration-dotted decoration-current/50 underline-offset-2"
+      >
+        {JOB_SLOT_CATEGORIES.map((category, index) => {
+          const entry = jobSlotSummary[category];
+          const tone = !entry
+            ? 'text-text-dim'
+            : entry.open === entry.max
+              ? 'text-danger'
+              : entry.open / entry.max >= 0.5
+                ? 'text-warning'
+                : 'text-text';
+          return (
+            <span key={category} className="flex items-center gap-1">
+              {index > 0 && <span className="text-text-dim">/</span>}
+              <span className={tone}>{entry ? entry.open : '—'}</span>
+            </span>
+          );
+        })}
+      </span>
+    </Tooltip>
+  );
+
+  /**
    * The header's one-line read: who this panel is showing, then what it holds.
    *
    * The character filter sits here beside the title rather than in a row of
@@ -500,42 +628,40 @@ export function ActiveJobsPanel({
    * without it. `Panel`'s left-hand group deliberately doesn't wrap (it holds
    * every panel's title), so the wrapper here carries its own.
    */
-  const jobsMeta =
-    showCharacterFilter || noneActive || collapsible ? (
-      <span className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
-        {showCharacterFilter && (
-          <CharacterFilterControl
-            characters={jobsFilterCandidates}
-            activeCharacterId={characterId}
-            value={jobsCharacterFilter}
-            onChange={setJobsCharacterFilter}
-          />
-        )}
-        {noneActive ? (
-          <span className="text-xs text-text-dim">{t('industry.jobsNoneMeta')}</span>
-        ) : (
-          collapsible && (
-            <span className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs tabular-nums">
-              <span className="text-text">
-                {t('industry.jobsSummary', { running: summary.running, done: summary.done })}
-              </span>
-              {summary.next && (
-                <span
-                  className={
-                    soon(summary.next.job) ? 'font-semibold text-warning' : 'text-text-dim'
-                  }
-                >
-                  {t('industry.jobsNextFinish', {
-                    name: nameForBlueprint(summary.next.job.blueprint_type_id),
-                    time: formatDuration(summary.next.seconds),
-                  })}
-                </span>
-              )}
+  const jobsMeta = (
+    <span className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+      {showCharacterFilter && (
+        <CharacterFilterControl
+          characters={jobsFilterCandidates}
+          activeCharacterId={characterId}
+          value={jobsCharacterFilter}
+          onChange={setJobsCharacterFilter}
+        />
+      )}
+      {jobSlotSummaryElement}
+      {noneActive ? (
+        <span className="text-xs text-text-dim">{t('industry.jobsNoneMeta')}</span>
+      ) : (
+        collapsible && (
+          <span className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs tabular-nums">
+            <span className="text-text">
+              {t('industry.jobsSummary', { running: summary.running, done: summary.done })}
             </span>
-          )
-        )}
-      </span>
-    ) : undefined;
+            {summary.next && (
+              <span
+                className={soon(summary.next.job) ? 'font-semibold text-warning' : 'text-text-dim'}
+              >
+                {t('industry.jobsNextFinish', {
+                  name: nameForBlueprint(summary.next.job.blueprint_type_id),
+                  time: formatDuration(summary.next.seconds),
+                })}
+              </span>
+            )}
+          </span>
+        )
+      )}
+    </span>
+  );
 
   return (
     <Panel
