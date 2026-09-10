@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
-import { act, render, screen, within, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, within, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
@@ -333,5 +333,48 @@ describe('Time format preference', () => {
 
     expect(within(table).getByText(formatTimestamp(EXPIRES, 'UTC'))).toBeInTheDocument();
     expect(within(table).queryByText(formatTimestamp(EXPIRES))).not.toBeInTheDocument();
+  });
+});
+
+describe('Contracts row context menu (issue #676)', () => {
+  /** Right-clicks a contract row by its rendered title-cell text and returns the row. */
+  async function openContractMenu(cellText: string) {
+    await screen.findByText('Rifter fit');
+    const table = screen.getByRole('table', { name: 'Contracts' });
+    const row = within(table).getByText(cellText).closest('tr');
+    if (!row) throw new Error(`expected a "${cellText}" contract row`);
+    row.focus();
+    fireEvent.contextMenu(row);
+    return row;
+  }
+
+  it('offers Copy title and Copy Contract ID, without opening the detail modal', async () => {
+    render(<App />);
+    await openContractMenu('Rifter fit');
+
+    expect(screen.getByRole('menuitem', { name: 'Copy title' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Copy Contract ID' })).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('offers the menu on a titleless contract, keyed off its type-label fallback', async () => {
+    render(<App />);
+    await openContractMenu('Courier');
+
+    expect(screen.getByRole('menuitem', { name: 'Copy title' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Copy Contract ID' })).toBeInTheDocument();
+  });
+
+  it('left-click on the title cell still opens the detail modal, unaffected by the context menu', async () => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/contracts/1/items`, () =>
+        HttpResponse.json([])
+      )
+    );
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByText('Rifter fit'));
+
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
   });
 });
