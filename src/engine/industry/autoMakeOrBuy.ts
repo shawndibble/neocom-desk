@@ -149,7 +149,9 @@ export function autoBuildHere(
           visit(inputs, depth + 1, subVisited);
         }
       } catch {
-        // Same "never throw" contract — this material still counts as built.
+        // Never-throw contract — bad recipe data below this material must
+        // not blank the row. Its own build/buy decision above already
+        // stands regardless of whether recursing beneath it succeeds.
       }
     }
   }
