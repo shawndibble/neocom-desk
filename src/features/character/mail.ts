@@ -13,6 +13,7 @@ import {
 import {
   loadWithCache,
   loadWithCacheStatus,
+  readCached,
   writeCached,
   STALE_AFTER,
   type CachedResult,
@@ -127,11 +128,28 @@ export function loadMailBody(
  * file: a stale grant (e.g. a token that predates `organize_mail`'s addition,
  * issue #741) would otherwise fail silently on every open with no way for the
  * user to learn a re-login would fix it.
+ *
+ * On success, patches the cached header list's own `is_read` flag rather than
+ * refetching from ESI: the local write already knows the true state, while a
+ * refetch risks losing a race with ESI's own propagation delay. Without this
+ * the session-local mark-read (Mail.tsx's `locallyReadIds`) is the only thing
+ * showing the mail as read, and it's gone the moment the headers reload from
+ * cache — leaving a message that reopens as unread on every return visit
+ * inside the 10-minute cache window.
  */
 export async function markMailReadOnEsi(characterId: number, mailId: number): Promise<void> {
   try {
     await putCharacterMail(characterId, mailId, { read: true });
   } catch (err) {
     if (isAuthFailure(err)) emitEsiAuthFailure(characterId);
+    return;
   }
+  const headers = await readCached<MailHeader[]>(characterId, KEYS.headers);
+  if (!headers) return;
+  await writeCached(
+    characterId,
+    KEYS.headers,
+    headers.map((header) => (header.mail_id === mailId ? { ...header, is_read: true } : header)),
+    Date.now()
+  );
 }
