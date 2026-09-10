@@ -382,6 +382,53 @@ describe('projection wiring', () => {
     ]);
   });
 
+  it("embeds the Character's configured extractorExpiringLeadHours, not the default, once it's set (issue #750)", async () => {
+    useNotificationPreferences.setState({
+      value: withCharacterEventThreshold(
+        DEFAULT_NOTIFICATION_PREFERENCES,
+        7,
+        'extractorExpiringLeadHours',
+        12
+      ),
+      hydrated: true,
+    });
+    vi.mocked(loadCharacterPlanets).mockResolvedValue(
+      statusResult([{ planet_id: 40000001, solar_system_id: 1, owner_id: 7 }], false) as never
+    );
+    vi.mocked(loadAllColonyDetails).mockResolvedValue(
+      new Map([
+        [
+          40000001,
+          statusResult(
+            {
+              links: [],
+              routes: [],
+              pins: [
+                {
+                  pin_id: 1,
+                  type_id: 2848,
+                  latitude: 0,
+                  longitude: 0,
+                  expiry_time: '2026-09-07T12:00:00Z',
+                  extractor_details: { heads: [] },
+                },
+              ],
+            },
+            false
+          ),
+        ],
+      ]) as never
+    );
+    expect(await colonyDomain.load(7)).toEqual([
+      {
+        planetId: 40000001,
+        extractors: [
+          { pinId: 1, expiryTimeMs: Date.parse('2026-09-07T12:00:00Z'), thresholdMs: 12 * HOUR_MS },
+        ],
+      },
+    ]);
+  });
+
   it('resolves planet names for colonies', async () => {
     vi.mocked(loadPlanetName).mockResolvedValue('Amarr III');
     const snapshot = {

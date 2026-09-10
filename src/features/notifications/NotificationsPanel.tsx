@@ -650,7 +650,12 @@ const CharacterNotificationSection = memo(function CharacterNotificationSection(
    * that assembles one Character's whole Projection correctly — rather
    * than uploading just this domain's rows, which would silently wipe
    * every other domain's pending push for every other Character too.
-   * `runForegroundPoll`'s own in-flight guard makes firing it here safe.
+   * `runForegroundPoll`'s in-flight guard coalesces rather than queues: a
+   * click landing while a poll is already running joins that in-flight
+   * poll instead of starting a fresh one, so it can compute under the
+   * *previous* threshold/toggle state — a narrow, self-healing race (the
+   * next ~5-minute tick still picks up the new value) that also happens to
+   * be what stops rapid Select changes from firing one ESI poll apiece.
    */
   const triggerExtractorReupload = () => {
     void runForegroundPoll(liveDependencies());
