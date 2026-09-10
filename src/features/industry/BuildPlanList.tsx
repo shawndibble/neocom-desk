@@ -625,16 +625,14 @@ export function BuildPlanList({
           // change would otherwise be stale for the rest of the drag.
           measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}
           // Wider edge threshold and stronger acceleration than dnd-kit's
-          // default, matching EntryList.tsx: the list below is a capped-height
-          // scroller (#408's shape), and the default threshold leaves too
-          // little room near its edges to start autoscrolling before the
-          // pointer runs out of list.
+          // default (#408, matching EntryList.tsx): now that the list has no
+          // scroller of its own, the nearest scrollable ancestor dnd-kit finds
+          // is the page itself, and the default threshold leaves too little
+          // room near the viewport's top/bottom edge to trigger autoscroll
+          // before the pointer runs off screen.
           autoScroll={{ threshold: { x: 0.2, y: 0.25 }, acceleration: 20 }}
         >
-          {/* The scroller is the row list alone, not the whole pane: the heading
-              and the blueprint picker stay put while a long plan list scrolls
-              under them, same as Mail's list. */}
-          <ul className="max-h-[28rem] overflow-y-auto rounded-xs border border-line">
+          <ul className="rounded-xs border border-line">
             {/* A group's header and its members are siblings in this one list,
                 not a nested `ul` per group: a nested list announces "list, 1
                 item" before every single plan. */}

@@ -104,7 +104,7 @@ function allToggledFlags<K extends string, M>(
   return result;
 }
 
-function selectionStateFor<K extends string, M>(
+function selectionStateFor<K extends string | number, M>(
   keys: readonly K[],
   map: M,
   channel: NotificationChannel,
@@ -150,6 +150,122 @@ export function toggleAllEventsOnChannel(
   channel: NotificationChannel
 ): EventEnabledMap {
   return { ...map, ...allToggledFlags(eventIds, map, channel, isEventEnabledFor) };
+}
+
+/**
+ * Cross-character select-all/mixed state for one event on one channel (issue
+ * #738's "All Characters" master row): the same three-state read as
+ * `selectionStateForEvents`, but the axis being summarized is Characters
+ * instead of Events — one event, every known Character's own value for it.
+ */
+export function selectionStateForEventAcrossCharacters(
+  characterIds: readonly number[],
+  eventId: NotificationEventId,
+  perCharacterMap: Readonly<Record<number, EventEnabledMap>>,
+  channel: NotificationChannel
+): SelectionState {
+  return selectionStateFor(characterIds, perCharacterMap, channel, (map, characterId, c) =>
+    isEventEnabledFor(map[characterId] ?? {}, eventId, c)
+  );
+}
+
+/**
+ * Cross-character, cross-event select-all/mixed state for the master row's
+ * own select-all header (issue #738) — checked only when every known
+ * Character agrees every Event is on for this channel.
+ */
+export function selectionStateForAllCharactersAllEvents(
+  characterIds: readonly number[],
+  eventIds: readonly NotificationEventId[],
+  perCharacterMap: Readonly<Record<number, EventEnabledMap>>,
+  channel: NotificationChannel
+): SelectionState {
+  if (characterIds.length === 0 || eventIds.length === 0) return 'unchecked';
+  const total = characterIds.length * eventIds.length;
+  let enabledCount = 0;
+  for (const characterId of characterIds) {
+    const map = perCharacterMap[characterId] ?? {};
+    for (const eventId of eventIds) {
+      if (isEventEnabledFor(map, eventId, channel)) enabledCount += 1;
+    }
+  }
+  if (enabledCount === 0) return 'unchecked';
+  return enabledCount === total ? 'checked' : 'indeterminate';
+}
+
+/** One event's channel flags with `channel` forced to `value`, the other channel carried through unchanged. */
+function eventFlagsWithChannelSet(
+  prefs: EventEnabledMap,
+  eventId: NotificationEventId,
+  channel: NotificationChannel,
+  value: boolean
+): ChannelFlags {
+  const flags: ChannelFlags = {};
+  for (const c of NOTIFICATION_CHANNELS) flags[c] = isEventEnabledFor(prefs, eventId, c);
+  flags[channel] = value;
+  return flags;
+}
+
+/**
+ * Broadcast cascade for one event's channel across every known Character
+ * (issue #738): same cascade rule as `allToggledFlags` (any state where at
+ * least one Character disagrees, or all are off, turns every Character on;
+ * only full agreement-on turns them all off), generalized over Characters
+ * instead of Events. Returns one merged `EventEnabledMap` per Character,
+ * ready to spread into `perCharacter`.
+ */
+export function broadcastEventChannelFlags(
+  characterIds: readonly number[],
+  eventId: NotificationEventId,
+  perCharacterMap: Readonly<Record<number, EventEnabledMap>>,
+  channel: NotificationChannel
+): Record<number, EventEnabledMap> {
+  const allEnabled =
+    characterIds.length > 0 &&
+    characterIds.every((id) => isEventEnabledFor(perCharacterMap[id] ?? {}, eventId, channel));
+  const nextEnabled = !allEnabled;
+  const result: Record<number, EventEnabledMap> = {};
+  for (const characterId of characterIds) {
+    const prefs = perCharacterMap[characterId] ?? {};
+    result[characterId] = {
+      ...prefs,
+      [eventId]: eventFlagsWithChannelSet(prefs, eventId, channel, nextEnabled),
+    };
+  }
+  return result;
+}
+
+/**
+ * Broadcast cascade for every event's channel across every known Character at
+ * once (issue #738's master select-all): one global on/off decision — is
+ * every (Character, Event) pair already on for this channel — applied
+ * uniformly, the same "one aggregate decision, applied to every key" shape
+ * `allToggledFlags` uses for a single Character's column.
+ */
+export function broadcastAllEventsChannelFlags(
+  characterIds: readonly number[],
+  eventIds: readonly NotificationEventId[],
+  perCharacterMap: Readonly<Record<number, EventEnabledMap>>,
+  channel: NotificationChannel
+): Record<number, EventEnabledMap> {
+  const allEnabled =
+    characterIds.length > 0 &&
+    eventIds.length > 0 &&
+    characterIds.every((id) => {
+      const prefs = perCharacterMap[id] ?? {};
+      return eventIds.every((eventId) => isEventEnabledFor(prefs, eventId, channel));
+    });
+  const nextEnabled = !allEnabled;
+  const result: Record<number, EventEnabledMap> = {};
+  for (const characterId of characterIds) {
+    const prefs = perCharacterMap[characterId] ?? {};
+    const nextPrefs: EventEnabledMap = { ...prefs };
+    for (const eventId of eventIds) {
+      nextPrefs[eventId] = eventFlagsWithChannelSet(prefs, eventId, channel, nextEnabled);
+    }
+    result[characterId] = nextPrefs;
+  }
+  return result;
 }
 
 /**

@@ -24,6 +24,8 @@ import {
   isEveTypeEnabledFor,
   toggleEveTypeChannel,
   toggleAllEveTypesOnChannel,
+  broadcastEventChannelFlags,
+  broadcastAllEventsChannelFlags,
   NOTIFICATION_CHANNELS,
   type EventEnabledMap,
   type EveTypeEnabledMap,
@@ -486,6 +488,64 @@ export function withCharacterEventThreshold<K extends keyof CharacterEventThresh
       [characterId]: { ...existing, [key]: amount },
     },
   };
+}
+
+/**
+ * Writes a batch of already-computed per-Character flags and persists it
+ * (issue #738) — the shared shell both broadcast functions below reduce to.
+ * `characterIds[0]` drives `updateNotificationPrefs`'s sync scheduling;
+ * callers put the active Character first so this is always a signed-in
+ * Character with a usable token, not just Dexie's insertion order
+ * (`NotificationsPanel.tsx`'s `allCharacterIds`).
+ */
+async function writeBroadcastFlags(
+  characterIds: readonly number[],
+  value: NotificationPreferencesValue,
+  flags: Record<number, EventEnabledMap>,
+  channel: NotificationChannel
+): Promise<void> {
+  if (characterIds.length === 0) return;
+  const next: NotificationPreferencesValue = {
+    ...value,
+    perCharacter: { ...value.perCharacter, ...flags },
+  };
+  await updateNotificationPrefs(characterIds[0], next, channel);
+}
+
+/**
+ * Broadcasts one event's channel value to every known Character at once
+ * (issue #738) — the "All Characters" master row's per-event control. A
+ * one-time broadcast to Characters that exist right now, not a saved default
+ * applied to ones added later; each can still be edited independently
+ * afterward.
+ */
+export async function broadcastEventChannelPref(
+  characterIds: readonly number[],
+  value: NotificationPreferencesValue,
+  eventId: NotificationEventId,
+  channel: NotificationChannel
+): Promise<void> {
+  await writeBroadcastFlags(
+    characterIds,
+    value,
+    broadcastEventChannelFlags(characterIds, eventId, value.perCharacter, channel),
+    channel
+  );
+}
+
+/** Same as `broadcastEventChannelPref`, for the master row's own select-all across every Event too. */
+export async function broadcastAllEventsChannelPref(
+  characterIds: readonly number[],
+  value: NotificationPreferencesValue,
+  eventIds: readonly NotificationEventId[],
+  channel: NotificationChannel
+): Promise<void> {
+  await writeBroadcastFlags(
+    characterIds,
+    value,
+    broadcastAllEventsChannelFlags(characterIds, eventIds, value.perCharacter, channel),
+    channel
+  );
 }
 
 /** Re-exported so callers gate on one import rather than reaching into eventSelection too. */

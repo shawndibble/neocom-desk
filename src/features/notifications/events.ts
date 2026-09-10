@@ -177,3 +177,12 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventDef[] = [
 export const NOTIFICATION_EVENT_IDS: readonly NotificationEventId[] = NOTIFICATION_EVENTS.map(
   (event) => event.id
 );
+
+const EVENT_BY_ID = new Map(NOTIFICATION_EVENTS.map((event) => [event.id, event]));
+
+/** One event's i18n label key — a shared lookup so callers don't each build their own copy of this catalog map. */
+export function eventLabelKey(eventId: NotificationEventId): string {
+  const def = EVENT_BY_ID.get(eventId);
+  if (!def) throw new Error(`Unknown Notification Event id: ${eventId}`);
+  return def.labelKey;
+}
