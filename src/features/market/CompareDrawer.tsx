@@ -225,7 +225,6 @@ export function CompareDrawer({
               </Button>
               <IconButton
                 size="sm"
-                variant="plain"
                 icon={<Icon.Close />}
                 label={t('common.close')}
                 onClick={close}
