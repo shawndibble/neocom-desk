@@ -37,6 +37,7 @@ type InternalRowKind =
   | 'column-captions'
   | 'event'
   | 'extractor-hint'
+  | 'extractor-lead-time'
   | 'fuel-threshold'
   | 'wallet-threshold'
   | 'corp-wallet-threshold'
@@ -57,6 +58,7 @@ const ROW_HEIGHT: Record<InternalRowKind, number> = {
   'column-captions': 26,
   event: 33,
   'extractor-hint': 48,
+  'extractor-lead-time': 44,
   'fuel-threshold': 52,
   'wallet-threshold': 52,
   'corp-wallet-threshold': 44,
@@ -83,6 +85,9 @@ export function estimateCharacterSectionHeight(input: CharacterSectionHeightInpu
     const rowEnabled = input.rowEnabledFor(eventId);
 
     if (eventId === 'planetaryExtractorExpiring') height += ROW_HEIGHT['extractor-hint'];
+    if (eventId === 'planetaryExtractorExpiring' && rowEnabled) {
+      height += ROW_HEIGHT['extractor-lead-time'];
+    }
     if (eventId === 'structureFuelLow' && rowEnabled) height += ROW_HEIGHT['fuel-threshold'];
     if (eventId === 'walletBalanceChanged' && rowEnabled) height += ROW_HEIGHT['wallet-threshold'];
     if (eventId === 'corpWalletThreshold' && rowEnabled) {
