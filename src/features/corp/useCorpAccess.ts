@@ -19,20 +19,13 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 import { corpWideRoles, loadCharacterRoles } from './roles';
 import { missingCorpScopes } from './corpScopes';
 
-/**
- * `getCharacterRoles` sits in the `corp` group, not the base grant: reading it
- * needs its own scope, so a Character's role is unknowable before they opt in.
- * Read off the registry rather than hand-copied, like every other derived
- * scope constant in this codebase.
- */
+/** Read off the registry rather than hand-copied, like every other derived scope constant in this codebase. */
 const ROLES_SCOPE: Scope = ESI_REGISTRY.getCharacterRoles.scope;
 
 /**
  * - `unknown` — scopes not resolved yet (the first frames of a cold load)
  * - `not-granted` — resolved, and the scope that reads corp roles has not been
- *   granted, so whether this Character even holds a role is unknowable without
- *   asking ESI — which this hook does not do speculatively, to avoid a doomed
- *   403 for the ~95% who will never grant it
+ *   granted, so whether this Character even holds a role is unknowable
  * - `none` — the role read succeeded, and this Character holds no corp role
  * - `roles-without-grant` — holds a role, some other corp scope not granted
  * - `ready` — holds a role and the scopes that role needs are granted

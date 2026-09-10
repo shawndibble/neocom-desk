@@ -45,6 +45,11 @@ const GRANT_KEYS = {
   ready: 'corp.accessGrantGranted',
 } as const satisfies Record<CorpAccessState, string>;
 
+/** Granting is the only way either of these two states moves. */
+function needsGrant(state: CorpAccessState): boolean {
+  return state === 'roles-without-grant' || state === 'not-granted';
+}
+
 export function CorpAccessPanel() {
   const { t } = useTranslation();
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
@@ -93,7 +98,7 @@ export function CorpAccessPanel() {
               server-side. `unknown` has no button because it has no answer
               yet, and `ready` has nothing left to ask for.
             */}
-            {(state === 'roles-without-grant' || state === 'not-granted') && (
+            {needsGrant(state) && (
               // `ghost`, not `primary`: /settings already spends its one
               // primary on the notifications panel's Enable
               // (docs/DESIGN.md §6, "One `primary` button per view").

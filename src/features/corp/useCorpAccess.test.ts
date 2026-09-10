@@ -4,6 +4,7 @@ import type { StatusResult } from '@/esi/cache';
 import type { CharacterCorporationRoles } from '@/esi/endpoints';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useGrantedScopes } from '@/app/useGrantedScopes';
+import { ESI_REGISTRY } from '@/esi/registry';
 import { scopesForGroup } from '@/esi/scopes';
 import { CORP_SCOPES_FOR_CAPABILITY } from './corpScopes';
 import { loadCharacterRoles } from './roles';
@@ -22,12 +23,11 @@ const CHARACTER_ID = 42;
 /**
  * Derived, not listed: this stands for "the Character granted corp access",
  * and the Grant button asks for the whole group. A hand-written copy went
- * stale the moment a capability grew a second scope requirement. Includes
- * `ROLES_SCOPE` now that `getCharacterRoles` is in the `corp` group.
+ * stale the moment a capability grew a second scope requirement.
  */
 const ALL_CORP_SCOPES = [...scopesForGroup('corp')];
 /** The one scope that gates whether the hook will even ask ESI for roles. */
-const ROLES_SCOPE = 'esi-characters.read_corporation_roles.v1';
+const ROLES_SCOPE = ESI_REGISTRY.getCharacterRoles.scope;
 
 function rolesResolvingTo(roles: readonly string[]): StatusResult<CharacterCorporationRoles> {
   return {
@@ -67,10 +67,10 @@ describe('useCorpAccess — unknown', () => {
 
   /**
    * `useGrantedScopes()` answers `undefined` (not `[]`) while unknown, and the
-   * roles fetch itself is now gated on the same resolved grant containing
-   * `ROLES_SCOPE` — so a roles snapshot landing before scopes resolve is no
-   * longer reachable at all (the fetch cannot start without them). This test
-   * covers the transition once scopes do resolve and turn out to include it.
+   * roles fetch is gated on the same resolved grant containing `ROLES_SCOPE` —
+   * so a roles snapshot landing before scopes resolve is unreachable (the
+   * fetch cannot start without them). This test covers the transition once
+   * scopes resolve and turn out to include it.
    */
   it('stays unknown while the granted scopes are unresolved, then reads roles once they resolve with the roles scope', async () => {
     mockedGrantedScopes.mockReturnValue(undefined);

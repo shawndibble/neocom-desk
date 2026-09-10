@@ -7,6 +7,7 @@ import type { CharacterCorporationRoles } from '@/esi/endpoints';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useGrantedScopes } from '@/app/useGrantedScopes';
 import { beginEveLogin } from '@/app/loginFlow';
+import { ESI_REGISTRY } from '@/esi/registry';
 import { scopesForGroup } from '@/esi/scopes';
 import { loadCharacterRoles } from './roles';
 import { CorpAccessPanel } from './CorpAccessPanel';
@@ -24,7 +25,7 @@ const mockedBeginLogin = vi.mocked(beginEveLogin);
 
 const CHARACTER_ID = 42;
 const ALL_CORP_SCOPES = [...scopesForGroup('corp')];
-const ROLES_SCOPE = 'esi-characters.read_corporation_roles.v1';
+const ROLES_SCOPE = ESI_REGISTRY.getCharacterRoles.scope;
 
 function rolesResolvingTo(roles: readonly string[]): StatusResult<CharacterCorporationRoles> {
   return {
