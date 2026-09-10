@@ -41,7 +41,12 @@ const JOB_SNAPSHOT: IndustryJobSnapshot = {
 };
 
 const COLONY_SNAPSHOT: PlanetarySnapshot = {
-  colonies: [{ planetId: 40000001, extractors: [{ pinId: 1, expiryTimeMs: 12345 }] }],
+  colonies: [
+    {
+      planetId: 40000001,
+      extractors: [{ pinId: 1, expiryTimeMs: 12345, thresholdMs: 21_600_000 }],
+    },
+  ],
   nowMs: 999,
 };
 

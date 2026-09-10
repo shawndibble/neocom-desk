@@ -22,6 +22,7 @@ import {
   characterEventThresholds,
   withCharacterEventThreshold,
   DEFAULT_STRUCTURE_FUEL_LOW_DAYS,
+  DEFAULT_EXTRACTOR_EXPIRING_LEAD_HOURS,
   DEFAULT_CORP_WALLET_BALANCE_FLOOR_ISK,
   DEFAULT_CORP_WALLET_TRANSACTION_CEILING_ISK,
   DEFAULT_WALLET_BALANCE_CHANGED_THRESHOLD_ISK,
@@ -293,6 +294,7 @@ describe('characterEventThresholds / withCharacterEventThreshold', () => {
   it('defaults to the documented defaults for a character with no overrides', () => {
     expect(characterEventThresholds(DEFAULT_NOTIFICATION_PREFERENCES, 1)).toEqual({
       structureFuelLowDays: DEFAULT_STRUCTURE_FUEL_LOW_DAYS,
+      extractorExpiringLeadHours: DEFAULT_EXTRACTOR_EXPIRING_LEAD_HOURS,
       corpWalletBalanceFloorIsk: DEFAULT_CORP_WALLET_BALANCE_FLOOR_ISK,
       corpWalletTransactionCeilingIsk: DEFAULT_CORP_WALLET_TRANSACTION_CEILING_ISK,
       walletBalanceChangedThresholdIsk: DEFAULT_WALLET_BALANCE_CHANGED_THRESHOLD_ISK,
@@ -308,6 +310,7 @@ describe('characterEventThresholds / withCharacterEventThreshold', () => {
     );
     expect(characterEventThresholds(next, 1)).toEqual({
       structureFuelLowDays: 3,
+      extractorExpiringLeadHours: DEFAULT_EXTRACTOR_EXPIRING_LEAD_HOURS,
       corpWalletBalanceFloorIsk: DEFAULT_CORP_WALLET_BALANCE_FLOOR_ISK,
       corpWalletTransactionCeilingIsk: DEFAULT_CORP_WALLET_TRANSACTION_CEILING_ISK,
       walletBalanceChangedThresholdIsk: DEFAULT_WALLET_BALANCE_CHANGED_THRESHOLD_ISK,
@@ -324,6 +327,7 @@ describe('characterEventThresholds / withCharacterEventThreshold', () => {
     const next = withCharacterEventThreshold(withFuel, 1, 'corpWalletBalanceFloorIsk', 10_000_000);
     expect(characterEventThresholds(next, 1)).toEqual({
       structureFuelLowDays: 1,
+      extractorExpiringLeadHours: DEFAULT_EXTRACTOR_EXPIRING_LEAD_HOURS,
       corpWalletBalanceFloorIsk: 10_000_000,
       corpWalletTransactionCeilingIsk: DEFAULT_CORP_WALLET_TRANSACTION_CEILING_ISK,
       walletBalanceChangedThresholdIsk: DEFAULT_WALLET_BALANCE_CHANGED_THRESHOLD_ISK,
@@ -349,6 +353,7 @@ describe('characterEventThresholds / withCharacterEventThreshold', () => {
     );
     expect(characterEventThresholds(next, 1)).toEqual({
       structureFuelLowDays: DEFAULT_STRUCTURE_FUEL_LOW_DAYS,
+      extractorExpiringLeadHours: DEFAULT_EXTRACTOR_EXPIRING_LEAD_HOURS,
       corpWalletBalanceFloorIsk: DEFAULT_CORP_WALLET_BALANCE_FLOOR_ISK,
       corpWalletTransactionCeilingIsk: DEFAULT_CORP_WALLET_TRANSACTION_CEILING_ISK,
       walletBalanceChangedThresholdIsk: 10_500_000,

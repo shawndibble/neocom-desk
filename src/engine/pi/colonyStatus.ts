@@ -21,9 +21,10 @@ import type { ColonyAttention, ColonyStatus, ExtractorProgram, ExtractorState } 
  * It governs more than a badge tone — `sortColoniesByAttention` ranks by it, so
  * the window decides which colony a pilot sees first on opening the page.
  *
- * Deliberately still distinct from `notificationDiffs.ts`'s
- * `EXTRACTOR_EXPIRY_WARNING_MS`, which is the lead time a *notification* fires
- * at. A notification cadence is not a status colour, and the two stay free to
+ * Deliberately still distinct from the Character's own configured
+ * `extractorExpiringLeadHours` (`features/notifications/preferences.ts`,
+ * issue #750), which is the lead time a *notification* fires at. A
+ * notification cadence is not a status colour, and the two stay free to
  * diverge.
  */
 export const EXPIRING_SOON_WINDOW_MS = 24 * 3_600_000;

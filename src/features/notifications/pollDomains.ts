@@ -521,7 +521,13 @@ export const industryJobDomain = defineDomain<
 function isExtractorSnapshot(raw: unknown): raw is ColonyExtractorSnapshot {
   if (typeof raw !== 'object' || raw === null) return false;
   const r = raw as Record<string, unknown>;
-  if (typeof r.pinId !== 'number' || typeof r.expiryTimeMs !== 'number') return false;
+  if (
+    typeof r.pinId !== 'number' ||
+    typeof r.expiryTimeMs !== 'number' ||
+    typeof r.thresholdMs !== 'number'
+  ) {
+    return false;
+  }
   // Optional in storage as well as on the wire: every snapshot written before
   // `disprovenExtractorOccurrences` needed `install_time` lacks the field,
   // and those must stay readable rather than being discarded as a stale shape
@@ -557,6 +563,8 @@ export const colonyDomain = defineDomain<
       characterId,
       planets.map((p) => p.planet_id)
     );
+    const thresholds = await currentThresholds(characterId);
+    const thresholdMs = thresholds.extractorExpiringLeadHours * HOUR_MS;
     const colonies: ColonySnapshotEntry[] = [];
     for (const planet of planets) {
       const detail = details.get(planet.planet_id);
@@ -567,6 +575,7 @@ export const colonyDomain = defineDomain<
         extractors: programs.map((p) => ({
           pinId: p.pinId,
           expiryTimeMs: p.expiryTimeMs,
+          thresholdMs,
           ...(p.installTimeMs !== undefined ? { installTimeMs: p.installTimeMs } : {}),
           // Carried only for `disprovenExtractorOccurrences`; no warning
           // reads it (ADR 0005). Omitted rather than defaulted when ESI left
@@ -966,6 +975,7 @@ export const eveNotificationDomain = defineDomain<
 /* -------------------------------------------------------------------------- */
 
 const DAY_MS = 86_400_000;
+const HOUR_MS = 3_600_000;
 
 /**
  * The corp gate every domain below runs before its own ESI call (AC5): CCP

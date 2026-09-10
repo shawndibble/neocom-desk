@@ -60,7 +60,6 @@ import {
   type CalendarEventStartingFire,
   type StructureFuelLowFire,
   type StructureReinforcementExitFire,
-  EXTRACTOR_EXPIRY_WARNING_MS,
 } from './notificationDiffs';
 import { reinforcementExitMs, parseEveNotificationPayload } from './eveNotificationPayload';
 import { occurrenceKey, type OccurrenceFire } from './occurrenceKey';
@@ -441,9 +440,9 @@ export function projectIndustryJobs(
  * `planetaryExtractionDone` keys on the colony's soonest extractor expiry
  * (`notificationDiffs.ts:274`'s `Math.min`, matching `colonyStatus.ts`'s idle
  * read) — one row per colony. `planetaryExtractorExpiring` is the opposite
- * granularity: one row per extractor per lead-time window it will cross
- * inside the horizon, so a single pin can project up to
- * `EXTRACTOR_EXPIRY_WARNING_MS.length` rows.
+ * granularity: one row per extractor, at that extractor's own baked-in
+ * `thresholdMs` (the Character's configured lead time), if that fire lands
+ * inside the horizon.
  */
 export function projectColonies(
   characterId: number,
@@ -476,27 +475,25 @@ export function projectColonies(
       );
     }
     for (const extractor of colony.extractors) {
-      for (const thresholdMs of EXTRACTOR_EXPIRY_WARNING_MS) {
-        const fireAt = extractor.expiryTimeMs - thresholdMs;
-        if (!inHorizon(fireAt, nowMs, horizonMs)) continue;
-        const fire: ExtractorExpiringFire = {
-          eventId: 'planetaryExtractorExpiring',
+      const fireAt = extractor.expiryTimeMs - extractor.thresholdMs;
+      if (!inHorizon(fireAt, nowMs, horizonMs)) continue;
+      const fire: ExtractorExpiringFire = {
+        eventId: 'planetaryExtractorExpiring',
+        characterId,
+        planetId: colony.planetId,
+        pinId: extractor.pinId,
+        thresholdMs: extractor.thresholdMs,
+        expiryTimeMs: extractor.expiryTimeMs,
+      };
+      rows.push(
+        buildRow(
           characterId,
-          planetId: colony.planetId,
-          pinId: extractor.pinId,
-          thresholdMs,
-          expiryTimeMs: extractor.expiryTimeMs,
-        };
-        rows.push(
-          buildRow(
-            characterId,
-            'planetaryExtractorExpiring',
-            fire,
-            fireAt,
-            planetaryExtractorExpiringText(characterName, planetName, thresholdMs)
-          )
-        );
-      }
+          'planetaryExtractorExpiring',
+          fire,
+          fireAt,
+          planetaryExtractorExpiringText(characterName, planetName, extractor.thresholdMs)
+        )
+      );
     }
   }
   return rows;

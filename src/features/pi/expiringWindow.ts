@@ -16,10 +16,10 @@
  * actually do a reset run, which is a fact about them and not about whichever
  * screen the Colonies view is open on.
  *
- * **Not the notification cadence.** `engine/notificationDiffs.ts` keeps its own
- * `EXTRACTOR_EXPIRY_WARNING_MS` lead times, and its comment says why: "a
- * notification cadence is not a status colour". This preference governs the
- * Colonies table only.
+ * **Not the notification cadence.** `features/notifications/preferences.ts`
+ * keeps its own `extractorExpiringLeadHours` (issue #750), and
+ * `engine/pi/colonyStatus.ts`'s comment says why: "a notification cadence is
+ * not a status colour". This preference governs the Colonies table only.
  */
 import { createSyncedSetting } from '@/lib/useSyncedSetting';
 
@@ -49,10 +49,11 @@ export const LEGACY_PI_EXPIRING_WINDOW_SETTING_KEY = 'piExpiringSoonHours';
  * two days. The 48h and 72h options this list used to carry were at or past
  * that, which is why they are gone rather than merely discouraged.
  *
- * The upper end matches `EXTRACTOR_EXPIRY_WARNING_MS`'s 24h/12h notification
- * lead times: the two are free to diverge, but they are answering the same
- * question about the same programs, and nothing was learned here to justify a
- * different scale.
+ * The upper end matches the notification lead time's own 24-hour ceiling
+ * (`extractorExpiringLeadHours`, `features/notifications/preferences.ts`):
+ * the two are free to diverge, but they are answering the same question about
+ * the same programs, and nothing was learned here to justify a different
+ * scale.
  */
 export const EXPIRING_WINDOW_HOUR_OPTIONS: readonly number[] = [1, 6, 12, 24];
 
