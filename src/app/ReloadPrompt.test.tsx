@@ -70,6 +70,20 @@ describe('ReloadPrompt', () => {
     expect(updateServiceWorker).toHaveBeenCalledWith(true);
   });
 
+  it('applies on resume when the grace period elapsed while backgrounded, even if the polling tick never ran (mobile OS freezes timers while hidden)', () => {
+    render(<ReloadPrompt />);
+    setHidden(true);
+    // No vi.advanceTimersByTimeAsync here — the tick never fires, as it
+    // wouldn't on a real phone that freezes JS while backgrounded. Only the
+    // wall clock moves.
+    vi.setSystemTime(new Date(Date.now() + HIDDEN_APPLY_GRACE_MS + 1000));
+    expect(updateServiceWorker).not.toHaveBeenCalled();
+
+    setHidden(false);
+
+    expect(updateServiceWorker).toHaveBeenCalledWith(true);
+  });
+
   it('does not apply if the tab becomes visible again before the grace period elapses', async () => {
     render(<ReloadPrompt />);
     setHidden(true);
