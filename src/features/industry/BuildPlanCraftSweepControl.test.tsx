@@ -5,7 +5,7 @@ import '@/i18n';
 import { BuildPlanCraftSweepControl } from './BuildPlanCraftSweepControl';
 
 const strategySelect = () => screen.getByRole('combobox', { name: 'Sweep Strategy' });
-const applyButton = () => screen.getByRole('button', { name: 'Apply Craft Sweep' });
+const reapplyButton = () => screen.getByRole('button', { name: 'Apply Craft Sweep' });
 
 describe('BuildPlanCraftSweepControl', () => {
   it('opens on Cost-effective', () => {
@@ -35,15 +35,19 @@ describe('BuildPlanCraftSweepControl', () => {
     ]);
   });
 
-  it('shows Manufacturing as the only enabled Craft Scope chip when Reactions is not eligible; Planetary always stays reserved', () => {
+  it('shows only a reserved Reactions chip when Reactions is not eligible — no Manufacturing chip, no Planetary chip', () => {
     render(<BuildPlanCraftSweepControl maxDepth={2} scope={['manufacturing']} onApply={vi.fn()} />);
 
-    expect(screen.getByText('Manufacturing')).not.toHaveAttribute('aria-disabled');
+    expect(screen.queryByText('Manufacturing')).not.toBeInTheDocument();
     expect(screen.getByText('Reactions')).toHaveAttribute('aria-disabled', 'true');
-    expect(screen.getByText('Planetary')).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.getByText('Reactions')).toHaveAttribute(
+      'title',
+      'Turn on Include Reactions to use this'
+    );
+    expect(screen.queryByText('Planetary')).not.toBeInTheDocument();
   });
 
-  it('lights up Reactions once it is in scope (issue #698) — Planetary stays reserved regardless', () => {
+  it('lights up Reactions once it is in scope (issue #698), with its own tooltip — no Manufacturing or Planetary chip', () => {
     render(
       <BuildPlanCraftSweepControl
         maxDepth={2}
@@ -52,31 +56,71 @@ describe('BuildPlanCraftSweepControl', () => {
       />
     );
 
-    expect(screen.getByText('Manufacturing')).not.toHaveAttribute('aria-disabled');
+    expect(screen.queryByText('Manufacturing')).not.toBeInTheDocument();
     expect(screen.getByText('Reactions')).not.toHaveAttribute('aria-disabled');
-    expect(screen.getByText('Planetary')).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.getByText('Reactions')).toHaveAttribute(
+      'title',
+      'Reaction materials are included when the sweep runs'
+    );
+    expect(screen.queryByText('Planetary')).not.toBeInTheDocument();
   });
 
-  it('applies the chosen strategy immediately on press — no confirmation dialog', async () => {
+  it('applies immediately when the Sweep Strategy changes — no confirmation dialog', async () => {
     const user = userEvent.setup();
     const onApply = vi.fn();
     render(<BuildPlanCraftSweepControl maxDepth={2} scope={['manufacturing']} onApply={onApply} />);
 
     await user.click(strategySelect());
     await user.click(screen.getByRole('option', { name: 'Build' }));
-    await user.click(applyButton());
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(onApply).toHaveBeenCalledWith({ strategy: 'build' });
   });
 
-  it('disables Apply when the plan has nothing to sweep', () => {
-    render(<BuildPlanCraftSweepControl maxDepth={0} scope={['manufacturing']} onApply={vi.fn()} />);
+  it('reselecting the already-shown strategy applies nothing — a controlled select never fires a change event for its own current value', async () => {
+    const user = userEvent.setup();
+    const onApply = vi.fn();
+    render(<BuildPlanCraftSweepControl maxDepth={2} scope={['manufacturing']} onApply={onApply} />);
 
-    expect(applyButton()).toBeDisabled();
+    await user.click(strategySelect());
+    await user.click(screen.getByRole('option', { name: 'Cost-effective' }));
+
+    expect(onApply).not.toHaveBeenCalled();
   });
 
-  it('disables Apply while prices are not yet loaded', () => {
+  it('the re-run button applies the current (default) strategy without touching the select — covers the gap above', async () => {
+    const user = userEvent.setup();
+    const onApply = vi.fn();
+    render(<BuildPlanCraftSweepControl maxDepth={2} scope={['manufacturing']} onApply={onApply} />);
+
+    await user.click(reapplyButton());
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(onApply).toHaveBeenCalledWith({ strategy: 'cost-effective' });
+  });
+
+  it('the re-run button re-applies the currently selected strategy after it has been changed', async () => {
+    const user = userEvent.setup();
+    const onApply = vi.fn();
+    render(<BuildPlanCraftSweepControl maxDepth={2} scope={['manufacturing']} onApply={onApply} />);
+
+    await user.click(strategySelect());
+    await user.click(screen.getByRole('option', { name: 'Buy' }));
+    onApply.mockClear();
+
+    await user.click(reapplyButton());
+
+    expect(onApply).toHaveBeenCalledWith({ strategy: 'buy' });
+  });
+
+  it('disables the Sweep Strategy select and the re-run button when the plan has nothing to sweep', () => {
+    render(<BuildPlanCraftSweepControl maxDepth={0} scope={['manufacturing']} onApply={vi.fn()} />);
+
+    expect(strategySelect()).toBeDisabled();
+    expect(reapplyButton()).toBeDisabled();
+  });
+
+  it('disables the Sweep Strategy select and the re-run button while prices are not yet loaded', () => {
     render(
       <BuildPlanCraftSweepControl
         maxDepth={2}
@@ -86,6 +130,7 @@ describe('BuildPlanCraftSweepControl', () => {
       />
     );
 
-    expect(applyButton()).toBeDisabled();
+    expect(strategySelect()).toBeDisabled();
+    expect(reapplyButton()).toBeDisabled();
   });
 });

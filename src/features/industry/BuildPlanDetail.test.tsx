@@ -560,14 +560,13 @@ describe('BuildPlanDetail sub-builds', () => {
 
 describe('BuildPlanDetail Craft Sweep (issue #695)', () => {
   const strategySelect = () => screen.getByRole('combobox', { name: 'Sweep Strategy' });
-  const sweepApplyButton = () => screen.getByRole('button', { name: 'Apply Craft Sweep' });
   const tritaniumBuildButton = () =>
     screen.getByRole('button', { name: 'Build Tritanium here instead of buying it' });
 
+  // Selecting a Sweep Strategy applies immediately — no separate Apply press.
   async function runSweep(user: ReturnType<typeof userEvent.setup>, strategyLabel: string) {
     await user.click(strategySelect());
     await user.click(await screen.findByRole('option', { name: strategyLabel }));
-    await user.click(sweepApplyButton());
   }
 
   it('has no Sweep Depth control — the single-plan sweep always walks the whole tree', async () => {
