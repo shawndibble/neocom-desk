@@ -182,3 +182,67 @@ have a real gap if it's wired into only one narrow caller — reprocessing math
 existed for a stuck sell order but never for a freshly-pasted appraisal; grep
 the engine's _callers_, not just its existence, before assuming full
 coverage.
+
+## 2026-09-09 (third run)
+
+A third same-day run. Checked `gh issue list --state all --search
+"created:2026-09-09"` up front per the second run's lesson — found ~20 issues
+filed today across `/next-ticket`, `/improve-ui` and the two prior
+`/add-missing-features` runs, none overlapping what this run went on to
+propose.
+
+### Tools surveyed
+
+Re-fetched the third-party developer forum category JSON; it has grown since
+the first run's list (30 threads now vs. fewer before). New threads checked
+this run, beyond the first run's already-logged table: **EVE Retroindustry**
+(free, runs-on-your-own-machine industry tool — production planner with
+Jita pricing, make-vs-buy optimizer, multi-character/corp asset tracking,
+personal/corp/alliance contract browser with per-line pricing, blueprint/PI/
+job tracking; notable for being local-first like Neocom Desk itself, just not
+a PWA); **ISK.GG** (account-free market browser — live regional order books
+down to station level, multi-region price-history comparison, item pages
+with 365-day history and "market-depth charts", saved items/folders with
+Quickbar-style import, CSV export); **EVE Quartermaster / EQM** (the most
+industry-adjacent of the new finds — production economics from inputs to
+disposition, a Market Appraisal module doing "Janice-style pasted item lists"
+with "multi-hub buy/sell price comparisons" and "best split estimate
+highlighting", a Corporate Exchange for member-to-member listings, wallet
+balance-trend analytics, jump freighter fuel planning). Also glanced at EVE
+Empire, Capsuleers.app and EVE Nexus (general companion apps / fitting sim —
+nothing industry/market-specific beyond what's already covered) without deep
+research, since nothing in their thread titles suggested a pipeline gap.
+
+### Already covered — proposed nothing beyond prior runs
+
+Confirmed still built and not re-proposed: undercut detection, order
+competition/health, realized profit, build-vs-buy/make-or-buy, single-hub
+appraisal, PI chains, price history (already charted with Recharts, see
+`PriceHistoryChart.tsx`), reprocessing, sourcing, hub-to-hub price gap for an
+owned sell order (`hubHaulGaps`), Build Groups/Build Opportunities (several
+same-day tickets, #626–632, cover most of Ravworks'/Slipway's "multi-item
+planning" pitch already), mining ledger tax tracking, Quickbar price alerts
+(#680, shipped same day). The Market Browser already renders the full raw
+order book as a sortable table with a context menu per row — not just a
+best-price summary — so "can a player see individual orders, not just a
+number" is already yes.
+
+### Candidates this run
+
+| Candidate                                  | Verdict | Outcome                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| ------------------------------------------ | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Public item-exchange contract deal browser | KILL    | Dropped in framing, before hostile review. EQM's/EVE Courier's "contracts manager" and EVE Retroindustry's public contract browser are real prior art, but ADR 0013 already deliberately narrowed the same EVE Ref public-contracts crawl to blueprint-copy-for-sale rows only (~122,717 of ~353,059 item rows) specifically to stay inside Firestore's free-tier write budget (~3,000/day vs. ~1.1M/day naive). A general item-exchange deal browser would re-open that exact cost problem at full scale, with no clear "good deal" heuristic besides (arbitrary compound contract packages, no per-item reference price guarantee). |
+| Appraisal: multi-hub price comparison      | SHIP    | Filed as #689. Shows a pasted pile's sell/buy totals at all 5 Trade Hubs side by side (EQM's "multi-hub buy/sell price comparisons" on a Janice-style paste is the direct prior art). Reuses the same batched-per-hub `getHubPrices` call `hubHaulGaps` already proves is cheap; the cited Region-mode rejection (`20260908-164742`) is about per-type paginated fetches, not a fixed 5-hub comparison, so it doesn't block this.                                                                                                                                                                                                     |
+| Market Browser: order-book depth chart     | KILL    | Hostile review's forced cut among three SHIP-leaning candidates. Narrowest reach of the three (only fires for a player who opened Market Browser _and_ selected a specific item to eyeball book shape), and duplicates data the app already renders twice over — the raw sortable order table, and `undercut.ts`/`orderCompetition.ts`'s numeric answer to the same question. Also understates real tuning burden: asymmetric books, extreme price outliers, and thin books all make a naive depth chart read as noise rather than signal.                                                                                            |
+| Wallet: balance-over-time chart            | SHIP    | Filed as #690. EQM's "wallet balance trends and net change" is the direct prior art; Neocom's own Wallet page shows only the instantaneous balance today despite the journal already carrying a `balance` field per entry. Widest reach of the three reviewed (every character has a wallet, no industry activity required) and the only one answering a question genuinely harder to read from the existing table than from a chart.                                                                                                                                                                                                 |
+
+**Lesson for the next run.** The forum category listing keeps growing
+(30 threads now) — worth a fresh fetch each run rather than trusting a prior
+run's cached table indefinitely, since new tools (EVE Retroindustry, ISK.GG,
+EQM this run) do appear between runs. EQM in particular is worth remembering
+by name: it's the single most industry/market-dense tool found across all
+three runs so far, and both of this run's survivors came directly from
+features it names explicitly ("multi-hub buy/sell price comparisons",
+"wallet balance trends"). If a future run runs dry on fresh candidates,
+re-reading EQM's full feature list against the current app state first is
+likely higher-yield than another cold forum sweep.
