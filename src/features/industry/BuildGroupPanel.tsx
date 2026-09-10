@@ -36,7 +36,7 @@ import { useAssumedMe } from './assumedMe';
 import { nameForType, toIndustryBlueprint, type BlueprintCatalog } from './blueprintCatalog';
 import type { BuildGroup } from './buildGroups';
 import { CraftSweepControl, type DepthChoice } from './CraftSweepControl';
-import { groupCraftSweepMaxDepth } from './craftSweepGroup';
+import { groupCraftScope, groupCraftSweepMaxDepth } from './craftSweepGroup';
 import { SourcingInput } from './MaterialsTable';
 import { OwnedStockScopeControl } from './OwnedStockScopeControl';
 import { stockLocationLabel, type OwnedStockSnapshot } from './ownedStockDetection';
@@ -150,6 +150,17 @@ export function BuildGroupPanel({
     () => groupCraftSweepMaxDepth(plans, catalog, recipeFor, skills),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- craftSweepBlueprintSignature is the stable proxy for `plans`' structural identity; see comment above.
     [craftSweepBlueprintSignature, catalog, recipeFor, skills]
+  );
+  // Craft Scope's Reactions chip (issue #698): lit whenever any single member
+  // is eligible, keyed on each member's own flag too, unlike the signature
+  // above — depth is structural, but eligibility follows Include Reactions.
+  const craftSweepScopeSignature = plans
+    .map((p) => `${p.blueprintTypeID}:${p.includeReactions ?? false}`)
+    .join(',');
+  const craftSweepScope = useMemo(
+    () => groupCraftScope(plans, catalog),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- craftSweepScopeSignature is the stable proxy for `plans`' structural identity; see comment above.
+    [craftSweepScopeSignature, catalog]
   );
   // What Apply will actually touch: `applyGroupCraftSweep` silently skips a
   // member whose blueprint no longer resolves in the catalog (the same
@@ -365,6 +376,7 @@ export function BuildGroupPanel({
         <div className="mb-3">
           <CraftSweepControl
             maxDepth={craftSweepMaxDepth}
+            scope={craftSweepScope}
             disabled={sweeping}
             initialStrategy={group.craftSweepDefault?.strategy}
             initialDepthChoice={group.craftSweepDefault?.depthChoice}

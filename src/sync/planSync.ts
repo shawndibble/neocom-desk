@@ -809,6 +809,29 @@ const buildPlanSpec: CollectionSpec<BuildPlanRecord, RemoteBuildPlanDoc> = {
       // its key list is pinned, so a new field fails there until it is routed
       // here deliberately.
       ...(p.buildGroupId !== undefined ? { buildGroupId: p.buildGroupId } : {}),
+      // Include Reactions / Reaction Location (issue #698) — same
+      // present-or-omitted convention as the plan's own location fields
+      // above, and the same buildSystemId/Name pairing rule, since the
+      // Reaction Location mirrors the primary location one-for-one.
+      ...(p.includeReactions !== undefined ? { includeReactions: p.includeReactions } : {}),
+      ...(p.reactionFacility !== undefined ? { reactionFacility: p.reactionFacility } : {}),
+      ...(p.reactionRigFit !== undefined ? { reactionRigFit: p.reactionRigFit } : {}),
+      ...(p.reactionSecurity !== undefined ? { reactionSecurity: p.reactionSecurity } : {}),
+      ...(p.reactionFacilityTaxPct !== undefined
+        ? { reactionFacilityTaxPct: p.reactionFacilityTaxPct }
+        : {}),
+      ...(p.reactionBuildSystemId !== undefined && p.reactionBuildSystemName !== undefined
+        ? {
+            reactionBuildSystemId: p.reactionBuildSystemId,
+            reactionBuildSystemName: p.reactionBuildSystemName,
+          }
+        : {}),
+      ...(p.reactionBuildLocationId !== undefined
+        ? { reactionBuildLocationId: p.reactionBuildLocationId }
+        : {}),
+      ...(p.reactionBuildLocationName !== undefined
+        ? { reactionBuildLocationName: p.reactionBuildLocationName }
+        : {}),
       updatedAt: p.updatedAt,
       ownerHash,
       deleted: false,
@@ -839,6 +862,25 @@ const buildPlanSpec: CollectionSpec<BuildPlanRecord, RemoteBuildPlanDoc> = {
     ...(r.ownedStockScope !== undefined ? { ownedStockScope: r.ownedStockScope } : {}),
     ...(r.buildHere !== undefined ? { buildHere: r.buildHere } : {}),
     ...(r.buildGroupId !== undefined ? { buildGroupId: r.buildGroupId } : {}),
+    ...(r.includeReactions !== undefined ? { includeReactions: r.includeReactions } : {}),
+    ...(r.reactionFacility !== undefined ? { reactionFacility: r.reactionFacility } : {}),
+    ...(r.reactionRigFit !== undefined ? { reactionRigFit: r.reactionRigFit } : {}),
+    ...(r.reactionSecurity !== undefined ? { reactionSecurity: r.reactionSecurity } : {}),
+    ...(r.reactionFacilityTaxPct !== undefined
+      ? { reactionFacilityTaxPct: r.reactionFacilityTaxPct }
+      : {}),
+    ...(r.reactionBuildSystemId !== undefined && r.reactionBuildSystemName !== undefined
+      ? {
+          reactionBuildSystemId: r.reactionBuildSystemId,
+          reactionBuildSystemName: r.reactionBuildSystemName,
+        }
+      : {}),
+    ...(r.reactionBuildLocationId !== undefined
+      ? { reactionBuildLocationId: r.reactionBuildLocationId }
+      : {}),
+    ...(r.reactionBuildLocationName !== undefined
+      ? { reactionBuildLocationName: r.reactionBuildLocationName }
+      : {}),
     updatedAt: r.updatedAt,
   }),
   bulkPutLocal: (records) => db.buildPlans.bulkPut(records),

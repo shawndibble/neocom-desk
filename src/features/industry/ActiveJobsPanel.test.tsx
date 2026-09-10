@@ -143,14 +143,27 @@ describe('ActiveJobsPanel: rendering', () => {
     expect(text.indexOf('Widget Alpha')).toBeLessThan(text.indexOf('Widget Beta'));
     expect(text.indexOf('Widget Beta')).toBeLessThan(text.indexOf('Widget Gamma'));
 
-    // Countdown, minutes granularity.
-    expect(screen.getByText('Done')).toBeInTheDocument();
+    // Countdown, minutes granularity. Job 3 (past end_date, "done") prints
+    // "Done" twice: the blueprint cell's success-tone badge, and the Ends-in
+    // cell text itself — both in success tone.
+    const doneTexts = screen.getAllByText('Done');
+    expect(doneTexts).toHaveLength(2);
+    doneTexts.forEach((el) => expect(el).toHaveClass('text-success'));
     expect(screen.getByText('30m')).toBeInTheDocument();
     expect(screen.getByText('1h 30m')).toBeInTheDocument();
 
     // <1h remaining ("completing soon") gets the warning-tone badge; the others don't.
-    // (#409 also added a "Completing soon" filter chip above the list, hence scoping.)
+    // (#409 also added an Activity/Status filter menu above the list, hence scoping.)
     expect(jobList.getByText('Completing soon')).toBeInTheDocument();
+
+    // Job 3 (Widget Alpha, done) carries the success tint; job 2 (Widget
+    // Beta, completing soon) carries the warning tint; job 1 (Widget Gamma,
+    // 90m out) carries neither.
+    expect(screen.getByText('Widget Alpha').closest('tr')).toHaveClass('bg-success/10');
+    expect(screen.getByText('Widget Beta').closest('tr')).toHaveClass('bg-warning/10');
+    const gammaRow = screen.getByText('Widget Gamma').closest('tr');
+    expect(gammaRow).not.toHaveClass('bg-warning/10');
+    expect(gammaRow).not.toHaveClass('bg-success/10');
 
     // Progress bars: past job at 100%, 30m-of-60m window at 50%, 30m-of-120m window at 25%.
     const bars = screen.getAllByRole('progressbar');
@@ -540,7 +553,12 @@ describe('ActiveJobsPanel: row context menu and filters (#409)', () => {
     await expandJobs(user);
     expect(screen.getByText('Widget Gamma')).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Manufacturing' }));
+    // Scoped: the "Activity" name also belongs to the table's sortable
+    // Activity column header.
+    const filterGroup = screen.getByRole('group', { name: 'Filter jobs' });
+    await user.click(within(filterGroup).getByRole('button', { name: 'Activity' }));
+    await user.click(screen.getByRole('menuitemcheckbox', { name: 'Manufacturing' }));
+    await user.keyboard('{Escape}');
 
     expect(screen.getByText('Widget Alpha')).toBeInTheDocument();
     expect(screen.queryByText('Widget Gamma')).not.toBeInTheDocument();
@@ -583,7 +601,9 @@ describe('ActiveJobsPanel: row context menu and filters (#409)', () => {
     await expandJobs(user);
     expect(screen.getByText('Widget Gamma')).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Completing soon' }));
+    await user.click(screen.getByRole('button', { name: 'Status' }));
+    await user.click(screen.getByRole('menuitemcheckbox', { name: 'Completing soon' }));
+    await user.keyboard('{Escape}');
 
     expect(screen.getByText('Widget Alpha')).toBeInTheDocument();
     expect(screen.queryByText('Widget Gamma')).not.toBeInTheDocument();
@@ -930,7 +950,7 @@ describe('ActiveJobsPanel: cross-character view (issue #607)', () => {
     // Solo: only Pilot One counts (3 open manufacturing).
     await screen.findByRole('button', { name: 'This character' });
     await waitFor(() => {
-      expect(container.querySelector('.cursor-help')!.textContent).toBe('3/1/1');
+      expect(container.querySelector('.cursor-help')!.textContent).toBe('Free slots3/1/1');
     });
 
     await user.click(screen.getByRole('button', { name: 'This character' }));
@@ -939,7 +959,7 @@ describe('ActiveJobsPanel: cross-character view (issue #607)', () => {
     // Both: 4+2=6 max, 2 running -> 4 open. Science/reaction stay at the
     // untrained 1/1 for both characters (base slot only), summed to 2/2.
     await waitFor(() => {
-      expect(container.querySelector('.cursor-help')!.textContent).toBe('4/2/2');
+      expect(container.querySelector('.cursor-help')!.textContent).toBe('Free slots4/2/2');
     });
   });
 });
@@ -973,7 +993,7 @@ describe('ActiveJobsPanel: open job-slot header (issue #679)', () => {
     };
   }
 
-  it('shows per-category open counts with per-category tone, and the open/max breakdown on the tooltip', async () => {
+  it('shows per-category open counts with per-category tone, and the used/max breakdown on the tooltip', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     vi.setSystemTime(NOW);
     // Manufacturing: Mass Production III -> 1+3=4 max, 3 running -> 1 open (25% open, plain).
@@ -1004,9 +1024,11 @@ describe('ActiveJobsPanel: open job-slot header (issue #679)', () => {
     expect(summaryEls[2]).toHaveClass('text-warning');
 
     const summaryTrigger = container.querySelector('.cursor-help')!;
-    expect(summaryTrigger.textContent).toBe('1/1/1');
+    expect(summaryTrigger.textContent).toBe('Free slots1/1/1');
     fireEvent.focus(summaryTrigger);
-    expect(screen.getByRole('tooltip')).toHaveTextContent('Mfg 1/4 · Sci 1/1 · Rxn 1/2');
+    // Numerator is jobs *used* (max - open), not open — 3 running of 4
+    // manufacturing, 0 of 1 science, 1 of 2 reaction.
+    expect(screen.getByRole('tooltip')).toHaveTextContent('Mfg 3/4 · Sci 0/1 · Rxn 1/2');
   });
 
   it('renders "—" per category, never a guessed number, when skills are not cached and ESI is unreachable', async () => {
@@ -1030,7 +1052,7 @@ describe('ActiveJobsPanel: open job-slot header (issue #679)', () => {
 
     await screen.findByText('None');
     const summaryTrigger = container.querySelector('.cursor-help')!;
-    expect(summaryTrigger.textContent).toBe('—/—/—');
+    expect(summaryTrigger.textContent).toBe('Free slots—/—/—');
     fireEvent.focus(summaryTrigger);
     expect(screen.getByRole('tooltip')).toHaveTextContent('Mfg — · Sci — · Rxn —');
   });

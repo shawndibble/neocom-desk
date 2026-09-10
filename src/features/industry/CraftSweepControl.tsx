@@ -11,6 +11,7 @@ import {
   SelectValue,
 } from '@/components/ui';
 import type { SweepStrategy } from '@/engine/industry/autoMakeOrBuy';
+import type { MakeMethod } from '@/engine/industry/makeOrBuy';
 import { CraftScopeChips, SweepStrategySelect } from './craftSweepShared';
 
 interface CraftSweepControlProps {
@@ -21,17 +22,21 @@ interface CraftSweepControlProps {
    */
   maxDepth: number;
   /**
-   * Not ready to apply: the single-plan caller gates this on live prices
-   * having landed (cost-effective needs them, same as `pricesReady`
-   * elsewhere on that plan); the Build Group caller instead gates it on a
-   * previous Apply's own market fetch still being in flight.
+   * Production methods currently eligible to sweep (issue #698's `craftScope`)
+   * — the same answer the recursive engine and the manual per-item toggle use,
+   * so this chip row can never promise more than a sweep will actually apply.
+   * Manufacturing is always eligible; Reactions lights up only when Include
+   * Reactions is on (or the plan's own activity is a reaction). Planetary
+   * stays reserved regardless — out of scope for #698.
    */
+  scope: readonly MakeMethod[];
+  /** Not ready to apply: gated on a previous Apply's own market fetch still being in flight. */
   disabled?: boolean;
   /** Pre-fills Sweep Strategy (issue #696's Build Group default); defaults to `'cost-effective'` when absent. */
   initialStrategy?: SweepStrategy;
   /** Pre-fills Sweep Depth (issue #696's Build Group default); defaults to `'all'` when absent. */
   initialDepthChoice?: DepthChoice;
-  /** Overrides the generic single-plan confirm copy — Build Group names the affected plan count instead. */
+  /** Names the affected plan count in the overwrite confirmation. */
   confirmMessage?: string;
   onApply: (options: { strategy: SweepStrategy; depth: number; depthChoice: DepthChoice }) => void;
 }
@@ -40,16 +45,23 @@ interface CraftSweepControlProps {
 export type DepthChoice = 'all' | number;
 
 /**
- * Craft Sweep (issue #695): a one-shot bulk build/buy control for a single
- * Build Plan. Picks a Sweep Strategy and Sweep Depth, then — behind a
- * generic overwrite confirmation, never a computed preview (that would
- * require running the walk twice per press) — overwrites this plan's
- * `buildHere` to match. Craft Scope is shown but not yet interactive: only
- * Manufacturing is functional this round (docs/context/decisions), Reactions
- * and Planetary are reserved slots for later tickets rather than hidden.
+ * Craft Sweep (issue #695): the Build Group's own one-shot bulk build/buy
+ * control, applied once per member (`craftSweepGroup.ts`). Picks a Sweep
+ * Strategy and Sweep Depth, then — behind a generic overwrite confirmation,
+ * never a computed preview (that would require running the walk twice per
+ * press) — overwrites every member's `buildHere` to match. The single-plan
+ * equivalent is `BuildPlanCraftSweepControl.tsx`, which offers no Sweep
+ * Depth choice and applies without confirmation; the Sweep Strategy select
+ * and Craft Scope chips both controls share live in `craftSweepShared.tsx`.
+ * Craft Scope's Manufacturing chip is always lit; Reactions lights up
+ * exactly when `scope` includes it (issue #698 — Include Reactions on, or a
+ * member's own activity is a reaction), else it reads the same
+ * reserved-and-disabled way it always has. Planetary stays reserved
+ * regardless — a later, unspecced ticket.
  */
 export function CraftSweepControl({
   maxDepth,
+  scope,
   disabled,
   initialStrategy,
   initialDepthChoice,
@@ -112,7 +124,7 @@ export function CraftSweepControl({
             </SelectContent>
           </Select>
         </label>
-        <CraftScopeChips reserved={['reactions', 'planetary']} />
+        <CraftScopeChips scope={scope} />
         <Button
           size="sm"
           onClick={() => setConfirmOpen(true)}

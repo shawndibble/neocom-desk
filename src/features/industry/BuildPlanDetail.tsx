@@ -28,18 +28,21 @@ import {
 } from '@/engine/industry/types';
 import { makeOrBuy, type MakeOrBuy } from '@/engine/industry/makeOrBuy';
 import { autoBuildHere, maxSweepDepth, type SweepStrategy } from '@/engine/industry/autoMakeOrBuy';
+import { craftScope } from '@/engine/industry/craftScope';
 import { ownedStockSale } from '@/engine/industry/ownedStockSale';
 import type {
   FacilityKind,
   MaterialPriceBasis,
   MaterialSourcing,
+  ReactionFacilityContext,
   RigKind,
   SkillLevels,
 } from '@/engine/industry/types';
 import { rigKindLabelKey, rigFitSummaryLabel } from './rigFitLabels';
 import type { BuildGroupSnapshot } from './buildGroups';
 import { GroupTargetLink } from './GroupTargetLink';
-import { facilityContextFor } from './planFacilityContext';
+import { facilityContextFor, reactionPlanFacilityContextFor } from './planFacilityContext';
+import { useReactionFacilityDefaults } from './reactionFacilityDefaults';
 import { retargetPatch } from './retargetPatch';
 import { DEFAULT_TRADE_HUB, TRADE_HUBS, getTradeHub } from '@/market/hubs';
 import type { BuildPlanRecord } from '@/db';
@@ -92,7 +95,7 @@ import { ProductionRunsPanel } from './ProductionRunsPanel';
 import { BuildSystemInput } from './BuildSystemInput';
 import { BuildLocationPicker } from './BuildLocationPicker';
 import { buildLocationLabel } from './buildLocationLabel';
-import { buildLocationPatch } from './buildLocationPatch';
+import { buildLocationPatch, reactionBuildLocationPatch } from './buildLocationPatch';
 import { useDerivedSecurityBand } from './useDerivedSecurityBand';
 
 /** The Build Plan fields this panel edits; `Industry.tsx` persists exactly these. */
@@ -115,6 +118,15 @@ export type PlanPatch = Partial<
     | 'materialPriceBasis'
     | 'ownedStockScope'
     | 'buildHere'
+    | 'includeReactions'
+    | 'reactionFacility'
+    | 'reactionRigFit'
+    | 'reactionSecurity'
+    | 'reactionFacilityTaxPct'
+    | 'reactionBuildSystemId'
+    | 'reactionBuildSystemName'
+    | 'reactionBuildLocationId'
+    | 'reactionBuildLocationName'
   >
 >;
 
@@ -127,6 +139,12 @@ export type PlanPatch = Partial<
 const clearedBuildLocation = {
   buildLocationId: undefined,
   buildLocationName: undefined,
+} satisfies PlanPatch;
+
+/** @see clearedBuildLocation — the same rule for the Reaction Location. */
+const clearedReactionBuildLocation = {
+  reactionBuildLocationId: undefined,
+  reactionBuildLocationName: undefined,
 } satisfies PlanPatch;
 
 /** One material's sourcing edit, for the bulk "use all" action. */
@@ -222,6 +240,17 @@ export function BuildPlanDetail({
   const activity = blueprint ? industryActivityOf(blueprint) : 'manufacturing';
   const hub = useMemo(() => getTradeHub(plan.hubId) ?? DEFAULT_TRADE_HUB, [plan.hubId]);
   const facilityPreset = FACILITY_PRESETS[plan.facility];
+  // Include Reactions (issue #698): meaningless for a reaction-activity plan,
+  // which is always eligible via its own top-level facility regardless of
+  // this flag — see `reactionCraftEligible`.
+  const includeReactions = plan.includeReactions ?? false;
+  // Production methods this plan may currently mark buildable — the one
+  // answer the recursive engine, the manual toggle and Craft Sweep all share,
+  // so they cannot disagree (`craftScope`'s own doc comment).
+  const craftScopeList = useMemo(
+    () => craftScope(activity, includeReactions),
+    [activity, includeReactions]
+  );
 
   // One level deeper than the plan itself needs: the make-or-buy marker
   // quotes each material's own recipe, and a quote is only as good as the
@@ -241,6 +270,16 @@ export function BuildPlanDetail({
   useEffect(() => {
     void hydrateAssumedMe();
   }, [hydrateAssumedMe]);
+
+  // Pre-fills a fresh plan's Reaction Location the first time Include
+  // Reactions is turned on for it (issue #698) — read here, alongside
+  // `assumedMe`, so it's in hand the moment `toggleIncludeReactions` needs it
+  // rather than one render behind.
+  const reactionFacilityDefaults = useReactionFacilityDefaults((state) => state.value);
+  const hydrateReactionFacilityDefaults = useReactionFacilityDefaults((state) => state.hydrate);
+  useEffect(() => {
+    void hydrateReactionFacilityDefaults();
+  }, [hydrateReactionFacilityDefaults]);
 
   const [refreshTick, setRefreshTick] = useState(0);
   /**
@@ -281,11 +320,36 @@ export function BuildPlanDetail({
           t
         );
 
+  // The Reaction Location's own build system / label pair, mirroring
+  // `buildSystem`/`buildLocationName` above one-for-one (issue #698).
+  const reactionBuildSystem =
+    plan.reactionBuildSystemId !== undefined && plan.reactionBuildSystemName !== undefined
+      ? { id: plan.reactionBuildSystemId, name: plan.reactionBuildSystemName }
+      : null;
+  const reactionBuildLocationName =
+    plan.reactionBuildLocationId === undefined
+      ? null
+      : buildLocationLabel(
+          plan.reactionBuildLocationName ?? null,
+          plan.reactionFacility ?? 'athanor',
+          reactionBuildSystem?.name ?? t('industry.reactionLocationNotSet'),
+          t
+        );
+
   // The band is derived, not typed, so it is reconciled here rather than only
   // on edit — otherwise a plan saved before the Security field went away keeps
   // a band nothing can correct, and still drives the rig multiplier.
   useDerivedSecurityBand(buildSystem?.id, hub.security, plan.security, (security) =>
     onDerivedFix({ security })
+  );
+  // Same reconciliation for the Reaction Location. There is no hub fallback
+  // for a place with no hub of its own — highsec is the same "nothing chosen
+  // yet" default `reactionPlanFacilityContextFor` already assumes.
+  useDerivedSecurityBand(
+    reactionBuildSystem?.id,
+    'highsec',
+    plan.reactionSecurity ?? 'highsec',
+    (security) => onDerivedFix({ reactionSecurity: security })
   );
 
   // Distinct from `pricesReady` below: that one collapses "still fetching"
@@ -297,6 +361,20 @@ export function BuildPlanDetail({
     fetchedAt,
     loading: pricesLoading,
   } = useMarketSnapshot(hub, typeIds, buildSystem?.id, activity, refreshTick);
+
+  // The Reaction Location's own cost index — a second, independent fetch
+  // (issue #698): sharing `snapshot` would charge a reaction job at the
+  // primary facility's system, which is exactly the wrong number Include
+  // Reactions exists to fix. Hub prices/adjusted prices are cached by
+  // (station, type) after the primary fetch above already resolved them, so
+  // this only really costs the one additional cost-index lookup.
+  const { snapshot: reactionSnapshot } = useMarketSnapshot(
+    hub,
+    typeIds,
+    reactionBuildSystem?.id,
+    'reaction',
+    refreshTick
+  );
 
   const ownedMatch = useMemo(
     () => findOwnedBlueprint(ownedBlueprints, plan.blueprintTypeID),
@@ -327,16 +405,49 @@ export function BuildPlanDetail({
     [catalog, pi, ownedBlueprints, assumedMe]
   );
 
-  // The one place "can this be built here" is decided (manufacturing only,
-  // docs/context/decisions) — a future new method only needs to change this.
-  // General over depth: a recipe input introduced by one build is exactly as
-  // buildable as the plan's own materials, which is what lets a player keep
-  // drilling down as many levels as the recipe tree actually has.
+  // The one place "can this be built here" is decided — `craftScopeList`
+  // (issue #698) is the same answer Craft Sweep's own Craft Scope and the
+  // recursive engine use, so the three can never disagree. General over
+  // depth: a recipe input introduced by one build is exactly as buildable as
+  // the plan's own materials, which is what lets a player keep drilling down
+  // as many levels as the recipe tree actually has.
   const canBuildHere = useMemo(
     () =>
-      (typeID: number): boolean =>
-        recipeFor(typeID)?.method === 'manufacturing',
-    [recipeFor]
+      (typeID: number): boolean => {
+        const method = recipeFor(typeID)?.method;
+        return method !== undefined && craftScopeList.includes(method);
+      },
+    [recipeFor, craftScopeList]
+  );
+
+  /** @see facilityContext — the Reaction Location's own "where and how" half, `null` until one is configured. */
+  const reactionPlanFacilityContext = useMemo(
+    () =>
+      reactionPlanFacilityContextFor({
+        reactionFacility: plan.reactionFacility,
+        reactionRigFit: plan.reactionRigFit,
+        reactionSecurity: plan.reactionSecurity,
+        reactionFacilityTaxPct: plan.reactionFacilityTaxPct,
+      }),
+    [plan.reactionFacility, plan.reactionRigFit, plan.reactionSecurity, plan.reactionFacilityTaxPct]
+  );
+
+  /**
+   * The Reaction Location, fully resolved with a live cost index — `undefined`
+   * until both a facility is configured and `reactionSnapshot` has landed.
+   * Fed to every engine context on this plan that needs it (`makeOrBuyContext`
+   * below, `computeBuildPlan`'s own `reactionFacility`), so the manual toggle,
+   * the recursive engine and the advisory marker all quote the same place.
+   * Memoized so its identity is stable across renders where nothing it reads
+   * changed — several `useMemo`s downstream (`makeOrBuyContext`,
+   * `craftSweepMaxDepth`, the `result` computation) list it as a dependency.
+   */
+  const reactionFacilityContext: ReactionFacilityContext | undefined = useMemo(
+    () =>
+      reactionPlanFacilityContext && reactionSnapshot?.systemCostIndex != null
+        ? { ...reactionPlanFacilityContext, systemCostIndex: reactionSnapshot.systemCostIndex }
+        : undefined,
+    [reactionPlanFacilityContext, reactionSnapshot]
   );
 
   const { result, error } = useMemo(() => {
@@ -350,8 +461,9 @@ export function BuildPlanDetail({
       materialPrices,
       skills,
       recipeFor,
+      reactionFacility: reactionFacilityContext,
     });
-  }, [plan, blueprint, snapshot, materialPrices, skills, recipeFor, t]);
+  }, [plan, blueprint, snapshot, materialPrices, skills, recipeFor, reactionFacilityContext, t]);
 
   /**
    * Both liquidation bases at once, so the Use-or-sell toggle switches between
@@ -407,8 +519,9 @@ export function BuildPlanDetail({
       adjustedPrices: snapshot.adjustedPrices,
       materialPrices,
       skills,
+      reactionFacility: reactionFacilityContext,
     };
-  }, [facilityContext, snapshot, materialPrices, skills]);
+  }, [facilityContext, snapshot, materialPrices, skills, reactionFacilityContext]);
 
   /**
    * Craft Sweep's own Sweep Depth range (issue #695): the plan's actual tree
@@ -427,10 +540,11 @@ export function BuildPlanDetail({
         adjustedPrices: {},
         materialPrices: {},
         skills,
+        reactionFacility: reactionFacilityContext,
       },
       runs: plan.runs,
     });
-  }, [blueprint, plan.me, plan.runs, recipeFor, facilityContext, skills]);
+  }, [blueprint, plan.me, plan.runs, recipeFor, facilityContext, skills, reactionFacilityContext]);
 
   /**
    * The materials table's rows: `result.materials` is already the whole
@@ -665,14 +779,37 @@ export function BuildPlanDetail({
   }
 
   /**
+   * Include Reactions (issue #698). Turning it on for the first time — no
+   * Reaction Location configured yet — pre-fills it from the Settings-level
+   * default, a real explicit default rather than copying any other plan's
+   * facility (unlike the primary location, which does copy forward for a
+   * fresh plan — see `reactionFacilityDefaults.ts`'s module doc). Turning it
+   * off only clears the flag: the Reaction Location itself is left alone, so
+   * flipping it back on doesn't lose whatever the pilot configured.
+   */
+  function toggleIncludeReactions(next: boolean) {
+    if (next && plan.reactionFacility === undefined) {
+      update({
+        includeReactions: true,
+        reactionFacility: reactionFacilityDefaults.facility,
+        reactionRigFit: reactionFacilityDefaults.rigFit,
+        reactionFacilityTaxPct: reactionFacilityDefaults.facilityTaxPct ?? undefined,
+      });
+    } else {
+      update({ includeReactions: next });
+    }
+  }
+
+  /**
    * Craft Sweep (issue #695): a one-shot bulk write, not a persistent policy
    * (docs/context/decisions). Fully replaces `buildHere` — re-running with
    * different settings, or the same ones again, overwrites whatever
    * craft/buy choices were there before, including hand-picked ones. Always
    * walks this plan's whole tree (`craftSweepMaxDepth`) — the single-plan
-   * control offers no Sweep Depth choice. Craft Scope is fixed to
-   * manufacturing-only; Reactions and Planetary are reserved for later
-   * tickets.
+   * control offers no Sweep Depth choice. Craft Scope is `craftScopeList`
+   * (issue #698) — the same answer the manual toggle and the recursive
+   * engine use, so a sweep never marks a material the plan itself would
+   * then ignore. Planetary is still reserved.
    */
   function applyCraftSweep(options: { strategy: SweepStrategy }) {
     if (!blueprint || !makeOrBuyContext) return;
@@ -681,7 +818,7 @@ export function BuildPlanDetail({
       ctx: makeOrBuyContext,
       depth: craftSweepMaxDepth,
       runs: plan.runs,
-      scope: ['manufacturing'],
+      scope: craftScopeList,
       strategy: options.strategy,
     });
     update({ buildHere: [...picked] });
@@ -1107,6 +1244,160 @@ export function BuildPlanDetail({
                     </Select>
                   </div>
                 </div>
+
+                {/* A reaction-activity plan never shows this: it reuses its own
+                  top-level facility/rig/security for a nested reaction
+                  sub-build instead (issue #698). */}
+                {activity === 'manufacturing' && (
+                  <div className="flex flex-col gap-3 border-t border-line pt-3">
+                    <span className="flex items-center gap-2 text-xs">
+                      <input
+                        id="build-plan-include-reactions"
+                        type="checkbox"
+                        checked={includeReactions}
+                        onChange={(e) => toggleIncludeReactions(e.target.checked)}
+                        className="size-4 shrink-0 cursor-pointer accent-accent"
+                      />
+                      <label htmlFor="build-plan-include-reactions">
+                        {t('industry.includeReactions')}
+                      </label>
+                      <InfoTooltip
+                        label={t('industry.includeReactionsTooltipLabel')}
+                        content={t('industry.includeReactionsTooltip')}
+                      />
+                    </span>
+
+                    {includeReactions && (
+                      <>
+                        <BuildLocationPicker
+                          activity="reaction"
+                          idPrefix="build-plan-reaction-location"
+                          labelKey="industry.reactionLocation"
+                          summary={t('industry.buildLocationSummary', {
+                            facility: FACILITY_PRESETS[plan.reactionFacility ?? 'athanor'].name,
+                            system:
+                              reactionBuildSystem?.name ?? t('industry.reactionLocationNotSet'),
+                            security: t(`industry.${plan.reactionSecurity ?? 'highsec'}`),
+                          })}
+                          selectedLabel={reactionBuildLocationName}
+                          onPick={(option) => update(reactionBuildLocationPatch(option))}
+                        >
+                          <label className="flex flex-col gap-1 text-xs">
+                            {t('industry.facility')}
+                            <Select
+                              value={plan.reactionFacility ?? 'athanor'}
+                              onValueChange={(value) =>
+                                update({
+                                  reactionFacility: value as FacilityKind,
+                                  ...clearedReactionBuildLocation,
+                                })
+                              }
+                            >
+                              <SelectTrigger aria-label={t('industry.facility')}>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {/* Reaction-capable structures only — an
+                                  engineering complex cannot host a reaction. */}
+                                {Object.values(FACILITY_PRESETS)
+                                  .filter((f) => f.activity === 'reaction')
+                                  .map((f) => (
+                                    <SelectItem key={f.kind} value={f.kind}>
+                                      {f.name}
+                                    </SelectItem>
+                                  ))}
+                              </SelectContent>
+                            </Select>
+                          </label>
+
+                          <BuildSystemInput
+                            idPrefix="build-plan-reaction-system"
+                            systemName={reactionBuildSystem?.name}
+                            hubSystemName={t('industry.reactionLocationNotSet')}
+                            securityLabel={t(`industry.${plan.reactionSecurity ?? 'highsec'}`)}
+                            onChange={(system) =>
+                              update({
+                                reactionBuildSystemId: system?.id,
+                                reactionBuildSystemName: system?.name,
+                                ...clearedReactionBuildLocation,
+                                ...(system === null
+                                  ? { reactionSecurity: 'highsec' }
+                                  : system.security !== null
+                                    ? { reactionSecurity: system.security }
+                                    : {}),
+                              })
+                            }
+                          />
+                        </BuildLocationPicker>
+
+                        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                          <div className="col-span-2 flex flex-col gap-1 text-xs sm:col-span-3">
+                            <span>{t('industry.rigFitLabel')}</span>
+                            <div className="flex flex-wrap gap-2">
+                              {resolveRigFit({ rigFit: plan.reactionRigFit }).map((kind, slot) => (
+                                <label key={slot} className="flex flex-col gap-1">
+                                  <span className="sr-only">
+                                    {t('industry.rigSlotLabel', { slot: slot + 1 })}
+                                  </span>
+                                  <Select
+                                    value={kind}
+                                    onValueChange={(value) =>
+                                      update({
+                                        reactionRigFit: setRigSlot(
+                                          resolveRigFit({ rigFit: plan.reactionRigFit }),
+                                          slot,
+                                          value as RigKind
+                                        ),
+                                      })
+                                    }
+                                  >
+                                    <SelectTrigger
+                                      aria-label={t('industry.rigSlotLabel', { slot: slot + 1 })}
+                                    >
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {RIG_KIND_OPTIONS.map((option) => (
+                                        <SelectItem key={option} value={option}>
+                                          {t(rigKindLabelKey(option))}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </label>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div className="flex flex-col gap-1 text-xs">
+                            <span className="flex items-center gap-1">
+                              <label htmlFor="build-plan-reaction-facility-tax">
+                                {t('industry.facilityTax')}
+                              </label>
+                              <InfoTooltip
+                                label={t('industry.facilityTaxTooltipLabel')}
+                                content={t('industry.facilityTaxTooltip')}
+                              />
+                            </span>
+                            <TextInput
+                              id="build-plan-reaction-facility-tax"
+                              type="number"
+                              min={0}
+                              max={100}
+                              step={0.1}
+                              value={plan.reactionFacilityTaxPct ?? 0}
+                              onChange={(e) =>
+                                update({
+                                  reactionFacilityTaxPct: Math.max(0, Number(e.target.value) || 0),
+                                })
+                              }
+                            />
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -1186,6 +1477,7 @@ export function BuildPlanDetail({
               <div className="mb-3 flex flex-col gap-3">
                 <BuildPlanCraftSweepControl
                   maxDepth={craftSweepMaxDepth}
+                  scope={craftScopeList}
                   disabled={!makeOrBuyContext}
                   onApply={applyCraftSweep}
                 />

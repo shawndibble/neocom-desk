@@ -33,6 +33,14 @@ export function buildVsBuy(inputs: IndustryInputs): BuildResult {
     adjustedPrices,
     skills,
   };
+  // The Reaction Location (issue #698): `inputs.reactionFacility` carries no
+  // pricing of its own, so it's projected onto the same `adjustedPrices`/
+  // `skills` every other context on this plan already uses.
+  const reactionCtx: SubBuildContext | undefined = inputs.reactionFacility && {
+    ...inputs.reactionFacility,
+    adjustedPrices,
+    skills,
+  };
 
   // One shared pool across every top-level material's own resolution, not one
   // per `.map()` iteration: two different blueprint materials can each build
@@ -46,6 +54,7 @@ export function buildVsBuy(inputs: IndustryInputs): BuildResult {
       materialPrices: inputs.materialPrices ?? hubPrices,
       sourcing: inputs.materialSourcing,
       ctx,
+      reactionCtx,
       ownedPool,
     })
   );
