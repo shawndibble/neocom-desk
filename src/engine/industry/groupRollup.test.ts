@@ -61,10 +61,20 @@ function member(over: Partial<BuildGroupMember> = {}): BuildGroupMember {
 }
 
 describe('rollUpBuildGroup — totals', () => {
-  it('sums each member’s own totalCost', () => {
+  it('sums each member’s own materialCost and job fee into one total', () => {
+    // No ledger in play, so totalCost is exactly what summing each member's
+    // own totalCost would give — derived from materialCost + jobFee instead
+    // of member.totalCost directly (see module doc), since materialCost is
+    // where a group ledger's saving is deducted.
     const rollup = rollUpBuildGroup([
-      member({ planId: 'a', result: result({ totalCost: 105 }) }),
-      member({ planId: 'b', result: result({ totalCost: 300 }) }),
+      member({
+        planId: 'a',
+        result: result({ materialCost: 100, jobFee: { total: 5 } as never, totalCost: 105 }),
+      }),
+      member({
+        planId: 'b',
+        result: result({ materialCost: 295, jobFee: { total: 5 } as never, totalCost: 300 }),
+      }),
     ]);
     expect(rollup.totalCost).toBe(405);
   });
@@ -162,10 +172,11 @@ describe('rollUpBuildGroup — material merging', () => {
     expect(rollup.shoppingMaterials[0].unitPrice).toBe(6.5);
   });
 
-  it('sums remaining quantities rather than re-netting owned stock', () => {
-    // Each member already netted against its own stored sourcing, and the
-    // member pages are open right beside the group — a group total that
-    // disagreed with them would be worse than one that is merely optimistic.
+  it('passes ownedQuantity/remainingQuantity through unmodified when no group ledger is given', () => {
+    // Members are re-resolved with owned-stock deduction disabled before
+    // reaching this function (issue #697), so ownedQuantity is normally 0 —
+    // but the merge itself stays a plain sum regardless of what it is handed;
+    // netting is the `ownedStock` option's job, not an implicit one.
     const rollup = rollUpBuildGroup([
       member({ planId: 'a', shoppingMaterials: [line(34, 100, { ownedQuantity: 100 })] }),
       member({ planId: 'b', shoppingMaterials: [line(34, 100, { ownedQuantity: 100 })] }),
@@ -177,38 +188,147 @@ describe('rollUpBuildGroup — material merging', () => {
   });
 });
 
-describe('rollUpBuildGroup — over-claimed owned stock', () => {
-  it('names a material the members collectively claim more of than exists', () => {
-    const detected = new Map([[34, 100]]);
+describe('rollUpBuildGroup — group-owned ledger', () => {
+  it('nets the ledger against the merged buy list and reduces the group total', () => {
+    const ownedStock = new Map([[34, 60]]);
     const rollup = rollUpBuildGroup(
       [
-        member({ planId: 'a', shoppingMaterials: [line(34, 100, { ownedQuantity: 100 })] }),
-        member({ planId: 'b', shoppingMaterials: [line(34, 100, { ownedQuantity: 100 })] }),
+        member({
+          planId: 'a',
+          result: result({ materialCost: 1000, totalCost: 1005 }),
+          shoppingMaterials: [line(34, 100)],
+        }),
       ],
-      { detectedOwnedStock: detected }
+      { ownedStock }
     );
-    expect(rollup.overClaimed).toEqual([34]);
+    const trit = rollup.shoppingMaterials.find((m) => m.typeID === 34);
+    expect(trit?.ownedQuantity).toBe(60);
+    expect(trit?.remainingQuantity).toBe(40);
+    expect(trit?.lineCost).toBe(400); // 40 remaining x unitPrice 10 (see `line()`)
+    // The buy list is the cost authority: the 600 ISK the ledger saved on
+    // material 34 comes straight off materialCost, and totalCost is derived
+    // from the (now net) materialCost plus job fees rather than re-summed
+    // from each member's own (gross, owned-disabled) totalCost.
+    expect(rollup.materialCost).toBe(400);
+    expect(rollup.totalCost).toBe(405);
   });
 
-  it('stays quiet when the claims fit inside what is actually owned', () => {
-    const detected = new Map([[34, 500]]);
-    const rollup = rollUpBuildGroup(
-      [
-        member({ planId: 'a', shoppingMaterials: [line(34, 100, { ownedQuantity: 100 })] }),
-        member({ planId: 'b', shoppingMaterials: [line(34, 100, { ownedQuantity: 100 })] }),
-      ],
-      { detectedOwnedStock: detected }
-    );
-    expect(rollup.overClaimed).toEqual([]);
+  it('clamps a ledger quantity larger than what is needed', () => {
+    const ownedStock = new Map([[34, 999]]);
+    const rollup = rollUpBuildGroup([member({ planId: 'a', shoppingMaterials: [line(34, 100)] })], {
+      ownedStock,
+    });
+    const trit = rollup.shoppingMaterials.find((m) => m.typeID === 34);
+    expect(trit?.ownedQuantity).toBe(100);
+    expect(trit?.remainingQuantity).toBe(0);
+    expect(trit?.lineCost).toBe(0);
   });
 
-  it('claims nothing when detection is unavailable', () => {
-    // No snapshot is not evidence of an empty hangar, so an absent detection
-    // must never be read as "you own zero of everything".
-    const rollup = rollUpBuildGroup([
-      member({ planId: 'a', shoppingMaterials: [line(34, 100, { ownedQuantity: 100 })] }),
+  it('nets the display table too, but never lets it double a deduction already taken off the buy list', () => {
+    // material 999 here is a built row (unitPrice null) — present in the
+    // table but not the buy list, so its netting is display-only and must
+    // not touch `materialCost`.
+    const ownedStock = new Map([
+      [34, 50],
+      [999, 1],
     ]);
-    expect(rollup.overClaimed).toEqual([]);
+    const rollup = rollUpBuildGroup(
+      [
+        member({
+          planId: 'a',
+          result: result({ materialCost: 1000, totalCost: 1005 }),
+          shoppingMaterials: [line(34, 100)],
+          tableMaterials: [
+            line(34, 100),
+            line(999, 1, { unitPrice: null, lineCost: 300, remainingQuantity: 1 }),
+          ],
+        }),
+      ],
+      { ownedStock }
+    );
+    const builtRow = rollup.tableMaterials.find((m) => m.typeID === 999);
+    expect(builtRow?.ownedQuantity).toBe(1);
+    expect(builtRow?.remainingQuantity).toBe(0);
+    expect(builtRow?.lineCost).toBe(0); // scaled proportionally from the prior lineCost
+    // Only the buy-list saving (material 34, 50 units x 10) comes off the total.
+    expect(rollup.materialCost).toBe(500);
+  });
+
+  it('ignores a ledger entry for a typeID the group does not need', () => {
+    const ownedStock = new Map([[999, 50]]);
+    const rollup = rollUpBuildGroup([member({ planId: 'a', shoppingMaterials: [line(34, 100)] })], {
+      ownedStock,
+    });
+    expect(rollup.shoppingMaterials.find((m) => m.typeID === 34)?.remainingQuantity).toBe(100);
+    expect(rollup.materialCost).toBe(100);
+  });
+
+  it('clears unpriced once the ledger fully covers a line with no known price', () => {
+    const ownedStock = new Map([[34, 100]]);
+    const rollup = rollUpBuildGroup(
+      [
+        member({
+          planId: 'a',
+          shoppingMaterials: [line(34, 100, { unitPrice: null, unpriced: true })],
+        }),
+      ],
+      { ownedStock }
+    );
+    const trit = rollup.shoppingMaterials.find((m) => m.typeID === 34);
+    expect(trit?.remainingQuantity).toBe(0);
+    expect(trit?.unpriced).toBe(false);
+  });
+
+  it('leaves the group total alone when the ledger is empty', () => {
+    const rollup = rollUpBuildGroup(
+      [
+        member({
+          planId: 'a',
+          result: result({ materialCost: 100, totalCost: 105 }),
+          shoppingMaterials: [line(34, 100)],
+        }),
+      ],
+      { ownedStock: new Map() }
+    );
+    expect(rollup.materialCost).toBe(100);
+    expect(rollup.totalCost).toBe(105);
+  });
+
+  it('clears unpriceable once the ledger fully covers the one material that made a member unpriceable', () => {
+    // The member's own result is unpriceable against its owned-disabled tree
+    // (materialResolution.ts computes that before the ledger ever runs), but
+    // the ledger now covers the only unpriced material — the group total must
+    // not keep reporting a shortfall that no longer exists.
+    const ownedStock = new Map([[34, 100]]);
+    const rollup = rollUpBuildGroup(
+      [
+        member({
+          planId: 'a',
+          result: result({ unpriceable: true, unpricedMaterials: [34] }),
+          shoppingMaterials: [line(34, 100, { unitPrice: null, unpriced: true })],
+        }),
+      ],
+      { ownedStock }
+    );
+    expect(rollup.unpriceable).toBe(false);
+  });
+
+  it('keeps unpriceable when the member’s own product has no price, regardless of the ledger', () => {
+    // `unpricedMaterials` empty alongside `unpriceable: true` means the
+    // product itself lacked a hub price (buildVsBuy.ts's !productPriced) — no
+    // ledger entry can fix that, so it must survive netting.
+    const ownedStock = new Map([[34, 999]]);
+    const rollup = rollUpBuildGroup(
+      [
+        member({
+          planId: 'a',
+          result: result({ unpriceable: true, unpricedMaterials: [] }),
+          shoppingMaterials: [line(34, 100)],
+        }),
+      ],
+      { ownedStock }
+    );
+    expect(rollup.unpriceable).toBe(true);
   });
 });
 

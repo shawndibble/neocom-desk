@@ -71,6 +71,7 @@ function row(overrides: Partial<ComparedBuildRow> & { planId: string }): Compare
     runs: 1,
     loading: false,
     result: null,
+    groupResult: null,
     error: null,
     ...overrides,
   };

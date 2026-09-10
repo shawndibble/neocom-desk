@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { OwnedStockScope } from '@/engine/industry/types';
 import {
   addBuildGroup,
   buildGroupsFor,
@@ -7,6 +8,8 @@ import {
   renameBuildGroup,
   withBuildGroups,
   withGroupCraftSweepDefault,
+  withGroupOwnedStock,
+  withGroupOwnedStockScope,
   withGroupSnapshot,
   type BuildGroup,
   type BuildGroupCraftSweepDefault,
@@ -254,6 +257,93 @@ describe('parseBuildGroups — craftSweepDefault', () => {
   });
 
   it('keeps a group with no Craft Sweep default at all — the pre-#696 shape', () => {
+    const raw = { 1: [{ id: 'g1', name: 'G', order: 0 }] };
+    expect(parseBuildGroups(raw)).toEqual({ 1: [{ id: 'g1', name: 'G', order: 0 }] });
+  });
+});
+
+describe('withGroupOwnedStock', () => {
+  it('sets the group ledger, leaving the rest of the group untouched', () => {
+    const value = withBuildGroups({}, 1, groups('Owns stuff', 'Other'));
+    const next = withGroupOwnedStock(value, 1, 'g1', { 34: 100, 35: 0 });
+    expect(buildGroupsFor(next, 1)).toEqual([
+      { id: 'g1', name: 'Owns stuff', order: 0, ownedStock: { 34: 100, 35: 0 } },
+      { id: 'g2', name: 'Other', order: 1 },
+    ]);
+  });
+
+  it('replaces the existing ledger rather than merging it', () => {
+    const value = withGroupOwnedStock(withBuildGroups({}, 1, groups('G')), 1, 'g1', { 34: 100 });
+    const next = withGroupOwnedStock(value, 1, 'g1', { 35: 5 });
+    expect(buildGroupsFor(next, 1)[0].ownedStock).toEqual({ 35: 5 });
+  });
+
+  it('is a no-op for a group id that does not exist', () => {
+    const value = withBuildGroups({}, 1, groups('G'));
+    expect(withGroupOwnedStock(value, 1, 'missing', { 34: 1 })).toBe(value);
+  });
+});
+
+describe('withGroupOwnedStockScope', () => {
+  const scope: OwnedStockScope = { mode: 'everywhere' };
+
+  it('sets the group ledger scope, leaving the rest of the group untouched', () => {
+    const value = withBuildGroups({}, 1, groups('Scoped', 'Other'));
+    const next = withGroupOwnedStockScope(value, 1, 'g1', scope);
+    expect(buildGroupsFor(next, 1)).toEqual([
+      { id: 'g1', name: 'Scoped', order: 0, ownedStockScope: scope },
+      { id: 'g2', name: 'Other', order: 1 },
+    ]);
+  });
+
+  it('is a no-op for a group id that does not exist', () => {
+    const value = withBuildGroups({}, 1, groups('G'));
+    expect(withGroupOwnedStockScope(value, 1, 'missing', scope)).toBe(value);
+  });
+});
+
+describe('parseBuildGroups — ownedStock / ownedStockScope', () => {
+  it('keeps a group whose ledger and scope are well-formed', () => {
+    const raw = {
+      1: [
+        {
+          id: 'g1',
+          name: 'G',
+          order: 0,
+          ownedStock: { 34: 100, 35: 0 },
+          ownedStockScope: { mode: 'everywhere' },
+        },
+      ],
+    };
+    expect(parseBuildGroups(raw)).toEqual({
+      1: [
+        {
+          id: 'g1',
+          name: 'G',
+          order: 0,
+          ownedStock: { 34: 100, 35: 0 },
+          ownedStockScope: { mode: 'everywhere' },
+        },
+      ],
+    });
+  });
+
+  it('drops a group whose ledger holds a negative or non-finite quantity', () => {
+    const raw = { 1: [{ id: 'g1', name: 'G', order: 0, ownedStock: { 34: -1 } }] };
+    expect(parseBuildGroups(raw)).toEqual({});
+  });
+
+  it('drops a group whose ledger key is not a typeID', () => {
+    const raw = { 1: [{ id: 'g1', name: 'G', order: 0, ownedStock: { notANumber: 1 } }] };
+    expect(parseBuildGroups(raw)).toEqual({});
+  });
+
+  it('drops a group whose scope is malformed', () => {
+    const raw = { 1: [{ id: 'g1', name: 'G', order: 0, ownedStockScope: { mode: 'bogus' } }] };
+    expect(parseBuildGroups(raw)).toEqual({});
+  });
+
+  it('keeps a group with neither field at all — the pre-#697 shape', () => {
     const raw = { 1: [{ id: 'g1', name: 'G', order: 0 }] };
     expect(parseBuildGroups(raw)).toEqual({ 1: [{ id: 'g1', name: 'G', order: 0 }] });
   });
