@@ -358,6 +358,7 @@ export function Market() {
     items: quickbarItems,
     write: writeQuickbar,
     add: handleAddToQuickbar,
+    setTarget: handleSetQuickbarTarget,
   } = useQuickbar(activeCharacterId);
 
   function handleRemoveFromQuickbar(typeId: number) {
@@ -1335,6 +1336,7 @@ export function Market() {
               onSelect={handleSelectItem}
               onRemove={handleRemoveFromQuickbar}
               onReorder={handleReorderQuickbar}
+              onSetTarget={handleSetQuickbarTarget}
             />
           </Panel>
 

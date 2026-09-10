@@ -162,6 +162,16 @@ export interface EsiCacheRecord {
 export interface QuickbarItem {
   typeId: number;
   name: string;
+  /**
+   * Optional price alert target (issue #680): fires `priceAlertTriggered`
+   * the first time the hub price crosses in `targetDirection`. Both absent
+   * together or both present — `market/quickbar.ts`'s
+   * `setQuickbarItemTarget` is the only writer. Not indexed, inside the
+   * `quickbars` table's JSON blob like `QuickbarRecord.items` itself, so
+   * needs no `db.version()` bump — same as `EsiCacheRecord.truncated`.
+   */
+  targetPrice?: number;
+  targetDirection?: 'above' | 'below';
 }
 
 /**

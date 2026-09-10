@@ -230,6 +230,8 @@ export const ScheduledPush = withWeight(Broadcast);
 export const BrowserNotifyOff = withWeight(BellSlash);
 /** Hide a Notification Feed row's type from the feed (issue #364) — one-way from here, reversible in Settings. */
 export const HideInFeed = withWeight(EyeSlash);
+/** A Quickbar item's price alert target (issue #680) — the same crosshair `OptimizeAtMarkers` uses for a different feature, distinct by name here. */
+export const PriceAlert = withWeight(Target);
 /** Open every collapsible group at once. */
 export const ExpandAll = withWeight(CaretDoubleDown);
 /** Close every collapsible group at once. */

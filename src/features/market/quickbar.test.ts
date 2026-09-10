@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { addQuickbarItem, removeQuickbarItem, reorderQuickbarItems } from './quickbar';
+import {
+  addQuickbarItem,
+  removeQuickbarItem,
+  reorderQuickbarItems,
+  setQuickbarItemTarget,
+  hasQuickbarTarget,
+} from './quickbar';
 
 describe('addQuickbarItem', () => {
   it('appends a new item', () => {
@@ -64,5 +70,68 @@ describe('reorderQuickbarItems', () => {
   it('returns an equivalent list when either id is unknown', () => {
     expect(reorderQuickbarItems(items, 1, 999)).toEqual(items);
     expect(reorderQuickbarItems(items, 999, 1)).toEqual(items);
+  });
+});
+
+describe('setQuickbarItemTarget', () => {
+  const items = [
+    { typeId: 1, name: 'Tritanium' },
+    { typeId: 2, name: 'Rifter' },
+  ];
+
+  it('sets a target price and direction on the matching item', () => {
+    expect(setQuickbarItemTarget(items, 1, { price: 5, direction: 'above' })).toEqual([
+      { typeId: 1, name: 'Tritanium', targetPrice: 5, targetDirection: 'above' },
+      { typeId: 2, name: 'Rifter' },
+    ]);
+  });
+
+  it('clears an existing target when given null', () => {
+    const withTarget = [
+      { typeId: 1, name: 'Tritanium', targetPrice: 5, targetDirection: 'above' as const },
+      { typeId: 2, name: 'Rifter' },
+    ];
+    expect(setQuickbarItemTarget(withTarget, 1, null)).toEqual([
+      { typeId: 1, name: 'Tritanium' },
+      { typeId: 2, name: 'Rifter' },
+    ]);
+  });
+
+  it('replaces an existing target rather than merging it', () => {
+    const withTarget = [
+      { typeId: 1, name: 'Tritanium', targetPrice: 5, targetDirection: 'above' as const },
+    ];
+    expect(setQuickbarItemTarget(withTarget, 1, { price: 10, direction: 'below' })).toEqual([
+      { typeId: 1, name: 'Tritanium', targetPrice: 10, targetDirection: 'below' },
+    ]);
+  });
+
+  it('is a no-op when the typeId is not present', () => {
+    expect(setQuickbarItemTarget(items, 999, { price: 5, direction: 'above' })).toEqual(items);
+  });
+
+  it('does not mutate the input array', () => {
+    setQuickbarItemTarget(items, 1, { price: 5, direction: 'above' });
+    expect(items).toEqual([
+      { typeId: 1, name: 'Tritanium' },
+      { typeId: 2, name: 'Rifter' },
+    ]);
+  });
+});
+
+describe('hasQuickbarTarget', () => {
+  it('is false for an item with neither field set', () => {
+    expect(hasQuickbarTarget({ typeId: 1, name: 'Tritanium' })).toBe(false);
+  });
+
+  it('is true for an item carrying both target fields', () => {
+    expect(
+      hasQuickbarTarget({
+        typeId: 1,
+        name: 'Tritanium',
+        targetPrice: 5,
+        targetDirection: 'above',
+      })
+    ).toBe(true);
   });
 });

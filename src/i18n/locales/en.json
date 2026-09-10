@@ -2341,6 +2341,11 @@
         "title": "Structure fuel low",
         "body": "{{character}}: {{structure}} has less than {{days}} days of fuel remaining."
       },
+      "priceAlertTriggered": {
+        "title": "Price alert",
+        "aboveBody": "{{item}} reached {{price}} ISK, at or above your {{target}} ISK target.",
+        "belowBody": "{{item}} reached {{price}} ISK, at or below your {{target}} ISK target."
+      },
       "corpIndustryJobReady": {
         "title": "Corp industry job ready for delivery",
         "body": "{{character}}: the corporation's {{item}} job is ready for delivery."
@@ -2650,7 +2655,16 @@
       "title": "Quickbar",
       "empty": "No items yet — right-click an item and choose Add to Quickbar.",
       "removeItem": "Remove {{name}} from Quickbar",
-      "reorderItem": "Reorder {{name}}"
+      "reorderItem": "Reorder {{name}}",
+      "priceAlert": {
+        "button": "Set price alert for {{name}}",
+        "priceLabel": "Target price (ISK)",
+        "directionLabel": "Direction",
+        "directionAbove": "At or above",
+        "directionBelow": "At or below",
+        "save": "Save",
+        "clear": "Clear alert"
+      }
     },
     "variations": {
       "title": "Variations",
@@ -2975,7 +2989,8 @@
         "corpIndustryJobReady": "Corp Industry Job Ready",
         "corpMemberJoined": "Member Joined",
         "corpMemberLeft": "Member Left",
-        "corpWalletThreshold": "Corp Wallet Threshold"
+        "corpWalletThreshold": "Corp Wallet Threshold",
+        "priceAlertTriggered": "Quickbar Price Alert"
       },
       "extractorExpiringHint": "Delivered up to 72 hours ahead, even with the app closed, once installed and enabled for notifications — open the app at least that often to keep it current. The Planetary Industry page always shows the real expiry.",
       "corpEventBestEffortHint": "Best-effort: fires only while the app is open. Not a substitute for in-game alerts.",

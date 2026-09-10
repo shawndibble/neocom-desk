@@ -19,6 +19,7 @@ import type {
   CorpMemberLeftFire,
   CorpWalletThresholdFire,
   StructureReinforcementExitFire,
+  PriceAlertTriggeredFire,
 } from './notificationDiffs';
 
 const T0 = 1_700_000_000_000;
@@ -329,6 +330,24 @@ describe('occurrenceKey', () => {
     const fire: MailNotificationFire = { eventId: 'newMail', characterId: 7, mailId: 789 };
     expect(occurrenceKey(fire, T0)).not.toEqual(occurrenceKey({ ...fire, characterId: 8 }, T0));
   });
+
+  it('keys priceAlertTriggered on typeId, targetPrice and direction, so an edited target is a distinct occurrence', () => {
+    const fire: PriceAlertTriggeredFire = {
+      eventId: 'priceAlertTriggered',
+      characterId: 7,
+      typeId: 34,
+      name: 'Tritanium',
+      price: 6,
+      targetPrice: 5,
+      direction: 'above',
+    };
+    // Same real occurrence, different poll time.
+    expect(occurrenceKey(fire, T0)).toEqual(occurrenceKey({ ...fire, price: 7 }, T0 + 60_000));
+    // A different target price is a genuinely different occurrence.
+    expect(occurrenceKey(fire, T0)).not.toEqual(occurrenceKey({ ...fire, targetPrice: 10 }, T0));
+    // A different direction is a genuinely different occurrence.
+    expect(occurrenceKey(fire, T0)).not.toEqual(occurrenceKey({ ...fire, direction: 'below' }, T0));
+  });
 });
 
 describe('occurrenceFiredAt', () => {
@@ -381,6 +400,19 @@ describe('occurrenceFiredAt', () => {
       orderId: 99,
       typeId: 34,
       quantity: 1,
+    };
+    expect(occurrenceFiredAt(fire, T0)).toBe(T0);
+  });
+
+  it('dates priceAlertTriggered by the poll that noticed the crossing', () => {
+    const fire: PriceAlertTriggeredFire = {
+      eventId: 'priceAlertTriggered',
+      characterId: 7,
+      typeId: 34,
+      name: 'Tritanium',
+      price: 6,
+      targetPrice: 5,
+      direction: 'above',
     };
     expect(occurrenceFiredAt(fire, T0)).toBe(T0);
   });

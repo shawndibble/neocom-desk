@@ -308,7 +308,15 @@ describe('Settings', () => {
   });
 });
 
-const ALL_NOTIFICATION_SCOPES = [...new Set(NOTIFICATION_EVENTS.map((event) => event.scope))];
+// `priceAlertTriggered` (issue #680) carries no scope at all — filtered out
+// here rather than widening `db.tokens`' `scopes: string[]` to hold `undefined`.
+const ALL_NOTIFICATION_SCOPES = [
+  ...new Set(
+    NOTIFICATION_EVENTS.map((event) => event.scope).filter(
+      (scope): scope is Exclude<typeof scope, undefined> => scope !== undefined
+    )
+  ),
+];
 const CHAR_2_ID = 92;
 
 /**

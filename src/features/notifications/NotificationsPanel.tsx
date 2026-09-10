@@ -417,7 +417,9 @@ export function NotificationsPanel() {
                 }
                 const togglableEventIds = visibleEventIds.filter((eventId) => {
                   const def = eventDef(eventId);
-                  return grantedScopes.has(def.scope) && hasCapability(def);
+                  return (
+                    (def.scope === undefined || grantedScopes.has(def.scope)) && hasCapability(def)
+                  );
                 });
                 const prefs = characterEventPrefs(prefsValue, character.characterId);
                 const eveTypePrefs = characterEveTypePrefs(prefsValue, character.characterId);
@@ -503,7 +505,8 @@ export function NotificationsPanel() {
                         <ul className="divide-y divide-line">
                           {visibleEventIds.map((eventId) => {
                             const def = eventDef(eventId);
-                            const hasScope = grantedScopes.has(def.scope);
+                            const hasScope =
+                              def.scope === undefined || grantedScopes.has(def.scope);
                             const capabilityMissing = !hasCapability(def);
                             const rowEnabled = hasScope && !capabilityMissing;
                             const eventLabel = t(def.labelKey);

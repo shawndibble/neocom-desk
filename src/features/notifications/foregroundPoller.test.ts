@@ -256,6 +256,7 @@ function baseDeps(overrides: Partial<PollDependencies> & DomainOverrides = {}): 
     corpRoster: async () => [],
     corpWallet: async () => [],
     spExtraction: async () => [],
+    priceAlert: async () => [],
   };
   const states: Record<string, DomainPollState> = {
     skillQueue: domainState(prevState, saveState),
@@ -272,6 +273,7 @@ function baseDeps(overrides: Partial<PollDependencies> & DomainOverrides = {}): 
     corpRoster: domainState(undefined, undefined),
     corpWallet: domainState(undefined, undefined),
     spExtraction: domainState(undefined, undefined),
+    priceAlert: domainState(undefined, undefined),
   };
 
   return {
@@ -1773,7 +1775,7 @@ describe('runForegroundPoll Scheduled Push upload (issue #358)', () => {
     ]);
   });
 
-  it('excludes a character this poll did not touch (no granted scope at all) from the upload map', async () => {
+  it('uploads no projection rows for a character with no granted scope at all', async () => {
     const charB: CharacterRef = { characterId: 2, name: 'Second Pilot' };
     const uploadProjection = vi.fn<PollDependencies['uploadProjection']>(async () => {});
     const deps = baseDeps({
@@ -1787,7 +1789,11 @@ describe('runForegroundPoll Scheduled Push upload (issue #358)', () => {
     expect(uploadProjection).toHaveBeenCalledTimes(1);
     const [rowsByCharacter] = uploadProjection.mock.calls[0];
     expect(rowsByCharacter.has(CHAR.characterId)).toBe(true);
-    expect(rowsByCharacter.has(charB.characterId)).toBe(false);
+    // charB still gets *fetched* — `priceAlertTriggered` (issue #680) needs no
+    // ESI scope at all, so it is not excluded by the scope gate every other
+    // domain answers to — but it projects nothing, since price alerts are
+    // foreground-only and every scope-gated domain above stays untouched.
+    expect(rowsByCharacter.get(charB.characterId) ?? []).toEqual([]);
   });
 
   it('does not upload at all when the poll does nothing (master switch off)', async () => {
