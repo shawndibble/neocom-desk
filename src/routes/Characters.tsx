@@ -376,9 +376,7 @@ function GroupSectionHeader({
         icon={<Icon.Close />}
         tone="danger"
         label={`${t('characters.deleteGroup')} ${group.name}`}
-        onClick={() => {
-          if (window.confirm(t('characters.deleteGroupConfirm'))) onRemove(group.id);
-        }}
+        onClick={() => onRemove(group.id)}
       />
     </div>
   );
@@ -780,6 +778,7 @@ export function Characters() {
 
   const [addingGroup, setAddingGroup] = useState(false);
   const [newGroupName, setNewGroupName] = useState('');
+  const [deletingGroupId, setDeletingGroupId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [removingCharacter, setRemovingCharacter] = useState<{
     id: number;
@@ -1009,6 +1008,7 @@ export function Characters() {
   }
 
   async function handleRemoveGroup(groupId: string) {
+    setDeletingGroupId(null);
     await setGroupsValue(
       updateGroups(groupsValue, (groups) => removeGroup(groups, groupId), Date.now())
     );
@@ -1280,7 +1280,7 @@ export function Characters() {
                     index={index}
                     groupCount={groupsValue.groups.length}
                     onRename={(id, name) => void handleRenameGroup(id, name)}
-                    onRemove={(id) => void handleRemoveGroup(id)}
+                    onRemove={(id) => setDeletingGroupId(id)}
                     onMove={(index2, direction) => void handleMoveGroup(index2, direction)}
                   />
                   {group.characterIds.length === 0 ? (
@@ -1320,6 +1320,26 @@ export function Characters() {
           </Button>
           <Button variant="danger" size="sm" onClick={() => void confirmRemoveCharacter()}>
             {t('characters.remove')}
+          </Button>
+        </div>
+      </Modal>
+
+      <Modal
+        open={deletingGroupId !== null}
+        onClose={() => setDeletingGroupId(null)}
+        title={t('characters.deleteGroup')}
+      >
+        <p className="text-xs text-text-dim">{t('characters.deleteGroupConfirm')}</p>
+        <div className="mt-3 flex justify-end gap-2">
+          <Button size="sm" onClick={() => setDeletingGroupId(null)}>
+            {t('characters.cancel')}
+          </Button>
+          <Button
+            size="sm"
+            variant="danger"
+            onClick={() => deletingGroupId && void handleRemoveGroup(deletingGroupId)}
+          >
+            {t('characters.deleteGroup')}
           </Button>
         </div>
       </Modal>

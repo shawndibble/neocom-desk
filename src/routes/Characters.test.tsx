@@ -274,6 +274,40 @@ describe('Characters', () => {
     });
   });
 
+  it('deletes a group via the confirmation Modal, not window.confirm', async () => {
+    await useOverviewGroups.getState().setValue({
+      groups: [{ id: 'a', name: 'Alts', characterIds: [] }],
+      updatedAt: 1,
+    });
+    const user = userEvent.setup();
+    renderCharacters();
+
+    await user.click(await screen.findByRole('button', { name: 'Delete group Alts' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Delete group' });
+    await user.click(within(dialog).getByRole('button', { name: 'Delete group' }));
+
+    await waitForSettingsValue(OVERVIEW_GROUPS_SETTING_KEY, (value) => {
+      const groups = (value as { groups: { id: string }[] }).groups;
+      return groups.length === 0;
+    });
+  });
+
+  it('cancels a group delete from the confirmation Modal without deleting', async () => {
+    await useOverviewGroups.getState().setValue({
+      groups: [{ id: 'a', name: 'Alts', characterIds: [] }],
+      updatedAt: 1,
+    });
+    const user = userEvent.setup();
+    renderCharacters();
+
+    await user.click(await screen.findByRole('button', { name: 'Delete group Alts' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Delete group' });
+    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Alts' })).toBeInTheDocument();
+  });
+
   it('sorts characters by name and reverses direction', async () => {
     const user = userEvent.setup();
     renderCharacters();
