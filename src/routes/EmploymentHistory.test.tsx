@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import '@/i18n';
@@ -262,5 +263,46 @@ describe('EmploymentHistory', () => {
     expect(await screen.findByText(/no employment history cached/i)).toBeInTheDocument();
     // The panel's toolbar outlives its rows, so there is still a way back.
     expect(screen.getByRole('button', { name: 'Refresh' })).toBeInTheDocument();
+  });
+});
+
+describe('Employment History row context menu (issue #729)', () => {
+  /** Right-clicks a corporation row by its resolved name and returns the row. */
+  async function openHistoryMenu(name: string) {
+    const row = (await screen.findByText(name)).closest('tr');
+    if (!row) throw new Error(`expected a ${name} row`);
+    row.focus();
+    fireEvent.contextMenu(row);
+    return row;
+  }
+
+  it('offers Copy Name and Show Info', async () => {
+    render(<App />);
+    await openHistoryMenu('Past Corp');
+
+    expect(screen.getByRole('menuitem', { name: 'Copy name' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Show info' })).toBeInTheDocument();
+  });
+
+  it('Show Info opens the shared Public Info Modal on the corporation tab, for a past (non-current) employer', async () => {
+    const user = userEvent.setup();
+    server.use(
+      http.get('https://esi.evetech.net/corporations/100', () =>
+        HttpResponse.json({
+          name: 'Past Corp',
+          ticker: 'PC',
+          ceo_id: 1,
+          creator_id: 1,
+          member_count: 3,
+          tax_rate: 0.1,
+        })
+      )
+    );
+    render(<App />);
+    await openHistoryMenu('Past Corp');
+    await user.click(screen.getByRole('menuitem', { name: 'Show info' }));
+
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByRole('tab', { name: 'Corporation' })).toBeInTheDocument();
   });
 });
