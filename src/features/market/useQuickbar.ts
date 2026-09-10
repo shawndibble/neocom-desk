@@ -9,7 +9,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type QuickbarItem } from '@/db';
 import { scheduleSync } from '@/sync';
 import { isSyncConfigured } from '@/app/syncStatus';
-import { addQuickbarItem, setQuickbarItemTarget } from './quickbar';
+import { addQuickbarItem, setQuickbarItemTarget, type QuickbarTarget } from './quickbar';
 
 export interface Quickbar {
   /** Empty until the live query resolves, and with nobody active. */
@@ -21,10 +21,7 @@ export interface Quickbar {
   /** Fire-and-forget single add, deduped by typeId. Matches `ItemContextMenu`'s handler signature. */
   add: (typeId: number, itemName: string) => void;
   /** Fire-and-forget target set/clear (issue #680). `null` clears the item's price alert. */
-  setTarget: (
-    typeId: number,
-    target: { price: number; direction: 'above' | 'below' } | null
-  ) => void;
+  setTarget: (typeId: number, target: QuickbarTarget) => void;
 }
 
 export function useQuickbar(activeCharacterId: number | null): Quickbar {

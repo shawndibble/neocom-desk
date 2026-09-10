@@ -4,6 +4,7 @@ import {
   removeQuickbarItem,
   reorderQuickbarItems,
   setQuickbarItemTarget,
+  hasQuickbarTarget,
 } from './quickbar';
 
 describe('addQuickbarItem', () => {
@@ -115,5 +116,22 @@ describe('setQuickbarItemTarget', () => {
       { typeId: 1, name: 'Tritanium' },
       { typeId: 2, name: 'Rifter' },
     ]);
+  });
+});
+
+describe('hasQuickbarTarget', () => {
+  it('is false for an item with neither field set', () => {
+    expect(hasQuickbarTarget({ typeId: 1, name: 'Tritanium' })).toBe(false);
+  });
+
+  it('is true for an item carrying both target fields', () => {
+    expect(
+      hasQuickbarTarget({
+        typeId: 1,
+        name: 'Tritanium',
+        targetPrice: 5,
+        targetDirection: 'above',
+      })
+    ).toBe(true);
   });
 });

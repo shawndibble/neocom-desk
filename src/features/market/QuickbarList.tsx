@@ -37,9 +37,8 @@ import {
 import * as Icon from '@/components/ui/icons';
 import { typeIconUrl } from '@/lib/eveImages';
 import { formatIsk, formatIskCompact, parseIskAmount } from '@/lib/isk';
+import { hasQuickbarTarget, type QuickbarTarget } from './quickbar';
 import type { QuickbarItem } from '@/db';
-
-export type QuickbarTarget = { price: number; direction: 'above' | 'below' } | null;
 
 /**
  * The target-price popover's own form state, editing a copy rather than the
@@ -64,7 +63,7 @@ function PriceAlertForm({
   const [text, setText] = useState(
     item.targetPrice !== undefined ? formatIsk(item.targetPrice) : ''
   );
-  const hasTarget = item.targetPrice !== undefined;
+  const hasTarget = hasQuickbarTarget(item);
 
   function handleSave() {
     const amount = parseIskAmount(text);
@@ -131,7 +130,7 @@ function QuickbarRow({ item, selected, onSelect, onRemove, onSetTarget }: Quickb
   });
   const style = { transform: CSS.Transform.toString(transform), transition };
   const [popoverOpen, setPopoverOpen] = useState(false);
-  const hasTarget = item.targetPrice !== undefined && item.targetDirection !== undefined;
+  const hasTarget = hasQuickbarTarget(item);
 
   return (
     <li
