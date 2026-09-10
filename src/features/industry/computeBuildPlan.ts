@@ -13,6 +13,7 @@ import type {
   BuildResult,
   HubPrices,
   IndustryBlueprint,
+  ReactionFacilityContext,
   SkillLevels,
 } from '@/engine/industry/types';
 import type { MaterialRecipe } from '@/engine/industry/makeOrBuy';
@@ -49,6 +50,8 @@ export interface ComputeBuildPlanInput {
    * never touched — this only shapes what gets passed to `buildVsBuy`.
    */
   ignoreOwnedStock?: boolean;
+  /** The Reaction Location (issue #698), when Include Reactions is on for this plan. */
+  reactionFacility?: ReactionFacilityContext;
 }
 
 export interface ComputeBuildPlanResult {
@@ -71,6 +74,7 @@ export function computeBuildPlan({
   skills,
   recipeFor,
   ignoreOwnedStock,
+  reactionFacility,
 }: ComputeBuildPlanInput): ComputeBuildPlanResult {
   const facility = FACILITY_PRESETS[plan.facility];
   const runs = clampInt(plan.runs, 1, MAX_JOB_RUNS);
@@ -104,6 +108,7 @@ export function computeBuildPlan({
       skills,
       buildHere: plan.buildHere,
       recipeFor,
+      reactionFacility,
     });
     return { result, error: null };
   } catch (err) {

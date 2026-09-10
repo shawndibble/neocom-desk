@@ -13,9 +13,6 @@ import { moveHighlight, type ComboboxNavKey } from './comboboxNav';
 import { MIN_SEARCH_LENGTH, searchBuildLocations } from './searchBuildLocations';
 import type { BuildLocationOption } from './buildLocations';
 
-const LISTBOX_ID = 'build-location-listbox';
-const optionId = (structureId: number) => `build-location-option-${structureId}`;
-
 interface BuildLocationPickerProps {
   /** What the plan is set to right now, already translated. Always the plan's own values. */
   summary: string;
@@ -26,6 +23,16 @@ interface BuildLocationPickerProps {
   onPick: (option: BuildLocationOption) => void;
   /** Which job the plan runs, so the search offers only places that can host it (issue #460). */
   activity: IndustryActivity;
+  /**
+   * Distinguishes this instance's DOM ids (listbox, option, label `for`) from
+   * any other `BuildLocationPicker` mounted on the same page — issue #698
+   * mounts a second one for the Reaction Location beside the plan's primary
+   * one. Defaults to the original hardcoded prefix, so the lone-picker case
+   * (every caller before #698) needs no change.
+   */
+  idPrefix?: string;
+  /** Overrides the search box's label — the Reaction Location instance names itself. Defaults to `industry.buildLocation`. */
+  labelKey?: string;
 }
 
 /** Read off the registry rather than spelled out here — this file stays hand-edit-free. */
@@ -68,8 +75,13 @@ export function BuildLocationPicker({
   children,
   onPick,
   activity,
+  idPrefix = 'build-location',
+  labelKey = 'industry.buildLocation',
 }: BuildLocationPickerProps) {
   const { t } = useTranslation();
+  const listboxId = `${idPrefix}-listbox`;
+  const optionId = (structureId: number) => `${idPrefix}-option-${structureId}`;
+  const inputId = `${idPrefix}-input`;
   const characterId = useActiveCharacter((state) => state.activeCharacterId);
   const granted = useGrantedScopes();
   const [overriding, setOverriding] = useState(false);
@@ -215,9 +227,9 @@ export function BuildLocationPicker({
   const searchBox =
     granted === undefined ? null : canSearch ? (
       <div className="relative flex flex-col gap-1">
-        <label htmlFor="build-plan-location">{t('industry.buildLocation')}</label>
+        <label htmlFor={inputId}>{t(labelKey)}</label>
         <SearchInput
-          id="build-plan-location"
+          id={inputId}
           value={query ?? picked ?? selectedLabel ?? ''}
           placeholder={t('industry.buildLocationPlaceholder')}
           onChange={(e) => setQuery(e.target.value)}
@@ -230,7 +242,7 @@ export function BuildLocationPicker({
           role="combobox"
           aria-autocomplete="list"
           aria-expanded={openResults !== null}
-          aria-controls={LISTBOX_ID}
+          aria-controls={listboxId}
           aria-activedescendant={
             highlightedOption ? optionId(highlightedOption.structureId) : undefined
           }
@@ -261,7 +273,7 @@ export function BuildLocationPicker({
         )}
         {openResults !== null && (
           <ul
-            id={LISTBOX_ID}
+            id={listboxId}
             role="listbox"
             className="max-h-56 overflow-y-auto rounded-xs border border-line bg-panel"
           >

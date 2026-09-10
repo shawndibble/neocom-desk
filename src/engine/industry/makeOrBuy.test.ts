@@ -160,6 +160,42 @@ describe('makeOrBuy', () => {
     it('is null when an input has no hub price', () => {
       expect(makeOrBuy(line(), reaction, { ...ctx, materialPrices: {} })).toBeNull();
     });
+
+    it("falls back to the plan's own facility/rig, not the fixed Athanor guess, when that plan's own activity is already a reaction (issue #698)", () => {
+      // A reaction-activity plan quoting a reaction-in-reaction sub-input
+      // (e.g. a Tatara with a fitted ME rig) needs no separate Reaction
+      // Location — it already has one, itself.
+      const reactionActivityCtx: MakeOrBuyContext = {
+        ...ctx,
+        facility: FACILITY_PRESETS.tatara,
+        rigFit: ['meT2', 'none', 'none'],
+      };
+      const result = makeOrBuy(line(), reaction, reactionActivityCtx);
+      // 60 Tritanium reduced 2.4% by the fitted rig -> ceil(58.56) = 59, at
+      // 5 = 295, plus the same 21.6 job fee as the unfitted-Athanor baseline
+      // (EIV is always ME0/no-bonus, untouched by rig or facility).
+      expect(result?.makeUnitPrice).toBeCloseTo(316.6 / 15, 10);
+    });
+
+    it('quotes against the resolved Reaction Location when one is configured (issue #698)', () => {
+      // Same 3-run job, but Reaction Location is a Tatara at a 0.10 cost
+      // index and a 2% owner tax — neither the fixed Athanor/no-rig
+      // assumption nor the parent ctx's own 0.05 index / 0% tax may leak in.
+      const withReactionLocation: MakeOrBuyContext = {
+        ...ctx,
+        reactionFacility: {
+          facility: FACILITY_PRESETS.tatara,
+          rigFit: ['none', 'none', 'none'],
+          security: 'highsec',
+          facilityTaxPct: 2,
+          systemCostIndex: 0.1,
+        },
+      };
+      const result = makeOrBuy(line(), reaction, withReactionLocation);
+      // 60 Tritanium at 5 = 300, plus a job fee on EIV 240: index 24 + SCC
+      // 9.6 + owner tax 4.8 = 38.4.
+      expect(result?.makeUnitPrice).toBeCloseTo(338.4 / 15, 10);
+    });
   });
 
   describe('planetary industry', () => {

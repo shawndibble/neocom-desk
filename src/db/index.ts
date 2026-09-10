@@ -314,6 +314,42 @@ export interface BuildPlanRecord {
    * something else on `MiningTaxAssignmentRecord` in this same file.
    */
   buildGroupId?: string;
+  /**
+   * Include Reactions (issue #698): whether this manufacturing-activity
+   * plan's recursive engine, manual craft/buy toggle and Craft Sweep may
+   * treat a reaction-produced material in its tree as buildable. Off (absent
+   * or `false`) hides the Reaction Location fields below entirely and is how
+   * every plan behaved before this existed. Meaningless for a
+   * reaction-activity plan, which is always eligible via its own top-level
+   * facility regardless of this flag — see `reactionCraftEligible`.
+   */
+  includeReactions?: boolean;
+  /**
+   * The Reaction Location: a second, fully independent facility/rig/security/
+   * tax context a reaction sub-build is costed against, distinct from this
+   * plan's own `facility`/`rigFit`/`security`/`facilityTaxPct` above — an
+   * engineering complex cannot host a reaction, so the plan's own context is
+   * never a valid stand-in. Same additive/unindexed convention as
+   * `buildHere` above; absent means Include Reactions has never been turned
+   * on for this plan. Mirrors the plan's own location fields one-for-one:
+   * `reactionFacility` is restricted to a refinery kind (`athanor`/`tatara`)
+   * by the picker, never enforced by this type itself.
+   */
+  reactionFacility?: FacilityKind;
+  /** @see reactionFacility */
+  reactionRigFit?: RigFit;
+  /** @see reactionFacility */
+  reactionSecurity?: SecurityBand;
+  /** @see reactionFacility */
+  reactionFacilityTaxPct?: number;
+  /** Solar system the Reaction Location's job runs in — mirrors `buildSystemId`. */
+  reactionBuildSystemId?: number;
+  /** @see reactionBuildSystemId */
+  reactionBuildSystemName?: string;
+  /** The station or structure picked for the Reaction Location — mirrors `buildLocationId`. */
+  reactionBuildLocationId?: number;
+  /** @see reactionBuildLocationId */
+  reactionBuildLocationName?: string;
   /** Epoch ms of the last edit. */
   updatedAt: number;
 }

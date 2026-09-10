@@ -11,6 +11,7 @@ import {
   SelectValue,
 } from '@/components/ui';
 import type { SweepStrategy } from '@/engine/industry/autoMakeOrBuy';
+import type { MakeMethod } from '@/engine/industry/makeOrBuy';
 
 interface CraftSweepControlProps {
   /**
@@ -19,6 +20,15 @@ interface CraftSweepControlProps {
    * there is nothing to sweep.
    */
   maxDepth: number;
+  /**
+   * Production methods currently eligible to sweep (issue #698's `craftScope`)
+   * — the same answer the recursive engine and the manual per-item toggle use,
+   * so this chip row can never promise more than a sweep will actually apply.
+   * Manufacturing is always eligible; Reactions lights up only when Include
+   * Reactions is on (or the plan's own activity is a reaction). Planetary
+   * stays reserved regardless — out of scope for #698.
+   */
+  scope: readonly MakeMethod[];
   /**
    * Not ready to apply: the single-plan caller gates this on live prices
    * having landed (cost-effective needs them, same as `pricesReady`
@@ -45,12 +55,15 @@ export type DepthChoice = 'all' | number;
  * Build Plan. Picks a Sweep Strategy and Sweep Depth, then — behind a
  * generic overwrite confirmation, never a computed preview (that would
  * require running the walk twice per press) — overwrites this plan's
- * `buildHere` to match. Craft Scope is shown but not yet interactive: only
- * Manufacturing is functional this round (docs/context/decisions), Reactions
- * and Planetary are reserved slots for later tickets rather than hidden.
+ * `buildHere` to match. Craft Scope's Manufacturing chip is always lit;
+ * Reactions lights up exactly when `scope` includes it (issue #698 — Include
+ * Reactions on, or the plan's own activity is a reaction), else it reads the
+ * same reserved-and-disabled way it always has. Planetary stays reserved
+ * regardless — a later, unspecced ticket.
  */
 export function CraftSweepControl({
   maxDepth,
+  scope,
   disabled,
   initialStrategy,
   initialDepthChoice,
@@ -58,6 +71,7 @@ export function CraftSweepControl({
   onApply,
 }: CraftSweepControlProps) {
   const { t } = useTranslation();
+  const reactionsEligible = scope.includes('reaction');
   const [strategy, setStrategy] = useState<SweepStrategy>(initialStrategy ?? 'cost-effective');
   // A restored numeric choice can outlive the tree it was measured against
   // (the group's members changed since it was stored) and fall outside this
@@ -135,9 +149,13 @@ export function CraftSweepControl({
             {t('industry.craftScopeManufacturing')}
           </span>
           <span
-            aria-disabled="true"
-            title={t('industry.craftScopeReserved')}
-            className="rounded-xs border border-line bg-panel-2 px-2 py-0.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase opacity-60"
+            aria-disabled={reactionsEligible ? undefined : true}
+            title={reactionsEligible ? undefined : t('industry.craftScopeReactionsDisabledHint')}
+            className={
+              reactionsEligible
+                ? 'rounded-xs border border-accent-dim bg-accent/15 px-2 py-0.5 text-[0.6875rem] font-semibold tracking-widest text-accent uppercase'
+                : 'rounded-xs border border-line bg-panel-2 px-2 py-0.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase opacity-60'
+            }
           >
             {t('industry.craftScopeReactions')}
           </span>

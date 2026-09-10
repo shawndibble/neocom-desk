@@ -976,6 +976,73 @@ describe('BuildPlanDetail reaction plans (issue #460)', () => {
     await user.click(screen.getByRole('button', { name: 'Show details' }));
     expect(screen.getByText('Costs & revenue')).toBeInTheDocument();
   });
+
+  it('never shows the Include Reactions toggle — it reuses its own facility for a nested reaction sub-build', async () => {
+    const user = userEvent.setup();
+    render(<Harness plan={reactionPlan()} catalog={REACTION_CATALOG} />);
+    await openSetup(user);
+
+    expect(screen.queryByRole('checkbox', { name: 'Include Reactions' })).toBeNull();
+  });
+});
+
+describe('BuildPlanDetail Include Reactions (issue #698)', () => {
+  it('shows an off Include Reactions toggle for a manufacturing-activity plan, with no Reaction Location fields', async () => {
+    const user = userEvent.setup();
+    render(<Harness plan={{ runs: 10 }} />);
+    await openSetup(user);
+
+    const toggle = screen.getByRole('checkbox', { name: 'Include Reactions' });
+    expect(toggle).not.toBeChecked();
+    expect(screen.queryByLabelText('Reaction location')).toBeNull();
+  });
+
+  it('turning it on pre-fills the Reaction Location from the Settings default and reveals its controls', async () => {
+    const user = userEvent.setup();
+    const onUpdate = vi.fn();
+    render(<Harness plan={{ runs: 10 }} onUpdate={onUpdate} />);
+    await openSetup(user);
+
+    await user.click(screen.getByRole('checkbox', { name: 'Include Reactions' }));
+
+    expect(onUpdate).toHaveBeenLastCalledWith({
+      includeReactions: true,
+      reactionFacility: 'athanor',
+      reactionRigFit: ['none', 'none', 'none'],
+      reactionFacilityTaxPct: undefined,
+    });
+    expect(await screen.findByLabelText('Reaction location')).toBeInTheDocument();
+  });
+
+  it('turning it off again only clears the flag — the Reaction Location itself is left alone', async () => {
+    const user = userEvent.setup();
+    const onUpdate = vi.fn();
+    render(
+      <Harness
+        plan={{ runs: 10, includeReactions: true, reactionFacility: 'tatara' }}
+        onUpdate={onUpdate}
+      />
+    );
+    await openSetup(user);
+
+    await user.click(screen.getByRole('checkbox', { name: 'Include Reactions' }));
+
+    expect(onUpdate).toHaveBeenLastCalledWith({ includeReactions: false });
+  });
+
+  it("lights up Craft Sweep's Reactions chip once Include Reactions is on", async () => {
+    render(<Harness plan={{ runs: 10, includeReactions: true }} />);
+    await screen.findByText('Tritanium');
+
+    expect(screen.getByText('Reactions')).not.toHaveAttribute('aria-disabled');
+  });
+
+  it("leaves Craft Sweep's Reactions chip disabled while Include Reactions is off", async () => {
+    render(<Harness plan={{ runs: 10 }} />);
+    await screen.findByText('Tritanium');
+
+    expect(screen.getByText('Reactions')).toHaveAttribute('aria-disabled', 'true');
+  });
 });
 
 describe('BuildPlanDetail material price basis', () => {

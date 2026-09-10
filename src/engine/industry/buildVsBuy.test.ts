@@ -396,5 +396,42 @@ describe('buildVsBuy', () => {
       expect(r.jobFee).toEqual(baseline.jobFee);
       expect(r.totalCost).toBeCloseTo(r.materialCost + r.jobFee.total, 6);
     });
+
+    it('resolves a reaction-produced material against reactionFacility, not this plan’s own facility (issue #698)', () => {
+      const reactionFormula: IndustryBlueprint = {
+        ...pyeriteBlueprint,
+        activity: 'reaction',
+      };
+      const withoutReactionFacility = buildVsBuy({
+        ...baseInputs,
+        adjustedPrices: { ...baseInputs.adjustedPrices, 36: 50 },
+        buildHere: [35],
+        recipeFor: recipeFor({ 35: { method: 'reaction', blueprint: reactionFormula } }),
+        materialPrices: { ...baseInputs.hubPrices, 36: 50 },
+      });
+      const withReactionFacility = buildVsBuy({
+        ...baseInputs,
+        adjustedPrices: { ...baseInputs.adjustedPrices, 36: 50 },
+        buildHere: [35],
+        recipeFor: recipeFor({ 35: { method: 'reaction', blueprint: reactionFormula } }),
+        materialPrices: { ...baseInputs.hubPrices, 36: 50 },
+        reactionFacility: {
+          facility: FACILITY_PRESETS.tatara,
+          rigFit: ['none', 'none', 'none'],
+          security: 'highsec',
+          facilityTaxPct: 3,
+          systemCostIndex: 0.15,
+        },
+      });
+
+      const pyerite = withReactionFacility.materials.find((m) => m.typeID === 35);
+      expect(pyerite?.subBuild).toBeDefined();
+      // A configured Reaction Location must move the sub-job's own fee away
+      // from what the plan's own Raitaru/index-0.05 context would have given.
+      expect(withReactionFacility.materialCost).not.toBeCloseTo(
+        withoutReactionFacility.materialCost,
+        0
+      );
+    });
   });
 });
