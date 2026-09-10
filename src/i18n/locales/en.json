@@ -3153,7 +3153,8 @@
       "fileLabel": "Backup file",
       "importButton": "Import backup",
       "importError": "Unable to decrypt file. Check the password and try again.",
-      "importSummary": "Added {{added}} character(s); skipped {{skipped}} already on this device."
+      "importSummary": "Added {{added}} character(s); skipped {{skipped}} already on this device.",
+      "importReloading": "Reloading to pick up the imported data…"
     },
     "defaultsTitle": "Defaults",
     "defaultsSyncHint": "Kept across your devices — set these once, on whichever one you have to hand.",

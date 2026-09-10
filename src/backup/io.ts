@@ -102,30 +102,43 @@ export async function importBackup(fileContents: string, password: string): Prom
   if (!isBackupFile(parsed)) {
     throw new Error('Not a Neocom Desk backup file');
   }
+  // Decrypt outside the transaction — WebCrypto is not a Dexie operation, and
+  // Dexie's `rw` transactions abort if execution steps outside their table
+  // set for too long between operations.
   const payload = (await decryptExportPayload(parsed, password)) as BackupPayload;
 
-  const [existingCharacters, existingSettings] = await Promise.all([
-    db.characters.toArray(),
-    db.settings.toArray(),
-  ]);
-  const existingCharacterIds = new Set(existingCharacters.map((c) => c.characterId));
-  const existingSettingKeys = new Set(existingSettings.map((s) => s.key));
+  // All reads and writes in one transaction: a failure partway through
+  // (a bulkAdd rejection, quota, etc.) must not leave a character's row
+  // written with its token missing, or any other partial import — this
+  // feature exists to recover credentials, not to lose them halfway.
+  return db.transaction(
+    'rw',
+    [db.characters, db.tokens, db.settings, ...EDITABLE_TABLES.map(editableTable)],
+    async () => {
+      const [existingCharacters, existingSettings] = await Promise.all([
+        db.characters.toArray(),
+        db.settings.toArray(),
+      ]);
+      const existingCharacterIds = new Set(existingCharacters.map((c) => c.characterId));
+      const existingSettingKeys = new Set(existingSettings.map((s) => s.key));
 
-  const { toWrite, skippedCharacterIds, skippedSettingKeys } = partitionImport(
-    payload,
-    existingCharacterIds,
-    existingSettingKeys
+      const { toWrite, skippedCharacterIds, skippedSettingKeys } = partitionImport(
+        payload,
+        existingCharacterIds,
+        existingSettingKeys
+      );
+
+      if (toWrite.characters.length) await db.characters.bulkAdd(toWrite.characters);
+      if (toWrite.tokens.length) await db.tokens.bulkAdd(toWrite.tokens);
+      await writeEditableTables(toWrite.editableTables);
+      if (toWrite.settings.length) await db.settings.bulkAdd(toWrite.settings);
+
+      return {
+        addedCharacterIds: toWrite.characters.map((c) => c.characterId),
+        skippedCharacterIds,
+        addedSettingKeys: toWrite.settings.map((s) => s.key),
+        skippedSettingKeys,
+      };
+    }
   );
-
-  if (toWrite.characters.length) await db.characters.bulkAdd(toWrite.characters);
-  if (toWrite.tokens.length) await db.tokens.bulkAdd(toWrite.tokens);
-  await writeEditableTables(toWrite.editableTables);
-  if (toWrite.settings.length) await db.settings.bulkAdd(toWrite.settings);
-
-  return {
-    addedCharacterIds: toWrite.characters.map((c) => c.characterId),
-    skippedCharacterIds,
-    addedSettingKeys: toWrite.settings.map((s) => s.key),
-    skippedSettingKeys,
-  };
 }

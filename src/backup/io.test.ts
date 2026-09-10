@@ -71,4 +71,36 @@ describe('exportBackup / importBackup', () => {
     await expect(importBackup(contents, 'not-the-password')).rejects.toThrow();
     await expect(db.characters.get(5)).resolves.toBeUndefined();
   });
+
+  it('rolls back the whole import if one write in the middle fails', async () => {
+    await db.characters.bulkAdd([{ characterId: 3, name: 'New Alt', ownerHash: 'h3', addedAt: 0 }]);
+    await db.tokens.bulkAdd([
+      { characterId: 3, accessToken: 'a3', refreshToken: 'r3', expiresAt: 0, scopes: [] },
+    ]);
+    await db.skillPlans.bulkAdd([
+      { id: 'conflict', characterId: 3, name: 'Plan', entries: [], remapCount: 0 } as never,
+    ]);
+
+    const { contents } = await exportBackup(PASSWORD);
+
+    // Fresh device: doesn't have character 3 yet, but already has an
+    // unrelated skill plan whose id collides with the one in the backup —
+    // the bulkAdd for `skillPlans` throws partway through the import, after
+    // `characters`/`tokens` would already have been written outside a
+    // transaction.
+    await db.characters.delete(3);
+    await db.tokens.delete(3);
+    await db.skillPlans.clear();
+    await db.skillPlans.bulkAdd([
+      { id: 'conflict', characterId: 99, name: 'Unrelated', entries: [], remapCount: 0 } as never,
+    ]);
+
+    await expect(importBackup(contents, PASSWORD)).rejects.toThrow();
+
+    // Nothing from the failed import was committed, including the character
+    // and token writes that Dexie would otherwise have applied before
+    // reaching the failing table.
+    await expect(db.characters.get(3)).resolves.toBeUndefined();
+    await expect(db.tokens.get(3)).resolves.toBeUndefined();
+  });
 });

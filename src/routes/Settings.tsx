@@ -366,6 +366,14 @@ function ImportPanel() {
       setPassword('');
       setFile(null);
       setStatus('idle');
+      // A newly-added character's token needs `ensureSignedIn`/`planSync` to
+      // run before it's usable, and any imported `sync.` setting is already
+      // on disk but not in the zustand store that read it at boot — same gap
+      // `ResetViewPreferences` above hits, and the same fix: reload once the
+      // pilot has had a moment to read the summary below.
+      if (result.addedCharacterIds.length > 0 || result.addedSettingKeys.length > 0) {
+        setTimeout(() => window.location.reload(), 2000);
+      }
     } catch {
       setStatus('error');
     }
@@ -408,6 +416,8 @@ function ImportPanel() {
               added: summary.addedCharacterIds.length,
               skipped: summary.skippedCharacterIds.length,
             })}
+            {(summary.addedCharacterIds.length > 0 || summary.addedSettingKeys.length > 0) &&
+              ` ${t('settings.backup.importReloading')}`}
           </p>
         )}
       </div>
