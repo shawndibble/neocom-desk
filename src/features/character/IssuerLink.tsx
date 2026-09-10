@@ -1,8 +1,8 @@
 /**
- * Opens the shared Public Info Modal for a contract's issuer — always a
- * character id per ESI's contracts schema, so no `kind` branching like
- * Contacts needs (CONTEXT.md round 49). Shared by the Contracts table and
- * its detail modal so the two button styles never drift.
+ * Opens the shared Public Info Modal for an entity — always a character id
+ * (a contract's issuer, a mail's sender), so no `kind` branching like
+ * Contacts needs (CONTEXT.md round 49). Shared by the Contracts table, its
+ * detail modal, and Mail's reading pane so the button styles never drift.
  */
 import { usePublicInfoModal } from '@/stores/publicInfoModal';
 
