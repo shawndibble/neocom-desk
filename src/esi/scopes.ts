@@ -1,5 +1,8 @@
 /**
- * ESI OAuth scopes for Neocom Desk v1. Read-only by design (see CONTEXT.md).
+ * ESI OAuth scopes for Neocom Desk v1. Read-only by design (see CONTEXT.md),
+ * with one narrow, explicit exception: `esi-mail.organize_mail.v1` (issue
+ * #741) marks a mail read on ESI when it's opened here, so it stays read
+ * after a reload. Every other scope below stays a read.
  * `esi-markets.structure_markets.v1` (issue #538) is opt-in only — behind the
  * `structureMarkets` group, never the base grant — since checking a player
  * structure's own market is a need almost nobody's orders have.

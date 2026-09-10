@@ -71,8 +71,8 @@ export interface EsiFetchOptions {
   etag?: string;
   signal?: AbortSignal;
   /** HTTP method; defaults to GET. */
-  method?: 'GET' | 'POST';
-  /** JSON-serialized as the request body when `method` is 'POST'. */
+  method?: 'GET' | 'POST' | 'PUT';
+  /** JSON-serialized as the request body when `method` is 'POST' or 'PUT'. */
   body?: unknown;
   /**
    * Identifies the call for the activity log (issue #32). Every
@@ -271,6 +271,19 @@ export async function esiFetch<T>(
       };
     }
     if (!response.ok) throw await errorFromResponse(response);
+
+    // A write (PUT) endpoint like the mail-read one (issue #741) answers with
+    // no body at all — `.json()` on that throws a SyntaxError, not a real
+    // failure. Same empty-envelope shape as the 304 branch above.
+    if (response.status === 204) {
+      recordEsiActivity(endpointId, characterId, 'success');
+      return {
+        data: null,
+        etag: response.headers.get('etag'),
+        pages: parsePages(response),
+        expires: response.headers.get('expires'),
+      };
+    }
 
     // Parsed before recordActivity: a body that fails to parse is this
     // request's outcome, not a second event stacked on top of a 'success'

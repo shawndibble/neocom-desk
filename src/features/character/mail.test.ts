@@ -3,7 +3,13 @@ import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { configureEsi, ESI_BASE_URL } from '@/esi/client';
 import { db } from '@/db';
-import { loadMailHeaders, loadMailBody, loadMailLabels, loadMoreMailHeaders } from './mail';
+import {
+  loadMailHeaders,
+  loadMailBody,
+  loadMailLabels,
+  loadMoreMailHeaders,
+  markMailReadOnEsi,
+} from './mail';
 
 const CHAR_ID = 91;
 const server = setupServer();
@@ -165,5 +171,39 @@ describe('loadMailBody', () => {
     const result = await loadMailBody(CHAR_ID, 7);
     expect(result?.data).toEqual(body);
     expect((await db.esiCache.get([CHAR_ID, 'mail:7']))?.value).toEqual(body);
+  });
+});
+
+describe('markMailReadOnEsi', () => {
+  it('PUTs {read:true} to the mail endpoint', async () => {
+    let capturedBody: unknown;
+    server.use(
+      http.put(`${ESI_BASE_URL}/characters/${CHAR_ID}/mail/7/`, async ({ request }) => {
+        capturedBody = await request.json();
+        return new HttpResponse(null, { status: 204 });
+      })
+    );
+
+    await markMailReadOnEsi(CHAR_ID, 7);
+
+    expect(capturedBody).toEqual({ read: true });
+  });
+
+  it('resolves rather than throwing when the write fails — fire-and-forget', async () => {
+    server.use(
+      http.put(`${ESI_BASE_URL}/characters/${CHAR_ID}/mail/7/`, () =>
+        HttpResponse.json({ error: 'missing scope' }, { status: 403 })
+      )
+    );
+
+    await expect(markMailReadOnEsi(CHAR_ID, 7)).resolves.toBeUndefined();
+  });
+
+  it('resolves rather than throwing on a network failure', async () => {
+    server.use(
+      http.put(`${ESI_BASE_URL}/characters/${CHAR_ID}/mail/7/`, () => HttpResponse.error())
+    );
+
+    await expect(markMailReadOnEsi(CHAR_ID, 7)).resolves.toBeUndefined();
   });
 });

@@ -81,6 +81,12 @@ const server = setupServer(
       read: false,
       recipients: [{ recipient_id: 90000003, recipient_type: 'character' }],
     })
+  ),
+  // Default success for the mark-read write (issue #741) — tests that care
+  // about its request body/URL override this per-test.
+  http.put(
+    'https://esi.evetech.net/characters/:characterId/mail/:mailId/',
+    () => new HttpResponse(null, { status: 204 })
   )
 );
 
@@ -473,7 +479,7 @@ describe('Mail', () => {
     expect(screen.getByText('Market report')).toBeInTheDocument();
   });
 
-  it('locally marks a mail read on selection without writing back to ESI, and can hide read mail', async () => {
+  it('locally marks a mail read on selection, and can hide read mail', async () => {
     const user = userEvent.setup();
     render(<App />);
     const fleetSubject = await screen.findByText('Fleet up!');
@@ -489,6 +495,61 @@ describe('Mail', () => {
     expect(screen.queryByText('Fleet up!')).not.toBeInTheDocument();
     // The already-read fixture header ('Market report') is also hidden now.
     expect(screen.queryByText('Market report')).not.toBeInTheDocument();
+  });
+
+  it('marks the mail read on ESI too, so it survives a real reload (issue #741)', async () => {
+    let capturedBody: unknown;
+    let requestCount = 0;
+    server.use(
+      http.put(`https://esi.evetech.net/characters/${CHAR_ID}/mail/1/`, async ({ request }) => {
+        requestCount += 1;
+        capturedBody = await request.json();
+        return new HttpResponse(null, { status: 204 });
+      })
+    );
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(await screen.findByText('Fleet up!'));
+
+    await waitFor(() => expect(requestCount).toBe(1));
+    expect(capturedBody).toEqual({ read: true });
+  });
+
+  it('does not write to ESI for a mail ESI already reports read', async () => {
+    let requestCount = 0;
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/mail/2`, () =>
+        HttpResponse.json({ from: 90000002, subject: 'Market report', body: 'Prices.', read: true })
+      ),
+      http.put(`https://esi.evetech.net/characters/${CHAR_ID}/mail/2/`, () => {
+        requestCount += 1;
+        return new HttpResponse(null, { status: 204 });
+      })
+    );
+    const user = userEvent.setup();
+    render(<App />);
+
+    // 'Market report' (mail_id 2) is `is_read: true` in the fixture already.
+    await user.click(await screen.findByText('Market report'));
+    await screen.findByText('Prices.');
+
+    expect(requestCount).toBe(0);
+  });
+
+  it('does not block or error the UI when the ESI write fails', async () => {
+    server.use(
+      http.put(`https://esi.evetech.net/characters/${CHAR_ID}/mail/1/`, () => HttpResponse.error())
+    );
+    const user = userEvent.setup();
+    render(<App />);
+    const fleetSubject = await screen.findByText('Fleet up!');
+    const fleetRow = fleetSubject.closest('li') as HTMLElement;
+
+    await user.click(fleetSubject);
+
+    expect(await screen.findByText('Undock now.')).toBeInTheDocument();
+    expect(within(fleetRow).getByText('Fleet up!')).toHaveClass('font-normal', 'text-text-dim');
   });
 
   it("resolves a mailing list's real name instead of the generic fallback", async () => {

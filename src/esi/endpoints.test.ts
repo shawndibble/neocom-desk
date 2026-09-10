@@ -24,6 +24,7 @@ import {
   getUniverseSystem,
   getCharacterMailHeaders,
   getCharacterMail,
+  putCharacterMail,
   postUniverseNames,
   postCharactersAffiliation,
   getCharacterCalendar,
@@ -586,6 +587,23 @@ describe('mail', () => {
 
     expect(result.data?.body).toBe('Hi <b>there</b>');
     expect(result.data?.read).toBe(true);
+  });
+
+  it('putCharacterMail PUTs {read:true} to the trailing-slash route and resolves on 204', async () => {
+    let capturedBody: unknown;
+    server.use(
+      http.put(`${ESI_BASE_URL}/characters/${CHARACTER_ID}/mail/1/`, async ({ request }) => {
+        const bad = rejectBadEsiHeaders(request);
+        if (bad) return bad;
+        capturedBody = await request.json();
+        return new HttpResponse(null, { status: 204 });
+      })
+    );
+
+    const result = await putCharacterMail(CHARACTER_ID, 1, { read: true });
+
+    expect(capturedBody).toEqual({ read: true });
+    expect(result.data).toBeNull();
   });
 });
 

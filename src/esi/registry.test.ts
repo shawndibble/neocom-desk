@@ -58,7 +58,7 @@ describe('parity with the endpoints.ts marker comments', () => {
   // swapping two endpoints' routes has to fail here.
   const markers = [
     ...endpointsSource.matchAll(
-      /^\/\/ --- (?:GET|POST) (\S+) \(([^)]+)\) ---$[\s\S]*?^export (?:async )?function (\w+)/gm
+      /^\/\/ --- (?:GET|POST|PUT) (\S+) \(([^)]+)\) ---$[\s\S]*?^export (?:async )?function (\w+)/gm
     ),
   ].map(([, route, scope, name]) => ({ name, route, scope }));
 

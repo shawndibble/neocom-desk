@@ -800,6 +800,7 @@
   "login": {
     "button": "Log in with EVE Online",
     "permissionsHint": "Signing in grants read-only access to your skills and training queue, wallet, assets, blueprints, industry jobs, mining ledger, market orders, contracts, mail, calendar, contacts, clones and implants, planetary colonies, loyalty points, notifications, current location, corporation roles, and the player structures you can dock at — both their names and a search across them, which is how a build location is picked. EVE's consent screen lists the planetary scope as \"manage your planetary installations\" — Neocom Desk only reads that data and never writes to it. Corporation data is a separate grant, requested only if you open the corporation pages. Log in again after an update to pick up newly requested permissions.",
+    "mailWriteException": "One exception: opening a mail in this app also marks it read in EVE, so it won't show as unread again after a refresh. That's the only write this app ever makes.",
     "eyebrow": "Read-only · Free · Open source",
     "heading": "Command deck for every character you fly.",
     "trustLine": "Read-only access. Your refresh token never leaves this device.",
@@ -903,7 +904,7 @@
     "trust": {
       "readOnly": {
         "name": "It never writes to your account",
-        "desc": "No order is placed, no mail is sent, no colony is touched. Every scope it asks for is a read."
+        "desc": "No order is placed, no colony is touched, and nothing else about your mail is changed."
       },
       "token": {
         "name": "Your refresh token stays in this browser",
@@ -2999,7 +3000,7 @@
         },
         "local": {
           "title": "Kept on this device only",
-          "description": "Everything Neocom Desk reads from EVE is cached in this browser and refetched from ESI when it goes stale. None of it is uploaded.",
+          "description": "Everything Neocom Desk reads from EVE is cached in this browser and refetched from ESI when it goes stale. None of it is uploaded. The one thing Neocom Desk writes back to your account: opening a mail here marks it read in EVE too, so it stays read after you reload. Nothing else — no orders, no messages, no colony changes — is ever written.",
           "esi": "Your assets, wallet, contracts, mail, contacts, clones, calendar, skills, skill queue, industry jobs and colonies.",
           "corp": "Everything on the Corporation pages — wallet, members, structures, assets and moon extractions.",
           "market": "Market prices, order books and the LP store.",
