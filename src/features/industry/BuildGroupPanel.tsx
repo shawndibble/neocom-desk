@@ -18,7 +18,7 @@ import { useTranslation } from 'react-i18next';
 import { Button, EmptyState, Panel, Spinner } from '@/components/ui';
 import type { BuildPlanRecord } from '@/db';
 import { rollUpBuildGroup, type BuildGroupMember } from '@/engine/industry/groupRollup';
-import type { BuildResult, MaterialCostLine, SkillLevels } from '@/engine/industry/types';
+import type { MaterialCostLine, SkillLevels } from '@/engine/industry/types';
 import type { CharacterBlueprint } from '@/esi/endpoints';
 import { writeToClipboard } from '@/lib/clipboard';
 import { formatDuration } from '@/lib/duration';
@@ -28,42 +28,11 @@ import type { PiData } from '@/sde/types';
 import { nameForType, toIndustryBlueprint, type BlueprintCatalog } from './blueprintCatalog';
 import type { BuildGroup } from './buildGroups';
 import type { OwnedStockSnapshot } from './ownedStockDetection';
+import { flattenBuildResult } from './resultFlattenCache';
 import { hasShoppingList, shoppingListText } from './shoppingList';
-import { materialTableRows, shoppingListMaterials } from './subBuildPlan';
 import { useComparedBuildResults } from './useComparedBuildResults';
 import { useDetectedOwnedStock } from './useDetectedOwnedStock';
 import { RetargetGroupDialog, type RetargetTarget } from './RetargetGroupDialog';
-
-/**
- * Each member's resolved tree, flattened the two ways the rollup needs.
- *
- * `useComparedBuildResults` settles each member into `rows` on its own, so
- * `rows` gets a fresh identity per settle — and without this every
- * already-settled member was re-flattened on each one. A 25-member fit did
- * ~650 material-tree walks to do 25 members' work. Members sharing a hub now
- * share one fetch and so tend to settle together, which shortens that run but
- * does not remove it: a mixed-hub group still settles hub by hub.
- *
- * Module-level and keyed on the `BuildResult` itself: a result is replaced
- * wholesale when its plan is repriced, so a cache entry is valid exactly as
- * long as the object it hangs off, and dies with it. Deliberately not
- * `useRef(new WeakMap())`, which allocates a map per render to throw away.
- */
-const flattenedByResult = new WeakMap<
-  BuildResult,
-  { shopping: MaterialCostLine[]; table: MaterialCostLine[] }
->();
-
-function flattenOnce(result: BuildResult) {
-  const cached = flattenedByResult.get(result);
-  if (cached) return cached;
-  const flattened = {
-    shopping: shoppingListMaterials(result.materials),
-    table: materialTableRows(result.materials),
-  };
-  flattenedByResult.set(result, flattened);
-  return flattened;
-}
 
 /** The whole-group copy control's key in `copyState`; no hub can collide with it. */
 const GROUP_COPY = 'group';
@@ -120,7 +89,7 @@ export function BuildGroupPanel({
       // nothing rather than contributing zeroes — a total that silently counts
       // a failed member as free is worse than one that says it is incomplete.
       if (!plan || !row.result) return [];
-      const flattened = flattenOnce(row.result);
+      const flattened = flattenBuildResult(row.result);
       return [
         {
           planId: row.planId,
