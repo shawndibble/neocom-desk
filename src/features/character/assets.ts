@@ -77,17 +77,19 @@ async function fanOutCharacterAssets(
 }
 
 /**
- * Every OTHER authenticated Character's assets, for the Assets page's
- * cross-character search toggle (issue #85) — the toggle degrades per
- * Character rather than failing as a whole.
+ * The given Characters' assets, for the Assets page's cross-character
+ * `CharacterFilterControl` (issue #746, replacing issue #85's all-or-nothing
+ * toggle) — a Character degrades individually rather than failing the whole
+ * fetch.
  */
 export async function loadOtherCharactersAssets(
-  activeCharacterId: number
+  characterIds: readonly number[]
 ): Promise<OtherCharacterAssets[]> {
+  const ids = new Set(characterIds);
   const characters = await db.characters.toArray();
-  const others = characters.filter((c) => c.characterId !== activeCharacterId);
-  const { entries } = await fanOutCharacterAssets(others);
-  // Narrowed back to this function's own shape: the toggle has no use for the
+  const matching = characters.filter((c) => ids.has(c.characterId));
+  const { entries } = await fanOutCharacterAssets(matching);
+  // Narrowed back to this function's own shape: the filter has no use for the
   // completeness detail, and its callers compare these objects wholesale.
   return entries.map(({ characterId, name, assets }) => ({ characterId, name, assets }));
 }
