@@ -126,6 +126,11 @@ describe('movingAverage', () => {
     expect(movingAverage([], 7)).toEqual([]);
   });
 
+  it('returns an empty array rather than throwing for a non-positive window', () => {
+    expect(movingAverage(points, 0)).toEqual([]);
+    expect(movingAverage(points, -1)).toEqual([]);
+  });
+
   it('does not mutate the input array', () => {
     const original = [...points];
     movingAverage(points, 3);

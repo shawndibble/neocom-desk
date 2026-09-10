@@ -221,6 +221,6 @@ describe('PriceHistoryPanel', () => {
     await waitFor(() => expect(screen.getByTestId('chart')).toBeInTheDocument());
     await user.click(screen.getByRole('combobox', { name: 'Range' }));
     await user.click(await screen.findByRole('option', { name: '7 days' }));
-    expect(screen.getByTestId('chart')).not.toHaveTextContent('1 ma points');
+    expect(screen.getByTestId('chart')).toHaveTextContent('5 ma points');
   });
 });

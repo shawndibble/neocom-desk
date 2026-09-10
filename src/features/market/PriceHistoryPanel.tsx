@@ -19,6 +19,10 @@ import {
   type MarketHistoryPoint,
   type PriceHistoryRange,
 } from '@/engine/market/priceHistory';
+import { usePriceHistoryRange } from './priceHistoryRangePref';
+
+const MOVING_AVERAGE_WINDOW_DAYS = 7;
+const MOVING_AVERAGE_WINDOW_DAYS_7D_RANGE = 3;
 
 /**
  * A 7-day window on the 7d range itself collapses to a single point —
@@ -26,9 +30,8 @@ import {
  * Use a shorter window there instead of hiding the line entirely.
  */
 function movingAverageWindowDays(range: PriceHistoryRange): number {
-  return range === '7d' ? 3 : 7;
+  return range === '7d' ? MOVING_AVERAGE_WINDOW_DAYS_7D_RANGE : MOVING_AVERAGE_WINDOW_DAYS;
 }
-import { usePriceHistoryRange } from './priceHistoryRangePref';
 
 /**
  * Dynamic import, not a static one: `PriceHistoryChart.tsx` statically
@@ -153,9 +156,7 @@ function RangedHistory({ points, range, onRangeChange, itemName, now }: RangedHi
   const filteredMovingAverage = useMemo(() => {
     const windowDays = movingAverageWindowDays(range);
     const fullMovingAverage = movingAverage(points, windowDays);
-    return now
-      ? filterPriceHistoryRange(fullMovingAverage, range, now)
-      : filterPriceHistoryRange(fullMovingAverage, range);
+    return filterPriceHistoryRange(fullMovingAverage, range, now);
   }, [points, range, now]);
 
   return (

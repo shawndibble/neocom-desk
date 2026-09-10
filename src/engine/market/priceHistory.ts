@@ -72,6 +72,7 @@ export function movingAverage(
   points: readonly MarketHistoryPoint[],
   windowDays: number
 ): MovingAveragePoint[] {
+  if (windowDays <= 0) return [];
   const result: MovingAveragePoint[] = [];
   for (let i = windowDays - 1; i < points.length; i++) {
     let sum = 0;
