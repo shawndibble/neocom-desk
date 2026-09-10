@@ -145,6 +145,15 @@ describe('Clones', () => {
     expect(screen.getByText(/Until/)).toBeInTheDocument();
   });
 
+  it('links each implant name to its Market listing, unlike the plain-text empty state', async () => {
+    render(<App />);
+    expect(
+      await screen.findByRole('link', { name: 'High-grade Ascendancy Alpha' })
+    ).toHaveAttribute('href', '/market?type=19540');
+    expect(screen.getByText('No implants')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'No implants' })).not.toBeInTheDocument();
+  });
+
   it('surfaces the home station and last jump-clone-change date', async () => {
     render(<App />);
     await screen.findByText('High-grade Ascendancy Alpha');
