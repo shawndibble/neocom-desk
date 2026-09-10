@@ -1,13 +1,18 @@
 /**
- * Corp assets, grouped division-first (issue #330).
+ * Corp assets, grouped division-first (issue #330), now onto the same
+ * virtualized tree engine `/assets` uses (issue #779).
  *
- * `AssetTreeStation`/`AssetTreeNode` (`engine/assetTree.ts`) have no level
- * between a station and a container — division lives in `location_flag`
- * (`CorpSAG1`..`CorpSAG7`), and that engine's only `location_flag` grouping,
- * `bayKindFor`, returns null for every one of them. A corp assets surface
- * needs division as its top axis instead of a station/container tree, so it
- * gets its own grouping here rather than bolting a case onto the personal
- * tree (CONTEXT.md round 41).
+ * Round 41/44 (CONTEXT.md) rejected reusing `engine/assetTree.ts`: division
+ * lives in `location_flag` (`CorpSAG1`..`CorpSAG7`), which has no `item_id`
+ * to key a URL segment on, and that engine had no grouping level between a
+ * station and a container to express it. That reasoning didn't account for
+ * the fact the tree engine already solves an identical problem for bay
+ * nodes — grouped by `location_flag`, addressed by kind rather than an asset
+ * id it doesn't have (`AssetTreeBayNode`, `assetNodeSegment`'s `b:${bay}`).
+ * `buildAssetGroups` (`engine/assetTree.ts`) generalizes exactly that
+ * mechanism to an arbitrary top-level grouping, so this module is now a thin
+ * division-shaped adapter over it rather than its own flat implementation —
+ * see `docs/context/decisions/` for the decision reversing round 41/44.
  *
  * Pure (CLAUDE.md): no `fetch`/DOM/Dexie import, and no `@/esi/endpoints`
  * import either — `features/corp/assets.ts` adapts ESI's `CorporationAsset`
@@ -15,6 +20,7 @@
  * at the boundary, the same split `engine/corp/members.ts` makes for
  * `MemberActivity`.
  */
+import { buildAssetGroups, type AssetTreeGroup, type EngineAsset } from '../assetTree';
 
 /** The seven hangar divisions every corporation has, in order. */
 export const HANGAR_DIVISIONS = [1, 2, 3, 4, 5, 6, 7] as const;
@@ -47,10 +53,9 @@ const FLAG_GROUP_ORDER: readonly CorpAssetFlagKind[] = [
 ];
 
 /**
- * Every `CorpAssetGroupId` this module knows about, for a caller that needs
- * to validate one (`assetsExpandPreference.ts`'s stored-value parser) without
- * re-enumerating the union by hand — an 8th division or a new flag kind then
- * only has to be added here.
+ * Every `CorpAssetGroupId` this module knows about, in the fixed order
+ * `buildCorpAssetTree` and `engine/corp/assetPath.ts`'s URL parser both need
+ * — an 8th division or a new flag kind then only has to be added here.
  */
 export const ALL_CORP_ASSET_GROUP_IDS: readonly CorpAssetGroupId[] = [
   ...HANGAR_DIVISIONS,
@@ -74,94 +79,46 @@ export function corpAssetGroupId(locationFlag: string): CorpAssetGroupId {
   return FLAG_KIND_BY_LOCATION_FLAG[locationFlag] ?? 'other';
 }
 
-/** What `features/corp/assets.ts` adapts each `CorporationAsset` into. */
+/** What `features/corp/assets.ts` adapts each `CorporationAsset` into — structurally `EngineAsset` under different field names, the same split `toCharacterEngineAsset`-style boundary code makes elsewhere. */
 export interface CorpAssetInput {
   itemId: number;
   typeId: number;
   quantity: number;
   locationId: number;
+  locationType: EngineAsset['location_type'];
   locationFlag: string;
 }
 
-/** One row inside a group. `locationFlag` is gone — the group it landed in already says that. */
-export interface CorpAssetRow {
-  itemId: number;
-  typeId: number;
-  quantity: number;
-  locationId: number;
-}
-
-export interface CorpAssetGroup {
-  id: CorpAssetGroupId;
-  rows: CorpAssetRow[];
-}
-
-function toRow(asset: CorpAssetInput): CorpAssetRow {
+function toEngineAsset(asset: CorpAssetInput): EngineAsset {
   return {
-    itemId: asset.itemId,
-    typeId: asset.typeId,
+    item_id: asset.itemId,
+    type_id: asset.typeId,
     quantity: asset.quantity,
-    locationId: asset.locationId,
+    location_id: asset.locationId,
+    location_type: asset.locationType,
+    location_flag: asset.locationFlag,
   };
 }
 
 /**
- * Groups every asset by division, or by its special flag when it has one.
- *
- * The seven hangar divisions are always present, in order, even when a
- * corporation has nothing in one of them — "seven hangar divisions as the top
- * axis" (the issue) means seven, not however many happen to be occupied. The
- * flag groups and `other` are the opposite: sibling groups that appear only
- * when the corporation actually has something in them, in a fixed order after
- * the seven divisions (CONTEXT.md round 44).
+ * The corp assets tree: divisions/flag groups as `buildAssetGroups`' top
+ * axis, exactly `ALL_CORP_ASSET_GROUP_IDS`'s order. The seven hangar
+ * divisions are always present even when empty ("seven hangar divisions as
+ * the top axis" — the issue); the flag groups and `other` are the opposite,
+ * appearing only when the corporation actually has something in them
+ * (CONTEXT.md round 44). Beneath each root, a container/ship/bay recurses
+ * exactly as `/assets`' own tree does — a container placed in a division
+ * shows its contents nested inside it, not flag-bucketed separately.
  */
-export function groupCorpAssets(assets: readonly CorpAssetInput[]): CorpAssetGroup[] {
-  const rowsById = new Map<CorpAssetGroupId, CorpAssetRow[]>();
-  for (const asset of assets) {
-    const id = corpAssetGroupId(asset.locationFlag);
-    const rows = rowsById.get(id);
-    if (rows) rows.push(toRow(asset));
-    else rowsById.set(id, [toRow(asset)]);
-  }
-
-  const groups: CorpAssetGroup[] = HANGAR_DIVISIONS.map((division) => ({
-    id: division,
-    rows: rowsById.get(division) ?? [],
-  }));
-
-  for (const flagKind of [...FLAG_GROUP_ORDER, 'other' as const]) {
-    const rows = rowsById.get(flagKind);
-    if (rows && rows.length > 0) groups.push({ id: flagKind, rows });
-  }
-
-  return groups;
-}
-
-/**
- * The same "resolved name, else the raw id" text the item column, the search
- * filter below, and the row context menu all print — one place so the three
- * cannot drift apart from each other.
- */
-export function corpAssetItemName(typeId: number, typeNames: ReadonlyMap<number, string>): string {
-  return typeNames.get(typeId) ?? `#${typeId}`;
-}
-
-/**
- * Search-time row filter (issue #420). Groups are never dropped, even to
- * zero rows — the view decides what a zero-row group means (a match found
- * elsewhere, or genuinely nothing here), this only narrows each group's rows.
- */
-export function filterCorpAssetGroups(
-  groups: readonly CorpAssetGroup[],
-  typeNames: ReadonlyMap<number, string>,
-  query: string
-): CorpAssetGroup[] {
-  const q = query.trim().toLowerCase();
-  if (!q) return [...groups];
-  return groups.map((group) => ({
-    id: group.id,
-    rows: group.rows.filter((row) =>
-      corpAssetItemName(row.typeId, typeNames).toLowerCase().includes(q)
-    ),
-  }));
+export function buildCorpAssetTree(
+  inputs: readonly CorpAssetInput[],
+  priceByTypeId: ReadonlyMap<number, number> = new Map()
+): AssetTreeGroup<CorpAssetGroupId>[] {
+  return buildAssetGroups(
+    inputs.map(toEngineAsset),
+    ALL_CORP_ASSET_GROUP_IDS,
+    new Set(HANGAR_DIVISIONS),
+    (asset) => corpAssetGroupId(asset.location_flag),
+    priceByTypeId
+  );
 }

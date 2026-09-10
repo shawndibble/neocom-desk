@@ -104,6 +104,8 @@ interface LocationRowProps {
   onTogglePin: () => void;
   /** Set when this "location" is really an orphan group — an asset whose parent wasn't in the fetch. */
   unresolvedParent?: boolean;
+  /** Corp assets has no pinning concept (no device-local "current owner" to pin per) — hides the pin control entirely rather than rendering one nothing can toggle meaningfully. */
+  showPin?: boolean;
   selectMode: boolean;
   selectionState: SelectionState;
   onToggleSelection: () => void;
@@ -125,6 +127,7 @@ export function LocationRow({
   pinState,
   onTogglePin,
   unresolvedParent = false,
+  showPin = true,
   selectMode,
   selectionState,
   onToggleSelection,
@@ -170,7 +173,7 @@ export function LocationRow({
         </span>
         <Icon.Descend size={Icon.ICON_SIZE.md} className="shrink-0 text-text-faint" />
       </Link>
-      {!unresolvedParent && (
+      {!unresolvedParent && showPin && (
         <IconButton
           icon={
             <Icon.Pin

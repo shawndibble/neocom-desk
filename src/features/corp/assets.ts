@@ -55,8 +55,12 @@ export function loadCorporationAssets(
  * The boundary adaptation (ARCHITECTURE.md): ESI's snake_case
  * `CorporationAsset` becomes `engine/corp/assetDivisions.ts`'s
  * `CorpAssetInput`, the same split `members.ts`'s `toMemberActivity` makes
- * for `MemberActivity`. `location_type` and `is_singleton`/`is_blueprint_copy`
- * are dropped: the division grouping only ever reads `location_flag`.
+ * for `MemberActivity`. `is_singleton`/`is_blueprint_copy` are still
+ * dropped — the tree engine tells a container from a leaf by whether
+ * anything else's `location_id` points at it, not by this flag — but
+ * `location_type` now carries through: `buildCorpAssetTree` (issue #779)
+ * needs it to tell a division's own top-level roots from an asset nested
+ * inside a container placed in one.
  */
 export function toCorpAssetInputs(assets: readonly CorporationAsset[]): CorpAssetInput[] {
   return assets.map((asset) => ({
@@ -64,6 +68,7 @@ export function toCorpAssetInputs(assets: readonly CorporationAsset[]): CorpAsse
     typeId: asset.type_id,
     quantity: asset.quantity,
     locationId: asset.location_id,
+    locationType: asset.location_type,
     locationFlag: asset.location_flag,
   }));
 }
