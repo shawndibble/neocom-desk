@@ -459,6 +459,28 @@ export function StopTierRow({
   );
 }
 
+/**
+ * The card-only line that keeps "Build up to" from reading as a bigger
+ * version of "Do this" above it (#702). Both rows can be true at once and
+ * about wildly different numbers, because they answer different questions:
+ * "Do this" is what to add given every colony's supply, "Build up to" is
+ * what *this planet alone* would earn rebuilt around one resource, ignoring
+ * the others entirely (ADR 0012). Silent when there is nothing to
+ * disambiguate — already-best and blocked results don't propose a rebuild.
+ */
+export function StopTierCardHint({
+  result,
+  extractedPerHour,
+}: {
+  result: ColonyStopTierAdvice;
+  extractedPerHour: readonly { typeId: number; unitsPerHour: number }[];
+}) {
+  const { t } = useTranslation();
+  if (result.status !== 'advised' || result.advice.kind !== 'recommended') return null;
+  if (isAlreadyBest(result, extractedPerHour)) return null;
+  return <p className="text-[0.6875rem] text-text-faint">{t('piAdvisor.stopTierCardHint')}</p>;
+}
+
 /** The sentence under a `StopTierRow`, in the modal only. */
 export function StopTierNote({
   result,

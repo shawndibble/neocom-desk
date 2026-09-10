@@ -154,6 +154,33 @@ export function buildAppraisal(items: readonly AppraisalItem[], pricePercent: nu
   };
 }
 
+/** One Trade Hub's row in the Compare Hubs table: both sides, at the given percentage. */
+export interface HubComparisonTotals {
+  /** Null when nothing among the items has a buy price at this hub — a dash, not a 0. */
+  buy: number | null;
+  /** Null when nothing among the items has a sell price at this hub — a dash, not a 0. */
+  sell: number | null;
+}
+
+/**
+ * Collapses `buildAppraisal`'s totals to the two figures a Compare Hubs row
+ * needs. `buildAppraisal` already excludes an unpriced row from a side's
+ * total rather than treating it as free, but its total is still `0` for a
+ * side nothing priced on — indistinguishable from "everything here is
+ * genuinely worth nothing". This turns that case to `null` too, so the whole
+ * hub column reads as a dash rather than a misleadingly precise 0.
+ */
+export function buildHubComparison(
+  items: readonly AppraisalItem[],
+  pricePercent: number
+): HubComparisonTotals {
+  const { totals } = buildAppraisal(items, pricePercent);
+  return {
+    buy: items.some((item) => item.buy !== null) ? totals.buy : null,
+    sell: items.some((item) => item.sell !== null) ? totals.sell : null,
+  };
+}
+
 /** What one item's reprocessing data looks like, resolved from the SDE bake. */
 export interface AppraisalReprocessingEntry {
   portionSize: number;

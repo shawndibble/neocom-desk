@@ -165,6 +165,7 @@ describe('useComparedBuildResults', () => {
         runs: 5,
         loading: false,
         result: RESULT,
+        groupResult: null,
         error: null,
       },
       {
@@ -174,6 +175,7 @@ describe('useComparedBuildResults', () => {
         runs: 10,
         loading: false,
         result: RESULT,
+        groupResult: null,
         error: null,
       },
     ]);
@@ -270,6 +272,30 @@ describe('useComparedBuildResults', () => {
     await waitFor(() => expect(result.current.every((row) => !row.loading)).toBe(true));
   });
 
+  it(
+    'recomputes an existing member when its own buildHere/updatedAt changes, same list length — ' +
+      "the mechanism a Build Group's rollup (issue #696) depends on for a manual craft/buy edit, " +
+      'or a group Craft Sweep, to show up in the group total on next open',
+    async () => {
+      const catalog = catalogWith([entry({ blueprintTypeID: 100 })]);
+      const { rerender } = renderHook(
+        (props: UseComparedBuildResultsArgs) => useComparedBuildResults(props),
+        { initialProps: { plans: [plan({ id: 'a', updatedAt: 1 })], catalog, ...baseArgs } }
+      );
+
+      await waitFor(() => expect(mockedCompute).toHaveBeenCalledTimes(1));
+
+      rerender({
+        plans: [plan({ id: 'a', updatedAt: 2, buildHere: [999] })],
+        catalog,
+        ...baseArgs,
+      });
+
+      await waitFor(() => expect(mockedCompute).toHaveBeenCalledTimes(2));
+      expect(mockedCompute.mock.calls[1]?.[0]?.plan.buildHere).toEqual([999]);
+    }
+  );
+
   it("prices each row at its own plan's material price basis", async () => {
     // Compare has to agree with the plan's own detail panel: a buy-basis plan
     // shown beside a sell-basis one must not quietly quote both at sell.
@@ -334,6 +360,56 @@ describe('useComparedBuildResults', () => {
     expect(call?.recipeFor?.(300)).toEqual(
       expect.objectContaining({ method: 'manufacturing', me: 7 })
     );
+  });
+
+  it('leaves groupResult null and never calls computeBuildPlan a second time when computeGroupResult is not requested', async () => {
+    const catalog = catalogWith([entry({ blueprintTypeID: 100 })]);
+    const plans = [plan({ id: 'a' })];
+
+    const { result } = renderHook(() => useComparedBuildResults({ plans, catalog, ...baseArgs }));
+    await waitFor(() => expect(result.current[0]?.loading).toBe(false));
+
+    expect(result.current[0]?.groupResult).toBeNull();
+    expect(mockedCompute).toHaveBeenCalledTimes(1);
+  });
+
+  it('computes a second, owned-stock-disabled result per plan when computeGroupResult is set (issue #697)', async () => {
+    const GROUP_RESULT: BuildResult = { ...RESULT, materialCost: 900, totalCost: 965 };
+    mockedCompute.mockImplementation(({ ignoreOwnedStock }) => ({
+      result: ignoreOwnedStock ? GROUP_RESULT : RESULT,
+      error: null,
+    }));
+    const catalog = catalogWith([entry({ blueprintTypeID: 100 })]);
+    const plans = [plan({ id: 'a' })];
+
+    const { result } = renderHook(() =>
+      useComparedBuildResults({ plans, catalog, ...baseArgs, computeGroupResult: true })
+    );
+    await waitFor(() => expect(result.current[0]?.loading).toBe(false));
+
+    expect(result.current[0]?.result).toEqual(RESULT);
+    expect(result.current[0]?.groupResult).toEqual(GROUP_RESULT);
+    expect(mockedCompute).toHaveBeenCalledTimes(2);
+    expect(mockedCompute.mock.calls.some(([args]) => args.ignoreOwnedStock === true)).toBe(true);
+  });
+
+  it("surfaces the group computation's own error on the row when the primary computation succeeds but the group one fails (issue #697)", async () => {
+    mockedCompute.mockImplementation(({ ignoreOwnedStock }) =>
+      ignoreOwnedStock
+        ? { result: null, error: 'group compute failed' }
+        : { result: RESULT, error: null }
+    );
+    const catalog = catalogWith([entry({ blueprintTypeID: 100 })]);
+    const plans = [plan({ id: 'a' })];
+
+    const { result } = renderHook(() =>
+      useComparedBuildResults({ plans, catalog, ...baseArgs, computeGroupResult: true })
+    );
+    await waitFor(() => expect(result.current[0]?.loading).toBe(false));
+
+    expect(result.current[0]?.result).toEqual(RESULT);
+    expect(result.current[0]?.groupResult).toBeNull();
+    expect(result.current[0]?.error).toBe('group compute failed');
   });
 
   it('waits for the assumedMe setting to hydrate before fetching, instead of fetching once at the default and again once hydrated', async () => {

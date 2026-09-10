@@ -3,11 +3,11 @@ import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { FUZZWORK_AGGREGATES_URL } from '@/market/fuzzwork';
 import { clearMarketPriceCache } from '@/market/prices';
-import { DEFAULT_TRADE_HUB } from '@/market/hubs';
+import { DEFAULT_TRADE_HUB, TRADE_HUBS } from '@/market/hubs';
 import { SKILL_IDS } from '@/engine/industry/types';
 import { loadReprocessing } from '@/sde/loadSde';
 import { loadCorrectedSkills, type CorrectedSkills } from '@/features/skills/correctedSkills';
-import { appraisePaste, clearAppraisalCatalogue } from './appraisalData';
+import { appraisePaste, clearAppraisalCatalogue, compareHubs } from './appraisalData';
 
 vi.mock('@/sde/loadMarketSde', () => ({
   loadMarketTypes: vi.fn(async () => [
@@ -237,5 +237,63 @@ describe('appraisePaste', () => {
       const expected = Math.floor(415 * 10 * efficiency) * 5.41;
       expect(appraisal.rows[0].refineTotal).toBeCloseTo(expected, 6);
     });
+  });
+});
+
+describe('compareHubs', () => {
+  it('prices the pile at every Trade Hub, one batched call each', async () => {
+    let hits = 0;
+    server.use(
+      http.get(FUZZWORK_AGGREGATES_URL, () => {
+        hits += 1;
+        return HttpResponse.json(PRICED);
+      })
+    );
+
+    const rows = await compareHubs('Damage Control II\t3', 90);
+
+    expect(hits).toBe(TRADE_HUBS.length);
+    expect(rows.map((row) => row.hub)).toEqual(TRADE_HUBS);
+    // Same aggregate served for every hub in this fixture, so every row
+    // matches the primary appraisal's own totals at the same percentage.
+    for (const row of rows) {
+      expect(row.buy).toBe(1_345_950);
+      expect(row.sell).toBe(1_382_400);
+    }
+  });
+
+  it('reports a hub with no orders on a side as null, not zero', async () => {
+    server.use(aggregates(PRICED));
+
+    const rows = await compareHubs('Civilian Gatling Railgun\t4', 100);
+
+    for (const row of rows) {
+      expect(row.buy).toBeNull();
+      expect(row.sell).toBe(4_000);
+    }
+  });
+
+  it('makes no price request for a paste that matches nothing', async () => {
+    let hits = 0;
+    server.use(
+      http.get(FUZZWORK_AGGREGATES_URL, () => {
+        hits += 1;
+        return HttpResponse.json({});
+      })
+    );
+
+    const rows = await compareHubs('Nope\t1', 100);
+
+    expect(hits).toBe(0);
+    expect(rows).toHaveLength(TRADE_HUBS.length);
+    expect(rows.every((row) => row.buy === null && row.sell === null)).toBe(true);
+  });
+
+  it('scales both sides by the given price percent', async () => {
+    server.use(aggregates(PRICED));
+
+    const rows = await compareHubs('Damage Control II\t3', 50);
+
+    expect(rows[0].sell).toBe(768_000);
   });
 });

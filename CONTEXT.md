@@ -26,7 +26,11 @@ here — they go one per file in `docs/context/decisions/`.
   sell orders. Scaled by a **Price Percent**. Distinct from **Compare**, which
   puts a handful of Quickbar items side by side on their own prices: an
   Appraisal answers "what is this pile worth", Compare answers "which of these
-  is cheaper".
+  is cheaper". Its collapsible "Compare hubs" section (issue #689) prices the
+  same pasted pile at all 5 Trade Hubs side by side — a different question
+  again ("where is this pile worth the most") from either of the above, and
+  not the **Compare** tab under another name: it shares no state, code path,
+  or Quickbar dependency with it.
 - **Price Percent**: The fraction of market an **Appraisal** is quoted at —
   100 is the order book untouched, and a buyer quoting loot pays some fraction
   of it.
@@ -240,7 +244,7 @@ here — they go one per file in `docs/context/decisions/`.
   sole deduction the group total ever applies, regardless of what any
   individual plan has entered for itself. See
   `docs/context/decisions/20260909-212724-group-ownership-overlay-replaces-per-plan-owned-stock.md`.
-- **Group Rollup**: What a **Build Group** shows when opened instead of one of its members: every member's materials merged by type, and the costs summed. A forward estimate only — Production Runs carry no group, so it never claims to say what a fit actually cost. Sums each member's own remaining quantities rather than re-netting owned stock across the group, so the total always agrees with the member pages beside it, and separately names any material the members collectively claim more of than the Character owns. Reports a mixture rather than resolving it: members sitting on different trade hubs still total in ISK, and since multibuy is per-station the paste is split rather than withheld — one list per hub, each copied on its own, with the hubs named. Nothing is re-homed to make the group tidy; the hub is the member plan's own fact.
+- **Group Rollup**: What a **Build Group** shows when opened instead of one of its members: every member's materials merged by type, and the costs summed. A forward estimate only — Production Runs carry no group, so it never claims to say what a fit actually cost. Each member's tree is re-resolved with owned-stock deduction disabled before merging, so a member's own per-plan owned quantity never reaches the group total; the group's only owned-stock opinion is its own **Group Owned Overlay** ledger, netted once against the merged total. A member's own individual page is unaffected — it keeps netting its own `materialSourcing` and can disagree with the group total, which is expected now that group-level ownership is the sole deduction the group applies. Reports a mixture rather than resolving it: members sitting on different trade hubs still total in ISK, and since multibuy is per-station the paste is split rather than withheld — one list per hub, each copied on its own, with the hubs named. Nothing is re-homed to make the group tidy; the hub is the member plan's own fact.
 - **Growth Collector**: On a Mining Ledger Entry covered by two or more
   Assignments (a quantity split, issue #523), the one Assignment that
   receives any ore ESI reports for that day _after_ the split — flagged

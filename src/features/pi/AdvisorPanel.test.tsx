@@ -1421,6 +1421,9 @@ describe('AdvisorPanel build advice', () => {
     renderPanel();
     expect(await screen.findByText('Bacteria (P1)')).toBeInTheDocument();
     expect(screen.getByText('Build up to')).toBeInTheDocument();
+    // Card-level, not just the modal (#702): a pilot reading the card alone
+    // needs to know this number isn't layered on "Do this" above it.
+    expect(screen.getByText(/a different question from "Do this" above/)).toBeInTheDocument();
   });
 
   it('recommends selling the ore when no made tier beats it', async () => {
@@ -1431,6 +1434,7 @@ describe('AdvisorPanel build advice', () => {
     expect(
       await screen.findByText('Switch to extracting Microorganisms and sell it raw')
     ).toBeInTheDocument();
+    expect(screen.getByText(/a different question from "Do this" above/)).toBeInTheDocument();
   });
 
   it('says “keep” only when the winning ore is the one already coming out', async () => {

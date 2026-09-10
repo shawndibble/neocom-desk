@@ -96,6 +96,25 @@ function usable(value: number | undefined): number | undefined {
 }
 
 /**
+ * `sourcing` with every `ownedQuantity` stripped, `overridePrice` kept — what
+ * a caller passes to resolve a tree as if nothing were owned, without losing
+ * a manually-entered price. Used by the Group Owned Overlay (issue #697): the
+ * group total re-resolves each member's tree this way, since owned stock is
+ * the group ledger's job now, not any one member's `materialSourcing`.
+ */
+export function withoutOwnedQuantities(
+  sourcing: MaterialSourcingMap | undefined
+): MaterialSourcingMap | undefined {
+  if (!sourcing) return sourcing;
+  const stripped: MaterialSourcingMap = {};
+  for (const [typeID, entry] of Object.entries(sourcing)) {
+    stripped[Number(typeID)] =
+      entry.overridePrice === undefined ? {} : { overridePrice: entry.overridePrice };
+  }
+  return stripped;
+}
+
+/**
  * Claims up to `quantity` units of `typeID` from the shared owned pool,
  * seeding the pool from `sourcing` the first time this typeID is reached.
  * Mutates `pool` — every subsequent claim across the tree sees the reduced
