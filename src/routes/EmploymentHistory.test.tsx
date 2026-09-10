@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import '@/i18n';
@@ -7,6 +8,8 @@ import { db } from '@/db';
 import { STALE_FETCHED_AT } from '@/esi/cacheFixtures';
 import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharacter';
 import { usePublicInfo } from '@/stores/publicInfo';
+import { usePublicInfoModalStore } from '@/stores/publicInfoModal';
+import { configureClipboard, type ClipboardWriter } from '@/lib/clipboard';
 import { writeRouteSnapshot } from '@/lib/routeSnapshotCache';
 import { App } from '@/app/App';
 
@@ -71,7 +74,10 @@ const server = setupServer(
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 afterAll(() => server.close());
-afterEach(() => server.resetHandlers());
+afterEach(() => {
+  server.resetHandlers();
+  configureClipboard(null);
+});
 beforeEach(async () => {
   skillCalls = 0;
   await db.characters.clear();
@@ -262,5 +268,59 @@ describe('EmploymentHistory', () => {
     expect(await screen.findByText(/no employment history cached/i)).toBeInTheDocument();
     // The panel's toolbar outlives its rows, so there is still a way back.
     expect(screen.getByRole('button', { name: 'Refresh' })).toBeInTheDocument();
+  });
+});
+
+describe('Employment History row context menu (issue #729)', () => {
+  /** Right-clicks a corporation row by its resolved name. */
+  async function openHistoryMenu(name: string) {
+    const row = (await screen.findByText(name)).closest('tr');
+    if (!row) throw new Error(`expected a ${name} row`);
+    row.focus();
+    fireEvent.contextMenu(row);
+  }
+
+  it('offers Copy Name and Show Info', async () => {
+    render(<App />);
+    await openHistoryMenu('Past Corp');
+
+    expect(screen.getByRole('menuitem', { name: 'Copy name' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Show info' })).toBeInTheDocument();
+  });
+
+  it('Copy Name copies the resolved corporation name to the clipboard', async () => {
+    const clipboardWriteText = vi.fn<ClipboardWriter>().mockResolvedValue(undefined);
+    configureClipboard(clipboardWriteText);
+    render(<App />);
+    await openHistoryMenu('Past Corp');
+
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Copy name' }));
+
+    expect(clipboardWriteText).toHaveBeenCalledWith('Past Corp');
+  });
+
+  it('falls back to #id when the row has no resolved name', async () => {
+    server.use(
+      http.post('https://esi.evetech.net/universe/names', () =>
+        HttpResponse.json([{ id: 200, name: 'Current Corp', category: 'corporation' }])
+      )
+    );
+    const clipboardWriteText = vi.fn<ClipboardWriter>().mockResolvedValue(undefined);
+    configureClipboard(clipboardWriteText);
+    render(<App />);
+    await openHistoryMenu('#100');
+
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Copy name' }));
+
+    expect(clipboardWriteText).toHaveBeenCalledWith('#100');
+  });
+
+  it('Show Info opens the shared Public Info Modal on the corporation tab, for a past (non-current) employer', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await openHistoryMenu('Past Corp');
+    await user.click(screen.getByRole('menuitem', { name: 'Show info' }));
+
+    expect(usePublicInfoModalStore.getState().request).toEqual({ kind: 'corporation', id: 100 });
   });
 });

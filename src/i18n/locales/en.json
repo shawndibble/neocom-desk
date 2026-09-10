@@ -401,9 +401,6 @@
     "craftSweepConfirm": "This will overwrite craft/buy choices on this plan — continue?",
     "craftSweepConfirmGroup_one": "This will overwrite craft/buy choices on {{count}} plan in this group — continue?",
     "craftSweepConfirmGroup_other": "This will overwrite craft/buy choices on {{count}} plans in this group — continue?",
-    "groupMemberHint": "Part of {{group}} — craft/buy edits here are reflected in the group's total.",
-    "groupMemberHintTooltipLabel": "About Build Group totals",
-    "groupMemberHintTooltip": "This plan belongs to a Build Group. Opening the group recomputes its total from every member's current craft/buy choices, this plan's included, on every open — nothing needs to be re-applied.",
     "price": "Price",
     "priceFor": "Price for {{material}}",
     "resetPriceFor": "Reset {{material}} to the market price",
@@ -2073,7 +2070,11 @@
     "corporation": "Corporation",
     "started": "Joined",
     "duration": "Duration",
-    "current": "Current"
+    "current": "Current",
+    "contextMenu": {
+      "copyName": "Copy name",
+      "showInfo": "Show info"
+    }
   },
   "contracts": {
     "title": "Contracts",
@@ -2696,7 +2697,8 @@
       "summaryHi": "High",
       "summaryLo": "Low",
       "summaryMedian": "Median",
-      "summaryNone": "No data in this range"
+      "summaryNone": "No data in this range",
+      "movingAverage": "Moving average"
     },
     "compare": {
       "handle": "Compare ({{count}})",
