@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -83,11 +83,21 @@ import type {
   CorporationWalletTransaction,
   WalletJournalEntry,
 } from '@/esi/endpoints';
+import { walletBalanceHistory, walletBalanceTrend } from '@/engine/wallet/balanceHistory';
 
 /** Newest first — the one order both the table (`defaultSort`) and CSV exports agree on. */
 function byDateDesc(a: WalletJournalEntry, b: WalletJournalEntry): number {
   return b.date.localeCompare(a.date);
 }
+
+/**
+ * Dynamic import, not a static one: `WalletBalanceChart.tsx` statically
+ * imports Recharts, so this is the boundary that keeps the library out of
+ * the initial page bundle — it only loads once the Balance tab actually
+ * renders a chart (see `market/PriceHistoryChart.tsx`'s bundle-size
+ * precedent).
+ */
+const LazyWalletBalanceChart = lazy(() => import('@/features/character/WalletBalanceChart'));
 
 interface JournalFilterBarProps {
   filter: WalletJournalFilter;
@@ -883,6 +893,11 @@ export function Wallet() {
   // same array on every render (issue #413). CSV export sorts its own copy at
   // export time instead, since it bypasses `DataTable` entirely.
   const journal = journalResult?.data ?? EMPTY_JOURNAL;
+  const walletBalancePoints = useMemo(() => walletBalanceHistory(journal), [journal]);
+  const walletBalanceTrendDirection = useMemo(
+    () => walletBalanceTrend(walletBalancePoints),
+    [walletBalancePoints]
+  );
   const corpJournalResult = corpJournal.data?.cached ?? null;
   const corpJournalEntries = corpJournalResult?.data ?? EMPTY_JOURNAL;
 
@@ -1148,6 +1163,36 @@ export function Wallet() {
               meta={walletCharacterFilterMeta}
               actions={balanceResult ? <DataAgeBadge date={balanceResult.fetchedAt} /> : undefined}
             >
+              {journal.length === 0 ? (
+                <EmptyState
+                  title={t('wallet.journalEmptyTitle')}
+                  hint={t('wallet.journalEmptyHint')}
+                  className="py-8"
+                />
+              ) : (
+                <div className="mb-4">
+                  {journalTruncated && (
+                    <p className="px-1 pb-2 text-[0.6875rem] text-warning uppercase">
+                      {t('common.incompleteTitle')} — {t('wallet.journalTruncatedHint')}
+                    </p>
+                  )}
+                  {walletBalancePoints.length > 0 && (
+                    <Suspense
+                      fallback={
+                        <div className="flex justify-center py-8">
+                          <Spinner label={t('common.loading')} />
+                        </div>
+                      }
+                    >
+                      <LazyWalletBalanceChart
+                        points={walletBalancePoints}
+                        trend={walletBalanceTrendDirection}
+                        timeZone={timeZone}
+                      />
+                    </Suspense>
+                  )}
+                </div>
+              )}
               <div className="flex flex-wrap gap-x-8 gap-y-4">
                 <div>
                   <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">

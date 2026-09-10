@@ -1141,6 +1141,7 @@
     "balanceEmpty": "No wallet data cached. Reconnect to fetch it.",
     "balanceByCharacter": "Balance by character",
     "totalBalance": "Total",
+    "balanceHistoryChartLabel": "Balance history",
     "balanceCharacterColumn": "Character",
     "balanceCharacterNotShared": "This character hasn't granted wallet access",
     "everMarks": "EverMarks",
