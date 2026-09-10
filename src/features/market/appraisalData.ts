@@ -27,6 +27,7 @@
  */
 import {
   buildAppraisal,
+  buildHubComparison,
   computeAppraisalRefine,
   type Appraisal,
   type AppraisalItem,
@@ -39,7 +40,7 @@ import {
 import { parseAppraisalPaste } from '@/engine/market/appraisalPaste';
 import { SKILL_IDS } from '@/engine/industry/types';
 import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
-import type { TradeHub } from '@/market/hubs';
+import { TRADE_HUBS, type TradeHub } from '@/market/hubs';
 import { getHubPrices, invalidateHubPrices } from '@/market/prices';
 import { loadMarketTypes } from '@/sde/loadMarketSde';
 import { loadReprocessing } from '@/sde/loadSde';
@@ -187,4 +188,49 @@ export async function appraisePaste(
     appraisal: buildAppraisal(items, pricePercent),
     unmatched,
   };
+}
+
+/** One Trade Hub's row in the Appraisal tab's Compare Hubs table. */
+export interface HubComparisonRow {
+  hub: TradeHub;
+  buy: number | null;
+  sell: number | null;
+}
+
+/**
+ * Prices the same pasted pile at every Trade Hub side by side, so a pilot can
+ * see hub disparity without switching `sync.marketHub` and re-pasting up to 5
+ * times. Parses and matches the paste once, then costs exactly one batched
+ * `getHubPrices` call per hub (5 total) regardless of paste length — the same
+ * shape `hubHaulGaps` already proves cheap for open orders. No refine
+ * comparison here: that stays primary-appraisal-only.
+ */
+export async function compareHubs(
+  text: string,
+  pricePercent: number,
+  { force = false }: AppraiseOptions = {}
+): Promise<HubComparisonRow[]> {
+  const entries = parseAppraisalPaste(text);
+  const catalogue = await loadAppraisalCatalogue();
+  const { matched } = matchAppraisalEntries(entries, catalogue);
+  const typeIds = matched.map((match) => match.typeId);
+
+  return Promise.all(
+    TRADE_HUBS.map(async (hub) => {
+      if (force) invalidateHubPrices(hub.stationId, typeIds);
+      const prices = await getHubPrices(hub, typeIds);
+      const items: AppraisalItem[] = matched.map((match) => {
+        const aggregate = prices.get(match.typeId);
+        return {
+          typeId: match.typeId,
+          name: match.name,
+          quantity: match.quantity,
+          buy: aggregate?.buyMax ?? null,
+          sell: aggregate?.sellMin ?? null,
+        };
+      });
+      const { buy, sell } = buildHubComparison(items, pricePercent);
+      return { hub, buy, sell };
+    })
+  );
 }

@@ -26,7 +26,11 @@ here — they go one per file in `docs/context/decisions/`.
   sell orders. Scaled by a **Price Percent**. Distinct from **Compare**, which
   puts a handful of Quickbar items side by side on their own prices: an
   Appraisal answers "what is this pile worth", Compare answers "which of these
-  is cheaper".
+  is cheaper". Its collapsible "Compare hubs" section (issue #689) prices the
+  same pasted pile at all 5 Trade Hubs side by side — a different question
+  again ("where is this pile worth the most") from either of the above, and
+  not the **Compare** tab under another name: it shares no state, code path,
+  or Quickbar dependency with it.
 - **Price Percent**: The fraction of market an **Appraisal** is quoted at —
   100 is the order book untouched, and a buyer quoting loot pays some fraction
   of it.

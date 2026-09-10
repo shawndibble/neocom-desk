@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   buildAppraisal,
+  buildHubComparison,
   computeAppraisalRefine,
   type AppraisalItem,
 } from '@/engine/market/appraisal';
@@ -225,5 +226,36 @@ describe('computeAppraisalRefine', () => {
       materialPrices: {},
     });
     expect(refine).toEqual({ valueAtFullPrice: 0, pricedAll: false, unitsLeftOver: 0 });
+  });
+});
+
+describe('buildHubComparison', () => {
+  it('totals both sides at the given percentage, same as buildAppraisal', () => {
+    const { buy, sell } = buildHubComparison([damageControl, tritanium], 90);
+    expect(buy).toBeCloseTo(1_952_140.5, 3);
+    expect(sell).toBeCloseTo(2_012_121, 3);
+  });
+
+  it('reports a side as null rather than zero when nothing priced on it', () => {
+    const unlisted: AppraisalItem = {
+      typeId: 99,
+      name: 'Civilian Gatling Railgun',
+      quantity: 4,
+      buy: null,
+      sell: 1_000,
+    };
+    const { buy, sell } = buildHubComparison([unlisted], 100);
+    expect(buy).toBeNull();
+    expect(sell).toBe(4_000);
+  });
+
+  it('reports both sides as null for an empty item list', () => {
+    expect(buildHubComparison([], 100)).toEqual({ buy: null, sell: null });
+  });
+
+  it('totals a side with at least one priced item among several unpriced ones', () => {
+    const noBuy: AppraisalItem = { typeId: 98, name: 'A', quantity: 1, buy: null, sell: 10 };
+    const { buy } = buildHubComparison([damageControl, noBuy], 100);
+    expect(buy).toBe(damageControl.buy! * damageControl.quantity);
   });
 });

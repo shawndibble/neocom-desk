@@ -38,6 +38,7 @@ vi.mock('@/features/market/appraisalData', () => ({
     appraisal: { rows: [], totals: { buy: 0, sell: 0, spread: 0, unpricedRows: 0 } },
     unmatched: [],
   })),
+  compareHubs: vi.fn(async () => []),
   loadAppraisalCatalogue: vi.fn(async () => new Map()),
   clearAppraisalCatalogue: vi.fn(),
 }));

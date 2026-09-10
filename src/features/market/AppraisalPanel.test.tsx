@@ -4,15 +4,17 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import type { Appraisal } from '@/engine/market/appraisal';
+import { TRADE_HUBS } from '@/market/hubs';
 import { AppraisalPanel } from './AppraisalPanel';
 import type { AppraisalController } from './useAppraisal';
-import type { AppraisalOutcome } from './appraisalData';
+import type { AppraisalOutcome, HubComparisonRow } from './appraisalData';
 
 function controller(overrides: Partial<AppraisalController> = {}): AppraisalController {
   return {
     text: '',
     setText: vi.fn(),
     result: null,
+    compare: null,
     loading: false,
     failed: false,
     canAppraise: false,
@@ -114,6 +116,49 @@ describe('AppraisalPanel', () => {
   it('says how many rows were left out of a total', () => {
     renderPanel({ controller: controller({ result: outcome() }) });
     expect(screen.getByText(/1 item has no orders on one side at this hub/)).toBeInTheDocument();
+  });
+
+  describe('Compare hubs', () => {
+    const COMPARE_ROWS: HubComparisonRow[] = TRADE_HUBS.map((hub, index) => ({
+      hub,
+      buy: index === 0 ? null : 1_000 * (index + 1),
+      sell: 2_000 * (index + 1),
+    }));
+
+    async function compareTable() {
+      const toggle = await screen.findByRole('button', { name: /hub comparison/i });
+      if (toggle.getAttribute('aria-label')?.startsWith('Show')) {
+        await userEvent.click(toggle);
+      }
+      return screen.findByRole('table', { name: 'Compare hubs' });
+    }
+
+    it('is absent until something has been appraised', () => {
+      renderPanel({ controller: controller({ result: null, compare: null }) });
+      expect(screen.queryByText('Compare hubs')).not.toBeInTheDocument();
+    });
+
+    it('lists all 5 Trade Hubs, collapsed by default', async () => {
+      renderPanel({ controller: controller({ result: outcome(), compare: COMPARE_ROWS }) });
+      expect(screen.getByText('Compare hubs')).toBeInTheDocument();
+      expect(screen.queryByRole('table', { name: 'Compare hubs' })).not.toBeInTheDocument();
+
+      const table = await compareTable();
+      for (const hub of TRADE_HUBS) {
+        expect(
+          within(table).getByRole('row', { name: new RegExp(hub.systemName) })
+        ).toBeInTheDocument();
+      }
+    });
+
+    it('shows a dash, not a zero, for a hub with no orders on a side', async () => {
+      renderPanel({ controller: controller({ result: outcome(), compare: COMPARE_ROWS }) });
+      const table = await compareTable();
+      const jitaRow = within(table).getByRole('row', {
+        name: new RegExp(TRADE_HUBS[0].systemName),
+      });
+      expect(within(jitaRow).getByText('—')).toBeInTheDocument();
+    });
   });
 
   describe('refine-then-sell (issue #672)', () => {

@@ -2642,7 +2642,11 @@
       "unmatched_other": "{{count}} lines not matched",
       "unmatchedLine": "line {{lines}} · {{name}}",
       "unpriced_one": "{{count}} item has no orders on one side at this hub, so it is left out of that total.",
-      "unpriced_other": "{{count}} items have no orders on one side at this hub, so they are left out of that total."
+      "unpriced_other": "{{count}} items have no orders on one side at this hub, so they are left out of that total.",
+      "compareHubsTitle": "Compare hubs",
+      "compareHubsShow": "Show hub comparison",
+      "compareHubsHide": "Hide hub comparison",
+      "columnHub": "Hub"
     },
     "priceHistory": {
       "chartLabel": "Daily average price and traded volume for {{item}}",
