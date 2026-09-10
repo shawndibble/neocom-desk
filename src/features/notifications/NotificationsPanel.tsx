@@ -36,7 +36,7 @@
  */ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useVirtualizer } from '@tanstack/react-virtual';
+import { useWindowVirtualizer } from '@tanstack/react-virtual';
 import {
   Button,
   Panel,
@@ -100,10 +100,6 @@ import { filterNotificationSections } from './notificationSearch';
 import { estimateCharacterSectionHeight } from './notificationRows';
 import { parseIskAmount, formatIsk } from '@/lib/isk';
 import { refreshAppBadge } from './appBadge';
-import {
-  useViewportBoundedHeight,
-  VIEWPORT_BOUNDED_BOTTOM_GAP_PX,
-} from '@/lib/useViewportBoundedHeight';
 import {
   useNotificationPermission,
   useNotificationPromptState,
@@ -359,30 +355,38 @@ export function NotificationsPanel() {
    * reuses the exact same conditional-row walk the section below renders
    * (`estimateCharacterSectionHeight`), so the estimate tracks what's really
    * about to render rather than guessing a flat height.
+   *
+   * Windows against the page itself rather than an inner scroll box
+   * (`useWindowVirtualizer`, not `useVirtualizer`): a fixed-height,
+   * internally-scrolling panel here read as a cramped box with its own
+   * scrollbar buried inside the page. The load-bearing case #740 was filed
+   * for is still covered — a search matching the whole roster expands every
+   * section at once (`expanded = searching || ...` below), which is the
+   * same worst case whichever element does the scrolling.
    */
-  const scrollElRef = useRef<HTMLDivElement>(null);
-  const [viewportHeightRef, viewportBoundedMaxHeight] = useViewportBoundedHeight(
-    VIEWPORT_BOUNDED_BOTTOM_GAP_PX
-  );
-  // Both refs need the same node: the virtualizer reads it imperatively via
-  // `getScrollElement`, and `useViewportBoundedHeight` measures it (a
-  // callback ref, not a `.current` object, since it has to re-fire once the
-  // node actually mounts).
-  const scrollParentRef = useCallback(
-    (node: HTMLDivElement | null) => {
-      scrollElRef.current = node;
-      viewportHeightRef(node);
-    },
-    [viewportHeightRef]
-  );
-  // React Compiler isn't enabled in this build (no babel plugin configured);
-  // this is eslint-plugin-react-hooks flagging TanStack Virtual's returned
-  // functions as unsafe to memoize *if* the compiler is ever turned on
-  // (same suppression `Assets.tsx`'s virtualizer uses).
-  // eslint-disable-next-line react-hooks/incompatible-library
-  const rowVirtualizer = useVirtualizer({
+  const [listElement, setListElement] = useState<HTMLDivElement | null>(null);
+  const [scrollMargin, setScrollMargin] = useState(0);
+  // A callback ref, not a plain `useRef` read at render time (the eslint
+  // `react-hooks/refs` rule this project enables forbids that): the list sits
+  // below content whose height can change after mount (a permission banner
+  // appearing, search narrowing the roster), so this re-measures on resize
+  // too, the same pattern `useViewportBoundedHeight` uses for its own
+  // layout-position read.
+  const listRef = useCallback((node: HTMLDivElement | null) => setListElement(node), []);
+  useEffect(() => {
+    if (!listElement) return;
+    const measure = () => setScrollMargin(listElement.offsetTop);
+    measure();
+    window.addEventListener('resize', measure);
+    const observer = new ResizeObserver(measure);
+    observer.observe(document.body);
+    return () => {
+      window.removeEventListener('resize', measure);
+      observer.disconnect();
+    };
+  }, [listElement]);
+  const rowVirtualizer = useWindowVirtualizer({
     count: visibleCharacters.length,
-    getScrollElement: () => scrollElRef.current,
     estimateSize: (index) => {
       const character = visibleCharacters[index];
       const expanded = searching || expandedCharacterIds.has(character.characterId);
@@ -404,6 +408,11 @@ export function NotificationsPanel() {
       });
     },
     getItemKey: (index) => visibleCharacters[index].characterId,
+    // `virtualRow.start` is otherwise measured from the top of the
+    // *document*, not this list — it has to know how far down the page the
+    // list itself starts (master switch, channel toggles, the All
+    // Characters section, and the search box all sit above it).
+    scrollMargin,
     overscan: 5,
   });
 
@@ -518,15 +527,9 @@ export function NotificationsPanel() {
               <EmptyState title={t('settings.notifications.noResults')} className="py-8" />
             ) : (
               <div
-                ref={scrollParentRef}
+                ref={listRef}
                 data-virtual-scroll-root
                 aria-label={t('settings.notificationsTitle')}
-                className="overflow-y-auto"
-                style={
-                  viewportBoundedMaxHeight !== null
-                    ? { maxHeight: viewportBoundedMaxHeight }
-                    : undefined
-                }
               >
                 <div
                   role="presentation"
@@ -550,7 +553,7 @@ export function NotificationsPanel() {
                           top: 0,
                           left: 0,
                           width: '100%',
-                          transform: `translateY(${virtualRow.start}px)`,
+                          transform: `translateY(${virtualRow.start - rowVirtualizer.options.scrollMargin}px)`,
                         }}
                       >
                         <CharacterNotificationSection

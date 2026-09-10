@@ -17,6 +17,10 @@ import {
   selectionStateForAllCharactersAllEvents,
   broadcastEventChannelFlags,
   broadcastAllEventsChannelFlags,
+  selectionStateForEveTypeAcrossCharacters,
+  selectionStateForAllCharactersEveTypes,
+  broadcastEveTypeChannelFlags,
+  broadcastAllEveTypesChannelFlags,
   type EventEnabledMap,
   type EveTypeEnabledMap,
 } from './eventSelection';
@@ -364,5 +368,105 @@ describe('toggleAllEveTypesOnChannel', () => {
     const next = toggleAllEveTypesOnChannel([TYPE_A, TYPE_B], map, 'browser');
     expect(isEveTypeEnabledFor(next, TYPE_A, 'browser')).toBe(true);
     expect(isEveTypeEnabledFor(next, TYPE_B, 'browser')).toBe(true);
+  });
+});
+
+describe('selectionStateForEveTypeAcrossCharacters (issue #745)', () => {
+  it('is checked when every Character agrees on', () => {
+    const perCharacter = { 1: { [TYPE_A]: { feed: true } }, 2: { [TYPE_A]: { feed: true } } };
+    expect(selectionStateForEveTypeAcrossCharacters([1, 2], TYPE_A, perCharacter, 'feed')).toBe(
+      'checked'
+    );
+  });
+
+  it('is unchecked when every Character agrees off', () => {
+    const perCharacter = { 1: { [TYPE_A]: { feed: false } }, 2: { [TYPE_A]: { feed: false } } };
+    expect(selectionStateForEveTypeAcrossCharacters([1, 2], TYPE_A, perCharacter, 'feed')).toBe(
+      'unchecked'
+    );
+  });
+
+  it('is indeterminate when Characters disagree', () => {
+    const perCharacter = { 1: { [TYPE_A]: { feed: false } }, 2: {} };
+    expect(selectionStateForEveTypeAcrossCharacters([1, 2], TYPE_A, perCharacter, 'feed')).toBe(
+      'indeterminate'
+    );
+  });
+
+  it('reads a Character absent from the map as its per-type default', () => {
+    const perCharacter = { 1: {} };
+    expect(selectionStateForEveTypeAcrossCharacters([1, 2], TYPE_A, perCharacter, 'feed')).toBe(
+      'checked'
+    );
+    expect(selectionStateForEveTypeAcrossCharacters([1, 2], TYPE_A, perCharacter, 'browser')).toBe(
+      'unchecked'
+    );
+  });
+});
+
+describe('selectionStateForAllCharactersEveTypes (issue #745)', () => {
+  it('is checked only when every Character agrees every type is on', () => {
+    const perCharacter = { 1: {}, 2: {} };
+    expect(
+      selectionStateForAllCharactersEveTypes([1, 2], [TYPE_A, TYPE_B], perCharacter, 'feed')
+    ).toBe('checked');
+  });
+
+  it('is indeterminate when one Character disagrees on one type', () => {
+    const perCharacter = { 1: { [TYPE_A]: { feed: false } }, 2: {} };
+    expect(
+      selectionStateForAllCharactersEveTypes([1, 2], [TYPE_A, TYPE_B], perCharacter, 'feed')
+    ).toBe('indeterminate');
+  });
+
+  it('is unchecked with no Characters or no types', () => {
+    expect(selectionStateForAllCharactersEveTypes([], [TYPE_A, TYPE_B], {}, 'feed')).toBe(
+      'unchecked'
+    );
+    expect(selectionStateForAllCharactersEveTypes([1], [], {}, 'feed')).toBe('unchecked');
+  });
+});
+
+describe('broadcastEveTypeChannelFlags (issue #745)', () => {
+  it('turns every known Character on when at least one disagrees or is off', () => {
+    const perCharacter = { 1: { [TYPE_A]: { feed: false } }, 2: {} };
+    const next = broadcastEveTypeChannelFlags([1, 2], TYPE_A, perCharacter, 'feed');
+    expect(isEveTypeEnabledFor(next[1], TYPE_A, 'feed')).toBe(true);
+    expect(isEveTypeEnabledFor(next[2], TYPE_A, 'feed')).toBe(true);
+  });
+
+  it('turns every known Character off only when all already agree on', () => {
+    const perCharacter = { 1: { [TYPE_A]: { feed: true } }, 2: { [TYPE_A]: { feed: true } } };
+    const next = broadcastEveTypeChannelFlags([1, 2], TYPE_A, perCharacter, 'feed');
+    expect(isEveTypeEnabledFor(next[1], TYPE_A, 'feed')).toBe(false);
+    expect(isEveTypeEnabledFor(next[2], TYPE_A, 'feed')).toBe(false);
+  });
+
+  it('leaves the other channel and other types untouched', () => {
+    const perCharacter = { 1: { [TYPE_A]: { browser: true }, [TYPE_B]: { feed: false } } };
+    const next = broadcastEveTypeChannelFlags([1], TYPE_A, perCharacter, 'feed');
+    expect(isEveTypeEnabledFor(next[1], TYPE_A, 'browser')).toBe(true);
+    expect(isEveTypeEnabledFor(next[1], TYPE_B, 'feed')).toBe(false);
+  });
+});
+
+describe('broadcastAllEveTypesChannelFlags (issue #745)', () => {
+  it('turns every Character and type on when the whole grid is not already fully on', () => {
+    const perCharacter = { 1: { [TYPE_A]: { feed: false } }, 2: {} };
+    const next = broadcastAllEveTypesChannelFlags([1, 2], [TYPE_A, TYPE_B], perCharacter, 'feed');
+    expect(isEveTypeEnabledFor(next[1], TYPE_A, 'feed')).toBe(true);
+    expect(isEveTypeEnabledFor(next[1], TYPE_B, 'feed')).toBe(true);
+    expect(isEveTypeEnabledFor(next[2], TYPE_A, 'feed')).toBe(true);
+    expect(isEveTypeEnabledFor(next[2], TYPE_B, 'feed')).toBe(true);
+  });
+
+  it('clears the whole grid only when it was already fully on', () => {
+    const perCharacter = {
+      1: { [TYPE_A]: { feed: true }, [TYPE_B]: { feed: true } },
+      2: { [TYPE_A]: { feed: true }, [TYPE_B]: { feed: true } },
+    };
+    const next = broadcastAllEveTypesChannelFlags([1, 2], [TYPE_A, TYPE_B], perCharacter, 'feed');
+    expect(isEveTypeEnabledFor(next[1], TYPE_A, 'feed')).toBe(false);
+    expect(isEveTypeEnabledFor(next[2], TYPE_B, 'feed')).toBe(false);
   });
 });
