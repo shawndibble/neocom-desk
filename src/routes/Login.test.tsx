@@ -34,7 +34,6 @@ const READ_ONLY_PHRASES: Record<string, string> = {
   'esi-markets.read_character_orders.v1': 'market orders',
   'esi-industry.read_character_jobs.v1': 'industry jobs',
   'esi-industry.read_character_mining.v1': 'mining ledger',
-  'esi-characters.read_corporation_roles.v1': 'corporation roles',
   'esi-planets.manage_planets.v1': 'planetary colonies',
   'esi-characters.read_contacts.v1': 'contacts',
   'esi-characters.read_loyalty.v1': 'loyalty points',

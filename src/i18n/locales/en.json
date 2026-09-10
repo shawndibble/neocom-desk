@@ -3333,6 +3333,7 @@
     "accessCharacterUnknown": "Select a character to see its corp access.",
     "accessRolesLabel": "Roles",
     "accessRolesNone": "None",
+    "accessRolesUnknown": "Unknown until granted",
     "accessGrantLabel": "Access",
     "accessGrantChecking": "Checking…",
     "accessGrantGranted": "Granted",
