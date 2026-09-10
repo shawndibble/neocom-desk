@@ -182,3 +182,71 @@ features it names explicitly ("multi-hub buy/sell price comparisons",
 "wallet balance trends"). If a future run runs dry on fresh candidates,
 re-reading EQM's full feature list against the current app state first is
 likely higher-yield than another cold forum sweep.
+
+## 2026-09-10
+
+An earlier same-day run of this skill filed three tickets (checked via
+`gh issue list --state all --search "created:2026-09-10"` per the third run's
+lesson) but never reached step 7, so it left no ledger entry of its own —
+recorded here so a future run doesn't re-propose the same ground: **#711**
+(Production Log gains a realized-profit-over-time chart, mirroring #690's
+Wallet balance chart), **#712** (Assets page gains a "Total Assets Value" stat
+summing per-station values already computed), **#713** (Open Orders table
+gains a progressively-loaded `daysToClear` column, reusing the existing
+`sellThrough()`/`checkGroupDeeper` fan-out).
+
+This run's own survey re-fetched the forum category JSON (still 30 threads,
+unchanged from the third run) and researched two previously-unchecked new
+threads: **EVEAIO** ("a desktop companion for EVE Online" — a bug-bounty
+preview page with no documented industry/market feature list found; too
+undifferentiated to draw a candidate from) and **Socketkill.com** (a
+killboard/combat-streaming tool, confirmed out of scope). Neither yielded a
+candidate. Given the forum sweep is now dry three runs running, this run
+instead followed the third run's own lesson — re-reading engine modules for
+single-caller gaps — which is what produced both of this run's candidates.
+
+### Already covered — proposed nothing beyond prior runs
+
+An Explore-agent inventory pass raised two "gap" claims that turned out to be
+false on verification, recorded here so a future run doesn't repeat the
+research: **PI output has no market-sell integration** — false;
+`engine/pi/chain.ts`/`stopTier.ts`/`network.ts` already price a chain's
+`revenue`/`margin` at `revenuePrices` (the hub's buy-order bid, deliberately
+distinct from the ask used for costs) for every tier, fully wired into the PI
+Advisor's stop-tier recommendation — the only real gap found there (the
+`margin` field's own doc comment: "No sales tax or broker fee: a chain's
+output is not assumed listed") is a documented, deliberate engine
+simplification, not an ecosystem-gap feature, so it was not drafted.
+**Corp Industry Jobs panel has no "who's building what" installer column** —
+real (installer_id is fetched but never rendered), but
+`src/esi/endpoints.ts`'s own doc comment on the personal `IndustryJob`
+interface ("Modeled fields only: this app shows active jobs, not
+installer/location bookkeeping") states a general anti-pattern this would cut
+against, and the audience (corp directors with `canReadIndustry`) is exactly
+the narrow-reach shape this skill's kill-bar warns about — dropped before
+drafting on both grounds. Also confirmed still built and not re-proposed:
+active manufacturing jobs across characters (`ActiveJobsPanel.tsx`,
+distinct from Build Opportunities), LP Store per-corp ISK/LP ranking
+(`offerRows.ts`), multi-character order aggregation (Open Orders' own
+`CharacterFilterControl`).
+
+### Candidates this run
+
+| Candidate                                            | Verdict | Outcome                                                                                                                                                                                                                                                                                                                                                                          |
+| ----------------------------------------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Contracts: appraise item-exchange contract lines       | SHIP    | Filed as #717. Reuses `buildAppraisal` wholesale for a contract's Included/Requested item lines; rendered as a neutral "Market value" figure (no isk-pos/isk-neg, no good/bad-deal badge) beside the existing Price/Reward rows, honoring `ContractDetailModal.tsx`'s own documented neutrality rule (a bare `Contract` doesn't say which side the active character is on).   |
+| Market: price history % change headline stat           | KILL    | The candidate's own methodology ("first vs last, or a short-window average — reviewer should sanity check") was the tell: EVE market history has thin-volume days where a naive delta swings wildly, and a scalar that occasionally contradicts the chart directly above it is worse than no stat. Smallest player value of the three, largest correctness risk. Not filed. |
+| Loyalty Store: cross-corp best-offer comparison         | NARROW  | Filed as #718, narrowed from ranking offers across every LP-holding corp (N parallel offer+market-snapshot+blueprint-catalog fetches) down to a plain balance-and-link list. The ranked computation only pays off for active multi-store grinding; most scattered LP is an incidental byproduct of agent running, where "you have LP elsewhere, go look" is the useful signal. |
+
+**Lessons for the next run.** (1) An engine can look unwired from the outside
+and still be fully wired: PI's revenue/margin math reads as market-blind until
+you grep `revenuePrices` through `chain.ts`/`stopTier.ts`/`network.ts` —
+Explore-agent summaries are a starting point for verification, not a
+substitute for it, especially for *absence* claims. (2) A field being fetched
+but not rendered isn't automatically a gap — check `esi/endpoints.ts`'s own
+doc comments first; this app has at least one standing policy ("active jobs,
+not installer/location bookkeeping") that a plausible-sounding candidate can
+directly contradict. (3) A candidate whose own integration plan asks the
+reviewer to bless an unresolved methodology question (this run's price-history
+delta) is usually not ready to draft at all — resolve the methodology first or
+drop it, rather than drafting around the hole.
