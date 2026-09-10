@@ -1,9 +1,13 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+import { useEffect } from 'react';
+import { renderHook } from '@testing-library/react';
 import {
   resolveCharacterFilter,
   toStoredCharacterFilterValue,
   fromStoredCharacterFilterValue,
   isStoredCharacterFilterValue,
+  useResolvedCharacterFilter,
+  type CharacterFilterValue,
 } from './characterFilterValue';
 
 describe('resolveCharacterFilter', () => {
@@ -38,6 +42,88 @@ describe('toStoredCharacterFilterValue / fromStoredCharacterFilterValue', () => 
     const stored = toStoredCharacterFilterValue(new Set([3, 1, 2]));
     expect(stored).toEqual([1, 2, 3]);
     expect(fromStoredCharacterFilterValue(stored)).toEqual(new Set([1, 2, 3]));
+  });
+});
+
+describe('useResolvedCharacterFilter', () => {
+  it('returns a referentially stable result across re-renders with unchanged inputs', () => {
+    const { result, rerender } = renderHook(
+      ({
+        value,
+        activeCharacterId,
+      }: {
+        value: CharacterFilterValue;
+        activeCharacterId: number | null;
+      }) => useResolvedCharacterFilter(value, activeCharacterId),
+      { initialProps: { value: 'current' as CharacterFilterValue, activeCharacterId: 42 } }
+    );
+    const first = result.current;
+    rerender({ value: 'current', activeCharacterId: 42 });
+    expect(result.current).toBe(first);
+  });
+
+  it('re-resolves when the active Character changes', () => {
+    const { result, rerender } = renderHook(
+      ({
+        value,
+        activeCharacterId,
+      }: {
+        value: CharacterFilterValue;
+        activeCharacterId: number | null;
+      }) => useResolvedCharacterFilter(value, activeCharacterId),
+      { initialProps: { value: 'current' as CharacterFilterValue, activeCharacterId: 42 } }
+    );
+    const first = result.current;
+    rerender({ value: 'current', activeCharacterId: 7 });
+    expect(result.current).not.toBe(first);
+    expect(result.current).toEqual(new Set([7]));
+  });
+
+  it('re-resolves when the filter value itself changes', () => {
+    const { result, rerender } = renderHook(
+      ({
+        value,
+        activeCharacterId,
+      }: {
+        value: CharacterFilterValue;
+        activeCharacterId: number | null;
+      }) => useResolvedCharacterFilter(value, activeCharacterId),
+      { initialProps: { value: 'current' as CharacterFilterValue, activeCharacterId: 42 } }
+    );
+    rerender({ value: 'all', activeCharacterId: 42 });
+    expect(result.current).toBe('all');
+  });
+
+  // Regression test for issue #675 (React error #185, commit c39a9e7): a
+  // caller that feeds the resolved filter into an effect's dependency array
+  // must not have that effect re-fire on every render just because
+  // `resolveCharacterFilter('current', ...)` allocates a fresh Set per call.
+  it('does not re-fire a downstream effect on every render (issue #675 regression)', () => {
+    const effect = vi.fn();
+    const { rerender } = renderHook(
+      ({
+        value,
+        activeCharacterId,
+      }: {
+        value: CharacterFilterValue;
+        activeCharacterId: number | null;
+      }) => {
+        const resolved = useResolvedCharacterFilter(value, activeCharacterId);
+        useEffect(() => {
+          effect(resolved);
+        }, [resolved]);
+      },
+      { initialProps: { value: 'current' as CharacterFilterValue, activeCharacterId: 42 } }
+    );
+    expect(effect).toHaveBeenCalledTimes(1);
+
+    rerender({ value: 'current', activeCharacterId: 42 });
+    rerender({ value: 'current', activeCharacterId: 42 });
+    rerender({ value: 'current', activeCharacterId: 42 });
+    expect(effect).toHaveBeenCalledTimes(1);
+
+    rerender({ value: 'current', activeCharacterId: 7 });
+    expect(effect).toHaveBeenCalledTimes(2);
   });
 });
 

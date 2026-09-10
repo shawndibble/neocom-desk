@@ -48,7 +48,7 @@ import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
 import { CharacterBadge } from '@/features/character/assetBrowserRows';
 import {
-  resolveCharacterFilter,
+  useResolvedCharacterFilter,
   fromStoredCharacterFilterValue,
   type CharacterFilterValue,
 } from '@/features/character/characterFilterValue';
@@ -145,8 +145,8 @@ export function ActiveJobsPanel({
    * The character-filter picker (issue #607): `'current'` by default —
    * today's exact behavior, no extra fan-out, and it keeps following the
    * active Character across a switch with no resync logic of its own
-   * (`resolveCharacterFilter` re-resolves it fresh every render) — or
-   * All/a hand-picked subset once the pilot asks. Applies only to **My
+   * (`useResolvedCharacterFilter` re-resolves it whenever the active
+   * Character changes) — or All/a hand-picked subset once the pilot asks. Applies only to **My
    * jobs**; Corp jobs are already "everyone in the corp," an orthogonal
    * axis, so the picker is hidden while `showingCorp` (see
    * `showCharacterFilter`, rendered in the panel header's `meta`).
@@ -169,7 +169,7 @@ export function ActiveJobsPanel({
     setJobsCharacterFilter(fromStoredCharacterFilterValue(defaultCharacterFilter));
   }
 
-  const resolvedJobsFilter = resolveCharacterFilter(jobsCharacterFilter, characterId);
+  const resolvedJobsFilter = useResolvedCharacterFilter(jobsCharacterFilter, characterId);
   const showingAllJobs =
     !showingCorp &&
     (resolvedJobsFilter === 'all' ||

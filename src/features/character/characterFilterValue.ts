@@ -7,17 +7,49 @@
  * synced default in Settings (issue #607) share this one type, so resolving
  * "current" is written once.
  */
+import { useMemo } from 'react';
 import type { MultiSelectFilter } from '@/lib/multiSelectFilter';
 
 export type CharacterFilterValue = 'current' | MultiSelectFilter<number>;
 
-/** `'current'` resolved against whichever Character is active right now; every other value passes through unchanged. */
+/**
+ * `'current'` resolved against whichever Character is active right now; every
+ * other value passes through unchanged.
+ *
+ * For the `'current'` case this allocates a **fresh `Set` on every call** —
+ * fine for a one-off read (an event handler, a single render-time
+ * comparison), but that fresh identity is exactly what turned into an
+ * infinite render loop (issue #675, React error #185, commit `c39a9e7`) the
+ * one time a caller let it reach a `useEffect`/`useMemo` dependency array
+ * without memoizing it first. Any render-time caller — anything that will
+ * feed the result into a hook dependency array — must use
+ * `useResolvedCharacterFilter` instead of calling this directly.
+ */
 export function resolveCharacterFilter(
   value: CharacterFilterValue,
   activeCharacterId: number | null
 ): MultiSelectFilter<number> {
   if (value !== 'current') return value;
   return activeCharacterId === null ? 'all' : new Set([activeCharacterId]);
+}
+
+/**
+ * The render-safe form of `resolveCharacterFilter`: memoized so the result is
+ * referentially stable across re-renders with unchanged inputs, safe to drop
+ * straight into a `useMemo`/`useEffect` dependency array. This is the seam
+ * that owns the stability guarantee — every component deriving a resolved
+ * filter at render time should call this instead of the raw function plus its
+ * own ad hoc `useMemo` (see issue #675 for what happens when a call site
+ * forgets to).
+ */
+export function useResolvedCharacterFilter(
+  value: CharacterFilterValue,
+  activeCharacterId: number | null
+): MultiSelectFilter<number> {
+  return useMemo(
+    () => resolveCharacterFilter(value, activeCharacterId),
+    [value, activeCharacterId]
+  );
 }
 
 /**
