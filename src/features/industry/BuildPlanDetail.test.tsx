@@ -558,6 +558,76 @@ describe('BuildPlanDetail sub-builds', () => {
   });
 });
 
+describe('BuildPlanDetail Craft Sweep (issue #695)', () => {
+  const strategySelect = () => screen.getByRole('combobox', { name: 'Sweep Strategy' });
+  const depthSelect = () => screen.getByRole('combobox', { name: 'Sweep Depth' });
+  const sweepApplyButton = () => screen.getByRole('button', { name: 'Apply Craft Sweep' });
+  const tritaniumBuildButton = () =>
+    screen.getByRole('button', { name: 'Build Tritanium here instead of buying it' });
+
+  async function runSweep(
+    user: ReturnType<typeof userEvent.setup>,
+    strategyLabel: string,
+    depthLabel: string
+  ) {
+    await user.click(strategySelect());
+    await user.click(await screen.findByRole('option', { name: strategyLabel }));
+    await user.click(depthSelect());
+    await user.click(await screen.findByRole('option', { name: depthLabel }));
+    await user.click(sweepApplyButton());
+    const dialog = await screen.findByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: 'Apply Craft Sweep' }));
+  }
+
+  it("sizes Sweep Depth's options to this plan's own tree depth: Tritanium (1) <- Pyerite (2), Mexallon unbuildable", async () => {
+    const user = userEvent.setup();
+    render(<Harness plan={{ runs: 10 }} />);
+    await screen.findByText('Tritanium');
+
+    await user.click(depthSelect());
+    const options = await screen.findAllByRole('option');
+    expect(options.map((o) => o.textContent?.replace(/^\W+/, ''))).toEqual([
+      '1 level',
+      '2 levels',
+      'All levels',
+    ]);
+  });
+
+  it('overwrites buildHere to match the chosen Sweep Strategy and Sweep Depth, reflected immediately in the materials table', async () => {
+    const user = userEvent.setup();
+    const onUpdate = vi.fn();
+    // `Harness` always passes `groupSnapshot={null}` — every test in this
+    // file, including this one, already covers a plan with no Build Group
+    // (AC #6): there is nothing special-cased for the grouped case here.
+    render(<Harness plan={{ runs: 10 }} onUpdate={onUpdate} />);
+    await screen.findByText('Tritanium');
+
+    await runSweep(user, 'Build', '2 levels');
+
+    expect(onUpdate).toHaveBeenLastCalledWith({ buildHere: [34, 35] });
+    // Pyerite's own consumption (Mexallon) only appears once its job is
+    // actually pulled onto the table by buildHere containing it.
+    expect(await screen.findByText('Mexallon')).toBeInTheDocument();
+  });
+
+  it('re-running the sweep overwrites a hand-picked build/buy choice — expected, not a bug', async () => {
+    const user = userEvent.setup();
+    const onUpdate = vi.fn();
+    render(<Harness plan={{ runs: 10 }} onUpdate={onUpdate} />);
+    await screen.findByText('Tritanium');
+
+    await user.click(tritaniumBuildButton());
+    expect(onUpdate).toHaveBeenLastCalledWith({ buildHere: [34] });
+
+    await runSweep(user, 'Buy', '1 level');
+
+    expect(onUpdate).toHaveBeenLastCalledWith({ buildHere: [] });
+    expect(
+      await screen.findByRole('button', { name: 'Build Tritanium here instead of buying it' })
+    ).toBeInTheDocument();
+  });
+});
+
 /**
  * The job fee is charged by the system the job runs in, not the system the
  * plan sells in — the two are routinely different, and pricing the fee at the

@@ -27,6 +27,7 @@ import {
   setRigSlot,
 } from '@/engine/industry/types';
 import { makeOrBuy, type MakeOrBuy } from '@/engine/industry/makeOrBuy';
+import { autoBuildHere, maxSweepDepth, type SweepStrategy } from '@/engine/industry/autoMakeOrBuy';
 import { ownedStockSale } from '@/engine/industry/ownedStockSale';
 import type {
   FacilityKind,
@@ -82,6 +83,7 @@ import {
 import { useDetectedOwnedStock } from './useDetectedOwnedStock';
 import { useAssumedMe } from './assumedMe';
 import { OwnedStockScopeControl } from './OwnedStockScopeControl';
+import { CraftSweepControl } from './CraftSweepControl';
 import { ResultsSummary } from './ResultsSummary';
 import { PlanVerdictHero } from './PlanVerdictHero';
 import { useIsDesktop } from '@/lib/useIsDesktop';
@@ -432,6 +434,28 @@ export function BuildPlanDetail({
   }, [facilityContext, snapshot, materialPrices, skills]);
 
   /**
+   * Craft Sweep's own Sweep Depth range (issue #695): the plan's actual tree
+   * depth, independent of whether live prices have loaded — depth discovery
+   * never prices anything, so gating it on `makeOrBuyContext` (null until
+   * `pricesReady`) would leave the depth control empty during a slow price
+   * fetch for no reason.
+   */
+  const craftSweepMaxDepth = useMemo(() => {
+    if (!blueprint) return 0;
+    return maxSweepDepth(blueprint, plan.me, {
+      recipeFor,
+      ctx: {
+        ...facilityContext,
+        systemCostIndex: 0,
+        adjustedPrices: {},
+        materialPrices: {},
+        skills,
+      },
+      runs: plan.runs,
+    });
+  }, [blueprint, plan.me, plan.runs, recipeFor, facilityContext, skills]);
+
+  /**
    * The materials table's rows: `result.materials` is already the whole
    * resolved tree — `buildVsBuy` applies every `buildHere` choice itself, at
    * whatever depth (src/engine/industry/materialResolution) — so this only
@@ -661,6 +685,27 @@ export function BuildPlanDetail({
         ? current.filter((id) => id !== typeID)
         : [...current, typeID],
     });
+  }
+
+  /**
+   * Craft Sweep (issue #695): a one-shot bulk write, not a persistent policy
+   * (docs/context/decisions). Fully replaces `buildHere` — re-running with
+   * different settings, or the same ones again, overwrites whatever
+   * craft/buy choices were there before, including hand-picked ones. Craft
+   * Scope is fixed to manufacturing-only this round; Reactions and Planetary
+   * are reserved for later tickets.
+   */
+  function applyCraftSweep(options: { strategy: SweepStrategy; depth: number }) {
+    if (!blueprint || !makeOrBuyContext) return;
+    const picked = autoBuildHere(blueprint, plan.me, {
+      recipeFor,
+      ctx: makeOrBuyContext,
+      depth: options.depth,
+      runs: plan.runs,
+      scope: ['manufacturing'],
+      strategy: options.strategy,
+    });
+    update({ buildHere: [...picked] });
   }
 
   /**
@@ -1159,7 +1204,12 @@ export function BuildPlanDetail({
               detected" offers — and nothing else on the plan. Beside Facility
               and Trade hub it read as another thing about where the job runs.
             */}
-              <div className="mb-3 flex flex-col gap-2">
+              <div className="mb-3 flex flex-col gap-3">
+                <CraftSweepControl
+                  maxDepth={craftSweepMaxDepth}
+                  disabled={!makeOrBuyContext}
+                  onApply={applyCraftSweep}
+                />
                 <OwnedStockScopeControl
                   scope={plan.ownedStockScope}
                   detectedStock={detectedStock}

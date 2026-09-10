@@ -72,6 +72,69 @@ export interface AutoBuildHereOptions {
   strategy?: SweepStrategy;
 }
 
+interface WalkContext {
+  recipeFor: (typeID: number) => MaterialRecipe | null;
+  ctx: MakeOrBuyContext;
+  maxDepth: number;
+}
+
+/**
+ * Shared depth-first descent through a material's own recipe inputs,
+ * cycle-safe per branch. `visitMaterial` decides what to record for each
+ * material reached and whether to keep descending beneath it; the descent
+ * shape itself (planetary schematics vs. blueprints, per-job run-sizing,
+ * the never-throw contract) is identical for every caller, so it lives here
+ * once rather than being reimplemented per feature — see the module doc
+ * comment on why this file avoids a second tree-walker.
+ */
+function walkMaterials(
+  materials: readonly EffectiveMaterial[],
+  depth: number,
+  visited: ReadonlySet<number>,
+  wctx: WalkContext,
+  visitMaterial: (material: EffectiveMaterial, recipe: MaterialRecipe, depth: number) => boolean
+): void {
+  if (depth >= wctx.maxDepth) return;
+  for (const material of materials) {
+    if (visited.has(material.typeID)) continue;
+    const recipe = wctx.recipeFor(material.typeID);
+    if (!recipe) continue;
+
+    const recurse = visitMaterial(material, recipe, depth);
+    if (!recurse) continue;
+
+    try {
+      const subVisited = new Set([...visited, material.typeID]);
+      if (recipe.method === 'planetary') {
+        if (recipe.outputQuantity <= 0) continue;
+        const subRuns = Math.max(1, Math.ceil(material.quantity / recipe.outputQuantity));
+        const inputs: EffectiveMaterial[] = recipe.inputs.map((input) => ({
+          typeID: input.typeID,
+          baseQuantity: input.quantity * subRuns,
+          quantity: input.quantity * subRuns,
+        }));
+        walkMaterials(inputs, depth + 1, subVisited, wctx, visitMaterial);
+      } else {
+        // Same "runs to cover what's needed" sizing `jobUnitCost` used to
+        // reach a cost-effective verdict — the child's own material list
+        // must reflect the job actually being evaluated, not an arbitrary
+        // single run. Reaction formulas are always ME0 (module doc on
+        // `MaterialRecipe`'s reaction variant).
+        const outputPerRun = recipe.blueprint.products[0]?.quantity ?? 0;
+        if (outputPerRun <= 0) continue;
+        const subRuns = Math.max(1, Math.ceil(material.quantity / outputPerRun));
+        const subME = recipe.method === 'manufacturing' ? recipe.me : 0;
+        const inputs = effectiveMaterials(recipe.blueprint, subRuns, subME, wctx.ctx);
+        walkMaterials(inputs, depth + 1, subVisited, wctx, visitMaterial);
+      }
+    } catch {
+      // Never-throw contract — bad recipe data below this material must not
+      // blank the row. Its own build/buy decision above already stands
+      // regardless of whether recursing beneath it succeeds.
+    }
+  }
+}
+
 /**
  * Materials chosen to auto-build, at any level within the requested depth.
  * Depth counts the same way `materialResolution.ts`'s recursion does: the
@@ -93,68 +156,31 @@ export function autoBuildHere(
 
   const runs = Math.max(1, Math.round(opts.runs));
   try {
-    visit(effectiveMaterials(blueprint, runs, me, opts.ctx), 0, new Set());
+    walkMaterials(
+      effectiveMaterials(blueprint, runs, me, opts.ctx),
+      0,
+      new Set(),
+      { recipeFor: opts.recipeFor, ctx: opts.ctx, maxDepth },
+      (material, recipe) => {
+        const inScope = scope.includes(recipe.method);
+        const decision = !inScope ? 'buy' : decide(material, recipe);
+        if (decision === 'build') {
+          buildHere.add(material.typeID);
+        }
+        // A material chosen to build is recursed into the same way it
+        // always was. A material outside Craft Scope is recursed into too —
+        // it was never a build/buy cost decision to begin with, so it can't
+        // "dead end" the way a genuine buy verdict does; there may be
+        // further in-scope materials beneath it. A material bought on cost,
+        // or forced to buy by the `buy` strategy, still ends the branch
+        // here.
+        return !(decision === 'buy' && inScope);
+      }
+    );
   } catch {
     // materialModifier range-checks ME; bad data must not blank the row.
   }
   return buildHere;
-
-  function visit(
-    materials: readonly EffectiveMaterial[],
-    depth: number,
-    visited: ReadonlySet<number>
-  ): void {
-    if (depth >= maxDepth) return;
-    for (const material of materials) {
-      if (visited.has(material.typeID)) continue;
-      const recipe = opts.recipeFor(material.typeID);
-      if (!recipe) continue;
-
-      const inScope = scope.includes(recipe.method);
-      const decision = !inScope ? 'buy' : decide(material, recipe);
-      if (decision === 'build') {
-        buildHere.add(material.typeID);
-      }
-
-      // A material chosen to build is recursed into the same way it always
-      // was. A material outside Craft Scope is recursed into too — it was
-      // never a build/buy cost decision to begin with, so it can't "dead
-      // end" the way a genuine buy verdict does; there may be further
-      // in-scope materials beneath it. A material bought on cost, or forced
-      // to buy by the `buy` strategy, still ends the branch here — that part
-      // of the original behavior is unchanged.
-      if (decision === 'buy' && inScope) continue;
-      try {
-        const subVisited = new Set([...visited, material.typeID]);
-        if (recipe.method === 'planetary') {
-          if (recipe.outputQuantity <= 0) continue;
-          const subRuns = Math.max(1, Math.ceil(material.quantity / recipe.outputQuantity));
-          const inputs: EffectiveMaterial[] = recipe.inputs.map((input) => ({
-            typeID: input.typeID,
-            baseQuantity: input.quantity * subRuns,
-            quantity: input.quantity * subRuns,
-          }));
-          visit(inputs, depth + 1, subVisited);
-        } else {
-          // Same "runs to cover what's needed" sizing `jobUnitCost` used to
-          // reach a cost-effective verdict — the child's own material list
-          // must reflect the job actually being evaluated, not an arbitrary
-          // single run. Reaction formulas are always ME0 (module doc on
-          // `MaterialRecipe`'s reaction variant).
-          const outputPerRun = recipe.blueprint.products[0]?.quantity ?? 0;
-          if (outputPerRun <= 0) continue;
-          const subRuns = Math.max(1, Math.ceil(material.quantity / outputPerRun));
-          const subME = recipe.method === 'manufacturing' ? recipe.me : 0;
-          const inputs = effectiveMaterials(recipe.blueprint, subRuns, subME, opts.ctx);
-          visit(inputs, depth + 1, subVisited);
-        }
-      } catch {
-        // Never-throw contract — bad recipe data below this material must
-        // not blank the row. Its own build/buy decision above already
-        // stands regardless of whether recursing beneath it succeeds.
-      }
-    }
-  }
 
   function decide(material: EffectiveMaterial, recipe: MaterialRecipe): 'build' | 'buy' {
     if (strategy === 'build') return 'build';
@@ -174,4 +200,47 @@ export function autoBuildHere(
     );
     return verdict?.verdict === 'build' ? 'build' : 'buy';
   }
+}
+
+export interface SweepDepthOptions {
+  recipeFor: (typeID: number) => MaterialRecipe | null;
+  ctx: MakeOrBuyContext;
+  /** Runs the job would actually be sized to, matching `AutoBuildHereOptions.runs`. */
+  runs: number;
+}
+
+/**
+ * Deepest level a plan's own material tree actually reaches, for sizing a
+ * Craft Sweep's Sweep Depth control to the plan rather than to a fixed
+ * range. Counts the same way `autoBuildHere` does — depth 1 means only the
+ * product's own materials have a recipe, depth 2 means at least one of
+ * those has a recipe of its own, and so on — and, like `autoBuildHere`,
+ * keeps walking beneath a material regardless of Craft Scope: Sweep Depth
+ * bounds how far a sweep can reach, not which materials within reach are
+ * eligible to build, so depth discovery must not undercount a tree whose
+ * eligible materials sit beneath a reaction or planetary step. Capped at
+ * `MAX_SUB_BUILD_DEPTH`. Never throws.
+ */
+export function maxSweepDepth(
+  blueprint: IndustryBlueprint,
+  me: number,
+  opts: SweepDepthOptions
+): number {
+  let deepest = 0;
+  const runs = Math.max(1, Math.round(opts.runs));
+  try {
+    walkMaterials(
+      effectiveMaterials(blueprint, runs, me, opts.ctx),
+      0,
+      new Set(),
+      { recipeFor: opts.recipeFor, ctx: opts.ctx, maxDepth: MAX_SUB_BUILD_DEPTH },
+      (_material, _recipe, depth) => {
+        deepest = Math.max(deepest, depth + 1);
+        return true;
+      }
+    );
+  } catch {
+    // materialModifier range-checks ME; bad data must not blank the result.
+  }
+  return deepest;
 }
