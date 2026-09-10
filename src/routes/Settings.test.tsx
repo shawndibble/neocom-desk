@@ -823,6 +823,26 @@ describe('Settings — Notifications (issue #170)', () => {
       ).not.toBeChecked();
     });
 
+    it("disables its browser column when the browser permission is denied, matching a Character's own row", async () => {
+      stubNotification('denied');
+      render(<App />);
+      await notificationsPanel();
+
+      const masterSelectAllBrowser = await screen.findByRole('checkbox', {
+        name: 'Toggle browser notifications for every character',
+      });
+      expect(masterSelectAllBrowser).toBeDisabled();
+      expect(
+        screen.getByRole('checkbox', {
+          name: 'Skill Level Complete for every character, browser notifications',
+        })
+      ).toBeDisabled();
+      // The Overview column is unaffected — only browser is permission-gated.
+      expect(
+        screen.getByRole('checkbox', { name: 'Toggle Overview notifications for every character' })
+      ).not.toBeDisabled();
+    });
+
     it('never opens a native confirm dialog for a broadcast', async () => {
       const user = userEvent.setup();
       const confirmSpy = vi.spyOn(window, 'confirm');

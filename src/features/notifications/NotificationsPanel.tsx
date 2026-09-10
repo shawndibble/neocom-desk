@@ -47,6 +47,7 @@ import { db } from '@/db';
 import {
   NOTIFICATION_EVENTS,
   NOTIFICATION_EVENT_IDS,
+  eventLabelKey,
   type NotificationEventDef,
   type NotificationEventId,
 } from './events';
@@ -264,7 +265,7 @@ export function NotificationsPanel() {
   }, [characters]);
 
   const eventLabels = useMemo(
-    () => NOTIFICATION_EVENTS.map((event) => ({ id: event.id, label: t(event.labelKey) })),
+    () => NOTIFICATION_EVENT_IDS.map((id) => ({ id, label: t(eventLabelKey(id)) })),
     [t]
   );
 
@@ -281,7 +282,21 @@ export function NotificationsPanel() {
   // useLiveQuery resolves asynchronously — render the panel and master switch
   // immediately (like ActivityLogPanel does), and treat "still loading" the
   // same as "no characters yet" rather than blanking the whole section.
-  const characterList = characters ?? [];
+  const characterList = useMemo(() => characters ?? [], [characters]);
+
+  /**
+   * Every known Character id, active one first (issue #738): the "All
+   * Characters" broadcast writes into every id here in one call, then drives
+   * `updateNotificationPrefs`'s sync scheduling off `characterIds[0]` — the
+   * active Character is the one this session already knows is signed in with
+   * a usable token, so leading with it (rather than Dexie's insertion order)
+   * is what makes that assumption actually hold.
+   */
+  const allCharacterIds = useMemo(() => {
+    const ids = characterList.map((c) => c.characterId);
+    if (activeCharacterId === null) return ids;
+    return [activeCharacterId, ...ids.filter((id) => id !== activeCharacterId)];
+  }, [characterList, activeCharacterId]);
 
   // A denied grant disables the *browser* column and its Enable button — JS
   // cannot re-request one, so those controls could never take effect. It no
@@ -388,8 +403,9 @@ export function NotificationsPanel() {
         ) : (
           <>
             <AllCharactersNotificationSection
-              characterIds={characterList.map((c) => c.characterId)}
+              characterIds={allCharacterIds}
               prefsValue={prefsValue}
+              browserBlocked={browserBlocked}
             />
             <SearchInput
               value={search}

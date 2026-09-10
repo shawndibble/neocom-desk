@@ -29,9 +29,12 @@ const CHANNEL_COLUMNS = 'grid shrink-0 grid-cols-[4.25rem_4.25rem] justify-items
 export function AllCharactersNotificationSection({
   characterIds,
   prefsValue,
+  browserBlocked,
 }: {
   characterIds: readonly number[];
   prefsValue: NotificationPreferencesValue;
+  /** Denied browser permission disables the browser column here too, matching an individual Character's row. */
+  browserBlocked: boolean;
 }) {
   const { t } = useTranslation();
 
@@ -51,6 +54,7 @@ export function AllCharactersNotificationSection({
                 prefsValue.perCharacter,
                 channel
               )}
+              disabled={channel === 'browser' && browserBlocked}
               onToggle={() =>
                 void broadcastAllEventsChannelPref(
                   characterIds,
@@ -83,6 +87,7 @@ export function AllCharactersNotificationSection({
                       prefsValue.perCharacter,
                       channel
                     )}
+                    disabled={channel === 'browser' && browserBlocked}
                     onToggle={() =>
                       void broadcastEventChannelPref(characterIds, prefsValue, eventId, channel)
                     }
