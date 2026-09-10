@@ -186,3 +186,19 @@ export function eventLabelKey(eventId: NotificationEventId): string {
   if (!def) throw new Error(`Unknown Notification Event id: ${eventId}`);
   return def.labelKey;
 }
+
+/**
+ * Every corp event (issue #299) — the ones that get the best-effort
+ * disclosure row. Derived from `corpCapability` rather than hand-listed, so
+ * a future corp event picks up the disclosure by virtue of carrying that
+ * field, not by also being added here — the one source both
+ * `NotificationsPanel.tsx` and `notificationRows.ts` read, so they can't
+ * drift apart (issue #740).
+ */
+const CORP_EVENT_ID_SET: ReadonlySet<NotificationEventId> = new Set(
+  NOTIFICATION_EVENTS.filter((event) => event.corpCapability !== undefined).map((event) => event.id)
+);
+
+export function isCorpEventId(eventId: NotificationEventId): boolean {
+  return CORP_EVENT_ID_SET.has(eventId);
+}

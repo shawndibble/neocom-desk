@@ -858,6 +858,86 @@ describe('Settings — Notifications (issue #170)', () => {
   });
 });
 
+describe('Settings — Notifications virtualization (issue #740)', () => {
+  const ROSTER_SIZE = 60;
+
+  beforeEach(async () => {
+    for (let i = 0; i < ROSTER_SIZE; i++) {
+      const characterId = 1000 + i;
+      await db.characters.put({
+        characterId,
+        name: `Pilot ${String(i).padStart(3, '0')}`,
+        ownerHash: `oh-${i}`,
+        addedAt: i,
+      });
+      await db.tokens.put({
+        characterId,
+        accessToken: 'a',
+        refreshToken: 'r',
+        expiresAt: Date.now() + 1000 * 60 * 60,
+        scopes: ALL_NOTIFICATION_SCOPES,
+      });
+    }
+    // The active character drives which section auto-expands.
+    await db.settings.put({ key: ACTIVE_CHARACTER_KEY, value: 1000 });
+  });
+
+  it('a large roster mounts only a bounded slice of Character sections, not all of them', async () => {
+    render(<App />);
+    const panel = await notificationsPanel();
+    await within(panel).findByText('Pilot 000');
+
+    // Virtualized rows carry `data-index`; with a real ~600px test viewport
+    // (vitest.setup.ts's `data-virtual-scroll-root` mock) and ~60 mostly
+    // collapsed Characters, the mounted count should be a small fraction of
+    // the roster — never all 60, which is exactly the bug this ticket fixes.
+    const mountedRows = panel.querySelectorAll('[data-index]');
+    expect(mountedRows.length).toBeGreaterThan(0);
+    expect(mountedRows.length).toBeLessThan(ROSTER_SIZE / 2);
+  });
+
+  it("the active (auto-expanded) character's own controls still work in a large roster", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    const panel = within(await notificationsPanel());
+    await panel.findByText('Pilot 000');
+
+    const mailCheckbox = await panel.findByRole('checkbox', {
+      name: 'New Mail, browser notifications',
+    });
+    await user.click(mailCheckbox);
+    expect(mailCheckbox).not.toBeChecked();
+    expect(
+      (await db.settings.get(NOTIFICATION_PREFS_SETTING_KEY))
+        ?.value as typeof DEFAULT_NOTIFICATION_PREFERENCES
+    ).toMatchObject({ perCharacter: { 1000: { newMail: { browser: false, feed: true } } } });
+  });
+
+  it('collapsed characters in a large roster still render no event rows', async () => {
+    render(<App />);
+    const panel = within(await notificationsPanel());
+    await panel.findByText('Pilot 000');
+
+    // Pilot 001 onward stay collapsed (only the active character auto-expands) —
+    // none of their event checkboxes exist anywhere in the panel.
+    expect(panel.queryByText('Pilot 059')).toBeNull(); // outside the mounted window entirely
+    expect(
+      panel.queryByRole('checkbox', { name: /Skill Level Complete, browser notifications/ })
+    ).not.toBeNull(); // Pilot 000's own, present since it's expanded
+  });
+
+  it('search filtering still narrows the roster correctly with many characters', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    const panel = within(await notificationsPanel());
+    await panel.findByText('Pilot 000');
+
+    await user.type(panel.getByPlaceholderText('Search events or characters'), 'Pilot 007');
+    expect(await panel.findByText('Pilot 007')).toBeInTheDocument();
+    expect(panel.queryByText('Pilot 000')).toBeNull();
+  });
+});
+
 describe('Settings defaults', () => {
   it('defaults the time format to local, and persists a switch to EVE time', async () => {
     const user = userEvent.setup();
