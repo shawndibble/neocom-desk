@@ -82,7 +82,7 @@ describe('CraftSweepControl', () => {
     const dialog = await screen.findByRole('dialog');
     await user.click(within(dialog).getByRole('button', { name: 'Apply Craft Sweep' }));
 
-    expect(onApply).toHaveBeenCalledWith({ strategy: 'build', depth: 1 });
+    expect(onApply).toHaveBeenCalledWith({ strategy: 'build', depth: 1, depthChoice: 1 });
   });
 
   it('resolves "All levels" to the plan\'s own max depth', async () => {
@@ -94,7 +94,11 @@ describe('CraftSweepControl', () => {
     const dialog = await screen.findByRole('dialog');
     await user.click(within(dialog).getByRole('button', { name: 'Apply Craft Sweep' }));
 
-    expect(onApply).toHaveBeenCalledWith({ strategy: 'cost-effective', depth: 4 });
+    expect(onApply).toHaveBeenCalledWith({
+      strategy: 'cost-effective',
+      depth: 4,
+      depthChoice: 'all',
+    });
   });
 
   it('cancelling the confirmation applies nothing', async () => {
