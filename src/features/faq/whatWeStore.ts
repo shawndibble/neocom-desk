@@ -13,13 +13,16 @@
  * Anything added to any of those makes this list wrong until it is added here
  * too. See the scope decision recorded alongside this feature.
  *
- * Deliberately honest about the three places where something EVE-derived, or
+ * Deliberately honest about the four places where something EVE-derived, or
  * anything at all, does leave the device, because a section that overclaimed
  * would be worth less than one that did not exist: Notification Feed rows
  * (already shown to the user, so another device can catch up), Scheduled Push
  * occurrences (rendered ahead of time because the backend holds no SDE and no
- * i18n catalog — `functions/src/registerDevice.ts`), and crash reports. Each
- * is stated in {@link WHAT_WE_STORE_NOTES} rather than buried.
+ * i18n catalog — `functions/src/registerDevice.ts`), crash reports, and an
+ * exported backup file (issue #789) — the one case that is not automatic:
+ * it only happens when the pilot presses the button, and the file (including
+ * sign-in tokens) goes wherever they choose to put it, not to us. Each is
+ * stated in {@link WHAT_WE_STORE_NOTES} rather than buried.
  */
 
 /** One line in a group: a short label, plus a note when the label alone would leave a real question. */
@@ -94,7 +97,7 @@ export const WHAT_WE_STORE_GROUPS: readonly WhatWeStoreGroup[] = [
 ];
 
 /**
- * The three "yes, but" cases, stated plainly under the groups above rather
+ * The four "yes, but" cases, stated plainly under the groups above rather
  * than folded into them: each is a real exception a careful reader would
  * otherwise catch us omitting.
  */
@@ -102,4 +105,5 @@ export const WHAT_WE_STORE_NOTES: readonly string[] = [
   'settings.faq.store.notes.push',
   'settings.faq.store.notes.crashes',
   'settings.faq.store.notes.removal',
+  'settings.faq.store.notes.export',
 ];

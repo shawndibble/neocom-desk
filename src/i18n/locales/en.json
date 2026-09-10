@@ -2982,7 +2982,7 @@
     "tabs": {
       "general": "General",
       "notifications": "Notifications",
-      "dataAge": "Data Age",
+      "data": "Data",
       "activity": "Activity Log",
       "faq": "FAQ"
     },
@@ -3020,7 +3020,8 @@
         "notes": {
           "push": "Push notifications, if you turn them on: we store a token for this device, the character IDs it covers, and the alerts due in the next 72 hours — including their text, so they can be delivered while the app is closed. Each character is verified with EVE at that moment, and the token used for that check is discarded straight after.",
           "crashes": "Crash reports: when something goes wrong we receive the error and which page it happened on, so it can be fixed. IP addresses are switched off, request and response bodies are never captured, and your EVE tokens are stripped before anything is sent.",
-          "removal": "Removing a character deletes everything above from our servers. If its EVE login has already expired we cannot sign in to do that, so the deletion runs the next time you add that character back."
+          "removal": "Removing a character deletes everything above from our servers. If its EVE login has already expired we cannot sign in to do that, so the deletion runs the next time you add that character back.",
+          "export": "Exporting a backup (Data tab) writes a password-encrypted file — including your sign-in tokens — to your device. This only happens when you press the button, and the file goes wherever you choose to put it; we never see it."
         }
       },
       "feedbackTitle": "Where do I report a bug or ask for a feature?",
@@ -3138,6 +3139,22 @@
     "dataHint": "Clear locally cached EVE data if a view looks stale or you're troubleshooting — the app refetches from ESI as needed.",
     "clearCache": "Clear cached ESI data",
     "clearCacheConfirm": "Cache cleared.",
+    "backup": {
+      "exportTitle": "Export backup",
+      "exportHint": "Download every character on this device — including sign-in tokens — as one password-encrypted file. Import it on another device to add these characters there without re-doing EVE SSO for each one.",
+      "passwordWarning": "The password is the only protection on this file — anyone who has both the file and the password can sign in as these characters. Choose one you can remember; there is no recovery if you lose it.",
+      "passwordLabel": "Password",
+      "confirmPasswordLabel": "Confirm password",
+      "exportButton": "Download backup",
+      "exportDone": "Backup downloaded.",
+      "exportError": "Couldn't create the backup. Try again.",
+      "importTitle": "Import backup",
+      "importHint": "Pick a backup file exported from Neocom Desk and enter its password. A character already on this device is left untouched; only new characters are added.",
+      "fileLabel": "Backup file",
+      "importButton": "Import backup",
+      "importError": "Unable to decrypt file. Check the password and try again.",
+      "importSummary": "Added {{added}} character(s); skipped {{skipped}} already on this device."
+    },
     "defaultsTitle": "Defaults",
     "defaultsSyncHint": "Kept across your devices — set these once, on whichever one you have to hand.",
     "corpDefaultsTitle": "Corporation",
