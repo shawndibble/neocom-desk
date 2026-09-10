@@ -26,6 +26,8 @@ import {
   toggleAllEveTypesOnChannel,
   broadcastEventChannelFlags,
   broadcastAllEventsChannelFlags,
+  broadcastEveTypeChannelFlags,
+  broadcastAllEveTypesChannelFlags,
   NOTIFICATION_CHANNELS,
   type EventEnabledMap,
   type EveTypeEnabledMap,
@@ -544,6 +546,71 @@ export async function broadcastAllEventsChannelPref(
     characterIds,
     value,
     broadcastAllEventsChannelFlags(characterIds, eventIds, value.perCharacter, channel),
+    channel
+  );
+}
+
+/**
+ * `writeBroadcastFlags`'s counterpart for `eveNotificationTypesByCharacter`
+ * (issue #745) — the per-type map lives in its own top-level field, not
+ * `perCharacter`, so it needs its own merge-and-write shell rather than
+ * reusing the one above.
+ */
+async function writeBroadcastEveTypeFlags(
+  characterIds: readonly number[],
+  value: NotificationPreferencesValue,
+  flags: Record<number, EveTypeEnabledMap>,
+  channel: NotificationChannel
+): Promise<void> {
+  if (characterIds.length === 0) return;
+  const next: NotificationPreferencesValue = {
+    ...value,
+    eveNotificationTypesByCharacter: { ...value.eveNotificationTypesByCharacter, ...flags },
+  };
+  await updateNotificationPrefs(characterIds[0], next, channel);
+}
+
+/**
+ * Broadcasts one EVE Notification type's channel value to every known
+ * Character at once (issue #745) — the "All Characters" section's per-type
+ * control underneath `eveNotification`, same one-time-broadcast contract as
+ * `broadcastEventChannelPref`.
+ */
+export async function broadcastEveTypeChannelPref(
+  characterIds: readonly number[],
+  value: NotificationPreferencesValue,
+  type: string,
+  channel: NotificationChannel
+): Promise<void> {
+  await writeBroadcastEveTypeFlags(
+    characterIds,
+    value,
+    broadcastEveTypeChannelFlags(
+      characterIds,
+      type,
+      value.eveNotificationTypesByCharacter ?? {},
+      channel
+    ),
+    channel
+  );
+}
+
+/** Same as `broadcastEveTypeChannelPref`, for a Family's own select-all across every Character too. */
+export async function broadcastAllEveTypesChannelPref(
+  characterIds: readonly number[],
+  value: NotificationPreferencesValue,
+  types: readonly string[],
+  channel: NotificationChannel
+): Promise<void> {
+  await writeBroadcastEveTypeFlags(
+    characterIds,
+    value,
+    broadcastAllEveTypesChannelFlags(
+      characterIds,
+      types,
+      value.eveNotificationTypesByCharacter ?? {},
+      channel
+    ),
     channel
   );
 }

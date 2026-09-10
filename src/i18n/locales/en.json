@@ -3103,6 +3103,10 @@
         "browser": "{{event}} for every character, browser notifications",
         "feed": "{{event}} for every character, Overview list"
       },
+      "selectAllCharactersFamily": {
+        "browser": "Toggle all browser notifications for {{family}} for every character",
+        "feed": "Toggle all Overview notifications for {{family}} for every character"
+      },
       "columnEvent": "Event",
       "eveTypesHint": "EVE’s own in-game notifications, grouped by family. These default to the Overview page only, except the attack and loss alerts, which also raise a browser pop-up — flip any of them per column.",
       "family": {
