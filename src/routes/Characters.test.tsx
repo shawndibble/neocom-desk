@@ -45,40 +45,28 @@ vi.mock('@/features/character/removeCharacter', async (importOriginal) => ({
 }));
 
 const server = setupServer(
-  http.get('https://esi.evetech.net/characters/:id', ({ params }) => {
-    if (params.id === '91') {
-      return HttpResponse.json({
-        name: 'Pilot One',
-        corporation_id: 1001,
-        alliance_id: 2001,
-        birthday: '2015-01-01T00:00:00Z',
-        bloodline_id: 1,
-        gender: 'female',
-        race_id: 1,
-      });
-    }
-    // Character 92: simulate offline / ESI failure.
-    return HttpResponse.error();
+  http.post('https://esi.evetech.net/characters/affiliation', async ({ request }) => {
+    const ids = (await request.json()) as number[];
+    // Character 92 never resolves — same as ESI silently omitting an id it
+    // can't affiliate, rather than erroring the whole batch. Pilot Two's
+    // corp/alliance stay unresolved for the life of the test, same intent as
+    // the old per-character "simulate offline" mock this replaced.
+    return HttpResponse.json(
+      ids
+        .filter((id) => id === 91)
+        .map((id) => ({ character_id: id, corporation_id: 1001, alliance_id: 2001 }))
+    );
   }),
-  http.get('https://esi.evetech.net/corporations/:id', () =>
-    HttpResponse.json({
-      name: 'Test Corp',
-      ticker: 'TC',
-      ceo_id: 1,
-      creator_id: 1,
-      member_count: 5,
-      tax_rate: 0.1,
-    })
-  ),
-  http.get('https://esi.evetech.net/alliances/:id', () =>
-    HttpResponse.json({
-      name: 'Test Alliance',
-      ticker: 'TA',
-      creator_corporation_id: 1,
-      creator_id: 1,
-      date_founded: '2016-01-01T00:00:00Z',
-    })
-  )
+  http.post('https://esi.evetech.net/universe/names', async ({ request }) => {
+    const ids = (await request.json()) as number[];
+    return HttpResponse.json(
+      ids.map((id) =>
+        id === 2001
+          ? { id, name: 'Test Alliance', category: 'alliance' }
+          : { id, name: 'Test Corp', category: 'corporation' }
+      )
+    );
+  })
 );
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));

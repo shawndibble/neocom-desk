@@ -730,7 +730,7 @@ export function Characters() {
   const navigate = useNavigate();
   const characters = useLiveQuery(() => db.characters.orderBy('characterId').toArray());
   const publicInfo = usePublicInfo((state) => state.byCharacterId);
-  const loadPublicInfo = usePublicInfo((state) => state.load);
+  const loadPublicInfoMany = usePublicInfo((state) => state.loadMany);
   const setActiveCharacter = useActiveCharacter((state) => state.setActiveCharacter);
 
   const groupsValue = useOverviewGroups((state) => state.value);
@@ -846,8 +846,13 @@ export function Characters() {
   }, [hydrateSpExtractionThreshold]);
 
   useEffect(() => {
-    characters?.forEach((character) => void loadPublicInfo(character.characterId));
-  }, [characters, loadPublicInfo]);
+    // One batched call for the whole roster (issue: /characters page N+1 ESI
+    // calls) rather than one `load` per character — see `loadMany`'s doc
+    // comment on `usePublicInfo`.
+    if (characters && characters.length > 0) {
+      void loadPublicInfoMany(characters.map((character) => character.characterId));
+    }
+  }, [characters, loadPublicInfoMany]);
 
   useEffect(() => {
     let cancelled = false;

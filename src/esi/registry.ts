@@ -281,6 +281,10 @@ export const ESI_REGISTRY = {
     route: '/universe/names',
     scope: PUBLIC,
   },
+  postCharactersAffiliation: {
+    route: '/characters/affiliation',
+    scope: PUBLIC,
+  },
   postUniverseIds: {
     route: '/universe/ids',
     scope: PUBLIC,

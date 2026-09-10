@@ -825,6 +825,48 @@ export async function postUniverseNames(
   return result.data ?? [];
 }
 
+// --- POST /characters/affiliation (public) ---
+
+export interface CharacterAffiliation {
+  character_id: number;
+  corporation_id: number;
+  alliance_id?: number;
+  faction_id?: number;
+}
+
+/** ESI's documented cap on ids per request (maxItems in the spec) — shared with `postUniverseNames`. */
+const AFFILIATION_BATCH_LIMIT = 1000;
+
+function chunk<T>(items: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
+  return out;
+}
+
+/**
+ * Bulk corp/alliance lookup for many characters in one round trip (up to 1000
+ * per request; more are chunked into sequential requests) — replaces N
+ * `getCharacterPublicInfo` calls with the one field the roster page actually
+ * needs from each (issue: /characters page N+1 ESI calls).
+ */
+export async function postCharactersAffiliation(
+  characterIds: number[],
+  options: { signal?: AbortSignal } = {}
+): Promise<CharacterAffiliation[]> {
+  if (characterIds.length === 0) return [];
+  const out: CharacterAffiliation[] = [];
+  for (const batch of chunk(characterIds, AFFILIATION_BATCH_LIMIT)) {
+    const result = await esiFetch<CharacterAffiliation[]>('/characters/affiliation', {
+      method: 'POST',
+      body: batch,
+      signal: options.signal,
+      endpointId: 'postCharactersAffiliation',
+    });
+    out.push(...(result.data ?? []));
+  }
+  return out;
+}
+
 // --- GET /characters/{character_id}/search (esi-search.search_structures.v1) ---
 
 /** Only the categories the Build Plan's location search asks for. */

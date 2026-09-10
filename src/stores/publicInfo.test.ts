@@ -5,6 +5,8 @@ import { usePublicInfo } from './publicInfo';
 
 const CHAR_ID = 91;
 let characterRequests = 0;
+let affiliationRequests = 0;
+let namesRequests = 0;
 
 const server = setupServer(
   http.get('https://esi.evetech.net/characters/:id', ({ params }) => {
@@ -51,7 +53,29 @@ const server = setupServer(
       creator_id: 1,
       date_founded: '2016-01-01T00:00:00Z',
     })
-  )
+  ),
+  http.post('https://esi.evetech.net/characters/affiliation', async ({ request }) => {
+    affiliationRequests += 1;
+    const ids = (await request.json()) as number[];
+    return HttpResponse.json(
+      ids.map((characterId) =>
+        characterId === 92
+          ? { character_id: characterId, corporation_id: 1001 }
+          : { character_id: characterId, corporation_id: 1001, alliance_id: 2001 }
+      )
+    );
+  }),
+  http.post('https://esi.evetech.net/universe/names', async ({ request }) => {
+    namesRequests += 1;
+    const ids = (await request.json()) as number[];
+    return HttpResponse.json(
+      ids.map((id) =>
+        id === 2001
+          ? { id, name: 'Test Alliance', category: 'alliance' }
+          : { id, name: 'Test Corp', category: 'corporation' }
+      )
+    );
+  })
 );
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
@@ -59,6 +83,8 @@ afterAll(() => server.close());
 afterEach(() => server.resetHandlers());
 beforeEach(() => {
   characterRequests = 0;
+  affiliationRequests = 0;
+  namesRequests = 0;
   usePublicInfo.setState({ byCharacterId: {} });
 });
 
@@ -96,6 +122,57 @@ describe('usePublicInfo', () => {
   it('tolerates network failure without caching', async () => {
     server.use(http.get('https://esi.evetech.net/characters/:id', () => HttpResponse.error()));
     await expect(usePublicInfo.getState().load(CHAR_ID)).resolves.toBeUndefined();
+    expect(usePublicInfo.getState().byCharacterId[CHAR_ID]).toBeUndefined();
+  });
+});
+
+describe('usePublicInfo.loadMany', () => {
+  it('resolves corp and alliance names for many characters in two requests total', async () => {
+    await usePublicInfo.getState().loadMany([CHAR_ID, 92]);
+
+    expect(usePublicInfo.getState().byCharacterId[CHAR_ID]).toEqual({
+      corporationName: 'Test Corp',
+      allianceName: 'Test Alliance',
+    });
+    expect(usePublicInfo.getState().byCharacterId[92]).toEqual({
+      corporationName: 'Test Corp',
+      allianceName: null,
+    });
+    expect(affiliationRequests).toBe(1);
+    expect(namesRequests).toBe(1);
+    expect(characterRequests).toBe(0);
+  });
+
+  it('dedupes shared corporation ids into a single names lookup', async () => {
+    await usePublicInfo.getState().loadMany([CHAR_ID, 92]);
+
+    // Both characters share corporation_id 1001 — the names batch should
+    // resolve it once (1001 + 2001 = 2 ids), not once per character.
+    expect(namesRequests).toBe(1);
+  });
+
+  it('skips characters already cached or in flight', async () => {
+    await usePublicInfo.getState().loadMany([CHAR_ID]);
+    affiliationRequests = 0;
+    namesRequests = 0;
+
+    await Promise.all([
+      usePublicInfo.getState().loadMany([CHAR_ID, 92]),
+      usePublicInfo.getState().loadMany([92]),
+    ]);
+
+    expect(affiliationRequests).toBe(1);
+    expect(usePublicInfo.getState().byCharacterId[92]).toEqual({
+      corporationName: 'Test Corp',
+      allianceName: null,
+    });
+  });
+
+  it('tolerates network failure without caching', async () => {
+    server.use(
+      http.post('https://esi.evetech.net/characters/affiliation', () => HttpResponse.error())
+    );
+    await expect(usePublicInfo.getState().loadMany([CHAR_ID])).resolves.toBeUndefined();
     expect(usePublicInfo.getState().byCharacterId[CHAR_ID]).toBeUndefined();
   });
 });
