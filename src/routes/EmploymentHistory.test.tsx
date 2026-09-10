@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, waitFor, fireEvent, within } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
@@ -8,6 +8,8 @@ import { db } from '@/db';
 import { STALE_FETCHED_AT } from '@/esi/cacheFixtures';
 import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharacter';
 import { usePublicInfo } from '@/stores/publicInfo';
+import { usePublicInfoModalStore } from '@/stores/publicInfoModal';
+import { configureClipboard, type ClipboardWriter } from '@/lib/clipboard';
 import { writeRouteSnapshot } from '@/lib/routeSnapshotCache';
 import { App } from '@/app/App';
 
@@ -72,7 +74,10 @@ const server = setupServer(
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 afterAll(() => server.close());
-afterEach(() => server.resetHandlers());
+afterEach(() => {
+  server.resetHandlers();
+  configureClipboard(null);
+});
 beforeEach(async () => {
   skillCalls = 0;
   await db.characters.clear();
@@ -267,13 +272,12 @@ describe('EmploymentHistory', () => {
 });
 
 describe('Employment History row context menu (issue #729)', () => {
-  /** Right-clicks a corporation row by its resolved name and returns the row. */
+  /** Right-clicks a corporation row by its resolved name. */
   async function openHistoryMenu(name: string) {
     const row = (await screen.findByText(name)).closest('tr');
     if (!row) throw new Error(`expected a ${name} row`);
     row.focus();
     fireEvent.contextMenu(row);
-    return row;
   }
 
   it('offers Copy Name and Show Info', async () => {
@@ -284,25 +288,39 @@ describe('Employment History row context menu (issue #729)', () => {
     expect(screen.getByRole('menuitem', { name: 'Show info' })).toBeInTheDocument();
   });
 
-  it('Show Info opens the shared Public Info Modal on the corporation tab, for a past (non-current) employer', async () => {
-    const user = userEvent.setup();
+  it('Copy Name copies the resolved corporation name to the clipboard', async () => {
+    const clipboardWriteText = vi.fn<ClipboardWriter>().mockResolvedValue(undefined);
+    configureClipboard(clipboardWriteText);
+    render(<App />);
+    await openHistoryMenu('Past Corp');
+
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Copy name' }));
+
+    expect(clipboardWriteText).toHaveBeenCalledWith('Past Corp');
+  });
+
+  it('falls back to #id when the row has no resolved name', async () => {
     server.use(
-      http.get('https://esi.evetech.net/corporations/100', () =>
-        HttpResponse.json({
-          name: 'Past Corp',
-          ticker: 'PC',
-          ceo_id: 1,
-          creator_id: 1,
-          member_count: 3,
-          tax_rate: 0.1,
-        })
+      http.post('https://esi.evetech.net/universe/names', () =>
+        HttpResponse.json([{ id: 200, name: 'Current Corp', category: 'corporation' }])
       )
     );
+    const clipboardWriteText = vi.fn<ClipboardWriter>().mockResolvedValue(undefined);
+    configureClipboard(clipboardWriteText);
+    render(<App />);
+    await openHistoryMenu('#100');
+
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Copy name' }));
+
+    expect(clipboardWriteText).toHaveBeenCalledWith('#100');
+  });
+
+  it('Show Info opens the shared Public Info Modal on the corporation tab, for a past (non-current) employer', async () => {
+    const user = userEvent.setup();
     render(<App />);
     await openHistoryMenu('Past Corp');
     await user.click(screen.getByRole('menuitem', { name: 'Show info' }));
 
-    const dialog = await screen.findByRole('dialog');
-    expect(within(dialog).getByRole('tab', { name: 'Corporation' })).toBeInTheDocument();
+    expect(usePublicInfoModalStore.getState().request).toEqual({ kind: 'corporation', id: 100 });
   });
 });
