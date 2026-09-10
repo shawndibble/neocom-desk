@@ -168,10 +168,8 @@ export function Mail() {
 
   const [selectedId, setSelectedId] = useState<number | null>(null);
   // Local "mark read" state, applied instantly on selection so the dim never
-  // waits on the network. `markMailReadOnEsi` (issue #741) pushes the same
-  // fact to ESI alongside it, fire-and-forget, so a real reload agrees too —
-  // this state itself is unaffected by whether that write lands. Set on
-  // selection, not toggled — there is no manual mark-unread control.
+  // waits on the network — independent of `markMailReadOnEsi`'s own write
+  // below. Set on selection, not toggled — no manual mark-unread control.
   const [locallyReadIds, setLocallyReadIds] = useState<ReadonlySet<number>>(new Set());
   const [hideRead, setHideRead] = useState(false);
   function markLocalRead(mailId: number) {
@@ -502,10 +500,9 @@ export function Mail() {
                           onClick={() => {
                             setSelectedId(header.mail_id);
                             markLocalRead(header.mail_id);
-                            // Gated on ESI's own flag, not `isRead` (which also
-                            // includes this session's local mark) — a write that
-                            // failed must get another chance on every reopen, not
-                            // just on the next full reload.
+                            // Gated on ESI's flag, not `isRead` (which also covers
+                            // local state) — a failed write must get another
+                            // chance on every reopen, not just the next reload.
                             if (!header.is_read) {
                               void markMailReadOnEsi(activeCharacterId, header.mail_id);
                             }

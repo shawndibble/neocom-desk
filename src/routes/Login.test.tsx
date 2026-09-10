@@ -41,12 +41,7 @@ const READ_ONLY_PHRASES: Record<string, string> = {
   'esi-location.read_location.v1': 'current location',
 };
 
-/**
- * The one Base Grant scope that is a write, not a read (issue #741) — its
- * disclosure deliberately does not go in the "read-only access" sentence
- * above (that would contradict itself); it gets its own fine-print line
- * instead, asserted separately below.
- */
+/** The one Base Grant scope that's a write, not a read — its disclosure goes in its own fine-print line, not the "read-only access" sentence, which it would otherwise contradict. */
 const WRITE_SCOPE_PHRASES: Record<string, string> = {
   'esi-mail.organize_mail.v1': 'marks it read in EVE',
 };
@@ -222,9 +217,6 @@ describe('Login', () => {
     }
   });
 
-  // The one write scope is deliberately excluded from the "read-only access"
-  // sentence above — asserting its phrase there would require the page to
-  // contradict itself. It still needs disclosing somewhere real, though.
   it('discloses the one write scope in its own fine-print line, not the read-only sentence', async () => {
     renderLogin();
     await screen.findByRole('heading', { name: /read-only, and it stays that way/i });

@@ -634,7 +634,7 @@ export function getCharacterMailingLists(
 
 // --- PUT /characters/{character_id}/mail/{mail_id}/ (esi-mail.organize_mail.v1) ---
 
-/** Marks a mail read (or unread) on ESI — the one write this app makes (issue #741). ESI answers 204 No Content on success. */
+/** The app's one ESI write: marks a mail read (or unread). Answers 204 No Content on success. */
 export function putCharacterMail(
   characterId: number,
   mailId: number,

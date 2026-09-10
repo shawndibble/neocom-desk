@@ -82,8 +82,8 @@ const server = setupServer(
       recipients: [{ recipient_id: 90000003, recipient_type: 'character' }],
     })
   ),
-  // Default success for the mark-read write (issue #741) — tests that care
-  // about its request body/URL override this per-test.
+  // Default success for the mark-read write — tests that care about its
+  // request body/URL override this per-test.
   http.put(
     'https://esi.evetech.net/characters/:characterId/mail/:mailId/',
     () => new HttpResponse(null, { status: 204 })
@@ -517,10 +517,9 @@ describe('Mail', () => {
   });
 
   it('retries the write on every reopen within the session, not only on a fresh page load', async () => {
-    // A failed write must get another chance "next time the mail is
-    // touched" (issue #741's acceptance criteria) — not only once the whole
-    // component remounts. `header.is_read` (from the unmocked ESI list,
-    // still `false` here) is what gates the write, not local session state.
+    // A failed write must get another chance on every reopen, not only once
+    // the whole component remounts. `header.is_read` (still `false` here)
+    // gates the write, not local session state.
     let requestCount = 0;
     server.use(
       http.put(`https://esi.evetech.net/characters/${CHAR_ID}/mail/1/`, () => {

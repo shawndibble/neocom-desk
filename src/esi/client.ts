@@ -261,7 +261,10 @@ export async function esiFetch<T>(
       }
     }
 
-    if (response.status === 304) {
+    // 304 (cache revalidation) and 204 (a write's empty response, e.g. the
+    // mail-read PUT) both carry no body — `.json()` on either throws, not a
+    // real failure.
+    if (response.status === 304 || response.status === 204) {
       recordEsiActivity(endpointId, characterId, 'success');
       return {
         data: null,
@@ -271,19 +274,6 @@ export async function esiFetch<T>(
       };
     }
     if (!response.ok) throw await errorFromResponse(response);
-
-    // A write (PUT) endpoint like the mail-read one (issue #741) answers with
-    // no body at all — `.json()` on that throws a SyntaxError, not a real
-    // failure. Same empty-envelope shape as the 304 branch above.
-    if (response.status === 204) {
-      recordEsiActivity(endpointId, characterId, 'success');
-      return {
-        data: null,
-        etag: response.headers.get('etag'),
-        pages: parsePages(response),
-        expires: response.headers.get('expires'),
-      };
-    }
 
     // Parsed before recordActivity: a body that fails to parse is this
     // request's outcome, not a second event stacked on top of a 'success'

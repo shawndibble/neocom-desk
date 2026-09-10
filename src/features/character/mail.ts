@@ -118,17 +118,11 @@ export function loadMailBody(
   );
 }
 
-/**
- * Pushes the "read" write to ESI (issue #741) — the app's one write, on top
- * of the session-local mark-read that always happens regardless. Errors are
- * swallowed: a failed write (missing scope pre-re-consent, offline, rate
- * limited) costs nothing but another chance next time this mail reopens or
- * the mailbox reloads, so there is nothing for a caller to react to.
- */
+/** Pushes the "read" write to ESI, alongside the session-local mark-read that always happens regardless. Errors are swallowed — nothing for a caller to react to, just another chance next time this mail reopens. */
 export async function markMailReadOnEsi(characterId: number, mailId: number): Promise<void> {
   try {
     await putCharacterMail(characterId, mailId, { read: true });
   } catch {
-    // Fire-and-forget — see docstring.
+    // swallowed — see docblock
   }
 }
