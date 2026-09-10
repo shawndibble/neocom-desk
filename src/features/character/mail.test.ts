@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } 
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { configureEsi, ESI_BASE_URL } from '@/esi/client';
+import { onEsiAuthFailure } from '@/esi/authFailureSignal';
 import { db } from '@/db';
 import {
   loadMailHeaders,
@@ -205,5 +206,37 @@ describe('markMailReadOnEsi', () => {
     );
 
     await expect(markMailReadOnEsi(CHAR_ID, 7)).resolves.toBeUndefined();
+  });
+
+  it('signals the app-wide reauth banner on a 401/403 — a stale grant (e.g. a token that predates organize_mail) must not fail silently', async () => {
+    server.use(
+      http.put(`${ESI_BASE_URL}/characters/${CHAR_ID}/mail/7/`, () =>
+        HttpResponse.json({ error: 'missing scope' }, { status: 403 })
+      )
+    );
+    const reported = vi.fn();
+    const unsubscribe = onEsiAuthFailure(reported);
+
+    try {
+      await markMailReadOnEsi(CHAR_ID, 7);
+      expect(reported).toHaveBeenCalledWith(CHAR_ID);
+    } finally {
+      unsubscribe();
+    }
+  });
+
+  it('does not signal the reauth banner for a non-auth failure (network error)', async () => {
+    server.use(
+      http.put(`${ESI_BASE_URL}/characters/${CHAR_ID}/mail/7/`, () => HttpResponse.error())
+    );
+    const reported = vi.fn();
+    const unsubscribe = onEsiAuthFailure(reported);
+
+    try {
+      await markMailReadOnEsi(CHAR_ID, 7);
+      expect(reported).not.toHaveBeenCalled();
+    } finally {
+      unsubscribe();
+    }
   });
 });
