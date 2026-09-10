@@ -16,7 +16,7 @@
       "social": "Social"
     },
     "wallet": "Wallet",
-    "miningTax": "Moon Mining",
+    "miningTax": "Mining",
     "clones": "Clones",
     "pi": "PI",
     "employmentHistory": "Employment",
@@ -1195,7 +1195,9 @@
     "journalNoFilterMatches": "No journal entries match this filter."
   },
   "miningTax": {
-    "title": "Moon Mining",
+    "title": "Mining",
+    "taxTab": "Tax",
+    "overviewTab": "Overview",
     "refresh": "Refresh",
     "reauthTitle": "Some characters need to log in again",
     "reauthHint": "Log in again to fetch this character's personal mining ledger.",
@@ -1398,7 +1400,29 @@
     "estimatedValueColumn": "Est. value",
     "taxOwedColumn": "Tax owed",
     "statusColumn": "Status",
-    "unknownPayee": "Unknown Payee"
+    "unknownPayee": "Unknown Payee",
+    "overview": {
+      "volumeColumn": "Volume",
+      "rawSellValue": "Raw sell value",
+      "refineValue": "Refined value",
+      "pricingColumn": "Pricing",
+      "pricingFull": "Full",
+      "pricingPartial": "Partial",
+      "totalValueStat": "Total value",
+      "iskPerHourStat": "ISK/hr",
+      "iskPerHourBasisHint": "Averaged over the date range, not active mining time — ESI's ledger has no time of day.",
+      "volumeStat": "Volume mined",
+      "dateRangeStat": "Date range",
+      "iskPerHour": "ISK/hr",
+      "rateChartTitle": "ISK/hr trend",
+      "compareChartTitle": "Raw vs. refined value by type",
+      "priceNoteTitle": "Prices have moved since these were mined",
+      "priceNoteLine": "{{type}} is now {{percent}}% {{direction}} its mined-date price.",
+      "priceNoteHigher": "higher than",
+      "priceNoteLower": "lower than",
+      "emptyTitle": "No mining ledger entries in this window",
+      "emptyHint": "Mine some ore or ice and check back — ESI's personal mining ledger updates daily."
+    }
   },
   "assets": {
     "title": "Assets",
