@@ -209,6 +209,15 @@ export function collectStationItemIds(station: AssetTreeStation): number[] {
   return station.children.flatMap(collectItemIds);
 }
 
+/**
+ * Sum of every station's own `estimatedValue` — each already aggregates its
+ * full nested contents (see `sumNodes`), so summing across top-level stations
+ * only avoids double-counting the nodes beneath them.
+ */
+export function totalEstimatedValue(stations: readonly AssetTreeStation[]): number {
+  return stations.reduce((sum, station) => sum + station.estimatedValue, 0);
+}
+
 interface RootGroup {
   locationType: EngineAsset['location_type'];
   roots: EngineAsset[];

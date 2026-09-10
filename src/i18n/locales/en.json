@@ -1539,7 +1539,8 @@
       "allLocations_one": "All locations · {{count}}",
       "allLocations_other": "All locations · {{count}}",
       "locationCount_one": "{{count}} location",
-      "locationCount_other": "{{count}} locations"
+      "locationCount_other": "{{count}} locations",
+      "totalValue": "Total Assets Value: {{value}}"
     },
     "unresolved": {
       "heading_one": "Location unresolved · {{count}}",

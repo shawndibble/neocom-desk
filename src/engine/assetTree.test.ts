@@ -4,6 +4,7 @@ import {
   compareStations,
   collectItemIds,
   collectStationItemIds,
+  totalEstimatedValue,
   type AssetTreeContainerNode,
   type AssetTreeStation,
   type EngineAsset,
@@ -370,6 +371,35 @@ describe('collectStationItemIds', () => {
       estimatedValue: 0,
     };
     expect(collectStationItemIds(station)).toEqual([]);
+  });
+});
+
+describe('totalEstimatedValue', () => {
+  const station = (
+    overrides: Partial<AssetTreeStation> & Pick<AssetTreeStation, 'locationId'>
+  ): AssetTreeStation => ({
+    locationType: 'station' as const,
+    children: [],
+    itemCount: 0,
+    estimatedValue: 0,
+    ...overrides,
+  });
+
+  it('returns 0 for no stations', () => {
+    expect(totalEstimatedValue([])).toBe(0);
+  });
+
+  it('sums each top-level station value once, without re-descending into children', () => {
+    const stations = [
+      station({ locationId: 1, estimatedValue: 100 }),
+      station({ locationId: 2, estimatedValue: 5_000 }),
+    ];
+    expect(totalEstimatedValue(stations)).toBe(5_100);
+  });
+
+  it('treats a station with no priced assets as contributing 0, not NaN', () => {
+    const stations = [station({ locationId: 1, estimatedValue: 0 })];
+    expect(totalEstimatedValue(stations)).toBe(0);
   });
 });
 
