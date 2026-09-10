@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { FACILITY_PRESETS } from '@/engine/industry/types';
 import { jobFee } from '@/engine/industry/jobCost';
-import { buildLocationPatch } from './buildLocationPatch';
+import { buildLocationPatch, reactionBuildLocationPatch } from './buildLocationPatch';
 import type { BuildLocationOption } from './buildLocations';
 
 function option(over: Partial<BuildLocationOption> = {}): BuildLocationOption {
@@ -70,5 +70,27 @@ describe('buildLocationPatch', () => {
 
     expect(patch.facilityTaxPct).toBeUndefined();
     expect(fee.facilityTax).toBeCloseTo(2_500, 6);
+  });
+});
+
+describe('reactionBuildLocationPatch (issue #698)', () => {
+  it('sets the Reaction Location fields from the chosen structure', () => {
+    expect(
+      reactionBuildLocationPatch(option({ facility: 'tatara', structureId: 5, name: 'Reactor 5' }))
+    ).toEqual({
+      reactionFacility: 'tatara',
+      reactionSecurity: 'highsec',
+      reactionBuildSystemId: 30003888,
+      reactionBuildSystemName: 'Badivefi',
+      reactionBuildLocationId: 5,
+      reactionBuildLocationName: 'Reactor 5',
+    });
+  });
+
+  it('keeps the id when ESI withheld the name, and stores no name', () => {
+    const patch = reactionBuildLocationPatch(option({ facility: 'athanor', name: null }));
+
+    expect(patch.reactionBuildLocationId).toBe(1);
+    expect(patch.reactionBuildLocationName).toBeUndefined();
   });
 });

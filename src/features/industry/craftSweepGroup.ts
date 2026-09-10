@@ -13,14 +13,19 @@
 import type { BuildPlanRecord } from '@/db';
 import type { CharacterBlueprint } from '@/esi/endpoints';
 import { autoBuildHere, maxSweepDepth, type SweepStrategy } from '@/engine/industry/autoMakeOrBuy';
-import type { MakeOrBuyContext, MaterialRecipe } from '@/engine/industry/makeOrBuy';
+import { craftScope, reactionCraftEligible } from '@/engine/industry/craftScope';
+import type { MakeMethod, MakeOrBuyContext, MaterialRecipe } from '@/engine/industry/makeOrBuy';
 import type { IndustryBlueprint, SkillLevels } from '@/engine/industry/types';
 import { industryActivityOf } from '@/engine/industry/types';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import type { PiData } from '@/sde/types';
 import { toIndustryBlueprint, type BlueprintCatalog } from './blueprintCatalog';
-import { loadMarketSnapshots } from './marketData';
-import { facilityContextFor, type PlanFacilityContext } from './planFacilityContext';
+import { loadMarketSnapshots, type MarketSnapshot } from './marketData';
+import {
+  facilityContextFor,
+  reactionPlanFacilityContextFor,
+  type PlanFacilityContext,
+} from './planFacilityContext';
 import { materialPricesFor } from './priceBasis';
 import { buildPlanTypeIds, recipeForLookup } from './recipes';
 
@@ -28,6 +33,8 @@ interface ResolvedMember {
   plan: BuildPlanRecord;
   blueprint: IndustryBlueprint;
   facilityContext: PlanFacilityContext;
+  /** @see reactionPlanFacilityContextFor — `null` when this member has no Reaction Location configured (issue #698). */
+  reactionPlanFacilityContext: PlanFacilityContext | null;
 }
 
 function resolveMember(plan: BuildPlanRecord, catalog: BlueprintCatalog): ResolvedMember | null {
@@ -37,7 +44,32 @@ function resolveMember(plan: BuildPlanRecord, catalog: BlueprintCatalog): Resolv
     plan,
     blueprint: toIndustryBlueprint(entry.blueprint),
     facilityContext: facilityContextFor(plan),
+    reactionPlanFacilityContext: reactionPlanFacilityContextFor(plan),
   };
+}
+
+/**
+ * Craft Scope for the group's own chip row (issue #698): Manufacturing is
+ * always eligible; Reactions lights up the moment any single member is
+ * eligible for it (Include Reactions on, or that member's own activity is a
+ * reaction) — a sweep still resolves each member's own scope independently
+ * in `applyGroupCraftSweep`, this only answers whether the chip should ever
+ * light up at all. Planetary stays reserved.
+ */
+export function groupCraftScope(
+  plans: readonly BuildPlanRecord[],
+  catalog: BlueprintCatalog
+): MakeMethod[] {
+  for (const plan of plans) {
+    const member = resolveMember(plan, catalog);
+    if (!member) continue;
+    if (
+      reactionCraftEligible(industryActivityOf(member.blueprint), plan.includeReactions ?? false)
+    ) {
+      return ['manufacturing', 'reaction'];
+    }
+  }
+  return ['manufacturing'];
 }
 
 /**
@@ -66,6 +98,9 @@ export function groupCraftSweepMaxDepth(
       adjustedPrices: {},
       materialPrices: {},
       skills,
+      reactionFacility: member.reactionPlanFacilityContext
+        ? { ...member.reactionPlanFacilityContext, systemCostIndex: 0 }
+        : undefined,
     };
     deepest = Math.max(
       deepest,
@@ -115,16 +150,44 @@ export async function applyGroupCraftSweep(
     assumedMeForUnowned: assumedMe,
   });
 
+  // A second, independent batch for only the members with a Reaction
+  // Location configured (issue #698) — most groups have none, so this is
+  // usually a no-op rather than doubling every group sweep's price fetch.
+  const reactionMembers = members.filter((m) => m.reactionPlanFacilityContext !== null);
+  const reactionSnapshots =
+    reactionMembers.length > 0
+      ? loadMarketSnapshots(
+          reactionMembers.map((member) => ({
+            hub: getTradeHub(member.plan.hubId) ?? DEFAULT_TRADE_HUB,
+            typeIds: buildPlanTypeIds(member.blueprint, { catalog, pi }),
+            costIndexSystemId: member.plan.reactionBuildSystemId,
+            activity: 'reaction',
+          }))
+        )
+      : [];
+  const reactionSnapshotByPlanId = new Map<string, Promise<MarketSnapshot>>(
+    reactionMembers.map((member, i) => [member.plan.id, reactionSnapshots[i]!])
+  );
+
   const picks = new Map<string, Set<number>>();
   await Promise.all(
     members.map(async (member, index) => {
       const snapshot = await snapshots[index]!;
+      const reactionSnapshot = await reactionSnapshotByPlanId.get(member.plan.id);
+      const reactionFacility =
+        member.reactionPlanFacilityContext && reactionSnapshot?.systemCostIndex != null
+          ? {
+              ...member.reactionPlanFacilityContext,
+              systemCostIndex: reactionSnapshot.systemCostIndex,
+            }
+          : undefined;
       const ctx: MakeOrBuyContext = {
         ...member.facilityContext,
         systemCostIndex: snapshot.systemCostIndex ?? 0,
         adjustedPrices: snapshot.adjustedPrices ?? {},
         materialPrices: materialPricesFor(snapshot, member.plan.materialPriceBasis),
         skills,
+        reactionFacility,
       };
       picks.set(
         member.plan.id,
@@ -133,7 +196,10 @@ export async function applyGroupCraftSweep(
           ctx,
           depth: options.depth,
           runs: member.plan.runs,
-          scope: ['manufacturing'],
+          scope: craftScope(
+            industryActivityOf(member.blueprint),
+            member.plan.includeReactions ?? false
+          ),
           strategy: options.strategy,
         })
       );

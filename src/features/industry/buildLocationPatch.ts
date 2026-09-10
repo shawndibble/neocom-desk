@@ -35,3 +35,28 @@ export function buildLocationPatch(option: BuildLocationOption): BuildLocationPa
       : { rigFit: EMPTY_RIG_FIT, facilityTaxPct: undefined }),
   };
 }
+
+type ReactionBuildLocationPatch = Pick<
+  BuildPlanRecord,
+  'reactionFacility' | 'reactionSecurity' | 'reactionBuildSystemId' | 'reactionBuildLocationId'
+> &
+  Partial<
+    Pick<
+      BuildPlanRecord,
+      'reactionRigFit' | 'reactionBuildSystemName' | 'reactionBuildLocationName'
+    >
+  >;
+
+/** @see buildLocationPatch — the same write, for the Reaction Location (issue #698). Both refinery kinds are always a structure, so there is no non-structure clearing case here. */
+export function reactionBuildLocationPatch(
+  option: BuildLocationOption
+): ReactionBuildLocationPatch {
+  return {
+    reactionFacility: option.facility,
+    reactionSecurity: option.security,
+    reactionBuildSystemId: option.systemId,
+    reactionBuildSystemName: option.systemName,
+    reactionBuildLocationId: option.structureId,
+    reactionBuildLocationName: option.name ?? undefined,
+  };
+}

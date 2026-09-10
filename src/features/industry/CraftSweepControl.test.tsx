@@ -15,7 +15,7 @@ async function openOptions(user: ReturnType<typeof userEvent.setup>, trigger: HT
 
 describe('CraftSweepControl', () => {
   it('opens on Cost-effective / All levels', () => {
-    render(<CraftSweepControl maxDepth={2} onApply={vi.fn()} />);
+    render(<CraftSweepControl maxDepth={2} scope={['manufacturing']} onApply={vi.fn()} />);
 
     expect(strategySelect()).toHaveTextContent('Cost-effective');
     expect(depthSelect()).toHaveTextContent('All levels');
@@ -23,7 +23,7 @@ describe('CraftSweepControl', () => {
 
   it('offers exactly the three Sweep Strategies', async () => {
     const user = userEvent.setup();
-    render(<CraftSweepControl maxDepth={2} onApply={vi.fn()} />);
+    render(<CraftSweepControl maxDepth={2} scope={['manufacturing']} onApply={vi.fn()} />);
 
     const options = await openOptions(user, strategySelect());
     expect(options.map((o) => o.textContent?.replace(/^\W+/, ''))).toEqual([
@@ -35,7 +35,7 @@ describe('CraftSweepControl', () => {
 
   it("sizes Sweep Depth's options to the plan's own tree depth, plus All levels", async () => {
     const user = userEvent.setup();
-    render(<CraftSweepControl maxDepth={3} onApply={vi.fn()} />);
+    render(<CraftSweepControl maxDepth={3} scope={['manufacturing']} onApply={vi.fn()} />);
 
     const options = await openOptions(user, depthSelect());
     expect(options.map((o) => o.textContent?.replace(/^\W+/, ''))).toEqual([
@@ -46,24 +46,34 @@ describe('CraftSweepControl', () => {
     ]);
   });
 
-  it('shows Manufacturing as the only enabled Craft Scope; Reactions and Planetary stay visible but reserved', () => {
-    render(<CraftSweepControl maxDepth={2} onApply={vi.fn()} />);
+  it('shows Manufacturing as the only enabled Craft Scope when Reactions is not eligible; Planetary always stays reserved', () => {
+    render(<CraftSweepControl maxDepth={2} scope={['manufacturing']} onApply={vi.fn()} />);
 
     expect(screen.getByText('Manufacturing')).not.toHaveAttribute('aria-disabled');
     expect(screen.getByText('Reactions')).toHaveAttribute('aria-disabled', 'true');
     expect(screen.getByText('Planetary')).toHaveAttribute('aria-disabled', 'true');
   });
 
+  it('lights up Reactions once it is in scope (issue #698) — Planetary stays reserved regardless', () => {
+    render(
+      <CraftSweepControl maxDepth={2} scope={['manufacturing', 'reaction']} onApply={vi.fn()} />
+    );
+
+    expect(screen.getByText('Manufacturing')).not.toHaveAttribute('aria-disabled');
+    expect(screen.getByText('Reactions')).not.toHaveAttribute('aria-disabled');
+    expect(screen.getByText('Planetary')).toHaveAttribute('aria-disabled', 'true');
+  });
+
   it('asks for a generic overwrite confirmation before applying — never a computed preview', async () => {
     const user = userEvent.setup();
     const onApply = vi.fn();
-    render(<CraftSweepControl maxDepth={2} onApply={onApply} />);
+    render(<CraftSweepControl maxDepth={2} scope={['manufacturing']} onApply={onApply} />);
 
     await user.click(applyButton());
 
     const dialog = await screen.findByRole('dialog');
     expect(
-      within(dialog).getByText('This will overwrite manufacturing choices on this plan — continue?')
+      within(dialog).getByText('This will overwrite craft/buy choices on this plan — continue?')
     ).toBeInTheDocument();
     expect(onApply).not.toHaveBeenCalled();
   });
@@ -71,7 +81,7 @@ describe('CraftSweepControl', () => {
   it('applies the chosen strategy and depth once the confirmation is accepted', async () => {
     const user = userEvent.setup();
     const onApply = vi.fn();
-    render(<CraftSweepControl maxDepth={2} onApply={onApply} />);
+    render(<CraftSweepControl maxDepth={2} scope={['manufacturing']} onApply={onApply} />);
 
     await user.click(strategySelect());
     await user.click(screen.getByRole('option', { name: 'Build' }));
@@ -88,7 +98,7 @@ describe('CraftSweepControl', () => {
   it('resolves "All levels" to the plan\'s own max depth', async () => {
     const user = userEvent.setup();
     const onApply = vi.fn();
-    render(<CraftSweepControl maxDepth={4} onApply={onApply} />);
+    render(<CraftSweepControl maxDepth={4} scope={['manufacturing']} onApply={onApply} />);
 
     await user.click(applyButton());
     const dialog = await screen.findByRole('dialog');
@@ -104,7 +114,7 @@ describe('CraftSweepControl', () => {
   it('cancelling the confirmation applies nothing', async () => {
     const user = userEvent.setup();
     const onApply = vi.fn();
-    render(<CraftSweepControl maxDepth={2} onApply={onApply} />);
+    render(<CraftSweepControl maxDepth={2} scope={['manufacturing']} onApply={onApply} />);
 
     await user.click(applyButton());
     const dialog = await screen.findByRole('dialog');
@@ -115,13 +125,13 @@ describe('CraftSweepControl', () => {
   });
 
   it('disables Apply when the plan has nothing to sweep', () => {
-    render(<CraftSweepControl maxDepth={0} onApply={vi.fn()} />);
+    render(<CraftSweepControl maxDepth={0} scope={['manufacturing']} onApply={vi.fn()} />);
 
     expect(applyButton()).toBeDisabled();
   });
 
   it('disables Apply while prices are not yet loaded', () => {
-    render(<CraftSweepControl maxDepth={2} disabled onApply={vi.fn()} />);
+    render(<CraftSweepControl maxDepth={2} scope={['manufacturing']} disabled onApply={vi.fn()} />);
 
     expect(applyButton()).toBeDisabled();
   });

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   autoBuildHere,
+  facilityContextForNode,
   maxSweepDepth,
   MAX_AUTO_BUILD_DEPTH,
 } from '@/engine/industry/autoMakeOrBuy';
@@ -403,5 +404,29 @@ describe('maxSweepDepth', () => {
     const cyclic = (id: number): MaterialRecipe | null =>
       id === 700 ? { method: 'manufacturing', blueprint: selfBlueprint, me: 0 } : null;
     expect(() => maxSweepDepth(root, 0, { recipeFor: cyclic, ctx, runs: 1 })).not.toThrow();
+  });
+});
+
+describe('facilityContextForNode (issue #698)', () => {
+  const reactionFacility = {
+    facility: FACILITY_PRESETS.athanor,
+    rigFit: ['meT2', 'none', 'none'] as const,
+    security: 'highsec' as const,
+    systemCostIndex: 0.1,
+  };
+
+  it('uses the Reaction Location for a reaction node, when one is configured', () => {
+    expect(facilityContextForNode('reaction', { ...ctx, reactionFacility })).toBe(reactionFacility);
+  });
+
+  it("falls back to the plan's own ctx for a reaction node with no Reaction Location — a reaction-activity plan reuses its own facility", () => {
+    expect(facilityContextForNode('reaction', ctx)).toBe(ctx);
+  });
+
+  it('never uses the Reaction Location for a manufacturing node, even when one is configured', () => {
+    const withReactionFacility = { ...ctx, reactionFacility };
+    expect(facilityContextForNode('manufacturing', withReactionFacility)).toBe(
+      withReactionFacility
+    );
   });
 });

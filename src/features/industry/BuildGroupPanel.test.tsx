@@ -305,7 +305,7 @@ describe('BuildGroupPanel — Craft Sweep (issue #696)', () => {
     const dialog = await screen.findByRole('dialog');
     expect(
       within(dialog).getByText(
-        'This will overwrite manufacturing choices on 1 plan in this group — continue?'
+        'This will overwrite craft/buy choices on 1 plan in this group — continue?'
       )
     ).toBeTruthy();
     await user.click(within(dialog).getByRole('button', { name: 'Apply Craft Sweep' }));
@@ -331,7 +331,7 @@ describe('BuildGroupPanel — Craft Sweep (issue #696)', () => {
     const dialog = await screen.findByRole('dialog');
     expect(
       within(dialog).getByText(
-        'This will overwrite manufacturing choices on 1 plan in this group — continue?'
+        'This will overwrite craft/buy choices on 1 plan in this group — continue?'
       )
     ).toBeTruthy();
   });

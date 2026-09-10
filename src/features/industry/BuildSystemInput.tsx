@@ -12,6 +12,14 @@ interface BuildSystemInputProps {
   securityLabel: string;
   /** `null` clears the field back to "build at the hub". */
   onChange: (system: SolarSystemRef | null) => void;
+  /**
+   * Distinguishes this instance's `id`/`htmlFor` from any other
+   * `BuildSystemInput` mounted on the same page — issue #698 mounts a second
+   * one for the Reaction Location beside the plan's primary one. Defaults to
+   * the original hardcoded id, so the lone-input case (every caller before
+   * #698) needs no change.
+   */
+  idPrefix?: string;
 }
 
 /**
@@ -39,10 +47,12 @@ export function BuildSystemInput({
   hubSystemName,
   securityLabel,
   onChange,
+  idPrefix = 'build-plan-system',
 }: BuildSystemInputProps) {
   const { t } = useTranslation();
   const [text, setText] = useState(systemName ?? '');
   const [status, setStatus] = useState<'idle' | 'resolving' | 'notFound'>('idle');
+  const errorId = `${idPrefix}-error`;
 
   // Follows the plan when it changes underneath — switching plans, or a sync
   // landing an edit made on another device. Adjusted during render rather than
@@ -74,7 +84,7 @@ export function BuildSystemInput({
   return (
     <div className="flex flex-col gap-1 text-xs">
       <span className="flex items-center gap-1">
-        <label htmlFor="build-plan-system">{t('industry.buildSystem')}</label>
+        <label htmlFor={idPrefix}>{t('industry.buildSystem')}</label>
         <InfoTooltip
           label={t('industry.buildSystemTooltipLabel')}
           content={t('industry.buildSystemTooltip')}
@@ -82,12 +92,12 @@ export function BuildSystemInput({
       </span>
       <span className="flex items-center gap-1">
         <TextInput
-          id="build-plan-system"
+          id={idPrefix}
           className="w-full"
           value={text}
           placeholder={hubSystemName}
           aria-invalid={status === 'notFound'}
-          aria-describedby={status === 'notFound' ? 'build-plan-system-error' : undefined}
+          aria-describedby={status === 'notFound' ? errorId : undefined}
           onChange={(e) => {
             setText(e.target.value);
             if (status === 'notFound') setStatus('idle');
@@ -103,7 +113,7 @@ export function BuildSystemInput({
         {status === 'resolving' && <Spinner size="sm" />}
       </span>
       {status === 'notFound' ? (
-        <span id="build-plan-system-error" role="alert" className="text-danger">
+        <span id={errorId} role="alert" className="text-danger">
           {t('industry.buildSystemNotFound')}
         </span>
       ) : (
