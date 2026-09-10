@@ -57,6 +57,7 @@ export function OrderRowSummaryText({ row }: { row: OpenOrderRow }): ReactElemen
                   rival: formatIskAuto(summary.rivalPrice),
                   floor: row.floor ? formatIskAuto(row.floor.relist) : '',
                 })}
+                openOnTap
               >
                 <span
                   tabIndex={0}

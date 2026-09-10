@@ -642,7 +642,7 @@ export function OpenOrdersPanel() {
             {row.stationName === null ? (
               t('market.unknownStructure')
             ) : (
-              <Tooltip content={row.stationName}>
+              <Tooltip content={row.stationName} openOnTap>
                 <span
                   tabIndex={0}
                   className="cursor-help underline decoration-dotted decoration-text-dim/50 underline-offset-2"
