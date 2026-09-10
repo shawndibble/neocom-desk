@@ -2732,6 +2732,7 @@
     "quickbar": {
       "title": "Quickbar",
       "empty": "No items yet — right-click an item and choose Add to Quickbar.",
+      "viewInAppraisal": "View in Appraisal",
       "removeItem": "Remove {{name}} from Quickbar",
       "reorderItem": "Reorder {{name}}",
       "priceAlert": {
