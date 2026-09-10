@@ -39,9 +39,9 @@ skill's step 7).
 | PlanetFlow.APP                 | Self-hosted corp-scale PI: inventory lots, bulk import, hauling/intel integration, shareable PI templates                      | yes     |
 | Cradle of War                  | Ore/mineral reprocessing value + top-5 buy-order lookup for bulwark-site ore                                                   | yes     |
 | EVE Data Site                  | Market history/distribution charts with outlier filtering, universe-avg pricing, PLEX ticker                                   | yes     |
-| PIM (EVE PI Manager)           | Multi-char PI: storage-fill/factory-stall forecasting, POCO-to-planet material linking                                        | yes     |
+| PIM (EVE PI Manager)           | Multi-char PI: storage-fill/factory-stall forecasting, POCO-to-planet material linking                                         | yes     |
 | Web-based PI Tracker           | Client-side-only multi-char extractor/material tracker (P0-P1 only)                                                            | yes     |
-| JitaStocks                     | Corp collaborative build management, material reservation/claim, LP↔ISK exchange                                              | yes     |
+| JitaStocks                     | Corp collaborative build management, material reservation/claim, LP↔ISK exchange                                               | yes     |
 
 **Skimmed by thread title only, confirmed out of domain (mapping/intel/
 fitting-sim/crew-sim/combat-loot-tracking, no industry or market surface):**
@@ -175,20 +175,20 @@ Reusable heuristics — check a new candidate against these before drafting:
 
 ## Killed / dropped candidates (never filed)
 
-| Candidate                                           | Reason                                                                                                        |
-| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| Hub arbitrage / trade route finder                  | Ships as `hubHaulGaps`; no ESI for per-route courier cost. Re-confirmed twice more against newly-found tools. |
-| System cost index watch                             | No historical ESI data; distribution is a near-constant.                                                      |
-| Corp ore buyback / fleet payout split               | Cross-player aggregation wall.                                                                                |
-| Skill Extractor ISK/hr comparison                   | Narrow reach (multi-account SP arbitrage).                                                                    |
-| Market/order-book depth chart                       | Picture of data already on screen.                                                                            |
-| Public item-exchange contract deal browser          | Reopens ADR 0013's Firestore write-budget limit at full scale.                                                |
-| Price history %-change headline stat                | Thin-volume days make a naive delta unreliable.                                                               |
-| Corp Wallet: extend balance chart to corp divisions | Narrow reach (Accountant/Junior_Accountant role only); explicitly deferred, not bundled.                      |
-| Build Plan material row → PI colony link            | Colony cache is Dexie-only, cold for most players most of the time.                                           |
-| EVE Forge-style Gantt production scheduling         | Picture of data already on screen (`ActiveJobsPanel.tsx`).                                                    |
-| Bulk relist / buy-queue automation                  | No write-scoped ESI; Open Orders is deliberately read-only.                                                   |
-| EQM Corporate Exchange                              | Cross-player aggregation wall.                                                                                |
-| Asset staleness / idle-inventory detection          | Assets endpoint has no acquisition/last-touched timestamp.                                                    |
+| Candidate                                           | Reason                                                                                                                                                                                                                                     |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Hub arbitrage / trade route finder                  | Ships as `hubHaulGaps`; no ESI for per-route courier cost. Re-confirmed twice more against newly-found tools.                                                                                                                              |
+| System cost index watch                             | No historical ESI data; distribution is a near-constant.                                                                                                                                                                                   |
+| Corp ore buyback / fleet payout split               | Cross-player aggregation wall.                                                                                                                                                                                                             |
+| Skill Extractor ISK/hr comparison                   | Narrow reach (multi-account SP arbitrage).                                                                                                                                                                                                 |
+| Market/order-book depth chart                       | Picture of data already on screen.                                                                                                                                                                                                         |
+| Public item-exchange contract deal browser          | Reopens ADR 0013's Firestore write-budget limit at full scale.                                                                                                                                                                             |
+| Price history %-change headline stat                | Thin-volume days make a naive delta unreliable.                                                                                                                                                                                            |
+| Corp Wallet: extend balance chart to corp divisions | Narrow reach (Accountant/Junior_Accountant role only); explicitly deferred, not bundled.                                                                                                                                                   |
+| Build Plan material row → PI colony link            | Colony cache is Dexie-only, cold for most players most of the time.                                                                                                                                                                        |
+| EVE Forge-style Gantt production scheduling         | Picture of data already on screen (`ActiveJobsPanel.tsx`).                                                                                                                                                                                 |
+| Bulk relist / buy-queue automation                  | No write-scoped ESI; Open Orders is deliberately read-only.                                                                                                                                                                                |
+| EQM Corporate Exchange                              | Cross-player aggregation wall.                                                                                                                                                                                                             |
+| Asset staleness / idle-inventory detection          | Assets endpoint has no acquisition/last-touched timestamp.                                                                                                                                                                                 |
 | Player-structure pricing for Build Plans/Appraisal  | `structureMarkets` scope has no consent UI yet; widens a 5-value literal union across ~15+ call sites for a minority (staging-citadel) population; a lone structure's book is usually thin so hub pricing still dominates the math anyway. |
-| Total Assets Value chart over time                  | Assets isn't a poll domain (page-visit-only fetch) — a locally-accumulated series would sample on whenever the player opens the page, producing misleading flat gaps rather than an honest history. |
+| Total Assets Value chart over time                  | Assets isn't a poll domain (page-visit-only fetch) — a locally-accumulated series would sample on whenever the player opens the page, producing misleading flat gaps rather than an honest history.                                        |
