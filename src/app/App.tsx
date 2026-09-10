@@ -40,6 +40,7 @@ import { Styleguide } from '@/routes/Styleguide';
 import { ErrorProbe } from '@/routes/ErrorProbe';
 import { NotFound } from '@/routes/NotFound';
 import { Layout } from './Layout';
+import { AnalyticsPageViewTracker } from './AnalyticsPageViewTracker';
 import { ReloadPrompt } from './ReloadPrompt';
 import { WhatsNewPanel } from './WhatsNewPanel';
 import { InstallPrompt } from './InstallPrompt';
@@ -196,6 +197,7 @@ export function App() {
     <ErrorBoundary>
       <BrowserRouter basename={BASENAME}>
         <AuthFailureRedirect />
+        <AnalyticsPageViewTracker />
         <SentryRoutes>
           <Route path="/" element={<Root />} />
           <Route path="/login" element={<Login />} />
