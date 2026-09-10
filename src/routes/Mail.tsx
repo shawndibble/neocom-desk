@@ -15,6 +15,7 @@ import {
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { beginEveLogin } from '@/app/loginFlow';
+import { IssuerLink } from '@/features/character/IssuerLink';
 import {
   loadMailHeaders,
   loadMailBody,
@@ -654,9 +655,13 @@ export function Mail() {
                     {body.data.subject || t('mail.noSubject')}
                   </p>
                   <div className="space-y-0.5 border-b border-line pb-2 text-text-dim">
-                    {/* The reading pane never said who sent the mail. */}
                     <p>
-                      {t('mail.from')} <span className="text-text">{selectedSender}</span>
+                      {t('mail.from')}{' '}
+                      {selectedHeader?.from !== undefined ? (
+                        <IssuerLink issuerId={selectedHeader.from} name={selectedSender} />
+                      ) : (
+                        <span className="text-text">{selectedSender}</span>
+                      )}
                     </p>
                     {selectedHeader !== null && recipients.length > 0 && (
                       <p>
