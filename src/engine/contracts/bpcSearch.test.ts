@@ -2,12 +2,16 @@ import { describe, it, expect } from 'vitest';
 import {
   EMPTY_BPC_SEARCH_FILTER,
   filterBpcContracts,
+  filterBpcSearchRows,
+  contractRowToSearchRow,
+  ownedBlueprintToSearchRow,
   blueprintOfferStats,
   bpcPriceSummary,
   cheapestByRegion,
   effectivePrice,
   listedBlueprintTypeOptions,
   type BpcContractRow,
+  type OwnedBlueprintInput,
   blueprintSearchName,
 } from './bpcSearch';
 
@@ -116,6 +120,119 @@ describe('filterBpcContracts', () => {
   });
 });
 
+function ownedInput(overrides: Partial<OwnedBlueprintInput> = {}): OwnedBlueprintInput {
+  return {
+    itemId: 1,
+    typeId: 32858,
+    runs: 5,
+    me: 10,
+    te: 20,
+    quantity: 1,
+    ...overrides,
+  };
+}
+
+describe('contractRowToSearchRow', () => {
+  it('carries the common fields plus the original contract row', () => {
+    const contract = row({ contractId: 7, typeId: 100, me: 10, te: 20, runs: 5, quantity: 2 });
+    expect(contractRowToSearchRow(contract)).toEqual({
+      source: 'contract',
+      typeId: 100,
+      me: 10,
+      te: 20,
+      runs: 5,
+      quantity: 2,
+      contract,
+    });
+  });
+});
+
+describe('ownedBlueprintToSearchRow', () => {
+  it('maps an owned blueprint to the unified row shape', () => {
+    const bp = ownedInput({ itemId: 42, typeId: 100, runs: 5, me: 10, te: 20, quantity: 1 });
+    expect(ownedBlueprintToSearchRow(bp)).toEqual({
+      source: 'owned',
+      typeId: 100,
+      me: 10,
+      te: 20,
+      runs: 5,
+      quantity: 1,
+      itemId: 42,
+    });
+  });
+});
+
+describe('filterBpcSearchRows', () => {
+  it('narrows to the given type ids across both sources', () => {
+    const rows = [
+      contractRowToSearchRow(row({ contractId: 1, typeId: 100 })),
+      ownedBlueprintToSearchRow(ownedInput({ itemId: 1, typeId: 200 })),
+    ];
+    const filtered = filterBpcSearchRows(rows, {
+      ...EMPTY_BPC_SEARCH_FILTER,
+      typeIds: new Set([200]),
+    });
+    expect(filtered).toHaveLength(1);
+    expect(filtered[0]?.typeId).toBe(200);
+  });
+
+  it('applies minMe and minTe uniformly to both sources', () => {
+    const rows = [
+      contractRowToSearchRow(row({ contractId: 1, me: 5, te: 20 })),
+      ownedBlueprintToSearchRow(ownedInput({ itemId: 1, me: 10, te: 5 })),
+    ];
+    expect(
+      filterBpcSearchRows(rows, { ...EMPTY_BPC_SEARCH_FILTER, minMe: 10 }).map((r) => r.source)
+    ).toEqual(['owned']);
+    expect(
+      filterBpcSearchRows(rows, { ...EMPTY_BPC_SEARCH_FILTER, minTe: 10 }).map((r) => r.source)
+    ).toEqual(['contract']);
+  });
+
+  it('an owned BPO original (runs -1) always passes a minRuns filter — it offers unlimited runs, not too few', () => {
+    const rows = [ownedBlueprintToSearchRow(ownedInput({ itemId: 1, runs: -1 }))];
+    expect(filterBpcSearchRows(rows, { ...EMPTY_BPC_SEARCH_FILTER, minRuns: 50 })).toEqual(rows);
+  });
+
+  it('still applies minRuns normally to an owned copy with a real run count', () => {
+    const rows = [
+      ownedBlueprintToSearchRow(ownedInput({ itemId: 1, runs: 3 })),
+      ownedBlueprintToSearchRow(ownedInput({ itemId: 2, runs: 10 })),
+    ];
+    const filtered = filterBpcSearchRows(rows, { ...EMPTY_BPC_SEARCH_FILTER, minRuns: 10 });
+    expect(filtered.map((r) => (r.source === 'owned' ? r.itemId : null))).toEqual([2]);
+  });
+
+  it('a region filter excludes owned rows — this app tracks no location for owned blueprints', () => {
+    const rows = [
+      contractRowToSearchRow(row({ contractId: 1, regionId: 10000002 })),
+      ownedBlueprintToSearchRow(ownedInput({ itemId: 1 })),
+    ];
+    const filtered = filterBpcSearchRows(rows, {
+      ...EMPTY_BPC_SEARCH_FILTER,
+      regionId: 10000002,
+    });
+    expect(filtered.map((r) => r.source)).toEqual(['contract']);
+  });
+
+  it('a maxPrice filter never excludes an owned row — it has no price to judge', () => {
+    const rows = [
+      contractRowToSearchRow(row({ contractId: 1, price: 9_000_000 })),
+      ownedBlueprintToSearchRow(ownedInput({ itemId: 1 })),
+    ];
+    const filtered = filterBpcSearchRows(rows, { ...EMPTY_BPC_SEARCH_FILTER, maxPrice: 1 });
+    expect(filtered.map((r) => r.source)).toEqual(['owned']);
+  });
+
+  it('returns every row for the empty filter', () => {
+    const rows = [
+      contractRowToSearchRow(row({ contractId: 1 })),
+      ownedBlueprintToSearchRow(ownedInput({ itemId: 1 })),
+    ];
+    expect(filterBpcSearchRows(rows, EMPTY_BPC_SEARCH_FILTER)).toEqual(rows);
+  });
+});
+
 describe('listedBlueprintTypeOptions', () => {
   it('names and de-duplicates the distinct type ids present in the rows', () => {
     const rows = [
@@ -140,6 +257,13 @@ describe('listedBlueprintTypeOptions', () => {
 
   it('is empty given no rows', () => {
     expect(listedBlueprintTypeOptions([], new Map())).toEqual([]);
+  });
+
+  it('accepts any typeId-bearing rows, not just contract rows — e.g. owned blueprints merged in', () => {
+    const names = new Map([[300, 'Vexor Blueprint']]);
+    expect(listedBlueprintTypeOptions([{ typeId: 300 }], names)).toEqual([
+      { typeId: 300, name: 'Vexor Blueprint' },
+    ]);
   });
 });
 

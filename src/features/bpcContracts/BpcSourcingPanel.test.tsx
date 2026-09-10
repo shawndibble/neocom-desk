@@ -11,7 +11,8 @@ import { isSyncConfigured } from '@/app/syncStatus';
 import { App } from '@/app/App';
 import type { BpcContractRow } from '@/engine/contracts/bpcSearch';
 import type { PublicBpcContractsSnapshot } from '@/features/bpcContracts/syncedContracts';
-import type { CachedResult } from '@/esi/cache';
+import type { CachedResult, StatusResult } from '@/esi/cache';
+import type { CharacterBlueprint } from '@/esi/endpoints';
 import type { BlueprintMap } from '@/sde/types';
 
 vi.mock('virtual:pwa-register/react', () => ({
@@ -47,6 +48,34 @@ const loadRegionName = vi.fn(async (regionId: number) =>
 vi.mock('@/features/bpcContracts/regionNames', () => ({
   loadRegionName: (...args: [number]) => loadRegionName(...args),
 }));
+
+const loadCharacterBlueprints = vi.fn();
+vi.mock('@/features/industry/data', () => ({
+  loadCharacterBlueprints: (...args: unknown[]) => loadCharacterBlueprints(...args),
+  findOwnedBlueprint: vi.fn(),
+}));
+
+function ownedResult(
+  blueprints: CharacterBlueprint[],
+  needsReauth = false
+): StatusResult<CharacterBlueprint[]> {
+  return {
+    cached: { data: blueprints, fetchedAt: new Date(), fromCache: false, truncated: false },
+    needsReauth,
+  };
+}
+
+function ownedBlueprint(overrides: Partial<CharacterBlueprint> = {}): CharacterBlueprint {
+  return {
+    item_id: 1,
+    type_id: 638,
+    runs: 5,
+    material_efficiency: 8,
+    time_efficiency: 16,
+    quantity: 1,
+    ...overrides,
+  };
+}
 
 const BLUEPRINTS: BlueprintMap = {
   '638': {
@@ -106,6 +135,8 @@ beforeEach(async () => {
   useTimeFormat.setState({ value: DEFAULT_TIME_FORMAT, hydrated: false });
   loadPublicBpcContracts.mockReset();
   loadPublicBpcContracts.mockResolvedValue(cachedSnapshot([]));
+  loadCharacterBlueprints.mockReset();
+  loadCharacterBlueprints.mockResolvedValue(ownedResult([]));
   vi.mocked(isSyncConfigured).mockReturnValue(true);
 
   await db.characters.put({ characterId: CHAR_ID, name: 'Pilot One', ownerHash: 'oh', addedAt: 1 });
@@ -385,5 +416,120 @@ describe('BpcSourcingPanel row identity', () => {
 
     expect(within(narrowed).getByText('Caracal Blueprint')).toBeInTheDocument();
     expect(within(narrowed).queryByText('Rifter Blueprint')).not.toBeInTheDocument();
+  });
+});
+
+describe('BpcSourcingPanel source multiselect', () => {
+  it('defaults to both sources on, showing contract and owned rows together', async () => {
+    loadPublicBpcContracts.mockResolvedValue(cachedSnapshot([row({ contractId: 1, typeId: 638 })]));
+    loadCharacterBlueprints.mockResolvedValue(
+      ownedResult([ownedBlueprint({ item_id: 1, type_id: 870 })])
+    );
+    render(<App />);
+
+    const table = await screen.findByRole('table', { name: 'BPC Search' });
+    expect(within(table).getByText('Rifter Blueprint')).toBeInTheDocument();
+    expect(within(table).getByText('Caracal Blueprint')).toBeInTheDocument();
+
+    expect(screen.getByRole('button', { name: 'Contracts' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+    expect(screen.getByRole('button', { name: 'Owned' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('with only Contracts selected, shows exactly the contract rows and no owned ones', async () => {
+    loadPublicBpcContracts.mockResolvedValue(cachedSnapshot([row({ contractId: 1, typeId: 638 })]));
+    loadCharacterBlueprints.mockResolvedValue(
+      ownedResult([ownedBlueprint({ item_id: 1, type_id: 870 })])
+    );
+    const user = userEvent.setup();
+    render(<App />);
+    const table = await screen.findByRole('table', { name: 'BPC Search' });
+    expect(within(table).getByText('Caracal Blueprint')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Owned' }));
+
+    expect(within(table).getByText('Rifter Blueprint')).toBeInTheDocument();
+    expect(within(table).queryByText('Caracal Blueprint')).not.toBeInTheDocument();
+    expect(within(table).getAllByText('Contract')).toHaveLength(1);
+  });
+
+  it('with only Owned selected, shows the owned blueprint and not the contract row', async () => {
+    loadPublicBpcContracts.mockResolvedValue(cachedSnapshot([row({ contractId: 1, typeId: 638 })]));
+    loadCharacterBlueprints.mockResolvedValue(
+      ownedResult([ownedBlueprint({ item_id: 1, type_id: 870, quantity: 2 })])
+    );
+    const user = userEvent.setup();
+    render(<App />);
+    const table = await screen.findByRole('table', { name: 'BPC Search' });
+    expect(within(table).getByText('Rifter Blueprint')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Contracts' }));
+
+    expect(within(table).getByText('Caracal Blueprint')).toBeInTheDocument();
+    expect(within(table).queryByText('Rifter Blueprint')).not.toBeInTheDocument();
+    expect(within(table).getAllByText('Owned')).toHaveLength(1);
+  });
+
+  it('renders an owned BPO original (runs -1) as unlimited runs, not -1', async () => {
+    loadPublicBpcContracts.mockResolvedValue(cachedSnapshot([]));
+    loadCharacterBlueprints.mockResolvedValue(
+      ownedResult([ownedBlueprint({ item_id: 1, type_id: 638, runs: -1 })])
+    );
+    render(<App />);
+
+    const table = await screen.findByRole('table', { name: 'BPC Search' });
+    expect(within(table).getByText('∞')).toBeInTheDocument();
+    expect(within(table).queryByText('-1')).not.toBeInTheDocument();
+  });
+
+  it('shows no owned rows, not a crash, when the blueprints scope needs re-login', async () => {
+    // Industry's own page-level banner (fed by the same `loadCharacterBlueprints`
+    // call) already tells the player to log in again on every tab — this
+    // panel does not duplicate it, just shows nothing under Owned.
+    loadPublicBpcContracts.mockResolvedValue(cachedSnapshot([row({ contractId: 1, typeId: 638 })]));
+    loadCharacterBlueprints.mockResolvedValue(ownedResult([], true));
+    const user = userEvent.setup();
+    render(<App />);
+    const table = await screen.findByRole('table', { name: 'BPC Search' });
+    expect(within(table).getByText('Rifter Blueprint')).toBeInTheDocument();
+
+    expect(screen.getByText('Log in again to see owned blueprints')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Contracts' }));
+
+    expect(screen.getByText('No BPC listings match your filters.')).toBeInTheDocument();
+  });
+
+  it('shows a dedicated empty state when every source is deselected', async () => {
+    loadPublicBpcContracts.mockResolvedValue(cachedSnapshot([row({ contractId: 1, typeId: 638 })]));
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByRole('table', { name: 'BPC Search' });
+
+    await user.click(screen.getByRole('button', { name: 'Contracts' }));
+    await user.click(screen.getByRole('button', { name: 'Owned' }));
+
+    expect(screen.getByText('Select Contracts, Owned, or both to search.')).toBeInTheDocument();
+  });
+
+  it('a region filter narrows out owned rows, which carry no location data', async () => {
+    loadPublicBpcContracts.mockResolvedValue(
+      cachedSnapshot([row({ contractId: 1, typeId: 638, regionId: 10000002 })])
+    );
+    loadCharacterBlueprints.mockResolvedValue(
+      ownedResult([ownedBlueprint({ item_id: 1, type_id: 870 })])
+    );
+    const user = userEvent.setup();
+    render(<App />);
+    const table = await screen.findByRole('table', { name: 'BPC Search' });
+    expect(within(table).getByText('Caracal Blueprint')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('combobox', { name: 'Region' }));
+    await user.click(await screen.findByRole('option', { name: 'The Forge' }));
+
+    expect(within(table).getByText('Rifter Blueprint')).toBeInTheDocument();
+    expect(within(table).queryByText('Caracal Blueprint')).not.toBeInTheDocument();
   });
 });
