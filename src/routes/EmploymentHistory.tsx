@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, type ReactElement } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -18,6 +18,7 @@ import {
   loadEmploymentHistory,
   type EmploymentHistoryRow,
 } from '@/features/character/employmentHistory';
+import { CorpHistoryContextMenu } from '@/features/character/CorpHistoryContextMenu';
 import type { CachedResult } from '@/esi/cache';
 import type { CorporationHistoryEntry } from '@/esi/endpoints';
 import { resolveNames } from '@/features/character/names';
@@ -128,6 +129,17 @@ export function EmploymentHistory() {
     [t, corpNames, character?.corporationId]
   );
 
+  function historyRowContextMenu(row: EmploymentHistoryRow, tr: ReactElement) {
+    return (
+      <CorpHistoryContextMenu
+        corporationId={row.corporationId}
+        name={corpNames.get(row.corporationId) ?? `#${row.corporationId}`}
+      >
+        {tr}
+      </CorpHistoryContextMenu>
+    );
+  }
+
   if (!hydrated) {
     return (
       <div className="flex justify-center py-16">
@@ -193,6 +205,7 @@ export function EmploymentHistory() {
               rows={rows}
               rowKey={(row) => row.recordId}
               rowClassName={(row) => (row.ongoing ? 'bg-success/5' : undefined)}
+              rowContextMenu={historyRowContextMenu}
             />
           </>
         )}

@@ -2064,7 +2064,11 @@
     "corporation": "Corporation",
     "started": "Joined",
     "duration": "Duration",
-    "current": "Current"
+    "current": "Current",
+    "contextMenu": {
+      "copyName": "Copy name",
+      "showInfo": "Show info"
+    }
   },
   "contracts": {
     "title": "Contracts",
