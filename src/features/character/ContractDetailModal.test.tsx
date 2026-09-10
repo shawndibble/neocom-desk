@@ -28,6 +28,9 @@ vi.mock('@/sde/loadSde', () => ({
   })),
 }));
 
+const pricesMock = vi.hoisted(() => ({ getHubPrices: vi.fn() }));
+vi.mock('@/market/prices', () => pricesMock);
+
 const CHAR_ID = 91;
 
 const ITEM_EXCHANGE: Contract = {
@@ -45,6 +48,12 @@ const ITEM_EXCHANGE: Contract = {
   date_completed: '2026-08-26T01:46:00Z',
   price: 18_205_203,
   start_location_id: 60003760,
+};
+
+const ITEM_EXCHANGE_OUTSTANDING: Contract = {
+  ...ITEM_EXCHANGE,
+  status: 'outstanding',
+  date_completed: undefined,
 };
 
 const COURIER: Contract = {
@@ -87,6 +96,7 @@ beforeEach(async () => {
   configureEsi({ getToken: vi.fn(async () => 'tok') });
   await db.esiCache.clear();
   usePublicInfoModalStore.setState({ request: null });
+  pricesMock.getHubPrices.mockReset().mockResolvedValue(new Map());
 });
 afterEach(() => {
   server.resetHandlers();
@@ -257,6 +267,111 @@ describe('ContractDetailModal', () => {
     expect(usePublicInfoModalStore.getState().request).toEqual({
       kind: 'character',
       id: ITEM_EXCHANGE.issuer_id,
+    });
+  });
+
+  describe('Market value (issue #717)', () => {
+    it('shows a neutral market-value total for an outstanding contract, naming the hub', async () => {
+      pricesMock.getHubPrices.mockResolvedValue(
+        new Map([[34, { sellMin: 5.5, buyMax: 5, sellVolume: 0, buyVolume: 0 }]])
+      );
+      server.use(
+        http.get(`${ESI_BASE_URL}/universe/stations/60003760`, () => new Promise(() => {})),
+        http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/contracts/12345/items`, () =>
+          HttpResponse.json([
+            { record_id: 1, type_id: 34, quantity: 744, is_included: true, is_singleton: false },
+          ])
+        )
+      );
+      renderModal({
+        characterId: CHAR_ID,
+        contract: ITEM_EXCHANGE_OUTSTANDING,
+        issuerName: 'Mero Otichoda',
+        onClose: () => {},
+      });
+
+      expect(await screen.findByText('Market value at Jita (sell orders)')).toBeInTheDocument();
+      expect(screen.getByText('4,092.00')).toBeInTheDocument(); // 744 * 5.5
+      expect(screen.queryByText(/unpriced/)).not.toBeInTheDocument();
+    });
+
+    it('flags unpriced lines instead of treating them as free, and leaves them out of the total', async () => {
+      pricesMock.getHubPrices.mockResolvedValue(
+        new Map([[34, { sellMin: null, buyMax: null, sellVolume: 0, buyVolume: 0 }]])
+      );
+      server.use(
+        http.get(`${ESI_BASE_URL}/universe/stations/60003760`, () => new Promise(() => {})),
+        http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/contracts/12345/items`, () =>
+          HttpResponse.json([
+            { record_id: 1, type_id: 34, quantity: 744, is_included: true, is_singleton: false },
+          ])
+        )
+      );
+      renderModal({
+        characterId: CHAR_ID,
+        contract: ITEM_EXCHANGE_OUTSTANDING,
+        issuerName: 'Mero Otichoda',
+        onClose: () => {},
+      });
+
+      expect(await screen.findByText('(1 item unpriced)')).toBeInTheDocument();
+      expect(screen.getByText('0.00')).toBeInTheDocument();
+    });
+
+    it('shows no market-value figure for a finished contract', async () => {
+      server.use(
+        http.get(`${ESI_BASE_URL}/universe/stations/60003760`, () => new Promise(() => {})),
+        http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/contracts/12345/items`, () =>
+          HttpResponse.json([
+            { record_id: 1, type_id: 34, quantity: 744, is_included: true, is_singleton: false },
+          ])
+        )
+      );
+      renderModal({
+        characterId: CHAR_ID,
+        contract: ITEM_EXCHANGE,
+        issuerName: 'Mero Otichoda',
+        onClose: () => {},
+      });
+
+      await screen.findByRole('table', { name: 'Included' });
+      expect(screen.queryByText(/Market value at/)).not.toBeInTheDocument();
+      expect(pricesMock.getHubPrices).not.toHaveBeenCalled();
+    });
+
+    it('shows no market-value figure for a courier contract', () => {
+      renderModal({
+        characterId: CHAR_ID,
+        contract: COURIER,
+        issuerName: 'Mero Otichoda',
+        onClose: () => {},
+      });
+      expect(screen.queryByText(/Market value at/)).not.toBeInTheDocument();
+      expect(pricesMock.getHubPrices).not.toHaveBeenCalled();
+    });
+
+    it('does not show a Requested market-value row when Requested has no items', async () => {
+      pricesMock.getHubPrices.mockResolvedValue(
+        new Map([[34, { sellMin: 5, buyMax: 4, sellVolume: 0, buyVolume: 0 }]])
+      );
+      server.use(
+        http.get(`${ESI_BASE_URL}/universe/stations/60003760`, () => new Promise(() => {})),
+        http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/contracts/12345/items`, () =>
+          HttpResponse.json([
+            { record_id: 1, type_id: 34, quantity: 744, is_included: true, is_singleton: false },
+          ])
+        )
+      );
+      renderModal({
+        characterId: CHAR_ID,
+        contract: ITEM_EXCHANGE_OUTSTANDING,
+        issuerName: 'Mero Otichoda',
+        onClose: () => {},
+      });
+
+      await screen.findByText('Market value at Jita (sell orders)');
+      expect(screen.queryByRole('table', { name: 'Requested' })).not.toBeInTheDocument();
+      expect(screen.getAllByText('Market value at Jita (sell orders)')).toHaveLength(1);
     });
   });
 });

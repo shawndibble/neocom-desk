@@ -2140,6 +2140,9 @@
     "detailItemName": "Name",
     "detailQuantity": "Qty",
     "detailNoItems": "No item data for this contract",
+    "detailMarketValue": "Market value at {{hub}} (sell orders)",
+    "detailMarketValueUnpriced_one": "({{count}} item unpriced)",
+    "detailMarketValueUnpriced_other": "({{count}} items unpriced)",
     "statusFilterLabel": "Status",
     "typeFilterLabel": "Contract type",
     "contextMenu": {

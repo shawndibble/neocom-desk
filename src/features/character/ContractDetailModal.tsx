@@ -18,6 +18,7 @@ import { DataTable, EmptyState, Modal, Spinner, type DataTableColumn } from '@/c
 import { loadContractItems } from './contractItems';
 import { loadContractLocationName } from './contractLocationName';
 import { loadTypeNames } from './typeNames';
+import { loadContractMarketValue, type ContractMarketValue } from './contractMarketValue';
 import {
   CONTRACT_AVAILABILITY_KEY,
   CONTRACT_STATUS_KEY,
@@ -25,6 +26,8 @@ import {
 } from './contractLabels';
 import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { BuildPlanContextMenu } from '@/features/industry/BuildPlanContextMenu';
+import { useMarketHub } from '@/features/market/hub';
+import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import { IssuerLink } from './IssuerLink';
 import { typeIconUrl } from '@/lib/eveImages';
 import { formatIsk } from '@/lib/isk';
@@ -49,6 +52,11 @@ interface ItemsState {
   typeNames: Map<number, string>;
 }
 
+interface MarketValueState {
+  included: ContractMarketValue | null;
+  requested: ContractMarketValue | null;
+}
+
 const HAS_ITEMS = new Set<Contract['type']>(['item_exchange', 'auction']);
 
 export function ContractDetailModal({
@@ -59,9 +67,13 @@ export function ContractDetailModal({
 }: ContractDetailModalProps) {
   const { t } = useTranslation();
   const timeZone = useTimeZone();
+  const hubId = useMarketHub((s) => s.value);
+  const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
   const [location, setLocation] = useState<LocationState | undefined>(undefined);
   /** Stays `undefined` forever for a courier/loan contract — `HAS_ITEMS` gates both the fetch and the render, so it's never inspected there. */
   const [items, setItems] = useState<ItemsState | undefined>(undefined);
+  /** Only computed for an outstanding contract — see the `Market value` render gate below. */
+  const [marketValue, setMarketValue] = useState<MarketValueState | undefined>(undefined);
 
   useEffect(() => {
     let cancelled = false;
@@ -96,6 +108,32 @@ export function ContractDetailModal({
       cancelled = true;
     };
   }, [characterId, contract.type, contract.contract_id]);
+
+  /**
+   * Only for an outstanding contract (issue #717) — a finished/cancelled one
+   * is history, not a decision a market figure could still inform.
+   */
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      if (!HAS_ITEMS.has(contract.type) || contract.status !== 'outstanding' || !items) {
+        setMarketValue(undefined);
+        return;
+      }
+      const includedItems = items.list.filter((item) => item.is_included);
+      const requestedItems = items.list.filter((item) => !item.is_included);
+      const [included, requested] = await Promise.all([
+        loadContractMarketValue(hub, includedItems, items.typeNames),
+        requestedItems.length > 0
+          ? loadContractMarketValue(hub, requestedItems, items.typeNames)
+          : Promise.resolve(null),
+      ]);
+      if (!cancelled) setMarketValue({ included, requested });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [contract.type, contract.status, items, hub]);
 
   const title = contract.title || t(CONTRACT_TYPE_KEY[contract.type]);
 
@@ -249,6 +287,10 @@ export function ContractDetailModal({
                   title={t('contracts.detailItemsIncluded')}
                   columns={itemColumns}
                   items={included}
+                  marketValue={
+                    contract.status === 'outstanding' ? marketValue?.included : undefined
+                  }
+                  hubName={hub.systemName}
                 />
               )}
               {itemColumns && (
@@ -256,6 +298,10 @@ export function ContractDetailModal({
                   title={t('contracts.detailItemsRequested')}
                   columns={itemColumns}
                   items={requested}
+                  marketValue={
+                    contract.status === 'outstanding' ? marketValue?.requested : undefined
+                  }
+                  hubName={hub.systemName}
                 />
               )}
             </>
@@ -270,15 +316,23 @@ export function ContractDetailModal({
  * columns, differing only in title and rows, so they share a component
  * rather than the block being written out twice — the right-click menu and
  * the narrow-screen wrapper had to stay in step across both.
+ *
+ * `marketValue` is `undefined` while still loading (or not applicable to this
+ * contract's status) and `null` when there is nothing to price — either way,
+ * no row renders. Only a resolved `ContractMarketValue` renders one.
  */
 function ItemSection({
   title,
   columns,
   items,
+  marketValue,
+  hubName,
 }: {
   title: string;
   columns: DataTableColumn<ContractItem>[];
   items: ContractItem[];
+  marketValue: ContractMarketValue | null | undefined;
+  hubName: string;
 }) {
   if (items.length === 0) return null;
   return (
@@ -297,6 +351,7 @@ function ItemSection({
           rowContextMenu={(item, tr) => <BuildPlanContextMenu typeId={item.type_id} trigger={tr} />}
         />
       </div>
+      {marketValue && <MarketValueRow value={marketValue} hubName={hubName} />}
     </div>
   );
 }
@@ -313,6 +368,29 @@ function IskRow({ label, value }: { label: string; value: number }) {
     <div className="flex items-baseline justify-between gap-3 py-1.5">
       <span className="text-text-dim">{label}</span>
       <span className="tabular-nums font-semibold">{formatIsk(value, 2)}</span>
+    </div>
+  );
+}
+
+/**
+ * The market-value figure (issue #717): styled like `IskRow` — same neutral
+ * color, for the same reason its doc comment gives — but for a fact this app
+ * computed itself (a sell-order total at a Trade Hub) rather than one ESI
+ * reported, so it gets its own row rather than reusing `IskRow` verbatim.
+ */
+function MarketValueRow({ value, hubName }: { value: ContractMarketValue; hubName: string }) {
+  const { t } = useTranslation();
+  return (
+    <div className="flex items-baseline justify-between gap-3 border-t border-line py-1.5">
+      <span className="text-text-dim">{t('contracts.detailMarketValue', { hub: hubName })}</span>
+      <span className="tabular-nums font-semibold">
+        {formatIsk(value.total, 2)}
+        {value.unpriced > 0 && (
+          <span className="ml-1.5 font-normal text-text-dim">
+            {t('contracts.detailMarketValueUnpriced', { count: value.unpriced })}
+          </span>
+        )}
+      </span>
     </div>
   );
 }
