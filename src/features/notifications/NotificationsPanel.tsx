@@ -40,6 +40,7 @@ import {
   SelectValue,
 } from '@/components/ui';
 import { SelectionCheckbox } from '@/features/character/SelectionCheckbox';
+import { AllCharactersNotificationSection } from './AllCharactersNotificationSection';
 import { ScheduledPush, ICON_SIZE } from '@/components/ui/icons';
 import { PROJECTABLE_EVENT_IDS } from '@/engine/projection';
 import { db } from '@/db';
@@ -386,6 +387,10 @@ export function NotificationsPanel() {
           <EmptyState title={t('settings.notifications.emptyTitle')} />
         ) : (
           <>
+            <AllCharactersNotificationSection
+              characterIds={characterList.map((c) => c.characterId)}
+              prefsValue={prefsValue}
+            />
             <SearchInput
               value={search}
               onChange={(e) => setSearch(e.target.value)}

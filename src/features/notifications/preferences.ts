@@ -24,6 +24,8 @@ import {
   isEveTypeEnabledFor,
   toggleEveTypeChannel,
   toggleAllEveTypesOnChannel,
+  broadcastEventChannelFlags,
+  broadcastAllEventsChannelFlags,
   NOTIFICATION_CHANNELS,
   type EventEnabledMap,
   type EveTypeEnabledMap,
@@ -486,6 +488,51 @@ export function withCharacterEventThreshold<K extends keyof CharacterEventThresh
       [characterId]: { ...existing, [key]: amount },
     },
   };
+}
+
+/**
+ * Broadcasts one event's channel value to every known Character at once
+ * (issue #738) — the "All Characters" master row's per-event control. A
+ * one-time broadcast to Characters that exist right now, not a saved default
+ * applied to ones added later; each can still be edited independently
+ * afterward. `characterIds[0]` drives `updateNotificationPrefs`'s sync
+ * scheduling — any signed-in Character's token can push the same synced
+ * blob, and one write covering every Character avoids scheduling (and
+ * syncing) once per Character for what is really a single user action.
+ */
+export async function broadcastEventChannelPref(
+  characterIds: readonly number[],
+  value: NotificationPreferencesValue,
+  eventId: NotificationEventId,
+  channel: NotificationChannel
+): Promise<void> {
+  if (characterIds.length === 0) return;
+  const next: NotificationPreferencesValue = {
+    ...value,
+    perCharacter: {
+      ...value.perCharacter,
+      ...broadcastEventChannelFlags(characterIds, eventId, value.perCharacter, channel),
+    },
+  };
+  await updateNotificationPrefs(characterIds[0], next, channel);
+}
+
+/** Same as `broadcastEventChannelPref`, for the master row's own select-all across every Event too. */
+export async function broadcastAllEventsChannelPref(
+  characterIds: readonly number[],
+  value: NotificationPreferencesValue,
+  eventIds: readonly NotificationEventId[],
+  channel: NotificationChannel
+): Promise<void> {
+  if (characterIds.length === 0) return;
+  const next: NotificationPreferencesValue = {
+    ...value,
+    perCharacter: {
+      ...value.perCharacter,
+      ...broadcastAllEventsChannelFlags(characterIds, eventIds, value.perCharacter, channel),
+    },
+  };
+  await updateNotificationPrefs(characterIds[0], next, channel);
 }
 
 /** Re-exported so callers gate on one import rather than reaching into eventSelection too. */
