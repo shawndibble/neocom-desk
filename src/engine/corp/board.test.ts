@@ -289,6 +289,37 @@ describe('industry jobs', () => {
         job({ jobId: 2, status: 'delivered' }),
         job({ jobId: 3, status: 'cancelled' }),
         job({ jobId: 4, status: 'paused' }),
+        job({ jobId: 5, status: 'reverted' }),
+      ],
+    });
+    expect(items).toEqual([]);
+  });
+
+  /**
+   * ESI frequently leaves a finished job's `status` at `active` past its
+   * `end_date` — the Industry tab already treats a job as done once its
+   * clock runs out regardless of what ESI reports. The corp board must
+   * agree, or a job can sit undelivered for days without ever surfacing here.
+   */
+  it('raises an active job whose end time has already passed', () => {
+    const [item] = board({
+      nowMs: NOW,
+      staleWindowMs: STALE_WINDOW,
+      jobs: [job({ status: 'active', endMs: at(-HOUR) })],
+    });
+    expect(item.kind).toBe('jobDelivery');
+    expect(item.deadlineMs).toBe(at(-HOUR));
+  });
+
+  it('still ignores a delivered/cancelled/paused/reverted job even once its end time has passed', () => {
+    const items = board({
+      nowMs: NOW,
+      staleWindowMs: STALE_WINDOW,
+      jobs: [
+        job({ jobId: 2, status: 'delivered', endMs: at(-HOUR) }),
+        job({ jobId: 3, status: 'cancelled', endMs: at(-HOUR) }),
+        job({ jobId: 4, status: 'paused', endMs: at(-HOUR) }),
+        job({ jobId: 5, status: 'reverted', endMs: at(-HOUR) }),
       ],
     });
     expect(items).toEqual([]);

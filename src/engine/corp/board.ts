@@ -373,10 +373,13 @@ export function buildCorpBoard(sources: CorpBoardSources): CorpBoardItem[] {
   for (const structure of sources.structures ?? []) items.push(...structureItems(structure, clock));
   for (const extraction of sources.extractions ?? []) items.push(extractionItem(extraction, clock));
   for (const job of sources.jobs ?? []) {
-    // `ready` is the only status with anything to do: the job is finished and
-    // the output is sitting in the facility waiting for someone to deliver it.
-    // Running jobs are not late, and delivered/cancelled ones are done with.
-    if (job.status !== 'ready') continue;
+    // ESI often leaves a finished job's status at `active` past its end
+    // time, so a job counts as ready once its clock has run out too, not
+    // just when ESI agrees. Anything other than `active`/`ready` is
+    // delivered, cancelled, paused, or reverted — done with regardless of
+    // end time, since there is nothing left to pick up.
+    const stillOpen = job.status === 'ready' || job.status === 'active';
+    if (!stillOpen || (job.status !== 'ready' && clock.nowMs < job.endMs)) continue;
     items.push(jobItem(job, clock));
   }
 
