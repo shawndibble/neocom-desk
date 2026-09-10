@@ -584,9 +584,11 @@ function ColonyRow({
           onClick={onToggle}
           className="flex w-full flex-col gap-2 px-3 py-2.5 text-left hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-4 sm:gap-y-1.5"
         >
-          {/* Below `sm` this collapses to 3 lines (name+status, the track,
-              expiry+product+pins+caret) instead of one field per line —
-              `sm:contents` drops these two grouping divs from layout at the
+          {/* Below `sm` this collapses to 4 lines (name+status, the track,
+              expiry alone, product+pins+caret) instead of one field per
+              line — expiry gets its own line so a long countdown never
+              shares width with (and gets truncated by) the product label.
+              `sm:contents` drops these grouping divs from layout at the
               desktop breakpoint so their children rejoin the outer
               `sm:flex-row` as flat siblings, unchanged from before. */}
           <div className="flex items-center justify-between gap-2 sm:contents">
@@ -611,10 +613,12 @@ function ColonyRow({
               <span className="block h-full bg-accent" style={{ width: `${soonestPercent}%` }} />
             )}
           </span>
-          <div className="flex w-full items-center gap-3 sm:contents">
+          <div className="flex w-full items-center sm:contents">
             <span className="min-w-0 flex-1 truncate text-xs text-text-dim tabular-nums sm:w-44 sm:shrink-0 sm:flex-none">
               {expiryLabel}
             </span>
+          </div>
+          <div className="flex w-full items-center gap-3 sm:contents">
             <span className="min-w-0 flex-1 truncate text-xs text-text-dim sm:w-40 sm:shrink-0 sm:flex-none">
               {productLabel}
             </span>
