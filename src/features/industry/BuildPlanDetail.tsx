@@ -41,7 +41,11 @@ import type {
 import { rigKindLabelKey, rigFitSummaryLabel } from './rigFitLabels';
 import type { BuildGroupSnapshot } from './buildGroups';
 import { GroupTargetLink } from './GroupTargetLink';
-import { facilityContextFor, reactionPlanFacilityContextFor } from './planFacilityContext';
+import {
+  facilityContextFor,
+  reactionPlanFacilityContextFor,
+  sweepDepthContext,
+} from './planFacilityContext';
 import { useReactionFacilityDefaults } from './reactionFacilityDefaults';
 import { retargetPatch } from './retargetPatch';
 import { DEFAULT_TRADE_HUB, TRADE_HUBS, getTradeHub } from '@/market/hubs';
@@ -528,23 +532,29 @@ export function BuildPlanDetail({
    * depth, independent of whether live prices have loaded — depth discovery
    * never prices anything, so gating it on `makeOrBuyContext` (null until
    * `pricesReady`) would leave the depth control empty during a slow price
-   * fetch for no reason.
+   * fetch for no reason. Built from `reactionPlanFacilityContext`, not the
+   * price-resolved `reactionFacilityContext` below: the latter stays
+   * `undefined` until its own market snapshot lands, which would understate
+   * this plan's depth for as long as that fetch is in flight whenever a
+   * Reaction Location is configured. `sweepDepthContext` is the same seam
+   * `craftSweepGroup.ts`'s per-member depth walk uses.
    */
   const craftSweepMaxDepth = useMemo(() => {
     if (!blueprint) return 0;
     return maxSweepDepth(blueprint, plan.me, {
       recipeFor,
-      ctx: {
-        ...facilityContext,
-        systemCostIndex: 0,
-        adjustedPrices: {},
-        materialPrices: {},
-        skills,
-        reactionFacility: reactionFacilityContext,
-      },
+      ctx: sweepDepthContext(facilityContext, reactionPlanFacilityContext, skills),
       runs: plan.runs,
     });
-  }, [blueprint, plan.me, plan.runs, recipeFor, facilityContext, skills, reactionFacilityContext]);
+  }, [
+    blueprint,
+    plan.me,
+    plan.runs,
+    recipeFor,
+    facilityContext,
+    skills,
+    reactionPlanFacilityContext,
+  ]);
 
   /**
    * The materials table's rows: `result.materials` is already the whole
