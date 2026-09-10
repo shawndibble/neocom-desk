@@ -59,6 +59,106 @@ function priceForMaxFilter(row: BpcContractRow): number | null {
   return row.buyout ?? null;
 }
 
+export type BpcSearchSource = 'contract' | 'owned';
+
+/** The fields `filterBpcSearchRows`/`ownedBlueprintToSearchRow` need out of a character's owned blueprint (ESI's `CharacterBlueprint`) — kept local to this module rather than importing the ESI type, so `src/engine` stays decoupled from `src/esi`. */
+export interface OwnedBlueprintInput {
+  itemId: number;
+  typeId: number;
+  /** -1 for an original (BPO) — offers unlimited runs, not "fewer" than any copy. */
+  runs: number;
+  me: number;
+  te: number;
+  quantity: number;
+}
+
+/**
+ * One row in BPC Search's unified results. Common fields sit at the top level
+ * so a column can read `row.me`/`row.te` without narrowing; a contract row
+ * also carries the original `BpcContractRow` for contract-only UI (the detail
+ * modal, the build-plan seed) to use without re-deriving it.
+ */
+export type BpcSearchRow =
+  | {
+      source: 'contract';
+      typeId: number;
+      me: number;
+      te: number;
+      runs: number;
+      quantity: number;
+      contract: BpcContractRow;
+    }
+  | {
+      source: 'owned';
+      typeId: number;
+      me: number;
+      te: number;
+      runs: number;
+      quantity: number;
+      itemId: number;
+    };
+
+export function contractRowToSearchRow(row: BpcContractRow): BpcSearchRow {
+  return {
+    source: 'contract',
+    typeId: row.typeId,
+    me: row.me,
+    te: row.te,
+    runs: row.runs,
+    quantity: row.quantity,
+    contract: row,
+  };
+}
+
+/** The contract row behind a search row, or `null` for an owned one — the single narrowing every contract-only column/action shares instead of re-checking `row.source` itself. */
+export function asContract(row: BpcSearchRow): BpcContractRow | null {
+  return row.source === 'contract' ? row.contract : null;
+}
+
+export function ownedBlueprintToSearchRow(bp: OwnedBlueprintInput): BpcSearchRow {
+  return {
+    source: 'owned',
+    typeId: bp.typeId,
+    me: bp.me,
+    te: bp.te,
+    runs: bp.runs,
+    // ESI's quantity is a real count only when positive — a single original
+    // is -1, a single copy is -2 (unlike `runs`'s -1, this sentinel means
+    // nothing beyond "one") — normalized here, not left for every reader.
+    quantity: bp.quantity > 0 ? bp.quantity : 1,
+    itemId: bp.itemId,
+  };
+}
+
+/**
+ * Filters unified rows — a sibling of `filterBpcContracts`, kept separate so
+ * the original contract-only filter path stays untouched. Region excludes an
+ * owned row outright (nothing to match); price never does (not for sale, so
+ * nothing can disqualify it) — the same stance `filterBpcContracts` already
+ * takes for a no-buyout auction's unknown eventual price.
+ */
+export function filterBpcSearchRows(
+  rows: readonly BpcSearchRow[],
+  filter: BpcSearchFilter
+): BpcSearchRow[] {
+  return rows.filter((row) => {
+    if (filter.typeIds && !filter.typeIds.has(row.typeId)) return false;
+    if (filter.minMe != null && row.me < filter.minMe) return false;
+    if (filter.minTe != null && row.te < filter.minTe) return false;
+    if (filter.minRuns != null && row.runs !== -1 && row.runs < filter.minRuns) return false;
+    if (row.source === 'contract') {
+      if (filter.regionId != null && row.contract.regionId !== filter.regionId) return false;
+      if (filter.maxPrice != null) {
+        const price = priceForMaxFilter(row.contract);
+        if (price != null && price > filter.maxPrice) return false;
+      }
+    } else if (filter.regionId != null) {
+      return false;
+    }
+    return true;
+  });
+}
+
 export function filterBpcContracts(
   rows: readonly BpcContractRow[],
   filter: BpcSearchFilter
@@ -226,12 +326,15 @@ export function blueprintSearchName(name: string): string {
  * Distinct blueprint/formula types actually present in the loaded rows,
  * named from the SDE blueprint catalog and sorted by name — the item-type
  * search's corpus. Deliberately narrower than the whole SDE catalog: search
- * only what is actually for sale right now, so a query never returns a type
- * with zero listings, and the catalog stays small enough that
- * `rankedSearch`'s result cap is never the reason a real match goes missing.
+ * only what is actually searchable right now (for sale, or owned), so a
+ * query never returns a type with zero results, and the catalog stays small
+ * enough that `rankedSearch`'s result cap is never the reason a real match
+ * goes missing. Takes any typeId-bearing rows rather than `BpcContractRow[]`
+ * specifically, so a caller can merge contract rows and owned blueprints
+ * into one corpus before calling this.
  */
 export function listedBlueprintTypeOptions(
-  rows: readonly BpcContractRow[],
+  rows: readonly { typeId: number }[],
   blueprintNames: ReadonlyMap<number, string>
 ): BlueprintTypeOption[] {
   const seen = new Map<number, string>();

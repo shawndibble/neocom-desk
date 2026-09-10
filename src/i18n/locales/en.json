@@ -2190,7 +2190,15 @@
     "contentsHeading": "Everything on this contract",
     "requestedItem": "Requested",
     "itemMeTe": "ME {{me}} / TE {{te}}",
-    "runsShort": "{{runs}} runs"
+    "runsShort": "{{runs}} runs",
+    "sourceLabel": "Source",
+    "sourceContracts": "Contracts",
+    "sourceContractSingular": "Contract",
+    "sourceOwned": "Owned",
+    "sourceColumn": "Source",
+    "unlimitedRuns": "∞",
+    "notApplicable": "—",
+    "noSourceSelected": "Select Contracts, Owned, or both to search."
   },
   "contacts": {
     "title": "Contacts",
