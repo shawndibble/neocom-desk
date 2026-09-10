@@ -2,8 +2,9 @@ import { describe, it, expect } from 'vitest';
 import { autoBuildHere, MAX_AUTO_BUILD_DEPTH } from '@/engine/industry/autoMakeOrBuy';
 import { makeOrBuy, type MakeOrBuyContext, type MaterialRecipe } from '@/engine/industry/makeOrBuy';
 import { effectiveMaterials } from '@/engine/industry/materials';
+import { MAX_SUB_BUILD_DEPTH } from '@/engine/industry/materialResolution';
 import { FACILITY_PRESETS } from '@/engine/industry/types';
-import type { IndustryBlueprint } from '@/engine/industry/types';
+import type { HubPrices, IndustryBlueprint } from '@/engine/industry/types';
 
 // A four-level chain, cheapest to build at every level: product (600) <-
 // gearA (502) <- gearB (501) <- gearC (500) <- gearD (499) <- Tritanium (34,
@@ -79,12 +80,56 @@ describe('autoBuildHere', () => {
     );
   });
 
-  it('clamps to MAX_AUTO_BUILD_DEPTH regardless of a larger requested depth', () => {
+  it('is no longer clamped to MAX_AUTO_BUILD_DEPTH — that constant is Build Opportunities UI sizing only', () => {
     expect(MAX_AUTO_BUILD_DEPTH).toBe(3);
     const result = autoBuildHere(productBlueprint, 0, { recipeFor, ctx, depth: 99, runs: 1 });
-    // gearD (499) is a 4th, still-cheaper-to-build level — excluded only if
-    // the clamp actually bites, not merely because nothing produces it.
-    expect(result).toEqual(new Set([502, 501, 500]));
+    // gearD (499) is a 4th, still-cheaper-to-build level, once excluded only
+    // because the old MAX_AUTO_BUILD_DEPTH=3 clamp bit — it must be reached
+    // now that the walk's only ceiling is MAX_SUB_BUILD_DEPTH.
+    expect(result).toEqual(new Set([502, 501, 500, 499]));
+  });
+
+  it('bounds an unbounded requested depth at MAX_SUB_BUILD_DEPTH, not MAX_AUTO_BUILD_DEPTH', () => {
+    const chainLength = MAX_SUB_BUILD_DEPTH + 2;
+    // A uniform manufacturing chain typeID[i] <- typeID[i+1] <- ... <- Tritanium
+    // (raw, unbuildable), each step wildly cheaper to build than to buy so a
+    // real ceiling — not a cost verdict — is what stops the walk.
+    const ids = Array.from({ length: chainLength }, (_, i) => 9000 + i);
+    const chainRecipes: Record<number, MaterialRecipe> = {};
+    const materialPrices: HubPrices = { 34: 1 };
+    const adjustedPrices: HubPrices = { 34: 1 };
+    for (let i = 0; i < chainLength; i++) {
+      const id = ids[i]!;
+      const nextTypeID = i + 1 < chainLength ? ids[i + 1]! : 34;
+      const bp: IndustryBlueprint = {
+        name: `Chain ${i}`,
+        time: 1,
+        materials: [{ typeID: nextTypeID, quantity: 1 }],
+        products: [{ typeID: id, quantity: 1 }],
+      };
+      chainRecipes[id] = { method: 'manufacturing', blueprint: bp, me: 0 };
+      // Strictly decreasing buy prices going down the chain, with a gap
+      // (1e9) far larger than any plausible job fee: each level's build cost
+      // is dominated by the next level's (lower) buy price, so build
+      // strictly beats buy at every level. Job-fee inputs (`adjustedPrices`)
+      // stay a flat, tiny constant so the fee itself can't erode that gap.
+      materialPrices[id] = (chainLength - i) * 1_000_000_000;
+      adjustedPrices[id] = 1;
+    }
+    const root: IndustryBlueprint = {
+      name: 'Chain Root',
+      time: 1,
+      materials: [{ typeID: ids[0]!, quantity: 1 }],
+      products: [{ typeID: 99999, quantity: 1 }],
+    };
+    const chainCtx: MakeOrBuyContext = { ...ctx, materialPrices, adjustedPrices };
+    const result = autoBuildHere(root, 0, {
+      recipeFor: (id) => chainRecipes[id] ?? null,
+      ctx: chainCtx,
+      depth: 9999,
+      runs: 1,
+    });
+    expect(result.size).toBe(MAX_SUB_BUILD_DEPTH);
   });
 
   it('excludes a material where buying beats building, and never inspects its own inputs', () => {
@@ -112,7 +157,7 @@ describe('autoBuildHere', () => {
     expect(result.size).toBe(0);
   });
 
-  it('never auto-builds a reaction or planetary material, even when cheaper', () => {
+  it('never auto-builds a reaction or planetary material, even when cheaper, within the default manufacturing-only Craft Scope', () => {
     // resolveMaterial only ever honours a manufacturing buildHere entry — an
     // auto-picked reaction/planetary typeID would silently do nothing in the
     // real plan, so it must never be offered here either.
@@ -122,10 +167,82 @@ describe('autoBuildHere', () => {
     const result = autoBuildHere(productBlueprint, 0, {
       recipeFor: (id) => reactionRecipes[id] ?? null,
       ctx,
-      depth: 3,
+      depth: 1,
       runs: 1,
     });
     expect(result.size).toBe(0);
+  });
+
+  it("does not dead-end on a reaction material outside Craft Scope — it keeps walking into that recipe's own inputs", () => {
+    // 502 is a reaction (out of scope, never buildable), but its own recipe
+    // (reused from gearABlueprint) consumes 501, which manufacturing can
+    // still pick up beneath it — this is exactly what previously dead-ended.
+    const reactionRecipes: Record<number, MaterialRecipe> = {
+      502: { method: 'reaction', blueprint: gearABlueprint },
+      501: { method: 'manufacturing', blueprint: gearBBlueprint, me: 0 },
+    };
+    const result = autoBuildHere(productBlueprint, 0, {
+      recipeFor: (id) => reactionRecipes[id] ?? null,
+      ctx,
+      depth: 2,
+      runs: 1,
+    });
+    expect(result).toEqual(new Set([501]));
+  });
+
+  it("does not dead-end on a planetary material outside Craft Scope — it keeps walking into that schematic's own inputs", () => {
+    // 502 is planetary (out of scope), with no blueprint — its own inputs
+    // list feeds directly into the walk instead of via effectiveMaterials.
+    const planetaryRecipes: Record<number, MaterialRecipe> = {
+      502: { method: 'planetary', outputQuantity: 5, inputs: [{ typeID: 501, quantity: 4 }] },
+      501: { method: 'manufacturing', blueprint: gearBBlueprint, me: 0 },
+    };
+    const result = autoBuildHere(productBlueprint, 0, {
+      recipeFor: (id) => planetaryRecipes[id] ?? null,
+      ctx,
+      depth: 2,
+      runs: 1,
+    });
+    expect(result).toEqual(new Set([501]));
+  });
+
+  it("'build' Sweep Strategy forces every Craft-Scope-eligible material buildable, bypassing the cost compare", () => {
+    const dear: MakeOrBuyContext = { ...ctx, materialPrices: { ...ctx.materialPrices, 502: 1 } };
+    const result = autoBuildHere(productBlueprint, 0, {
+      recipeFor,
+      ctx: dear,
+      depth: 1,
+      runs: 1,
+      strategy: 'build',
+    });
+    expect(result).toEqual(new Set([502]));
+  });
+
+  it("'buy' Sweep Strategy forces every Craft-Scope-eligible material to buy, even when building is cheaper", () => {
+    const result = autoBuildHere(productBlueprint, 0, {
+      recipeFor,
+      ctx,
+      depth: 3,
+      runs: 1,
+      strategy: 'buy',
+    });
+    expect(result.size).toBe(0);
+  });
+
+  it("'build' Sweep Strategy still respects Craft Scope — a reaction material stays excluded but its inputs are still reached", () => {
+    const reactionRecipes: Record<number, MaterialRecipe> = {
+      502: { method: 'reaction', blueprint: gearABlueprint },
+      501: { method: 'manufacturing', blueprint: gearBBlueprint, me: 0 },
+    };
+    const result = autoBuildHere(productBlueprint, 0, {
+      recipeFor: (id) => reactionRecipes[id] ?? null,
+      ctx,
+      depth: 2,
+      runs: 1,
+      strategy: 'build',
+      scope: ['manufacturing'],
+    });
+    expect(result).toEqual(new Set([501]));
   });
 
   it('never revisits a material that is already its own ancestor on this branch', () => {
