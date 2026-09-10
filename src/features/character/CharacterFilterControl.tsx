@@ -12,7 +12,8 @@
  * time — so a Settings default of "This Character" keeps meaning "whichever
  * one I'm on," not "always character #91," and a page-level picker keeps
  * following a Character switch without any resync logic of its own
- * (`resolveCharacterFilter` re-resolves it fresh on every render instead).
+ * (`useResolvedCharacterFilter` re-resolves it whenever the active Character
+ * changes instead).
  *
  * Named CharacterFilter, not "character scope": "scope" already means an ESI
  * OAuth grant everywhere else in this app (`ESI_REGISTRY[...].scope`,
@@ -40,7 +41,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui';
 import { toggleFilterMember } from '@/lib/multiSelectFilter';
-import { resolveCharacterFilter, type CharacterFilterValue } from './characterFilterValue';
+import { useResolvedCharacterFilter, type CharacterFilterValue } from './characterFilterValue';
 
 export interface CharacterFilterCandidate {
   characterId: number;
@@ -62,7 +63,7 @@ export function CharacterFilterControl({
   onChange,
 }: CharacterFilterControlProps) {
   const { t } = useTranslation();
-  const resolved = resolveCharacterFilter(value, activeCharacterId);
+  const resolved = useResolvedCharacterFilter(value, activeCharacterId);
   // Reads "This character" for the literal `'current'` and for a hand-picked
   // subset that happens to resolve to just the active Character too — how it
   // got there doesn't change what the trigger should say.

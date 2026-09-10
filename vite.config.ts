@@ -37,6 +37,7 @@ const { app: appStrings } = JSON.parse(
  */
 const DOM_TS_TESTS = [
   // renderHook
+  'src/features/character/characterFilterValue.test.ts',
   'src/features/corp/owner.test.ts',
   'src/features/corp/useCorpAccess.test.ts',
   'src/features/corp/useCorpRouteGate.test.ts',

@@ -36,7 +36,7 @@ import {
 } from '@/features/character/wallet';
 import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
 import {
-  resolveCharacterFilter,
+  useResolvedCharacterFilter,
   fromStoredCharacterFilterValue,
   type CharacterFilterValue,
 } from '@/features/character/characterFilterValue';
@@ -527,8 +527,9 @@ export function Wallet() {
    * The cross-character Balance view (issue #607): `'current'` by default —
    * today's exact behavior, no extra fan-out, and it keeps following the
    * active Character across a switch with no resync logic of its own
-   * (`resolveCharacterFilter` re-resolves it fresh every render) — or All/a
-   * hand-picked subset once the pilot asks via `CharacterFilterControl`.
+   * (`useResolvedCharacterFilter` re-resolves it whenever the active
+   * Character changes) — or All/a hand-picked subset once the pilot asks via
+   * `CharacterFilterControl`.
    */
   const [walletCharacterFilter, setWalletCharacterFilter] =
     useState<CharacterFilterValue>('current');
@@ -547,7 +548,7 @@ export function Wallet() {
     setWalletCharacterFilter(fromStoredCharacterFilterValue(defaultCharacterFilter));
   }
 
-  const resolvedWalletFilter = resolveCharacterFilter(walletCharacterFilter, activeCharacterId);
+  const resolvedWalletFilter = useResolvedCharacterFilter(walletCharacterFilter, activeCharacterId);
   const showingAllWalletBalances =
     resolvedWalletFilter === 'all' ||
     resolvedWalletFilter.size !== 1 ||
