@@ -5,13 +5,15 @@ _Recorded 2026-09-10._
 - **A single Build Plan's Craft Sweep control (`BuildPlanCraftSweepControl.tsx`)
   is a separate, simpler component from the Build Group's
   (`CraftSweepControl.tsx`), not a mode of the same one.** The two now
-  diverge enough — no header/tooltip, no Sweep Depth, no confirmation — that
-  sharing one component would mean threading feature flags through it for
-  no shared behavior left worth keeping in common. `CraftSweepControl.tsx`
-  is untouched and still backs `BuildGroupPanel`, where a sweep's larger
-  blast radius (every member plan) still earns the header, tooltip, Sweep
-  Depth choice and overwrite confirmation from the original
-  `20260909-212715-craft-sweep-*` decision.
+  diverge enough in overall shape — header/tooltip, Sweep Depth, confirmation
+  — that sharing one top-level component would mean threading feature flags
+  through it. `CraftSweepControl.tsx` still backs `BuildGroupPanel`, where a
+  sweep's larger blast radius (every member plan) still earns the header,
+  tooltip, Sweep Depth choice and overwrite confirmation from the original
+  `20260909-212715-craft-sweep-*` decision. What genuinely was identical
+  between the two — the Sweep Strategy select and the Craft Scope chip row —
+  moved into `craftSweepShared.tsx`, which both controls compose; only the
+  surrounding shape stays forked.
 
 - **The single-plan sweep always walks the whole tree — no Sweep Depth
   control**, on direct instruction. `applyCraftSweep` passes
