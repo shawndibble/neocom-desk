@@ -67,7 +67,7 @@ here — they go one per file in `docs/context/decisions/`.
 - **BPC Sourcing**: Industry's third tab (Build Plans / Records / BPC Sourcing). Search over every publicly contracted Blueprint Copy for sale across all of New Eden — item type, region, ME/TE, runs, price (issue #608, ADR 0013). Not per-Character: a scheduled backend job crawls EVE Ref's public-contracts dataset (ESI itself has no search over public contracts) and republishes a small, shared, read-only snapshot every 30 minutes for every signed-in Character to search. Distinct from the personal **Contracts** view, which is one Character's own issued/accepted contracts read straight from ESI.
 - **Offer** (BPC Contract Search): one contract row in that snapshot — a single blueprint copy listing at a single price. Not a **copy**: one contract can offer `quantity: 3` copies at one price, so a count of offers is smaller than a count of copies. Every count on the search says "offers", because an offer is what a buyer chooses between.
 - **Build Group**: A named collection of **Build Plan**s belonging to one Character, which also totals as one — open a member and it behaves exactly like any other Build Plan; open the group and every material across its members is added up and costed (see **Group Rollup**). Membership is exclusive and groups do not nest. Membership lives only on the plan, as `buildGroupId`; the group's name, order and mere existence live in the `sync.industryBuildGroups` setting, so an emptied group survives having no members and no merge can hand one plan to two groups. Deleting a group orphans its plans rather than deleting them, and a `buildGroupId` naming a group that is gone renders as an ordinary ungrouped plan — the same rule the Mining Tax `groupId` follows. Written in full in code and docs, where a bare "group" would collide with **Market Group** or an item's **Group**; the Industry plan list's own copy says "group", since neither of those can be meant there. See **Craft Sweep** and **Group Owned Overlay** for two of a group's own operations, distinct from what it merely displays via **Group Rollup**.
-- **Build Location**: The search at the head of a Build Plan's Location & market group, over the stations and structures the Character can dock at. Picking one fills facility, **Build System** and security band in a single edit, and the plan remembers which place it was so the box can still name it after a reload. That name is a label only — every number reads the plan's own values, and any edit that moves the job elsewhere drops it. "Override" unfolds the fields behind the box.
+- **Build Location**: The search at the head of a Build Plan's Location & market group, over the stations and structures the Character can dock at. Picking one fills facility, **Build System** and security band in a single edit, and the plan remembers which place it was so the box can still name it after a reload. That name is a label only — every number reads the plan's own values, and any edit that moves the job elsewhere drops it. "Override" unfolds the fields behind the box. A manufacturing-activity plan can additionally carry a **Reaction Location** — a second, independent instance of this same control, gated by **Include Reactions**.
 - **Build Opportunities**: Industry's fourth tab (Build Plans / Records / BPC Sourcing / Opportunities, issue #642). Ranks every manufacturing blueprint original or copy the chosen Character(s) own by ISK/hour, owned-materials-adjusted, at the default Trade Hub — the same costing `computeBuildPlan`/`buildVsBuy` already do for a hand-made Build Plan, run over every owned blueprint instead of one. Reaction blueprints are excluded; invention/research/copying stay out of scope, same as **Build Plan**. Selecting rows seeds them into **Build Plan Compare** as ordinary Build Plans. See **Order Depth** and **Auto Build Depth** for their own new vocabulary.
 - **Build Plan**: An industry plan for one blueprint or reaction formula: materials needed, costs, fees/taxes, time, and two independent verdicts — an **Acquisition Verdict** and a **Sale Profitability** read (see round 15). Covers manufacturing and reactions (issue #460); invention and research/copying are still out of scope (`.out-of-scope/`). Which activity a plan runs is derived from the picked blueprint/formula's own `activity`, never a separate field on the record.
 - **Build System**: The solar system a Build Plan's job runs in, named on the plan. Sets the **Cost Index** the job fee is charged at _and_ the security band the rig bonus reads — both follow from the system, so neither is a separate field. Materials are still priced at the plan's trade hub. Empty means "the hub's own system", which is how every plan behaved before the field existed.
@@ -157,6 +157,8 @@ here — they go one per file in `docs/context/decisions/`.
   there — it keeps walking into that material's own inputs looking for
   further in-scope materials underneath. See
   `docs/context/decisions/20260909-212715-craft-sweep-bulk-build-depth-strategy-control-for.md`.
+  Reactions' own path to becoming a real, selectable option is decided —
+  see **Include Reactions** and **Reaction Location**.
 - **Craft Sweep**: A one-shot bulk action on a **Build Plan** or every member
   of a **Build Group**: walk the material tree down to a chosen **Sweep
   Depth**, within the enabled **Craft Scope**, applying one **Sweep
@@ -264,6 +266,16 @@ here — they go one per file in `docs/context/decisions/`.
   "at what price do I stop losing ISK," which only holds net of the fees an
   actual sale pays.
 - **High-Tech Production Plant**: The planetary pin that makes a P3 from two P2s. The tier above an **Advanced Industry Facility**, and the reason the Advisor will not offer one to a pilot whose colonies make no P2: it has nothing to put in it unless the P2s are bought at a hub and hauled in.
+- **Include Reactions**: A manufacturing-activity Build Plan's own toggle,
+  off by default, for whether a reaction-produced sub-input anywhere in its
+  material tree can be recursively built rather than only marked advisory.
+  Off, none of **Reaction Location**'s fields exist on screen at all — not
+  merely inert. On, a reaction material becomes selectable in **Craft
+  Scope** and hand-toggleable in the materials table the same way a
+  manufacturing one already is. Never shown on a plan whose own top-level
+  **Industry Activity** is already `reaction` — such a plan reuses its own
+  location for a nested reaction sub-build instead. See
+  `docs/context/decisions/20260910-082559-reaction-location-a-second-facility-context-lets-craft.md`.
 - **Industry Activity**: Which job a **Build Plan** runs — `'manufacturing'` or `'reaction'` (issue #460). Never a field on `BuildPlanRecord`; always derived from the picked blueprint/reaction formula's own `activity`, tagged onto it from the SDE (`industryActivity.csv`'s activity ID 1 vs 11) at build time. Determines which **Facility Preset**s and reactor/engineering rig security multipliers apply — a facility hosts one activity, never both.
 - **Install Prompt**: A one-time, in-app call-to-action to install Neocom
   Desk as a home-screen/desktop app, layered on top of the browser's own
@@ -505,6 +517,16 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   eats. A colony is sized by subtracting the fixed overhead (a mandatory
   Launchpad, plus a Storage Facility if the layout buffers through one) and
   dividing what is left by one block.
+- **Reaction Location**: A manufacturing-activity Build Plan's second,
+  independent location — same shape as **Build Location** (search
+  restricted to Athanor/Tatara, reactor rig fit, tax, security band read off
+  the pick), revealed only when **Include Reactions** is on. Not derived
+  from the plan's own primary location; a fresh plan's first one is
+  pre-filled from its own Settings-level default rather than carried forward
+  from whichever plan was last edited (issue #456's precedent for the
+  primary Build Location), since a pilot's manufacturing location turns over
+  far more often than their one dedicated reactor. See
+  `docs/context/decisions/20260910-082559-reaction-location-a-second-facility-context-lets-craft.md`.
 - **Remap**: In-game reallocation of a character's attributes. The optimizer suggests where in a Skill Plan remaps should be placed.
 - **Remap Marker**: A user-placed row in a Skill Plan marking where the character will remap attributes. Draggable like a plan entry.
 - **Remaps Available**: How many attribute remaps the character can spend: bonus remaps (new characters get several) plus the yearly remap when off cooldown. Read from the API (bonus_remaps, last_remap_date, cooldown); user may override. Optimizer must support the common single-remap case: train a leading segment on current attributes, then remap at the optimizer-chosen point.
