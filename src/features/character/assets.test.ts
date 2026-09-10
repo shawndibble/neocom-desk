@@ -113,20 +113,35 @@ describe('loadOtherCharactersAssets (issue #85)', () => {
     ]);
   });
 
-  it('fetches every other Character, excluding the active one', async () => {
+  it('fetches only the given Character ids', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${OTHER_ID}/assets`, () =>
+        HttpResponse.json([ASSET(2)], { headers: { 'X-Pages': '1' } })
+      ),
+      http.get(`${ESI_BASE_URL}/characters/${THIRD_ID}/assets`, () => {
+        throw new Error('must not fetch a Character id that was not requested');
+      }),
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/assets`, () => {
+        throw new Error('must not fetch a Character id that was not requested');
+      })
+    );
+
+    const results = await loadOtherCharactersAssets([OTHER_ID]);
+
+    expect(results).toEqual([{ characterId: OTHER_ID, name: 'Alt Pilot', assets: [ASSET(2)] }]);
+  });
+
+  it('fetches every requested Character', async () => {
     server.use(
       http.get(`${ESI_BASE_URL}/characters/${OTHER_ID}/assets`, () =>
         HttpResponse.json([ASSET(2)], { headers: { 'X-Pages': '1' } })
       ),
       http.get(`${ESI_BASE_URL}/characters/${THIRD_ID}/assets`, () =>
         HttpResponse.json([ASSET(3)], { headers: { 'X-Pages': '1' } })
-      ),
-      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/assets`, () => {
-        throw new Error('must not fetch the active character');
-      })
+      )
     );
 
-    const results = await loadOtherCharactersAssets(CHAR_ID);
+    const results = await loadOtherCharactersAssets([OTHER_ID, THIRD_ID]);
 
     expect(results).toEqual(
       expect.arrayContaining([
@@ -147,7 +162,7 @@ describe('loadOtherCharactersAssets (issue #85)', () => {
       )
     );
 
-    const results = await loadOtherCharactersAssets(CHAR_ID);
+    const results = await loadOtherCharactersAssets([OTHER_ID, THIRD_ID]);
 
     expect(results).toEqual([{ characterId: OTHER_ID, name: 'Alt Pilot', assets: [ASSET(2)] }]);
   });

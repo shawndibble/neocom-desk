@@ -963,7 +963,7 @@ describe('cross-character search (issue #85)', () => {
     });
   });
 
-  it('does not show another character’s items until the toggle is turned on', async () => {
+  it('does not show another character’s items until "All characters" is picked', async () => {
     const user = userEvent.setup();
     render(<App />);
     await screen.findByText(JITA);
@@ -973,34 +973,43 @@ describe('cross-character search (issue #85)', () => {
     expect(screen.queryByText('Pyerite')).not.toBeInTheDocument();
   });
 
-  it('reaches other characters once the toggle is on, tagging the match with a character badge', async () => {
+  async function selectAllCharacters(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(screen.getByRole('button', { name: 'This character' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'All characters' }));
+  }
+
+  async function selectThisCharacter(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(screen.getByRole('button', { name: 'All characters' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'This character' }));
+  }
+
+  it('reaches other characters once "All characters" is picked, tagging the match with a character badge', async () => {
     const user = userEvent.setup();
     render(<App />);
     await screen.findByText(JITA);
 
-    await user.click(screen.getByRole('button', { name: /search all characters/i }));
+    await selectAllCharacters(user);
     await user.type(screen.getByPlaceholderText(/search items/i), 'pyerite');
 
     expect(await screen.findByText('Pyerite')).toBeInTheDocument();
     expect(screen.getByText('Pilot Two')).toBeInTheDocument();
   });
 
-  it('returns to single-character search once the toggle is turned back off', async () => {
+  it('returns to single-character search once switched back to "This character"', async () => {
     const user = userEvent.setup();
     render(<App />);
     await screen.findByText(JITA);
 
-    const toggle = screen.getByRole('button', { name: /search all characters/i });
-    await user.click(toggle);
+    await selectAllCharacters(user);
     await user.type(screen.getByPlaceholderText(/search items/i), 'pyerite');
     expect(await screen.findByText('Pyerite')).toBeInTheDocument();
 
-    await user.click(toggle);
+    await selectThisCharacter(user);
     expect(await screen.findByText(/no items match your search/i)).toBeInTheDocument();
     expect(screen.queryByText('Pyerite')).not.toBeInTheDocument();
   });
 
-  it('caches the other characters’ assets — flipping the toggle off then on again for the same character does not refetch (issue #415)', async () => {
+  it('caches the other characters’ assets — switching away then back to "All characters" does not refetch (issue #415)', async () => {
     let fetchCount = 0;
     server.use(
       http.get(`https://esi.evetech.net/characters/${CHAR_ID_2}/assets`, () => {
@@ -1025,14 +1034,13 @@ describe('cross-character search (issue #85)', () => {
     render(<App />);
     await screen.findByText(JITA);
 
-    const toggle = screen.getByRole('button', { name: /search all characters/i });
-    await user.click(toggle);
+    await selectAllCharacters(user);
     await user.type(screen.getByPlaceholderText(/search items/i), 'pyerite');
     expect(await screen.findByText('Pyerite')).toBeInTheDocument();
     expect(fetchCount).toBe(1);
 
-    await user.click(toggle);
-    await user.click(toggle);
+    await selectThisCharacter(user);
+    await selectAllCharacters(user);
     expect(await screen.findByText('Pyerite')).toBeInTheDocument();
     expect(fetchCount).toBe(1);
   });
@@ -1046,7 +1054,7 @@ describe('cross-character search (issue #85)', () => {
     await screen.findByText('Tritanium');
     expect(screen.queryByText(/CSV export only includes this character/i)).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: /search all characters/i }));
+    await selectAllCharacters(user);
     await user.clear(screen.getByPlaceholderText(/search items/i));
     await user.type(screen.getByPlaceholderText(/search items/i), 'pyerite');
 

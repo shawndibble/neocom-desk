@@ -31,6 +31,13 @@ import {
   loadOtherCharactersAssets,
   type OtherCharacterAssets,
 } from '@/features/character/assets';
+import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
+import {
+  fromStoredCharacterFilterValue,
+  useResolvedCharacterFilter,
+  type CharacterFilterValue,
+} from '@/features/character/characterFilterValue';
+import { useDefaultCharacterFilter } from '@/features/character/defaultCharacterFilter';
 import type { CachedResult } from '@/esi/cache';
 import { loadStationName, loadStationSystemId } from '@/features/character/stations';
 import { loadStructureName, loadStructureSystemId } from '@/features/character/structures';
@@ -328,7 +335,7 @@ async function loadAssetsSnapshot(
   };
 }
 
-/** Everything the cross-character search toggle (issue #85) merges into the active Character's own snapshot. */
+/** Everything the cross-character Character filter (issue #746) merges into the active Character's own snapshot. */
 interface CrossCharacterData {
   entries: OtherCharacterAssets[];
   typeNames: Map<number, string>;
@@ -406,9 +413,11 @@ async function loadCrossCharacterNames(
   return { typeNames, locationNames };
 }
 
-/** Fetches + resolves everything the cross-character search toggle needs, once per toggle-on. */
-async function loadCrossCharacterData(activeCharacterId: number): Promise<CrossCharacterData> {
-  const entries = await loadOtherCharactersAssets(activeCharacterId);
+/** Fetches + resolves everything the cross-character Character filter needs, once per resolved id set. */
+async function loadCrossCharacterData(
+  otherCharacterIds: readonly number[]
+): Promise<CrossCharacterData> {
+  const entries = await loadOtherCharactersAssets(otherCharacterIds);
   const { typeNames, locationNames } = await loadCrossCharacterNames(entries);
 
   const characterIdByItemId = new Map<number, number>();
@@ -466,9 +475,9 @@ function sortStations(
 }
 
 /**
- * Cross-character search (issue #85): who owns which row, relative to the
- * active Character — the three pieces always travel together, so they get
- * one value instead of three.
+ * Cross-character search (issue #746, formerly #85's toggle): who owns which
+ * row, relative to the active Character — the three pieces always travel
+ * together, so they get one value instead of three.
  */
 interface CharacterBadgeContext {
   activeCharacterId: number | null;
@@ -607,27 +616,74 @@ export function Assets() {
     setSelectedIds((prev) => toggleSelection(prev, ids));
   }
 
-  // Cross-character search (issue #85): off by default, and device/session-local
-  // rather than a synced or persisted preference — flipping it on fetches every
-  // other authenticated Character's assets once, reused for the rest of this
-  // search session. A stale `crossCharacterData` left over from a previous
-  // toggle-on is harmless while the toggle is off: `activeCrossCharacterData`
-  // below only reads it when the toggle is on AND a search is active, so
-  // there is nothing to reset on toggle-off.
-  const [crossCharacterSearch, setCrossCharacterSearch] = useState(false);
+  // Cross-character search (issue #746, replacing issue #85's binary toggle):
+  // `'current'` by default (today's old off-state, no extra fan-out), or
+  // All/a hand-picked subset once the pilot asks via `CharacterFilterControl`
+  // — same picker Wallet Balance and Industry Active Jobs already use, seeded
+  // from the synced Settings default the same way (`Wallet.tsx`'s identical
+  // seeding).
+  const [crossCharacterFilter, setCrossCharacterFilter] = useState<CharacterFilterValue>('current');
+  const defaultCharacterFilter = useDefaultCharacterFilter((s) => s.value);
+  const defaultCharacterFilterHydrated = useDefaultCharacterFilter((s) => s.hydrated);
+  const hydrateDefaultCharacterFilter = useDefaultCharacterFilter((s) => s.hydrate);
+  useEffect(() => {
+    void hydrateDefaultCharacterFilter();
+  }, [hydrateDefaultCharacterFilter]);
+  const [seededCrossCharacterFilter, setSeededCrossCharacterFilter] = useState(false);
+  if (defaultCharacterFilterHydrated && !seededCrossCharacterFilter) {
+    setSeededCrossCharacterFilter(true);
+    setCrossCharacterFilter(fromStoredCharacterFilterValue(defaultCharacterFilter));
+  }
+  const resolvedCrossCharacterFilter = useResolvedCharacterFilter(
+    crossCharacterFilter,
+    activeCharacterId
+  );
+
+  const allCharactersQuery = useLiveQuery(() => db.characters.toArray(), [], []);
+  const crossCharacterCandidates = useMemo(
+    () =>
+      (allCharactersQuery ?? []).map((c) => ({
+        characterId: c.characterId,
+        characterName: c.name,
+      })),
+    [allCharactersQuery]
+  );
+  // Absent for a one-Character account: "This character" and "All characters"
+  // then resolve to the same pilot, leaving a control that cannot change
+  // anything (`OpenOrdersPanel`'s precedent).
+  const crossCharacterFilterMeta =
+    crossCharacterCandidates.length > 1 ? (
+      <CharacterFilterControl
+        characters={crossCharacterCandidates}
+        activeCharacterId={activeCharacterId}
+        value={crossCharacterFilter}
+        onChange={setCrossCharacterFilter}
+      />
+    ) : undefined;
+
+  // The active Character's own assets already come from `assetsResult` —
+  // this is only ever the *other* Characters the resolved filter names.
+  const otherCharacterIds = useMemo(() => {
+    const ids =
+      resolvedCrossCharacterFilter === 'all'
+        ? crossCharacterCandidates.map((c) => c.characterId)
+        : [...resolvedCrossCharacterFilter];
+    return ids.filter((id) => id !== activeCharacterId);
+  }, [resolvedCrossCharacterFilter, crossCharacterCandidates, activeCharacterId]);
+
   const [crossCharacterData, setCrossCharacterData] = useState<CrossCharacterData | null>(null);
   const [crossCharacterLoading, setCrossCharacterLoading] = useState(false);
-  // Cached per Character (issue #415): flipping the toggle off then on again
-  // for the same Character reuses this instead of refetching every other
-  // Character's assets again. A ref, not state — it must survive the toggle
-  // going off (which intentionally leaves `crossCharacterData` itself alone,
-  // per the comment above) without itself being a render dependency.
-  const crossCharacterCacheRef = useRef<{ characterId: number; data: CrossCharacterData } | null>(
-    null
-  );
+  // Cached per resolved id set (issue #415's per-Character caching, widened to
+  // a set): switching the filter away and back to the same set reuses this
+  // instead of refetching. A ref, not state — it must survive the resolved
+  // set becoming empty (which intentionally leaves `crossCharacterData`
+  // itself alone, per the comment below) without itself being a render
+  // dependency.
+  const crossCharacterCacheRef = useRef<{ key: string; data: CrossCharacterData } | null>(null);
   useEffect(() => {
-    if (!crossCharacterSearch || activeCharacterId === null) return;
-    if (crossCharacterCacheRef.current?.characterId === activeCharacterId) {
+    if (otherCharacterIds.length === 0 || activeCharacterId === null) return;
+    const key = [...otherCharacterIds].sort((a, b) => a - b).join(',');
+    if (crossCharacterCacheRef.current?.key === key) {
       setCrossCharacterData(crossCharacterCacheRef.current.data);
       return;
     }
@@ -635,9 +691,9 @@ export function Assets() {
     void (async () => {
       setCrossCharacterLoading(true);
       try {
-        const result = await loadCrossCharacterData(activeCharacterId);
+        const result = await loadCrossCharacterData(otherCharacterIds);
         if (!cancelled) {
-          crossCharacterCacheRef.current = { characterId: activeCharacterId, data: result };
+          crossCharacterCacheRef.current = { key, data: result };
           setCrossCharacterData(result);
         }
       } finally {
@@ -647,11 +703,13 @@ export function Assets() {
     return () => {
       cancelled = true;
     };
-  }, [crossCharacterSearch, activeCharacterId]);
+  }, [otherCharacterIds, activeCharacterId]);
   // Only reaches beyond the active Character while an actual search is
-  // active — flipping the toggle on alone doesn't change browsing. Narrowed
-  // (not a plain boolean) so every memo below gets a non-null value for free.
-  const activeCrossCharacterData = crossCharacterSearch && searchActive ? crossCharacterData : null;
+  // active — resolving the filter to more than "current" alone doesn't
+  // change browsing. Narrowed (not a plain boolean) so every memo below gets
+  // a non-null value for free.
+  const activeCrossCharacterData =
+    otherCharacterIds.length > 0 && searchActive ? crossCharacterData : null;
 
   // Quickbar (CONTEXT.md): the same Editable Data record the Market Browser's
   // and Industry's item context menus write to, keyed by the active character.
@@ -1417,19 +1475,23 @@ export function Assets() {
     >
       <PageHeader
         title={t('assets.title')}
-        meta={assetsResult && <DataAgeBadge date={assetsResult.fetchedAt} />}
+        // `CharacterFilterControl` rides here rather than in `actions` per
+        // `docs/context/decisions/20260908-192806-the-character-filter-rides-in-the-panel-header.md`
+        // — Assets has no titled inner `Panel` to attach it to, so it takes
+        // the page-level title band instead, the same "names whose data this
+        // is" role the decision describes for a panel's own `meta`.
+        meta={
+          <>
+            {assetsResult && <DataAgeBadge date={assetsResult.fetchedAt} />}
+            {crossCharacterFilterMeta}
+            {otherCharacterIds.length > 0 && crossCharacterLoading && (
+              <Spinner size="sm" label={t('assets.crossCharacterLoading')} />
+            )}
+          </>
+        }
         actions={
           <>
             <div className="ml-auto flex items-center gap-1.5">
-              {crossCharacterSearch && crossCharacterLoading && (
-                <Spinner size="sm" label={t('assets.crossCharacterLoading')} />
-              )}
-              <IconButton
-                icon={<Icon.AllCharacters />}
-                label={t('assets.crossCharacterToggle')}
-                pressed={crossCharacterSearch}
-                onClick={() => setCrossCharacterSearch((v) => !v)}
-              />
               <IconButton
                 icon={<Icon.Sort />}
                 label={t('assets.allItemsToggle')}
