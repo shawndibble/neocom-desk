@@ -16,6 +16,7 @@ import {
   type TooltipContentProps,
 } from 'recharts';
 import { useTranslation } from 'react-i18next';
+import { GROUPED_NUMBER_Y_AXIS_MARGIN_LEFT, GROUPED_NUMBER_Y_AXIS_WIDTH } from '@/lib/chartAxis';
 import { formatIsk } from '@/lib/isk';
 
 export interface DailyRatePoint {
@@ -96,7 +97,10 @@ export default function MiningYieldCharts({ dailyRate, typeComparison }: MiningY
         </p>
         <div role="img" aria-label={t('miningTax.overview.rateChartTitle')} className="h-64 w-full">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={dailyRate} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+            <BarChart
+              data={dailyRate}
+              margin={{ top: 8, right: 8, left: GROUPED_NUMBER_Y_AXIS_MARGIN_LEFT, bottom: 0 }}
+            >
               <CartesianGrid stroke="var(--color-line)" strokeDasharray="3 3" />
               <XAxis
                 dataKey="date"
@@ -107,7 +111,7 @@ export default function MiningYieldCharts({ dailyRate, typeComparison }: MiningY
               <YAxis
                 stroke="var(--color-text-dim)"
                 tick={{ fontSize: 11, fill: 'var(--color-text-dim)' }}
-                width={70}
+                width={GROUPED_NUMBER_Y_AXIS_WIDTH}
                 tickFormatter={(value: number) => formatIsk(value, 0)}
               />
               <Tooltip content={(props) => <RateTooltip {...props} />} />
@@ -131,7 +135,10 @@ export default function MiningYieldCharts({ dailyRate, typeComparison }: MiningY
           className="h-64 w-full"
         >
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={typeComparison} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+            <BarChart
+              data={typeComparison}
+              margin={{ top: 8, right: 8, left: GROUPED_NUMBER_Y_AXIS_MARGIN_LEFT, bottom: 0 }}
+            >
               <CartesianGrid stroke="var(--color-line)" strokeDasharray="3 3" />
               <XAxis
                 dataKey="typeName"
@@ -145,7 +152,7 @@ export default function MiningYieldCharts({ dailyRate, typeComparison }: MiningY
               <YAxis
                 stroke="var(--color-text-dim)"
                 tick={{ fontSize: 11, fill: 'var(--color-text-dim)' }}
-                width={70}
+                width={GROUPED_NUMBER_Y_AXIS_WIDTH}
                 tickFormatter={(value: number) => formatIsk(value, 0)}
               />
               <Tooltip content={(props) => <CompareTooltip {...props} />} />
