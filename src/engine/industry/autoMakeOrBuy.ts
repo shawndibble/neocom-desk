@@ -26,7 +26,11 @@
  * is exactly what a pilot would get by ticking the same boxes by hand.
  */
 
-import type { EffectiveMaterial, IndustryBlueprint } from '@/engine/industry/types';
+import type {
+  EffectiveMaterial,
+  FacilityContext,
+  IndustryBlueprint,
+} from '@/engine/industry/types';
 import { effectiveMaterials } from '@/engine/industry/materials';
 import {
   makeOrBuy,
@@ -80,6 +84,20 @@ interface WalkContext {
 }
 
 /**
+ * Which facility context a node's own material breakdown is computed
+ * against (issue #698): `ctx.reactionFacility` for a reaction node, when one
+ * is configured, else `ctx` itself — the same choice `resolveMaterial`'s
+ * `reactionCtx` makes, kept in step so the sweep's own depth walk and the
+ * real recursive engine never disagree about what a reaction job's material
+ * consumption looks like. An engineering complex's structure bonus and
+ * manufacturing-rig security table must never leak into a reaction job's own
+ * materials just because it happens to be reached from a manufacturing plan.
+ */
+export function facilityContextForNode(method: MakeMethod, ctx: MakeOrBuyContext): FacilityContext {
+  return method === 'reaction' && ctx.reactionFacility ? ctx.reactionFacility : ctx;
+}
+
+/**
  * Shared depth-first descent through a material's own recipe inputs,
  * cycle-safe per branch. `visitMaterial` decides what to record for each
  * material reached and whether to keep descending beneath it; the descent
@@ -124,7 +142,12 @@ function walkMaterials(
         const sizing = sizeRuns(material.quantity, recipe.blueprint.products[0]?.quantity ?? 0);
         if (!sizing) continue;
         const subME = recipe.method === 'manufacturing' ? recipe.me : 0;
-        const inputs = effectiveMaterials(recipe.blueprint, sizing.runs, subME, wctx.ctx);
+        const inputs = effectiveMaterials(
+          recipe.blueprint,
+          sizing.runs,
+          subME,
+          facilityContextForNode(recipe.method, wctx.ctx)
+        );
         walkMaterials(inputs, depth + 1, subVisited, wctx, visitMaterial);
       }
     } catch {

@@ -17,6 +17,7 @@ import type {
   IndustryBlueprint,
   MaterialCostLine,
   QuantityEntry,
+  ReactionFacilityContext,
   RigFit,
   SecurityBand,
   SkillLevels,
@@ -68,6 +69,14 @@ export interface MakeOrBuyContext {
    */
   materialPrices: HubPrices;
   skills: SkillLevels;
+  /**
+   * The Reaction Location (issue #698), when Include Reactions is on for
+   * this plan — quoted instead of the fixed unfitted-Athanor fallback below.
+   * Absent for a plan with no reaction facility configured, and for a
+   * reaction-activity plan, which reuses its own `facility`/`rigFit`/
+   * `security`/`facilityTaxPct`/`systemCostIndex` above instead.
+   */
+  reactionFacility?: ReactionFacilityContext;
 }
 
 export interface MakeOrBuy {
@@ -128,29 +137,42 @@ function jobUnitCost(
 
 /**
  * Cost per unit of reacting the material, sized to a real job — reuses
- * `jobUnitCost`, but quoted against an unfitted Athanor (the smaller, more
- * commonly available refinery) rather than the parent plan's own facility.
+ * `jobUnitCost`, quoted against `ctx.reactionFacility` (issue #698's Reaction
+ * Location) when one is configured.
  *
- * The parent's facility cannot stand in here the way it does for a
- * manufacturing sub-build: this app has no reaction-formula-consuming-a-
- * reaction-formula case where that facility is itself a refinery, so a
- * sub-input reached from a *manufacturing* plan (issue #460 follow-up — e.g.
- * a Raven's component consuming a reaction material) would otherwise be
- * quoted as if an engineering complex's bonuses and manufacturing-rig
- * security table applied to a job that structure cannot even run. Assuming
- * no rig keeps the estimate conservative (understating the saving) rather
- * than wrong (misapplying an inapplicable bonus) — the same trade this
- * codebase already makes wherever a real number isn't knowable.
+ * Absent that, a plan whose own facility is already a refinery (a
+ * reaction-activity plan quoting a reaction-in-reaction sub-input) is quoted
+ * against that facility/rig directly — it needs no second, independent
+ * context, the same reuse `resolveMaterial`'s own `reactionCtx` fallback
+ * makes for the recursive engine. Only when neither exists — a
+ * *manufacturing* plan with no Reaction Location configured (issue #460
+ * follow-up — e.g. a Raven's component consuming a reaction material) — does
+ * this fall back to an unfitted Athanor (the smaller, more commonly
+ * available refinery): the parent's own engineering-complex bonuses and
+ * manufacturing-rig security table cannot apply to a job that structure
+ * cannot even run, and assuming no rig keeps that guess conservative
+ * (understating the saving) rather than wrong (misapplying an inapplicable
+ * bonus) — the same trade this codebase already makes wherever a real number
+ * isn't knowable. The parent's own `security`/`facilityTaxPct`/
+ * `systemCostIndex` still apply in the fallback case, same as before —
+ * `reactionFacility` carries its own values for all five fields, so no
+ * partial mix of parent and Reaction Location values is possible.
  */
 function reactionUnitCost(
   blueprint: IndustryBlueprint,
   needed: number,
   ctx: MakeOrBuyContext
 ): number | null {
+  const location = ctx.reactionFacility;
+  const ownFacilityIsReaction = ctx.facility.activity === 'reaction';
   return jobUnitCost(blueprint, 0, needed, {
     ...ctx,
-    facility: FACILITY_PRESETS.athanor,
-    rigFit: EMPTY_RIG_FIT,
+    facility:
+      location?.facility ?? (ownFacilityIsReaction ? ctx.facility : FACILITY_PRESETS.athanor),
+    rigFit: location?.rigFit ?? (ownFacilityIsReaction ? ctx.rigFit : EMPTY_RIG_FIT),
+    security: location?.security ?? ctx.security,
+    facilityTaxPct: location?.facilityTaxPct ?? ctx.facilityTaxPct,
+    systemCostIndex: location?.systemCostIndex ?? ctx.systemCostIndex,
   });
 }
 

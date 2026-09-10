@@ -252,6 +252,77 @@ describe('resolveMaterial — recursion', () => {
   });
 });
 
+describe('resolveMaterial — reaction sub-builds (issue #698)', () => {
+  /** Distinct facility/cost-index from `CTX`, so a leaked context is detectable. */
+  const REACTION_CTX = {
+    facility: FACILITY_PRESETS.athanor,
+    rigFit: ['none', 'none', 'none'] as const,
+    security: 'highsec' as const,
+    systemCostIndex: 0.2,
+    adjustedPrices: { [LEAF_TYPE]: 10, [ROOT_TYPE]: 3 },
+    skills: {} as Record<number, number>,
+  };
+  const CTX_WITH_ROOT_PRICE = { ...CTX, adjustedPrices: { [ROOT_TYPE]: 3 } };
+
+  it('a reaction node uses reactionCtx while a manufacturing node beneath it still uses ctx — mixed tree at multiple depths', () => {
+    // PARENT (manufacturing) -> MID (reaction) -> LEAF (manufacturing) -> ROOT (bought).
+    // MID's own job fee must be quoted against reactionCtx; LEAF's, nested
+    // beneath MID, must fall back to ctx rather than inheriting reactionCtx —
+    // the exact inheritance bug a naive `{...opts, ctx: reactionCtx}` spread
+    // would introduce.
+    const resolved = resolveMaterial(
+      material(PARENT_TYPE, 1),
+      baseOptions({
+        buildHere: new Set([PARENT_TYPE, MID_TYPE, LEAF_TYPE]),
+        recipeFor: recipeFor({
+          [PARENT_TYPE]: { method: 'manufacturing', blueprint: parentBlueprint, me: 0 },
+          [MID_TYPE]: { method: 'reaction', blueprint: { ...midBlueprint, activity: 'reaction' } },
+          [LEAF_TYPE]: { method: 'manufacturing', blueprint: leafBlueprint, me: 0 },
+        }),
+        materialPrices: { [ROOT_TYPE]: 2 },
+        ctx: CTX_WITH_ROOT_PRICE,
+        reactionCtx: REACTION_CTX,
+      })
+    );
+
+    const midRow = resolved.subBuild?.inputs.find((i) => i.typeID === MID_TYPE);
+    const leafRow = midRow?.subBuild?.inputs.find((i) => i.typeID === LEAF_TYPE);
+    const rootRow = leafRow?.subBuild?.inputs.find((i) => i.typeID === ROOT_TYPE);
+
+    expect(midRow?.subBuild).toBeDefined();
+    expect(leafRow?.subBuild).toBeDefined();
+    expect(rootRow?.subBuild).toBeUndefined();
+    expect(rootRow?.lineCost).toBe(60); // 30 ROOT at 2 ISK
+
+    // MID's own job fee: index 0.2, Athanor 0% tax — reactionCtx.
+    expect(midRow?.subBuild?.jobFee.total).toBeCloseTo(24, 6);
+    // LEAF's own job fee, nested under MID: index 0.05, NPC station 0.25%
+    // tax — ctx, not reactionCtx. A leaked reactionCtx would give 21.6 here.
+    expect(leafRow?.subBuild?.jobFee.total).toBeCloseTo(8.325, 6);
+
+    expect(resolved.subBuild?.unitCost).toBeCloseTo(132.975, 6);
+    expect(resolved.unpriced).toBe(false);
+  });
+
+  it("a reaction-activity plan's own nested reaction sub-build reuses ctx when no reactionCtx is given", () => {
+    const resolved = resolveMaterial(
+      material(MID_TYPE, 2),
+      baseOptions({
+        buildHere: new Set([MID_TYPE]),
+        recipeFor: recipeFor({
+          [MID_TYPE]: { method: 'reaction', blueprint: { ...midBlueprint, activity: 'reaction' } },
+        }),
+        materialPrices: { [LEAF_TYPE]: 10 },
+        ctx: REACTION_CTX,
+        // No reactionCtx — a reaction-activity plan reuses its own ctx.
+      })
+    );
+
+    expect(resolved.subBuild).toBeDefined();
+    expect(resolved.subBuild?.jobFee.total).toBeCloseTo(24, 6);
+  });
+});
+
 describe('resolveMaterial — a poisoned leaf blocks every ancestor honestly', () => {
   it('propagates "unpriced" up through a built branch instead of silently costing it as free', () => {
     const resolved = resolveMaterial(

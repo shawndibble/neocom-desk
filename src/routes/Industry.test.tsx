@@ -758,12 +758,11 @@ describe('Industry: side-by-side Build Plan list + detail layout (#159)', () => 
     expect(detailPane).not.toHaveClass('hidden');
     expect(screen.queryByRole('button', { name: 'Back to build plans' })).not.toBeInTheDocument();
 
-    // The list pane keeps its own scroller (the row list alone, so the
-    // heading and blueprint picker stay put); the detail pane does not — it
-    // flows in normal page layout so the whole page scrolls together, with
-    // only the nav rail pinned (docs/context/decisions).
+    // Neither pane gets its own inner scroller — both grow with their
+    // content and the whole page scrolls together, with only the nav rail
+    // pinned (docs/context/decisions).
     expect(listPanel?.parentElement).toHaveClass('lg:grid-cols-[20rem_1fr]', 'lg:items-start');
-    expect(screen.getByRole('list')).toHaveClass('max-h-[28rem]', 'overflow-y-auto');
+    expect(screen.getByRole('list').className).not.toMatch(/overflow-y-auto|max-h-/);
     expect(detailPane?.querySelector('div')?.className ?? '').not.toMatch(/overflow-y-auto|max-h-/);
   });
 });

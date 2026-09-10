@@ -20,11 +20,13 @@ import { useTranslation } from 'react-i18next';
 import { DataTable, type DataTableColumn } from '@/components/ui';
 import { formatIsk } from '@/lib/isk';
 import { formatVolume } from './format';
-import type { MarketHistoryPoint } from '@/engine/market/priceHistory';
+import type { MarketHistoryPoint, MovingAveragePoint } from '@/engine/market/priceHistory';
 
 interface PriceHistoryChartProps {
   points: MarketHistoryPoint[];
   itemName: string;
+  /** Empty when the item has fewer real days of history than the moving-average window — no line, not a truncated one. */
+  movingAverage?: readonly MovingAveragePoint[];
 }
 
 /**
@@ -65,9 +67,18 @@ function HistoryTooltip({
 }
 
 /** Daily average price (line) over traded volume (bars), for one item in one region. */
-export default function PriceHistoryChart({ points, itemName }: PriceHistoryChartProps) {
+export default function PriceHistoryChart({
+  points,
+  itemName,
+  movingAverage = [],
+}: PriceHistoryChartProps) {
   const { t } = useTranslation();
-  const chartData = points.map((p) => ({ ...p, dateLabel: formatTick(p.date) }));
+  const maByDate = new Map(movingAverage.map((p) => [p.date, p.average]));
+  const chartData = points.map((p) => ({
+    ...p,
+    dateLabel: formatTick(p.date),
+    movingAverage: maByDate.get(p.date),
+  }));
 
   const columns = useMemo<DataTableColumn<MarketHistoryPoint>[]>(
     () => [
@@ -135,6 +146,19 @@ export default function PriceHistoryChart({ points, itemName }: PriceHistoryChar
               dot={false}
               name={t('market.priceHistory.average')}
             />
+            {movingAverage.length > 0 && (
+              <Line
+                yAxisId="price"
+                type="monotone"
+                dataKey="movingAverage"
+                stroke="var(--color-text-dim)"
+                strokeWidth={1.5}
+                strokeDasharray="4 3"
+                dot={false}
+                connectNulls={false}
+                name={t('market.priceHistory.movingAverage')}
+              />
+            )}
           </ComposedChart>
         </ResponsiveContainer>
       </div>

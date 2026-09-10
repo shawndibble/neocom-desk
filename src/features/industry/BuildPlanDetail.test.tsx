@@ -217,7 +217,6 @@ function Harness({ plan: planOverrides, catalog = CATALOG, onUpdate, onDerivedFi
         quickbarAvailable
         onShowInfo={vi.fn()}
         groupSnapshot={null}
-        groupName={null}
       />
     </MemoryRouter>
   );
@@ -561,40 +560,24 @@ describe('BuildPlanDetail sub-builds', () => {
 
 describe('BuildPlanDetail Craft Sweep (issue #695)', () => {
   const strategySelect = () => screen.getByRole('combobox', { name: 'Sweep Strategy' });
-  const depthSelect = () => screen.getByRole('combobox', { name: 'Sweep Depth' });
   const sweepApplyButton = () => screen.getByRole('button', { name: 'Apply Craft Sweep' });
   const tritaniumBuildButton = () =>
     screen.getByRole('button', { name: 'Build Tritanium here instead of buying it' });
 
-  async function runSweep(
-    user: ReturnType<typeof userEvent.setup>,
-    strategyLabel: string,
-    depthLabel: string
-  ) {
+  async function runSweep(user: ReturnType<typeof userEvent.setup>, strategyLabel: string) {
     await user.click(strategySelect());
     await user.click(await screen.findByRole('option', { name: strategyLabel }));
-    await user.click(depthSelect());
-    await user.click(await screen.findByRole('option', { name: depthLabel }));
     await user.click(sweepApplyButton());
-    const dialog = await screen.findByRole('dialog');
-    await user.click(within(dialog).getByRole('button', { name: 'Apply Craft Sweep' }));
   }
 
-  it("sizes Sweep Depth's options to this plan's own tree depth: Tritanium (1) <- Pyerite (2), Mexallon unbuildable", async () => {
-    const user = userEvent.setup();
+  it('has no Sweep Depth control — the single-plan sweep always walks the whole tree', async () => {
     render(<Harness plan={{ runs: 10 }} />);
     await screen.findByText('Tritanium');
 
-    await user.click(depthSelect());
-    const options = await screen.findAllByRole('option');
-    expect(options.map((o) => o.textContent?.replace(/^\W+/, ''))).toEqual([
-      '1 level',
-      '2 levels',
-      'All levels',
-    ]);
+    expect(screen.queryByRole('combobox', { name: 'Sweep Depth' })).not.toBeInTheDocument();
   });
 
-  it('overwrites buildHere to match the chosen Sweep Strategy and Sweep Depth, reflected immediately in the materials table', async () => {
+  it('overwrites buildHere to match the chosen Sweep Strategy, applied immediately with no confirmation, reflected right away in the materials table', async () => {
     const user = userEvent.setup();
     const onUpdate = vi.fn();
     // `Harness` always passes `groupSnapshot={null}` — every test in this
@@ -603,8 +586,10 @@ describe('BuildPlanDetail Craft Sweep (issue #695)', () => {
     render(<Harness plan={{ runs: 10 }} onUpdate={onUpdate} />);
     await screen.findByText('Tritanium');
 
-    await runSweep(user, 'Build', '2 levels');
+    await runSweep(user, 'Build');
 
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    // Depth is always "All levels": Tritanium (1) <- Pyerite (2).
     expect(onUpdate).toHaveBeenLastCalledWith({ buildHere: [34, 35] });
     // Pyerite's own consumption (Mexallon) only appears once its job is
     // actually pulled onto the table by buildHere containing it.
@@ -620,7 +605,7 @@ describe('BuildPlanDetail Craft Sweep (issue #695)', () => {
     await user.click(tritaniumBuildButton());
     expect(onUpdate).toHaveBeenLastCalledWith({ buildHere: [34] });
 
-    await runSweep(user, 'Buy', '1 level');
+    await runSweep(user, 'Buy');
 
     expect(onUpdate).toHaveBeenLastCalledWith({ buildHere: [] });
     expect(
@@ -975,6 +960,73 @@ describe('BuildPlanDetail reaction plans (issue #460)', () => {
     expect(await screen.findByText('Fullerides')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Show details' }));
     expect(screen.getByText('Costs & revenue')).toBeInTheDocument();
+  });
+
+  it('never shows the Include Reactions toggle — it reuses its own facility for a nested reaction sub-build', async () => {
+    const user = userEvent.setup();
+    render(<Harness plan={reactionPlan()} catalog={REACTION_CATALOG} />);
+    await openSetup(user);
+
+    expect(screen.queryByRole('checkbox', { name: 'Include Reactions' })).toBeNull();
+  });
+});
+
+describe('BuildPlanDetail Include Reactions (issue #698)', () => {
+  it('shows an off Include Reactions toggle for a manufacturing-activity plan, with no Reaction Location fields', async () => {
+    const user = userEvent.setup();
+    render(<Harness plan={{ runs: 10 }} />);
+    await openSetup(user);
+
+    const toggle = screen.getByRole('checkbox', { name: 'Include Reactions' });
+    expect(toggle).not.toBeChecked();
+    expect(screen.queryByLabelText('Reaction location')).toBeNull();
+  });
+
+  it('turning it on pre-fills the Reaction Location from the Settings default and reveals its controls', async () => {
+    const user = userEvent.setup();
+    const onUpdate = vi.fn();
+    render(<Harness plan={{ runs: 10 }} onUpdate={onUpdate} />);
+    await openSetup(user);
+
+    await user.click(screen.getByRole('checkbox', { name: 'Include Reactions' }));
+
+    expect(onUpdate).toHaveBeenLastCalledWith({
+      includeReactions: true,
+      reactionFacility: 'athanor',
+      reactionRigFit: ['none', 'none', 'none'],
+      reactionFacilityTaxPct: undefined,
+    });
+    expect(await screen.findByLabelText('Reaction location')).toBeInTheDocument();
+  });
+
+  it('turning it off again only clears the flag — the Reaction Location itself is left alone', async () => {
+    const user = userEvent.setup();
+    const onUpdate = vi.fn();
+    render(
+      <Harness
+        plan={{ runs: 10, includeReactions: true, reactionFacility: 'tatara' }}
+        onUpdate={onUpdate}
+      />
+    );
+    await openSetup(user);
+
+    await user.click(screen.getByRole('checkbox', { name: 'Include Reactions' }));
+
+    expect(onUpdate).toHaveBeenLastCalledWith({ includeReactions: false });
+  });
+
+  it("lights up Craft Sweep's Reactions chip once Include Reactions is on", async () => {
+    render(<Harness plan={{ runs: 10, includeReactions: true }} />);
+    await screen.findByText('Tritanium');
+
+    expect(screen.getByText('Reactions')).not.toHaveAttribute('aria-disabled');
+  });
+
+  it("leaves Craft Sweep's Reactions chip disabled while Include Reactions is off", async () => {
+    render(<Harness plan={{ runs: 10 }} />);
+    await screen.findByText('Tritanium');
+
+    expect(screen.getByText('Reactions')).toHaveAttribute('aria-disabled', 'true');
   });
 });
 

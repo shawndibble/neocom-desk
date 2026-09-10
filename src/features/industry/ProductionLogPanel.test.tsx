@@ -219,6 +219,44 @@ describe('ProductionLogPanel', () => {
     expect(within(await runsTable()).getByText('42')).toBeInTheDocument();
   });
 
+  it('shows no profit-history chart when every run logs on the same calendar day', async () => {
+    await addRun({ id: 'run-1' });
+    await addRun({ id: 'run-2' });
+
+    render(
+      <ProductionLogPanel characterId={CHARACTER_ID} catalog={CATALOG} skills={{}} plans={PLANS} />
+    );
+
+    await runsTable();
+    expect(
+      screen.queryByRole('img', { name: 'Realized profit over time' })
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows a profit-history chart once runs span at least two distinct days, and hides it again once the date filter narrows to one day', async () => {
+    const old = Date.parse('2026-01-01T00:00:00Z');
+    const recent = Date.parse('2026-08-15T00:00:00Z');
+    await addRun({ id: 'run-old', loggedAt: old, updatedAt: old });
+    await addRun({ id: 'run-recent', loggedAt: recent, updatedAt: recent });
+
+    render(
+      <ProductionLogPanel characterId={CHARACTER_ID} catalog={CATALOG} skills={{}} plans={PLANS} />
+    );
+
+    expect(
+      await screen.findByRole('img', { name: 'Realized profit over time' })
+    ).toBeInTheDocument();
+
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText('From'), '2026-08-01');
+
+    await waitFor(() => {
+      expect(
+        screen.queryByRole('img', { name: 'Realized profit over time' })
+      ).not.toBeInTheDocument();
+    });
+  });
+
   it('reports a filtered-empty state distinct from the "nothing logged ever" state', async () => {
     const old = Date.parse('2026-01-01T00:00:00Z');
     await addRun({ id: 'run-old', loggedAt: old, updatedAt: old });

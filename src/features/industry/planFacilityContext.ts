@@ -32,3 +32,27 @@ export function facilityContextFor(
     facilityTaxPct: facility.structure ? plan.facilityTaxPct : undefined,
   };
 }
+
+/**
+ * The Reaction Location's own "where and how" half (issue #698) — `null`
+ * when none is configured, which is how every plan behaves before Include
+ * Reactions is ever turned on. Missing `systemCostIndex` on purpose: that
+ * comes from a live ESI call the caller makes separately (mirroring how the
+ * plan's own `systemCostIndex` is layered on top of `facilityContextFor`'s
+ * result rather than being part of it), keyed by `reactionBuildSystemId`.
+ */
+export function reactionPlanFacilityContextFor(
+  plan: Pick<
+    BuildPlanRecord,
+    'reactionFacility' | 'reactionRigFit' | 'reactionSecurity' | 'reactionFacilityTaxPct'
+  >
+): PlanFacilityContext | null {
+  if (plan.reactionFacility === undefined) return null;
+  const facility = FACILITY_PRESETS[plan.reactionFacility];
+  return {
+    facility,
+    rigFit: resolveRigFit({ rigFit: plan.reactionRigFit }),
+    security: plan.reactionSecurity ?? 'highsec',
+    facilityTaxPct: facility.structure ? plan.reactionFacilityTaxPct : undefined,
+  };
+}
