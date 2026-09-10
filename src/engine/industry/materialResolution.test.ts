@@ -10,6 +10,7 @@ import {
   MAX_SUB_BUILD_DEPTH,
   resolveMaterial,
   unpricedLeafTypeIds,
+  withoutOwnedQuantities,
   type ResolveMaterialOptions,
 } from './materialResolution';
 
@@ -457,5 +458,32 @@ describe('resolveMaterial — never throws on bad blueprint/ME data', () => {
     expect(() =>
       resolveMaterial(material(LEAF_TYPE, 1), baseOptions({ sourcing: sourcingMap }))
     ).not.toThrow();
+  });
+});
+
+describe('withoutOwnedQuantities', () => {
+  it('drops every ownedQuantity but keeps overridePrice', () => {
+    const sourcing: MaterialSourcingMap = {
+      [LEAF_TYPE]: { ownedQuantity: 5, overridePrice: 12 },
+      [ROOT_TYPE]: { ownedQuantity: 3 },
+    };
+    expect(withoutOwnedQuantities(sourcing)).toEqual({
+      [LEAF_TYPE]: { overridePrice: 12 },
+      [ROOT_TYPE]: {},
+    });
+  });
+
+  it('passes undefined through unchanged', () => {
+    expect(withoutOwnedQuantities(undefined)).toBeUndefined();
+  });
+
+  it('never claims stock when the stripped map feeds resolveMaterial', () => {
+    const sourcing: MaterialSourcingMap = { [LEAF_TYPE]: { ownedQuantity: 100 } };
+    const resolved = resolveMaterial(
+      material(LEAF_TYPE, 4),
+      baseOptions({ sourcing: withoutOwnedQuantities(sourcing) })
+    );
+    expect(resolved.ownedQuantity).toBe(0);
+    expect(resolved.remainingQuantity).toBe(4);
   });
 });

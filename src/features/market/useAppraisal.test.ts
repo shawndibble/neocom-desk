@@ -2,10 +2,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import { useAppraisal } from './useAppraisal';
-import type { AppraisalOutcome } from './appraisalData';
+import type { AppraisalOutcome, HubComparisonRow } from './appraisalData';
 
 const appraisePaste = vi.hoisted(() => vi.fn());
-vi.mock('./appraisalData', () => ({ appraisePaste }));
+const compareHubs = vi.hoisted(() => vi.fn());
+vi.mock('./appraisalData', () => ({ appraisePaste, compareHubs }));
 
 function outcome(sell: number): AppraisalOutcome {
   return {
@@ -17,9 +18,13 @@ function outcome(sell: number): AppraisalOutcome {
   };
 }
 
+const COMPARE_ROWS: HubComparisonRow[] = [{ hub: DEFAULT_TRADE_HUB, buy: 90, sell: 100 }];
+
 beforeEach(() => {
   appraisePaste.mockReset();
   appraisePaste.mockResolvedValue(outcome(100));
+  compareHubs.mockReset();
+  compareHubs.mockResolvedValue(COMPARE_ROWS);
 });
 
 describe('useAppraisal', () => {
@@ -30,7 +35,9 @@ describe('useAppraisal', () => {
     await waitFor(() => expect(result.current.canAppraise).toBe(true));
 
     expect(appraisePaste).not.toHaveBeenCalled();
+    expect(compareHubs).not.toHaveBeenCalled();
     expect(result.current.result).toBeNull();
+    expect(result.current.compare).toBeNull();
   });
 
   it('prices the submitted text on Appraise', async () => {
@@ -43,6 +50,17 @@ describe('useAppraisal', () => {
     expect(appraisePaste).toHaveBeenCalledWith('Tritanium 5', DEFAULT_TRADE_HUB, 90, null, {
       force: false,
     });
+  });
+
+  it('compares all 5 hubs alongside the primary appraisal', async () => {
+    const { result } = renderHook(() => useAppraisal(DEFAULT_TRADE_HUB, 90, null));
+
+    act(() => result.current.setText('Tritanium 5'));
+    act(() => result.current.appraise());
+
+    await waitFor(() => expect(result.current.compare).not.toBeNull());
+    expect(compareHubs).toHaveBeenCalledWith('Tritanium 5', 90, { force: false });
+    expect(result.current.compare).toBe(COMPARE_ROWS);
   });
 
   /**
@@ -82,6 +100,11 @@ describe('useAppraisal', () => {
     expect(appraisePaste).toHaveBeenLastCalledWith('Tritanium 5', amarr, 90, null, {
       force: false,
     });
+    // The comparison is hub-invariant on its own, but AC #689 says changing
+    // the primary hub still recomputes it — which only holds because it
+    // shares this effect's dependency array, not because compareHubs itself
+    // takes the hub as an argument.
+    expect(compareHubs).toHaveBeenCalledTimes(2);
   });
 
   /** AC: switching the active Character recomputes every row from scratch. */
@@ -117,6 +140,7 @@ describe('useAppraisal', () => {
     expect(appraisePaste).toHaveBeenLastCalledWith('Tritanium 5', DEFAULT_TRADE_HUB, 90, null, {
       force: true,
     });
+    expect(compareHubs).toHaveBeenLastCalledWith('Tritanium 5', 90, { force: true });
 
     // The next ordinary re-price must not still be forcing a network round trip.
     rerender({ percent: 80 });
@@ -136,6 +160,7 @@ describe('useAppraisal', () => {
     act(() => result.current.clear());
     await waitFor(() => expect(result.current.result).toBeNull());
     expect(result.current.text).toBe('');
+    expect(result.current.compare).toBeNull();
   });
 
   it('reports a catalogue failure without losing the pasted text', async () => {
@@ -147,6 +172,7 @@ describe('useAppraisal', () => {
 
     await waitFor(() => expect(result.current.failed).toBe(true));
     expect(result.current.result).toBeNull();
+    expect(result.current.compare).toBeNull();
     expect(result.current.text).toBe('Tritanium 5');
   });
 

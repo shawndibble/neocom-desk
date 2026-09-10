@@ -8,14 +8,17 @@
  * That is also where unmatched lines are reported, next to the text they
  * refer to.
  *
- * Both halves are one `Panel` each in the Browser's own two-column grid, but
- * narrower on the left: a paste box does not need the width the Market Group
- * tree does.
+ * The Browser's own two-column grid holds two halves: the paste box, one
+ * `Panel`, narrower on the left since it does not need the width the Market
+ * Group tree does; and the result column, which stacks the primary result
+ * `Panel` above an optional Compare Hubs `CollapsiblePanel` once something
+ * has been appraised.
  */
 import { useState, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
+  CollapsiblePanel,
   DataTable,
   EmptyState,
   IconButton,
@@ -33,6 +36,7 @@ import { iskToneClass } from '@/features/character/format';
 import type { BlueprintCatalog } from '@/features/industry/blueprintCatalog';
 import { formatIsk, formatIskAuto } from '@/lib/isk';
 import { downloadCsv } from '@/lib/downloadCsv';
+import type { HubComparisonRow } from './appraisalData';
 import { appraisalCsvColumns } from './appraisalCsv';
 import { formatVolume } from './format';
 import { ItemContextMenu } from './ItemContextMenu';
@@ -92,7 +96,8 @@ export function AppraisalPanel({
   onShowInfo,
 }: AppraisalPanelProps) {
   const { t } = useTranslation();
-  const { text, setText, result, loading, failed } = controller;
+  const { text, setText, result, compare, loading, failed } = controller;
+  const [compareExpanded, setCompareExpanded] = useState(false);
 
   /*
    * The percent field is a string while it is being typed. Committing on every
@@ -239,6 +244,32 @@ export function AppraisalPanel({
     );
   }
 
+  const compareColumns: DataTableColumn<HubComparisonRow>[] = [
+    {
+      id: 'hub',
+      header: t('market.appraisal.columnHub'),
+      primary: true,
+      render: (row) => row.hub.systemName,
+      sortValue: (row) => row.hub.systemName,
+    },
+    {
+      id: 'sellTotal',
+      header: t('market.appraisal.columnSellTotal'),
+      align: 'right',
+      className: 'whitespace-nowrap tabular-nums',
+      render: (row) => iskCell(row.sell, 0),
+      sortValue: (row) => row.sell ?? undefined,
+    },
+    {
+      id: 'buyTotal',
+      header: t('market.appraisal.columnBuyTotal'),
+      align: 'right',
+      className: 'whitespace-nowrap tabular-nums',
+      render: (row) => iskCell(row.buy, 0),
+      sortValue: (row) => row.buy ?? undefined,
+    },
+  ];
+
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-[21rem_1fr] lg:items-start">
       <Panel
@@ -329,101 +360,124 @@ export function AppraisalPanel({
         </div>
       </Panel>
 
-      <Panel
-        title={t('market.appraisal.resultTitle')}
-        padded={result === null}
-        meta={
-          result !== null ? (
-            <StatChip label={hubName} value={t('market.appraisal.atPercent', { pricePercent })} />
-          ) : undefined
-        }
-        actions={
-          <IconButton
-            size="sm"
-            icon={<Icon.Download />}
-            label={t('market.appraisal.exportCsv')}
-            disabled={rows.length === 0}
-            onClick={() =>
-              downloadCsv('market-appraisal', rows, appraisalCsvColumns(t), new Date())
-            }
-          />
-        }
-      >
-        {loading && result === null ? (
-          <div className="flex justify-center py-8">
-            <Spinner label={t('common.loading')} />
-          </div>
-        ) : failed ? (
-          <EmptyState
-            title={t('market.loadFailedTitle')}
-            hint={t('market.loadFailedHint')}
-            className="py-8"
-          />
-        ) : result === null || totals === undefined ? (
-          <EmptyState
-            title={t('market.appraisal.emptyTitle')}
-            hint={t('market.appraisal.emptyHint')}
-            className="py-8"
-          />
-        ) : rows.length === 0 ? (
-          <EmptyState
-            title={t('market.appraisal.noMatchesTitle')}
-            hint={t('market.appraisal.noMatchesHint')}
-            className="py-8"
-          />
-        ) : (
-          <>
-            <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2">
-              <StatChip
-                label={t('market.appraisal.sellTotal')}
-                value={formatIsk(totals.sell)}
-                tone="accent"
-                tooltip={t('market.appraisal.sellTotalHelp')}
-              />
-              <StatChip
-                label={t('market.appraisal.buyTotal')}
-                value={formatIsk(totals.buy)}
-                tooltip={t('market.appraisal.buyTotalHelp')}
-              />
-              <StatChip
-                label={t('market.appraisal.spread')}
-                value={
-                  <span className={iskToneClass(totals.spread)}>{formatIsk(totals.spread)}</span>
-                }
-              />
-              {hasRefine && (
-                <StatChip
-                  label={t('market.appraisal.refineTotal')}
-                  value={formatIsk(totals.refine)}
-                  tooltip={t('market.appraisal.refineTotalHelp')}
-                />
-              )}
-              <StatChip label={t('market.appraisal.items')} value={rows.length} />
-              {loading && <Spinner label={t('common.loading')} size="sm" />}
-            </div>
-
-            {totals.unpricedRows > 0 && (
-              <p className="border-b border-line px-3 py-2 text-[0.6875rem] text-warning">
-                {t('market.appraisal.unpriced', { count: totals.unpricedRows })}
-              </p>
-            )}
-            {totals.refineUnpricedRows > 0 && (
-              <p className="border-b border-line px-3 py-2 text-[0.6875rem] text-warning">
-                {t('market.appraisal.refineUnpriced', { count: totals.refineUnpricedRows })}
-              </p>
-            )}
-
-            <DataTable
-              columns={columns}
-              rows={rows}
-              rowKey={(row) => row.typeId}
-              label={t('market.appraisal.resultTitle')}
-              className="pb-1"
-              rowContextMenu={rowContextMenu}
+      <div className="flex flex-col gap-4">
+        <Panel
+          title={t('market.appraisal.resultTitle')}
+          padded={result === null}
+          meta={
+            result !== null ? (
+              <StatChip label={hubName} value={t('market.appraisal.atPercent', { pricePercent })} />
+            ) : undefined
+          }
+          actions={
+            <IconButton
+              size="sm"
+              icon={<Icon.Download />}
+              label={t('market.appraisal.exportCsv')}
+              disabled={rows.length === 0}
+              onClick={() =>
+                downloadCsv('market-appraisal', rows, appraisalCsvColumns(t), new Date())
+              }
             />
-          </>
+          }
+        >
+          {loading && result === null ? (
+            <div className="flex justify-center py-8">
+              <Spinner label={t('common.loading')} />
+            </div>
+          ) : failed ? (
+            <EmptyState
+              title={t('market.loadFailedTitle')}
+              hint={t('market.loadFailedHint')}
+              className="py-8"
+            />
+          ) : result === null || totals === undefined ? (
+            <EmptyState
+              title={t('market.appraisal.emptyTitle')}
+              hint={t('market.appraisal.emptyHint')}
+              className="py-8"
+            />
+          ) : rows.length === 0 ? (
+            <EmptyState
+              title={t('market.appraisal.noMatchesTitle')}
+              hint={t('market.appraisal.noMatchesHint')}
+              className="py-8"
+            />
+          ) : (
+            <>
+              <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2">
+                <StatChip
+                  label={t('market.appraisal.sellTotal')}
+                  value={formatIsk(totals.sell)}
+                  tone="accent"
+                  tooltip={t('market.appraisal.sellTotalHelp')}
+                />
+                <StatChip
+                  label={t('market.appraisal.buyTotal')}
+                  value={formatIsk(totals.buy)}
+                  tooltip={t('market.appraisal.buyTotalHelp')}
+                />
+                <StatChip
+                  label={t('market.appraisal.spread')}
+                  value={
+                    <span className={iskToneClass(totals.spread)}>{formatIsk(totals.spread)}</span>
+                  }
+                />
+                {hasRefine && (
+                  <StatChip
+                    label={t('market.appraisal.refineTotal')}
+                    value={formatIsk(totals.refine)}
+                    tooltip={t('market.appraisal.refineTotalHelp')}
+                  />
+                )}
+                <StatChip label={t('market.appraisal.items')} value={rows.length} />
+                {loading && <Spinner label={t('common.loading')} size="sm" />}
+              </div>
+
+              {totals.unpricedRows > 0 && (
+                <p className="border-b border-line px-3 py-2 text-[0.6875rem] text-warning">
+                  {t('market.appraisal.unpriced', { count: totals.unpricedRows })}
+                </p>
+              )}
+              {totals.refineUnpricedRows > 0 && (
+                <p className="border-b border-line px-3 py-2 text-[0.6875rem] text-warning">
+                  {t('market.appraisal.refineUnpriced', { count: totals.refineUnpricedRows })}
+                </p>
+              )}
+
+              <DataTable
+                columns={columns}
+                rows={rows}
+                rowKey={(row) => row.typeId}
+                label={t('market.appraisal.resultTitle')}
+                className="pb-1"
+                rowContextMenu={rowContextMenu}
+              />
+            </>
+          )}
+        </Panel>
+
+        {compare !== null && (
+          <CollapsiblePanel
+            title={t('market.appraisal.compareHubsTitle')}
+            expanded={compareExpanded}
+            onToggle={() => setCompareExpanded((open) => !open)}
+            labels={{
+              show: t('market.appraisal.compareHubsShow'),
+              hide: t('market.appraisal.compareHubsHide'),
+            }}
+            padded={false}
+          >
+            <DataTable
+              columns={compareColumns}
+              rows={compare}
+              rowKey={(row) => row.hub.id}
+              label={t('market.appraisal.compareHubsTitle')}
+              density="compact"
+            />
+          </CollapsiblePanel>
         )}
-      </Panel>
+      </div>
     </div>
   );
 }

@@ -3,9 +3,19 @@
  * every member's materials merged by type, and the costs summed.
  *
  * Pure, like the rest of `src/engine`. The caller hands in each member's
- * already-computed `BuildResult` — one per plan, priced at that plan's own
- * hub/ME/facility — plus its two flattened material lists, and gets one set of
- * group figures back.
+ * `BuildResult` — one per plan, priced at that plan's own hub/ME/facility —
+ * plus its two flattened material lists, and gets one set of group figures
+ * back.
+ *
+ * ## Owned stock is the group's own ledger now, not each member's (issue #697)
+ *
+ * Each member's `BuildResult` here must be re-resolved with owned-stock
+ * deduction disabled (`materialResolution.ts`'s `withoutOwnedQuantities` on
+ * the plan's own `materialSourcing`, fed back through `buildVsBuy`) — never
+ * the same `BuildResult` a member's own page shows, which still nets its own
+ * `materialSourcing.ownedQuantity`. This function's own owned-stock opinion
+ * comes entirely from `RollUpBuildGroupOptions.ownedStock`, the **Group
+ * Owned Overlay**'s ledger, applied once here — see `applyOwnedLedger`.
  *
  * ## Why the caller flattens, and why there are two lists
  *
@@ -25,15 +35,25 @@
  * them — which has the happy side effect of making the distinction visible at
  * the call site rather than buried here.
  *
+ * The ledger nets against both lists independently — same ledger quantity,
+ * each list's own merged quantity — since they are alternate views of the
+ * same total rather than two pools to spend it from. Only the buy list's
+ * saving ever reaches `materialCost`/`totalCost`, though: a built row's
+ * netting is display-only (see `applyOwnedLedger` and `materialCost` below).
+ *
  * ## What it deliberately does not do
  *
- * It does not re-net owned stock across the group, and it does not resolve a
- * mixture of trade hubs. Both are reported instead — see `overClaimed` and
+ * It does not resolve a mixture of trade hubs — reported instead, see
  * `hubIds`. A mixture is split rather than resolved: `shoppingByHub` is the
  * same buy list partitioned by the hub each unit is bought at, so a pilot with
  * plans at two hubs pastes twice instead of not at all (issue #631). Nothing
  * is moved between hubs to make that tidier — the hub is the plan's fact, and
  * a group that quietly re-homed a member would be a second writer for it.
+ * `shoppingByHub` is **not** netted against the ledger — which hub's paste
+ * should shrink when the group owns a unit is not a fact this module has, so
+ * the per-hub blocks stay the raw, un-netted split; only the single merged
+ * `shoppingMaterials` (and the whole-group copy control it feeds) reflects
+ * the ledger.
  *
  * It is also a forward estimate only. Production Runs carry no group and
  * outlive their plans by design, so nothing here can say what a fit actually
@@ -111,20 +131,59 @@ export interface BuildGroupRollup {
   hubIds: string[];
   /** True when every member shares one hub — the only case a single paste covers the group. */
   singleHub: boolean;
-  /**
-   * Materials the members between them claim to own more of than the Character
-   * actually holds. Empty when no detection was supplied — an absent snapshot
-   * is not evidence of an empty hangar.
-   */
-  overClaimed: number[];
 }
 
 export interface RollUpBuildGroupOptions {
   /**
-   * Detected units per material typeID, across every location, unfiltered.
-   * Used only to flag over-claiming; never to change a quantity.
+   * The Group Owned Overlay's ledger (issue #697): units of each typeID the
+   * group itself owns, by typeID. Nets against the merged `shoppingMaterials`
+   * and `tableMaterials` — see the module doc. Omitted or empty leaves every
+   * merged line exactly as the members produced it.
    */
-  detectedOwnedStock?: ReadonlyMap<number, number>;
+  ownedStock?: ReadonlyMap<number, number>;
+}
+
+/**
+ * One merged line, netted against `ledgerQuantity` units of the group's own
+ * ledger — clamped into `[0, quantity]`, the same rule `claimOwned` applies
+ * per-material in `materialResolution.ts`, but against an already-merged line
+ * rather than by walking a tree.
+ *
+ * `unitPrice` known: `lineCost` is recomputed exactly, `remainingQuantity x
+ * unitPrice`. `unitPrice` null (a built row, or a leaf with no market price):
+ * there is no per-unit price to multiply, so the existing `lineCost` is
+ * scaled by the new remaining fraction — an approximation for a built row
+ * (job fees and run rounding are not linear), acceptable only because this
+ * path is display-only for such rows (see `materialCost` below).
+ */
+function applyOwnedLedger(line: MaterialCostLine, ledgerQuantity: number): MaterialCostLine {
+  const ownedQuantity = Math.min(Math.max(ledgerQuantity, 0), line.quantity);
+  const remainingQuantity = line.quantity - ownedQuantity;
+  const priorRemaining = line.remainingQuantity;
+  const lineCost =
+    line.unitPrice !== null
+      ? remainingQuantity * line.unitPrice
+      : priorRemaining > 0
+        ? (remainingQuantity / priorRemaining) * line.lineCost
+        : 0;
+  return {
+    ...line,
+    ownedQuantity,
+    remainingQuantity,
+    lineCost,
+    // A line the ledger now fully covers has nothing left to price, the same
+    // rule `resolveMaterial` applies when a claim from owned stock alone
+    // zeroes the remainder.
+    unpriced: remainingQuantity > 0 && line.unpriced,
+  };
+}
+
+function nettedAgainstLedger(
+  materials: readonly MaterialCostLine[],
+  ownedStock: ReadonlyMap<number, number> | undefined
+): MaterialCostLine[] {
+  if (!ownedStock) return [...materials];
+  return materials.map((m) => applyOwnedLedger(m, ownedStock.get(m.typeID) ?? 0));
 }
 
 function mergeMaterials(
@@ -162,10 +221,14 @@ function shoppingListsByHub(members: readonly BuildGroupMember[]): HubShoppingLi
 
 export function rollUpBuildGroup(
   members: readonly BuildGroupMember[],
-  { detectedOwnedStock }: RollUpBuildGroupOptions = {}
+  { ownedStock }: RollUpBuildGroupOptions = {}
 ): BuildGroupRollup {
-  const shoppingMaterials = mergeMaterials(members, (m) => m.shoppingMaterials);
-  const tableMaterials = mergeMaterials(members, (m) => m.tableMaterials);
+  const rawShoppingMaterials = mergeMaterials(members, (m) => m.shoppingMaterials);
+  const tableMaterials = nettedAgainstLedger(
+    mergeMaterials(members, (m) => m.tableMaterials),
+    ownedStock
+  );
+  const shoppingMaterials = nettedAgainstLedger(rawShoppingMaterials, ownedStock);
 
   const shoppingByHub = shoppingListsByHub(members);
   const hubIds = shoppingByHub.map((block) => block.hubId);
@@ -181,25 +244,42 @@ export function rollUpBuildGroup(
     buyCost += member.result.buyCost;
   }
 
-  // Against the merged *buy list*, since that is where an owned unit actually
-  // reduces spend. Compared with the unfiltered detection on purpose: each
-  // member may scope its own detection to different locations, so the only
-  // number both can be measured against is the whole hangar.
-  const overClaimed = detectedOwnedStock
-    ? shoppingMaterials
-        .filter((m) => m.ownedQuantity > (detectedOwnedStock.get(m.typeID) ?? 0))
-        .map((m) => m.typeID)
-    : [];
+  // The buy list is the one cost authority the ledger ever adjusts (see
+  // module doc): what it saved is the gap between each merged buy-list line
+  // before and after netting, and that gap — never the table's — is what
+  // comes off materialCost. Members already carry `materialCost`/`jobFee`
+  // computed with owned-stock deduction disabled, so summing those first and
+  // then subtracting the ledger's saving is the one place ownership is
+  // deducted, matching how a single plan's own `materialCost` already has its
+  // own owned stock netted in exactly once.
+  const ownedSaving = rawShoppingMaterials.reduce(
+    (sum, raw, i) => sum + (raw.lineCost - shoppingMaterials[i]!.lineCost),
+    0
+  );
+  const materialCost = members.reduce((sum, m) => sum + m.result.materialCost, 0) - ownedSaving;
+  const topLevelJobFees = members.reduce((sum, m) => sum + m.result.jobFee.total, 0);
+
+  // `member.result.unpriceable` is computed against the owned-disabled tree,
+  // before the ledger's netting — so a material the ledger now fully covers
+  // must not still count. A member's *product* having no hub price is a
+  // separate cause `unpriceable` bundles in (`buildVsBuy.ts`'s
+  // `!productPriced`) that the ledger can never fix; decomposed here as "the
+  // member is unpriceable and named no unpriced material", since
+  // `unpricedMaterials` is empty in exactly that case.
+  const productUnpriceable = members.some(
+    (m) => m.result.unpriceable && m.result.unpricedMaterials.length === 0
+  );
+  const unpriceable = productUnpriceable || tableMaterials.some((m) => m.unpriced);
 
   return {
     shoppingMaterials,
     tableMaterials,
-    materialCost: members.reduce((sum, m) => sum + m.result.materialCost, 0),
-    topLevelJobFees: members.reduce((sum, m) => sum + m.result.jobFee.total, 0),
-    totalCost: members.reduce((sum, m) => sum + m.result.totalCost, 0),
+    materialCost,
+    topLevelJobFees,
+    totalCost: materialCost + topLevelJobFees,
     buyCost,
     seconds: members.reduce((sum, m) => sum + m.result.seconds, 0),
-    unpriceable: members.some((m) => m.result.unpriceable),
+    unpriceable,
     shoppingByHub,
     hubIds,
     // An empty group has no mixture to warn about, but also nothing to paste;
@@ -208,6 +288,5 @@ export function rollUpBuildGroup(
     // longer a dead end — it is `shoppingByHub`, one paste per hub — so this
     // now says only whether one paste covers the whole group.
     singleHub: hubIds.length <= 1,
-    overClaimed,
   };
 }

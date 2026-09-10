@@ -17,53 +17,36 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, EmptyState, Panel, Spinner } from '@/components/ui';
 import type { BuildPlanRecord } from '@/db';
+import type { SweepStrategy } from '@/engine/industry/autoMakeOrBuy';
 import { rollUpBuildGroup, type BuildGroupMember } from '@/engine/industry/groupRollup';
-import type { BuildResult, MaterialCostLine, SkillLevels } from '@/engine/industry/types';
+import {
+  filterStockByScope,
+  suggestedOwnedQuantity,
+  type OwnedStockScope,
+} from '@/engine/industry/ownedStock';
+import type { MaterialCostLine, SkillLevels } from '@/engine/industry/types';
 import type { CharacterBlueprint } from '@/esi/endpoints';
 import { writeToClipboard } from '@/lib/clipboard';
 import { formatDuration } from '@/lib/duration';
 import { formatIsk } from '@/lib/isk';
+import { unmaskNumber } from '@/lib/numberMask';
 import { getTradeHub } from '@/market/hubs';
 import type { PiData } from '@/sde/types';
+import { useAssumedMe } from './assumedMe';
 import { nameForType, toIndustryBlueprint, type BlueprintCatalog } from './blueprintCatalog';
 import type { BuildGroup } from './buildGroups';
-import type { OwnedStockSnapshot } from './ownedStockDetection';
+import { CraftSweepControl, type DepthChoice } from './CraftSweepControl';
+import { groupCraftSweepMaxDepth } from './craftSweepGroup';
+import { SourcingInput } from './MaterialsTable';
+import { OwnedStockScopeControl } from './OwnedStockScopeControl';
+import { stockLocationLabel, type OwnedStockSnapshot } from './ownedStockDetection';
+import type { OwnedStockDetection } from './ownedStockDetection';
+import { recipeForLookup } from './recipes';
+import { flattenBuildResult } from './resultFlattenCache';
 import { hasShoppingList, shoppingListText } from './shoppingList';
-import { materialTableRows, shoppingListMaterials } from './subBuildPlan';
 import { useComparedBuildResults } from './useComparedBuildResults';
 import { useDetectedOwnedStock } from './useDetectedOwnedStock';
 import { RetargetGroupDialog, type RetargetTarget } from './RetargetGroupDialog';
-
-/**
- * Each member's resolved tree, flattened the two ways the rollup needs.
- *
- * `useComparedBuildResults` settles each member into `rows` on its own, so
- * `rows` gets a fresh identity per settle — and without this every
- * already-settled member was re-flattened on each one. A 25-member fit did
- * ~650 material-tree walks to do 25 members' work. Members sharing a hub now
- * share one fetch and so tend to settle together, which shortens that run but
- * does not remove it: a mixed-hub group still settles hub by hub.
- *
- * Module-level and keyed on the `BuildResult` itself: a result is replaced
- * wholesale when its plan is repriced, so a cache entry is valid exactly as
- * long as the object it hangs off, and dies with it. Deliberately not
- * `useRef(new WeakMap())`, which allocates a map per render to throw away.
- */
-const flattenedByResult = new WeakMap<
-  BuildResult,
-  { shopping: MaterialCostLine[]; table: MaterialCostLine[] }
->();
-
-function flattenOnce(result: BuildResult) {
-  const cached = flattenedByResult.get(result);
-  if (cached) return cached;
-  const flattened = {
-    shopping: shoppingListMaterials(result.materials),
-    table: materialTableRows(result.materials),
-  };
-  flattenedByResult.set(result, flattened);
-  return flattened;
-}
 
 /** The whole-group copy control's key in `copyState`; no hub can collide with it. */
 const GROUP_COPY = 'group';
@@ -91,6 +74,25 @@ interface BuildGroupPanelProps {
   onOpenPlan: (planId: string) => void;
   /** "Retarget group" (issue #632): bulk-writes `target` onto every plan in `planIds`. */
   onRetarget: (target: RetargetTarget, planIds: string[]) => void;
+  /**
+   * Craft Sweep on the group (issue #696): applies one Sweep Strategy +
+   * Sweep Depth to every member independently. Returns a Promise so this
+   * panel can disable the control for the duration, the same way a
+   * synchronous single-plan Apply never needs to.
+   */
+  onCraftSweep: (options: {
+    strategy: SweepStrategy;
+    depth: number;
+    depthChoice: DepthChoice;
+  }) => Promise<void>;
+  /**
+   * Group Owned Overlay (issue #697): writes the group's own owned-stock
+   * ledger, replacing it wholesale — the same "replace, don't merge"
+   * contract `withGroupOwnedStock` keeps.
+   */
+  onOwnedStockChange: (ownedStock: Record<number, number>) => void;
+  /** @see BuildGroupPanelProps.onOwnedStockChange */
+  onOwnedStockScopeChange: (scope: OwnedStockScope | undefined) => void;
 }
 
 export function BuildGroupPanel({
@@ -103,6 +105,9 @@ export function BuildGroupPanel({
   ownedStockSnapshot,
   onOpenPlan,
   onRetarget,
+  onCraftSweep,
+  onOwnedStockChange,
+  onOwnedStockScopeChange,
 }: BuildGroupPanelProps) {
   const { t } = useTranslation();
   // Which list the outcome belongs to, not a bare flag: a mixed-hub group
@@ -110,7 +115,50 @@ export function BuildGroupPanel({
   // copied the moment Jita was. `GROUP_COPY` is the whole-group control's key.
   const [copyState, setCopyState] = useState<{ key: string; status: CopyStatus } | null>(null);
   const [retargeting, setRetargeting] = useState(false);
-  const rows = useComparedBuildResults({ plans, catalog, pi, ownedBlueprints, skills });
+  const [sweeping, setSweeping] = useState(false);
+  // computeGroupResult: true — the group total needs each member's tree
+  // re-resolved with owned-stock deduction disabled (issue #697), never the
+  // owned-netted `result` a member's own page shows (still read below, for
+  // the member list's own totals).
+  const rows = useComparedBuildResults({
+    plans,
+    catalog,
+    pi,
+    ownedBlueprints,
+    skills,
+    computeGroupResult: true,
+  });
+
+  // Same setting `useComparedBuildResults` reads for these members' own
+  // pricing — sub-builds unowned anywhere in the group must assume the same
+  // ME that hook already quotes them at.
+  const assumedMe = useAssumedMe((state) => state.value);
+  const recipeFor = useMemo(
+    () => recipeForLookup({ catalog, pi, ownedBlueprints, assumedMeForUnowned: assumedMe }),
+    [catalog, pi, ownedBlueprints, assumedMe]
+  );
+
+  // Sweep Depth is structural — which typeIDs have a recipe — and never
+  // moves with a member's runs/ME/hub/sourcing edit, so this keys on the
+  // blueprints actually in play rather than on `plans` itself: `plans` gets
+  // a fresh array identity from `useLiveQuery` on every keystroke in any
+  // member, and `groupCraftSweepMaxDepth` walks every member's full tree —
+  // exactly the O(members) tree-walk cost `resultFlattenCache` exists to
+  // avoid for the rollup's own flattening.
+  const craftSweepBlueprintSignature = plans.map((p) => `${p.blueprintTypeID}`).join(',');
+  const craftSweepMaxDepth = useMemo(
+    () => groupCraftSweepMaxDepth(plans, catalog, recipeFor, skills),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- craftSweepBlueprintSignature is the stable proxy for `plans`' structural identity; see comment above.
+    [craftSweepBlueprintSignature, catalog, recipeFor, skills]
+  );
+  // What Apply will actually touch: `applyGroupCraftSweep` silently skips a
+  // member whose blueprint no longer resolves in the catalog (the same
+  // "skip, don't zero" policy the rollup itself applies to an unresolvable
+  // member), so the confirmation must count survivors, not every plan in the
+  // group, or it would overstate its own blast radius.
+  const craftSweepAffectedCount = plans.filter((p) =>
+    catalog.byBlueprintTypeID.has(p.blueprintTypeID)
+  ).length;
 
   const members: BuildGroupMember[] = useMemo(() => {
     const byId = new Map(plans.map((p) => [p.id, p]));
@@ -119,14 +167,18 @@ export function BuildGroupPanel({
       // A member still loading, or one that could not be priced, contributes
       // nothing rather than contributing zeroes — a total that silently counts
       // a failed member as free is worse than one that says it is incomplete.
-      if (!plan || !row.result) return [];
-      const flattened = flattenOnce(row.result);
+      // `groupResult`, never `result`: the group total re-resolves each
+      // member with owned-stock deduction disabled (issue #697) — `result`
+      // is what that member's own page shows, still netted against its own
+      // `materialSourcing`, and stays untouched in the member list below.
+      if (!plan || !row.groupResult) return [];
+      const flattened = flattenBuildResult(row.groupResult);
       return [
         {
           planId: row.planId,
           planName: row.planName,
           hubId: plan.hubId,
-          result: row.result,
+          result: row.groupResult,
           shoppingMaterials: flattened.shopping,
           tableMaterials: flattened.table,
         },
@@ -152,19 +204,74 @@ export function BuildGroupPanel({
 
   // The very detection a single plan's own page runs, over the union of the
   // group's materials — reused rather than re-derived, so a group and its
-  // members can never hold two opinions about what the hangar contains.
+  // members can never hold two opinions about what the hangar contains. Feeds
+  // the Group Owned Overlay's own ledger UI below (issue #697), not the
+  // rollup directly — `rollUpBuildGroup` only ever sees the ledger the pilot
+  // has committed to, in `ownedStockMap`.
   const detected = useDetectedOwnedStock(ownedStockSnapshot, materialTypeIds);
-  const detectedOwnedStock = useMemo(
+  const scopedStock = useMemo(
+    () => filterStockByScope(detected.stock, group.ownedStockScope),
+    [detected.stock, group.ownedStockScope]
+  );
+  const detection = useMemo<OwnedStockDetection>(
+    () => ({
+      stockFor: (typeID) => detected.stock.get(typeID),
+      scopedQuantityFor: (typeID) => scopedStock.get(typeID)?.quantity ?? 0,
+      lowerBound: detected.incompleteCharacters.length > 0,
+      incompleteCharacters: detected.incompleteCharacters,
+      characterNameFor: (characterId) =>
+        detected.characterNames.get(characterId) ?? t('common.unknown'),
+      locationLabelFor: (placement) => stockLocationLabel(placement, detected.locationNames, t),
+    }),
+    [detected, scopedStock, t]
+  );
+
+  const ownedStockMap = useMemo(
     () =>
-      detected.stock.size === 0
-        ? undefined
-        : new Map([...detected.stock].map(([typeID, stock]) => [typeID, stock.quantity])),
-    [detected.stock]
+      new Map(Object.entries(group.ownedStock ?? {}).map(([typeID, qty]) => [Number(typeID), qty])),
+    [group.ownedStock]
   );
 
   const rollup = useMemo(
-    () => rollUpBuildGroup(members, { detectedOwnedStock }),
-    [members, detectedOwnedStock]
+    () => rollUpBuildGroup(members, { ownedStock: ownedStockMap }),
+    [members, ownedStockMap]
+  );
+
+  /** One write path for the ledger: every caller mutates a copy of `group.ownedStock`, this commits it. */
+  function updateOwnedStock(mutate: (next: Record<number, number>) => void) {
+    const next: Record<number, number> = { ...group.ownedStock };
+    mutate(next);
+    onOwnedStockChange(next);
+  }
+
+  function setOwnedQuantity(typeID: number, quantity: number | undefined) {
+    updateOwnedStock((next) => {
+      if (quantity === undefined || quantity <= 0) delete next[typeID];
+      else next[typeID] = quantity;
+    });
+  }
+
+  // Same "never clobber a hand-typed value" rule the plan-level bulk fill
+  // keeps: only rows with nothing in the ledger yet are offered.
+  const bulkDetectedEntries = useMemo(
+    () =>
+      rollup.tableMaterials
+        .filter((m) => ownedStockMap.get(m.typeID) === undefined && scopedStock.has(m.typeID))
+        .map(
+          (m) =>
+            [
+              m.typeID,
+              suggestedOwnedQuantity(scopedStock.get(m.typeID)!.quantity, m.quantity),
+            ] as const
+        ),
+    [rollup.tableMaterials, ownedStockMap, scopedStock]
+  );
+  const bulkClearTypeIds = useMemo(
+    () =>
+      rollup.tableMaterials
+        .filter((m) => (ownedStockMap.get(m.typeID) ?? 0) > 0)
+        .map((m) => m.typeID),
+    [rollup.tableMaterials, ownedStockMap]
   );
 
   // The copy outcome is a flash, not a state the panel keeps. Cleared by an
@@ -255,6 +362,22 @@ export function BuildGroupPanel({
           </div>
         )}
 
+        <div className="mb-3">
+          <CraftSweepControl
+            maxDepth={craftSweepMaxDepth}
+            disabled={sweeping}
+            initialStrategy={group.craftSweepDefault?.strategy}
+            initialDepthChoice={group.craftSweepDefault?.depthChoice}
+            confirmMessage={t('industry.craftSweepConfirmGroup', {
+              count: craftSweepAffectedCount,
+            })}
+            onApply={(options) => {
+              setSweeping(true);
+              void onCraftSweep(options).finally(() => setSweeping(false));
+            }}
+          />
+        </div>
+
         <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs sm:grid-cols-4">
           <div>
             <dt className="text-text-dim">{t('industry.materialCost')}</dt>
@@ -328,13 +451,6 @@ export function BuildGroupPanel({
         {rollup.unpriceable && (
           <p className="mt-2 text-xs text-warning">{t('industry.groupUnpriceable')}</p>
         )}
-        {rollup.overClaimed.length > 0 && (
-          <p className="mt-2 text-xs text-warning">
-            {t('industry.groupOverClaimed', {
-              materials: rollup.overClaimed.map((id) => nameForType(catalog, id)).join(', '),
-            })}
-          </p>
-        )}
         {failed.length > 0 && (
           <ul className="mt-2 text-xs text-danger">
             {failed.map((row) => (
@@ -364,6 +480,80 @@ export function BuildGroupPanel({
             );
           })}
         </ul>
+      </Panel>
+
+      {/* The Group Owned Overlay (issue #697): the group's own "I own this"
+          ledger, independent of any member's per-plan owned quantity — see
+          CONTEXT.md's "Group Owned Overlay". Manual entry, or "use detected"
+          scoped the same way a single plan's owned-stock entry is. */}
+      <Panel title={t('industry.groupOwnedStockTitle')} padded={false}>
+        <div className="space-y-3 p-2.5">
+          <OwnedStockScopeControl
+            scope={group.ownedStockScope}
+            detectedStock={detected.stock}
+            detection={detection}
+            onChange={onOwnedStockScopeChange}
+            action={
+              (bulkDetectedEntries.length > 0 || bulkClearTypeIds.length > 0) && (
+                <div className="flex gap-2">
+                  {bulkDetectedEntries.length > 0 && (
+                    <Button
+                      size="sm"
+                      onClick={() =>
+                        updateOwnedStock((next) => {
+                          for (const [typeID, quantity] of bulkDetectedEntries)
+                            next[typeID] = quantity;
+                        })
+                      }
+                    >
+                      {t('industry.useAllOwned')}
+                    </Button>
+                  )}
+                  {bulkClearTypeIds.length > 0 && (
+                    <Button
+                      size="sm"
+                      onClick={() =>
+                        updateOwnedStock((next) => {
+                          for (const typeID of bulkClearTypeIds) delete next[typeID];
+                        })
+                      }
+                    >
+                      {t('industry.useNoneOwned')}
+                    </Button>
+                  )}
+                </div>
+              )
+            }
+          />
+          {rollup.tableMaterials.length === 0 ? (
+            <EmptyState title={t('industry.groupNothingToBuy')} className="py-4" />
+          ) : (
+            <ul className="divide-y divide-line text-xs">
+              {rollup.tableMaterials.map((material) => (
+                <li
+                  key={material.typeID}
+                  className="flex items-center justify-between gap-2 py-1.5"
+                >
+                  <span className="truncate">{nameForType(catalog, material.typeID)}</span>
+                  <SourcingInput
+                    value={ownedStockMap.get(material.typeID)}
+                    label={t('industry.groupOwnedQuantityLabel', {
+                      material: nameForType(catalog, material.typeID),
+                    })}
+                    inputMode="numeric"
+                    widthClassName="w-20"
+                    placeholder="0"
+                    parse={(raw) => {
+                      const value = unmaskNumber(raw);
+                      return value === undefined ? undefined : Math.floor(value);
+                    }}
+                    onCommit={(quantity) => setOwnedQuantity(material.typeID, quantity)}
+                  />
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       </Panel>
 
       {/* The whole merge, built materials included — `tableMaterials`, not the

@@ -76,6 +76,20 @@ describe('computeBuildPlan', () => {
     expect(result?.materialCost).toBeCloseTo((tritanium!.quantity - 20_000) * 4, 6);
   });
 
+  it("ignores the plan's owned quantity, but keeps its override price, when ignoreOwnedStock is set", () => {
+    const { result, error } = computeBuildPlan({
+      plan: { ...BASE_PLAN, materialSourcing: { 34: { ownedQuantity: 20_000, overridePrice: 4 } } },
+      blueprint: BLUEPRINT,
+      ...MARKET,
+      ignoreOwnedStock: true,
+    });
+    expect(error).toBeNull();
+    const tritanium = result?.materials[0];
+    expect(tritanium?.ownedQuantity).toBe(0);
+    expect(tritanium?.remainingQuantity).toBe(tritanium?.quantity);
+    expect(tritanium?.unitPrice).toBe(4); // overridePrice survives
+  });
+
   it('clamps a cleared/invalid runs field to 1 instead of throwing', () => {
     const { result, error } = computeBuildPlan({
       plan: { ...BASE_PLAN, runs: 0 },

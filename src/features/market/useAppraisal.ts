@@ -22,7 +22,12 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { TradeHub } from '@/market/hubs';
-import { appraisePaste, type AppraisalOutcome } from './appraisalData';
+import {
+  appraisePaste,
+  compareHubs,
+  type AppraisalOutcome,
+  type HubComparisonRow,
+} from './appraisalData';
 
 export interface AppraisalController {
   /** What is in the box. */
@@ -30,6 +35,8 @@ export interface AppraisalController {
   setText: (next: string) => void;
   /** Null until the first Appraise, and again after Clear. */
   result: AppraisalOutcome | null;
+  /** The same pile priced at all 5 Trade Hubs. Null and set together with `result`. */
+  compare: HubComparisonRow[] | null;
   loading: boolean;
   /** The catalogue could not be loaded; the paste itself is untouched. */
   failed: boolean;
@@ -49,6 +56,7 @@ export function useAppraisal(
   const [text, setText] = useState('');
   const [submitted, setSubmitted] = useState('');
   const [result, setResult] = useState<AppraisalOutcome | null>(null);
+  const [compare, setCompare] = useState<HubComparisonRow[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [failed, setFailed] = useState(false);
   // Bumped by the refresh button only. Part of the effect's dependencies so a
@@ -72,13 +80,18 @@ export function useAppraisal(
       setLoading(true);
       setFailed(false);
       try {
-        const outcome = await appraisePaste(submitted, hub, pricePercent, characterId, { force });
+        const [outcome, compareRows] = await Promise.all([
+          appraisePaste(submitted, hub, pricePercent, characterId, { force }),
+          compareHubs(submitted, pricePercent, { force }),
+        ]);
         if (cancelled) return;
         setResult(outcome);
+        setCompare(compareRows);
       } catch {
         // Only the catalogue load throws; prices degrade to nulls in place.
         if (cancelled) return;
         setResult(null);
+        setCompare(null);
         setFailed(true);
       } finally {
         if (!cancelled) setLoading(false);
@@ -104,6 +117,7 @@ export function useAppraisal(
     setText('');
     setSubmitted('');
     setResult(null);
+    setCompare(null);
     setLoading(false);
     setFailed(false);
   }, []);
@@ -117,6 +131,7 @@ export function useAppraisal(
     text,
     setText,
     result,
+    compare,
     loading,
     failed,
     canAppraise: text.trim() !== '',
