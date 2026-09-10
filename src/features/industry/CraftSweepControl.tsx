@@ -11,6 +11,7 @@ import {
   SelectValue,
 } from '@/components/ui';
 import type { SweepStrategy } from '@/engine/industry/autoMakeOrBuy';
+import { CraftScopeChips, SweepStrategySelect } from './craftSweepShared';
 
 interface CraftSweepControlProps {
   /**
@@ -34,8 +35,6 @@ interface CraftSweepControlProps {
   confirmMessage?: string;
   onApply: (options: { strategy: SweepStrategy; depth: number; depthChoice: DepthChoice }) => void;
 }
-
-const SWEEP_STRATEGIES: readonly SweepStrategy[] = ['cost-effective', 'build', 'buy'];
 
 /** 'all' is a sentinel distinct from any numeric depth — resolved to `maxDepth` on apply. */
 export type DepthChoice = 'all' | number;
@@ -74,12 +73,6 @@ export function CraftSweepControl({
   const depthOptions = Array.from({ length: maxDepth }, (_, i) => i + 1);
   const resolvedDepth = depthChoice === 'all' ? maxDepth : depthChoice;
 
-  const strategyLabel: Record<SweepStrategy, string> = {
-    'cost-effective': t('industry.craftSweepStrategyCostEffective'),
-    build: t('industry.craftSweepStrategyBuild'),
-    buy: t('industry.craftSweepStrategyBuy'),
-  };
-
   return (
     <div className="flex flex-col gap-2 text-xs">
       <span className="flex items-center gap-1.5">
@@ -96,18 +89,7 @@ export function CraftSweepControl({
           <span className="whitespace-nowrap text-text-dim">
             {t('industry.craftSweepStrategyLabel')}
           </span>
-          <Select value={strategy} onValueChange={(value) => setStrategy(value as SweepStrategy)}>
-            <SelectTrigger size="sm" aria-label={t('industry.craftSweepStrategyLabel')}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {SWEEP_STRATEGIES.map((option) => (
-                <SelectItem key={option} value={option}>
-                  {strategyLabel[option]}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <SweepStrategySelect strategy={strategy} onChange={setStrategy} size="sm" />
         </label>
         <label className="flex items-center gap-1.5">
           <span className="whitespace-nowrap text-text-dim">
@@ -130,25 +112,7 @@ export function CraftSweepControl({
             </SelectContent>
           </Select>
         </label>
-        <span className="flex items-center gap-1">
-          <span className="rounded-xs border border-accent-dim bg-accent/15 px-2 py-0.5 text-[0.6875rem] font-semibold tracking-widest text-accent uppercase">
-            {t('industry.craftScopeManufacturing')}
-          </span>
-          <span
-            aria-disabled="true"
-            title={t('industry.craftScopeReserved')}
-            className="rounded-xs border border-line bg-panel-2 px-2 py-0.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase opacity-60"
-          >
-            {t('industry.craftScopeReactions')}
-          </span>
-          <span
-            aria-disabled="true"
-            title={t('industry.craftScopeReserved')}
-            className="rounded-xs border border-line bg-panel-2 px-2 py-0.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase opacity-60"
-          >
-            {t('industry.craftScopePlanetary')}
-          </span>
-        </span>
+        <CraftScopeChips reserved={['reactions', 'planetary']} />
         <Button
           size="sm"
           onClick={() => setConfirmOpen(true)}

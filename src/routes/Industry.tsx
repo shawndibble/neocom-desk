@@ -334,18 +334,6 @@ export function Industry() {
     if (groupId === undefined) return null;
     return groups.find((g) => g.id === groupId)?.snapshot ?? null;
   }, [selectedPlan, groups]);
-  /**
-   * The open plan's own group name, or null when ungrouped (issue #696) — a
-   * separate question from `selectedPlanGroupSnapshot`, which is also null
-   * for a grouped-but-never-Retargeted plan and so cannot tell the two
-   * apart.
-   */
-  const selectedPlanGroupName = useMemo(() => {
-    const groupId = selectedPlan?.buildGroupId;
-    if (groupId === undefined) return null;
-    return groups.find((g) => g.id === groupId)?.name ?? null;
-  }, [selectedPlan, groups]);
-
   // Narrow screens show one column at a time (CONTEXT.md round 25); matches
   // the grid's own `lg:` breakpoint so the JS-driven visibility and the CSS
   // layout switch at the same width. Gated on the explicit `selectedId`, not
@@ -867,7 +855,6 @@ export function Industry() {
                       quickbarAvailable={quickbar.available}
                       onShowInfo={(typeId, itemName) => setInfoModalItem({ typeId, itemName })}
                       groupSnapshot={selectedPlanGroupSnapshot}
-                      groupName={selectedPlanGroupName}
                     />
                   ) : plans.length > 0 ? (
                     <div className="flex justify-center py-8">
