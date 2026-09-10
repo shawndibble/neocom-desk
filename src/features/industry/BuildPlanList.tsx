@@ -17,21 +17,11 @@ import {
   type DragOverEvent,
   type DragStartEvent,
 } from '@dnd-kit/core';
-import {
-  Button,
-  Caret,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-  EmptyState,
-  IconButton,
-  TextInput,
-} from '@/components/ui';
+import { Button, Caret, EmptyState, IconButton, TextInput } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import type { BuildPlanRecord } from '@/db';
 import { BlueprintPicker } from './BlueprintPicker';
+import { BuildPlanRowContextMenu } from './BuildPlanRowContextMenu';
 import type { BuildGroup } from './buildGroups';
 import { groupDropId, planDropId, planIdFromDropId, resolveGroupDrop } from './groupDrop';
 import type { BlueprintCatalog, BlueprintCatalogEntry } from './blueprintCatalog';
@@ -206,9 +196,11 @@ function PlanRow({
           Deliberately not focusable and hidden from assistive tech. Keyboard
           dragging here would step the row a flat 25px per arrow press —
           `sortableKeyboardCoordinates` needs a sort order this list does not
-          have — and announce raw droppable ids. The "Move to group" menu two
-          controls along reaches every destination this handle does, from the
-          keyboard, which is the pointer alternative that matters (WCAG 2.5.7).
+          have — and announce raw droppable ids. The row's `ContextMenu` (name
+          button, opens on right-click/long-press or the keyboard's Shift+F10 /
+          Menu key) has a "Move to group" submenu that reaches every
+          destination this handle does, which is the pointer alternative that
+          matters (WCAG 2.5.7).
 
           The `title` is a pointer-only hint on a pointer-only control rather
           than a `Tooltip`, which would put it back in the accessibility tree
@@ -245,65 +237,26 @@ function PlanRow({
           onDone={() => setRenaming(false)}
         />
       ) : (
-        <button
-          type="button"
-          onClick={() => onSelect(plan.id)}
-          onDoubleClick={() => setRenaming(true)}
-          className="flex-1 truncate text-left"
+        // Only Delete stays a visible button; move-to-group/rename/duplicate
+        // move into the row's context menu, so delete doesn't get lost among
+        // four same-weight icons.
+        <BuildPlanRowContextMenu
+          plan={plan}
+          groups={groups}
+          onRename={() => setRenaming(true)}
+          onDuplicate={() => onDuplicate(plan.id)}
+          onMovePlan={(groupId) => onMovePlan(plan.id, groupId)}
         >
-          {plan.name}
-        </button>
-      )}
-      {/* Three labelled buttons left the plan name ~90px on a phone ("Raven
-          Nav…"). The name is the row — the actions are the adornment — so the
-          actions become icons and give the width back. Each label names the
-          plan too, so a screen reader hears which row it is on; the tooltip
-          drops it, since a pointer user is already looking at the row.
-
-          Grouping is a fourth control, which would take that width straight
-          back, so it lives behind a menu rather than beside them (#626). */}
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <IconButton
-            size="sm"
-            icon={<Icon.BuildGroup />}
-            label={`${t('industry.moveToGroup')} ${plan.name}`}
-            tooltip={t('industry.moveToGroup')}
-          />
-        </DropdownMenuTrigger>
-        <DropdownMenuContent>
-          {groups.map((group) => (
-            <DropdownMenuItem
-              key={group.id}
-              disabled={plan.buildGroupId === group.id}
-              onSelect={() => onMovePlan(plan.id, group.id)}
-            >
-              {group.name}
-            </DropdownMenuItem>
-          ))}
-          {groups.length > 0 && <DropdownMenuSeparator />}
-          <DropdownMenuItem
-            disabled={plan.buildGroupId === undefined}
-            onSelect={() => onMovePlan(plan.id, null)}
+          <button
+            type="button"
+            onClick={() => onSelect(plan.id)}
+            onDoubleClick={() => setRenaming(true)}
+            className="flex-1 truncate text-left"
           >
-            {t('industry.removeFromGroup')}
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-      <IconButton
-        size="sm"
-        icon={<Icon.Rename />}
-        label={`${t('industry.rename')} ${plan.name}`}
-        tooltip={t('industry.rename')}
-        onClick={() => setRenaming(true)}
-      />
-      <IconButton
-        size="sm"
-        icon={<Icon.Duplicate />}
-        label={`${t('industry.duplicate')} ${plan.name}`}
-        tooltip={t('industry.duplicate')}
-        onClick={() => onDuplicate(plan.id)}
-      />
+            {plan.name}
+          </button>
+        </BuildPlanRowContextMenu>
+      )}
       <IconButton
         size="sm"
         icon={<Icon.Close />}
