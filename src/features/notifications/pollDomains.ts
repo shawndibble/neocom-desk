@@ -44,6 +44,10 @@ import { loadCorporationMemberIds } from '@/features/corp/members';
 import { loadCorporationWallets, loadCorporationWalletJournal } from '@/features/corp/wallet';
 import { loadCharacterRoles, corpWideRoles } from '@/features/corp/roles';
 import { corpCapabilities, type CorpCapability } from '@/engine/corpRoles';
+import { db, type QuickbarItem } from '@/db';
+import { getHubPrices } from '@/market/prices';
+import { getTradeHub, DEFAULT_TRADE_HUB } from '@/market/hubs';
+import { useMarketHub } from '@/features/market/hub';
 import type {
   SkillQueueEntry,
   IndustryJob,
@@ -124,6 +128,10 @@ import {
   type CorpWalletDivisionSnapshot,
   type CorpWalletSnapshot,
   type CorpWalletThresholdFire,
+  diffPriceAlertTriggered,
+  type PriceAlertEntrySnapshot,
+  type PriceAlertSnapshot,
+  type PriceAlertTriggeredFire,
 } from '@/engine/notificationDiffs';
 import { parseEveNotificationPayload } from '@/engine/eveNotificationPayload';
 import {
@@ -191,7 +199,8 @@ export type AnyNotificationFire =
   | CorpIndustryJobNotificationFire
   | CorpMemberJoinedFire
   | CorpMemberLeftFire
-  | CorpWalletThresholdFire;
+  | CorpWalletThresholdFire
+  | PriceAlertTriggeredFire;
 
 /**
  * The one diff signature every domain speaks. Most engine diffs don't take an
@@ -1203,6 +1212,67 @@ export const corpWalletDomain = defineDomain<
   diffs: [gatedOn('corpWalletThreshold', diffCorpWalletThreshold)],
 });
 
+/* Quickbar: price alerts ----------------------------------------------------- */
+
+function isPriceAlertEntrySnapshot(raw: unknown): raw is PriceAlertEntrySnapshot {
+  if (typeof raw !== 'object' || raw === null) return false;
+  const r = raw as Record<string, unknown>;
+  return (
+    typeof r.typeId === 'number' &&
+    typeof r.name === 'string' &&
+    typeof r.targetPrice === 'number' &&
+    (r.direction === 'above' || r.direction === 'below') &&
+    (r.price === null || typeof r.price === 'number')
+  );
+}
+
+/** The Trade Hub Quickbar prices at, re-read every poll for the same reason as `currentThresholds`: AC4's "without a reload" needs the live value. */
+async function currentHub() {
+  await useMarketHub.getState().hydrate();
+  return getTradeHub(useMarketHub.getState().value) ?? DEFAULT_TRADE_HUB;
+}
+
+/**
+ * Prices only the Quickbar items carrying a target (issue #680) — an item
+ * with no target has nothing for `diffPriceAlertTriggered` to compare, so
+ * pricing it would be a wasted Fuzzwork call. Always prices "the item's
+ * Quickbar entry" at the one Trade Hub Quickbar and Compare already share
+ * (`features/market/hub.ts`); `QuickbarItem` carries no hub of its own.
+ */
+export const priceAlertDomain = defineDomain<
+  PriceAlertEntrySnapshot,
+  PriceAlertSnapshot,
+  PriceAlertTriggeredFire
+>({
+  id: 'priceAlert',
+  eventIds: ['priceAlertTriggered'],
+  stateKey: 'notifications.pollerState.priceAlert',
+  entriesKey: 'entries',
+  isEntry: isPriceAlertEntrySnapshot,
+  load: async (characterId) => {
+    const record = await db.quickbars.get(String(characterId));
+    const targeted = (record?.items ?? []).filter(
+      (item): item is QuickbarItem & { targetPrice: number; targetDirection: 'above' | 'below' } =>
+        item.targetPrice !== undefined && item.targetDirection !== undefined
+    );
+    if (targeted.length === 0) return [];
+    const hub = await currentHub();
+    const prices = await getHubPrices(
+      hub,
+      targeted.map((item) => item.typeId)
+    );
+    return targeted.map((item) => ({
+      typeId: item.typeId,
+      name: item.name,
+      targetPrice: item.targetPrice,
+      direction: item.targetDirection,
+      price: prices.get(item.typeId)?.sellMin ?? null,
+    }));
+  },
+  toSnapshot: (entries, nowMs) => ({ entries: [...entries], nowMs }),
+  diffs: [gatedOn('priceAlertTriggered', diffPriceAlertTriggered)],
+});
+
 /**
  * Every polled domain, in fetch order. One entry here is the whole cost of
  * adding a domain: `foregroundPoller.ts` names none of them.
@@ -1222,4 +1292,5 @@ export const POLL_DOMAINS: readonly PollDomain[] = [
   corpIndustryJobDomain,
   corpRosterDomain,
   corpWalletDomain,
+  priceAlertDomain,
 ];

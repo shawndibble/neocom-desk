@@ -26,13 +26,22 @@ export type NotificationEventId =
   | 'corpIndustryJobReady'
   | 'corpMemberJoined'
   | 'corpMemberLeft'
-  | 'corpWalletThreshold';
+  | 'corpWalletThreshold'
+  | 'priceAlertTriggered';
 
 export interface NotificationEventDef {
   readonly id: NotificationEventId;
   /** i18next key under the `settings.notifications.event.*` namespace. */
   readonly labelKey: string;
-  readonly scope: Scope;
+  /**
+   * Absent only for `priceAlertTriggered` (issue #680): every other event
+   * reads ESI data and so needs a real OAuth grant to fetch at all, but
+   * price alerts poll Quickbar (local Dexie) and the public Fuzzwork
+   * aggregate path, neither of which is behind any scope. `enabledEventsFor`
+   * (`foregroundPoller.ts`) treats an absent scope as always-satisfied,
+   * rather than this catalog borrowing an unrelated scope as a fake gate.
+   */
+  readonly scope?: Scope;
   /**
    * The second, role-shaped gate a corp event needs on top of `scope` (issue
    * #299): CCP role-gates the corporation endpoints server-side, so a granted
@@ -156,6 +165,12 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventDef[] = [
     labelKey: 'settings.notifications.event.corpWalletThreshold',
     scope: requiredScope('getCorporationWallets'),
     corpCapability: 'canReadWallet',
+  },
+  // No ESI scope (see `NotificationEventDef.scope`'s doc) — pricing and the
+  // Quickbar list are both scope-free.
+  {
+    id: 'priceAlertTriggered',
+    labelKey: 'settings.notifications.event.priceAlertTriggered',
   },
 ] as const;
 

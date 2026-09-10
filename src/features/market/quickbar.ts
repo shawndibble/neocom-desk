@@ -30,3 +30,23 @@ export function reorderQuickbarItems(
   next.splice(overIndex, 0, moved);
   return next;
 }
+
+/**
+ * Sets or clears a Quickbar item's price alert target (issue #680). `null`
+ * clears both fields rather than leaving a stale price behind — the only way
+ * to stop a target's alerts is to remove it or replace it outright, never to
+ * edit one field independently of the other.
+ */
+export function setQuickbarItemTarget(
+  items: readonly QuickbarItem[],
+  typeId: number,
+  target: { price: number; direction: 'above' | 'below' } | null
+): QuickbarItem[] {
+  return items.map((item) => {
+    if (item.typeId !== typeId) return item;
+    if (target === null) {
+      return { typeId: item.typeId, name: item.name };
+    }
+    return { ...item, targetPrice: target.price, targetDirection: target.direction };
+  });
+}

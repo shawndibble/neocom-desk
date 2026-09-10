@@ -110,6 +110,7 @@ const EVENT_SEVERITY: Readonly<Partial<Record<NotificationEventId, DeadlineSever
   // News. It already went the way you wanted.
   marketOrderFilled: 'clear',
   walletBalanceChanged: 'clear',
+  priceAlertTriggered: 'clear',
 };
 
 export function alertSeverity(target: EntryChannelTarget): DeadlineSeverity {
