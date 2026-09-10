@@ -25,7 +25,8 @@ interface CraftSweepControlProps {
    * Production methods currently eligible to sweep (issue #698's `craftScope`)
    * — the same answer the recursive engine and the manual per-item toggle use,
    * so this chip row can never promise more than a sweep will actually apply.
-   * Manufacturing is always eligible; Reactions lights up only when Include
+   * Manufacturing is always eligible and isn't shown as a chip (issue #778 —
+   * every sweep always includes it); Reactions lights up only when Include
    * Reactions is on (or the plan's own activity is a reaction). Planetary
    * stays reserved regardless — out of scope for #698.
    */

@@ -35,13 +35,31 @@ interface SweepStrategySelectProps {
   strategy: SweepStrategy;
   onChange: (strategy: SweepStrategy) => void;
   size?: ControlSize;
+  /**
+   * The single-plan `BuildPlanCraftSweepControl` passes this while there is
+   * nothing to sweep or prices aren't ready — it applies on change and on
+   * its own re-run press, so a disabled trigger is the only way to block
+   * that. The Build Group's `CraftSweepControl` does not pass it: its select
+   * stays live while prices load — pre-pick a strategy, then Apply — and
+   * only its own Apply button is gated.
+   */
+  disabled?: boolean;
 }
 
-export function SweepStrategySelect({ strategy, onChange, size }: SweepStrategySelectProps) {
+export function SweepStrategySelect({
+  strategy,
+  onChange,
+  size,
+  disabled,
+}: SweepStrategySelectProps) {
   const { t } = useTranslation();
   const label = useSweepStrategyLabels();
   return (
-    <Select value={strategy} onValueChange={(value) => onChange(value as SweepStrategy)}>
+    <Select
+      value={strategy}
+      onValueChange={(value) => onChange(value as SweepStrategy)}
+      disabled={disabled}
+    >
       <SelectTrigger size={size} aria-label={t('industry.craftSweepStrategyLabel')}>
         <SelectValue />
       </SelectTrigger>
@@ -66,35 +84,57 @@ interface CraftScopeChipsProps {
    * Production methods currently eligible to sweep (issue #698's
    * `craftScope`) — the same answer the recursive engine and the manual
    * per-item toggle use, so this chip row can never promise more than a
-   * sweep will actually apply. Manufacturing is always eligible; Reactions
+   * sweep will actually apply. Manufacturing is always in `scope` and isn't
+   * shown here at all (issue #778) — every sweep on every surface includes
+   * it unconditionally, so a chip for it never carries information. Reactions
    * lights up only when `scope` includes it (Include Reactions on, or the
    * plan's own activity is a reaction). Planetary is never in `scope` yet —
-   * out of scope for #698 — and always renders reserved.
+   * out of scope for #698 — and always renders reserved, when shown at all.
    */
   scope: readonly MakeMethod[];
+  /**
+   * Whether to render the reserved Planetary chip. Defaults to `true` (the
+   * Build Group's `CraftSweepControl`, unchanged). The single-plan
+   * `BuildPlanCraftSweepControl` passes `false` — issue #778 dropped that
+   * chip from this surface as dead weight: nothing there will ever light it
+   * up, and the group control a few clicks away already carries it.
+   */
+  includePlanetary?: boolean;
 }
 
-/** Manufacturing always renders active: every caller's `scope` includes it unconditionally. */
-export function CraftScopeChips({ scope }: CraftScopeChipsProps) {
+/**
+ * Just the Reactions chip (and, on callers that ask for it, the reserved
+ * Planetary chip) — Manufacturing was dropped (issue #778) as a chip that
+ * could never say anything: every sweep always includes it, on both the
+ * group and single-plan surfaces, so it only ever repeated what "Craft
+ * Sweep" already implies. The Reactions chip always carries a tooltip,
+ * lit or not, explaining what it does either way.
+ */
+export function CraftScopeChips({ scope, includePlanetary = true }: CraftScopeChipsProps) {
   const { t } = useTranslation();
   const reactionsEligible = scope.includes('reaction');
   return (
     <span className="flex items-center gap-1">
-      <span className={ACTIVE_CLASSES}>{t('industry.craftScopeManufacturing')}</span>
       <span
         aria-disabled={reactionsEligible ? undefined : true}
-        title={reactionsEligible ? undefined : t('industry.craftScopeReactionsDisabledHint')}
+        title={
+          reactionsEligible
+            ? t('industry.craftScopeReactionsEnabledHint')
+            : t('industry.craftScopeReactionsDisabledHint')
+        }
         className={reactionsEligible ? ACTIVE_CLASSES : RESERVED_CLASSES}
       >
         {t('industry.craftScopeReactions')}
       </span>
-      <span
-        aria-disabled="true"
-        title={t('industry.craftScopeReserved')}
-        className={RESERVED_CLASSES}
-      >
-        {t('industry.craftScopePlanetary')}
-      </span>
+      {includePlanetary && (
+        <span
+          aria-disabled="true"
+          title={t('industry.craftScopeReserved')}
+          className={RESERVED_CLASSES}
+        >
+          {t('industry.craftScopePlanetary')}
+        </span>
+      )}
     </span>
   );
 }

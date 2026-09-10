@@ -46,20 +46,20 @@ describe('CraftSweepControl', () => {
     ]);
   });
 
-  it('shows Manufacturing as the only enabled Craft Scope when Reactions is not eligible; Planetary always stays reserved', () => {
+  it('shows a reserved Reactions chip when Reactions is not eligible — no Manufacturing chip; Planetary always stays reserved', () => {
     render(<CraftSweepControl maxDepth={2} scope={['manufacturing']} onApply={vi.fn()} />);
 
-    expect(screen.getByText('Manufacturing')).not.toHaveAttribute('aria-disabled');
+    expect(screen.queryByText('Manufacturing')).not.toBeInTheDocument();
     expect(screen.getByText('Reactions')).toHaveAttribute('aria-disabled', 'true');
     expect(screen.getByText('Planetary')).toHaveAttribute('aria-disabled', 'true');
   });
 
-  it('lights up Reactions once it is in scope (issue #698) — Planetary stays reserved regardless', () => {
+  it('lights up Reactions once it is in scope (issue #698) — no Manufacturing chip; Planetary stays reserved regardless', () => {
     render(
       <CraftSweepControl maxDepth={2} scope={['manufacturing', 'reaction']} onApply={vi.fn()} />
     );
 
-    expect(screen.getByText('Manufacturing')).not.toHaveAttribute('aria-disabled');
+    expect(screen.queryByText('Manufacturing')).not.toBeInTheDocument();
     expect(screen.getByText('Reactions')).not.toHaveAttribute('aria-disabled');
     expect(screen.getByText('Planetary')).toHaveAttribute('aria-disabled', 'true');
   });
