@@ -57,6 +57,17 @@ export function ReloadPrompt() {
     },
   });
 
+  // Mobile OSes freeze a backgrounded PWA's timers entirely, so the polling
+  // tick below never runs while the tab is hidden — it only resumes once the
+  // tab is visible again. Mirrored in refs so the resume check (mount-once
+  // effect, below) always reads the latest values.
+  const needRefreshRef = useRef(needRefresh);
+  const updateServiceWorkerRef = useRef(updateServiceWorker);
+  useEffect(() => {
+    needRefreshRef.current = needRefresh;
+    updateServiceWorkerRef.current = updateServiceWorker;
+  }, [needRefresh, updateServiceWorker]);
+
   // Tracks user activity and tab visibility — independent of whether an
   // update is waiting, so the idle/hidden clocks are already running by the
   // time one shows up.
@@ -65,7 +76,24 @@ export function ReloadPrompt() {
       lastActivityRef.current = Date.now();
     };
     const trackVisibility = () => {
-      hiddenSinceRef.current = document.hidden ? Date.now() : 0;
+      if (document.hidden) {
+        hiddenSinceRef.current = Date.now();
+        return;
+      }
+      // Coming back visible: judge the grace period by wall-clock time right
+      // here, rather than waiting for the polling tick to notice — on a
+      // frozen-while-backgrounded tab that tick may not run again until well
+      // after resume, and by then trackVisibility will already have cleared
+      // hiddenSinceRef below, silently skipping the hidden-apply path.
+      const hiddenSince = hiddenSinceRef.current;
+      hiddenSinceRef.current = 0;
+      if (
+        hiddenSince &&
+        needRefreshRef.current &&
+        Date.now() - hiddenSince >= HIDDEN_APPLY_GRACE_MS
+      ) {
+        void updateServiceWorkerRef.current(true);
+      }
     };
     markActive();
     trackVisibility();
