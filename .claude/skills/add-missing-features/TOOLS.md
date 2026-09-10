@@ -8,31 +8,31 @@ skill's step 7).
 
 ## Tools surveyed
 
-| Tool | What it does | Live |
-| --- | --- | --- |
-| Adam4EVE | Market stats/graphs over time, PI profitability and chains, industry indices | yes |
-| Ravworks | Multi-item production planning, full material tree, ME/TE and facility bonuses | yes |
-| EVE Tycoon | Profit tracking, order management, market browser, per-item stock | yes |
-| Slipway | Industry planner: what to build, where to build it, where to sell it | yes |
-| Janice / Iron Whales Appraiser | Bulk appraisal, ore reprocessing, live BPO/BPC contract pricing | yes |
-| EVE Blue Desk / EvE Blueprint | Blueprint market and production platform | yes |
-| EVE Courier | Route planning, gatecamp check, arbitrage finder, contracts manager | yes |
-| Fuzzwork | Blueprint calculator, reprocessing, static data dumps | yes |
-| EVE Ref | Reference data and market browsing | yes |
-| EVE Retroindustry | Local BOM/make-vs-buy planner, multi-char asset/blueprint/PI/wallet tracking, contract search | yes |
-| ISK.GG | Market browser: multi-region price history, depth charts, saved views, CSV export | yes |
-| EVE Miner Hub | Cross-character mining ledger aggregator, ISK/hr, OBS widget | yes |
-| EQM | All-in-one: production economics, multi-hub appraisal, Corporate Exchange, wallet trends, JF fuel planning | yes |
-| EveLens | EVEMon-style skill planning + Skill Farm ISK/hr dashboard | yes |
-| EVE Horizon | Manufacturing + PI planning: hangar-sweep BOM netting, PI plan-vs-actual scorecards, cross-colony coordination, market restock | yes |
-| EVE Forge | Nested BOM/capital parts, reactions, invention calc, PI calc, trading indicators, Gantt scheduling | yes |
-| EVE-Industry-Scanner-Tool | Manufacturing/reaction/PI profitability scoring across 5 hubs, hub arbitrage, opportunity score | yes |
-| EVE-HUB | PI planner (P0-P4), hub-to-hub arbitrage scanner, route/threat intel, multi-hub watchlist | yes |
-| EVE TradeLooper | Cargo valuation, mining/industry planning, LP store analysis, pasted cargo/ore/dscan scanner | yes |
-| EVE Night Trade Tools | FIFO P&L dashboard, undercut alerts, station-trading and inter-region scanners | yes |
-| IndustrialEVE | PI notifications | yes |
-| jEveAssets | Established multi-account asset manager | yes |
-| EVEAIO | Bug-bounty preview, no feature list disclosed | unknown |
+| Tool                           | What it does                                                                                                                   | Live    |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------ | ------- |
+| Adam4EVE                       | Market stats/graphs over time, PI profitability and chains, industry indices                                                   | yes     |
+| Ravworks                       | Multi-item production planning, full material tree, ME/TE and facility bonuses                                                 | yes     |
+| EVE Tycoon                     | Profit tracking, order management, market browser, per-item stock                                                              | yes     |
+| Slipway                        | Industry planner: what to build, where to build it, where to sell it                                                           | yes     |
+| Janice / Iron Whales Appraiser | Bulk appraisal, ore reprocessing, live BPO/BPC contract pricing                                                                | yes     |
+| EVE Blue Desk / EvE Blueprint  | Blueprint market and production platform                                                                                       | yes     |
+| EVE Courier                    | Route planning, gatecamp check, arbitrage finder, contracts manager                                                            | yes     |
+| Fuzzwork                       | Blueprint calculator, reprocessing, static data dumps                                                                          | yes     |
+| EVE Ref                        | Reference data and market browsing                                                                                             | yes     |
+| EVE Retroindustry              | Local BOM/make-vs-buy planner, multi-char asset/blueprint/PI/wallet tracking, contract search                                  | yes     |
+| ISK.GG                         | Market browser: multi-region price history, depth charts, saved views, CSV export                                              | yes     |
+| EVE Miner Hub                  | Cross-character mining ledger aggregator, ISK/hr, OBS widget                                                                   | yes     |
+| EQM                            | All-in-one: production economics, multi-hub appraisal, Corporate Exchange, wallet trends, JF fuel planning                     | yes     |
+| EveLens                        | EVEMon-style skill planning + Skill Farm ISK/hr dashboard                                                                      | yes     |
+| EVE Horizon                    | Manufacturing + PI planning: hangar-sweep BOM netting, PI plan-vs-actual scorecards, cross-colony coordination, market restock | yes     |
+| EVE Forge                      | Nested BOM/capital parts, reactions, invention calc, PI calc, trading indicators, Gantt scheduling                             | yes     |
+| EVE-Industry-Scanner-Tool      | Manufacturing/reaction/PI profitability scoring across 5 hubs, hub arbitrage, opportunity score                                | yes     |
+| EVE-HUB                        | PI planner (P0-P4), hub-to-hub arbitrage scanner, route/threat intel, multi-hub watchlist                                      | yes     |
+| EVE TradeLooper                | Cargo valuation, mining/industry planning, LP store analysis, pasted cargo/ore/dscan scanner                                   | yes     |
+| EVE Night Trade Tools          | FIFO P&L dashboard, undercut alerts, station-trading and inter-region scanners                                                 | yes     |
+| IndustrialEVE                  | PI notifications                                                                                                               | yes     |
+| jEveAssets                     | Established multi-account asset manager                                                                                        | yes     |
+| EVEAIO                         | Bug-bounty preview, no feature list disclosed                                                                                  | unknown |
 
 **Skimmed by thread title only, confirmed out of domain (mapping/intel/
 fitting-sim/crew-sim, no industry or market surface):** EVE Crews, Nexum,
@@ -42,7 +42,7 @@ Nexus, Eve PvP Radar, EVE-O Preview, EVE MCP Server, EVE Threat Checker, EVE
 Fit Assistant, SLH Local Scanner, EveBoosters.com, Dd24tool.de (a paid
 buyback business, not a tool gap).
 
-**The forum category JSON paginates** (`more_topics_url`). Fetch page 0 *and*
+**The forum category JSON paginates** (`more_topics_url`). Fetch page 0 _and_
 page 1 minimum, and keep following the link while present — five early runs
 only ever fetched page 0 and missed EVE Horizon/EVE Forge/EVE-HUB, which held
 the only surviving PI candidates found so far.
@@ -106,7 +106,7 @@ Reusable heuristics — check a new candidate against these before drafting:
    independently: order-book depth chart. Also killed a Gantt job-scheduling
    timeline (`ActiveJobsPanel.tsx` already answers "when do jobs finish" as
    rows).
-4. **Engine exists but has one caller.** Grep the engine's *callers*, not
+4. **Engine exists but has one caller.** Grep the engine's _callers_, not
    just its existence, before assuming full coverage — reprocessing and the
    wallet balance chart were both real gaps hiding behind an already-built
    engine used in exactly one place.
@@ -123,40 +123,40 @@ Reusable heuristics — check a new candidate against these before drafting:
 
 ## Filed candidates
 
-| # | Verdict | Candidate |
-| --- | --- | --- |
-| #642 | NARROW | Build Opportunity Finder — seeding/sorting tab over Build Plan Compare |
-| #643 | NARROW | Restock / reorder points |
-| #671 | NARROW | Mining Yield Tracker — ordinary ore/ice |
-| #672 | NARROW | Appraisal refine-then-sell comparison |
-| #679 | NARROW | Build Opportunities — job-slot header count |
-| #680 | SHIP | Quickbar price alerts |
-| #689 | SHIP | Appraisal multi-hub comparison |
-| #690 | SHIP | Wallet balance-over-time chart |
-| #711 | SHIP | Production Log realized-profit-over-time chart |
-| #712 | SHIP | Assets total portfolio value |
-| #713 | NARROW | Open Orders sell-through column |
-| #717 | SHIP | Contracts market-value appraisal |
-| #718 | NARROW | Loyalty Store cross-corp offer list |
-| #722 | NARROW | Build Opportunities unowned-blueprint coverage |
-| #725 | SHIP | PI Production Run/Log |
-| #726 | NARROW | Quickbar → Appraisal multi-hub handoff |
-| #730 | NARROW | Price History 7-day moving average |
+| #    | Verdict | Candidate                                                              |
+| ---- | ------- | ---------------------------------------------------------------------- |
+| #642 | NARROW  | Build Opportunity Finder — seeding/sorting tab over Build Plan Compare |
+| #643 | NARROW  | Restock / reorder points                                               |
+| #671 | NARROW  | Mining Yield Tracker — ordinary ore/ice                                |
+| #672 | NARROW  | Appraisal refine-then-sell comparison                                  |
+| #679 | NARROW  | Build Opportunities — job-slot header count                            |
+| #680 | SHIP    | Quickbar price alerts                                                  |
+| #689 | SHIP    | Appraisal multi-hub comparison                                         |
+| #690 | SHIP    | Wallet balance-over-time chart                                         |
+| #711 | SHIP    | Production Log realized-profit-over-time chart                         |
+| #712 | SHIP    | Assets total portfolio value                                           |
+| #713 | NARROW  | Open Orders sell-through column                                        |
+| #717 | SHIP    | Contracts market-value appraisal                                       |
+| #718 | NARROW  | Loyalty Store cross-corp offer list                                    |
+| #722 | NARROW  | Build Opportunities unowned-blueprint coverage                         |
+| #725 | SHIP    | PI Production Run/Log                                                  |
+| #726 | NARROW  | Quickbar → Appraisal multi-hub handoff                                 |
+| #730 | NARROW  | Price History 7-day moving average                                     |
 
 ## Killed / dropped candidates (never filed)
 
-| Candidate | Reason |
-| --- | --- |
-| Hub arbitrage / trade route finder | Ships as `hubHaulGaps`; no ESI for per-route courier cost. Re-confirmed twice more against newly-found tools. |
-| System cost index watch | No historical ESI data; distribution is a near-constant. |
-| Corp ore buyback / fleet payout split | Cross-player aggregation wall. |
-| Skill Extractor ISK/hr comparison | Narrow reach (multi-account SP arbitrage). |
-| Market/order-book depth chart | Picture of data already on screen. |
-| Public item-exchange contract deal browser | Reopens ADR 0013's Firestore write-budget limit at full scale. |
-| Price history %-change headline stat | Thin-volume days make a naive delta unreliable. |
-| Corp Wallet: extend balance chart to corp divisions | Narrow reach (Accountant/Junior_Accountant role only); explicitly deferred, not bundled. |
-| Build Plan material row → PI colony link | Colony cache is Dexie-only, cold for most players most of the time. |
-| EVE Forge-style Gantt production scheduling | Picture of data already on screen (`ActiveJobsPanel.tsx`). |
-| Bulk relist / buy-queue automation | No write-scoped ESI; Open Orders is deliberately read-only. |
-| EQM Corporate Exchange | Cross-player aggregation wall. |
-| Asset staleness / idle-inventory detection | Assets endpoint has no acquisition/last-touched timestamp. |
+| Candidate                                           | Reason                                                                                                        |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| Hub arbitrage / trade route finder                  | Ships as `hubHaulGaps`; no ESI for per-route courier cost. Re-confirmed twice more against newly-found tools. |
+| System cost index watch                             | No historical ESI data; distribution is a near-constant.                                                      |
+| Corp ore buyback / fleet payout split               | Cross-player aggregation wall.                                                                                |
+| Skill Extractor ISK/hr comparison                   | Narrow reach (multi-account SP arbitrage).                                                                    |
+| Market/order-book depth chart                       | Picture of data already on screen.                                                                            |
+| Public item-exchange contract deal browser          | Reopens ADR 0013's Firestore write-budget limit at full scale.                                                |
+| Price history %-change headline stat                | Thin-volume days make a naive delta unreliable.                                                               |
+| Corp Wallet: extend balance chart to corp divisions | Narrow reach (Accountant/Junior_Accountant role only); explicitly deferred, not bundled.                      |
+| Build Plan material row → PI colony link            | Colony cache is Dexie-only, cold for most players most of the time.                                           |
+| EVE Forge-style Gantt production scheduling         | Picture of data already on screen (`ActiveJobsPanel.tsx`).                                                    |
+| Bulk relist / buy-queue automation                  | No write-scoped ESI; Open Orders is deliberately read-only.                                                   |
+| EQM Corporate Exchange                              | Cross-player aggregation wall.                                                                                |
+| Asset staleness / idle-inventory detection          | Assets endpoint has no acquisition/last-touched timestamp.                                                    |
