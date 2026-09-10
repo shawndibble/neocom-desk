@@ -8,6 +8,7 @@ import { db } from '@/db';
 import { STALE_FETCHED_AT } from '@/esi/cacheFixtures';
 import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharacter';
 import { usePublicInfo } from '@/stores/publicInfo';
+import { usePublicInfoModalStore } from '@/stores/publicInfoModal';
 import { DEFAULT_MAIL_FOLDERS, useMailFolders } from '@/features/character/mailFolderPref';
 import { App } from '@/app/App';
 
@@ -100,6 +101,7 @@ beforeEach(async () => {
   await db.esiCache.clear();
   useActiveCharacter.setState({ activeCharacterId: null, hydrated: false });
   usePublicInfo.setState({ byCharacterId: {} });
+  usePublicInfoModalStore.setState({ request: null });
   // Module-scoped store: without this the folder selection one test makes
   // leaks into the next, and `hydrate` short-circuits on `hydrated`.
   useMailFolders.setState({ value: DEFAULT_MAIL_FOLDERS, hydrated: false });
@@ -129,6 +131,29 @@ describe('Mail', () => {
     render(<App />);
     await user.click(await screen.findByText('Fleet up!'));
     expect(await screen.findByText('Undock now.')).toBeInTheDocument();
+  });
+
+  it('reading pane sender name opens the shared Public Info Modal (issue #787)', async () => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/90000001`, () =>
+        HttpResponse.json({
+          name: 'Fleet Commander',
+          birthday: '2020-01-01T00:00:00Z',
+          bloodline_id: 1,
+          gender: 'male',
+          race_id: 1,
+          security_status: 1.5,
+        })
+      )
+    );
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByText('Fleet up!'));
+    const senderButton = await screen.findByRole('button', { name: 'Fleet Commander' });
+    await user.click(senderButton);
+
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByRole('tab', { name: 'Character' })).toBeInTheDocument();
   });
 
   it('falls back to cached headers offline', async () => {
