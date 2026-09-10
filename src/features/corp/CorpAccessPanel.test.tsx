@@ -24,6 +24,7 @@ const mockedBeginLogin = vi.mocked(beginEveLogin);
 
 const CHARACTER_ID = 42;
 const ALL_CORP_SCOPES = [...scopesForGroup('corp')];
+const ROLES_SCOPE = 'esi-characters.read_corporation_roles.v1';
 
 function rolesResolvingTo(roles: readonly string[]): StatusResult<CharacterCorporationRoles> {
   return {
@@ -45,13 +46,14 @@ beforeEach(() => {
 });
 
 /**
- * AC 4: all four `useCorpAccess()` states, told apart on sight. This row is the
+ * AC 4: all five `useCorpAccess()` states, told apart on sight. This row is the
  * only surface that renders for an ungranted Character — everything else in the
  * corp section hides — so "correct" here means the user can tell which of the
- * four they are in, and whether there is anything they can do about it.
+ * five they are in, and whether there is anything they can do about it.
  */
-describe('CorpAccessPanel — the four states', () => {
+describe('CorpAccessPanel — the five states', () => {
   it('unknown: says it is still reading, and offers no Grant button', () => {
+    mockedGrantedScopes.mockReturnValue(ALL_CORP_SCOPES);
     mockedLoadRoles.mockReturnValue(new Promise(() => {}));
     render(<CorpAccessPanel />);
     // Both cells: with no answer yet, "Roles: None" would be an answer, and the
@@ -71,7 +73,7 @@ describe('CorpAccessPanel — the four states', () => {
   });
 
   it('roles-without-grant: names the roles held and offers the Grant button', async () => {
-    mockedGrantedScopes.mockReturnValue([]);
+    mockedGrantedScopes.mockReturnValue([ROLES_SCOPE]);
     mockedLoadRoles.mockResolvedValue(rolesResolvingTo(['Junior_Accountant']));
     render(<CorpAccessPanel />);
     await waitFor(() => expect(screen.getByText('Not granted')).toBeInTheDocument());
@@ -100,11 +102,20 @@ describe('CorpAccessPanel — the four states', () => {
     await waitFor(() => expect(screen.getByText('Not applicable')).toBeInTheDocument());
     expect(screen.getByText('Hangar Take 1')).toBeInTheDocument();
   });
+
+  it('not-granted: says roles are unknown until granted, and offers the Grant button', () => {
+    mockedGrantedScopes.mockReturnValue([]);
+    render(<CorpAccessPanel />);
+    expect(screen.getByText('Unknown until granted')).toBeInTheDocument();
+    expect(screen.getByText('Not granted')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /grant access/i })).toBeInTheDocument();
+    expect(mockedLoadRoles).not.toHaveBeenCalled();
+  });
 });
 
 describe('CorpAccessPanel — the Grant button', () => {
   it('asks for the corp group AS this Character, so the existing grant is not narrowed', async () => {
-    mockedGrantedScopes.mockReturnValue([]);
+    mockedGrantedScopes.mockReturnValue([ROLES_SCOPE]);
     mockedLoadRoles.mockResolvedValue(rolesResolvingTo(['Director']));
     render(<CorpAccessPanel />);
     await screen.findByRole('button', { name: /grant access/i });

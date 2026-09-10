@@ -19,23 +19,27 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useCorpAccess, type CorpAccessState } from './useCorpAccess';
 import { corpRoleLabel } from './roles';
 
-/** One line of explanation per state — all four, including the ones with no action. */
+/** One line of explanation per state — all five, including the ones with no action. */
 const HINT_KEYS = {
   unknown: 'corp.accessUnknownHint',
+  'not-granted': 'corp.accessMissingHint',
   none: 'corp.accessNoneHint',
   'roles-without-grant': 'corp.accessMissingHint',
   ready: 'corp.accessReadyHint',
 } as const satisfies Record<CorpAccessState, string>;
 
 /**
- * A distinct answer per state, so all four are told apart on sight (AC 4).
+ * A distinct answer per state, so all five are told apart on sight (AC 4).
  *
  * `none` gets its own rather than borrowing "Not granted": there is nothing
  * for it to be missing, and "Not granted" beside a row with no Grant button
- * would read as a fault the user could fix.
+ * would read as a fault the user could fix. `not-granted` shares copy with
+ * `roles-without-grant` on purpose — both mean "press Grant to move past
+ * this" — and is told apart by the Roles cell instead.
  */
 const GRANT_KEYS = {
   unknown: 'corp.accessGrantChecking',
+  'not-granted': 'corp.accessGrantMissing',
   none: 'corp.accessGrantNotApplicable',
   'roles-without-grant': 'corp.accessGrantMissing',
   ready: 'corp.accessGrantGranted',
@@ -60,14 +64,17 @@ export function CorpAccessPanel() {
                 {/*
                   `unknown` has no answer yet, and "None" would be one — the
                   wrong one, for the Director whose roles read is still in
-                  flight. Both cells say the same thing until it lands.
+                  flight. `not-granted` has no answer either, for a different
+                  reason: the read that would tell us has not been asked for.
                 */}
                 <dd className="text-right">
                   {state === 'unknown'
                     ? t('corp.accessGrantChecking')
-                    : roles.length === 0
-                      ? t('corp.accessRolesNone')
-                      : roles.map(corpRoleLabel).join(', ')}
+                    : state === 'not-granted'
+                      ? t('corp.accessRolesUnknown')
+                      : roles.length === 0
+                        ? t('corp.accessRolesNone')
+                        : roles.map(corpRoleLabel).join(', ')}
                 </dd>
               </div>
               <div className="flex items-center justify-between gap-4 py-2">
@@ -79,13 +86,14 @@ export function CorpAccessPanel() {
             </dl>
             <p className="text-xs text-text-dim">{t(HINT_KEYS[state])}</p>
             {/*
-              Only `roles-without-grant` gets a button. `none` deliberately does
-              not (AC 4): granting would widen the consent screen and unlock
-              nothing, because CCP gates these endpoints on roles server-side.
-              `unknown` has no button because it has no answer yet, and `ready`
-              has nothing left to ask for.
+              `roles-without-grant` and `not-granted` both get a button —
+              granting is the only way either one moves. `none` deliberately
+              does not (AC 4): granting would widen the consent screen and
+              unlock nothing, because CCP gates these endpoints on roles
+              server-side. `unknown` has no button because it has no answer
+              yet, and `ready` has nothing left to ask for.
             */}
-            {state === 'roles-without-grant' && (
+            {(state === 'roles-without-grant' || state === 'not-granted') && (
               // `ghost`, not `primary`: /settings already spends its one
               // primary on the notifications panel's Enable
               // (docs/DESIGN.md §6, "One `primary` button per view").

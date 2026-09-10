@@ -204,14 +204,19 @@ export const ESI_REGISTRY = {
     scope: PUBLIC,
   },
   /**
-   * The one corp-adjacent scope in the base grant. It is cheap, has no role
-   * gate of its own, and every corp surface downstream needs it for *every*
-   * character in order to know whether to render at all — so it is not
-   * something to offer as an opt-in (CONTEXT.md round 35).
+   * In the `corp` group, not the base grant: reading this needs its own scope
+   * regardless of the other eight, so a Character cannot know their corp role
+   * until they opt in. That costs the "you just made Director, grant now"
+   * proactive nudge (`CorpGrantPrompt`) for anyone who never granted the group
+   * before — `useCorpAccess` answers `not-granted` instead, and Settings'
+   * Corp access row is the only way in. A Character who already held this
+   * scope from the old base grant keeps it (`app/loginFlow.ts` unions with
+   * the stored grant), so nothing changes for them.
    */
   getCharacterRoles: {
     route: '/characters/{character_id}/roles',
     scope: 'esi-characters.read_corporation_roles.v1',
+    group: 'corp',
   },
   getCharacterClones: {
     route: '/characters/{character_id}/clones',

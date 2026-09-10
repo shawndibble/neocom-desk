@@ -32,6 +32,8 @@ const mockedBeginLogin = vi.mocked(beginEveLogin);
 const CHARACTER_ID = 42;
 const OTHER_CHARACTER_ID = 77;
 const ALL_CORP_SCOPES = [...scopesForGroup('corp')];
+/** Holds only the scope that unlocks the roles read itself — every test below is about what happens once a role is known. */
+const ROLES_SCOPE = 'esi-characters.read_corporation_roles.v1';
 
 function rolesResolvingTo(roles: readonly string[]): StatusResult<CharacterCorporationRoles> {
   return {
@@ -53,7 +55,7 @@ beforeEach(async () => {
   useActiveCharacter.setState({ activeCharacterId: CHARACTER_ID, hydrated: true });
   useGrantPromptDismissals.setState({ value: NO_DISMISSALS, hydrated: false });
   usePublicInfo.setState({ byCharacterId: {} });
-  mockedGrantedScopes.mockReturnValue([]);
+  mockedGrantedScopes.mockReturnValue([ROLES_SCOPE]);
   mockedLoadRoles.mockResolvedValue(rolesResolvingTo(['Director']));
 });
 

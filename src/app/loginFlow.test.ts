@@ -100,7 +100,6 @@ describe('beginAddCharacterLogin', () => {
 
     const requested = new Set(requestedScopes());
     for (const scope of scopesForGroup('corp')) expect(requested.has(scope), scope).toBe(false);
-    expect(requested.has('esi-characters.read_corporation_roles.v1')).toBe(true);
   });
 
   it('does NOT inherit another character’s wider grant', async () => {
