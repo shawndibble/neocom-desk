@@ -38,6 +38,7 @@
     "navLocked": "Needs a new login",
     "staleGrantTitle": "EVE access was refused",
     "staleGrantHint": "EVE turned down a request for this character's data. If you removed this app's access in EVE's third-party application list, log in again to restore it.",
+    "staleGrantHintNamed": "EVE turned down a request for {{character}}'s data. If you removed this app's access in EVE's third-party application list, log in again to restore it.",
     "staleGrantAction": "Log in again with EVE Online",
     "dismiss": "Dismiss"
   },

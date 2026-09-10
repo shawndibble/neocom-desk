@@ -1,6 +1,8 @@
 import { useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from '@/db';
 import { Button, ReauthBanner } from '@/components/ui';
 import { useAuthFailure } from '@/stores/authFailure';
 import { useActiveCharacter } from '@/stores/activeCharacter';
@@ -54,6 +56,12 @@ export function AuthFailureNotice() {
   const failure = useAuthFailure((state) => state.failure);
   const dismiss = useAuthFailure((state) => state.dismiss);
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
+  // Only ever looked up for the active Character (the guard below), so this
+  // never has to reconcile with which Character a background failure was for.
+  const character = useLiveQuery(
+    () => (activeCharacterId ? db.characters.get(activeCharacterId) : undefined),
+    [activeCharacterId]
+  );
 
   if (failure?.kind !== 'request' || failure.characterId !== activeCharacterId) return null;
 
@@ -61,7 +69,11 @@ export function AuthFailureNotice() {
     <div role="status" className="mb-4 rounded-xs border border-warning/40 bg-panel px-3 py-1">
       <ReauthBanner
         title={t('reauth.staleGrantTitle')}
-        hint={t('reauth.staleGrantHint')}
+        hint={
+          character
+            ? t('reauth.staleGrantHintNamed', { character: character.name })
+            : t('reauth.staleGrantHint')
+        }
         actionLabel={t('reauth.staleGrantAction')}
         onLogin={() => void beginEveLogin()}
         // Renders above a route that may have its own primary button

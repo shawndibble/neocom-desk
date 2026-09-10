@@ -2,9 +2,10 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import '@/i18n';
+import { db } from '@/db';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useAuthFailure } from '@/stores/authFailure';
-import { AuthFailureRedirect } from './AuthFailureNotice';
+import { AuthFailureNotice, AuthFailureRedirect } from './AuthFailureNotice';
 
 const CHARACTER_ID = 12;
 
@@ -54,5 +55,27 @@ describe('AuthFailureRedirect', () => {
     useAuthFailure.getState().reportTokenFailure(CHARACTER_ID + 1);
     renderApp();
     expect(screen.getByText('mail view')).toBeInTheDocument();
+  });
+});
+
+describe('AuthFailureNotice', () => {
+  it('names the active character so the pilot knows which one to re-auth', async () => {
+    await db.characters.put({
+      characterId: CHARACTER_ID,
+      name: 'Pilot One',
+      ownerHash: 'oh',
+      addedAt: 1,
+    });
+    useAuthFailure.getState().reportRequestFailure(CHARACTER_ID);
+    render(<AuthFailureNotice />);
+    expect(await screen.findByText(/Pilot One/)).toBeInTheDocument();
+  });
+
+  it('falls back to the unnamed hint when the character record is not yet loaded', () => {
+    useAuthFailure.getState().reportRequestFailure(CHARACTER_ID);
+    render(<AuthFailureNotice />);
+    expect(
+      screen.getByText("EVE turned down a request for this character's data.", { exact: false })
+    ).toBeInTheDocument();
   });
 });
