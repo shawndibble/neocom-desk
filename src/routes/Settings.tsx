@@ -56,6 +56,7 @@ import { NotificationsPanel } from '@/features/notifications/NotificationsPanel'
 import { CorpAccessPanel } from '@/features/corp/CorpAccessPanel';
 import { FaqPanel } from '@/features/faq/FaqPanel';
 import { db } from '@/db';
+import { exportBackupToFile, importBackup, type ImportSummary } from '@/backup/io';
 import { ENDPOINT_ROUTES } from '@/esi/endpointRoutes';
 import { useActivityLog, type ActivityLogEntry } from '@/stores/activityLog';
 import type { ActivityOutcome } from '@/esi/activityLog';
@@ -268,6 +269,156 @@ function DataAgePanel() {
             label={t('dataAge.title')}
             density="compact"
           />
+        )}
+      </div>
+    </Panel>
+  );
+}
+
+/**
+ * Every Character on this device, encrypted under a password and downloaded
+ * as a JSON file — the escape hatch for a new device that would otherwise
+ * need EVE SSO re-run per alt (issue #789,
+ * docs/adr/0014-encrypted-device-backup-for-cross-device-setup.md).
+ * No character picker: always every Character, since the whole point is one
+ * file that replaces re-login for all of them at once.
+ */
+function ExportPanel() {
+  const { t } = useTranslation();
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [status, setStatus] = useState<'idle' | 'exporting' | 'done' | 'error'>('idle');
+
+  const canExport = password.length > 0 && password === confirmPassword;
+
+  async function handleExport() {
+    setStatus('exporting');
+    try {
+      await exportBackupToFile(password);
+      setPassword('');
+      setConfirmPassword('');
+      setStatus('done');
+      setTimeout(() => setStatus('idle'), 2000);
+    } catch {
+      setStatus('error');
+    }
+  }
+
+  return (
+    <Panel title={t('settings.backup.exportTitle')}>
+      <div className="max-w-md space-y-2">
+        <p className="text-xs text-text-dim">{t('settings.backup.exportHint')}</p>
+        <p className="text-xs text-warning">{t('settings.backup.passwordWarning')}</p>
+        <TextInput
+          type="password"
+          autoComplete="new-password"
+          aria-label={t('settings.backup.passwordLabel')}
+          placeholder={t('settings.backup.passwordLabel')}
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+        />
+        <TextInput
+          type="password"
+          autoComplete="new-password"
+          aria-label={t('settings.backup.confirmPasswordLabel')}
+          placeholder={t('settings.backup.confirmPasswordLabel')}
+          value={confirmPassword}
+          onChange={(e) => setConfirmPassword(e.target.value)}
+        />
+        <Button
+          size="sm"
+          disabled={!canExport || status === 'exporting'}
+          onClick={() => void handleExport()}
+        >
+          {t('settings.backup.exportButton')}
+        </Button>
+        {status === 'done' && <ActionConfirmation message={t('settings.backup.exportDone')} />}
+        {status === 'error' && (
+          <p role="alert" className="text-xs text-danger">
+            {t('settings.backup.exportError')}
+          </p>
+        )}
+      </div>
+    </Panel>
+  );
+}
+
+/**
+ * The counterpart to {@link ExportPanel}. Conflict policy (issue #789, not
+ * relitigated here): a Character already on this device is skipped whole —
+ * its token and data are untouched — a new Character is written in full.
+ */
+function ImportPanel() {
+  const { t } = useTranslation();
+  const [file, setFile] = useState<File | null>(null);
+  const [password, setPassword] = useState('');
+  const [status, setStatus] = useState<'idle' | 'importing' | 'error'>('idle');
+  const [summary, setSummary] = useState<ImportSummary | null>(null);
+
+  async function handleImport() {
+    if (!file) return;
+    setStatus('importing');
+    setSummary(null);
+    try {
+      const contents = await file.text();
+      const result = await importBackup(contents, password);
+      setSummary(result);
+      setPassword('');
+      setFile(null);
+      setStatus('idle');
+      // A newly-added character's token needs `ensureSignedIn`/`planSync` to
+      // run before it's usable, and any imported `sync.` setting is already
+      // on disk but not in the zustand store that read it at boot — same gap
+      // `ResetViewPreferences` above hits, and the same fix: reload once the
+      // pilot has had a moment to read the summary below.
+      if (result.addedCharacterIds.length > 0 || result.addedSettingKeys.length > 0) {
+        setTimeout(() => window.location.reload(), 2000);
+      }
+    } catch {
+      setStatus('error');
+    }
+  }
+
+  return (
+    <Panel title={t('settings.backup.importTitle')}>
+      <div className="max-w-md space-y-2">
+        <p className="text-xs text-text-dim">{t('settings.backup.importHint')}</p>
+        <input
+          type="file"
+          accept="application/json"
+          aria-label={t('settings.backup.fileLabel')}
+          onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+          className="block w-full text-xs text-text-dim file:mr-3 file:rounded-xs file:border-0 file:bg-panel-2 file:px-2 file:py-1 file:text-xs file:text-text"
+        />
+        <TextInput
+          type="password"
+          autoComplete="current-password"
+          aria-label={t('settings.backup.passwordLabel')}
+          placeholder={t('settings.backup.passwordLabel')}
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+        />
+        <Button
+          size="sm"
+          disabled={!file || password.length === 0 || status === 'importing'}
+          onClick={() => void handleImport()}
+        >
+          {t('settings.backup.importButton')}
+        </Button>
+        {status === 'error' && (
+          <p role="alert" className="text-xs text-danger">
+            {t('settings.backup.importError')}
+          </p>
+        )}
+        {summary && (
+          <p role="status" aria-live="polite" className="text-xs text-success">
+            {t('settings.backup.importSummary', {
+              added: summary.addedCharacterIds.length,
+              skipped: summary.skippedCharacterIds.length,
+            })}
+            {(summary.addedCharacterIds.length > 0 || summary.addedSettingKeys.length > 0) &&
+              ` ${t('settings.backup.importReloading')}`}
+          </p>
         )}
       </div>
     </Panel>
@@ -756,7 +907,7 @@ export function Settings() {
         tabs={[
           { id: 'general', label: t('settings.tabs.general') },
           { id: 'notifications', label: t('settings.tabs.notifications') },
-          { id: 'dataAge', label: t('settings.tabs.dataAge') },
+          { id: 'dataAge', label: t('settings.tabs.data') },
           { id: 'activity', label: t('settings.tabs.activity') },
           { id: 'faq', label: t('settings.tabs.faq') },
         ]}
@@ -842,7 +993,13 @@ export function Settings() {
           <NotificationsPanel />
         </div>
       )}
-      {tab === 'dataAge' && <DataAgePanel />}
+      {tab === 'dataAge' && (
+        <div className="space-y-4">
+          <DataAgePanel />
+          <ExportPanel />
+          <ImportPanel />
+        </div>
+      )}
       {tab === 'activity' && <ActivityLogPanel />}
       {/* Same `id` wrapper as `#notifications` above, so `/settings#faq` both
           selects the tab and has something for the scroll effect to find. */}

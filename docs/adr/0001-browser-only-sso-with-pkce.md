@@ -26,5 +26,9 @@ SSO login per character.
 - XSS is the residual risk for on-device tokens; mitigated by no third-party
   scripts and a strict dependency policy.
 - New devices require re-login per character (accepted in design review).
+  Partially relaxed by ADR 0014: a pilot who exports an encrypted backup can
+  seed a new device from that file instead, at the cost of trusting a
+  password to protect a bearer-credential bundle they now have to keep track
+  of.
 - Confidential-client flow is impossible from the browser (CORS blocks the
   Authorization header) — irrelevant under PKCE.

@@ -60,7 +60,7 @@ function stubNotification(permission: NotificationPermission) {
   return requestPermission;
 }
 
-/** Switches Settings' own tab bar (General / Notifications / Data Age / Activity Log) — not app navigation. */
+/** Switches Settings' own tab bar (General / Notifications / Data / Activity Log) — not app navigation. */
 async function openTab(user: ReturnType<typeof userEvent.setup>, name: RegExp) {
   await screen.findByRole('heading', { level: 1, name: /settings/i });
   await user.click(screen.getByRole('tab', { name }));
@@ -263,7 +263,7 @@ describe('Settings', () => {
   it('Data Age tab shows an empty state when nothing has succeeded yet', async () => {
     const user = userEvent.setup();
     render(<App />);
-    await openTab(user, /data age/i);
+    await openTab(user, /^data$/i);
 
     expect(screen.getByRole('heading', { name: /data age/i })).toBeInTheDocument();
     expect(screen.getByText(/nothing fetched yet/i)).toBeInTheDocument();
@@ -272,7 +272,7 @@ describe('Settings', () => {
   it('Data Age tab lists only the latest successful fetch per endpoint/character, skipping failures (issue #32)', async () => {
     const user = userEvent.setup();
     render(<App />);
-    await openTab(user, /data age/i);
+    await openTab(user, /^data$/i);
 
     act(() => {
       const log = useActivityLog.getState();
