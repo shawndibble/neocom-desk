@@ -23,6 +23,7 @@ import type {
 } from '@/engine/industry/types';
 import { EMPTY_RIG_FIT, FACILITY_PRESETS } from '@/engine/industry/types';
 import { buildVsBuy } from '@/engine/industry/buildVsBuy';
+import { sizeRuns } from '@/engine/industry/runSizing';
 
 export type MakeMethod = 'manufacturing' | 'planetary' | 'reaction';
 
@@ -100,8 +101,10 @@ function jobUnitCost(
   ctx: MakeOrBuyContext
 ): number | null {
   const product = blueprint.products[0];
-  if (!product || product.quantity <= 0) return null;
-  const runs = Math.max(1, Math.ceil(needed / product.quantity));
+  if (!product) return null;
+  const sizing = sizeRuns(needed, product.quantity);
+  if (!sizing) return null;
+  const { runs } = sizing;
   // TE is irrelevant to cost, so the cheapest honest value is passed.
   const result = buildVsBuy({
     blueprint,

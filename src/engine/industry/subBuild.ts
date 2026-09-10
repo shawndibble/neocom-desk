@@ -27,6 +27,7 @@ import type {
 import { effectiveMaterials } from '@/engine/industry/materials';
 import { jobDurationSeconds } from '@/engine/industry/time';
 import { estimatedItemValue, jobFee } from '@/engine/industry/jobCost';
+import { sizeRuns } from '@/engine/industry/runSizing';
 
 /** A planned sub-job: what to install, and what it eats. */
 export interface SubBuild {
@@ -79,10 +80,11 @@ export function planSubBuild(
   const needed = material.remainingQuantity;
   if (needed <= 0) return null;
   const product = blueprint.products[0];
-  if (!product || product.quantity <= 0) return null;
-
+  if (!product) return null;
+  const sizing = sizeRuns(needed, product.quantity);
+  if (!sizing) return null;
+  const { runs, unitsMade, spare } = sizing;
   const outputPerRun = product.quantity;
-  const runs = Math.ceil(needed / outputPerRun);
 
   try {
     const inputs = effectiveMaterials(blueprint, runs, me, ctx);
@@ -90,9 +92,9 @@ export function planSubBuild(
       typeID: material.typeID,
       runs,
       outputPerRun,
-      unitsMade: runs * outputPerRun,
+      unitsMade,
       needed,
-      spare: runs * outputPerRun - needed,
+      spare,
       me,
       seconds: jobDurationSeconds(blueprint.time, runs, 0, ctx.skills, ctx),
       inputs,

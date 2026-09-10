@@ -22,6 +22,7 @@
 import type { EffectiveMaterial, IndustryBlueprint } from '@/engine/industry/types';
 import { effectiveMaterials } from '@/engine/industry/materials';
 import { makeOrBuy, type MakeOrBuyContext, type MaterialRecipe } from '@/engine/industry/makeOrBuy';
+import { sizeRuns } from '@/engine/industry/runSizing';
 
 /** A feature-sized bound, not a safety valve — see the module doc comment. */
 export const MAX_AUTO_BUILD_DEPTH = 3;
@@ -98,10 +99,9 @@ export function autoBuildHere(
         // Same "runs to cover what's needed" sizing `jobUnitCost` used to
         // reach this verdict — the child's own material list must reflect
         // the job actually being evaluated, not an arbitrary single run.
-        const outputPerRun = recipe.blueprint.products[0]?.quantity ?? 0;
-        if (outputPerRun <= 0) continue;
-        const subRuns = Math.max(1, Math.ceil(material.quantity / outputPerRun));
-        const inputs = effectiveMaterials(recipe.blueprint, subRuns, recipe.me, opts.ctx);
+        const sizing = sizeRuns(material.quantity, recipe.blueprint.products[0]?.quantity ?? 0);
+        if (!sizing) continue;
+        const inputs = effectiveMaterials(recipe.blueprint, sizing.runs, recipe.me, opts.ctx);
         visit(inputs, depth + 1, new Set([...visited, material.typeID]));
       } catch {
         // Same "never throw" contract — this material still counts as built.
