@@ -274,6 +274,14 @@ export interface ColonyExtractorSnapshot {
   pinId: number;
   expiryTimeMs: number;
   /**
+   * The Character's current `extractorExpiringLeadHours` preference (issue
+   * #750), converted to ms and baked in per entry at `pollDomains.ts`'s
+   * `colonyDomain.load()` time — the same `StructureFuelEntrySnapshot.thresholdMs`
+   * pattern `structureFuelLowDays` uses, since `DomainDiff` itself is
+   * synchronous and cannot read the character's preference.
+   */
+  thresholdMs: number;
+  /**
    * When this program was installed, or absent when ESI omitted it —
    * `install_time` is spec-optional (`features/pi/adapters.ts`).
    *
@@ -350,19 +358,6 @@ export function diffPlanetaryExtractionDone(
 }
 
 /**
- * Lead times before an extractor program's `expiry_time` at which a warning
- * fires (issue #310), most distant first: a poll that skips over both edges
- * reports both, and the notification tag is per Character *and* per event, so
- * emitting the 12-hour copy last is what leaves the more urgent one on screen.
- *
- * Deliberately its own constant rather than an import of
- * `pi/colonyStatus.ts`'s `EXPIRING_SOON_WINDOW_MS`: that one is the Planetary
- * Industry table's colour threshold, and the two are free to diverge — a
- * notification cadence is not a status colour.
- */
-export const EXTRACTOR_EXPIRY_WARNING_MS: readonly number[] = [24 * 3_600_000, 12 * 3_600_000];
-
-/**
  * One warning about one program at one lead time. Shared by the diff that
  * raises these and by `disprovenExtractorOccurrences`, which retracts them:
  * the two must build an identical fire or the retraction addresses a row that
@@ -390,15 +385,16 @@ export interface ExtractorExpiringFire {
   characterId: number;
   planetId: number;
   pinId: number;
-  /** Which lead-time window was crossed, in ms — one of `EXTRACTOR_EXPIRY_WARNING_MS`. */
+  /** The Character's configured lead time, in ms, that this fire crossed. */
   thresholdMs: number;
   /** The program's `expiry_time` (issue #348: Occurrence Key input) — fixed for the program's life. */
   expiryTimeMs: number;
 }
 
 /**
- * Fires per extractor program that has newly crossed into a lead-time window
- * before its `expiry_time` (issue #310), once per window.
+ * Fires per extractor program that has newly crossed into its Character's
+ * configured lead time (issue #310, made user-selectable in #750) before its
+ * `expiry_time`, once per program.
  *
  * The predicate is deliberately **not** `diffCalendarEventStarting`'s "newly
  * in the past" shape. `expiry - now <= 24h` stays true forever once the
@@ -412,6 +408,14 @@ export interface ExtractorExpiringFire {
  *   program is `diffPlanetaryExtractionDone`'s to report, never this event's,
  *   and the boundary lines up exactly: `colonyStatus` reads a colony as idle
  *   from `nowMs >= expiryTimeMs`, which is where this diff stops firing.
+ *
+ * "Is it inside the lead time now" is judged against `extractor.thresholdMs`
+ * — the setting in force *this* poll. "Was it already inside" is judged
+ * against **`prevExtractor.thresholdMs`**, the setting in force when `prev`
+ * was captured, on `diffStructureFuelLow`'s precedent: comparing each side to
+ * the threshold that was actually live when it was measured is what makes a
+ * Character raising or lowering the lead time take effect on the very next
+ * poll, in both directions, without special-casing either.
  *
  * A program's identity is `(pinId, expiryTimeMs)`, because `expiry_time` is
  * fixed for a program's life: a pin whose expiry changed is carrying a *new*
@@ -436,21 +440,22 @@ export function diffPlanetaryExtractorExpiring(
     const prevByPin = new Map((prevColony?.extractors ?? []).map((e) => [e.pinId, e]));
     for (const extractor of colony.extractors) {
       if (extractor.expiryTimeMs <= next.nowMs) continue;
+      if (extractor.expiryTimeMs - next.nowMs > extractor.thresholdMs) continue;
+      const prevExtractor = prevByPin.get(extractor.pinId);
       const observedBefore =
-        prevByPin.get(extractor.pinId)?.expiryTimeMs === extractor.expiryTimeMs;
-      for (const thresholdMs of EXTRACTOR_EXPIRY_WARNING_MS) {
-        if (extractor.expiryTimeMs - next.nowMs > thresholdMs) continue;
-        if (observedBefore && extractor.expiryTimeMs - prev.nowMs <= thresholdMs) continue;
-        fires.push(
-          extractorExpiringFire(
-            characterId,
-            colony.planetId,
-            extractor.pinId,
-            thresholdMs,
-            extractor.expiryTimeMs
-          )
-        );
+        prevExtractor !== undefined && prevExtractor.expiryTimeMs === extractor.expiryTimeMs;
+      if (observedBefore && extractor.expiryTimeMs - prev.nowMs <= prevExtractor.thresholdMs) {
+        continue;
       }
+      fires.push(
+        extractorExpiringFire(
+          characterId,
+          colony.planetId,
+          extractor.pinId,
+          extractor.thresholdMs,
+          extractor.expiryTimeMs
+        )
+      );
     }
   }
   return fires;
@@ -516,20 +521,18 @@ export function disprovenExtractorOccurrences(
     };
 
     for (const program of prevColony.extractors) {
-      for (const thresholdMs of EXTRACTOR_EXPIRY_WARNING_MS) {
-        // `projectColonies` fires this warning at `expiry - threshold`; only
-        // a replacement already standing by then makes it a false claim.
-        if (!replacedBefore(program, program.expiryTimeMs - thresholdMs)) continue;
-        fires.push(
-          extractorExpiringFire(
-            characterId,
-            prevColony.planetId,
-            program.pinId,
-            thresholdMs,
-            program.expiryTimeMs
-          )
-        );
-      }
+      // `projectColonies` fires this warning at `expiry - threshold`; only
+      // a replacement already standing by then makes it a false claim.
+      if (!replacedBefore(program, program.expiryTimeMs - program.thresholdMs)) continue;
+      fires.push(
+        extractorExpiringFire(
+          characterId,
+          prevColony.planetId,
+          program.pinId,
+          program.thresholdMs,
+          program.expiryTimeMs
+        )
+      );
     }
 
     // `planetaryExtractionDone` keys on the colony's soonest expiry, and
