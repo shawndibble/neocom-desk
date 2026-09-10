@@ -676,16 +676,25 @@ describe('Settings — Notifications (issue #170)', () => {
     await notificationsPanel();
 
     // Pilot One's section opens itself, and it holds every scope, so the
-    // per-type list under "EVE Notifications" is on screen already.
-    expect(await screen.findByText('Structure Under Attack')).toBeInTheDocument();
-    expect(screen.getByText('Corporation Bill Issued')).toBeInTheDocument();
+    // per-type list under "EVE Notifications" is on screen already. Scoped to
+    // Pilot One's own section (same pattern the search test above uses): the
+    // "All Characters" master row (issue #745) repeats this same per-type
+    // list above the real character list, so an unscoped query now matches
+    // twice.
+    const pilotOneSection = within(await notificationsPanel())
+      .getByRole('button', { name: /pilot one/i })
+      .closest('div')!.parentElement!;
+    const panel = within(pilotOneSection);
+
+    expect(await panel.findByText('Structure Under Attack')).toBeInTheDocument();
+    expect(panel.getByText('Corporation Bill Issued')).toBeInTheDocument();
     // The two reinforcement types share a fired title ("Structure reinforced")
     // but are separately togglable rows, so they must read differently here.
-    expect(screen.getByText('Structure Lost Shields')).toBeInTheDocument();
-    expect(screen.getByText('Structure Lost Armor')).toBeInTheDocument();
+    expect(panel.getByText('Structure Lost Shields')).toBeInTheDocument();
+    expect(panel.getByText('Structure Lost Armor')).toBeInTheDocument();
 
-    expect(screen.queryByText('StructureUnderAttack')).not.toBeInTheDocument();
-    expect(screen.queryByText('CorpAllBillMsg')).not.toBeInTheDocument();
+    expect(panel.queryByText('StructureUnderAttack')).not.toBeInTheDocument();
+    expect(panel.queryByText('CorpAllBillMsg')).not.toBeInTheDocument();
   });
 
   /**
