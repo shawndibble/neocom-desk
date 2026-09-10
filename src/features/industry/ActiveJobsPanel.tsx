@@ -3,11 +3,15 @@ import { useTranslation } from 'react-i18next';
 import { useHighlightParam } from '@/lib/useHighlightParam';
 import { useLiveQuery } from 'dexie-react-hooks';
 import {
+  Button,
   Caret,
   DataAgeBadge,
   DataTable,
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
   EmptyState,
-  FilterChip,
   IconButton,
   Panel,
   ReauthBanner,
@@ -70,6 +74,61 @@ import { useDefaultCharacterFilter } from '@/features/character/defaultCharacter
 /** A row on the table, tagged with its owning Character even in the single-character view — so `rowKey` and the optional character column need no branch. */
 type JobRow = ActiveJob & { characterId: number; characterName: string };
 
+/** The two derived job states this panel's Status filter offers — not ESI's raw `status` enum, just what the list already highlights. */
+type JobStatusFilter = 'completingSoon' | 'done';
+
+/** Picks a job tone's class out of a per-site map, `undefined` for the neutral case — the one place every `cellClassName`/`rowClassName`/fill-color call site turns a tone into a string. */
+function toneClass(
+  tone: 'warning' | 'success' | undefined,
+  classes: { warning: string; success: string }
+): string | undefined {
+  return tone && classes[tone];
+}
+
+/**
+ * One grouped multiselect dropdown — Activity and Status are two instances
+ * of the exact same shape (a `Button` trigger, a `DropdownMenuCheckboxItem`
+ * per option), so this exists once rather than being hand-rolled twice in
+ * `ActiveJobsPanel`. Not lifted out to `components/ui` or its own file: unlike
+ * `CalendarKindFilterMenu`/`CharacterFilterControl` (each shared across
+ * several panels), both instances of this one live in this single component,
+ * so a local, unexported function is the proportionate amount of reuse.
+ */
+function JobFilterMenu<T extends string | number>({
+  triggerLabel,
+  items,
+  selected,
+  onToggle,
+}: {
+  triggerLabel: string;
+  items: readonly { value: T; label: string }[];
+  selected: ReadonlySet<T>;
+  onToggle: (value: T) => void;
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button size="sm">{triggerLabel}</Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start">
+        {items.map((item) => (
+          <DropdownMenuCheckboxItem
+            key={item.value}
+            checked={selected.has(item.value)}
+            // Without this the menu closes on the first toggle, which makes
+            // a multi-select take one round trip per option
+            // (`CalendarKindFilterMenu`'s precedent).
+            onSelect={(event) => event.preventDefault()}
+            onCheckedChange={() => onToggle(item.value)}
+          >
+            {item.label}
+          </DropdownMenuCheckboxItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 interface ActiveJobsPanelProps {
   characterId: number;
   onAddToQuickbar: (typeId: number, itemName: string) => void;
@@ -129,10 +188,17 @@ export function ActiveJobsPanel({
 }: ActiveJobsPanelProps) {
   const { t } = useTranslation();
   const [now, setNow] = useState(() => Date.now());
-  // View-only filters (not persisted): an empty set means "every activity",
-  // matching how no chip pressed reads as no filter everywhere else in the app.
+  // View-only filters (not persisted): plain Sets, empty meaning "every
+  // activity"/"every status" — matching how no chip pressed reads as no
+  // filter everywhere else in the app. Deliberately not the shared
+  // `MultiSelectFilter`/`toggleFilterMember` convention (`'all'` as the
+  // no-filter sentinel): that pair is built for a picker that starts fully
+  // selected and narrows by *unchecking* members (`CharacterFilterControl`).
+  // This menu starts with nothing checked and narrows by *checking* the
+  // activities/statuses to include, so the empty set has to mean "no
+  // filter" from the very first click, not `'all'`.
   const [activityFilter, setActivityFilter] = useState<ReadonlySet<number>>(new Set());
-  const [completingSoonOnly, setCompletingSoonOnly] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<ReadonlySet<JobStatusFilter>>(new Set());
   // The list is folded away by default: the header's one-line read (how many
   // run, what finishes next, a bar per job) is what a pilot glancing at the
   // page wants, and the six-column table is one click away when they don't.
@@ -409,12 +475,22 @@ export function ActiveJobsPanel({
    */
   const showCharacterFilter = !showingCorp && jobsFilterCandidates.length > 1;
 
-  // Chips only for activities actually present — a chip for an activity type
-  // this character never runs would just be a permanently-dead toggle.
+  // Menu entries only for activities actually present — an entry for an
+  // activity type this character never runs would just be a permanently-dead
+  // toggle.
   const presentActivityIds = useMemo(
     () => [...new Set(jobs.map((job) => job.activity_id))].sort((a, b) => a - b),
     [jobs]
   );
+  // Only worth a control once there is more than one activity to tell apart.
+  const showActivityFilter = presentActivityIds.length > 1;
+  // Kept mounted while a status filter is still active even if no job
+  // currently matches it — losing the control out from under an applied
+  // filter would leave the list silently narrowed with no way to clear it.
+  // `summary.done` (already computed above) stands in for a second
+  // `jobs.some(isJobDone)` scan of the same list.
+  const showStatusFilter =
+    statusFilter.size > 0 || summary.done > 0 || jobs.some((job) => isCompletingSoon(job, now));
 
   // The job an `industryJobComplete` alert pointed at, if any. It stays in
   // this list until it is delivered, which is exactly what the alert is about.
@@ -424,10 +500,14 @@ export function ActiveJobsPanel({
     () =>
       jobs.filter((job) => {
         if (activityFilter.size > 0 && !activityFilter.has(job.activity_id)) return false;
-        if (completingSoonOnly && !isCompletingSoon(job, now)) return false;
+        if (statusFilter.size > 0) {
+          const matchesSoon = statusFilter.has('completingSoon') && isCompletingSoon(job, now);
+          const matchesDone = statusFilter.has('done') && isJobDone(job, now);
+          if (!matchesSoon && !matchesDone) return false;
+        }
         return true;
       }),
-    [jobs, activityFilter, completingSoonOnly, now]
+    [jobs, activityFilter, statusFilter, now]
   );
 
   function toggleActivity(activityId: number) {
@@ -439,6 +519,15 @@ export function ActiveJobsPanel({
     });
   }
 
+  function toggleStatus(status: JobStatusFilter) {
+    setStatusFilter((current) => {
+      const next = new Set(current);
+      if (next.has(status)) next.delete(status);
+      else next.add(status);
+      return next;
+    });
+  }
+
   const nameForBlueprint = useCallback(
     (typeId: number): string => types[String(typeId)]?.name ?? `#${typeId}`,
     [types]
@@ -446,6 +535,14 @@ export function ActiveJobsPanel({
 
   /** One binding of the warning state: the row tint, the stripe, the badge and the bar all read it. */
   const soon = useCallback((job: ActiveJob) => isCompletingSoon(job, now), [now]);
+  /** One binding of the done state: same four places as `soon`, in success tone — mutually exclusive with it (`isCompletingSoon` requires time still remaining). */
+  const done = useCallback((job: ActiveJob) => isJobDone(job, now), [now]);
+  /** The one precedence rule (`soon` beats `done`, though they're mutually exclusive) shared by every place a job's tone shows up, so the four call sites below each pick a class from a lookup rather than re-deriving the same `soon ? … : done ? … : …` chain. */
+  const jobTone = useCallback(
+    (job: ActiveJob): 'warning' | 'success' | undefined =>
+      soon(job) ? 'warning' : done(job) ? 'success' : undefined,
+    [soon, done]
+  );
 
   /**
    * Rebuilt on every countdown tick — the remaining time, the progress
@@ -464,13 +561,22 @@ export function ActiveJobsPanel({
         // table here inherits; a cell border paints. Held behind `sm:` — once
         // `.dt-stack` blocks the cell there is no row edge to stripe, and the
         // card's tint already carries the state.
-        cellClassName: (job) => (soon(job) ? 'sm:border-l sm:border-l-warning' : undefined),
+        cellClassName: (job) =>
+          toneClass(jobTone(job), {
+            warning: 'sm:border-l sm:border-l-warning',
+            success: 'sm:border-l sm:border-l-success',
+          }),
         render: (job) => (
           <span className="flex flex-wrap items-center gap-1.5">
             <span>{nameForBlueprint(job.blueprint_type_id)}</span>
             {soon(job) && (
               <span className="rounded-xs border border-warning/50 bg-warning/15 px-1.5 py-0.5 text-[0.625rem] font-semibold tracking-widest text-warning uppercase">
                 {t('industry.jobsCompletingSoon')}
+              </span>
+            )}
+            {done(job) && (
+              <span className="rounded-xs border border-success/50 bg-success/15 px-1.5 py-0.5 text-[0.625rem] font-semibold tracking-widest text-success uppercase">
+                {t('industry.jobsDone')}
               </span>
             )}
             {/* Only once more than one Character's jobs are on screen (`showCharacterColumn`) — same gate as `OpenOrdersPanel`'s `showCharacterStrip`. */}
@@ -516,7 +622,10 @@ export function ActiveJobsPanel({
                 className="block h-1.5 w-16 shrink-0 overflow-hidden rounded-full bg-panel sm:w-24"
               >
                 <span
-                  className={`block h-full ${soon(job) ? 'bg-warning' : 'bg-accent'}`}
+                  className={`block h-full ${
+                    toneClass(jobTone(job), { warning: 'bg-warning', success: 'bg-success' }) ??
+                    'bg-accent'
+                  }`}
                   style={{ width: `${progress}%` }}
                 />
               </span>
@@ -532,11 +641,15 @@ export function ActiveJobsPanel({
         header: t('industry.jobsColEndsIn'),
         align: 'right',
         className: 'tabular-nums whitespace-nowrap',
-        cellClassName: (job) => (soon(job) ? 'font-semibold text-warning' : undefined),
+        cellClassName: (job) =>
+          toneClass(jobTone(job), {
+            warning: 'font-semibold text-warning',
+            success: 'font-semibold text-success',
+          }),
         // The timestamp, never the printed duration: "1d 4h" sorts before "9h" as a string.
         sortValue: (job) => Date.parse(job.end_date),
         render: (job) =>
-          isJobDone(job, now) ? t('industry.jobsDone') : formatDuration(secondsRemaining(job, now)),
+          done(job) ? t('industry.jobsDone') : formatDuration(secondsRemaining(job, now)),
       },
       {
         id: 'ends',
@@ -549,7 +662,7 @@ export function ActiveJobsPanel({
         },
       },
     ],
-    [t, now, soon, nameForBlueprint, showCharacterColumn]
+    [t, now, soon, done, jobTone, nameForBlueprint, showCharacterColumn]
   );
 
   /** Right-click any row for the shared item menu. */
@@ -571,12 +684,19 @@ export function ActiveJobsPanel({
 
   /**
    * Open manufacturing/science/reaction slots for the panel's current
-   * character-filter selection (issue #679) — always visible, since it's
-   * meant for a one-glance read alongside the fold summary. A dashed
-   * underline expands to the open/max breakdown per category on hover/focus,
-   * same tooltip idiom `Characters.tsx`'s `openJobsColumn` already uses. Tone
-   * is per-category, not on the group as a whole: one idle pool is worth
-   * flagging even when the other two are busy.
+   * character-filter selection (issue #679) — sits in the header's `actions`
+   * group (far right), not beside the title: parked next to "N running · N
+   * done" it read as another fact about what's currently running, when it is
+   * actually free *capacity* — unrelated to whether anything is running at
+   * all (issue: the numbers looked like they described the same thing).
+   *
+   * A dashed underline expands to the used/max breakdown per category on
+   * hover/focus, same wording `Characters.tsx`'s `openJobsColumn` tooltip
+   * already uses (`{{used}}/{{max}} slots used`) — used, not open, is the
+   * numerator a reader expects under a fraction, and here it also stays
+   * legible when open happens to equal max (used reads `0/11`, not the
+   * doubled-looking `11/11`). Tone is per-category, not on the group as a
+   * whole: one idle pool is worth flagging even when the other two are busy.
    */
   const jobSlotSummaryElement = (
     <Tooltip
@@ -586,7 +706,7 @@ export function ActiveJobsPanel({
         return entry
           ? t('industry.jobSlotBreakdown', {
               category: label,
-              open: entry.open,
+              used: entry.max - entry.open,
               max: entry.max,
             })
           : t('industry.jobSlotBreakdownUnknown', { category: label });
@@ -596,6 +716,9 @@ export function ActiveJobsPanel({
         tabIndex={0}
         className="flex cursor-help items-center gap-1 text-xs tabular-nums underline decoration-dotted decoration-current/50 underline-offset-2"
       >
+        <span className="hidden text-[0.625rem] font-semibold tracking-widest text-text-dim uppercase sm:inline">
+          {t('industry.jobSlotSummaryLabel')}
+        </span>
         {JOB_SLOT_CATEGORIES.map((category, index) => {
           const entry = jobSlotSummary[category];
           const tone = !entry
@@ -638,7 +761,6 @@ export function ActiveJobsPanel({
           onChange={setJobsCharacterFilter}
         />
       )}
-      {jobSlotSummaryElement}
       {noneActive ? (
         <span className="text-xs text-text-dim">{t('industry.jobsNoneMeta')}</span>
       ) : (
@@ -701,6 +823,15 @@ export function ActiveJobsPanel({
             </span>
           )}
           {dataAgeDate && <DataAgeBadge date={dataAgeDate} />}
+          {/* Grouped with `DataAgeBadge`, not appended after the caret: both
+              are passive, hover-only readouts (nothing to click), while
+              Export/Refresh/the caret are actions — interleaving the two
+              kinds breaks the toolbar's scan order, and the caret in
+              particular earns the literal last slot as this panel's primary
+              affordance. Landing in `actions` at all (rather than `meta`,
+              beside "N running · N done") is what answers the original ask:
+              it no longer reads as a description of what's currently running. */}
+          {jobSlotSummaryElement}
           <IconButton
             size="sm"
             icon={<Icon.Download />}
@@ -802,25 +933,48 @@ export function ActiveJobsPanel({
               {listRefreshCount > 0 ? t('common.refreshFailedTitle') : t('common.offlineTitle')}
             </p>
           )}
-          {(presentActivityIds.length > 1 || jobs.some((job) => isCompletingSoon(job, now))) && (
+          {(showActivityFilter || showStatusFilter) && (
             <div
               role="group"
               aria-label={t('industry.jobsFilterLabel')}
               className="flex flex-wrap gap-1.5"
             >
-              {presentActivityIds.map((activityId) => (
-                <FilterChip
-                  key={activityId}
-                  label={t(activityI18nKey(activityId), { id: activityId })}
-                  selected={activityFilter.has(activityId)}
-                  onToggle={() => toggleActivity(activityId)}
+              {showActivityFilter && (
+                <JobFilterMenu
+                  triggerLabel={
+                    activityFilter.size === 0
+                      ? t('industry.jobsFilterActivity')
+                      : t('industry.jobsFilterWithCount', {
+                          label: t('industry.jobsFilterActivity'),
+                          count: activityFilter.size,
+                        })
+                  }
+                  items={presentActivityIds.map((activityId) => ({
+                    value: activityId,
+                    label: t(activityI18nKey(activityId), { id: activityId }),
+                  }))}
+                  selected={activityFilter}
+                  onToggle={toggleActivity}
                 />
-              ))}
-              <FilterChip
-                label={t('industry.jobsCompletingSoon')}
-                selected={completingSoonOnly}
-                onToggle={() => setCompletingSoonOnly((v) => !v)}
-              />
+              )}
+              {showStatusFilter && (
+                <JobFilterMenu
+                  triggerLabel={
+                    statusFilter.size === 0
+                      ? t('industry.jobsFilterStatus')
+                      : t('industry.jobsFilterWithCount', {
+                          label: t('industry.jobsFilterStatus'),
+                          count: statusFilter.size,
+                        })
+                  }
+                  items={[
+                    { value: 'completingSoon' as const, label: t('industry.jobsCompletingSoon') },
+                    { value: 'done' as const, label: t('industry.jobsDone') },
+                  ]}
+                  selected={statusFilter}
+                  onToggle={toggleStatus}
+                />
+              )}
             </div>
           )}
           {filteredJobs.length === 0 ? (
@@ -843,7 +997,9 @@ export function ActiveJobsPanel({
                 label={t('industry.jobsTitle')}
                 defaultSort={{ columnId: 'endsIn', direction: 'asc' }}
                 density="compact"
-                rowClassName={(job) => (soon(job) ? 'bg-warning/10' : undefined)}
+                rowClassName={(job) =>
+                  toneClass(jobTone(job), { warning: 'bg-warning/10', success: 'bg-success/10' })
+                }
                 rowContextMenu={jobContextMenu}
               />
             </div>

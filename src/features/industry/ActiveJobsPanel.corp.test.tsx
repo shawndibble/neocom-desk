@@ -377,7 +377,7 @@ describe('ActiveJobsPanel: the corp side (AC 2, AC 3)', () => {
 
     await screen.findByText('Widget Alpha');
     await waitFor(() => {
-      expect(container.querySelector('.cursor-help')!.textContent).toBe('3/1/1');
+      expect(container.querySelector('.cursor-help')!.textContent).toBe('Free slots3/1/1');
     });
 
     await user.click(await screen.findByRole('button', { name: 'Corp jobs' }));
@@ -386,7 +386,7 @@ describe('ActiveJobsPanel: the corp side (AC 2, AC 3)', () => {
     // CORP_JOB (4 runs of manufacturing) is in the list now, but the
     // header's manufacturing count must stay exactly what it was: personal
     // capacity, never the corp list's jobs.
-    expect(container.querySelector('.cursor-help')!.textContent).toBe('3/1/1');
+    expect(container.querySelector('.cursor-help')!.textContent).toBe('Free slots3/1/1');
   });
 
   it('says "None" and keeps the owner switch, so an empty corp side is not a dead end', async () => {

@@ -30,6 +30,8 @@ import {
   toggleAllEventsChannelPref,
   toggleEveTypeChannelPref,
   toggleAllEveTypesChannelPref,
+  broadcastEventChannelPref,
+  broadcastAllEventsChannelPref,
 } from './preferences';
 import { SYNCED_NOTIFICATION_FEED_PREFS_KEY } from './syncedPreferences';
 
@@ -481,6 +483,43 @@ describe('toggleEventChannelPref / toggleAllEventsChannelPref / toggleEveTypeCha
     );
     await updateNotificationPrefs(1, next);
     expect(await db.settings.get(SYNCED_NOTIFICATION_FEED_PREFS_KEY)).toBeDefined();
+  });
+});
+
+describe('broadcastEventChannelPref / broadcastAllEventsChannelPref (issue #738)', () => {
+  it('writes the broadcast value into every known Character at once', async () => {
+    await broadcastEventChannelPref([1, 2], DEFAULT_NOTIFICATION_PREFERENCES, EVENT_A, 'browser');
+    const value = useNotificationPreferences.getState().value;
+    expect(isEventEnabledFor(characterEventPrefs(value, 1), EVENT_A, 'browser')).toBe(false);
+    expect(isEventEnabledFor(characterEventPrefs(value, 2), EVENT_A, 'browser')).toBe(false);
+  });
+
+  it('a browser broadcast never touches the synced setting; a feed broadcast does', async () => {
+    await broadcastEventChannelPref([1, 2], DEFAULT_NOTIFICATION_PREFERENCES, EVENT_A, 'browser');
+    expect(await db.settings.get(SYNCED_NOTIFICATION_FEED_PREFS_KEY)).toBeUndefined();
+
+    await broadcastEventChannelPref([1, 2], DEFAULT_NOTIFICATION_PREFERENCES, EVENT_A, 'feed');
+    expect(await db.settings.get(SYNCED_NOTIFICATION_FEED_PREFS_KEY)).toBeDefined();
+  });
+
+  it('is a no-op with no known Characters', async () => {
+    await broadcastEventChannelPref([], DEFAULT_NOTIFICATION_PREFERENCES, EVENT_A, 'browser');
+    expect(useNotificationPreferences.getState().value).toEqual(DEFAULT_NOTIFICATION_PREFERENCES);
+  });
+
+  it('broadcastAllEventsChannelPref writes every event to every known Character', async () => {
+    await broadcastAllEventsChannelPref(
+      [1, 2],
+      DEFAULT_NOTIFICATION_PREFERENCES,
+      [EVENT_A, EVENT_B],
+      'browser'
+    );
+    const value = useNotificationPreferences.getState().value;
+    for (const characterId of [1, 2]) {
+      const prefs = characterEventPrefs(value, characterId);
+      expect(isEventEnabledFor(prefs, EVENT_A, 'browser')).toBe(false);
+      expect(isEventEnabledFor(prefs, EVENT_B, 'browser')).toBe(false);
+    }
   });
 });
 
