@@ -3077,6 +3077,16 @@
         "browser": "{{event}}, browser notifications",
         "feed": "{{event}}, Overview list"
       },
+      "allCharactersLabel": "All Characters",
+      "allCharactersHint": "Apply a setting to every character at once. This is a one-time broadcast, not a saved default — a character added later starts from its own defaults, and any character can still be edited independently afterward.",
+      "selectAllCharacters": {
+        "browser": "Toggle browser notifications for every character",
+        "feed": "Toggle Overview notifications for every character"
+      },
+      "toggleAllCharactersLabel": {
+        "browser": "{{event}} for every character, browser notifications",
+        "feed": "{{event}} for every character, Overview list"
+      },
       "columnEvent": "Event",
       "eveTypesHint": "EVE’s own in-game notifications, grouped by family. These default to the Overview page only, except the attack and loss alerts, which also raise a browser pop-up — flip any of them per column.",
       "family": {

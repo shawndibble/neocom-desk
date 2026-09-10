@@ -13,6 +13,10 @@ import {
   eveTypesByFamily,
   selectionStateForEveTypes,
   toggleAllEveTypesOnChannel,
+  selectionStateForEventAcrossCharacters,
+  selectionStateForAllCharactersAllEvents,
+  broadcastEventChannelFlags,
+  broadcastAllEventsChannelFlags,
   type EventEnabledMap,
   type EveTypeEnabledMap,
 } from './eventSelection';
@@ -106,6 +110,98 @@ describe('toggleAllEventsOnChannel', () => {
     const next = toggleAllEventsOnChannel([A, B], map, 'browser');
     expect(isEventEnabledFor(next, A, 'browser')).toBe(true);
     expect(isEventEnabledFor(next, B, 'browser')).toBe(true);
+  });
+});
+
+describe('selectionStateForEventAcrossCharacters (issue #738)', () => {
+  it('is checked when every Character agrees on', () => {
+    const perCharacter = { 1: {}, 2: {} };
+    expect(selectionStateForEventAcrossCharacters([1, 2], A, perCharacter, 'browser')).toBe(
+      'checked'
+    );
+  });
+
+  it('is unchecked when every Character agrees off', () => {
+    const perCharacter = { 1: { [A]: { browser: false } }, 2: { [A]: { browser: false } } };
+    expect(selectionStateForEventAcrossCharacters([1, 2], A, perCharacter, 'browser')).toBe(
+      'unchecked'
+    );
+  });
+
+  it('is indeterminate when Characters disagree', () => {
+    const perCharacter = { 1: { [A]: { browser: false } }, 2: {} };
+    expect(selectionStateForEventAcrossCharacters([1, 2], A, perCharacter, 'browser')).toBe(
+      'indeterminate'
+    );
+  });
+
+  it('reads a Character absent from the map as its default (on)', () => {
+    const perCharacter = { 1: {} };
+    expect(selectionStateForEventAcrossCharacters([1, 2], A, perCharacter, 'browser')).toBe(
+      'checked'
+    );
+  });
+});
+
+describe('selectionStateForAllCharactersAllEvents (issue #738)', () => {
+  it('is checked only when every Character agrees every Event is on', () => {
+    const perCharacter = { 1: {}, 2: {} };
+    expect(selectionStateForAllCharactersAllEvents([1, 2], [A, B], perCharacter, 'browser')).toBe(
+      'checked'
+    );
+  });
+
+  it('is indeterminate when one Character disagrees on one Event', () => {
+    const perCharacter = { 1: { [A]: { browser: false } }, 2: {} };
+    expect(selectionStateForAllCharactersAllEvents([1, 2], [A, B], perCharacter, 'browser')).toBe(
+      'indeterminate'
+    );
+  });
+
+  it('is unchecked with no Characters or no Events', () => {
+    expect(selectionStateForAllCharactersAllEvents([], [A, B], {}, 'browser')).toBe('unchecked');
+    expect(selectionStateForAllCharactersAllEvents([1], [], {}, 'browser')).toBe('unchecked');
+  });
+});
+
+describe('broadcastEventChannelFlags (issue #738)', () => {
+  it('turns every known Character on when at least one disagrees or is off', () => {
+    const perCharacter = { 1: { [A]: { browser: false } }, 2: {} };
+    const next = broadcastEventChannelFlags([1, 2], A, perCharacter, 'browser');
+    expect(isEventEnabledFor(next[1], A, 'browser')).toBe(true);
+    expect(isEventEnabledFor(next[2], A, 'browser')).toBe(true);
+  });
+
+  it('turns every known Character off only when all already agree on', () => {
+    const perCharacter = { 1: {}, 2: {} };
+    const next = broadcastEventChannelFlags([1, 2], A, perCharacter, 'browser');
+    expect(isEventEnabledFor(next[1], A, 'browser')).toBe(false);
+    expect(isEventEnabledFor(next[2], A, 'browser')).toBe(false);
+  });
+
+  it('leaves the other channel and other events untouched', () => {
+    const perCharacter = { 1: { [A]: { feed: false }, [B]: { browser: false } } };
+    const next = broadcastEventChannelFlags([1], A, perCharacter, 'browser');
+    expect(isEventEnabledFor(next[1], A, 'feed')).toBe(false);
+    expect(isEventEnabledFor(next[1], B, 'browser')).toBe(false);
+  });
+});
+
+describe('broadcastAllEventsChannelFlags (issue #738)', () => {
+  it('turns every Character and Event on when the whole grid is not already fully on', () => {
+    const perCharacter = { 1: { [A]: { browser: false } }, 2: {} };
+    const next = broadcastAllEventsChannelFlags([1, 2], [A, B], perCharacter, 'browser');
+    expect(isEventEnabledFor(next[1], A, 'browser')).toBe(true);
+    expect(isEventEnabledFor(next[1], B, 'browser')).toBe(true);
+    expect(isEventEnabledFor(next[2], A, 'browser')).toBe(true);
+    expect(isEventEnabledFor(next[2], B, 'browser')).toBe(true);
+  });
+
+  it('clears the whole grid only when it was already fully on', () => {
+    const perCharacter = { 1: {}, 2: {} };
+    const next = broadcastAllEventsChannelFlags([1, 2], [A, B], perCharacter, 'browser');
+    expect(isEventEnabledFor(next[1], A, 'browser')).toBe(false);
+    expect(isEventEnabledFor(next[2], B, 'browser')).toBe(false);
   });
 });
 

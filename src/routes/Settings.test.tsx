@@ -702,9 +702,12 @@ describe('Settings — Notifications (issue #170)', () => {
 
     const badgeName = /arrives even with the app closed/i;
     // The label and its badge are siblings inside one wrapper span, so the
-    // label's parent is exactly the scope to ask about.
-    await panel.findByText('Skill Level Complete');
-    const rowFor = (name: string) => within(panel.getByText(name).parentElement!);
+    // label's parent is exactly the scope to ask about. The All Characters
+    // master row (issue #738) repeats every event label above the real
+    // character list, so `name` can now match twice — the last match is
+    // always Pilot One's own row, since the master row renders first.
+    await panel.findAllByText('Skill Level Complete');
+    const rowFor = (name: string) => within(panel.getAllByText(name).at(-1)!.parentElement!);
 
     // Scheduled Push: a knowable future instant the backend can fire on.
     expect(
@@ -733,6 +736,125 @@ describe('Settings — Notifications (issue #170)', () => {
     expect(panel.getAllByText(/^Overview$/).length).toBeGreaterThan(0);
     expect(panel.queryByText(/^App$/)).not.toBeInTheDocument();
     expect(panel.queryByText(/^List$/)).not.toBeInTheDocument();
+  });
+
+  describe('All Characters master row (issue #738)', () => {
+    it('shows a master row above the character list, with the same per-event checkboxes', async () => {
+      render(<App />);
+      const panel = within(await notificationsPanel());
+
+      expect(await panel.findByText('All Characters')).toBeInTheDocument();
+      expect(
+        panel.getByRole('checkbox', {
+          name: 'Skill Level Complete for every character, browser notifications',
+        })
+      ).toBeInTheDocument();
+    });
+
+    it('is checked when known Characters agree, indeterminate once they disagree', async () => {
+      render(<App />);
+      await notificationsPanel();
+
+      const masterEventCheckbox = (await screen.findByRole('checkbox', {
+        name: 'Skill Level Complete for every character, browser notifications',
+      })) as HTMLInputElement;
+      // Both Characters default to skillLevelComplete-browser on: agreement.
+      expect(masterEventCheckbox.indeterminate).toBe(false);
+      expect(masterEventCheckbox).toBeChecked();
+
+      // Pilot Two disagrees on that event/channel — set directly on the
+      // store rather than through Pilot Two's own row, which shares an
+      // identical aria-label with Pilot One's once both are expanded.
+      act(() => {
+        useNotificationPreferences.setState({
+          value: {
+            ...DEFAULT_NOTIFICATION_PREFERENCES,
+            perCharacter: { [CHAR_2_ID]: { skillLevelComplete: { browser: false } } },
+          },
+          hydrated: true,
+        });
+      });
+
+      expect(masterEventCheckbox.indeterminate).toBe(true);
+    });
+
+    it("toggling one event's master checkbox writes that value to every known Character, even one whose own row is scope-disabled for it", async () => {
+      const user = userEvent.setup();
+      render(<App />);
+      await notificationsPanel();
+
+      // Pilot Two has every notification scope except New Mail's (outer
+      // beforeEach) — its own New Mail row renders disabled, but the master
+      // row is not scope-gated at all (issue #738: "every known Character").
+      const newMailMaster = await screen.findByRole('checkbox', {
+        name: 'New Mail for every character, browser notifications',
+      });
+      await user.click(newMailMaster);
+
+      const stored = (await db.settings.get(NOTIFICATION_PREFS_SETTING_KEY))
+        ?.value as typeof DEFAULT_NOTIFICATION_PREFERENCES;
+      expect(stored.perCharacter[CHAR_ID]?.newMail).toMatchObject({ browser: false });
+      expect(stored.perCharacter[CHAR_2_ID]?.newMail).toMatchObject({ browser: false });
+    });
+
+    it("the top select-all row broadcasts every event to every Character, same cascade as a Character's own select-all", async () => {
+      const user = userEvent.setup();
+      render(<App />);
+      await notificationsPanel();
+
+      // Wallet Balance Changed/Market Order Filled default browser-off while
+      // the rest default browser-on (CONTEXT.md round 45) — the grid starts
+      // partial, so the first click fills every event, every Character, on.
+      const selectAllCharacters = await screen.findByRole('checkbox', {
+        name: 'Toggle browser notifications for every character',
+      });
+      await user.click(selectAllCharacters);
+      expect(
+        screen.getByRole('checkbox', { name: 'Skill Level Complete, browser notifications' })
+      ).toBeChecked();
+      expect(
+        screen.getByRole('checkbox', { name: 'Wallet Balance Changed, browser notifications' })
+      ).toBeChecked();
+
+      // Now fully on across the board — the next click clears it.
+      await user.click(selectAllCharacters);
+      expect(
+        screen.getByRole('checkbox', { name: 'Skill Level Complete, browser notifications' })
+      ).not.toBeChecked();
+    });
+
+    it("disables its browser column when the browser permission is denied, matching a Character's own row", async () => {
+      stubNotification('denied');
+      render(<App />);
+      await notificationsPanel();
+
+      const masterSelectAllBrowser = await screen.findByRole('checkbox', {
+        name: 'Toggle browser notifications for every character',
+      });
+      expect(masterSelectAllBrowser).toBeDisabled();
+      expect(
+        screen.getByRole('checkbox', {
+          name: 'Skill Level Complete for every character, browser notifications',
+        })
+      ).toBeDisabled();
+      // The Overview column is unaffected — only browser is permission-gated.
+      expect(
+        screen.getByRole('checkbox', { name: 'Toggle Overview notifications for every character' })
+      ).not.toBeDisabled();
+    });
+
+    it('never opens a native confirm dialog for a broadcast', async () => {
+      const user = userEvent.setup();
+      const confirmSpy = vi.spyOn(window, 'confirm');
+      render(<App />);
+      await notificationsPanel();
+
+      const selectAllCharacters = await screen.findByRole('checkbox', {
+        name: 'Toggle browser notifications for every character',
+      });
+      await user.click(selectAllCharacters);
+      expect(confirmSpy).not.toHaveBeenCalled();
+    });
   });
 });
 
