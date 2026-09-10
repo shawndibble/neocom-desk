@@ -19,15 +19,26 @@ interface CraftSweepControlProps {
    * there is nothing to sweep.
    */
   maxDepth: number;
-  /** Not ready until live prices land — cost-effective needs them, same gate `pricesReady` uses elsewhere on this plan. */
+  /**
+   * Not ready to apply: the single-plan caller gates this on live prices
+   * having landed (cost-effective needs them, same as `pricesReady`
+   * elsewhere on that plan); the Build Group caller instead gates it on a
+   * previous Apply's own market fetch still being in flight.
+   */
   disabled?: boolean;
-  onApply: (options: { strategy: SweepStrategy; depth: number }) => void;
+  /** Pre-fills Sweep Strategy (issue #696's Build Group default); defaults to `'cost-effective'` when absent. */
+  initialStrategy?: SweepStrategy;
+  /** Pre-fills Sweep Depth (issue #696's Build Group default); defaults to `'all'` when absent. */
+  initialDepthChoice?: DepthChoice;
+  /** Overrides the generic single-plan confirm copy — Build Group names the affected plan count instead. */
+  confirmMessage?: string;
+  onApply: (options: { strategy: SweepStrategy; depth: number; depthChoice: DepthChoice }) => void;
 }
 
 const SWEEP_STRATEGIES: readonly SweepStrategy[] = ['cost-effective', 'build', 'buy'];
 
 /** 'all' is a sentinel distinct from any numeric depth — resolved to `maxDepth` on apply. */
-type DepthChoice = 'all' | number;
+export type DepthChoice = 'all' | number;
 
 /**
  * Craft Sweep (issue #695): a one-shot bulk build/buy control for a single
@@ -38,10 +49,26 @@ type DepthChoice = 'all' | number;
  * Manufacturing is functional this round (docs/context/decisions), Reactions
  * and Planetary are reserved slots for later tickets rather than hidden.
  */
-export function CraftSweepControl({ maxDepth, disabled, onApply }: CraftSweepControlProps) {
+export function CraftSweepControl({
+  maxDepth,
+  disabled,
+  initialStrategy,
+  initialDepthChoice,
+  confirmMessage,
+  onApply,
+}: CraftSweepControlProps) {
   const { t } = useTranslation();
-  const [strategy, setStrategy] = useState<SweepStrategy>('cost-effective');
-  const [depthChoice, setDepthChoice] = useState<DepthChoice>('all');
+  const [strategy, setStrategy] = useState<SweepStrategy>(initialStrategy ?? 'cost-effective');
+  // A restored numeric choice can outlive the tree it was measured against
+  // (the group's members changed since it was stored) and fall outside this
+  // mount's own `maxDepth` range, where no `<SelectItem>` would match it —
+  // falling back to 'all' is always in range, whatever `maxDepth` turns out
+  // to be, the same reason `BuildGroupCraftSweepDefault.depthChoice` prefers
+  // storing 'all' over a resolved number in the first place.
+  const [depthChoice, setDepthChoice] = useState<DepthChoice>(() => {
+    if (initialDepthChoice === undefined || initialDepthChoice === 'all') return 'all';
+    return initialDepthChoice <= maxDepth ? initialDepthChoice : 'all';
+  });
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   const depthOptions = Array.from({ length: maxDepth }, (_, i) => i + 1);
@@ -136,7 +163,7 @@ export function CraftSweepControl({ maxDepth, disabled, onApply }: CraftSweepCon
         onClose={() => setConfirmOpen(false)}
         title={t('industry.craftSweepLabel')}
       >
-        <p className="text-xs text-text-dim">{t('industry.craftSweepConfirm')}</p>
+        <p className="text-xs text-text-dim">{confirmMessage ?? t('industry.craftSweepConfirm')}</p>
         <div className="mt-3 flex justify-end gap-2">
           <Button size="sm" onClick={() => setConfirmOpen(false)}>
             {t('industry.cancel')}
@@ -146,7 +173,7 @@ export function CraftSweepControl({ maxDepth, disabled, onApply }: CraftSweepCon
             variant="danger"
             onClick={() => {
               setConfirmOpen(false);
-              onApply({ strategy, depth: resolvedDepth });
+              onApply({ strategy, depth: resolvedDepth, depthChoice });
             }}
           >
             {t('industry.craftSweepApply')}

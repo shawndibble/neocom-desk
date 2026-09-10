@@ -6,8 +6,10 @@ import {
   removeBuildGroup,
   renameBuildGroup,
   withBuildGroups,
+  withGroupCraftSweepDefault,
   withGroupSnapshot,
   type BuildGroup,
+  type BuildGroupCraftSweepDefault,
   type BuildGroupSnapshot,
   type BuildGroupsValue,
 } from './buildGroups';
@@ -20,6 +22,14 @@ const snapshot = (overrides: Partial<BuildGroupSnapshot> = {}): BuildGroupSnapsh
   facility: 'npcStation',
   security: 'highsec',
   appliedAt: 1000,
+  ...overrides,
+});
+
+const craftSweepDefault = (
+  overrides: Partial<BuildGroupCraftSweepDefault> = {}
+): BuildGroupCraftSweepDefault => ({
+  strategy: 'cost-effective',
+  depthChoice: 'all',
   ...overrides,
 });
 
@@ -171,6 +181,81 @@ describe('withGroupSnapshot', () => {
   it('is a no-op for a group id that does not exist', () => {
     const value = withBuildGroups({}, 1, groups('G'));
     expect(withGroupSnapshot(value, 1, 'missing', snapshot())).toBe(value);
+  });
+});
+
+describe('withGroupCraftSweepDefault', () => {
+  it('sets a Craft Sweep default on one group, leaving the rest of the group untouched', () => {
+    const value = withBuildGroups({}, 1, groups('Sweep me', 'Other'));
+    const next = withGroupCraftSweepDefault(value, 1, 'g1', craftSweepDefault());
+    expect(buildGroupsFor(next, 1)).toEqual([
+      { id: 'g1', name: 'Sweep me', order: 0, craftSweepDefault: craftSweepDefault() },
+      { id: 'g2', name: 'Other', order: 1 },
+    ]);
+  });
+
+  it('replaces an existing default rather than merging it', () => {
+    const value = withGroupCraftSweepDefault(
+      withBuildGroups({}, 1, groups('G')),
+      1,
+      'g1',
+      craftSweepDefault()
+    );
+    const next = withGroupCraftSweepDefault(
+      value,
+      1,
+      'g1',
+      craftSweepDefault({ strategy: 'build', depthChoice: 3 })
+    );
+    expect(buildGroupsFor(next, 1)[0].craftSweepDefault).toEqual(
+      craftSweepDefault({ strategy: 'build', depthChoice: 3 })
+    );
+  });
+
+  it('is a no-op for a group id that does not exist', () => {
+    const value = withBuildGroups({}, 1, groups('G'));
+    expect(withGroupCraftSweepDefault(value, 1, 'missing', craftSweepDefault())).toBe(value);
+  });
+});
+
+describe('parseBuildGroups — craftSweepDefault', () => {
+  it('keeps a group whose Craft Sweep default is well-formed, numeric depth included', () => {
+    const raw = {
+      1: [
+        { id: 'g1', name: 'G', order: 0, craftSweepDefault: craftSweepDefault({ depthChoice: 5 }) },
+      ],
+    };
+    expect(parseBuildGroups(raw)).toEqual({
+      1: [
+        { id: 'g1', name: 'G', order: 0, craftSweepDefault: craftSweepDefault({ depthChoice: 5 }) },
+      ],
+    });
+  });
+
+  it('drops a group whose Craft Sweep default is malformed, rather than keeping the group without it', () => {
+    const raw = {
+      1: [{ id: 'g1', name: 'G', order: 0, craftSweepDefault: { strategy: 'not-a-strategy' } }],
+    };
+    expect(parseBuildGroups(raw)).toEqual({});
+  });
+
+  it('drops a Craft Sweep default whose depthChoice is neither "all" nor a positive number', () => {
+    const raw = {
+      1: [
+        {
+          id: 'g1',
+          name: 'G',
+          order: 0,
+          craftSweepDefault: craftSweepDefault({ depthChoice: 0 }),
+        },
+      ],
+    };
+    expect(parseBuildGroups(raw)).toEqual({});
+  });
+
+  it('keeps a group with no Craft Sweep default at all — the pre-#696 shape', () => {
+    const raw = { 1: [{ id: 'g1', name: 'G', order: 0 }] };
+    expect(parseBuildGroups(raw)).toEqual({ 1: [{ id: 'g1', name: 'G', order: 0 }] });
   });
 });
 

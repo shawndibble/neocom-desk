@@ -17,6 +17,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, EmptyState, Panel, Spinner } from '@/components/ui';
 import type { BuildPlanRecord } from '@/db';
+import type { SweepStrategy } from '@/engine/industry/autoMakeOrBuy';
 import { rollUpBuildGroup, type BuildGroupMember } from '@/engine/industry/groupRollup';
 import type { BuildResult, MaterialCostLine, SkillLevels } from '@/engine/industry/types';
 import type { CharacterBlueprint } from '@/esi/endpoints';
@@ -25,9 +26,13 @@ import { formatDuration } from '@/lib/duration';
 import { formatIsk } from '@/lib/isk';
 import { getTradeHub } from '@/market/hubs';
 import type { PiData } from '@/sde/types';
+import { useAssumedMe } from './assumedMe';
 import { nameForType, toIndustryBlueprint, type BlueprintCatalog } from './blueprintCatalog';
 import type { BuildGroup } from './buildGroups';
+import { CraftSweepControl, type DepthChoice } from './CraftSweepControl';
+import { groupCraftSweepMaxDepth } from './craftSweepGroup';
 import type { OwnedStockSnapshot } from './ownedStockDetection';
+import { recipeForLookup } from './recipes';
 import { hasShoppingList, shoppingListText } from './shoppingList';
 import { materialTableRows, shoppingListMaterials } from './subBuildPlan';
 import { useComparedBuildResults } from './useComparedBuildResults';
@@ -91,6 +96,17 @@ interface BuildGroupPanelProps {
   onOpenPlan: (planId: string) => void;
   /** "Retarget group" (issue #632): bulk-writes `target` onto every plan in `planIds`. */
   onRetarget: (target: RetargetTarget, planIds: string[]) => void;
+  /**
+   * Craft Sweep on the group (issue #696): applies one Sweep Strategy +
+   * Sweep Depth to every member independently. Returns a Promise so this
+   * panel can disable the control for the duration, the same way a
+   * synchronous single-plan Apply never needs to.
+   */
+  onCraftSweep: (options: {
+    strategy: SweepStrategy;
+    depth: number;
+    depthChoice: DepthChoice;
+  }) => Promise<void>;
 }
 
 export function BuildGroupPanel({
@@ -103,6 +119,7 @@ export function BuildGroupPanel({
   ownedStockSnapshot,
   onOpenPlan,
   onRetarget,
+  onCraftSweep,
 }: BuildGroupPanelProps) {
   const { t } = useTranslation();
   // Which list the outcome belongs to, not a bare flag: a mixed-hub group
@@ -110,7 +127,39 @@ export function BuildGroupPanel({
   // copied the moment Jita was. `GROUP_COPY` is the whole-group control's key.
   const [copyState, setCopyState] = useState<{ key: string; status: CopyStatus } | null>(null);
   const [retargeting, setRetargeting] = useState(false);
+  const [sweeping, setSweeping] = useState(false);
   const rows = useComparedBuildResults({ plans, catalog, pi, ownedBlueprints, skills });
+
+  // Same setting `useComparedBuildResults` reads for these members' own
+  // pricing — sub-builds unowned anywhere in the group must assume the same
+  // ME that hook already quotes them at.
+  const assumedMe = useAssumedMe((state) => state.value);
+  const recipeFor = useMemo(
+    () => recipeForLookup({ catalog, pi, ownedBlueprints, assumedMeForUnowned: assumedMe }),
+    [catalog, pi, ownedBlueprints, assumedMe]
+  );
+
+  // Sweep Depth is structural — which typeIDs have a recipe — and never
+  // moves with a member's runs/ME/hub/sourcing edit, so this keys on the
+  // blueprints actually in play rather than on `plans` itself: `plans` gets
+  // a fresh array identity from `useLiveQuery` on every keystroke in any
+  // member, and `groupCraftSweepMaxDepth` walks every member's full tree —
+  // exactly the O(members) tree-walk cost `flattenedByResult` above exists
+  // to avoid for the rollup's own flattening.
+  const craftSweepBlueprintSignature = plans.map((p) => `${p.blueprintTypeID}`).join(',');
+  const craftSweepMaxDepth = useMemo(
+    () => groupCraftSweepMaxDepth(plans, catalog, recipeFor, skills),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- craftSweepBlueprintSignature is the stable proxy for `plans`' structural identity; see comment above.
+    [craftSweepBlueprintSignature, catalog, recipeFor, skills]
+  );
+  // What Apply will actually touch: `applyGroupCraftSweep` silently skips a
+  // member whose blueprint no longer resolves in the catalog (the same
+  // "skip, don't zero" policy the rollup itself applies to an unresolvable
+  // member), so the confirmation must count survivors, not every plan in the
+  // group, or it would overstate its own blast radius.
+  const craftSweepAffectedCount = plans.filter((p) =>
+    catalog.byBlueprintTypeID.has(p.blueprintTypeID)
+  ).length;
 
   const members: BuildGroupMember[] = useMemo(() => {
     const byId = new Map(plans.map((p) => [p.id, p]));
@@ -254,6 +303,22 @@ export function BuildGroupPanel({
             <Spinner label={t('common.loading')} />
           </div>
         )}
+
+        <div className="mb-3">
+          <CraftSweepControl
+            maxDepth={craftSweepMaxDepth}
+            disabled={sweeping}
+            initialStrategy={group.craftSweepDefault?.strategy}
+            initialDepthChoice={group.craftSweepDefault?.depthChoice}
+            confirmMessage={t('industry.craftSweepConfirmGroup', {
+              count: craftSweepAffectedCount,
+            })}
+            onApply={(options) => {
+              setSweeping(true);
+              void onCraftSweep(options).finally(() => setSweeping(false));
+            }}
+          />
+        </div>
 
         <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs sm:grid-cols-4">
           <div>

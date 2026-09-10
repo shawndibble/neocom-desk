@@ -217,6 +217,7 @@ function Harness({ plan: planOverrides, catalog = CATALOG, onUpdate, onDerivedFi
         quickbarAvailable
         onShowInfo={vi.fn()}
         groupSnapshot={null}
+        groupName={null}
       />
     </MemoryRouter>
   );

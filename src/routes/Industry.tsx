@@ -19,6 +19,8 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 import { beginEveLogin } from '@/app/loginFlow';
 import { useIsDesktop } from '@/lib/useIsDesktop';
 import type { MaterialSourcing, SkillLevels } from '@/engine/industry/types';
+import type { SweepStrategy } from '@/engine/industry/autoMakeOrBuy';
+import type { DepthChoice } from '@/features/industry/CraftSweepControl';
 import type { CharacterBlueprint } from '@/esi/endpoints';
 import { loadPi } from '@/sde/loadSde';
 import type { PiData } from '@/sde/types';
@@ -67,12 +69,14 @@ import {
   removeBuildGroup,
   renameBuildGroup,
   useBuildGroups,
+  withGroupCraftSweepDefault,
   withGroupSnapshot,
   type BuildGroupSnapshot,
 } from '@/features/industry/buildGroups';
 import { retargetPatch } from '@/features/industry/retargetPatch';
 import { useExpandedGroups, withGroupExpanded } from '@/features/industry/expandedGroups';
 import { BuildGroupPanel } from '@/features/industry/BuildGroupPanel';
+import { applyGroupCraftSweep } from '@/features/industry/craftSweepGroup';
 import { FitImportDialog } from '@/features/industry/FitImportDialog';
 import { applyFitImport, fitImportGroupName } from '@/features/industry/fitImport';
 import { useAssumedMe } from '@/features/industry/assumedMe';
@@ -498,6 +502,17 @@ export function Industry() {
     if (groupId === undefined) return null;
     return groups.find((g) => g.id === groupId)?.snapshot ?? null;
   }, [selectedPlan, groups]);
+  /**
+   * The open plan's own group name, or null when ungrouped (issue #696) — a
+   * separate question from `selectedPlanGroupSnapshot`, which is also null
+   * for a grouped-but-never-Retargeted plan and so cannot tell the two
+   * apart.
+   */
+  const selectedPlanGroupName = useMemo(() => {
+    const groupId = selectedPlan?.buildGroupId;
+    if (groupId === undefined) return null;
+    return groups.find((g) => g.id === groupId)?.name ?? null;
+  }, [selectedPlan, groups]);
 
   // Narrow screens show one column at a time (CONTEXT.md round 25); matches
   // the grid's own `lg:` breakpoint so the JS-driven visibility and the CSS
@@ -751,6 +766,51 @@ export function Industry() {
     await setBuildGroups(withGroupSnapshot(buildGroups, activeCharacterId, groupId, snapshot));
   }
 
+  /**
+   * Craft Sweep on a Build Group (issue #696): the same one-shot bulk
+   * build/buy control from #695, run once per member — each member's own
+   * tree walked independently and only its own `buildHere` patched, never a
+   * shared tree. The persisted default is written first, from the choice
+   * the pilot just confirmed, rather than after the market fetch below: that
+   * fetch can take real wall-clock time, and spanning it with the
+   * `buildGroups` closure would risk overwriting a concurrent edit to the
+   * group with a stale read.
+   */
+  async function handleCraftSweepGroup(
+    groupId: string,
+    groupPlans: readonly BuildPlanRecord[],
+    options: { strategy: SweepStrategy; depth: number; depthChoice: DepthChoice }
+  ) {
+    if (activeCharacterId === null || !catalog) return;
+    await setBuildGroups(
+      withGroupCraftSweepDefault(buildGroups, activeCharacterId, groupId, {
+        strategy: options.strategy,
+        depthChoice: options.depthChoice,
+      })
+    );
+    const picks = await applyGroupCraftSweep(
+      groupPlans,
+      catalog,
+      pi,
+      ownedBlueprints,
+      skills,
+      assumedMe,
+      options
+    );
+    if (picks.size === 0) return;
+    await db.transaction('rw', db.buildPlans, async () => {
+      const stored = await db.buildPlans.bulkGet([...picks.keys()]);
+      const now = Date.now();
+      const updated = stored.flatMap((p) => {
+        if (!p) return [];
+        const picked = picks.get(p.id);
+        return picked ? [{ ...p, buildHere: [...picked], updatedAt: now }] : [];
+      });
+      await db.buildPlans.bulkPut(updated);
+    });
+    scheduleSync(activeCharacterId);
+  }
+
   /** Creates a group and one plan per buildable item in a pasted fit, then opens it. */
   async function handleFitImport(preview: FitToBuildPlansResult) {
     if (activeCharacterId === null || !catalog) return;
@@ -955,6 +1015,9 @@ export function Industry() {
                       onRetarget={(target, planIds) =>
                         void handleRetargetGroup(selectedGroup.id, target, planIds)
                       }
+                      onCraftSweep={(options) =>
+                        handleCraftSweepGroup(selectedGroup.id, selectedGroupPlans, options)
+                      }
                     />
                   ) : comparing ? (
                     comparePlans.length >= 2 ? (
@@ -994,6 +1057,7 @@ export function Industry() {
                       quickbarAvailable={quickbar.available}
                       onShowInfo={(typeId, itemName) => setInfoModalItem({ typeId, itemName })}
                       groupSnapshot={selectedPlanGroupSnapshot}
+                      groupName={selectedPlanGroupName}
                     />
                   ) : plans.length > 0 ? (
                     <div className="flex justify-center py-8">

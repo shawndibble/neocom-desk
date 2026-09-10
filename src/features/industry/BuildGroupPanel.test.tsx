@@ -5,15 +5,17 @@
  * copied — a single shared `copied` flag would say "copied" on all of them.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import type { BuildPlanRecord } from '@/db';
+import type { SweepStrategy } from '@/engine/industry/autoMakeOrBuy';
 import type { BuildResult, MaterialCostLine } from '@/engine/industry/types';
 import { configureClipboard } from '@/lib/clipboard';
 import { BuildGroupPanel } from './BuildGroupPanel';
-import type { BlueprintCatalog } from './blueprintCatalog';
+import type { BlueprintCatalog, BlueprintCatalogEntry } from './blueprintCatalog';
 import type { BuildGroup } from './buildGroups';
+import type { DepthChoice } from './CraftSweepControl';
 import type { OwnedStockSnapshot } from './ownedStockDetection';
 import { useComparedBuildResults, type ComparedBuildRow } from './useComparedBuildResults';
 
@@ -43,6 +45,50 @@ const SNAPSHOT: OwnedStockSnapshot = {
 };
 
 const GROUP: BuildGroup = { id: 'g1', name: 'Rifter fit' } as BuildGroup;
+
+// A two-level chain so Sweep Depth has something to size to: every fixture
+// plan's `blueprintTypeID` is 1 (see `plan()` below), producing 100 from
+// material 2, and 2 is itself producible from 3 — depth 1.
+const PRODUCT_ENTRY: BlueprintCatalogEntry = {
+  blueprintTypeID: 1,
+  blueprint: {
+    name: 'Product',
+    time: 1,
+    materials: [{ typeID: 2, quantity: 1 }],
+    products: [{ typeID: 100, quantity: 1 }],
+    skills: [],
+    activity: 'manufacturing',
+  },
+  productTypeID: 100,
+  productName: 'Product',
+  productNameLower: 'product',
+};
+const SUB_ENTRY: BlueprintCatalogEntry = {
+  blueprintTypeID: 2,
+  blueprint: {
+    name: 'Sub',
+    time: 1,
+    materials: [],
+    products: [{ typeID: 2, quantity: 1 }],
+    skills: [],
+    activity: 'manufacturing',
+  },
+  productTypeID: 2,
+  productName: 'Sub',
+  productNameLower: 'sub',
+};
+const CHAIN_CATALOG: BlueprintCatalog = {
+  entries: [PRODUCT_ENTRY, SUB_ENTRY],
+  byBlueprintTypeID: new Map([
+    [1, PRODUCT_ENTRY],
+    [2, SUB_ENTRY],
+  ]),
+  byProductTypeID: new Map([
+    [100, PRODUCT_ENTRY],
+    [2, SUB_ENTRY],
+  ]),
+  typesById: {},
+};
 
 function plan(id: string, hubId: string): BuildPlanRecord {
   return {
@@ -111,16 +157,28 @@ function renderMixedGroup() {
   return written;
 }
 
-function renderPanel(plans: BuildPlanRecord[]) {
+function renderPanel(
+  plans: BuildPlanRecord[],
+  overrides: {
+    group?: BuildGroup;
+    catalog?: BlueprintCatalog;
+    onCraftSweep?: (options: {
+      strategy: SweepStrategy;
+      depth: number;
+      depthChoice: DepthChoice;
+    }) => Promise<void>;
+  } = {}
+) {
   render(
     <BuildGroupPanel
-      group={GROUP}
+      group={overrides.group ?? GROUP}
       plans={plans}
-      catalog={CATALOG}
+      catalog={overrides.catalog ?? CATALOG}
       pi={null}
       ownedBlueprints={[]}
       skills={{} as never}
       ownedStockSnapshot={SNAPSHOT}
+      onCraftSweep={overrides.onCraftSweep ?? (() => Promise.resolve())}
       onOpenPlan={() => {}}
       onRetarget={() => {}}
     />
@@ -215,5 +273,58 @@ describe('BuildGroupPanel — mixed-hub multibuy', () => {
     expect(
       (screen.getByRole('button', { name: 'Copy Jita list' }) as HTMLButtonElement).disabled
     ).toBe(false);
+  });
+});
+
+describe('BuildGroupPanel — Craft Sweep (issue #696)', () => {
+  it("pre-fills Sweep Strategy from the group's persisted default", () => {
+    mockedUseComparedBuildResults.mockReturnValue([row('a', [material(34, 100)])]);
+    renderPanel([plan('a', 'jita')], {
+      catalog: CHAIN_CATALOG,
+      group: { ...GROUP, craftSweepDefault: { strategy: 'build', depthChoice: 'all' } },
+    });
+
+    expect(screen.getByRole('combobox', { name: 'Sweep Strategy' }).textContent).toBe('Build');
+  });
+
+  it('names how many plans it will affect, and applies with the chosen options', async () => {
+    const user = userEvent.setup();
+    mockedUseComparedBuildResults.mockReturnValue([row('a', [material(34, 100)])]);
+    const onCraftSweep = vi.fn().mockResolvedValue(undefined);
+    renderPanel([plan('a', 'jita')], { catalog: CHAIN_CATALOG, onCraftSweep });
+
+    await user.click(screen.getByRole('button', { name: 'Apply Craft Sweep' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(
+      within(dialog).getByText(
+        'This will overwrite manufacturing choices on 1 plan in this group — continue?'
+      )
+    ).toBeTruthy();
+    await user.click(within(dialog).getByRole('button', { name: 'Apply Craft Sweep' }));
+
+    expect(onCraftSweep).toHaveBeenCalledWith({
+      strategy: 'cost-effective',
+      depth: 1,
+      depthChoice: 'all',
+    });
+  });
+
+  it('counts only members whose blueprint still resolves in the catalog, not every plan in the group', async () => {
+    const user = userEvent.setup();
+    mockedUseComparedBuildResults.mockReturnValue([
+      row('a', [material(34, 100)]),
+      row('orphan', [material(35, 10)]),
+    ]);
+    renderPanel([plan('a', 'jita'), { ...plan('orphan', 'jita'), blueprintTypeID: 999 }], {
+      catalog: CHAIN_CATALOG,
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Apply Craft Sweep' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(
+      within(dialog).getByText(
+        'This will overwrite manufacturing choices on 1 plan in this group — continue?'
+      )
+    ).toBeTruthy();
   });
 });
