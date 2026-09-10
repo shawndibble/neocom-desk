@@ -24,7 +24,7 @@ import {
   suggestedOwnedQuantity,
   type OwnedStockScope,
 } from '@/engine/industry/ownedStock';
-import type { BuildResult, MaterialCostLine, SkillLevels } from '@/engine/industry/types';
+import type { MaterialCostLine, SkillLevels } from '@/engine/industry/types';
 import type { CharacterBlueprint } from '@/esi/endpoints';
 import { writeToClipboard } from '@/lib/clipboard';
 import { formatDuration } from '@/lib/duration';
@@ -42,42 +42,11 @@ import { OwnedStockScopeControl } from './OwnedStockScopeControl';
 import { stockLocationLabel, type OwnedStockSnapshot } from './ownedStockDetection';
 import type { OwnedStockDetection } from './ownedStockDetection';
 import { recipeForLookup } from './recipes';
+import { flattenBuildResult } from './resultFlattenCache';
 import { hasShoppingList, shoppingListText } from './shoppingList';
-import { materialTableRows, shoppingListMaterials } from './subBuildPlan';
 import { useComparedBuildResults } from './useComparedBuildResults';
 import { useDetectedOwnedStock } from './useDetectedOwnedStock';
 import { RetargetGroupDialog, type RetargetTarget } from './RetargetGroupDialog';
-
-/**
- * Each member's resolved tree, flattened the two ways the rollup needs.
- *
- * `useComparedBuildResults` settles each member into `rows` on its own, so
- * `rows` gets a fresh identity per settle — and without this every
- * already-settled member was re-flattened on each one. A 25-member fit did
- * ~650 material-tree walks to do 25 members' work. Members sharing a hub now
- * share one fetch and so tend to settle together, which shortens that run but
- * does not remove it: a mixed-hub group still settles hub by hub.
- *
- * Module-level and keyed on the `BuildResult` itself: a result is replaced
- * wholesale when its plan is repriced, so a cache entry is valid exactly as
- * long as the object it hangs off, and dies with it. Deliberately not
- * `useRef(new WeakMap())`, which allocates a map per render to throw away.
- */
-const flattenedByResult = new WeakMap<
-  BuildResult,
-  { shopping: MaterialCostLine[]; table: MaterialCostLine[] }
->();
-
-function flattenOnce(result: BuildResult) {
-  const cached = flattenedByResult.get(result);
-  if (cached) return cached;
-  const flattened = {
-    shopping: shoppingListMaterials(result.materials),
-    table: materialTableRows(result.materials),
-  };
-  flattenedByResult.set(result, flattened);
-  return flattened;
-}
 
 /** The whole-group copy control's key in `copyState`; no hub can collide with it. */
 const GROUP_COPY = 'group';
@@ -174,8 +143,8 @@ export function BuildGroupPanel({
   // blueprints actually in play rather than on `plans` itself: `plans` gets
   // a fresh array identity from `useLiveQuery` on every keystroke in any
   // member, and `groupCraftSweepMaxDepth` walks every member's full tree —
-  // exactly the O(members) tree-walk cost `flattenedByResult` above exists
-  // to avoid for the rollup's own flattening.
+  // exactly the O(members) tree-walk cost `resultFlattenCache` exists to
+  // avoid for the rollup's own flattening.
   const craftSweepBlueprintSignature = plans.map((p) => `${p.blueprintTypeID}`).join(',');
   const craftSweepMaxDepth = useMemo(
     () => groupCraftSweepMaxDepth(plans, catalog, recipeFor, skills),
@@ -203,7 +172,7 @@ export function BuildGroupPanel({
       // is what that member's own page shows, still netted against its own
       // `materialSourcing`, and stays untouched in the member list below.
       if (!plan || !row.groupResult) return [];
-      const flattened = flattenOnce(row.groupResult);
+      const flattened = flattenBuildResult(row.groupResult);
       return [
         {
           planId: row.planId,
