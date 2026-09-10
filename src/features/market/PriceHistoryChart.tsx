@@ -18,6 +18,7 @@ import {
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { DataTable, type DataTableColumn } from '@/components/ui';
+import { GROUPED_NUMBER_Y_AXIS_MARGIN_LEFT, GROUPED_NUMBER_Y_AXIS_WIDTH } from '@/lib/chartAxis';
 import { formatIsk } from '@/lib/isk';
 import { formatVolume } from './format';
 import type { MarketHistoryPoint, MovingAveragePoint } from '@/engine/market/priceHistory';
@@ -108,7 +109,10 @@ export default function PriceHistoryChart({
         className="h-72 w-full"
       >
         <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+          <ComposedChart
+            data={chartData}
+            margin={{ top: 8, right: 8, left: GROUPED_NUMBER_Y_AXIS_MARGIN_LEFT, bottom: 0 }}
+          >
             <CartesianGrid stroke="var(--color-line)" strokeDasharray="3 3" />
             <XAxis
               dataKey="dateLabel"
@@ -119,15 +123,18 @@ export default function PriceHistoryChart({
               yAxisId="price"
               stroke="var(--color-accent)"
               tick={{ fontSize: 11, fill: 'var(--color-text-dim)' }}
-              width={70}
+              width={GROUPED_NUMBER_Y_AXIS_WIDTH}
               tickFormatter={(value: number) => formatIsk(value, 0)}
             />
+            {/* formatVolume shares formatIsk's comma-grouped-integer shape, so the
+                same gutter width applies; margin.right was already 8 (unlike the
+                margin.left: 0 that #764 had to fix), so only width needs widening here. */}
             <YAxis
               yAxisId="volume"
               orientation="right"
               stroke="var(--color-text-dim)"
               tick={{ fontSize: 11, fill: 'var(--color-text-dim)' }}
-              width={60}
+              width={GROUPED_NUMBER_Y_AXIS_WIDTH}
               tickFormatter={(value: number) => formatVolume(value)}
             />
             <Tooltip content={(props) => <HistoryTooltip {...props} />} />

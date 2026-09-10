@@ -18,6 +18,7 @@ import {
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { DataTable, type DataTableColumn } from '@/components/ui';
+import { GROUPED_NUMBER_Y_AXIS_MARGIN_LEFT, GROUPED_NUMBER_Y_AXIS_WIDTH } from '@/lib/chartAxis';
 import { formatIsk } from '@/lib/isk';
 import { formatDateOnly, formatTimestamp } from '@/lib/timestamp';
 import type { WalletBalancePoint, WalletBalanceTrend } from '@/engine/wallet/balanceHistory';
@@ -82,7 +83,10 @@ export default function WalletBalanceChart({ points, trend, timeZone }: WalletBa
     <div>
       <div role="img" aria-label={t('wallet.balanceHistoryChartLabel')} className="h-64 w-full">
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={chartData} margin={{ top: 8, right: 8, left: 8, bottom: 0 }}>
+          <LineChart
+            data={chartData}
+            margin={{ top: 8, right: 8, left: GROUPED_NUMBER_Y_AXIS_MARGIN_LEFT, bottom: 0 }}
+          >
             <CartesianGrid stroke="var(--color-line)" strokeDasharray="3 3" />
             <XAxis
               dataKey="dateLabel"
@@ -92,7 +96,7 @@ export default function WalletBalanceChart({ points, trend, timeZone }: WalletBa
             <YAxis
               stroke="var(--color-text-dim)"
               tick={{ fontSize: 11, fill: 'var(--color-text-dim)' }}
-              width={95}
+              width={GROUPED_NUMBER_Y_AXIS_WIDTH}
               tickFormatter={(value: number) => formatIsk(value, 0)}
             />
             <Tooltip content={(props) => <BalanceTooltip {...props} />} />
