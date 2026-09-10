@@ -225,7 +225,7 @@ export function QuickbarList({
   }
 
   return (
-    <div className="mt-3 border-t border-line pt-2">
+    <div className="mt-3 border-t border-line pt-2" data-testid="quickbar">
       <div className="flex items-center justify-between pb-1">
         <h2 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
           {t('market.quickbar.title')}
