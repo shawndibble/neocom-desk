@@ -8,8 +8,8 @@
  * Laboratory Operation 24624, Mass Reactions 45748, Advanced Mass Reactions
  * 45749.
  */
-import type { CharacterSkill } from '@/esi/endpoints';
-import type { JobSlotSkills } from '@/engine/industry/jobSlots';
+import type { CharacterSkill, IndustryJob } from '@/esi/endpoints';
+import type { JobSlotJob, JobSlotSkills } from '@/engine/industry/jobSlots';
 
 const SKILL_ID = {
   massProduction: 3387,
@@ -42,4 +42,17 @@ export function jobSlotSkillsFromCharacterSkills(skills: readonly CharacterSkill
     massReactions: levelOf(SKILL_ID.massReactions),
     advancedMassReactions: levelOf(SKILL_ID.advancedMassReactions),
   };
+}
+
+/**
+ * `IndustryJob[]` (or the `ActiveJob` subset sharing these two fields) ->
+ * `engine/industry/jobSlots.ts`'s named shape — the other half of this
+ * file's ESI/engine boundary adaptation, shared by every caller that reads
+ * running jobs for slot-count purposes (`rosterAttention.ts`,
+ * `ActiveJobsPanel.tsx`) rather than each re-deriving the same mapping.
+ */
+export function toJobSlotJobs(
+  jobs: readonly Pick<IndustryJob, 'activity_id' | 'end_date'>[]
+): JobSlotJob[] {
+  return jobs.map((job) => ({ activityId: job.activity_id, endMs: Date.parse(job.end_date) }));
 }

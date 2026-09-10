@@ -711,6 +711,8 @@
     },
     "jobsSummary": "{{running}} running · {{done}} done",
     "jobsNextFinish": "{{name}} finishes in {{time}}",
+    "jobSlotBreakdown": "{{category}} {{open}}/{{max}}",
+    "jobSlotBreakdownUnknown": "{{category}} —",
     "jobsShowList": "Show job list",
     "jobsHideList": "Hide job list",
     "setup": "Setup",

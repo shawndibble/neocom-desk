@@ -80,6 +80,10 @@ function rolesUrl(characterId: number) {
 function corpJobsUrl() {
   return `${ESI_BASE_URL}/corporations/${CORP_ID}/industry/jobs`;
 }
+/** Any character's `/skills` — the job-slot header (#679) reads this for every render, unrelated to the My Jobs/Corp Jobs switch this file tests. */
+function skillsUrl(characterId: number | string = ':characterId') {
+  return `${ESI_BASE_URL}/characters/${characterId}/skills`;
+}
 
 /** The job list is folded by default (verdict-first header) — table rows only render once opened. */
 async function expandJobs(user: { click: (el: Element) => Promise<void> } = userEvent) {
@@ -115,6 +119,7 @@ beforeEach(async () => {
   await db.settings.clear();
   useActiveCharacter.setState({ activeCharacterId: CHAR_ID, hydrated: true });
   server.use(http.get(personalJobsUrl(CHAR_ID), () => HttpResponse.json([PERSONAL_JOB])));
+  server.use(http.get(skillsUrl(), () => HttpResponse.json({ skills: [], total_sp: 0 })));
 });
 afterEach(() => {
   server.resetHandlers();
@@ -336,6 +341,52 @@ describe('ActiveJobsPanel: the corp side (AC 2, AC 3)', () => {
     expect(container.querySelector('header time')?.getAttribute('dateTime')).toBe(
       new Date(corpFetchedAt).toISOString()
     );
+  });
+
+  it('keeps the job-slot header at personal capacity, unaffected by the My Jobs/Corp Jobs toggle (issue #679)', async () => {
+    // Mass Production III -> 1+3=4 max, 1 running (PERSONAL_JOB) -> 3 open.
+    server.use(
+      http.get(skillsUrl(CHAR_ID), () =>
+        HttpResponse.json({
+          skills: [
+            {
+              skill_id: 3387,
+              trained_skill_level: 3,
+              active_skill_level: 3,
+              skillpoints_in_skill: 1,
+            },
+          ],
+          total_sp: 1,
+        })
+      ),
+      http.get(corpJobsUrl(), () => HttpResponse.json([CORP_JOB]))
+    );
+    await seedCorpCapableCharacter();
+    const user = userEvent.setup();
+
+    const { container } = render(
+      <MemoryRouter>
+        <ActiveJobsPanel
+          characterId={CHAR_ID}
+          onAddToQuickbar={() => {}}
+          quickbarAvailable={true}
+          onShowInfo={() => {}}
+        />
+      </MemoryRouter>
+    );
+
+    await screen.findByText('Widget Alpha');
+    await waitFor(() => {
+      expect(container.querySelector('.cursor-help')!.textContent).toBe('3/1/1');
+    });
+
+    await user.click(await screen.findByRole('button', { name: 'Corp jobs' }));
+    await screen.findByText('Widget Beta');
+
+    // CORP_JOB (4 runs of manufacturing) is in the list now, but the
+    // header's manufacturing count must stay exactly what it was: personal
+    // capacity, never the corp list's jobs.
+    expect(container.querySelector('.cursor-help')!.textContent).toBe('3/1/1');
   });
 
   it('says "None" and keeps the owner switch, so an empty corp side is not a dead end', async () => {
