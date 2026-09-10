@@ -734,7 +734,6 @@ export function ActiveJobsPanel({
       meta={jobsMeta}
       actions={
         <span className="flex items-center gap-2">
-          {jobSlotSummaryElement}
           {collapsible && !expanded && (
             // One bar per job, desktop only: the fold's whole point is a
             // glance, and at phone width the names would not fit beside them.
@@ -767,6 +766,15 @@ export function ActiveJobsPanel({
             </span>
           )}
           {dataAgeDate && <DataAgeBadge date={dataAgeDate} />}
+          {/* Grouped with `DataAgeBadge`, not appended after the caret: both
+              are passive, hover-only readouts (nothing to click), while
+              Export/Refresh/the caret are actions — interleaving the two
+              kinds breaks the toolbar's scan order, and the caret in
+              particular earns the literal last slot as this panel's primary
+              affordance. Landing in `actions` at all (rather than `meta`,
+              beside "N running · N done") is what answers the original ask:
+              it no longer reads as a description of what's currently running. */}
+          {jobSlotSummaryElement}
           <IconButton
             size="sm"
             icon={<Icon.Download />}
