@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useFacilityDefaults } from '@/features/industry/facilityDefaults';
 import { Navigate, useSearchParams } from 'react-router-dom';
+import { usePlanSelection } from '@/features/industry/usePlanSelection';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type BuildPlanRecord } from '@/db';
@@ -26,7 +27,6 @@ import { loadPi } from '@/sde/loadSde';
 import type { PiData } from '@/sde/types';
 import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
 import {
-  buildPlansByMaterialTypeID,
   loadBlueprintCatalog,
   type BlueprintCatalog,
   type BlueprintCatalogEntry,
@@ -51,18 +51,8 @@ import {
   type SourcingPatchEntry,
 } from '@/features/industry/BuildPlanDetail';
 import { saveSourcingEdit } from '@/features/industry/sourcingEdits';
-import {
-  lastOpenedPlanFor,
-  useLastOpenedPlan,
-  withLastOpenedPlan,
-} from '@/features/industry/lastOpenedPlan';
 import { mostRecentlyUpdatedPlan, newBuildPlan } from '@/features/industry/newBuildPlan';
-import {
-  clearPlanSeed,
-  matchesPlanSeed,
-  parsePlanSeed,
-  type BuildPlanSeed,
-} from '@/features/industry/planSeed';
+import { type BuildPlanSeed } from '@/features/industry/planSeed';
 import {
   addBuildGroup,
   buildGroupsFor,
@@ -86,28 +76,6 @@ import { applyFitImport, fitImportGroupName } from '@/features/industry/fitImpor
 import { useAssumedMe } from '@/features/industry/assumedMe';
 import { useAssumedTe } from '@/features/industry/assumedTe';
 import type { FitToBuildPlansResult } from '@/engine/import/fitToBuildPlans';
-
-/**
- * What the detail pane is showing.
- *
- * One value rather than a plan id, a group id and a `comparing` boolean kept
- * mutually exclusive by hand: the invariant used to be re-stated at every site
- * that changed any of them, and one that forgot (creating a plan while a group
- * was open) left two selections live, so the new plan silently did not open.
- * Making the states alternatives of one type removes the invariant rather than
- * restating it.
- *
- * Compare *mode* — the row checkboxes — is deliberately not in here. It is
- * orthogonal: the checkboxes stay up while the table is closed, which is the
- * whole "check some, then open" flow.
- */
-type DetailSelection =
-  | { kind: 'none' }
-  | { kind: 'plan'; planId: string }
-  | { kind: 'group'; groupId: string }
-  | { kind: 'compare' };
-
-const NO_SELECTION: DetailSelection = { kind: 'none' };
 
 type IndustryTab = 'plans' | 'records' | 'sourcing' | 'opportunities';
 
@@ -205,30 +173,11 @@ export function Industry() {
     void hydrateAssumedTe();
   }, [hydrateBuildGroups, hydrateExpandedGroups, hydrateAssumedMe, hydrateAssumedTe]);
 
-  const [selection, setSelection] = useState<DetailSelection>(NO_SELECTION);
-  // Read back as the three things the pane below actually asks about. The tag
-  // is what keeps a group id out of `lastOpenedPlan`, which matches whatever
-  // it is given against the Character's own plans and would hold a group id
-  // as dead weight for ever.
-  const selectedId = selection.kind === 'plan' ? selection.planId : null;
-  const selectedGroupId = selection.kind === 'group' ? selection.groupId : null;
-  const comparing = selection.kind === 'compare';
   const [fitImportOpen, setFitImportOpen] = useState(false);
   // Only ever set for a group that still has members: deleting an empty one
   // destroys nothing, and a dialog asking about plans it does not have would
   // be a worse answer than just doing it.
   const [deletingGroupId, setDeletingGroupId] = useState<string | null>(null);
-  // Which plan this Character had open last time (device-local). Read only
-  // through `effectiveSelectedId` below, never written into `selectedId`
-  // itself: `selectedId` also decides which column a narrow screen shows, and
-  // reopening a plan must not stop a phone landing on the list.
-  const lastOpened = useLastOpenedPlan((state) => state.value);
-  const lastOpenedHydrated = useLastOpenedPlan((state) => state.hydrated);
-  const hydrateLastOpened = useLastOpenedPlan((state) => state.hydrate);
-  const setLastOpened = useLastOpenedPlan((state) => state.setValue);
-  useEffect(() => {
-    void hydrateLastOpened();
-  }, [hydrateLastOpened]);
   const [catalog, setCatalog] = useState<BlueprintCatalog | null>(null);
   // Planetary schematics, for the materials table's make-or-buy marker. Loaded
   // beside the catalog so both are in place before a plan first renders — a
@@ -337,143 +286,22 @@ export function Industry() {
     [activeCharacterId, ownedBlueprints, plans, facilityDefaults, assumedMe, assumedTe, t]
   );
 
-  // The Market Browser's item context menu "jump to a Build Plan" action
-  // (issue #6) lands here with `?product=<typeId>`. The blueprint this
-  // resolves to, and whether the character already has a plan for it, are
-  // pure lookups against data already in hand — computed here so the
-  // render-time sync below and the effect's create-if-missing branch read
-  // the same answer instead of re-deriving it twice.
-  const productParam = searchParams.get('product');
-  // A BPC Sourcing Offer also sends the copy's own ME/TE/runs (#637). Memoized on
-  // `searchParams` — which react-router keeps stable per `location.search` —
-  // because the create effect below depends on it: a fresh object every render
-  // would re-fire that effect, and it writes to Dexie.
-  const planSeed = useMemo(() => parsePlanSeed(searchParams), [searchParams]);
-  const pendingEntry =
-    productParam && catalog ? (catalog.byProductTypeID.get(Number(productParam)) ?? null) : null;
-  // Unseeded, this adopts any plan for the blueprint — the Market Browser,
-  // Assets and appraised-row behaviour, unchanged. Seeded, the plan must also
-  // hold the Offer's three numbers: a plan for the same blueprint at other
-  // research is left alone and the seeded one is created beside it, while
-  // browsing back to the same Offer reuses what the first click created.
-  const pendingExistingPlan =
-    pendingEntry && plans
-      ? (plans.find(
-          (p) =>
-            p.blueprintTypeID === pendingEntry.blueprintTypeID &&
-            (planSeed === null || matchesPlanSeed(p, planSeed))
-        ) ?? null)
-      : null;
-
-  // Render-time state adjustment ("Adjusting state when a prop changes",
-  // react.dev): once the plan a `?product=` param points at exists — already
-  // there, or just created by the effect below once `plans` catches up —
-  // adopt it as the selection. Pure and synchronous, so it belongs here
-  // rather than in the effect, which React's set-state-in-effect check flags
-  // as cascading-render risk for exactly this shape.
-  if (pendingExistingPlan && selectedId !== pendingExistingPlan.id) {
-    setSelection({ kind: 'plan', planId: pendingExistingPlan.id });
-  }
-
-  // Creating a missing plan is a real side effect (a Dexie write), so it
-  // stays here — but only the write (`createPlan`, never selects). The param
-  // is cleared only once resolved to an existing plan: immediately if one
-  // was already there, or once the create above lands and the render-time
-  // sync picks it up — so the URL and the selection never disagree about
-  // which plan the click was pointing at.
-  useEffect(() => {
-    if (!productParam || activeCharacterId === null || !plans || !catalog) return;
-    if (pendingEntry && !pendingExistingPlan) {
-      void createPlan(pendingEntry, planSeed);
-      return;
-    }
-    const next = new URLSearchParams(searchParams);
-    next.delete('product');
-    // Spent along with the param it rode in on: `?material=` below preserves
-    // whatever it does not delete, so a leftover seed would ride onto an
-    // unrelated navigation.
-    clearPlanSeed(next);
-    setSearchParams(next, { replace: true });
-  }, [
-    productParam,
-    activeCharacterId,
-    plans,
-    catalog,
-    pendingEntry,
-    pendingExistingPlan,
-    planSeed,
-    searchParams,
-    setSearchParams,
-    createPlan,
-  ]);
-
-  // Assets' item context menu "View in Industry as material" action (issue
-  // #414) lands here with `?material=<typeId>`. Unlike `?product=`, this
-  // never creates a plan — the action only renders when at least one of the
-  // character's own plans already consumes that material, so it just
-  // selects that plan.
-  const materialParam = searchParams.get('material');
-  const materialPlanByTypeID = useMemo(
-    () => (plans && catalog ? buildPlansByMaterialTypeID(plans, catalog) : null),
-    [plans, catalog]
-  );
-  const materialPlan = materialParam
-    ? (materialPlanByTypeID?.get(Number(materialParam)) ?? null)
-    : null;
-
-  if (materialPlan && selectedId !== materialPlan.id) {
-    setSelection({ kind: 'plan', planId: materialPlan.id });
-  }
-
-  useEffect(() => {
-    if (!materialParam || !plans || !catalog) return;
-    const next = new URLSearchParams(searchParams);
-    next.delete('material');
-    setSearchParams(next, { replace: true });
-  }, [materialParam, plans, catalog, searchParams, setSearchParams]);
-
-  // Derived, not effect-synced: the explicit selection, else the plan this
-  // Character had open last, else the first plan (first ever visit, or the
-  // remembered one was deleted — here or on another device).
-  const effectiveSelectedId = useMemo(() => {
-    if (!plans) return null;
-    // A group is showing, so the first-plan fallback below must not also pick
-    // a plan — it would mark a row selected under the group's own rollup and
-    // fetch market prices for a plan nobody opened.
-    if (selection.kind === 'group') return null;
-    if (selectedId && plans.some((p) => p.id === selectedId)) return selectedId;
-    // Nothing until the memory has been read: the settings row and the Dexie
-    // plan query race, and taking the first-plan fallback before the answer
-    // arrives mounts the wrong plan, then swaps — a `key={plan.id}` remount
-    // and a second price fetch for a plan the pilot never asked for. A failed
-    // read still settles `hydrated`, so this cannot stall.
-    if (!lastOpenedHydrated) return null;
-    const remembered =
-      activeCharacterId === null ? null : lastOpenedPlanFor(lastOpened, activeCharacterId);
-    if (remembered && plans.some((p) => p.id === remembered)) return remembered;
-    return plans[0]?.id ?? null;
-  }, [plans, selection, selectedId, lastOpened, lastOpenedHydrated, activeCharacterId]);
-
-  const selectedPlan = useMemo(
-    () => plans?.find((p) => p.id === effectiveSelectedId) ?? null,
-    [plans, effectiveSelectedId]
-  );
-
-  // Recorded from the effective selection rather than from each place that
-  // sets one: the `?product=`/`?material=` deep links and the first-plan
-  // fallback are openings too, and the narrow-screen back control — which
-  // clears `selectedId` to show the list again — is not a change of plan and
-  // must not erase the memory. Waits for hydration, so the stored map is the
-  // one being added to rather than an empty default overwriting it.
-  useEffect(() => {
-    if (!lastOpenedHydrated || activeCharacterId === null) return;
-    // Against the plan, not the id: filing one pilot's plan under another's
-    // name loses the memory this map exists to keep apart, so the ownership
-    // the stamped query already guarantees is worth restating cheaply here.
-    if (selectedPlan?.characterId !== activeCharacterId) return;
-    if (lastOpenedPlanFor(lastOpened, activeCharacterId) === selectedPlan.id) return;
-    void setLastOpened(withLastOpenedPlan(lastOpened, activeCharacterId, selectedPlan.id));
-  }, [lastOpenedHydrated, lastOpened, activeCharacterId, selectedPlan, setLastOpened]);
+  // Detail-pane selection (which Build Plan/Group/Compare is showing), the
+  // `?product=`/`?material=` deep-link resolution and the last-opened-plan
+  // fallback — see `usePlanSelection` for why the effects live there too,
+  // not just the arithmetic.
+  const {
+    selection,
+    selectedGroupId,
+    comparing,
+    effectiveSelectedId,
+    selectedPlan,
+    selectPlan,
+    openGroup,
+    openCompare,
+    close: closeSelection,
+    closeIfComparing,
+  } = usePlanSelection({ plans, catalog, activeCharacterId, createPlan });
 
   const comparePlans = useMemo(
     () => plans?.filter((p) => compareSelectedIds.has(p.id)) ?? [],
@@ -631,7 +459,7 @@ export function Industry() {
       // closes the table — the single exit path "Cancel" and "Done" share.
       if (wasOn) {
         setCompareSelectedIds(new Set());
-        setSelection((current) => (current.kind === 'compare' ? NO_SELECTION : current));
+        closeIfComparing();
       }
       return !wasOn;
     });
@@ -646,14 +474,10 @@ export function Industry() {
     });
   }
 
-  function selectPlan(planId: string) {
-    setSelection({ kind: 'plan', planId });
-  }
-
   /** Opens a group's rollup, and stands the row checkboxes down with it. */
   function selectGroup(groupId: string) {
     clearCompareMode();
-    setSelection({ kind: 'group', groupId });
+    openGroup(groupId);
   }
 
   async function setGroupExpanded(groupId: string, expanded: boolean) {
@@ -701,7 +525,7 @@ export function Industry() {
       buildGroups,
       setBuildGroups,
     });
-    if (selectedGroupId === groupId) setSelection(NO_SELECTION);
+    if (selectedGroupId === groupId) closeSelection();
   }
 
   /** Moves one plan between groups, or out of every group when `groupId` is null. */
@@ -836,7 +660,7 @@ export function Industry() {
     await db.buildPlans.bulkAdd(newPlans);
     scheduleSync(activeCharacterId);
     setCompareSelectedIds(new Set(newPlans.map((p) => p.id)));
-    setSelection({ kind: 'compare' });
+    openCompare();
     setTab('plans');
   }
 
@@ -847,7 +671,7 @@ export function Industry() {
 
   function exitCompare() {
     clearCompareMode();
-    setSelection(NO_SELECTION);
+    closeSelection();
   }
 
   /**
@@ -952,7 +776,7 @@ export function Industry() {
                   compareSelectedIds={compareSelectedIds}
                   onToggleCompareMode={toggleCompareMode}
                   onToggleCompareSelected={toggleCompareSelected}
-                  onOpenCompare={() => setSelection({ kind: 'compare' })}
+                  onOpenCompare={openCompare}
                   groups={groups}
                   expandedGroupIds={expandedGroupIds}
                   selectedGroupId={detailVisible ? selectedGroupId : null}
@@ -974,7 +798,7 @@ export function Industry() {
                     size="sm"
                     onClick={() => {
                       if (comparing) exitCompare();
-                      else setSelection(NO_SELECTION);
+                      else closeSelection();
                     }}
                   >
                     {t('industry.backToList')}
