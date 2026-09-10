@@ -84,7 +84,7 @@ import {
 import { useDetectedOwnedStock } from './useDetectedOwnedStock';
 import { useAssumedMe } from './assumedMe';
 import { OwnedStockScopeControl } from './OwnedStockScopeControl';
-import { CraftSweepControl } from './CraftSweepControl';
+import { BuildPlanCraftSweepControl } from './BuildPlanCraftSweepControl';
 import { ResultsSummary } from './ResultsSummary';
 import { PlanVerdictHero } from './PlanVerdictHero';
 import { useIsDesktop } from '@/lib/useIsDesktop';
@@ -178,8 +178,6 @@ interface BuildPlanDetailProps {
   onShowInfo: (typeId: number, itemName: string) => void;
   /** This plan's group's last Retarget (issue #632), or null when ungrouped or not yet Retargeted. */
   groupSnapshot: BuildGroupSnapshot | null;
-  /** This plan's own Build Group name (issue #696), or null when ungrouped. */
-  groupName: string | null;
 }
 
 function clampInt(value: number, min: number, max: number): number {
@@ -216,7 +214,6 @@ export function BuildPlanDetail({
   quickbarAvailable,
   onShowInfo,
   groupSnapshot,
-  groupName,
 }: BuildPlanDetailProps) {
   const { t } = useTranslation();
 
@@ -671,16 +668,18 @@ export function BuildPlanDetail({
    * Craft Sweep (issue #695): a one-shot bulk write, not a persistent policy
    * (docs/context/decisions). Fully replaces `buildHere` — re-running with
    * different settings, or the same ones again, overwrites whatever
-   * craft/buy choices were there before, including hand-picked ones. Craft
-   * Scope is fixed to manufacturing-only this round; Reactions and Planetary
-   * are reserved for later tickets.
+   * craft/buy choices were there before, including hand-picked ones. Always
+   * walks this plan's whole tree (`craftSweepMaxDepth`) — the single-plan
+   * control offers no Sweep Depth choice. Craft Scope is fixed to
+   * manufacturing-only; Reactions and Planetary are reserved for later
+   * tickets.
    */
-  function applyCraftSweep(options: { strategy: SweepStrategy; depth: number }) {
+  function applyCraftSweep(options: { strategy: SweepStrategy }) {
     if (!blueprint || !makeOrBuyContext) return;
     const picked = autoBuildHere(blueprint, plan.me, {
       recipeFor,
       ctx: makeOrBuyContext,
-      depth: options.depth,
+      depth: craftSweepMaxDepth,
       runs: plan.runs,
       scope: ['manufacturing'],
       strategy: options.strategy,
@@ -1185,20 +1184,11 @@ export function BuildPlanDetail({
               and Trade hub it read as another thing about where the job runs.
             */}
               <div className="mb-3 flex flex-col gap-3">
-                <CraftSweepControl
+                <BuildPlanCraftSweepControl
                   maxDepth={craftSweepMaxDepth}
                   disabled={!makeOrBuyContext}
                   onApply={applyCraftSweep}
                 />
-                {groupName !== null && (
-                  <span className="flex items-center gap-1.5 text-[0.6875rem] text-text-dim">
-                    {t('industry.groupMemberHint', { group: groupName })}
-                    <InfoTooltip
-                      label={t('industry.groupMemberHintTooltipLabel')}
-                      content={t('industry.groupMemberHintTooltip')}
-                    />
-                  </span>
-                )}
                 <OwnedStockScopeControl
                   scope={plan.ownedStockScope}
                   detectedStock={detectedStock}

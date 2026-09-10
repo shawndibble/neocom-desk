@@ -217,7 +217,6 @@ function Harness({ plan: planOverrides, catalog = CATALOG, onUpdate, onDerivedFi
         quickbarAvailable
         onShowInfo={vi.fn()}
         groupSnapshot={null}
-        groupName={null}
       />
     </MemoryRouter>
   );
@@ -561,40 +560,24 @@ describe('BuildPlanDetail sub-builds', () => {
 
 describe('BuildPlanDetail Craft Sweep (issue #695)', () => {
   const strategySelect = () => screen.getByRole('combobox', { name: 'Sweep Strategy' });
-  const depthSelect = () => screen.getByRole('combobox', { name: 'Sweep Depth' });
   const sweepApplyButton = () => screen.getByRole('button', { name: 'Apply Craft Sweep' });
   const tritaniumBuildButton = () =>
     screen.getByRole('button', { name: 'Build Tritanium here instead of buying it' });
 
-  async function runSweep(
-    user: ReturnType<typeof userEvent.setup>,
-    strategyLabel: string,
-    depthLabel: string
-  ) {
+  async function runSweep(user: ReturnType<typeof userEvent.setup>, strategyLabel: string) {
     await user.click(strategySelect());
     await user.click(await screen.findByRole('option', { name: strategyLabel }));
-    await user.click(depthSelect());
-    await user.click(await screen.findByRole('option', { name: depthLabel }));
     await user.click(sweepApplyButton());
-    const dialog = await screen.findByRole('dialog');
-    await user.click(within(dialog).getByRole('button', { name: 'Apply Craft Sweep' }));
   }
 
-  it("sizes Sweep Depth's options to this plan's own tree depth: Tritanium (1) <- Pyerite (2), Mexallon unbuildable", async () => {
-    const user = userEvent.setup();
+  it('has no Sweep Depth control — the single-plan sweep always walks the whole tree', async () => {
     render(<Harness plan={{ runs: 10 }} />);
     await screen.findByText('Tritanium');
 
-    await user.click(depthSelect());
-    const options = await screen.findAllByRole('option');
-    expect(options.map((o) => o.textContent?.replace(/^\W+/, ''))).toEqual([
-      '1 level',
-      '2 levels',
-      'All levels',
-    ]);
+    expect(screen.queryByRole('combobox', { name: 'Sweep Depth' })).not.toBeInTheDocument();
   });
 
-  it('overwrites buildHere to match the chosen Sweep Strategy and Sweep Depth, reflected immediately in the materials table', async () => {
+  it('overwrites buildHere to match the chosen Sweep Strategy, applied immediately with no confirmation, reflected right away in the materials table', async () => {
     const user = userEvent.setup();
     const onUpdate = vi.fn();
     // `Harness` always passes `groupSnapshot={null}` — every test in this
@@ -603,8 +586,10 @@ describe('BuildPlanDetail Craft Sweep (issue #695)', () => {
     render(<Harness plan={{ runs: 10 }} onUpdate={onUpdate} />);
     await screen.findByText('Tritanium');
 
-    await runSweep(user, 'Build', '2 levels');
+    await runSweep(user, 'Build');
 
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    // Depth is always "All levels": Tritanium (1) <- Pyerite (2).
     expect(onUpdate).toHaveBeenLastCalledWith({ buildHere: [34, 35] });
     // Pyerite's own consumption (Mexallon) only appears once its job is
     // actually pulled onto the table by buildHere containing it.
@@ -620,7 +605,7 @@ describe('BuildPlanDetail Craft Sweep (issue #695)', () => {
     await user.click(tritaniumBuildButton());
     expect(onUpdate).toHaveBeenLastCalledWith({ buildHere: [34] });
 
-    await runSweep(user, 'Buy', '1 level');
+    await runSweep(user, 'Buy');
 
     expect(onUpdate).toHaveBeenLastCalledWith({ buildHere: [] });
     expect(
