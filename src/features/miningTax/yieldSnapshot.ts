@@ -21,7 +21,7 @@ import {
 import { comparePriceToToday, type PriceDivergence } from '@/engine/miningTax/priceDivergence';
 import { sortPriceHistory } from '@/engine/market/priceHistory';
 import type { ReprocessingSkills } from '@/engine/industry/reprocessing';
-import { loadPriceHistory } from '@/features/market/priceHistory';
+import { loadPriceHistory, type PriceHistoryResult } from '@/features/market/priceHistory';
 import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
 import { SKILL_IDS } from '@/engine/industry/types';
 import { loadCompressedOreTypeIds, loadReprocessing } from '@/sde/loadSde';
@@ -148,12 +148,24 @@ export async function loadMiningYieldSnapshot(): Promise<MiningYieldSnapshot> {
   const pricingTypeIds = [...new Set(rawTypeIds.map(pricingTypeId))];
   const historyTypeIds = [...new Set([...pricingTypeIds, ...materialTypeIds])];
 
-  const histories = await Promise.all(
+  // Some type_ids in this union (e.g. non-tradable ore/ice variants like
+  // Banidine/Augumene) 400 from ESI's /markets/{region}/history — a real,
+  // honest "not tradable" answer, not a transient failure. One such id must
+  // not fail the whole snapshot: settle each independently and drop the
+  // failures, the same tolerance `valueMiningYield` already gives a missing
+  // price (contributes 0, flips `pricedAll` false, never thrown).
+  const historyAttempts = await Promise.allSettled(
     historyTypeIds.map(
       async (typeId) =>
         [typeId, await loadPriceHistory(DEFAULT_TRADE_HUB.regionId, typeId)] as const
     )
   );
+  const histories = historyAttempts
+    .filter(
+      (attempt): attempt is PromiseFulfilledResult<readonly [number, PriceHistoryResult]> =>
+        attempt.status === 'fulfilled'
+    )
+    .map((attempt) => attempt.value);
   const priceByTypeAndDate = new Map<number, Map<string, number>>();
   const latestPriceByType = new Map<number, number>();
   for (const [typeId, result] of histories) {
