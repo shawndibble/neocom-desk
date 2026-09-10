@@ -148,8 +148,7 @@ describe('ActiveJobsPanel: rendering', () => {
     // cell text itself — both in success tone.
     const doneTexts = screen.getAllByText('Done');
     expect(doneTexts).toHaveLength(2);
-    expect(doneTexts[0]).toHaveClass('text-success');
-    expect(doneTexts[1]).toHaveClass('text-success');
+    doneTexts.forEach((el) => expect(el).toHaveClass('text-success'));
     expect(screen.getByText('30m')).toBeInTheDocument();
     expect(screen.getByText('1h 30m')).toBeInTheDocument();
 

@@ -77,6 +77,58 @@ type JobRow = ActiveJob & { characterId: number; characterName: string };
 /** The two derived job states this panel's Status filter offers — not ESI's raw `status` enum, just what the list already highlights. */
 type JobStatusFilter = 'completingSoon' | 'done';
 
+/** Picks a job tone's class out of a per-site map, `undefined` for the neutral case — the one place every `cellClassName`/`rowClassName`/fill-color call site turns a tone into a string. */
+function toneClass(
+  tone: 'warning' | 'success' | undefined,
+  classes: { warning: string; success: string }
+): string | undefined {
+  return tone && classes[tone];
+}
+
+/**
+ * One grouped multiselect dropdown — Activity and Status are two instances
+ * of the exact same shape (a `Button` trigger, a `DropdownMenuCheckboxItem`
+ * per option), so this exists once rather than being hand-rolled twice in
+ * `ActiveJobsPanel`. Not lifted out to `components/ui` or its own file: unlike
+ * `CalendarKindFilterMenu`/`CharacterFilterControl` (each shared across
+ * several panels), both instances of this one live in this single component,
+ * so a local, unexported function is the proportionate amount of reuse.
+ */
+function JobFilterMenu<T extends string | number>({
+  triggerLabel,
+  items,
+  selected,
+  onToggle,
+}: {
+  triggerLabel: string;
+  items: readonly { value: T; label: string }[];
+  selected: ReadonlySet<T>;
+  onToggle: (value: T) => void;
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button size="sm">{triggerLabel}</Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start">
+        {items.map((item) => (
+          <DropdownMenuCheckboxItem
+            key={item.value}
+            checked={selected.has(item.value)}
+            // Without this the menu closes on the first toggle, which makes
+            // a multi-select take one round trip per option
+            // (`CalendarKindFilterMenu`'s precedent).
+            onSelect={(event) => event.preventDefault()}
+            onCheckedChange={() => onToggle(item.value)}
+          >
+            {item.label}
+          </DropdownMenuCheckboxItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 interface ActiveJobsPanelProps {
   characterId: number;
   onAddToQuickbar: (typeId: number, itemName: string) => void;
@@ -435,10 +487,10 @@ export function ActiveJobsPanel({
   // Kept mounted while a status filter is still active even if no job
   // currently matches it — losing the control out from under an applied
   // filter would leave the list silently narrowed with no way to clear it.
+  // `summary.done` (already computed above) stands in for a second
+  // `jobs.some(isJobDone)` scan of the same list.
   const showStatusFilter =
-    statusFilter.size > 0 ||
-    jobs.some((job) => isCompletingSoon(job, now)) ||
-    jobs.some((job) => isJobDone(job, now));
+    statusFilter.size > 0 || summary.done > 0 || jobs.some((job) => isCompletingSoon(job, now));
 
   // The job an `industryJobComplete` alert pointed at, if any. It stays in
   // this list until it is delivered, which is exactly what the alert is about.
@@ -485,6 +537,12 @@ export function ActiveJobsPanel({
   const soon = useCallback((job: ActiveJob) => isCompletingSoon(job, now), [now]);
   /** One binding of the done state: same four places as `soon`, in success tone — mutually exclusive with it (`isCompletingSoon` requires time still remaining). */
   const done = useCallback((job: ActiveJob) => isJobDone(job, now), [now]);
+  /** The one precedence rule (`soon` beats `done`, though they're mutually exclusive) shared by every place a job's tone shows up, so the four call sites below each pick a class from a lookup rather than re-deriving the same `soon ? … : done ? … : …` chain. */
+  const jobTone = useCallback(
+    (job: ActiveJob): 'warning' | 'success' | undefined =>
+      soon(job) ? 'warning' : done(job) ? 'success' : undefined,
+    [soon, done]
+  );
 
   /**
    * Rebuilt on every countdown tick — the remaining time, the progress
@@ -504,11 +562,10 @@ export function ActiveJobsPanel({
         // `.dt-stack` blocks the cell there is no row edge to stripe, and the
         // card's tint already carries the state.
         cellClassName: (job) =>
-          soon(job)
-            ? 'sm:border-l sm:border-l-warning'
-            : done(job)
-              ? 'sm:border-l sm:border-l-success'
-              : undefined,
+          toneClass(jobTone(job), {
+            warning: 'sm:border-l sm:border-l-warning',
+            success: 'sm:border-l sm:border-l-success',
+          }),
         render: (job) => (
           <span className="flex flex-wrap items-center gap-1.5">
             <span>{nameForBlueprint(job.blueprint_type_id)}</span>
@@ -566,7 +623,8 @@ export function ActiveJobsPanel({
               >
                 <span
                   className={`block h-full ${
-                    done(job) ? 'bg-success' : soon(job) ? 'bg-warning' : 'bg-accent'
+                    toneClass(jobTone(job), { warning: 'bg-warning', success: 'bg-success' }) ??
+                    'bg-accent'
                   }`}
                   style={{ width: `${progress}%` }}
                 />
@@ -584,11 +642,10 @@ export function ActiveJobsPanel({
         align: 'right',
         className: 'tabular-nums whitespace-nowrap',
         cellClassName: (job) =>
-          soon(job)
-            ? 'font-semibold text-warning'
-            : done(job)
-              ? 'font-semibold text-success'
-              : undefined,
+          toneClass(jobTone(job), {
+            warning: 'font-semibold text-warning',
+            success: 'font-semibold text-success',
+          }),
         // The timestamp, never the printed duration: "1d 4h" sorts before "9h" as a string.
         sortValue: (job) => Date.parse(job.end_date),
         render: (job) =>
@@ -605,7 +662,7 @@ export function ActiveJobsPanel({
         },
       },
     ],
-    [t, now, soon, done, nameForBlueprint, showCharacterColumn]
+    [t, now, soon, done, jobTone, nameForBlueprint, showCharacterColumn]
   );
 
   /** Right-click any row for the shared item menu. */
@@ -883,57 +940,40 @@ export function ActiveJobsPanel({
               className="flex flex-wrap gap-1.5"
             >
               {showActivityFilter && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button size="sm">
-                      {activityFilter.size === 0
-                        ? t('industry.jobsFilterActivity')
-                        : t('industry.jobsFilterActivityWithCount', { count: activityFilter.size })}
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start">
-                    {presentActivityIds.map((activityId) => (
-                      <DropdownMenuCheckboxItem
-                        key={activityId}
-                        checked={activityFilter.has(activityId)}
-                        // Without this the menu closes on the first toggle,
-                        // which makes a multi-select take one round trip per
-                        // activity (`CalendarKindFilterMenu`'s precedent).
-                        onSelect={(event) => event.preventDefault()}
-                        onCheckedChange={() => toggleActivity(activityId)}
-                      >
-                        {t(activityI18nKey(activityId), { id: activityId })}
-                      </DropdownMenuCheckboxItem>
-                    ))}
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                <JobFilterMenu
+                  triggerLabel={
+                    activityFilter.size === 0
+                      ? t('industry.jobsFilterActivity')
+                      : t('industry.jobsFilterWithCount', {
+                          label: t('industry.jobsFilterActivity'),
+                          count: activityFilter.size,
+                        })
+                  }
+                  items={presentActivityIds.map((activityId) => ({
+                    value: activityId,
+                    label: t(activityI18nKey(activityId), { id: activityId }),
+                  }))}
+                  selected={activityFilter}
+                  onToggle={toggleActivity}
+                />
               )}
               {showStatusFilter && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button size="sm">
-                      {statusFilter.size === 0
-                        ? t('industry.jobsFilterStatus')
-                        : t('industry.jobsFilterStatusWithCount', { count: statusFilter.size })}
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start">
-                    <DropdownMenuCheckboxItem
-                      checked={statusFilter.has('completingSoon')}
-                      onSelect={(event) => event.preventDefault()}
-                      onCheckedChange={() => toggleStatus('completingSoon')}
-                    >
-                      {t('industry.jobsCompletingSoon')}
-                    </DropdownMenuCheckboxItem>
-                    <DropdownMenuCheckboxItem
-                      checked={statusFilter.has('done')}
-                      onSelect={(event) => event.preventDefault()}
-                      onCheckedChange={() => toggleStatus('done')}
-                    >
-                      {t('industry.jobsDone')}
-                    </DropdownMenuCheckboxItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                <JobFilterMenu
+                  triggerLabel={
+                    statusFilter.size === 0
+                      ? t('industry.jobsFilterStatus')
+                      : t('industry.jobsFilterWithCount', {
+                          label: t('industry.jobsFilterStatus'),
+                          count: statusFilter.size,
+                        })
+                  }
+                  items={[
+                    { value: 'completingSoon' as const, label: t('industry.jobsCompletingSoon') },
+                    { value: 'done' as const, label: t('industry.jobsDone') },
+                  ]}
+                  selected={statusFilter}
+                  onToggle={toggleStatus}
+                />
               )}
             </div>
           )}
@@ -958,7 +998,7 @@ export function ActiveJobsPanel({
                 defaultSort={{ columnId: 'endsIn', direction: 'asc' }}
                 density="compact"
                 rowClassName={(job) =>
-                  soon(job) ? 'bg-warning/10' : done(job) ? 'bg-success/10' : undefined
+                  toneClass(jobTone(job), { warning: 'bg-warning/10', success: 'bg-success/10' })
                 }
                 rowContextMenu={jobContextMenu}
               />
