@@ -80,4 +80,18 @@ describe('loadMiningYieldSnapshot', () => {
     expect(nontradableLine?.rawValue).toBe(0);
     expect(row.valuation.pricedAll).toBe(false);
   });
+
+  it('still fails the whole snapshot on a non-400 failure, rather than silently pricing it as not tradable', async () => {
+    priceHistoryMock.loadPriceHistory.mockImplementation((_regionId: number, typeId: number) => {
+      if (typeId === NONTRADABLE) {
+        return Promise.reject(new EsiError(503, 'Service unavailable'));
+      }
+      return Promise.resolve({
+        points: [{ date: '2026-09-01', average: 10, volume: 1 }],
+        fetchedAt: Date.now(),
+      });
+    });
+
+    await expect(loadMiningYieldSnapshot()).rejects.toThrow('Service unavailable');
+  });
 });
