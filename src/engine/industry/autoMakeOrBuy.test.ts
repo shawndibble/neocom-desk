@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { autoBuildHere, MAX_AUTO_BUILD_DEPTH } from '@/engine/industry/autoMakeOrBuy';
+import {
+  autoBuildHere,
+  maxSweepDepth,
+  MAX_AUTO_BUILD_DEPTH,
+} from '@/engine/industry/autoMakeOrBuy';
 import { makeOrBuy, type MakeOrBuyContext, type MaterialRecipe } from '@/engine/industry/makeOrBuy';
 import { effectiveMaterials } from '@/engine/industry/materials';
 import { MAX_SUB_BUILD_DEPTH } from '@/engine/industry/materialResolution';
@@ -322,5 +326,82 @@ describe('autoBuildHere', () => {
     const opts = { recipeFor: (id: number) => (id === 9840 ? recipe : null), ctx, depth: 1 };
     expect(autoBuildHere(root, 0, { ...opts, runs: 1 })).toEqual(new Set());
     expect(autoBuildHere(root, 0, { ...opts, runs: 3 })).toEqual(new Set([9840]));
+  });
+});
+
+describe('maxSweepDepth', () => {
+  it('is 0 for a product whose materials are all raw (nothing has a recipe)', () => {
+    const mined: IndustryBlueprint = {
+      ...productBlueprint,
+      materials: [{ typeID: 34, quantity: 10 }],
+    };
+    expect(maxSweepDepth(mined, 0, { recipeFor, ctx, runs: 1 })).toBe(0);
+  });
+
+  it("reaches the full depth of the product's real material chain", () => {
+    // product(600) <- 502 <- 501 <- 500 <- 499 <- Tritanium(34, unbuildable):
+    // four levels have a recipe, so the tree bottoms out at depth 4.
+    expect(maxSweepDepth(productBlueprint, 0, { recipeFor, ctx, runs: 1 })).toBe(4);
+  });
+
+  it('is capped at MAX_SUB_BUILD_DEPTH for a chain deeper than the safety valve', () => {
+    const chainLength = MAX_SUB_BUILD_DEPTH + 2;
+    const ids = Array.from({ length: chainLength }, (_, i) => 9000 + i);
+    const chainRecipes: Record<number, MaterialRecipe> = {};
+    for (let i = 0; i < chainLength; i++) {
+      const id = ids[i]!;
+      const nextTypeID = i + 1 < chainLength ? ids[i + 1]! : 34;
+      const bp: IndustryBlueprint = {
+        name: `Chain ${i}`,
+        time: 1,
+        materials: [{ typeID: nextTypeID, quantity: 1 }],
+        products: [{ typeID: id, quantity: 1 }],
+      };
+      chainRecipes[id] = { method: 'manufacturing', blueprint: bp, me: 0 };
+    }
+    const root: IndustryBlueprint = {
+      name: 'Chain Root',
+      time: 1,
+      materials: [{ typeID: ids[0]!, quantity: 1 }],
+      products: [{ typeID: 99999, quantity: 1 }],
+    };
+    const result = maxSweepDepth(root, 0, {
+      recipeFor: (id) => chainRecipes[id] ?? null,
+      ctx,
+      runs: 1,
+    });
+    expect(result).toBe(MAX_SUB_BUILD_DEPTH);
+  });
+
+  it('does not dead-end on a material outside Craft Scope — depth-discovery ignores scope entirely', () => {
+    // 502 is a reaction (would be out of Craft Scope at apply-time), but
+    // depth discovery isn't scope-aware: it only asks whether a recipe
+    // exists, so it still walks into 502's own inputs (501).
+    const reactionRecipes: Record<number, MaterialRecipe> = {
+      502: { method: 'reaction', blueprint: gearABlueprint },
+      501: { method: 'manufacturing', blueprint: gearBBlueprint, me: 0 },
+    };
+    const result = maxSweepDepth(productBlueprint, 0, {
+      recipeFor: (id) => reactionRecipes[id] ?? null,
+      ctx,
+      runs: 1,
+    });
+    expect(result).toBe(2);
+  });
+
+  it('never revisits a material that is already its own ancestor on this branch', () => {
+    const selfBlueprint: IndustryBlueprint = {
+      name: 'Self-referencing',
+      time: 100,
+      materials: [{ typeID: 700, quantity: 1 }],
+      products: [{ typeID: 700, quantity: 1 }],
+    };
+    const root: IndustryBlueprint = {
+      ...productBlueprint,
+      materials: [{ typeID: 700, quantity: 1 }],
+    };
+    const cyclic = (id: number): MaterialRecipe | null =>
+      id === 700 ? { method: 'manufacturing', blueprint: selfBlueprint, me: 0 } : null;
+    expect(() => maxSweepDepth(root, 0, { recipeFor: cyclic, ctx, runs: 1 })).not.toThrow();
   });
 });
