@@ -52,6 +52,7 @@
  */
 
 import { FACILITY_PRESETS, type FacilityKind, type SecurityBand } from '@/engine/industry/types';
+import type { SweepStrategy } from '@/engine/industry/autoMakeOrBuy';
 import { coerceArrayEntry, parseCharacterKeyedRecord } from '@/lib/characterKeyedRecord';
 import { createSyncedSetting } from '@/lib/useSyncedSetting';
 import { TRADE_HUBS, type TradeHub } from '@/market/hubs';
@@ -83,6 +84,25 @@ export interface BuildGroupSnapshot {
   appliedAt: number;
 }
 
+/**
+ * A Build Group's last-used Craft Sweep (issue #696): a convenience default
+ * only, the same "clipboard, not a second writer" role `BuildGroupSnapshot`
+ * plays for Retarget — reopening the group pre-fills `CraftSweepControl`
+ * with these, but nothing here re-applies automatically and no plan's own
+ * `buildHere` is read from it.
+ */
+export interface BuildGroupCraftSweepDefault {
+  strategy: SweepStrategy;
+  /**
+   * The raw control choice, `'all'` sentinel included — not the depth number
+   * it resolved to that run. A stored numeric depth could outlive the tree
+   * it was measured against (a member removed, or replaced by a shallower
+   * blueprint) and silently fall outside the next reopening's own depth
+   * range; `'all'` never can.
+   */
+  depthChoice: 'all' | number;
+}
+
 /** One Build Group: what it is called and where it sits in the list. */
 export interface BuildGroup {
   id: string;
@@ -91,6 +111,8 @@ export interface BuildGroup {
   order: number;
   /** @see BuildGroupSnapshot */
   snapshot?: BuildGroupSnapshot;
+  /** @see BuildGroupCraftSweepDefault */
+  craftSweepDefault?: BuildGroupCraftSweepDefault;
 }
 
 /** Every Character's groups, in one value — see the module comment. */
@@ -114,9 +136,19 @@ function usableSnapshot(value: unknown): value is BuildGroupSnapshot {
   );
 }
 
+function usableCraftSweepDefault(value: unknown): value is BuildGroupCraftSweepDefault {
+  if (typeof value !== 'object' || value === null) return false;
+  const { strategy, depthChoice } = value as Partial<BuildGroupCraftSweepDefault>;
+  return (
+    (strategy === 'buy' || strategy === 'build' || strategy === 'cost-effective') &&
+    (depthChoice === 'all' ||
+      (typeof depthChoice === 'number' && Number.isFinite(depthChoice) && depthChoice > 0))
+  );
+}
+
 function usableGroup(value: unknown): value is BuildGroup {
   if (typeof value !== 'object' || value === null) return false;
-  const { id, name, order, snapshot } = value as Partial<BuildGroup>;
+  const { id, name, order, snapshot, craftSweepDefault } = value as Partial<BuildGroup>;
   return (
     typeof id === 'string' &&
     id !== '' &&
@@ -124,7 +156,8 @@ function usableGroup(value: unknown): value is BuildGroup {
     name.trim() !== '' &&
     typeof order === 'number' &&
     Number.isFinite(order) &&
-    (snapshot === undefined || usableSnapshot(snapshot))
+    (snapshot === undefined || usableSnapshot(snapshot)) &&
+    (craftSweepDefault === undefined || usableCraftSweepDefault(craftSweepDefault))
   );
 }
 
@@ -235,6 +268,25 @@ export function withGroupSnapshot(
     value,
     characterId,
     existing.map((g) => (g.id === groupId ? { ...g, snapshot } : g))
+  );
+}
+
+/**
+ * The value with one group's last-used Craft Sweep default set (or
+ * replaced). Same no-op-for-a-missing-group guard as `withGroupSnapshot`.
+ */
+export function withGroupCraftSweepDefault(
+  value: BuildGroupsValue,
+  characterId: number,
+  groupId: string,
+  craftSweepDefault: BuildGroupCraftSweepDefault
+): BuildGroupsValue {
+  const existing = buildGroupsFor(value, characterId);
+  if (!existing.some((g) => g.id === groupId)) return value;
+  return withBuildGroups(
+    value,
+    characterId,
+    existing.map((g) => (g.id === groupId ? { ...g, craftSweepDefault } : g))
   );
 }
 

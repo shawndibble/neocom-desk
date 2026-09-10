@@ -270,6 +270,30 @@ describe('useComparedBuildResults', () => {
     await waitFor(() => expect(result.current.every((row) => !row.loading)).toBe(true));
   });
 
+  it(
+    'recomputes an existing member when its own buildHere/updatedAt changes, same list length — ' +
+      "the mechanism a Build Group's rollup (issue #696) depends on for a manual craft/buy edit, " +
+      'or a group Craft Sweep, to show up in the group total on next open',
+    async () => {
+      const catalog = catalogWith([entry({ blueprintTypeID: 100 })]);
+      const { rerender } = renderHook(
+        (props: UseComparedBuildResultsArgs) => useComparedBuildResults(props),
+        { initialProps: { plans: [plan({ id: 'a', updatedAt: 1 })], catalog, ...baseArgs } }
+      );
+
+      await waitFor(() => expect(mockedCompute).toHaveBeenCalledTimes(1));
+
+      rerender({
+        plans: [plan({ id: 'a', updatedAt: 2, buildHere: [999] })],
+        catalog,
+        ...baseArgs,
+      });
+
+      await waitFor(() => expect(mockedCompute).toHaveBeenCalledTimes(2));
+      expect(mockedCompute.mock.calls[1]?.[0]?.plan.buildHere).toEqual([999]);
+    }
+  );
+
   it("prices each row at its own plan's material price basis", async () => {
     // Compare has to agree with the plan's own detail panel: a buy-basis plan
     // shown beside a sell-basis one must not quietly quote both at sell.
