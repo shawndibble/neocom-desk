@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { Fragment, useMemo } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -17,6 +17,7 @@ import * as Icon from '@/components/ui/icons';
 import { beginEveLogin } from '@/app/loginFlow';
 import { CharacterHeader } from '@/features/character/CharacterHeader';
 import { loadCharacterClones } from '@/features/character/clones';
+import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { loadCharacterSpSummary } from '@/features/character/characterSp';
 import { getLastKnownSpSummary, type CharacterSpSummary } from '@/stores/characterSp';
 import { OverviewSubNav } from '@/features/character/OverviewSubNav';
@@ -181,7 +182,14 @@ export function Clones() {
         render: (clone) =>
           clone.implants.length === 0
             ? t('clones.noImplants')
-            : clone.implants.map((id) => implantNames.get(id) ?? `Type #${id}`).join(', '),
+            : clone.implants.map((id, index) => (
+                <Fragment key={id}>
+                  {index > 0 && ', '}
+                  <MarketItemLink typeId={id}>
+                    {implantNames.get(id) ?? `Type #${id}`}
+                  </MarketItemLink>
+                </Fragment>
+              )),
       },
     ],
     [t, locationNames, implantNames]
