@@ -34,9 +34,8 @@ import { recordFeedEntry } from '@/features/notifications/feed';
 declare let self: ServiceWorkerGlobalScope;
 
 // registerType: 'prompt' (vite.config.ts) — the worker must stay in
-// `waiting` until the page's ReloadPrompt asks for it, not skip ahead on its
-// own. `workbox-window`'s `messageSkipWaiting()` (behind ReloadPrompt's
-// "Reload" button) sends exactly this message (AC3).
+// `waiting` until ReloadPrompt triggers it (auto, once idle/hidden) via
+// workbox-window's `messageSkipWaiting()`, which sends exactly this message.
 self.addEventListener('message', (event) => {
   if (event.data?.type === 'SKIP_WAITING') self.skipWaiting();
 });

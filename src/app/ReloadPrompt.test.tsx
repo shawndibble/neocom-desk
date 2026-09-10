@@ -1,12 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { render } from '@testing-library/react';
 import '@/i18n';
 import { ReloadPrompt } from './ReloadPrompt';
 
-const { updateServiceWorker, setNeedRefresh, state, registerSWOptions } = vi.hoisted(() => ({
+const { updateServiceWorker, state, registerSWOptions } = vi.hoisted(() => ({
   updateServiceWorker: vi.fn(),
-  setNeedRefresh: vi.fn(),
   state: { needRefresh: true },
   registerSWOptions: {
     current: undefined as { onRegisteredSW?: (...a: unknown[]) => void } | undefined,
@@ -17,54 +15,97 @@ vi.mock('virtual:pwa-register/react', () => ({
   useRegisterSW: (options?: { onRegisteredSW?: (...a: unknown[]) => void }) => {
     registerSWOptions.current = options;
     return {
-      needRefresh: [state.needRefresh, setNeedRefresh],
+      needRefresh: [state.needRefresh, vi.fn()],
       offlineReady: [false, vi.fn()],
       updateServiceWorker,
     };
   },
 }));
 
+function setHidden(hidden: boolean) {
+  Object.defineProperty(document, 'hidden', { configurable: true, value: hidden });
+  document.dispatchEvent(new Event('visibilitychange'));
+}
+
+const HIDDEN_APPLY_GRACE_MS = 30 * 1000;
+const VISIBLE_IDLE_APPLY_THRESHOLD_MS = 30 * 60 * 1000;
+const APPLY_CHECK_POLL_MS = 15 * 1000;
+
 beforeEach(() => {
   updateServiceWorker.mockClear();
-  setNeedRefresh.mockClear();
   state.needRefresh = true;
+  setHidden(false);
+  vi.useFakeTimers();
+  // Start the fake clock well past epoch 0 — the component uses 0 as a
+  // sentinel for "not hidden," which would collide with a real Date.now()
+  // reading if the clock started at 0.
+  vi.setSystemTime(new Date('2026-01-01T00:00:00Z'));
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+  setHidden(false);
 });
 
 describe('ReloadPrompt', () => {
-  it('renders nothing when no update is waiting', () => {
-    state.needRefresh = false;
-    render(<ReloadPrompt />);
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  it('renders nothing', () => {
+    const { container } = render(<ReloadPrompt />);
+    expect(container).toBeEmptyDOMElement();
   });
 
-  it('shows the update toast and reloads on click', async () => {
-    const user = userEvent.setup();
+  it('does nothing when no update is waiting', async () => {
+    state.needRefresh = false;
     render(<ReloadPrompt />);
-    expect(screen.getByRole('alert')).toHaveTextContent(/new version/i);
-    await user.click(screen.getByRole('button', { name: /reload/i }));
+    await vi.advanceTimersByTimeAsync(VISIBLE_IDLE_APPLY_THRESHOLD_MS);
+    expect(updateServiceWorker).not.toHaveBeenCalled();
+  });
+
+  it('applies the update once a hidden tab stays hidden past the grace period', async () => {
+    render(<ReloadPrompt />);
+    setHidden(true);
+    expect(updateServiceWorker).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(HIDDEN_APPLY_GRACE_MS);
+
     expect(updateServiceWorker).toHaveBeenCalledWith(true);
   });
 
-  it('moves bottom-center with a heavier border on desktop, issue #613', () => {
+  it('does not apply if the tab becomes visible again before the grace period elapses', async () => {
     render(<ReloadPrompt />);
-    const toast = screen.getByRole('alert');
-    // Mobile: unchanged bottom-right corner toast.
-    expect(toast).toHaveClass('right-4', 'bottom-16');
-    // Desktop: bottom-center and a heavier border so it isn't easy to miss —
-    // no accent/shadow, which DESIGN.md §6 reserves for interactive elements
-    // and popovers/menus respectively.
-    expect(toast).toHaveClass('md:left-1/2', 'md:-translate-x-1/2', 'md:bottom-6', 'md:border-2');
+    setHidden(true);
+    await vi.advanceTimersByTimeAsync(HIDDEN_APPLY_GRACE_MS / 2);
+    setHidden(false);
+
+    await vi.advanceTimersByTimeAsync(HIDDEN_APPLY_GRACE_MS);
+
+    expect(updateServiceWorker).not.toHaveBeenCalled();
   });
 
-  it('dismisses the toast', async () => {
-    const user = userEvent.setup();
+  it('applies the update once a visible tab has been idle a long time', async () => {
     render(<ReloadPrompt />);
-    await user.click(screen.getByRole('button', { name: /dismiss/i }));
-    expect(setNeedRefresh).toHaveBeenCalledWith(false);
+    await vi.advanceTimersByTimeAsync(VISIBLE_IDLE_APPLY_THRESHOLD_MS);
+    expect(updateServiceWorker).toHaveBeenCalledWith(true);
+  });
+
+  it('does not apply while a visible tab is in recent use', async () => {
+    render(<ReloadPrompt />);
+    await vi.advanceTimersByTimeAsync(VISIBLE_IDLE_APPLY_THRESHOLD_MS - 1000);
+    expect(updateServiceWorker).not.toHaveBeenCalled();
+  });
+
+  it('retries on the next tick if the apply did not cause the page to unload', async () => {
+    render(<ReloadPrompt />);
+    setHidden(true);
+    await vi.advanceTimersByTimeAsync(HIDDEN_APPLY_GRACE_MS);
+    expect(updateServiceWorker).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(APPLY_CHECK_POLL_MS);
+
+    expect(updateServiceWorker).toHaveBeenCalledTimes(2);
   });
 
   describe('periodic update check', () => {
-    const TEN_MINUTES_MS = 10 * 60 * 1000;
+    const THIRTY_MINUTES_MS = 30 * 60 * 1000;
 
     function fireOnRegistered(registration: {
       installing: ServiceWorker | null;
@@ -82,12 +123,10 @@ describe('ReloadPrompt', () => {
     }
 
     beforeEach(() => {
-      vi.useFakeTimers();
       vi.stubGlobal('fetch', vi.fn());
     });
 
     afterEach(() => {
-      vi.useRealTimers();
       vi.unstubAllGlobals();
     });
 
@@ -95,7 +134,7 @@ describe('ReloadPrompt', () => {
       vi.mocked(fetch).mockResolvedValue(new Response(null, { status: 200 }));
       const { update } = setup();
 
-      await vi.advanceTimersByTimeAsync(TEN_MINUTES_MS);
+      await vi.advanceTimersByTimeAsync(THIRTY_MINUTES_MS);
 
       expect(fetch).toHaveBeenCalledWith('sw.js', expect.objectContaining({ cache: 'no-store' }));
       expect(update).toHaveBeenCalledTimes(1);
@@ -105,7 +144,7 @@ describe('ReloadPrompt', () => {
       vi.stubGlobal('navigator', { ...navigator, onLine: false });
       const { update } = setup();
 
-      await vi.advanceTimersByTimeAsync(TEN_MINUTES_MS);
+      await vi.advanceTimersByTimeAsync(THIRTY_MINUTES_MS);
 
       expect(fetch).not.toHaveBeenCalled();
       expect(update).not.toHaveBeenCalled();
@@ -117,10 +156,10 @@ describe('ReloadPrompt', () => {
         .mockResolvedValue(new Response(null, { status: 200 }));
       const { update } = setup();
 
-      await vi.advanceTimersByTimeAsync(TEN_MINUTES_MS);
+      await vi.advanceTimersByTimeAsync(THIRTY_MINUTES_MS);
       expect(update).not.toHaveBeenCalled();
 
-      await vi.advanceTimersByTimeAsync(TEN_MINUTES_MS);
+      await vi.advanceTimersByTimeAsync(THIRTY_MINUTES_MS);
       expect(update).toHaveBeenCalledTimes(1);
     });
 
@@ -129,7 +168,7 @@ describe('ReloadPrompt', () => {
       const registration = setup();
       fireOnRegistered(registration);
 
-      await vi.advanceTimersByTimeAsync(TEN_MINUTES_MS);
+      await vi.advanceTimersByTimeAsync(THIRTY_MINUTES_MS);
 
       expect(registration.update).toHaveBeenCalledTimes(1);
     });

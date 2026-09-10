@@ -1,8 +1,19 @@
+import { useEffect, useRef } from 'react';
 import { useRegisterSW } from 'virtual:pwa-register/react';
-import { useTranslation } from 'react-i18next';
-import { Button } from '@/components/ui';
 
-const UPDATE_CHECK_INTERVAL_MS = 10 * 60 * 1000;
+const UPDATE_CHECK_INTERVAL_MS = 30 * 60 * 1000;
+// A tab must stay hidden this long before a waiting update applies — a
+// short grace period so a quick tab-peek mid-edit doesn't get its unsaved
+// state wiped the instant the tab is switched away from.
+const HIDDEN_APPLY_GRACE_MS = 30 * 1000;
+// Fallback for a tab that's visible but genuinely untouched for a long
+// while (e.g. a dashboard left open) — long enough that "no input" can't
+// plausibly mean "reading/thinking mid-edit."
+const VISIBLE_IDLE_APPLY_THRESHOLD_MS = 30 * 60 * 1000;
+// Coarse cadence for checking the two thresholds above — not itself a
+// threshold.
+const APPLY_CHECK_POLL_MS = 15 * 1000;
+const ACTIVITY_EVENTS = ['pointerdown', 'keydown', 'wheel', 'touchstart'] as const;
 
 // React StrictMode double-invokes the useState lazy initializer that
 // registerSW runs on, so onRegisteredSW can fire twice on first mount in
@@ -25,11 +36,18 @@ async function checkForUpdate(swUrl: string, registration: ServiceWorkerRegistra
   }
 }
 
-/** Toast for a waiting SW update; also polls the registration periodically to trigger update checks. */
+/**
+ * No UI. Polls the registration for updates, then applies a waiting update
+ * silently instead of prompting: once the tab has been hidden for a short
+ * grace period, or — for a tab that stays visible but goes untouched a long
+ * while — once it's been idle that long. A tab that's visible and in recent
+ * use is never reloaded, so it can't interrupt in-progress work.
+ */
 export function ReloadPrompt() {
-  const { t } = useTranslation();
+  const lastActivityRef = useRef(0);
+  const hiddenSinceRef = useRef(0);
   const {
-    needRefresh: [needRefresh, setNeedRefresh],
+    needRefresh: [needRefresh],
     updateServiceWorker,
   } = useRegisterSW({
     onRegisteredSW(swUrl, registration) {
@@ -39,27 +57,42 @@ export function ReloadPrompt() {
     },
   });
 
-  if (!needRefresh) return null;
+  // Tracks user activity and tab visibility — independent of whether an
+  // update is waiting, so the idle/hidden clocks are already running by the
+  // time one shows up.
+  useEffect(() => {
+    const markActive = () => {
+      lastActivityRef.current = Date.now();
+    };
+    const trackVisibility = () => {
+      hiddenSinceRef.current = document.hidden ? Date.now() : 0;
+    };
+    markActive();
+    trackVisibility();
+    ACTIVITY_EVENTS.forEach((evt) => window.addEventListener(evt, markActive, { passive: true }));
+    document.addEventListener('visibilitychange', trackVisibility);
+    return () => {
+      ACTIVITY_EVENTS.forEach((evt) => window.removeEventListener(evt, markActive));
+      document.removeEventListener('visibilitychange', trackVisibility);
+    };
+  }, []);
 
-  return (
-    <div
-      role="alert"
-      // Mobile keeps the original bottom-right corner toast, clearing the
-      // bottom nav bar. Desktop moves it bottom-center and grows a size and
-      // border weight — a corner toast is too easy to miss against a full
-      // desktop layout, which is exactly what issue #613 reported. No accent
-      // or shadow here: DESIGN.md §6 reserves accent for interactive/selected
-      // elements (the Reload button already carries it) and shadows for
-      // popovers/menus, so the emphasis comes from layering weight instead.
-      className="fixed right-4 bottom-16 z-50 flex items-center gap-3 rounded-xs border border-line-bright bg-panel-2 px-3 py-2 text-sm shadow-lg md:right-auto md:bottom-6 md:left-1/2 md:-translate-x-1/2 md:border-2 md:px-5 md:py-4 md:text-base"
-    >
-      <span>{t('pwa.updateReady')}</span>
-      <Button size="sm" variant="primary" onClick={() => void updateServiceWorker(true)}>
-        {t('pwa.reload')}
-      </Button>
-      <Button size="sm" onClick={() => setNeedRefresh(false)}>
-        {t('pwa.dismiss')}
-      </Button>
-    </div>
-  );
+  useEffect(() => {
+    if (!needRefresh) return;
+
+    // Re-checked every tick rather than latched — if a prior call didn't
+    // actually trigger a reload (SKIP_WAITING lost, controllerchange never
+    // fired), the next tick just tries again.
+    const tick = () => {
+      const hiddenSince = hiddenSinceRef.current;
+      const since = hiddenSince || lastActivityRef.current;
+      const threshold = hiddenSince ? HIDDEN_APPLY_GRACE_MS : VISIBLE_IDLE_APPLY_THRESHOLD_MS;
+      if (Date.now() - since >= threshold) void updateServiceWorker(true);
+    };
+
+    const id = window.setInterval(tick, APPLY_CHECK_POLL_MS);
+    return () => window.clearInterval(id);
+  }, [needRefresh, updateServiceWorker]);
+
+  return null;
 }
