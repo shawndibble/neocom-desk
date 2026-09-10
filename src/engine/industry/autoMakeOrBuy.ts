@@ -35,6 +35,7 @@ import {
   type MaterialRecipe,
 } from '@/engine/industry/makeOrBuy';
 import { MAX_SUB_BUILD_DEPTH } from '@/engine/industry/materialResolution';
+import { sizeRuns } from '@/engine/industry/runSizing';
 
 /** Build Opportunities' own UI-sizing constant only — see the module doc comment. */
 export const MAX_AUTO_BUILD_DEPTH = 3;
@@ -106,12 +107,12 @@ function walkMaterials(
     try {
       const subVisited = new Set([...visited, material.typeID]);
       if (recipe.method === 'planetary') {
-        if (recipe.outputQuantity <= 0) continue;
-        const subRuns = Math.max(1, Math.ceil(material.quantity / recipe.outputQuantity));
+        const sizing = sizeRuns(material.quantity, recipe.outputQuantity);
+        if (!sizing) continue;
         const inputs: EffectiveMaterial[] = recipe.inputs.map((input) => ({
           typeID: input.typeID,
-          baseQuantity: input.quantity * subRuns,
-          quantity: input.quantity * subRuns,
+          baseQuantity: input.quantity * sizing.runs,
+          quantity: input.quantity * sizing.runs,
         }));
         walkMaterials(inputs, depth + 1, subVisited, wctx, visitMaterial);
       } else {
@@ -120,11 +121,10 @@ function walkMaterials(
         // must reflect the job actually being evaluated, not an arbitrary
         // single run. Reaction formulas are always ME0 (module doc on
         // `MaterialRecipe`'s reaction variant).
-        const outputPerRun = recipe.blueprint.products[0]?.quantity ?? 0;
-        if (outputPerRun <= 0) continue;
-        const subRuns = Math.max(1, Math.ceil(material.quantity / outputPerRun));
+        const sizing = sizeRuns(material.quantity, recipe.blueprint.products[0]?.quantity ?? 0);
+        if (!sizing) continue;
         const subME = recipe.method === 'manufacturing' ? recipe.me : 0;
-        const inputs = effectiveMaterials(recipe.blueprint, subRuns, subME, wctx.ctx);
+        const inputs = effectiveMaterials(recipe.blueprint, sizing.runs, subME, wctx.ctx);
         walkMaterials(inputs, depth + 1, subVisited, wctx, visitMaterial);
       }
     } catch {
