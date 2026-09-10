@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { lazy, Suspense, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import {
@@ -14,6 +14,7 @@ import {
   EmptyState,
   FilterBar,
   Panel,
+  Spinner,
   TextInput,
   useFilterSurface,
 } from '@/components/ui';
@@ -27,6 +28,7 @@ import {
   filterProductionRunsByDate,
   type ProductionLogFilter,
 } from './productionLogFilter';
+import { productionProfitHistory, productionProfitTrend } from './productionProfitHistory';
 import { summarizeProductionRun, type ProductionRunSummary } from './productionRunSummary';
 import {
   loggedAtColumn,
@@ -42,6 +44,15 @@ import { useSaleLinking } from './useSaleLinking';
 import { iskToneClass } from '@/features/character/format';
 import { formatIsk } from '@/lib/isk';
 import { formatPercent } from './format';
+
+/**
+ * Dynamic import, not a static one: `ProductionProfitChart.tsx` statically
+ * imports Recharts, so this is the boundary that keeps the library out of
+ * the initial page bundle — it only loads once the Records tab actually
+ * renders a chart (see `character/WalletBalanceChart.tsx`'s bundle-size
+ * precedent).
+ */
+const LazyProductionProfitChart = lazy(() => import('./ProductionProfitChart'));
 
 interface ProductionLogPanelProps {
   characterId: number;
@@ -292,6 +303,18 @@ export function ProductionLogPanel({
     [runs, saleLinks, orderWatches, filter, skills, catalog, planIds]
   );
 
+  const profitHistoryPoints = useMemo(
+    () =>
+      productionProfitHistory(
+        rollup.summaries.map((s) => ({ loggedAt: s.run.loggedAt, profit: s.profit.profit }))
+      ),
+    [rollup.summaries]
+  );
+  const profitHistoryTrend = useMemo(
+    () => productionProfitTrend(profitHistoryPoints),
+    [profitHistoryPoints]
+  );
+
   if (runs.length === 0) {
     return (
       <Panel title={t('industry.productionLog')}>
@@ -441,6 +464,20 @@ export function ProductionLogPanel({
           />
         ) : (
           <div className="min-w-0 space-y-4">
+            {profitHistoryPoints.length >= 2 && (
+              <Suspense
+                fallback={
+                  <div className="flex justify-center py-8">
+                    <Spinner label={t('common.loading')} />
+                  </div>
+                }
+              >
+                <LazyProductionProfitChart
+                  points={profitHistoryPoints}
+                  trend={profitHistoryTrend}
+                />
+              </Suspense>
+            )}
             <div>
               <h3 className="border-b border-line pb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
                 {t('industry.byItem')}

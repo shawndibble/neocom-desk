@@ -521,6 +521,7 @@
     "totalRevenueLinked": "Total revenue linked",
     "openInventoryValue": "Open inventory value",
     "byItem": "By item",
+    "profitHistoryChartLabel": "Realized profit over time",
     "runsLogged": "Runs logged",
     "unitsProduced": "Units produced",
     "unitsSold": "Units sold",
