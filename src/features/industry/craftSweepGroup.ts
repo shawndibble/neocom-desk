@@ -24,6 +24,7 @@ import { loadMarketSnapshots, type MarketSnapshot } from './marketData';
 import {
   facilityContextFor,
   reactionPlanFacilityContextFor,
+  sweepDepthContext,
   type PlanFacilityContext,
 } from './planFacilityContext';
 import { materialPricesFor } from './priceBasis';
@@ -92,16 +93,11 @@ export function groupCraftSweepMaxDepth(
   for (const plan of plans) {
     const member = resolveMember(plan, catalog);
     if (!member) continue;
-    const ctx: MakeOrBuyContext = {
-      ...member.facilityContext,
-      systemCostIndex: 0,
-      adjustedPrices: {},
-      materialPrices: {},
-      skills,
-      reactionFacility: member.reactionPlanFacilityContext
-        ? { ...member.reactionPlanFacilityContext, systemCostIndex: 0 }
-        : undefined,
-    };
+    const ctx = sweepDepthContext(
+      member.facilityContext,
+      member.reactionPlanFacilityContext,
+      skills
+    );
     deepest = Math.max(
       deepest,
       maxSweepDepth(member.blueprint, plan.me, { recipeFor, ctx, runs: plan.runs })

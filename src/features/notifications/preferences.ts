@@ -26,6 +26,8 @@ import {
   toggleAllEveTypesOnChannel,
   broadcastEventChannelFlags,
   broadcastAllEventsChannelFlags,
+  broadcastEveTypeChannelFlags,
+  broadcastAllEveTypesChannelFlags,
   NOTIFICATION_CHANNELS,
   type EventEnabledMap,
   type EveTypeEnabledMap,
@@ -84,6 +86,8 @@ export interface NotificationPreferencesValue {
 export interface CharacterEventThresholds {
   /** Days of fuel remaining that trigger `structureFuelLow` — one of `STRUCTURE_FUEL_LOW_DAY_OPTIONS`. */
   structureFuelLowDays?: number;
+  /** Hours before an extractor's `expiry_time` that trigger `planetaryExtractorExpiring` (issue #750) — one of `EXTRACTOR_EXPIRING_LEAD_HOUR_OPTIONS`. */
+  extractorExpiringLeadHours?: number;
   /** ISK balance at or under which `corpWalletThreshold` fires its `balanceBelow` half. */
   corpWalletBalanceFloorIsk?: number;
   /** ISK amount a single journal entry must exceed to fire `corpWalletThreshold`'s `transactionAbove` half. */
@@ -95,8 +99,12 @@ export interface CharacterEventThresholds {
 /** The three lead times `structureFuelLow`'s inline control offers (issue #299) — CCP's own alert fires separately and later. */
 export const STRUCTURE_FUEL_LOW_DAY_OPTIONS: readonly number[] = [7, 3, 1];
 
+/** The lead times `planetaryExtractorExpiring`'s inline control offers (issue #750), replacing the old fixed 24h/12h pair. */
+export const EXTRACTOR_EXPIRING_LEAD_HOUR_OPTIONS: readonly number[] = [24, 12, 6, 1];
+
 /** A week's warning is the issue's own justification: "a director planning a fuel run wants a week's warning." */
 export const DEFAULT_STRUCTURE_FUEL_LOW_DAYS = 7;
+export const DEFAULT_EXTRACTOR_EXPIRING_LEAD_HOURS = 6;
 export const DEFAULT_CORP_WALLET_BALANCE_FLOOR_ISK = 50_000_000;
 export const DEFAULT_CORP_WALLET_TRANSACTION_CEILING_ISK = 100_000_000;
 export const DEFAULT_WALLET_BALANCE_CHANGED_THRESHOLD_ISK = 1_000_000;
@@ -159,6 +167,7 @@ function isCharacterEventThresholds(raw: unknown): raw is CharacterEventThreshol
   const r = raw as Record<string, unknown>;
   return (
     isOptionalFiniteNumber(r.structureFuelLowDays) &&
+    isOptionalFiniteNumber(r.extractorExpiringLeadHours) &&
     isOptionalFiniteNumber(r.corpWalletBalanceFloorIsk) &&
     isOptionalFiniteNumber(r.corpWalletTransactionCeilingIsk) &&
     isOptionalFiniteNumber(r.walletBalanceChangedThresholdIsk)
@@ -464,6 +473,8 @@ export function characterEventThresholds(
   const raw = value.thresholdsByCharacter?.[characterId] ?? {};
   return {
     structureFuelLowDays: raw.structureFuelLowDays ?? DEFAULT_STRUCTURE_FUEL_LOW_DAYS,
+    extractorExpiringLeadHours:
+      raw.extractorExpiringLeadHours ?? DEFAULT_EXTRACTOR_EXPIRING_LEAD_HOURS,
     corpWalletBalanceFloorIsk:
       raw.corpWalletBalanceFloorIsk ?? DEFAULT_CORP_WALLET_BALANCE_FLOOR_ISK,
     corpWalletTransactionCeilingIsk:
@@ -544,6 +555,71 @@ export async function broadcastAllEventsChannelPref(
     characterIds,
     value,
     broadcastAllEventsChannelFlags(characterIds, eventIds, value.perCharacter, channel),
+    channel
+  );
+}
+
+/**
+ * `writeBroadcastFlags`'s counterpart for `eveNotificationTypesByCharacter`
+ * (issue #745) — the per-type map lives in its own top-level field, not
+ * `perCharacter`, so it needs its own merge-and-write shell rather than
+ * reusing the one above.
+ */
+async function writeBroadcastEveTypeFlags(
+  characterIds: readonly number[],
+  value: NotificationPreferencesValue,
+  flags: Record<number, EveTypeEnabledMap>,
+  channel: NotificationChannel
+): Promise<void> {
+  if (characterIds.length === 0) return;
+  const next: NotificationPreferencesValue = {
+    ...value,
+    eveNotificationTypesByCharacter: { ...value.eveNotificationTypesByCharacter, ...flags },
+  };
+  await updateNotificationPrefs(characterIds[0], next, channel);
+}
+
+/**
+ * Broadcasts one EVE Notification type's channel value to every known
+ * Character at once (issue #745) — the "All Characters" section's per-type
+ * control underneath `eveNotification`, same one-time-broadcast contract as
+ * `broadcastEventChannelPref`.
+ */
+export async function broadcastEveTypeChannelPref(
+  characterIds: readonly number[],
+  value: NotificationPreferencesValue,
+  type: string,
+  channel: NotificationChannel
+): Promise<void> {
+  await writeBroadcastEveTypeFlags(
+    characterIds,
+    value,
+    broadcastEveTypeChannelFlags(
+      characterIds,
+      type,
+      value.eveNotificationTypesByCharacter ?? {},
+      channel
+    ),
+    channel
+  );
+}
+
+/** Same as `broadcastEveTypeChannelPref`, for a Family's own select-all across every Character too. */
+export async function broadcastAllEveTypesChannelPref(
+  characterIds: readonly number[],
+  value: NotificationPreferencesValue,
+  types: readonly string[],
+  channel: NotificationChannel
+): Promise<void> {
+  await writeBroadcastEveTypeFlags(
+    characterIds,
+    value,
+    broadcastAllEveTypesChannelFlags(
+      characterIds,
+      types,
+      value.eveNotificationTypesByCharacter ?? {},
+      channel
+    ),
     channel
   );
 }

@@ -36,7 +36,7 @@
  */ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useVirtualizer } from '@tanstack/react-virtual';
+import { useWindowVirtualizer } from '@tanstack/react-virtual';
 import {
   Button,
   Panel,
@@ -81,8 +81,10 @@ import {
   characterEventThresholds,
   withCharacterEventThreshold,
   STRUCTURE_FUEL_LOW_DAY_OPTIONS,
+  EXTRACTOR_EXPIRING_LEAD_HOUR_OPTIONS,
   type CharacterEventThresholds,
 } from './preferences';
+import { runForegroundPoll, liveDependencies } from './foregroundPoller';
 import {
   isEventEnabledFor,
   isEveTypeEnabledFor,
@@ -100,10 +102,6 @@ import { filterNotificationSections } from './notificationSearch';
 import { estimateCharacterSectionHeight } from './notificationRows';
 import { parseIskAmount, formatIsk } from '@/lib/isk';
 import { refreshAppBadge } from './appBadge';
-import {
-  useViewportBoundedHeight,
-  VIEWPORT_BOUNDED_BOTTOM_GAP_PX,
-} from '@/lib/useViewportBoundedHeight';
 import {
   useNotificationPermission,
   useNotificationPromptState,
@@ -359,30 +357,38 @@ export function NotificationsPanel() {
    * reuses the exact same conditional-row walk the section below renders
    * (`estimateCharacterSectionHeight`), so the estimate tracks what's really
    * about to render rather than guessing a flat height.
+   *
+   * Windows against the page itself rather than an inner scroll box
+   * (`useWindowVirtualizer`, not `useVirtualizer`): a fixed-height,
+   * internally-scrolling panel here read as a cramped box with its own
+   * scrollbar buried inside the page. The load-bearing case #740 was filed
+   * for is still covered — a search matching the whole roster expands every
+   * section at once (`expanded = searching || ...` below), which is the
+   * same worst case whichever element does the scrolling.
    */
-  const scrollElRef = useRef<HTMLDivElement>(null);
-  const [viewportHeightRef, viewportBoundedMaxHeight] = useViewportBoundedHeight(
-    VIEWPORT_BOUNDED_BOTTOM_GAP_PX
-  );
-  // Both refs need the same node: the virtualizer reads it imperatively via
-  // `getScrollElement`, and `useViewportBoundedHeight` measures it (a
-  // callback ref, not a `.current` object, since it has to re-fire once the
-  // node actually mounts).
-  const scrollParentRef = useCallback(
-    (node: HTMLDivElement | null) => {
-      scrollElRef.current = node;
-      viewportHeightRef(node);
-    },
-    [viewportHeightRef]
-  );
-  // React Compiler isn't enabled in this build (no babel plugin configured);
-  // this is eslint-plugin-react-hooks flagging TanStack Virtual's returned
-  // functions as unsafe to memoize *if* the compiler is ever turned on
-  // (same suppression `Assets.tsx`'s virtualizer uses).
-  // eslint-disable-next-line react-hooks/incompatible-library
-  const rowVirtualizer = useVirtualizer({
+  const [listElement, setListElement] = useState<HTMLDivElement | null>(null);
+  const [scrollMargin, setScrollMargin] = useState(0);
+  // A callback ref, not a plain `useRef` read at render time (the eslint
+  // `react-hooks/refs` rule this project enables forbids that): the list sits
+  // below content whose height can change after mount (a permission banner
+  // appearing, search narrowing the roster), so this re-measures on resize
+  // too, the same pattern `useViewportBoundedHeight` uses for its own
+  // layout-position read.
+  const listRef = useCallback((node: HTMLDivElement | null) => setListElement(node), []);
+  useEffect(() => {
+    if (!listElement) return;
+    const measure = () => setScrollMargin(listElement.offsetTop);
+    measure();
+    window.addEventListener('resize', measure);
+    const observer = new ResizeObserver(measure);
+    observer.observe(document.body);
+    return () => {
+      window.removeEventListener('resize', measure);
+      observer.disconnect();
+    };
+  }, [listElement]);
+  const rowVirtualizer = useWindowVirtualizer({
     count: visibleCharacters.length,
-    getScrollElement: () => scrollElRef.current,
     estimateSize: (index) => {
       const character = visibleCharacters[index];
       const expanded = searching || expandedCharacterIds.has(character.characterId);
@@ -404,6 +410,11 @@ export function NotificationsPanel() {
       });
     },
     getItemKey: (index) => visibleCharacters[index].characterId,
+    // `virtualRow.start` is otherwise measured from the top of the
+    // *document*, not this list — it has to know how far down the page the
+    // list itself starts (master switch, channel toggles, the All
+    // Characters section, and the search box all sit above it).
+    scrollMargin,
     overscan: 5,
   });
 
@@ -518,15 +529,9 @@ export function NotificationsPanel() {
               <EmptyState title={t('settings.notifications.noResults')} className="py-8" />
             ) : (
               <div
-                ref={scrollParentRef}
+                ref={listRef}
                 data-virtual-scroll-root
                 aria-label={t('settings.notificationsTitle')}
-                className="overflow-y-auto"
-                style={
-                  viewportBoundedMaxHeight !== null
-                    ? { maxHeight: viewportBoundedMaxHeight }
-                    : undefined
-                }
               >
                 <div
                   role="presentation"
@@ -550,7 +555,7 @@ export function NotificationsPanel() {
                           top: 0,
                           left: 0,
                           width: '100%',
-                          transform: `translateY(${virtualRow.start}px)`,
+                          transform: `translateY(${virtualRow.start - rowVirtualizer.options.scrollMargin}px)`,
                         }}
                       >
                         <CharacterNotificationSection
@@ -635,6 +640,26 @@ const CharacterNotificationSection = memo(function CharacterNotificationSection(
   // Every write reads the store fresh at click time rather than closing
   // over a `prefsValue` prop — see this component's props doc for why.
   const currentValue = () => useNotificationPreferences.getState().value;
+
+  /**
+   * `registerDeviceForWebPush` replaces the backend's whole stored
+   * Projection for a Character on every poll tick (issue #358), so a
+   * lead-time change or an off-toggle otherwise leaves a stale Scheduled
+   * Push live until the next ~5-minute tick catches up (issue #750). This
+   * re-runs the full Foreground Poller — the only thing in the codebase
+   * that assembles one Character's whole Projection correctly — rather
+   * than uploading just this domain's rows, which would silently wipe
+   * every other domain's pending push for every other Character too.
+   * `runForegroundPoll`'s in-flight guard coalesces rather than queues: a
+   * click landing while a poll is already running joins that in-flight
+   * poll instead of starting a fresh one, so it can compute under the
+   * *previous* threshold/toggle state — a narrow, self-healing race (the
+   * next ~5-minute tick still picks up the new value) that also happens to
+   * be what stops rapid Select changes from firing one ESI poll apiece.
+   */
+  const triggerExtractorReupload = () => {
+    void runForegroundPoll(liveDependencies());
+  };
 
   return (
     <div className="rounded-xs border border-line bg-panel/85 backdrop-blur-sm">
@@ -739,14 +764,18 @@ const CharacterNotificationSection = memo(function CharacterNotificationSection(
                             !hasScope ? 'scope' : capabilityMissing ? 'capability' : null
                           }
                           checked={isEventEnabledFor(prefs, eventId, channel)}
-                          onToggle={() =>
+                          onToggle={() => {
+                            const wasEnabled = isEventEnabledFor(prefs, eventId, channel);
                             void toggleEventChannelPref(
                               character.characterId,
                               currentValue(),
                               eventId,
                               channel
-                            )
-                          }
+                            );
+                            if (eventId === 'planetaryExtractorExpiring' && wasEnabled) {
+                              triggerExtractorReupload();
+                            }
+                          }}
                         />
                       ))}
                     </div>
@@ -764,6 +793,50 @@ const CharacterNotificationSection = memo(function CharacterNotificationSection(
                     <p className="border-t border-line bg-panel/60 px-6 py-1.5 text-[0.6875rem] text-text-dim">
                       {t('settings.notifications.extractorExpiringHint')}
                     </p>
+                  )}
+                  {/*
+                    Extractor lead time's inline threshold control (issue
+                    #750), same pattern as structure fuel's below — the
+                    fixed 24h/12h warning pair is gone, replaced by this one
+                    configured value both delivery channels read.
+                  */}
+                  {eventId === 'planetaryExtractorExpiring' && rowEnabled && (
+                    <div className="border-t border-line bg-panel/60 px-6 py-1.5">
+                      <label className="flex items-center gap-2 text-[0.6875rem] text-text-dim">
+                        {t('settings.notifications.extractorExpiringLeadTimeLabel')}
+                        <Select
+                          value={String(thresholds.extractorExpiringLeadHours)}
+                          onValueChange={(value) => {
+                            void updatePrefs(
+                              character.characterId,
+                              withCharacterEventThreshold(
+                                currentValue(),
+                                character.characterId,
+                                'extractorExpiringLeadHours',
+                                Number(value)
+                              )
+                            );
+                            triggerExtractorReupload();
+                          }}
+                        >
+                          <SelectTrigger
+                            size="sm"
+                            aria-label={t('settings.notifications.extractorExpiringLeadTimeLabel')}
+                          >
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {EXTRACTOR_EXPIRING_LEAD_HOUR_OPTIONS.map((hours) => (
+                              <SelectItem key={hours} value={String(hours)}>
+                                {t('settings.notifications.extractorExpiringLeadTimeOption', {
+                                  count: hours,
+                                })}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </label>
+                    </div>
                   )}
                   {/*
                     Structure fuel's inline threshold control

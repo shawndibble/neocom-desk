@@ -241,7 +241,10 @@ describe('Industry: Build Plan CRUD', () => {
     expect(stored[0].hubId).toBe(DEFAULT_TRADE_HUB.id);
     expect(stored[0].facilityTaxPct).toBeUndefined();
 
-    await user.click(screen.getByRole('button', { name: 'Rename Rifter' }));
+    // Rename/duplicate/move-to-group live behind the row's context menu now
+    // (#767) — only Delete stays a visible button.
+    fireEvent.contextMenu(screen.getByRole('button', { name: 'Rifter' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Rename' }));
     const renameInput = screen.getByRole('textbox', { name: 'Rename' });
     await user.clear(renameInput);
     await user.type(renameInput, 'Rifter run{Enter}');
@@ -253,7 +256,8 @@ describe('Industry: Build Plan CRUD', () => {
     fireEvent.pointerMove(within(row).getByRole('button', { name: 'Delete Rifter run' }));
     expect(await screen.findByRole('tooltip')).toHaveTextContent(/^Delete$/);
 
-    await user.click(within(row).getByRole('button', { name: 'Duplicate Rifter run' }));
+    fireEvent.contextMenu(within(row).getByRole('button', { name: 'Rifter run' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Duplicate' }));
     expect(await screen.findByRole('button', { name: 'Rifter run (copy)' })).toBeInTheDocument();
     expect(await db.buildPlans.where('characterId').equals(CHAR_ID).count()).toBe(2);
 

@@ -419,3 +419,118 @@ export function toggleAllEveTypesOnChannel(
 ): EveTypeEnabledMap {
   return { ...map, ...allToggledFlags(types, map, channel, isEveTypeEnabledFor) };
 }
+
+/**
+ * Cross-character select-all/mixed state for one EVE Notification type on one
+ * channel — the eve-type counterpart of `selectionStateForEventAcrossCharacters`
+ * (issue #738), for the "All Characters" section's per-type rows underneath
+ * `eveNotification` (issue #745). One type, every known Character's own value
+ * for it.
+ */
+export function selectionStateForEveTypeAcrossCharacters(
+  characterIds: readonly number[],
+  type: string,
+  perCharacterMap: Readonly<Record<number, EveTypeEnabledMap>>,
+  channel: NotificationChannel
+): SelectionState {
+  return selectionStateFor(characterIds, perCharacterMap, channel, (map, characterId, c) =>
+    isEveTypeEnabledFor(map[characterId] ?? {}, type, c)
+  );
+}
+
+/**
+ * Cross-character, cross-type select-all/mixed state for a Family's own
+ * select-all header in the "All Characters" section (issue #745) — the
+ * eve-type counterpart of `selectionStateForAllCharactersAllEvents`, scoped
+ * to whatever `types` the caller passes (a single Family's types here).
+ */
+export function selectionStateForAllCharactersEveTypes(
+  characterIds: readonly number[],
+  types: readonly string[],
+  perCharacterMap: Readonly<Record<number, EveTypeEnabledMap>>,
+  channel: NotificationChannel
+): SelectionState {
+  if (characterIds.length === 0 || types.length === 0) return 'unchecked';
+  const total = characterIds.length * types.length;
+  let enabledCount = 0;
+  for (const characterId of characterIds) {
+    const map = perCharacterMap[characterId] ?? {};
+    for (const type of types) {
+      if (isEveTypeEnabledFor(map, type, channel)) enabledCount += 1;
+    }
+  }
+  if (enabledCount === 0) return 'unchecked';
+  return enabledCount === total ? 'checked' : 'indeterminate';
+}
+
+/** One type's channel flags with `channel` forced to `value`, the other channel carried through unchanged. */
+function eveTypeFlagsWithChannelSet(
+  prefs: EveTypeEnabledMap,
+  type: string,
+  channel: NotificationChannel,
+  value: boolean
+): ChannelFlags {
+  const flags: ChannelFlags = {};
+  for (const c of NOTIFICATION_CHANNELS) flags[c] = isEveTypeEnabledFor(prefs, type, c);
+  flags[channel] = value;
+  return flags;
+}
+
+/**
+ * Broadcast cascade for one EVE Notification type's channel across every
+ * known Character (issue #745) — the eve-type counterpart of
+ * `broadcastEventChannelFlags`, same cascade rule (any disagreement or
+ * all-off turns everyone on; only full agreement-on turns everyone off).
+ */
+export function broadcastEveTypeChannelFlags(
+  characterIds: readonly number[],
+  type: string,
+  perCharacterMap: Readonly<Record<number, EveTypeEnabledMap>>,
+  channel: NotificationChannel
+): Record<number, EveTypeEnabledMap> {
+  const allEnabled =
+    characterIds.length > 0 &&
+    characterIds.every((id) => isEveTypeEnabledFor(perCharacterMap[id] ?? {}, type, channel));
+  const nextEnabled = !allEnabled;
+  const result: Record<number, EveTypeEnabledMap> = {};
+  for (const characterId of characterIds) {
+    const prefs = perCharacterMap[characterId] ?? {};
+    result[characterId] = {
+      ...prefs,
+      [type]: eveTypeFlagsWithChannelSet(prefs, type, channel, nextEnabled),
+    };
+  }
+  return result;
+}
+
+/**
+ * Broadcast cascade for a whole set of EVE Notification types' channel across
+ * every known Character at once (issue #745) — the eve-type counterpart of
+ * `broadcastAllEventsChannelFlags`, used for a Family's own select-all in the
+ * "All Characters" section.
+ */
+export function broadcastAllEveTypesChannelFlags(
+  characterIds: readonly number[],
+  types: readonly string[],
+  perCharacterMap: Readonly<Record<number, EveTypeEnabledMap>>,
+  channel: NotificationChannel
+): Record<number, EveTypeEnabledMap> {
+  const allEnabled =
+    characterIds.length > 0 &&
+    types.length > 0 &&
+    characterIds.every((id) => {
+      const prefs = perCharacterMap[id] ?? {};
+      return types.every((type) => isEveTypeEnabledFor(prefs, type, channel));
+    });
+  const nextEnabled = !allEnabled;
+  const result: Record<number, EveTypeEnabledMap> = {};
+  for (const characterId of characterIds) {
+    const prefs = perCharacterMap[characterId] ?? {};
+    const nextPrefs: EveTypeEnabledMap = { ...prefs };
+    for (const type of types) {
+      nextPrefs[type] = eveTypeFlagsWithChannelSet(prefs, type, channel, nextEnabled);
+    }
+    result[characterId] = nextPrefs;
+  }
+  return result;
+}

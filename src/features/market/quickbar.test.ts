@@ -5,6 +5,7 @@ import {
   reorderQuickbarItems,
   setQuickbarItemTarget,
   hasQuickbarTarget,
+  quickbarToPasteText,
 } from './quickbar';
 
 describe('addQuickbarItem', () => {
@@ -116,6 +117,29 @@ describe('setQuickbarItemTarget', () => {
       { typeId: 1, name: 'Tritanium' },
       { typeId: 2, name: 'Rifter' },
     ]);
+  });
+});
+
+describe('quickbarToPasteText', () => {
+  it('joins item names one per line', () => {
+    expect(
+      quickbarToPasteText([
+        { typeId: 1, name: 'Tritanium' },
+        { typeId: 2, name: 'Rifter' },
+      ])
+    ).toBe('Tritanium\nRifter');
+  });
+
+  it('ignores target price fields, emitting bare names only', () => {
+    expect(
+      quickbarToPasteText([
+        { typeId: 1, name: 'Tritanium', targetPrice: 5, targetDirection: 'above' },
+      ])
+    ).toBe('Tritanium');
+  });
+
+  it('is empty for an empty Quickbar', () => {
+    expect(quickbarToPasteText([])).toBe('');
   });
 });
 

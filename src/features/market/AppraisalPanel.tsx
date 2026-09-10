@@ -56,6 +56,8 @@ interface AppraisalPanelProps {
   onAddToQuickbar: (typeId: number, itemName: string) => void;
   quickbarAvailable: boolean;
   onShowInfo: (typeId: number, itemName: string) => void;
+  /** Opens the Compare Hubs panel already expanded — the Quickbar's "View in Appraisal" action (#726) lands directly on the multi-hub view rather than a collapsed one. */
+  defaultCompareExpanded?: boolean;
 }
 
 /** A missing price is a dash, never a zero — the house placeholder. */
@@ -94,10 +96,11 @@ export function AppraisalPanel({
   onAddToQuickbar,
   quickbarAvailable,
   onShowInfo,
+  defaultCompareExpanded = false,
 }: AppraisalPanelProps) {
   const { t } = useTranslation();
   const { text, setText, result, compare, loading, failed } = controller;
-  const [compareExpanded, setCompareExpanded] = useState(false);
+  const [compareExpanded, setCompareExpanded] = useState(defaultCompareExpanded);
 
   /*
    * The percent field is a string while it is being typed. Committing on every

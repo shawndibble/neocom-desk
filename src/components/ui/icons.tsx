@@ -74,8 +74,10 @@ import {
   ShoppingCart,
   SignIn as SignInGlyph,
   Sliders,
+  SquaresFour,
   Stack,
   Star,
+  Table as TableGlyph,
   Target,
   Tray,
   UsersFour,
@@ -311,3 +313,7 @@ export const SignIn = withWeight(SignInGlyph);
 export const Watched = withWeight(Eye);
 /** A contact this character has blocked. */
 export const Blocked = withWeight(Prohibit);
+/** Card-grid view mode toggle. */
+export const CardsView = withWeight(SquaresFour);
+/** Table view mode toggle. */
+export const TableView = withWeight(TableGlyph);

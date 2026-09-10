@@ -12,7 +12,9 @@ import {
   type FacilityPreset,
   type RigFit,
   type SecurityBand,
+  type SkillLevels,
 } from '@/engine/industry/types';
+import type { MakeOrBuyContext } from '@/engine/industry/makeOrBuy';
 
 export interface PlanFacilityContext {
   facility: FacilityPreset;
@@ -54,5 +56,33 @@ export function reactionPlanFacilityContextFor(
     rigFit: resolveRigFit({ rigFit: plan.reactionRigFit }),
     security: plan.reactionSecurity ?? 'highsec',
     facilityTaxPct: facility.structure ? plan.reactionFacilityTaxPct : undefined,
+  };
+}
+
+/**
+ * Craft Sweep's Sweep Depth context (issues #695/#696): a `MakeOrBuyContext`
+ * with every pricing field zeroed, since `maxSweepDepth` never prices
+ * anything — only walks the tree. Built from the plan-level
+ * `reactionPlanFacilityContextFor` result, never the price-resolved
+ * `reactionFacilityContext` a rendered plan also carries: that one stays
+ * `undefined` until its own market snapshot lands, which would gate depth
+ * discovery on a fetch it does not need for any plan with a Reaction
+ * Location configured. The single seam `BuildPlanDetail.tsx`'s solo control
+ * and `craftSweepGroup.ts`'s per-member walk both build this from.
+ */
+export function sweepDepthContext(
+  facilityContext: PlanFacilityContext,
+  reactionPlanFacilityContext: PlanFacilityContext | null,
+  skills: SkillLevels
+): MakeOrBuyContext {
+  return {
+    ...facilityContext,
+    systemCostIndex: 0,
+    adjustedPrices: {},
+    materialPrices: {},
+    skills,
+    reactionFacility: reactionPlanFacilityContext
+      ? { ...reactionPlanFacilityContext, systemCostIndex: 0 }
+      : undefined,
   };
 }

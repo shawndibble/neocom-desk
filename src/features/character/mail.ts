@@ -118,11 +118,20 @@ export function loadMailBody(
   );
 }
 
-/** Pushes the "read" write to ESI, alongside the session-local mark-read that always happens regardless. Errors are swallowed — nothing for a caller to react to, just another chance next time this mail reopens. */
+/**
+ * Pushes the "read" write to ESI, alongside the session-local mark-read that
+ * always happens regardless. Errors are otherwise swallowed — nothing for a
+ * caller to react to, just another chance next time this mail reopens — but
+ * an auth failure still signals the app-wide reauth banner
+ * (`emitEsiAuthFailure`), same as every other read-through loader in this
+ * file: a stale grant (e.g. a token that predates `organize_mail`'s addition,
+ * issue #741) would otherwise fail silently on every open with no way for the
+ * user to learn a re-login would fix it.
+ */
 export async function markMailReadOnEsi(characterId: number, mailId: number): Promise<void> {
   try {
     await putCharacterMail(characterId, mailId, { read: true });
-  } catch {
-    // swallowed — see docblock
+  } catch (err) {
+    if (isAuthFailure(err)) emitEsiAuthFailure(characterId);
   }
 }

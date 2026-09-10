@@ -1047,7 +1047,7 @@ describe('Quickbar (issue #7)', () => {
     fireEvent.contextMenu(item);
     await user.click(screen.getByRole('menuitem', { name: 'Add to Quickbar' }));
 
-    const quickbar = (await screen.findByRole('heading', { name: 'Quickbar' })).closest('div')!;
+    const quickbar = await screen.findByTestId('quickbar');
     await waitFor(() => expect(within(quickbar).getAllByText('Rifter')).toHaveLength(1));
 
     fireEvent.contextMenu(item);
@@ -1102,7 +1102,7 @@ describe('Quickbar (issue #7)', () => {
     unmount();
 
     render(<App />);
-    const quickbar = (await screen.findByRole('heading', { name: 'Quickbar' })).closest('div')!;
+    const quickbar = await screen.findByTestId('quickbar');
     expect(await within(quickbar).findByText('Rifter')).toBeInTheDocument();
   });
 });

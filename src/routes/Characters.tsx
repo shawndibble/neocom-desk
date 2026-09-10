@@ -14,7 +14,6 @@ import {
   DropdownMenuTrigger,
   EmptyState,
   FilterBar,
-  FilterChip,
   FilterField,
   IconButton,
   Modal,
@@ -1227,46 +1226,50 @@ export function Characters() {
                 </Button>
               )}
             </div>
-            <div
-              role="group"
-              aria-label={t('characters.densityLabel')}
-              className="flex flex-wrap gap-2"
-            >
-              {FONT_SCALE_STEPS.map((step) => (
-                <FilterChip
-                  key={step}
-                  size="md"
-                  label={t(DENSITY_LABEL_KEYS[step])}
-                  selected={density === step}
-                  onToggle={() => void setDensity(step)}
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Shared app-wide text-size control (`useFontScale`), also on Settings' Display
+                  tab — relabeled Compact/Cozy/Comfortable/Spacious here, but changing it here
+                  changes text size everywhere. */}
+              <Select
+                value={String(density)}
+                onValueChange={(value) => void setDensity(Number(value) as FontScale)}
+              >
+                <SelectTrigger size="sm" aria-label={t('characters.densityLabel')} className="w-28">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {FONT_SCALE_STEPS.map((step) => (
+                    <SelectItem key={step} value={String(step)}>
+                      {t(DENSITY_LABEL_KEYS[step])}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <div role="group" aria-label={t('characters.viewModeLabel')} className="flex gap-2">
+                <IconButton
+                  size="sm"
+                  icon={<Icon.CardsView />}
+                  label={t('characters.viewCards')}
+                  pressed={viewMode === 'card'}
+                  onClick={() => void setViewMode('card')}
                 />
-              ))}
+                <IconButton
+                  size="sm"
+                  icon={<Icon.TableView />}
+                  label={t('characters.viewTable')}
+                  pressed={viewMode === 'table'}
+                  onClick={() => void setViewMode('table')}
+                />
+              </div>
+              {viewMode === 'table' && (
+                <ColumnPickerMenu
+                  available={availableColumnIds}
+                  visible={activeColumnIds}
+                  columnsById={columnsById}
+                  onToggle={handleToggleColumn}
+                />
+              )}
             </div>
-          </div>
-
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div role="group" aria-label={t('characters.viewModeLabel')} className="flex gap-2">
-              <FilterChip
-                size="md"
-                label={t('characters.viewCards')}
-                selected={viewMode === 'card'}
-                onToggle={() => void setViewMode('card')}
-              />
-              <FilterChip
-                size="md"
-                label={t('characters.viewTable')}
-                selected={viewMode === 'table'}
-                onToggle={() => void setViewMode('table')}
-              />
-            </div>
-            {viewMode === 'table' && (
-              <ColumnPickerMenu
-                available={availableColumnIds}
-                visible={activeColumnIds}
-                columnsById={columnsById}
-                onToggle={handleToggleColumn}
-              />
-            )}
           </div>
 
           {noSearchMatches ? (

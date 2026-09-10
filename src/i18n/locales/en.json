@@ -1539,7 +1539,8 @@
       "allLocations_one": "All locations · {{count}}",
       "allLocations_other": "All locations · {{count}}",
       "locationCount_one": "{{count}} location",
-      "locationCount_other": "{{count}} locations"
+      "locationCount_other": "{{count}} locations",
+      "totalValue": "Total Assets Value: {{value}}"
     },
     "unresolved": {
       "heading_one": "Location unresolved · {{count}}",
@@ -2139,6 +2140,9 @@
     "detailItemName": "Name",
     "detailQuantity": "Qty",
     "detailNoItems": "No item data for this contract",
+    "detailMarketValue": "Market value at {{hub}} (sell orders)",
+    "detailMarketValueUnpriced_one": "({{count}} item unpriced)",
+    "detailMarketValueUnpriced_other": "({{count}} items unpriced)",
     "statusFilterLabel": "Status",
     "typeFilterLabel": "Contract type",
     "contextMenu": {
@@ -2728,6 +2732,7 @@
     "quickbar": {
       "title": "Quickbar",
       "empty": "No items yet — right-click an item and choose Add to Quickbar.",
+      "viewInAppraisal": "View in Appraisal",
       "removeItem": "Remove {{name}} from Quickbar",
       "reorderItem": "Reorder {{name}}",
       "priceAlert": {
@@ -3069,6 +3074,9 @@
       "extractorExpiringHint": "Delivered up to 72 hours ahead, even with the app closed, once installed and enabled for notifications — open the app at least that often to keep it current. The Planetary Industry page always shows the real expiry.",
       "corpEventBestEffortHint": "Best-effort: fires only while the app is open. Not a substitute for in-game alerts.",
       "scheduledPushBadge": "Arrives even with the app closed — the backend schedules this one up to 72 hours ahead. Needs notification permission, and on iPhone and iPad the app installed to the home screen. Every other event needs the app open.",
+      "extractorExpiringLeadTimeLabel": "Warn this far before an extractor expires:",
+      "extractorExpiringLeadTimeOption_one": "{{count}} hour",
+      "extractorExpiringLeadTimeOption_other": "{{count}} hours",
       "structureFuelLowThresholdLabel": "Warn when fuel remaining drops below:",
       "structureFuelLowThresholdOption_one": "{{count}} day",
       "structureFuelLowThresholdOption_other": "{{count}} days",
@@ -3102,6 +3110,10 @@
       "toggleAllCharactersLabel": {
         "browser": "{{event}} for every character, browser notifications",
         "feed": "{{event}} for every character, Overview list"
+      },
+      "selectAllCharactersFamily": {
+        "browser": "Toggle all browser notifications for {{family}} for every character",
+        "feed": "Toggle all Overview notifications for {{family}} for every character"
       },
       "columnEvent": "Event",
       "eveTypesHint": "EVE’s own in-game notifications, grouped by family. These default to the Overview page only, except the attack and loss alerts, which also raise a browser pop-up — flip any of them per column.",
@@ -3324,6 +3336,7 @@
     "accessCharacterUnknown": "Select a character to see its corp access.",
     "accessRolesLabel": "Roles",
     "accessRolesNone": "None",
+    "accessRolesUnknown": "Unknown until granted",
     "accessGrantLabel": "Access",
     "accessGrantChecking": "Checking…",
     "accessGrantGranted": "Granted",

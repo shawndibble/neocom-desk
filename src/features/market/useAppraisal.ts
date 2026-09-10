@@ -33,6 +33,13 @@ export interface AppraisalController {
   /** What is in the box. */
   text: string;
   setText: (next: string) => void;
+  /**
+   * Sets the text and submits it in one call, rather than `setText` followed
+   * by `appraise()` — `appraise` closes over `text`, so a caller submitting a
+   * value it just computed (not one the pilot typed) needs the value applied
+   * directly instead of racing the state update.
+   */
+  appraiseText: (next: string) => void;
   /** Null until the first Appraise, and again after Clear. */
   result: AppraisalOutcome | null;
   /** The same pile priced at all 5 Trade Hubs. Null and set together with `result`. */
@@ -103,15 +110,19 @@ export function useAppraisal(
     };
   }, [submitted, hub, pricePercent, characterId, forceTick]);
 
-  const appraise = useCallback(() => {
+  const appraiseText = useCallback((next: string) => {
+    setText(next);
     // Guarded rather than left to the effect: an empty submit would otherwise
     // leave the previous result on screen with nothing backing it.
-    if (text.trim() === '') return;
-    setSubmitted(text);
-    // Re-pressing Appraise with the text unchanged must still re-run, or the
+    if (next.trim() === '') return;
+    setSubmitted(next);
+    // Re-submitting the same text unchanged must still re-run, or the
     // button does nothing after a failure.
     setForceTick((tick) => tick + 1);
-  }, [text]);
+  }, []);
+
+  // `setText(text)` here is a no-op re-set of the value it already holds.
+  const appraise = useCallback(() => appraiseText(text), [text, appraiseText]);
 
   const clear = useCallback(() => {
     setText('');
@@ -130,6 +141,7 @@ export function useAppraisal(
   return {
     text,
     setText,
+    appraiseText,
     result,
     compare,
     loading,

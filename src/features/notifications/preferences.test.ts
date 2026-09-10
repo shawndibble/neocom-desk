@@ -22,6 +22,7 @@ import {
   characterEventThresholds,
   withCharacterEventThreshold,
   DEFAULT_STRUCTURE_FUEL_LOW_DAYS,
+  DEFAULT_EXTRACTOR_EXPIRING_LEAD_HOURS,
   DEFAULT_CORP_WALLET_BALANCE_FLOOR_ISK,
   DEFAULT_CORP_WALLET_TRANSACTION_CEILING_ISK,
   DEFAULT_WALLET_BALANCE_CHANGED_THRESHOLD_ISK,
@@ -32,11 +33,15 @@ import {
   toggleAllEveTypesChannelPref,
   broadcastEventChannelPref,
   broadcastAllEventsChannelPref,
+  broadcastEveTypeChannelPref,
+  broadcastAllEveTypesChannelPref,
 } from './preferences';
 import { SYNCED_NOTIFICATION_FEED_PREFS_KEY } from './syncedPreferences';
 
 const EVENT_A = 'skillLevelComplete' satisfies NotificationEventId;
 const EVENT_B = 'newMail' satisfies NotificationEventId;
+const TYPE_A = 'BillOutOfMoneyMsg';
+const TYPE_B = 'AllWarDeclaredMsg';
 
 beforeEach(async () => {
   await db.settings.clear();
@@ -289,6 +294,7 @@ describe('characterEventThresholds / withCharacterEventThreshold', () => {
   it('defaults to the documented defaults for a character with no overrides', () => {
     expect(characterEventThresholds(DEFAULT_NOTIFICATION_PREFERENCES, 1)).toEqual({
       structureFuelLowDays: DEFAULT_STRUCTURE_FUEL_LOW_DAYS,
+      extractorExpiringLeadHours: DEFAULT_EXTRACTOR_EXPIRING_LEAD_HOURS,
       corpWalletBalanceFloorIsk: DEFAULT_CORP_WALLET_BALANCE_FLOOR_ISK,
       corpWalletTransactionCeilingIsk: DEFAULT_CORP_WALLET_TRANSACTION_CEILING_ISK,
       walletBalanceChangedThresholdIsk: DEFAULT_WALLET_BALANCE_CHANGED_THRESHOLD_ISK,
@@ -304,6 +310,7 @@ describe('characterEventThresholds / withCharacterEventThreshold', () => {
     );
     expect(characterEventThresholds(next, 1)).toEqual({
       structureFuelLowDays: 3,
+      extractorExpiringLeadHours: DEFAULT_EXTRACTOR_EXPIRING_LEAD_HOURS,
       corpWalletBalanceFloorIsk: DEFAULT_CORP_WALLET_BALANCE_FLOOR_ISK,
       corpWalletTransactionCeilingIsk: DEFAULT_CORP_WALLET_TRANSACTION_CEILING_ISK,
       walletBalanceChangedThresholdIsk: DEFAULT_WALLET_BALANCE_CHANGED_THRESHOLD_ISK,
@@ -320,6 +327,7 @@ describe('characterEventThresholds / withCharacterEventThreshold', () => {
     const next = withCharacterEventThreshold(withFuel, 1, 'corpWalletBalanceFloorIsk', 10_000_000);
     expect(characterEventThresholds(next, 1)).toEqual({
       structureFuelLowDays: 1,
+      extractorExpiringLeadHours: DEFAULT_EXTRACTOR_EXPIRING_LEAD_HOURS,
       corpWalletBalanceFloorIsk: 10_000_000,
       corpWalletTransactionCeilingIsk: DEFAULT_CORP_WALLET_TRANSACTION_CEILING_ISK,
       walletBalanceChangedThresholdIsk: DEFAULT_WALLET_BALANCE_CHANGED_THRESHOLD_ISK,
@@ -345,6 +353,7 @@ describe('characterEventThresholds / withCharacterEventThreshold', () => {
     );
     expect(characterEventThresholds(next, 1)).toEqual({
       structureFuelLowDays: DEFAULT_STRUCTURE_FUEL_LOW_DAYS,
+      extractorExpiringLeadHours: DEFAULT_EXTRACTOR_EXPIRING_LEAD_HOURS,
       corpWalletBalanceFloorIsk: DEFAULT_CORP_WALLET_BALANCE_FLOOR_ISK,
       corpWalletTransactionCeilingIsk: DEFAULT_CORP_WALLET_TRANSACTION_CEILING_ISK,
       walletBalanceChangedThresholdIsk: 10_500_000,
@@ -519,6 +528,43 @@ describe('broadcastEventChannelPref / broadcastAllEventsChannelPref (issue #738)
       const prefs = characterEventPrefs(value, characterId);
       expect(isEventEnabledFor(prefs, EVENT_A, 'browser')).toBe(false);
       expect(isEventEnabledFor(prefs, EVENT_B, 'browser')).toBe(false);
+    }
+  });
+});
+
+describe('broadcastEveTypeChannelPref / broadcastAllEveTypesChannelPref (issue #745)', () => {
+  it('writes the broadcast value into every known Character at once', async () => {
+    await broadcastEveTypeChannelPref([1, 2], DEFAULT_NOTIFICATION_PREFERENCES, TYPE_A, 'feed');
+    const value = useNotificationPreferences.getState().value;
+    expect(isEveTypeEnabledFor(characterEveTypePrefs(value, 1), TYPE_A, 'feed')).toBe(false);
+    expect(isEveTypeEnabledFor(characterEveTypePrefs(value, 2), TYPE_A, 'feed')).toBe(false);
+  });
+
+  it('a browser broadcast never touches the synced setting; a feed broadcast does', async () => {
+    await broadcastEveTypeChannelPref([1, 2], DEFAULT_NOTIFICATION_PREFERENCES, TYPE_A, 'browser');
+    expect(await db.settings.get(SYNCED_NOTIFICATION_FEED_PREFS_KEY)).toBeUndefined();
+
+    await broadcastEveTypeChannelPref([1, 2], DEFAULT_NOTIFICATION_PREFERENCES, TYPE_A, 'feed');
+    expect(await db.settings.get(SYNCED_NOTIFICATION_FEED_PREFS_KEY)).toBeDefined();
+  });
+
+  it('is a no-op with no known Characters', async () => {
+    await broadcastEveTypeChannelPref([], DEFAULT_NOTIFICATION_PREFERENCES, TYPE_A, 'feed');
+    expect(useNotificationPreferences.getState().value).toEqual(DEFAULT_NOTIFICATION_PREFERENCES);
+  });
+
+  it('broadcastAllEveTypesChannelPref writes every type to every known Character', async () => {
+    await broadcastAllEveTypesChannelPref(
+      [1, 2],
+      DEFAULT_NOTIFICATION_PREFERENCES,
+      [TYPE_A, TYPE_B],
+      'feed'
+    );
+    const value = useNotificationPreferences.getState().value;
+    for (const characterId of [1, 2]) {
+      const prefs = characterEveTypePrefs(value, characterId);
+      expect(isEveTypeEnabledFor(prefs, TYPE_A, 'feed')).toBe(false);
+      expect(isEveTypeEnabledFor(prefs, TYPE_B, 'feed')).toBe(false);
     }
   });
 });
