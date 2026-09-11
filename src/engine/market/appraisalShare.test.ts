@@ -98,6 +98,14 @@ describe('decodeAppraisalShare', () => {
     expect(decodeAppraisalShare('jita:100:1:1-0')).toEqual({ ok: false, reason: 'invalid' });
   });
 
+  it('rejects a token with trailing garbage rather than silently truncating it', () => {
+    // parseInt('5.5', 36) is 5, not NaN — a lone regex-free parseInt would
+    // have let this decode to typeId 5 instead of rejecting the payload.
+    expect(decodeAppraisalShare('jita:100:1:5.5-1')).toEqual({ ok: false, reason: 'invalid' });
+    expect(decodeAppraisalShare('jita:100:1:1-5.5')).toEqual({ ok: false, reason: 'invalid' });
+    expect(decodeAppraisalShare('jita:100:5.5:1-1')).toEqual({ ok: false, reason: 'invalid' });
+  });
+
   it('rejects a payload carrying more items than the ceiling, forged or not', () => {
     const pairs = Array.from(
       { length: MAX_SHARE_ITEMS + 1 },

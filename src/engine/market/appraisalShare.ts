@@ -64,6 +64,20 @@ function isPositiveInteger(value: number): boolean {
   return Number.isInteger(value) && value > 0;
 }
 
+const BASE36_TOKEN = /^[0-9a-z]+$/;
+
+/**
+ * `parseInt(str, 36)` parses a leading valid run and silently ignores
+ * whatever follows (`parseInt('5.5', 36)` is `5`, not `NaN`) — too lax for a
+ * decoder whose whole point is that a malformed or forged payload always
+ * comes back `{ ok: false }`. This requires the entire token to be base36
+ * digits before parsing it at all.
+ */
+function parseBase36(token: string): number | null {
+  if (!BASE36_TOKEN.test(token)) return null;
+  return parseInt(token, 36);
+}
+
 /**
  * `hub:percent:generatedAt:pairs`, `pairs` being `typeId-quantity` (both
  * base36, since both are always positive integers) joined by `_`. Only the
@@ -98,8 +112,8 @@ export function decodeAppraisalShare(payload: string): DecodeAppraisalShareResul
     return { ok: false, reason: 'invalid' };
   }
 
-  const generatedAt = parseInt(generatedAtStr, 36);
-  if (!Number.isInteger(generatedAt) || generatedAt < 0) {
+  const generatedAt = parseBase36(generatedAtStr);
+  if (generatedAt === null || generatedAt < 0) {
     return { ok: false, reason: 'invalid' };
   }
 
@@ -112,9 +126,14 @@ export function decodeAppraisalShare(payload: string): DecodeAppraisalShareResul
     const segments = token.split('-');
     if (segments.length !== 2) return { ok: false, reason: 'invalid' };
     const [typeIdStr, quantityStr] = segments;
-    const typeId = parseInt(typeIdStr, 36);
-    const quantity = parseInt(quantityStr, 36);
-    if (!isPositiveInteger(typeId) || !isPositiveInteger(quantity)) {
+    const typeId = parseBase36(typeIdStr);
+    const quantity = parseBase36(quantityStr);
+    if (
+      typeId === null ||
+      quantity === null ||
+      !isPositiveInteger(typeId) ||
+      !isPositiveInteger(quantity)
+    ) {
       return { ok: false, reason: 'invalid' };
     }
     items.push({ typeId, quantity });
