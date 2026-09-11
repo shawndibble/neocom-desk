@@ -190,7 +190,7 @@ export function LoadMeter({
         aria-valuenow={percent}
         aria-valuemin={0}
         aria-valuemax={100}
-        className="h-1 flex-1 overflow-hidden rounded-full bg-panel-2"
+        className="h-1.5 flex-1 overflow-hidden rounded-full bg-panel-2"
       >
         <div
           className={`h-full ${tight ? 'bg-warning' : 'bg-accent'}`}
