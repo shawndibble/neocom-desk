@@ -34,10 +34,13 @@ import type { AppraisalRow } from '@/engine/market/appraisal';
 import { countPasteLines } from '@/engine/market/appraisalPaste';
 import { iskToneClass } from '@/features/character/format';
 import type { BlueprintCatalog } from '@/features/industry/blueprintCatalog';
+import { writeToClipboard } from '@/lib/clipboard';
 import { formatIsk, formatIskAuto } from '@/lib/isk';
 import { downloadCsv } from '@/lib/downloadCsv';
+import type { TradeHub } from '@/market/hubs';
 import type { HubComparisonRow } from './appraisalData';
 import { appraisalCsvColumns } from './appraisalCsv';
+import { buildAppraisalShareLink, MAX_SHARE_ITEMS } from './appraisalShareData';
 import { formatVolume } from './format';
 import { ItemContextMenu } from './ItemContextMenu';
 import { MarketItemLink } from './MarketItemLink';
@@ -48,8 +51,8 @@ interface AppraisalPanelProps {
   controller: AppraisalController;
   pricePercent: number;
   onPricePercentChange: (value: number) => void;
-  /** The hub the figures are quoted at, for the panel's own provenance chip. */
-  hubName: string;
+  /** The hub the figures are quoted at — the panel's own provenance chip, and what a Share link (#831) is generated against. */
+  hub: TradeHub;
   /** Same per-item context menu as the tree and the Variations table: null until requested, then per-typeId lookups. */
   blueprintCatalog: BlueprintCatalog | null;
   onRequestBlueprintCatalog: () => void;
@@ -90,7 +93,7 @@ export function AppraisalPanel({
   controller,
   pricePercent,
   onPricePercentChange,
-  hubName,
+  hub,
   blueprintCatalog,
   onRequestBlueprintCatalog,
   onAddToQuickbar,
@@ -101,6 +104,21 @@ export function AppraisalPanel({
   const { t } = useTranslation();
   const { text, setText, result, compare, loading, failed } = controller;
   const [compareExpanded, setCompareExpanded] = useState(defaultCompareExpanded);
+  const [shareCopied, setShareCopied] = useState(false);
+  const hubName = hub.systemName;
+
+  async function handleShare() {
+    if (!result) return;
+    setShareCopied(false);
+    const shared = buildAppraisalShareLink(result, hub, pricePercent);
+    if (!shared.ok) return; // pre-checked by the disabled state below
+    try {
+      await writeToClipboard(shared.url);
+      setShareCopied(true);
+    } catch {
+      setShareCopied(false);
+    }
+  }
 
   /*
    * The percent field is a string while it is being typed. Committing on every
@@ -373,15 +391,31 @@ export function AppraisalPanel({
             ) : undefined
           }
           actions={
-            <IconButton
-              size="sm"
-              icon={<Icon.Download />}
-              label={t('market.appraisal.exportCsv')}
-              disabled={rows.length === 0}
-              onClick={() =>
-                downloadCsv('market-appraisal', rows, appraisalCsvColumns(t), new Date())
-              }
-            />
+            <>
+              <IconButton
+                size="sm"
+                icon={shareCopied ? <Icon.Done /> : <Icon.Share />}
+                label={t('market.appraisal.share')}
+                tooltip={
+                  rows.length > MAX_SHARE_ITEMS
+                    ? t('market.appraisal.shareTooLarge')
+                    : shareCopied
+                      ? t('market.appraisal.shareCopied')
+                      : undefined
+                }
+                disabled={rows.length === 0 || rows.length > MAX_SHARE_ITEMS}
+                onClick={() => void handleShare()}
+              />
+              <IconButton
+                size="sm"
+                icon={<Icon.Download />}
+                label={t('market.appraisal.exportCsv')}
+                disabled={rows.length === 0}
+                onClick={() =>
+                  downloadCsv('market-appraisal', rows, appraisalCsvColumns(t), new Date())
+                }
+              />
+            </>
           }
         >
           {loading && result === null ? (
