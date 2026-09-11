@@ -2,8 +2,8 @@
  * Which **Build Group**s each Character has open in the plan list.
  *
  * Device-local, not Editable Data: it says what this screen is showing, not
- * what the pilot built — the same reasoning `lastOpenedPlan.ts` records. A
- * phone left with everything collapsed must not fold up the desktop.
+ * what the pilot built. A phone left with everything collapsed must not fold
+ * up the desktop.
  *
  * ## Expanded ids, deliberately not collapsed ones
  *
@@ -14,14 +14,13 @@
  *   without ever having been named here. Storing *collapsed* ids would make it
  *   arrive **expanded** — so importing a 25-plan fit on a laptop would unfold
  *   it on the phone too, which is the exact thing collapsing is for.
- * - A stored id whose group is gone is harmless here (the list only expands
- *   ids it still has groups for, exactly as `Industry.tsx` only adopts a
- *   remembered plan id still present in `plans`). Storing collapsed ids would
- *   instead accumulate rows pinning groups that no longer exist.
+ * - A stored id whose group is gone is harmless here — the list only expands
+ *   ids it still has groups for. Storing collapsed ids would instead
+ *   accumulate rows pinning groups that no longer exist.
  *
- * Keyed by characterId for the same reason `lastOpenedPlan` is: the plan list
- * is scoped to the active Character, and one flat set would be overwritten by
- * whichever Character was looked at last.
+ * Keyed by characterId: the plan list is scoped to the active Character, and
+ * one flat set would be overwritten by whichever Character was looked at
+ * last.
  */
 import { coerceArrayEntry, parseCharacterKeyedRecord } from '@/lib/characterKeyedRecord';
 import { createLocalSetting } from '@/lib/useLocalSetting';

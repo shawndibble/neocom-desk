@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { rollupProductionRuns, summarizeProductionRun } from './productionRunSummary';
+import {
+  countRunsByPlan,
+  rollupProductionRuns,
+  summarizeProductionRun,
+} from './productionRunSummary';
 import type {
   ProductionOrderWatchRecord,
   ProductionRunRecord,
@@ -143,5 +147,27 @@ describe('rollupProductionRuns', () => {
 
   it('is zero for no runs', () => {
     expect(rollupProductionRuns([])).toEqual({ count: 0, realizedProfit: 0, openCount: 0 });
+  });
+});
+
+describe('countRunsByPlan', () => {
+  it('counts runs per buildPlanId', () => {
+    const counts = countRunsByPlan([
+      run({ id: 'r1', buildPlanId: 'plan-a' }),
+      run({ id: 'r2', buildPlanId: 'plan-a' }),
+      run({ id: 'r3', buildPlanId: 'plan-b' }),
+    ]);
+    expect(counts.get('plan-a')).toBe(2);
+    expect(counts.get('plan-b')).toBe(1);
+  });
+
+  it('omits a plan with no runs rather than reporting zero', () => {
+    const counts = countRunsByPlan([run({ id: 'r1', buildPlanId: 'plan-a' })]);
+    expect(counts.has('plan-b')).toBe(false);
+    expect(counts.get('plan-b')).toBeUndefined();
+  });
+
+  it('is empty for no runs', () => {
+    expect(countRunsByPlan([]).size).toBe(0);
   });
 });

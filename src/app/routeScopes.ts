@@ -78,6 +78,11 @@ export const ROUTE_REQUIREMENTS = {
   '/overview': UNGATED,
   '/skills/trained': UNGATED,
   '/industry': UNGATED,
+  // Detail routes off the index (same reasoning as `/skills/plans/:planId`
+  // above): each mixes the same blueprints/jobs/skills reads the index does,
+  // gated at the panel level, not the route.
+  '/industry/plans/:planId': UNGATED,
+  '/industry/groups/:groupId': UNGATED,
   // Multi-scope, like Overview above: the Balance tab mixes wallet and
   // loyalty-point (EverMarks) reads, each panel already rendering its own
   // `ReauthBanner` from its own `needsReauth` result.
