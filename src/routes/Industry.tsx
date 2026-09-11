@@ -26,7 +26,7 @@ import { ItemDetailModal } from '@/features/market/ItemDetailModal';
 import { useQuickbar } from '@/features/market/useQuickbar';
 import { ActiveJobsPanel } from '@/features/industry/ActiveJobsPanel';
 import { BuildPlanList } from '@/features/industry/BuildPlanList';
-import type { PlanIndexStats, PlanVerdictTag } from '@/features/industry/BuildPlanList';
+import type { PlanIndexStats, PlanRollupStats } from '@/features/industry/BuildPlanList';
 import { BuildPlanCompare } from '@/features/industry/BuildPlanCompare';
 import { OpportunitiesPanel } from '@/features/industry/OpportunitiesPanel';
 import {
@@ -50,20 +50,13 @@ import { applyFitImport, fitImportGroupName } from '@/features/industry/fitImpor
 import type { FitToBuildPlansResult } from '@/engine/import/fitToBuildPlans';
 import { useComparedBuildResults } from '@/features/industry/useComparedBuildResults';
 import { useRunCountsByPlan } from '@/features/industry/useRunCountsByPlan';
-import { flattenBuildResult } from '@/features/industry/resultFlattenCache';
-import { rollUpBuildGroup, type BuildGroupMember } from '@/engine/industry/groupRollup';
+import { computeGroupIndexStats, verdictOf } from '@/features/industry/groupIndexStats';
 
 type IndustryTab = 'plans' | 'records' | 'sourcing' | 'opportunities';
 
 /** An unknown or absent `?tab=` falls back to Plans rather than rendering nothing — a stale or hand-edited link should land somewhere useful. */
 function readIndustryTab(value: string | null): IndustryTab {
   return value === 'records' || value === 'sourcing' || value === 'opportunities' ? value : 'plans';
-}
-
-/** A plan/group with no price yet, or that failed to price, reads as "unknown" rather than silently missing. */
-function verdictOf(totalCost: number | null, buyCost: number | null): PlanVerdictTag {
-  if (buyCost === null) return 'unknown';
-  return totalCost !== null && totalCost <= buyCost ? 'build' : 'buy';
 }
 
 /**
@@ -295,7 +288,7 @@ export function Industry() {
     ownedBlueprints,
     skills,
   });
-  const runCounts = useRunCountsByPlan(activeCharacterId ?? -1);
+  const runCounts = useRunCountsByPlan(activeCharacterId);
 
   const statsByPlanId = useMemo(() => {
     const map = new Map<string, PlanIndexStats>();
@@ -311,36 +304,10 @@ export function Industry() {
 
   const statsByGroupId = useMemo(() => {
     const rowByPlanId = new Map(groupedRows.map((row) => [row.planId, row]));
-    const map = new Map<string, { totalCost: number | null; verdict: PlanVerdictTag }>();
+    const map = new Map<string, PlanRollupStats>();
     for (const group of groups) {
-      const members: BuildGroupMember[] = [];
-      for (const plan of groupedPlans) {
-        if (plan.buildGroupId !== group.id) continue;
-        const row = rowByPlanId.get(plan.id);
-        if (!row?.groupResult) continue;
-        const flattened = flattenBuildResult(row.groupResult);
-        members.push({
-          planId: row.planId,
-          planName: row.planName,
-          hubId: plan.hubId,
-          result: row.groupResult,
-          shoppingMaterials: flattened.shopping,
-          tableMaterials: flattened.table,
-        });
-      }
-      const settledCount = groupedPlans.filter((p) => p.buildGroupId === group.id).length;
-      if (members.length === 0 || members.length !== settledCount) {
-        map.set(group.id, { totalCost: null, verdict: 'unknown' });
-        continue;
-      }
-      const ownedStock = new Map(
-        Object.entries(group.ownedStock ?? {}).map(([typeID, qty]) => [Number(typeID), qty])
-      );
-      const rollup = rollUpBuildGroup(members, { ownedStock });
-      map.set(group.id, {
-        totalCost: rollup.totalCost,
-        verdict: verdictOf(rollup.totalCost, rollup.buyCost),
-      });
+      const memberPlans = groupedPlans.filter((p) => p.buildGroupId === group.id);
+      map.set(group.id, computeGroupIndexStats(group, memberPlans, rowByPlanId));
     }
     return map;
   }, [groups, groupedPlans, groupedRows]);

@@ -36,4 +36,12 @@ describe('useRunCountsByPlan', () => {
     expect(result.current.get('plan-b')).toBe(1);
     expect(result.current.has('plan-c')).toBe(false);
   });
+
+  it('is empty with no active character, rather than querying an arbitrary id', async () => {
+    await db.productionRuns.bulkAdd([run({ buildPlanId: 'plan-a' })]);
+
+    const { result } = renderHook(() => useRunCountsByPlan(null));
+
+    expect(result.current.size).toBe(0);
+  });
 });

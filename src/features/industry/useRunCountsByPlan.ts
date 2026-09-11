@@ -11,10 +11,10 @@ import { countRunsByPlan } from './productionRunSummary';
 
 const EMPTY_COUNTS: ReadonlyMap<string, number> = new Map();
 
-export function useRunCountsByPlan(characterId: number): ReadonlyMap<string, number> {
-  const runs = useLiveQuery(
-    () => db.productionRuns.where('characterId').equals(characterId).toArray(),
-    [characterId]
-  );
+export function useRunCountsByPlan(characterId: number | null): ReadonlyMap<string, number> {
+  const runs = useLiveQuery(async () => {
+    if (characterId === null) return undefined;
+    return db.productionRuns.where('characterId').equals(characterId).toArray();
+  }, [characterId]);
   return useMemo(() => (runs ? countRunsByPlan(runs) : EMPTY_COUNTS), [runs]);
 }

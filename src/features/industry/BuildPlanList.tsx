@@ -30,16 +30,25 @@ import type { BlueprintCatalog, BlueprintCatalogEntry } from './blueprintCatalog
 /** Build-vs-buy verdict, compact enough for a list row's own column. */
 export type PlanVerdictTag = 'build' | 'buy' | 'unknown';
 
-/** One row's Est. total / Verdict / Runs — everything the pricing/records data supplies per plan. */
-export interface PlanIndexStats {
+/** Est. total / Verdict — the two figures both a plan row and a group row carry. */
+export interface PlanRollupStats {
   totalCost: number | null;
   verdict: PlanVerdictTag;
+}
+
+/** One plan row's Est. total / Verdict / Runs — everything the pricing/records data supplies per plan. */
+export interface PlanIndexStats extends PlanRollupStats {
   runs: number;
 }
 
+// Same tone convention `PlanVerdictHero.tsx`'s `VerdictPill` already
+// established for this exact build/buy/unknown concept — not the ISK-amount
+// tokens (`isk-pos`/`isk-neg`), which DESIGN.md §1 reserves for money
+// figures, and not a fourth ad-hoc palette for what is still a two-outcome
+// status, which already has one (`success`/`warning`/muted).
 const VERDICT_TAG_CLASS: Record<PlanVerdictTag, string> = {
-  build: 'text-isk-pos border-accent-dim',
-  buy: 'text-warning border-warning',
+  build: 'text-success border-success/50',
+  buy: 'text-warning border-warning/50',
   unknown: 'text-text-faint border-line',
 };
 
@@ -141,7 +150,7 @@ interface BuildPlanListProps {
   /** Est. total / Verdict / Runs per plan row — `undefined` renders every column as "—". */
   statsByPlanId: ReadonlyMap<string, PlanIndexStats>;
   /** Est. total / Verdict per group row (rolled up from its members) — Runs has no group-level meaning. */
-  statsByGroupId: ReadonlyMap<string, { totalCost: number | null; verdict: PlanVerdictTag }>;
+  statsByGroupId: ReadonlyMap<string, PlanRollupStats>;
 }
 
 /**
@@ -360,7 +369,7 @@ function GroupHeader({
   onRename: (name: string) => void;
   onDelete: () => void;
   onToggleAllMembers: (selected: boolean) => void;
-  stats: { totalCost: number | null; verdict: PlanVerdictTag } | undefined;
+  stats: PlanRollupStats | undefined;
 }) {
   const { t } = useTranslation();
   const [renaming, setRenaming] = useState(false);
