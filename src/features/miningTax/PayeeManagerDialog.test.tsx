@@ -127,3 +127,67 @@ describe('PayeeManagerDialog — trade hub', () => {
     expect((await loadPayees(CHAR))[0]?.systemId).toBe(SYSTEM);
   });
 });
+
+describe('PayeeManagerDialog delete confirmation (#862: no silent delete)', () => {
+  const stored: PayeeRecord = {
+    id: 'p1',
+    characterId: CHAR,
+    name: 'Hek landlord',
+    defaultTaxPct: 10,
+    hubId: 'hek',
+    updatedAt: 1,
+  };
+
+  beforeEach(async () => {
+    await db.payees.put(stored);
+  });
+
+  it('opens a modal naming the Payee and does not delete until confirmed', async () => {
+    renderDialog([stored]);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Delete Hek landlord' }));
+
+    expect(screen.getByText('Delete "Hek landlord"? This can\'t be undone.')).toBeInTheDocument();
+    expect(await loadPayees(CHAR)).toHaveLength(1);
+  });
+
+  it('leaves the Payee untouched on cancel', async () => {
+    renderDialog([stored]);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Delete Hek landlord' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+
+    expect(
+      screen.queryByText('Delete "Hek landlord"? This can\'t be undone.')
+    ).not.toBeInTheDocument();
+    expect(await loadPayees(CHAR)).toHaveLength(1);
+  });
+
+  it('leaves the Payee untouched on Escape', async () => {
+    renderDialog([stored]);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Delete Hek landlord' }));
+    await userEvent.keyboard('{Escape}');
+
+    await waitFor(() => {
+      expect(
+        screen.queryByText('Delete "Hek landlord"? This can\'t be undone.')
+      ).not.toBeInTheDocument();
+    });
+    expect(await loadPayees(CHAR)).toHaveLength(1);
+  });
+
+  it('deletes the Payee once confirmed', async () => {
+    renderDialog([stored]);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Delete Hek landlord' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+
+    await waitFor(() => {
+      expect(syncMock.markPayeeDeleted).toHaveBeenCalledWith(CHAR, 'p1');
+    });
+    expect(
+      screen.queryByText('Delete "Hek landlord"? This can\'t be undone.')
+    ).not.toBeInTheDocument();
+  });
+});
