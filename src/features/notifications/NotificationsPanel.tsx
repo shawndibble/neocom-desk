@@ -51,6 +51,7 @@ import {
   SelectValue,
 } from '@/components/ui';
 import { SelectionCheckbox } from '@/features/character/SelectionCheckbox';
+import { Caret } from '@/components/ui';
 import { AllCharactersNotificationSection } from './AllCharactersNotificationSection';
 import { ScheduledPush, ICON_SIZE } from '@/components/ui/icons';
 import { PROJECTABLE_EVENT_IDS } from '@/engine/projection';
@@ -675,9 +676,7 @@ const CharacterNotificationSection = memo(function CharacterNotificationSection(
           onClick={() => onToggleExpanded(character.characterId)}
           className="flex min-w-0 flex-1 items-center gap-1.5 text-left text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase hover:text-text focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
         >
-          <span aria-hidden="true" className="w-3 shrink-0 text-text-faint">
-            {expanded ? '▾' : '▸'}
-          </span>
+          <Caret expanded={expanded} />
           <span className="min-w-0 truncate normal-case">{character.name}</span>
         </button>
         {/* One select-all per column, in the same grid track as
