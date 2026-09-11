@@ -275,7 +275,7 @@ describe('useComparedBuildResults', () => {
   it(
     'recomputes an existing member when its own buildHere/updatedAt changes, same list length — ' +
       "the mechanism a Build Group's rollup (issue #696) depends on for a manual craft/buy edit, " +
-      'or a group Craft Sweep, to show up in the group total on next open',
+      'or a group Auto Build, to show up in the group total on next open',
     async () => {
       const catalog = catalogWith([entry({ blueprintTypeID: 100 })]);
       const { rerender } = renderHook(

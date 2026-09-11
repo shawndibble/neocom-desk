@@ -20,7 +20,7 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 import { beginEveLogin } from '@/app/loginFlow';
 import { useIsDesktop } from '@/lib/useIsDesktop';
 import type { MaterialSourcing, OwnedStockScope, SkillLevels } from '@/engine/industry/types';
-import type { SweepStrategy } from '@/engine/industry/autoMakeOrBuy';
+import type { BuildStrategy } from '@/engine/industry/autoMakeOrBuy';
 import type { CharacterBlueprint } from '@/esi/endpoints';
 import { loadPi } from '@/sde/loadSde';
 import type { PiData } from '@/sde/types';
@@ -58,7 +58,7 @@ import {
   buildGroupsFor,
   renameBuildGroup,
   useBuildGroups,
-  withGroupCraftSweepDefault,
+  withGroupAutoBuildDefault,
   withGroupOwnedStock,
   withGroupOwnedStockScope,
   type BuildGroupSnapshot,
@@ -70,7 +70,7 @@ import {
 } from '@/features/industry/buildGroupActions';
 import { useExpandedGroups, withGroupExpanded } from '@/features/industry/expandedGroups';
 import { BuildGroupPanel } from '@/features/industry/BuildGroupPanel';
-import { applyGroupCraftSweep } from '@/features/industry/craftSweepGroup';
+import { applyGroupAutoBuild } from '@/features/industry/autoBuildGroup';
 import { FitImportDialog } from '@/features/industry/FitImportDialog';
 import { applyFitImport, fitImportGroupName } from '@/features/industry/fitImport';
 import { useAssumedMe } from '@/features/industry/assumedMe';
@@ -549,7 +549,7 @@ export function Industry() {
   }
 
   /**
-   * Craft Sweep on a Build Group (issue #696): the same one-shot bulk
+   * Auto Build on a Build Group (issue #696): the same one-shot bulk
    * build/buy control from #695, run once per member — each member's own
    * tree walked independently and only its own `buildHere` patched, never a
    * shared tree. The persisted default is written first, from the choice
@@ -558,18 +558,18 @@ export function Industry() {
    * `buildGroups` closure would risk overwriting a concurrent edit to the
    * group with a stale read.
    */
-  async function handleCraftSweepGroup(
+  async function handleAutoBuildGroup(
     groupId: string,
     groupPlans: readonly BuildPlanRecord[],
-    options: { strategy: SweepStrategy; depth: number }
+    options: { strategy: BuildStrategy; depth: number }
   ) {
     if (activeCharacterId === null || !catalog) return;
     await setBuildGroups(
-      withGroupCraftSweepDefault(buildGroups, activeCharacterId, groupId, {
+      withGroupAutoBuildDefault(buildGroups, activeCharacterId, groupId, {
         strategy: options.strategy,
       })
     );
-    const picks = await applyGroupCraftSweep(
+    const picks = await applyGroupAutoBuild(
       groupPlans,
       catalog,
       pi,
@@ -811,8 +811,8 @@ export function Industry() {
                       onRetarget={(target, planIds) =>
                         void handleRetargetGroup(selectedGroup.id, target, planIds)
                       }
-                      onCraftSweep={(options) =>
-                        handleCraftSweepGroup(selectedGroup.id, selectedGroupPlans, options)
+                      onAutoBuild={(options) =>
+                        handleAutoBuildGroup(selectedGroup.id, selectedGroupPlans, options)
                       }
                       onOwnedStockChange={(ownedStock) =>
                         void handleGroupOwnedStockChange(selectedGroup.id, ownedStock)

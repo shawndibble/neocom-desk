@@ -650,33 +650,7 @@ export function BpcSourcingPanel() {
 
   const bpcColumnsById = useMemo<Record<BpcSearchColumnId, DataTableColumn<BpcSearchRow>>>(
     () => ({
-      location: {
-        id: 'location',
-        header: t('bpcContracts.locationColumn'),
-        sortValue: (row) => row.locationName ?? '',
-        render: (row) => row.locationName ?? t('bpcContracts.notApplicable'),
-      },
-      space: {
-        id: 'space',
-        header: t('bpcContracts.spaceColumn'),
-        sortValue: (row) => row.space ?? '',
-        render: (row) =>
-          row.space ? t(`bpcContracts.space.${row.space}`) : t('bpcContracts.notApplicable'),
-      },
-    }),
-    [t]
-  );
-
-  const columns = useMemo<DataTableColumn<BpcSearchRow>[]>(() => {
-    const cols: DataTableColumn<BpcSearchRow>[] = [
-      {
-        id: 'item',
-        header: t('bpcContracts.itemColumn'),
-        primary: true,
-        sortValue: (row) => blueprintNames.get(row.typeId) ?? `#${row.typeId}`,
-        render: (row) => blueprintNames.get(row.typeId) ?? `#${row.typeId}`,
-      },
-      {
+      source: {
         id: 'source',
         header: t('bpcContracts.sourceColumn'),
         sortValue: (row) => row.source,
@@ -688,10 +662,13 @@ export function BpcSourcingPanel() {
           </span>
         ),
       },
-    ];
-    if (visibleColumns.includes('location')) cols.push(bpcColumnsById.location);
-    cols.push(
-      {
+      location: {
+        id: 'location',
+        header: t('bpcContracts.locationColumn'),
+        sortValue: (row) => row.locationName ?? '',
+        render: (row) => row.locationName ?? t('bpcContracts.notApplicable'),
+      },
+      me: {
         id: 'me',
         header: t('bpcContracts.meColumn'),
         align: 'right',
@@ -699,7 +676,7 @@ export function BpcSourcingPanel() {
         sortValue: (row) => row.me,
         render: (row) => row.me,
       },
-      {
+      te: {
         id: 'te',
         header: t('bpcContracts.teColumn'),
         align: 'right',
@@ -707,7 +684,7 @@ export function BpcSourcingPanel() {
         sortValue: (row) => row.te,
         render: (row) => row.te,
       },
-      {
+      runs: {
         id: 'runs',
         header: t('bpcContracts.runsColumn'),
         align: 'right',
@@ -716,7 +693,7 @@ export function BpcSourcingPanel() {
         // A BPO's -1 renders as ∞, not a nonsensical negative count.
         render: (row) => (row.runs === -1 ? t('bpcContracts.unlimitedRuns') : row.runs),
       },
-      {
+      qty: {
         id: 'qty',
         header: t('bpcContracts.qtyColumn'),
         align: 'right',
@@ -724,7 +701,7 @@ export function BpcSourcingPanel() {
         sortValue: (row) => row.quantity,
         render: (row) => row.quantity,
       },
-      {
+      price: {
         id: 'price',
         header: t('bpcContracts.priceColumn'),
         align: 'right',
@@ -748,7 +725,7 @@ export function BpcSourcingPanel() {
             : formatIsk(contract.price, 2);
         },
       },
-      {
+      region: {
         id: 'region',
         header: t('bpcContracts.regionColumn'),
         // An owned row's `regionId` comes from its resolved location
@@ -765,25 +742,47 @@ export function BpcSourcingPanel() {
             ? t('bpcContracts.notApplicable')
             : (regionNames.get(regionId) ?? `#${regionId}`);
         },
-      }
-    );
-    if (visibleColumns.includes('space')) cols.push(bpcColumnsById.space);
-    cols.push({
-      id: 'expires',
-      header: t('bpcContracts.expiresColumn'),
-      className: 'whitespace-nowrap text-text-dim',
-      // Infinity sorts an owned row last, same as price, rather than epoch 0
-      // reading as "expires soonest."
-      sortValue: (row) => asContract(row)?.dateExpired ?? Infinity,
-      render: (row) => {
-        const contract = asContract(row);
-        return contract
-          ? formatTimestamp(new Date(contract.dateExpired), timeZone)
-          : t('bpcContracts.notApplicable');
       },
-    });
+      space: {
+        id: 'space',
+        header: t('bpcContracts.spaceColumn'),
+        sortValue: (row) => row.space ?? '',
+        render: (row) =>
+          row.space ? t(`bpcContracts.space.${row.space}`) : t('bpcContracts.notApplicable'),
+      },
+      expires: {
+        id: 'expires',
+        header: t('bpcContracts.expiresColumn'),
+        className: 'whitespace-nowrap text-text-dim',
+        // Infinity sorts an owned row last, same as price, rather than epoch 0
+        // reading as "expires soonest."
+        sortValue: (row) => asContract(row)?.dateExpired ?? Infinity,
+        render: (row) => {
+          const contract = asContract(row);
+          return contract
+            ? formatTimestamp(new Date(contract.dateExpired), timeZone)
+            : t('bpcContracts.notApplicable');
+        },
+      },
+    }),
+    [t, regionNames, timeZone]
+  );
+
+  const columns = useMemo<DataTableColumn<BpcSearchRow>[]>(() => {
+    const cols: DataTableColumn<BpcSearchRow>[] = [
+      {
+        id: 'item',
+        header: t('bpcContracts.itemColumn'),
+        primary: true,
+        sortValue: (row) => blueprintNames.get(row.typeId) ?? `#${row.typeId}`,
+        render: (row) => blueprintNames.get(row.typeId) ?? `#${row.typeId}`,
+      },
+    ];
+    for (const id of BPC_SEARCH_COLUMN_IDS) {
+      if (visibleColumns.includes(id)) cols.push(bpcColumnsById[id]);
+    }
     return cols;
-  }, [t, blueprintNames, regionNames, timeZone, visibleColumns, bpcColumnsById]);
+  }, [t, blueprintNames, visibleColumns, bpcColumnsById]);
 
   if (!hydrated || activeCharacterId === null) {
     // No redirect of its own: the Industry route this sits in already sends a

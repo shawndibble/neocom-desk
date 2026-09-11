@@ -55,11 +55,9 @@ export interface UseOpportunitiesArgs {
   facilityDefaults: FacilityDefaults;
   skills: SkillLevels;
   ownedStockSnapshot: OwnedStockSnapshot;
-  /** Every owned blueprint by character (issue #652), so a sub-build the auto pass picks quotes at a researched copy's real ME where the pilot owns one. */
+  /** Every owned blueprint by character, so a sub-build the recursive engine prices quotes at a researched copy's real ME where the pilot owns one. */
   ownedByCharacter: ReadonlyMap<number, readonly CharacterBlueprint[]>;
-  /** 0-3; 0 reproduces issue #642's plain behavior (nothing auto-built). */
-  autoBuildDepth: number;
-  /** ME to quote an auto-picked sub-build at when the pilot owns no copy of its blueprint — same preference `BuildPlanDetail.tsx` uses. */
+  /** ME to quote a sub-build at when the pilot owns no copy of its blueprint — same preference `BuildPlanDetail.tsx` uses. */
   assumedMe: number;
 }
 
@@ -93,7 +91,6 @@ export function useOpportunities({
   skills,
   ownedStockSnapshot,
   ownedByCharacter,
-  autoBuildDepth,
   assumedMe,
 }: UseOpportunitiesArgs): UseOpportunitiesResult {
   const [state, setState] = useState<OpportunitiesState>(EMPTY_STATE);
@@ -105,10 +102,7 @@ export function useOpportunities({
   });
 
   const manualRefreshOnly = !autoRecalculates(candidates.length);
-  const key = useMemo(
-    () => opportunitiesCacheKey(candidates, hub, autoBuildDepth),
-    [candidates, hub, autoBuildDepth]
-  );
+  const key = useMemo(() => opportunitiesCacheKey(candidates, hub), [candidates, hub]);
 
   useEffect(() => {
     const currentCandidates = candidatesRef.current;
@@ -158,7 +152,11 @@ export function useOpportunities({
           });
           const row = computeOpportunityRow(candidate, snapshot, facilityDefaults, skills, stock, {
             recipeFor,
-            depth: autoBuildDepth,
+            // Build Opportunities' own auto-build depth control was removed
+            // as unused (issue #652 superseded) — every row now prices with
+            // nothing auto-built, `computeOpportunityRow`'s own pre-#652
+            // plain behavior.
+            depth: 0,
           });
           if (row) unranked.push(row);
         }
@@ -194,7 +192,6 @@ export function useOpportunities({
     skills,
     ownedStockSnapshot,
     ownedByCharacter,
-    autoBuildDepth,
     assumedMe,
     refreshToken,
     manualRefreshOnly,

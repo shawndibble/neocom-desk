@@ -9,7 +9,7 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import type { BuildPlanRecord } from '@/db';
-import type { SweepStrategy } from '@/engine/industry/autoMakeOrBuy';
+import type { BuildStrategy } from '@/engine/industry/autoMakeOrBuy';
 import type { BuildResult, MaterialCostLine } from '@/engine/industry/types';
 import { configureClipboard } from '@/lib/clipboard';
 import { BuildGroupPanel } from './BuildGroupPanel';
@@ -45,7 +45,7 @@ const SNAPSHOT: OwnedStockSnapshot = {
 
 const GROUP: BuildGroup = { id: 'g1', name: 'Rifter fit' } as BuildGroup;
 
-// A two-level chain so Sweep Depth has something to size to: every fixture
+// A two-level chain so depth has something to size to: every fixture
 // plan's `blueprintTypeID` is 1 (see `plan()` below), producing 100 from
 // material 2, and 2 is itself producible from 3 — depth 1.
 const PRODUCT_ENTRY: BlueprintCatalogEntry = {
@@ -180,7 +180,7 @@ function renderPanel(
   overrides: {
     group?: BuildGroup;
     catalog?: BlueprintCatalog;
-    onCraftSweep?: (options: { strategy: SweepStrategy; depth: number }) => Promise<void>;
+    onAutoBuild?: (options: { strategy: BuildStrategy; depth: number }) => Promise<void>;
     onOwnedStockChange?: (ownedStock: Record<number, number>) => void;
   } = {}
 ) {
@@ -193,7 +193,7 @@ function renderPanel(
       ownedBlueprints={[]}
       skills={{} as never}
       ownedStockSnapshot={SNAPSHOT}
-      onCraftSweep={overrides.onCraftSweep ?? (() => Promise.resolve())}
+      onAutoBuild={overrides.onAutoBuild ?? (() => Promise.resolve())}
       onOpenPlan={() => {}}
       onRetarget={() => {}}
       onOwnedStockChange={overrides.onOwnedStockChange ?? (() => {})}
@@ -293,43 +293,43 @@ describe('BuildGroupPanel — mixed-hub multibuy', () => {
   });
 });
 
-describe('BuildGroupPanel — Craft Sweep (issue #696)', () => {
-  it("pre-fills Sweep Strategy from the group's persisted default", () => {
+describe('BuildGroupPanel — Auto Build (issue #696)', () => {
+  it("pre-fills Build Strategy from the group's persisted default", () => {
     mockedUseComparedBuildResults.mockReturnValue([row('a', [material(34, 100)])]);
     renderPanel([plan('a', 'jita')], {
       catalog: CHAIN_CATALOG,
-      group: { ...GROUP, craftSweepDefault: { strategy: 'build' } },
+      group: { ...GROUP, autoBuildDefault: { strategy: 'build' } },
     });
 
-    expect(screen.getByRole('combobox', { name: 'Sweep Strategy' }).textContent).toBe('Build');
+    expect(screen.getByRole('combobox', { name: 'Build Strategy' }).textContent).toBe('Build');
   });
 
   it('names how many plans it will affect, and applies with the chosen options', async () => {
     const user = userEvent.setup();
     mockedUseComparedBuildResults.mockReturnValue([row('a', [material(34, 100)])]);
-    const onCraftSweep = vi.fn().mockResolvedValue(undefined);
-    renderPanel([plan('a', 'jita')], { catalog: CHAIN_CATALOG, onCraftSweep });
+    const onAutoBuild = vi.fn().mockResolvedValue(undefined);
+    renderPanel([plan('a', 'jita')], { catalog: CHAIN_CATALOG, onAutoBuild });
 
-    await user.click(screen.getByRole('button', { name: 'Apply Craft Sweep' }));
+    await user.click(screen.getByRole('button', { name: 'Apply Auto Build' }));
     const dialog = await screen.findByRole('dialog');
     expect(
       within(dialog).getByText(
         'This will overwrite craft/buy choices on 1 plan in this group — continue?'
       )
     ).toBeTruthy();
-    await user.click(within(dialog).getByRole('button', { name: 'Apply Craft Sweep' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Apply Auto Build' }));
 
-    expect(onCraftSweep).toHaveBeenCalledWith({
+    expect(onAutoBuild).toHaveBeenCalledWith({
       strategy: 'cost-effective',
       depth: 1,
     });
   });
 
-  it('has no Sweep Depth control and no Planetary chip (issue #798)', () => {
+  it('has no depth control and no Planetary chip (issue #798)', () => {
     mockedUseComparedBuildResults.mockReturnValue([row('a', [material(34, 100)])]);
     renderPanel([plan('a', 'jita')], { catalog: CHAIN_CATALOG });
 
-    expect(screen.queryByRole('combobox', { name: 'Sweep Depth' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: 'Depth' })).not.toBeInTheDocument();
     expect(screen.queryByText('Planetary')).not.toBeInTheDocument();
   });
 
@@ -343,7 +343,7 @@ describe('BuildGroupPanel — Craft Sweep (issue #696)', () => {
       catalog: CHAIN_CATALOG,
     });
 
-    await user.click(screen.getByRole('button', { name: 'Apply Craft Sweep' }));
+    await user.click(screen.getByRole('button', { name: 'Apply Auto Build' }));
     const dialog = await screen.findByRole('dialog');
     expect(
       within(dialog).getByText(

@@ -28,7 +28,11 @@ import {
   setRigSlot,
 } from '@/engine/industry/types';
 import { makeOrBuy, type MakeOrBuy } from '@/engine/industry/makeOrBuy';
-import { autoBuildHere, maxSweepDepth, type SweepStrategy } from '@/engine/industry/autoMakeOrBuy';
+import {
+  autoBuildHere,
+  maxAutoBuildDepth,
+  type BuildStrategy,
+} from '@/engine/industry/autoMakeOrBuy';
 import { craftScope } from '@/engine/industry/craftScope';
 import { ownedStockSale } from '@/engine/industry/ownedStockSale';
 import type {
@@ -45,7 +49,7 @@ import { GroupTargetLink } from './GroupTargetLink';
 import {
   facilityContextFor,
   reactionPlanFacilityContextFor,
-  sweepDepthContext,
+  autoBuildDepthContext,
 } from './planFacilityContext';
 import { useReactionFacilityDefaults } from './reactionFacilityDefaults';
 import { retargetPatch } from './retargetPatch';
@@ -93,7 +97,7 @@ import { useDetectedOwnedStock } from './useDetectedOwnedStock';
 import type { CorpOwnedStockState } from './corpOwnedStock';
 import { useAssumedMe } from './assumedMe';
 import { OwnedStockScopeControl } from './OwnedStockScopeControl';
-import { BuildPlanCraftSweepControl } from './BuildPlanCraftSweepControl';
+import { BuildPlanAutoBuildControl } from './BuildPlanAutoBuildControl';
 import { ResultsSummary } from './ResultsSummary';
 import { PlanVerdictHero } from './PlanVerdictHero';
 import { useIsDesktop } from '@/lib/useIsDesktop';
@@ -261,7 +265,7 @@ export function BuildPlanDetail({
   // this flag — see `reactionCraftEligible`.
   const includeReactions = plan.includeReactions ?? false;
   // Production methods this plan may currently mark buildable — the one
-  // answer the recursive engine, the manual toggle and Craft Sweep all share,
+  // answer the recursive engine, the manual toggle and Auto Build all share,
   // so they cannot disagree (`craftScope`'s own doc comment).
   const craftScopeList = useMemo(
     () => craftScope(activity, includeReactions),
@@ -422,7 +426,7 @@ export function BuildPlanDetail({
   );
 
   // The one place "can this be built here" is decided — `craftScopeList`
-  // (issue #698) is the same answer Craft Sweep's own Craft Scope and the
+  // (issue #698) is the same answer Auto Build's own Craft Scope and the
   // recursive engine use, so the three can never disagree. General over
   // depth: a recipe input introduced by one build is exactly as buildable as
   // the plan's own materials, which is what lets a player keep drilling down
@@ -456,7 +460,7 @@ export function BuildPlanDetail({
    * the recursive engine and the advisory marker all quote the same place.
    * Memoized so its identity is stable across renders where nothing it reads
    * changed — several `useMemo`s downstream (`makeOrBuyContext`,
-   * `craftSweepMaxDepth`, the `result` computation) list it as a dependency.
+   * `autoBuildMaxDepth`, the `result` computation) list it as a dependency.
    */
   const reactionFacilityContext: ReactionFacilityContext | undefined = useMemo(
     () =>
@@ -540,22 +544,22 @@ export function BuildPlanDetail({
   }, [facilityContext, snapshot, materialPrices, skills, reactionFacilityContext]);
 
   /**
-   * Craft Sweep's own Sweep Depth range (issue #695): the plan's actual tree
+   * Auto Build's own depth range (issue #695): the plan's actual tree
    * depth, independent of whether live prices have loaded — depth discovery
    * never prices anything, so gating it on `makeOrBuyContext` (null until
-   * `pricesReady`) would leave the depth control empty during a slow price
+   * `pricesReady`) would leave Apply disabled during a slow price
    * fetch for no reason. Built from `reactionPlanFacilityContext`, not the
    * price-resolved `reactionFacilityContext` below: the latter stays
    * `undefined` until its own market snapshot lands, which would understate
    * this plan's depth for as long as that fetch is in flight whenever a
-   * Reaction Location is configured. `sweepDepthContext` is the same seam
-   * `craftSweepGroup.ts`'s per-member depth walk uses.
+   * Reaction Location is configured. `autoBuildDepthContext` is the same seam
+   * `autoBuildGroup.ts`'s per-member depth walk uses.
    */
-  const craftSweepMaxDepth = useMemo(() => {
+  const autoBuildMaxDepth = useMemo(() => {
     if (!blueprint) return 0;
-    return maxSweepDepth(blueprint, plan.me, {
+    return maxAutoBuildDepth(blueprint, plan.me, {
       recipeFor,
-      ctx: sweepDepthContext(facilityContext, reactionPlanFacilityContext, skills),
+      ctx: autoBuildDepthContext(facilityContext, reactionPlanFacilityContext, skills),
       runs: plan.runs,
     });
   }, [
@@ -856,22 +860,22 @@ export function BuildPlanDetail({
   }
 
   /**
-   * Craft Sweep (issue #695): a one-shot bulk write, not a persistent policy
+   * Auto Build (issue #695): a one-shot bulk write, not a persistent policy
    * (docs/context/decisions). Fully replaces `buildHere` — re-running with
    * different settings, or the same ones again, overwrites whatever
    * craft/buy choices were there before, including hand-picked ones. Always
-   * walks this plan's whole tree (`craftSweepMaxDepth`) — the single-plan
-   * control offers no Sweep Depth choice. Craft Scope is `craftScopeList`
+   * walks this plan's whole tree (`autoBuildMaxDepth`) — the single-plan
+   * control offers no depth choice. Craft Scope is `craftScopeList`
    * (issue #698) — the same answer the manual toggle and the recursive
-   * engine use, so a sweep never marks a material the plan itself would
-   * then ignore. Planetary is still reserved.
+   * engine use, so an Auto Build pass never marks a material the plan itself
+   * would then ignore. Planetary is still reserved.
    */
-  function applyCraftSweep(options: { strategy: SweepStrategy }) {
+  function applyAutoBuild(options: { strategy: BuildStrategy }) {
     if (!blueprint || !makeOrBuyContext) return;
     const picked = autoBuildHere(blueprint, plan.me, {
       recipeFor,
       ctx: makeOrBuyContext,
-      depth: craftSweepMaxDepth,
+      depth: autoBuildMaxDepth,
       runs: plan.runs,
       scope: craftScopeList,
       strategy: options.strategy,
@@ -1530,11 +1534,11 @@ export function BuildPlanDetail({
               and Trade hub it read as another thing about where the job runs.
             */}
               <div className="mb-3 flex flex-col gap-3">
-                <BuildPlanCraftSweepControl
-                  maxDepth={craftSweepMaxDepth}
+                <BuildPlanAutoBuildControl
+                  maxDepth={autoBuildMaxDepth}
                   scope={craftScopeList}
                   disabled={!makeOrBuyContext}
-                  onApply={applyCraftSweep}
+                  onApply={applyAutoBuild}
                 />
                 <OwnedStockScopeControl
                   scope={plan.ownedStockScope}

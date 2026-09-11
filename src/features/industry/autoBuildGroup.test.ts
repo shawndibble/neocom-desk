@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { applyGroupCraftSweep, groupCraftSweepMaxDepth } from './craftSweepGroup';
+import { applyGroupAutoBuild, groupAutoBuildMaxDepth } from './autoBuildGroup';
 import { loadMarketSnapshots, type MarketSnapshot } from './marketData';
 import { recipeForLookup } from './recipes';
 import type { BuildPlanRecord } from '@/db';
@@ -101,9 +101,9 @@ beforeEach(() => {
   mockedSnapshots.mockImplementation((requests) => requests.map(() => Promise.resolve(SNAPSHOT)));
 });
 
-describe('groupCraftSweepMaxDepth', () => {
+describe('groupAutoBuildMaxDepth', () => {
   it('returns 0 for an empty group', () => {
-    expect(groupCraftSweepMaxDepth([], catalogWith([]), () => null, {})).toBe(0);
+    expect(groupAutoBuildMaxDepth([], catalogWith([]), () => null, {})).toBe(0);
   });
 
   it("takes the deepest member's own tree, not the shallowest", () => {
@@ -119,17 +119,17 @@ describe('groupCraftSweepMaxDepth', () => {
       plan({ id: 'shallow', blueprintTypeID: 101 }), // 601 -> 602
       plan({ id: 'deep', blueprintTypeID: 100 }), // 600 -> 601 -> 602
     ];
-    expect(groupCraftSweepMaxDepth(plans, catalog, recipeFor, {})).toBe(2);
+    expect(groupAutoBuildMaxDepth(plans, catalog, recipeFor, {})).toBe(2);
   });
 
   it('skips a plan whose blueprint no longer resolves in the catalog', () => {
     const catalog = catalogWith([]);
     const plans = [plan({ id: 'orphan', blueprintTypeID: 999 })];
-    expect(groupCraftSweepMaxDepth(plans, catalog, () => null, {})).toBe(0);
+    expect(groupAutoBuildMaxDepth(plans, catalog, () => null, {})).toBe(0);
   });
 });
 
-describe('applyGroupCraftSweep', () => {
+describe('applyGroupAutoBuild', () => {
   it("walks each member's own tree independently and returns one buildHere set per plan", async () => {
     const catalog = catalogWith(CHAIN_CATALOG_ENTRIES);
     const plans = [
@@ -137,7 +137,7 @@ describe('applyGroupCraftSweep', () => {
       plan({ id: 'b', blueprintTypeID: 101, hubId: 'jita' }), // needs 602
     ];
 
-    const picks = await applyGroupCraftSweep(plans, catalog, null, [], {}, 0, {
+    const picks = await applyGroupAutoBuild(plans, catalog, null, [], {}, 0, {
       strategy: 'build',
       depth: 1,
     });
@@ -155,7 +155,7 @@ describe('applyGroupCraftSweep', () => {
       plan({ id: 'orphan', blueprintTypeID: 999 }),
     ];
 
-    const picks = await applyGroupCraftSweep(plans, catalog, null, [], {}, 0, {
+    const picks = await applyGroupAutoBuild(plans, catalog, null, [], {}, 0, {
       strategy: 'build',
       depth: 1,
     });
@@ -171,7 +171,7 @@ describe('applyGroupCraftSweep', () => {
       plan({ id: 'b', blueprintTypeID: 100, hubId: 'amarr' }),
     ];
 
-    await applyGroupCraftSweep(plans, catalog, null, [], {}, 0, {
+    await applyGroupAutoBuild(plans, catalog, null, [], {}, 0, {
       strategy: 'buy',
       depth: 1,
     });
@@ -185,7 +185,7 @@ describe('applyGroupCraftSweep', () => {
     const catalog = catalogWith([entry({ blueprintTypeID: 100 })]);
     const plans = [plan({ id: 'a', blueprintTypeID: 100 })];
 
-    const picks = await applyGroupCraftSweep(plans, catalog, null, [], {}, 0, {
+    const picks = await applyGroupAutoBuild(plans, catalog, null, [], {}, 0, {
       strategy: 'buy',
       depth: 5,
     });

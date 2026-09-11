@@ -166,21 +166,15 @@ describe('opportunitiesCacheKey', () => {
   }
 
   it('is independent of array order', () => {
-    const a = opportunitiesCacheKey([candidate('b'), candidate('a')], DEFAULT_TRADE_HUB, 1);
-    const b = opportunitiesCacheKey([candidate('a'), candidate('b')], DEFAULT_TRADE_HUB, 1);
+    const a = opportunitiesCacheKey([candidate('b'), candidate('a')], DEFAULT_TRADE_HUB);
+    const b = opportunitiesCacheKey([candidate('a'), candidate('b')], DEFAULT_TRADE_HUB);
     expect(a).toBe(b);
   });
 
   it('changes when the hub changes', () => {
-    const jita = opportunitiesCacheKey([candidate('a')], DEFAULT_TRADE_HUB, 1);
-    const amarr = opportunitiesCacheKey([candidate('a')], { ...DEFAULT_TRADE_HUB, id: 'amarr' }, 1);
+    const jita = opportunitiesCacheKey([candidate('a')], DEFAULT_TRADE_HUB);
+    const amarr = opportunitiesCacheKey([candidate('a')], { ...DEFAULT_TRADE_HUB, id: 'amarr' });
     expect(jita).not.toBe(amarr);
-  });
-
-  it('changes when the auto-build depth changes — a stale-depth cache would serve the wrong buildHere picks', () => {
-    const depth1 = opportunitiesCacheKey([candidate('a')], DEFAULT_TRADE_HUB, 1);
-    const depth2 = opportunitiesCacheKey([candidate('a')], DEFAULT_TRADE_HUB, 2);
-    expect(depth1).not.toBe(depth2);
   });
 });
 

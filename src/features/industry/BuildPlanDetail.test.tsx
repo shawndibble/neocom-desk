@@ -575,25 +575,28 @@ describe('BuildPlanDetail sub-builds', () => {
   });
 });
 
-describe('BuildPlanDetail Craft Sweep (issue #695)', () => {
-  const strategySelect = () => screen.getByRole('combobox', { name: 'Sweep Strategy' });
+describe('BuildPlanDetail Auto Build (issue #695)', () => {
+  const strategySelect = () => screen.getByRole('combobox', { name: 'Build Strategy' });
   const tritaniumBuildButton = () =>
     screen.getByRole('button', { name: 'Build Tritanium here instead of buying it' });
 
-  // Selecting a Sweep Strategy applies immediately — no separate Apply press.
-  async function runSweep(user: ReturnType<typeof userEvent.setup>, strategyLabel: string) {
+  // Selecting a Build Strategy applies immediately — no separate Apply press.
+  async function applyBuildStrategy(
+    user: ReturnType<typeof userEvent.setup>,
+    strategyLabel: string
+  ) {
     await user.click(strategySelect());
     await user.click(await screen.findByRole('option', { name: strategyLabel }));
   }
 
-  it('has no Sweep Depth control — the single-plan sweep always walks the whole tree', async () => {
+  it('has no depth control — the single-plan Auto Build pass always walks the whole tree', async () => {
     render(<Harness plan={{ runs: 10 }} />);
     await screen.findByText('Tritanium');
 
-    expect(screen.queryByRole('combobox', { name: 'Sweep Depth' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: 'Depth' })).not.toBeInTheDocument();
   });
 
-  it('overwrites buildHere to match the chosen Sweep Strategy, applied immediately with no confirmation, reflected right away in the materials table', async () => {
+  it('overwrites buildHere to match the chosen Build Strategy, applied immediately with no confirmation, reflected right away in the materials table', async () => {
     const user = userEvent.setup();
     const onUpdate = vi.fn();
     // `Harness` always passes `groupSnapshot={null}` — every test in this
@@ -602,7 +605,7 @@ describe('BuildPlanDetail Craft Sweep (issue #695)', () => {
     render(<Harness plan={{ runs: 10 }} onUpdate={onUpdate} />);
     await screen.findByText('Tritanium');
 
-    await runSweep(user, 'Build');
+    await applyBuildStrategy(user, 'Build');
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     // Depth is always "All levels": Tritanium (1) <- Pyerite (2).
@@ -612,7 +615,7 @@ describe('BuildPlanDetail Craft Sweep (issue #695)', () => {
     expect(await screen.findByText('Mexallon')).toBeInTheDocument();
   });
 
-  it('re-running the sweep overwrites a hand-picked build/buy choice — expected, not a bug', async () => {
+  it('re-running Auto Build overwrites a hand-picked build/buy choice — expected, not a bug', async () => {
     const user = userEvent.setup();
     const onUpdate = vi.fn();
     render(<Harness plan={{ runs: 10 }} onUpdate={onUpdate} />);
@@ -621,7 +624,7 @@ describe('BuildPlanDetail Craft Sweep (issue #695)', () => {
     await user.click(tritaniumBuildButton());
     expect(onUpdate).toHaveBeenLastCalledWith({ buildHere: [34] });
 
-    await runSweep(user, 'Buy');
+    await applyBuildStrategy(user, 'Buy');
 
     expect(onUpdate).toHaveBeenLastCalledWith({ buildHere: [] });
     expect(
@@ -1031,14 +1034,14 @@ describe('BuildPlanDetail Include Reactions (issue #698)', () => {
     expect(onUpdate).toHaveBeenLastCalledWith({ includeReactions: false });
   });
 
-  it("lights up Craft Sweep's Reactions chip once Include Reactions is on", async () => {
+  it("lights up Auto Build's Reactions chip once Include Reactions is on", async () => {
     render(<Harness plan={{ runs: 10, includeReactions: true }} />);
     await screen.findByText('Tritanium');
 
     expect(screen.getByText('Reactions')).not.toHaveAttribute('aria-disabled');
   });
 
-  it("leaves Craft Sweep's Reactions chip disabled while Include Reactions is off", async () => {
+  it("leaves Auto Build's Reactions chip disabled while Include Reactions is off", async () => {
     render(<Harness plan={{ runs: 10 }} />);
     await screen.findByText('Tritanium');
 

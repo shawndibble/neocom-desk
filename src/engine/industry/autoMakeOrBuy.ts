@@ -1,16 +1,18 @@
 /**
- * Craft Sweep engine (issue #694, generalized from issue #652's Auto Build
+ * Auto Build engine (issue #694, generalized from issue #652's Auto Build
  * Depth): decides, without the player marking anything, which materials in a
  * build's tree to mark buildable — walking down to a chosen depth, within a
  * chosen Craft Scope (which production methods may be marked buildable), by
- * a chosen Sweep Strategy (how to decide build-or-buy within that scope).
+ * a chosen Build Strategy (how to decide build-or-buy within that scope).
  * Unrelated to Opportunities' own order-book "depth" (`classifyOrderDepth`).
  *
- * The only depth ceiling left is `MAX_SUB_BUILD_DEPTH`
- * (`materialResolution.ts`) — the recursive engine's own safety valve against
- * a pathological chain, not a size chosen for this feature.
- * `MAX_AUTO_BUILD_DEPTH` still exists, but only to size Build Opportunities'
- * own 0-3 depth control; it no longer clamps this walk.
+ * The only depth ceiling is `MAX_SUB_BUILD_DEPTH` (`materialResolution.ts`)
+ * — the recursive engine's own safety valve against a pathological chain,
+ * not a size chosen for this feature. Build Opportunities used to expose its
+ * own 0-3 depth control over this same pass (`MAX_AUTO_BUILD_DEPTH`, issue
+ * #652); that control was removed as unused, and Opportunities now always
+ * calls this with `depth: 0` — the pass itself is unchanged and still a
+ * real, generically useful option here for any future caller.
  *
  * A material outside the given Craft Scope (or forced to buy by the `buy`
  * strategy) is never marked buildable, but the walk still recurses into that
@@ -41,15 +43,12 @@ import {
 import { MAX_SUB_BUILD_DEPTH } from '@/engine/industry/materialResolution';
 import { sizeRuns } from '@/engine/industry/runSizing';
 
-/** Build Opportunities' own UI-sizing constant only — see the module doc comment. */
-export const MAX_AUTO_BUILD_DEPTH = 3;
-
 /**
  * Which rule decides build-or-buy for a material within Craft Scope: `buy`
  * (force buy), `build` (force craft), or `cost-effective` (build only where
  * cheaper — Auto Build Depth's own heuristic, and the default here).
  */
-export type SweepStrategy = 'buy' | 'build' | 'cost-effective';
+export type BuildStrategy = 'buy' | 'build' | 'cost-effective';
 
 export interface AutoBuildHereOptions {
   recipeFor: (typeID: number) => MaterialRecipe | null;
@@ -74,7 +73,7 @@ export interface AutoBuildHereOptions {
    */
   scope?: readonly MakeMethod[];
   /** Defaults to `'cost-effective'` — Build Opportunities' own heuristic. */
-  strategy?: SweepStrategy;
+  strategy?: BuildStrategy;
 }
 
 interface WalkContext {
@@ -87,9 +86,9 @@ interface WalkContext {
  * Which facility context a node's own material breakdown is computed
  * against (issue #698): `ctx.reactionFacility` for a reaction node, when one
  * is configured, else `ctx` itself — the same choice `resolveMaterial`'s
- * `reactionCtx` makes, kept in step so the sweep's own depth walk and the
- * real recursive engine never disagree about what a reaction job's material
- * consumption looks like. An engineering complex's structure bonus and
+ * `reactionCtx` makes, kept in step so the Auto Build pass's own depth walk
+ * and the real recursive engine never disagree about what a reaction job's
+ * material consumption looks like. An engineering complex's structure bonus and
  * manufacturing-rig security table must never leak into a reaction job's own
  * materials just because it happens to be reached from a manufacturing plan.
  */
@@ -225,7 +224,7 @@ export function autoBuildHere(
   }
 }
 
-export interface SweepDepthOptions {
+export interface AutoBuildDepthOptions {
   recipeFor: (typeID: number) => MaterialRecipe | null;
   ctx: MakeOrBuyContext;
   /** Runs the job would actually be sized to, matching `AutoBuildHereOptions.runs`. */
@@ -233,21 +232,21 @@ export interface SweepDepthOptions {
 }
 
 /**
- * Deepest level a plan's own material tree actually reaches, for sizing a
- * Craft Sweep's Sweep Depth control to the plan rather than to a fixed
- * range. Counts the same way `autoBuildHere` does — depth 1 means only the
- * product's own materials have a recipe, depth 2 means at least one of
- * those has a recipe of its own, and so on — and, like `autoBuildHere`,
- * keeps walking beneath a material regardless of Craft Scope: Sweep Depth
- * bounds how far a sweep can reach, not which materials within reach are
- * eligible to build, so depth discovery must not undercount a tree whose
- * eligible materials sit beneath a reaction or planetary step. Capped at
- * `MAX_SUB_BUILD_DEPTH`. Never throws.
+ * Deepest level a plan's own material tree actually reaches — how far an
+ * Auto Build pass over this plan could walk, at most. Counts the same way
+ * `autoBuildHere` does — depth 1 means only the product's own materials have
+ * a recipe, depth 2 means at least one of those has a recipe of its own, and
+ * so on — and, like `autoBuildHere`, keeps walking beneath a material
+ * regardless of Craft Scope: depth bounds how far an Auto Build pass can
+ * reach, not which materials within reach are eligible to build, so depth
+ * discovery must not undercount a tree whose eligible materials sit beneath
+ * a reaction or planetary step. Capped at `MAX_SUB_BUILD_DEPTH`. Never
+ * throws.
  */
-export function maxSweepDepth(
+export function maxAutoBuildDepth(
   blueprint: IndustryBlueprint,
   me: number,
-  opts: SweepDepthOptions
+  opts: AutoBuildDepthOptions
 ): number {
   let deepest = 0;
   const runs = Math.max(1, Math.round(opts.runs));

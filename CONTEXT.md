@@ -46,16 +46,25 @@ here — they go one per file in `docs/context/decisions/`.
   Assignment ("I don't pay tax on this entry") carries no Payee at all, but
   still re-diffs the same way — growth on it still surfaces rather than
   staying tax-free forever (issue #523).
-- **Auto Build Depth**: A **Build Opportunities** row's player-configurable
-  0–3 setting (default 1) for how many materials-tree levels the automatic
-  make-or-buy pass evaluates before falling back to buying everything below
-  that (issue #652). At depth 0, a row prices exactly as it did before this
-  setting existed. A distinct, much smaller cap than the recursive engine's
-  own `MAX_SUB_BUILD_DEPTH` safety valve, and unrelated to **Order Depth**
-  despite the shared word — see
-  `docs/context/decisions/20260909-153528-auto-make-or-buy-depth-reuses-buildhere-decided.md`.
-  The same walk a **Craft Sweep** later generalizes for Build Group and
-  Build Plan use, rather than a second implementation.
+- **Auto Build**: A one-shot bulk action on a **Build Plan** or every member
+  of a **Build Group** (issues #694/#695/#696, generalized from #652's
+  original depth-only pass): walk the material tree — the plan's or each
+  member's own full depth, no longer a player-chosen setting since issue
+  #798 — within the enabled **Craft Scope**, applying one **Build Strategy**
+  to decide build-or-buy for every material reached. Patches `buildHere`
+  immediately and is never enforced afterward — running it again fully
+  overwrites whatever craft/buy choices, hand-picked ones included, were
+  there before. The Build Group surface asks a generic overwrite
+  confirmation before applying, never a computed preview; the single-plan
+  surface applies immediately with no confirmation and no separate re-run
+  control, since a plan's own fields already recompute live. Named "Craft
+  Sweep" before issue #798's rename — see
+  `docs/context/decisions/20260909-212715-craft-sweep-bulk-build-depth-strategy-control-for.md`
+  and
+  `docs/context/decisions/20260910-225409-rename-craft-sweep-to-auto-build-sweep-strategy.md`.
+  Distinct from **Build Opportunities**' own former "Auto Build Depth"
+  control (issue #652), removed as unused ahead of this rename — see the
+  same 20260910 decision file.
 - **Base Grant**: What every Character is asked for at sign-in — `SCOPES`, and
   nothing from any Scope Group.
 - **Base sheet** — the character's attributes as base + remap alone: five
@@ -66,10 +75,16 @@ here — they go one per file in `docs/context/decisions/`.
 - **Booster**: Cerebral accelerator; user toggles it on manually with an expiry date for training-time math. Stored on the Skill Plan and synced with it, like What-If Implants above (round 33).
 - **BPC Sourcing**: Industry's third tab (Build Plans / Records / BPC Sourcing). Search over every publicly contracted Blueprint Copy for sale across all of New Eden — item type, region, ME/TE, runs, price (issue #608, ADR 0013). Not per-Character: a scheduled backend job crawls EVE Ref's public-contracts dataset (ESI itself has no search over public contracts) and republishes a small, shared, read-only snapshot every 30 minutes for every signed-in Character to search. Distinct from the personal **Contracts** view, which is one Character's own issued/accepted contracts read straight from ESI.
 - **Offer** (BPC Contract Search): one contract row in that snapshot — a single blueprint copy listing at a single price. Not a **copy**: one contract can offer `quantity: 3` copies at one price, so a count of offers is smaller than a count of copies. Every count on the search says "offers", because an offer is what a buyer chooses between.
-- **Build Group**: A named collection of **Build Plan**s belonging to one Character, which also totals as one — open a member and it behaves exactly like any other Build Plan; open the group and every material across its members is added up and costed (see **Group Rollup**). Membership is exclusive and groups do not nest. Membership lives only on the plan, as `buildGroupId`; the group's name, order and mere existence live in the `sync.industryBuildGroups` setting, so an emptied group survives having no members and no merge can hand one plan to two groups. Deleting a group orphans its plans rather than deleting them, and a `buildGroupId` naming a group that is gone renders as an ordinary ungrouped plan — the same rule the Mining Tax `groupId` follows. Written in full in code and docs, where a bare "group" would collide with **Market Group** or an item's **Group**; the Industry plan list's own copy says "group", since neither of those can be meant there. See **Craft Sweep** and **Group Owned Overlay** for two of a group's own operations, distinct from what it merely displays via **Group Rollup**.
+- **Build Group**: A named collection of **Build Plan**s belonging to one Character, which also totals as one — open a member and it behaves exactly like any other Build Plan; open the group and every material across its members is added up and costed (see **Group Rollup**). Membership is exclusive and groups do not nest. Membership lives only on the plan, as `buildGroupId`; the group's name, order and mere existence live in the `sync.industryBuildGroups` setting, so an emptied group survives having no members and no merge can hand one plan to two groups. Deleting a group orphans its plans rather than deleting them, and a `buildGroupId` naming a group that is gone renders as an ordinary ungrouped plan — the same rule the Mining Tax `groupId` follows. Written in full in code and docs, where a bare "group" would collide with **Market Group** or an item's **Group**; the Industry plan list's own copy says "group", since neither of those can be meant there. See **Auto Build** and **Group Owned Overlay** for two of a group's own operations, distinct from what it merely displays via **Group Rollup**.
 - **Build Location**: The search at the head of a Build Plan's Location & market group, over the stations and structures the Character can dock at. Picking one fills facility, **Build System** and security band in a single edit, and the plan remembers which place it was so the box can still name it after a reload. That name is a label only — every number reads the plan's own values, and any edit that moves the job elsewhere drops it. "Override" unfolds the fields behind the box. A manufacturing-activity plan can additionally carry a **Reaction Location** — a second, independent instance of this same control, gated by **Include Reactions**.
-- **Build Opportunities**: Industry's fourth tab (Build Plans / Records / BPC Sourcing / Opportunities, issue #642). Ranks every manufacturing blueprint original or copy the chosen Character(s) own by ISK/hour, owned-materials-adjusted, at the default Trade Hub — the same costing `computeBuildPlan`/`buildVsBuy` already do for a hand-made Build Plan, run over every owned blueprint instead of one. Reaction blueprints are excluded; invention/research/copying stay out of scope, same as **Build Plan**. Selecting rows seeds them into **Build Plan Compare** as ordinary Build Plans. See **Order Depth** and **Auto Build Depth** for their own new vocabulary.
+- **Build Opportunities**: Industry's fourth tab (Build Plans / Records / BPC Sourcing / Opportunities, issue #642). Ranks every manufacturing blueprint original or copy the chosen Character(s) own by ISK/hour, owned-materials-adjusted, at the default Trade Hub — the same costing `computeBuildPlan`/`buildVsBuy` already do for a hand-made Build Plan, run over every owned blueprint instead of one. Reaction blueprints are excluded; invention/research/copying stay out of scope, same as **Build Plan**. Selecting rows seeds them into **Build Plan Compare** as ordinary Build Plans. See **Order Depth** for its own new vocabulary — the row-ranking auto-build depth setting this tab once had (issue #652) was removed as unused ahead of the **Auto Build** rename (issue #798).
 - **Build Plan**: An industry plan for one blueprint or reaction formula: materials needed, costs, fees/taxes, time, and two independent verdicts — an **Acquisition Verdict** and a **Sale Profitability** read (see round 15). Covers manufacturing and reactions (issue #460); invention and research/copying are still out of scope (`.out-of-scope/`). Which activity a plan runs is derived from the picked blueprint/formula's own `activity`, never a separate field on the record.
+- **Build Strategy**: Which rule an **Auto Build** pass applies to every
+  material it reaches within its **Craft Scope** — `buy` (force buy),
+  `build` (force craft), or `cost-effective` (build only where cheaper —
+  the default, reusing the same per-material cost compare
+  `makeOrBuy` uses elsewhere). Named "Sweep Strategy" before issue #798's
+  rename.
 - **Build System**: The solar system a Build Plan's job runs in, named on the plan. Sets the **Cost Index** the job fee is charged at _and_ the security band the rig bonus reads — both follow from the system, so neither is a separate field. Materials are still priced at the plan's trade hub. Empty means "the hub's own system", which is how every plan behaved before the field existed.
 - **Calculation Breakdown**: The modal behind a Build Plan's results that
   restates every figure on screen as a rule plus that rule with the plan's own
@@ -148,27 +163,17 @@ here — they go one per file in `docs/context/decisions/`.
 - **Cost Index**: A solar system's current manufacturing activity level
   (read live from ESI). Higher activity in a system drives its Job Fee up;
   distinct from EIV, which prices the materials rather than the system.
-- **Craft Scope**: Which **Industry Activity** types a **Craft Sweep** is
-  allowed to mark buildable — a multi-select, not a hardcoded
+- **Craft Scope**: Which **Industry Activity** types an **Auto Build** pass
+  is allowed to mark buildable — a multi-select, not a hardcoded
   manufacturing-only filter. Only Manufacturing is functional today;
   Reactions and Planetary (PI) are reserved slots the same control will grow
   into as their own tickets land, not a redesign of this one. A material
-  outside the enabled scope is priced as bought, but a sweep does not stop
+  outside the enabled scope is priced as bought, but the pass does not stop
   there — it keeps walking into that material's own inputs looking for
   further in-scope materials underneath. See
   `docs/context/decisions/20260909-212715-craft-sweep-bulk-build-depth-strategy-control-for.md`.
   Reactions' own path to becoming a real, selectable option is decided —
   see **Include Reactions** and **Reaction Location**.
-- **Craft Sweep**: A one-shot bulk action on a **Build Plan** or every member
-  of a **Build Group**: walk the material tree down to a chosen **Sweep
-  Depth**, within the enabled **Craft Scope**, applying one **Sweep
-  Strategy** to decide build-or-buy for every material reached. Patches
-  `buildHere` immediately and is never enforced afterward — running it again
-  fully overwrites whatever craft/buy choices, hand-picked ones included,
-  were there before; a generic confirmation warns before applying, never a
-  computed preview. The same depth-walk **Auto Build Depth** already uses,
-  generalized — not a second implementation. See
-  `docs/context/decisions/20260909-212715-craft-sweep-bulk-build-depth-strategy-control-for.md`.
 - **Dark**: A member with no login for the corp's inactivity span or more —
   the pilot's own setting (14/30/60/90 days), defaulting to
   `DARK_AFTER_DAYS` (30). `engine/corp/members.ts` still owns the default and
@@ -595,16 +600,6 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   every cycle, and the number `chainCost` and `pinBudget` take as their
   extraction rate. CCP's own worked example averages ~5,580/hr against the
   13,930/hr `qty_per_cycle` alone implies.
-- **Sweep Depth**: How many materials-tree levels a **Craft Sweep** walks —
-  1..N, or "All" (however deep the tree actually goes), bounded only by the
-  recursive engine's own `MAX_SUB_BUILD_DEPTH` safety valve (10), not by
-  **Auto Build Depth**'s own smaller 0–3 cap. Counts the same way
-  `materialResolution.ts`'s recursion does: the product's own materials sit
-  at depth 0.
-- **Sweep Strategy**: Which rule a **Craft Sweep** applies to every material
-  it reaches within its **Craft Scope** — `buy` (force buy), `build` (force
-  craft), or `cost-effective` (build only where cheaper — the default,
-  reusing **Auto Build Depth**'s own cost-compare heuristic).
 - **System Label**: One of ESI's four built-in mail labels — Inbox, Sent,
   Corp, Alliance — returned by `/characters/{id}/mail/labels/` alongside
   their `unread_count`. Unrenamable/undeletable in-game; CCP does the
