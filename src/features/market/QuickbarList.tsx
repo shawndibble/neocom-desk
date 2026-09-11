@@ -147,7 +147,7 @@ function QuickbarRow({ item, selected, onSelect, onRemove, onSetTarget }: Quickb
         aria-label={t('market.quickbar.reorderItem', { name: item.name })}
         className="cursor-grab touch-none px-1 text-text-faint hover:text-text focus-visible:outline-2 focus-visible:outline-accent"
       >
-        ⠿
+        <Icon.DragHandle />
       </button>
       <button
         type="button"

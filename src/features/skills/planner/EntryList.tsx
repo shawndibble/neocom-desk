@@ -300,7 +300,7 @@ const EntryRow = memo(function EntryRow({
       aria-label={t('plans.reorderEntry', { name: rowLabel })}
       className="cursor-grab touch-none px-1 text-text-faint hover:text-text focus-visible:outline-2 focus-visible:outline-accent"
     >
-      ⠿
+      <Icon.DragHandle />
     </button>
   );
 
@@ -444,7 +444,7 @@ const PrereqRow = memo(function PrereqRow({
       aria-label={t('plans.dragPrereq', { name: label })}
       className="cursor-grab touch-none px-1 text-text-faint hover:text-text focus-visible:outline-2 focus-visible:outline-accent"
     >
-      ⠿
+      <Icon.DragHandle />
     </button>
   );
 
@@ -579,7 +579,7 @@ const MarkerRow = memo(function MarkerRow({
         aria-label={t('plans.reorderMarker')}
         className="cursor-grab touch-none px-1 text-text-faint hover:text-text focus-visible:outline-2 focus-visible:outline-accent"
       >
-        ⠿
+        <Icon.DragHandle />
       </button>
       {attributes ? (
         <button
