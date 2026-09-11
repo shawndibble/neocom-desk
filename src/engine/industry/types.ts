@@ -499,9 +499,18 @@ export interface MaterialSourcing {
 /** Sourcing overrides keyed by material typeID. Missing key = no overrides. */
 export type MaterialSourcingMap = Record<number, MaterialSourcing>;
 
-/** One Character-and-location combination that can hold owned stock (issue #454). */
+/**
+ * One Character/Corporation-and-location combination that can hold owned
+ * stock (issue #454). `corporationId` present (issue #798) means the
+ * location is owned-stock scoped to the active Character's corporation
+ * rather than a personal Character; `characterId` is still carried on a
+ * corp-owned location as the Director whose access it was read through
+ * (see `OwnedStockSource`'s doc comment) — never part of the location's own
+ * identity, which lives in `ownedStockLocationKey`.
+ */
 export interface OwnedStockLocation {
   characterId: number;
+  corporationId?: number;
   locationId: number;
   locationType: EngineAsset['location_type'];
 }

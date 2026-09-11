@@ -35,15 +35,29 @@ export interface StockAsset extends EngineAsset {
   is_singleton: boolean;
 }
 
-/** One Character's asset list. Characters that could not be loaded are simply absent. */
+/**
+ * One Character's asset list, or one Corporation's (issue #798) read through
+ * a Director's own access. Characters that could not be loaded are simply
+ * absent. `characterId` is always the Character whose access produced this
+ * source — for a corp source that's the reading Director, kept because
+ * structure-name resolution is ACL-checked per Character
+ * (`resolveStockLocationNames`) even when the stock itself belongs to the
+ * corp. `corporationId` present is what actually marks a source as
+ * corp-owned rather than personal.
+ */
 export interface OwnedStockSource {
   characterId: number;
+  corporationId?: number;
   assets: readonly StockAsset[];
 }
 
-/** Owned units of one material held by one Character at one location. */
+/**
+ * Owned units of one material held by one Character or Corporation
+ * (`corporationId` present, issue #798) at one location.
+ */
 export interface OwnedStockPlacement {
   characterId: number;
+  corporationId?: number;
   locationId: number;
   locationType: EngineAsset['location_type'];
   quantity: number;
@@ -64,11 +78,25 @@ export type DetectedOwnedStockMap = Map<number, DetectedOwnedStock>;
  * owned-stock-scope operation keys off of, shared by `filterStockByScope`,
  * `collectStockLocations`, and the scope-control UI's own chip identity.
  * Accepts a placement or a bare location: both carry the three fields.
+ *
+ * A corp-owned location (`corporationId` present, issue #798) keys on the
+ * corporation instead, under a distinct `corp:` prefix — never on
+ * `characterId`, which for a corp placement is only the Director who
+ * happened to read it and must not be part of the identity: switching the
+ * active Director must not orphan a plan's saved "selected locations"
+ * scope. The `corp:` prefix also keeps this format byte-identical to every
+ * pre-existing personal key, so an already-persisted `BuildPlanRecord`'s
+ * `ownedStockScope` keeps matching its own placements unchanged.
  */
 export function ownedStockLocationKey(
-  location: Pick<OwnedStockPlacement, 'characterId' | 'locationId' | 'locationType'>
+  location: Pick<
+    OwnedStockPlacement,
+    'characterId' | 'corporationId' | 'locationId' | 'locationType'
+  >
 ): string {
-  return `${location.characterId}:${location.locationType}:${location.locationId}`;
+  return location.corporationId !== undefined
+    ? `corp:${location.corporationId}:${location.locationType}:${location.locationId}`
+    : `${location.characterId}:${location.locationType}:${location.locationId}`;
 }
 
 /**
@@ -111,6 +139,7 @@ export function collectStockLocations(stock: DetectedOwnedStockMap): OwnedStockL
       if (!seen.has(key)) {
         seen.set(key, {
           characterId: p.characterId,
+          ...(p.corporationId !== undefined ? { corporationId: p.corporationId } : {}),
           locationId: p.locationId,
           locationType: p.locationType,
         });
@@ -165,15 +194,24 @@ function isShipHeld(locationFlag: string): boolean {
   return isShipBayFlag(locationFlag) || SHIP_HOLD_PATTERN.test(locationFlag);
 }
 
-/** `characterId:locationId` — placements are grouped per Character, so both are part of the key. */
-function placementKey(characterId: number, locationId: number): string {
-  return `${characterId}:${locationId}`;
+/**
+ * Groups placements per owner (Character, or Corporation when
+ * `corporationId` is given) and location. A corp source groups on the
+ * corporation, not the reading Director, for the same reason
+ * `ownedStockLocationKey` does.
+ */
+function placementKey(
+  source: { characterId: number; corporationId?: number },
+  locationId: number
+): string {
+  return source.corporationId !== undefined
+    ? `corp:${source.corporationId}:${locationId}`
+    : `${source.characterId}:${locationId}`;
 }
 
 function comparePlacements(a: OwnedStockPlacement, b: OwnedStockPlacement): number {
   if (a.quantity !== b.quantity) return b.quantity - a.quantity;
-  if (a.characterId !== b.characterId) return a.characterId - b.characterId;
-  return a.locationId - b.locationId;
+  return ownedStockLocationKey(a).localeCompare(ownedStockLocationKey(b));
 }
 
 /**
@@ -191,12 +229,13 @@ export function detectOwnedStock(
   const detected: DetectedOwnedStockMap = new Map();
   if (typeIDs.size === 0) return detected;
 
-  for (const { characterId, assets } of sources) {
+  for (const { characterId, corporationId, assets } of sources) {
     const byItemId = new Map<number, StockAsset>();
     for (const a of assets) byItemId.set(a.item_id, a);
 
-    // typeID -> "characterId:locationId" -> placement, so repeated stacks of
-    // one material at one location collapse into a single breakdown line.
+    // typeID -> "characterId:locationId" (or "corp:corporationId:locationId")
+    // -> placement, so repeated stacks of one material at one location
+    // collapse into a single breakdown line.
     const grouped = new Map<number, Map<string, OwnedStockPlacement>>();
     for (const a of assets) {
       if (a.is_singleton || !typeIDs.has(a.type_id)) continue;
@@ -208,12 +247,17 @@ export function detectOwnedStock(
         byLocation = new Map();
         grouped.set(a.type_id, byLocation);
       }
-      const key = placementKey(characterId, placement.locationId);
+      const key = placementKey({ characterId, corporationId }, placement.locationId);
       const existing = byLocation.get(key);
       if (existing) {
         existing.quantity += a.quantity;
       } else {
-        byLocation.set(key, { characterId, ...placement, quantity: a.quantity });
+        byLocation.set(key, {
+          characterId,
+          ...(corporationId !== undefined ? { corporationId } : {}),
+          ...placement,
+          quantity: a.quantity,
+        });
       }
     }
 
