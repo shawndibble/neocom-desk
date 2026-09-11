@@ -1,4 +1,11 @@
-import type { BlueprintMap, PiData, ReprocessingMap, SkillType, TypeMap } from './types';
+import type {
+  BlueprintMap,
+  MarketWideTreeMap,
+  PiData,
+  ReprocessingMap,
+  SkillType,
+  TypeMap,
+} from './types';
 
 async function fetchJson<T>(file: string): Promise<T> {
   const res = await fetch(`${import.meta.env.BASE_URL}data/${file}`);
@@ -65,3 +72,9 @@ export const loadOreAndIceTypeIds = cached<number[]>('oreAndIceTypeIds.json');
  * (rare, but real) and prices as itself.
  */
 export const loadCompressedOreTypeIds = cached<Record<string, number>>('compressedOreTypeIds.json');
+/**
+ * Every manufacturing blueprint's flattened material tree, precomputed at SDE
+ * build time (issue #819) — the market-wide Build Opportunities scan's input,
+ * so ranking the whole SDE never resolves a sub-build tree live per candidate.
+ */
+export const loadMarketWideTrees = cached<MarketWideTreeMap>('marketWideTrees.json');

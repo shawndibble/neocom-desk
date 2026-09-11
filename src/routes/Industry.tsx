@@ -22,8 +22,9 @@ import { useIsDesktop } from '@/lib/useIsDesktop';
 import type { MaterialSourcing, OwnedStockScope, SkillLevels } from '@/engine/industry/types';
 import type { BuildStrategy } from '@/engine/industry/autoMakeOrBuy';
 import type { CharacterBlueprint } from '@/esi/endpoints';
-import { loadPi } from '@/sde/loadSde';
-import type { PiData } from '@/sde/types';
+import { loadMarketWideTrees, loadPi } from '@/sde/loadSde';
+import type { MarketWideTreeMap, PiData } from '@/sde/types';
+import { DEFAULT_TRADE_HUB } from '@/market/hubs';
 import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
 import {
   loadBlueprintCatalog,
@@ -39,6 +40,7 @@ import { ActiveJobsPanel } from '@/features/industry/ActiveJobsPanel';
 import { BuildPlanList } from '@/features/industry/BuildPlanList';
 import { BuildPlanCompare } from '@/features/industry/BuildPlanCompare';
 import { OpportunitiesPanel } from '@/features/industry/OpportunitiesPanel';
+import { MarketWideOpportunitiesPanel } from '@/features/industry/MarketWideOpportunitiesPanel';
 import {
   planForOpportunityCandidate,
   type OpportunityRow,
@@ -184,6 +186,19 @@ export function Industry() {
   // be a worse answer than just doing it.
   const [deletingGroupId, setDeletingGroupId] = useState<string | null>(null);
   const [catalog, setCatalog] = useState<BlueprintCatalog | null>(null);
+  // Character-independent, loaded once — the market-wide scan's precomputed
+  // input (issue #819). Not part of the per-character effect below: it never
+  // changes when the active character does.
+  const [marketWideTrees, setMarketWideTrees] = useState<MarketWideTreeMap | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    void loadMarketWideTrees().then((trees) => {
+      if (!cancelled) setMarketWideTrees(trees);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   // Planetary schematics, for the materials table's make-or-buy marker. Loaded
   // beside the catalog so both are in place before a plan first renders — a
   // late arrival would widen the price fetch's type list and refire it.
@@ -724,15 +739,28 @@ export function Industry() {
           {tab === 'sourcing' ? (
             <BpcSourcingPanel />
           ) : tab === 'opportunities' ? (
-            <OpportunitiesPanel
-              catalog={catalog}
-              pi={pi}
-              skills={skills}
-              facilityDefaults={facilityDefaults}
-              activeCharacterId={activeCharacterId}
-              ownedStockSnapshot={ownedStockSnapshot}
-              onAddToCompare={(rows) => void handleAddOpportunitiesToCompare(rows)}
-            />
+            <div className="flex flex-col gap-4">
+              <OpportunitiesPanel
+                catalog={catalog}
+                pi={pi}
+                skills={skills}
+                facilityDefaults={facilityDefaults}
+                activeCharacterId={activeCharacterId}
+                ownedStockSnapshot={ownedStockSnapshot}
+                onAddToCompare={(rows) => void handleAddOpportunitiesToCompare(rows)}
+              />
+              <MarketWideOpportunitiesPanel
+                hub={DEFAULT_TRADE_HUB}
+                trees={marketWideTrees}
+                catalog={catalog}
+                onStartPlan={(entry) => {
+                  setTab('plans');
+                  void createPlan(entry).then((id) => {
+                    if (id) selectPlan(id);
+                  });
+                }}
+              />
+            </div>
           ) : tab === 'records' ? (
             <ProductionLogPanel
               characterId={activeCharacterId}

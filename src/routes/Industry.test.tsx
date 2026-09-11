@@ -65,6 +65,7 @@ vi.mock('@/sde/loadSde', () => ({
   loadTypes: vi.fn(async () => TYPES),
   loadBlueprints: vi.fn(async () => BLUEPRINTS),
   loadPi: vi.fn(async () => ({ schematics: {}, raw: [] })),
+  loadMarketWideTrees: vi.fn(async () => ({})),
 }));
 
 // The materials row menu's "Show info" opens ItemDetailModal, which resolves
