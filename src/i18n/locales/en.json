@@ -510,7 +510,7 @@
       "feesTitle": "Sales tax and broker fee",
       "salesTax": "Sales tax applies to all gross revenue. Accounting {{accounting}} sets the rate ({{pct}}).",
       "salesTaxFormula": "Sales tax = {{tax}}",
-      "brokerFee": "Broker fee applies only to revenue confirmed via a watched sell order — never a linked wallet transaction, since ESI can't say if that was an instant sale or an order fill. Broker Relations {{broker}} sets the rate ({{pct}}).",
+      "brokerFee": "Broker fee applies only to revenue confirmed via a watched sell order — never a linked wallet transaction, since ESI can't say if that was an instant sale or an order fill. Broker Relations {{broker}} sets the rate ({{pct}}), 100 ISK minimum per order.",
       "brokerFeeFormula": "Broker fee = {{broker}}",
       "netRevenueFormula": "Net revenue = {{gross}} − sales tax {{tax}} − broker fee {{broker}} = {{net}}",
       "profitTitle": "Profit and margin",

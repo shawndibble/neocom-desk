@@ -1,30 +1,25 @@
 import { useState } from 'react';
 import { IconButton } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
+import { SKILL_IDS, type SkillLevels } from '@/engine/industry/types';
 import { formatIsk } from '@/lib/isk';
 import type { ProductionRunSummary } from './productionRunSummary';
 import { RealizedProfitBreakdown } from './RealizedProfitBreakdown';
 
-interface RealizedProfitCellProps<Row extends ProductionRunSummary> {
-  row: Row;
+interface RealizedProfitCellProps {
+  row: ProductionRunSummary;
   label: string;
-  accountingLevel: number;
-  brokerRelationsLevel: number;
+  skills: SkillLevels;
 }
 
 /**
  * The realized-profit figure plus, once something has sold, a trigger that
  * opens `RealizedProfitBreakdown` for that row (issue #824) —
- * `quantitySold === 0` means `marginPct` is null and there is nothing
- * realized yet to explain, so the trigger is withheld rather than shown
- * disabled.
+ * `quantitySold === 0` means `grossRevenue` is also 0 and `marginPct` is
+ * null, so there is nothing realized yet to explain and the trigger is
+ * withheld rather than shown disabled.
  */
-export function RealizedProfitCell<Row extends ProductionRunSummary>({
-  row,
-  label,
-  accountingLevel,
-  brokerRelationsLevel,
-}: RealizedProfitCellProps<Row>) {
+export function RealizedProfitCell({ row, label, skills }: RealizedProfitCellProps) {
   const [open, setOpen] = useState(false);
   const value = formatIsk(row.profit.profit);
 
@@ -44,8 +39,8 @@ export function RealizedProfitCell<Row extends ProductionRunSummary>({
         open={open}
         onClose={() => setOpen(false)}
         profit={row.profit}
-        accountingLevel={accountingLevel}
-        brokerRelationsLevel={brokerRelationsLevel}
+        accountingLevel={skills[SKILL_IDS.accounting] ?? 0}
+        brokerRelationsLevel={skills[SKILL_IDS.brokerRelations] ?? 0}
       />
     </span>
   );

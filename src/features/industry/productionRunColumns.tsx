@@ -1,5 +1,5 @@
 import type { DataTableColumn } from '@/components/ui';
-import { SKILL_IDS, type SkillLevels } from '@/engine/industry/types';
+import type { SkillLevels } from '@/engine/industry/types';
 import type { ProductionRunSummary } from './productionRunSummary';
 import { ProductionRunStatusChip } from './ProductionRunStatusChip';
 import { RealizedProfitCell } from './RealizedProfitCell';
@@ -70,8 +70,6 @@ export function realizedProfitColumn<Row extends ProductionRunSummary>(
   t: T,
   skills: SkillLevels
 ): DataTableColumn<Row> {
-  const accountingLevel = skills[SKILL_IDS.accounting] ?? 0;
-  const brokerRelationsLevel = skills[SKILL_IDS.brokerRelations] ?? 0;
   return {
     id: 'realizedProfit',
     header: t('industry.realizedProfit'),
@@ -80,12 +78,7 @@ export function realizedProfitColumn<Row extends ProductionRunSummary>(
     cellClassName: (r) => iskToneClass(r.profit.profit),
     sortValue: (r) => r.profit.profit,
     render: (r) => (
-      <RealizedProfitCell
-        row={r}
-        label={t('industry.breakdownTrigger')}
-        accountingLevel={accountingLevel}
-        brokerRelationsLevel={brokerRelationsLevel}
-      />
+      <RealizedProfitCell row={r} label={t('industry.breakdownTrigger')} skills={skills} />
     ),
   };
 }
