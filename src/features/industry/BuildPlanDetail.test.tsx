@@ -8,6 +8,7 @@ import { configureClipboard, type ClipboardWriter } from '@/lib/clipboard';
 import type { BuildPlanRecord } from '@/db';
 import type { BlueprintType, TypeMap } from '@/sde/types';
 import type { BlueprintCatalog, BlueprintCatalogEntry } from './blueprintCatalog';
+import type { CorpOwnedStockState } from './corpOwnedStock';
 import { EMPTY_OWNED_STOCK_SNAPSHOT } from './ownedStockDetection';
 import { BuildPlanDetail, type PlanPatch } from './BuildPlanDetail';
 
@@ -185,14 +186,29 @@ interface HarnessProps {
   catalog?: BlueprintCatalog;
   onUpdate?: (patch: PlanPatch) => void;
   onDerivedFix?: (patch: PlanPatch) => void;
+  corpOwnedStock?: Partial<CorpOwnedStockState>;
 }
+
+const CORP_OWNED_STOCK_UNAVAILABLE: CorpOwnedStockState = {
+  source: null,
+  corporationId: null,
+  corporationName: null,
+  available: false,
+  incomplete: false,
+};
 
 /**
  * Stands in for Industry.tsx: holds the plan in local state and applies
  * `onUpdate` patches to it, so a committed edit is visible in the next
  * render the way it would be against the real store.
  */
-function Harness({ plan: planOverrides, catalog = CATALOG, onUpdate, onDerivedFix }: HarnessProps) {
+function Harness({
+  plan: planOverrides,
+  catalog = CATALOG,
+  onUpdate,
+  onDerivedFix,
+  corpOwnedStock,
+}: HarnessProps) {
   const [plan, setPlan] = useState<BuildPlanRecord>(makePlan(planOverrides));
   return (
     <MemoryRouter>
@@ -203,13 +219,7 @@ function Harness({ plan: planOverrides, catalog = CATALOG, onUpdate, onDerivedFi
         ownedBlueprints={[]}
         skills={{}}
         ownedStockSnapshot={EMPTY_OWNED_STOCK_SNAPSHOT}
-        corpOwnedStock={{
-          source: null,
-          corporationId: null,
-          corporationName: null,
-          available: false,
-          incomplete: false,
-        }}
+        corpOwnedStock={{ ...CORP_OWNED_STOCK_UNAVAILABLE, ...corpOwnedStock }}
         onUpdate={(patch) => {
           onUpdate?.(patch);
           setPlan((p) => ({ ...p, ...patch }));
@@ -1108,5 +1118,37 @@ describe('BuildPlanDetail material price basis', () => {
     expect(await screen.findByText('Tritanium')).toBeInTheDocument();
     expect(tritaniumPrice().value).toBe('4');
     expect(basisSelect()).toHaveTextContent('Buy orders');
+  });
+});
+
+describe('BuildPlanDetail Corp Assets (issue #798)', () => {
+  const corpAssetsToggle = () => screen.getByRole('button', { name: 'Corp Assets' });
+
+  it("renders as a toggle button, not a checkbox — matches the app's other toggles", async () => {
+    render(<Harness plan={{ runs: 10 }} corpOwnedStock={{ available: true }} />);
+    await screen.findByText('Tritanium');
+
+    expect(corpAssetsToggle()).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.queryByRole('checkbox', { name: 'Corp Assets' })).not.toBeInTheDocument();
+  });
+
+  it('is disabled when the active character lacks the corp Director role', async () => {
+    render(<Harness plan={{ runs: 10 }} corpOwnedStock={{ available: false }} />);
+    await screen.findByText('Tritanium');
+
+    expect(corpAssetsToggle()).toBeDisabled();
+  });
+
+  it('toggles on and writes includeCorpAssets when the Director role is held', async () => {
+    const user = userEvent.setup();
+    const onUpdate = vi.fn();
+    render(
+      <Harness plan={{ runs: 10 }} corpOwnedStock={{ available: true }} onUpdate={onUpdate} />
+    );
+    await screen.findByText('Tritanium');
+
+    await user.click(corpAssetsToggle());
+
+    expect(onUpdate).toHaveBeenCalledWith({ includeCorpAssets: true });
   });
 });

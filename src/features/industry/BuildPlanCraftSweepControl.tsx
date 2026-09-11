@@ -43,9 +43,9 @@ interface BuildPlanCraftSweepControlProps {
  *
  * Craft Scope's Reactions chip lights up exactly when `scope` includes it
  * (issue #698 — Include Reactions on, or the plan's own activity is a
- * reaction). Planetary isn't shown here at all (issue #778) — nothing on
- * this surface will ever light it up, and the group control a few clicks
- * away already carries the reserved slot.
+ * reaction). Manufacturing and Planetary are never shown as chips at all —
+ * every sweep always includes Manufacturing, and Planetary is not yet a
+ * sweep-eligible method on any surface.
  */
 export function BuildPlanCraftSweepControl({
   maxDepth,
@@ -68,9 +68,10 @@ export function BuildPlanCraftSweepControl({
       <SweepStrategySelect
         strategy={strategy}
         onChange={handleStrategyChange}
+        size="sm"
         disabled={!canApply}
       />
-      <CraftScopeChips scope={scope} includePlanetary={false} />
+      <CraftScopeChips scope={scope} />
       <IconButton
         size="sm"
         icon={<Icon.Run />}

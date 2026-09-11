@@ -16,8 +16,8 @@ import type { MakeMethod } from '@/engine/industry/makeOrBuy';
  * Strategy choices and the same Craft Scope chip look. Kept in one place so
  * a future label or style tweak lands once rather than being hand-kept in
  * sync across both files. Each control's own shape around these pieces —
- * header/tooltip, Sweep Depth, confirmation — stays genuinely separate; only
- * what was actually identical between them moved here.
+ * header/tooltip, confirmation — stays genuinely separate; only what was
+ * actually identical between them moved here.
  */
 
 const SWEEP_STRATEGIES: readonly SweepStrategy[] = ['cost-effective', 'build', 'buy'];
@@ -88,29 +88,25 @@ interface CraftScopeChipsProps {
    * shown here at all (issue #778) — every sweep on every surface includes
    * it unconditionally, so a chip for it never carries information. Reactions
    * lights up only when `scope` includes it (Include Reactions on, or the
-   * plan's own activity is a reaction). Planetary is never in `scope` yet —
-   * out of scope for #698 — and always renders reserved, when shown at all.
+   * plan's own activity is a reaction). Planetary is never in `scope` and has
+   * no chip at all (issue #798 dropped the reserved Planetary chip from both
+   * surfaces) — a sweep-eligible Planetary method would need one again then,
+   * not before.
    */
   scope: readonly MakeMethod[];
-  /**
-   * Whether to render the reserved Planetary chip. Defaults to `true` (the
-   * Build Group's `CraftSweepControl`, unchanged). The single-plan
-   * `BuildPlanCraftSweepControl` passes `false` — issue #778 dropped that
-   * chip from this surface as dead weight: nothing there will ever light it
-   * up, and the group control a few clicks away already carries it.
-   */
-  includePlanetary?: boolean;
 }
 
 /**
- * Just the Reactions chip (and, on callers that ask for it, the reserved
- * Planetary chip) — Manufacturing was dropped (issue #778) as a chip that
- * could never say anything: every sweep always includes it, on both the
+ * Just the Reactions chip — Manufacturing was dropped (issue #778) as a chip
+ * that could never say anything: every sweep always includes it, on both the
  * group and single-plan surfaces, so it only ever repeated what "Craft
- * Sweep" already implies. The Reactions chip always carries a tooltip,
- * lit or not, explaining what it does either way.
+ * Sweep" already implies. Planetary's reserved chip was dropped the same way
+ * (issue #798): Planetary is not a sweep-eligible method on any surface, so
+ * a permanently-disabled chip for it never carried information either. The
+ * Reactions chip always carries a tooltip, lit or not, explaining what it
+ * does either way.
  */
-export function CraftScopeChips({ scope, includePlanetary = true }: CraftScopeChipsProps) {
+export function CraftScopeChips({ scope }: CraftScopeChipsProps) {
   const { t } = useTranslation();
   const reactionsEligible = scope.includes('reaction');
   return (
@@ -126,15 +122,6 @@ export function CraftScopeChips({ scope, includePlanetary = true }: CraftScopeCh
       >
         {t('industry.craftScopeReactions')}
       </span>
-      {includePlanetary && (
-        <span
-          aria-disabled="true"
-          title={t('industry.craftScopeReserved')}
-          className={RESERVED_CLASSES}
-        >
-          {t('industry.craftScopePlanetary')}
-        </span>
-      )}
     </span>
   );
 }

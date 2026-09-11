@@ -5,6 +5,7 @@ import {
   CollapsiblePanel,
   DataAgeBadge,
   EmptyState,
+  FilterChip,
   IconButton,
   InfoTooltip,
   Panel,
@@ -1535,35 +1536,31 @@ export function BuildPlanDetail({
                   disabled={!makeOrBuyContext}
                   onApply={applyCraftSweep}
                 />
-                <span className="flex items-center gap-2 text-xs">
-                  <input
-                    id="build-plan-include-corp-assets"
-                    type="checkbox"
-                    checked={plan.includeCorpAssets ?? false}
-                    disabled={!corpOwnedStock.available}
-                    onChange={(e) => update({ includeCorpAssets: e.target.checked })}
-                    className="size-4 shrink-0 cursor-pointer accent-accent disabled:cursor-not-allowed"
-                  />
-                  <label
-                    htmlFor="build-plan-include-corp-assets"
-                    className={corpOwnedStock.available ? undefined : 'text-text-dim'}
-                  >
-                    {t('industry.includeCorpAssets')}
-                  </label>
-                  <InfoTooltip
-                    label={t('industry.includeCorpAssetsTooltipLabel')}
-                    content={
-                      corpOwnedStock.available
-                        ? t('industry.includeCorpAssetsTooltip')
-                        : t('industry.includeCorpAssetsUnavailable')
-                    }
-                  />
-                </span>
                 <OwnedStockScopeControl
                   scope={plan.ownedStockScope}
                   detectedStock={detectedStock}
                   detection={detection}
                   onChange={(ownedStockScope) => update({ ownedStockScope })}
+                  corpAssetsToggle={
+                    <span className="flex items-center gap-1">
+                      <FilterChip
+                        label={t('industry.includeCorpAssets')}
+                        selected={plan.includeCorpAssets ?? false}
+                        disabled={!corpOwnedStock.available}
+                        onToggle={() =>
+                          update({ includeCorpAssets: !(plan.includeCorpAssets ?? false) })
+                        }
+                      />
+                      <InfoTooltip
+                        label={t('industry.includeCorpAssetsTooltipLabel')}
+                        content={
+                          corpOwnedStock.available
+                            ? t('industry.includeCorpAssetsTooltip')
+                            : t('industry.includeCorpAssetsUnavailable')
+                        }
+                      />
+                    </span>
+                  }
                   action={
                     (bulkDetectedPatches.length > 0 || bulkClearPatches.length > 0) && (
                       <div className="flex gap-2">
