@@ -1,11 +1,15 @@
 /**
  * The "This Character / All Characters / specific characters" picker shared
  * by the cross-character Wallet Balance and Industry Active Jobs views, and
- * by the synced default in Settings (issue #607). Same `DropdownMenu` +
- * checkbox-per-character shape `MoonMiningTax.tsx` already ships for its
- * Character filter, plus the "This Character" quick-select that page
- * doesn't offer — every existing caller of that pattern only ever needed
- * "all or a hand-picked subset."
+ * by the synced default in Settings (issue #607). Same checkbox-per-character
+ * shape `MoonMiningTax.tsx` already ships for its Character filter, plus the
+ * "This Character" quick-select that page doesn't offer — every existing
+ * caller of that pattern only ever needed "all or a hand-picked subset."
+ * Built on the shared `MultiSelect` (issue #797) for its type-to-filter
+ * search box; the quick-selects render as plain buttons in `extraContent`
+ * above it, not `DropdownMenu` items — a live search input doesn't mix with
+ * Radix's menu-family navigation, see
+ * `docs/context/decisions/20260905-114550-hand-build-aria-comboboxes-rather-than-buy-radix.md`.
  *
  * "This Character" emits the literal `'current'` (`CharacterFilterValue`),
  * not a `Set` frozen to whichever Character happens to be active at click
@@ -31,15 +35,7 @@
  * chips, in a `Panel` whose header carries no title for it to sit beside.
  */
 import { useTranslation } from 'react-i18next';
-import {
-  Button,
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui';
+import { Button, MultiSelect } from '@/components/ui';
 import { toggleFilterMember } from '@/lib/multiSelectFilter';
 import { useResolvedCharacterFilter, type CharacterFilterValue } from './characterFilterValue';
 
@@ -91,35 +87,46 @@ export function CharacterFilterControl({
     );
   }
 
+  const selected = resolved === 'all' ? new Set(characters.map((c) => c.characterId)) : resolved;
+
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button size="sm">{label}</Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent>
-        {activeCharacterId !== null && (
-          <DropdownMenuItem onSelect={() => onChange('current')}>
-            {t('character.filter.thisCharacter')}
-          </DropdownMenuItem>
-        )}
-        <DropdownMenuItem onSelect={() => onChange('all')}>
-          {t('character.filter.allCharacters')}
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        {characters.map((c) => (
-          <DropdownMenuCheckboxItem
-            key={c.characterId}
-            checked={resolved === 'all' || resolved.has(c.characterId)}
-            // Without this the menu closes on the first toggle, which makes a
-            // multi-select take one round trip per character
-            // (`CalendarKindFilterMenu`'s precedent).
-            onSelect={(event) => event.preventDefault()}
-            onCheckedChange={() => toggleCharacter(c.characterId)}
-          >
-            {c.characterName}
-          </DropdownMenuCheckboxItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <MultiSelect
+      trigger={<Button size="sm">{label}</Button>}
+      options={characters.map((c) => ({ id: c.characterId, label: c.characterName }))}
+      selected={selected}
+      onToggle={toggleCharacter}
+      searchPlaceholder={t('character.filter.searchPlaceholder')}
+      noResultsLabel={t('character.filter.noResults')}
+      extraContent={(close) => {
+        function quickSelect(next: CharacterFilterValue) {
+          onChange(next);
+          close();
+        }
+        return (
+          <div className="border-b border-line p-1">
+            {activeCharacterId !== null && (
+              <Button
+                variant="ghost"
+                align="start"
+                size="sm"
+                className="w-full"
+                onClick={() => quickSelect('current')}
+              >
+                {t('character.filter.thisCharacter')}
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              align="start"
+              size="sm"
+              className="w-full"
+              onClick={() => quickSelect('all')}
+            >
+              {t('character.filter.allCharacters')}
+            </Button>
+          </div>
+        );
+      }}
+    />
   );
 }
