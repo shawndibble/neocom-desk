@@ -99,6 +99,7 @@ import { useDetectedOwnedStock } from './useDetectedOwnedStock';
 import type { CorpOwnedStockState } from './corpOwnedStock';
 import type { CorpOwnedBlueprintsState } from './corpOwnedBlueprints';
 import { useAssumedMe } from './assumedMe';
+import { useIncludeBlueprintCost } from './includeBlueprintCost';
 import { OwnedStockScopeControl } from './OwnedStockScopeControl';
 import { BuildPlanAutoBuildControl } from './BuildPlanAutoBuildControl';
 import { ResultsSummary } from './ResultsSummary';
@@ -311,6 +312,14 @@ export function BuildPlanDetail({
     void hydrateAssumedMe();
   }, [hydrateAssumedMe]);
 
+  // Whether Blueprint Acquisition's resolved cost counts toward this plan's
+  // totalCost/profit at all — see includeBlueprintCost.ts.
+  const includeBlueprintCost = useIncludeBlueprintCost((state) => state.value);
+  const hydrateIncludeBlueprintCost = useIncludeBlueprintCost((state) => state.hydrate);
+  useEffect(() => {
+    void hydrateIncludeBlueprintCost();
+  }, [hydrateIncludeBlueprintCost]);
+
   // Pre-fills a fresh plan's Reaction Location the first time Include
   // Reactions is turned on for it (issue #698) — read here, alongside
   // `assumedMe`, so it's in hand the moment `toggleIncludeReactions` needs it
@@ -467,29 +476,36 @@ export function BuildPlanDetail({
   // price, same as if no contract offer were listed.
   const bpcOffersFor = useBpcAcquisitionOffers(plan.characterId, hub.regionId);
 
-  const acquisitionFor = useMemo(
-    () =>
-      acquisitionForLookup({
-        catalog,
-        pi,
-        ownedBlueprints: effectiveOwnedBlueprints,
-        assumedMeForUnowned: assumedMe,
-        blueprintAcquisition: {
-          offersFor: bpcOffersFor,
-          hubPrices: snapshot?.hubPrices ?? {},
-          sourcing: plan.materialSourcing,
-        },
-      }),
-    [
+  const acquisitionFor = useMemo(() => {
+    const raw = acquisitionForLookup({
       catalog,
       pi,
-      effectiveOwnedBlueprints,
-      assumedMe,
-      bpcOffersFor,
-      snapshot,
-      plan.materialSourcing,
-    ]
-  );
+      ownedBlueprints: effectiveOwnedBlueprints,
+      assumedMeForUnowned: assumedMe,
+      blueprintAcquisition: {
+        offersFor: bpcOffersFor,
+        hubPrices: snapshot?.hubPrices ?? {},
+        sourcing: plan.materialSourcing,
+      },
+    });
+    // includeBlueprintCost off: still resolve the cheapest tier (so nested
+    // material quantities never change), but report nothing to buy — the
+    // same `line: null` contract an owned BPO already reports.
+    if (includeBlueprintCost) return raw;
+    return (...args: Parameters<typeof raw>) => {
+      const resolved = raw(...args);
+      return resolved ? { ...resolved, line: null } : null;
+    };
+  }, [
+    catalog,
+    pi,
+    effectiveOwnedBlueprints,
+    assumedMe,
+    bpcOffersFor,
+    snapshot,
+    plan.materialSourcing,
+    includeBlueprintCost,
+  ]);
 
   // The one place "can this be built here" is decided — `craftScopeList`
   // (issue #698) is the same answer Auto Build's own Craft Scope and the

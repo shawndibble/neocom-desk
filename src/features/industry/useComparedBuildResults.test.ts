@@ -9,6 +9,8 @@ import {
 import { computeBuildPlan } from './computeBuildPlan';
 import { loadMarketSnapshots, type MarketSnapshot } from './marketData';
 import { useAssumedMe } from './assumedMe';
+import { useIncludeBlueprintCost } from './includeBlueprintCost';
+import { loadPublicBpcContracts } from '@/features/bpcContracts/syncedContracts';
 import type { BuildPlanRecord } from '@/db';
 import type { BlueprintCatalog, BlueprintCatalogEntry } from './blueprintCatalog';
 import type { BuildResult } from '@/engine/industry/types';
@@ -16,16 +18,24 @@ import type { CharacterBlueprint } from '@/esi/endpoints';
 
 vi.mock('./computeBuildPlan', () => ({ computeBuildPlan: vi.fn() }));
 vi.mock('./marketData', () => ({ loadMarketSnapshots: vi.fn() }));
+vi.mock('@/features/bpcContracts/syncedContracts', () => ({
+  loadPublicBpcContracts: vi.fn(),
+}));
 // A controllable stand-in for the real synced-setting store, so the
 // hydration-gating test below can flip `hydrated` deterministically instead
 // of racing the real Dexie/fake-indexeddb read.
 vi.mock('./assumedMe', () => ({
   useAssumedMe: create(() => ({ value: 0, hydrated: false, hydrate: vi.fn() })),
 }));
+vi.mock('./includeBlueprintCost', () => ({
+  useIncludeBlueprintCost: create(() => ({ value: true, hydrated: true, hydrate: vi.fn() })),
+}));
 
 const mockedCompute = vi.mocked(computeBuildPlan);
 const mockedSnapshots = vi.mocked(loadMarketSnapshots);
 const mockedAssumedMe = vi.mocked(useAssumedMe);
+const mockedIncludeBlueprintCost = vi.mocked(useIncludeBlueprintCost);
+const mockedBpcContracts = vi.mocked(loadPublicBpcContracts);
 
 function plan(overrides: Partial<BuildPlanRecord> & { id: string }): BuildPlanRecord {
   return {
@@ -116,6 +126,9 @@ beforeEach(() => {
   // this setting) exercise the real fetch path; the hydration-gating test
   // overrides this to `false` itself.
   mockedAssumedMe.setState({ value: 0, hydrated: true, hydrate: vi.fn() });
+  mockedIncludeBlueprintCost.setState({ value: true, hydrated: true, hydrate: vi.fn() });
+  mockedBpcContracts.mockReset();
+  mockedBpcContracts.mockResolvedValue(null);
   mockedSnapshots.mockImplementation((requests) => requests.map(() => Promise.resolve(SNAPSHOT)));
   mockedCompute.mockReturnValue({ result: RESULT, error: null });
 });
@@ -362,6 +375,66 @@ describe('useComparedBuildResults', () => {
     expect(call?.recipeFor?.(300)).toEqual(
       expect.objectContaining({ method: 'manufacturing', me: 7 })
     );
+  });
+
+  it('wires blueprintAcquisition and acquisitionFor into computeBuildPlan when a tier resolves (issue: index profit column excluded blueprint cost)', async () => {
+    const producedEntry = entry({ blueprintTypeID: 100, productTypeID: 1, productName: 'Widget' });
+    const catalog: BlueprintCatalog = {
+      ...catalogWith([producedEntry]),
+      byProductTypeID: new Map([[1, producedEntry]]),
+    };
+    mockedSnapshots.mockImplementation((requests) =>
+      requests.map(() =>
+        // hubPrices[100] is the blueprint's own typeID — the BPO's ordinary
+        // sell price, the fallback tier when nothing is owned and BPC
+        // Sourcing has no listing.
+        Promise.resolve({
+          hubPrices: { 100: 500 },
+          hubBuyPrices: {},
+          hubSellVolumes: {},
+          adjustedPrices: {},
+          systemCostIndex: 0.01,
+        })
+      )
+    );
+    const plans = [plan({ id: 'a' })];
+
+    const { result } = renderHook(() => useComparedBuildResults({ plans, catalog, ...baseArgs }));
+    await waitFor(() => expect(result.current[0]?.loading).toBe(false));
+
+    const call = mockedCompute.mock.calls[0]?.[0];
+    expect(call?.blueprintAcquisition).toEqual({
+      blueprintTypeID: 100,
+      line: { unitPrice: 500, owned: false },
+    });
+    expect(typeof call?.acquisitionFor).toBe('function');
+  });
+
+  it('reports no blueprint cost, while still resolving the tier, when the includeBlueprintCost setting is off', async () => {
+    mockedIncludeBlueprintCost.setState({ value: false, hydrated: true, hydrate: vi.fn() });
+    const producedEntry = entry({ blueprintTypeID: 100, productTypeID: 1, productName: 'Widget' });
+    const catalog: BlueprintCatalog = {
+      ...catalogWith([producedEntry]),
+      byProductTypeID: new Map([[1, producedEntry]]),
+    };
+    mockedSnapshots.mockImplementation((requests) =>
+      requests.map(() =>
+        Promise.resolve({
+          hubPrices: { 100: 500 },
+          hubBuyPrices: {},
+          hubSellVolumes: {},
+          adjustedPrices: {},
+          systemCostIndex: 0.01,
+        })
+      )
+    );
+    const plans = [plan({ id: 'a' })];
+
+    const { result } = renderHook(() => useComparedBuildResults({ plans, catalog, ...baseArgs }));
+    await waitFor(() => expect(result.current[0]?.loading).toBe(false));
+
+    const call = mockedCompute.mock.calls[0]?.[0];
+    expect(call?.blueprintAcquisition).toEqual({ blueprintTypeID: 100, line: null });
   });
 
   it('leaves groupResult null and never calls computeBuildPlan a second time when computeGroupResult is not requested', async () => {
