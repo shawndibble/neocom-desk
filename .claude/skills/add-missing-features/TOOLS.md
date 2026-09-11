@@ -50,6 +50,7 @@ skill's step 7).
 | EVE Buddy                          | Cross-platform companion: char/corp monitoring, PI colony overview, manufacturing-slot summary, contract-status alerts           | yes     |
 | Dr.MoonGoo / CLI Metenox Calculator | Discord bot + CLI: Metenox fuel-block/magmatic-gas yield from probe-scan input, no persistent ledger                            | yes     |
 | Eden Buyback                       | Standalone highsec ore/loot buyback marketplace (cross-player pricing service, not a personal tool)                              | yes     |
+| EVE Appraisal                      | Bulk ISK appraisal (loot/cargo/contracts/killmails) + Market Watcher (multi-region watchlists, position P&L, price alerts)       | yes     |
 
 **Skimmed by thread title only, confirmed out of domain** (mapping/intel/
 fitting-sim/crew-sim/combat-loot-tracking/DPS-meters/multibox/dev-tooling —
@@ -73,7 +74,7 @@ Helper, EVE Preview Manager, Eve Ship Stats, Advanced Armor Layering, Grey
 Zone Automation, EVE411, Eve Skillsboard, EVE Intelligence Nexus, Rangefinder,
 Eveswitcher, Insurgency Tools, Battlefield.Space, EVE OQM integration and
 "Loyalty point wallet/logs" (both dev-recruitment/feature-request threads,
-not shipped tools).
+not shipped tools), TT Route Planner (wormhole-only routing).
 
 **The forum category JSON paginates** (`more_topics_url`). Fetch page 0 _and_
 page 1 minimum, and keep following the link while present — five early runs
@@ -223,6 +224,8 @@ Reusable heuristics — check a new candidate against these before drafting:
 | #726 | NARROW  | Quickbar → Appraisal multi-hub handoff                                |
 | #730 | NARROW  | Price History 7-day moving average                                    |
 | #819 | NARROW  | Build Opportunities market-wide "what to build" finder, unowned-agnostic |
+| #821 | NARROW  | Industry job-slot utilization chart over time                          |
+| #822 | NARROW  | Skills: Industry Skill ROI panel (job-slot skills only)                |
 
 ## Killed / dropped candidates (never filed)
 
@@ -255,3 +258,4 @@ One line each: what, why, and the kill-test/decision it hit.
 | Moon Survey / Metenox Yield Estimator (paste survey-scan clipboard, estimate monthly ISK before anchoring a drill) | Real clipboard-paste precedent and genuinely new capability (nothing shows moon composition or pre-extraction estimates today), but hostile review killed on player reach (nullsec/lowsec/WH-only structure, one decision per moon, not recurring) plus kill-test 13 (drill/Metenox yield formulas aren't SDE-derivable and have no ESI fixture to validate against). |
 | Metenox Moon Drill fuel/yield tracking, ongoing corp ledger (vs. the one-shot estimator above) | Audience is a sub-slice of a sub-slice (moon-owning corp leadership, not renters); the only prior-art tool attempting this (Dr.MoonGoo) reported ESI's corp assets endpoint may no longer expose magmatic-gas quantity separately, a go/no-go blocker on the core mechanic. Kill-test 13. |
 | Market Movers / Trending Items dashboard (market-wide "what's hot" discovery, Adam4EVE/EVE ONE-style) | Kill-test 14 — no bulk market-history endpoint; a true market-wide scan needs a backend crawl heavier than ADR 0013 already rejected for a smaller dataset, and the narrowed bounded-set alternative collapses into the existing Price History chart. |
+| Working Capital Locked in the Pipeline (stat combining job cost + order escrow vs. wallet balance) | Kill-test 3 — sums numbers already visible on three separate pages with no new engine/history; the "cost" field on `industry_jobs` is installation-fee-only, not materials, so the framing would misrepresent the dominant illiquid cost (materials already spent) as covered. |
