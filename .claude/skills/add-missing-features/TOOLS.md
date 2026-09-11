@@ -40,8 +40,18 @@ Interaction Tools (PI commodity/pricing checker, colony builder), EVE ONE
 (char/corp monitoring, PI overview, slot summary), Dr.MoonGoo/CLI Metenox
 Calculator (fuel-block/gas yield from scan input, no ledger), Eden Buyback
 (standalone buyback marketplace — cross-player), EVE Appraisal (bulk
-appraisal + Market Watcher watchlists/alerts). All confirmed live unless
-noted otherwise above.
+appraisal + Market Watcher watchlists/alerts), Evernus (desktop margin calc/
+multi-region market analysis/mfg planning), GESI (Google Sheets ESI add-on
+for jobs/orders/assets/wallet), Lazy Blacksmith (blueprint search/analysis,
+rehosted), EVE Orchestra (mining ledger/reprocessing/job tracking, corp
+mining tax), Alysii's PI Scheme (PI chain calculator, rehosted), EVE
+Planetary Planner (PI chain planner w/ market history, ~7yr active), Upwell
+Fuel Monitor (corp-director structure fuel tracker — already covered, see
+below). All confirmed live unless noted otherwise above.
+
+**Dead/abandoned, industry-adjacent, no surviving gap found:** Marquette.ch,
+EVE Panel (PI sim, iOS), EVE GURU/Production Ledger, Indeve, EveTerminal.io,
+OMIP (moon-mining tax), EVEMissioneer, Mining Timer Tool.
 
 **Skimmed by thread title only, confirmed out of domain** (mapping/intel/
 fitting-sim/crew-sim/DPS-meters/multibox/dev-tooling/feature-request threads
@@ -66,9 +76,9 @@ Insurgency Tools, Battlefield.Space, EVE OQM integration, "Loyalty point
 wallet/logs" (dev-recruitment thread).
 
 **The forum category JSON paginates** (`more_topics_url`). Fetch page 0 _and_
-page 1 minimum, keep following while present. Pages 0–5 (newest through
-~2026-01) are fully surveyed and hold no unsurveyed industry/market tool
-beyond this ledger — start at page 6 next time unless this ledger's own
+page 1 minimum, keep following while present. Pages 0–10 (newest through
+~late 2023) are fully surveyed and hold no unsurveyed industry/market tool
+beyond this ledger — start at page 11 next time unless this ledger's own
 last-updated is old enough that new threads landed above page 0.
 
 ## Already covered — don't re-propose
@@ -104,6 +114,8 @@ Mapped to the module/route that proves it:
 - **Restock**: on-hand vs. listed vs. par-level join, multibuy refill (#643).
 - **Contracts**: item-exchange/auction market value (#717); courier
   reward-per-m3/jump/collateral ratio filed as #826 (not yet shipped).
+- **Corp Ops Board**: structure fuel-expiry clock already tracked
+  (`structureFuel` kind in `engine/corp/board.ts`).
 
 Also settled: PI chain revenue/margin already prices at `revenuePrices`
 end-to-end; no market-sell PI gap. Corp Industry Jobs' missing installer
@@ -208,17 +220,18 @@ what the Advisor already computes per-planet; don't re-propose.
 | Bulk relist / buy-queue automation | Kill-test 2. |
 | EQM Corporate Exchange | Kill-test 1. |
 | Asset staleness / idle-inventory detection | Kill-test 7. |
-| Player-structure pricing for Build Plans/Appraisal | Kill-test 9; widens a 5-value union across ~15+ call sites for a minority. |
+| Player-structure pricing for Build Plans/Appraisal | Kill-test 9; widens a union for a minority. |
 | Total Assets Value chart over time | Kill-test 8 (rescoped from #712). |
 | Production Run: link material cost to wallet purchases | Kill-test 10 (buy side). |
-| LP Store redemption ledger / ROI tracking | Kill-test 11; fragile free-text `description` parsing needed. |
-| LP transaction log / API-visible LP cashout audit | ESI exposes no LP transaction log at all. |
+| LP Store redemption ledger / ROI tracking | Kill-test 11; needs fragile free-text parsing. |
+| LP transaction log / API-visible LP cashout audit | ESI has no LP transaction log. |
 | PI Advisor: arbitrary-system search | Kill-test 12. |
 | Multi-hop reaction-chain profitability | Kill-test 6 (round 27 BOM-rollup rejection). |
-| Pure station-trading FIFO P&L tracker | Kill-test 10, extended to trading with no manufacturing. |
+| Pure station-trading FIFO P&L tracker | Kill-test 10, extended to pure trading. |
 | Public contract sell-advisor for manufactured goods | Kill-test 6 (ADR 0013). |
-| Moon Survey / Metenox Yield Estimator | Narrow reach (structure-owning only, one decision per moon) + kill-test 13. |
-| Metenox Moon Drill ongoing fuel/yield ledger | Sub-slice-of-a-sub-slice reach; kill-test 13 (ESI gas-quantity granularity unconfirmed). |
+| Moon Survey / Metenox Yield Estimator | Narrow reach + kill-test 13. |
+| Metenox Moon Drill ongoing fuel/yield ledger | Narrow reach + kill-test 13. |
 | Market Movers / Trending Items dashboard | Kill-test 14. |
-| Working Capital Locked in the Pipeline stat | Kill-test 3; `industry_jobs.cost` is fee-only, not materials — would misrepresent the dominant illiquid cost. |
-| PI Colony Layout Template (save/reuse a pin layout across colonies) | Superseded by the Advisor's per-planet, link-cost-aware fitted build plan — a static template would be a worse version of what already exists. |
+| Working Capital Locked in the Pipeline stat | Kill-test 3; job cost is fee-only, not materials. |
+| PI Colony Layout Template (save/reuse pin layout) | Superseded by Advisor's per-planet fitted plan. |
+| Upwell Fuel Monitor-style structure fuel tracker | Already covered — `structureFuel` in corp board. |
