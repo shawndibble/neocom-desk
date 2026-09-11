@@ -617,6 +617,13 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   optional there, unlike an Offer's, which always carries them. Named for the
   copy it quotes ("Rifter 10/20 ×5"), since a Character can hold a plain plan
   and several seeded plans for one blueprint at once.
+- **Share Link**: A URL an **Appraisal** generates (issue #831) encoding only
+  the pasted pile's `typeId:quantity` pairs plus its **Trade Hub**,
+  **Price Percent** and a generation timestamp — never priced numbers.
+  Opening it, with or without a session, re-runs the same appraisal engine
+  against the decoded pairs and renders a read-only, unauthenticated view; the
+  app's first real unauthenticated content route. Stateless — nothing is
+  stored server-side, and there is nothing to expire or revoke.
 - **Skill Plan**: An ordered list of skill-level entries a user intends to train. User-editable (drag and drop). Distinct from the in-game **Skill Queue**, which is the game's actual training queue.
 - **Standing (corp)**: The `/corp` overview's top panel: the figures a corp
   manager acts on — clocks due inside a day, Runway, 30-day net — beside the

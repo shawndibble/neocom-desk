@@ -2705,6 +2705,9 @@
       "resultTitle": "Appraisal",
       "atPercent": "{{pricePercent}}%",
       "exportCsv": "Export appraisal as CSV",
+      "share": "Copy shareable link",
+      "shareCopied": "Link copied",
+      "shareTooLarge": "Too large to share as a link — use Export CSV instead.",
       "columnQuantity": "Qty",
       "columnItem": "Item",
       "columnBuyEach": "Buy each",
@@ -3014,6 +3017,17 @@
     "title": "Something went wrong",
     "hint": "Reloading usually fixes this. Your Skill Plans and Build Plans are stored locally and are not affected.",
     "reload": "Reload"
+  },
+  "appraisalShare": {
+    "title": "Shared appraisal",
+    "banner": "Unverified, user-generated link — not an official quote.",
+    "generatedLabel": "Generated",
+    "invalidTitle": "This link isn't valid",
+    "invalidHint": "The link may be corrupted or incomplete. Ask whoever sent it to share it again.",
+    "unresolved_one": "{{count}} item id from this link isn't recognised",
+    "unresolved_other": "{{count}} item ids from this link aren't recognised",
+    "unresolvedTypeId": "type id {{typeId}}",
+    "backToApp": "Open Neocom Desk"
   },
   "notFound": {
     "title": "Page not found",

@@ -80,7 +80,7 @@ function renderPanel(
         controller={controller()}
         pricePercent={90}
         onPricePercentChange={onPricePercentChange}
-        hubName="Jita"
+        hub={TRADE_HUBS[0]}
         blueprintCatalog={null}
         onRequestBlueprintCatalog={onRequestBlueprintCatalog}
         onAddToQuickbar={onAddToQuickbar}
