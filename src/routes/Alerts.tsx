@@ -246,25 +246,22 @@ export function Alerts() {
               </Select>
             </FilterField>
             {FILTERABLE_SEVERITIES.map((severity) => (
-              <FilterField key={severity} label={t(SEVERITY_LABEL[severity])} stretch={false}>
-                <FilterChip
-                  label={t(SEVERITY_LABEL[severity])}
-                  count={severityCounts.get(severity) ?? 0}
-                  selected={draft.severities.has(severity)}
-                  onToggle={() =>
-                    setDraft({ ...draft, severities: toggled(draft.severities, severity) })
-                  }
-                />
-              </FilterField>
-            ))}
-            <FilterField label={t('alerts.mutedTypes')} stretch={false}>
               <FilterChip
-                label={t('alerts.mutedTypes')}
-                count={groups.length - liveGroups.length}
-                selected={draft.showMuted}
-                onToggle={() => setDraft({ ...draft, showMuted: !draft.showMuted })}
+                key={severity}
+                label={t(SEVERITY_LABEL[severity])}
+                count={severityCounts.get(severity) ?? 0}
+                selected={draft.severities.has(severity)}
+                onToggle={() =>
+                  setDraft({ ...draft, severities: toggled(draft.severities, severity) })
+                }
               />
-            </FilterField>
+            ))}
+            <FilterChip
+              label={t('alerts.mutedTypes')}
+              count={groups.length - liveGroups.length}
+              selected={draft.showMuted}
+              onToggle={() => setDraft({ ...draft, showMuted: !draft.showMuted })}
+            />
           </>
         )}
       </FilterBar>

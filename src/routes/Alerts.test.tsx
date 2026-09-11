@@ -12,6 +12,7 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
+import { NARROW_QUERY } from '@/lib/useIsNarrow';
 import { db } from '@/db';
 import { Alerts } from './Alerts';
 import {
@@ -201,6 +202,39 @@ describe('Alerts', () => {
     await userEvent.click(await screen.findByRole('button', { name: /muted types/i }));
     expect(await screen.findByText('New Mail')).toBeInTheDocument();
     expect(screen.getByText('Muted')).toBeInTheDocument();
+  });
+
+  /*
+   * Each severity chip and the muted-types chip already show their own label
+   * as pill text (`FilterChip`'s `label`). Wrapping a self-labelled chip in
+   * `FilterField` — meant for controls with no visible label of their own,
+   * like a `Select` trigger — would also caption it, doubling the label in
+   * the mobile sheet where `FilterField` renders a caption.
+   */
+  it('shows each severity and the muted-types label once in the mobile filter sheet', async () => {
+    const realMatchMedia = window.matchMedia;
+    window.matchMedia = (media: string) =>
+      ({
+        media,
+        matches: media === NARROW_QUERY,
+        onchange: null,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        addListener: () => {},
+        removeListener: () => {},
+        dispatchEvent: () => false,
+      }) as MediaQueryList;
+
+    try {
+      renderPage();
+      await openFilters();
+
+      for (const label of ['Worth watching', 'Due soon', 'Critical', 'Muted types']) {
+        expect(screen.getAllByText(label)).toHaveLength(1);
+      }
+    } finally {
+      window.matchMedia = realMatchMedia;
+    }
   });
 
   /*
