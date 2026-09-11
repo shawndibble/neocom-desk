@@ -152,7 +152,10 @@ Reusable heuristics — check a new candidate against these before drafting:
 4. **Engine exists but has one caller.** Caller *count* is not the signal —
    test exported vs. consumed capability: does the caller use every field the
    engine returns? Reprocessing/wallet balance chart were real gaps of that
-   shape; `orderFloor`/`linkCost.greatCircleKm` came back clean (2026-09-10).
+   shape; `orderFloor`/`linkCost.greatCircleKm` came back clean (2026-09-10);
+   `realizedProfit.ts`'s `salesTax`/`brokerFee`/`netRevenue`/`marginPct` were
+   another real gap (#824, 2026-09-11) — its sole caller forwarded only 2 of
+   8 output fields to the view layer.
 5. **No historical ESI series.** System cost index has no ESI history at all
    (63% of systems sit at an identical floor) — kills any cost-index-over-time
    feature.
@@ -226,6 +229,7 @@ Reusable heuristics — check a new candidate against these before drafting:
 | #819 | NARROW  | Build Opportunities market-wide "what to build" finder, unowned-agnostic |
 | #821 | NARROW  | Industry job-slot utilization chart over time                          |
 | #822 | NARROW  | Skills: Industry Skill ROI panel (job-slot skills only)                |
+| #824 | NARROW  | Production Run realized tax/fee/margin breakdown, per-run only         |
 
 ## Killed / dropped candidates (never filed)
 
