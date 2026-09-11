@@ -2,6 +2,8 @@ import { describe, it, expect, vi } from 'vitest';
 import type { BlueprintMap, TypeMap } from '@/sde/types';
 import { piFixture } from '@/sde/__fixtures__/pi';
 import type { CharacterBlueprint } from '@/esi/endpoints';
+import { FACILITY_PRESETS } from '@/engine/industry/types';
+import type { SubBuildContext } from '@/engine/industry/subBuild';
 
 const BLUEPRINTS: BlueprintMap = {
   '9841': {
@@ -93,7 +95,8 @@ vi.mock('@/sde/loadSde', () => ({
 }));
 
 const { loadBlueprintCatalog } = await import('./blueprintCatalog');
-const { buildPlanTypeIds, materialRecipe, recipeInputTypeIds } = await import('./recipes');
+const { acquisitionForLookup, buildPlanTypeIds, materialRecipe, recipeInputTypeIds } =
+  await import('./recipes');
 
 const catalog = await loadBlueprintCatalog();
 
@@ -274,5 +277,91 @@ describe('buildPlanTypeIds', () => {
     expect(ids.sort((a, b) => a - b)).toEqual([
       34, 40, 41, 42, 43, 2398, 9840, 9841, 9843, 9844, 9845,
     ]);
+  });
+});
+
+describe('acquisitionForLookup', () => {
+  const ctx: SubBuildContext = {
+    facility: FACILITY_PRESETS.npcStation,
+    rigFit: ['none', 'none', 'none'],
+    security: 'highsec',
+    systemCostIndex: 0.05,
+    adjustedPrices: {},
+    skills: {},
+  };
+
+  it('is a no-op — always null — when the caller never configured Blueprint Acquisition', () => {
+    const acquisitionFor = acquisitionForLookup({ catalog, pi: PI, ownedBlueprints: [] });
+    expect(acquisitionFor(9840, 5, ctx, { 34: 10 })).toBeNull();
+  });
+
+  it('is null for a typeID nothing in the SDE produces (a planetary output, or a raw material)', () => {
+    const acquisitionFor = acquisitionForLookup({
+      catalog,
+      pi: PI,
+      ownedBlueprints: [],
+      blueprintAcquisition: { offersFor: () => [], hubPrices: {} },
+    });
+    expect(acquisitionFor(34, 5, ctx, {})).toBeNull();
+    expect(acquisitionFor(2398, 5, ctx, {})).toBeNull();
+  });
+
+  it('resolves a manufacturing node via the BPO sell-price cascade when nothing is owned and no BPC offer exists', () => {
+    const acquisitionFor = acquisitionForLookup({
+      catalog,
+      pi: PI,
+      ownedBlueprints: [],
+      blueprintAcquisition: { offersFor: () => [], hubPrices: { 9841: 777 } },
+    });
+    const result = acquisitionFor(9840, 5, ctx, { 34: 10 });
+    expect(result).toEqual({
+      me: 0,
+      te: 0,
+      blueprintTypeID: 9841,
+      line: { unitPrice: 777, owned: false },
+    });
+  });
+
+  it('quotes the ME the character actually owns when it is the cheapest tier', () => {
+    const acquisitionFor = acquisitionForLookup({
+      catalog,
+      pi: PI,
+      ownedBlueprints: [
+        {
+          item_id: 1,
+          type_id: 9841,
+          runs: -1,
+          material_efficiency: 8,
+          time_efficiency: 16,
+          quantity: 1,
+          location_id: 1,
+          location_flag: 'Hangar',
+        },
+      ],
+      blueprintAcquisition: { offersFor: () => [], hubPrices: {} },
+    });
+    const result = acquisitionFor(9840, 5, ctx, { 34: 10 });
+    expect(result).toEqual({ me: 8, te: 16, blueprintTypeID: 9841, line: null });
+  });
+
+  it('never searches BPC Sourcing for a reaction formula — BPO-only, even when an offer would be cheaper', () => {
+    const acquisitionFor = acquisitionForLookup({
+      catalog,
+      pi: PI,
+      ownedBlueprints: [],
+      blueprintAcquisition: {
+        // A suspiciously cheap offer that must never be consulted for a
+        // reaction node — reaction formulas cannot be copied at all.
+        offersFor: () => [{ me: 0, te: 0, runs: 1, price: 1 }],
+        hubPrices: { 46156: 999 },
+      },
+    });
+    const result = acquisitionFor(16667, 5, ctx, { 16650: 10 });
+    expect(result).toEqual({
+      me: 0,
+      te: 0,
+      blueprintTypeID: 46156,
+      line: { unitPrice: 999, owned: false },
+    });
   });
 });

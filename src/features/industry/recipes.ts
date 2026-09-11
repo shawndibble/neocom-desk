@@ -7,9 +7,18 @@
  * a planet (a schematic produces it), or neither — a mineral, an ice product,
  * a raw P0 resource. The three are mutually exclusive in the SDE.
  */
-import type { IndustryBlueprint, QuantityEntry } from '@/engine/industry/types';
+import type {
+  AcquisitionResolution,
+  HubPrices,
+  IndustryBlueprint,
+  QuantityEntry,
+} from '@/engine/industry/types';
 import type { MaterialRecipe } from '@/engine/industry/makeOrBuy';
 import { MAX_SUB_BUILD_DEPTH } from '@/engine/industry/materialResolution';
+import { effectiveMaterials } from '@/engine/industry/materials';
+import { sizeRuns } from '@/engine/industry/runSizing';
+import type { SubBuildContext } from '@/engine/industry/subBuild';
+import { selectBlueprintTier, type BpcOffer } from '@/engine/industry/blueprintAcquisition';
 import type { CharacterBlueprint } from '@/esi/endpoints';
 import type { PiData } from '@/sde/types';
 import { toIndustryBlueprint, type BlueprintCatalog } from './blueprintCatalog';
@@ -34,6 +43,25 @@ export interface RecipeSources extends RecipeCatalog {
    * read, it never overrides a real ME in either direction.
    */
   assumedMeForUnowned?: number;
+  /**
+   * Blueprint Acquisition (issue #838): opts `acquisitionForLookup` into
+   * cost-based tier selection for every buildable node. Absent leaves
+   * `materialRecipe`'s existing ME-only heuristic untouched — this feature
+   * is additive, not a replacement for the plain ME lookup above.
+   */
+  blueprintAcquisition?: BlueprintAcquisitionSources;
+}
+
+/** What `acquisitionForLookup` needs beyond ownership to price a Blueprint Acquisition row. */
+export interface BlueprintAcquisitionSources {
+  /**
+   * Listings for one blueprint type, already narrowed to the node's own
+   * Trade Hub region — the caller's job, since region scoping is a Trade
+   * Hub concept this module stays decoupled from.
+   */
+  offersFor: (blueprintTypeID: number) => readonly BpcOffer[];
+  /** Hub sell prices, for a BPO's own ordinary sell price when no BPC offer covers it. */
+  hubPrices: HubPrices;
 }
 
 /** ME is 0..10 in the engine, which range-checks it and throws outside that. */
@@ -109,6 +137,88 @@ export function materialRecipe(typeID: number, sources: RecipeSources): Material
  */
 export function recipeForLookup(sources: RecipeSources): (typeID: number) => MaterialRecipe | null {
   return (typeID) => materialRecipe(typeID, sources);
+}
+
+/** Every owned copy of one blueprint type, adapted to the pure engine's decoupled shape. */
+function ownedCopiesFor(
+  blueprintTypeID: number,
+  ownedBlueprints: readonly CharacterBlueprint[]
+): { me: number; te: number; runs: number }[] {
+  return ownedBlueprints
+    .filter((b) => b.type_id === blueprintTypeID)
+    .map((b) => ({ me: clampMe(b.material_efficiency), te: b.time_efficiency, runs: b.runs }));
+}
+
+/**
+ * This blueprint's own material cost at a candidate ME, for `neededRuns`
+ * runs, priced at `materialPrices` — one level deep, the same simplification
+ * `makeOrBuy.ts`'s `jobUnitCost` already makes for a cost comparison (its own
+ * doc comment: recursing further would make the comparison itself as
+ * expensive as building the whole tree, for a number only used to pick a
+ * tier). `runs` is ME-independent (`sizeRuns` never reads it), so it is sized
+ * once and every candidate ME re-prices the same run count.
+ */
+function materialCostAtMeFor(
+  blueprint: IndustryBlueprint,
+  neededRuns: number,
+  ctx: SubBuildContext,
+  materialPrices: HubPrices
+): (me: number) => number | null {
+  const product = blueprint.products[0];
+  const sizing = product ? sizeRuns(neededRuns, product.quantity) : null;
+  return (me) => {
+    if (!sizing) return null;
+    try {
+      let total = 0;
+      for (const material of effectiveMaterials(blueprint, sizing.runs, me, ctx)) {
+        const price = materialPrices[material.typeID];
+        if (price === undefined) return null;
+        total += price * material.quantity;
+      }
+      return total;
+    } catch {
+      // The engine range-checks ME — a nonsense candidate is unpriceable, not fatal.
+      return null;
+    }
+  };
+}
+
+/**
+ * Builds the `acquisitionFor` closure `IndustryInputs`/`ResolveMaterialOptions`
+ * take (issue #838): resolves one buildable node's cost-minimizing ME/TE tier
+ * and what, if anything, covers its shortfall. Always returns null when
+ * `sources.blueprintAcquisition` is absent, so a caller can pass this through
+ * unconditionally without branching on whether the feature is configured.
+ */
+export function acquisitionForLookup(
+  sources: RecipeSources
+): (
+  productTypeID: number,
+  needed: number,
+  ctx: SubBuildContext,
+  materialPrices: HubPrices
+) => AcquisitionResolution | null {
+  return (productTypeID, needed, ctx, materialPrices) => {
+    const acquisitionSources = sources.blueprintAcquisition;
+    if (!acquisitionSources) return null;
+    const entry = sources.catalog.byProductTypeID.get(productTypeID);
+    if (!entry) return null;
+
+    const blueprint = toIndustryBlueprint(entry.blueprint);
+    const blueprintTypeID = entry.blueprintTypeID;
+    // Reaction formulas cannot be copied — never search BPC Sourcing for one.
+    const isReaction = entry.blueprint.activity === 'reaction';
+
+    const resolved = selectBlueprintTier({
+      ownedCopies: ownedCopiesFor(blueprintTypeID, sources.ownedBlueprints),
+      neededRuns: needed,
+      materialCostAtMe: materialCostAtMeFor(blueprint, needed, ctx, materialPrices),
+      bpcOffers: isReaction ? [] : acquisitionSources.offersFor(blueprintTypeID),
+      bpoSellPrice: acquisitionSources.hubPrices[blueprintTypeID] ?? null,
+      assumedMeForUnowned: sources.assumedMeForUnowned ?? 0,
+    });
+    return { me: resolved.me, te: resolved.te, blueprintTypeID, line: resolved.line };
+  };
 }
 
 /**
