@@ -6,12 +6,9 @@ import { db, type CharacterRecord } from '@/db';
 import {
   Button,
   CharacterAvatar,
+  ColumnPickerMenu,
   DataAgeBadge,
   DataTable,
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
   EmptyState,
   FilterBar,
   FilterField,
@@ -683,44 +680,6 @@ function buildColumns(
   };
 }
 
-interface ColumnPickerMenuProps {
-  available: readonly CharacterColumnId[];
-  visible: readonly CharacterColumnId[];
-  columnsById: Record<CharacterColumnId, DataTableColumn<CharacterRow>>;
-  onToggle: (id: CharacterColumnId) => void;
-}
-
-/** Which columns show in table view — a menu, not a form: every toggle is already reversible in one tap (same reasoning as CalendarKindFilterMenu). Labels come straight from `columnsById`'s own already-translated `header`, not a second id->i18n-key table that could drift from it. */
-function ColumnPickerMenu({ available, visible, columnsById, onToggle }: ColumnPickerMenuProps) {
-  const { t } = useTranslation();
-  const visibleSet = new Set(visible);
-
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button size="md">{t('characters.columnsButton')}</Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="min-w-48">
-        <p className="px-2 py-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-          {t('characters.columnsMenuTitle')}
-        </p>
-        {available.map((id) => (
-          <DropdownMenuCheckboxItem
-            key={id}
-            checked={visibleSet.has(id)}
-            // A picker that closes on the first check makes picking several
-            // columns take one round trip per column.
-            onSelect={(event) => event.preventDefault()}
-            onCheckedChange={() => onToggle(id)}
-          >
-            {columnsById[id].header}
-          </DropdownMenuCheckboxItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
-
 /** Character wall: pick the active character, group/sort/densify it, or add another via EVE SSO. */
 export function Characters() {
   const { t } = useTranslation();
@@ -1267,6 +1226,8 @@ export function Characters() {
                   visible={activeColumnIds}
                   columnsById={columnsById}
                   onToggle={handleToggleColumn}
+                  buttonLabel={t('characters.columnsButton')}
+                  menuTitle={t('characters.columnsMenuTitle')}
                 />
               )}
             </div>

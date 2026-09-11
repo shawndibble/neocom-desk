@@ -133,7 +133,7 @@ function ownedInput(overrides: Partial<OwnedBlueprintInput> = {}): OwnedBlueprin
 }
 
 describe('contractRowToSearchRow', () => {
-  it('carries the common fields plus the original contract row', () => {
+  it('carries the common fields plus the original contract row, unresolved location by default', () => {
     const contract = row({ contractId: 7, typeId: 100, me: 10, te: 20, runs: 5, quantity: 2 });
     expect(contractRowToSearchRow(contract)).toEqual({
       source: 'contract',
@@ -143,7 +143,16 @@ describe('contractRowToSearchRow', () => {
       runs: 5,
       quantity: 2,
       contract,
+      locationName: null,
+      space: null,
     });
+  });
+
+  it('carries a resolved location when given one', () => {
+    const contract = row({ contractId: 7 });
+    const result = contractRowToSearchRow(contract, { name: 'Jita IV - Moon 4', space: 'highsec' });
+    expect(result.locationName).toBe('Jita IV - Moon 4');
+    expect(result.space).toBe('highsec');
   });
 });
 
@@ -158,7 +167,23 @@ describe('ownedBlueprintToSearchRow', () => {
       runs: 5,
       quantity: 1,
       itemId: 42,
+      locationName: null,
+      regionId: null,
+      space: null,
     });
+  });
+
+  it('carries a resolved location when given one', () => {
+    const bp = ownedInput({
+      itemId: 42,
+      locationName: 'J105443 - Some structure',
+      regionId: 11000001,
+      space: 'wormhole',
+    });
+    const result = ownedBlueprintToSearchRow(bp);
+    expect(result.locationName).toBe('J105443 - Some structure');
+    expect(result.source === 'owned' && result.regionId).toBe(11000001);
+    expect(result.space).toBe('wormhole');
   });
 
   /**
@@ -220,7 +245,7 @@ describe('filterBpcSearchRows', () => {
     expect(filtered.map((r) => (r.source === 'owned' ? r.itemId : null))).toEqual([2]);
   });
 
-  it('a region filter excludes owned rows — this app tracks no location for owned blueprints', () => {
+  it('a region filter excludes an owned row with no resolved region', () => {
     const rows = [
       contractRowToSearchRow(row({ contractId: 1, regionId: 10000002 })),
       ownedBlueprintToSearchRow(ownedInput({ itemId: 1 })),
@@ -230,6 +255,47 @@ describe('filterBpcSearchRows', () => {
       regionId: 10000002,
     });
     expect(filtered.map((r) => r.source)).toEqual(['contract']);
+  });
+
+  it('a region filter matches an owned row once its location resolves to that region', () => {
+    const rows = [
+      contractRowToSearchRow(row({ contractId: 1, regionId: 10000043 })),
+      ownedBlueprintToSearchRow(ownedInput({ itemId: 1, regionId: 10000002 })),
+    ];
+    const filtered = filterBpcSearchRows(rows, {
+      ...EMPTY_BPC_SEARCH_FILTER,
+      regionId: 10000002,
+    });
+    expect(filtered.map((r) => r.source)).toEqual(['owned']);
+  });
+
+  it('a space filter narrows both sources to the checked kinds', () => {
+    const rows = [
+      contractRowToSearchRow(row({ contractId: 1 }), { name: 'Jita', space: 'highsec' }),
+      ownedBlueprintToSearchRow(ownedInput({ itemId: 1, space: 'wormhole' })),
+    ];
+    const filtered = filterBpcSearchRows(rows, {
+      ...EMPTY_BPC_SEARCH_FILTER,
+      spaceKinds: new Set(['wormhole']),
+    });
+    expect(filtered.map((r) => r.source)).toEqual(['owned']);
+  });
+
+  it('a space filter excludes a row whose space could not be resolved', () => {
+    const rows = [ownedBlueprintToSearchRow(ownedInput({ itemId: 1 }))];
+    const filtered = filterBpcSearchRows(rows, {
+      ...EMPTY_BPC_SEARCH_FILTER,
+      spaceKinds: new Set(['highsec', 'lowsec', 'nullsec', 'wormhole']),
+    });
+    expect(filtered).toEqual([]);
+  });
+
+  it('no space filter (null) passes every row regardless of resolved space', () => {
+    const rows = [
+      contractRowToSearchRow(row({ contractId: 1 })),
+      ownedBlueprintToSearchRow(ownedInput({ itemId: 1, space: 'nullsec' })),
+    ];
+    expect(filterBpcSearchRows(rows, EMPTY_BPC_SEARCH_FILTER)).toEqual(rows);
   });
 
   it('a maxPrice filter never excludes an owned row — it has no price to judge', () => {

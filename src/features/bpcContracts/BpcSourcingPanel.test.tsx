@@ -10,6 +10,7 @@ import { DEFAULT_TIME_FORMAT, useTimeFormat } from '@/lib/timeFormat';
 import { isSyncConfigured } from '@/app/syncStatus';
 import { App } from '@/app/App';
 import type { BpcContractRow } from '@/engine/contracts/bpcSearch';
+import type { SpaceKind } from '@/engine/space';
 import type { PublicBpcContractsSnapshot } from '@/features/bpcContracts/syncedContracts';
 import type { CachedResult, StatusResult } from '@/esi/cache';
 import type { CharacterBlueprint } from '@/esi/endpoints';
@@ -55,6 +56,26 @@ vi.mock('@/features/industry/data', () => ({
   findOwnedBlueprint: vi.fn(),
 }));
 
+// Location resolution (`blueprintLocation.ts`) goes through the SDE snapshot
+// and, for player structures, ESI — neither of which this file otherwise
+// mocks. Mocked directly at the module boundary so Space-filter/column tests
+// control what each `location_id` resolves to without needing a real fetch.
+const loadBlueprintLocation = vi
+  .fn<
+    (
+      characterId: number,
+      locationId: number
+    ) => Promise<{ name: string | null; regionId: number | null; space: SpaceKind | null }>
+  >()
+  .mockResolvedValue({ name: null, regionId: null, space: null });
+const loadContractLocationInfo = vi
+  .fn<(locationId: number) => Promise<{ name: string | null; space: SpaceKind | null }>>()
+  .mockResolvedValue({ name: null, space: null });
+vi.mock('@/features/bpcContracts/blueprintLocation', () => ({
+  loadBlueprintLocation: (...args: [number, number]) => loadBlueprintLocation(...args),
+  loadContractLocationInfo: (...args: [number]) => loadContractLocationInfo(...args),
+}));
+
 function ownedResult(
   blueprints: CharacterBlueprint[],
   needsReauth = false
@@ -73,6 +94,8 @@ function ownedBlueprint(overrides: Partial<CharacterBlueprint> = {}): CharacterB
     material_efficiency: 8,
     time_efficiency: 16,
     quantity: 1,
+    location_id: 60003760,
+    location_flag: 'Hangar',
     ...overrides,
   };
 }
@@ -137,6 +160,10 @@ beforeEach(async () => {
   loadPublicBpcContracts.mockResolvedValue(cachedSnapshot([]));
   loadCharacterBlueprints.mockReset();
   loadCharacterBlueprints.mockResolvedValue(ownedResult([]));
+  loadBlueprintLocation.mockReset();
+  loadBlueprintLocation.mockResolvedValue({ name: null, regionId: null, space: null });
+  loadContractLocationInfo.mockReset();
+  loadContractLocationInfo.mockResolvedValue({ name: null, space: null });
   vi.mocked(isSyncConfigured).mockReturnValue(true);
 
   await db.characters.put({ characterId: CHAR_ID, name: 'Pilot One', ownerHash: 'oh', addedAt: 1 });
@@ -535,7 +562,7 @@ describe('BpcSourcingPanel source multiselect', () => {
     expect(screen.getByText('Select Contracts, Owned, or both to search.')).toBeInTheDocument();
   });
 
-  it('a region filter narrows out owned rows, which carry no location data', async () => {
+  it('a region filter narrows out an owned row whose location has not resolved', async () => {
     loadPublicBpcContracts.mockResolvedValue(
       cachedSnapshot([row({ contractId: 1, typeId: 638, regionId: 10000002 })])
     );
@@ -552,5 +579,85 @@ describe('BpcSourcingPanel source multiselect', () => {
 
     expect(within(table).getByText('Rifter Blueprint')).toBeInTheDocument();
     expect(within(table).queryByText('Caracal Blueprint')).not.toBeInTheDocument();
+  });
+
+  it('a region filter matches an owned row once its location resolves into that region', async () => {
+    // Region options come from synced contract rows only, so the contract
+    // here shares the region the owned blueprint's location resolves
+    // into — the point under test is that the owned row survives the
+    // filter too, not that it displaces the contract row.
+    loadPublicBpcContracts.mockResolvedValue(
+      cachedSnapshot([row({ contractId: 1, typeId: 638, regionId: 10000002 })])
+    );
+    loadCharacterBlueprints.mockResolvedValue(
+      ownedResult([ownedBlueprint({ item_id: 1, type_id: 870, location_id: 60003760 })])
+    );
+    loadBlueprintLocation.mockResolvedValue({
+      name: 'Jita IV - Moon 4',
+      regionId: 10000002,
+      space: 'highsec',
+    });
+    const user = userEvent.setup();
+    render(<App />);
+    const table = await screen.findByRole('table', { name: 'BPC Search' });
+    expect(within(table).getByText('Caracal Blueprint')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('combobox', { name: 'Region' }));
+    await user.click(await screen.findByRole('option', { name: 'The Forge' }));
+
+    expect(within(table).getByText('Rifter Blueprint')).toBeInTheDocument();
+    expect(within(table).getByText('Caracal Blueprint')).toBeInTheDocument();
+  });
+});
+
+describe('BpcSourcingPanel Location/Space', () => {
+  it('shows an owned row resolved location in the Location column instead of "—"', async () => {
+    loadCharacterBlueprints.mockResolvedValue(
+      ownedResult([ownedBlueprint({ item_id: 1, type_id: 870, location_id: 60003760 })])
+    );
+    loadBlueprintLocation.mockResolvedValue({
+      name: 'Jita IV - Moon 4',
+      regionId: 10000002,
+      space: 'highsec',
+    });
+    render(<App />);
+
+    const table = await screen.findByRole('table', { name: 'BPC Search' });
+    expect(within(table).getByText('Jita IV - Moon 4')).toBeInTheDocument();
+  });
+
+  it('classifies a wormhole-system owned blueprint as wormhole space, and the Space filter can hide it', async () => {
+    loadCharacterBlueprints.mockResolvedValue(
+      ownedResult([
+        ownedBlueprint({ item_id: 1, type_id: 870, location_id: 31000007 }),
+        ownedBlueprint({ item_id: 2, type_id: 638, location_id: 60003760 }),
+      ])
+    );
+    loadBlueprintLocation.mockImplementation(async (_characterId: number, locationId: number) =>
+      locationId === 31000007
+        ? { name: 'J105443', regionId: 11000001, space: 'wormhole' as const }
+        : { name: 'Jita IV - Moon 4', regionId: 10000002, space: 'highsec' as const }
+    );
+    const user = userEvent.setup();
+    render(<App />);
+    const table = await screen.findByRole('table', { name: 'BPC Search' });
+    expect(within(table).getByText('Caracal Blueprint')).toBeInTheDocument();
+    expect(within(table).getByText('Rifter Blueprint')).toBeInTheDocument();
+
+    // Space column is hidden by default (issue #796) — toggle it on via the
+    // shared column picker before asserting on its text. The menu stays open
+    // (multi-select) and Radix marks the rest of the page aria-hidden while
+    // it is, so close it first (Characters.tsx's own column-picker tests do
+    // the same) before querying anything outside the menu.
+    await user.click(await screen.findByRole('button', { name: 'Columns' }));
+    await user.click(await screen.findByRole('menuitemcheckbox', { name: 'Space' }));
+    await user.keyboard('{Escape}');
+    expect(within(table).getByText('Wormhole')).toBeInTheDocument();
+    expect(within(table).getByText('Highsec')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Wormhole' }));
+
+    expect(within(table).queryByText('Caracal Blueprint')).not.toBeInTheDocument();
+    expect(within(table).getByText('Rifter Blueprint')).toBeInTheDocument();
   });
 });

@@ -29,6 +29,8 @@ describe('loadCharacterBlueprints', () => {
       material_efficiency: 10,
       time_efficiency: 20,
       quantity: 1,
+      location_id: 60003760,
+      location_flag: 'Hangar',
     },
   ];
 
@@ -95,6 +97,8 @@ describe('findOwnedBlueprint', () => {
     material_efficiency: 8,
     time_efficiency: 16,
     quantity: 1,
+    location_id: 60003760,
+    location_flag: 'Hangar',
   };
   const bpcLow: CharacterBlueprint = {
     item_id: 2,
@@ -103,6 +107,8 @@ describe('findOwnedBlueprint', () => {
     material_efficiency: 4,
     time_efficiency: 6,
     quantity: 1,
+    location_id: 60003760,
+    location_flag: 'Hangar',
   };
   const bpcHigh: CharacterBlueprint = {
     item_id: 3,
@@ -111,6 +117,8 @@ describe('findOwnedBlueprint', () => {
     material_efficiency: 10,
     time_efficiency: 20,
     quantity: 1,
+    location_id: 60003760,
+    location_flag: 'Hangar',
   };
 
   it('returns null when none owned', () => {

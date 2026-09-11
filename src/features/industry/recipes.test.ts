@@ -105,6 +105,8 @@ function owned(overrides: Partial<CharacterBlueprint>): CharacterBlueprint {
     runs: -1,
     time_efficiency: 0,
     type_id: 9841,
+    location_id: 60003760,
+    location_flag: 'Hangar',
     ...overrides,
   };
 }

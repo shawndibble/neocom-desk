@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
+  ColumnPickerMenu,
   DataAgeBadge,
   DataTable,
   EmptyState,
@@ -42,11 +43,24 @@ import {
   type BpcSearchRow,
   type BpcSearchSource,
 } from '@/engine/contracts/bpcSearch';
+import { SPACE_KINDS, type SpaceKind } from '@/engine/space';
 import {
   loadPublicBpcContracts,
   type PublicBpcContractsSnapshot,
 } from '@/features/bpcContracts/syncedContracts';
 import { loadRegionName } from '@/features/bpcContracts/regionNames';
+import {
+  loadBlueprintLocation,
+  loadContractLocationInfo,
+  type ContractLocationInfo,
+  type ResolvedLocation,
+} from '@/features/bpcContracts/blueprintLocation';
+import {
+  BPC_SEARCH_COLUMN_IDS,
+  useVisibleBpcSearchColumns,
+  type BpcSearchColumnId,
+} from '@/features/bpcContracts/bpcSearchColumns';
+import { useSpaceFilter } from '@/features/bpcContracts/bpcSpaceFilterPref';
 import { BpcContractModal } from '@/features/bpcContracts/BpcContractModal';
 import { BuildPlanContextMenu } from '@/features/industry/BuildPlanContextMenu';
 import { loadCharacterBlueprints } from '@/features/industry/data';
@@ -68,6 +82,10 @@ interface Snapshot {
   regionNames: Map<number, string>;
   /** A 401/403 fetching these just resolves empty — Industry's own top-level banner (same `loadCharacterBlueprints` call) already covers re-login on every tab. */
   ownedBlueprints: CharacterBlueprint[];
+  /** Keyed by `BpcContractRow.locationId`. SDE-only (issue #796) — see `loadContractLocationInfo`. */
+  contractLocations: Map<number, ContractLocationInfo>;
+  /** Keyed by `CharacterBlueprint.location_id`, this character's ACL. */
+  ownedLocations: Map<number, ResolvedLocation>;
 }
 
 async function loadBpcContractsSnapshot(
@@ -81,6 +99,8 @@ async function loadBpcContractsSnapshot(
       blueprintNames: new Map(),
       regionNames: new Map(),
       ownedBlueprints: [],
+      contractLocations: new Map(),
+      ownedLocations: new Map(),
     };
   }
 
@@ -106,12 +126,36 @@ async function loadBpcContractsSnapshot(
   );
   const regionNames = new Map(regionEntries.filter((entry) => entry !== null));
 
+  const ownedBlueprints = ownedResult.cached?.data ?? [];
+
+  const contractLocationIds = signal.cancelled ? [] : [...new Set(rows.map((r) => r.locationId))];
+  const contractLocationEntries = await Promise.all(
+    contractLocationIds.map(async (id): Promise<[number, ContractLocationInfo]> => [
+      id,
+      await loadContractLocationInfo(id),
+    ])
+  );
+  const contractLocations = new Map(contractLocationEntries);
+
+  const ownedLocationIds = signal.cancelled
+    ? []
+    : [...new Set(ownedBlueprints.map((bp) => bp.location_id))];
+  const ownedLocationEntries = await Promise.all(
+    ownedLocationIds.map(async (id): Promise<[number, ResolvedLocation]> => [
+      id,
+      await loadBlueprintLocation(characterId, id),
+    ])
+  );
+  const ownedLocations = new Map(ownedLocationEntries);
+
   return {
     contractsResult,
     syncConfigured: true,
     blueprintNames,
     regionNames,
-    ownedBlueprints: ownedResult.cached?.data ?? [],
+    ownedBlueprints,
+    contractLocations,
+    ownedLocations,
   };
 }
 
@@ -296,6 +340,36 @@ export function BpcSourcingPanel() {
   const blueprintNames = data?.blueprintNames ?? EMPTY_MAP;
   const regionNames = data?.regionNames ?? EMPTY_MAP;
   const ownedBlueprints = data?.ownedBlueprints ?? EMPTY_OWNED_BLUEPRINTS;
+  const contractLocations = data?.contractLocations ?? EMPTY_CONTRACT_LOCATIONS;
+  const ownedLocations = data?.ownedLocations ?? EMPTY_OWNED_LOCATIONS;
+
+  const spaceFilter = useSpaceFilter((state) => state.value);
+  const setSpaceFilter = useSpaceFilter((state) => state.setValue);
+  const hydrateSpaceFilter = useSpaceFilter((state) => state.hydrate);
+  useEffect(() => {
+    void hydrateSpaceFilter();
+  }, [hydrateSpaceFilter]);
+
+  const visibleColumns = useVisibleBpcSearchColumns((state) => state.value);
+  const setVisibleColumns = useVisibleBpcSearchColumns((state) => state.setValue);
+  const hydrateVisibleColumns = useVisibleBpcSearchColumns((state) => state.hydrate);
+  useEffect(() => {
+    void hydrateVisibleColumns();
+  }, [hydrateVisibleColumns]);
+
+  function toggleSpaceKind(kind: SpaceKind) {
+    const next = spaceFilter.includes(kind)
+      ? spaceFilter.filter((existing) => existing !== kind)
+      : [...spaceFilter, kind];
+    void setSpaceFilter(next);
+  }
+
+  function toggleColumn(id: BpcSearchColumnId) {
+    const next = visibleColumns.includes(id)
+      ? visibleColumns.filter((existing) => existing !== id)
+      : [...visibleColumns, id];
+    void setVisibleColumns(next);
+  }
 
   const [uiFilter, setUiFilter] = useState<UiFilter>(EMPTY_UI_FILTER);
   const [showAll, setShowAll] = useState(false);
@@ -326,6 +400,28 @@ export function BpcSourcingPanel() {
 
   const rows = useMemo(() => contractsResult?.data?.rows ?? [], [contractsResult]);
 
+  /** `null` when every kind is checked — the filter's own default, a no-op. */
+  const activeSpaceKinds = useMemo(
+    () => (spaceFilter.length === SPACE_KINDS.length ? null : new Set(spaceFilter)),
+    [spaceFilter]
+  );
+
+  // Space narrows contract rows before anything downstream sees them:
+  // `BpcContractRow` carries no `space` field of its own (it's resolved
+  // separately, keyed by `locationId`, since ADR 0013 already deferred exact
+  // location resolution for these rows) so `filterBpcContracts` — which
+  // stays untouched — cannot filter on it the way it does region/ME/TE. Doing
+  // it here instead keeps the suggestion counts and the displayed table
+  // agreeing on what "40 offers" means, the same property `nonTypeFilter`
+  // below already protects for the other criteria.
+  const spaceFilteredRows = useMemo(() => {
+    if (!activeSpaceKinds) return rows;
+    return rows.filter((row) => {
+      const space = contractLocations.get(row.locationId)?.space ?? null;
+      return space != null && activeSpaceKinds.has(space);
+    });
+  }, [rows, activeSpaceKinds, contractLocations]);
+
   // Merges in owned typeIds, gated on the Owned toggle, so free-text search
   // narrows an Owned-only result even without a contract listing — but never
   // displaces a real contract match out of the ranked window when Owned is
@@ -334,8 +430,8 @@ export function BpcSourcingPanel() {
     const ownedTypeIds = sources.has('owned')
       ? ownedBlueprints.map((bp) => ({ typeId: bp.type_id }))
       : [];
-    return listedBlueprintTypeOptions([...rows, ...ownedTypeIds], blueprintNames);
-  }, [rows, ownedBlueprints, sources, blueprintNames]);
+    return listedBlueprintTypeOptions([...spaceFilteredRows, ...ownedTypeIds], blueprintNames);
+  }, [spaceFilteredRows, ownedBlueprints, sources, blueprintNames]);
 
   /**
    * Every filter *except* the blueprint itself. Suggestions are counted
@@ -353,13 +449,21 @@ export function BpcSourcingPanel() {
       minTe: parsePositiveNumber(uiFilter.minTe),
       minRuns: parsePositiveNumber(uiFilter.minRuns),
       maxPrice: parsePositiveNumber(uiFilter.maxPrice),
+      spaceKinds: activeSpaceKinds,
     }),
-    [uiFilter.regionId, uiFilter.minMe, uiFilter.minTe, uiFilter.minRuns, uiFilter.maxPrice]
+    [
+      uiFilter.regionId,
+      uiFilter.minMe,
+      uiFilter.minTe,
+      uiFilter.minRuns,
+      uiFilter.maxPrice,
+      activeSpaceKinds,
+    ]
   );
 
   const suggestionRows = useMemo(
-    () => filterBpcContracts(rows, nonTypeFilter),
-    [rows, nonTypeFilter]
+    () => filterBpcContracts(spaceFilteredRows, nonTypeFilter),
+    [spaceFilteredRows, nonTypeFilter]
   );
   const offerStats = useMemo(() => blueprintOfferStats(suggestionRows), [suggestionRows]);
 
@@ -429,27 +533,36 @@ export function BpcSourcingPanel() {
     return { ...nonTypeFilter, typeIds };
   }, [nonTypeFilter, uiFilter.typeQuery, typeOptions, selectedTypeId]);
 
-  // This filter path stays exactly as it was pre-multiselect — the source
-  // toggle below only gates what gets merged in alongside it.
-  const filteredRows = useMemo(() => filterBpcContracts(rows, engineFilter), [rows, engineFilter]);
+  // This filter path stays exactly as it was pre-multiselect (space already
+  // narrowed via `spaceFilteredRows`) — the source toggle below only gates
+  // what gets merged in alongside it.
+  const filteredRows = useMemo(
+    () => filterBpcContracts(spaceFilteredRows, engineFilter),
+    [spaceFilteredRows, engineFilter]
+  );
   const contractSearchRows = useMemo(
-    () => filteredRows.map(contractRowToSearchRow),
-    [filteredRows]
+    () =>
+      filteredRows.map((row) => contractRowToSearchRow(row, contractLocations.get(row.locationId))),
+    [filteredRows, contractLocations]
   );
 
   const ownedSearchRows = useMemo(
     () =>
-      ownedBlueprints.map((bp) =>
-        ownedBlueprintToSearchRow({
+      ownedBlueprints.map((bp) => {
+        const location = ownedLocations.get(bp.location_id);
+        return ownedBlueprintToSearchRow({
           itemId: bp.item_id,
           typeId: bp.type_id,
           runs: bp.runs,
           me: bp.material_efficiency,
           te: bp.time_efficiency,
           quantity: bp.quantity,
-        })
-      ),
-    [ownedBlueprints]
+          locationName: location?.name ?? null,
+          regionId: location?.regionId ?? null,
+          space: location?.space ?? null,
+        });
+      }),
+    [ownedBlueprints, ownedLocations]
   );
   const filteredOwnedRows = useMemo(
     () => filterBpcSearchRows(ownedSearchRows, engineFilter),
@@ -482,8 +595,27 @@ export function BpcSourcingPanel() {
     [selectedTypeId, filteredRows]
   );
 
-  const columns = useMemo<DataTableColumn<BpcSearchRow>[]>(
-    () => [
+  const bpcColumnsById = useMemo<Record<BpcSearchColumnId, DataTableColumn<BpcSearchRow>>>(
+    () => ({
+      location: {
+        id: 'location',
+        header: t('bpcContracts.locationColumn'),
+        sortValue: (row) => row.locationName ?? '',
+        render: (row) => row.locationName ?? t('bpcContracts.notApplicable'),
+      },
+      space: {
+        id: 'space',
+        header: t('bpcContracts.spaceColumn'),
+        sortValue: (row) => row.space ?? '',
+        render: (row) =>
+          row.space ? t(`bpcContracts.space.${row.space}`) : t('bpcContracts.notApplicable'),
+      },
+    }),
+    [t]
+  );
+
+  const columns = useMemo<DataTableColumn<BpcSearchRow>[]>(() => {
+    const cols: DataTableColumn<BpcSearchRow>[] = [
       {
         id: 'item',
         header: t('bpcContracts.itemColumn'),
@@ -503,6 +635,9 @@ export function BpcSourcingPanel() {
           </span>
         ),
       },
+    ];
+    if (visibleColumns.includes('location')) cols.push(bpcColumnsById.location);
+    cols.push(
       {
         id: 'me',
         header: t('bpcContracts.meColumn'),
@@ -563,34 +698,39 @@ export function BpcSourcingPanel() {
       {
         id: 'region',
         header: t('bpcContracts.regionColumn'),
+        // An owned row's `regionId` comes from its resolved location
+        // (issue #796) rather than `contract.regionId` — before that
+        // resolution existed this column had nothing to show an owned row at
+        // all, which is the "—" the issue reported.
         sortValue: (row) => {
-          const contract = asContract(row);
-          return contract ? (regionNames.get(contract.regionId) ?? `#${contract.regionId}`) : '';
+          const regionId = row.source === 'contract' ? row.contract.regionId : row.regionId;
+          return regionId == null ? '' : (regionNames.get(regionId) ?? `#${regionId}`);
         },
         render: (row) => {
-          const contract = asContract(row);
-          return contract
-            ? (regionNames.get(contract.regionId) ?? `#${contract.regionId}`)
-            : t('bpcContracts.notApplicable');
+          const regionId = row.source === 'contract' ? row.contract.regionId : row.regionId;
+          return regionId == null
+            ? t('bpcContracts.notApplicable')
+            : (regionNames.get(regionId) ?? `#${regionId}`);
         },
+      }
+    );
+    if (visibleColumns.includes('space')) cols.push(bpcColumnsById.space);
+    cols.push({
+      id: 'expires',
+      header: t('bpcContracts.expiresColumn'),
+      className: 'whitespace-nowrap text-text-dim',
+      // Infinity sorts an owned row last, same as price, rather than epoch 0
+      // reading as "expires soonest."
+      sortValue: (row) => asContract(row)?.dateExpired ?? Infinity,
+      render: (row) => {
+        const contract = asContract(row);
+        return contract
+          ? formatTimestamp(new Date(contract.dateExpired), timeZone)
+          : t('bpcContracts.notApplicable');
       },
-      {
-        id: 'expires',
-        header: t('bpcContracts.expiresColumn'),
-        className: 'whitespace-nowrap text-text-dim',
-        // Infinity sorts an owned row last, same as price, rather than epoch 0
-        // reading as "expires soonest."
-        sortValue: (row) => asContract(row)?.dateExpired ?? Infinity,
-        render: (row) => {
-          const contract = asContract(row);
-          return contract
-            ? formatTimestamp(new Date(contract.dateExpired), timeZone)
-            : t('bpcContracts.notApplicable');
-        },
-      },
-    ],
-    [t, blueprintNames, regionNames, timeZone]
-  );
+    });
+    return cols;
+  }, [t, blueprintNames, regionNames, timeZone, visibleColumns, bpcColumnsById]);
 
   if (!hydrated || activeCharacterId === null) {
     // No redirect of its own: the Industry route this sits in already sends a
@@ -662,6 +802,25 @@ export function BpcSourcingPanel() {
               selected={sources.has('owned')}
               onToggle={() => toggleSource('owned')}
             />
+            <span className="ml-3 text-text-dim">{t('bpcContracts.spaceLabel')}</span>
+            {SPACE_KINDS.map((kind) => (
+              <FilterChip
+                key={kind}
+                label={t(`bpcContracts.space.${kind}`)}
+                selected={spaceFilter.includes(kind)}
+                onToggle={() => toggleSpaceKind(kind)}
+              />
+            ))}
+            <div className="ml-auto">
+              <ColumnPickerMenu
+                available={BPC_SEARCH_COLUMN_IDS}
+                visible={visibleColumns}
+                columnsById={bpcColumnsById}
+                onToggle={toggleColumn}
+                buttonLabel={t('bpcContracts.columnsButton')}
+                menuTitle={t('bpcContracts.columnsMenuTitle')}
+              />
+            </div>
           </div>
 
           {/* Inset on its own ground with an accent edge, because as a plain
@@ -847,3 +1006,5 @@ export function BpcSourcingPanel() {
 /** Stable identity, so a missing snapshot doesn't invalidate memoized columns/options every render. */
 const EMPTY_MAP: ReadonlyMap<number, string> = new Map();
 const EMPTY_OWNED_BLUEPRINTS: CharacterBlueprint[] = [];
+const EMPTY_CONTRACT_LOCATIONS: ReadonlyMap<number, ContractLocationInfo> = new Map();
+const EMPTY_OWNED_LOCATIONS: ReadonlyMap<number, ResolvedLocation> = new Map();

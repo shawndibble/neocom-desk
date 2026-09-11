@@ -54,6 +54,7 @@ export {
   DropdownMenuCheckboxItem,
   DropdownMenuSeparator,
 } from './DropdownMenu';
+export { ColumnPickerMenu } from './ColumnPickerMenu';
 export {
   Select,
   SelectValue,

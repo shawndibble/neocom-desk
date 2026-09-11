@@ -54,6 +54,8 @@ function owned(typeId: number, overrides: Partial<CharacterBlueprint> = {}): Cha
     material_efficiency: 10,
     time_efficiency: 20,
     runs: -1,
+    location_id: 60003760,
+    location_flag: 'Hangar',
     ...overrides,
   };
 }

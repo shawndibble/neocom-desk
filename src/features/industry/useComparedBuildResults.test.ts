@@ -346,6 +346,8 @@ describe('useComparedBuildResults', () => {
         material_efficiency: 7,
         time_efficiency: 14,
         quantity: 1,
+        location_id: 60003760,
+        location_flag: 'Hangar',
       },
     ];
     const plans = [plan({ id: 'a', buildHere: [300] })];
