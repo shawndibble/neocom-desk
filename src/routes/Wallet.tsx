@@ -57,6 +57,8 @@ import {
   loadCorporationWallets,
 } from '@/features/corp/wallet';
 import { CorpTransactionsPanel } from '@/features/corp/CorpTransactionsPanel';
+import { ItemDetailModal } from '@/features/market/ItemDetailModal';
+import { useQuickbar } from '@/features/market/useQuickbar';
 import { useHighlightParam } from '@/lib/useHighlightParam';
 import { loadTypeNames } from '@/features/character/typeNames';
 import {
@@ -524,6 +526,18 @@ export function Wallet() {
   const navigate = useNavigate();
   const { data, error, loading, hydrated, activeCharacterId, refreshCount, refresh } =
     useRouteSnapshot(loadWalletSnapshot, undefined, { cacheKey: 'wallet' });
+
+  // Corp Transactions' item context menu (issue #817) — same Quickbar/Item
+  // Detail plumbing as every other item table, added here rather than to
+  // `CorpTransactionsPanel` since the Quickbar is per-character state, not
+  // this panel's own.
+  const { add: handleAddToQuickbar, available: quickbarAvailable } = useQuickbar(activeCharacterId);
+  const [infoModalItem, setInfoModalItem] = useState<{ typeId: number; itemName: string } | null>(
+    null
+  );
+  function handleShowInfo(typeId: number, itemName: string) {
+    setInfoModalItem({ typeId, itemName });
+  }
 
   // A notification's `?tab=` deep link (`notificationOptions.ts`) picks the
   // opening tab; read once on mount, same as the `Tabs` control's own local
@@ -1070,6 +1084,9 @@ export function Wallet() {
                 ? 'common.refreshFailedTitle'
                 : 'common.offlineTitle'
             }
+            onAddToQuickbar={handleAddToQuickbar}
+            quickbarAvailable={quickbarAvailable}
+            onShowInfo={handleShowInfo}
           />
         ) : (
           <CorpWalletView
@@ -1321,6 +1338,14 @@ export function Wallet() {
             </>
           )}
         </Panel>
+      )}
+
+      {infoModalItem && (
+        <ItemDetailModal
+          typeId={infoModalItem.typeId}
+          itemName={infoModalItem.itemName}
+          onClose={() => setInfoModalItem(null)}
+        />
       )}
     </div>
   );
