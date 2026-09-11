@@ -78,7 +78,7 @@ _Recorded 2026-09-11 · issue #838._
   Setup.
 
 - **Corp-owned BPC/BPO is out of scope here — it needs new plumbing, not a
-  reused toggle.** Corp *assets* already feed materials-ownership detection
+  reused toggle.** Corp _assets_ already feed materials-ownership detection
   (issue #798's "Corp Assets" toggle, `features/industry/corpOwnedStock.ts`),
   but personal blueprint ownership has always read a distinct dedicated
   endpoint (`GET /characters/{character_id}/blueprints`), and this
@@ -93,6 +93,6 @@ _Recorded 2026-09-11 · issue #838._
   (`features/industry/data.ts`), and the recursive `ownedBlueprints`
   threading through `materialEfficiencyFor` all already existed before this
   decision — confirmed by reading the code rather than assumed. This
-  feature only replaces the *selection rule* inside that existing plumbing
+  feature only replaces the _selection rule_ inside that existing plumbing
   and adds the pricing/UI on top; it does not need to build ownership
   access from scratch.
