@@ -14,6 +14,11 @@ import {
   Spinner,
   type DataTableColumn,
 } from '@/components/ui';
+import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
+import {
+  useResolvedCharacterFilter,
+  type CharacterFilterValue,
+} from '@/features/character/characterFilterValue';
 import * as Icon from '@/components/ui/icons';
 import { beginEveLogin } from '@/app/loginFlow';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
@@ -173,7 +178,7 @@ export function TaxTab() {
     { cacheKey: 'moonMiningTax' }
   );
 
-  const [characterFilter, setCharacterFilter] = useState<ReadonlySet<number> | 'all'>('all');
+  const [characterFilter, setCharacterFilter] = useState<CharacterFilterValue>('all');
   const [payeeFilter, setPayeeFilter] = useState<ReadonlySet<string> | 'all'>('all');
   // Remembered across visits (`statusFilterPref.ts`): this filter hides rows,
   // so forgetting it silently drops whatever the pilot was working from.
@@ -224,12 +229,14 @@ export function TaxTab() {
 
   const allDisplayRows = useMemo(() => flatten(data?.entries ?? []), [data]);
 
+  const resolvedCharacterFilter = useResolvedCharacterFilter(characterFilter, activeCharacterId);
+
   const characterFiltered = useMemo(
     () =>
       allDisplayRows.filter(
-        (dr) => characterFilter === 'all' || characterFilter.has(dr.row.characterId)
+        (dr) => resolvedCharacterFilter === 'all' || resolvedCharacterFilter.has(dr.row.characterId)
       ),
-    [allDisplayRows, characterFilter]
+    [allDisplayRows, resolvedCharacterFilter]
   );
 
   // Every Payee across every tracked character, so the filter dropdown lists
@@ -336,16 +343,6 @@ export function TaxTab() {
     // empty table with nothing explaining it, and a stored empty array is
     // rejected on read for the same reason.
     if (next.size > 0) setStatusFilter(next);
-  }
-
-  function toggleCharacter(characterId: number) {
-    setCharacterFilter((previous) =>
-      toggleFilterMember(
-        previous,
-        characterId,
-        characters.map((c) => c.characterId)
-      )
-    );
   }
 
   function togglePayee(payeeId: string) {
@@ -994,27 +991,15 @@ export function TaxTab() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button size="sm">
-                  {characterFilter === 'all'
-                    ? t('miningTax.allCharacters')
-                    : t('miningTax.charactersSelected', { count: characterFilter.size })}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent>
-                {characters.map((c) => (
-                  <DropdownMenuCheckboxItem
-                    key={c.characterId}
-                    checked={characterFilter === 'all' || characterFilter.has(c.characterId)}
-                    onSelect={(e) => e.preventDefault()}
-                    onCheckedChange={() => toggleCharacter(c.characterId)}
-                  >
-                    {c.characterName}
-                  </DropdownMenuCheckboxItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <CharacterFilterControl
+              characters={characters.map((c) => ({
+                characterId: c.characterId,
+                characterName: c.characterName,
+              }))}
+              activeCharacterId={activeCharacterId}
+              value={characterFilter}
+              onChange={setCharacterFilter}
+            />
 
             {allPayees.length > 0 && (
               <DropdownMenu>
