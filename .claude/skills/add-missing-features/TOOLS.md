@@ -49,9 +49,8 @@ Planetary Planner (PI chain planner w/ market history, ~7yr active), Upwell
 Fuel Monitor (corp-director structure fuel tracker — already covered, see
 below). All confirmed live unless noted otherwise above.
 
-**Dead/abandoned, industry-adjacent, no surviving gap found:** Marquette.ch,
-EVE Panel (PI sim, iOS), EVE GURU/Production Ledger, Indeve, EveTerminal.io,
-OMIP (moon-mining tax), EVEMissioneer, Mining Timer Tool.
+**Dead/abandoned, not gap-analysed this run:** EVE Panel (PI sim, iOS), EVE
+GURU/Production Ledger, EveTerminal.io, Mining Timer Tool.
 
 **Skimmed by thread title only, confirmed out of domain** (mapping/intel/
 fitting-sim/crew-sim/DPS-meters/multibox/dev-tooling/feature-request threads
@@ -116,6 +115,14 @@ Mapped to the module/route that proves it:
   reward-per-m3/jump/collateral ratio filed as #826 (not yet shipped).
 - **Corp Ops Board**: structure fuel-expiry clock already tracked
   (`structureFuel` kind in `engine/corp/board.ts`).
+- **Market**: item-variation/meta comparison (EVEMissioneer's pitch) already
+  covered — `VariationsTable.tsx`/`VariationsCompareModal.tsx`,
+  `engine/market/variations.ts`, `engine/market/attributeCompareMatrix.ts`.
+- **Mining**: OMIP-style moon-mining tax tracking already covered by
+  `miningTax` (see Mining bullet above); Lazy Blacksmith/EVE Orchestra-style
+  blueprint material calc already covered by the Build Plan/BOM engine
+  (`features/industry/blueprintCatalog.ts`, `BuildPlanDetail.tsx`,
+  `MaterialsTable.tsx`).
 
 Also settled: PI chain revenue/margin already prices at `revenuePrices`
 end-to-end; no market-sell PI gap. Corp Industry Jobs' missing installer
@@ -174,6 +181,13 @@ what the Advisor already computes per-planet; don't re-propose.
     at a time — kills market-wide movers/trending dashboards; a bounded
     (Quickbar-scoped) version collapses into the existing Price History
     chart (kill-test 3).
+15. **Every real route requires a Character.** `FEATURE_ROUTES` wraps every
+    page in `RequireCharacter`/`ScopeGate` (`routeScopes.test.ts` enforces
+    it); only `/login`, `/callback`, `/styleguide` are exempt, and none
+    carry user/game data. A share-link/public-view candidate is the first
+    thing that would break this pattern — narrow it to a hand-added route
+    outside the map with its own exemption test, don't assume it's a
+    drop-in extension (#831).
 
 ## Filed candidates
 
@@ -202,6 +216,7 @@ what the Advisor already computes per-planet; don't re-propose.
 | #824 | NARROW  | Production Run realized tax/fee/margin breakdown, per-run       |
 | #826 | NARROW  | Contracts: courier reward-per-m3/jump/collateral ratio, detail modal only |
 | #827 | SHIP    | Skills: Market Fee Skill ROI panel (Broker Relations/Accounting) |
+| #831 | NARROW  | Appraisal shareable link — typeId:qty payload, recompute-at-both-ends, byte-capped, unauthenticated route outside ScopeGate |
 
 ## Killed / dropped candidates (never filed)
 
