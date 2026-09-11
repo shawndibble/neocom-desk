@@ -72,9 +72,32 @@ here — they go one per file in `docs/context/decisions/`.
   change, the space the optimizer searches, and the input `computeSchedule`
   and `placeRemaps` expect. Distinct from the _effective_ values ESI reports,
   which fold in implants and any cerebral accelerator on top.
+- **Blueprint Acquisition**: A Build Plan materials-table row — the
+  blueprint's own type ID, distinct from the product's — priced whenever a
+  buildable node (the top-level plan or any nested sub-build) isn't fully
+  covered by an owned **BPO**. Tries **BPC Sourcing** at the node's own
+  Trade Hub first, then that BPO's ordinary sell price there; always
+  overridable like any material (`overridePrice`). Picks whichever
+  owned-or-purchasable ME/TE tier makes the node's total cost lowest and
+  reseeds the node's own `me`/`te` to match — tiers never mix within one
+  node. A reaction-activity node only ever considers a BPO, since reaction
+  formulas cannot be copied. See
+  `docs/context/decisions/20260911-073307-blueprint-acquisition-cost-as-a-tier-optimized-material.md`
+  (issue #838).
 - **Booster**: Cerebral accelerator; user toggles it on manually with an expiry date for training-time math. Stored on the Skill Plan and synced with it, like What-If Implants above (round 33).
+- **BPC**: An owned Blueprint Copy — an ESI blueprint instance with a finite
+  number of `runs` remaining (`CharacterBlueprint.runs`,
+  `esi/endpoints.ts`). Distinct from a **BPO**, which never depletes.
+  Circulates only via player contracts in EVE, never ordinary market
+  orders — see **BPC Sourcing**.
 - **BPC Sourcing**: Industry's third tab (Build Plans / Records / BPC Sourcing). Search over every publicly contracted Blueprint Copy for sale across all of New Eden — item type, region, ME/TE, runs, price (issue #608, ADR 0013). Not per-Character: a scheduled backend job crawls EVE Ref's public-contracts dataset (ESI itself has no search over public contracts) and republishes a small, shared, read-only snapshot every 30 minutes for every signed-in Character to search. Distinct from the personal **Contracts** view, which is one Character's own issued/accepted contracts read straight from ESI.
 - **Offer** (BPC Contract Search): one contract row in that snapshot — a single blueprint copy listing at a single price. Not a **copy**: one contract can offer `quantity: 3` copies at one price, so a count of offers is smaller than a count of copies. Every count on the search says "offers", because an offer is what a buyer chooses between.
+- **BPO**: An owned Blueprint Original — an ESI blueprint instance with
+  unlimited runs (`runs: -1`). Distinct from a **BPC**, which depletes.
+  Unlike a BPC, a BPO is sometimes an ordinarily marketable item (mostly
+  T1); **Blueprint Acquisition** falls back to its sell price when no BPC
+  Sourcing offer is listed. The only acquisition target for a
+  reaction-activity node, since reaction formulas have no copies at all.
 - **Build Group**: A named collection of **Build Plan**s belonging to one Character, which also totals as one — open a member and it behaves exactly like any other Build Plan; open the group and every material across its members is added up and costed (see **Group Rollup**). Membership is exclusive and groups do not nest. Membership lives only on the plan, as `buildGroupId`; the group's name, order and mere existence live in the `sync.industryBuildGroups` setting, so an emptied group survives having no members and no merge can hand one plan to two groups. Deleting a group orphans its plans rather than deleting them, and a `buildGroupId` naming a group that is gone renders as an ordinary ungrouped plan — the same rule the Mining Tax `groupId` follows. Written in full in code and docs, where a bare "group" would collide with **Market Group** or an item's **Group**; the Industry plan list's own copy says "group", since neither of those can be meant there. See **Auto Build** and **Group Owned Overlay** for two of a group's own operations, distinct from what it merely displays via **Group Rollup**.
 - **Build Location**: The search at the head of a Build Plan's Location & market group, over the stations and structures the Character can dock at. Picking one fills facility, **Build System** and security band in a single edit, and the plan remembers which place it was so the box can still name it after a reload. That name is a label only — every number reads the plan's own values, and any edit that moves the job elsewhere drops it. "Override" unfolds the fields behind the box. A manufacturing-activity plan can additionally carry a **Reaction Location** — a second, independent instance of this same control, gated by **Include Reactions**.
 - **Build Opportunities**: Industry's fourth tab (Build Plans / Records / BPC Sourcing / Opportunities, issue #642). Ranks every manufacturing blueprint original or copy the chosen Character(s) own by ISK/hour, owned-materials-adjusted, at the default Trade Hub — the same costing `computeBuildPlan`/`buildVsBuy` already do for a hand-made Build Plan, run over every owned blueprint instead of one. Reaction blueprints are excluded; invention/research/copying stay out of scope, same as **Build Plan**. Selecting rows seeds them into **Build Plan Compare** as ordinary Build Plans. See **Order Depth** for its own new vocabulary — the row-ranking auto-build depth setting this tab once had (issue #652) was removed as unused ahead of the **Auto Build** rename (issue #798).
