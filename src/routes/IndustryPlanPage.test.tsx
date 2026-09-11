@@ -222,61 +222,19 @@ beforeEach(async () => {
   window.history.pushState({}, '', '/industry/plans/bp-1');
 });
 
-describe('IndustryPlanPage: owned-blueprint prefill', () => {
-  it('prefills ME/TE from the best owned copy and shows the owned hint, once created from the index and opened', async () => {
-    server.use(
-      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/blueprints`, () =>
-        HttpResponse.json([
-          {
-            item_id: 1,
-            type_id: 638,
-            runs: -1,
-            material_efficiency: 8,
-            time_efficiency: 16,
-            quantity: 1,
-          },
-        ])
-      )
-    );
-    window.history.pushState({}, '', '/industry');
-    const user = userEvent.setup();
-    render(<App />);
-
-    const search = await screen.findByRole('searchbox', { name: 'Add build plan' });
-    await user.type(search, 'Rift');
-    await user.click(await screen.findByRole('button', { name: /Rifter/ }));
-
-    // Creating stays on the index (list-management action) — opening the new
-    // row is its own explicit step now, same as opening any other plan.
-    await user.click(await screen.findByRole('button', { name: 'Rifter' }));
-
-    await screen.findByRole('heading', { name: 'Rifter' });
-    await openSetup(user);
-    // Text fields now (issue #455's commit-on-blur fix), not `type="number"`
-    // spinbuttons — `toHaveValue` compares against the DOM string value.
-    expect(screen.getByLabelText('ME %')).toHaveValue('8');
-    expect(screen.getByLabelText('TE %')).toHaveValue('16');
-    expect(screen.getByText('Owned, ME 8% / TE 16%')).toBeInTheDocument();
-
-    const stored = await db.buildPlans.where('characterId').equals(CHAR_ID).first();
-    expect(stored?.me).toBe(8);
-    expect(stored?.te).toBe(16);
-  });
-});
-
 describe('IndustryPlanPage: jargon tooltips (UX-REVIEW #8)', () => {
-  it('gives ME, TE, and facility tax inputs an accessible tooltip without polluting their labels', async () => {
+  it('gives the facility tax input an accessible tooltip without polluting its label', async () => {
     const user = userEvent.setup();
     await db.buildPlans.add(seedPlan());
     render(<App />);
 
     await screen.findByRole('heading', { name: 'Rifter' });
     await openSetup(user);
-    // Labels stay exact ("ME %"/"TE %") — the tooltip trigger lives outside the <label>.
-    expect(screen.getByLabelText('ME %')).toBeInTheDocument();
-    expect(screen.getByLabelText('TE %')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'About ME' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'About TE' })).toBeInTheDocument();
+    // ME/TE are no longer pilot-set inputs (Blueprint Acquisition, issue
+    // #838): the setup chips show the resolved tier instead, with no
+    // tooltip trigger of their own.
+    expect(screen.queryByRole('button', { name: 'About ME' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'About TE' })).not.toBeInTheDocument();
 
     expect(screen.queryByRole('button', { name: 'About facility tax' })).not.toBeInTheDocument();
     // Facility folds behind "Override" now that the location search fills it.
@@ -301,10 +259,10 @@ describe('IndustryPlanPage: build plan settings grouping (#120)', () => {
     expect(screen.getByText('Blueprint')).toBeInTheDocument();
     expect(screen.getByText('Location & market')).toBeInTheDocument();
 
-    // All the original fields still render, just regrouped.
+    // Runs still renders as a field; ME/TE no longer do (Blueprint
+    // Acquisition, issue #838, resolves them automatically — shown only as
+    // setup chips, not editable inputs).
     expect(screen.getByLabelText('Runs')).toBeInTheDocument();
-    expect(screen.getByLabelText('ME %')).toBeInTheDocument();
-    expect(screen.getByLabelText('TE %')).toBeInTheDocument();
     expect(screen.getByLabelText('Trade hub')).toBeInTheDocument();
     // Rig and facility tax belong to a player structure. The seeded plan is an
     // NPC station, which has neither, so neither control is on screen.
