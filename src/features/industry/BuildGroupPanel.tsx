@@ -13,9 +13,10 @@
  * outlive their plans by design, so "what did this fit actually cost" is a
  * question this view cannot answer and must not appear to.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, EmptyState, IconButton, Panel, Spinner } from '@/components/ui';
+import { Button, DataTable, EmptyState, IconButton, Panel, Spinner } from '@/components/ui';
+import type { DataTableColumn } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import type { BuildPlanRecord } from '@/db';
 import type { BuildStrategy } from '@/engine/industry/autoMakeOrBuy';
@@ -38,16 +39,29 @@ import { nameForType, toIndustryBlueprint, type BlueprintCatalog } from './bluep
 import type { BuildGroup } from './buildGroups';
 import { AutoBuildControl } from './AutoBuildControl';
 import { groupCraftScope, groupAutoBuildMaxDepth } from './autoBuildGroup';
+import { profitOf, verdictOf } from './groupIndexStats';
 import { SourcingInput } from './MaterialsTable';
+import { OwnedStockHint } from './OwnedStockHint';
 import { OwnedStockScopeControl } from './OwnedStockScopeControl';
 import { stockLocationLabel, type OwnedStockSnapshot } from './ownedStockDetection';
 import type { OwnedStockDetection } from './ownedStockDetection';
+import { VerdictPill } from './PlanVerdictHero';
 import { recipeForLookup } from './recipes';
 import { flattenBuildResult } from './resultFlattenCache';
 import { hasShoppingList, shoppingListText } from './shoppingList';
 import { useComparedBuildResults } from './useComparedBuildResults';
 import { useDetectedOwnedStock } from './useDetectedOwnedStock';
 import { RetargetGroupDialog, type RetargetTarget } from './RetargetGroupDialog';
+
+/** A merged materials row still open to buying, plus the buy-list's own
+ * netted remainder — see the `buyRows`/`craftedTypeIds` split below. */
+type BuyMaterialRow = MaterialCostLine & { buyToShow: number };
+
+/** Whole-unit input parsing shared by every owned-quantity cell in this panel. */
+function parseOwnedCount(raw: string): number | undefined {
+  const value = unmaskNumber(raw);
+  return value === undefined ? undefined : Math.floor(value);
+}
 
 /** The whole-group copy control's key in `copyState`; no hub can collide with it. */
 const GROUP_COPY = 'group';
@@ -265,25 +279,59 @@ export function BuildGroupPanel({
     [members, ownedStockMap]
   );
 
-  /** One write path for the ledger: every caller mutates a copy of `group.ownedStock`, this commits it. */
-  function updateOwnedStock(mutate: (next: Record<number, number>) => void) {
-    const next: Record<number, number> = { ...group.ownedStock };
-    mutate(next);
-    onOwnedStockChange(next);
-  }
+  // The group's own Acquisition Verdict (mirrors `PlanVerdictHero`'s single-plan
+  // pill) — buyCost null means at least one member is unpriced, same "unknown"
+  // rule `computeGroupIndexStats` already applies to the index row for this group.
+  const groupProfit = profitOf(rollup.totalCost, rollup.buyCost);
+  const groupVerdict = verdictOf(groupProfit);
 
-  function setOwnedQuantity(typeID: number, quantity: number | undefined) {
-    updateOwnedStock((next) => {
-      if (quantity === undefined || quantity <= 0) delete next[typeID];
-      else next[typeID] = quantity;
-    });
-  }
+  // Materials merge Need/Owned/Still-to-buy into one table now (issue: group
+  // page redesign) — but a material fully covered by this group's own build
+  // tree (`builtQuantityByType` above) was never bought at all, so it moves to
+  // its own "Crafted" list below rather than sitting in the buy table showing
+  // "Covered" for a reason that has nothing to do with the owned-stock ledger.
+  const { buyRows, craftedTypeIds } = useMemo(() => {
+    const buyRows: BuyMaterialRow[] = [];
+    const craftedTypeIds: number[] = [];
+    for (const line of rollup.tableMaterials) {
+      const builtQuantity = builtQuantityByType.get(line.typeID) ?? 0;
+      if (builtQuantity > 0 && builtQuantity >= line.quantity) {
+        craftedTypeIds.push(line.typeID);
+        continue;
+      }
+      buyRows.push({ ...line, buyToShow: Math.max(0, line.remainingQuantity - builtQuantity) });
+    }
+    return { buyRows, craftedTypeIds };
+  }, [rollup.tableMaterials, builtQuantityByType]);
+
+  /** One write path for the ledger: every caller mutates a copy of `group.ownedStock`, this commits it. */
+  const updateOwnedStock = useCallback(
+    (mutate: (next: Record<number, number>) => void) => {
+      const next: Record<number, number> = { ...group.ownedStock };
+      mutate(next);
+      onOwnedStockChange(next);
+    },
+    [group.ownedStock, onOwnedStockChange]
+  );
+
+  const setOwnedQuantity = useCallback(
+    (typeID: number, quantity: number | undefined) => {
+      updateOwnedStock((next) => {
+        if (quantity === undefined || quantity <= 0) delete next[typeID];
+        else next[typeID] = quantity;
+      });
+    },
+    [updateOwnedStock]
+  );
 
   // Same "never clobber a hand-typed value" rule the plan-level bulk fill
-  // keeps: only rows with nothing in the ledger yet are offered.
+  // keeps: only rows with nothing in the ledger yet are offered. Scoped to
+  // `buyRows`, not every merged material — a fully-crafted row (see above)
+  // is never bought, so it has no owned quantity for "Use all"/"Use none" to
+  // touch.
   const bulkDetectedEntries = useMemo(
     () =>
-      rollup.tableMaterials
+      buyRows
         .filter((m) => ownedStockMap.get(m.typeID) === undefined && scopedStock.has(m.typeID))
         .map(
           (m) =>
@@ -292,14 +340,95 @@ export function BuildGroupPanel({
               suggestedOwnedQuantity(scopedStock.get(m.typeID)!.quantity, m.quantity),
             ] as const
         ),
-    [rollup.tableMaterials, ownedStockMap, scopedStock]
+    [buyRows, ownedStockMap, scopedStock]
   );
+  // Unlike `bulkDetectedEntries`, this scans every merged material, not just
+  // `buyRows`: a material can carry an owned-stock ledger entry from before
+  // it became fully crafted (see `craftedTypeIds` above), and that entry is
+  // still live in `ownedStockMap` — still read by `rollUpBuildGroup` above —
+  // even though the Crafted section renders no input for it. "Use none" has
+  // to be able to reach it, or a stray entry becomes permanently stuck.
   const bulkClearTypeIds = useMemo(
     () =>
       rollup.tableMaterials
         .filter((m) => (ownedStockMap.get(m.typeID) ?? 0) > 0)
         .map((m) => m.typeID),
     [rollup.tableMaterials, ownedStockMap]
+  );
+
+  const buyMaterialColumns = useMemo<DataTableColumn<BuyMaterialRow>[]>(
+    () => [
+      {
+        id: 'material',
+        header: t('industry.material'),
+        primary: true,
+        render: (material) => (
+          <span className="truncate">{nameForType(catalog, material.typeID)}</span>
+        ),
+      },
+      {
+        id: 'need',
+        header: t('industry.quantity'),
+        align: 'right',
+        className: 'tabular-nums text-text-dim',
+        render: (material) => material.quantity.toLocaleString(),
+      },
+      {
+        id: 'owned',
+        header: t('industry.ownedQuantity'),
+        align: 'right',
+        render: (material) => {
+          const stock = detection.stockFor(material.typeID);
+          const owned = ownedStockMap.get(material.typeID);
+          const scopedQuantity = detection.scopedQuantityFor(material.typeID);
+          const suggestion = stock ? suggestedOwnedQuantity(scopedQuantity, material.quantity) : 0;
+          return (
+            <span className="flex flex-col items-start gap-0.5 sm:items-end">
+              <SourcingInput
+                value={owned}
+                label={t('industry.groupOwnedQuantityLabel', {
+                  material: nameForType(catalog, material.typeID),
+                })}
+                inputMode="numeric"
+                widthClassName="w-20"
+                placeholder="0"
+                parse={parseOwnedCount}
+                onCommit={(quantity) => setOwnedQuantity(material.typeID, quantity)}
+              />
+              {stock && (
+                <OwnedStockHint
+                  scopedQuantity={scopedQuantity}
+                  detection={detection}
+                  materialName={nameForType(catalog, material.typeID)}
+                  suggestion={suggestion}
+                  canApply={owned !== suggestion && suggestion > 0}
+                  onApply={() => setOwnedQuantity(material.typeID, suggestion)}
+                />
+              )}
+            </span>
+          );
+        },
+      },
+      {
+        id: 'stillToBuy',
+        header: t('industry.stillToBuyColumn'),
+        align: 'right',
+        className: 'tabular-nums',
+        render: (material) => (
+          <span className="flex flex-col items-start gap-0.5 sm:items-end">
+            <span className={material.buyToShow === 0 ? 'text-success' : 'font-semibold'}>
+              {material.buyToShow === 0
+                ? t('industry.stillToBuyCovered')
+                : material.buyToShow.toLocaleString()}
+            </span>
+            {material.unpriced && material.buyToShow > 0 && (
+              <span className="text-[0.6875rem] text-warning">{t('industry.unpriced')}</span>
+            )}
+          </span>
+        ),
+      },
+    ],
+    [t, catalog, ownedStockMap, detection, setOwnedQuantity]
   );
 
   // The copy outcome is a flash, not a state the panel keeps. Cleared by an
@@ -409,6 +538,27 @@ export function BuildGroupPanel({
           </div>
         )}
 
+        {/* The group's own Acquisition Verdict, up front — same pill
+            convention `PlanVerdictHero` uses for a single plan, so a group
+            and its members never disagree about what "Build"/"Buy" mean. */}
+        {!loading && (
+          <div className="mb-3">
+            {groupProfit === null ? (
+              <VerdictPill label={t('industry.acquisitionVerdictLabel')} tone="muted">
+                {t('industry.verdictUnknown')}
+              </VerdictPill>
+            ) : groupVerdict === 'build' ? (
+              <VerdictPill label={t('industry.acquisitionVerdictLabel')} tone="success">
+                {t('industry.verdictBuild', { amount: formatIsk(groupProfit) })}
+              </VerdictPill>
+            ) : (
+              <VerdictPill label={t('industry.acquisitionVerdictLabel')} tone="warning">
+                {t('industry.verdictBuy', { amount: formatIsk(-groupProfit) })}
+              </VerdictPill>
+            )}
+          </div>
+        )}
+
         <div className="mb-3">
           <AutoBuildControl
             maxDepth={autoBuildMaxDepth}
@@ -509,149 +659,122 @@ export function BuildGroupPanel({
         )}
       </Panel>
 
-      <Panel title={t('industry.groupMembers')} padded={false}>
-        <ul className="divide-y divide-line text-xs">
-          {plans.map((plan) => {
-            const row = rowByPlanId.get(plan.id);
-            return (
-              <li key={plan.id}>
-                <button
-                  type="button"
-                  onClick={() => onOpenPlan(plan.id)}
-                  className="flex w-full items-center justify-between gap-2 px-2.5 py-1.5 text-left hover:bg-panel-2"
-                >
-                  <span className="truncate">{plan.name}</span>
-                  <span className="shrink-0 tabular-nums text-text-dim">
-                    {row?.result ? formatIsk(row.result.totalCost) : '—'}
-                  </span>
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      </Panel>
-
-      {/* The Group Owned Overlay (issue #697): the group's own "I own this"
-          ledger, independent of any member's per-plan owned quantity — see
-          CONTEXT.md's "Group Owned Overlay". Manual entry, or "use detected"
-          scoped the same way a single plan's owned-stock entry is. */}
-      <Panel title={t('industry.groupOwnedStockTitle')} padded={false}>
-        <div className="space-y-3 p-2.5">
-          <OwnedStockScopeControl
-            scope={group.ownedStockScope}
-            detectedStock={detected.stock}
-            detection={detection}
-            onChange={onOwnedStockScopeChange}
-            action={
-              (bulkDetectedEntries.length > 0 || bulkClearTypeIds.length > 0) && (
-                <div className="flex gap-2">
-                  {bulkDetectedEntries.length > 0 && (
-                    <Button
-                      size="sm"
-                      onClick={() =>
-                        updateOwnedStock((next) => {
-                          for (const [typeID, quantity] of bulkDetectedEntries)
-                            next[typeID] = quantity;
-                        })
-                      }
-                    >
-                      {t('industry.useAllOwned')}
-                    </Button>
-                  )}
-                  {bulkClearTypeIds.length > 0 && (
-                    <Button
-                      size="sm"
-                      onClick={() =>
-                        updateOwnedStock((next) => {
-                          for (const typeID of bulkClearTypeIds) delete next[typeID];
-                        })
-                      }
-                    >
-                      {t('industry.useNoneOwned')}
-                    </Button>
-                  )}
-                </div>
-              )
-            }
-          />
-          {rollup.tableMaterials.length === 0 ? (
-            <EmptyState title={t('industry.groupNothingToBuy')} className="py-4" />
-          ) : (
-            <ul className="divide-y divide-line text-xs">
-              {rollup.tableMaterials.map((material) => (
-                <li
-                  key={material.typeID}
-                  className="flex items-center justify-between gap-2 py-1.5"
-                >
-                  <span className="truncate">{nameForType(catalog, material.typeID)}</span>
-                  <SourcingInput
-                    value={ownedStockMap.get(material.typeID)}
-                    label={t('industry.groupOwnedQuantityLabel', {
-                      material: nameForType(catalog, material.typeID),
-                    })}
-                    inputMode="numeric"
-                    widthClassName="w-20"
-                    placeholder="0"
-                    parse={(raw) => {
-                      const value = unmaskNumber(raw);
-                      return value === undefined ? undefined : Math.floor(value);
-                    }}
-                    onCommit={(quantity) => setOwnedQuantity(material.typeID, quantity)}
-                  />
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      </Panel>
-
-      {/* The whole merge, built materials included — `tableMaterials`, not the
-          buy list. The two are only the same where no member builds anything,
-          and mixing them into one number double-counts the moment one member
-          buys what another member's sub-job also consumes. The copy control
-          above pastes `shoppingMaterials`, which is the leaves alone. */}
-      <Panel title={t('industry.groupMaterials')} padded={false}>
-        {rollup.tableMaterials.length === 0 ? (
-          <EmptyState title={t('industry.groupNothingToBuy')} className="py-6" />
-        ) : (
+      {/* Full-width now that the plan/group list has its own route (issue:
+          group page redesign) — Members and Materials sit side by side
+          rather than competing with a nav rail and a 20rem list column for
+          the same row. */}
+      <div className="grid gap-4 lg:grid-cols-[20rem_1fr] lg:items-start">
+        <Panel title={t('industry.groupMembers')} padded={false}>
           <ul className="divide-y divide-line text-xs">
-            {rollup.tableMaterials.map((material) => {
-              // A row some member builds rather than buys: `remainingQuantity`
-              // still carries `resolveMaterial`'s bought-line formula (quantity
-              // minus owned), so rendering it as a buy count here would repeat
-              // the per-plan table's bug (`MaterialsTable.tsx`'s own
-              // `subBuilds.length > 0` check) — only display, not the ledger
-              // math, is corrected: `rollup.tableMaterials` itself is untouched.
-              //
-              // A typeID can be built by one member and bought outright by
-              // another (a raw material to one plan, an intermediate to
-              // another) — `builtQuantity` is only ever a portion of the
-              // merged `quantity` then, never the whole of it, so `buyToShow`
-              // is what's left to source once the built portion is set aside,
-              // and the row still reads as a genuine (smaller) buy need
-              // instead of being wrongly cleared to "Built" or left
-              // overstated by the units another member is manufacturing.
-              const builtQuantity = builtQuantityByType.get(material.typeID) ?? 0;
-              const fullyBuilt = builtQuantity > 0 && builtQuantity >= material.quantity;
-              const buyToShow = Math.max(0, material.remainingQuantity - builtQuantity);
+            {plans.map((plan) => {
+              const row = rowByPlanId.get(plan.id);
               return (
-                <li key={material.typeID} className="flex justify-between gap-2 px-2.5 py-1.5">
-                  <span className="truncate">{nameForType(catalog, material.typeID)}</span>
-                  <span className="shrink-0 tabular-nums text-text-dim">
-                    {fullyBuilt
-                      ? t('industry.priceSourceBuilt')
-                      : t('industry.groupMaterialNeed', {
-                          quantity: material.quantity.toLocaleString(),
-                          remaining: buyToShow.toLocaleString(),
-                        })}
-                    {material.unpriced ? ` · ${t('industry.unpriced')}` : ''}
-                  </span>
+                <li key={plan.id}>
+                  <button
+                    type="button"
+                    onClick={() => onOpenPlan(plan.id)}
+                    className="flex w-full items-center justify-between gap-2 px-2.5 py-1.5 text-left hover:bg-panel-2"
+                  >
+                    <span className="truncate">{plan.name}</span>
+                    <span className="shrink-0 tabular-nums text-text-dim">
+                      {row?.result ? formatIsk(row.result.totalCost) : '—'}
+                    </span>
+                  </button>
                 </li>
               );
             })}
           </ul>
-        )}
-      </Panel>
+        </Panel>
+
+        {/* Materials and the Group Owned Overlay (issue #697) as one table:
+            typing an owned quantity updates that same row's Still To Buy
+            instead of a separate panel scroll-lengths away. A material this
+            group's own build tree fully produces (see `craftedTypeIds`
+            above) was never bought at all, so it never had an owned
+            quantity to enter — it gets its own section below instead. */}
+        <Panel title={t('industry.groupMaterials')} padded={false}>
+          <div className="space-y-3 p-2.5">
+            <OwnedStockScopeControl
+              scope={group.ownedStockScope}
+              detectedStock={detected.stock}
+              detection={detection}
+              onChange={onOwnedStockScopeChange}
+              action={
+                (bulkDetectedEntries.length > 0 || bulkClearTypeIds.length > 0) && (
+                  <div className="flex gap-2">
+                    {bulkDetectedEntries.length > 0 && (
+                      <Button
+                        size="sm"
+                        onClick={() =>
+                          updateOwnedStock((next) => {
+                            for (const [typeID, quantity] of bulkDetectedEntries)
+                              next[typeID] = quantity;
+                          })
+                        }
+                      >
+                        {t('industry.useAllOwned')}
+                      </Button>
+                    )}
+                    {bulkClearTypeIds.length > 0 && (
+                      <Button
+                        size="sm"
+                        onClick={() =>
+                          updateOwnedStock((next) => {
+                            for (const typeID of bulkClearTypeIds) delete next[typeID];
+                          })
+                        }
+                      >
+                        {t('industry.useNoneOwned')}
+                      </Button>
+                    )}
+                  </div>
+                )
+              }
+            />
+          </div>
+
+          {/* An empty buy table two different ways: genuinely nothing left
+              (every material owned, or there are none) reads "Nothing left
+              to buy," but a table empty because everything is crafted has
+              its own section right below explaining that — showing both
+              would call a crafted material "owned," which is exactly the
+              hangar-vs-job confusion the Crafted section exists to avoid. */}
+          {buyRows.length === 0 && craftedTypeIds.length === 0 ? (
+            <EmptyState title={t('industry.groupNothingToBuy')} className="py-6" />
+          ) : buyRows.length > 0 ? (
+            <div className="overflow-x-auto">
+              <DataTable
+                columns={buyMaterialColumns}
+                rows={buyRows}
+                rowKey={(material) => material.typeID}
+                label={t('industry.groupMaterials')}
+                density="compact"
+              />
+            </div>
+          ) : null}
+
+          {craftedTypeIds.length > 0 && (
+            <div className="border-t border-line p-2.5">
+              <p className="text-[0.6875rem] font-semibold tracking-wide text-accent uppercase">
+                {t('industry.groupCraftedTitle', { count: craftedTypeIds.length })}
+              </p>
+              <ul className="mt-1.5 divide-y divide-line text-xs">
+                {craftedTypeIds.map((typeID) => (
+                  <li key={typeID} className="flex items-center justify-between gap-2 py-1.5">
+                    <span className="truncate">{nameForType(catalog, typeID)}</span>
+                    <span className="shrink-0 rounded-xs border border-accent-dim/50 px-1.5 py-0.5 text-[0.625rem] font-semibold tracking-wide text-accent uppercase">
+                      {t('industry.groupCraftedTag')}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-1.5 text-[0.6875rem] text-text-dim">
+                {t('industry.groupCraftedHint')}
+              </p>
+            </div>
+          )}
+        </Panel>
+      </div>
 
       {retargeting && (
         <RetargetGroupDialog

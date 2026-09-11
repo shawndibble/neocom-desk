@@ -1298,7 +1298,7 @@ export function Market() {
           controller={appraisal}
           pricePercent={pricePercent}
           onPricePercentChange={(value) => void setPricePercent(value)}
-          hubName={effectiveHub.systemName}
+          hub={effectiveHub}
           blueprintCatalog={blueprintCatalog}
           onRequestBlueprintCatalog={ensureBlueprintCatalog}
           onAddToQuickbar={handleAddToQuickbar}

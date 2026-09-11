@@ -39,6 +39,7 @@ import { Contacts } from '@/routes/Contacts';
 import { EmploymentHistory } from '@/routes/EmploymentHistory';
 import { Settings } from '@/routes/Settings';
 import { Styleguide } from '@/routes/Styleguide';
+import { AppraisalShared } from '@/routes/AppraisalShared';
 import { ErrorProbe } from '@/routes/ErrorProbe';
 import { NotFound } from '@/routes/NotFound';
 import { Layout } from './Layout';
@@ -220,6 +221,11 @@ export function App() {
             </Route>
           </Route>
           <Route path="/styleguide" element={<Styleguide />} />
+          {/* The app's first real unauthenticated content route (#831) — a
+              Share link must open with no session and no Character, so it
+              sits outside RequireCharacter/ScopeGate the same way /styleguide
+              does. routeScopes.test.ts asserts this exemption is deliberate. */}
+          <Route path="/share/appraisal" element={<AppraisalShared />} />
           {/* Undisclosed Sentry probe — see routes/ErrorProbe.tsx. */}
           <Route path="/error" element={<ErrorProbe />} />
           <Route path="*" element={<NotFound />} />

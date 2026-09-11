@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, FilterChip, Modal, TextInput } from '@/components/ui';
+import { Button, FilterChip, IconButton, Modal, TextInput } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import type { MiningTaxAssignmentRecord, MiningTaxPaymentMethod } from '@/db';
+import { invalidateFreshness } from '@/esi/cache';
 import type { WalletJournalEntry } from '@/esi/endpoints';
 import { loadWalletJournal } from '@/features/character/wallet';
 import { humanizeRefType } from '@/features/character/format';
@@ -93,6 +94,12 @@ export function SettleUpDialog({ open, onClose, rows, systemNames, onPaid }: Set
       cancelled = true;
     };
   }, [step, candidates, included, amountToSend]);
+
+  /** Manual re-fetch (issue: the payment just sent in step 2 may not have posted to ESI's journal yet). Bypasses the freshness window the same way any other Refresh button does. */
+  function refreshJournal() {
+    invalidateFreshness();
+    setCandidates(null);
+  }
 
   function toggle(id: string) {
     setExcluded((previous) => {
@@ -339,9 +346,19 @@ export function SettleUpDialog({ open, onClose, rows, systemNames, onPaid }: Set
               </div>
             )}
             <div className="space-y-1">
-              <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                {t('miningTax.settleUpJournalLabel')}
-              </p>
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                  {t('miningTax.settleUpJournalLabel')}
+                </p>
+                <IconButton
+                  variant="plain"
+                  size="sm"
+                  icon={<Icon.Refresh />}
+                  label={t('miningTax.settleUpJournalRefresh')}
+                  onClick={refreshJournal}
+                  disabled={candidates === null}
+                />
+              </div>
               {candidates === null ? (
                 <p className="text-xs text-text-dim">{t('common.loading')}</p>
               ) : candidates.length === 0 ? (

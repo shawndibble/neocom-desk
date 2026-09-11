@@ -57,6 +57,7 @@ const DOM_TS_TESTS = [
   'src/lib/download.test.ts',
   'src/lib/fontScale.test.ts',
   'src/sync/deviceRegistration.test.ts',
+  'src/features/market/appraisalShareData.test.ts',
   // DOMParser
   'src/features/skills/planner/planXmlDocument.test.ts',
   'src/features/skills/planner/planXmlImport.test.ts',

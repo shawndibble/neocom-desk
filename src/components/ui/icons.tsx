@@ -71,6 +71,7 @@ import {
   Queue,
   Receipt,
   Scales,
+  ShareNetwork,
   ShieldCheck,
   ShoppingCart,
   SignIn as SignInGlyph,
@@ -195,6 +196,8 @@ export const DragHandle = withWeight(DotsSixVertical);
 export const Duplicate = withWeight(Copy);
 /** Put text on the clipboard — the same glyph as `Duplicate`, named for the other sense of "copy". */
 export const CopyToClipboard = withWeight(Copy);
+/** Generates a link that reproduces a view for someone without the app open. */
+export const Share = withWeight(ShareNetwork);
 /** Confirms an action that leaves nothing on screen to look at, e.g. a copy that went to the clipboard. */
 export const Done = withWeight(Check);
 /** Overflow menu. */
