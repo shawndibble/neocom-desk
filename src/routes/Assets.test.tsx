@@ -975,12 +975,12 @@ describe('cross-character search (issue #85)', () => {
 
   async function selectAllCharacters(user: ReturnType<typeof userEvent.setup>) {
     await user.click(screen.getByRole('button', { name: 'This character' }));
-    await user.click(await screen.findByRole('menuitem', { name: 'All characters' }));
+    await user.click(await screen.findByRole('button', { name: 'All characters' }));
   }
 
   async function selectThisCharacter(user: ReturnType<typeof userEvent.setup>) {
     await user.click(screen.getByRole('button', { name: 'All characters' }));
-    await user.click(await screen.findByRole('menuitem', { name: 'This character' }));
+    await user.click(await screen.findByRole('button', { name: 'This character' }));
   }
 
   it('reaches other characters once "All characters" is picked, tagging the match with a character badge', async () => {

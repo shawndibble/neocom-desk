@@ -660,7 +660,7 @@ describe('Wallet', () => {
       const balanceHeader = screen.getByRole('heading', { name: 'Balance' }).closest('header');
       expect(balanceHeader).not.toBeNull();
       await user.click(within(balanceHeader!).getByRole('button', { name: 'This character' }));
-      await user.click(await screen.findByRole('menuitem', { name: 'All characters' }));
+      await user.click(await screen.findByRole('button', { name: 'All characters' }));
 
       // The panel below swaps to the per-character table; the picker rides
       // along into that panel's header rather than being left behind.
@@ -688,7 +688,7 @@ describe('Wallet', () => {
 
       await screen.findByText(/4,500\.00/);
       await user.click(screen.getByRole('button', { name: 'This character' }));
-      await user.click(await screen.findByRole('menuitem', { name: 'All characters' }));
+      await user.click(await screen.findByRole('button', { name: 'All characters' }));
 
       const table = await screen.findByRole('table', { name: 'Balance by character' });
       expect(await within(table).findByText('Pilot One')).toBeInTheDocument();
@@ -723,7 +723,7 @@ describe('Wallet', () => {
 
       await screen.findByText(/4,500\.00/);
       await user.click(screen.getByRole('button', { name: 'This character' }));
-      await user.click(await screen.findByRole('menuitem', { name: 'All characters' }));
+      await user.click(await screen.findByRole('button', { name: 'All characters' }));
 
       // All three selected: Pilot Three's skipped notice shows.
       expect(
@@ -735,7 +735,7 @@ describe('Wallet', () => {
       // #607 CodeRabbit review: the notice list must follow the same filter
       // the balance rows do).
       await user.click(screen.getByRole('button', { name: 'All characters' }));
-      await user.click(screen.getByRole('menuitemcheckbox', { name: 'Pilot Three' }));
+      await user.click(screen.getByRole('option', { name: 'Pilot Three' }));
       await user.keyboard('{Escape}');
 
       expect(

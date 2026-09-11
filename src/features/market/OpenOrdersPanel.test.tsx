@@ -338,7 +338,7 @@ describe('OpenOrdersPanel', () => {
 
     await user.click(trigger);
     // The active Character (from `useActiveCharacter`) is Alpha (id 1).
-    await user.click(screen.getByRole('menuitem', { name: 'This character' }));
+    await user.click(screen.getByRole('button', { name: 'This character' }));
 
     // Narrowed to Alpha's own order (Tritanium, type 34); Bravo's (Mexallon,
     // type 36) is gone. Both groups were on screen before the pick.

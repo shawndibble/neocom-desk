@@ -55,6 +55,8 @@ export {
   DropdownMenuSeparator,
 } from './DropdownMenu';
 export { ColumnPickerMenu } from './ColumnPickerMenu';
+export { MultiSelect } from './MultiSelect';
+export type { MultiSelectGroup, MultiSelectOption, MultiSelectProps } from './MultiSelect';
 export {
   Select,
   SelectValue,

@@ -66,7 +66,7 @@ describe('CharacterFilterControl', () => {
     expect(screen.getByRole('button', { name: '2 characters' })).toBeInTheDocument();
   });
 
-  it('lists every character as a checkbox, checked per the current value', async () => {
+  it('lists every character as an option, selected per the current value', async () => {
     render(
       <CharacterFilterControl
         characters={CHARACTERS}
@@ -76,14 +76,8 @@ describe('CharacterFilterControl', () => {
       />
     );
     await openMenu();
-    expect(screen.getByRole('menuitemcheckbox', { name: 'Alice' })).toHaveAttribute(
-      'aria-checked',
-      'true'
-    );
-    expect(screen.getByRole('menuitemcheckbox', { name: 'Carol' })).toHaveAttribute(
-      'aria-checked',
-      'false'
-    );
+    expect(screen.getByRole('option', { name: 'Alice' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('option', { name: 'Carol' })).toHaveAttribute('aria-selected', 'false');
   });
 
   it('toggling a character calls onChange with the flipped set', async () => {
@@ -97,7 +91,7 @@ describe('CharacterFilterControl', () => {
       />
     );
     const user = await openMenu();
-    await user.click(screen.getByRole('menuitemcheckbox', { name: 'Bob' }));
+    await user.click(screen.getByRole('option', { name: 'Bob' }));
     expect(onChange).toHaveBeenCalledWith(new Set([1, 2]));
   });
 
@@ -112,7 +106,7 @@ describe('CharacterFilterControl', () => {
       />
     );
     const user = await openMenu();
-    await user.click(screen.getByRole('menuitemcheckbox', { name: 'Bob' }));
+    await user.click(screen.getByRole('option', { name: 'Bob' }));
     expect(onChange).toHaveBeenCalledWith(new Set([1, 2]));
   });
 
@@ -127,8 +121,9 @@ describe('CharacterFilterControl', () => {
       />
     );
     const user = await openMenu();
-    await user.click(screen.getByRole('menuitem', { name: 'This character' }));
+    await user.click(screen.getByRole('button', { name: 'This character' }));
     expect(onChange).toHaveBeenCalledWith('current');
+    expect(screen.queryByPlaceholderText('Search characters')).not.toBeInTheDocument();
   });
 
   it('"All Characters" sets the value to \'all\'', async () => {
@@ -142,7 +137,7 @@ describe('CharacterFilterControl', () => {
       />
     );
     const user = await openMenu();
-    await user.click(screen.getByRole('menuitem', { name: 'All characters' }));
+    await user.click(screen.getByRole('button', { name: 'All characters' }));
     expect(onChange).toHaveBeenCalledWith('all');
   });
 
@@ -156,6 +151,40 @@ describe('CharacterFilterControl', () => {
       />
     );
     await openMenu();
-    expect(screen.queryByRole('menuitem', { name: 'This character' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'This character' })).not.toBeInTheDocument();
+  });
+
+  it('typing in the search box narrows the visible character options by name', async () => {
+    render(
+      <CharacterFilterControl
+        characters={CHARACTERS}
+        activeCharacterId={1}
+        value="all"
+        onChange={() => {}}
+      />
+    );
+    const user = await openMenu();
+    await user.type(screen.getByPlaceholderText('Search characters'), 'ali');
+    expect(screen.getByRole('option', { name: 'Alice' })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'Bob' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'Carol' })).not.toBeInTheDocument();
+  });
+
+  it('clearing the search box restores the full character list', async () => {
+    render(
+      <CharacterFilterControl
+        characters={CHARACTERS}
+        activeCharacterId={1}
+        value="all"
+        onChange={() => {}}
+      />
+    );
+    const user = await openMenu();
+    const search = screen.getByPlaceholderText('Search characters');
+    await user.type(search, 'ali');
+    await user.clear(search);
+    expect(screen.getByRole('option', { name: 'Alice' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Bob' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Carol' })).toBeInTheDocument();
   });
 });

@@ -946,7 +946,9 @@
       "thisCharacter": "This character",
       "allCharacters": "All characters",
       "selectedCount_one": "{{count}} character",
-      "selectedCount_other": "{{count}} characters"
+      "selectedCount_other": "{{count}} characters",
+      "searchPlaceholder": "Search characters",
+      "noResults": "No characters match your search."
     }
   },
   "characters": {
