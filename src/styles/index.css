@@ -20,20 +20,28 @@
 }
 
 /*
- * Same-document route change (`PageTransitionOutlet`), as opposed to the
- * `@view-transition` rule above (a full document reload). Browsers without
- * View Transition support just swap the outlet with no animation — this rule
- * only refines browsers that already ran one via `startViewTransition()`.
+ * Same-document route change (`PageTransitionOutlet`, wrapped in `.page-outlet`
+ * below), as opposed to the `@view-transition` rule above (a full document
+ * reload). Named `app-outlet` rather than left to share the document's
+ * implicit `root` group: `root` is also what the cross-document rule above
+ * animates, and an unnamed rule here would silently retime that reload fade
+ * too. Browsers without View Transition support just swap the outlet with no
+ * animation — this rule only refines browsers that already ran one via
+ * `startViewTransition()`.
  *
  * A quick fade is enough: the outlet is the whole main content area
- * (everything below the rail/tab bar stays in place, sharing no `::view-
- * transition-name` with the page), so a slide would read as the entire app
- * chrome sliding rather than a page turn. `PageTransitionOutlet` already
- * skips calling `startViewTransition()` under reduced motion, so no
- * duplicate `@media` guard is needed here.
+ * (everything below the rail/tab bar stays in place, outside this named
+ * group), so a slide would read as the entire app chrome sliding rather than
+ * a page turn. `PageTransitionOutlet` already skips calling
+ * `startViewTransition()` under reduced motion, so no duplicate `@media`
+ * guard is needed here.
  */
-::view-transition-old(root),
-::view-transition-new(root) {
+.page-outlet {
+  view-transition-name: app-outlet;
+}
+
+::view-transition-old(app-outlet),
+::view-transition-new(app-outlet) {
   animation-duration: 0.12s;
   animation-timing-function: ease-out;
 }
