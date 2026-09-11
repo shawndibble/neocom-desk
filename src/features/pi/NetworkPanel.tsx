@@ -77,8 +77,8 @@ function groupBlockers(
 
 /**
  * The count itself, not a partial name list: "+18 more" still leaves the
- * question of which 18. The dashed underline is the only hint this is a
- * trigger — the tooltip carries every name in the group.
+ * question of which 18. The dotted underline + cursor-help is the only hint
+ * this is a trigger — the tooltip carries every name in the group.
  */
 function BlockedGroupCount({ names }: { names: string[] }) {
   const { t } = useTranslation();
@@ -86,7 +86,7 @@ function BlockedGroupCount({ names }: { names: string[] }) {
     <Tooltip content={names.join(', ')} openOnTap>
       <button
         type="button"
-        className="underline decoration-dashed decoration-text-dim underline-offset-2 hover:text-text"
+        className="cursor-help underline decoration-dotted decoration-text-dim underline-offset-2 hover:text-text focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
       >
         {t('piAdvisor.networkBlockedCount', { count: names.length })}
       </button>

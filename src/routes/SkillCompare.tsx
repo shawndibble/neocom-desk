@@ -17,6 +17,7 @@ import {
   type DataTableColumn,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
+import { controlHeightClassName } from '@/components/ui/controlStyles';
 import { SkillsSubNav } from '@/features/skills/SkillsSubNav';
 import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
 import { loadSkillCatalog, type SkillCatalog } from '@/features/skills/skillMap';
@@ -372,7 +373,7 @@ export function SkillCompare() {
                   type="button"
                   aria-pressed={selected}
                   onClick={() => toggleCharacter(character.characterId)}
-                  className={`flex items-center gap-1.5 rounded-xs border px-2 py-1 text-xs ${FOCUS_RING} ${
+                  className={`flex items-center gap-1.5 rounded-xs border px-2.5 text-xs ${controlHeightClassName.sm} ${FOCUS_RING} ${
                     selected ? 'border-accent bg-panel-2' : 'border-line'
                   }`}
                 >
