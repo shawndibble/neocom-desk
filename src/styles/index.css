@@ -20,6 +20,25 @@
 }
 
 /*
+ * Same-document route change (`PageTransitionOutlet`), as opposed to the
+ * `@view-transition` rule above (a full document reload). Browsers without
+ * View Transition support just swap the outlet with no animation — this rule
+ * only refines browsers that already ran one via `startViewTransition()`.
+ *
+ * A quick fade is enough: the outlet is the whole main content area
+ * (everything below the rail/tab bar stays in place, sharing no `::view-
+ * transition-name` with the page), so a slide would read as the entire app
+ * chrome sliding rather than a page turn. `PageTransitionOutlet` already
+ * skips calling `startViewTransition()` under reduced motion, so no
+ * duplicate `@media` guard is needed here.
+ */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 0.12s;
+  animation-timing-function: ease-out;
+}
+
+/*
  * Scan only the app source. Tailwind's automatic content detection walks every
  * non-gitignored file, so Markdown under `docs/` that merely *mentions* a class
  * name emits real utility rules into the shipped stylesheet.

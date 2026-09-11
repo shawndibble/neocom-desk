@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link, NavLink, Outlet } from 'react-router-dom';
+import { Link, NavLink } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
@@ -10,6 +10,7 @@ import { SyncStatusDot } from './SyncStatusDot';
 import { useSyncStatus } from './useSyncStatus';
 import { CharacterAvatar, characterAvatarBoxClassName, LogoMark, Modal } from '@/components/ui';
 import { AuthFailureNotice } from './AuthFailureNotice';
+import { PageTransitionOutlet } from './PageTransitionOutlet';
 import { useLockedRoutes } from './useGrantedScopes';
 import { useKeyboardShortcuts } from './useKeyboardShortcuts';
 import { NotificationPermissionPrompt } from '@/features/notifications/NotificationPermissionPrompt';
@@ -509,7 +510,7 @@ export function Layout() {
 
       <main className="min-w-0 flex-1 p-4 pb-[calc(5rem+env(safe-area-inset-bottom))] md:pb-4">
         <AuthFailureNotice />
-        <Outlet />
+        <PageTransitionOutlet />
       </main>
 
       {/* Mobile bottom tab bar: 4 primary destinations + More. Fixed-width
