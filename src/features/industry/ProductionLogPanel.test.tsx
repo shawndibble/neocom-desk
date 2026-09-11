@@ -198,6 +198,33 @@ describe('ProductionLogPanel', () => {
     expect(within(table).queryByText('Raven Line')).not.toBeInTheDocument();
   });
 
+  it('opens the realized-profit breakdown from the cross-plan runs table', async () => {
+    await addRun({ id: 'run-1' });
+    const now = Date.now();
+    await db.productionSaleLinks.add({
+      id: `${CHARACTER_ID}:txn:9001`,
+      characterId: CHARACTER_ID,
+      runId: 'run-1',
+      transactionId: 9001,
+      quantity: 5,
+      unitPrice: 100_000,
+      linkedAt: now,
+      updatedAt: now,
+    });
+
+    render(
+      <ProductionLogPanel characterId={CHARACTER_ID} catalog={CATALOG} skills={{}} plans={PLANS} />
+    );
+    const table = await runsTable();
+    const user = userEvent.setup();
+
+    await user.click(within(table).getByRole('button', { name: 'Calculations?' }));
+
+    expect(
+      await screen.findByRole('dialog', { name: "How this run's realized profit is calculated" })
+    ).toBeInTheDocument();
+  });
+
   it('excludes runs outside the selected date range, keeping runs inside it', async () => {
     const old = Date.parse('2026-01-01T00:00:00Z');
     const recent = Date.parse('2026-08-15T00:00:00Z');

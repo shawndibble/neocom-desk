@@ -400,7 +400,7 @@ export function ProductionLogPanel({
     quantityColumn(t),
     totalCostColumn(t),
     quantitySoldColumn(t),
-    realizedProfitColumn(t),
+    realizedProfitColumn(t, skills),
     statusColumn(t),
     soldActionsColumn(sale),
   ];
