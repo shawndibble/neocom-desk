@@ -1491,7 +1491,7 @@ describe('Market search focus (issue #25 "jump to search" shortcut)', () => {
     ).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Search BPC contracts' })).toHaveAttribute(
       'href',
-      '/industry?tab=sourcing'
+      '/industry?tab=sourcing&bpcSearch=638'
     );
   });
 
