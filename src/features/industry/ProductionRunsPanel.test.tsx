@@ -268,6 +268,54 @@ describe('ProductionRunsPanel', () => {
     });
   });
 
+  it('hides the realized-profit breakdown trigger until something has sold', async () => {
+    await addRun();
+    const user = userEvent.setup();
+    renderPanel(null);
+    await expandRuns(user);
+    await screen.findByRole('cell', { name: /^320,000$/ });
+
+    expect(screen.queryByRole('button', { name: 'Calculations?' })).not.toBeInTheDocument();
+  });
+
+  it('opens a realized-profit breakdown with the confirmed sale figures once sold', async () => {
+    await addRun();
+    const now = Date.now();
+    await db.productionSaleLinks.add({
+      id: `${CHARACTER_ID}:txn:9001`,
+      characterId: CHARACTER_ID,
+      runId: 'run-1',
+      transactionId: 9001,
+      quantity: 5,
+      unitPrice: 100_000,
+      linkedAt: now,
+      updatedAt: now,
+    });
+    const user = userEvent.setup();
+    renderPanel(null);
+    await expandRuns(user);
+
+    await user.click(await screen.findByRole('button', { name: 'Calculations?' }));
+    const dialog = await screen.findByRole('dialog', {
+      name: "How this run's realized profit is calculated",
+    });
+
+    // grossRevenue 500,000; salesTax 7.5% (Accounting 0) = 37,500; no watched
+    // order so brokerFeeableRevenue is 0 and broker fee is 0; netRevenue
+    // 462,500; totalCost 320,000 (300,000 material + 20,000 job fee); profit
+    // 142,500; margin 142,500 / 500,000 = 28.5%.
+    expect(within(dialog).getByText('Gross revenue = 500,000')).toBeInTheDocument();
+    expect(within(dialog).getByText('Sales tax = 37,500')).toBeInTheDocument();
+    expect(within(dialog).getByText('Broker fee = 0')).toBeInTheDocument();
+    expect(
+      within(dialog).getByText('Net revenue = 500,000 − sales tax 37,500 − broker fee 0 = 462,500')
+    ).toBeInTheDocument();
+    expect(
+      within(dialog).getByText('Profit = net revenue 462,500 − total cost 320,000 = 142,500')
+    ).toBeInTheDocument();
+    expect(within(dialog).getByText('Margin: 28.5% of gross revenue.')).toBeInTheDocument();
+  });
+
   it('rejects linking the same transaction twice, even across runs', async () => {
     const now = Date.now();
     await db.productionSaleLinks.add({

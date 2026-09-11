@@ -1,6 +1,8 @@
 import type { DataTableColumn } from '@/components/ui';
+import type { SkillLevels } from '@/engine/industry/types';
 import type { ProductionRunSummary } from './productionRunSummary';
 import { ProductionRunStatusChip } from './ProductionRunStatusChip';
+import { RealizedProfitCell } from './RealizedProfitCell';
 import { SoldSplitButton } from './SaleLinkingControls';
 import type { SaleLinking } from './useSaleLinking';
 import { iskToneClass } from '@/features/character/format';
@@ -64,7 +66,10 @@ export function quantitySoldColumn<Row extends ProductionRunSummary>(t: T): Data
   };
 }
 
-export function realizedProfitColumn<Row extends ProductionRunSummary>(t: T): DataTableColumn<Row> {
+export function realizedProfitColumn<Row extends ProductionRunSummary>(
+  t: T,
+  skills: SkillLevels
+): DataTableColumn<Row> {
   return {
     id: 'realizedProfit',
     header: t('industry.realizedProfit'),
@@ -72,7 +77,9 @@ export function realizedProfitColumn<Row extends ProductionRunSummary>(t: T): Da
     className: 'tabular-nums font-semibold',
     cellClassName: (r) => iskToneClass(r.profit.profit),
     sortValue: (r) => r.profit.profit,
-    render: (r) => formatIsk(r.profit.profit),
+    render: (r) => (
+      <RealizedProfitCell row={r} label={t('industry.breakdownTrigger')} skills={skills} />
+    ),
   };
 }
 
