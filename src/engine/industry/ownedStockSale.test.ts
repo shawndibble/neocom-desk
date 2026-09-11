@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { ownedStockSale, compareUseOrSell } from './ownedStockSale';
+import { ownedStockSale, compareUseOrSell, sellableMaterials } from './ownedStockSale';
 import { SKILL_IDS, type MaterialCostLine } from './types';
 
 const NO_SKILLS = {};
@@ -71,6 +71,21 @@ describe('ownedStockSale', () => {
     expect(sale.gross).toBe(0);
     expect(sale.unpriced).toEqual([35]);
     expect(sale.ownedUnits).toBe(50);
+  });
+});
+
+describe('sellableMaterials', () => {
+  it('drops the synthetic Blueprint Acquisition row, owned or not', () => {
+    const bpo = { ...line({ typeID: 999, ownedQuantity: 1 }), acquisitionTier: { me: 10, te: 20 } };
+    const mineral = line({ typeID: 34 });
+
+    expect(sellableMaterials([bpo, mineral])).toEqual([mineral]);
+  });
+
+  it('keeps every material with no acquisition tier untouched', () => {
+    const materials = [line({ typeID: 34 }), line({ typeID: 35 })];
+
+    expect(sellableMaterials(materials)).toEqual(materials);
   });
 });
 
