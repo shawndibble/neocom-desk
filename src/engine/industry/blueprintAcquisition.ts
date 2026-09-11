@@ -5,10 +5,11 @@
  * highest-ME BPC" heuristic with a cost-minimizing one
  * (docs/context/decisions/20260911-073307).
  *
- * Pure and decoupled from ESI/BPC Sourcing's own types, the same way
+ * Decoupled from ESI/BPC Sourcing's own types, the same way
  * `engine/contracts/bpcSearch.ts`'s `OwnedBlueprintInput` stays decoupled —
  * a caller adapts `CharacterBlueprint`/`BpcContractRow` into the shapes here.
  */
+import type { AcquisitionResolution } from '@/engine/industry/types';
 
 /** One owned copy of a blueprint. */
 export interface OwnedBlueprintCopy {
@@ -24,23 +25,13 @@ export interface BpcOffer {
   te: number;
   /** -1 = an original sold via contract: unlimited runs, one copy covers any shortfall. */
   runs: number;
+  /** Copies this one listing bundles at its combined `price` — a contract can list several at once (`engine/contracts/bpcSearch.ts`'s own `BlueprintOfferStats` doc comment). 1 for an ordinary single-copy listing. */
+  quantity: number;
   price: number;
 }
 
-/** What a node's Blueprint Acquisition row should show, or `null` for no row at all. */
-export interface AcquisitionLine {
-  /** ISK to cover the shortfall at the resolved tier; 0 when fully covered by owned runs. */
-  unitPrice: number | null;
-  /** True when the resolved tier's owned runs already cover the need — nothing bought. */
-  owned: boolean;
-}
-
-export interface BlueprintTierResult {
-  me: number;
-  te: number;
-  /** `null` only when the resolved tier is an owned BPO — infinite runs, nothing to ever acquire. */
-  line: AcquisitionLine | null;
-}
+/** `AcquisitionResolution` minus `blueprintTypeID` — this module has no typeID of its own to report, only the caller (`recipes.ts`) knows it. */
+export type BlueprintTierResult = Omit<AcquisitionResolution, 'blueprintTypeID'>;
 
 export interface SelectBlueprintTierInputs {
   /** Every copy of this blueprint type the Character owns, at any ME/TE. */
@@ -102,7 +93,13 @@ function cheapestOffer(offers: readonly BpcOffer[]): BpcOffer | null {
 }
 
 function offerToExtend(offer: BpcOffer): { capacityRuns: number; price: number } {
-  return { capacityRuns: offer.runs === -1 ? INFINITE_RUNS : offer.runs, price: offer.price };
+  return {
+    // A listing's combined `quantity` copies all come with the one contract
+    // at its one `price` — buying it whole nets every run all of them carry,
+    // not just one copy's worth.
+    capacityRuns: offer.runs === -1 ? INFINITE_RUNS : offer.runs * offer.quantity,
+    price: offer.price,
+  };
 }
 
 /** Whole copies needed to cover `shortfall` runs at `extend`'s capacity/price — never a fractional-copy price. */
@@ -133,14 +130,17 @@ function candidateCost(
  * one node. See docs/context/decisions/20260911-073307 for the full design.
  */
 export function selectBlueprintTier(inputs: SelectBlueprintTierInputs): BlueprintTierResult {
-  const {
-    ownedCopies,
-    neededRuns,
-    materialCostAtMe,
-    bpcOffers,
-    bpoSellPrice,
-    assumedMeForUnowned,
-  } = inputs;
+  const { ownedCopies, neededRuns, materialCostAtMe, bpoSellPrice, assumedMeForUnowned } = inputs;
+
+  // BPC Sourcing is synced, untrusted data (a public contract archive) — a
+  // listing with `runs: 0`/negative (anything but the -1 original sentinel)
+  // or `quantity <= 0` is malformed, and `Math.ceil(shortfall / 0)` would
+  // silently poison every cost this offer touches with Infinity/NaN rather
+  // than the "no price" `null` every other bad-data path in this feature
+  // falls back to.
+  const bpcOffers = inputs.bpcOffers.filter(
+    (offer) => (offer.runs === -1 || offer.runs > 0) && offer.quantity > 0
+  );
 
   const candidates = ownedTierCandidates(ownedCopies);
   // Each owned tier can only be extended by a matching-ME/TE offer — tiers

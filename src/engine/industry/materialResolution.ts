@@ -255,6 +255,36 @@ export function resolveMaterial(
 }
 
 /**
+ * The synthetic Blueprint Acquisition row for one buildable node (issue
+ * #838) — keyed by the blueprint's own typeID, never the product's. Shared
+ * by `resolveSubBuild` (a nested sub-build) and `buildVsBuy` (the plan's own
+ * top-level product), the only two places a node's tier is resolved outside
+ * the normal buy/build path `resolveMaterial` otherwise handles. Bypasses
+ * `claimOwned`/`ownedPool` entirely: it isn't material stock, it's the means
+ * to build at all.
+ */
+export function acquisitionMaterialFor(
+  acquisition: AcquisitionResolution,
+  overridePrice: number | undefined
+): ResolvedMaterial | null {
+  if (!acquisition.line) return null;
+  const resolvedOverride = usable(overridePrice);
+  const remainingQuantity = acquisition.line.owned ? 0 : 1;
+  const unitPrice = resolvedOverride ?? acquisition.line.unitPrice;
+  return {
+    typeID: acquisition.blueprintTypeID,
+    baseQuantity: 1,
+    quantity: 1,
+    ownedQuantity: 1 - remainingQuantity,
+    remainingQuantity,
+    unitPrice,
+    lineCost: remainingQuantity * (unitPrice ?? 0),
+    unpriced: remainingQuantity > 0 && unitPrice === null,
+    acquisitionTier: { me: acquisition.me, te: acquisition.te },
+  };
+}
+
+/**
  * Plans one level's job, then resolves what it consumes — recursively. `null`
  * mirrors `planSubBuild`'s own "nothing to plan" and error cases.
  *
@@ -276,27 +306,11 @@ function resolveSubBuild(
   const sub = planSubBuild({ typeID, remainingQuantity: needed }, blueprint, me, ctx);
   if (!sub) return null;
 
-  // Blueprint Acquisition (issue #838): a synthetic row for the blueprint
-  // itself, keyed by its own typeID — never the product's — sitting first
-  // among this node's own inputs. Bypasses `claimOwned`/`ownedPool`
-  // entirely: it isn't material stock, it's the means to build at all.
-  const acquisitionMaterial: ResolvedMaterial | null = acquisition?.line
-    ? (() => {
-        const overridePrice = usable(opts.sourcing?.[acquisition.blueprintTypeID]?.overridePrice);
-        const remainingQuantity = acquisition.line.owned ? 0 : 1;
-        const unitPrice = overridePrice ?? acquisition.line.unitPrice;
-        return {
-          typeID: acquisition.blueprintTypeID,
-          baseQuantity: 1,
-          quantity: 1,
-          ownedQuantity: 1 - remainingQuantity,
-          remainingQuantity,
-          unitPrice,
-          lineCost: remainingQuantity * (unitPrice ?? 0),
-          unpriced: remainingQuantity > 0 && unitPrice === null,
-          acquisitionTier: { me: acquisition.me, te: acquisition.te },
-        };
-      })()
+  const acquisitionMaterial = acquisition
+    ? acquisitionMaterialFor(
+        acquisition,
+        opts.sourcing?.[acquisition.blueprintTypeID]?.overridePrice
+      )
     : null;
 
   const inputs = acquisitionMaterial

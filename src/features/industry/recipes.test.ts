@@ -352,7 +352,7 @@ describe('acquisitionForLookup', () => {
       blueprintAcquisition: {
         // A suspiciously cheap offer that must never be consulted for a
         // reaction node — reaction formulas cannot be copied at all.
-        offersFor: () => [{ me: 0, te: 0, runs: 1, price: 1 }],
+        offersFor: () => [{ me: 0, te: 0, runs: 1, quantity: 1, price: 1 }],
         hubPrices: { 46156: 999 },
       },
     });

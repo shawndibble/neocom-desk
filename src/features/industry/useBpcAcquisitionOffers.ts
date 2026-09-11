@@ -36,7 +36,13 @@ export function useBpcAcquisitionOffers(
     for (const row of rows) {
       if (row.regionId !== regionId) continue;
       const list = map.get(row.typeId) ?? [];
-      list.push({ me: row.me, te: row.te, runs: row.runs, price: effectivePrice(row) });
+      list.push({
+        me: row.me,
+        te: row.te,
+        runs: row.runs,
+        quantity: row.quantity,
+        price: effectivePrice(row),
+      });
       map.set(row.typeId, list);
     }
     return map;

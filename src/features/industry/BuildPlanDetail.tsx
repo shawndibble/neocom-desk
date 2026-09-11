@@ -612,14 +612,14 @@ export function BuildPlanDetail({
    */
   const autoBuildMaxDepth = useMemo(() => {
     if (!blueprint) return 0;
-    return maxAutoBuildDepth(blueprint, plan.me, {
+    return maxAutoBuildDepth(blueprint, resolvedMe, {
       recipeFor,
       ctx: autoBuildDepthContext(facilityContext, reactionPlanFacilityContext, skills),
       runs: plan.runs,
     });
   }, [
     blueprint,
-    plan.me,
+    resolvedMe,
     plan.runs,
     recipeFor,
     facilityContext,
@@ -927,7 +927,7 @@ export function BuildPlanDetail({
    */
   function applyAutoBuild(options: { strategy: BuildStrategy }) {
     if (!blueprint || !makeOrBuyContext) return;
-    const picked = autoBuildHere(blueprint, plan.me, {
+    const picked = autoBuildHere(blueprint, resolvedMe, {
       recipeFor,
       ctx: makeOrBuyContext,
       depth: autoBuildMaxDepth,

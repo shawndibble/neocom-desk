@@ -93,6 +93,13 @@ const TYPES: TypeMap = {
   '34': { name: 'Tritanium', groupID: 18, volume: 0.01 },
   '35': { name: 'Pyerite', groupID: 18, volume: 0.01 },
   '36': { name: 'Mexallon', groupID: 18, volume: 0.01 },
+  // A blueprint is itself a real, named SDE type — production's `types.json`
+  // (`loadSde.ts`) carries these alongside every other item, so a Blueprint
+  // Acquisition row (issue #838) never actually falls back to `#<typeID>`.
+  // Named here so this fixture doesn't misrepresent that as a real gap.
+  '638': { name: 'Rifter Blueprint', groupID: 429, volume: 0.01 },
+  '639': { name: 'Tritanium Blueprint', groupID: 429, volume: 0.01 },
+  '640': { name: 'Pyerite Blueprint', groupID: 429, volume: 0.01 },
 };
 
 const ENTRY: BlueprintCatalogEntry = {
@@ -324,11 +331,11 @@ describe('BuildPlanDetail shopping list', () => {
 
     await user.click(copyButton());
 
-    // "#638" is the Rifter blueprint's own Blueprint Acquisition row (issue
-    // #838): no owned copy, no BPC offer and no hub price for it in this
-    // fixture, so it lists unpriced at quantity 1 — still on the shopping
-    // list, since it is a real thing the pilot has to go acquire.
-    expect(writeText).toHaveBeenCalledWith('#638\t1\nTritanium\t960');
+    // "Rifter Blueprint" is the blueprint's own Blueprint Acquisition row
+    // (issue #838): no owned copy, no BPC offer and no hub price for it in
+    // this fixture, so it lists unpriced at quantity 1 — still on the
+    // shopping list, since it is a real thing the pilot has to go acquire.
+    expect(writeText).toHaveBeenCalledWith('Rifter Blueprint\t1\nTritanium\t960');
   });
 
   it('confirms on the button itself — a clipboard write leaves nothing else to look at', async () => {
@@ -473,10 +480,13 @@ describe('BuildPlanDetail sub-builds', () => {
     await user.click(buildButton());
     await user.click(screen.getByRole('button', { name: 'Copy shopping list for multibuy' }));
 
-    // "#638" (Rifter, unbuilt) and "#639" (Tritanium, now built here — its
-    // own Blueprint Acquisition row, issue #838) both list unpriced at
-    // quantity 1 in this fixture; Pyerite is what the build actually needs.
-    expect(writeText).toHaveBeenCalledWith('#638\t1\n#639\t1\nPyerite\t1250');
+    // "Rifter Blueprint" (unbuilt) and "Tritanium Blueprint" (Tritanium is
+    // now built here — its own Blueprint Acquisition row, issue #838) both
+    // list unpriced at quantity 1 in this fixture; Pyerite is what the
+    // build actually needs.
+    expect(writeText).toHaveBeenCalledWith(
+      'Rifter Blueprint\t1\nTritanium Blueprint\t1\nPyerite\t1250'
+    );
   });
 
   it('sizes the job against what is still needed, never rebuilding owned stock', async () => {
@@ -489,7 +499,9 @@ describe('BuildPlanDetail sub-builds', () => {
     await user.click(buildButton());
     await user.click(screen.getByRole('button', { name: 'Copy shopping list for multibuy' }));
 
-    expect(writeText).toHaveBeenCalledWith('#638\t1\n#639\t1\nPyerite\t1000');
+    expect(writeText).toHaveBeenCalledWith(
+      'Rifter Blueprint\t1\nTritanium Blueprint\t1\nPyerite\t1000'
+    );
   });
 
   it('puts the material back on the list when the choice is undone', async () => {
@@ -502,10 +514,10 @@ describe('BuildPlanDetail sub-builds', () => {
     await user.click(screen.getByRole('button', { name: 'Buy Tritanium instead of building it' }));
     await user.click(screen.getByRole('button', { name: 'Copy shopping list for multibuy' }));
 
-    // Undone: Tritanium is bought again, not built, so its own "#639"
-    // Blueprint Acquisition row is gone too — only "#638" (the plan's own
-    // Rifter blueprint) remains.
-    expect(writeText).toHaveBeenCalledWith('#638\t1\nTritanium\t1000');
+    // Undone: Tritanium is bought again, not built, so its own "Tritanium
+    // Blueprint" Blueprint Acquisition row is gone too — only "Rifter
+    // Blueprint" (the plan's own blueprint) remains.
+    expect(writeText).toHaveBeenCalledWith('Rifter Blueprint\t1\nTritanium\t1000');
   });
 });
 

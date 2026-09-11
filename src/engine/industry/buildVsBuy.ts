@@ -17,10 +17,9 @@ import type { BuildResult, IndustryInputs } from '@/engine/industry/types';
 import { SKILL_IDS } from '@/engine/industry/types';
 import { effectiveMaterials } from '@/engine/industry/materials';
 import {
+  acquisitionMaterialFor,
   resolveMaterial,
   unpricedLeafTypeIds,
-  usable,
-  type ResolvedMaterial,
 } from '@/engine/industry/materialResolution';
 import type { SubBuildContext } from '@/engine/industry/subBuild';
 import { jobDurationSeconds } from '@/engine/industry/time';
@@ -68,28 +67,12 @@ export function buildVsBuy(inputs: IndustryInputs): BuildResult {
   // Blueprint Acquisition (issue #838) for the plan's own top-level product —
   // the same synthetic-row shape a nested sub-build gets from
   // `resolveSubBuild`, but built here since the top level has no parent node
-  // to resolve it from. Bypasses owned-stock claiming entirely: it isn't
-  // material stock, it's the means to build at all.
-  const acquisitionLine = inputs.blueprintAcquisition?.line;
-  const acquisitionMaterial: ResolvedMaterial | null = acquisitionLine
-    ? (() => {
-        const { blueprintTypeID } = inputs.blueprintAcquisition!;
-        const line = acquisitionLine;
-        const overridePrice = usable(inputs.materialSourcing?.[blueprintTypeID]?.overridePrice);
-        const remainingQuantity = line.owned ? 0 : 1;
-        const unitPrice = overridePrice ?? line.unitPrice;
-        return {
-          typeID: blueprintTypeID,
-          baseQuantity: 1,
-          quantity: 1,
-          ownedQuantity: 1 - remainingQuantity,
-          remainingQuantity,
-          unitPrice,
-          lineCost: remainingQuantity * (unitPrice ?? 0),
-          unpriced: remainingQuantity > 0 && unitPrice === null,
-          acquisitionTier: { me, te },
-        };
-      })()
+  // to resolve it from.
+  const acquisitionMaterial = inputs.blueprintAcquisition
+    ? acquisitionMaterialFor(
+        { me, te, ...inputs.blueprintAcquisition },
+        inputs.materialSourcing?.[inputs.blueprintAcquisition.blueprintTypeID]?.overridePrice
+      )
     : null;
   const materials = acquisitionMaterial
     ? [acquisitionMaterial, ...resolvedMaterials]

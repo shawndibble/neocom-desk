@@ -26,7 +26,7 @@ describe('selectBlueprintTier', () => {
       ownedCopies: owned,
       neededRuns: 5,
       materialCostAtMe: costAtMe,
-      bpcOffers: [{ me: 0, te: 0, runs: 1, price: 1_000_000 }],
+      bpcOffers: [{ me: 0, te: 0, runs: 1, quantity: 1, price: 1_000_000 }],
       bpoSellPrice: 500_000,
       assumedMeForUnowned: 0,
     });
@@ -40,7 +40,7 @@ describe('selectBlueprintTier', () => {
       neededRuns: 5,
       // ME0 material cost is 300; a single 1-ISK BPC copy at ME10 (100) beats it.
       materialCostAtMe: costAtMe,
-      bpcOffers: [{ me: 10, te: 20, runs: 5, price: 1 }],
+      bpcOffers: [{ me: 10, te: 20, runs: 5, quantity: 1, price: 1 }],
       bpoSellPrice: null,
       assumedMeForUnowned: 0,
     });
@@ -69,7 +69,7 @@ describe('selectBlueprintTier', () => {
       ownedCopies: owned,
       neededRuns: 5,
       materialCostAtMe: () => 100, // flat, so the shortfall math is the only variable
-      bpcOffers: [{ me: 6, te: 12, runs: 2, price: 10 }],
+      bpcOffers: [{ me: 6, te: 12, runs: 2, quantity: 1, price: 10 }],
       bpoSellPrice: null,
       assumedMeForUnowned: 0,
     });
@@ -94,7 +94,7 @@ describe('selectBlueprintTier', () => {
       ownedCopies: [],
       neededRuns: 50,
       materialCostAtMe: () => 100,
-      bpcOffers: [{ me: 3, te: 6, runs: -1, price: 500 }],
+      bpcOffers: [{ me: 3, te: 6, runs: -1, quantity: 1, price: 500 }],
       bpoSellPrice: 10_000,
       assumedMeForUnowned: 0,
     });
@@ -106,11 +106,65 @@ describe('selectBlueprintTier', () => {
       ownedCopies: [{ me: 10, te: 20, runs: -1 }],
       neededRuns: 5,
       materialCostAtMe: (me) => (me === 10 ? null : 100),
-      bpcOffers: [{ me: 0, te: 0, runs: 1, price: 5 }],
+      bpcOffers: [{ me: 0, te: 0, runs: 1, quantity: 1, price: 5 }],
       bpoSellPrice: null,
       assumedMeForUnowned: 0,
     });
     // 5 runs needed, this offer covers 1 run per copy at 5 ISK: 5 copies = 25.
     expect(result).toEqual({ me: 0, te: 0, line: { unitPrice: 25, owned: false } });
+  });
+
+  it('discards a malformed offer with zero runs rather than dividing by it', () => {
+    const result = selectBlueprintTier({
+      ownedCopies: [],
+      neededRuns: 5,
+      materialCostAtMe: () => 100,
+      bpcOffers: [{ me: 0, te: 0, runs: 0, quantity: 1, price: 1 }],
+      bpoSellPrice: 30,
+      assumedMeForUnowned: 0,
+    });
+    // The zero-runs offer is unusable; falls through to the BPO sell price.
+    expect(result).toEqual({ me: 0, te: 0, line: { unitPrice: 30, owned: false } });
+  });
+
+  it('discards a malformed offer with negative runs (anything but the -1 original sentinel)', () => {
+    const result = selectBlueprintTier({
+      ownedCopies: [],
+      neededRuns: 5,
+      materialCostAtMe: () => 100,
+      bpcOffers: [{ me: 0, te: 0, runs: -3, quantity: 1, price: 1 }],
+      bpoSellPrice: 30,
+      assumedMeForUnowned: 0,
+    });
+    expect(result).toEqual({ me: 0, te: 0, line: { unitPrice: 30, owned: false } });
+  });
+
+  it('discards a malformed offer with zero or negative quantity', () => {
+    const result = selectBlueprintTier({
+      ownedCopies: [],
+      neededRuns: 5,
+      materialCostAtMe: () => 100,
+      bpcOffers: [{ me: 0, te: 0, runs: 5, quantity: 0, price: 1 }],
+      bpoSellPrice: 30,
+      assumedMeForUnowned: 0,
+    });
+    expect(result).toEqual({ me: 0, te: 0, line: { unitPrice: 30, owned: false } });
+  });
+
+  it("nets a multi-copy listing's whole bundle, not one copy, against the shortfall", () => {
+    // One contract lists 3 copies of a 2-run BPC for 10 ISK total (issue
+    // #838 spec: "the total is the real ISK that would leave the wallet" —
+    // buying this one contract nets 3 x 2 = 6 runs for 10 ISK, covering a
+    // 5-run shortfall in a single purchase, not the 3 copies x 10 ISK a
+    // per-copy read would charge.
+    const result = selectBlueprintTier({
+      ownedCopies: [],
+      neededRuns: 5,
+      materialCostAtMe: () => 100,
+      bpcOffers: [{ me: 0, te: 0, runs: 2, quantity: 3, price: 10 }],
+      bpoSellPrice: null,
+      assumedMeForUnowned: 0,
+    });
+    expect(result).toEqual({ me: 0, te: 0, line: { unitPrice: 10, owned: false } });
   });
 });
