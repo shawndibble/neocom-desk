@@ -25,6 +25,20 @@ import type { HubPrices, MaterialCostLine, SkillLevels } from '@/engine/industry
 /** How the owned stock would be turned into ISK. */
 export type LiquidationBasis = 'instant' | 'order';
 
+/**
+ * Drops the synthetic Blueprint Acquisition row (issue #838) — its
+ * `acquisitionTier` marker is only ever set on that row — before a plan's
+ * materials reach `ownedStockSale`. An owned BPO/BPC has no hub price to
+ * sell at, so leaving it in would flag it `unpriced` and null out the whole
+ * verdict for a "sale" that was never a real option: you don't sell the
+ * blueprint you're using to build.
+ */
+export function sellableMaterials<T extends MaterialCostLine & { acquisitionTier?: unknown }>(
+  materials: readonly T[]
+): T[] {
+  return materials.filter((material) => material.acquisitionTier === undefined);
+}
+
 export interface OwnedStockSaleLine {
   typeID: number;
   /** Owned units this job would consume — never more than the job needs. */

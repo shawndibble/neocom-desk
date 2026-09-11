@@ -35,7 +35,7 @@ import {
   type BuildStrategy,
 } from '@/engine/industry/autoMakeOrBuy';
 import { craftScope } from '@/engine/industry/craftScope';
-import { ownedStockSale } from '@/engine/industry/ownedStockSale';
+import { ownedStockSale, sellableMaterials } from '@/engine/industry/ownedStockSale';
 import type {
   FacilityKind,
   MaterialPriceBasis,
@@ -654,9 +654,10 @@ export function BuildPlanDetail({
    */
   const ownedSale = useMemo(() => {
     if (!result || !snapshot) return null;
+    const materials = sellableMaterials(result.materials);
     return {
-      instant: ownedStockSale(result.materials, snapshot.hubBuyPrices, 'instant', skills),
-      order: ownedStockSale(result.materials, snapshot.hubPrices, 'order', skills),
+      instant: ownedStockSale(materials, snapshot.hubBuyPrices, 'instant', skills),
+      order: ownedStockSale(materials, snapshot.hubPrices, 'order', skills),
     };
   }, [result, snapshot, skills]);
 
