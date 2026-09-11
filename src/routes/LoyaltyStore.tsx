@@ -44,6 +44,7 @@ import { buildMarketParams } from '@/engine/market/urlState';
 import { useLoyaltyStoreOffers } from '@/features/loyalty/useLoyaltyStoreOffers';
 import type { LoyaltyOfferRow } from '@/features/loyalty/offerRows';
 import type { BlueprintCatalog } from '@/features/industry/blueprintCatalog';
+import type { ResolvedMaterial } from '@/engine/industry/materialResolution';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import { ItemDetailModal } from '@/features/market/ItemDetailModal';
 import { useQuickbar } from '@/features/market/useQuickbar';
@@ -90,6 +91,37 @@ function OfferDetail({
   const { t } = useTranslation();
   const { typeId: marketTypeId, itemName: displayName } = resolveLoyaltyRowItem(row);
   const { profit } = row;
+
+  const materialColumns: DataTableColumn<ResolvedMaterial>[] = [
+    {
+      id: 'name',
+      header: t('loyaltyStore.materialColName'),
+      primary: true,
+      render: (material) =>
+        catalog ? nameForType(catalog, material.typeID) : `#${material.typeID}`,
+    },
+    {
+      id: 'needed',
+      header: t('loyaltyStore.materialColNeeded'),
+      align: 'right',
+      className: 'tabular-nums text-text-dim',
+      render: (material) => material.quantity.toLocaleString(),
+    },
+    {
+      id: 'owned',
+      header: t('loyaltyStore.materialColOwned'),
+      align: 'right',
+      className: 'tabular-nums text-text-dim',
+      render: (material) => material.ownedQuantity.toLocaleString(),
+    },
+    {
+      id: 'buyCost',
+      header: t('loyaltyStore.materialColBuyCost'),
+      align: 'right',
+      className: 'tabular-nums text-text',
+      render: (material) => formatIsk(material.lineCost),
+    },
+  ];
 
   return (
     <div className="flex flex-col gap-4">
@@ -191,42 +223,14 @@ function OfferDetail({
             {t('loyaltyStore.useOwnMaterialsHint')}
           </p>
           <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="border-b border-line text-left text-text-dim">
-                  <th className="py-1 pr-2 font-semibold uppercase">
-                    {t('loyaltyStore.materialColName')}
-                  </th>
-                  <th className="py-1 pr-2 text-right font-semibold uppercase">
-                    {t('loyaltyStore.materialColNeeded')}
-                  </th>
-                  <th className="py-1 pr-2 text-right font-semibold uppercase">
-                    {t('loyaltyStore.materialColOwned')}
-                  </th>
-                  <th className="py-1 text-right font-semibold uppercase">
-                    {t('loyaltyStore.materialColBuyCost')}
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-line">
-                {row.build.materials.map((material) => (
-                  <tr key={material.typeID}>
-                    <td className="py-1 pr-2 text-text">
-                      {catalog ? nameForType(catalog, material.typeID) : `#${material.typeID}`}
-                    </td>
-                    <td className="py-1 pr-2 text-right tabular-nums text-text-dim">
-                      {material.quantity.toLocaleString()}
-                    </td>
-                    <td className="py-1 pr-2 text-right tabular-nums text-text-dim">
-                      {material.ownedQuantity.toLocaleString()}
-                    </td>
-                    <td className="py-1 text-right tabular-nums text-text">
-                      {formatIsk(material.lineCost)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <DataTable
+              label={t('loyaltyStore.materials')}
+              columns={materialColumns}
+              rows={row.build.materials}
+              rowKey={(material) => material.typeID}
+              density="compact"
+              responsive="table"
+            />
           </div>
         </div>
       )}
