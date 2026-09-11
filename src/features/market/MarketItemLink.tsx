@@ -17,7 +17,10 @@ export function MarketItemLink({ typeId, children }: MarketItemLinkProps) {
   const location = useLocation();
   const params = marketLinkParams(typeId, location.search);
   return (
-    <Link to={`/market?${new URLSearchParams(params).toString()}`} className="hover:underline">
+    <Link
+      to={`/market?${new URLSearchParams(params).toString()}`}
+      className="hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+    >
       {children}
     </Link>
   );
