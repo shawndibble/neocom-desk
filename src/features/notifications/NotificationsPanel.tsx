@@ -49,9 +49,9 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  Caret,
 } from '@/components/ui';
 import { SelectionCheckbox } from '@/features/character/SelectionCheckbox';
-import { Caret } from '@/components/ui';
 import { AllCharactersNotificationSection } from './AllCharactersNotificationSection';
 import { ScheduledPush, ICON_SIZE } from '@/components/ui/icons';
 import { PROJECTABLE_EVENT_IDS } from '@/engine/projection';
