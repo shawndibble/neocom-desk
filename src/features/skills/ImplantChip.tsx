@@ -1,7 +1,6 @@
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Tooltip } from '@/components/ui';
+import { Tooltip, TypeIcon } from '@/components/ui';
 import { marketLinkParams } from '@/engine/market/urlState';
-import { typeIconUrl } from '@/lib/eveImages';
 
 interface ImplantChipProps {
   typeId: number;
@@ -33,13 +32,7 @@ export function ImplantChip({ typeId, name, description }: ImplantChipProps) {
       }}
       className="flex items-center gap-1.5 rounded-xs border border-line bg-panel-2 px-2 py-0.5 text-xs hover:border-line-bright focus-visible:outline-2 focus-visible:outline-accent"
     >
-      <img
-        src={typeIconUrl(typeId, 32)}
-        alt=""
-        width={16}
-        height={16}
-        className="size-4 shrink-0"
-      />
+      <TypeIcon typeId={typeId} size={32} width={16} height={16} className="size-4 shrink-0" />
       {name}
     </button>
   );

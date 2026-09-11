@@ -13,7 +13,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { EmptyState, Modal, Spinner } from '@/components/ui';
+import { EmptyState, Modal, Spinner, TypeIcon } from '@/components/ui';
 import {
   buildCompareMatrix,
   type CompareAttributeGroup,
@@ -27,7 +27,6 @@ import type {
 import type { OrderBookSummary } from '@/engine/market/orderBook';
 import { getUniverseType } from '@/esi/endpoints';
 import { loadAttributeDictionary } from '@/sde/loadMarketSde';
-import { typeIconUrl } from '@/lib/eveImages';
 import { formatIsk } from '@/lib/isk';
 import { loadAttributeReferenceNames } from './attributeReferenceNames';
 import { formatAttributeValue } from './format';
@@ -163,9 +162,9 @@ export function VariationsCompareModal({ items, prices, onClose }: VariationsCom
                     scope="col"
                     className="min-w-24 border-b border-line px-2 py-1 text-center font-medium text-text"
                   >
-                    <img
-                      src={typeIconUrl(item.typeId, 32)}
-                      alt=""
+                    <TypeIcon
+                      typeId={item.typeId}
+                      size={32}
                       width={32}
                       height={32}
                       className="mx-auto rounded-xs border border-line"

@@ -9,9 +9,9 @@ import {
   SelectTrigger,
   SelectValue,
   TextInput,
+  TypeIcon,
 } from '@/components/ui';
 import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
-import { typeIconUrl } from '@/lib/eveImages';
 import { joinAssignments, type JoinMemberInput } from './assignments';
 import { agreedTerms } from './selection';
 import type { MoonMiningTaxRow } from './snapshot';
@@ -218,7 +218,7 @@ export function JoinAssignDialog({
                     key={`${candidate.row.entry.date}:${line.typeId}`}
                     className="flex items-center gap-1.5 py-1 first:pt-0 last:pb-0"
                   >
-                    <img src={typeIconUrl(line.typeId, 32)} alt="" className="h-4 w-4 shrink-0" />
+                    <TypeIcon typeId={line.typeId} size={32} className="h-4 w-4 shrink-0" />
                     <span className="w-40 shrink-0 truncate">
                       {typeNames.get(line.typeId) ?? `#${line.typeId}`}
                     </span>

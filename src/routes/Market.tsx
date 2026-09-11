@@ -18,6 +18,7 @@ import {
   SelectValue,
   Spinner,
   Tabs,
+  TypeIcon,
 } from '@/components/ui';
 import type { DataTableColumn } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
@@ -94,7 +95,6 @@ import {
 } from '@/engine/market/urlState';
 import type { RegionOrder } from '@/esi/endpoints';
 import { formatIsk } from '@/lib/isk';
-import { typeIconUrl } from '@/lib/eveImages';
 import type { MarketFocusSearchState } from '@/lib/shortcuts';
 import { loadBlueprintCatalog, type BlueprintCatalog } from '@/features/industry/blueprintCatalog';
 import { buttonClassName } from '@/components/ui/buttonClassName';
@@ -279,7 +279,7 @@ function MarketGroupTree({
                         selectedTypeId === item.typeId ? 'text-accent' : 'text-text-dim'
                       }`}
                     >
-                      <img src={typeIconUrl(item.typeId, 32)} alt="" className="h-4 w-4 shrink-0" />
+                      <TypeIcon typeId={item.typeId} size={32} className="h-4 w-4 shrink-0" />
                       <span className="truncate">{item.name}</span>
                     </button>
                   </ItemContextMenu>

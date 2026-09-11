@@ -8,11 +8,11 @@ import {
   SelectTrigger,
   SelectValue,
   TextInput,
+  TypeIcon,
 } from '@/components/ui';
 import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
 import type { OreLine } from '@/engine/miningTax/types';
 import { computeAssignmentValue } from '@/engine/miningTax/valuation';
-import { typeIconUrl } from '@/lib/eveImages';
 import { maskIsk } from '@/lib/isk';
 import { unmaskNumber } from '@/lib/numberMask';
 import { DEFAULT_TRADE_HUB } from '@/market/hubs';
@@ -361,7 +361,7 @@ export function AssignDialog({
                   checked={includedTypeIds.has(line.typeId)}
                   onChange={() => toggleLine(line.typeId)}
                 />
-                <img src={typeIconUrl(line.typeId, 32)} alt="" className="h-4 w-4 shrink-0" />
+                <TypeIcon typeId={line.typeId} size={32} className="h-4 w-4 shrink-0" />
                 <label htmlFor={`line-${line.typeId}`} className="w-40 shrink-0 truncate">
                   {typeNames.get(line.typeId) ?? `#${line.typeId}`}
                 </label>
