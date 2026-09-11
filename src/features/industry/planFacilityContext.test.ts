@@ -3,7 +3,7 @@ import { FACILITY_PRESETS } from '@/engine/industry/types';
 import {
   facilityContextFor,
   reactionPlanFacilityContextFor,
-  sweepDepthContext,
+  autoBuildDepthContext,
 } from './planFacilityContext';
 
 describe('reactionPlanFacilityContextFor', () => {
@@ -54,7 +54,7 @@ describe('facilityContextFor', () => {
   });
 });
 
-describe('sweepDepthContext', () => {
+describe('autoBuildDepthContext', () => {
   const facilityContext = facilityContextFor({
     facility: 'npcStation',
     rigFit: ['none', 'none', 'none'],
@@ -62,21 +62,21 @@ describe('sweepDepthContext', () => {
   });
 
   it('zeroes every pricing field, since depth discovery never prices anything', () => {
-    const ctx = sweepDepthContext(facilityContext, null, {});
+    const ctx = autoBuildDepthContext(facilityContext, null, {});
     expect(ctx.systemCostIndex).toBe(0);
     expect(ctx.adjustedPrices).toEqual({});
     expect(ctx.materialPrices).toEqual({});
   });
 
   it('carries the plan facility context through unchanged', () => {
-    const ctx = sweepDepthContext(facilityContext, null, {});
+    const ctx = autoBuildDepthContext(facilityContext, null, {});
     expect(ctx.facility).toBe(facilityContext.facility);
     expect(ctx.rigFit).toBe(facilityContext.rigFit);
     expect(ctx.security).toBe(facilityContext.security);
   });
 
   it('omits reactionFacility when no Reaction Location is configured', () => {
-    const ctx = sweepDepthContext(facilityContext, null, {});
+    const ctx = autoBuildDepthContext(facilityContext, null, {});
     expect(ctx.reactionFacility).toBeUndefined();
   });
 
@@ -86,7 +86,7 @@ describe('sweepDepthContext', () => {
       reactionRigFit: ['meT2', 'teT2', 'none'],
       reactionFacilityTaxPct: 2,
     });
-    const ctx = sweepDepthContext(facilityContext, reactionPlanFacilityContext, {});
+    const ctx = autoBuildDepthContext(facilityContext, reactionPlanFacilityContext, {});
     // Ready the instant a Reaction Location is configured — never waiting on
     // a live systemCostIndex the way the price-resolved reactionFacilityContext
     // does, which is the bug this seam exists to not repeat.

@@ -2,7 +2,7 @@
  * The "where and how this plan's job runs" half of a make-or-buy context —
  * facility, rig fit, security, structure tax — independent of pricing, which
  * each caller layers its own fields on top of (`BuildPlanDetail.tsx`'s own
- * `makeOrBuyContext`, `craftSweepGroup.ts`'s per-member `ctx`). Pulled out
+ * `makeOrBuyContext`, `autoBuildGroup.ts`'s per-member `ctx`). Pulled out
  * once both needed the exact same four-field shape.
  */
 import type { BuildPlanRecord } from '@/db';
@@ -60,17 +60,17 @@ export function reactionPlanFacilityContextFor(
 }
 
 /**
- * Craft Sweep's Sweep Depth context (issues #695/#696): a `MakeOrBuyContext`
- * with every pricing field zeroed, since `maxSweepDepth` never prices
+ * Auto Build's depth context (issues #695/#696): a `MakeOrBuyContext`
+ * with every pricing field zeroed, since `maxAutoBuildDepth` never prices
  * anything — only walks the tree. Built from the plan-level
  * `reactionPlanFacilityContextFor` result, never the price-resolved
  * `reactionFacilityContext` a rendered plan also carries: that one stays
  * `undefined` until its own market snapshot lands, which would gate depth
  * discovery on a fetch it does not need for any plan with a Reaction
  * Location configured. The single seam `BuildPlanDetail.tsx`'s solo control
- * and `craftSweepGroup.ts`'s per-member walk both build this from.
+ * and `autoBuildGroup.ts`'s per-member walk both build this from.
  */
-export function sweepDepthContext(
+export function autoBuildDepthContext(
   facilityContext: PlanFacilityContext,
   reactionPlanFacilityContext: PlanFacilityContext | null,
   skills: SkillLevels

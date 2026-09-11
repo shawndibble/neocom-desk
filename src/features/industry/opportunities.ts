@@ -260,21 +260,21 @@ export function detectOpportunityStock(
 
 /**
  * A batch's identity for the "don't auto-recalculate above 10 blueprints"
- * cache (issue #642): which owned-blueprint entities, at which hub, at which
- * auto make-or-buy depth (issue #652) — a depth change picks different
- * materials to build, so it must read as a different batch the same way a
- * hub change does, or a cached batch above the threshold would keep serving
- * rows priced at the depth it was first computed with. Content-keyed rather
- * than array-identity-keyed so a re-render with a fresh `candidates` array
- * reference (the panel recomputes it from Dexie/ESI data on every render)
- * does not read as "a different batch."
+ * cache (issue #642): which owned-blueprint entities, at which hub.
+ * Content-keyed rather than array-identity-keyed so a re-render with a fresh
+ * `candidates` array reference (the panel recomputes it from Dexie/ESI data
+ * on every render) does not read as "a different batch."
+ *
+ * No longer includes the auto make-or-buy depth (issue #652): Build
+ * Opportunities' own depth control was removed as unused, and every caller
+ * now computes rows at a fixed depth, so a depth component would only ever
+ * hold one value.
  */
 export function opportunitiesCacheKey(
   candidates: readonly OpportunityCandidate[],
-  hub: TradeHub,
-  autoBuildDepth: number
+  hub: TradeHub
 ): string {
-  return `${hub.id}:${autoBuildDepth}:${candidates
+  return `${hub.id}:${candidates
     .map((c) => c.id)
     .sort()
     .join(',')}`;

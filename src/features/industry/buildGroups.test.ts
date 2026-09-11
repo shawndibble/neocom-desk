@@ -7,12 +7,12 @@ import {
   removeBuildGroup,
   renameBuildGroup,
   withBuildGroups,
-  withGroupCraftSweepDefault,
+  withGroupAutoBuildDefault,
   withGroupOwnedStock,
   withGroupOwnedStockScope,
   withGroupSnapshot,
   type BuildGroup,
-  type BuildGroupCraftSweepDefault,
+  type BuildGroupAutoBuildDefault,
   type BuildGroupSnapshot,
   type BuildGroupsValue,
 } from './buildGroups';
@@ -28,9 +28,9 @@ const snapshot = (overrides: Partial<BuildGroupSnapshot> = {}): BuildGroupSnapsh
   ...overrides,
 });
 
-const craftSweepDefault = (
-  overrides: Partial<BuildGroupCraftSweepDefault> = {}
-): BuildGroupCraftSweepDefault => ({
+const autoBuildDefault = (
+  overrides: Partial<BuildGroupAutoBuildDefault> = {}
+): BuildGroupAutoBuildDefault => ({
   strategy: 'cost-effective',
   ...overrides,
 });
@@ -186,65 +186,60 @@ describe('withGroupSnapshot', () => {
   });
 });
 
-describe('withGroupCraftSweepDefault', () => {
-  it('sets a Craft Sweep default on one group, leaving the rest of the group untouched', () => {
-    const value = withBuildGroups({}, 1, groups('Sweep me', 'Other'));
-    const next = withGroupCraftSweepDefault(value, 1, 'g1', craftSweepDefault());
+describe('withGroupAutoBuildDefault', () => {
+  it('sets an Auto Build default on one group, leaving the rest of the group untouched', () => {
+    const value = withBuildGroups({}, 1, groups('Auto Build me', 'Other'));
+    const next = withGroupAutoBuildDefault(value, 1, 'g1', autoBuildDefault());
     expect(buildGroupsFor(next, 1)).toEqual([
-      { id: 'g1', name: 'Sweep me', order: 0, craftSweepDefault: craftSweepDefault() },
+      { id: 'g1', name: 'Auto Build me', order: 0, autoBuildDefault: autoBuildDefault() },
       { id: 'g2', name: 'Other', order: 1 },
     ]);
   });
 
   it('replaces an existing default rather than merging it', () => {
-    const value = withGroupCraftSweepDefault(
+    const value = withGroupAutoBuildDefault(
       withBuildGroups({}, 1, groups('G')),
       1,
       'g1',
-      craftSweepDefault()
+      autoBuildDefault()
     );
-    const next = withGroupCraftSweepDefault(
-      value,
-      1,
-      'g1',
-      craftSweepDefault({ strategy: 'build' })
-    );
-    expect(buildGroupsFor(next, 1)[0].craftSweepDefault).toEqual(
-      craftSweepDefault({ strategy: 'build' })
+    const next = withGroupAutoBuildDefault(value, 1, 'g1', autoBuildDefault({ strategy: 'build' }));
+    expect(buildGroupsFor(next, 1)[0].autoBuildDefault).toEqual(
+      autoBuildDefault({ strategy: 'build' })
     );
   });
 
   it('is a no-op for a group id that does not exist', () => {
     const value = withBuildGroups({}, 1, groups('G'));
-    expect(withGroupCraftSweepDefault(value, 1, 'missing', craftSweepDefault())).toBe(value);
+    expect(withGroupAutoBuildDefault(value, 1, 'missing', autoBuildDefault())).toBe(value);
   });
 });
 
-describe('parseBuildGroups — craftSweepDefault', () => {
-  it('keeps a group whose Craft Sweep default is well-formed', () => {
+describe('parseBuildGroups — autoBuildDefault', () => {
+  it('keeps a group whose Auto Build default is well-formed', () => {
     const raw = {
-      1: [{ id: 'g1', name: 'G', order: 0, craftSweepDefault: craftSweepDefault() }],
+      1: [{ id: 'g1', name: 'G', order: 0, autoBuildDefault: autoBuildDefault() }],
     };
     expect(parseBuildGroups(raw)).toEqual({
-      1: [{ id: 'g1', name: 'G', order: 0, craftSweepDefault: craftSweepDefault() }],
+      1: [{ id: 'g1', name: 'G', order: 0, autoBuildDefault: autoBuildDefault() }],
     });
   });
 
-  it('drops a group whose Craft Sweep default is malformed, rather than keeping the group without it', () => {
+  it('drops a group whose Auto Build default is malformed, rather than keeping the group without it', () => {
     const raw = {
-      1: [{ id: 'g1', name: 'G', order: 0, craftSweepDefault: { strategy: 'not-a-strategy' } }],
+      1: [{ id: 'g1', name: 'G', order: 0, autoBuildDefault: { strategy: 'not-a-strategy' } }],
     };
     expect(parseBuildGroups(raw)).toEqual({});
   });
 
-  it('keeps a group whose stored Craft Sweep default still carries a pre-#798 depthChoice field — extra data, silently ignored', () => {
+  it('keeps a group whose stored Auto Build default still carries a pre-#798 depthChoice field — extra data, silently ignored', () => {
     const raw = {
       1: [
         {
           id: 'g1',
           name: 'G',
           order: 0,
-          craftSweepDefault: { ...craftSweepDefault(), depthChoice: 'all' },
+          autoBuildDefault: { ...autoBuildDefault(), depthChoice: 'all' },
         },
       ],
     };
@@ -254,13 +249,13 @@ describe('parseBuildGroups — craftSweepDefault', () => {
           id: 'g1',
           name: 'G',
           order: 0,
-          craftSweepDefault: { ...craftSweepDefault(), depthChoice: 'all' },
+          autoBuildDefault: { ...autoBuildDefault(), depthChoice: 'all' },
         },
       ],
     });
   });
 
-  it('keeps a group with no Craft Sweep default at all — the pre-#696 shape', () => {
+  it('keeps a group with no Auto Build default at all — the pre-#696 shape', () => {
     const raw = { 1: [{ id: 'g1', name: 'G', order: 0 }] };
     expect(parseBuildGroups(raw)).toEqual({ 1: [{ id: 'g1', name: 'G', order: 0 }] });
   });

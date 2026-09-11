@@ -327,7 +327,7 @@ export interface BuildPlanRecord {
   buildGroupId?: string;
   /**
    * Include Reactions (issue #698): whether this manufacturing-activity
-   * plan's recursive engine, manual craft/buy toggle and Craft Sweep may
+   * plan's recursive engine, manual craft/buy toggle and Auto Build may
    * treat a reaction-produced material in its tree as buildable. Off (absent
    * or `false`) hides the Reaction Location fields below entirely and is how
    * every plan behaved before this existed. Meaningless for a
