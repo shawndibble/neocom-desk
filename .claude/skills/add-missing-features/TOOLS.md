@@ -167,7 +167,7 @@ what the Advisor already computes per-planet; don't re-propose.
     including pure station-trading P&L trackers built from wallet history.
 11. **A `ref_type` Wallet journal filter already exists**
     (`walletJournalFilter.ts`). "A view of entries with ref_type X" is
-    usually a saved filter, not new capability — but a *projection* computed
+    usually a saved filter, not new capability — but a _projection_ computed
     from a ref_type's history (e.g. skill-training payback) is not disposed
     of by this alone; check what's actually new. Killed: LP Store redemption
     ledger off `ref_type: lp_store`.
@@ -194,70 +194,70 @@ what the Advisor already computes per-planet; don't re-propose.
     Identical to packaged only for planetary commodities (verified in
     `scripts/build-sde.mjs`'s own comment). For a ship/hull type the two can
     differ 10-100x (Rifter: 27,289 m3 assembled vs. its much smaller packaged
-    volume). Kills or narrows any candidate that reports a *product*'s own
+    volume). Kills or narrows any candidate that reports a _product_'s own
     hauling volume (ships/structures are exactly the common product types);
-    fine for ordinary mineral/component *material* lines, where the two
+    fine for ordinary mineral/component _material_ lines, where the two
     coincide.
 
 ## Filed candidates
 
-| #    | Verdict | Candidate                                                    |
-| ---- | ------- | ------------------------------------------------------------- |
-| #642 | NARROW  | Build Opportunity Finder — seeding tab over Build Plan Compare |
-| #643 | NARROW  | Restock / reorder points                                      |
-| #671 | NARROW  | Mining Yield Tracker — ordinary ore/ice                        |
-| #672 | NARROW  | Appraisal refine-then-sell comparison                          |
-| #679 | NARROW  | Build Opportunities — job-slot header count                    |
-| #680 | SHIP    | Quickbar price alerts                                          |
-| #689 | SHIP    | Appraisal multi-hub comparison                                 |
-| #690 | SHIP    | Wallet balance-over-time chart                                 |
-| #711 | SHIP    | Production Log realized-profit-over-time chart                 |
-| #712 | SHIP    | Assets total portfolio value                                   |
-| #713 | NARROW  | Open Orders sell-through column                                |
-| #717 | SHIP    | Contracts market-value appraisal                                |
-| #718 | NARROW  | Loyalty Store cross-corp offer list                            |
-| #722 | NARROW  | Build Opportunities unowned-blueprint coverage                 |
-| #725 | SHIP    | PI Production Run/Log                                          |
-| #726 | NARROW  | Quickbar → Appraisal multi-hub handoff                          |
-| #730 | NARROW  | Price History 7-day moving average                             |
-| #819 | NARROW  | Build Opportunities market-wide finder, ownership-agnostic     |
-| #821 | NARROW  | Industry job-slot utilization chart over time                  |
-| #822 | NARROW  | Skills: Industry Skill ROI panel (job-slot skills only)         |
-| #824 | NARROW  | Production Run realized tax/fee/margin breakdown, per-run       |
-| #826 | NARROW  | Contracts: courier reward-per-m3/jump/collateral ratio, detail modal only |
-| #827 | SHIP    | Skills: Market Fee Skill ROI panel (Broker Relations/Accounting) |
+| #    | Verdict | Candidate                                                                                          |
+| ---- | ------- | -------------------------------------------------------------------------------------------------- |
+| #642 | NARROW  | Build Opportunity Finder — seeding tab over Build Plan Compare                                     |
+| #643 | NARROW  | Restock / reorder points                                                                           |
+| #671 | NARROW  | Mining Yield Tracker — ordinary ore/ice                                                            |
+| #672 | NARROW  | Appraisal refine-then-sell comparison                                                              |
+| #679 | NARROW  | Build Opportunities — job-slot header count                                                        |
+| #680 | SHIP    | Quickbar price alerts                                                                              |
+| #689 | SHIP    | Appraisal multi-hub comparison                                                                     |
+| #690 | SHIP    | Wallet balance-over-time chart                                                                     |
+| #711 | SHIP    | Production Log realized-profit-over-time chart                                                     |
+| #712 | SHIP    | Assets total portfolio value                                                                       |
+| #713 | NARROW  | Open Orders sell-through column                                                                    |
+| #717 | SHIP    | Contracts market-value appraisal                                                                   |
+| #718 | NARROW  | Loyalty Store cross-corp offer list                                                                |
+| #722 | NARROW  | Build Opportunities unowned-blueprint coverage                                                     |
+| #725 | SHIP    | PI Production Run/Log                                                                              |
+| #726 | NARROW  | Quickbar → Appraisal multi-hub handoff                                                             |
+| #730 | NARROW  | Price History 7-day moving average                                                                 |
+| #819 | NARROW  | Build Opportunities market-wide finder, ownership-agnostic                                         |
+| #821 | NARROW  | Industry job-slot utilization chart over time                                                      |
+| #822 | NARROW  | Skills: Industry Skill ROI panel (job-slot skills only)                                            |
+| #824 | NARROW  | Production Run realized tax/fee/margin breakdown, per-run                                          |
+| #826 | NARROW  | Contracts: courier reward-per-m3/jump/collateral ratio, detail modal only                          |
+| #827 | SHIP    | Skills: Market Fee Skill ROI panel (Broker Relations/Accounting)                                   |
 | #831 | NARROW  | Appraisal shareable link — byte-capped typeId:qty payload, unauthenticated route outside ScopeGate |
-| #858 | SHIP    | Quickbar unrealized P&L against a player-entered cost basis, reusing existing price fetch |
-| #874 | SHIP    | Materials Table / Group Rollup total m3 volume, hauling-trip planning |
+| #858 | SHIP    | Quickbar unrealized P&L against a player-entered cost basis, reusing existing price fetch          |
+| #874 | SHIP    | Materials Table / Group Rollup total m3 volume, hauling-trip planning                              |
 
 ## Killed / dropped candidates (never filed)
 
-| Candidate | Reason |
-| --- | --- |
-| Hub arbitrage/trade finder, corp ore buyback/payout split, EQM Corporate Exchange | Kill-test 1 (cross-player aggregation wall); arbitrage also ships as `hubHaulGaps`. |
-| System cost index watch | Kill-test 5. |
-| Skill Extractor ISK/hr comparison | Narrow reach (multi-account SP arbitrage). |
-| Market/order-book depth chart, EVE Forge-style Gantt scheduling, Working Capital Locked stat | Kill-test 3 (picture of data already on screen; job cost is fee-only for the last one). |
-| Public item-exchange contract deal browser | Kill-test 6 (ADR 0013 at full scale). |
-| Price history %-change headline stat | Thin-volume days make a naive delta unreliable. |
-| Corp Wallet: balance chart to corp divisions | Narrow (Accountant-only); deferred. |
-| Build Plan material row → PI colony link | Colony cache is Dexie-only, cold for most players. |
-| Bulk relist / buy-queue automation | Kill-test 2. |
-| Asset staleness / idle-inventory detection | Kill-test 7. |
-| Player-structure pricing for Build Plans/Appraisal | Kill-test 9; widens a union for a minority. |
-| Total Assets Value chart over time | Kill-test 8 (rescoped from #712). |
-| Production Run: link material cost to wallet purchases | Kill-test 10 (buy side). |
-| LP Store redemption ledger / ROI tracking | Kill-test 11; needs fragile free-text parsing. |
-| LP transaction log / API-visible LP cashout audit | ESI has no LP transaction log. |
-| PI Advisor: arbitrary-system search | Kill-test 12. |
-| Multi-hop reaction-chain profitability | Kill-test 6 (round 27 BOM-rollup rejection). |
-| Pure station-trading FIFO P&L tracker | Kill-test 10, extended to pure trading. |
-| Public contract sell-advisor for manufactured goods | Kill-test 6 (ADR 0013). |
-| Moon Survey / Metenox Yield Estimator | Narrow reach + kill-test 13. |
-| Metenox Moon Drill ongoing fuel/yield ledger (any framing, incl. a static no-depletion readout) | Narrow reach (moon-owning corp leadership only) + kill-test 13. Filed as #859, closed on rediscovering this entry. |
-| Market Movers / Trending Items dashboard | Kill-test 14. |
-| PI Colony Layout Template (save/reuse pin layout) | Superseded by Advisor's per-planet fitted plan. |
-| Upwell Fuel Monitor-style structure fuel tracker | Already covered — `structureFuel` in corp board. |
-| Hauler-capacity trip-count estimator (player-typed cargo m3, derived trip count) | Reopens the settled hauling-cost decision’s exact reasoning — an unverifiable, app-cannot-check number — just relabeled as division instead of ISK/m3. |
-| Build Plan product output volume + haul distance to Trade Hub (hubHaulGaps mirror for a not-yet-listed product) | Kill-test 16 (assembled-volume defect hits ship products hardest, the common case); also overlaps Appraisal multi-hub compare once the product is pasted in — kill-test 3. |
-| PI colony output material volume (total m3 awaiting haul-out) | Not filed this run — plausible narrow follow-up to #874’s pattern, but needs a check of the Colonies/Reset-Run surface for an existing fill/capacity readout first (kill-test 3 risk unverified). |
+| Candidate                                                                                                       | Reason                                                                                                                                                                                            |
+| --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Hub arbitrage/trade finder, corp ore buyback/payout split, EQM Corporate Exchange                               | Kill-test 1 (cross-player aggregation wall); arbitrage also ships as `hubHaulGaps`.                                                                                                               |
+| System cost index watch                                                                                         | Kill-test 5.                                                                                                                                                                                      |
+| Skill Extractor ISK/hr comparison                                                                               | Narrow reach (multi-account SP arbitrage).                                                                                                                                                        |
+| Market/order-book depth chart, EVE Forge-style Gantt scheduling, Working Capital Locked stat                    | Kill-test 3 (picture of data already on screen; job cost is fee-only for the last one).                                                                                                           |
+| Public item-exchange contract deal browser                                                                      | Kill-test 6 (ADR 0013 at full scale).                                                                                                                                                             |
+| Price history %-change headline stat                                                                            | Thin-volume days make a naive delta unreliable.                                                                                                                                                   |
+| Corp Wallet: balance chart to corp divisions                                                                    | Narrow (Accountant-only); deferred.                                                                                                                                                               |
+| Build Plan material row → PI colony link                                                                        | Colony cache is Dexie-only, cold for most players.                                                                                                                                                |
+| Bulk relist / buy-queue automation                                                                              | Kill-test 2.                                                                                                                                                                                      |
+| Asset staleness / idle-inventory detection                                                                      | Kill-test 7.                                                                                                                                                                                      |
+| Player-structure pricing for Build Plans/Appraisal                                                              | Kill-test 9; widens a union for a minority.                                                                                                                                                       |
+| Total Assets Value chart over time                                                                              | Kill-test 8 (rescoped from #712).                                                                                                                                                                 |
+| Production Run: link material cost to wallet purchases                                                          | Kill-test 10 (buy side).                                                                                                                                                                          |
+| LP Store redemption ledger / ROI tracking                                                                       | Kill-test 11; needs fragile free-text parsing.                                                                                                                                                    |
+| LP transaction log / API-visible LP cashout audit                                                               | ESI has no LP transaction log.                                                                                                                                                                    |
+| PI Advisor: arbitrary-system search                                                                             | Kill-test 12.                                                                                                                                                                                     |
+| Multi-hop reaction-chain profitability                                                                          | Kill-test 6 (round 27 BOM-rollup rejection).                                                                                                                                                      |
+| Pure station-trading FIFO P&L tracker                                                                           | Kill-test 10, extended to pure trading.                                                                                                                                                           |
+| Public contract sell-advisor for manufactured goods                                                             | Kill-test 6 (ADR 0013).                                                                                                                                                                           |
+| Moon Survey / Metenox Yield Estimator                                                                           | Narrow reach + kill-test 13.                                                                                                                                                                      |
+| Metenox Moon Drill ongoing fuel/yield ledger (any framing, incl. a static no-depletion readout)                 | Narrow reach (moon-owning corp leadership only) + kill-test 13. Filed as #859, closed on rediscovering this entry.                                                                                |
+| Market Movers / Trending Items dashboard                                                                        | Kill-test 14.                                                                                                                                                                                     |
+| PI Colony Layout Template (save/reuse pin layout)                                                               | Superseded by Advisor's per-planet fitted plan.                                                                                                                                                   |
+| Upwell Fuel Monitor-style structure fuel tracker                                                                | Already covered — `structureFuel` in corp board.                                                                                                                                                  |
+| Hauler-capacity trip-count estimator (player-typed cargo m3, derived trip count)                                | Reopens the settled hauling-cost decision’s exact reasoning — an unverifiable, app-cannot-check number — just relabeled as division instead of ISK/m3.                                            |
+| Build Plan product output volume + haul distance to Trade Hub (hubHaulGaps mirror for a not-yet-listed product) | Kill-test 16 (assembled-volume defect hits ship products hardest, the common case); also overlaps Appraisal multi-hub compare once the product is pasted in — kill-test 3.                        |
+| PI colony output material volume (total m3 awaiting haul-out)                                                   | Not filed this run — plausible narrow follow-up to #874’s pattern, but needs a check of the Colonies/Reset-Run surface for an existing fill/capacity readout first (kill-test 3 risk unverified). |
