@@ -35,12 +35,7 @@ import { useEffect, useRef, useState } from 'react';
 import i18n from '@/i18n';
 import type { BuildPlanRecord } from '@/db';
 import { MAX_JOB_RUNS, industryActivityOf } from '@/engine/industry/types';
-import type {
-  AcquisitionResolution,
-  BuildResult,
-  IndustryBlueprint,
-  SkillLevels,
-} from '@/engine/industry/types';
+import type { BuildResult, IndustryBlueprint, SkillLevels } from '@/engine/industry/types';
 import type { BpcOffer } from '@/engine/industry/blueprintAcquisition';
 import { effectivePrice, type BpcContractRow } from '@/engine/contracts/bpcSearch';
 import type { CharacterBlueprint } from '@/esi/endpoints';
@@ -51,7 +46,12 @@ import { toIndustryBlueprint, type BlueprintCatalog } from './blueprintCatalog';
 import { computeBuildPlan } from './computeBuildPlan';
 import { loadMarketSnapshots, type MarketSnapshot, type MarketSnapshotRequest } from './marketData';
 import { materialPricesFor } from './priceBasis';
-import { acquisitionForLookup, buildPlanTypeIds, recipeForLookup } from './recipes';
+import {
+  acquisitionForLookup,
+  buildPlanTypeIds,
+  recipeForLookup,
+  withoutAcquisitionCost,
+} from './recipes';
 import { facilityContextFor } from './planFacilityContext';
 import { useAssumedMe } from './assumedMe';
 import { useIncludeBlueprintCost } from './includeBlueprintCost';
@@ -215,15 +215,9 @@ async function computeRow(
     };
     const recipeFor = recipeForLookup(recipeSources);
     const rawAcquisitionFor = acquisitionForLookup(recipeSources);
-    // `useIncludeBlueprintCost` off: still resolve the cheapest tier (so
-    // nested material quantities never change), but report nothing to buy —
-    // the same `line: null` contract an owned BPO already reports.
     const acquisitionFor = includeBlueprintCost
       ? rawAcquisitionFor
-      : (...args: Parameters<typeof rawAcquisitionFor>): AcquisitionResolution | null => {
-          const resolved = rawAcquisitionFor(...args);
-          return resolved ? { ...resolved, line: null } : null;
-        };
+      : withoutAcquisitionCost(rawAcquisitionFor);
 
     const common = {
       blueprint: priced.blueprint,

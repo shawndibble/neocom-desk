@@ -61,7 +61,12 @@ import type { PiData } from '@/sde/types';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import { nameForType, toIndustryBlueprint, type BlueprintCatalog } from './blueprintCatalog';
 import { computeBuildPlan } from './computeBuildPlan';
-import { acquisitionForLookup, buildPlanTypeIds, recipeForLookup } from './recipes';
+import {
+  acquisitionForLookup,
+  buildPlanTypeIds,
+  recipeForLookup,
+  withoutAcquisitionCost,
+} from './recipes';
 import { useBpcAcquisitionOffers } from './useBpcAcquisitionOffers';
 import { materialPriceBasisOf, materialPricesFor } from './priceBasis';
 import { useMarketSnapshot } from './useMarketSnapshot';
@@ -488,14 +493,7 @@ export function BuildPlanDetail({
         sourcing: plan.materialSourcing,
       },
     });
-    // includeBlueprintCost off: still resolve the cheapest tier (so nested
-    // material quantities never change), but report nothing to buy — the
-    // same `line: null` contract an owned BPO already reports.
-    if (includeBlueprintCost) return raw;
-    return (...args: Parameters<typeof raw>) => {
-      const resolved = raw(...args);
-      return resolved ? { ...resolved, line: null } : null;
-    };
+    return includeBlueprintCost ? raw : withoutAcquisitionCost(raw);
   }, [
     catalog,
     pi,
