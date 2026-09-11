@@ -1239,7 +1239,7 @@
     "emptyTitle": "No mining ledger entries match this filter",
     "emptyHint": "Mine a moon and check back — ESI's personal mining ledger updates daily.",
     "managePayeesAction": "Payees",
-    "managePayeesTitle": "Manage Payees — {{character}}",
+    "managePayeesTitle": "Manage Payees",
     "payeesEmpty": "No Payees yet.",
     "editPayee": "Edit {{name}}",
     "deletePayee": "Delete {{name}}",
