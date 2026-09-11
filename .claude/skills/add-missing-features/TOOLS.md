@@ -45,6 +45,8 @@ skill's step 7).
 | Indeve                          | Multi-product BOM planner w/ reactions/reprocessing, per-activity presets, material cost imported from wallet transaction history | yes     |
 | EVE Fleet Mining & Ratting Tool | Fleet mining ledger/payout split (main+alt grouping), ore value + reprocess overview, minimal ratting bounty tracker, PI planner  | yes     |
 | FW LP Store shopping-cart tool  | Faction Warfare LP store cart w/ LP/ISK filters, build-cost breakdown; in-dev redemption portfolio/ROI tracker                    | yes     |
+| EWT Planetary Interaction Tools | PI: commodity input/output + Jita pricing, per-system "what can this planet produce" checker, colony setup builder                | yes     |
+| EVE ONE                         | All-in-one companion: PI, market/corp-market analysis, in-progress industry suite (jobs, blueprints, profit/material planners)    | yes     |
 
 **Skimmed by thread title only, confirmed out of domain (mapping/intel/
 fitting-sim/crew-sim/combat-loot-tracking, no industry or market surface):**
@@ -60,8 +62,11 @@ Pod, EveHunter, ADAPT, Helm, Nicotine, fleet-manager/HARUSPEX/EasyEve,
 icon server, contract-monitoring Discord bot, Ministry of Pantoscopic
 Observance/observance.app (wormhole intel, no industry/market surface),
 Modular All-in-One Desktop Tool (names Production/Market modules, discloses
-no feature detail — revisit if it publishes specifics) (corp/fleet/intel
-tooling, no industry or market surface).
+no feature detail — revisit if it publishes specifics), EVE Market Pro/"ALL
+IN ONE TOOL!" (market/ESI aggregator, launched broken and abandoned — no
+traction, skip), "Assets within structures" (an ESI support Q&A thread, not
+a tool announcement) (corp/fleet/intel tooling, no industry or market
+surface).
 
 **The forum category JSON paginates** (`more_topics_url`). Fetch page 0 _and_
 page 1 minimum, and keep following the link while present — five early runs
@@ -175,6 +180,14 @@ Reusable heuristics — check a new candidate against these before drafting:
     ref_type-scoped ledger/chart as a gap (kill-test 3's "picture of data
     already on screen" extends here). Killed: LP Store redemption ledger off
     `ref_type: lp_store`.
+12. **A module's own header comment can be a settled decision, not an
+    unbuilt gap.** Not every scope boundary lives in `docs/context/
+    decisions/` — some are recorded inline as JSDoc/comment blocks with a
+    stated reason, and carry the same weight. Read the file's header before
+    proposing a "just extend this control" candidate. Killed: PI Advisor
+    arbitrary-system search (`AdvisorPanel.tsx`'s header already rejects it —
+    an uncolonised system has no richness ranking to fall back on, so the
+    search "would be a control that cannot pay off yet").
 
 ## Filed candidates
 
@@ -219,3 +232,5 @@ Reusable heuristics — check a new candidate against these before drafting:
 | Total Assets Value chart over time                                                                      | Assets isn't a poll domain (page-visit-only fetch) — a locally-accumulated series would sample on whenever the player opens the page, producing misleading flat gaps rather than an honest history.                                                                                                            |
 | Production Run: link material cost to actual wallet purchase transactions (Indeve-style)                | Materials are fungible with no per-unit purchase provenance; `materialCost` is one aggregate number, not a line list; contradicts #525's settled FIFO-reconstruction rejection extended to the buy side. See standing kill-test 10.                                                                            |
 | LP Store redemption ledger / ROI tracking (from an FW LP shopping-cart tool's in-dev portfolio feature) | Item-level ROI needs parsing the journal's free-text `description` (fragile, unconfirmed format) since `ref_type: lp_store` carries no structured item/qty. Even the safely-buildable aggregate ISK-spend-over-time version overlaps the Wallet page's existing `ref_type` filter — see standing kill-test 11. |
+| LP transaction log / API-visible LP cashout audit (forum feature request)                               | Not app-side at all: ESI genuinely exposes no LP transaction log (players were asking CCP, not a tool author, to add one). No endpoint to build against.                                                                                                                                                     |
+| PI Advisor: arbitrary-system search (EWT "System Checker"-style)                                        | Settled by `AdvisorPanel.tsx`'s own header comment: the picker is scoped to systems the character has colonised on purpose, since an uncolonised system has no richness ranking and would render only unmeasurable resource-name cards. See standing kill-test 12.                                          |
