@@ -203,6 +203,13 @@ function Harness({ plan: planOverrides, catalog = CATALOG, onUpdate, onDerivedFi
         ownedBlueprints={[]}
         skills={{}}
         ownedStockSnapshot={EMPTY_OWNED_STOCK_SNAPSHOT}
+        corpOwnedStock={{
+          source: null,
+          corporationId: null,
+          corporationName: null,
+          available: false,
+          incomplete: false,
+        }}
         onUpdate={(patch) => {
           onUpdate?.(patch);
           setPlan((p) => ({ ...p, ...patch }));

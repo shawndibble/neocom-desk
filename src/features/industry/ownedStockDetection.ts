@@ -167,5 +167,7 @@ export interface OwnedStockDetection {
   lowerBound: boolean;
   incompleteCharacters: readonly string[];
   characterNameFor: (characterId: number) => string;
+  /** For a corp-owned placement (issue #798's Corp Assets toggle) — labels it by corporation, not the reading Director. */
+  corporationNameFor: (corporationId: number) => string;
   locationLabelFor: (placement: Pick<OwnedStockPlacement, 'locationId' | 'locationType'>) => string;
 }

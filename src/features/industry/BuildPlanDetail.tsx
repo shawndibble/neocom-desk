@@ -89,6 +89,7 @@ import {
   type OwnedStockSnapshot,
 } from './ownedStockDetection';
 import { useDetectedOwnedStock } from './useDetectedOwnedStock';
+import type { CorpOwnedStockState } from './corpOwnedStock';
 import { useAssumedMe } from './assumedMe';
 import { OwnedStockScopeControl } from './OwnedStockScopeControl';
 import { BuildPlanCraftSweepControl } from './BuildPlanCraftSweepControl';
@@ -121,6 +122,7 @@ export type PlanPatch = Partial<
     | 'facilityTaxPct'
     | 'materialPriceBasis'
     | 'ownedStockScope'
+    | 'includeCorpAssets'
     | 'buildHere'
     | 'includeReactions'
     | 'reactionFacility'
@@ -171,6 +173,14 @@ interface BuildPlanDetailProps {
    * must not redo that load, only the (cheap) per-plan aggregation below.
    */
   ownedStockSnapshot: OwnedStockSnapshot;
+  /**
+   * The active Character's corporation as a second owned-stock source
+   * (issue #798's Corp Assets toggle), loaded once by
+   * `useCorpOwnedStockSource` above the same remount boundary as
+   * `ownedStockSnapshot` — it re-resolves on Character switch on its own,
+   * independent of which plan is open.
+   */
+  corpOwnedStock: CorpOwnedStockState;
   onUpdate: (patch: PlanPatch) => void;
   /**
    * A correction the panel derived rather than the pilot made — persisted
@@ -228,6 +238,7 @@ export function BuildPlanDetail({
   ownedBlueprints,
   skills,
   ownedStockSnapshot,
+  corpOwnedStock,
   onUpdate,
   onDerivedFix,
   onSourcingChange,
@@ -593,12 +604,20 @@ export function BuildPlanDetail({
     () => (materialTypeIdKey === '' ? [] : materialTypeIdKey.split(',').map(Number)),
     [materialTypeIdKey]
   );
+  // Folded in only when this plan's own toggle is on — Corp Assets is a
+  // per-plan choice (issue #798), not something every plan inherits merely
+  // because the active Character happens to hold Director on some corp.
+  const includeCorpAssets = (plan.includeCorpAssets ?? false) && corpOwnedStock.available;
   const {
     stock: detectedStock,
     characterNames,
     locationNames,
     incompleteCharacters,
-  } = useDetectedOwnedStock(ownedStockSnapshot, materialTypeIds);
+  } = useDetectedOwnedStock(
+    ownedStockSnapshot,
+    materialTypeIds,
+    includeCorpAssets ? corpOwnedStock.source : null
+  );
 
   // Narrowed to the plan's owned-stock scope (issue #454); `detectedStock`
   // itself stays the full, galaxy-wide picture the breakdown popover shows.
@@ -607,16 +626,41 @@ export function BuildPlanDetail({
     [detectedStock, plan.ownedStockScope]
   );
 
+  // The corp source's own incompleteness (a capped/missing asset page) folds
+  // in only while it's actually contributing — an untoggled or unavailable
+  // corp source has nothing to be incomplete about.
+  const allIncompleteCharacters = useMemo(
+    () =>
+      includeCorpAssets && corpOwnedStock.incomplete && corpOwnedStock.corporationName
+        ? [...incompleteCharacters, corpOwnedStock.corporationName]
+        : incompleteCharacters,
+    [
+      incompleteCharacters,
+      includeCorpAssets,
+      corpOwnedStock.incomplete,
+      corpOwnedStock.corporationName,
+    ]
+  );
+
   const detection = useMemo<OwnedStockDetection>(
     () => ({
       stockFor: (typeID) => detectedStock.get(typeID),
       scopedQuantityFor: (typeID) => scopedStock.get(typeID)?.quantity ?? 0,
-      lowerBound: incompleteCharacters.length > 0,
-      incompleteCharacters,
+      lowerBound: allIncompleteCharacters.length > 0,
+      incompleteCharacters: allIncompleteCharacters,
       characterNameFor: (characterId) => characterNames.get(characterId) ?? t('common.unknown'),
+      corporationNameFor: () => corpOwnedStock.corporationName ?? t('common.unknown'),
       locationLabelFor: (placement) => stockLocationLabel(placement, locationNames, t),
     }),
-    [detectedStock, scopedStock, characterNames, locationNames, incompleteCharacters, t]
+    [
+      detectedStock,
+      scopedStock,
+      characterNames,
+      locationNames,
+      allIncompleteCharacters,
+      corpOwnedStock.corporationName,
+      t,
+    ]
   );
 
   // "Use all" fills only rows with nothing typed in them: a
@@ -1491,6 +1535,30 @@ export function BuildPlanDetail({
                   disabled={!makeOrBuyContext}
                   onApply={applyCraftSweep}
                 />
+                <span className="flex items-center gap-2 text-xs">
+                  <input
+                    id="build-plan-include-corp-assets"
+                    type="checkbox"
+                    checked={plan.includeCorpAssets ?? false}
+                    disabled={!corpOwnedStock.available}
+                    onChange={(e) => update({ includeCorpAssets: e.target.checked })}
+                    className="size-4 shrink-0 cursor-pointer accent-accent disabled:cursor-not-allowed"
+                  />
+                  <label
+                    htmlFor="build-plan-include-corp-assets"
+                    className={corpOwnedStock.available ? undefined : 'text-text-dim'}
+                  >
+                    {t('industry.includeCorpAssets')}
+                  </label>
+                  <InfoTooltip
+                    label={t('industry.includeCorpAssetsTooltipLabel')}
+                    content={
+                      corpOwnedStock.available
+                        ? t('industry.includeCorpAssetsTooltip')
+                        : t('industry.includeCorpAssetsUnavailable')
+                    }
+                  />
+                </span>
                 <OwnedStockScopeControl
                   scope={plan.ownedStockScope}
                   detectedStock={detectedStock}

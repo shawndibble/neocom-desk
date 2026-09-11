@@ -282,6 +282,17 @@ export interface BuildPlanRecord {
    */
   ownedStockScope?: OwnedStockScope;
   /**
+   * Folds the active Character's corporation's assets into owned-stock
+   * detection alongside personal detection, when that Character can read
+   * them (issue #798 — corp Director only). Off by default: `undefined`/
+   * `false` behaves exactly as every plan did before this existed, counting
+   * only personal stock. Per-plan, not an account default, since one plan
+   * may be a corp production job and another a purely personal one.
+   * Additive and unindexed, same as `ownedStockScope` above — no schema
+   * version bump needed.
+   */
+  includeCorpAssets?: boolean;
+  /**
    * Material typeIDs the player chose to produce rather than buy, one level
    * deep: each one is replaced in the materials table and the shopping list by
    * the inputs its own job consumes. Manufacturing only — a planetary material

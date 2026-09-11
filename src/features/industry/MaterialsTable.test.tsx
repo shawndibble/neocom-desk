@@ -637,6 +637,7 @@ describe('MaterialsTable detected owned stock (issue #181)', () => {
       lowerBound: false,
       incompleteCharacters: [],
       characterNameFor: (characterId) => CHARACTER_NAMES[characterId] ?? 'Unknown',
+      corporationNameFor: () => 'Unknown Corp',
       locationLabelFor: (p) => LOCATION_NAMES[p.locationId] ?? `Station #${p.locationId}`,
       ...overrides,
     };

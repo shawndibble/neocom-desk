@@ -232,6 +232,10 @@ export function BuildGroupPanel({
       incompleteCharacters: detected.incompleteCharacters,
       characterNameFor: (characterId) =>
         detected.characterNames.get(characterId) ?? t('common.unknown'),
+      // Corp Assets (issue #798) is a per-plan toggle, not a group-level one —
+      // the group rollup never merges a corp source in, so this is never
+      // actually reached, only required by the shared `OwnedStockDetection` shape.
+      corporationNameFor: () => t('common.unknown'),
       locationLabelFor: (placement) => stockLocationLabel(placement, detected.locationNames, t),
     }),
     [detected, scopedStock, t]
