@@ -32,6 +32,7 @@ import { rigKindLabelKey } from '@/features/industry/rigFitLabels';
 import { useMarketHub } from '@/features/market/hub';
 import { useAssumedMe, MIN_ASSUMED_ME, MAX_ASSUMED_ME } from '@/features/industry/assumedMe';
 import { useAssumedTe, MIN_ASSUMED_TE, MAX_ASSUMED_TE } from '@/features/industry/assumedTe';
+import { useIncludeBlueprintCost } from '@/features/industry/includeBlueprintCost';
 import {
   useFacilityDefaults,
   normalizeFacilityDefaults,
@@ -553,6 +554,8 @@ function DefaultsPanel() {
   const setAssumedMe = useAssumedMe((state) => state.setValue);
   const assumedTe = useAssumedTe((state) => state.value);
   const setAssumedTe = useAssumedTe((state) => state.setValue);
+  const includeBlueprintCost = useIncludeBlueprintCost((state) => state.value);
+  const setIncludeBlueprintCost = useIncludeBlueprintCost((state) => state.setValue);
   const facilityDefaults = useFacilityDefaults((state) => state.value);
   const setFacilityDefaults = useFacilityDefaults((state) => state.setValue);
   const expiringHours = useExpiringWindowHours((state) => state.value);
@@ -569,6 +572,7 @@ function DefaultsPanel() {
   const hubHydrated = useHydratedStore(useMarketHub);
   const assumedMeHydrated = useHydratedStore(useAssumedMe);
   const assumedTeHydrated = useHydratedStore(useAssumedTe);
+  const includeBlueprintCostHydrated = useHydratedStore(useIncludeBlueprintCost);
   const facilityHydrated = useHydratedStore(useFacilityDefaults);
   const expiringHydrated = useHydratedStore(useExpiringWindowHours);
   const defaultCharacterFilterHydrated = useHydratedStore(useDefaultCharacterFilter);
@@ -578,6 +582,7 @@ function DefaultsPanel() {
     hubHydrated &&
     assumedMeHydrated &&
     assumedTeHydrated &&
+    includeBlueprintCostHydrated &&
     facilityHydrated &&
     expiringHydrated &&
     defaultCharacterFilterHydrated &&
@@ -757,6 +762,19 @@ function DefaultsPanel() {
               void setAssumedTe(Math.min(MAX_ASSUMED_TE, Math.max(MIN_ASSUMED_TE, parsed)));
             }}
           />
+        </div>
+
+        <div className="space-y-1.5 border-t border-line pt-3">
+          <label className="flex items-center gap-2 text-xs font-semibold">
+            <input
+              type="checkbox"
+              checked={includeBlueprintCost}
+              onChange={() => void setIncludeBlueprintCost(!includeBlueprintCost)}
+              className="size-4 shrink-0 cursor-pointer accent-accent"
+            />
+            {t('settings.includeBlueprintCostLabel')}
+          </label>
+          <p className="text-xs text-text-dim">{t('settings.includeBlueprintCostHint')}</p>
         </div>
 
         <div className="border-t border-line pt-3">

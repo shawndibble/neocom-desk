@@ -108,6 +108,13 @@
 // it ever held and the tombstone-expiry edge above does not bite it. That is
 // also why a group deleted on a laptop left offline for a month cannot
 // resurrect the way a per-document collection's would.
+// sync.industryIncludeBlueprintCost: whether Blueprint Acquisition's resolved
+// cost counts toward a plan's totalCost/profit everywhere that number is
+// shown (a plan's own page, the Industry index's Profit column, a Build
+// Group's rollup) — see features/industry/includeBlueprintCost.ts. Same "set
+// to another value, never unset" shape as the Defaults-panel preferences
+// above, so the tombstone-expiry edge does not bite it. No `legacyKey`: the
+// preference is new, with no device-local life to seed from.
 export const SYNCED_SETTING_KEYS: readonly string[] = [
   'sync.corpDarkAfterDays',
   'sync.defaultCharacterFilter',
@@ -115,6 +122,7 @@ export const SYNCED_SETTING_KEYS: readonly string[] = [
   'sync.industryAssumedTe',
   'sync.industryBuildGroups',
   'sync.industryFacilityDefaults',
+  'sync.industryIncludeBlueprintCost',
   'sync.industryReactionFacilityDefaults',
   'sync.marketHub',
   'sync.marketPricePercent',

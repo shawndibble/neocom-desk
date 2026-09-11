@@ -255,6 +255,25 @@ export function acquisitionForLookup(
 }
 
 /**
+ * Wraps an `acquisitionForLookup` closure so every resolution still resolves
+ * its cheapest ME/TE tier (material quantities never change — only the
+ * blueprint cost line does) but reports nothing to buy: the same `line: null`
+ * contract an owned BPO already reports. This is what the
+ * `useIncludeBlueprintCost` setting being off means, applied once here rather
+ * than duplicated at both of this closure's callers (`BuildPlanDetail.tsx`'s
+ * `acquisitionFor`, `useComparedBuildResults.ts`'s `computeRow`) — both wrap
+ * the same top-level and nested resolutions this closure produces.
+ */
+export function withoutAcquisitionCost(
+  acquisitionFor: ReturnType<typeof acquisitionForLookup>
+): ReturnType<typeof acquisitionForLookup> {
+  return (...args) => {
+    const resolved = acquisitionFor(...args);
+    return resolved ? { ...resolved, line: null } : null;
+  };
+}
+
+/**
  * Every typeID a make-or-buy verdict needs a hub price for: the materials
  * themselves plus, one level down, whatever their recipes consume. The Build
  * Plan's price fetch is one batched call, so widening it here costs nothing
