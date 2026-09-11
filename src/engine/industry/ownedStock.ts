@@ -194,21 +194,6 @@ function isShipHeld(locationFlag: string): boolean {
   return isShipBayFlag(locationFlag) || SHIP_HOLD_PATTERN.test(locationFlag);
 }
 
-/**
- * Groups placements per owner (Character, or Corporation when
- * `corporationId` is given) and location. A corp source groups on the
- * corporation, not the reading Director, for the same reason
- * `ownedStockLocationKey` does.
- */
-function placementKey(
-  source: { characterId: number; corporationId?: number },
-  locationId: number
-): string {
-  return source.corporationId !== undefined
-    ? `corp:${source.corporationId}:${locationId}`
-    : `${source.characterId}:${locationId}`;
-}
-
 function comparePlacements(a: OwnedStockPlacement, b: OwnedStockPlacement): number {
   if (a.quantity !== b.quantity) return b.quantity - a.quantity;
   return ownedStockLocationKey(a).localeCompare(ownedStockLocationKey(b));
@@ -233,31 +218,34 @@ export function detectOwnedStock(
     const byItemId = new Map<number, StockAsset>();
     for (const a of assets) byItemId.set(a.item_id, a);
 
-    // typeID -> "characterId:locationId" (or "corp:corporationId:locationId")
-    // -> placement, so repeated stacks of one material at one location
-    // collapse into a single breakdown line.
+    // typeID -> ownedStockLocationKey -> placement, so repeated stacks of one
+    // material at one location collapse into a single breakdown line. Keying
+    // on the same identity `ownedStockLocationKey` defines elsewhere (rather
+    // than a second, ad-hoc key) is what keeps "which owner does this belong
+    // to" answered in exactly one place.
     const grouped = new Map<number, Map<string, OwnedStockPlacement>>();
     for (const a of assets) {
       if (a.is_singleton || !typeIDs.has(a.type_id)) continue;
-      const placement = resolvePlacement(a, byItemId);
-      if (!placement) continue;
+      const resolved = resolvePlacement(a, byItemId);
+      if (!resolved) continue;
+      const placement: OwnedStockPlacement = {
+        characterId,
+        ...(corporationId !== undefined ? { corporationId } : {}),
+        ...resolved,
+        quantity: a.quantity,
+      };
 
       let byLocation = grouped.get(a.type_id);
       if (!byLocation) {
         byLocation = new Map();
         grouped.set(a.type_id, byLocation);
       }
-      const key = placementKey({ characterId, corporationId }, placement.locationId);
+      const key = ownedStockLocationKey(placement);
       const existing = byLocation.get(key);
       if (existing) {
         existing.quantity += a.quantity;
       } else {
-        byLocation.set(key, {
-          characterId,
-          ...(corporationId !== undefined ? { corporationId } : {}),
-          ...placement,
-          quantity: a.quantity,
-        });
+        byLocation.set(key, placement);
       }
     }
 
