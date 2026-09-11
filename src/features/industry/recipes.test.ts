@@ -254,14 +254,25 @@ describe('buildPlanTypeIds', () => {
     // a `buildHere` choice can now sit at any of them (docs/context/decisions),
     // and each one needs a hub price for its own recipe's inputs.
     // 9840 (product) -> manufacturing input 34.
-    expect(ids.sort((a, b) => a - b)).toEqual([34, 40, 41, 42, 43, 2267, 2398, 9840]);
+    // Every manufactured typeID reached (9840, 40, 41, 42) also pulls in its
+    // own blueprint's typeID (9841, 9843, 9844, 9845 respectively — issue
+    // #838's Blueprint Acquisition needs a hub price for the blueprint
+    // itself, not only for what it produces). 43 and 34 are raw, no
+    // blueprint of their own; 2398/2267 are planetary, not in the
+    // manufacturing catalog at all.
+    expect(ids.sort((a, b) => a - b)).toEqual([
+      34, 40, 41, 42, 43, 2267, 2398, 9840, 9841, 9843, 9844, 9845,
+    ]);
   });
 
   it('skips the planetary widening when pi.json is unavailable', () => {
     const ids = buildPlanTypeIds(blueprint, { catalog, pi: null });
     // No pi means no schematic for 2398, so 2267 never gets added — 2398
     // itself stays, as a plain material with nothing produced beneath it.
-    // The manufacturing side (40 -> 41 -> 42 -> 43, 9840 -> 34) is unaffected.
-    expect(ids.sort((a, b) => a - b)).toEqual([34, 40, 41, 42, 43, 2398, 9840]);
+    // The manufacturing side (40 -> 41 -> 42 -> 43, 9840 -> 34) and its
+    // blueprint typeIDs are unaffected.
+    expect(ids.sort((a, b) => a - b)).toEqual([
+      34, 40, 41, 42, 43, 2398, 9840, 9841, 9843, 9844, 9845,
+    ]);
   });
 });

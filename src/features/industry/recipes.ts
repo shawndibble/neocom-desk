@@ -153,5 +153,17 @@ export function buildPlanTypeIds(blueprint: IndustryBlueprint, sources: RecipeCa
     for (const id of next) ids.add(id);
     frontier = next;
   }
+
+  // Blueprint Acquisition (issue #838): every buildable node's own blueprint
+  // typeID too — distinct from the product it makes — so a BPO's ordinary
+  // sell price at the hub is fetched for it rather than silently unpriced.
+  // `product.typeID` above already makes this cover the top-level blueprint
+  // itself, not only nested sub-builds: the plan's own product maps back to
+  // the plan's own blueprintTypeID through the same lookup.
+  for (const typeID of [...ids]) {
+    const entry = sources.catalog.byProductTypeID.get(typeID);
+    if (entry) ids.add(entry.blueprintTypeID);
+  }
+
   return [...ids];
 }
