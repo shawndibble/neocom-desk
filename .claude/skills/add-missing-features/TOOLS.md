@@ -193,6 +193,13 @@ Reusable heuristics — check a new candidate against these before drafting:
     community numbers that go stale silently on the next balance pass, for a
     calculation most players run once per decision rather than repeatedly.
     Killed: Moon Survey / Metenox Yield Estimator.
+14. **No bulk market-history endpoint.** ESI's `/markets/{region_id}/history`
+    is one type ID at a time; a market-wide "movers/trending items" scan needs
+    history for thousands of types per region — heavier than the crawl ADR
+    0013 already rejected for the much smaller public-contracts dataset.
+    Narrowing to an already-bounded set (Quickbar/appraisal history) mostly
+    collapses into a sort over the existing per-item Price History chart
+    (kill-test 3). Killed: Market Movers / Trending Items dashboard.
 
 ## Filed candidates
 
@@ -215,6 +222,7 @@ Reusable heuristics — check a new candidate against these before drafting:
 | #725 | SHIP    | PI Production Run/Log                                                 |
 | #726 | NARROW  | Quickbar → Appraisal multi-hub handoff                                |
 | #730 | NARROW  | Price History 7-day moving average                                    |
+| #819 | NARROW  | Build Opportunities market-wide "what to build" finder, unowned-agnostic |
 
 ## Killed / dropped candidates (never filed)
 
@@ -245,3 +253,5 @@ One line each: what, why, and the kill-test/decision it hit.
 | Pure station-trading FIFO P&L tracker (EVE Tycoon/Night Trade Tools-style) | Kill-test 10, extended to trading with no manufacturing involved.  |
 | Public contract sell-advisor for manufactured goods    | Kill-test 6 (ADR 0013), same as the item-exchange browser above.               |
 | Moon Survey / Metenox Yield Estimator (paste survey-scan clipboard, estimate monthly ISK before anchoring a drill) | Real clipboard-paste precedent and genuinely new capability (nothing shows moon composition or pre-extraction estimates today), but hostile review killed on player reach (nullsec/lowsec/WH-only structure, one decision per moon, not recurring) plus kill-test 13 (drill/Metenox yield formulas aren't SDE-derivable and have no ESI fixture to validate against). |
+| Metenox Moon Drill fuel/yield tracking, ongoing corp ledger (vs. the one-shot estimator above) | Audience is a sub-slice of a sub-slice (moon-owning corp leadership, not renters); the only prior-art tool attempting this (Dr.MoonGoo) reported ESI's corp assets endpoint may no longer expose magmatic-gas quantity separately, a go/no-go blocker on the core mechanic. Kill-test 13. |
+| Market Movers / Trending Items dashboard (market-wide "what's hot" discovery, Adam4EVE/EVE ONE-style) | Kill-test 14 — no bulk market-history endpoint; a true market-wide scan needs a backend crawl heavier than ADR 0013 already rejected for a smaller dataset, and the narrowed bounded-set alternative collapses into the existing Price History chart. |
