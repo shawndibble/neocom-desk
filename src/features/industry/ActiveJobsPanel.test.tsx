@@ -169,6 +169,13 @@ describe('ActiveJobsPanel: rendering', () => {
     const bars = screen.getAllByRole('progressbar');
     expect(bars.map((b) => b.getAttribute('aria-valuenow'))).toEqual(['100', '50', '25']);
 
+    // Track sits in the Panel's bg-panel/85 content area, so its fill backdrop
+    // must be one layering step up (bg-panel-2), not the panel's own bg-panel (#828).
+    bars.forEach((bar) => {
+      expect(bar).toHaveClass('bg-panel-2');
+      expect(bar).not.toHaveClass('bg-panel');
+    });
+
     // Absolute end date exposed via dateTime (ISO, TZ-stable) in Ends (EVE).
     // Scoped to the job list: the panel header's DataAgeBadge also renders a <time>.
     const timeEls = container.querySelectorAll('tbody time');
