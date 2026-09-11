@@ -86,7 +86,9 @@ Mapped to the module/route that proves it:
 
 - **Market**: undercut detection, order competition/health, full order book
   as sortable table (Market Browser), hub-to-hub price gap for an owned sell
-  order (`hubHaulGaps`).
+  order (`hubHaulGaps`), item-variation/meta comparison (EVEMissioneer's
+  pitch — `VariationsTable.tsx`/`VariationsCompareModal.tsx`,
+  `engine/market/variations.ts`, `engine/market/attributeCompareMatrix.ts`).
 - **Appraisal**: single-hub, multi-hub comparison (#689), refine-then-sell
   (#672), contract-line market value (#717), reprocessing (`reprocessing.ts`).
 - **Industry**: realized profit (`realizedProfit.ts`), build-vs-buy, Build
@@ -107,20 +109,17 @@ Mapped to the module/route that proves it:
 - **Open Orders**: sell-through/days-to-clear column (#713), multi-character
   aggregation.
 - **Mining**: moon-ore ledger tax tracking (renter-side reconciliation only —
-  no moon composition/pre-extraction data), ordinary ore/ice yield tracker
-  (#671).
+  no moon composition/pre-extraction data; also covers OMIP-style moon-mining
+  tax tracking), ordinary ore/ice yield tracker (#671).
 - **Quickbar**: price alerts (#680), multi-hub Appraisal handoff (#726).
 - **Restock**: on-hand vs. listed vs. par-level join, multibuy refill (#643).
 - **Contracts**: item-exchange/auction market value (#717); courier
   reward-per-m3/jump/collateral ratio filed as #826 (not yet shipped).
 - **Corp Ops Board**: structure fuel-expiry clock already tracked
-  (`structureFuel` kind in `engine/corp/board.ts`).
-- **Market**: item-variation/meta comparison (EVEMissioneer's pitch) already
-  covered — `VariationsTable.tsx`/`VariationsCompareModal.tsx`,
-  `engine/market/variations.ts`, `engine/market/attributeCompareMatrix.ts`.
-- **Mining**: OMIP-style moon-mining tax tracking already covered by
-  `miningTax` (see Mining bullet above); Lazy Blacksmith/EVE Orchestra-style
-  blueprint material calc already covered by the Build Plan/BOM engine
+  (`structureFuel` kind in `engine/corp/board.ts`); Metenox reactor fuel/gas
+  tracking considered and killed — kill-test 13.
+- **Industry**: Lazy Blacksmith/EVE Orchestra-style blueprint material calc
+  already covered by the Build Plan/BOM engine
   (`features/industry/blueprintCatalog.ts`, `BuildPlanDetail.tsx`,
   `MaterialsTable.tsx`).
 
@@ -217,6 +216,7 @@ what the Advisor already computes per-planet; don't re-propose.
 | #826 | NARROW  | Contracts: courier reward-per-m3/jump/collateral ratio, detail modal only |
 | #827 | SHIP    | Skills: Market Fee Skill ROI panel (Broker Relations/Accounting) |
 | #831 | NARROW  | Appraisal shareable link — typeId:qty payload, recompute-at-both-ends, byte-capped, unauthenticated route outside ScopeGate |
+| #858 | SHIP    | Quickbar unrealized P&L against a player-entered cost basis, reusing existing price fetch |
 
 ## Killed / dropped candidates (never filed)
 
@@ -245,7 +245,7 @@ what the Advisor already computes per-planet; don't re-propose.
 | Pure station-trading FIFO P&L tracker | Kill-test 10, extended to pure trading. |
 | Public contract sell-advisor for manufactured goods | Kill-test 6 (ADR 0013). |
 | Moon Survey / Metenox Yield Estimator | Narrow reach + kill-test 13. |
-| Metenox Moon Drill ongoing fuel/yield ledger | Narrow reach + kill-test 13. |
+| Metenox Moon Drill ongoing fuel/yield ledger | Narrow reach + kill-test 13. Re-confirmed independently as a "static readout" variant (no depletion estimate) — same director/moon-owning-corp-only reach objection applies regardless of ledger vs. snapshot framing; filed as #859 then closed on rediscovering this entry. |
 | Market Movers / Trending Items dashboard | Kill-test 14. |
 | Working Capital Locked in the Pipeline stat | Kill-test 3; job cost is fee-only, not materials. |
 | PI Colony Layout Template (save/reuse pin layout) | Superseded by Advisor's per-planet fitted plan. |
