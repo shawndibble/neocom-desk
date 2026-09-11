@@ -120,6 +120,20 @@ function material(typeID: number, quantity: number, remaining = quantity): Mater
   };
 }
 
+/**
+ * A material the plan is building rather than buying — `resolveMaterial`
+ * would attach a real `subBuild`; the group panel only ever checks
+ * `subBuilds.length > 0` (never opens the "Build it" modal from this list),
+ * so a minimal stub is enough to exercise the built/bought branch.
+ */
+function builtMaterial(typeID: number, quantity: number): MaterialCostLine {
+  return {
+    ...material(typeID, quantity),
+    unitPrice: null,
+    subBuild: { inputs: [] },
+  } as MaterialCostLine;
+}
+
 function result(materials: MaterialCostLine[]): BuildResult {
   return {
     materials: materials.map((m) => ({ ...m, children: [], decision: 'buy' })),
@@ -352,5 +366,41 @@ describe('BuildGroupPanel — Group Owned Overlay (issue #697)', () => {
     await user.tab();
 
     expect(onOwnedStockChange).toHaveBeenCalledWith({ 35: 7, 34: 50 });
+  });
+});
+
+describe('BuildGroupPanel — built materials in the group needs list (issue #802)', () => {
+  it('labels a material the plan is building as Built, not a buy count', () => {
+    mockedUseComparedBuildResults.mockReturnValue([row('a', [builtMaterial(999, 1)])]);
+    renderPanel([plan('a', 'jita')]);
+
+    const needsPanel = screen.getByText('Everything this group needs').closest('section')!;
+    expect(within(needsPanel).getByText('Built')).toBeTruthy();
+    expect(within(needsPanel).queryByText('1 to buy of 1')).toBeNull();
+  });
+
+  it('still shows a genuine buy line as a buy count, unaffected by a built row elsewhere', () => {
+    mockedUseComparedBuildResults.mockReturnValue([
+      row('a', [builtMaterial(999, 1), material(34, 100)]),
+    ]);
+    renderPanel([plan('a', 'jita')]);
+
+    const needsPanel = screen.getByText('Everything this group needs').closest('section')!;
+    expect(within(needsPanel).getByText('100 to buy of 100')).toBeTruthy();
+  });
+
+  it('nets out the built portion when one member builds a type and another buys the same one', () => {
+    // Member a builds 10 of type 999 as its own sub-job; member b needs 5 more
+    // of the same type as a plain material. The group still has to buy 5 —
+    // neither "Built" (some of it genuinely isn't) nor "15 to buy" (10 of
+    // those 15 are already spoken for by a's build) is correct.
+    mockedUseComparedBuildResults.mockReturnValue([
+      row('a', [builtMaterial(999, 10)]),
+      row('b', [material(999, 5)]),
+    ]);
+    renderPanel([plan('a', 'jita'), plan('b', 'jita')]);
+
+    const needsPanel = screen.getByText('Everything this group needs').closest('section')!;
+    expect(within(needsPanel).getByText('5 to buy of 15')).toBeTruthy();
   });
 });

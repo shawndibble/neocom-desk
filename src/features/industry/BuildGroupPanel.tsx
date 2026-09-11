@@ -171,9 +171,18 @@ export function BuildGroupPanel({
     catalog.byBlueprintTypeID.has(p.blueprintTypeID)
   ).length;
 
-  const members: BuildGroupMember[] = useMemo(() => {
+  // `tableMaterials` widens to `MaterialCostLine[]` at the `BuildGroupMember`
+  // boundary (`groupRollup.ts` stays free of feature types), which loses
+  // `subBuilds` for anyone reading it back off `members` — so this is
+  // computed here, off `flattened.table` while it is still a
+  // `MaterialTableRow[]`, rather than downstream. Summed by typeID across
+  // members the same way `mergeMaterials` sums quantity, since a material one
+  // member builds is still built no matter how many members contribute it.
+  const { members, builtQuantityByType } = useMemo(() => {
     const byId = new Map(plans.map((p) => [p.id, p]));
-    return rows.flatMap((row) => {
+    const builtQuantityByType = new Map<number, number>();
+    const members: BuildGroupMember[] = [];
+    for (const row of rows) {
       const plan = byId.get(row.planId);
       // A member still loading, or one that could not be priced, contributes
       // nothing rather than contributing zeroes — a total that silently counts
@@ -182,19 +191,25 @@ export function BuildGroupPanel({
       // member with owned-stock deduction disabled (issue #697) — `result`
       // is what that member's own page shows, still netted against its own
       // `materialSourcing`, and stays untouched in the member list below.
-      if (!plan || !row.groupResult) return [];
+      if (!plan || !row.groupResult) continue;
       const flattened = flattenBuildResult(row.groupResult);
-      return [
-        {
-          planId: row.planId,
-          planName: row.planName,
-          hubId: plan.hubId,
-          result: row.groupResult,
-          shoppingMaterials: flattened.shopping,
-          tableMaterials: flattened.table,
-        },
-      ];
-    });
+      for (const material of flattened.table) {
+        if (material.subBuilds.length === 0) continue;
+        builtQuantityByType.set(
+          material.typeID,
+          (builtQuantityByType.get(material.typeID) ?? 0) + material.quantity
+        );
+      }
+      members.push({
+        planId: row.planId,
+        planName: row.planName,
+        hubId: plan.hubId,
+        result: row.groupResult,
+        shoppingMaterials: flattened.shopping,
+        tableMaterials: flattened.table,
+      });
+    }
+    return { members, builtQuantityByType };
   }, [rows, plans]);
 
   // The members' *blueprint* material types, never the computed cost lines:
@@ -582,18 +597,40 @@ export function BuildGroupPanel({
           <EmptyState title={t('industry.groupNothingToBuy')} className="py-6" />
         ) : (
           <ul className="divide-y divide-line text-xs">
-            {rollup.tableMaterials.map((material) => (
-              <li key={material.typeID} className="flex justify-between gap-2 px-2.5 py-1.5">
-                <span className="truncate">{nameForType(catalog, material.typeID)}</span>
-                <span className="shrink-0 tabular-nums text-text-dim">
-                  {t('industry.groupMaterialNeed', {
-                    quantity: material.quantity.toLocaleString(),
-                    remaining: material.remainingQuantity.toLocaleString(),
-                  })}
-                  {material.unpriced ? ` · ${t('industry.unpriced')}` : ''}
-                </span>
-              </li>
-            ))}
+            {rollup.tableMaterials.map((material) => {
+              // A row some member builds rather than buys: `remainingQuantity`
+              // still carries `resolveMaterial`'s bought-line formula (quantity
+              // minus owned), so rendering it as a buy count here would repeat
+              // the per-plan table's bug (`MaterialsTable.tsx`'s own
+              // `subBuilds.length > 0` check) — only display, not the ledger
+              // math, is corrected: `rollup.tableMaterials` itself is untouched.
+              //
+              // A typeID can be built by one member and bought outright by
+              // another (a raw material to one plan, an intermediate to
+              // another) — `builtQuantity` is only ever a portion of the
+              // merged `quantity` then, never the whole of it, so `buyToShow`
+              // is what's left to source once the built portion is set aside,
+              // and the row still reads as a genuine (smaller) buy need
+              // instead of being wrongly cleared to "Built" or left
+              // overstated by the units another member is manufacturing.
+              const builtQuantity = builtQuantityByType.get(material.typeID) ?? 0;
+              const fullyBuilt = builtQuantity > 0 && builtQuantity >= material.quantity;
+              const buyToShow = Math.max(0, material.remainingQuantity - builtQuantity);
+              return (
+                <li key={material.typeID} className="flex justify-between gap-2 px-2.5 py-1.5">
+                  <span className="truncate">{nameForType(catalog, material.typeID)}</span>
+                  <span className="shrink-0 tabular-nums text-text-dim">
+                    {fullyBuilt
+                      ? t('industry.priceSourceBuilt')
+                      : t('industry.groupMaterialNeed', {
+                          quantity: material.quantity.toLocaleString(),
+                          remaining: buyToShow.toLocaleString(),
+                        })}
+                    {material.unpriced ? ` · ${t('industry.unpriced')}` : ''}
+                  </span>
+                </li>
+              );
+            })}
           </ul>
         )}
       </Panel>
