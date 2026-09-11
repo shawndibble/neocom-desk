@@ -20,6 +20,8 @@ import { SkillPlans } from '@/routes/SkillPlans';
 import { SkillPlanEditor } from '@/routes/SkillPlanEditor';
 import { SkillCompare } from '@/routes/SkillCompare';
 import { Industry } from '@/routes/Industry';
+import { IndustryPlanPage } from '@/routes/IndustryPlanPage';
+import { IndustryGroupPage } from '@/routes/IndustryGroupPage';
 import { Corp } from '@/routes/Corp';
 import { CorpMembers } from '@/routes/CorpMembers';
 import { CorpAssets } from '@/routes/CorpAssets';
@@ -92,6 +94,8 @@ const ROUTE_ELEMENTS = {
   '/skills/plans/:planId': <SkillPlanEditor />,
   '/skills/compare': <SkillCompare />,
   '/industry': <Industry />,
+  '/industry/plans/:planId': <IndustryPlanPage />,
+  '/industry/groups/:groupId': <IndustryGroupPage />,
   '/market': <Market />,
   '/wallet': <Wallet />,
   '/wallet/loyalty/:corporationId': <LoyaltyStore />,

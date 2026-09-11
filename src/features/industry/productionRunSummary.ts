@@ -99,3 +99,19 @@ export function rollupProductionRuns(
     openCount: rows.filter((row) => row.status !== 'closed').length,
   };
 }
+
+/**
+ * How many runs a Build Plan has recorded — the Industry index's Runs
+ * column. A plan with no runs has no entry at all rather than a `0`, so a
+ * caller renders "—" from the same absence a `Map.get` returning `undefined`
+ * already gives it, instead of every unraised plan needing its own zero-fill.
+ */
+export function countRunsByPlan(
+  runs: readonly Pick<ProductionRunRecord, 'buildPlanId'>[]
+): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const run of runs) {
+    counts.set(run.buildPlanId, (counts.get(run.buildPlanId) ?? 0) + 1);
+  }
+  return counts;
+}

@@ -73,6 +73,8 @@ const NOOP_GROUP_PROPS = {
   onDeleteGroup: () => {},
   onMovePlan: () => {},
   onOpenFitImport: () => {},
+  statsByPlanId: new Map(),
+  statsByGroupId: new Map(),
 };
 
 describe('BuildPlanList', () => {

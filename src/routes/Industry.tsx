@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useFacilityDefaults } from '@/features/industry/facilityDefaults';
-import { Navigate, useSearchParams } from 'react-router-dom';
-import { usePlanSelection } from '@/features/industry/usePlanSelection';
+import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type BuildPlanRecord } from '@/db';
@@ -16,27 +15,18 @@ import {
   Spinner,
   Tabs,
 } from '@/components/ui';
-import { useActiveCharacter } from '@/stores/activeCharacter';
 import { beginEveLogin } from '@/app/loginFlow';
-import { useIsDesktop } from '@/lib/useIsDesktop';
-import type { MaterialSourcing, OwnedStockScope, SkillLevels } from '@/engine/industry/types';
-import type { SweepStrategy } from '@/engine/industry/autoMakeOrBuy';
-import type { CharacterBlueprint } from '@/esi/endpoints';
-import { loadPi } from '@/sde/loadSde';
-import type { PiData } from '@/sde/types';
-import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
+import { useIndustryWorkspace } from '@/features/industry/useIndustryWorkspace';
 import {
-  loadBlueprintCatalog,
-  type BlueprintCatalog,
+  buildPlansByMaterialTypeID,
   type BlueprintCatalogEntry,
 } from '@/features/industry/blueprintCatalog';
-import { findOwnedBlueprint, loadCharacterBlueprints } from '@/features/industry/data';
-import { useOwnedStockSnapshot } from '@/features/industry/useDetectedOwnedStock';
-import { useCorpOwnedStockSource } from '@/features/industry/corpOwnedStock';
+import { findOwnedBlueprint } from '@/features/industry/data';
 import { ItemDetailModal } from '@/features/market/ItemDetailModal';
 import { useQuickbar } from '@/features/market/useQuickbar';
 import { ActiveJobsPanel } from '@/features/industry/ActiveJobsPanel';
 import { BuildPlanList } from '@/features/industry/BuildPlanList';
+import type { PlanIndexStats, PlanVerdictTag } from '@/features/industry/BuildPlanList';
 import { BuildPlanCompare } from '@/features/industry/BuildPlanCompare';
 import { OpportunitiesPanel } from '@/features/industry/OpportunitiesPanel';
 import {
@@ -45,37 +35,23 @@ import {
 } from '@/features/industry/opportunities';
 import { ProductionLogPanel } from '@/features/industry/ProductionLogPanel';
 import { BpcSourcingPanel } from '@/features/bpcContracts/BpcSourcingPanel';
-import {
-  BuildPlanDetail,
-  type PlanPatch,
-  type SourcingPatchEntry,
-} from '@/features/industry/BuildPlanDetail';
-import { saveSourcingEdit } from '@/features/industry/sourcingEdits';
 import { mostRecentlyUpdatedPlan, newBuildPlan } from '@/features/industry/newBuildPlan';
-import { type BuildPlanSeed } from '@/features/industry/planSeed';
 import {
-  addBuildGroup,
-  buildGroupsFor,
-  renameBuildGroup,
-  useBuildGroups,
-  withGroupCraftSweepDefault,
-  withGroupOwnedStock,
-  withGroupOwnedStockScope,
-  type BuildGroupSnapshot,
-} from '@/features/industry/buildGroups';
-import {
-  deleteBuildGroup,
-  moveBuildPlanToGroup,
-  retargetBuildGroup,
-} from '@/features/industry/buildGroupActions';
+  clearPlanSeed,
+  matchesPlanSeed,
+  parsePlanSeed,
+  type BuildPlanSeed,
+} from '@/features/industry/planSeed';
+import { addBuildGroup, buildGroupsFor, renameBuildGroup } from '@/features/industry/buildGroups';
+import { deleteBuildGroup, moveBuildPlanToGroup } from '@/features/industry/buildGroupActions';
 import { useExpandedGroups, withGroupExpanded } from '@/features/industry/expandedGroups';
-import { BuildGroupPanel } from '@/features/industry/BuildGroupPanel';
-import { applyGroupCraftSweep } from '@/features/industry/craftSweepGroup';
 import { FitImportDialog } from '@/features/industry/FitImportDialog';
 import { applyFitImport, fitImportGroupName } from '@/features/industry/fitImport';
-import { useAssumedMe } from '@/features/industry/assumedMe';
-import { useAssumedTe } from '@/features/industry/assumedTe';
 import type { FitToBuildPlansResult } from '@/engine/import/fitToBuildPlans';
+import { useComparedBuildResults } from '@/features/industry/useComparedBuildResults';
+import { useRunCountsByPlan } from '@/features/industry/useRunCountsByPlan';
+import { flattenBuildResult } from '@/features/industry/resultFlattenCache';
+import { rollUpBuildGroup, type BuildGroupMember } from '@/engine/industry/groupRollup';
 
 type IndustryTab = 'plans' | 'records' | 'sourcing' | 'opportunities';
 
@@ -84,25 +60,43 @@ function readIndustryTab(value: string | null): IndustryTab {
   return value === 'records' || value === 'sourcing' || value === 'opportunities' ? value : 'plans';
 }
 
-/** Build Plan manager: create (via blueprint search)/duplicate/delete/rename plans, edit the selected one. */
+/** A plan/group with no price yet, or that failed to price, reads as "unknown" rather than silently missing. */
+function verdictOf(totalCost: number | null, buyCost: number | null): PlanVerdictTag {
+  if (buyCost === null) return 'unknown';
+  return totalCost !== null && totalCost <= buyCost ? 'build' : 'buy';
+}
+
+/**
+ * Build Plan manager index: create (via blueprint search)/duplicate/delete/
+ * rename plans and groups, search, drag plans between groups, and open one
+ * as its own full-width page (`/industry/plans/:id`, `/industry/groups/:id`)
+ * — this route no longer renders any plan/group detail itself.
+ */
 export function Industry() {
   const { t } = useTranslation();
-  // Only consulted for a character's first plan, or one whose previous plan
-  // hosts a different activity — `newBuildPlan` carries everything forward
-  // from the most recent plan otherwise (issue #456).
-  const facilityDefaults = useFacilityDefaults((state) => state.value);
+  const navigate = useNavigate();
+  const workspace = useIndustryWorkspace();
+  const {
+    activeCharacterId,
+    hydrated,
+    catalog,
+    pi,
+    ownedBlueprints,
+    blueprintsNeedsReauth,
+    skills,
+    buildGroups,
+    buildGroupsHydrated,
+    setBuildGroups,
+    assumedMe,
+    assumedTe,
+    facilityDefaults,
+  } = workspace;
   const hydrateFacilityDefaults = useFacilityDefaults((state) => state.hydrate);
   useEffect(() => {
     void hydrateFacilityDefaults();
   }, [hydrateFacilityDefaults]);
-  const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
-  const hydrated = useActiveCharacter((state) => state.hydrated);
+
   const [searchParams, setSearchParams] = useSearchParams();
-  /**
-   * In the URL, unlike the other two tabs' history, because `/bpc-contracts`
-   * redirects to `?tab=sourcing` — a deep link needs somewhere to land, and a
-   * tab held only in component state has no address to give it.
-   */
   const tab = readIndustryTab(searchParams.get('tab'));
   const setTab = useCallback(
     (next: IndustryTab) => {
@@ -121,12 +115,6 @@ export function Industry() {
     [setSearchParams]
   );
 
-  // Stamped with the Character it was read for, because `useLiveQuery` holds
-  // its previous result in a ref across a deps change: for one render after
-  // the active Character changes, the rows belong to the Character who just
-  // left. Unstamped, every consumer below has to re-derive that — and the one
-  // that mounts `BuildPlanDetail` would open a plan this pilot does not own
-  // and fetch market prices for its materials, only to remount a tick later.
   const plansQuery = useLiveQuery(async () => {
     if (activeCharacterId === null) return undefined;
     return {
@@ -134,109 +122,28 @@ export function Industry() {
       rows: await db.buildPlans.where('characterId').equals(activeCharacterId).toArray(),
     };
   }, [activeCharacterId]);
-  // `undefined` means "not read yet" for the incoming Character exactly as it
-  // does on a first load, so every consumer's existing loading path covers it.
   const plans = plansQuery?.characterId === activeCharacterId ? plansQuery.rows : undefined;
 
-  // The materials table's item context menu (CONTEXT.md round 26) writes the
-  // same Quickbar record the Market Browser and Assets do, and opens the same
-  // Item Detail modal — which stays mounted at the route, not inside
-  // `BuildPlanDetail`, so switching plans while it is open doesn't tear it down.
   const quickbar = useQuickbar(activeCharacterId);
   const [infoModalItem, setInfoModalItem] = useState<{ typeId: number; itemName: string } | null>(
     null
   );
 
-  // Loaded once here, above BuildPlanDetail's `key={plan.id}` remount below —
-  // switching plans must not redo the whole-account asset load (issue #409).
-  const ownedStockSnapshot = useOwnedStockSnapshot();
-  // Corp Assets (issue #798): its own hook, not folded into the snapshot
-  // above — it follows the *active* Character's corporation, re-resolving on
-  // a Character switch, unlike the whole-account personal load which is
-  // fixed for the session.
-  const corpOwnedStock = useCorpOwnedStockSource();
-
-  // Build Groups (issue #626). Names/order/existence sync as one setting;
-  // membership is `buildGroupId` on each plan. Which groups are *open* is
-  // device-local — a phone left collapsed must not fold up the desktop.
-  const buildGroups = useBuildGroups((state) => state.value);
-  const buildGroupsHydrated = useBuildGroups((state) => state.hydrated);
-  const hydrateBuildGroups = useBuildGroups((state) => state.hydrate);
-  const setBuildGroups = useBuildGroups((state) => state.setValue);
   const expandedGroups = useExpandedGroups((state) => state.value);
   const expandedGroupsHydrated = useExpandedGroups((state) => state.hydrated);
   const hydrateExpandedGroups = useExpandedGroups((state) => state.hydrate);
   const setExpandedGroups = useExpandedGroups((state) => state.setValue);
-  const assumedMe = useAssumedMe((state) => state.value);
-  const hydrateAssumedMe = useAssumedMe((state) => state.hydrate);
-  const assumedTe = useAssumedTe((state) => state.value);
-  const hydrateAssumedTe = useAssumedTe((state) => state.hydrate);
   useEffect(() => {
-    void hydrateBuildGroups();
     void hydrateExpandedGroups();
-    void hydrateAssumedMe();
-    void hydrateAssumedTe();
-  }, [hydrateBuildGroups, hydrateExpandedGroups, hydrateAssumedMe, hydrateAssumedTe]);
+  }, [hydrateExpandedGroups]);
 
   const [fitImportOpen, setFitImportOpen] = useState(false);
-  // Only ever set for a group that still has members: deleting an empty one
-  // destroys nothing, and a dialog asking about plans it does not have would
-  // be a worse answer than just doing it.
   const [deletingGroupId, setDeletingGroupId] = useState<string | null>(null);
-  const [catalog, setCatalog] = useState<BlueprintCatalog | null>(null);
-  // Planetary schematics, for the materials table's make-or-buy marker. Loaded
-  // beside the catalog so both are in place before a plan first renders — a
-  // late arrival would widen the price fetch's type list and refire it.
-  const [pi, setPi] = useState<PiData | null>(null);
-  const [ownedBlueprints, setOwnedBlueprints] = useState<CharacterBlueprint[]>([]);
-  const [blueprintsNeedsReauth, setBlueprintsNeedsReauth] = useState(false);
-  const [skills, setSkills] = useState<SkillLevels>({});
 
-  // Compare mode (issue #453): the list shows a checkbox per row while
-  // `compareMode` is on, and `comparing` swaps the detail pane over to
-  // `BuildPlanCompare` for the checked plans. Kept as three separate pieces
-  // (mode/selection/open) rather than one, because unchecking down to a
-  // single plan while the table is open should show a "need 2+" hint, not
-  // silently fall back to `selectedPlan`'s detail — only the explicit
-  // `exitCompare` action (the compare view's "Done", or the back control)
-  // does that.
   const [compareMode, setCompareMode] = useState(false);
   const [compareSelectedIds, setCompareSelectedIds] = useState<ReadonlySet<string>>(new Set());
+  const [comparing, setComparing] = useState(false);
 
-  useEffect(() => {
-    if (activeCharacterId === null) return;
-    let cancelled = false;
-    void (async () => {
-      const [cat, planetary, owned, corrected] = await Promise.all([
-        loadBlueprintCatalog(),
-        // Only the make-or-buy marker needs this one, so its failure costs a
-        // handful of verdicts rather than the whole page.
-        loadPi().catch(() => null),
-        loadCharacterBlueprints(activeCharacterId),
-        loadCorrectedSkills(activeCharacterId, Date.now(), { skipQueueWithoutScope: true }),
-      ]);
-      if (cancelled) return;
-      setCatalog(cat);
-      setPi(planetary);
-      setOwnedBlueprints(owned.cached?.data ?? []);
-      setBlueprintsNeedsReauth(owned.needsReauth);
-      // /skills lags until the character logs in; completed queue entries are
-      // the difference. Without them industry math undercounts skills.
-      const map: SkillLevels = {};
-      for (const [skillId, trained] of corrected.trained) map[skillId] = trained.level;
-      setSkills(map);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [activeCharacterId]);
-
-  // Writes the plan only — never selects it. A `useEffect` may call this
-  // (see below): React's set-state-in-effect check traces into called
-  // functions, so a helper an effect calls must never itself call a
-  // `useState` setter, even after an `await`. Callers that need the new
-  // plan selected (the blueprint-picker click handler; the render-time sync
-  // below) do that themselves, outside the effect.
   const createPlan = useCallback(
     async (
       entry: BlueprintCatalogEntry,
@@ -251,19 +158,8 @@ export function Industry() {
         mostRecentlyUpdatedPlan(plans),
         facilityDefaults,
         {
-          // The same assumed ME and TE Fit Import seeds its plans with (#626,
-          // #634). Passed here too so one blueprint cannot start at two
-          // different research levels depending on whether it was picked or
-          // imported; an owned copy still wins on both paths.
           assumedMe,
           assumedTe,
-          // An Offer's own numbers beat both (#637). The name carries them too:
-          // the reuse rule below lets a pilot hold a plain plan and one or more
-          // seeded plans for one blueprint, and three rows all reading "Rifter"
-          // would be unusable. Spelled field by field rather than spread:
-          // TypeScript's excess-property check does not see through a spread,
-          // so `{ ...seed }` would couple `BuildPlanSeed` to
-          // `NewBuildPlanOverrides` by field-name coincidence alone.
           ...(seed
             ? {
                 me: seed.me,
@@ -283,35 +179,69 @@ export function Industry() {
       scheduleSync(activeCharacterId);
       return plan.id;
     },
-    // `t` is load-bearing here, not incidental: this callback is a dependency
-    // of the create-if-missing effect below, so a `t` whose identity churned
-    // would re-fire a Dexie write. react-i18next only re-binds it on
-    // `languageChanged`, which cannot happen while the app is English-only —
-    // whoever adds a second locale needs to weigh that here.
     [activeCharacterId, ownedBlueprints, plans, facilityDefaults, assumedMe, assumedTe, t]
   );
 
-  // Detail-pane selection (which Build Plan/Group/Compare is showing), the
-  // `?product=`/`?material=` deep-link resolution and the last-opened-plan
-  // fallback — see `usePlanSelection` for why the effects live there too,
-  // not just the arithmetic.
-  const {
-    selection,
-    selectedGroupId,
-    comparing,
-    effectiveSelectedId,
-    selectedPlan,
-    selectPlan,
-    openGroup,
-    openCompare,
-    close: closeSelection,
-    closeIfComparing,
-  } = usePlanSelection({ plans, catalog, activeCharacterId, createPlan });
-
-  const comparePlans = useMemo(
-    () => plans?.filter((p) => compareSelectedIds.has(p.id)) ?? [],
-    [plans, compareSelectedIds]
-  );
+  // The Market Browser / Assets / BPC Search "jump to a Build Plan" deep
+  // links (`?product=<typeId>`, `?material=<typeId>`). Unlike the old
+  // `usePlanSelection`, this navigates to the plan's own route rather than
+  // setting in-memory selection — once resolved, the browser is simply on a
+  // different page, so there is no selection state left to keep in sync with
+  // the URL. Only the *unresolvable* cases stay on `/industry` and need the
+  // param cleaned up.
+  const productParam = searchParams.get('product');
+  const materialParam = searchParams.get('material');
+  const planSeed = useMemo(() => parsePlanSeed(searchParams), [searchParams]);
+  useEffect(() => {
+    if (activeCharacterId === null || !plans || !catalog) return;
+    if (productParam) {
+      const entry = catalog.byProductTypeID.get(Number(productParam)) ?? null;
+      const existing = entry
+        ? (plans.find(
+            (p) =>
+              p.blueprintTypeID === entry.blueprintTypeID &&
+              (planSeed === null || matchesPlanSeed(p, planSeed))
+          ) ?? null)
+        : null;
+      if (existing) {
+        navigate(`/industry/plans/${existing.id}`, { replace: true });
+        return;
+      }
+      if (entry) {
+        void createPlan(entry, planSeed).then((id) => {
+          if (id) navigate(`/industry/plans/${id}`, { replace: true });
+        });
+        return;
+      }
+      const next = new URLSearchParams(searchParams);
+      next.delete('product');
+      clearPlanSeed(next);
+      setSearchParams(next, { replace: true });
+      return;
+    }
+    if (materialParam) {
+      const materialPlan =
+        buildPlansByMaterialTypeID(plans, catalog).get(Number(materialParam)) ?? null;
+      if (materialPlan) {
+        navigate(`/industry/plans/${materialPlan.id}`, { replace: true });
+        return;
+      }
+      const next = new URLSearchParams(searchParams);
+      next.delete('material');
+      setSearchParams(next, { replace: true });
+    }
+  }, [
+    activeCharacterId,
+    plans,
+    catalog,
+    productParam,
+    materialParam,
+    planSeed,
+    searchParams,
+    setSearchParams,
+    createPlan,
+    navigate,
+  ]);
 
   const groups = useMemo(
     () => (activeCharacterId === null ? [] : buildGroupsFor(buildGroups, activeCharacterId)),
@@ -321,36 +251,99 @@ export function Industry() {
     () => new Set(activeCharacterId === null ? [] : (expandedGroups[activeCharacterId] ?? [])),
     [expandedGroups, activeCharacterId]
   );
-  const selectedGroup = useMemo(
-    () => groups.find((g) => g.id === selectedGroupId) ?? null,
-    [groups, selectedGroupId]
-  );
   const membersOfGroup = useCallback(
     (groupId: string) => plans?.filter((p) => p.buildGroupId === groupId) ?? [],
     [plans]
   );
-  const selectedGroupPlans = useMemo(
-    () => (selectedGroupId === null ? [] : membersOfGroup(selectedGroupId)),
-    [membersOfGroup, selectedGroupId]
+  const comparePlans = useMemo(
+    () => plans?.filter((p) => compareSelectedIds.has(p.id)) ?? [],
+    [plans, compareSelectedIds]
   );
-  /** The open plan's group's last Retarget (issue #632), for the quick-fill link. */
-  const selectedPlanGroupSnapshot = useMemo(() => {
-    const groupId = selectedPlan?.buildGroupId;
-    if (groupId === undefined) return null;
-    return groups.find((g) => g.id === groupId)?.snapshot ?? null;
-  }, [selectedPlan, groups]);
-  // Narrow screens show one column at a time (CONTEXT.md round 25); matches
-  // the grid's own `lg:` breakpoint so the JS-driven visibility and the CSS
-  // layout switch at the same width. Gated on the explicit `selectedId`, not
-  // `effectiveSelectedId`'s first-plan fallback, so a narrow-screen visitor
-  // lands on the list first, same as Mail/SkillPlans, rather than jumping
-  // straight to whichever plan the fallback picked. `comparing` participates
-  // in the same collapse (issue #453): it is a state of this detail pane, not
-  // a separate screen, so opening it on a narrow screen must navigate away
-  // from the list exactly like picking a plan does.
-  const isDesktop = useIsDesktop();
-  const detailVisible = isDesktop || selection.kind !== 'none';
-  const showBackControl = !isDesktop && selection.kind !== 'none';
+
+  // Est. total / Verdict / Runs for every row. `computeGroupResult: true`
+  // only for grouped plans — the extra owned-stock-disabled resolve
+  // `BuildGroupPanel` already pays for its one open group, paid here for
+  // every group at once so the group row can show its own rollup total;
+  // ungrouped plans skip it, since nothing on this page ever rolls them up.
+  const knownGroupIds = useMemo(() => new Set(groups.map((g) => g.id)), [groups]);
+  const groupedPlans = useMemo(
+    () =>
+      (plans ?? []).filter(
+        (p) => p.buildGroupId !== undefined && knownGroupIds.has(p.buildGroupId)
+      ),
+    [plans, knownGroupIds]
+  );
+  const ungroupedPlans = useMemo(
+    () =>
+      (plans ?? []).filter(
+        (p) => p.buildGroupId === undefined || !knownGroupIds.has(p.buildGroupId)
+      ),
+    [plans, knownGroupIds]
+  );
+  const groupedRows = useComparedBuildResults({
+    plans: groupedPlans,
+    catalog,
+    pi,
+    ownedBlueprints,
+    skills,
+    computeGroupResult: true,
+  });
+  const ungroupedRows = useComparedBuildResults({
+    plans: ungroupedPlans,
+    catalog,
+    pi,
+    ownedBlueprints,
+    skills,
+  });
+  const runCounts = useRunCountsByPlan(activeCharacterId ?? -1);
+
+  const statsByPlanId = useMemo(() => {
+    const map = new Map<string, PlanIndexStats>();
+    for (const row of [...groupedRows, ...ungroupedRows]) {
+      map.set(row.planId, {
+        totalCost: row.result?.totalCost ?? null,
+        verdict: row.result ? verdictOf(row.result.totalCost, row.result.buyCost) : 'unknown',
+        runs: runCounts.get(row.planId) ?? 0,
+      });
+    }
+    return map;
+  }, [groupedRows, ungroupedRows, runCounts]);
+
+  const statsByGroupId = useMemo(() => {
+    const rowByPlanId = new Map(groupedRows.map((row) => [row.planId, row]));
+    const map = new Map<string, { totalCost: number | null; verdict: PlanVerdictTag }>();
+    for (const group of groups) {
+      const members: BuildGroupMember[] = [];
+      for (const plan of groupedPlans) {
+        if (plan.buildGroupId !== group.id) continue;
+        const row = rowByPlanId.get(plan.id);
+        if (!row?.groupResult) continue;
+        const flattened = flattenBuildResult(row.groupResult);
+        members.push({
+          planId: row.planId,
+          planName: row.planName,
+          hubId: plan.hubId,
+          result: row.groupResult,
+          shoppingMaterials: flattened.shopping,
+          tableMaterials: flattened.table,
+        });
+      }
+      const settledCount = groupedPlans.filter((p) => p.buildGroupId === group.id).length;
+      if (members.length === 0 || members.length !== settledCount) {
+        map.set(group.id, { totalCost: null, verdict: 'unknown' });
+        continue;
+      }
+      const ownedStock = new Map(
+        Object.entries(group.ownedStock ?? {}).map(([typeID, qty]) => [Number(typeID), qty])
+      );
+      const rollup = rollUpBuildGroup(members, { ownedStock });
+      map.set(group.id, {
+        totalCost: rollup.totalCost,
+        verdict: verdictOf(rollup.totalCost, rollup.buyCost),
+      });
+    }
+    return map;
+  }, [groups, groupedPlans, groupedRows]);
 
   if (!hydrated) {
     return (
@@ -372,13 +365,13 @@ export function Industry() {
     };
     await db.buildPlans.add(copy);
     scheduleSync(activeCharacterId);
-    selectPlan(copy.id);
+    // Stays on the index, like rename/delete — duplicate is a list-management
+    // action here, not "go start editing this". Only a deep link
+    // (`?product=`/`?material=`) or an explicit row click opens a plan's own
+    // page.
   }
 
   async function handleDelete(id: string) {
-    // No explicit selection reset needed: effectiveSelectedId falls back
-    // automatically once `plans` no longer contains the deleted id.
-    // Tombstoned (not plain-deleted) so the remote copy can't resurrect it.
     if (activeCharacterId === null) return;
     await markBuildPlanDeleted(activeCharacterId, id);
     scheduleSync(activeCharacterId);
@@ -389,71 +382,9 @@ export function Industry() {
     if (activeCharacterId !== null) scheduleSync(activeCharacterId);
   }
 
-  /**
-   * Merges a patch into the stored record inside a transaction, never into
-   * `selectedPlan` from this render's closure.
-   *
-   * A whole-record `put` built on a closure snapshot silently reverts every
-   * field the patch does not mention back to whatever they were when that
-   * snapshot was taken — which wiped `buildHere` (ten build choices at once)
-   * whenever an async write landed with a stale one in hand.
-   * `saveSourcingEdit` has always taken this path for exactly this reason.
-   *
-   * `touch` is the only thing separating the plan's two whole-field writers.
-   * A pilot edit bumps `updatedAt`; a correction the app made for itself —
-   * today, a security band brought back into line with the plan's build
-   * system — deliberately does not. Merely opening a plan is not editing it:
-   * bumping the timestamp would make the last plan *viewed* win the "default a
-   * new plan from the most recently updated one" rule (#456), and would churn
-   * every device's sync for a value the pilot never changed.
-   */
-  async function writePlanPatch(patch: PlanPatch, touch: boolean) {
-    const planId = selectedPlan?.id;
-    if (planId === undefined) return;
-    await db.transaction('rw', db.buildPlans, async () => {
-      const stored = await db.buildPlans.get(planId);
-      if (!stored) return;
-      await db.buildPlans.put({ ...stored, ...patch, ...(touch ? { updatedAt: Date.now() } : {}) });
-    });
-    if (activeCharacterId !== null) scheduleSync(activeCharacterId);
-  }
-
-  async function handleUpdate(patch: PlanPatch) {
-    await writePlanPatch(patch, true);
-  }
-
-  async function handleDerivedFix(patch: PlanPatch) {
-    await writePlanPatch(patch, false);
-  }
-
-  /**
-   * "Use all" (issue #181), applied one row at a time through the very
-   * same write path a typed value takes. Awaited in sequence, not fired in
-   * parallel: each `saveSourcingEdit` merges into the record it reads inside
-   * its own transaction, so overlapping writes would drop all but the last.
-   */
-  async function handleSourcingChangeMany(patches: readonly SourcingPatchEntry[]) {
-    if (!selectedPlan) return;
-    for (const { typeID, patch } of patches) {
-      await saveSourcingEdit(selectedPlan.id, typeID, patch);
-    }
-    if (activeCharacterId !== null) scheduleSync(activeCharacterId);
-  }
-
-  async function handleSourcingChange(typeID: number, patch: MaterialSourcing) {
-    if (!selectedPlan) return;
-    await saveSourcingEdit(selectedPlan.id, typeID, patch);
-    if (activeCharacterId !== null) scheduleSync(activeCharacterId);
-  }
-
   function toggleCompareMode() {
     setCompareMode((wasOn) => {
-      // Turning off (from either state) always resets the selection and
-      // closes the table — the single exit path "Cancel" and "Done" share.
-      if (wasOn) {
-        setCompareSelectedIds(new Set());
-        closeIfComparing();
-      }
+      if (wasOn) setCompareSelectedIds(new Set());
       return !wasOn;
     });
   }
@@ -465,12 +396,6 @@ export function Industry() {
       else next.add(id);
       return next;
     });
-  }
-
-  /** Opens a group's rollup, and stands the row checkboxes down with it. */
-  function selectGroup(groupId: string) {
-    clearCompareMode();
-    openGroup(groupId);
   }
 
   async function setGroupExpanded(groupId: string, expanded: boolean) {
@@ -486,10 +411,7 @@ export function Industry() {
     await setBuildGroups(
       addBuildGroup(buildGroups, activeCharacterId, { id, name: t('industry.newGroupName') })
     );
-    // Opened as well as created: a group with nothing in it is the one state
-    // where an unopened row tells the pilot nothing at all.
     await setGroupExpanded(id, true);
-    selectGroup(id);
   }
 
   async function handleRenameGroup(groupId: string, name: string) {
@@ -497,19 +419,11 @@ export function Industry() {
     await setBuildGroups(renameBuildGroup(buildGroups, activeCharacterId, groupId, name));
   }
 
-  /** Asks first, but only when there are plans for the question to be about. */
   function requestDeleteGroup(groupId: string) {
     if (membersOfGroup(groupId).length === 0) void handleDeleteGroup(groupId);
     else setDeletingGroupId(groupId);
   }
 
-  /**
-   * Deleting a group orphans its plans; it never cascades.
-   *
-   * A Build Plan is worth more than its membership — the same call
-   * `markBuildPlanDeleted` makes about Production Runs, which it deliberately
-   * does not cascade to either. The members reappear in the ungrouped list.
-   */
   async function handleDeleteGroup(groupId: string) {
     if (activeCharacterId === null) return;
     setDeletingGroupId(null);
@@ -518,96 +432,14 @@ export function Industry() {
       buildGroups,
       setBuildGroups,
     });
-    if (selectedGroupId === groupId) closeSelection();
   }
 
-  /** Moves one plan between groups, or out of every group when `groupId` is null. */
   async function handleMovePlan(planId: string, groupId: string | null) {
     if (activeCharacterId === null) return;
     await moveBuildPlanToGroup(planId, groupId, activeCharacterId);
-    // Into a collapsed group the plan would simply vanish from the list, so
-    // the move opens its destination.
     if (groupId !== null) await setGroupExpanded(groupId, true);
   }
 
-  /**
-   * Applies a Retarget group's chosen hub/facility/security/build-system to
-   * every checked member plan (issue #632). See `buildGroupActions.ts` for
-   * the write itself.
-   */
-  async function handleRetargetGroup(
-    groupId: string,
-    target: Omit<BuildGroupSnapshot, 'appliedAt'>,
-    planIds: readonly string[]
-  ) {
-    if (activeCharacterId === null) return;
-    await retargetBuildGroup(groupId, target, planIds, {
-      characterId: activeCharacterId,
-      buildGroups,
-      setBuildGroups,
-    });
-  }
-
-  /**
-   * Craft Sweep on a Build Group (issue #696): the same one-shot bulk
-   * build/buy control from #695, run once per member — each member's own
-   * tree walked independently and only its own `buildHere` patched, never a
-   * shared tree. The persisted default is written first, from the choice
-   * the pilot just confirmed, rather than after the market fetch below: that
-   * fetch can take real wall-clock time, and spanning it with the
-   * `buildGroups` closure would risk overwriting a concurrent edit to the
-   * group with a stale read.
-   */
-  async function handleCraftSweepGroup(
-    groupId: string,
-    groupPlans: readonly BuildPlanRecord[],
-    options: { strategy: SweepStrategy; depth: number }
-  ) {
-    if (activeCharacterId === null || !catalog) return;
-    await setBuildGroups(
-      withGroupCraftSweepDefault(buildGroups, activeCharacterId, groupId, {
-        strategy: options.strategy,
-      })
-    );
-    const picks = await applyGroupCraftSweep(
-      groupPlans,
-      catalog,
-      pi,
-      ownedBlueprints,
-      skills,
-      assumedMe,
-      options
-    );
-    if (picks.size === 0) return;
-    await db.transaction('rw', db.buildPlans, async () => {
-      const stored = await db.buildPlans.bulkGet([...picks.keys()]);
-      const now = Date.now();
-      const updated = stored.flatMap((p) => {
-        if (!p) return [];
-        const picked = picks.get(p.id);
-        return picked ? [{ ...p, buildHere: [...picked], updatedAt: now }] : [];
-      });
-      await db.buildPlans.bulkPut(updated);
-    });
-    scheduleSync(activeCharacterId);
-  }
-
-  /** Group Owned Overlay (issue #697): writes the group's own owned-stock ledger wholesale. */
-  async function handleGroupOwnedStockChange(groupId: string, ownedStock: Record<number, number>) {
-    if (activeCharacterId === null) return;
-    await setBuildGroups(withGroupOwnedStock(buildGroups, activeCharacterId, groupId, ownedStock));
-  }
-
-  /** @see handleGroupOwnedStockChange */
-  async function handleGroupOwnedStockScopeChange(
-    groupId: string,
-    scope: OwnedStockScope | undefined
-  ) {
-    if (activeCharacterId === null) return;
-    await setBuildGroups(withGroupOwnedStockScope(buildGroups, activeCharacterId, groupId, scope));
-  }
-
-  /** Creates a group and one plan per buildable item in a pasted fit, then opens it. */
   async function handleFitImport(preview: FitToBuildPlansResult) {
     if (activeCharacterId === null || !catalog) return;
     const result = await applyFitImport(preview, {
@@ -628,17 +460,9 @@ export function Industry() {
     if (!result) return;
     await setGroupExpanded(result.groupId, true);
     setFitImportOpen(false);
-    selectGroup(result.groupId);
+    navigate(`/industry/groups/${result.groupId}`);
   }
 
-  /**
-   * Build Opportunities' "Add to Compare" (issue #642): seeds real,
-   * persisted Build Plans from the selected ranked rows, priced at the same
-   * owned-materials claim that ranked them, then hands the pilot straight to
-   * Compare. `OpportunitiesPanel` only lets the active Character's own rows
-   * be selected, so every seeded plan belongs here — no cross-character
-   * `scheduleSync` fan-out needed.
-   */
   async function handleAddOpportunitiesToCompare(rows: readonly OpportunityRow[]) {
     if (activeCharacterId === null || rows.length === 0) return;
     const newPlans = rows.map((row) =>
@@ -652,34 +476,20 @@ export function Industry() {
     await db.buildPlans.bulkAdd(newPlans);
     scheduleSync(activeCharacterId);
     setCompareSelectedIds(new Set(newPlans.map((p) => p.id)));
-    openCompare();
+    setComparing(true);
     setTab('plans');
-  }
-
-  function clearCompareMode() {
-    setCompareMode(false);
-    setCompareSelectedIds(new Set());
   }
 
   function exitCompare() {
-    clearCompareMode();
-    closeSelection();
+    setCompareMode(false);
+    setCompareSelectedIds(new Set());
+    setComparing(false);
   }
 
-  /**
-   * Records tab row click: jump to the run's own Build Plan on the Build
-   * Plans tab. Exits Compare first — otherwise the detail pane's own
-   * `comparing` branch (checked before `selectedPlan`) would keep showing
-   * the compare table instead of the run's plan if Compare was left open.
-   */
   function openRunFromRecords(buildPlanId: string) {
-    exitCompare();
-    // A plan inside a collapsed group has no row on screen, so selecting it
-    // would look like the click did nothing. Open its group first.
     const groupId = plans?.find((p) => p.id === buildPlanId)?.buildGroupId;
     if (groupId !== undefined) void setGroupExpanded(groupId, true);
-    selectPlan(buildPlanId);
-    setTab('plans');
+    navigate(`/industry/plans/${buildPlanId}`);
   }
 
   return (
@@ -730,7 +540,7 @@ export function Industry() {
               skills={skills}
               facilityDefaults={facilityDefaults}
               activeCharacterId={activeCharacterId}
-              ownedStockSnapshot={ownedStockSnapshot}
+              ownedStockSnapshot={workspace.ownedStockSnapshot}
               onAddToCompare={(rows) => void handleAddOpportunitiesToCompare(rows)}
             />
           ) : tab === 'records' ? (
@@ -741,136 +551,62 @@ export function Industry() {
               plans={plans}
               onOpenRun={openRunFromRecords}
             />
-          ) : (
-            // `lg:items-start`: grid items stretch to the row's height by
-            // default, so without this the list column (often just a couple
-            // of short rows) gets pulled up to match the detail column's
-            // full height, rendering as a tall, mostly-empty box.
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-[20rem_1fr] lg:items-start">
-              <Panel className={isDesktop || !detailVisible ? '' : 'hidden'}>
-                <BuildPlanList
-                  plans={plans}
-                  catalog={catalog}
-                  // Only mark a row selected when its detail is actually on
-                  // screen: the first-plan fallback would otherwise leave a row
-                  // highlighted on a narrow screen with nothing open.
-                  selectedId={detailVisible ? effectiveSelectedId : null}
-                  onSelect={selectPlan}
-                  onCreate={(entry) =>
-                    void createPlan(entry).then((id) => {
-                      if (id) selectPlan(id);
-                    })
-                  }
-                  onDuplicate={(id) => void handleDuplicate(id)}
-                  onDelete={(id) => void handleDelete(id)}
-                  onRename={(id, name) => void handleRename(id, name)}
-                  compareMode={compareMode}
-                  compareSelectedIds={compareSelectedIds}
-                  onToggleCompareMode={toggleCompareMode}
-                  onToggleCompareSelected={toggleCompareSelected}
-                  onOpenCompare={openCompare}
-                  groups={groups}
-                  expandedGroupIds={expandedGroupIds}
-                  selectedGroupId={detailVisible ? selectedGroupId : null}
-                  onToggleGroup={(groupId) =>
-                    void setGroupExpanded(groupId, !expandedGroupIds.has(groupId))
-                  }
-                  onSelectGroup={selectGroup}
-                  onCreateGroup={() => void handleCreateGroup()}
-                  onRenameGroup={(groupId, name) => void handleRenameGroup(groupId, name)}
-                  onDeleteGroup={requestDeleteGroup}
-                  onMovePlan={(planId, groupId) => void handleMovePlan(planId, groupId)}
-                  onOpenFitImport={() => setFitImportOpen(true)}
-                />
-              </Panel>
-
-              <article className={`space-y-2 ${detailVisible ? '' : 'hidden'}`}>
-                {showBackControl && (
-                  <Button
-                    size="sm"
-                    onClick={() => {
-                      if (comparing) exitCompare();
-                      else closeSelection();
-                    }}
-                  >
-                    {t('industry.backToList')}
+          ) : comparing ? (
+            comparePlans.length >= 2 ? (
+              <BuildPlanCompare
+                plans={comparePlans}
+                catalog={catalog}
+                pi={pi}
+                ownedBlueprints={ownedBlueprints}
+                skills={skills}
+                onDone={exitCompare}
+              />
+            ) : (
+              <EmptyState
+                title={t('industry.compareNeedMore')}
+                hint={t('industry.compareNeedMoreHint')}
+                action={
+                  <Button size="sm" onClick={exitCompare}>
+                    {t('industry.compareDone')}
                   </Button>
-                )}
-                <div className="space-y-4">
-                  {!detailVisible ? null : selectedGroup ? (
-                    <BuildGroupPanel
-                      key={selectedGroup.id}
-                      group={selectedGroup}
-                      plans={selectedGroupPlans}
-                      catalog={catalog}
-                      pi={pi}
-                      ownedBlueprints={ownedBlueprints}
-                      skills={skills}
-                      ownedStockSnapshot={ownedStockSnapshot}
-                      onOpenPlan={selectPlan}
-                      onRetarget={(target, planIds) =>
-                        void handleRetargetGroup(selectedGroup.id, target, planIds)
-                      }
-                      onCraftSweep={(options) =>
-                        handleCraftSweepGroup(selectedGroup.id, selectedGroupPlans, options)
-                      }
-                      onOwnedStockChange={(ownedStock) =>
-                        void handleGroupOwnedStockChange(selectedGroup.id, ownedStock)
-                      }
-                      onOwnedStockScopeChange={(scope) =>
-                        void handleGroupOwnedStockScopeChange(selectedGroup.id, scope)
-                      }
-                    />
-                  ) : comparing ? (
-                    comparePlans.length >= 2 ? (
-                      <BuildPlanCompare
-                        plans={comparePlans}
-                        catalog={catalog}
-                        pi={pi}
-                        ownedBlueprints={ownedBlueprints}
-                        skills={skills}
-                        onDone={exitCompare}
-                      />
-                    ) : (
-                      <EmptyState
-                        title={t('industry.compareNeedMore')}
-                        hint={t('industry.compareNeedMoreHint')}
-                        action={
-                          <Button size="sm" onClick={exitCompare}>
-                            {t('industry.compareDone')}
-                          </Button>
-                        }
-                      />
-                    )
-                  ) : selectedPlan ? (
-                    <BuildPlanDetail
-                      key={selectedPlan.id}
-                      plan={selectedPlan}
-                      catalog={catalog}
-                      pi={pi}
-                      ownedBlueprints={ownedBlueprints}
-                      skills={skills}
-                      ownedStockSnapshot={ownedStockSnapshot}
-                      corpOwnedStock={corpOwnedStock}
-                      onUpdate={(patch) => void handleUpdate(patch)}
-                      onDerivedFix={(patch) => void handleDerivedFix(patch)}
-                      onSourcingChange={(typeID, patch) => void handleSourcingChange(typeID, patch)}
-                      onSourcingChangeMany={(patches) => void handleSourcingChangeMany(patches)}
-                      onAddToQuickbar={quickbar.add}
-                      quickbarAvailable={quickbar.available}
-                      onShowInfo={(typeId, itemName) => setInfoModalItem({ typeId, itemName })}
-                      groupSnapshot={selectedPlanGroupSnapshot}
-                    />
-                  ) : plans.length > 0 ? (
-                    <div className="flex justify-center py-8">
-                      <Spinner label={t('common.loading')} />
-                    </div>
-                  ) : (
-                    <EmptyState title={t('industry.selectHint')} />
-                  )}
-                </div>
-              </article>
-            </div>
+                }
+              />
+            )
+          ) : (
+            <Panel>
+              <BuildPlanList
+                plans={plans}
+                catalog={catalog}
+                selectedId={null}
+                onSelect={(id) => navigate(`/industry/plans/${id}`)}
+                // Stays on the index, same as duplicate — the search box adds
+                // a row to manage, it doesn't presume the pilot wants to edit
+                // it immediately. `void`: `onCreate` only takes the entry.
+                onCreate={(entry) => void createPlan(entry)}
+                onDuplicate={(id) => void handleDuplicate(id)}
+                onDelete={(id) => void handleDelete(id)}
+                onRename={(id, name) => void handleRename(id, name)}
+                compareMode={compareMode}
+                compareSelectedIds={compareSelectedIds}
+                onToggleCompareMode={toggleCompareMode}
+                onToggleCompareSelected={toggleCompareSelected}
+                onOpenCompare={() => setComparing(true)}
+                groups={groups}
+                expandedGroupIds={expandedGroupIds}
+                selectedGroupId={null}
+                onToggleGroup={(groupId) =>
+                  void setGroupExpanded(groupId, !expandedGroupIds.has(groupId))
+                }
+                onSelectGroup={(groupId) => navigate(`/industry/groups/${groupId}`)}
+                onCreateGroup={() => void handleCreateGroup()}
+                onRenameGroup={(groupId, name) => void handleRenameGroup(groupId, name)}
+                onDeleteGroup={requestDeleteGroup}
+                onMovePlan={(planId, groupId) => void handleMovePlan(planId, groupId)}
+                onOpenFitImport={() => setFitImportOpen(true)}
+                statsByPlanId={statsByPlanId}
+                statsByGroupId={statsByGroupId}
+              />
+            </Panel>
           )}
         </>
       )}

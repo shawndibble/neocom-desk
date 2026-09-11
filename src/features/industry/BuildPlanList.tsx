@@ -20,11 +20,58 @@ import {
 import { Button, Caret, EmptyState, IconButton, TextInput } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import type { BuildPlanRecord } from '@/db';
+import { formatIsk } from '@/lib/isk';
 import { BlueprintPicker } from './BlueprintPicker';
 import { BuildPlanRowContextMenu } from './BuildPlanRowContextMenu';
 import type { BuildGroup } from './buildGroups';
 import { groupDropId, planDropId, planIdFromDropId, resolveGroupDrop } from './groupDrop';
 import type { BlueprintCatalog, BlueprintCatalogEntry } from './blueprintCatalog';
+
+/** Build-vs-buy verdict, compact enough for a list row's own column. */
+export type PlanVerdictTag = 'build' | 'buy' | 'unknown';
+
+/** One row's Est. total / Verdict / Runs — everything the pricing/records data supplies per plan. */
+export interface PlanIndexStats {
+  totalCost: number | null;
+  verdict: PlanVerdictTag;
+  runs: number;
+}
+
+const VERDICT_TAG_CLASS: Record<PlanVerdictTag, string> = {
+  build: 'text-isk-pos border-accent-dim',
+  buy: 'text-warning border-warning',
+  unknown: 'text-text-faint border-line',
+};
+
+function VerdictTag({ verdict }: { verdict: PlanVerdictTag }) {
+  const { t } = useTranslation();
+  const label =
+    verdict === 'build'
+      ? t('industry.verdictTagBuild')
+      : verdict === 'buy'
+        ? t('industry.verdictTagBuy')
+        : t('industry.verdictTagUnknown');
+  return (
+    <span
+      className={`rounded-xs border px-1.5 py-0.5 text-[0.625rem] font-semibold uppercase tracking-wide ${VERDICT_TAG_CLASS[verdict]}`}
+    >
+      {label}
+    </span>
+  );
+}
+
+/** `runs === 0` reads as "—", not "0" — an unraised plan is not the same statement as a plan with zero runs recorded. */
+function RunsCell({ runs }: { runs: number }) {
+  return <span className="tabular-nums text-text-dim">{runs > 0 ? runs : '—'}</span>;
+}
+
+function EstTotalCell({ totalCost }: { totalCost: number | null }) {
+  return (
+    <span className="tabular-nums text-text-dim">
+      {totalCost === null ? '—' : formatIsk(totalCost)}
+    </span>
+  );
+}
 
 /**
  * Hand-composed, because `closestCenter` — what both existing dnd lists use —
@@ -83,7 +130,7 @@ interface BuildPlanListProps {
   expandedGroupIds: ReadonlySet<string>;
   selectedGroupId: string | null;
   onToggleGroup: (groupId: string) => void;
-  /** Opens the group's own rollup in the detail pane. */
+  /** Opens the group's own rollup page (`/industry/groups/:id`). */
   onSelectGroup: (groupId: string) => void;
   onCreateGroup: () => void;
   onRenameGroup: (groupId: string, name: string) => void;
@@ -91,6 +138,10 @@ interface BuildPlanListProps {
   /** Moves one plan into a group, or out of every group when null. */
   onMovePlan: (planId: string, groupId: string | null) => void;
   onOpenFitImport: () => void;
+  /** Est. total / Verdict / Runs per plan row — `undefined` renders every column as "—". */
+  statsByPlanId: ReadonlyMap<string, PlanIndexStats>;
+  /** Est. total / Verdict per group row (rolled up from its members) — Runs has no group-level meaning. */
+  statsByGroupId: ReadonlyMap<string, { totalCost: number | null; verdict: PlanVerdictTag }>;
 }
 
 /**
@@ -149,6 +200,7 @@ type PlanRowProps = {
   dropKind: 'into' | 'out' | null;
   /** Set on a row sitting under its group's header, to step it in from the ungrouped ones. */
   indented?: boolean;
+  stats: PlanIndexStats | undefined;
 } & Pick<BuildPlanListProps, 'onSelect' | 'onDuplicate' | 'onDelete' | 'onRename'>;
 
 function PlanRow({
@@ -165,6 +217,7 @@ function PlanRow({
   onMovePlan,
   dropKind,
   indented = false,
+  stats,
 }: PlanRowProps) {
   const { t } = useTranslation();
   const [renaming, setRenaming] = useState(false);
@@ -257,6 +310,15 @@ function PlanRow({
           </button>
         </BuildPlanRowContextMenu>
       )}
+      <span className="w-20 shrink-0 text-right">
+        <EstTotalCell totalCost={stats?.totalCost ?? null} />
+      </span>
+      <span className="hidden w-14 shrink-0 justify-end sm:flex">
+        <VerdictTag verdict={stats?.verdict ?? 'unknown'} />
+      </span>
+      <span className="hidden w-8 shrink-0 text-right sm:block">
+        <RunsCell runs={stats?.runs ?? 0} />
+      </span>
       <IconButton
         size="sm"
         icon={<Icon.Close />}
@@ -282,6 +344,7 @@ function GroupHeader({
   onRename,
   onDelete,
   onToggleAllMembers,
+  stats,
 }: {
   group: BuildGroup;
   memberCount: number;
@@ -297,6 +360,7 @@ function GroupHeader({
   onRename: (name: string) => void;
   onDelete: () => void;
   onToggleAllMembers: (selected: boolean) => void;
+  stats: { totalCost: number | null; verdict: PlanVerdictTag } | undefined;
 }) {
   const { t } = useTranslation();
   const [renaming, setRenaming] = useState(false);
@@ -352,6 +416,17 @@ function GroupHeader({
         </button>
       )}
       <span className="shrink-0 tabular-nums text-text-dim">{memberCount}</span>
+      <span className="w-20 shrink-0 text-right">
+        <EstTotalCell totalCost={stats?.totalCost ?? null} />
+      </span>
+      <span className="hidden w-14 shrink-0 justify-end sm:flex">
+        <VerdictTag verdict={stats?.verdict ?? 'unknown'} />
+      </span>
+      {/* Runs has no group-level meaning — a group aggregates cost, not a
+          production history of its own — so this column stays a fixed-width
+          blank rather than a second dash competing with the plan rows' real
+          one for the reader's attention. */}
+      <span className="hidden w-8 shrink-0 sm:block" aria-hidden="true" />
       <IconButton
         size="sm"
         icon={<Icon.Rename />}
@@ -371,7 +446,16 @@ function GroupHeader({
   );
 }
 
-/** Build Plan CRUD list: create via blueprint search, select, duplicate, delete, rename inline. Owns Compare mode's row checkboxes (issue #453) and the Build Group rows (issue #626) — the comparison and the group rollup both render in `Industry.tsx`'s detail pane. A plan row can be dragged onto a group header or another group's row to move it (issue #627); `groupDrop.ts` decides what a drop meant. */
+/**
+ * Build Plan CRUD list: create via blueprint search, select, duplicate,
+ * delete, rename inline. Owns Compare mode's row checkboxes (issue #453) and
+ * the Build Group rows (issue #626). `onSelect`/`onSelectGroup` navigate to
+ * that plan's/group's own full-width page (`/industry/plans/:id`,
+ * `/industry/groups/:id`) rather than swapping an in-memory selection — this
+ * is now the whole `/industry` index, not a sidebar beside a detail column.
+ * A plan row can be dragged onto a group header or another group's row to
+ * move it (issue #627); `groupDrop.ts` decides what a drop meant.
+ */
 export function BuildPlanList({
   plans,
   catalog,
@@ -396,6 +480,8 @@ export function BuildPlanList({
   onDeleteGroup,
   onMovePlan,
   onOpenFitImport,
+  statsByPlanId,
+  statsByGroupId,
 }: BuildPlanListProps) {
   const { t } = useTranslation();
   const sensors = useSensors(
@@ -502,6 +588,7 @@ export function BuildPlanList({
       onToggleCompareSelected,
       groups,
       onMovePlan,
+      stats: statsByPlanId.get(plan.id),
     };
   }
 
@@ -585,6 +672,22 @@ export function BuildPlanList({
           // before the pointer runs off screen.
           autoScroll={{ threshold: { x: 0.2, y: 0.25 }, acceleration: 20 }}
         >
+          {/* Column labels for the three cells every row now carries. Not a
+              `role="table"` header — this list stays the flat `<ul>` above
+              (a nested list per group would announce "list, 1 item" before
+              every plan), so this is a plain labelled strip lined up with the
+              row cells by the same fixed widths, not real table cells. */}
+          <div className="flex items-center gap-2 border-b border-line bg-panel-2 px-2 py-1.5 text-[0.625rem] font-semibold tracking-widest text-text-dim uppercase">
+            <span className="flex-1">{t('industry.title')}</span>
+            <span className="w-20 shrink-0 text-right">{t('industry.estTotalColumn')}</span>
+            <span className="hidden w-14 shrink-0 justify-end sm:flex">
+              {t('industry.verdictColumn')}
+            </span>
+            <span className="hidden w-8 shrink-0 text-right sm:block">
+              {t('industry.runsColumn')}
+            </span>
+            <span className="w-9 shrink-0" aria-hidden="true" />
+          </div>
           <ul className="rounded-xs border border-line">
             {/* A group's header and its members are siblings in this one list,
                 not a nested `ul` per group: a nested list announces "list, 1
@@ -612,6 +715,7 @@ export function BuildPlanList({
                     onSelect={() => onSelectGroup(group.id)}
                     onRename={(name) => onRenameGroup(group.id, name)}
                     onDelete={() => onDeleteGroup(group.id)}
+                    stats={statsByGroupId.get(group.id)}
                     onToggleAllMembers={(selected) => {
                       // Toggled one row at a time, through the very callback a
                       // row's own checkbox uses, so the header can never write a
