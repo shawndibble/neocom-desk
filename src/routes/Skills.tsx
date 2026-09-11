@@ -384,7 +384,11 @@ export function Skills() {
           )}
 
           {searching && filterResult.visibleGroupNames.size === 0 ? (
-            <EmptyState title={t('skills.noResults')} className="py-8" />
+            <EmptyState
+              title={t('skills.noResults')}
+              hint={t('skills.noResultsHint')}
+              className="py-8"
+            />
           ) : (
             groups.map((group) => {
               if (searching && !filterResult.visibleGroupNames.has(group.groupName)) return null;

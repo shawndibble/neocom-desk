@@ -62,6 +62,7 @@
     "levelOfFive": "Level {{level}} of 5",
     "searchPlaceholder": "Search skills…",
     "noResults": "No skills match your search.",
+    "noResultsHint": "Clear the search to see every skill.",
     "expandAll": "Expand all",
     "collapseAll": "Collapse all",
     "attr": {
