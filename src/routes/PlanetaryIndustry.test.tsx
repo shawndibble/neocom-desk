@@ -495,6 +495,18 @@ describe('PlanetaryIndustry', () => {
     expect(within(panel).queryByText('Healthy')).not.toBeInTheDocument();
   });
 
+  it('pairs the no-pin-data title with a hint on why it happened, not just the title alone', async () => {
+    server.use(
+      http.get(`${ESI}/characters/${CHAR_ID}/planets/${PLANET_ID}`, () => HttpResponse.error())
+    );
+    render(<App />);
+    const panel = await colonyPanelFor(/Jita IV/);
+    expect(within(panel).getByText('No pin data cached for this colony')).toBeInTheDocument();
+    expect(
+      within(panel).getByText("Refresh to fetch this colony's deployed pins.")
+    ).toBeInTheDocument();
+  });
+
   it("lists an alt's cached programs beside the active character's, without fetching for it", async () => {
     const ALT_ID = 92;
     const ALT_PLANET_ID = 40000002;
