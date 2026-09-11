@@ -603,6 +603,69 @@ async function main() {
     };
   }
 
+  // --- marketWideTrees.json: flattened manufacturing material trees for the
+  // market-wide Build Opportunities scan (issue #819) ---
+  //
+  // For every manufacturing blueprint whose product is published and carries
+  // a Market Group (the only products the scan could ever rank — an
+  // unsellable product has no ISK/hour to compute), recursively expand any
+  // material that is itself a manufacturing blueprint's product down to base
+  // materials, at ME 0. This is an approximation (no ME/TE, no owned stock,
+  // no auto-make-or-buy — `computeBuildPlan` still does the real math once a
+  // row is turned into a Build Plan); what it buys is a scan that never
+  // resolves a sub-build tree live over the whole SDE, which is the ticket's
+  // explicit "precomputed, not resolved live" requirement.
+  const MARKET_WIDE_MAX_DEPTH = 10; // mirrors src/engine/industry/materialResolution.ts's MAX_SUB_BUILD_DEPTH
+  const manufacturingByProduct = new Map(); // productTypeID -> blueprintTypeID (first-wins, mirrors blueprintCatalog.ts)
+  for (const [typeID, bp] of Object.entries(blueprints)) {
+    if (bp.activity !== 'manufacturing') continue;
+    const product = bp.products[0];
+    if (!product) continue;
+    if (!manufacturingByProduct.has(product.typeID)) {
+      manufacturingByProduct.set(product.typeID, Number(typeID));
+    }
+  }
+  function flattenMaterials(blueprintTypeID, multiplier, depth, acc, visited) {
+    const bp = blueprints[blueprintTypeID];
+    for (const material of bp.materials) {
+      const subBlueprintTypeID = manufacturingByProduct.get(material.typeID);
+      const subBp = subBlueprintTypeID !== undefined ? blueprints[subBlueprintTypeID] : undefined;
+      const subOutput = subBp?.products.find((p) => p.typeID === material.typeID);
+      if (
+        subBlueprintTypeID !== undefined &&
+        subOutput &&
+        depth < MARKET_WIDE_MAX_DEPTH &&
+        !visited.has(subBlueprintTypeID)
+      ) {
+        flattenMaterials(
+          subBlueprintTypeID,
+          (multiplier * material.quantity) / subOutput.quantity,
+          depth + 1,
+          acc,
+          new Set(visited).add(subBlueprintTypeID)
+        );
+      } else {
+        acc.set(material.typeID, (acc.get(material.typeID) ?? 0) + multiplier * material.quantity);
+      }
+    }
+  }
+  const marketWideTrees = {};
+  for (const [productTypeID, blueprintTypeID] of manufacturingByProduct) {
+    const productType = types.get(productTypeID);
+    if (!productType || !productType.published || productType.marketGroupID === null) continue;
+    const bp = blueprints[blueprintTypeID];
+    const product = bp.products.find((p) => p.typeID === productTypeID);
+    const acc = new Map();
+    flattenMaterials(blueprintTypeID, 1, 0, acc, new Set([blueprintTypeID]));
+    marketWideTrees[productTypeID] = {
+      blueprintTypeID,
+      time: bp.time,
+      outputQuantity: product.quantity,
+      marketGroupID: productType.marketGroupID,
+      materials: [...acc].map(([typeID, quantity]) => ({ typeID, quantity })),
+    };
+  }
+
   // --- reprocessing.json: typeID -> what refining it returns (issue #537) ---
   //
   // Restricted to PUBLISHED types that carry a market group: the one caller is
@@ -1335,6 +1398,7 @@ async function main() {
   const outputs = [
     ['skills.json', skills],
     ['blueprints.json', blueprints],
+    ['marketWideTrees.json', marketWideTrees],
     ['reprocessing.json', reprocessing],
     ['types.json', typeMap],
     ['pi.json', pi],
@@ -1389,6 +1453,7 @@ async function main() {
     );
   }
   console.log(`  types map entries: ${Object.keys(typeMap).length}`);
+  console.log(`  market-wide trees: ${Object.keys(marketWideTrees).length}`);
   console.log(`  moon ore type ids: ${moonOreTypeIds.length}`);
   if (!moonOresParent || moonOreMarketGroupIds.size === 0 || moonOreTypeIds.length < 50) {
     console.error(

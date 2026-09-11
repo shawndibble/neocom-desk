@@ -77,7 +77,7 @@ here — they go one per file in `docs/context/decisions/`.
 - **Offer** (BPC Contract Search): one contract row in that snapshot — a single blueprint copy listing at a single price. Not a **copy**: one contract can offer `quantity: 3` copies at one price, so a count of offers is smaller than a count of copies. Every count on the search says "offers", because an offer is what a buyer chooses between.
 - **Build Group**: A named collection of **Build Plan**s belonging to one Character, which also totals as one — open a member and it behaves exactly like any other Build Plan; open the group and every material across its members is added up and costed (see **Group Rollup**). Membership is exclusive and groups do not nest. Membership lives only on the plan, as `buildGroupId`; the group's name, order and mere existence live in the `sync.industryBuildGroups` setting, so an emptied group survives having no members and no merge can hand one plan to two groups. Deleting a group orphans its plans rather than deleting them, and a `buildGroupId` naming a group that is gone renders as an ordinary ungrouped plan — the same rule the Mining Tax `groupId` follows. Written in full in code and docs, where a bare "group" would collide with **Market Group** or an item's **Group**; the Industry plan list's own copy says "group", since neither of those can be meant there. See **Auto Build** and **Group Owned Overlay** for two of a group's own operations, distinct from what it merely displays via **Group Rollup**.
 - **Build Location**: The search at the head of a Build Plan's Location & market group, over the stations and structures the Character can dock at. Picking one fills facility, **Build System** and security band in a single edit, and the plan remembers which place it was so the box can still name it after a reload. That name is a label only — every number reads the plan's own values, and any edit that moves the job elsewhere drops it. "Override" unfolds the fields behind the box. A manufacturing-activity plan can additionally carry a **Reaction Location** — a second, independent instance of this same control, gated by **Include Reactions**.
-- **Build Opportunities**: Industry's fourth tab (Build Plans / Records / BPC Sourcing / Opportunities, issue #642). Ranks every manufacturing blueprint original or copy the chosen Character(s) own by ISK/hour, owned-materials-adjusted, at the default Trade Hub — the same costing `computeBuildPlan`/`buildVsBuy` already do for a hand-made Build Plan, run over every owned blueprint instead of one. Reaction blueprints are excluded; invention/research/copying stay out of scope, same as **Build Plan**. Selecting rows seeds them into **Build Plan Compare** as ordinary Build Plans. See **Order Depth** for its own new vocabulary — the row-ranking auto-build depth setting this tab once had (issue #652) was removed as unused ahead of the **Auto Build** rename (issue #798).
+- **Build Opportunities**: Industry's fourth tab (Build Plans / Records / BPC Sourcing / Opportunities, issue #642). Ranks every manufacturing blueprint original or copy the chosen Character(s) own by ISK/hour, owned-materials-adjusted, at the default Trade Hub — the same costing `computeBuildPlan`/`buildVsBuy` already do for a hand-made Build Plan, run over every owned blueprint instead of one. Reaction blueprints are excluded; invention/research/copying stay out of scope, same as **Build Plan**. Selecting rows seeds them into **Build Plan Compare** as ordinary Build Plans. See **Order Depth** for its own new vocabulary — the row-ranking auto-build depth setting this tab once had (issue #652) was removed as unused ahead of the **Auto Build** rename (issue #798). Sits beside **Market-Wide Build Opportunities** (issue #819), the tab's ownership-independent sibling panel.
 - **Build Plan**: An industry plan for one blueprint or reaction formula: materials needed, costs, fees/taxes, time, and two independent verdicts — an **Acquisition Verdict** and a **Sale Profitability** read (see round 15). Covers manufacturing and reactions (issue #460); invention and research/copying are still out of scope (`.out-of-scope/`). Which activity a plan runs is derived from the picked blueprint/formula's own `activity`, never a separate field on the record.
 - **Build Strategy**: Which rule an **Auto Build** pass applies to every
   material it reaches within its **Craft Scope** — `buy` (force buy),
@@ -308,6 +308,22 @@ here — they go one per file in `docs/context/decisions/`.
   `Ships → Frigates → Standard Frigates`). Distinct from an item's **Group**
   (`invGroups`, a taxonomy that is not the market's). Only Market Groups with
   `hasTypes` hold items; the rest are branches.
+- **Market-Wide Build Opportunities**: The Opportunities tab's second panel
+  (issue #819) — ranks manufacturable products across the whole SDE by
+  ISK/hour, independent of ownership or material overlap with anything the
+  chosen Character owns; **Build Opportunities** itself only ever ranks
+  blueprints the Character(s) already hold. Reactions and PI stay excluded,
+  same as **Build Opportunities**. Opt-in ("Run market scan"), never
+  auto-computed. Candidates are bounded by a **Liquidity Floor** and a fixed
+  top-N per **Market Group**, computed against material trees precomputed at
+  SDE-build time (`public/data/marketWideTrees.json`,
+  `scripts/build-sde.mjs`) rather than resolved live — an ME-0 approximation;
+  selecting a row still opens a real Build Plan for exact numbers.
+- **Liquidity Floor**: The minimum sell-order ISK a product must carry at the
+  hub to be considered at all in **Market-Wide Build Opportunities** — the
+  same `sellPrice * sellVolume` depth `classifyOrderDepth` (**Order Depth**)
+  already reads, applied here as a hard cutoff before any material pricing
+  runs, not just a classification of a row already priced.
 - **Market Order Filled**: Fires when any of a Character's market orders
   completes — a sell order being bought out, or a buy order being delivered.
   Both directions count as one event type, not two.
