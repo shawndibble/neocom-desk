@@ -1152,7 +1152,7 @@ describe('MaterialsTable Blueprint Acquisition picker trigger (issue #839)', () 
     materialCostLines(MATERIALS, HUB_PRICES)
   ).map((row, i) => (i === 0 ? { ...row, acquisitionTier: { me: 8, te: 16 } } : row));
 
-  it('shows the picker trigger beside the tier caption when the caller supplied a handler', () => {
+  it('shows the picker trigger beside the material name when the caller supplied a handler', () => {
     renderTable({ materials: acquisitionRow, onOpenAcquisitionPicker: vi.fn() });
 
     expect(screen.getByText('ME 8% / TE 16%')).toBeInTheDocument();

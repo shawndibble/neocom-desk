@@ -29,4 +29,17 @@ describe('MarketItemLink', () => {
       '/market?type=9899&region=10000002'
     );
   });
+
+  it('shows a visible focus ring when focused via keyboard', () => {
+    render(
+      <MemoryRouter initialEntries={['/wallet']}>
+        <MarketItemLink typeId={9899}>Ocular Filter - Basic</MarketItemLink>
+      </MemoryRouter>
+    );
+
+    const link = screen.getByRole('link', { name: 'Ocular Filter - Basic' });
+    expect(link).toHaveClass('focus-visible:outline-2');
+    expect(link).toHaveClass('focus-visible:outline-offset-2');
+    expect(link).toHaveClass('focus-visible:outline-accent');
+  });
 });
