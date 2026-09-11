@@ -17,7 +17,7 @@
  */
 import { Fragment, useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { EmptyState, Modal, Spinner } from '@/components/ui';
+import { EmptyState, Modal, Spinner, TypeIcon } from '@/components/ui';
 import { groupItemAttributes, type AttributeGroup } from '@/engine/market/itemAttributes';
 import { parseItemDescription, type DescriptionRun } from '@/engine/market/itemDescription';
 import { summarizeOrderBook, type OrderBookSummary } from '@/engine/market/orderBook';
@@ -26,7 +26,6 @@ import { loadAttributeDictionary } from '@/sde/loadMarketSde';
 import { loadPi } from '@/sde/loadSde';
 import type { PiData } from '@/sde/types';
 import { formatDuration } from '@/lib/duration';
-import { typeIconUrl } from '@/lib/eveImages';
 import { formatIsk } from '@/lib/isk';
 import { getTradeHub } from '@/market/hubs';
 import { loadAttributeReferenceNames } from './attributeReferenceNames';
@@ -146,9 +145,9 @@ export function ItemDetailModal({ typeId, itemName, onClose }: ItemDetailModalPr
       ) : (
         <div className="space-y-4">
           <div className="flex items-start gap-3">
-            <img
-              src={typeIconUrl(typeId, 64)}
-              alt=""
+            <TypeIcon
+              typeId={typeId}
+              size={64}
               width={64}
               height={64}
               className="shrink-0 rounded-xs border border-line"

@@ -14,7 +14,14 @@
  */
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { DataTable, EmptyState, Modal, Spinner, type DataTableColumn } from '@/components/ui';
+import {
+  DataTable,
+  EmptyState,
+  Modal,
+  Spinner,
+  TypeIcon,
+  type DataTableColumn,
+} from '@/components/ui';
 import { loadContractItems } from './contractItems';
 import { loadContractLocationName } from './contractLocationName';
 import { loadTypeNames } from './typeNames';
@@ -29,7 +36,6 @@ import { BuildPlanContextMenu } from '@/features/industry/BuildPlanContextMenu';
 import { useMarketHub } from '@/features/market/hub';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import { IssuerLink } from './IssuerLink';
-import { typeIconUrl } from '@/lib/eveImages';
 import { formatIsk } from '@/lib/isk';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
@@ -151,9 +157,9 @@ export function ContractDetailModal({
       render: (item) => (
         <MarketItemLink typeId={item.type_id}>
           <span className="flex items-center gap-1.5">
-            <img
-              src={typeIconUrl(item.type_id, 32)}
-              alt=""
+            <TypeIcon
+              typeId={item.type_id}
+              size={32}
               width={20}
               height={20}
               className="shrink-0 rounded-xs border border-line"

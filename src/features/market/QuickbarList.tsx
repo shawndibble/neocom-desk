@@ -33,9 +33,9 @@ import {
   SelectTrigger,
   SelectValue,
   TextInput,
+  TypeIcon,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
-import { typeIconUrl } from '@/lib/eveImages';
 import { formatIsk, formatIskCompact, parseIskAmount } from '@/lib/isk';
 import { hasQuickbarTarget, type QuickbarTarget } from './quickbar';
 import type { QuickbarItem } from '@/db';
@@ -157,7 +157,7 @@ function QuickbarRow({ item, selected, onSelect, onRemove, onSetTarget }: Quickb
           selected ? 'text-accent' : 'text-text-dim'
         }`}
       >
-        <img src={typeIconUrl(item.typeId, 32)} alt="" className="h-4 w-4 shrink-0" />
+        <TypeIcon typeId={item.typeId} size={32} className="h-4 w-4 shrink-0" />
         <span className="truncate">{item.name}</span>
         {hasTarget && (
           <span className="shrink-0 text-text-faint">

@@ -25,6 +25,7 @@ export type { ModalPlacement } from './Modal';
 export { DataTable } from './DataTable';
 export type { DataTableColumn } from './DataTable';
 export { CharacterAvatar } from './CharacterAvatar';
+export { TypeIcon } from './TypeIcon';
 export { characterAvatarBoxClassName } from './characterAvatarBox';
 export type { CharacterAvatarSize } from './characterAvatarBox';
 export { FilterChip } from './FilterChip';

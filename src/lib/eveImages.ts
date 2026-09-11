@@ -12,6 +12,15 @@ export function typeIconUrl(typeId: number, size: 32 | 64 | 128): string {
   return `https://images.evetech.net/types/${typeId}/icon?size=${size}`;
 }
 
+/**
+ * Blueprints and reaction formulas have no `icon` render on the image
+ * server (it 400s) — only this one, under their own type ID. `TypeIcon`
+ * falls back to it when `typeIconUrl` fails to load.
+ */
+export function typeBlueprintIconUrl(typeId: number, size: 32 | 64 | 128): string {
+  return `https://images.evetech.net/types/${typeId}/bp?size=${size}`;
+}
+
 export function corporationLogoUrl(corporationId: number, size: 32 | 64 | 128 | 256): string {
   return `https://images.evetech.net/corporations/${corporationId}/logo?size=${size}`;
 }

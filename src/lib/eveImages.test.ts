@@ -3,6 +3,7 @@ import {
   allianceLogoUrl,
   characterPortraitUrl,
   corporationLogoUrl,
+  typeBlueprintIconUrl,
   typeIconUrl,
 } from './eveImages';
 
@@ -18,6 +19,12 @@ describe('typeIconUrl', () => {
   it('builds the EVE image server icon URL', () => {
     expect(typeIconUrl(9899, 64)).toBe('https://images.evetech.net/types/9899/icon?size=64');
     expect(typeIconUrl(9899, 32)).toBe('https://images.evetech.net/types/9899/icon?size=32');
+  });
+});
+
+describe('typeBlueprintIconUrl', () => {
+  it('builds the EVE image server blueprint icon URL', () => {
+    expect(typeBlueprintIconUrl(681, 64)).toBe('https://images.evetech.net/types/681/bp?size=64');
   });
 });
 
