@@ -46,7 +46,7 @@ export function CorpOfflineServices({ items }: CorpOfflineServicesProps) {
         {items.map((item) => (
           <li
             key={item.id}
-            className="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-xs border border-line bg-panel-2 px-2.5 text-xs whitespace-nowrap"
+            className="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-xs border border-line bg-panel-2 px-2.5 text-[0.6875rem] whitespace-nowrap"
           >
             {/*
               Decorative: the severity's name is the visible text beside it

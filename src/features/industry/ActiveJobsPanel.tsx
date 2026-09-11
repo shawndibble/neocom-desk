@@ -619,7 +619,7 @@ export function ActiveJobsPanel({
                 aria-valuenow={progress}
                 aria-valuemin={0}
                 aria-valuemax={100}
-                className="block h-1.5 w-16 shrink-0 overflow-hidden rounded-full bg-panel sm:w-24"
+                className="block h-1.5 w-16 shrink-0 overflow-hidden rounded-full bg-panel-2 sm:w-24"
               >
                 <span
                   className={`block h-full ${
