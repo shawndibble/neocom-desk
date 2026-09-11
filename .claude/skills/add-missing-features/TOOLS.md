@@ -132,10 +132,19 @@ Reusable heuristics — check a new candidate against these before drafting:
    independently: order-book depth chart. Also killed a Gantt job-scheduling
    timeline (`ActiveJobsPanel.tsx` already answers "when do jobs finish" as
    rows).
-4. **Engine exists but has one caller.** Grep the engine's _callers_, not
-   just its existence, before assuming full coverage — reprocessing and the
-   wallet balance chart were both real gaps hiding behind an already-built
-   engine used in exactly one place.
+4. **Engine exists but has one caller.** Caller *count* is not the signal —
+   a correctly-scoped single-purpose engine (e.g. `attributeCompareMatrix` →
+   `VariationsCompareModal`, `itemDescription` → `ItemDetailModal`) has
+   exactly one caller and is not a gap. The real test is exported capability
+   vs. consumed capability: does the caller use every field the engine
+   returns, or does something sit unread? Reprocessing and the wallet
+   balance chart were both real gaps of that shape. Re-run on 2026-09-10
+   against `orderFloor` (conditional call site) and `linkCost`'s exported
+   `greatCircleKm`: both came back clean (`floor.relist` *and* `floor.fill`
+   both reach `OrderDetailModal.tsx`; `greatCircleKm` is an internal helper
+   of `linksLoad`/`newLinkLoad`, exported only for direct unit testing) — no
+   new candidate, but confirms the sharper test is worth running before a
+   caller-count grep alone.
 5. **No historical ESI series.** System cost index has no ESI history at all
    (and 63% of systems sit at an identical floor) — kills any cost-index-
    over-time feature.
