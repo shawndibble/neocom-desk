@@ -8,6 +8,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#0d1117" />
     <title>Neocom Desk</title>
+    <!-- Matches --color-bg in src/styles/index.css — paints before any
+         CSS/JS loads so a reload (deploy update or otherwise) never flashes
+         the browser's default white background. -->
+    <style>
+      html,
+      body {
+        background-color: #0a0e14;
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>
