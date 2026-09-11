@@ -1,4 +1,5 @@
-import { Button } from './Button';
+import * as Icon from './icons';
+import { IconButton } from './IconButton';
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -12,6 +13,7 @@ interface ColumnPickerMenuProps<Id extends string, Row> {
   visible: readonly Id[];
   columnsById: Record<Id, DataTableColumn<Row>>;
   onToggle: (id: Id) => void;
+  /** Accessible name and tooltip text for the trigger — the picker itself is icon-only. */
   buttonLabel: string;
   menuTitle: string;
 }
@@ -39,7 +41,7 @@ export function ColumnPickerMenu<Id extends string, Row>({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button size="md">{buttonLabel}</Button>
+        <IconButton icon={<Icon.ColumnsPicker />} label={buttonLabel} />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-48">
         <p className="px-2 py-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">

@@ -39,6 +39,7 @@ import {
   Check,
   CheckCircle,
   Clipboard,
+  Columns as ColumnsGlyph,
   Copy,
   DotsSixVertical,
   DotsThreeVertical,
@@ -328,3 +329,5 @@ export const Blocked = withWeight(Prohibit);
 export const CardsView = withWeight(SquaresFour);
 /** Table view mode toggle. */
 export const TableView = withWeight(TableGlyph);
+/** Opens the column-visibility picker for a table. */
+export const ColumnsPicker = withWeight(ColumnsGlyph);
