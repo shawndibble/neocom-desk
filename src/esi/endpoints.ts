@@ -1960,6 +1960,8 @@ export function getCorporationAssets(
   });
 }
 
+// --- GET /corporations/{corporation_id}/blueprints (esi-corporations.read_blueprints.v1) ---
+
 /** The corp twin of `CharacterBlueprint` (issue #839) — same fields, ESI mirrors the shape field-for-field. */
 export interface CorporationBlueprint {
   item_id: number;
