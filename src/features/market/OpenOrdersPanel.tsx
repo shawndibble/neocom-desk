@@ -955,7 +955,7 @@ export function OpenOrdersPanel() {
               ))}
               <button
                 type="button"
-                className="text-xs text-text-dim underline hover:text-text"
+                className="rounded-xs text-[0.6875rem] font-semibold tracking-widest text-accent uppercase hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                 onClick={() => setFilter(DEFAULT_FILTER)}
               >
                 {t('market.orders.filter.clearAll')}
@@ -1041,7 +1041,7 @@ export function OpenOrdersPanel() {
                         {group.problem === 'healthy' && (
                           <button
                             type="button"
-                            className="text-xs text-accent underline hover:text-text"
+                            className="rounded-xs text-[0.6875rem] font-semibold tracking-widest text-accent uppercase hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                             onClick={toggle}
                           >
                             {t(
@@ -1098,7 +1098,7 @@ export function OpenOrdersPanel() {
           <div className="flex flex-wrap items-center gap-3 px-3 py-2">
             <button
               type="button"
-              className="text-xs text-text-dim underline hover:text-text"
+              className="rounded-xs text-[0.6875rem] font-semibold tracking-widest text-accent uppercase hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
               onClick={() => setLegendOpen(true)}
             >
               {t('market.orders.legendOpen')}
