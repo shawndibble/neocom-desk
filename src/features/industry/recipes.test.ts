@@ -364,4 +364,68 @@ describe('acquisitionForLookup', () => {
       line: { unitPrice: 999, owned: false },
     });
   });
+
+  it('honors a pilot-forced tier override over the cheapest owned tier (issue #839)', () => {
+    const acquisitionFor = acquisitionForLookup({
+      catalog,
+      pi: PI,
+      ownedBlueprints: [
+        {
+          item_id: 1,
+          type_id: 9841,
+          runs: -1,
+          material_efficiency: 0,
+          time_efficiency: 0,
+          quantity: 1,
+          location_id: 1,
+          location_flag: 'Hangar',
+        },
+        {
+          item_id: 2,
+          type_id: 9841,
+          runs: 10,
+          material_efficiency: 8,
+          time_efficiency: 16,
+          quantity: 1,
+          location_id: 1,
+          location_flag: 'Hangar',
+        },
+      ],
+      blueprintAcquisition: {
+        offersFor: () => [],
+        hubPrices: {},
+        sourcing: { 9841: { acquisitionTierOverride: { me: 8, te: 16 } } },
+      },
+    });
+    // The ME0 BPO is the cheapest tier (unlimited runs, no shortfall to buy),
+    // but the pilot pinned the ME8 BPC instead — that copy's own runs cover
+    // the 5 needed, so the line reports owned/free at the pinned tier.
+    const result = acquisitionFor(9840, 5, ctx, { 34: 10 });
+    expect(result).toEqual({
+      me: 8,
+      te: 16,
+      blueprintTypeID: 9841,
+      line: { unitPrice: 0, owned: true },
+    });
+  });
+
+  it('resolves a pilot-forced tier the character owns no matching copy of — an invisible copy, priced only by overridePrice', () => {
+    const acquisitionFor = acquisitionForLookup({
+      catalog,
+      pi: PI,
+      ownedBlueprints: [],
+      blueprintAcquisition: {
+        offersFor: () => [],
+        hubPrices: {},
+        sourcing: { 9841: { acquisitionTierOverride: { me: 10, te: 20 } } },
+      },
+    });
+    const result = acquisitionFor(9840, 5, ctx, { 34: 10 });
+    expect(result).toEqual({
+      me: 10,
+      te: 20,
+      blueprintTypeID: 9841,
+      line: { unitPrice: null, owned: false },
+    });
+  });
 });

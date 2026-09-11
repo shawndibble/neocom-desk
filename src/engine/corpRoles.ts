@@ -46,6 +46,12 @@ export interface CorpCapabilities {
    * roles open a division in the client but open nothing in ESI.
    */
   canReadAssets: boolean;
+  /**
+   * GET /corporations/{id}/blueprints — the corporation's own BPOs/BPCs
+   * (issue #839). Director-only, like `canReadAssets` and `canReadMembers`:
+   * `x-required-roles` on this route is `["Director"]` alone.
+   */
+  canReadBlueprints: boolean;
 }
 
 export type CorpCapability = keyof CorpCapabilities;
@@ -64,6 +70,7 @@ export const CORP_CAPABILITIES: readonly CorpCapability[] = [
   'canReadMembers',
   'canReadIndustry',
   'canReadAssets',
+  'canReadBlueprints',
 ];
 
 /** The answer for a Character with no roles — and the shape of "not loaded yet". */
@@ -74,6 +81,7 @@ export const NO_CORP_CAPABILITIES: CorpCapabilities = {
   canReadMembers: false,
   canReadIndustry: false,
   canReadAssets: false,
+  canReadBlueprints: false,
 };
 
 /**
@@ -99,6 +107,10 @@ const ROLES_FOR_CAPABILITY: Readonly<Record<CorpCapability, readonly string[]>> 
   // below already satisfies it, and repeating the string here would say there
   // is a second way in when there is not.
   canReadAssets: [],
+  // Same story on /corporations/{id}/blueprints: `x-required-roles` is
+  // ["Director"] alone (issue #839's own brief guessed Director/
+  // Factory_Manager, which the live spec does not confirm).
+  canReadBlueprints: [],
 };
 
 /**

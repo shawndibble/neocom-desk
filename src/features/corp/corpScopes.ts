@@ -68,6 +68,12 @@ export const CORP_SCOPES_FOR_CAPABILITY: Readonly<Record<CorpCapability, readonl
    * reach this surface at all.
    */
   canReadAssets: ['esi-assets.read_corporation_assets.v1', 'esi-corporations.read_divisions.v1'],
+  /**
+   * The corp twin of the base grant's `esi-characters.read_blueprints.v1`
+   * (issue #839) — its own scope, since a character granting the personal
+   * read says nothing about the corp one.
+   */
+  canReadBlueprints: ['esi-corporations.read_blueprints.v1'],
 };
 
 /**

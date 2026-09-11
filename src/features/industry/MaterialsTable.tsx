@@ -43,6 +43,13 @@ interface MaterialsTableProps {
    * where the caller has no modal to open, which simply drops the link.
    */
   onShowRecipe?: (typeID: number) => void;
+  /**
+   * Opens the picker/override modal (issue #839) for a Blueprint Acquisition
+   * row — present alongside `material.acquisitionTier` exactly where that
+   * caption renders. Omitted where the caller has no modal to open, which
+   * simply drops the trigger.
+   */
+  onOpenAcquisitionPicker?: (typeID: number) => void;
 }
 
 /** Blank or garbage clears the field; anything real is kept as-is (the engine clamps). */
@@ -353,6 +360,7 @@ export function MaterialsTable({
   canBuildHere,
   onToggleBuildHere,
   onShowRecipe,
+  onOpenAcquisitionPicker,
 }: MaterialsTableProps) {
   const { t } = useTranslation();
 
@@ -666,8 +674,17 @@ export function MaterialsTable({
                   the price tag above already says about it (owned,
                   overridden, or unpriced). */}
               {material.acquisitionTier && (
-                <span className="text-[0.6875rem] text-text-dim">
+                <span className="flex items-center gap-1 text-[0.6875rem] text-text-dim">
                   {t('industry.blueprintAcquisitionTier', material.acquisitionTier)}
+                  {onOpenAcquisitionPicker && (
+                    <IconButton
+                      variant="plain"
+                      size="sm"
+                      icon={<Icon.OptimizeRemaps />}
+                      label={t('industry.blueprintAcquisitionOpenPicker')}
+                      onClick={() => onOpenAcquisitionPicker(material.typeID)}
+                    />
+                  )}
                 </span>
               )}
             </span>
@@ -715,6 +732,7 @@ export function MaterialsTable({
       canBuildHere,
       onToggleBuildHere,
       onShowRecipe,
+      onOpenAcquisitionPicker,
     ]
   );
 

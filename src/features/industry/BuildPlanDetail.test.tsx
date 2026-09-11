@@ -9,6 +9,7 @@ import type { BuildPlanRecord } from '@/db';
 import type { BlueprintType, TypeMap } from '@/sde/types';
 import type { BlueprintCatalog, BlueprintCatalogEntry } from './blueprintCatalog';
 import type { CorpOwnedStockState } from './corpOwnedStock';
+import type { CorpOwnedBlueprintsState } from './corpOwnedBlueprints';
 import { EMPTY_OWNED_STOCK_SNAPSHOT } from './ownedStockDetection';
 import { BuildPlanDetail, type PlanPatch } from './BuildPlanDetail';
 
@@ -194,12 +195,19 @@ interface HarnessProps {
   onUpdate?: (patch: PlanPatch) => void;
   onDerivedFix?: (patch: PlanPatch) => void;
   corpOwnedStock?: Partial<CorpOwnedStockState>;
+  corpOwnedBlueprints?: Partial<CorpOwnedBlueprintsState>;
 }
 
 const CORP_OWNED_STOCK_UNAVAILABLE: CorpOwnedStockState = {
   source: null,
   corporationId: null,
   corporationName: null,
+  available: false,
+  incomplete: false,
+};
+
+const CORP_OWNED_BLUEPRINTS_UNAVAILABLE: CorpOwnedBlueprintsState = {
+  blueprints: [],
   available: false,
   incomplete: false,
 };
@@ -215,6 +223,7 @@ function Harness({
   onUpdate,
   onDerivedFix,
   corpOwnedStock,
+  corpOwnedBlueprints,
 }: HarnessProps) {
   const [plan, setPlan] = useState<BuildPlanRecord>(makePlan(planOverrides));
   return (
@@ -227,6 +236,7 @@ function Harness({
         skills={{}}
         ownedStockSnapshot={EMPTY_OWNED_STOCK_SNAPSHOT}
         corpOwnedStock={{ ...CORP_OWNED_STOCK_UNAVAILABLE, ...corpOwnedStock }}
+        corpOwnedBlueprints={{ ...CORP_OWNED_BLUEPRINTS_UNAVAILABLE, ...corpOwnedBlueprints }}
         onUpdate={(patch) => {
           onUpdate?.(patch);
           setPlan((p) => ({ ...p, ...patch }));
@@ -241,6 +251,7 @@ function Harness({
         quickbarAvailable
         onShowInfo={vi.fn()}
         groupSnapshot={null}
+        onSearchBpcSourcing={vi.fn()}
       />
     </MemoryRouter>
   );

@@ -388,12 +388,14 @@ describe('BuildGroupPanel — built materials in the group needs list (issue #80
     mockedUseComparedBuildResults.mockReturnValue([row('a', [builtMaterial(999, 1)])]);
     renderPanel([plan('a', 'jita')]);
 
+    // The Crafted section is its own panel now, beside Members — not inside
+    // "Everything this group needs."
+    expect(screen.getByText('Crafted in this group · 1')).toBeTruthy();
+    expect(screen.getAllByText('Crafted')).toHaveLength(1);
+    // Nothing else to buy, but the Crafted panel already explains why — the
+    // "already owned" empty state would call a crafted material "owned,"
+    // the exact confusion the Crafted panel exists to avoid.
     const needsPanel = screen.getByText('Everything this group needs').closest('section')!;
-    expect(within(needsPanel).getByText('Crafted in this group · 1')).toBeTruthy();
-    expect(within(needsPanel).getAllByText('Crafted')).toHaveLength(1);
-    // Nothing else to buy, but the Crafted section already explains why —
-    // the "already owned" empty state would call a crafted material
-    // "owned," the exact confusion this section exists to avoid.
     expect(
       within(needsPanel).queryByText('Nothing left to buy — every material is already owned.')
     ).toBeNull();
@@ -423,8 +425,8 @@ describe('BuildGroupPanel — built materials in the group needs list (issue #80
     ]);
     renderPanel([plan('a', 'jita')]);
 
+    expect(screen.getByText('Crafted in this group · 1')).toBeTruthy();
     const needsPanel = screen.getByText('Everything this group needs').closest('section')!;
-    expect(within(needsPanel).getByText('Crafted in this group · 1')).toBeTruthy();
     const buyRow = within(needsPanel).getByText('Tritanium').closest('tr')!;
     expect(within(buyRow).getByText('100', { selector: 'td:nth-of-type(2)' })).toBeTruthy();
   });

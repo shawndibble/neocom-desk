@@ -202,6 +202,7 @@ describe('useCorpAccess — ready', () => {
       canReadMembers: true,
       canReadIndustry: true,
       canReadAssets: true,
+      canReadBlueprints: true,
     });
   });
 

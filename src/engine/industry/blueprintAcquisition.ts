@@ -61,6 +61,23 @@ interface Candidate {
   extend: { capacityRuns: number; price: number } | null;
 }
 
+/**
+ * One ME/TE tier a buildable node could be quoted at, with its total plan
+ * cost (issue #839 — the picker/override modal lists every one of these,
+ * not just `selectBlueprintTier`'s cheapest). `cost` is the same number
+ * `candidateCost` uses to pick a winner: material cost at this tier plus
+ * whatever covering the shortfall costs, or `null` when unpriceable.
+ */
+export interface TierOption {
+  me: number;
+  te: number;
+  /** Runs already covered before buying anything; Infinity for a BPO. */
+  ownedRuns: number;
+  /** How to extend this exact tier by buying more, if anything can. */
+  extend: { capacityRuns: number; price: number } | null;
+  cost: number | null;
+}
+
 const INFINITE_RUNS = Number.POSITIVE_INFINITY;
 
 function tierKey(me: number, te: number): string {
@@ -123,14 +140,9 @@ function candidateCost(
   return materialCost + shortfallCost(shortfall, candidate.extend);
 }
 
-/**
- * Picks the cheapest overall ME/TE tier for one buildable node: every tier
- * the Character owns any runs at, plus the cheapest purchasable tier (BPC
- * Sourcing first, else the BPO's own sell price) — never mixing tiers within
- * one node. See docs/context/decisions/20260911-073307 for the full design.
- */
-export function selectBlueprintTier(inputs: SelectBlueprintTierInputs): BlueprintTierResult {
-  const { ownedCopies, neededRuns, materialCostAtMe, bpoSellPrice, assumedMeForUnowned } = inputs;
+/** Every ME/TE tier candidate for one buildable node, before pricing — the shared half of `tierOptions` and `selectBlueprintTier`. */
+function buildCandidates(inputs: SelectBlueprintTierInputs): Candidate[] {
+  const { ownedCopies, bpoSellPrice } = inputs;
 
   // BPC Sourcing is synced, untrusted data (a public contract archive) — a
   // listing with `runs: 0`/negative (anything but the -1 original sentinel)
@@ -172,28 +184,59 @@ export function selectBlueprintTier(inputs: SelectBlueprintTierInputs): Blueprin
     });
   }
 
-  if (candidates.length === 0) {
-    return { me: assumedMeForUnowned, te: 0, line: { unitPrice: null, owned: false } };
+  return candidates;
+}
+
+/**
+ * Every ME/TE tier a buildable node could be quoted at, each priced the same
+ * way `selectBlueprintTier` prices its winner (issue #839 — the
+ * picker/override modal lists these so a pilot can deliberately pick a tier
+ * other than the cheapest, e.g. to use up a worse owned copy first).
+ */
+export function tierOptions(inputs: SelectBlueprintTierInputs): readonly TierOption[] {
+  return buildCandidates(inputs).map((candidate) => ({
+    ...candidate,
+    cost: candidateCost(candidate, inputs.neededRuns, inputs.materialCostAtMe),
+  }));
+}
+
+/**
+ * What a specific tier resolves to for a node needing `neededRuns` — the same
+ * owned/shortfall logic `selectBlueprintTier` applies to its winner, exposed
+ * so the picker/override modal can resolve whichever `TierOption` the pilot
+ * picks, not only the cheapest.
+ */
+export function resolveTierOption(option: TierOption, neededRuns: number): BlueprintTierResult {
+  if (option.ownedRuns === INFINITE_RUNS) {
+    return { me: option.me, te: option.te, line: null };
+  }
+  const shortfall = Math.max(0, neededRuns - option.ownedRuns);
+  if (shortfall === 0) {
+    return { me: option.me, te: option.te, line: { unitPrice: 0, owned: true } };
+  }
+  const price = option.extend ? shortfallCost(shortfall, option.extend) : null;
+  return { me: option.me, te: option.te, line: { unitPrice: price, owned: false } };
+}
+
+/**
+ * Picks the cheapest overall ME/TE tier for one buildable node: every tier
+ * the Character owns any runs at, plus the cheapest purchasable tier (BPC
+ * Sourcing first, else the BPO's own sell price) — never mixing tiers within
+ * one node. See docs/context/decisions/20260911-073307 for the full design.
+ */
+export function selectBlueprintTier(inputs: SelectBlueprintTierInputs): BlueprintTierResult {
+  const options = tierOptions(inputs);
+
+  if (options.length === 0) {
+    return { me: inputs.assumedMeForUnowned, te: 0, line: { unitPrice: null, owned: false } };
   }
 
-  let winner = candidates[0];
-  let winnerCost = candidateCost(winner, neededRuns, materialCostAtMe);
-  for (const candidate of candidates.slice(1)) {
-    const cost = candidateCost(candidate, neededRuns, materialCostAtMe);
-    if (cost !== null && (winnerCost === null || cost < winnerCost)) {
-      winner = candidate;
-      winnerCost = cost;
+  let winner = options[0];
+  for (const option of options.slice(1)) {
+    if (option.cost !== null && (winner.cost === null || option.cost < winner.cost)) {
+      winner = option;
     }
   }
 
-  if (winner.ownedRuns === INFINITE_RUNS) {
-    return { me: winner.me, te: winner.te, line: null };
-  }
-
-  const shortfall = Math.max(0, neededRuns - winner.ownedRuns);
-  if (shortfall === 0) {
-    return { me: winner.me, te: winner.te, line: { unitPrice: 0, owned: true } };
-  }
-  const price = winner.extend ? shortfallCost(shortfall, winner.extend) : null;
-  return { me: winner.me, te: winner.te, line: { unitPrice: price, owned: false } };
+  return resolveTierOption(winner, inputs.neededRuns);
 }

@@ -93,6 +93,10 @@ export function Industry() {
 
   const [searchParams, setSearchParams] = useSearchParams();
   const tab = readIndustryTab(searchParams.get('tab'));
+  // The picker/override modal's "search BPC Sourcing" action (issue #839)
+  // lands here via `/industry?tab=sourcing&bpcSearch=<typeID>`.
+  const bpcSearchParam = searchParams.get('bpcSearch');
+  const bpcSearchTypeId = bpcSearchParam === null ? null : Number(bpcSearchParam);
   const setTab = useCallback(
     (next: IndustryTab) => {
       setSearchParams(
@@ -481,7 +485,7 @@ export function Industry() {
       ) : (
         <>
           {tab === 'sourcing' ? (
-            <BpcSourcingPanel />
+            <BpcSourcingPanel initialTypeId={bpcSearchTypeId} />
           ) : tab === 'opportunities' ? (
             <div className="flex flex-col gap-4">
               <OpportunitiesPanel
