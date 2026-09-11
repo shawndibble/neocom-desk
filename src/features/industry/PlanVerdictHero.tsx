@@ -24,7 +24,7 @@ const PILL_TONE: Record<PillTone, string> = {
  * as the separately-labelled statements ADR 0006 asks for, while the eye gets
  * the tone and the glyph — never colour alone (docs/DESIGN.md §7).
  */
-function VerdictPill({
+export function VerdictPill({
   label,
   tone,
   children,
