@@ -64,6 +64,7 @@ vi.mock('@/sde/loadSde', () => ({
   loadSkills: vi.fn(async () => FIXTURE_SKILLS),
   loadTypes: vi.fn(async () => ({})),
   loadBlueprints: vi.fn(async () => ({})),
+  loadMarketWideTrees: vi.fn(async () => ({})),
 }));
 
 const CHAR_A = 91;

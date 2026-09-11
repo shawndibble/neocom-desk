@@ -46,6 +46,7 @@ vi.mock('@/sde/loadSde', () => ({
   loadTypes: vi.fn(async () => ({})),
   loadBlueprints: vi.fn(async () => ({})),
   loadPi: vi.fn(async () => piData),
+  loadMarketWideTrees: vi.fn(async () => ({})),
 }));
 
 // The one price path, stubbed at the feature seam: `loadMarketSnapshot` goes

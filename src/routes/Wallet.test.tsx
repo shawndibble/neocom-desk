@@ -33,6 +33,7 @@ vi.mock('@/sde/loadSde', () => ({
   loadTypes: vi.fn(async () => TYPES),
   loadBlueprints: vi.fn(async () => ({})),
   loadPi: vi.fn(async () => ({ schematics: {}, raw: [] })),
+  loadMarketWideTrees: vi.fn(async () => ({})),
 }));
 
 const CHAR_ID = 91;

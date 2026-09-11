@@ -37,6 +37,7 @@ vi.mock('@/sde/loadSde', () => ({
   loadTypes: vi.fn(async () => ({})),
   loadBlueprints: vi.fn(async (): Promise<BlueprintMap> => BLUEPRINTS),
   loadPi: vi.fn(async () => ({ schematics: {}, raw: [] })),
+  loadMarketWideTrees: vi.fn(async () => ({})),
 }));
 
 vi.mock('@/app/syncStatus', async (importOriginal) => {
