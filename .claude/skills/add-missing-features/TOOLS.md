@@ -47,10 +47,13 @@ rehosted), EVE Orchestra (mining ledger/reprocessing/job tracking, corp
 mining tax), Alysii's PI Scheme (PI chain calculator, rehosted), EVE
 Planetary Planner (PI chain planner w/ market history, ~7yr active), Upwell
 Fuel Monitor (corp-director structure fuel tracker — already covered, see
-below). All confirmed live unless noted otherwise above.
+below), Esparto Industries (blueprint/reaction browser, reprocessing calc,
+moon-ore tax parsing, char sheet tabs — all already covered, tiny Discord).
+All confirmed live unless noted otherwise above.
 
 **Dead/abandoned, not gap-analysed this run:** EVE Panel (PI sim, iOS), EVE
-GURU/Production Ledger, EveTerminal.io, Mining Timer Tool.
+GURU/Production Ledger, EveTerminal.io, Mining Timer Tool, EVE Hauling
+Advisor (discontinued).
 
 **Skimmed by thread title only, confirmed out of domain** (mapping/intel/
 fitting-sim/crew-sim/DPS-meters/multibox/dev-tooling/feature-request threads
@@ -75,10 +78,10 @@ Insurgency Tools, Battlefield.Space, EVE OQM integration, "Loyalty point
 wallet/logs" (dev-recruitment thread).
 
 **The forum category JSON paginates** (`more_topics_url`). Fetch page 0 _and_
-page 1 minimum, keep following while present. Pages 0–10 (newest through
-~late 2023) are fully surveyed and hold no unsurveyed industry/market tool
-beyond this ledger — start at page 11 next time unless this ledger's own
-last-updated is old enough that new threads landed above page 0.
+page 1 minimum, keep following while present. Pages 0–15 are fully surveyed;
+16+ is 2022-and-older ESI/SSO Q&A archive with no live industry/market tool
+found in a sweep of three more pages past 10 — re-check page 0 for new
+threads on the next run instead of going deeper.
 
 ## Already covered — don't re-propose
 
@@ -187,6 +190,14 @@ what the Advisor already computes per-planet; don't re-propose.
     thing that would break this pattern — narrow it to a hand-added route
     outside the map with its own exemption test, don't assume it's a
     drop-in extension (#831).
+16. **SDE `invTypes.volume` is assembled volume, not packaged/cargo volume.**
+    Identical to packaged only for planetary commodities (verified in
+    `scripts/build-sde.mjs`'s own comment). For a ship/hull type the two can
+    differ 10-100x (Rifter: 27,289 m3 assembled vs. its much smaller packaged
+    volume). Kills or narrows any candidate that reports a *product*'s own
+    hauling volume (ships/structures are exactly the common product types);
+    fine for ordinary mineral/component *material* lines, where the two
+    coincide.
 
 ## Filed candidates
 
@@ -217,23 +228,21 @@ what the Advisor already computes per-planet; don't re-propose.
 | #827 | SHIP    | Skills: Market Fee Skill ROI panel (Broker Relations/Accounting) |
 | #831 | NARROW  | Appraisal shareable link — byte-capped typeId:qty payload, unauthenticated route outside ScopeGate |
 | #858 | SHIP    | Quickbar unrealized P&L against a player-entered cost basis, reusing existing price fetch |
+| #874 | SHIP    | Materials Table / Group Rollup total m3 volume, hauling-trip planning |
 
 ## Killed / dropped candidates (never filed)
 
 | Candidate | Reason |
 | --- | --- |
-| Hub arbitrage / trade route finder | Ships as `hubHaulGaps`; kill-test 1, re-confirmed 3x. |
+| Hub arbitrage/trade finder, corp ore buyback/payout split, EQM Corporate Exchange | Kill-test 1 (cross-player aggregation wall); arbitrage also ships as `hubHaulGaps`. |
 | System cost index watch | Kill-test 5. |
-| Corp ore buyback / fleet payout split | Kill-test 1. |
 | Skill Extractor ISK/hr comparison | Narrow reach (multi-account SP arbitrage). |
-| Market/order-book depth chart | Kill-test 3. |
+| Market/order-book depth chart, EVE Forge-style Gantt scheduling, Working Capital Locked stat | Kill-test 3 (picture of data already on screen; job cost is fee-only for the last one). |
 | Public item-exchange contract deal browser | Kill-test 6 (ADR 0013 at full scale). |
 | Price history %-change headline stat | Thin-volume days make a naive delta unreliable. |
 | Corp Wallet: balance chart to corp divisions | Narrow (Accountant-only); deferred. |
 | Build Plan material row → PI colony link | Colony cache is Dexie-only, cold for most players. |
-| EVE Forge-style Gantt production scheduling | Kill-test 3. |
 | Bulk relist / buy-queue automation | Kill-test 2. |
-| EQM Corporate Exchange | Kill-test 1. |
 | Asset staleness / idle-inventory detection | Kill-test 7. |
 | Player-structure pricing for Build Plans/Appraisal | Kill-test 9; widens a union for a minority. |
 | Total Assets Value chart over time | Kill-test 8 (rescoped from #712). |
@@ -247,6 +256,8 @@ what the Advisor already computes per-planet; don't re-propose.
 | Moon Survey / Metenox Yield Estimator | Narrow reach + kill-test 13. |
 | Metenox Moon Drill ongoing fuel/yield ledger (any framing, incl. a static no-depletion readout) | Narrow reach (moon-owning corp leadership only) + kill-test 13. Filed as #859, closed on rediscovering this entry. |
 | Market Movers / Trending Items dashboard | Kill-test 14. |
-| Working Capital Locked in the Pipeline stat | Kill-test 3; job cost is fee-only, not materials. |
 | PI Colony Layout Template (save/reuse pin layout) | Superseded by Advisor's per-planet fitted plan. |
 | Upwell Fuel Monitor-style structure fuel tracker | Already covered — `structureFuel` in corp board. |
+| Hauler-capacity trip-count estimator (player-typed cargo m3, derived trip count) | Reopens the settled hauling-cost decision’s exact reasoning — an unverifiable, app-cannot-check number — just relabeled as division instead of ISK/m3. |
+| Build Plan product output volume + haul distance to Trade Hub (hubHaulGaps mirror for a not-yet-listed product) | Kill-test 16 (assembled-volume defect hits ship products hardest, the common case); also overlaps Appraisal multi-hub compare once the product is pasted in — kill-test 3. |
+| PI colony output material volume (total m3 awaiting haul-out) | Not filed this run — plausible narrow follow-up to #874’s pattern, but needs a check of the Colonies/Reset-Run surface for an existing fill/capacity readout first (kill-test 3 risk unverified). |
