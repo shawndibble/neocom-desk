@@ -397,7 +397,17 @@ function BpcFilterBar({
  * data — this one is global and Firestore-backed, Industry's is per-character
  * and ESI-backed.
  */
-export function BpcSourcingPanel() {
+export interface BpcSourcingPanelProps {
+  /**
+   * Pre-selects this blueprint on mount (issue #839's picker/override modal:
+   * "a search action pre-filtered to the item, opening BPC Sourcing").
+   * `Industry.tsx` reads it from the `bpcSearch` query param. `null`/absent
+   * leaves the search on whatever the pilot was last browsing.
+   */
+  initialTypeId?: number | null;
+}
+
+export function BpcSourcingPanel({ initialTypeId = null }: BpcSourcingPanelProps = {}) {
   const { t } = useTranslation();
   const timeZone = useTimeZone();
   const { data, error, loading, hydrated, activeCharacterId, refresh } = useRouteSnapshot(
@@ -447,7 +457,18 @@ export function BpcSourcingPanel() {
    * cheapest-by-region comparison, neither of which means anything averaged
    * across several different blueprints.
    */
-  const [selectedTypeId, setSelectedTypeId] = useState<number | null>(null);
+  const [selectedTypeId, setSelectedTypeId] = useState<number | null>(initialTypeId);
+  // Adjusted during render, not an effect (React's own pattern for "store
+  // info from props" — an effect's setState would cost an extra render):
+  // re-applies whenever the caller passes a new id (e.g. the picker/override
+  // modal's search action fires again for a different blueprint while this
+  // panel stays mounted), which a `useState` initializer alone would miss
+  // past the first mount.
+  const [prevInitialTypeId, setPrevInitialTypeId] = useState(initialTypeId);
+  if (initialTypeId !== prevInitialTypeId) {
+    setPrevInitialTypeId(initialTypeId);
+    if (initialTypeId !== null) setSelectedTypeId(initialTypeId);
+  }
   /** The row whose contract detail is open, if any. */
   const [openRow, setOpenRow] = useState<BpcContractRow | null>(null);
 

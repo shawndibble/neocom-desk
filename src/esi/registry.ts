@@ -417,6 +417,16 @@ export const ESI_REGISTRY = {
     scope: 'esi-assets.read_corporation_assets.v1',
     group: 'corp',
   },
+  /**
+   * The corp twin of `getCharacterBlueprints` (issue #839) — the
+   * corporation's own BPOs/BPCs, Director-only per `x-required-roles`
+   * (`engine/corpRoles.ts`'s `canReadBlueprints`).
+   */
+  getCorporationBlueprints: {
+    route: '/corporations/{corporation_id}/blueprints',
+    scope: 'esi-corporations.read_blueprints.v1',
+    group: 'corp',
+  },
 } as const satisfies Record<EndpointName, EsiEndpointSpec>;
 
 export type EsiEndpointId = keyof typeof ESI_REGISTRY;

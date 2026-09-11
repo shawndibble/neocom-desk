@@ -40,6 +40,7 @@ export function IndustryPlanPage() {
     skills,
     ownedStockSnapshot,
     corpOwnedStock,
+    corpOwnedBlueprints,
     blueprintsNeedsReauth,
   } = workspace;
 
@@ -134,6 +135,7 @@ export function IndustryPlanPage() {
           skills={skills}
           ownedStockSnapshot={ownedStockSnapshot}
           corpOwnedStock={corpOwnedStock}
+          corpOwnedBlueprints={corpOwnedBlueprints}
           onUpdate={(patch) => void writePlanPatch(patch, true)}
           onDerivedFix={(patch) => void writePlanPatch(patch, false)}
           onSourcingChange={(typeID, patch) => void handleSourcingChange(typeID, patch)}
@@ -142,6 +144,7 @@ export function IndustryPlanPage() {
           quickbarAvailable={quickbar.available}
           onShowInfo={(typeId, itemName) => setInfoModalItem({ typeId, itemName })}
           groupSnapshot={groupSnapshot}
+          onSearchBpcSourcing={(typeId) => navigate(`/industry?tab=sourcing&bpcSearch=${typeId}`)}
         />
       )}
 

@@ -1959,3 +1959,29 @@ export function getCorporationAssets(
     maxPages: MAX_ASSET_PAGES,
   });
 }
+
+/** The corp twin of `CharacterBlueprint` (issue #839) — same fields, ESI mirrors the shape field-for-field. */
+export interface CorporationBlueprint {
+  item_id: number;
+  type_id: number;
+  /** -1 for an original (BPO); -2 or run count for a copy (BPC). */
+  runs: number;
+  material_efficiency: number;
+  time_efficiency: number;
+  quantity: number;
+  location_id: number;
+  location_flag: string;
+}
+
+/** Paginated (X-Pages); Director-only (`engine/corpRoles.ts`'s `canReadBlueprints`). */
+export function getCorporationBlueprints(
+  characterId: number,
+  corporationId: number,
+  options: EndpointOptions = {}
+): Promise<TruncatableResult<CorporationBlueprint>> {
+  return fetchAllPagesStatus<CorporationBlueprint>(`/corporations/${corporationId}/blueprints`, {
+    ...options,
+    characterId,
+    endpointId: 'getCorporationBlueprints',
+  });
+}

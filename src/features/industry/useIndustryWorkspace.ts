@@ -20,6 +20,7 @@ import { loadBlueprintCatalog, type BlueprintCatalog } from './blueprintCatalog'
 import { loadCharacterBlueprints } from './data';
 import { useOwnedStockSnapshot } from './useDetectedOwnedStock';
 import { useCorpOwnedStockSource, type CorpOwnedStockState } from './corpOwnedStock';
+import { useCorpOwnedBlueprints, type CorpOwnedBlueprintsState } from './corpOwnedBlueprints';
 import { useBuildGroups } from './buildGroups';
 import { useAssumedMe } from './assumedMe';
 import { useAssumedTe } from './assumedTe';
@@ -36,6 +37,7 @@ export interface IndustryWorkspace {
   skills: SkillLevels;
   ownedStockSnapshot: OwnedStockSnapshot;
   corpOwnedStock: CorpOwnedStockState;
+  corpOwnedBlueprints: CorpOwnedBlueprintsState;
   assumedMe: number;
   assumedTe: number;
   buildGroups: ReturnType<typeof useBuildGroups.getState>['value'];
@@ -55,6 +57,7 @@ export function useIndustryWorkspace(): IndustryWorkspace {
 
   const ownedStockSnapshot = useOwnedStockSnapshot();
   const corpOwnedStock = useCorpOwnedStockSource();
+  const corpOwnedBlueprints = useCorpOwnedBlueprints();
 
   const buildGroups = useBuildGroups((state) => state.value);
   const buildGroupsHydrated = useBuildGroups((state) => state.hydrated);
@@ -115,6 +118,7 @@ export function useIndustryWorkspace(): IndustryWorkspace {
     skills,
     ownedStockSnapshot,
     corpOwnedStock,
+    corpOwnedBlueprints,
     assumedMe,
     assumedTe,
     buildGroups,

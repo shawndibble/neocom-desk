@@ -525,6 +525,17 @@ export interface MaterialSourcing {
   ownedQuantity?: number;
   /** Unit price for the non-owned remainder, replacing the hub price. */
   overridePrice?: number;
+  /**
+   * A pilot-forced ME/TE tier for a Blueprint Acquisition row (issue #839),
+   * keyed the same way `overridePrice` already is: by the blueprint's own
+   * typeID, not per buildable node — tiers never mix within one node, so one
+   * override per blueprint type is enough. Bypasses `selectBlueprintTier`'s
+   * cost-minimization so a pilot can deliberately use up a worse owned copy
+   * first, or reseed the tier for a copy the app cannot see at all (a
+   * private contract or in-person trade) — that case pairs this with
+   * `overridePrice` for its cost, since nothing here priced it.
+   */
+  acquisitionTierOverride?: { me: number; te: number };
 }
 
 /** Sourcing overrides keyed by material typeID. Missing key = no overrides. */
