@@ -1270,8 +1270,26 @@ export function Market() {
 
       {section === 'orders' && <OpenOrdersPanel />}
 
-      {section === 'history' && <OrderHistoryPanel onViewChange={handleSectionChange} />}
-      {section === 'transactions' && <TransactionsPanel onViewChange={handleSectionChange} />}
+      {section === 'history' && (
+        <OrderHistoryPanel
+          onViewChange={handleSectionChange}
+          blueprintCatalog={blueprintCatalog}
+          onRequestBlueprintCatalog={ensureBlueprintCatalog}
+          onAddToQuickbar={handleAddToQuickbar}
+          quickbarAvailable={activeCharacterId !== null}
+          onShowInfo={handleShowInfo}
+        />
+      )}
+      {section === 'transactions' && (
+        <TransactionsPanel
+          onViewChange={handleSectionChange}
+          blueprintCatalog={blueprintCatalog}
+          onRequestBlueprintCatalog={ensureBlueprintCatalog}
+          onAddToQuickbar={handleAddToQuickbar}
+          quickbarAvailable={activeCharacterId !== null}
+          onShowInfo={handleShowInfo}
+        />
+      )}
 
       {/* The list itself lives in `useAppraisal` at route level, so switching
           to the Browser and back does not throw away a forty-line paste. */}
@@ -1328,7 +1346,7 @@ export function Market() {
                 <Spinner label={t('common.loading')} />
               </div>
             ) : filterResult && filterResult.visibleGroupIds.size === 0 ? (
-              <p className="pt-3 text-xs text-text-dim">{t('market.noResults')}</p>
+              <EmptyState title={t('market.noResults')} className="py-8" />
             ) : (
               <div className="mt-3 border-t border-line pt-2">
                 <MarketGroupTree

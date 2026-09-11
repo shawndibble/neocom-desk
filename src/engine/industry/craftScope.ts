@@ -2,7 +2,7 @@
  * Craft Scope's reaction eligibility (issue #698): the single answer to
  * "may a reaction-produced material be marked buildable on this plan right
  * now", shared by the recursive engine's own gate, the manual per-item
- * craft/buy toggle, and Craft Sweep's Craft Scope option — so the three can
+ * craft/buy toggle, and Auto Build's Craft Scope option — so the three can
  * never disagree (docs/context/decisions/20260910-082559-reaction-location-
  * a-second-facility-context-lets-craft.md).
  */

@@ -23,11 +23,6 @@ import {
   InfoTooltip,
   Modal,
   Panel,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
   Spinner,
   StatChip,
   type DataTableColumn,
@@ -56,10 +51,6 @@ import type { OwnedStockSnapshot } from './ownedStockDetection';
 import { buildOpportunityCandidates, type OpportunityRow } from './opportunities';
 import { useOpportunities } from './useOpportunities';
 import { useAssumedMe } from './assumedMe';
-import { MAX_AUTO_BUILD_DEPTH } from '@/engine/industry/autoMakeOrBuy';
-
-const AUTO_BUILD_DEPTH_OPTIONS = Array.from({ length: MAX_AUTO_BUILD_DEPTH + 1 }, (_, i) => i);
-const DEFAULT_AUTO_BUILD_DEPTH = 1;
 
 interface OpportunitiesPanelProps {
   catalog: BlueprintCatalog;
@@ -175,9 +166,8 @@ export function OpportunitiesPanel({
     [ownedByCharacter, characterNames, catalog]
   );
 
-  const [autoBuildDepth, setAutoBuildDepth] = useState(DEFAULT_AUTO_BUILD_DEPTH);
   // Same setting BuildPlanDetail.tsx uses for an owned-blueprint's unowned
-  // sub-builds — an auto-picked build quotes at the pilot's own assumption,
+  // sub-builds — a priced sub-build quotes at the pilot's own assumption,
   // not a hard 0, the same way a hand-ticked one would.
   const assumedMe = useAssumedMe((state) => state.value);
   const hydrateAssumedMe = useAssumedMe((state) => state.hydrate);
@@ -194,7 +184,6 @@ export function OpportunitiesPanel({
     skills,
     ownedStockSnapshot,
     ownedByCharacter,
-    autoBuildDepth,
     assumedMe,
   });
 
@@ -310,19 +299,7 @@ export function OpportunitiesPanel({
       align: 'right',
       className: 'tabular-nums',
       sortValue: (row) => row.result.marginPct ?? undefined,
-      render: (row) => (
-        <span className="flex items-center sm:justify-end gap-1">
-          {numericCell(row.result.marginPct, formatPercent, unknown)}
-          {row.buildHere.length > 0 && (
-            <InfoTooltip
-              label={t('industry.opportunitiesAutoBuildBadgeFor', {
-                name: row.candidate.catalogEntry.productName,
-              })}
-              content={t('industry.opportunitiesAutoBuildBadge')}
-            />
-          )}
-        </span>
-      ),
+      render: (row) => numericCell(row.result.marginPct, formatPercent, unknown),
     },
     {
       id: 'duration',
@@ -378,26 +355,6 @@ export function OpportunitiesPanel({
           onChange={setCharacterFilter}
         />
       )}
-      <span className="flex items-center gap-1.5 text-xs text-text-dim">
-        <span className="whitespace-nowrap">{t('industry.opportunitiesAutoBuildDepthLabel')}</span>
-        <Select
-          value={String(autoBuildDepth)}
-          onValueChange={(value) => setAutoBuildDepth(Number(value))}
-        >
-          <SelectTrigger size="sm" aria-label={t('industry.opportunitiesAutoBuildDepthLabel')}>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {AUTO_BUILD_DEPTH_OPTIONS.map((depth) => (
-              <SelectItem key={depth} value={String(depth)}>
-                {depth === 0
-                  ? t('industry.opportunitiesAutoBuildDepthOff')
-                  : t('industry.opportunitiesAutoBuildDepthLevels', { count: depth })}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </span>
       {oldestFetchedAt && <DataAgeBadge date={oldestFetchedAt} />}
     </span>
   );

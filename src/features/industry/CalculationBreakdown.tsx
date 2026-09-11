@@ -40,7 +40,8 @@ interface CalculationBreakdownProps {
   context: BreakdownContext;
 }
 
-function Section({ title, children }: { title: string; children: ReactNode }) {
+/** Also used by `RealizedProfitBreakdown`, the Production Run sibling of this modal. */
+export function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="space-y-1.5">
       <h3 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
@@ -52,7 +53,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 }
 
 /** A worked line: the formula with this plan's own numbers substituted in. */
-function Formula({ children }: { children: ReactNode }) {
+export function Formula({ children }: { children: ReactNode }) {
   return (
     <p className="overflow-x-auto rounded-xs border border-line bg-panel-2 px-2 py-1 font-mono text-[0.6875rem] whitespace-nowrap text-text-dim tabular-nums">
       {children}

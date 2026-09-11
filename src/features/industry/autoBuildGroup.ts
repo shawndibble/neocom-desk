@@ -1,6 +1,6 @@
 /**
- * Craft Sweep, generalized to a Build Group (issue #696): the same one-shot
- * bulk build/buy control from #695 (`CraftSweepControl.tsx`,
+ * Auto Build, generalized to a Build Group (issue #696): the same one-shot
+ * bulk build/buy control from #695 (`AutoBuildControl.tsx`,
  * `autoMakeOrBuy.ts`), run once per member independently. Each member's own
  * material tree is walked with its own facility/hub/security/blueprint/ME —
  * there is no single shared tree for a group the way `groupRollup.ts` merges
@@ -12,7 +12,11 @@
  */
 import type { BuildPlanRecord } from '@/db';
 import type { CharacterBlueprint } from '@/esi/endpoints';
-import { autoBuildHere, maxSweepDepth, type SweepStrategy } from '@/engine/industry/autoMakeOrBuy';
+import {
+  autoBuildHere,
+  maxAutoBuildDepth,
+  type BuildStrategy,
+} from '@/engine/industry/autoMakeOrBuy';
 import { craftScope, reactionCraftEligible } from '@/engine/industry/craftScope';
 import type { MakeMethod, MakeOrBuyContext, MaterialRecipe } from '@/engine/industry/makeOrBuy';
 import type { IndustryBlueprint, SkillLevels } from '@/engine/industry/types';
@@ -24,7 +28,7 @@ import { loadMarketSnapshots, type MarketSnapshot } from './marketData';
 import {
   facilityContextFor,
   reactionPlanFacilityContextFor,
-  sweepDepthContext,
+  autoBuildDepthContext,
   type PlanFacilityContext,
 } from './planFacilityContext';
 import { materialPricesFor } from './priceBasis';
@@ -53,9 +57,9 @@ function resolveMember(plan: BuildPlanRecord, catalog: BlueprintCatalog): Resolv
  * Craft Scope for the group's own chip row (issue #698): Manufacturing is
  * always eligible; Reactions lights up the moment any single member is
  * eligible for it (Include Reactions on, or that member's own activity is a
- * reaction) — a sweep still resolves each member's own scope independently
- * in `applyGroupCraftSweep`, this only answers whether the chip should ever
- * light up at all. Planetary stays reserved.
+ * reaction) — an Auto Build pass still resolves each member's own scope
+ * independently in `applyGroupAutoBuild`, this only answers whether the chip
+ * should ever light up at all. Planetary stays reserved.
  */
 export function groupCraftScope(
   plans: readonly BuildPlanRecord[],
@@ -74,16 +78,16 @@ export function groupCraftScope(
 }
 
 /**
- * The group's Sweep Depth ceiling: the deepest level any single member's own
+ * The group's depth ceiling: the deepest level any single member's own
  * tree reaches, the same way a solo plan sizes its own control
- * (`BuildPlanDetail.tsx`'s `craftSweepMaxDepth`). Needs no live prices —
- * depth discovery never prices anything (`maxSweepDepth`'s own doc comment)
- * — so, unlike `applyGroupCraftSweep`, this never waits on a market fetch.
+ * (`BuildPlanDetail.tsx`'s `autoBuildMaxDepth`). Needs no live prices —
+ * depth discovery never prices anything (`maxAutoBuildDepth`'s own doc comment)
+ * — so, unlike `applyGroupAutoBuild`, this never waits on a market fetch.
  * A member whose blueprint no longer resolves contributes nothing, the same
  * "skip, don't zero" policy `groupRollup.ts` applies to an unresolvable
  * member.
  */
-export function groupCraftSweepMaxDepth(
+export function groupAutoBuildMaxDepth(
   plans: readonly BuildPlanRecord[],
   catalog: BlueprintCatalog,
   recipeFor: (typeID: number) => MaterialRecipe | null,
@@ -93,21 +97,21 @@ export function groupCraftSweepMaxDepth(
   for (const plan of plans) {
     const member = resolveMember(plan, catalog);
     if (!member) continue;
-    const ctx = sweepDepthContext(
+    const ctx = autoBuildDepthContext(
       member.facilityContext,
       member.reactionPlanFacilityContext,
       skills
     );
     deepest = Math.max(
       deepest,
-      maxSweepDepth(member.blueprint, plan.me, { recipeFor, ctx, runs: plan.runs })
+      maxAutoBuildDepth(member.blueprint, plan.me, { recipeFor, ctx, runs: plan.runs })
     );
   }
   return deepest;
 }
 
 /**
- * Applies one Sweep Strategy + Sweep Depth to every member independently:
+ * Applies one Build Strategy, at the group's own depth ceiling, to every member independently:
  * each member is priced at its own hub/build-system (batched by hub, the
  * same `loadMarketSnapshots` union `useComparedBuildResults.ts` uses), then
  * walked with its own facility/ME/runs. Returns the picked `buildHere` set
@@ -116,14 +120,14 @@ export function groupCraftSweepMaxDepth(
  * is left out of the returned map entirely, contributing nothing rather than
  * an empty set.
  */
-export async function applyGroupCraftSweep(
+export async function applyGroupAutoBuild(
   plans: readonly BuildPlanRecord[],
   catalog: BlueprintCatalog,
   pi: PiData | null,
   ownedBlueprints: readonly CharacterBlueprint[],
   skills: SkillLevels,
   assumedMe: number,
-  options: { strategy: SweepStrategy; depth: number }
+  options: { strategy: BuildStrategy; depth: number }
 ): Promise<Map<string, Set<number>>> {
   const members = plans.flatMap((plan) => {
     const member = resolveMember(plan, catalog);
@@ -148,7 +152,7 @@ export async function applyGroupCraftSweep(
 
   // A second, independent batch for only the members with a Reaction
   // Location configured (issue #698) — most groups have none, so this is
-  // usually a no-op rather than doubling every group sweep's price fetch.
+  // usually a no-op rather than doubling every group Auto Build's price fetch.
   const reactionMembers = members.filter((m) => m.reactionPlanFacilityContext !== null);
   const reactionSnapshots =
     reactionMembers.length > 0

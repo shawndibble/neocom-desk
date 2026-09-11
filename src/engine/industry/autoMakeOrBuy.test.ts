@@ -2,8 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   autoBuildHere,
   facilityContextForNode,
-  maxSweepDepth,
-  MAX_AUTO_BUILD_DEPTH,
+  maxAutoBuildDepth,
 } from '@/engine/industry/autoMakeOrBuy';
 import { makeOrBuy, type MakeOrBuyContext, type MaterialRecipe } from '@/engine/industry/makeOrBuy';
 import { effectiveMaterials } from '@/engine/industry/materials';
@@ -85,16 +84,15 @@ describe('autoBuildHere', () => {
     );
   });
 
-  it('is no longer clamped to MAX_AUTO_BUILD_DEPTH — that constant is Build Opportunities UI sizing only', () => {
-    expect(MAX_AUTO_BUILD_DEPTH).toBe(3);
+  it('walks past the old Build Opportunities 0-3 UI range once that control is removed', () => {
     const result = autoBuildHere(productBlueprint, 0, { recipeFor, ctx, depth: 99, runs: 1 });
-    // gearD (499) is a 4th, still-cheaper-to-build level, once excluded only
-    // because the old MAX_AUTO_BUILD_DEPTH=3 clamp bit — it must be reached
-    // now that the walk's only ceiling is MAX_SUB_BUILD_DEPTH.
+    // gearD (499) is a 4th level, reachable now that the walk's only ceiling
+    // is MAX_SUB_BUILD_DEPTH — the removed Opportunities picker used to stop
+    // a caller from ever requesting past 3.
     expect(result).toEqual(new Set([502, 501, 500, 499]));
   });
 
-  it('bounds an unbounded requested depth at MAX_SUB_BUILD_DEPTH, not MAX_AUTO_BUILD_DEPTH', () => {
+  it('bounds an unbounded requested depth at MAX_SUB_BUILD_DEPTH', () => {
     const chainLength = MAX_SUB_BUILD_DEPTH + 2;
     // A uniform manufacturing chain typeID[i] <- typeID[i+1] <- ... <- Tritanium
     // (raw, unbuildable), each step wildly cheaper to build than to buy so a
@@ -211,7 +209,7 @@ describe('autoBuildHere', () => {
     expect(result).toEqual(new Set([501]));
   });
 
-  it("'build' Sweep Strategy forces every Craft-Scope-eligible material buildable, bypassing the cost compare", () => {
+  it("'build' Build Strategy forces every Craft-Scope-eligible material buildable, bypassing the cost compare", () => {
     const dear: MakeOrBuyContext = { ...ctx, materialPrices: { ...ctx.materialPrices, 502: 1 } };
     const result = autoBuildHere(productBlueprint, 0, {
       recipeFor,
@@ -223,7 +221,7 @@ describe('autoBuildHere', () => {
     expect(result).toEqual(new Set([502]));
   });
 
-  it("'buy' Sweep Strategy forces every Craft-Scope-eligible material to buy, even when building is cheaper", () => {
+  it("'buy' Build Strategy forces every Craft-Scope-eligible material to buy, even when building is cheaper", () => {
     const result = autoBuildHere(productBlueprint, 0, {
       recipeFor,
       ctx,
@@ -234,7 +232,7 @@ describe('autoBuildHere', () => {
     expect(result.size).toBe(0);
   });
 
-  it("'build' Sweep Strategy still respects Craft Scope — a reaction material stays excluded but its inputs are still reached", () => {
+  it("'build' Build Strategy still respects Craft Scope — a reaction material stays excluded but its inputs are still reached", () => {
     const reactionRecipes: Record<number, MaterialRecipe> = {
       502: { method: 'reaction', blueprint: gearABlueprint },
       501: { method: 'manufacturing', blueprint: gearBBlueprint, me: 0 },
@@ -330,19 +328,19 @@ describe('autoBuildHere', () => {
   });
 });
 
-describe('maxSweepDepth', () => {
+describe('maxAutoBuildDepth', () => {
   it('is 0 for a product whose materials are all raw (nothing has a recipe)', () => {
     const mined: IndustryBlueprint = {
       ...productBlueprint,
       materials: [{ typeID: 34, quantity: 10 }],
     };
-    expect(maxSweepDepth(mined, 0, { recipeFor, ctx, runs: 1 })).toBe(0);
+    expect(maxAutoBuildDepth(mined, 0, { recipeFor, ctx, runs: 1 })).toBe(0);
   });
 
   it("reaches the full depth of the product's real material chain", () => {
     // product(600) <- 502 <- 501 <- 500 <- 499 <- Tritanium(34, unbuildable):
     // four levels have a recipe, so the tree bottoms out at depth 4.
-    expect(maxSweepDepth(productBlueprint, 0, { recipeFor, ctx, runs: 1 })).toBe(4);
+    expect(maxAutoBuildDepth(productBlueprint, 0, { recipeFor, ctx, runs: 1 })).toBe(4);
   });
 
   it('is capped at MAX_SUB_BUILD_DEPTH for a chain deeper than the safety valve', () => {
@@ -366,7 +364,7 @@ describe('maxSweepDepth', () => {
       materials: [{ typeID: ids[0]!, quantity: 1 }],
       products: [{ typeID: 99999, quantity: 1 }],
     };
-    const result = maxSweepDepth(root, 0, {
+    const result = maxAutoBuildDepth(root, 0, {
       recipeFor: (id) => chainRecipes[id] ?? null,
       ctx,
       runs: 1,
@@ -382,7 +380,7 @@ describe('maxSweepDepth', () => {
       502: { method: 'reaction', blueprint: gearABlueprint },
       501: { method: 'manufacturing', blueprint: gearBBlueprint, me: 0 },
     };
-    const result = maxSweepDepth(productBlueprint, 0, {
+    const result = maxAutoBuildDepth(productBlueprint, 0, {
       recipeFor: (id) => reactionRecipes[id] ?? null,
       ctx,
       runs: 1,
@@ -403,7 +401,7 @@ describe('maxSweepDepth', () => {
     };
     const cyclic = (id: number): MaterialRecipe | null =>
       id === 700 ? { method: 'manufacturing', blueprint: selfBlueprint, me: 0 } : null;
-    expect(() => maxSweepDepth(root, 0, { recipeFor: cyclic, ctx, runs: 1 })).not.toThrow();
+    expect(() => maxAutoBuildDepth(root, 0, { recipeFor: cyclic, ctx, runs: 1 })).not.toThrow();
   });
 });
 

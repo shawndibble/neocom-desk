@@ -57,7 +57,7 @@ export function AllCharactersNotificationSection({
   return (
     <div className="rounded-xs border border-accent/40 bg-panel/85 backdrop-blur-sm">
       <div className="flex min-h-8 items-center gap-2 border-b border-line px-2.5 py-1.5">
-        <span className="min-w-0 flex-1 truncate text-[0.6875rem] font-semibold tracking-widest text-text uppercase">
+        <span className="min-w-0 flex-1 truncate text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
           {t('settings.notifications.allCharactersLabel')}
         </span>
         <div className={CHANNEL_COLUMNS}>

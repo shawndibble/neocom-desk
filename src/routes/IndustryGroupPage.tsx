@@ -9,14 +9,14 @@ import { IndustryHeader } from '@/features/industry/IndustryHeader';
 import { industryTabHref, type IndustryTab } from '@/features/industry/industryTabs';
 import {
   buildGroupsFor,
-  withGroupCraftSweepDefault,
+  withGroupAutoBuildDefault,
   withGroupOwnedStock,
   withGroupOwnedStockScope,
 } from '@/features/industry/buildGroups';
 import { retargetBuildGroup } from '@/features/industry/buildGroupActions';
 import { BuildGroupPanel } from '@/features/industry/BuildGroupPanel';
-import { applyGroupCraftSweep } from '@/features/industry/craftSweepGroup';
-import type { SweepStrategy } from '@/engine/industry/autoMakeOrBuy';
+import { applyGroupAutoBuild } from '@/features/industry/autoBuildGroup';
+import type { BuildStrategy } from '@/engine/industry/autoMakeOrBuy';
 import type { OwnedStockScope } from '@/engine/industry/types';
 import { useQuickbar } from '@/features/market/useQuickbar';
 import { ItemDetailModal } from '@/features/market/ItemDetailModal';
@@ -71,15 +71,15 @@ export function IndustryGroupPage() {
     });
   }
 
-  /** @see BuildGroupPanel's `onCraftSweep` doc — same one-shot bulk build/buy control, run once per member. */
-  async function handleCraftSweepGroup(options: { strategy: SweepStrategy; depth: number }) {
+  /** @see BuildGroupPanel's `onAutoBuild` doc — same one-shot bulk build/buy control, run once per member. */
+  async function handleAutoBuildGroup(options: { strategy: BuildStrategy; depth: number }) {
     if (activeCharacterId === null || groupId === undefined || !catalog) return;
     await workspace.setBuildGroups(
-      withGroupCraftSweepDefault(workspace.buildGroups, activeCharacterId, groupId, {
+      withGroupAutoBuildDefault(workspace.buildGroups, activeCharacterId, groupId, {
         strategy: options.strategy,
       })
     );
-    const picks = await applyGroupCraftSweep(
+    const picks = await applyGroupAutoBuild(
       plans,
       catalog,
       pi,
@@ -162,7 +162,7 @@ export function IndustryGroupPage() {
           ownedStockSnapshot={ownedStockSnapshot}
           onOpenPlan={(planId) => navigate(`/industry/plans/${planId}`)}
           onRetarget={(target, planIds) => void handleRetargetGroup(target, planIds)}
-          onCraftSweep={(options) => handleCraftSweepGroup(options)}
+          onAutoBuild={(options) => handleAutoBuildGroup(options)}
           onOwnedStockChange={(ownedStock) => void handleGroupOwnedStockChange(ownedStock)}
           onOwnedStockScopeChange={(scope) => void handleGroupOwnedStockScopeChange(scope)}
         />

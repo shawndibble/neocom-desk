@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -24,7 +24,12 @@ interface PayeeManagerDialogProps {
   characters: readonly TrackedCharacter[];
   /** Every tracked character's current Payees, already loaded by the parent route's snapshot — the initial list here is seeded from this rather than a fresh Dexie read. */
   payeesByCharacter: ReadonlyMap<number, PayeeRecord[]>;
-  /** Preselected on open — usually whichever character the "Manage Payees" action was pressed from. */
+  /**
+   * Which character a newly-created Payee is stored under — a Payee row still
+   * belongs to one character in Dexie, even though a corp's landlord list is
+   * the same regardless of which alt is looking. Usually whichever character
+   * the "Manage Payees" action was pressed from.
+   */
   initialCharacterId: number;
   onChanged: () => void;
 }
@@ -58,11 +63,13 @@ const EMPTY_DRAFT: DraftPayee = {
 
 /**
  * Manage Payees (decision doc): create/edit/remove the corps and people a
- * character owes a moon-rental tax to. Per-character, like the character
- * whose ledger it's opened from. Name, default tax %, and the trade hub the
- * Payee's ore is valued at — the moon/system tag (CONTEXT.md's Payee entry) is
- * set from `AssignDialog`'s "remember this system" checkbox instead, at the
- * moment it's actually useful, rather than asking for a system id here.
+ * character owes a moon-rental tax to. Payees are shared across every
+ * tracked character — a landlord doesn't change depending on which alt is
+ * looking — so this lists the union of all of them rather than gating on one
+ * character at a time. Name, default tax %, and the trade hub the Payee's ore
+ * is valued at — the moon/system tag (CONTEXT.md's Payee entry) is set from
+ * `AssignDialog`'s "remember this system" checkbox instead, at the moment
+ * it's actually useful, rather than asking for a system id here.
  *
  * The hub belongs to the Payee rather than to this device because the figure
  * it produces is a bill one player sends another: a device-local pick would
@@ -79,32 +86,31 @@ export function PayeeManagerDialog({
   onChanged,
 }: PayeeManagerDialogProps) {
   const { t } = useTranslation();
-  // No mount-time reset effect needed: the route only renders this dialog
-  // while `payeeManagerCharacterId !== null`, so it remounts fresh (new
-  // `useState` initializers) every time it opens — `characterId` only moves
-  // afterward, via the in-dialog character switcher below.
-  const [characterId, setCharacterId] = useState(initialCharacterId);
-  const [payees, setPayees] = useState<PayeeRecord[]>(
-    () => payeesByCharacter.get(initialCharacterId) ?? []
-  );
+  const [payeesByCharacterState, setPayeesByCharacterState] = useState(payeesByCharacter);
   const [draft, setDraft] = useState<DraftPayee>(EMPTY_DRAFT);
   const [error, setError] = useState<string | null>(null);
 
-  // Render-time adjustment (not an effect) for the in-dialog character
-  // switcher: the parent route's snapshot already loaded every character's
-  // Payees, so switching here re-reads that map instead of firing a fresh
-  // Dexie query the data already answers.
-  const [payeesLoadedFor, setPayeesLoadedFor] = useState(characterId);
-  if (payeesLoadedFor !== characterId) {
-    setPayeesLoadedFor(characterId);
-    setPayees(payeesByCharacter.get(characterId) ?? []);
-  }
+  // Deduped by id: the same corp Payee, however it's stored per-character
+  // under the hood, must not show up twice just because two alts happen to
+  // owe it.
+  const payees = useMemo(() => {
+    const seen = new Map<string, PayeeRecord>();
+    for (const list of payeesByCharacterState.values()) {
+      for (const payee of list) seen.set(payee.id, payee);
+    }
+    return [...seen.values()].sort((a, b) => a.name.localeCompare(b.name));
+  }, [payeesByCharacterState]);
 
   // A genuinely fresh read after a mutation, since the parent's snapshot map
   // is a point-in-time seed and won't reflect this dialog's own edit until
-  // its next full refresh.
+  // its next full refresh. Reloads every tracked character since a mutation
+  // could touch any of them (an edit keeps its Payee's existing owner; a new
+  // Payee is created under `initialCharacterId`).
   async function refresh() {
-    setPayees(await loadPayees(characterId));
+    const entries = await Promise.all(
+      characters.map(async (c) => [c.characterId, await loadPayees(c.characterId)] as const)
+    );
+    setPayeesByCharacterState(new Map(entries));
   }
 
   function startEdit(payee: PayeeRecord) {
@@ -144,7 +150,7 @@ export function PayeeManagerDialog({
     if (existing) {
       await updatePayee(existing, input);
     } else {
-      await createPayee(characterId, input);
+      await createPayee(initialCharacterId, input);
     }
     setDraft(EMPTY_DRAFT);
     setError(null);
@@ -159,8 +165,6 @@ export function PayeeManagerDialog({
     onChanged();
   }
 
-  const characterName = characters.find((c) => c.characterId === characterId)?.characterName ?? '';
-
   return (
     <Modal
       open={open}
@@ -169,31 +173,9 @@ export function PayeeManagerDialog({
         setError(null);
         onClose();
       }}
-      title={t('miningTax.managePayeesTitle', { character: characterName })}
+      title={t('miningTax.managePayeesTitle')}
     >
       <div className="space-y-3">
-        {characters.length > 1 && (
-          <div className="space-y-1">
-            <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-              {t('miningTax.characterColumn')}
-            </p>
-            <Select
-              value={String(characterId)}
-              onValueChange={(value) => setCharacterId(Number(value))}
-            >
-              <SelectTrigger aria-label={t('miningTax.characterColumn')}>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {characters.map((c) => (
-                  <SelectItem key={c.characterId} value={String(c.characterId)}>
-                    {c.characterName}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        )}
         {payees.length === 0 ? (
           <p className="text-xs text-text-dim">{t('miningTax.payeesEmpty')}</p>
         ) : (

@@ -19,6 +19,7 @@ import { BuildPlanList } from '@/features/industry/BuildPlanList';
 import type { PlanIndexStats, PlanRollupStats } from '@/features/industry/BuildPlanList';
 import { BuildPlanCompare } from '@/features/industry/BuildPlanCompare';
 import { OpportunitiesPanel } from '@/features/industry/OpportunitiesPanel';
+import { MarketWideOpportunitiesPanel } from '@/features/industry/MarketWideOpportunitiesPanel';
 import {
   planForOpportunityCandidate,
   type OpportunityRow,
@@ -42,6 +43,9 @@ import { useComparedBuildResults } from '@/features/industry/useComparedBuildRes
 import { useRunCountsByPlan } from '@/features/industry/useRunCountsByPlan';
 import { computeGroupIndexStats, profitOf, verdictOf } from '@/features/industry/groupIndexStats';
 import { readIndustryTab, type IndustryTab } from '@/features/industry/industryTabs';
+import { DEFAULT_TRADE_HUB } from '@/market/hubs';
+import { loadMarketWideTrees } from '@/sde/loadSde';
+import type { MarketWideTreeMap } from '@/sde/types';
 
 /**
  * Build Plan manager index: create (via blueprint search)/duplicate/delete/
@@ -72,6 +76,20 @@ export function Industry() {
   useEffect(() => {
     void hydrateFacilityDefaults();
   }, [hydrateFacilityDefaults]);
+
+  // Character-independent, loaded once — the market-wide scan's precomputed
+  // input (issue #819). Not part of `useIndustryWorkspace`: only this index's
+  // Opportunities tab needs it, never the plan/group detail pages.
+  const [marketWideTrees, setMarketWideTrees] = useState<MarketWideTreeMap | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    void loadMarketWideTrees().then((trees) => {
+      if (!cancelled) setMarketWideTrees(trees);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const [searchParams, setSearchParams] = useSearchParams();
   const tab = readIndustryTab(searchParams.get('tab'));
@@ -237,8 +255,8 @@ export function Industry() {
     [plans, compareSelectedIds]
   );
 
-  // Est. total / Verdict / Runs for every row. `computeGroupResult: true`
-  // only for grouped plans — the extra owned-stock-disabled resolve
+  // Profit / Verdict / Runs for every row. `computeGroupResult: true` only
+  // for grouped plans — the extra owned-stock-disabled resolve
   // `BuildGroupPanel` already pays for its one open group, paid here for
   // every group at once so the group row can show its own rollup total;
   // ungrouped plans skip it, since nothing on this page ever rolls them up.
@@ -465,15 +483,32 @@ export function Industry() {
           {tab === 'sourcing' ? (
             <BpcSourcingPanel />
           ) : tab === 'opportunities' ? (
-            <OpportunitiesPanel
-              catalog={catalog}
-              pi={pi}
-              skills={skills}
-              facilityDefaults={facilityDefaults}
-              activeCharacterId={activeCharacterId}
-              ownedStockSnapshot={workspace.ownedStockSnapshot}
-              onAddToCompare={(rows) => void handleAddOpportunitiesToCompare(rows)}
-            />
+            <div className="flex flex-col gap-4">
+              <OpportunitiesPanel
+                catalog={catalog}
+                pi={pi}
+                skills={skills}
+                facilityDefaults={facilityDefaults}
+                activeCharacterId={activeCharacterId}
+                ownedStockSnapshot={workspace.ownedStockSnapshot}
+                onAddToCompare={(rows) => void handleAddOpportunitiesToCompare(rows)}
+              />
+              <MarketWideOpportunitiesPanel
+                hub={DEFAULT_TRADE_HUB}
+                trees={marketWideTrees}
+                catalog={catalog}
+                onStartPlan={(entry) => {
+                  // Distinct from the plain search-box create: picking a
+                  // scan result is an explicit "go build this" choice, same
+                  // as opening a `?product=` deep link, so it opens the new
+                  // plan's own page rather than leaving the pilot on the
+                  // Opportunities tab.
+                  void createPlan(entry).then((id) => {
+                    if (id) navigate(`/industry/plans/${id}`);
+                  });
+                }}
+              />
+            </div>
           ) : tab === 'records' ? (
             <ProductionLogPanel
               characterId={activeCharacterId}

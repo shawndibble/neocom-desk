@@ -85,6 +85,31 @@ export type ReprocessingMap = Record<string, ReprocessingType>;
 /** public/data/types.json: typeID -> TypeInfo */
 export type TypeMap = Record<string, TypeInfo>;
 
+/**
+ * One manufacturing blueprint's fully flattened material tree — sub-builds
+ * (a material that is itself another manufacturing blueprint's product)
+ * resolved recursively at SDE-build time down to base, non-producible
+ * materials, at ME 0 (issue #819). This is an approximation, not a
+ * `computeBuildPlan`-grade cost: it ignores ME/TE, owned stock, and
+ * auto-make-or-buy, trading exact-run precision for a lookup cheap enough to
+ * run over the whole SDE at once rather than resolved live per candidate.
+ * Picking a row still opens a real Build Plan for exact numbers.
+ */
+export interface MarketWideTreeEntry {
+  blueprintTypeID: number;
+  /** base job time in seconds, one run */
+  time: number;
+  /** product units per run */
+  outputQuantity: number;
+  /** null when the product carries no Market Group (shouldn't happen — the build script only bakes sellable products). */
+  marketGroupID: number | null;
+  /** Flattened base materials for one run of the blueprint. */
+  materials: BlueprintQuantity[];
+}
+
+/** public/data/marketWideTrees.json: product typeID -> its flattened manufacturing tree. */
+export type MarketWideTreeMap = Record<string, MarketWideTreeEntry>;
+
 /** One input line of a planetary schematic. */
 export interface PiInput {
   typeID: number;

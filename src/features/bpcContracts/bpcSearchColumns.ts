@@ -6,12 +6,44 @@
  */
 import { createLocalSetting } from '@/lib/useLocalSetting';
 
-export const BPC_SEARCH_COLUMN_IDS = ['location', 'space'] as const;
+/**
+ * In table column order — `columns` in `BpcSourcingPanel.tsx` renders exactly
+ * this sequence, filtered to whichever ids are visible. `item` is not here:
+ * it is the one column the table can never lose, so it is never optional.
+ */
+export const BPC_SEARCH_COLUMN_IDS = [
+  'source',
+  'location',
+  'me',
+  'te',
+  'runs',
+  'qty',
+  'price',
+  'region',
+  'space',
+  'expires',
+] as const;
 
 export type BpcSearchColumnId = (typeof BPC_SEARCH_COLUMN_IDS)[number];
 
-/** Location starts visible — it's the direct fix for the reported gap (owned rows showing "—"). Space starts hidden, per the ticket. */
-export const DEFAULT_VISIBLE_BPC_SEARCH_COLUMNS: readonly BpcSearchColumnId[] = ['location'];
+/**
+ * Location starts visible — it's the direct fix for the reported gap (owned
+ * rows showing "—"). Space starts hidden, per the ticket. Every other id
+ * starts visible too — before it became optional each one rendered
+ * unconditionally, so making it toggleable must not change what a pilot
+ * already sees by default.
+ */
+export const DEFAULT_VISIBLE_BPC_SEARCH_COLUMNS: readonly BpcSearchColumnId[] = [
+  'source',
+  'location',
+  'me',
+  'te',
+  'runs',
+  'qty',
+  'price',
+  'region',
+  'expires',
+];
 
 function isBpcSearchColumnId(raw: unknown): raw is BpcSearchColumnId {
   return typeof raw === 'string' && (BPC_SEARCH_COLUMN_IDS as readonly string[]).includes(raw);

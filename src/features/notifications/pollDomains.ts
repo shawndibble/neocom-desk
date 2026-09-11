@@ -133,7 +133,6 @@ import {
   type PriceAlertSnapshot,
   type PriceAlertTriggeredFire,
 } from '@/engine/notificationDiffs';
-import { parseEveNotificationPayload } from '@/engine/eveNotificationPayload';
 import {
   projectSkillQueue,
   projectIndustryJobs,
@@ -141,6 +140,7 @@ import {
   projectCalendar,
   projectStructureFuel,
   projectEveNotificationReinforcementExit,
+  reinforcementExitStructureIds,
   type ProjectionRow,
 } from '@/engine/projection';
 import { loadUniverseType } from '@/features/skills/data';
@@ -954,9 +954,12 @@ export const eveNotificationDomain = defineDomain<
       (entry) =>
         isEveTypeAllowed(entry.type) && isEveTypeEnabledFor(eveTypePrefs, entry.type, 'browser')
     );
-    const structureIds = eligible
-      .map((entry) => parseEveNotificationPayload(entry.text).structureId)
-      .filter((id): id is number => id !== undefined);
+    // Only ids the projector will actually put in a row's text (issue #359
+    // follow-up, Sentry N+1): most of `eligible` is outside the 72-hour
+    // horizon and produces no row at all, so resolving every one of their
+    // structure ids up front fanned `loadStructureName` out over names whose
+    // results were always going to be discarded.
+    const structureIds = reinforcementExitStructureIds(eligible, nowMs);
     const structureNames = await resolveProjectionNames(structureIds, (id) =>
       loadStructureName(characterId, id)
     );
