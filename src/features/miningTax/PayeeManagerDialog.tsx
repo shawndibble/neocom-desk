@@ -89,6 +89,7 @@ export function PayeeManagerDialog({
   const [payeesByCharacterState, setPayeesByCharacterState] = useState(payeesByCharacter);
   const [draft, setDraft] = useState<DraftPayee>(EMPTY_DRAFT);
   const [error, setError] = useState<string | null>(null);
+  const [deletingPayee, setDeletingPayee] = useState<PayeeRecord | null>(null);
 
   // Deduped by id: the same corp Payee, however it's stored per-character
   // under the hood, must not show up twice just because two alts happen to
@@ -165,6 +166,12 @@ export function PayeeManagerDialog({
     onChanged();
   }
 
+  function confirmDelete() {
+    const payee = deletingPayee;
+    setDeletingPayee(null);
+    if (payee) void handleDelete(payee);
+  }
+
   return (
     <Modal
       open={open}
@@ -204,7 +211,7 @@ export function PayeeManagerDialog({
                   tone="danger"
                   icon={<Icon.Close />}
                   label={t('miningTax.deletePayee', { name: payee.name })}
-                  onClick={() => void handleDelete(payee)}
+                  onClick={() => setDeletingPayee(payee)}
                 />
               </li>
             ))}
@@ -276,6 +283,23 @@ export function PayeeManagerDialog({
           </div>
         </div>
       </div>
+      <Modal
+        open={deletingPayee !== null}
+        onClose={() => setDeletingPayee(null)}
+        title={t('miningTax.deletePayeeAction')}
+      >
+        <p className="text-xs text-text-dim">
+          {t('miningTax.deletePayeeConfirm', { name: deletingPayee?.name ?? '' })}
+        </p>
+        <div className="mt-3 flex justify-end gap-2">
+          <Button size="sm" onClick={() => setDeletingPayee(null)}>
+            {t('filters.cancel')}
+          </Button>
+          <Button variant="danger" size="sm" onClick={confirmDelete}>
+            {t('miningTax.deletePayeeAction')}
+          </Button>
+        </div>
+      </Modal>
     </Modal>
   );
 }

@@ -1298,6 +1298,8 @@
     "payeesEmpty": "No Payees yet.",
     "editPayee": "Edit {{name}}",
     "deletePayee": "Delete {{name}}",
+    "deletePayeeAction": "Delete",
+    "deletePayeeConfirm": "Delete \"{{name}}\"? This can't be undone.",
     "editPayeeTitle": "Edit Payee",
     "addPayeeTitle": "Add a Payee",
     "payeeNamePlaceholder": "Payee name",
