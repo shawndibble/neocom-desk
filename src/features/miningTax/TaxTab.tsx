@@ -369,7 +369,7 @@ export function TaxTab() {
       members.map((m) => ({
         assignment: m.assignment,
         characterName: m.row.characterName,
-        payeeName: payeeName(m.row.characterId, m.assignment.payeeId),
+        payeeName: payeeName(m.assignment.payeeId),
       }))
     );
   }
@@ -420,18 +420,15 @@ export function TaxTab() {
     return pricesAtHub(data?.pricesByHub ?? new Map(), hubId);
   }
 
-  function payeeName(characterId: number, payeeId: string | undefined): string {
-    return (
-      data?.payeesByCharacter.get(characterId)?.find((p) => p.id === payeeId)?.name ??
-      t('miningTax.unknownPayee')
-    );
+  function payeeName(payeeId: string | undefined): string {
+    return allPayees.find((p) => p.id === payeeId)?.name ?? t('miningTax.unknownPayee');
   }
 
   /** The detail modal's Payee display: a resolved name, "No tax owed" for a dismissal, or a dash when unassigned. */
   function payeeDisplayName(dr: DisplayRow): string {
     if (!dr.assignment) return '—';
     if (dr.assignment.status === 'dismissed') return t('miningTax.dismissedLabel');
-    return payeeName(dr.row.characterId, dr.assignment.payeeId);
+    return payeeName(dr.assignment.payeeId);
   }
 
   function systemName(dr: DisplayRow): string {
@@ -590,7 +587,7 @@ export function TaxTab() {
       settleUpMembers(selectedRows).map((m) => ({
         assignment: m.assignment,
         characterName: m.row.characterName,
-        payeeName: payeeName(m.row.characterId, m.assignment.payeeId),
+        payeeName: payeeName(m.assignment.payeeId),
       })),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [selectedRows, data]
@@ -1142,7 +1139,7 @@ export function TaxTab() {
           }
           systemSecurity={data.systemSecurity.get(detailTarget.row.entry.solarSystemId)}
           typeNames={data.typeNames}
-          payees={data.payeesByCharacter.get(detailTarget.row.characterId) ?? []}
+          payees={allPayees}
           unitPrices={data.unitPrices}
           pricesFor={pricesFor}
           busy={busy}
@@ -1173,7 +1170,7 @@ export function TaxTab() {
           assignment={splitTarget.assignment}
           row={splitTarget.row}
           systemName={systemName(splitTarget)}
-          payees={data.payeesByCharacter.get(splitTarget.row.characterId) ?? []}
+          payees={allPayees}
           typeNames={data.typeNames}
           pricesFor={pricesFor}
           busy={busy}
@@ -1198,7 +1195,7 @@ export function TaxTab() {
               : joinCandidatesFor(joinTarget)
           }
           initialSelection={joinCandidateOverride ? 'all' : 'none'}
-          payees={data.payeesByCharacter.get(joinTarget.row.characterId) ?? []}
+          payees={allPayees}
           typeNames={data.typeNames}
           pricesFor={pricesFor}
           busy={busy}
