@@ -43,6 +43,7 @@ const NAMES: Record<number, string> = {
   34: 'Tritanium',
   35: 'Pyerite',
   9840: 'Mechanical Parts',
+  9841: 'Widget Blueprint',
 };
 const nameFor = (typeID: number) => NAMES[typeID] ?? `#${typeID}`;
 
@@ -1083,6 +1084,66 @@ describe('MaterialsTable build-here control', () => {
     renderTable({ materials: building(), canBuildHere: buildable, onToggleBuildHere: vi.fn() });
 
     expect(screen.queryByRole('button', { name: /Build it/ })).toBeNull();
+  });
+});
+
+describe('Blueprint Acquisition row (issue #838)', () => {
+  const BLUEPRINT_TYPE_ID = 9841;
+
+  function acquisitionRow(remainingQuantity: 0 | 1): MaterialTableRow {
+    return {
+      typeID: BLUEPRINT_TYPE_ID,
+      baseQuantity: 1,
+      quantity: 1,
+      ownedQuantity: 1 - remainingQuantity,
+      remainingQuantity,
+      unitPrice: remainingQuantity === 0 ? 0 : 500,
+      lineCost: remainingQuantity === 0 ? 0 : 500,
+      unpriced: false,
+      acquisitionTier: { me: 8, te: 16 },
+      subBuilds: [],
+    };
+  }
+
+  it('shows the blueprint glyph in the name slot instead of a build/buy toggle', () => {
+    renderTable({ materials: [acquisitionRow(1)] });
+
+    const nameSlot = within(row('Widget Blueprint')).getAllByRole('cell')[0];
+    expect(nameSlot.querySelector('svg')).toBeInTheDocument();
+    expect(
+      within(row('Widget Blueprint')).queryByRole('button', { name: /here instead of/ })
+    ).not.toBeInTheDocument();
+  });
+
+  it('never renders an editable owned-quantity field for this row — nothing reads it', () => {
+    renderTable({ materials: [acquisitionRow(1)] });
+
+    expect(
+      screen.queryByRole('textbox', { name: `Owned quantity for Widget Blueprint` })
+    ).not.toBeInTheDocument();
+  });
+
+  it('reflects owned as static text when the resolved tier is fully owned', () => {
+    renderTable({ materials: [acquisitionRow(0)] });
+
+    expect(within(row('Widget Blueprint')).getByText('Owned')).toBeInTheDocument();
+  });
+
+  it('shows nothing in the owned column when the tier still needs buying', () => {
+    renderTable({ materials: [acquisitionRow(1)] });
+
+    expect(within(row('Widget Blueprint')).queryByText('Owned')).not.toBeInTheDocument();
+  });
+
+  it('the price field still works — the real escape hatch for an unowned tier', async () => {
+    const onChange = vi.fn();
+    renderTable({ materials: [acquisitionRow(1)], onSourcingChange: onChange });
+
+    const input = priceInput('Widget Blueprint');
+    fireEvent.change(input, { target: { value: '42' } });
+    fireEvent.blur(input);
+
+    expect(onChange).toHaveBeenCalledWith(BLUEPRINT_TYPE_ID, { overridePrice: 42 });
   });
 });
 

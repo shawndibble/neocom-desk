@@ -413,6 +413,7 @@
     "priceSourceOwned": "Owned",
     "priceSourceBuilt": "Built",
     "blueprintAcquisitionTier": "ME {{me}}% / TE {{te}}%",
+    "blueprintAcquisitionOwned": "Owned",
     "blueprintAcquisitionModalTitle": "Blueprint tier: {{name}}",
     "blueprintAcquisitionOwnedTiers": "Owned tiers",
     "blueprintAcquisitionNoOwnedTiers": "No owned copies of this blueprint were found.",

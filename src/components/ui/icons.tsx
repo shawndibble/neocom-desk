@@ -25,6 +25,7 @@ import {
   ArrowsLeftRight,
   Bell,
   BellSlash,
+  BlueprintIcon,
   Buildings,
   CaretDoubleDown,
   CaretDoubleUp,
@@ -149,6 +150,8 @@ export const Pin = withWeight(Star);
 export const AllCharacters = withWeight(UsersThree);
 /** A container or a ship's bay — anything holding other assets. */
 export const Container = withWeight(Package);
+/** Marks a Blueprint Acquisition row (issue #838) as the blueprint itself, not a material it consumes. */
+export const Blueprint = withWeight(BlueprintIcon);
 /**
  * A **Build Group**: several Build Plans kept and costed together (issue
  * #626). A folder rather than `Container`'s box, which already means a
