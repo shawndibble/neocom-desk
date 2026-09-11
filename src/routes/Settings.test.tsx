@@ -1096,7 +1096,7 @@ describe('Settings defaults', () => {
     await screen.findByRole('heading', { level: 1, name: /settings/i });
 
     await user.click(await screen.findByRole('button', { name: 'This character' }));
-    await user.click(await screen.findByRole('menuitem', { name: 'All characters' }));
+    await user.click(await screen.findByRole('button', { name: 'All characters' }));
 
     expect(await screen.findByRole('button', { name: 'All characters' })).toBeInTheDocument();
     await waitFor(async () => {

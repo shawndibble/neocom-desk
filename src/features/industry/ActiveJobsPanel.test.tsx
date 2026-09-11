@@ -842,7 +842,7 @@ describe('ActiveJobsPanel: cross-character view (issue #607)', () => {
     );
 
     await user.click(await screen.findByRole('button', { name: 'This character' }));
-    await user.click(await screen.findByRole('menuitem', { name: 'All characters' }));
+    await user.click(await screen.findByRole('button', { name: 'All characters' }));
 
     await expandJobs(user);
     expect(await screen.findByText('Pilot One')).toBeInTheDocument();
@@ -876,7 +876,7 @@ describe('ActiveJobsPanel: cross-character view (issue #607)', () => {
     );
 
     await user.click(await screen.findByRole('button', { name: 'This character' }));
-    await user.click(await screen.findByRole('menuitem', { name: 'All characters' }));
+    await user.click(await screen.findByRole('button', { name: 'All characters' }));
     await expandJobs(user);
 
     // All three selected: Pilot Three's skipped notice shows.
@@ -889,7 +889,7 @@ describe('ActiveJobsPanel: cross-character view (issue #607)', () => {
     // CodeRabbit review: the notice list must follow the same filter the
     // job rows do).
     await user.click(screen.getByRole('button', { name: 'All characters' }));
-    await user.click(screen.getByRole('menuitemcheckbox', { name: 'Pilot Three' }));
+    await user.click(screen.getByRole('option', { name: 'Pilot Three' }));
     await user.keyboard('{Escape}');
 
     expect(
@@ -954,7 +954,7 @@ describe('ActiveJobsPanel: cross-character view (issue #607)', () => {
     });
 
     await user.click(screen.getByRole('button', { name: 'This character' }));
-    await user.click(await screen.findByRole('menuitem', { name: 'All characters' }));
+    await user.click(await screen.findByRole('button', { name: 'All characters' }));
 
     // Both: 4+2=6 max, 2 running -> 4 open. Science/reaction stay at the
     // untrained 1/1 for both characters (base slot only), summed to 2/2.
