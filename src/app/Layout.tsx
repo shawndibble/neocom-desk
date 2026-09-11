@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link, NavLink, Outlet } from 'react-router-dom';
+import { Link, NavLink } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
@@ -10,6 +10,7 @@ import { SyncStatusDot } from './SyncStatusDot';
 import { useSyncStatus } from './useSyncStatus';
 import { CharacterAvatar, characterAvatarBoxClassName, LogoMark, Modal } from '@/components/ui';
 import { AuthFailureNotice } from './AuthFailureNotice';
+import { PageTransitionOutlet } from './PageTransitionOutlet';
 import { useLockedRoutes } from './useGrantedScopes';
 import { useKeyboardShortcuts } from './useKeyboardShortcuts';
 import { NotificationPermissionPrompt } from '@/features/notifications/NotificationPermissionPrompt';
@@ -509,7 +510,15 @@ export function Layout() {
 
       <main className="min-w-0 flex-1 p-4 pb-[calc(5rem+env(safe-area-inset-bottom))] md:pb-4">
         <AuthFailureNotice />
-        <Outlet />
+        {/* `page-outlet` (styles/index.css) gives this box its own named
+            view-transition group, distinct from the document's implicit
+            `root` group the cross-document reload transition above it in
+            that file also targets — without a name of its own the two would
+            share `::view-transition-old(root)`/`new(root)` and this rule
+            would silently retime the reload fade too. */}
+        <div className="page-outlet">
+          <PageTransitionOutlet />
+        </div>
       </main>
 
       {/* Mobile bottom tab bar: 4 primary destinations + More. Fixed-width
