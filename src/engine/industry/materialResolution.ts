@@ -39,6 +39,7 @@
  */
 
 import type {
+  AcquisitionResolution,
   EffectiveMaterial,
   HubPrices,
   IndustryBlueprint,
@@ -62,28 +63,6 @@ export interface ResolvedMaterial extends MaterialCostLine {
    * quote) — it rides along purely for display.
    */
   acquisitionTier?: { me: number; te: number };
-}
-
-/** What `AcquisitionResolution.line` reports about a Blueprint Acquisition row. */
-export interface AcquisitionLine {
-  /** ISK to cover the shortfall at the resolved tier; ignored when `owned`. */
-  unitPrice: number | null;
-  /** True when the resolved tier's owned runs already cover the need — nothing bought. */
-  owned: boolean;
-}
-
-/**
- * What a buildable node's Blueprint Acquisition resolution reports back to
- * `resolveSubBuild`: the tier to build at, replacing the recipe's own `me`,
- * and (unless the tier is an owned BPO) a material row for the row list.
- */
-export interface AcquisitionResolution {
-  me: number;
-  te: number;
-  /** The blueprint's own typeID — distinct from what it produces. */
-  blueprintTypeID: number;
-  /** `null` only when the resolved tier is an owned BPO — nothing to acquire. */
-  line: AcquisitionLine | null;
 }
 
 /** A planned sub-job whose own inputs have been resolved the same way, recursively. */
@@ -149,7 +128,8 @@ export interface ResolveMaterialOptions {
   ) => AcquisitionResolution | null;
 }
 
-function usable(value: number | undefined): number | undefined {
+/** A defined, non-negative, finite number, or `undefined` — the one input guard every optional-override read in this module shares. */
+export function usable(value: number | undefined): number | undefined {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : undefined;
 }
 
