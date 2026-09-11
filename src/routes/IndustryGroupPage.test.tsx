@@ -62,6 +62,9 @@ vi.mock('@/sde/loadSde', () => ({
   loadTypes: vi.fn(async () => TYPES),
   loadBlueprints: vi.fn(async () => BLUEPRINTS),
   loadPi: vi.fn(async () => ({ schematics: {}, raw: [] })),
+  // A stale group id redirects to `/industry`, which loads this
+  // unconditionally for its Opportunities tab.
+  loadMarketWideTrees: vi.fn(async () => ({})),
 }));
 
 const CHAR_ID = 91;

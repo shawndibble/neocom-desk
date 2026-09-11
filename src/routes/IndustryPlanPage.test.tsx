@@ -64,6 +64,10 @@ vi.mock('@/sde/loadSde', () => ({
   loadTypes: vi.fn(async () => TYPES),
   loadBlueprints: vi.fn(async () => BLUEPRINTS),
   loadPi: vi.fn(async () => ({ schematics: {}, raw: [] })),
+  // The `?product=` deep link resolves through `Industry.tsx` before landing
+  // on the plan's own page (`BuildPlanContextMenu`'s "Build Plan" action),
+  // and that route loads this unconditionally for its Opportunities tab.
+  loadMarketWideTrees: vi.fn(async () => ({})),
 }));
 
 // The materials row menu's "Show info" opens ItemDetailModal, which resolves
