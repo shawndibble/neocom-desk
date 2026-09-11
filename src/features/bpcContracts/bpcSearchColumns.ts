@@ -27,22 +27,15 @@ export const BPC_SEARCH_COLUMN_IDS = [
 export type BpcSearchColumnId = (typeof BPC_SEARCH_COLUMN_IDS)[number];
 
 /**
- * Location starts visible — it's the direct fix for the reported gap (owned
- * rows showing "—"). Space starts hidden, per the ticket. Every other id
- * starts visible too — before it became optional each one rendered
- * unconditionally, so making it toggleable must not change what a pilot
- * already sees by default.
+ * Location, ME, TE and Price are what a pilot needs to judge whether a copy
+ * is worth buying — everything else (Source, Runs, Qty, Region, Expires)
+ * starts hidden and is a toggle away via `ColumnPickerMenu`.
  */
 export const DEFAULT_VISIBLE_BPC_SEARCH_COLUMNS: readonly BpcSearchColumnId[] = [
-  'source',
   'location',
   'me',
   'te',
-  'runs',
-  'qty',
   'price',
-  'region',
-  'expires',
 ];
 
 function isBpcSearchColumnId(raw: unknown): raw is BpcSearchColumnId {

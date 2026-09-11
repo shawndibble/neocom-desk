@@ -188,7 +188,7 @@ beforeEach(async () => {
 });
 
 describe('BpcSourcingPanel', () => {
-  it('renders synced BPC rows with item name, ME/TE/runs, price and region', async () => {
+  it('renders synced BPC rows with item name, ME/TE and price', async () => {
     loadPublicBpcContracts.mockResolvedValue(
       cachedSnapshot([row({ contractId: 1, typeId: 638, regionId: 10000002 })])
     );
@@ -196,8 +196,8 @@ describe('BpcSourcingPanel', () => {
 
     const table = await screen.findByRole('table', { name: 'BPC Search' });
     expect(within(table).getByText('Rifter Blueprint')).toBeInTheDocument();
-    expect(within(table).getByText('The Forge')).toBeInTheDocument();
     expect(within(table).getByText('10')).toBeInTheDocument();
+    expect(within(table).getByText('5,000,000.00')).toBeInTheDocument();
   });
 
   it('narrows the table to a typed item-name search', async () => {
@@ -495,7 +495,6 @@ describe('BpcSourcingPanel source multiselect', () => {
 
     expect(within(table).getByText('Rifter Blueprint')).toBeInTheDocument();
     expect(within(table).queryByText('Caracal Blueprint')).not.toBeInTheDocument();
-    expect(within(table).getAllByText('Contract')).toHaveLength(1);
   });
 
   it('with only Owned selected, shows the owned blueprint and not the contract row', async () => {
@@ -512,7 +511,6 @@ describe('BpcSourcingPanel source multiselect', () => {
 
     expect(within(table).getByText('Caracal Blueprint')).toBeInTheDocument();
     expect(within(table).queryByText('Rifter Blueprint')).not.toBeInTheDocument();
-    expect(within(table).getAllByText('Owned')).toHaveLength(1);
   });
 
   /**
@@ -542,9 +540,17 @@ describe('BpcSourcingPanel source multiselect', () => {
     loadCharacterBlueprints.mockResolvedValue(
       ownedResult([ownedBlueprint({ item_id: 1, type_id: 638, runs: -1 })])
     );
+    const user = userEvent.setup();
     render(<App />);
 
     const table = await screen.findByRole('table', { name: 'BPC Search' });
+    await within(table).findByText('Rifter Blueprint');
+
+    // Runs is not a default-visible column — switch it on first.
+    await user.click(await screen.findByRole('button', { name: 'Columns' }));
+    await user.click(await screen.findByRole('menuitemcheckbox', { name: 'Runs' }));
+    await user.keyboard('{Escape}');
+
     expect(within(table).getByText('∞')).toBeInTheDocument();
     expect(within(table).queryByText('-1')).not.toBeInTheDocument();
   });
@@ -677,7 +683,7 @@ describe('BpcSourcingPanel Location/Space', () => {
     expect(within(table).getByText('Rifter Blueprint')).toBeInTheDocument();
   });
 
-  it('shows Source/ME/TE/Runs/Qty/Price/Region/Expires by default and can hide them via the column picker', async () => {
+  it('shows Location/ME/TE/Price by default and can toggle columns via the column picker', async () => {
     loadCharacterBlueprints.mockResolvedValue(
       ownedResult([ownedBlueprint({ item_id: 1, type_id: 870, location_id: 60003760 })])
     );
@@ -695,17 +701,22 @@ describe('BpcSourcingPanel Location/Space', () => {
     const table = await screen.findByRole('table', { name: 'BPC Search' });
     await within(table).findByText('Caracal Blueprint');
 
-    for (const name of ['Source', 'ME', 'TE', 'Runs', 'Qty', 'Price', 'Region', 'Expires']) {
+    for (const name of ['Location', 'ME', 'TE', 'Price']) {
       expect(within(table).getByRole('columnheader', { name })).toBeInTheDocument();
+    }
+    for (const name of ['Source', 'Runs', 'Qty', 'Region', 'Expires']) {
+      expect(within(table).queryByRole('columnheader', { name })).not.toBeInTheDocument();
     }
 
     // Same close-the-menu-before-querying rule the Space test above follows.
     await user.click(await screen.findByRole('button', { name: 'Columns' }));
     await user.click(await screen.findByRole('menuitemcheckbox', { name: 'ME' }));
+    await user.click(await screen.findByRole('menuitemcheckbox', { name: 'Source' }));
     await user.keyboard('{Escape}');
 
     expect(within(table).queryByRole('columnheader', { name: 'ME' })).not.toBeInTheDocument();
-    // Every other default-visible column is untouched by hiding one.
+    expect(within(table).getByRole('columnheader', { name: 'Source' })).toBeInTheDocument();
+    // Every other default-visible column is untouched.
     expect(within(table).getByRole('columnheader', { name: 'TE' })).toBeInTheDocument();
   });
 });

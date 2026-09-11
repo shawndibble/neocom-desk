@@ -830,12 +830,22 @@ export function BpcSourcingPanel({ initialTypeId = null }: BpcSourcingPanelProps
         )
       }
       actions={
-        <IconButton
-          icon={<Icon.Refresh />}
-          label={t('bpcContracts.refresh')}
-          onClick={refresh}
-          disabled={loading}
-        />
+        <>
+          <ColumnPickerMenu
+            available={BPC_SEARCH_COLUMN_IDS}
+            visible={visibleColumns}
+            columnsById={bpcColumnsById}
+            onToggle={toggleColumn}
+            buttonLabel={t('bpcContracts.columnsButton')}
+            menuTitle={t('bpcContracts.columnsMenuTitle')}
+          />
+          <IconButton
+            icon={<Icon.Refresh />}
+            label={t('bpcContracts.refresh')}
+            onClick={refresh}
+            disabled={loading}
+          />
+        </>
       }
     >
       {loading && !data ? (
@@ -870,21 +880,6 @@ export function BpcSourcingPanel({ initialTypeId = null }: BpcSourcingPanelProps
             spaceKinds={spaceFilter}
             onSpaceKindsChange={(next) => void setSpaceFilter(next)}
           />
-
-          {/* ColumnPickerMenu is a display preference, not a filter — it stays
-              in its own row rather than inside `BpcFilterBar`, so it never
-              collapses behind the funnel with Source/Space (matching
-              Characters.tsx's density/columns row). */}
-          <div className="flex justify-end border-b border-line px-3 py-2">
-            <ColumnPickerMenu
-              available={BPC_SEARCH_COLUMN_IDS}
-              visible={visibleColumns}
-              columnsById={bpcColumnsById}
-              onToggle={toggleColumn}
-              buttonLabel={t('bpcContracts.columnsButton')}
-              menuTitle={t('bpcContracts.columnsMenuTitle')}
-            />
-          </div>
 
           {/* Inset on its own ground with an accent edge, because as a plain
               list flush against the filter bar it read as more page furniture
