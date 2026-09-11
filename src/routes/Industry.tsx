@@ -51,13 +51,7 @@ import type { FitToBuildPlansResult } from '@/engine/import/fitToBuildPlans';
 import { useComparedBuildResults } from '@/features/industry/useComparedBuildResults';
 import { useRunCountsByPlan } from '@/features/industry/useRunCountsByPlan';
 import { computeGroupIndexStats, verdictOf } from '@/features/industry/groupIndexStats';
-
-type IndustryTab = 'plans' | 'records' | 'sourcing' | 'opportunities';
-
-/** An unknown or absent `?tab=` falls back to Plans rather than rendering nothing — a stale or hand-edited link should land somewhere useful. */
-function readIndustryTab(value: string | null): IndustryTab {
-  return value === 'records' || value === 'sourcing' || value === 'opportunities' ? value : 'plans';
-}
+import { industryTabs, readIndustryTab, type IndustryTab } from '@/features/industry/industryTabs';
 
 /**
  * Build Plan manager index: create (via blueprint search)/duplicate/delete/
@@ -490,12 +484,7 @@ export function Industry() {
             label={t('nav.industry')}
             value={tab}
             onChange={(id) => setTab(id as IndustryTab)}
-            tabs={[
-              { id: 'plans', label: t('industry.buildPlansTab') },
-              { id: 'records', label: t('industry.recordsTab') },
-              { id: 'sourcing', label: t('industry.bpcSearchTab') },
-              { id: 'opportunities', label: t('industry.opportunitiesTab') },
-            ]}
+            tabs={industryTabs(t)}
           />
 
           {tab === 'sourcing' ? (

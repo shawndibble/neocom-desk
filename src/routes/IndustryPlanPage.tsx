@@ -1,12 +1,13 @@
 import { useState } from 'react';
-import { Link, Navigate, useParams } from 'react-router-dom';
+import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
 import { scheduleSync } from '@/sync';
-import { Spinner } from '@/components/ui';
+import { PageHeader, Spinner, Tabs } from '@/components/ui';
 import { useIndustryWorkspace } from '@/features/industry/useIndustryWorkspace';
 import { buildGroupsFor } from '@/features/industry/buildGroups';
+import { industryTabHref, industryTabs, type IndustryTab } from '@/features/industry/industryTabs';
 import {
   BuildPlanDetail,
   type PlanPatch,
@@ -27,6 +28,7 @@ import { ItemDetailModal } from '@/features/market/ItemDetailModal';
  */
 export function IndustryPlanPage() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const { planId } = useParams<{ planId: string }>();
   const workspace = useIndustryWorkspace();
   const {
@@ -101,10 +103,17 @@ export function IndustryPlanPage() {
       : (groups.find((g) => g.id === plan.buildGroupId)?.snapshot ?? null);
 
   return (
-    <div className="mx-auto max-w-7xl space-y-3">
-      <Link to="/industry" className="inline-block text-xs text-accent hover:underline">
-        {t('industry.backToList')}
-      </Link>
+    <div className="mx-auto max-w-7xl space-y-4">
+      <PageHeader title={t('nav.industry')} />
+      {/* A plan is still conceptually inside Build Plans — the strip has to
+          keep saying so, not just offer a bare "back" link, and it doubles
+          as the way back: picking another tab navigates there directly. */}
+      <Tabs
+        label={t('nav.industry')}
+        value="plans"
+        onChange={(id) => navigate(industryTabHref(id as IndustryTab))}
+        tabs={industryTabs(t)}
+      />
 
       {!catalog ? (
         <div className="flex justify-center py-16">

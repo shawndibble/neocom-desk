@@ -1,9 +1,10 @@
-import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
+import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type BuildPlanRecord } from '@/db';
-import { Spinner } from '@/components/ui';
+import { PageHeader, Spinner, Tabs } from '@/components/ui';
 import { useIndustryWorkspace } from '@/features/industry/useIndustryWorkspace';
+import { industryTabHref, industryTabs, type IndustryTab } from '@/features/industry/industryTabs';
 import {
   buildGroupsFor,
   withGroupCraftSweepDefault,
@@ -115,10 +116,16 @@ export function IndustryGroupPage() {
   if (!group) return <Navigate to="/industry" replace />;
 
   return (
-    <div className="mx-auto max-w-7xl space-y-3">
-      <Link to="/industry" className="inline-block text-xs text-accent hover:underline">
-        {t('industry.backToList')}
-      </Link>
+    <div className="mx-auto max-w-7xl space-y-4">
+      <PageHeader title={t('nav.industry')} />
+      {/* Same reasoning as `IndustryPlanPage`: a group is still conceptually
+          inside Build Plans, and the strip is the way back too. */}
+      <Tabs
+        label={t('nav.industry')}
+        value="plans"
+        onChange={(id) => navigate(industryTabHref(id as IndustryTab))}
+        tabs={industryTabs(t)}
+      />
 
       {!catalog ? (
         <div className="flex justify-center py-16">
