@@ -1326,8 +1326,6 @@
     "oreTagsLoadError": "Couldn't load your ore tags. Check your connection and reopen this dialog.",
     "oreTagsRemoveError": "Couldn't remove the {{name}} tag. Try again.",
     "removeOreTagLabel": "Remove the {{name}} tag",
-    "allCharacters": "All characters",
-    "charactersSelected": "{{count}} character(s)",
     "allPayees": "All payees",
     "payeesSelected": "{{count}} payee(s)",
     "payeeOptionWithCharacter": "{{payee}} ({{character}})",
