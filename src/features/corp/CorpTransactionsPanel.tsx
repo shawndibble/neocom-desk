@@ -17,7 +17,7 @@
  * "what did we buy last Tuesday" is a question worth a control, and the
  * character view answers a much smaller list.
  */
-import { useMemo } from 'react';
+import { useMemo, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   DataAgeBadge,
@@ -38,6 +38,7 @@ import {
   type DataTableColumn,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
+import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import { MarketItemLink } from '@/features/market/MarketItemLink';
 import {
   activeWalletTransactionFilterCount,
@@ -70,6 +71,9 @@ interface CorpTransactionsPanelProps {
   /** Names the CSV file's division, when the division list has loaded. */
   divisionQualifier: string | undefined;
   offlineTitleKey: string;
+  onAddToQuickbar: (typeId: number, itemName: string) => void;
+  quickbarAvailable: boolean;
+  onShowInfo: (typeId: number, itemName: string) => void;
 }
 
 /** Radix needs a value here, and `''` reads to it as "nothing selected". */
@@ -147,8 +151,28 @@ export function CorpTransactionsPanel({
   nameFor,
   divisionQualifier,
   offlineTitleKey,
+  onAddToQuickbar,
+  quickbarAvailable,
+  onShowInfo,
 }: CorpTransactionsPanelProps) {
   const { t } = useTranslation();
+
+  /** Same menu every other item table carries (issue #817). */
+  function rowContextMenu(txn: CorporationWalletTransaction, tr: ReactElement) {
+    const itemName = nameFor(txn.type_id);
+    return (
+      <ItemContextMenu
+        typeId={txn.type_id}
+        itemName={itemName}
+        blueprintTypeID={null}
+        onAddToQuickbar={onAddToQuickbar}
+        quickbarAvailable={quickbarAvailable}
+        onShowInfo={onShowInfo}
+      >
+        {tr}
+      </ItemContextMenu>
+    );
+  }
 
   // The same six columns Market's character panel draws, and in the same
   // order: the two tables answer the same question about different wallets,
@@ -282,6 +306,7 @@ export function CorpTransactionsPanel({
               rows={filteredTransactions}
               rowKey={(txn) => txn.transaction_id}
               defaultSort={{ columnId: 'date', direction: 'desc' }}
+              rowContextMenu={rowContextMenu}
             />
           )}
         </>
