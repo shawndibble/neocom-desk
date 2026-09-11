@@ -401,7 +401,7 @@
     "craftScopeReactions": "Reactions",
     "craftScopeReactionsEnabledHint": "Reaction materials are included when Auto Build runs",
     "craftScopeReactionsDisabledHint": "Edit setup and turn on Include Reactions to use this",
-    "autoBuildApply": "Apply Auto Build",
+    "autoBuildApply": "Apply",
     "autoBuildConfirm": "This will overwrite craft/buy choices on this plan — continue?",
     "autoBuildConfirmGroup_one": "This will overwrite craft/buy choices on {{count}} plan in this group — continue?",
     "autoBuildConfirmGroup_other": "This will overwrite craft/buy choices on {{count}} plans in this group — continue?",

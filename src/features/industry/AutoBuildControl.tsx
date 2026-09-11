@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, InfoTooltip, Modal } from '@/components/ui';
+import { Button, Modal } from '@/components/ui';
 import type { BuildStrategy } from '@/engine/industry/autoMakeOrBuy';
 import type { MakeMethod } from '@/engine/industry/makeOrBuy';
 import { CraftScopeChips, BuildStrategySelect } from './autoBuildShared';
@@ -62,15 +62,6 @@ export function AutoBuildControl({
 
   return (
     <div className="flex flex-col gap-2 text-xs">
-      <span className="flex items-center gap-1.5">
-        <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-          {t('industry.autoBuildLabel')}
-        </span>
-        <InfoTooltip
-          label={t('industry.autoBuildTooltipLabel')}
-          content={t('industry.autoBuildTooltip')}
-        />
-      </span>
       <div className="flex flex-wrap items-center gap-2">
         <label className="flex items-center gap-1.5">
           <span className="whitespace-nowrap text-text-dim">

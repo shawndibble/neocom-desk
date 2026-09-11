@@ -310,14 +310,14 @@ describe('BuildGroupPanel — Auto Build (issue #696)', () => {
     const onAutoBuild = vi.fn().mockResolvedValue(undefined);
     renderPanel([plan('a', 'jita')], { catalog: CHAIN_CATALOG, onAutoBuild });
 
-    await user.click(screen.getByRole('button', { name: 'Apply Auto Build' }));
+    await user.click(screen.getByRole('button', { name: 'Apply' }));
     const dialog = await screen.findByRole('dialog');
     expect(
       within(dialog).getByText(
         'This will overwrite craft/buy choices on 1 plan in this group — continue?'
       )
     ).toBeTruthy();
-    await user.click(within(dialog).getByRole('button', { name: 'Apply Auto Build' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Apply' }));
 
     expect(onAutoBuild).toHaveBeenCalledWith({
       strategy: 'cost-effective',
@@ -343,7 +343,7 @@ describe('BuildGroupPanel — Auto Build (issue #696)', () => {
       catalog: CHAIN_CATALOG,
     });
 
-    await user.click(screen.getByRole('button', { name: 'Apply Auto Build' }));
+    await user.click(screen.getByRole('button', { name: 'Apply' }));
     const dialog = await screen.findByRole('dialog');
     expect(
       within(dialog).getByText(
