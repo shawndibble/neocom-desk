@@ -1485,9 +1485,11 @@ export function Market() {
                             }
                             className="py-6"
                             action={
-                              selectedIsBlueprint && stationFilter === null ? (
+                              selectedIsBlueprint &&
+                              stationFilter === null &&
+                              selectedTypeId !== null ? (
                                 <Link
-                                  to="/industry?tab=sourcing"
+                                  to={`/industry?tab=sourcing&bpcSearch=${selectedTypeId}`}
                                   className={buttonClassName({ size: 'sm' })}
                                 >
                                   {t('market.searchBpcContracts')}
