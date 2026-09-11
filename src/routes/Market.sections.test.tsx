@@ -28,6 +28,9 @@ vi.mock('@/sde/loadSde', () => ({
   loadSkills: vi.fn(async () => []),
   loadTypes: vi.fn(async () => TYPES),
   loadBlueprints: vi.fn(async () => ({})),
+  // ItemContextMenu (now on every row, including Transactions/Order History
+  // per #815) checks PI plannability unconditionally on mount.
+  loadPi: vi.fn(async () => ({ schematics: {}, raw: [], infrastructure: {} })),
 }));
 
 // Market() unconditionally loads its own catalogue on mount regardless of

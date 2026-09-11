@@ -1270,8 +1270,26 @@ export function Market() {
 
       {section === 'orders' && <OpenOrdersPanel />}
 
-      {section === 'history' && <OrderHistoryPanel onViewChange={handleSectionChange} />}
-      {section === 'transactions' && <TransactionsPanel onViewChange={handleSectionChange} />}
+      {section === 'history' && (
+        <OrderHistoryPanel
+          onViewChange={handleSectionChange}
+          blueprintCatalog={blueprintCatalog}
+          onRequestBlueprintCatalog={ensureBlueprintCatalog}
+          onAddToQuickbar={handleAddToQuickbar}
+          quickbarAvailable={activeCharacterId !== null}
+          onShowInfo={handleShowInfo}
+        />
+      )}
+      {section === 'transactions' && (
+        <TransactionsPanel
+          onViewChange={handleSectionChange}
+          blueprintCatalog={blueprintCatalog}
+          onRequestBlueprintCatalog={ensureBlueprintCatalog}
+          onAddToQuickbar={handleAddToQuickbar}
+          quickbarAvailable={activeCharacterId !== null}
+          onShowInfo={handleShowInfo}
+        />
+      )}
 
       {/* The list itself lives in `useAppraisal` at route level, so switching
           to the Browser and back does not throw away a forty-line paste. */}
