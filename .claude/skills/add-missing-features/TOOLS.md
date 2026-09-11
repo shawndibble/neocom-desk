@@ -215,7 +215,7 @@ what the Advisor already computes per-planet; don't re-propose.
 | #824 | NARROW  | Production Run realized tax/fee/margin breakdown, per-run       |
 | #826 | NARROW  | Contracts: courier reward-per-m3/jump/collateral ratio, detail modal only |
 | #827 | SHIP    | Skills: Market Fee Skill ROI panel (Broker Relations/Accounting) |
-| #831 | NARROW  | Appraisal shareable link — typeId:qty payload, recompute-at-both-ends, byte-capped, unauthenticated route outside ScopeGate |
+| #831 | NARROW  | Appraisal shareable link — byte-capped typeId:qty payload, unauthenticated route outside ScopeGate |
 | #858 | SHIP    | Quickbar unrealized P&L against a player-entered cost basis, reusing existing price fetch |
 
 ## Killed / dropped candidates (never filed)
@@ -245,7 +245,7 @@ what the Advisor already computes per-planet; don't re-propose.
 | Pure station-trading FIFO P&L tracker | Kill-test 10, extended to pure trading. |
 | Public contract sell-advisor for manufactured goods | Kill-test 6 (ADR 0013). |
 | Moon Survey / Metenox Yield Estimator | Narrow reach + kill-test 13. |
-| Metenox Moon Drill ongoing fuel/yield ledger | Narrow reach + kill-test 13. Re-confirmed independently as a "static readout" variant (no depletion estimate) — same director/moon-owning-corp-only reach objection applies regardless of ledger vs. snapshot framing; filed as #859 then closed on rediscovering this entry. |
+| Metenox Moon Drill ongoing fuel/yield ledger (any framing, incl. a static no-depletion readout) | Narrow reach (moon-owning corp leadership only) + kill-test 13. Filed as #859, closed on rediscovering this entry. |
 | Market Movers / Trending Items dashboard | Kill-test 14. |
 | Working Capital Locked in the Pipeline stat | Kill-test 3; job cost is fee-only, not materials. |
 | PI Colony Layout Template (save/reuse pin layout) | Superseded by Advisor's per-planet fitted plan. |
