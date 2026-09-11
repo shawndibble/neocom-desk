@@ -218,7 +218,7 @@ describe('SkillCompare', () => {
     expect(await screen.findByText('Miners')).toBeInTheDocument();
 
     const row = screen.getByText('Miners').closest('li')!;
-    await user.click(within(row).getByRole('button', { name: 'Delete' }));
+    await user.click(within(row).getByRole('button', { name: 'Delete Miners' }));
     const dialog = await screen.findByRole('dialog', { name: 'Delete' });
     await user.click(within(dialog).getByRole('button', { name: 'Delete' }));
     await waitFor(() => expect(screen.queryByText('Miners')).not.toBeInTheDocument());

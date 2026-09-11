@@ -123,16 +123,19 @@ function SavedComparisonRow({
           {comparison.name}
         </button>
       )}
-      <Button
+      <IconButton
         size="sm"
+        icon={<Icon.Rename />}
+        label={`${t('skillCompare.rename')} ${comparison.name}`}
         onClick={() => setRenaming(true)}
-        aria-label={`${t('skillCompare.rename')} ${comparison.name}`}
-      >
-        {t('skillCompare.rename')}
-      </Button>
-      <Button variant="danger" size="sm" onClick={() => onRequestDelete(comparison.id)}>
-        {t('skillCompare.delete')}
-      </Button>
+      />
+      <IconButton
+        size="sm"
+        icon={<Icon.Close />}
+        label={`${t('skillCompare.delete')} ${comparison.name}`}
+        tone="danger"
+        onClick={() => onRequestDelete(comparison.id)}
+      />
     </li>
   );
 }
