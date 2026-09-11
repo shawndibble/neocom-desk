@@ -1,9 +1,8 @@
 /**
  * Composes the Mining Yield Overview tab's data (issue #671): every tracked
  * character's unfiltered ore/ice mining output, valued raw-vs-refined at
- * each entry's own mined-date price, plus the price-divergence notes the
- * tab's banner shows. Fetch/Dexie/SDE layer only — the pure arithmetic lives
- * in `src/engine/miningTax` (`valueMiningYield`, `comparePriceToToday`).
+ * each entry's own mined-date price. Fetch/Dexie/SDE layer only — the pure
+ * arithmetic lives in `src/engine/miningTax` (`valueMiningYield`).
  *
  * Raw ore is priced via its Compressed counterpart when one exists, the same
  * convention `pricing.ts` already uses for the Tax tab
@@ -18,8 +17,6 @@ import {
   type EntryValuation,
   type YieldReprocessingEntry,
 } from '@/engine/miningTax/yieldValuation';
-import { comparePriceToToday, type PriceDivergence } from '@/engine/miningTax/priceDivergence';
-import { sortPriceHistory } from '@/engine/market/priceHistory';
 import type { ReprocessingSkills } from '@/engine/industry/reprocessing';
 import { loadPriceHistory, type PriceHistoryResult } from '@/features/market/priceHistory';
 import { EsiError } from '@/esi/errors';
@@ -42,12 +39,6 @@ export interface MiningYieldRow {
   valuation: EntryValuation;
 }
 
-/** One ore/ice type whose price today differs meaningfully from the most recent mined-date price used to value it. */
-export interface MiningYieldPriceNote {
-  typeId: number;
-  divergence: PriceDivergence;
-}
-
 export interface MiningYieldSnapshot {
   rows: MiningYieldRow[];
   characters: TrackedCharacter[];
@@ -55,7 +46,6 @@ export interface MiningYieldSnapshot {
   systemNames: Map<number, string>;
   systemSecurity: Map<number, number>;
   typeNames: Map<number, string>;
-  priceNotes: MiningYieldPriceNote[];
   fetchedAt: Date | null;
   fromCache: boolean;
 }
@@ -110,7 +100,6 @@ export async function loadMiningYieldSnapshot(): Promise<MiningYieldSnapshot> {
       systemNames: new Map(),
       systemSecurity: new Map(),
       typeNames: new Map(),
-      priceNotes: [],
       fetchedAt,
       fromCache,
     };
@@ -174,14 +163,10 @@ export async function loadMiningYieldSnapshot(): Promise<MiningYieldSnapshot> {
     throw attempt.reason;
   }
   const priceByTypeAndDate = new Map<number, Map<string, number>>();
-  const latestPriceByType = new Map<number, number>();
   for (const [typeId, result] of histories) {
     const byDate = new Map<string, number>();
     for (const point of result.points) byDate.set(point.date, point.average);
     priceByTypeAndDate.set(typeId, byDate);
-    const sorted = sortPriceHistory(result.points);
-    const latest = sorted[sorted.length - 1];
-    if (latest) latestPriceByType.set(typeId, latest.average);
   }
 
   const characterIds = [...new Set(allEntries.map(({ characterId }) => characterId))];
@@ -214,24 +199,6 @@ export async function loadMiningYieldSnapshot(): Promise<MiningYieldSnapshot> {
     return { characterId, characterName, entry, valuation };
   });
 
-  // One note per distinct raw ore/ice type: its most recent mined-date price
-  // (the one a pilot most recently saw a total computed from) vs today's.
-  const mostRecentDateByType = new Map<number, string>();
-  for (const { entry } of allEntries) {
-    for (const line of entry.oreLines) {
-      const current = mostRecentDateByType.get(line.typeId);
-      if (!current || entry.date > current) mostRecentDateByType.set(line.typeId, entry.date);
-    }
-  }
-  const priceNotes: MiningYieldPriceNote[] = [];
-  for (const [typeId, date] of mostRecentDateByType) {
-    const minedDatePrice = priceByTypeAndDate.get(pricingTypeId(typeId))?.get(date);
-    const currentPrice = latestPriceByType.get(pricingTypeId(typeId));
-    if (minedDatePrice === undefined || currentPrice === undefined) continue;
-    const divergence = comparePriceToToday(minedDatePrice, currentPrice);
-    if (divergence?.significant) priceNotes.push({ typeId, divergence });
-  }
-
   const [systemRows, typeNames] = await Promise.all([
     Promise.all(systemIds.map(async (id) => ({ id, ...(await loadSystemNameAndSecurity(id)) }))),
     loadTypeNames(rawTypeIds),
@@ -250,7 +217,6 @@ export async function loadMiningYieldSnapshot(): Promise<MiningYieldSnapshot> {
     systemNames,
     systemSecurity,
     typeNames,
-    priceNotes,
     fetchedAt,
     fromCache,
   };
