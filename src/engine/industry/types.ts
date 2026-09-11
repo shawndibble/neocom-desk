@@ -455,6 +455,24 @@ export interface IndustryInputs {
    */
   recipeFor?: (typeID: number) => MaterialRecipe | null;
   /**
+   * Blueprint Acquisition (issue #838) for any buildable node reached during
+   * recursion — see `ResolveMaterialOptions.acquisitionFor`, which this is
+   * forwarded into unchanged. Absent alongside `buildHere`/`recipeFor` —
+   * every nested sub-build then keeps today's recipe-me heuristic, same as
+   * `recipeFor`'s own absent case.
+   */
+  acquisitionFor?: (
+    productTypeID: number,
+    needed: number,
+    ctx: FacilityContext & {
+      facilityTaxPct?: number;
+      systemCostIndex: number;
+      adjustedPrices: AdjustedPrices;
+      skills: SkillLevels;
+    },
+    materialPrices: HubPrices
+  ) => AcquisitionResolution | null;
+  /**
    * Where a reaction-produced material's own sub-build runs, when Include
    * Reactions is on for this (manufacturing-activity) plan — the Reaction
    * Location. Absent for a reaction-activity plan, which reuses this
@@ -462,6 +480,19 @@ export interface IndustryInputs {
    * sub-build instead (see `resolveMaterial`'s `reactionCtx` fallback).
    */
   reactionFacility?: ReactionFacilityContext;
+  /**
+   * Blueprint Acquisition (issue #838) for the plan's own top-level product.
+   * A nested sub-build resolves its own via a `recipeFor` caller's own
+   * `ResolveMaterialOptions.acquisitionFor`; the top level has no parent
+   * node to resolve it from, so the feature layer computes it once and
+   * passes it in here instead. Absent = no row, unchanged behavior.
+   */
+  blueprintAcquisition?: {
+    /** The blueprint's own typeID — distinct from `blueprint.products[0]`. */
+    blueprintTypeID: number;
+    /** `null` only when the resolved tier is an owned BPO — nothing to acquire. */
+    line: AcquisitionLine | null;
+  };
 }
 
 export interface JobFeeBreakdown {
@@ -523,6 +554,28 @@ export interface OwnedStockLocation {
  */
 export type OwnedStockScope =
   { mode: 'everywhere' } | { mode: 'selected'; locations: readonly OwnedStockLocation[] };
+
+/** What a Blueprint Acquisition row (issue #838) reports, at whatever node resolved it. */
+export interface AcquisitionLine {
+  /** ISK to cover the shortfall at the resolved tier; ignored when `owned`. */
+  unitPrice: number | null;
+  /** True when the resolved tier's owned runs already cover the need — nothing bought. */
+  owned: boolean;
+}
+
+/**
+ * What a buildable node's Blueprint Acquisition resolution reports back: the
+ * tier to build at, replacing the recipe's own `me`, and (unless the tier is
+ * an owned BPO) a material row for the row list.
+ */
+export interface AcquisitionResolution {
+  me: number;
+  te: number;
+  /** The blueprint's own typeID — distinct from what it produces. */
+  blueprintTypeID: number;
+  /** `null` only when the resolved tier is an owned BPO — nothing to acquire. */
+  line: AcquisitionLine | null;
+}
 
 /** An effective material priced against its sourcing overrides + hub prices. */
 export interface MaterialCostLine extends EffectiveMaterial {

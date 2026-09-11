@@ -93,6 +93,13 @@ const TYPES: TypeMap = {
   '34': { name: 'Tritanium', groupID: 18, volume: 0.01 },
   '35': { name: 'Pyerite', groupID: 18, volume: 0.01 },
   '36': { name: 'Mexallon', groupID: 18, volume: 0.01 },
+  // A blueprint is itself a real, named SDE type — production's `types.json`
+  // (`loadSde.ts`) carries these alongside every other item, so a Blueprint
+  // Acquisition row (issue #838) never actually falls back to `#<typeID>`.
+  // Named here so this fixture doesn't misrepresent that as a real gap.
+  '638': { name: 'Rifter Blueprint', groupID: 429, volume: 0.01 },
+  '639': { name: 'Tritanium Blueprint', groupID: 429, volume: 0.01 },
+  '640': { name: 'Pyerite Blueprint', groupID: 429, volume: 0.01 },
 };
 
 const ENTRY: BlueprintCatalogEntry = {
@@ -240,8 +247,6 @@ function Harness({
 }
 
 const runsInput = () => screen.getByRole('textbox', { name: 'Runs' });
-const meInput = () => screen.getByLabelText('ME %');
-const teInput = () => screen.getByLabelText('TE %');
 const valueOf = (input: HTMLElement) => (input as HTMLInputElement).value;
 
 /** Inputs live behind "Edit setup" now — open it before touching any of them. */
@@ -300,89 +305,15 @@ describe('BuildPlanDetail runs/me/te fields (issue #455)', () => {
     expect(onUpdate).not.toHaveBeenCalled();
   });
 
-  it('does not call the update callback when a field is tabbed through untouched', async () => {
+  it('does not call the update callback when the Runs field is tabbed through untouched', async () => {
     const user = userEvent.setup();
     const onUpdate = vi.fn();
-    render(<Harness plan={{ runs: 10, me: 5, te: 8 }} onUpdate={onUpdate} />);
+    render(<Harness plan={{ runs: 10 }} onUpdate={onUpdate} />);
     await openSetup(user);
 
-    // Runs, then ME, then TE, then out — none of them touched.
-    await user.tab();
-    await user.tab();
-    await user.tab();
     await user.tab();
 
     expect(onUpdate).not.toHaveBeenCalled();
-  });
-
-  it('ME: shows the raw typed value while editing and clamps only on blur', async () => {
-    const user = userEvent.setup();
-    const onUpdate = vi.fn();
-    render(<Harness plan={{ me: 0 }} onUpdate={onUpdate} />);
-    await openSetup(user);
-
-    await user.clear(meInput());
-    await user.type(meInput(), '15');
-    expect(valueOf(meInput())).toBe('15');
-
-    await user.tab();
-
-    expect(onUpdate).toHaveBeenCalledTimes(1);
-    expect(onUpdate).toHaveBeenCalledWith({ me: 10 });
-  });
-
-  it('TE: shows the raw typed value while editing and clamps only on blur', async () => {
-    const user = userEvent.setup();
-    const onUpdate = vi.fn();
-    render(<Harness plan={{ te: 0 }} onUpdate={onUpdate} />);
-    await openSetup(user);
-
-    await user.clear(teInput());
-    await user.type(teInput(), '25');
-    expect(valueOf(teInput())).toBe('25');
-
-    await user.tab();
-
-    expect(onUpdate).toHaveBeenCalledTimes(1);
-    expect(onUpdate).toHaveBeenCalledWith({ te: 20 });
-  });
-
-  it('ME: reverts to the last committed value on blur after clearing, without committing', async () => {
-    const user = userEvent.setup();
-    const onUpdate = vi.fn();
-    render(<Harness plan={{ me: 5 }} onUpdate={onUpdate} />);
-    await openSetup(user);
-
-    await user.clear(meInput());
-    expect(valueOf(meInput())).toBe('');
-    await user.tab();
-
-    expect(valueOf(meInput())).toBe('5');
-    expect(onUpdate).not.toHaveBeenCalled();
-  });
-
-  it('TE: reverts to the last committed value on blur after clearing, without committing', async () => {
-    const user = userEvent.setup();
-    const onUpdate = vi.fn();
-    render(<Harness plan={{ te: 8 }} onUpdate={onUpdate} />);
-    await openSetup(user);
-
-    await user.clear(teInput());
-    expect(valueOf(teInput())).toBe('');
-    await user.tab();
-
-    expect(valueOf(teInput())).toBe('8');
-    expect(onUpdate).not.toHaveBeenCalled();
-  });
-
-  it('clicking the ME label focuses its input, proving the htmlFor/id pairing (not just aria-label) works', async () => {
-    const user = userEvent.setup();
-    render(<Harness />);
-    await openSetup(user);
-
-    await user.click(screen.getByText('ME %'));
-
-    expect(document.activeElement).toBe(meInput());
   });
 });
 
@@ -400,7 +331,11 @@ describe('BuildPlanDetail shopping list', () => {
 
     await user.click(copyButton());
 
-    expect(writeText).toHaveBeenCalledWith('Tritanium\t960');
+    // "Rifter Blueprint" is the blueprint's own Blueprint Acquisition row
+    // (issue #838): no owned copy, no BPC offer and no hub price for it in
+    // this fixture, so it lists unpriced at quantity 1 — still on the
+    // shopping list, since it is a real thing the pilot has to go acquire.
+    expect(writeText).toHaveBeenCalledWith('Rifter Blueprint\t1\nTritanium\t960');
   });
 
   it('confirms on the button itself — a clipboard write leaves nothing else to look at', async () => {
@@ -545,7 +480,13 @@ describe('BuildPlanDetail sub-builds', () => {
     await user.click(buildButton());
     await user.click(screen.getByRole('button', { name: 'Copy shopping list for multibuy' }));
 
-    expect(writeText).toHaveBeenCalledWith('Pyerite\t1250');
+    // "Rifter Blueprint" (unbuilt) and "Tritanium Blueprint" (Tritanium is
+    // now built here — its own Blueprint Acquisition row, issue #838) both
+    // list unpriced at quantity 1 in this fixture; Pyerite is what the
+    // build actually needs.
+    expect(writeText).toHaveBeenCalledWith(
+      'Rifter Blueprint\t1\nTritanium Blueprint\t1\nPyerite\t1250'
+    );
   });
 
   it('sizes the job against what is still needed, never rebuilding owned stock', async () => {
@@ -558,7 +499,9 @@ describe('BuildPlanDetail sub-builds', () => {
     await user.click(buildButton());
     await user.click(screen.getByRole('button', { name: 'Copy shopping list for multibuy' }));
 
-    expect(writeText).toHaveBeenCalledWith('Pyerite\t1000');
+    expect(writeText).toHaveBeenCalledWith(
+      'Rifter Blueprint\t1\nTritanium Blueprint\t1\nPyerite\t1000'
+    );
   });
 
   it('puts the material back on the list when the choice is undone', async () => {
@@ -571,7 +514,10 @@ describe('BuildPlanDetail sub-builds', () => {
     await user.click(screen.getByRole('button', { name: 'Buy Tritanium instead of building it' }));
     await user.click(screen.getByRole('button', { name: 'Copy shopping list for multibuy' }));
 
-    expect(writeText).toHaveBeenCalledWith('Tritanium\t1000');
+    // Undone: Tritanium is bought again, not built, so its own "Tritanium
+    // Blueprint" Blueprint Acquisition row is gone too — only "Rifter
+    // Blueprint" (the plan's own blueprint) remains.
+    expect(writeText).toHaveBeenCalledWith('Rifter Blueprint\t1\nTritanium\t1000');
   });
 });
 

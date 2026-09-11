@@ -39,6 +39,7 @@
  */
 
 import type {
+  AcquisitionResolution,
   EffectiveMaterial,
   HubPrices,
   IndustryBlueprint,
@@ -55,6 +56,13 @@ export const MAX_SUB_BUILD_DEPTH = 10;
 export interface ResolvedMaterial extends MaterialCostLine {
   /** Present only when this material is being produced rather than bought. */
   subBuild?: ResolvedSubBuild;
+  /**
+   * Present only on a synthetic Blueprint Acquisition row (issue #838) — the
+   * ME/TE tier it resolved to, for the row's caption. TE plays no part in any
+   * cost or time formula (matching `planSubBuild`'s own TE-agnostic sub-build
+   * quote) — it rides along purely for display.
+   */
+  acquisitionTier?: { me: number; te: number };
 }
 
 /** A planned sub-job whose own inputs have been resolved the same way, recursively. */
@@ -103,9 +111,25 @@ export interface ResolveMaterialOptions {
    * branch for it to share stock with.
    */
   ownedPool?: Map<number, number>;
+  /**
+   * Blueprint Acquisition (issue #838): resolves the ME/TE tier a buildable
+   * node should use — replacing the recipe's own `me` for that node — and
+   * what, if anything, covering its shortfall costs. Absent keeps today's
+   * behaviour exactly: the recipe's own `me`, no acquisition row. Takes the
+   * node's own resolved context and price basis, since a reaction node's
+   * tier is priced against `reactionCtx` while a manufacturing one is priced
+   * against `ctx` — the same choice `resolveSubBuild` already makes.
+   */
+  acquisitionFor?: (
+    productTypeID: number,
+    needed: number,
+    ctx: SubBuildContext,
+    materialPrices: HubPrices
+  ) => AcquisitionResolution | null;
 }
 
-function usable(value: number | undefined): number | undefined {
+/** A defined, non-negative, finite number, or `undefined` — the one input guard every optional-override read in this module shares. */
+export function usable(value: number | undefined): number | undefined {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : undefined;
 }
 
@@ -182,16 +206,29 @@ export function resolveMaterial(
   const recipe = eligible ? recipeFor(material.typeID) : null;
 
   if (recipe?.method === 'manufacturing' || recipe?.method === 'reaction') {
-    const me = recipe.method === 'manufacturing' ? recipe.me : 0;
     // The reaction branch's own context, never folded into `opts.ctx` — see
     // the `reactionCtx` doc comment above.
     const subCtx = recipe.method === 'reaction' ? (opts.reactionCtx ?? opts.ctx) : opts.ctx;
-    const sub = resolveSubBuild(material.typeID, remainingQuantity, recipe.blueprint, me, subCtx, {
-      ...opts,
-      visited: new Set([...visited, material.typeID]),
-      depth: depth + 1,
-      ownedPool,
-    });
+    // Blueprint Acquisition (issue #838): replaces the recipe's own `me` with
+    // the cost-minimizing tier's, when the caller opted in.
+    const acquisition =
+      opts.acquisitionFor?.(material.typeID, remainingQuantity, subCtx, opts.materialPrices) ??
+      null;
+    const me = acquisition ? acquisition.me : recipe.method === 'manufacturing' ? recipe.me : 0;
+    const sub = resolveSubBuild(
+      material.typeID,
+      remainingQuantity,
+      recipe.blueprint,
+      me,
+      subCtx,
+      {
+        ...opts,
+        visited: new Set([...visited, material.typeID]),
+        depth: depth + 1,
+        ownedPool,
+      },
+      acquisition
+    );
     if (sub) {
       return {
         ...material,
@@ -218,6 +255,36 @@ export function resolveMaterial(
 }
 
 /**
+ * The synthetic Blueprint Acquisition row for one buildable node (issue
+ * #838) — keyed by the blueprint's own typeID, never the product's. Shared
+ * by `resolveSubBuild` (a nested sub-build) and `buildVsBuy` (the plan's own
+ * top-level product), the only two places a node's tier is resolved outside
+ * the normal buy/build path `resolveMaterial` otherwise handles. Bypasses
+ * `claimOwned`/`ownedPool` entirely: it isn't material stock, it's the means
+ * to build at all.
+ */
+export function acquisitionMaterialFor(
+  acquisition: AcquisitionResolution,
+  overridePrice: number | undefined
+): ResolvedMaterial | null {
+  if (!acquisition.line) return null;
+  const resolvedOverride = usable(overridePrice);
+  const remainingQuantity = acquisition.line.owned ? 0 : 1;
+  const unitPrice = resolvedOverride ?? acquisition.line.unitPrice;
+  return {
+    typeID: acquisition.blueprintTypeID,
+    baseQuantity: 1,
+    quantity: 1,
+    ownedQuantity: 1 - remainingQuantity,
+    remainingQuantity,
+    unitPrice,
+    lineCost: remainingQuantity * (unitPrice ?? 0),
+    unpriced: remainingQuantity > 0 && unitPrice === null,
+    acquisitionTier: { me: acquisition.me, te: acquisition.te },
+  };
+}
+
+/**
  * Plans one level's job, then resolves what it consumes — recursively. `null`
  * mirrors `planSubBuild`'s own "nothing to plan" and error cases.
  *
@@ -233,12 +300,22 @@ function resolveSubBuild(
   blueprint: IndustryBlueprint,
   me: number,
   ctx: SubBuildContext,
-  opts: ResolveMaterialOptions
+  opts: ResolveMaterialOptions,
+  acquisition: AcquisitionResolution | null = null
 ): ResolvedSubBuild | null {
   const sub = planSubBuild({ typeID, remainingQuantity: needed }, blueprint, me, ctx);
   if (!sub) return null;
 
-  const inputs = sub.inputs.map((input) => resolveMaterial(input, opts));
+  const acquisitionMaterial = acquisition
+    ? acquisitionMaterialFor(
+        acquisition,
+        opts.sourcing?.[acquisition.blueprintTypeID]?.overridePrice
+      )
+    : null;
+
+  const inputs = acquisitionMaterial
+    ? [acquisitionMaterial, ...sub.inputs.map((input) => resolveMaterial(input, opts))]
+    : sub.inputs.map((input) => resolveMaterial(input, opts));
   const materialCost = inputs.reduce((sum, i) => sum + i.lineCost, 0);
   const descendantFees = inputs.reduce((sum, i) => sum + (i.subBuild?.totalFees ?? 0), 0);
   const totalFees = sub.jobFee.total + descendantFees;

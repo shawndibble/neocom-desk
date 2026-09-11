@@ -435,3 +435,57 @@ describe('buildVsBuy', () => {
     });
   });
 });
+
+describe('buildVsBuy — Blueprint Acquisition for the top-level product (issue #838)', () => {
+  it('does nothing when the caller does not opt in', () => {
+    const r = buildVsBuy(baseInputs);
+    expect(r.materials.some((m) => m.acquisitionTier)).toBe(false);
+    expect(r.materials).toHaveLength(2);
+  });
+
+  it('prepends a priced row first, and it counts toward materialCost/unpriceable', () => {
+    const r = buildVsBuy({
+      ...baseInputs,
+      blueprintAcquisition: { blueprintTypeID: 1001, line: { unitPrice: 750, owned: false } },
+    });
+    expect(r.materials[0]).toMatchObject({
+      typeID: 1001,
+      remainingQuantity: 1,
+      unitPrice: 750,
+      lineCost: 750,
+      unpriced: false,
+      acquisitionTier: { me: baseInputs.me, te: baseInputs.te },
+    });
+    expect(r.materials).toHaveLength(3);
+    expect(r.materialCost).toBe(
+      750 + r.materials.filter((m) => m.typeID !== 1001).reduce((s, m) => s + m.lineCost, 0)
+    );
+    expect(r.unpriceable).toBe(false);
+  });
+
+  it('adds no row when the resolved tier is an owned BPO', () => {
+    const r = buildVsBuy({
+      ...baseInputs,
+      blueprintAcquisition: { blueprintTypeID: 1001, line: null },
+    });
+    expect(r.materials).toHaveLength(2);
+  });
+
+  it('an unpriceable line makes the whole plan unpriceable', () => {
+    const r = buildVsBuy({
+      ...baseInputs,
+      blueprintAcquisition: { blueprintTypeID: 1001, line: { unitPrice: null, owned: false } },
+    });
+    expect(r.unpricedMaterials).toContain(1001);
+    expect(r.unpriceable).toBe(true);
+  });
+
+  it('a manual overridePrice on the blueprint typeID wins over the resolved price', () => {
+    const r = buildVsBuy({
+      ...baseInputs,
+      materialSourcing: { 1001: { overridePrice: 1 } },
+      blueprintAcquisition: { blueprintTypeID: 1001, line: { unitPrice: 750, owned: false } },
+    });
+    expect(r.materials[0]).toMatchObject({ typeID: 1001, unitPrice: 1, lineCost: 1 });
+  });
+});

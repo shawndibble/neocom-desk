@@ -558,3 +558,113 @@ describe('withoutOwnedQuantities', () => {
     expect(resolved.remainingQuantity).toBe(4);
   });
 });
+
+describe('resolveMaterial — Blueprint Acquisition (issue #838)', () => {
+  const MID_BLUEPRINT_TYPE = 600;
+  const buildMid = (acquisitionFor: ResolveMaterialOptions['acquisitionFor']) =>
+    resolveMaterial(
+      material(MID_TYPE, 10),
+      baseOptions({
+        buildHere: new Set([MID_TYPE]),
+        recipeFor: recipeFor({
+          [MID_TYPE]: { method: 'manufacturing', blueprint: midBlueprint, me: 0 },
+        }),
+        materialPrices: { [LEAF_TYPE]: 100 },
+        acquisitionFor,
+      })
+    );
+
+  it('does nothing when the caller does not opt in — no row, no acquisitionTier', () => {
+    const resolved = buildMid(undefined);
+    expect(resolved.subBuild?.inputs.every((i) => i.acquisitionTier === undefined)).toBe(true);
+    expect(resolved.subBuild?.inputs).toHaveLength(1);
+    expect(resolved.subBuild?.inputs[0].typeID).toBe(LEAF_TYPE);
+  });
+
+  it('prepends a priced Blueprint Acquisition row first among the node’s own inputs, at the resolved tier', () => {
+    const resolved = buildMid(() => ({
+      me: 8,
+      te: 16,
+      blueprintTypeID: MID_BLUEPRINT_TYPE,
+      line: { unitPrice: 500, owned: false },
+    }));
+
+    const inputs = resolved.subBuild?.inputs ?? [];
+    expect(inputs).toHaveLength(2);
+    expect(inputs[0]).toMatchObject({
+      typeID: MID_BLUEPRINT_TYPE,
+      remainingQuantity: 1,
+      unitPrice: 500,
+      lineCost: 500,
+      unpriced: false,
+      acquisitionTier: { me: 8, te: 16 },
+    });
+    expect(inputs[1].typeID).toBe(LEAF_TYPE);
+    // The resolved tier (ME8) replaces the recipe's own me (0) for scaling —
+    // fewer LEAF units than the ME0 case (50) confirms it was actually used.
+    expect(inputs[1].quantity).toBeLessThan(50);
+    expect(resolved.subBuild?.materialCost).toBe(500 + inputs[1].lineCost);
+  });
+
+  it('adds no row at all when the resolved tier is an owned BPO', () => {
+    const resolved = buildMid(() => ({
+      me: 10,
+      te: 20,
+      blueprintTypeID: MID_BLUEPRINT_TYPE,
+      line: null,
+    }));
+    expect(resolved.subBuild?.inputs).toHaveLength(1);
+    expect(resolved.subBuild?.inputs[0].typeID).toBe(LEAF_TYPE);
+  });
+
+  it('shows the free/owned row, priced 0, when the resolved tier is a covering owned BPC', () => {
+    const resolved = buildMid(() => ({
+      me: 6,
+      te: 12,
+      blueprintTypeID: MID_BLUEPRINT_TYPE,
+      line: { unitPrice: 0, owned: true },
+    }));
+    const row = resolved.subBuild?.inputs[0];
+    expect(row).toMatchObject({
+      typeID: MID_BLUEPRINT_TYPE,
+      ownedQuantity: 1,
+      remainingQuantity: 0,
+      lineCost: 0,
+      unpriced: false,
+    });
+  });
+
+  it('an unpriceable acquisition line poisons this node, same as any other unpriced material', () => {
+    const resolved = buildMid(() => ({
+      me: 0,
+      te: 0,
+      blueprintTypeID: MID_BLUEPRINT_TYPE,
+      line: { unitPrice: null, owned: false },
+    }));
+    expect(resolved.subBuild?.inputs[0].unpriced).toBe(true);
+    expect(resolved.subBuild?.unitCost).toBeNull();
+    expect(resolved.unpriced).toBe(true);
+  });
+
+  it('a manual overridePrice on the blueprint’s own typeID wins over the resolved cascade price', () => {
+    const resolved = resolveMaterial(
+      material(MID_TYPE, 10),
+      baseOptions({
+        buildHere: new Set([MID_TYPE]),
+        recipeFor: recipeFor({
+          [MID_TYPE]: { method: 'manufacturing', blueprint: midBlueprint, me: 0 },
+        }),
+        materialPrices: { [LEAF_TYPE]: 100 },
+        sourcing: { [MID_BLUEPRINT_TYPE]: { overridePrice: 42 } },
+        acquisitionFor: () => ({
+          me: 8,
+          te: 16,
+          blueprintTypeID: MID_BLUEPRINT_TYPE,
+          line: { unitPrice: 500, owned: false },
+        }),
+      })
+    );
+    const row = resolved.subBuild?.inputs[0];
+    expect(row).toMatchObject({ typeID: MID_BLUEPRINT_TYPE, unitPrice: 42, lineCost: 42 });
+  });
+});

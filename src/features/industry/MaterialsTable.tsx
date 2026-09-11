@@ -640,6 +640,15 @@ export function MaterialsTable({
                   )}
                 </span>
               )}
+              {/* Blueprint Acquisition (issue #838): the tier this row
+                  resolved to, distinct from — and shown alongside — whatever
+                  the price tag above already says about it (owned,
+                  overridden, or unpriced). */}
+              {material.acquisitionTier && (
+                <span className="text-[0.6875rem] text-text-dim">
+                  {t('industry.blueprintAcquisitionTier', material.acquisitionTier)}
+                </span>
+              )}
             </span>
           );
         },

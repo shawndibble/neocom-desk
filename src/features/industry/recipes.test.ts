@@ -2,6 +2,8 @@ import { describe, it, expect, vi } from 'vitest';
 import type { BlueprintMap, TypeMap } from '@/sde/types';
 import { piFixture } from '@/sde/__fixtures__/pi';
 import type { CharacterBlueprint } from '@/esi/endpoints';
+import { FACILITY_PRESETS } from '@/engine/industry/types';
+import type { SubBuildContext } from '@/engine/industry/subBuild';
 
 const BLUEPRINTS: BlueprintMap = {
   '9841': {
@@ -93,7 +95,8 @@ vi.mock('@/sde/loadSde', () => ({
 }));
 
 const { loadBlueprintCatalog } = await import('./blueprintCatalog');
-const { buildPlanTypeIds, materialRecipe, recipeInputTypeIds } = await import('./recipes');
+const { acquisitionForLookup, buildPlanTypeIds, materialRecipe, recipeInputTypeIds } =
+  await import('./recipes');
 
 const catalog = await loadBlueprintCatalog();
 
@@ -254,14 +257,111 @@ describe('buildPlanTypeIds', () => {
     // a `buildHere` choice can now sit at any of them (docs/context/decisions),
     // and each one needs a hub price for its own recipe's inputs.
     // 9840 (product) -> manufacturing input 34.
-    expect(ids.sort((a, b) => a - b)).toEqual([34, 40, 41, 42, 43, 2267, 2398, 9840]);
+    // Every manufactured typeID reached (9840, 40, 41, 42) also pulls in its
+    // own blueprint's typeID (9841, 9843, 9844, 9845 respectively — issue
+    // #838's Blueprint Acquisition needs a hub price for the blueprint
+    // itself, not only for what it produces). 43 and 34 are raw, no
+    // blueprint of their own; 2398/2267 are planetary, not in the
+    // manufacturing catalog at all.
+    expect(ids.sort((a, b) => a - b)).toEqual([
+      34, 40, 41, 42, 43, 2267, 2398, 9840, 9841, 9843, 9844, 9845,
+    ]);
   });
 
   it('skips the planetary widening when pi.json is unavailable', () => {
     const ids = buildPlanTypeIds(blueprint, { catalog, pi: null });
     // No pi means no schematic for 2398, so 2267 never gets added — 2398
     // itself stays, as a plain material with nothing produced beneath it.
-    // The manufacturing side (40 -> 41 -> 42 -> 43, 9840 -> 34) is unaffected.
-    expect(ids.sort((a, b) => a - b)).toEqual([34, 40, 41, 42, 43, 2398, 9840]);
+    // The manufacturing side (40 -> 41 -> 42 -> 43, 9840 -> 34) and its
+    // blueprint typeIDs are unaffected.
+    expect(ids.sort((a, b) => a - b)).toEqual([
+      34, 40, 41, 42, 43, 2398, 9840, 9841, 9843, 9844, 9845,
+    ]);
+  });
+});
+
+describe('acquisitionForLookup', () => {
+  const ctx: SubBuildContext = {
+    facility: FACILITY_PRESETS.npcStation,
+    rigFit: ['none', 'none', 'none'],
+    security: 'highsec',
+    systemCostIndex: 0.05,
+    adjustedPrices: {},
+    skills: {},
+  };
+
+  it('is a no-op — always null — when the caller never configured Blueprint Acquisition', () => {
+    const acquisitionFor = acquisitionForLookup({ catalog, pi: PI, ownedBlueprints: [] });
+    expect(acquisitionFor(9840, 5, ctx, { 34: 10 })).toBeNull();
+  });
+
+  it('is null for a typeID nothing in the SDE produces (a planetary output, or a raw material)', () => {
+    const acquisitionFor = acquisitionForLookup({
+      catalog,
+      pi: PI,
+      ownedBlueprints: [],
+      blueprintAcquisition: { offersFor: () => [], hubPrices: {} },
+    });
+    expect(acquisitionFor(34, 5, ctx, {})).toBeNull();
+    expect(acquisitionFor(2398, 5, ctx, {})).toBeNull();
+  });
+
+  it('resolves a manufacturing node via the BPO sell-price cascade when nothing is owned and no BPC offer exists', () => {
+    const acquisitionFor = acquisitionForLookup({
+      catalog,
+      pi: PI,
+      ownedBlueprints: [],
+      blueprintAcquisition: { offersFor: () => [], hubPrices: { 9841: 777 } },
+    });
+    const result = acquisitionFor(9840, 5, ctx, { 34: 10 });
+    expect(result).toEqual({
+      me: 0,
+      te: 0,
+      blueprintTypeID: 9841,
+      line: { unitPrice: 777, owned: false },
+    });
+  });
+
+  it('quotes the ME the character actually owns when it is the cheapest tier', () => {
+    const acquisitionFor = acquisitionForLookup({
+      catalog,
+      pi: PI,
+      ownedBlueprints: [
+        {
+          item_id: 1,
+          type_id: 9841,
+          runs: -1,
+          material_efficiency: 8,
+          time_efficiency: 16,
+          quantity: 1,
+          location_id: 1,
+          location_flag: 'Hangar',
+        },
+      ],
+      blueprintAcquisition: { offersFor: () => [], hubPrices: {} },
+    });
+    const result = acquisitionFor(9840, 5, ctx, { 34: 10 });
+    expect(result).toEqual({ me: 8, te: 16, blueprintTypeID: 9841, line: null });
+  });
+
+  it('never searches BPC Sourcing for a reaction formula — BPO-only, even when an offer would be cheaper', () => {
+    const acquisitionFor = acquisitionForLookup({
+      catalog,
+      pi: PI,
+      ownedBlueprints: [],
+      blueprintAcquisition: {
+        // A suspiciously cheap offer that must never be consulted for a
+        // reaction node — reaction formulas cannot be copied at all.
+        offersFor: () => [{ me: 0, te: 0, runs: 1, quantity: 1, price: 1 }],
+        hubPrices: { 46156: 999 },
+      },
+    });
+    const result = acquisitionFor(16667, 5, ctx, { 16650: 10 });
+    expect(result).toEqual({
+      me: 0,
+      te: 0,
+      blueprintTypeID: 46156,
+      line: { unitPrice: 999, owned: false },
+    });
   });
 });
