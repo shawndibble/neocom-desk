@@ -8,6 +8,7 @@ import {
   projectCalendar,
   projectStructureFuel,
   projectEveNotificationReinforcementExit,
+  reinforcementExitStructureIds,
 } from './projection';
 import { occurrenceKey } from './occurrenceKey';
 import type { NotificationFire, EveNotificationEntrySnapshot } from './notificationDiffs';
@@ -382,5 +383,39 @@ describe('projectEveNotificationReinforcementExit', () => {
     );
     expect(noId).toHaveLength(1);
     expect(noId[0].body).not.toContain('undefined');
+  });
+});
+
+describe('reinforcementExitStructureIds', () => {
+  const T_ISO = new Date(T0).toISOString();
+
+  function entry(
+    overrides: Partial<EveNotificationEntrySnapshot> = {}
+  ): EveNotificationEntrySnapshot {
+    return {
+      notificationId: 1,
+      type: 'StructureUnderAttack',
+      senderId: 1000132,
+      senderType: 'corporation',
+      text: 'structureID: 111\ntimeLeft: 36000000000\n',
+      timestamp: T_ISO,
+      ...overrides,
+    };
+  }
+
+  it('returns only the structure ids whose reinforcement exit falls inside the horizon — the ids the projector will actually name', () => {
+    const outsideTicks = (PROJECTION_HORIZON_MS + HOUR_MS) * 10_000;
+    const ids = reinforcementExitStructureIds(
+      [
+        entry({ notificationId: 1, text: 'structureID: 111\ntimeLeft: 36000000000\n' }),
+        entry({
+          notificationId: 2,
+          text: `structureID: 222\ntimeLeft: ${outsideTicks}\n`,
+        }),
+        entry({ notificationId: 3, text: 'structureID: 333\n' }),
+      ],
+      T0
+    );
+    expect(ids).toEqual([111]);
   });
 });

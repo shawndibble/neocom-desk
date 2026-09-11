@@ -527,6 +527,27 @@ describe('projection wiring', () => {
       );
       expect(rows).toEqual([]);
     });
+
+    it('skips loadStructureName for entries whose reinforcement exit falls outside the projection horizon (Sentry N+1, /skills)', async () => {
+      // 76 hours in 100ns ticks — past the 72-hour horizon.
+      const outsideTicks = 76 * 3_600 * 10_000_000;
+      const snapshot = {
+        entries: [
+          {
+            notificationId: 42,
+            type: 'StructureUnderAttack',
+            senderId: 1000132,
+            senderType: 'corporation',
+            text: `structureID: 111\ntimeLeft: ${outsideTicks}\n`,
+            timestamp: new Date(T0).toISOString(),
+          },
+        ],
+        nowMs: T0,
+      };
+      const rows = await eveNotificationDomain.projection!(7, 'Kestrel', snapshot, T0);
+      expect(rows).toEqual([]);
+      expect(loadStructureName).not.toHaveBeenCalled();
+    });
   });
 });
 

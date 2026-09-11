@@ -583,6 +583,36 @@ export function projectStructureFuel(
  * plain fire would collide with the live "lost shields/armor" fire sharing
  * the same `notificationId`.
  */
+/**
+ * The structure ids `projectEveNotificationReinforcementExit` will actually
+ * put in a row's text, for a caller that has to resolve display names first
+ * (`features/notifications/pollDomains.ts`'s `eveNotificationDomain`
+ * projection — `src/engine` stays free of the ESI call that resolves a name,
+ * per this module's own header). Runs the identical `reinforcementExitMs` +
+ * `inHorizon` gate `projectEveNotificationReinforcementExit` runs, so an
+ * entry excluded here is exactly an entry that function would have produced
+ * no row for — there is no ESI call this skips that a name would have
+ * appeared in. Callers must pass the same `nowMs` to both functions: an
+ * entry that passes this gate and fails the projector's (or vice versa) would
+ * fall back to rendering `#id` for a lookup that either wasn't attempted or
+ * was wasted.
+ */
+export function reinforcementExitStructureIds(
+  entries: readonly EveNotificationEntrySnapshot[],
+  nowMs: number,
+  horizonMs: number = PROJECTION_HORIZON_MS
+): number[] {
+  const ids: number[] = [];
+  for (const entry of entries) {
+    const payload = parseEveNotificationPayload(entry.text);
+    const exitMs = reinforcementExitMs(entry.timestamp, payload);
+    if (exitMs === undefined) continue;
+    if (!inHorizon(exitMs, nowMs, horizonMs)) continue;
+    if (payload.structureId !== undefined) ids.push(payload.structureId);
+  }
+  return ids;
+}
+
 export function projectEveNotificationReinforcementExit(
   characterId: number,
   characterName: string,
