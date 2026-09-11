@@ -448,6 +448,12 @@ export function MaterialsTable({
                     tooltip={tooltip}
                     onClick={() => toggle(material.typeID)}
                   />
+                ) : material.acquisitionTier ? (
+                  // Blueprint Acquisition (issue #838): marks this row as the
+                  // blueprint itself, not a material the blueprint consumes —
+                  // the same fixed slot every other row's toggle/advice glyph
+                  // occupies, so the name column never zigzags.
+                  <Icon.Blueprint size={Icon.ICON_SIZE.sm} className="text-text-dim" />
                 ) : (
                   advice && (
                     <MakeOrBuyMarker advice={advice} remaining={material.remainingQuantity} />
@@ -487,6 +493,21 @@ export function MaterialsTable({
         header: t('industry.ownedQuantity'),
         align: 'right',
         render: (material) => {
+          // Blueprint Acquisition (issue #838): this row's "owned" state
+          // comes entirely from `acquisition.line.owned` — the Character's
+          // real BPO/BPC ownership, resolved by `selectBlueprintTier` — never
+          // from a typed quantity. There is no such thing as owning "some" of
+          // a blueprint the way a material has partial stock, so unlike every
+          // other row, this cell either says "Owned" or says nothing — an
+          // editable input here would silently do nothing (the price field is
+          // the real escape hatch, docs/context/decisions/20260911-073307).
+          if (material.acquisitionTier) {
+            return material.remainingQuantity === 0 ? (
+              <span className="text-[0.6875rem] text-text-dim">
+                {t('industry.blueprintAcquisitionOwned')}
+              </span>
+            ) : null;
+          }
           // Whether anything is detected at all, galaxy-wide — the offer's
           // own number is the scoped one below.
           const stock = detection?.stockFor(material.typeID);

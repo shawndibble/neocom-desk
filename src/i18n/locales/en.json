@@ -413,6 +413,7 @@
     "priceSourceOwned": "Owned",
     "priceSourceBuilt": "Built",
     "blueprintAcquisitionTier": "ME {{me}}% / TE {{te}}%",
+    "blueprintAcquisitionOwned": "Owned",
     "buildHereFor": "Build {{material}} here instead of buying it",
     "buyInsteadFor": "Buy {{material}} instead of building it",
     "subBuildRuns": "{{runs}} runs",
