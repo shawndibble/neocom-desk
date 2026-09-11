@@ -469,6 +469,20 @@ export function MaterialsTable({
                 )}
               </span>
               {name}
+              {/* Blueprint Acquisition (issue #838): opens the picker/override
+                  modal for this row's tier right beside the name it governs,
+                  rather than beside the ME/TE caption in the price column —
+                  the config is about which blueprint this row resolves to,
+                  which is a property of the row's identity, not its price. */}
+              {material.acquisitionTier && onOpenAcquisitionPicker && (
+                <IconButton
+                  variant="plain"
+                  size="sm"
+                  icon={<Icon.OptimizeRemaps />}
+                  label={t('industry.blueprintAcquisitionOpenPicker')}
+                  onClick={() => onOpenAcquisitionPicker(material.typeID)}
+                />
+              )}
             </span>
           );
         },
@@ -670,21 +684,13 @@ export function MaterialsTable({
                 </span>
               )}
               {/* Blueprint Acquisition (issue #838): the tier this row
-                  resolved to, distinct from — and shown alongside — whatever
-                  the price tag above already says about it (owned,
-                  overridden, or unpriced). */}
+                  resolved to, distinct from whatever the price tag above
+                  already says about it (owned, overridden, or unpriced). The
+                  picker button that used to sit beside it now lives next to
+                  the material name in the first column instead. */}
               {material.acquisitionTier && (
                 <span className="flex items-center gap-1 text-[0.6875rem] text-text-dim">
                   {t('industry.blueprintAcquisitionTier', material.acquisitionTier)}
-                  {onOpenAcquisitionPicker && (
-                    <IconButton
-                      variant="plain"
-                      size="sm"
-                      icon={<Icon.OptimizeRemaps />}
-                      label={t('industry.blueprintAcquisitionOpenPicker')}
-                      onClick={() => onOpenAcquisitionPicker(material.typeID)}
-                    />
-                  )}
                 </span>
               )}
             </span>
