@@ -675,6 +675,38 @@ describe('BpcSourcingPanel Location/Space', () => {
     expect(within(table).queryByText('Caracal Blueprint')).not.toBeInTheDocument();
     expect(within(table).getByText('Rifter Blueprint')).toBeInTheDocument();
   });
+
+  it('shows Source/ME/TE/Runs/Qty/Price/Region/Expires by default and can hide them via the column picker', async () => {
+    loadCharacterBlueprints.mockResolvedValue(
+      ownedResult([ownedBlueprint({ item_id: 1, type_id: 870, location_id: 60003760 })])
+    );
+    // A resolved, real space — the Space filter's chip state is not reset
+    // between tests in this file (unlike the Zustand stores `beforeEach`
+    // does reset), so a preceding test's narrowed filter can otherwise
+    // exclude this fixture's default unresolved (null) space entirely.
+    loadBlueprintLocation.mockResolvedValue({
+      name: 'Jita IV - Moon 4',
+      regionId: 10000002,
+      space: 'highsec',
+    });
+    const user = userEvent.setup();
+    render(<App />);
+    const table = await screen.findByRole('table', { name: 'BPC Search' });
+    await within(table).findByText('Caracal Blueprint');
+
+    for (const name of ['Source', 'ME', 'TE', 'Runs', 'Qty', 'Price', 'Region', 'Expires']) {
+      expect(within(table).getByRole('columnheader', { name })).toBeInTheDocument();
+    }
+
+    // Same close-the-menu-before-querying rule the Space test above follows.
+    await user.click(await screen.findByRole('button', { name: 'Columns' }));
+    await user.click(await screen.findByRole('menuitemcheckbox', { name: 'ME' }));
+    await user.keyboard('{Escape}');
+
+    expect(within(table).queryByRole('columnheader', { name: 'ME' })).not.toBeInTheDocument();
+    // Every other default-visible column is untouched by hiding one.
+    expect(within(table).getByRole('columnheader', { name: 'TE' })).toBeInTheDocument();
+  });
 });
 
 describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
