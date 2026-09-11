@@ -739,7 +739,7 @@ function ColonyRow({
               </div>
             </div>
           ) : (
-            <EmptyState title={t('pi.noPinsTitle')} className="py-6" />
+            <EmptyState title={t('pi.noPinsTitle')} hint={t('pi.noPinsHint')} className="py-6" />
           )}
         </div>
       )}

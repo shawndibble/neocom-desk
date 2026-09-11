@@ -1762,6 +1762,7 @@
     "noOwnColoniesTitle": "This character has no colonies",
     "noOwnColoniesHint": "Turn on \"Show alt colonies\" above to see your other characters' colonies.",
     "noPinsTitle": "No pin data cached for this colony",
+    "noPinsHint": "Refresh to fetch this colony's deployed pins.",
     "state": {
       "active": "Active",
       "expiring-soon": "Expiring soon",
