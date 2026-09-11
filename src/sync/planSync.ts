@@ -797,6 +797,7 @@ const buildPlanSpec: CollectionSpec<BuildPlanRecord, RemoteBuildPlanDoc> = {
       ...(p.materialPriceBasis !== undefined ? { materialPriceBasis: p.materialPriceBasis } : {}),
       ...(materialSourcing !== undefined ? { materialSourcing } : {}),
       ...(p.ownedStockScope !== undefined ? { ownedStockScope: p.ownedStockScope } : {}),
+      ...(p.includeCorpAssets !== undefined ? { includeCorpAssets: p.includeCorpAssets } : {}),
       // An empty selection is omitted rather than pushed as [], so a plan that
       // expanded a row and collapsed it again is byte-identical to one that
       // never did — the same rule materialSourcing follows above.
@@ -860,6 +861,7 @@ const buildPlanSpec: CollectionSpec<BuildPlanRecord, RemoteBuildPlanDoc> = {
     ...(r.materialPriceBasis !== undefined ? { materialPriceBasis: r.materialPriceBasis } : {}),
     ...(r.materialSourcing !== undefined ? { materialSourcing: r.materialSourcing } : {}),
     ...(r.ownedStockScope !== undefined ? { ownedStockScope: r.ownedStockScope } : {}),
+    ...(r.includeCorpAssets !== undefined ? { includeCorpAssets: r.includeCorpAssets } : {}),
     ...(r.buildHere !== undefined ? { buildHere: r.buildHere } : {}),
     ...(r.buildGroupId !== undefined ? { buildGroupId: r.buildGroupId } : {}),
     ...(r.includeReactions !== undefined ? { includeReactions: r.includeReactions } : {}),

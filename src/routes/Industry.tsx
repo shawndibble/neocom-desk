@@ -33,6 +33,7 @@ import {
 } from '@/features/industry/blueprintCatalog';
 import { findOwnedBlueprint, loadCharacterBlueprints } from '@/features/industry/data';
 import { useOwnedStockSnapshot } from '@/features/industry/useDetectedOwnedStock';
+import { useCorpOwnedStockSource } from '@/features/industry/corpOwnedStock';
 import { ItemDetailModal } from '@/features/market/ItemDetailModal';
 import { useQuickbar } from '@/features/market/useQuickbar';
 import { ActiveJobsPanel } from '@/features/industry/ActiveJobsPanel';
@@ -150,6 +151,11 @@ export function Industry() {
   // Loaded once here, above BuildPlanDetail's `key={plan.id}` remount below —
   // switching plans must not redo the whole-account asset load (issue #409).
   const ownedStockSnapshot = useOwnedStockSnapshot();
+  // Corp Assets (issue #798): its own hook, not folded into the snapshot
+  // above — it follows the *active* Character's corporation, re-resolving on
+  // a Character switch, unlike the whole-account personal load which is
+  // fixed for the session.
+  const corpOwnedStock = useCorpOwnedStockSource();
 
   // Build Groups (issue #626). Names/order/existence sync as one setting;
   // membership is `buildGroupId` on each plan. Which groups are *open* is
@@ -847,6 +853,7 @@ export function Industry() {
                       ownedBlueprints={ownedBlueprints}
                       skills={skills}
                       ownedStockSnapshot={ownedStockSnapshot}
+                      corpOwnedStock={corpOwnedStock}
                       onUpdate={(patch) => void handleUpdate(patch)}
                       onDerivedFix={(patch) => void handleDerivedFix(patch)}
                       onSourcingChange={(typeID, patch) => void handleSourcingChange(typeID, patch)}

@@ -5,6 +5,7 @@ import {
   collectStockLocations,
   detectOwnedStock,
   filterStockByScope,
+  ownedStockLocationKey,
   suggestedOwnedQuantity,
   type DetectedOwnedStockMap,
   type OwnedStockSource,
@@ -32,6 +33,14 @@ function asset(
 
 function source(characterId: number, assets: readonly StockAsset[]): OwnedStockSource {
   return { characterId, assets };
+}
+
+function corpSource(
+  characterId: number,
+  corporationId: number,
+  assets: readonly StockAsset[]
+): OwnedStockSource {
+  return { characterId, corporationId, assets };
 }
 
 const MATERIALS = new Set([TRITANIUM, PYERITE]);
@@ -265,6 +274,82 @@ describe('detectOwnedStock', () => {
       MATERIALS
     );
     expect(stock.get(PYERITE)?.placements[0]?.locationType).toBe('solar_system');
+  });
+});
+
+describe('detectOwnedStock with a corporation source (issue #798)', () => {
+  it('detects corp-only stock, tagged with the corporation, not the reading Director', () => {
+    const stock = detectOwnedStock(
+      [corpSource(1, 500, [asset({ item_id: 300, type_id: TRITANIUM, quantity: 4000 })])],
+      MATERIALS
+    );
+    expect(stock.get(TRITANIUM)).toEqual({
+      quantity: 4000,
+      placements: [
+        {
+          characterId: 1,
+          corporationId: 500,
+          locationId: STATION,
+          locationType: 'station',
+          quantity: 4000,
+        },
+      ],
+    });
+  });
+
+  it('sums a personal source and a corp source for the same material', () => {
+    const stock = detectOwnedStock(
+      [
+        source(1, [asset({ item_id: 301, type_id: TRITANIUM, quantity: 100 })]),
+        corpSource(1, 500, [asset({ item_id: 302, type_id: TRITANIUM, quantity: 4000 })]),
+      ],
+      MATERIALS
+    );
+    expect(stock.get(TRITANIUM)?.quantity).toBe(4100);
+    expect(stock.get(TRITANIUM)?.placements).toHaveLength(2);
+  });
+
+  it('never collides a corp placement with a personal placement carrying the same numeric id at the same location', () => {
+    // Corporation 1 happens to share a numeric id with Character 1 here —
+    // the two must still be counted as distinct owners, not merged into one.
+    const stock = detectOwnedStock(
+      [
+        source(1, [asset({ item_id: 303, type_id: TRITANIUM, quantity: 10 })]),
+        corpSource(1, 1, [asset({ item_id: 304, type_id: TRITANIUM, quantity: 20 })]),
+      ],
+      MATERIALS
+    );
+    expect(stock.get(TRITANIUM)?.quantity).toBe(30);
+    expect(stock.get(TRITANIUM)?.placements).toHaveLength(2);
+  });
+
+  it('gives a corp placement a distinct ownedStockLocationKey from the reading Director’s own key', () => {
+    const corpPlacement = {
+      characterId: 1,
+      corporationId: 1,
+      locationId: STATION,
+      locationType: 'station' as const,
+    };
+    const characterPlacement = {
+      characterId: 1,
+      locationId: STATION,
+      locationType: 'station' as const,
+    };
+    expect(ownedStockLocationKey(corpPlacement)).not.toBe(
+      ownedStockLocationKey(characterPlacement)
+    );
+  });
+});
+
+describe('collectStockLocations with a corporation source (issue #798)', () => {
+  it('carries corporationId through to the collected location', () => {
+    const detected = detectOwnedStock(
+      [corpSource(1, 500, [asset({ item_id: 310, type_id: TRITANIUM, quantity: 10 })])],
+      MATERIALS
+    );
+    expect(collectStockLocations(detected)).toEqual([
+      { characterId: 1, corporationId: 500, locationId: STATION, locationType: 'station' },
+    ]);
   });
 });
 

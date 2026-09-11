@@ -1,12 +1,14 @@
 import { useMemo, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  FilterChip,
+  Button,
+  MultiSelect,
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
+  type MultiSelectGroup,
 } from '@/components/ui';
 import {
   collectStockLocations,
@@ -58,12 +60,22 @@ export function OwnedStockScopeControl({
   const mode = scope?.mode ?? 'everywhere';
   const selected = useMemo(() => (scope?.mode === 'selected' ? scope.locations : []), [scope]);
   const selectedKeys = useMemo(() => new Set(selected.map(ownedStockLocationKey)), [selected]);
+  const byKey = useMemo(
+    () => new Map(locations.map((location) => [ownedStockLocationKey(location), location])),
+    [locations]
+  );
 
   function labelFor(location: OwnedStockLocation): string {
     return t('industry.detectedOwnedPlacement', {
-      character: detection.characterNameFor(location.characterId),
+      character: ownerNameFor(location),
       location: detection.locationLabelFor(location),
     });
+  }
+
+  function ownerNameFor(location: OwnedStockLocation): string {
+    return location.corporationId !== undefined
+      ? detection.corporationNameFor(location.corporationId)
+      : detection.characterNameFor(location.characterId);
   }
 
   function toggle(location: OwnedStockLocation) {
@@ -73,6 +85,28 @@ export function OwnedStockScopeControl({
       : [...selected, location];
     onChange({ mode: 'selected', locations: next });
   }
+
+  // Grouped only once a corp placement actually exists (issue #798): a plan
+  // with no Corp Assets contribution shows the same flat, ungrouped list it
+  // always has — a "Personal" header with nothing to distinguish it from
+  // would be noise. Not memoized: `locations` itself already is, and
+  // splitting/labeling a handful of already-collected locations is cheap.
+  const personalLocations = locations.filter((location) => location.corporationId === undefined);
+  const corpLocations = locations.filter((location) => location.corporationId !== undefined);
+  const toOption = (location: OwnedStockLocation) => ({
+    id: ownedStockLocationKey(location),
+    label: labelFor(location),
+  });
+  const locationGroups: readonly MultiSelectGroup<string>[] =
+    corpLocations.length === 0
+      ? [{ label: '', options: personalLocations.map(toOption) }]
+      : [
+          {
+            label: t('industry.ownedStockScopeGroupPersonal'),
+            options: personalLocations.map(toOption),
+          },
+          { label: t('industry.ownedStockScopeGroupCorp'), options: corpLocations.map(toOption) },
+        ];
 
   // Two children, not one wrapper: the label-and-select line, and the chip
   // list as a block of its own beneath. Splitting them is what stops the
@@ -120,16 +154,21 @@ export function OwnedStockScopeControl({
         (locations.length === 0 ? (
           <span className="text-xs text-text-dim">{t('industry.ownedStockScopeNoLocations')}</span>
         ) : (
-          <div className="flex flex-wrap gap-1.5">
-            {locations.map((location) => (
-              <FilterChip
-                key={ownedStockLocationKey(location)}
-                label={labelFor(location)}
-                selected={selectedKeys.has(ownedStockLocationKey(location))}
-                onToggle={() => toggle(location)}
-              />
-            ))}
-          </div>
+          <MultiSelect
+            trigger={
+              <Button size="sm">
+                {t('industry.ownedStockScopeSelectedCount', { count: selected.length })}
+              </Button>
+            }
+            groups={locationGroups}
+            selected={selectedKeys}
+            onToggle={(key) => {
+              const location = byKey.get(key);
+              if (location) toggle(location);
+            }}
+            searchPlaceholder={t('industry.ownedStockScopeSearchPlaceholder')}
+            noResultsLabel={t('industry.ownedStockScopeNoResults')}
+          />
         ))}
     </>
   );

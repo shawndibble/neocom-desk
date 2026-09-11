@@ -23,6 +23,7 @@ import {
   detectOwnedStock,
   type DetectedOwnedStockMap,
   type OwnedStockPlacement,
+  type OwnedStockSource,
 } from '@/engine/industry/ownedStock';
 import {
   EMPTY_OWNED_STOCK_SNAPSHOT,
@@ -72,19 +73,31 @@ export function useOwnedStockSnapshot(): OwnedStockSnapshot {
  * @param snapshot the whole-account asset snapshot from `useOwnedStockSnapshot`.
  * @param typeIDs the plan's material typeIDs. Pass a referentially stable array
  * (a `useMemo` keyed off the blueprint) — it keys the aggregation memo.
+ * @param corpSource the active Character's corporation as a second source
+ * (issue #798's Corp Assets toggle), from `useCorpOwnedStockSource` — or
+ * `null`/omitted when the plan's toggle is off or no corp source is
+ * available. Kept as a separate argument rather than folded into `snapshot`
+ * because it has its own, different re-resolution rule: it follows the
+ * *active* Character, not the whole-account load `snapshot` pools once above
+ * the plan-switch remount boundary.
  */
 export function useDetectedOwnedStock(
   snapshot: OwnedStockSnapshot,
-  typeIDs: readonly number[]
+  typeIDs: readonly number[],
+  corpSource?: OwnedStockSource | null
 ): DetectedOwnedStockResult {
   const [locationNames, setLocationNames] = useState<ReadonlyMap<number, string>>(NO_NAMES);
 
   const typeIDSet = useMemo(() => new Set(typeIDs), [typeIDs]);
 
+  const sources = useMemo(
+    () => (corpSource ? [...snapshot.sources, corpSource] : snapshot.sources),
+    [snapshot, corpSource]
+  );
+
   const stock = useMemo(
-    () =>
-      snapshot.sources.length === 0 ? NO_STOCK : detectOwnedStock(snapshot.sources, typeIDSet),
-    [snapshot, typeIDSet]
+    () => (sources.length === 0 ? NO_STOCK : detectOwnedStock(sources, typeIDSet)),
+    [sources, typeIDSet]
   );
 
   useEffect(() => {

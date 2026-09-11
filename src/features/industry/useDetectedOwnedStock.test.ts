@@ -99,4 +99,36 @@ describe('useDetectedOwnedStock', () => {
     rerender({ ids: TYPE_IDS });
     expect(result.current.stock).toBe(first);
   });
+
+  it('folds a corp source in alongside the personal snapshot (issue #798)', async () => {
+    const corpSource = {
+      characterId: 91,
+      corporationId: 500,
+      assets: [
+        {
+          item_id: 2,
+          type_id: 34,
+          quantity: 9000,
+          location_id: 60008494,
+          location_type: 'station' as const,
+          location_flag: 'CorpSAG1',
+          is_singleton: false,
+        },
+      ],
+    };
+    const { result } = renderHook(() => useDetectedOwnedStock(SNAPSHOT, TYPE_IDS, corpSource));
+
+    await waitFor(() => expect(result.current.stock.get(34)?.quantity).toBe(14000));
+    expect(result.current.stock.get(34)?.placements.some((p) => p.corporationId === 500)).toBe(
+      true
+    );
+  });
+
+  it('omits the corp source entirely when null, unlike an empty personal snapshot', async () => {
+    const { result } = renderHook(() => useDetectedOwnedStock(SNAPSHOT, TYPE_IDS, null));
+    await waitFor(() => expect(result.current.stock.get(34)?.quantity).toBe(5000));
+    expect(
+      result.current.stock.get(34)?.placements.every((p) => p.corporationId === undefined)
+    ).toBe(true);
+  });
 });
