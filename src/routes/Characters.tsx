@@ -1088,7 +1088,7 @@ export function Characters() {
                 disabled={refreshingAll}
                 title={t('characters.refreshAllHint')}
               >
-                <Icon.Refresh className={refreshingAll ? 'animate-spin' : undefined} />
+                {refreshingAll ? <Spinner size="sm" /> : <Icon.Refresh />}
                 {refreshingAll ? t('characters.refreshingAll') : t('characters.refreshAll')}
               </Button>
             )}
