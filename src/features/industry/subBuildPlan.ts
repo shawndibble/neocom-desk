@@ -40,6 +40,15 @@ export interface MaterialTableRow extends MaterialCostLine {
    * each, and both belong to this one row.
    */
   subBuilds: readonly ResolvedSubBuild[];
+  /**
+   * Present only on a synthetic Blueprint Acquisition row (issue #838) — the
+   * ME/TE tier it resolved to, for the row's caption. Dropped on a merge
+   * (`mergeCostLines` returns a plain `MaterialCostLine`): the same
+   * blueprint acquired at two branches of one tree is rare enough that
+   * losing the caption on that specific collision is an acceptable gap,
+   * rather than widening `mergeCostLines`'s shared contract for it.
+   */
+  acquisitionTier?: { me: number; te: number };
 }
 
 /**

@@ -9,6 +9,7 @@ import { buildVsBuy } from '@/engine/industry/buildVsBuy';
 import { withoutOwnedQuantities } from '@/engine/industry/materialResolution';
 import { FACILITY_PRESETS, MAX_JOB_RUNS, resolveRigFit } from '@/engine/industry/types';
 import type {
+  AcquisitionResolution,
   AdjustedPrices,
   BuildResult,
   HubPrices,
@@ -16,6 +17,7 @@ import type {
   ReactionFacilityContext,
   SkillLevels,
 } from '@/engine/industry/types';
+import type { SubBuildContext } from '@/engine/industry/subBuild';
 import type { MaterialRecipe } from '@/engine/industry/makeOrBuy';
 import type { BuildPlanRecord } from '@/db';
 
@@ -43,6 +45,18 @@ export interface ComputeBuildPlanInput {
   skills: SkillLevels;
   /** What produces a material, for anything `plan.buildHere` might name at any depth. */
   recipeFor?: (typeID: number) => MaterialRecipe | null;
+  /** Blueprint Acquisition (issue #838) for any buildable node reached during recursion. */
+  acquisitionFor?: (
+    productTypeID: number,
+    needed: number,
+    ctx: SubBuildContext,
+    materialPrices: HubPrices
+  ) => AcquisitionResolution | null;
+  /** Blueprint Acquisition (issue #838) for the plan's own top-level product. */
+  blueprintAcquisition?: {
+    blueprintTypeID: number;
+    line: AcquisitionResolution['line'];
+  };
   /**
    * Resolves the tree as if the plan owned nothing (issue #697's Group Owned
    * Overlay): `plan.materialSourcing`'s `ownedQuantity`s are stripped before
@@ -73,6 +87,8 @@ export function computeBuildPlan({
   materialPrices,
   skills,
   recipeFor,
+  acquisitionFor,
+  blueprintAcquisition,
   ignoreOwnedStock,
   reactionFacility,
 }: ComputeBuildPlanInput): ComputeBuildPlanResult {
@@ -108,6 +124,8 @@ export function computeBuildPlan({
       skills,
       buildHere: plan.buildHere,
       recipeFor,
+      acquisitionFor,
+      blueprintAcquisition,
       reactionFacility,
     });
     return { result, error: null };

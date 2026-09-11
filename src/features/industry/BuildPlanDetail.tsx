@@ -20,6 +20,7 @@ import {
 import * as Icon from '@/components/ui/icons';
 import {
   FACILITY_PRESETS,
+  MAX_JOB_RUNS,
   RIG_KIND_OPTIONS,
   SKILL_IDS,
   EMPTY_RIG_FIT,
@@ -59,9 +60,9 @@ import type { CharacterBlueprint } from '@/esi/endpoints';
 import type { PiData } from '@/sde/types';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import { nameForType, toIndustryBlueprint, type BlueprintCatalog } from './blueprintCatalog';
-import { findOwnedBlueprint } from './data';
 import { computeBuildPlan } from './computeBuildPlan';
-import { buildPlanTypeIds, recipeForLookup } from './recipes';
+import { acquisitionForLookup, buildPlanTypeIds, recipeForLookup } from './recipes';
+import { useBpcAcquisitionOffers } from './useBpcAcquisitionOffers';
 import { materialPriceBasisOf, materialPricesFor } from './priceBasis';
 import { useMarketSnapshot } from './useMarketSnapshot';
 import { formatDuration } from '@/lib/duration';
@@ -396,11 +397,6 @@ export function BuildPlanDetail({
     refreshTick
   );
 
-  const ownedMatch = useMemo(
-    () => findOwnedBlueprint(ownedBlueprints, plan.blueprintTypeID),
-    [ownedBlueprints, plan.blueprintTypeID]
-  );
-
   /**
    * The one map every "what does this material cost to buy" on the plan reads
    * — its own cost lines, its sub-build inputs and its make-or-buy verdicts,
@@ -423,6 +419,25 @@ export function BuildPlanDetail({
   const recipeFor = useMemo(
     () => recipeForLookup({ catalog, pi, ownedBlueprints, assumedMeForUnowned: assumedMe }),
     [catalog, pi, ownedBlueprints, assumedMe]
+  );
+
+  // Blueprint Acquisition (issue #838): BPC Sourcing offers for this plan's
+  // own Trade Hub region, grouped by blueprint typeID. Degrades to "no
+  // offers" when BPC Sourcing sync isn't configured or hasn't landed yet —
+  // the price cascade then falls straight through to the BPO's own hub sell
+  // price, same as if no contract offer were listed.
+  const bpcOffersFor = useBpcAcquisitionOffers(plan.characterId, hub.regionId);
+
+  const acquisitionFor = useMemo(
+    () =>
+      acquisitionForLookup({
+        catalog,
+        pi,
+        ownedBlueprints,
+        assumedMeForUnowned: assumedMe,
+        blueprintAcquisition: { offersFor: bpcOffersFor, hubPrices: snapshot?.hubPrices ?? {} },
+      }),
+    [catalog, pi, ownedBlueprints, assumedMe, bpcOffersFor, snapshot]
   );
 
   // The one place "can this be built here" is decided — `craftScopeList`
@@ -470,39 +485,6 @@ export function BuildPlanDetail({
     [reactionPlanFacilityContext, reactionSnapshot]
   );
 
-  const { result, error } = useMemo(() => {
-    if (!blueprint) return { result: null, error: t('industry.blueprintMissing') };
-    return computeBuildPlan({
-      plan,
-      blueprint,
-      systemCostIndex: snapshot?.systemCostIndex ?? 0,
-      adjustedPrices: snapshot?.adjustedPrices ?? {},
-      hubPrices: snapshot?.hubPrices ?? {},
-      materialPrices,
-      skills,
-      recipeFor,
-      reactionFacility: reactionFacilityContext,
-    });
-  }, [plan, blueprint, snapshot, materialPrices, skills, recipeFor, reactionFacilityContext, t]);
-
-  /**
-   * Both liquidation bases at once, so the Use-or-sell toggle switches between
-   * two numbers already in hand rather than re-deriving one per click. Sell-now
-   * reads the buy side of the book (what a standing order pays today), sell-order
-   * the sell side (what listing your own stack asks) — deliberately independent
-   * of the plan's *material* price basis, which is about buying, not selling.
-   */
-  const ownedSale = useMemo(() => {
-    if (!result || !snapshot) return null;
-    return {
-      instant: ownedStockSale(result.materials, snapshot.hubBuyPrices, 'instant', skills),
-      order: ownedStockSale(result.materials, snapshot.hubPrices, 'order', skills),
-    };
-  }, [result, snapshot, skills]);
-
-  const pricesReady =
-    snapshot !== null && snapshot.adjustedPrices !== null && snapshot.systemCostIndex !== null;
-
   /**
    * The facility/rig/security/tax inputs every engine context on this plan
    * needs — the "where and how a job runs" half, which doesn't depend on
@@ -542,6 +524,79 @@ export function BuildPlanDetail({
       reactionFacility: reactionFacilityContext,
     };
   }, [facilityContext, snapshot, materialPrices, skills, reactionFacilityContext]);
+
+  /**
+   * Blueprint Acquisition (issue #838) for the plan's own top-level product —
+   * the resolved ME/TE tier and, unless it is an owned BPO, a material row.
+   * Computed here rather than persisted: `plan.me`/`plan.te` stay whatever
+   * they last were (Setup no longer edits them — the resolved tier is now
+   * the only source of truth), and every reader below — the results
+   * computation, the breakdown modal, the setup chips — uses `resolvedMe`/
+   * `resolvedTe` instead, so there is exactly one number in play, never two
+   * disagreeing.
+   */
+  const topLevelAcquisition = useMemo(() => {
+    const product = blueprint?.products[0];
+    if (!product || !makeOrBuyContext) return null;
+    return acquisitionFor(
+      product.typeID,
+      clampInt(plan.runs, 1, MAX_JOB_RUNS),
+      makeOrBuyContext,
+      materialPrices
+    );
+  }, [blueprint, makeOrBuyContext, plan.runs, acquisitionFor, materialPrices]);
+  const resolvedMe = topLevelAcquisition?.me ?? plan.me;
+  const resolvedTe = topLevelAcquisition?.te ?? plan.te;
+
+  const { result, error } = useMemo(() => {
+    if (!blueprint) return { result: null, error: t('industry.blueprintMissing') };
+    return computeBuildPlan({
+      plan: { ...plan, me: resolvedMe, te: resolvedTe },
+      blueprint,
+      systemCostIndex: snapshot?.systemCostIndex ?? 0,
+      adjustedPrices: snapshot?.adjustedPrices ?? {},
+      hubPrices: snapshot?.hubPrices ?? {},
+      materialPrices,
+      skills,
+      recipeFor,
+      acquisitionFor,
+      blueprintAcquisition: topLevelAcquisition
+        ? { blueprintTypeID: topLevelAcquisition.blueprintTypeID, line: topLevelAcquisition.line }
+        : undefined,
+      reactionFacility: reactionFacilityContext,
+    });
+  }, [
+    plan,
+    resolvedMe,
+    resolvedTe,
+    blueprint,
+    snapshot,
+    materialPrices,
+    skills,
+    recipeFor,
+    acquisitionFor,
+    topLevelAcquisition,
+    reactionFacilityContext,
+    t,
+  ]);
+
+  /**
+   * Both liquidation bases at once, so the Use-or-sell toggle switches between
+   * two numbers already in hand rather than re-deriving one per click. Sell-now
+   * reads the buy side of the book (what a standing order pays today), sell-order
+   * the sell side (what listing your own stack asks) — deliberately independent
+   * of the plan's *material* price basis, which is about buying, not selling.
+   */
+  const ownedSale = useMemo(() => {
+    if (!result || !snapshot) return null;
+    return {
+      instant: ownedStockSale(result.materials, snapshot.hubBuyPrices, 'instant', skills),
+      order: ownedStockSale(result.materials, snapshot.hubPrices, 'order', skills),
+    };
+  }, [result, snapshot, skills]);
+
+  const pricesReady =
+    snapshot !== null && snapshot.adjustedPrices !== null && snapshot.systemCostIndex !== null;
 
   /**
    * Auto Build's own depth range (issue #695): the plan's actual tree
@@ -953,7 +1008,7 @@ export function BuildPlanDetail({
   const breakdownContext = {
     hubName: hub.systemName,
     materialPriceBasis: materialPriceBasisOf(plan.materialPriceBasis),
-    me: plan.me,
+    me: resolvedMe,
     isReaction: activity === 'reaction',
     accountingLevel: skills[SKILL_IDS.accounting] ?? 0,
     brokerRelationsLevel: skills[SKILL_IDS.brokerRelations] ?? 0,
@@ -972,8 +1027,8 @@ export function BuildPlanDetail({
     chip(t('industry.runs'), plan.runs.toLocaleString()),
     ...(activity === 'manufacturing'
       ? [
-          chip(t('industry.setupChipMe'), `${plan.me}%`),
-          chip(t('industry.setupChipTe'), `${plan.te}%`),
+          chip(t('industry.setupChipMe'), `${resolvedMe}%`),
+          chip(t('industry.setupChipTe'), `${resolvedTe}%`),
         ]
       : []),
     // The place the pilot picked, by the name they picked it under; the
@@ -1052,59 +1107,14 @@ export function BuildPlanDetail({
                 </label>
 
                 {/*
-                Reaction formulas carry no material/time efficiency — the SDE
-                has no research activity for any of them (issue #460), so
-                they always run at 0/0 and the fields have nothing to edit.
+                ME/TE are no longer pilot-set fields (issue #838): the
+                Blueprint Acquisition tier picker resolves them — whichever
+                owned or purchasable tier is cheapest overall — and the
+                setup chips above show the result. A pilot who sources a
+                copy the app cannot see still overrides its price the way
+                any material's price is overridden (#839 will add a picker
+                for choosing among multiple owned instances).
               */}
-                {activity === 'manufacturing' && (
-                  <>
-                    <div className="flex flex-col gap-1 text-xs">
-                      <span className="flex items-center gap-1">
-                        <label htmlFor="build-plan-me">{t('industry.me')}</label>
-                        <InfoTooltip
-                          label={t('industry.meTooltipLabel')}
-                          content={t('industry.meTooltip')}
-                        />
-                      </span>
-                      <SourcingInput
-                        id="build-plan-me"
-                        value={plan.me}
-                        label={t('industry.me')}
-                        inputMode="numeric"
-                        widthClassName="w-full"
-                        parse={(raw) => parseOrKeep(plan.me, raw, (n) => clampInt(n, 0, 10))}
-                        onCommit={(me) => update({ me })}
-                      />
-                      {ownedMatch && (
-                        <span className="text-[0.6875rem] text-text-dim">
-                          {t('industry.ownedHint', {
-                            me: ownedMatch.material_efficiency,
-                            te: ownedMatch.time_efficiency,
-                          })}
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="flex flex-col gap-1 text-xs">
-                      <span className="flex items-center gap-1">
-                        <label htmlFor="build-plan-te">{t('industry.te')}</label>
-                        <InfoTooltip
-                          label={t('industry.teTooltipLabel')}
-                          content={t('industry.teTooltip')}
-                        />
-                      </span>
-                      <SourcingInput
-                        id="build-plan-te"
-                        value={plan.te}
-                        label={t('industry.te')}
-                        inputMode="numeric"
-                        widthClassName="w-full"
-                        parse={(raw) => parseOrKeep(plan.te, raw, (n) => clampInt(n, 0, 20))}
-                        onCommit={(te) => update({ te })}
-                      />
-                    </div>
-                  </>
-                )}
               </div>
             </div>
 
