@@ -28,7 +28,9 @@ import {
 } from '@/engine/industry/ownedStock';
 import type { MaterialCostLine, SkillLevels } from '@/engine/industry/types';
 import type { CharacterBlueprint } from '@/esi/endpoints';
+import { iskToneClass } from '@/features/character/format';
 import { writeToClipboard } from '@/lib/clipboard';
+import { cx } from '@/lib/cx';
 import { formatDuration } from '@/lib/duration';
 import { formatIsk } from '@/lib/isk';
 import { unmaskNumber } from '@/lib/numberMask';
@@ -39,13 +41,13 @@ import { nameForType, toIndustryBlueprint, type BlueprintCatalog } from './bluep
 import type { BuildGroup } from './buildGroups';
 import { AutoBuildControl } from './AutoBuildControl';
 import { groupCraftScope, groupAutoBuildMaxDepth } from './autoBuildGroup';
+import { formatPercent } from './format';
 import { profitOf, verdictOf } from './groupIndexStats';
 import { SourcingInput } from './MaterialsTable';
 import { OwnedStockHint } from './OwnedStockHint';
 import { OwnedStockScopeControl } from './OwnedStockScopeControl';
 import { stockLocationLabel, type OwnedStockSnapshot } from './ownedStockDetection';
 import type { OwnedStockDetection } from './ownedStockDetection';
-import { VerdictPill } from './PlanVerdictHero';
 import { recipeForLookup } from './recipes';
 import { flattenBuildResult } from './resultFlattenCache';
 import { hasShoppingList, shoppingListText } from './shoppingList';
@@ -279,11 +281,58 @@ export function BuildGroupPanel({
     [members, ownedStockMap]
   );
 
-  // The group's own Acquisition Verdict (mirrors `PlanVerdictHero`'s single-plan
-  // pill) — buyCost null means at least one member is unpriced, same "unknown"
-  // rule `computeGroupIndexStats` already applies to the index row for this group.
+  // The group's own Acquisition Verdict — buyCost null means at least one
+  // member is unpriced, same "unknown" rule `computeGroupIndexStats` already
+  // applies to the index row for this group.
   const groupProfit = profitOf(rollup.totalCost, rollup.buyCost);
   const groupVerdict = verdictOf(groupProfit);
+
+  // The verdict band's sub-line: percent + hub only when there's a real
+  // comparison to state (buyCost known and non-zero on the relevant side);
+  // material cost, job fees, and job time are always known once pricing
+  // settles, so those three always show.
+  const verdictQualifiers = useMemo(() => {
+    const material = t('industry.groupVerdictMaterial', { amount: formatIsk(rollup.materialCost) });
+    const jobFees = t('industry.groupVerdictJobFees', {
+      amount: formatIsk(rollup.topLevelJobFees),
+    });
+    const duration = formatDuration(rollup.seconds);
+    if (groupProfit === null || rollup.buyCost === null) {
+      return [material, jobFees, duration].join(' · ');
+    }
+    const pct =
+      groupVerdict === 'build'
+        ? rollup.buyCost > 0
+          ? (groupProfit / rollup.buyCost) * 100
+          : null
+        : rollup.totalCost > 0
+          ? (-groupProfit / rollup.totalCost) * 100
+          : null;
+    // A mixed-hub group has no one "buying at X" to name (see the mixed-hub
+    // notice further down) — the percent still stands on its own without it.
+    const hub = rollup.singleHub ? hubLabel(rollup.hubIds[0]) : null;
+    const comparisonKey =
+      groupVerdict === 'build'
+        ? hub
+          ? 'industry.groupVerdictCheaperAt'
+          : 'industry.groupVerdictCheaper'
+        : hub
+          ? 'industry.groupVerdictMoreAt'
+          : 'industry.groupVerdictMore';
+    const comparison = pct === null ? null : t(comparisonKey, { percent: formatPercent(pct), hub });
+    return [comparison, material, jobFees, duration].filter(Boolean).join(' · ');
+  }, [
+    groupProfit,
+    groupVerdict,
+    rollup.buyCost,
+    rollup.totalCost,
+    rollup.materialCost,
+    rollup.topLevelJobFees,
+    rollup.seconds,
+    rollup.singleHub,
+    rollup.hubIds,
+    t,
+  ]);
 
   // Materials merge Need/Owned/Still-to-buy into one table now (issue: group
   // page redesign) — but a material fully covered by this group's own build
@@ -538,24 +587,43 @@ export function BuildGroupPanel({
           </div>
         )}
 
-        {/* The group's own Acquisition Verdict, up front — same pill
-            convention `PlanVerdictHero` uses for a single plan, so a group
-            and its members never disagree about what "Build"/"Buy" mean. */}
+        {/* The group's own Acquisition Verdict, up front, as a single band —
+            the headline profit figure and the numbers that qualify it on one
+            line under it, mirroring `PlanVerdictHero`'s single-plan hero so a
+            group and its members never disagree about what "Build"/"Buy"
+            mean. */}
         {!loading && (
-          <div className="mb-3">
-            {groupProfit === null ? (
-              <VerdictPill label={t('industry.acquisitionVerdictLabel')} tone="muted">
-                {t('industry.verdictUnknown')}
-              </VerdictPill>
-            ) : groupVerdict === 'build' ? (
-              <VerdictPill label={t('industry.acquisitionVerdictLabel')} tone="success">
-                {t('industry.verdictBuild', { amount: formatIsk(groupProfit) })}
-              </VerdictPill>
-            ) : (
-              <VerdictPill label={t('industry.acquisitionVerdictLabel')} tone="warning">
-                {t('industry.verdictBuy', { amount: formatIsk(-groupProfit) })}
-              </VerdictPill>
+          <div
+            className={cx(
+              'mb-3 flex flex-wrap items-baseline gap-x-3 gap-y-1 rounded-xs border p-3',
+              groupProfit === null
+                ? 'border-line'
+                : groupVerdict === 'build'
+                  ? 'border-accent-dim bg-accent/5'
+                  : 'border-warning/50 bg-warning/10'
             )}
+          >
+            <p
+              className={cx(
+                'inline-flex items-center gap-1.5 text-base font-semibold tabular-nums',
+                groupProfit === null ? 'text-text-dim' : iskToneClass(groupProfit)
+              )}
+            >
+              <span className="sr-only">{t('industry.acquisitionVerdictLabel')} </span>
+              {groupProfit === null ? (
+                <Icon.Info size={Icon.ICON_SIZE.sm} aria-hidden="true" className="shrink-0" />
+              ) : groupVerdict === 'build' ? (
+                <Icon.Done size={Icon.ICON_SIZE.sm} aria-hidden="true" className="shrink-0" />
+              ) : (
+                <Icon.Warn size={Icon.ICON_SIZE.sm} aria-hidden="true" className="shrink-0" />
+              )}
+              {groupProfit === null
+                ? t('industry.verdictUnknown')
+                : groupVerdict === 'build'
+                  ? t('industry.verdictBuild', { amount: formatIsk(groupProfit) })
+                  : t('industry.verdictBuy', { amount: formatIsk(-groupProfit) })}
+            </p>
+            <p className="text-xs tabular-nums text-text-dim">{verdictQualifiers}</p>
           </div>
         )}
 
@@ -577,36 +645,7 @@ export function BuildGroupPanel({
           />
         </div>
 
-        <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs sm:grid-cols-4">
-          <div>
-            <dt className="text-text-dim">{t('industry.materialCost')}</dt>
-            <dd className="tabular-nums">{formatIsk(rollup.materialCost)}</dd>
-          </div>
-          <div>
-            <dt className="text-text-dim">{t('industry.groupJobFees')}</dt>
-            <dd className="tabular-nums">{formatIsk(rollup.topLevelJobFees)}</dd>
-          </div>
-          <div>
-            <dt className="text-text-dim">{t('industry.totalCost')}</dt>
-            <dd className="font-semibold tabular-nums">{formatIsk(rollup.totalCost)}</dd>
-          </div>
-          <div>
-            <dt className="text-text-dim">{t('industry.groupJobTime')}</dt>
-            <dd className="tabular-nums">{formatDuration(rollup.seconds)}</dd>
-          </div>
-          {/* What the same fit costs bought outright — the group's own
-              Acquisition Verdict, and the comparison a pilot pasting a fit is
-              actually making. Null when any member's product is unpriced,
-              because a partial sum shown as a whole is worse than none. */}
-          <div>
-            <dt className="text-text-dim">{t('industry.groupBuyCost')}</dt>
-            <dd className="tabular-nums">
-              {rollup.buyCost === null ? t('industry.unpriced') : formatIsk(rollup.buyCost)}
-            </dd>
-          </div>
-        </dl>
-
-        <p className="mt-2 text-xs text-text-dim">{t('industry.groupEstimateNote')}</p>
+        <p className="text-xs text-text-dim">{t('industry.groupEstimateNote')}</p>
 
         {/* Shown as a line rather than as the button's own label: the message
             is about the clipboard, not about which list, and it is a sentence
@@ -664,34 +703,63 @@ export function BuildGroupPanel({
           rather than competing with a nav rail and a 20rem list column for
           the same row. */}
       <div className="grid gap-4 lg:grid-cols-[20rem_1fr] lg:items-start">
-        <Panel title={t('industry.groupMembers')} padded={false}>
-          <ul className="divide-y divide-line text-xs">
-            {plans.map((plan) => {
-              const row = rowByPlanId.get(plan.id);
-              return (
-                <li key={plan.id}>
-                  <button
-                    type="button"
-                    onClick={() => onOpenPlan(plan.id)}
-                    className="flex w-full items-center justify-between gap-2 px-2.5 py-1.5 text-left hover:bg-panel-2"
+        <div className="space-y-4">
+          <Panel title={t('industry.groupMembers')} padded={false}>
+            <ul className="divide-y divide-line text-xs">
+              {plans.map((plan) => {
+                const row = rowByPlanId.get(plan.id);
+                return (
+                  <li key={plan.id}>
+                    <button
+                      type="button"
+                      onClick={() => onOpenPlan(plan.id)}
+                      className="flex w-full items-center justify-between gap-2 px-2.5 py-1.5 text-left hover:bg-panel-2"
+                    >
+                      <span className="truncate">{plan.name}</span>
+                      <span className="shrink-0 tabular-nums text-text-dim">
+                        {row?.result ? formatIsk(row.result.totalCost) : '—'}
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </Panel>
+
+          {/* A material this group's own build tree fully produces (see
+              `craftedTypeIds` above) was never bought at all, so it lives
+              alongside Members rather than inside the buy table — the two
+              panels together are "what this group is made of," split by
+              whether a plan is another member or a material it manufactures
+              directly. */}
+          {craftedTypeIds.length > 0 && (
+            <Panel
+              title={t('industry.groupCraftedTitle', { count: craftedTypeIds.length })}
+              padded={false}
+            >
+              <ul className="divide-y divide-line text-xs">
+                {craftedTypeIds.map((typeID) => (
+                  <li
+                    key={typeID}
+                    className="flex items-center justify-between gap-2 px-2.5 py-1.5"
                   >
-                    <span className="truncate">{plan.name}</span>
-                    <span className="shrink-0 tabular-nums text-text-dim">
-                      {row?.result ? formatIsk(row.result.totalCost) : '—'}
+                    <span className="truncate">{nameForType(catalog, typeID)}</span>
+                    <span className="shrink-0 rounded-xs border border-accent-dim/50 px-1.5 py-0.5 text-[0.625rem] font-semibold tracking-wide text-accent uppercase">
+                      {t('industry.groupCraftedTag')}
                     </span>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        </Panel>
+                  </li>
+                ))}
+              </ul>
+              <p className="p-2.5 text-[0.6875rem] text-text-dim">
+                {t('industry.groupCraftedHint')}
+              </p>
+            </Panel>
+          )}
+        </div>
 
         {/* Materials and the Group Owned Overlay (issue #697) as one table:
             typing an owned quantity updates that same row's Still To Buy
-            instead of a separate panel scroll-lengths away. A material this
-            group's own build tree fully produces (see `craftedTypeIds`
-            above) was never bought at all, so it never had an owned
-            quantity to enter — it gets its own section below instead. */}
+            instead of a separate panel scroll-lengths away. */}
         <Panel title={t('industry.groupMaterials')} padded={false}>
           <div className="space-y-3 p-2.5">
             <OwnedStockScopeControl
@@ -736,9 +804,9 @@ export function BuildGroupPanel({
           {/* An empty buy table two different ways: genuinely nothing left
               (every material owned, or there are none) reads "Nothing left
               to buy," but a table empty because everything is crafted has
-              its own section right below explaining that — showing both
+              its own panel beside Members explaining that — showing both
               would call a crafted material "owned," which is exactly the
-              hangar-vs-job confusion the Crafted section exists to avoid. */}
+              hangar-vs-job confusion the Crafted panel exists to avoid. */}
           {buyRows.length === 0 && craftedTypeIds.length === 0 ? (
             <EmptyState title={t('industry.groupNothingToBuy')} className="py-6" />
           ) : buyRows.length > 0 ? (
@@ -752,27 +820,6 @@ export function BuildGroupPanel({
               />
             </div>
           ) : null}
-
-          {craftedTypeIds.length > 0 && (
-            <div className="border-t border-line p-2.5">
-              <p className="text-[0.6875rem] font-semibold tracking-wide text-accent uppercase">
-                {t('industry.groupCraftedTitle', { count: craftedTypeIds.length })}
-              </p>
-              <ul className="mt-1.5 divide-y divide-line text-xs">
-                {craftedTypeIds.map((typeID) => (
-                  <li key={typeID} className="flex items-center justify-between gap-2 py-1.5">
-                    <span className="truncate">{nameForType(catalog, typeID)}</span>
-                    <span className="shrink-0 rounded-xs border border-accent-dim/50 px-1.5 py-0.5 text-[0.625rem] font-semibold tracking-wide text-accent uppercase">
-                      {t('industry.groupCraftedTag')}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-              <p className="mt-1.5 text-[0.6875rem] text-text-dim">
-                {t('industry.groupCraftedHint')}
-              </p>
-            </div>
-          )}
         </Panel>
       </div>
 
