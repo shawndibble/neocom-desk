@@ -214,7 +214,7 @@ export function ProductionRunsPanel({
       sortValue: (r) => r.profit.grossRevenue,
       render: (r) => formatIsk(r.profit.grossRevenue),
     },
-    realizedProfitColumn(t),
+    realizedProfitColumn(t, skills),
     quantitySoldColumn(t),
     statusColumn(t),
     soldActionsColumn(sale),
