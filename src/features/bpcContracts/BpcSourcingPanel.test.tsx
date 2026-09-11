@@ -3,6 +3,12 @@ import { render, screen, waitFor, within, fireEvent } from '@testing-library/rea
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { db } from '@/db';
+import { NARROW_QUERY } from '@/lib/useIsNarrow';
+import { DEFAULT_SPACE_FILTER, useSpaceFilter } from '@/features/bpcContracts/bpcSpaceFilterPref';
+import {
+  DEFAULT_VISIBLE_BPC_SEARCH_COLUMNS,
+  useVisibleBpcSearchColumns,
+} from '@/features/bpcContracts/bpcSearchColumns';
 import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharacter';
 import { usePublicInfo } from '@/stores/publicInfo';
 import { usePublicInfoModalStore } from '@/stores/publicInfoModal';
@@ -156,6 +162,15 @@ beforeEach(async () => {
   usePublicInfo.setState({ byCharacterId: {} });
   usePublicInfoModalStore.setState({ request: null });
   useTimeFormat.setState({ value: DEFAULT_TIME_FORMAT, hydrated: false });
+  // These two are Dexie-backed singletons (`createLocalSetting`): once
+  // hydrated, `hydrate()` no-ops, so a value one test writes (e.g. toggling
+  // the Space chips or a column) would otherwise leak into every later test
+  // in this file despite `db.settings.clear()` above.
+  useSpaceFilter.setState({ value: DEFAULT_SPACE_FILTER, hydrated: false });
+  useVisibleBpcSearchColumns.setState({
+    value: DEFAULT_VISIBLE_BPC_SEARCH_COLUMNS,
+    hydrated: false,
+  });
   loadPublicBpcContracts.mockReset();
   loadPublicBpcContracts.mockResolvedValue(cachedSnapshot([]));
   loadCharacterBlueprints.mockReset();
@@ -659,5 +674,116 @@ describe('BpcSourcingPanel Location/Space', () => {
 
     expect(within(table).queryByText('Caracal Blueprint')).not.toBeInTheDocument();
     expect(within(table).getByText('Rifter Blueprint')).toBeInTheDocument();
+  });
+});
+
+describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
+  /**
+   * jsdom's `matchMedia` stub never matches, which `useIsNarrow` reads as a
+   * pointer viewport — flip it so the shared `FilterBar` renders its sheet.
+   */
+  function useNarrowViewport(): () => void {
+    const real = window.matchMedia;
+    window.matchMedia = (media: string) =>
+      ({
+        media,
+        matches: media === NARROW_QUERY,
+        onchange: null,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        addListener: () => {},
+        removeListener: () => {},
+        dispatchEvent: () => false,
+      }) as unknown as MediaQueryList;
+    return () => {
+      window.matchMedia = real;
+    };
+  }
+
+  it('collapses Source/Space chips behind the shared filter funnel on a narrow viewport, leaving ColumnPickerMenu in the row', async () => {
+    const restore = useNarrowViewport();
+    try {
+      loadPublicBpcContracts.mockResolvedValue(
+        cachedSnapshot([row({ contractId: 1, typeId: 638 })])
+      );
+      const user = userEvent.setup();
+      render(<App />);
+      await screen.findByRole('table', { name: 'BPC Search' });
+
+      expect(screen.queryByRole('button', { name: 'Contracts' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Owned' })).not.toBeInTheDocument();
+      // The column picker is a display preference, not a filter — it stays in
+      // the row rather than collapsing with Source/Space.
+      expect(screen.getByRole('button', { name: 'Columns' })).toBeInTheDocument();
+
+      await user.click(screen.getByRole('button', { name: /^Filters/ }));
+
+      const dialog = screen.getByRole('dialog', { name: 'Filters' });
+      expect(within(dialog).getByRole('button', { name: 'Contracts' })).toBeInTheDocument();
+      expect(within(dialog).getByRole('button', { name: 'Owned' })).toBeInTheDocument();
+      expect(within(dialog).getByRole('button', { name: 'Highsec' })).toBeInTheDocument();
+    } finally {
+      restore();
+    }
+  });
+
+  it('applies a Source deselected in the sheet only once Apply is pressed, not before', async () => {
+    const restore = useNarrowViewport();
+    try {
+      loadPublicBpcContracts.mockResolvedValue(
+        cachedSnapshot([row({ contractId: 1, typeId: 638 })])
+      );
+      loadCharacterBlueprints.mockResolvedValue(
+        ownedResult([ownedBlueprint({ item_id: 1, type_id: 870 })])
+      );
+      const user = userEvent.setup();
+      render(<App />);
+      const table = await screen.findByRole('table', { name: 'BPC Search' });
+      expect(within(table).getByText('Caracal Blueprint')).toBeInTheDocument();
+
+      await user.click(screen.getByRole('button', { name: /^Filters/ }));
+      const dialog = screen.getByRole('dialog', { name: 'Filters' });
+      await user.click(within(dialog).getByRole('button', { name: 'Owned' }));
+
+      // Still applied against the row behind the modal — the sheet's edit is a draft.
+      expect(within(table).getByText('Caracal Blueprint')).toBeInTheDocument();
+
+      await user.click(within(dialog).getByRole('button', { name: 'Apply' }));
+
+      expect(within(table).queryByText('Caracal Blueprint')).not.toBeInTheDocument();
+      expect(within(table).getByText('Rifter Blueprint')).toBeInTheDocument();
+    } finally {
+      restore();
+    }
+  });
+
+  it('counts a non-default Source or Space as active on the filter trigger', async () => {
+    const restore = useNarrowViewport();
+    try {
+      loadPublicBpcContracts.mockResolvedValue(
+        cachedSnapshot([row({ contractId: 1, typeId: 638 })])
+      );
+      const user = userEvent.setup();
+      render(<App />);
+      await screen.findByRole('table', { name: 'BPC Search' });
+
+      expect(screen.queryByRole('button', { name: /^Filters \(/ })).not.toBeInTheDocument();
+
+      await user.click(screen.getByRole('button', { name: /^Filters/ }));
+      let dialog = screen.getByRole('dialog', { name: 'Filters' });
+      await user.click(within(dialog).getByRole('button', { name: 'Owned' }));
+      await user.click(within(dialog).getByRole('button', { name: 'Apply' }));
+
+      expect(screen.getByRole('button', { name: 'Filters (1 active)' })).toBeInTheDocument();
+
+      await user.click(screen.getByRole('button', { name: /^Filters/ }));
+      dialog = screen.getByRole('dialog', { name: 'Filters' });
+      await user.click(within(dialog).getByRole('button', { name: 'Wormhole' }));
+      await user.click(within(dialog).getByRole('button', { name: 'Apply' }));
+
+      expect(screen.getByRole('button', { name: 'Filters (2 active)' })).toBeInTheDocument();
+    } finally {
+      restore();
+    }
   });
 });

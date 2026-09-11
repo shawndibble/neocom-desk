@@ -204,13 +204,28 @@ function parsePositiveNumber(value: string): number | null {
 /** Rows shown before "show all" (same precedent as Contracts/the market order book). */
 const ROW_CAP = 50;
 
+/** Both on by default: an existing user must keep seeing today's contract results, plus their owned blueprints, not a narrower default. */
+const DEFAULT_SOURCES: ReadonlySet<BpcSearchSource> = new Set(['contract', 'owned']);
+
 interface BpcFilterBarProps {
   filter: UiFilter;
   onChange: (filter: UiFilter) => void;
   regionOptions: { id: number; name: string }[];
+  sources: ReadonlySet<BpcSearchSource>;
+  onSourcesChange: (next: ReadonlySet<BpcSearchSource>) => void;
+  spaceKinds: readonly SpaceKind[];
+  onSpaceKindsChange: (next: readonly SpaceKind[]) => void;
 }
 
-function BpcFilterBar({ filter, onChange, regionOptions }: BpcFilterBarProps) {
+function BpcFilterBar({
+  filter,
+  onChange,
+  regionOptions,
+  sources,
+  onSourcesChange,
+  spaceKinds,
+  onSpaceKindsChange,
+}: BpcFilterBarProps) {
   const { t } = useTranslation();
   const activeCount = [
     filter.typeQuery,
@@ -219,12 +234,24 @@ function BpcFilterBar({ filter, onChange, regionOptions }: BpcFilterBarProps) {
     filter.minTe,
     filter.minRuns,
     filter.maxPrice,
+    sources.size !== DEFAULT_SOURCES.size,
+    spaceKinds.length !== SPACE_KINDS.length,
   ].filter(Boolean).length;
+
+  const compositeValue = { ...filter, sources, spaceKinds };
+
+  /** Widened past `UiFilter` so Source/Space buffer and commit through the same draft/Apply/Cancel as the other fields (matching Contracts.tsx and Market's FilterBar usage) instead of applying instantly. Space is a Dexie-backed preference, written here and nowhere else, so Cancel never leaves a store write to roll back. */
+  function handleCompositeChange(next: typeof compositeValue) {
+    const { sources: nextSources, spaceKinds: nextSpaceKinds, ...restFilter } = next;
+    onChange(restFilter);
+    if (nextSources !== sources) onSourcesChange(nextSources);
+    if (nextSpaceKinds !== spaceKinds) onSpaceKindsChange(nextSpaceKinds);
+  }
 
   return (
     <FilterBar
-      value={filter}
-      onChange={onChange}
+      value={compositeValue}
+      onChange={handleCompositeChange}
       activeCount={activeCount}
       className="border-b border-line px-3 py-2"
       search={
@@ -308,6 +335,50 @@ function BpcFilterBar({ filter, onChange, regionOptions }: BpcFilterBarProps) {
               onChange={(event) => setDraft({ ...draft, maxPrice: event.target.value })}
             />
           </FilterField>
+          <div
+            role="group"
+            aria-label={t('bpcContracts.sourceLabel')}
+            className="flex flex-wrap items-center gap-2"
+          >
+            <span className="text-text-dim">{t('bpcContracts.sourceLabel')}</span>
+            {(['contract', 'owned'] as const).map((source) => (
+              <FilterChip
+                key={source}
+                label={t(
+                  source === 'contract'
+                    ? 'bpcContracts.sourceContracts'
+                    : 'bpcContracts.sourceOwned'
+                )}
+                selected={draft.sources.has(source)}
+                onToggle={() => {
+                  const next = new Set(draft.sources);
+                  if (next.has(source)) next.delete(source);
+                  else next.add(source);
+                  setDraft({ ...draft, sources: next });
+                }}
+              />
+            ))}
+          </div>
+          <div
+            role="group"
+            aria-label={t('bpcContracts.spaceLabel')}
+            className="flex flex-wrap items-center gap-2"
+          >
+            <span className="text-text-dim">{t('bpcContracts.spaceLabel')}</span>
+            {SPACE_KINDS.map((kind) => (
+              <FilterChip
+                key={kind}
+                label={t(`bpcContracts.space.${kind}`)}
+                selected={draft.spaceKinds.includes(kind)}
+                onToggle={() => {
+                  const next = draft.spaceKinds.includes(kind)
+                    ? draft.spaceKinds.filter((existing) => existing !== kind)
+                    : [...draft.spaceKinds, kind];
+                  setDraft({ ...draft, spaceKinds: next });
+                }}
+              />
+            ))}
+          </div>
         </>
       )}
     </FilterBar>
@@ -357,13 +428,6 @@ export function BpcSourcingPanel() {
     void hydrateVisibleColumns();
   }, [hydrateVisibleColumns]);
 
-  function toggleSpaceKind(kind: SpaceKind) {
-    const next = spaceFilter.includes(kind)
-      ? spaceFilter.filter((existing) => existing !== kind)
-      : [...spaceFilter, kind];
-    void setSpaceFilter(next);
-  }
-
   function toggleColumn(id: BpcSearchColumnId) {
     const next = visibleColumns.includes(id)
       ? visibleColumns.filter((existing) => existing !== id)
@@ -373,18 +437,7 @@ export function BpcSourcingPanel() {
 
   const [uiFilter, setUiFilter] = useState<UiFilter>(EMPTY_UI_FILTER);
   const [showAll, setShowAll] = useState(false);
-  /** Both on by default: an existing user must keep seeing today's contract results, plus their owned blueprints, not a narrower default. */
-  const [sources, setSources] = useState<ReadonlySet<BpcSearchSource>>(
-    () => new Set<BpcSearchSource>(['contract', 'owned'])
-  );
-  function toggleSource(source: BpcSearchSource) {
-    setSources((prev) => {
-      const next = new Set(prev);
-      if (next.has(source)) next.delete(source);
-      else next.add(source);
-      return next;
-    });
-  }
+  const [sources, setSources] = useState<ReadonlySet<BpcSearchSource>>(DEFAULT_SOURCES);
   /**
    * The one blueprint the search has been narrowed to, or `null` while the
    * query is still free text. Distinct from `uiFilter.typeQuery`: typing
@@ -788,39 +841,29 @@ export function BpcSourcingPanel() {
               {t('common.offlineTitle')}
             </p>
           )}
-          <BpcFilterBar filter={uiFilter} onChange={changeFilter} regionOptions={regionOptions} />
+          <BpcFilterBar
+            filter={uiFilter}
+            onChange={changeFilter}
+            regionOptions={regionOptions}
+            sources={sources}
+            onSourcesChange={setSources}
+            spaceKinds={spaceFilter}
+            onSpaceKindsChange={(next) => void setSpaceFilter(next)}
+          />
 
-          <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2 text-xs">
-            <span className="text-text-dim">{t('bpcContracts.sourceLabel')}</span>
-            <FilterChip
-              label={t('bpcContracts.sourceContracts')}
-              selected={sources.has('contract')}
-              onToggle={() => toggleSource('contract')}
+          {/* ColumnPickerMenu is a display preference, not a filter — it stays
+              in its own row rather than inside `BpcFilterBar`, so it never
+              collapses behind the funnel with Source/Space (matching
+              Characters.tsx's density/columns row). */}
+          <div className="flex justify-end border-b border-line px-3 py-2">
+            <ColumnPickerMenu
+              available={BPC_SEARCH_COLUMN_IDS}
+              visible={visibleColumns}
+              columnsById={bpcColumnsById}
+              onToggle={toggleColumn}
+              buttonLabel={t('bpcContracts.columnsButton')}
+              menuTitle={t('bpcContracts.columnsMenuTitle')}
             />
-            <FilterChip
-              label={t('bpcContracts.sourceOwned')}
-              selected={sources.has('owned')}
-              onToggle={() => toggleSource('owned')}
-            />
-            <span className="ml-3 text-text-dim">{t('bpcContracts.spaceLabel')}</span>
-            {SPACE_KINDS.map((kind) => (
-              <FilterChip
-                key={kind}
-                label={t(`bpcContracts.space.${kind}`)}
-                selected={spaceFilter.includes(kind)}
-                onToggle={() => toggleSpaceKind(kind)}
-              />
-            ))}
-            <div className="ml-auto">
-              <ColumnPickerMenu
-                available={BPC_SEARCH_COLUMN_IDS}
-                visible={visibleColumns}
-                columnsById={bpcColumnsById}
-                onToggle={toggleColumn}
-                buttonLabel={t('bpcContracts.columnsButton')}
-                menuTitle={t('bpcContracts.columnsMenuTitle')}
-              />
-            </div>
           </div>
 
           {/* Inset on its own ground with an accent edge, because as a plain
