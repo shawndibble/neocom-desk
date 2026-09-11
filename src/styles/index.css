@@ -1,6 +1,25 @@
 @import 'tailwindcss' source(none);
 
 /*
+ * Opts every same-origin navigation — including the reload
+ * ReloadPrompt.tsx triggers to apply a waiting service-worker update — into
+ * the browser's native cross-document View Transition, where supported
+ * (Chromium). The browser cross-fades the outgoing and incoming documents
+ * itself, which reads far smoother than ReloadPrompt's cover-div fallback;
+ * that fallback still runs underneath for browsers without support, since
+ * this rule is a no-op there. Requires the outgoing page to have already
+ * shipped this rule too — the very next deploy after this one is the first
+ * to get the native transition; until then ReloadPrompt's own fade covers
+ * it. Gated on prefers-reduced-motion since @view-transition offers no
+ * built-in opt-out.
+ */
+@media (prefers-reduced-motion: no-preference) {
+  @view-transition {
+    navigation: auto;
+  }
+}
+
+/*
  * Scan only the app source. Tailwind's automatic content detection walks every
  * non-gitignored file, so Markdown under `docs/` that merely *mentions* a class
  * name emits real utility rules into the shipped stylesheet.
