@@ -11,6 +11,7 @@ import type {
   AcquisitionResolution,
   HubPrices,
   IndustryBlueprint,
+  MaterialSourcingMap,
   QuantityEntry,
 } from '@/engine/industry/types';
 import type { MaterialRecipe } from '@/engine/industry/makeOrBuy';
@@ -18,7 +19,12 @@ import { MAX_SUB_BUILD_DEPTH } from '@/engine/industry/materialResolution';
 import { effectiveMaterials } from '@/engine/industry/materials';
 import { sizeRuns } from '@/engine/industry/runSizing';
 import type { SubBuildContext } from '@/engine/industry/subBuild';
-import { selectBlueprintTier, type BpcOffer } from '@/engine/industry/blueprintAcquisition';
+import {
+  resolveTierOption,
+  selectBlueprintTier,
+  tierOptions,
+  type BpcOffer,
+} from '@/engine/industry/blueprintAcquisition';
 import type { CharacterBlueprint } from '@/esi/endpoints';
 import type { PiData } from '@/sde/types';
 import { toIndustryBlueprint, type BlueprintCatalog } from './blueprintCatalog';
@@ -62,6 +68,13 @@ export interface BlueprintAcquisitionSources {
   offersFor: (blueprintTypeID: number) => readonly BpcOffer[];
   /** Hub sell prices, for a BPO's own ordinary sell price when no BPC offer covers it. */
   hubPrices: HubPrices;
+  /**
+   * Per-blueprint sourcing overrides, for `acquisitionTierOverride` (issue
+   * #839) — a pilot-forced ME/TE tier that bypasses cost-minimization.
+   * Optional: an absent map leaves every node on the automatic cheapest-tier
+   * path, same as before this field existed.
+   */
+  sourcing?: MaterialSourcingMap;
 }
 
 /** ME is 0..10 in the engine, which range-checks it and throws outside that. */
@@ -209,14 +222,34 @@ export function acquisitionForLookup(
     // Reaction formulas cannot be copied — never search BPC Sourcing for one.
     const isReaction = entry.blueprint.activity === 'reaction';
 
-    const resolved = selectBlueprintTier({
+    const tierInputs = {
       ownedCopies: ownedCopiesFor(blueprintTypeID, sources.ownedBlueprints),
       neededRuns: needed,
       materialCostAtMe: materialCostAtMeFor(blueprint, needed, ctx, materialPrices),
       bpcOffers: isReaction ? [] : acquisitionSources.offersFor(blueprintTypeID),
       bpoSellPrice: acquisitionSources.hubPrices[blueprintTypeID] ?? null,
       assumedMeForUnowned: sources.assumedMeForUnowned ?? 0,
-    });
+    };
+
+    // A pilot-forced tier (issue #839) bypasses cost-minimization. When it
+    // matches a real owned/purchasable tier, resolve that tier's actual
+    // owned/shortfall cost like automatic selection would; when it matches
+    // nothing the app can see (a private contract, in-person trade), report
+    // the forced me/te with no line price — `overridePrice` on the same
+    // sourcing entry is what prices it, in `materialResolution.ts`.
+    const override = acquisitionSources.sourcing?.[blueprintTypeID]?.acquisitionTierOverride;
+    let resolved;
+    if (override) {
+      const matched = tierOptions(tierInputs).find(
+        (o) => o.me === override.me && o.te === override.te
+      );
+      resolved = matched
+        ? resolveTierOption(matched, needed)
+        : { me: override.me, te: override.te, line: { unitPrice: null, owned: false } };
+    } else {
+      resolved = selectBlueprintTier(tierInputs);
+    }
+
     return { me: resolved.me, te: resolved.te, blueprintTypeID, line: resolved.line };
   };
 }

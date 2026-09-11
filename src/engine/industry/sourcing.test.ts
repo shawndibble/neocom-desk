@@ -147,4 +147,16 @@ describe('normalizeMaterialSourcingMap', () => {
       34: { overridePrice: 0 },
     });
   });
+
+  it('keeps a pilot-forced acquisition tier override (issue #839)', () => {
+    expect(
+      normalizeMaterialSourcingMap({ 34: { acquisitionTierOverride: { me: 8, te: 16 } } })
+    ).toEqual({ 34: { acquisitionTierOverride: { me: 8, te: 16 } } });
+  });
+
+  it('drops an acquisition tier override alone, with nothing else set', () => {
+    expect(
+      normalizeMaterialSourcingMap({ 34: { acquisitionTierOverride: undefined } })
+    ).toBeUndefined();
+  });
 });

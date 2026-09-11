@@ -78,12 +78,19 @@ export function normalizeMaterialSourcingMap(
     const typeID = Number(key);
     const ownedQuantity = usable(entry?.ownedQuantity);
     const overridePrice = usable(entry?.overridePrice);
-    if (!Number.isFinite(typeID) || (ownedQuantity === undefined && overridePrice === undefined)) {
+    const acquisitionTierOverride = entry?.acquisitionTierOverride;
+    if (
+      !Number.isFinite(typeID) ||
+      (ownedQuantity === undefined &&
+        overridePrice === undefined &&
+        acquisitionTierOverride === undefined)
+    ) {
       continue;
     }
     normalized[typeID] = {
       ...(ownedQuantity !== undefined ? { ownedQuantity } : {}),
       ...(overridePrice !== undefined ? { overridePrice } : {}),
+      ...(acquisitionTierOverride !== undefined ? { acquisitionTierOverride } : {}),
     };
     kept = true;
   }

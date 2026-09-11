@@ -1085,3 +1085,32 @@ describe('MaterialsTable build-here control', () => {
     expect(screen.queryByRole('button', { name: /Build it/ })).toBeNull();
   });
 });
+
+describe('MaterialsTable Blueprint Acquisition picker trigger (issue #839)', () => {
+  const acquisitionRow: readonly MaterialTableRow[] = asRows(
+    materialCostLines(MATERIALS, HUB_PRICES)
+  ).map((row, i) => (i === 0 ? { ...row, acquisitionTier: { me: 8, te: 16 } } : row));
+
+  it('shows the picker trigger beside the tier caption when the caller supplied a handler', () => {
+    renderTable({ materials: acquisitionRow, onOpenAcquisitionPicker: vi.fn() });
+
+    expect(screen.getByText('ME 8% / TE 16%')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Choose blueprint tier' })).toBeInTheDocument();
+  });
+
+  it('calls the handler with the row typeID when clicked', () => {
+    const onOpenAcquisitionPicker = vi.fn();
+    renderTable({ materials: acquisitionRow, onOpenAcquisitionPicker });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Choose blueprint tier' }));
+
+    expect(onOpenAcquisitionPicker).toHaveBeenCalledWith(34);
+  });
+
+  it('drops the trigger when the caller has no picker to open', () => {
+    renderTable({ materials: acquisitionRow });
+
+    expect(screen.getByText('ME 8% / TE 16%')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Choose blueprint tier' })).toBeNull();
+  });
+});

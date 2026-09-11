@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { selectBlueprintTier } from '@/engine/industry/blueprintAcquisition';
+import {
+  resolveTierOption,
+  selectBlueprintTier,
+  tierOptions,
+} from '@/engine/industry/blueprintAcquisition';
 import type { OwnedBlueprintCopy } from '@/engine/industry/blueprintAcquisition';
 
 /** Material cost doubles per ME point lost, floors at 100 for ME10 — enough spread to make tier choice matter without a real formula. */
@@ -166,5 +170,86 @@ describe('selectBlueprintTier', () => {
       assumedMeForUnowned: 0,
     });
     expect(result).toEqual({ me: 0, te: 0, line: { unitPrice: 10, owned: false } });
+  });
+});
+
+describe('tierOptions', () => {
+  it('lists every owned tier plus the cheapest purchasable one, each with its own cost', () => {
+    const owned: OwnedBlueprintCopy[] = [
+      { me: 0, te: 0, runs: -1 },
+      { me: 6, te: 12, runs: 10 },
+    ];
+    const options = tierOptions({
+      ownedCopies: owned,
+      neededRuns: 5,
+      materialCostAtMe: costAtMe,
+      bpcOffers: [{ me: 10, te: 20, runs: 5, quantity: 1, price: 1 }],
+      bpoSellPrice: null,
+      assumedMeForUnowned: 0,
+    });
+
+    // Each cost is the tier's total plan cost — material cost at that ME plus
+    // whatever covering its shortfall costs (0 for the ME6 tier, which is
+    // fully owned; 1 for the ME10 tier, bought outright).
+    expect(options).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ me: 0, te: 0, ownedRuns: Infinity, cost: 300 }),
+        expect.objectContaining({ me: 6, te: 12, ownedRuns: 10, cost: 180 }),
+        expect.objectContaining({ me: 10, te: 20, ownedRuns: 0, cost: 101 }),
+      ])
+    );
+    expect(options).toHaveLength(3);
+  });
+
+  it('picking the cheapest option and resolving it matches selectBlueprintTier', () => {
+    const owned: OwnedBlueprintCopy[] = [{ me: 0, te: 0, runs: -1 }];
+    const inputs = {
+      ownedCopies: owned,
+      neededRuns: 5,
+      materialCostAtMe: costAtMe,
+      bpcOffers: [{ me: 10, te: 20, runs: 5, quantity: 1, price: 1 }],
+      bpoSellPrice: null,
+      assumedMeForUnowned: 0,
+    };
+    const options = tierOptions(inputs);
+    const cheapest = options.reduce((best, o) =>
+      o.cost !== null && (best.cost === null || o.cost < best.cost) ? o : best
+    );
+    expect(resolveTierOption(cheapest, inputs.neededRuns)).toEqual(selectBlueprintTier(inputs));
+  });
+
+  it('lets a pilot resolve a deliberately worse owned tier, not just the cheapest', () => {
+    const owned: OwnedBlueprintCopy[] = [
+      { me: 0, te: 0, runs: -1 },
+      { me: 6, te: 12, runs: 10 },
+    ];
+    const options = tierOptions({
+      ownedCopies: owned,
+      neededRuns: 5,
+      materialCostAtMe: costAtMe,
+      bpcOffers: [],
+      bpoSellPrice: null,
+      assumedMeForUnowned: 0,
+    });
+    const worseTier = options.find((o) => o.me === 6 && o.te === 12);
+    expect(worseTier).toBeDefined();
+    expect(resolveTierOption(worseTier!, 5)).toEqual({
+      me: 6,
+      te: 12,
+      line: { unitPrice: 0, owned: true },
+    });
+  });
+
+  it('returns an empty list when nothing is owned and nothing can be bought', () => {
+    expect(
+      tierOptions({
+        ownedCopies: [],
+        neededRuns: 5,
+        materialCostAtMe: costAtMe,
+        bpcOffers: [],
+        bpoSellPrice: null,
+        assumedMeForUnowned: 0,
+      })
+    ).toEqual([]);
   });
 });

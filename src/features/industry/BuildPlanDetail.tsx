@@ -71,6 +71,7 @@ import { writeToClipboard } from '@/lib/clipboard';
 import { unmaskNumber } from '@/lib/numberMask';
 import { MaterialsTable, SourcingInput } from './MaterialsTable';
 import { BuildRecipeModal } from './BuildRecipeModal';
+import { BlueprintAcquisitionModal } from './BlueprintAcquisitionModal';
 import { buyPricedLine } from './materialRow';
 import { materialsCsvColumns } from './materialsCsv';
 import { hasShoppingList, shoppingListText } from './shoppingList';
@@ -96,6 +97,7 @@ import {
 } from './ownedStockDetection';
 import { useDetectedOwnedStock } from './useDetectedOwnedStock';
 import type { CorpOwnedStockState } from './corpOwnedStock';
+import type { CorpOwnedBlueprintsState } from './corpOwnedBlueprints';
 import { useAssumedMe } from './assumedMe';
 import { OwnedStockScopeControl } from './OwnedStockScopeControl';
 import { BuildPlanAutoBuildControl } from './BuildPlanAutoBuildControl';
@@ -187,6 +189,14 @@ interface BuildPlanDetailProps {
    * independent of which plan is open.
    */
   corpOwnedStock: CorpOwnedStockState;
+  /**
+   * The active Character's corporation's blueprints as a second ownership
+   * source (issue #839), loaded once by `useCorpOwnedBlueprints` above the
+   * same remount boundary as `corpOwnedStock`. Folded into `ownedBlueprints`
+   * below exactly when `plan.includeCorpAssets` is on — the same toggle
+   * `corpOwnedStock` already answers to, not a second one.
+   */
+  corpOwnedBlueprints: CorpOwnedBlueprintsState;
   onUpdate: (patch: PlanPatch) => void;
   /**
    * A correction the panel derived rather than the pilot made — persisted
@@ -216,6 +226,13 @@ interface BuildPlanDetailProps {
   onShowInfo: (typeId: number, itemName: string) => void;
   /** This plan's group's last Retarget (issue #632), or null when ungrouped or not yet Retargeted. */
   groupSnapshot: BuildGroupSnapshot | null;
+  /**
+   * The picker/override modal's "search BPC Sourcing" action (issue #839) —
+   * navigates to `/industry?tab=sourcing&bpcSearch=<typeID>`. A prop rather
+   * than an inline `useNavigate` here, since this component stays
+   * route-agnostic; `IndustryPlanPage.tsx` supplies it.
+   */
+  onSearchBpcSourcing: (blueprintTypeID: number) => void;
 }
 
 function clampInt(value: number, min: number, max: number): number {
@@ -245,6 +262,7 @@ export function BuildPlanDetail({
   skills,
   ownedStockSnapshot,
   corpOwnedStock,
+  corpOwnedBlueprints,
   onUpdate,
   onDerivedFix,
   onSourcingChange,
@@ -253,6 +271,7 @@ export function BuildPlanDetail({
   quickbarAvailable,
   onShowInfo,
   groupSnapshot,
+  onSearchBpcSourcing,
 }: BuildPlanDetailProps) {
   const { t } = useTranslation();
 
@@ -409,6 +428,20 @@ export function BuildPlanDetail({
     [snapshot, plan.materialPriceBasis]
   );
 
+  // Corp-owned blueprints (issue #839) fold in only when this plan's own
+  // Corp Assets toggle is on — the same `plan.includeCorpAssets` toggle
+  // `corpOwnedStock` above already answers to, not a second one.
+  // `CorporationBlueprint` mirrors `CharacterBlueprint` field-for-field, so
+  // the corp source needs no further adaptation before it can sit alongside
+  // the personal list.
+  const effectiveOwnedBlueprints = useMemo(
+    () =>
+      (plan.includeCorpAssets ?? false) && corpOwnedBlueprints.available
+        ? [...ownedBlueprints, ...corpOwnedBlueprints.blueprints]
+        : ownedBlueprints,
+    [ownedBlueprints, plan.includeCorpAssets, corpOwnedBlueprints]
+  );
+
   /**
    * What produces a material — general over any typeID a `buildHere` choice
    * might reach, at any depth, not only the blueprint's own materials. Recipe
@@ -417,8 +450,14 @@ export function BuildPlanDetail({
    * during a slow or unreachable price fetch.
    */
   const recipeFor = useMemo(
-    () => recipeForLookup({ catalog, pi, ownedBlueprints, assumedMeForUnowned: assumedMe }),
-    [catalog, pi, ownedBlueprints, assumedMe]
+    () =>
+      recipeForLookup({
+        catalog,
+        pi,
+        ownedBlueprints: effectiveOwnedBlueprints,
+        assumedMeForUnowned: assumedMe,
+      }),
+    [catalog, pi, effectiveOwnedBlueprints, assumedMe]
   );
 
   // Blueprint Acquisition (issue #838): BPC Sourcing offers for this plan's
@@ -433,11 +472,23 @@ export function BuildPlanDetail({
       acquisitionForLookup({
         catalog,
         pi,
-        ownedBlueprints,
+        ownedBlueprints: effectiveOwnedBlueprints,
         assumedMeForUnowned: assumedMe,
-        blueprintAcquisition: { offersFor: bpcOffersFor, hubPrices: snapshot?.hubPrices ?? {} },
+        blueprintAcquisition: {
+          offersFor: bpcOffersFor,
+          hubPrices: snapshot?.hubPrices ?? {},
+          sourcing: plan.materialSourcing,
+        },
       }),
-    [catalog, pi, ownedBlueprints, assumedMe, bpcOffersFor, snapshot]
+    [
+      catalog,
+      pi,
+      effectiveOwnedBlueprints,
+      assumedMe,
+      bpcOffersFor,
+      snapshot,
+      plan.materialSourcing,
+    ]
   );
 
   // The one place "can this be built here" is decided — `craftScopeList`
@@ -761,6 +812,19 @@ export function BuildPlanDetail({
    * is also how the modal closes when its row stops being built underneath it.
    */
   const [recipeTypeId, setRecipeTypeId] = useState<number | null>(null);
+
+  /** Which Blueprint Acquisition row's picker/override modal (issue #839) is open, if any. */
+  const [acquisitionPickerTypeId, setAcquisitionPickerTypeId] = useState<number | null>(null);
+  const acquisitionPickerOwnedCopies = useMemo(
+    () =>
+      acquisitionPickerTypeId === null
+        ? []
+        : effectiveOwnedBlueprints
+            .filter((b) => b.type_id === acquisitionPickerTypeId)
+            .map((b) => ({ me: b.material_efficiency, te: b.time_efficiency, runs: b.runs })),
+    [acquisitionPickerTypeId, effectiveOwnedBlueprints]
+  );
+
   const openRecipe = useMemo(() => {
     const row = visibleMaterials.find((material) => material.typeID === recipeTypeId);
     return row ? buildRecipe(row) : null;
@@ -1608,6 +1672,7 @@ export function BuildPlanDetail({
                 canBuildHere={canBuildHere}
                 onToggleBuildHere={toggleBuildHere}
                 onShowRecipe={setRecipeTypeId}
+                onOpenAcquisitionPicker={setAcquisitionPickerTypeId}
               />
               <BuildRecipeModal
                 recipe={openRecipe}
@@ -1615,6 +1680,17 @@ export function BuildPlanDetail({
                 nameFor={(typeID) => nameForType(catalog, typeID)}
                 onOpenRecipe={setRecipeTypeId}
               />
+              {acquisitionPickerTypeId !== null && (
+                <BlueprintAcquisitionModal
+                  onClose={() => setAcquisitionPickerTypeId(null)}
+                  blueprintTypeID={acquisitionPickerTypeId}
+                  blueprintName={nameForType(catalog, acquisitionPickerTypeId)}
+                  ownedCopies={acquisitionPickerOwnedCopies}
+                  sourcing={plan.materialSourcing?.[acquisitionPickerTypeId]}
+                  onSourcingChange={onSourcingChange}
+                  onSearchBpcSourcing={onSearchBpcSourcing}
+                />
+              )}
               {/*
               What building the chosen material(s) actually costs — already
               folded into the Results panel's totals below, at whatever depth

@@ -68,6 +68,16 @@ describe('corpCapabilities', () => {
   });
 
   /**
+   * GET /corporations/{id}/blueprints declares ["Director"] and nothing else
+   * (issue #839, verified against `x-required-roles` — the issue's own brief
+   * guessed Director/Factory_Manager, which the live spec does not confirm).
+   */
+  it('grants corp blueprint access only to a Director', () => {
+    expect(corpCapabilities(['Factory_Manager']).canReadBlueprints).toBe(false);
+    expect(corpCapabilities(['Director']).canReadBlueprints).toBe(true);
+  });
+
+  /**
    * The case a naive `roles.includes('Accountant')` gets wrong for the most
    * important user. In EVE a Director implicitly holds every other role, and
    * ESI does *not* expand that in the response — a Director's `roles` array is
