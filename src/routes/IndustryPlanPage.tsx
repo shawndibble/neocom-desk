@@ -4,10 +4,11 @@ import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
 import { scheduleSync } from '@/sync';
-import { PageHeader, Spinner, Tabs } from '@/components/ui';
+import { Spinner } from '@/components/ui';
 import { useIndustryWorkspace } from '@/features/industry/useIndustryWorkspace';
+import { IndustryHeader } from '@/features/industry/IndustryHeader';
 import { buildGroupsFor } from '@/features/industry/buildGroups';
-import { industryTabHref, industryTabs, type IndustryTab } from '@/features/industry/industryTabs';
+import { industryTabHref, type IndustryTab } from '@/features/industry/industryTabs';
 import {
   BuildPlanDetail,
   type PlanPatch,
@@ -39,6 +40,7 @@ export function IndustryPlanPage() {
     skills,
     ownedStockSnapshot,
     corpOwnedStock,
+    blueprintsNeedsReauth,
   } = workspace;
 
   const quickbar = useQuickbar(activeCharacterId);
@@ -104,15 +106,18 @@ export function IndustryPlanPage() {
 
   return (
     <div className="mx-auto max-w-7xl space-y-4">
-      <PageHeader title={t('nav.industry')} />
-      {/* A plan is still conceptually inside Build Plans — the strip has to
-          keep saying so, not just offer a bare "back" link, and it doubles
-          as the way back: picking another tab navigates there directly. */}
-      <Tabs
-        label={t('nav.industry')}
-        value="plans"
-        onChange={(id) => navigate(industryTabHref(id as IndustryTab))}
-        tabs={industryTabs(t)}
+      {/* Same chrome the index shows above its own tab strip — a plan is
+          still conceptually inside Build Plans, so moving here should read
+          as "the content under the tabs changed," not a jump to a different
+          page. Picking another tab navigates back to `/industry` itself. */}
+      <IndustryHeader
+        activeCharacterId={activeCharacterId}
+        activeTab="plans"
+        onTabChange={(id) => navigate(industryTabHref(id as IndustryTab))}
+        blueprintsNeedsReauth={blueprintsNeedsReauth}
+        onAddToQuickbar={quickbar.add}
+        quickbarAvailable={quickbar.available}
+        onShowInfo={(typeId, itemName) => setInfoModalItem({ typeId, itemName })}
       />
 
       {!catalog ? (

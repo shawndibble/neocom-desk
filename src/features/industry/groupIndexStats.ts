@@ -1,5 +1,5 @@
 /**
- * A Build Group's Est. total / Verdict for the Industry index — the same
+ * A Build Group's Profit / Verdict for the Industry index — the same
  * rollup `BuildGroupPanel` computes for its one open group, run here for
  * every group's row at once. Pulled out of `Industry.tsx` (rather than
  * assembled inline there) because it reaches into a priced `ComparedBuildRow`
@@ -12,13 +12,18 @@ import type { BuildGroup } from './buildGroups';
 import { flattenBuildResult } from './resultFlattenCache';
 import type { ComparedBuildRow } from './useComparedBuildResults';
 
-/** A plan/group with no price yet, or that failed to price, reads as "unknown" rather than silently missing. */
-export function verdictOf(totalCost: number | null, buyCost: number | null): PlanVerdictTag {
-  if (buyCost === null) return 'unknown';
-  return totalCost !== null && totalCost <= buyCost ? 'build' : 'buy';
+/** Buy price minus build cost — positive is money saved building it. Null with no buy price to compare against. */
+export function profitOf(totalCost: number, buyCost: number | null): number | null {
+  return buyCost === null ? null : buyCost - totalCost;
 }
 
-const UNKNOWN_STATS: PlanRollupStats = { totalCost: null, verdict: 'unknown' };
+/** No buy price to compare against reads as "unknown" rather than silently missing. */
+export function verdictOf(profit: number | null): PlanVerdictTag {
+  if (profit === null) return 'unknown';
+  return profit >= 0 ? 'build' : 'buy';
+}
+
+const UNKNOWN_STATS: PlanRollupStats = { profit: null, verdict: 'unknown' };
 
 /**
  * `memberPlans` must be exactly this group's own members. A member missing
@@ -52,5 +57,6 @@ export function computeGroupIndexStats(
     Object.entries(group.ownedStock ?? {}).map(([typeID, qty]) => [Number(typeID), qty])
   );
   const rollup = rollUpBuildGroup(members, { ownedStock });
-  return { totalCost: rollup.totalCost, verdict: verdictOf(rollup.totalCost, rollup.buyCost) };
+  const profit = profitOf(rollup.totalCost, rollup.buyCost);
+  return { profit, verdict: verdictOf(profit) };
 }

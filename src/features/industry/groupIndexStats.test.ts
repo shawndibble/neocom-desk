@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { BuildPlanRecord } from '@/db';
 import type { BuildResult } from '@/engine/industry/types';
 import type { BuildGroup } from './buildGroups';
-import { computeGroupIndexStats, verdictOf } from './groupIndexStats';
+import { computeGroupIndexStats, profitOf, verdictOf } from './groupIndexStats';
 import type { ComparedBuildRow } from './useComparedBuildResults';
 
 const GROUP: BuildGroup = { id: 'g1', name: 'Fit', order: 0 };
@@ -65,23 +65,34 @@ function row(planId: string, over: Partial<ComparedBuildRow> = {}): ComparedBuil
   };
 }
 
+describe('profitOf', () => {
+  it('is buy price minus build cost', () => {
+    expect(profitOf(100, 200)).toBe(100);
+    expect(profitOf(201, 200)).toBe(-1);
+  });
+
+  it('is null with no buy price to compare against', () => {
+    expect(profitOf(100, null)).toBeNull();
+  });
+});
+
 describe('verdictOf', () => {
-  it('is "build" when the total is at or below the buy price', () => {
-    expect(verdictOf(100, 200)).toBe('build');
-    expect(verdictOf(200, 200)).toBe('build');
+  it('is "build" for a zero or positive profit', () => {
+    expect(verdictOf(100)).toBe('build');
+    expect(verdictOf(0)).toBe('build');
   });
 
-  it('is "buy" when the total is above the buy price', () => {
-    expect(verdictOf(201, 200)).toBe('buy');
+  it('is "buy" for a negative profit', () => {
+    expect(verdictOf(-1)).toBe('buy');
   });
 
-  it('is "unknown" whenever there is no buy price to compare against', () => {
-    expect(verdictOf(100, null)).toBe('unknown');
+  it('is "unknown" for a null profit', () => {
+    expect(verdictOf(null)).toBe('unknown');
   });
 });
 
 describe('computeGroupIndexStats', () => {
-  it("sums every member's own rollup into one totalCost/verdict", () => {
+  it("sums every member's own rollup into one profit/verdict", () => {
     const plans = [plan('p1'), plan('p2')];
     const jobFee = { eiv: 0, grossCost: 0, sccSurcharge: 0, facilityTax: 0, total: 5 };
     const rows = new Map([
@@ -91,8 +102,8 @@ describe('computeGroupIndexStats', () => {
 
     const stats = computeGroupIndexStats(GROUP, plans, rows);
 
-    // totalCost = (100+5) + (50+5) = 160; buyCost = 200 + 100 = 300 -> build
-    expect(stats.totalCost).toBe(160);
+    // totalCost = (100+5) + (50+5) = 160; buyCost = 200 + 100 = 300 -> profit 140, build
+    expect(stats.profit).toBe(140);
     expect(stats.verdict).toBe('build');
   });
 
@@ -105,11 +116,11 @@ describe('computeGroupIndexStats', () => {
 
     const stats = computeGroupIndexStats(GROUP, plans, rows);
 
-    expect(stats).toEqual({ totalCost: null, verdict: 'unknown' });
+    expect(stats).toEqual({ profit: null, verdict: 'unknown' });
   });
 
   it('reads "unknown" for an empty group rather than a zero total', () => {
     const stats = computeGroupIndexStats(GROUP, [], new Map());
-    expect(stats).toEqual({ totalCost: null, verdict: 'unknown' });
+    expect(stats).toEqual({ profit: null, verdict: 'unknown' });
   });
 });

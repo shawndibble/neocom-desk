@@ -314,7 +314,7 @@
     "emptyHint": "Create a plan to price out a manufacturing job.",
     "selectHint": "Select a build plan, or create one.",
     "backToList": "Back to build plans",
-    "estTotalColumn": "Est. total",
+    "profitColumn": "Profit",
     "verdictColumn": "Verdict",
     "runsColumn": "Runs",
     "verdictTagBuild": "Build",

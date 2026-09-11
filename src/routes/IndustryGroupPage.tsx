@@ -1,10 +1,12 @@
+import { useState } from 'react';
 import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type BuildPlanRecord } from '@/db';
-import { PageHeader, Spinner, Tabs } from '@/components/ui';
+import { Spinner } from '@/components/ui';
 import { useIndustryWorkspace } from '@/features/industry/useIndustryWorkspace';
-import { industryTabHref, industryTabs, type IndustryTab } from '@/features/industry/industryTabs';
+import { IndustryHeader } from '@/features/industry/IndustryHeader';
+import { industryTabHref, type IndustryTab } from '@/features/industry/industryTabs';
 import {
   buildGroupsFor,
   withGroupCraftSweepDefault,
@@ -16,6 +18,8 @@ import { BuildGroupPanel } from '@/features/industry/BuildGroupPanel';
 import { applyGroupCraftSweep } from '@/features/industry/craftSweepGroup';
 import type { SweepStrategy } from '@/engine/industry/autoMakeOrBuy';
 import type { OwnedStockScope } from '@/engine/industry/types';
+import { useQuickbar } from '@/features/market/useQuickbar';
+import { ItemDetailModal } from '@/features/market/ItemDetailModal';
 
 const NO_PLANS: BuildPlanRecord[] = [];
 
@@ -30,7 +34,20 @@ export function IndustryGroupPage() {
   const navigate = useNavigate();
   const { groupId } = useParams<{ groupId: string }>();
   const workspace = useIndustryWorkspace();
-  const { activeCharacterId, catalog, pi, ownedBlueprints, skills, ownedStockSnapshot } = workspace;
+  const {
+    activeCharacterId,
+    catalog,
+    pi,
+    ownedBlueprints,
+    skills,
+    ownedStockSnapshot,
+    blueprintsNeedsReauth,
+  } = workspace;
+
+  const quickbar = useQuickbar(activeCharacterId);
+  const [infoModalItem, setInfoModalItem] = useState<{ typeId: number; itemName: string } | null>(
+    null
+  );
 
   const plansQuery = useLiveQuery(async () => {
     if (activeCharacterId === null || groupId === undefined) return undefined;
@@ -117,14 +134,16 @@ export function IndustryGroupPage() {
 
   return (
     <div className="mx-auto max-w-7xl space-y-4">
-      <PageHeader title={t('nav.industry')} />
-      {/* Same reasoning as `IndustryPlanPage`: a group is still conceptually
-          inside Build Plans, and the strip is the way back too. */}
-      <Tabs
-        label={t('nav.industry')}
-        value="plans"
-        onChange={(id) => navigate(industryTabHref(id as IndustryTab))}
-        tabs={industryTabs(t)}
+      {/* Same chrome the index shows above its own tab strip — see
+          `IndustryPlanPage`'s identical use of it. */}
+      <IndustryHeader
+        activeCharacterId={activeCharacterId}
+        activeTab="plans"
+        onTabChange={(id) => navigate(industryTabHref(id as IndustryTab))}
+        blueprintsNeedsReauth={blueprintsNeedsReauth}
+        onAddToQuickbar={quickbar.add}
+        quickbarAvailable={quickbar.available}
+        onShowInfo={(typeId, itemName) => setInfoModalItem({ typeId, itemName })}
       />
 
       {!catalog ? (
@@ -146,6 +165,14 @@ export function IndustryGroupPage() {
           onCraftSweep={(options) => handleCraftSweepGroup(options)}
           onOwnedStockChange={(ownedStock) => void handleGroupOwnedStockChange(ownedStock)}
           onOwnedStockScopeChange={(scope) => void handleGroupOwnedStockScopeChange(scope)}
+        />
+      )}
+
+      {infoModalItem && (
+        <ItemDetailModal
+          typeId={infoModalItem.typeId}
+          itemName={infoModalItem.itemName}
+          onClose={() => setInfoModalItem(null)}
         />
       )}
     </div>

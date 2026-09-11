@@ -5,18 +5,9 @@ import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type BuildPlanRecord } from '@/db';
 import { markBuildPlanDeleted, scheduleSync } from '@/sync';
-import {
-  Button,
-  EmptyState,
-  Modal,
-  PageHeader,
-  Panel,
-  ReauthBanner,
-  Spinner,
-  Tabs,
-} from '@/components/ui';
-import { beginEveLogin } from '@/app/loginFlow';
+import { Button, EmptyState, Modal, Panel, Spinner } from '@/components/ui';
 import { useIndustryWorkspace } from '@/features/industry/useIndustryWorkspace';
+import { IndustryHeader } from '@/features/industry/IndustryHeader';
 import {
   buildPlansByMaterialTypeID,
   type BlueprintCatalogEntry,
@@ -24,7 +15,6 @@ import {
 import { findOwnedBlueprint } from '@/features/industry/data';
 import { ItemDetailModal } from '@/features/market/ItemDetailModal';
 import { useQuickbar } from '@/features/market/useQuickbar';
-import { ActiveJobsPanel } from '@/features/industry/ActiveJobsPanel';
 import { BuildPlanList } from '@/features/industry/BuildPlanList';
 import type { PlanIndexStats, PlanRollupStats } from '@/features/industry/BuildPlanList';
 import { BuildPlanCompare } from '@/features/industry/BuildPlanCompare';
@@ -50,8 +40,8 @@ import { applyFitImport, fitImportGroupName } from '@/features/industry/fitImpor
 import type { FitToBuildPlansResult } from '@/engine/import/fitToBuildPlans';
 import { useComparedBuildResults } from '@/features/industry/useComparedBuildResults';
 import { useRunCountsByPlan } from '@/features/industry/useRunCountsByPlan';
-import { computeGroupIndexStats, verdictOf } from '@/features/industry/groupIndexStats';
-import { industryTabs, readIndustryTab, type IndustryTab } from '@/features/industry/industryTabs';
+import { computeGroupIndexStats, profitOf, verdictOf } from '@/features/industry/groupIndexStats';
+import { readIndustryTab, type IndustryTab } from '@/features/industry/industryTabs';
 
 /**
  * Build Plan manager index: create (via blueprint search)/duplicate/delete/
@@ -287,9 +277,10 @@ export function Industry() {
   const statsByPlanId = useMemo(() => {
     const map = new Map<string, PlanIndexStats>();
     for (const row of [...groupedRows, ...ungroupedRows]) {
+      const profit = row.result ? profitOf(row.result.totalCost, row.result.buyCost) : null;
       map.set(row.planId, {
-        totalCost: row.result?.totalCost ?? null,
-        verdict: row.result ? verdictOf(row.result.totalCost, row.result.buyCost) : 'unknown',
+        profit,
+        verdict: verdictOf(profit),
         runs: runCounts.get(row.planId) ?? 0,
       });
     }
@@ -455,24 +446,15 @@ export function Industry() {
 
   return (
     <div className="mx-auto max-w-7xl space-y-4">
-      <PageHeader title={t('nav.industry')} />
-      <ActiveJobsPanel
-        characterId={activeCharacterId}
+      <IndustryHeader
+        activeCharacterId={activeCharacterId}
+        activeTab={tab}
+        onTabChange={setTab}
+        blueprintsNeedsReauth={blueprintsNeedsReauth}
         onAddToQuickbar={quickbar.add}
         quickbarAvailable={quickbar.available}
         onShowInfo={(typeId, itemName) => setInfoModalItem({ typeId, itemName })}
       />
-
-      {blueprintsNeedsReauth && (
-        <Panel title={t('industry.blueprintsTitle')}>
-          <ReauthBanner
-            title={t('industry.blueprintsReauthTitle')}
-            hint={t('industry.blueprintsReauthHint')}
-            actionLabel={t('industry.blueprintsReauthAction')}
-            onLogin={() => void beginEveLogin()}
-          />
-        </Panel>
-      )}
 
       {!plans || !catalog || !buildGroupsHydrated || !expandedGroupsHydrated ? (
         <div className="flex justify-center py-16">
@@ -480,13 +462,6 @@ export function Industry() {
         </div>
       ) : (
         <>
-          <Tabs
-            label={t('nav.industry')}
-            value={tab}
-            onChange={(id) => setTab(id as IndustryTab)}
-            tabs={industryTabs(t)}
-          />
-
           {tab === 'sourcing' ? (
             <BpcSourcingPanel />
           ) : tab === 'opportunities' ? (

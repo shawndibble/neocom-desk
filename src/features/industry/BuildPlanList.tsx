@@ -17,9 +17,20 @@ import {
   type DragOverEvent,
   type DragStartEvent,
 } from '@dnd-kit/core';
-import { Button, Caret, EmptyState, IconButton, TextInput } from '@/components/ui';
+import {
+  Button,
+  Caret,
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+  EmptyState,
+  IconButton,
+  TextInput,
+} from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import type { BuildPlanRecord } from '@/db';
+import { iskToneClass } from '@/features/character/format';
 import { formatIsk } from '@/lib/isk';
 import { BlueprintPicker } from './BlueprintPicker';
 import { BuildPlanRowContextMenu } from './BuildPlanRowContextMenu';
@@ -30,9 +41,10 @@ import type { BlueprintCatalog, BlueprintCatalogEntry } from './blueprintCatalog
 /** Build-vs-buy verdict, compact enough for a list row's own column. */
 export type PlanVerdictTag = 'build' | 'buy' | 'unknown';
 
-/** Est. total / Verdict — the two figures both a plan row and a group row carry. */
+/** Profit / Verdict — the two figures both a plan row and a group row carry. */
 export interface PlanRollupStats {
-  totalCost: number | null;
+  /** Buy price minus build cost — positive is money saved building it, negative is money lost building it. Null with no buy price to compare against. */
+  profit: number | null;
   verdict: PlanVerdictTag;
 }
 
@@ -74,10 +86,13 @@ function RunsCell({ runs }: { runs: number }) {
   return <span className="tabular-nums text-text-dim">{runs > 0 ? runs : '—'}</span>;
 }
 
-function EstTotalCell({ totalCost }: { totalCost: number | null }) {
+/** Sign kept alongside the color, not instead of it (DESIGN.md §7) — a viewer who can't tell green from red still reads "+"/"-". */
+function ProfitCell({ profit }: { profit: number | null }) {
+  if (profit === null) return <span className="tabular-nums text-text-dim">—</span>;
   return (
-    <span className="tabular-nums text-text-dim">
-      {totalCost === null ? '—' : formatIsk(totalCost)}
+    <span className={`tabular-nums ${iskToneClass(profit)}`}>
+      {profit > 0 ? '+' : ''}
+      {formatIsk(profit)}
     </span>
   );
 }
@@ -147,9 +162,9 @@ interface BuildPlanListProps {
   /** Moves one plan into a group, or out of every group when null. */
   onMovePlan: (planId: string, groupId: string | null) => void;
   onOpenFitImport: () => void;
-  /** Est. total / Verdict / Runs per plan row — `undefined` renders every column as "—". */
+  /** Profit / Verdict / Runs per plan row — `undefined` renders every column as "—". */
   statsByPlanId: ReadonlyMap<string, PlanIndexStats>;
-  /** Est. total / Verdict per group row (rolled up from its members) — Runs has no group-level meaning. */
+  /** Profit / Verdict per group row (rolled up from its members) — Runs has no group-level meaning. */
   statsByGroupId: ReadonlyMap<string, PlanRollupStats>;
 }
 
@@ -319,8 +334,8 @@ function PlanRow({
           </button>
         </BuildPlanRowContextMenu>
       )}
-      <span className="w-20 shrink-0 text-right">
-        <EstTotalCell totalCost={stats?.totalCost ?? null} />
+      <span className="w-24 shrink-0 text-right">
+        <ProfitCell profit={stats?.profit ?? null} />
       </span>
       <span className="hidden w-14 shrink-0 justify-end sm:flex">
         <VerdictTag verdict={stats?.verdict ?? 'unknown'} />
@@ -342,7 +357,6 @@ function PlanRow({
 
 function GroupHeader({
   group,
-  memberCount,
   expanded,
   active,
   dropActive,
@@ -356,7 +370,6 @@ function GroupHeader({
   stats,
 }: {
   group: BuildGroup;
-  memberCount: number;
   expanded: boolean;
   active: boolean;
   /** A dragged plan currently resolves to this group — including via one of its member rows. */
@@ -415,18 +428,29 @@ function GroupHeader({
           onDone={() => setRenaming(false)}
         />
       ) : (
-        <button
-          type="button"
-          onClick={onSelect}
-          onDoubleClick={() => setRenaming(true)}
-          className="flex-1 truncate text-left font-semibold"
-        >
-          {group.name}
-        </button>
+        // Rename lives in the context menu now, same as a plan row's own
+        // name button — a second always-visible icon here was shifting the
+        // Est. total/Verdict/Runs columns over for every group header.
+        <ContextMenu>
+          <ContextMenuTrigger asChild>
+            <button
+              type="button"
+              onClick={onSelect}
+              onDoubleClick={() => setRenaming(true)}
+              className="flex-1 truncate text-left font-semibold"
+            >
+              {group.name}
+            </button>
+          </ContextMenuTrigger>
+          <ContextMenuContent>
+            <ContextMenuItem onSelect={() => setRenaming(true)}>
+              {t('industry.rename')}
+            </ContextMenuItem>
+          </ContextMenuContent>
+        </ContextMenu>
       )}
-      <span className="shrink-0 tabular-nums text-text-dim">{memberCount}</span>
-      <span className="w-20 shrink-0 text-right">
-        <EstTotalCell totalCost={stats?.totalCost ?? null} />
+      <span className="w-24 shrink-0 text-right">
+        <ProfitCell profit={stats?.profit ?? null} />
       </span>
       <span className="hidden w-14 shrink-0 justify-end sm:flex">
         <VerdictTag verdict={stats?.verdict ?? 'unknown'} />
@@ -436,13 +460,6 @@ function GroupHeader({
           blank rather than a second dash competing with the plan rows' real
           one for the reader's attention. */}
       <span className="hidden w-8 shrink-0 sm:block" aria-hidden="true" />
-      <IconButton
-        size="sm"
-        icon={<Icon.Rename />}
-        label={`${t('industry.renameGroup')} ${group.name}`}
-        tooltip={t('industry.renameGroup')}
-        onClick={() => setRenaming(true)}
-      />
       <IconButton
         size="sm"
         icon={<Icon.Close />}
@@ -688,7 +705,7 @@ export function BuildPlanList({
               row cells by the same fixed widths, not real table cells. */}
           <div className="flex items-center gap-2 border-b border-line bg-panel-2 px-2 py-1.5 text-[0.625rem] font-semibold tracking-widest text-text-dim uppercase">
             <span className="flex-1">{t('industry.title')}</span>
-            <span className="w-20 shrink-0 text-right">{t('industry.estTotalColumn')}</span>
+            <span className="w-24 shrink-0 text-right">{t('industry.profitColumn')}</span>
             <span className="hidden w-14 shrink-0 justify-end sm:flex">
               {t('industry.verdictColumn')}
             </span>
@@ -708,7 +725,6 @@ export function BuildPlanList({
                 <Fragment key={group.id}>
                   <GroupHeader
                     group={group}
-                    memberCount={members.length}
                     expanded={expandedGroupIds.has(group.id)}
                     active={group.id === selectedGroupId}
                     dropActive={dropTarget?.groupId === group.id}

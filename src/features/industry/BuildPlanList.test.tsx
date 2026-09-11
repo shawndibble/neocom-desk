@@ -235,10 +235,9 @@ describe('BuildPlanList: build groups (#626)', () => {
     );
   }
 
-  it('collapses a group by default, showing its count but none of its members', () => {
+  it('collapses a group by default, hiding its members', () => {
     renderGrouped();
     expect(screen.getByText("Loru's Max Hacker — Buzzard")).toBeInTheDocument();
-    expect(screen.getByText('2')).toBeInTheDocument();
     expect(screen.queryByText('Data Analyzer II')).not.toBeInTheDocument();
   });
 
@@ -300,6 +299,20 @@ describe('BuildPlanList: build groups (#626)', () => {
     await userEvent.click(screen.getByRole('checkbox', { name: /Select every plan in/ }));
     expect(onToggleCompareSelected).toHaveBeenCalledWith('b');
     expect(onToggleCompareSelected).not.toHaveBeenCalledWith('a');
+  });
+
+  it('renames a group from its context menu, with no separate visible rename button', async () => {
+    // A second always-visible icon here shifted the Est./Verdict/Runs
+    // columns over for every group header — rename lives in the context
+    // menu now, same as a plan row's own name button.
+    renderGrouped();
+    expect(screen.queryByRole('button', { name: /^Rename group/ })).not.toBeInTheDocument();
+
+    const nameButton = screen.getByRole('button', { name: "Loru's Max Hacker — Buzzard" });
+    fireEvent.contextMenu(nameButton);
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Rename' }));
+
+    expect(screen.getByRole('textbox', { name: 'Rename group' })).toBeInTheDocument();
   });
 });
 
