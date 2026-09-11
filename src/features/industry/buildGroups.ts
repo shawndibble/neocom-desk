@@ -98,14 +98,6 @@ export interface BuildGroupSnapshot {
  */
 export interface BuildGroupCraftSweepDefault {
   strategy: SweepStrategy;
-  /**
-   * The raw control choice, `'all'` sentinel included — not the depth number
-   * it resolved to that run. A stored numeric depth could outlive the tree
-   * it was measured against (a member removed, or replaced by a shallower
-   * blueprint) and silently fall outside the next reopening's own depth
-   * range; `'all'` never can.
-   */
-  depthChoice: 'all' | number;
 }
 
 /** One Build Group: what it is called and where it sits in the list. */
@@ -156,14 +148,14 @@ function usableSnapshot(value: unknown): value is BuildGroupSnapshot {
   );
 }
 
+// A stored `depthChoice` from a pre-#798 record (Sweep Depth's own field, now
+// removed) is simply never read — this only validates `strategy`, so an
+// older synced record with the extra field still parses rather than being
+// dropped wholesale.
 function usableCraftSweepDefault(value: unknown): value is BuildGroupCraftSweepDefault {
   if (typeof value !== 'object' || value === null) return false;
-  const { strategy, depthChoice } = value as Partial<BuildGroupCraftSweepDefault>;
-  return (
-    (strategy === 'buy' || strategy === 'build' || strategy === 'cost-effective') &&
-    (depthChoice === 'all' ||
-      (typeof depthChoice === 'number' && Number.isFinite(depthChoice) && depthChoice > 0))
-  );
+  const { strategy } = value as Partial<BuildGroupCraftSweepDefault>;
+  return strategy === 'buy' || strategy === 'build' || strategy === 'cost-effective';
 }
 
 const LOCATION_TYPES = new Set(['station', 'solar_system', 'item', 'other']);

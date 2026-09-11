@@ -15,7 +15,6 @@ import { configureClipboard } from '@/lib/clipboard';
 import { BuildGroupPanel } from './BuildGroupPanel';
 import type { BlueprintCatalog, BlueprintCatalogEntry } from './blueprintCatalog';
 import type { BuildGroup } from './buildGroups';
-import type { DepthChoice } from './CraftSweepControl';
 import type { OwnedStockSnapshot } from './ownedStockDetection';
 import { useComparedBuildResults, type ComparedBuildRow } from './useComparedBuildResults';
 
@@ -181,11 +180,7 @@ function renderPanel(
   overrides: {
     group?: BuildGroup;
     catalog?: BlueprintCatalog;
-    onCraftSweep?: (options: {
-      strategy: SweepStrategy;
-      depth: number;
-      depthChoice: DepthChoice;
-    }) => Promise<void>;
+    onCraftSweep?: (options: { strategy: SweepStrategy; depth: number }) => Promise<void>;
     onOwnedStockChange?: (ownedStock: Record<number, number>) => void;
   } = {}
 ) {
@@ -303,7 +298,7 @@ describe('BuildGroupPanel — Craft Sweep (issue #696)', () => {
     mockedUseComparedBuildResults.mockReturnValue([row('a', [material(34, 100)])]);
     renderPanel([plan('a', 'jita')], {
       catalog: CHAIN_CATALOG,
-      group: { ...GROUP, craftSweepDefault: { strategy: 'build', depthChoice: 'all' } },
+      group: { ...GROUP, craftSweepDefault: { strategy: 'build' } },
     });
 
     expect(screen.getByRole('combobox', { name: 'Sweep Strategy' }).textContent).toBe('Build');
@@ -327,8 +322,15 @@ describe('BuildGroupPanel — Craft Sweep (issue #696)', () => {
     expect(onCraftSweep).toHaveBeenCalledWith({
       strategy: 'cost-effective',
       depth: 1,
-      depthChoice: 'all',
     });
+  });
+
+  it('has no Sweep Depth control and no Planetary chip (issue #798)', () => {
+    mockedUseComparedBuildResults.mockReturnValue([row('a', [material(34, 100)])]);
+    renderPanel([plan('a', 'jita')], { catalog: CHAIN_CATALOG });
+
+    expect(screen.queryByRole('combobox', { name: 'Sweep Depth' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Planetary')).not.toBeInTheDocument();
   });
 
   it('counts only members whose blueprint still resolves in the catalog, not every plan in the group', async () => {
@@ -348,6 +350,18 @@ describe('BuildGroupPanel — Craft Sweep (issue #696)', () => {
         'This will overwrite craft/buy choices on 1 plan in this group — continue?'
       )
     ).toBeTruthy();
+  });
+});
+
+describe('BuildGroupPanel — header actions as icon buttons (issue #798)', () => {
+  it('opens the Retarget dialog from the icon-only Retarget group control', async () => {
+    const user = userEvent.setup();
+    mockedUseComparedBuildResults.mockReturnValue([row('a', [material(34, 100)])]);
+    renderPanel([plan('a', 'jita')]);
+
+    await user.click(screen.getByRole('button', { name: 'Retarget group' }));
+
+    expect(await screen.findByRole('dialog')).toBeTruthy();
   });
 });
 

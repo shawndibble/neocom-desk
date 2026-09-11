@@ -1,24 +1,17 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  Button,
-  InfoTooltip,
-  Modal,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui';
+import { Button, InfoTooltip, Modal } from '@/components/ui';
 import type { SweepStrategy } from '@/engine/industry/autoMakeOrBuy';
 import type { MakeMethod } from '@/engine/industry/makeOrBuy';
 import { CraftScopeChips, SweepStrategySelect } from './craftSweepShared';
 
 interface CraftSweepControlProps {
   /**
-   * This plan's own material tree's deepest level with a recipe (`maxSweepDepth`) —
-   * bounds Sweep Depth's range. 0 means nothing in the tree has a recipe, so
-   * there is nothing to sweep.
+   * This plan's own material tree's deepest level with a recipe
+   * (`maxSweepDepth`). 0 means nothing in the tree has a recipe, so there is
+   * nothing to sweep; otherwise a sweep always walks the whole tree, the
+   * same as the single-plan control (issue #798 dropped the Sweep Depth
+   * choice — see the decision file).
    */
   maxDepth: number;
   /**
@@ -27,64 +20,44 @@ interface CraftSweepControlProps {
    * so this chip row can never promise more than a sweep will actually apply.
    * Manufacturing is always eligible and isn't shown as a chip (issue #778 —
    * every sweep always includes it); Reactions lights up only when Include
-   * Reactions is on (or the plan's own activity is a reaction). Planetary
-   * stays reserved regardless — out of scope for #698.
+   * Reactions is on (or the plan's own activity is a reaction).
    */
   scope: readonly MakeMethod[];
   /** Not ready to apply: gated on a previous Apply's own market fetch still being in flight. */
   disabled?: boolean;
   /** Pre-fills Sweep Strategy (issue #696's Build Group default); defaults to `'cost-effective'` when absent. */
   initialStrategy?: SweepStrategy;
-  /** Pre-fills Sweep Depth (issue #696's Build Group default); defaults to `'all'` when absent. */
-  initialDepthChoice?: DepthChoice;
   /** Names the affected plan count in the overwrite confirmation. */
   confirmMessage?: string;
-  onApply: (options: { strategy: SweepStrategy; depth: number; depthChoice: DepthChoice }) => void;
+  onApply: (options: { strategy: SweepStrategy }) => void;
 }
-
-/** 'all' is a sentinel distinct from any numeric depth — resolved to `maxDepth` on apply. */
-export type DepthChoice = 'all' | number;
 
 /**
  * Craft Sweep (issue #695): the Build Group's own one-shot bulk build/buy
  * control, applied once per member (`craftSweepGroup.ts`). Picks a Sweep
- * Strategy and Sweep Depth, then — behind a generic overwrite confirmation,
- * never a computed preview (that would require running the walk twice per
- * press) — overwrites every member's `buildHere` to match. The single-plan
- * equivalent is `BuildPlanCraftSweepControl.tsx`, which offers no Sweep
- * Depth choice and applies without confirmation; the Sweep Strategy select
- * and Craft Scope chips both controls share live in `craftSweepShared.tsx`.
- * Craft Scope's Manufacturing chip is always lit; Reactions lights up
- * exactly when `scope` includes it (issue #698 — Include Reactions on, or a
- * member's own activity is a reaction), else it reads the same
- * reserved-and-disabled way it always has. Planetary stays reserved
- * regardless — a later, unspecced ticket.
+ * Strategy, then — behind a generic overwrite confirmation, never a computed
+ * preview (that would require running the walk twice per press) —
+ * overwrites every member's `buildHere` to match, always across each
+ * member's own whole tree (issue #798 dropped the Sweep Depth choice — see
+ * the decision file). The single-plan equivalent is
+ * `BuildPlanCraftSweepControl.tsx`, which applies without confirmation; the
+ * Sweep Strategy select and Craft Scope chips both controls share live in
+ * `craftSweepShared.tsx`. Craft Scope's Manufacturing chip is always lit;
+ * Reactions lights up exactly when `scope` includes it (issue #698 —
+ * Include Reactions on, or a member's own activity is a reaction), else it
+ * reads the same reserved-and-disabled way it always has.
  */
 export function CraftSweepControl({
   maxDepth,
   scope,
   disabled,
   initialStrategy,
-  initialDepthChoice,
   confirmMessage,
   onApply,
 }: CraftSweepControlProps) {
   const { t } = useTranslation();
   const [strategy, setStrategy] = useState<SweepStrategy>(initialStrategy ?? 'cost-effective');
-  // A restored numeric choice can outlive the tree it was measured against
-  // (the group's members changed since it was stored) and fall outside this
-  // mount's own `maxDepth` range, where no `<SelectItem>` would match it —
-  // falling back to 'all' is always in range, whatever `maxDepth` turns out
-  // to be, the same reason `BuildGroupCraftSweepDefault.depthChoice` prefers
-  // storing 'all' over a resolved number in the first place.
-  const [depthChoice, setDepthChoice] = useState<DepthChoice>(() => {
-    if (initialDepthChoice === undefined || initialDepthChoice === 'all') return 'all';
-    return initialDepthChoice <= maxDepth ? initialDepthChoice : 'all';
-  });
   const [confirmOpen, setConfirmOpen] = useState(false);
-
-  const depthOptions = Array.from({ length: maxDepth }, (_, i) => i + 1);
-  const resolvedDepth = depthChoice === 'all' ? maxDepth : depthChoice;
 
   return (
     <div className="flex flex-col gap-2 text-xs">
@@ -103,27 +76,6 @@ export function CraftSweepControl({
             {t('industry.craftSweepStrategyLabel')}
           </span>
           <SweepStrategySelect strategy={strategy} onChange={setStrategy} size="sm" />
-        </label>
-        <label className="flex items-center gap-1.5">
-          <span className="whitespace-nowrap text-text-dim">
-            {t('industry.craftSweepDepthLabel')}
-          </span>
-          <Select
-            value={String(depthChoice)}
-            onValueChange={(value) => setDepthChoice(value === 'all' ? 'all' : Number(value))}
-          >
-            <SelectTrigger size="sm" aria-label={t('industry.craftSweepDepthLabel')}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {depthOptions.map((depth) => (
-                <SelectItem key={depth} value={String(depth)}>
-                  {t('industry.craftSweepDepthLevels', { count: depth })}
-                </SelectItem>
-              ))}
-              <SelectItem value="all">{t('industry.craftSweepDepthAll')}</SelectItem>
-            </SelectContent>
-          </Select>
         </label>
         <CraftScopeChips scope={scope} />
         <Button
@@ -150,7 +102,7 @@ export function CraftSweepControl({
             variant="danger"
             onClick={() => {
               setConfirmOpen(false);
-              onApply({ strategy, depth: resolvedDepth, depthChoice });
+              onApply({ strategy });
             }}
           >
             {t('industry.craftSweepApply')}

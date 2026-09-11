@@ -25,4 +25,13 @@ describe('FilterChip', () => {
     render(<FilterChip label="Ships" selected count={12} onToggle={() => undefined} />);
     expect(screen.getByRole('button', { name: /Ships/ })).toHaveTextContent('12');
   });
+
+  it('renders inert and does not call onToggle when disabled', async () => {
+    const onToggle = vi.fn();
+    render(<FilterChip label="Corp Assets" selected={false} onToggle={onToggle} disabled />);
+    const chip = screen.getByRole('button', { name: /Corp Assets/ });
+    expect(chip).toBeDisabled();
+    await userEvent.click(chip);
+    expect(onToggle).not.toHaveBeenCalled();
+  });
 });
