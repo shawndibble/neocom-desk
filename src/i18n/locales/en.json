@@ -2209,7 +2209,18 @@
     "sourceColumn": "Source",
     "unlimitedRuns": "∞",
     "notApplicable": "—",
-    "noSourceSelected": "Select Contracts, Owned, or both to search."
+    "noSourceSelected": "Select Contracts, Owned, or both to search.",
+    "locationColumn": "Location",
+    "spaceColumn": "Space",
+    "spaceLabel": "Space",
+    "space": {
+      "highsec": "Highsec",
+      "lowsec": "Lowsec",
+      "nullsec": "Nullsec",
+      "wormhole": "Wormhole"
+    },
+    "columnsButton": "Columns",
+    "columnsMenuTitle": "Columns"
   },
   "contacts": {
     "title": "Contacts",

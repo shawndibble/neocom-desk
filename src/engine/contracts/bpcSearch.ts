@@ -4,6 +4,7 @@
  * narrows the row set, which is the part a table's `sortValue` callbacks
  * can't express.
  */
+import type { SpaceKind } from '@/engine/space';
 
 /** One synced row — a for-sale blueprint copy joined to its contract. Mirrors `functions/src/publicContracts.ts`'s `BpcContractRow`, which this module never imports (client and Functions are separate packages). */
 export interface BpcContractRow {
@@ -34,6 +35,14 @@ export interface BpcSearchFilter {
   minTe?: number | null;
   minRuns?: number | null;
   maxPrice?: number | null;
+  /**
+   * `null`/`undefined` means "every space passes" (the filter's own default:
+   * all four checked). A row whose space could not be classified (contract
+   * row at a player structure, or an owned row whose location has not
+   * resolved yet) is excluded once a real restriction is active — the same
+   * stance `regionId` already takes on a row with no known region.
+   */
+  spaceKinds?: ReadonlySet<SpaceKind> | null;
 }
 
 export const EMPTY_BPC_SEARCH_FILTER: BpcSearchFilter = {
@@ -43,6 +52,7 @@ export const EMPTY_BPC_SEARCH_FILTER: BpcSearchFilter = {
   minTe: null,
   minRuns: null,
   maxPrice: null,
+  spaceKinds: null,
 };
 
 /**
@@ -70,6 +80,12 @@ export interface OwnedBlueprintInput {
   me: number;
   te: number;
   quantity: number;
+  /** The resolved station/structure/system name, or `null` while unresolved (offline, or the character has no ACL into a structure). */
+  locationName?: string | null;
+  /** The region the resolved location sits in, or `null` while unresolved. */
+  regionId?: number | null;
+  /** The resolved location's four-way space classification, or `null` while unresolved. */
+  space?: SpaceKind | null;
 }
 
 /**
@@ -77,6 +93,14 @@ export interface OwnedBlueprintInput {
  * so a column can read `row.me`/`row.te` without narrowing; a contract row
  * also carries the original `BpcContractRow` for contract-only UI (the detail
  * modal, the build-plan seed) to use without re-deriving it.
+ *
+ * `locationName`/`space` sit at the top level on both branches (rather than
+ * nested under `contract`) so the Location/Space columns and the Space filter
+ * read one field regardless of source — a contract row's `regionId` for
+ * filtering purposes lives at `contract.regionId` still (it was always known,
+ * synced with every row), but `locationName`/`space` need per-row resolution
+ * work neither branch had before this ticket, so both start `null` until a
+ * caller resolves them.
  */
 export type BpcSearchRow =
   | {
@@ -87,6 +111,8 @@ export type BpcSearchRow =
       runs: number;
       quantity: number;
       contract: BpcContractRow;
+      locationName: string | null;
+      space: SpaceKind | null;
     }
   | {
       source: 'owned';
@@ -96,9 +122,22 @@ export type BpcSearchRow =
       runs: number;
       quantity: number;
       itemId: number;
+      locationName: string | null;
+      regionId: number | null;
+      space: SpaceKind | null;
     };
 
-export function contractRowToSearchRow(row: BpcContractRow): BpcSearchRow {
+/**
+ * `location` is optional: most callers resolve it separately (an ESI/SDE
+ * lookup keyed on `contract.locationId`, run outside this pure module) and
+ * pass the result in once it's ready, rather than this function blocking on
+ * it — a table needs to show contract rows immediately and fill in
+ * Location/Space as each resolves.
+ */
+export function contractRowToSearchRow(
+  row: BpcContractRow,
+  location?: { name: string | null; space: SpaceKind | null }
+): BpcSearchRow {
   return {
     source: 'contract',
     typeId: row.typeId,
@@ -107,6 +146,8 @@ export function contractRowToSearchRow(row: BpcContractRow): BpcSearchRow {
     runs: row.runs,
     quantity: row.quantity,
     contract: row,
+    locationName: location?.name ?? null,
+    space: location?.space ?? null,
   };
 }
 
@@ -127,15 +168,22 @@ export function ownedBlueprintToSearchRow(bp: OwnedBlueprintInput): BpcSearchRow
     // nothing beyond "one") — normalized here, not left for every reader.
     quantity: bp.quantity > 0 ? bp.quantity : 1,
     itemId: bp.itemId,
+    locationName: bp.locationName ?? null,
+    regionId: bp.regionId ?? null,
+    space: bp.space ?? null,
   };
 }
 
 /**
  * Filters unified rows — a sibling of `filterBpcContracts`, kept separate so
- * the original contract-only filter path stays untouched. Region excludes an
- * owned row outright (nothing to match); price never does (not for sale, so
- * nothing can disqualify it) — the same stance `filterBpcContracts` already
- * takes for a no-buyout auction's unknown eventual price.
+ * the original contract-only filter path stays untouched. Price never
+ * excludes an owned row (not for sale, so nothing can disqualify it) — the
+ * same stance `filterBpcContracts` already takes for a no-buyout auction's
+ * unknown eventual price. Region and Space *do* now exclude an owned row once
+ * a restriction is active and the row's location has not resolved to a
+ * matching value — resolving that location is issue #796's whole point, but
+ * an unresolved one (offline, no ACL) still cannot honestly match a specific
+ * region or space the player picked.
  */
 export function filterBpcSearchRows(
   rows: readonly BpcSearchRow[],
@@ -146,19 +194,31 @@ export function filterBpcSearchRows(
     if (filter.minMe != null && row.me < filter.minMe) return false;
     if (filter.minTe != null && row.te < filter.minTe) return false;
     if (filter.minRuns != null && row.runs !== -1 && row.runs < filter.minRuns) return false;
-    if (row.source === 'contract') {
-      if (filter.regionId != null && row.contract.regionId !== filter.regionId) return false;
-      if (filter.maxPrice != null) {
-        const price = priceForMaxFilter(row.contract);
-        if (price != null && price > filter.maxPrice) return false;
-      }
-    } else if (filter.regionId != null) {
+    if (filter.regionId != null) {
+      const regionId = row.source === 'contract' ? row.contract.regionId : row.regionId;
+      if (regionId !== filter.regionId) return false;
+    }
+    if (filter.spaceKinds && (row.space == null || !filter.spaceKinds.has(row.space))) {
       return false;
+    }
+    if (row.source === 'contract' && filter.maxPrice != null) {
+      const price = priceForMaxFilter(row.contract);
+      if (price != null && price > filter.maxPrice) return false;
     }
     return true;
   });
 }
 
+/**
+ * Silently ignores `filter.spaceKinds`: a raw `BpcContractRow` carries no
+ * `space` of its own (that classification is resolved separately, keyed by
+ * `locationId`, since ADR 0013 already deferred exact location resolution for
+ * these rows) and this function stays untouched for that reason. Applying a
+ * Space filter to contract rows is `BpcSourcingPanel`'s job, narrowing
+ * *before* calling this — a caller that expects `spaceKinds` honored here
+ * instead should use `filterBpcSearchRows`, which works over the unified row
+ * shape that does carry `space`.
+ */
 export function filterBpcContracts(
   rows: readonly BpcContractRow[],
   filter: BpcSearchFilter

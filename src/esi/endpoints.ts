@@ -122,6 +122,10 @@ export interface CharacterBlueprint {
   material_efficiency: number;
   time_efficiency: number;
   quantity: number;
+  /** A station, structure, or (rarely) another item id — same shape a contract's `start_location_id` has, no `location_type` alongside it (issue #796). */
+  location_id: number;
+  /** e.g. `Hangar`, `AssetSafety` — where in that location the blueprint sits. Not currently read by anything; captured because ESI sends it alongside `location_id`. */
+  location_flag: string;
 }
 
 /** Paginated (X-Pages); see fetchAllPagesStatus. */
