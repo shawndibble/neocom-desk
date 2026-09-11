@@ -263,37 +263,6 @@ export function OverviewTab() {
             </div>
           )}
 
-          {/*
-            One row per ore/ice type whose current price has moved
-            meaningfully from the mined-date price the table below actually
-            used — so a pilot reading the totals as "what I'd get selling
-            today" isn't misled (issue #671's acceptance criteria).
-          */}
-          {data && data.priceNotes.length > 0 && (
-            <div
-              role="alert"
-              className="space-y-1 rounded-xs border border-warning/60 bg-warning/10 p-2 text-xs"
-            >
-              <p className="font-semibold text-warning uppercase">
-                {t('miningTax.overview.priceNoteTitle')}
-              </p>
-              <ul className="space-y-0.5 text-text-dim">
-                {data.priceNotes.map((note) => (
-                  <li key={note.typeId}>
-                    {t('miningTax.overview.priceNoteLine', {
-                      type: data.typeNames.get(note.typeId) ?? `#${note.typeId}`,
-                      percent: Math.abs(note.divergence.percentChange).toFixed(0),
-                      direction:
-                        note.divergence.percentChange >= 0
-                          ? t('miningTax.overview.priceNoteHigher')
-                          : t('miningTax.overview.priceNoteLower'),
-                    })}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
           {visibleRows.length === 0 ? (
             <EmptyState
               title={t('miningTax.overview.emptyTitle')}
