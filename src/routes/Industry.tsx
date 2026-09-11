@@ -21,7 +21,6 @@ import { beginEveLogin } from '@/app/loginFlow';
 import { useIsDesktop } from '@/lib/useIsDesktop';
 import type { MaterialSourcing, OwnedStockScope, SkillLevels } from '@/engine/industry/types';
 import type { SweepStrategy } from '@/engine/industry/autoMakeOrBuy';
-import type { DepthChoice } from '@/features/industry/CraftSweepControl';
 import type { CharacterBlueprint } from '@/esi/endpoints';
 import { loadPi } from '@/sde/loadSde';
 import type { PiData } from '@/sde/types';
@@ -562,13 +561,12 @@ export function Industry() {
   async function handleCraftSweepGroup(
     groupId: string,
     groupPlans: readonly BuildPlanRecord[],
-    options: { strategy: SweepStrategy; depth: number; depthChoice: DepthChoice }
+    options: { strategy: SweepStrategy; depth: number }
   ) {
     if (activeCharacterId === null || !catalog) return;
     await setBuildGroups(
       withGroupCraftSweepDefault(buildGroups, activeCharacterId, groupId, {
         strategy: options.strategy,
-        depthChoice: options.depthChoice,
       })
     );
     const picks = await applyGroupCraftSweep(

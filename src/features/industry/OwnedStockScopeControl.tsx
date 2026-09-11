@@ -35,6 +35,14 @@ interface OwnedStockScopeControlProps {
    * component still knows nothing about sourcing patches.
    */
   action?: ReactNode;
+  /**
+   * The Corp Assets toggle (issue #798), rendered on the same line as the
+   * label and Select rather than a row of its own — it governs what feeds
+   * this very scope, so a line between the two read as unrelated. Omitted
+   * entirely by the Build Group's own owned-stock overlay, which has no
+   * per-plan Corp Assets choice.
+   */
+  corpAssetsToggle?: ReactNode;
 }
 
 /**
@@ -54,6 +62,7 @@ export function OwnedStockScopeControl({
   detection,
   onChange,
   action,
+  corpAssetsToggle,
 }: OwnedStockScopeControlProps) {
   const { t } = useTranslation();
   const locations = useMemo(() => collectStockLocations(detectedStock), [detectedStock]);
@@ -121,10 +130,12 @@ export function OwnedStockScopeControl({
     <>
       <div className="flex flex-col gap-1 text-xs sm:flex-row sm:items-center sm:gap-2">
         <span className="whitespace-nowrap">{t('industry.ownedStockScopeLabel')}</span>
-        {/* Select and action share a row at every width: the bulk fill spends
-            exactly the stock this select scopes, and stacking them apart on a
-            narrow screen is what made the two read as unrelated. */}
-        <div className="flex items-center gap-2">
+        {/* Select, Corp Assets toggle and action share a row at every width:
+            the bulk fill spends exactly the stock this select scopes, and
+            stacking them apart on a narrow screen is what made the two read
+            as unrelated. `flex-wrap` lets a phone-width row fold rather than
+            squeeze three controls plus a label onto one line. */}
+        <div className="flex flex-wrap items-center gap-2">
           <Select
             value={mode}
             onValueChange={(value) => {
@@ -139,7 +150,7 @@ export function OwnedStockScopeControl({
               );
             }}
           >
-            <SelectTrigger aria-label={t('industry.ownedStockScopeLabel')}>
+            <SelectTrigger size="sm" aria-label={t('industry.ownedStockScopeLabel')}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -147,6 +158,7 @@ export function OwnedStockScopeControl({
               <SelectItem value="selected">{t('industry.ownedStockScopeSelected')}</SelectItem>
             </SelectContent>
           </Select>
+          {corpAssetsToggle}
           {action}
         </div>
       </div>

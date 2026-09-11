@@ -28,6 +28,13 @@ interface FilterChipProps {
   className?: string;
   /** `sm` (default) matches every existing toolbar; `md` lines up with a `SearchInput`/`NativeSelect` left at their own default size. */
   size?: ControlSize;
+  /**
+   * Inert and muted, same as a disabled `Button` — for a toggle whose
+   * capability isn't available right now (e.g. Corp Assets without the
+   * Director role) rather than one that is merely off. Pair with a tooltip on
+   * the caller's side explaining why; this component only renders the state.
+   */
+  disabled?: boolean;
 }
 
 /**
@@ -44,15 +51,17 @@ export function FilterChip({
   countLabel,
   className = '',
   size = 'sm',
+  disabled = false,
 }: FilterChipProps) {
   const hasGloss = countLabel !== undefined;
   return (
     <button
       type="button"
       aria-pressed={selected}
+      disabled={disabled}
       onClick={onToggle}
       className={cx(
-        'inline-flex items-center gap-1.5 rounded-xs border px-2.5 text-[0.6875rem] font-semibold tracking-widest whitespace-nowrap uppercase transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent',
+        'inline-flex items-center gap-1.5 rounded-xs border px-2.5 text-[0.6875rem] font-semibold tracking-widest whitespace-nowrap uppercase transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:pointer-events-none disabled:opacity-40',
         controlHeightClassName[size],
         selected
           ? 'border-accent-dim bg-accent/15 text-accent'

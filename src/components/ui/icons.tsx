@@ -164,6 +164,8 @@ export const BuildGroup = withWeight(FolderSimple);
 export const Compare = withWeight(Scales);
 /** Route preference (shortest vs safest). */
 export const Route = withWeight(ArrowsLeftRight);
+/** Bulk-writes a chosen hub/facility/security/build-system onto every plan in a Build Group (issue #632) — the same crosshair `OptimizeAtMarkers`/`PriceAlert` use, for retargeting a group. */
+export const RetargetGroup = withWeight(Target);
 /** Something is incomplete or unresolved — pairs with `warning` text, never used alone. */
 export const Warn = withWeight(Warning);
 /** Opens a longer explanation of the numbers on screen, e.g. a Build Plan's calculation breakdown. */

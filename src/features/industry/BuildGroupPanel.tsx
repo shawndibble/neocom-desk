@@ -15,7 +15,8 @@
  */
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, EmptyState, Panel, Spinner } from '@/components/ui';
+import { Button, EmptyState, IconButton, Panel, Spinner } from '@/components/ui';
+import * as Icon from '@/components/ui/icons';
 import type { BuildPlanRecord } from '@/db';
 import type { SweepStrategy } from '@/engine/industry/autoMakeOrBuy';
 import { rollUpBuildGroup, type BuildGroupMember } from '@/engine/industry/groupRollup';
@@ -35,7 +36,7 @@ import type { PiData } from '@/sde/types';
 import { useAssumedMe } from './assumedMe';
 import { nameForType, toIndustryBlueprint, type BlueprintCatalog } from './blueprintCatalog';
 import type { BuildGroup } from './buildGroups';
-import { CraftSweepControl, type DepthChoice } from './CraftSweepControl';
+import { CraftSweepControl } from './CraftSweepControl';
 import { groupCraftScope, groupCraftSweepMaxDepth } from './craftSweepGroup';
 import { SourcingInput } from './MaterialsTable';
 import { OwnedStockScopeControl } from './OwnedStockScopeControl';
@@ -75,16 +76,13 @@ interface BuildGroupPanelProps {
   /** "Retarget group" (issue #632): bulk-writes `target` onto every plan in `planIds`. */
   onRetarget: (target: RetargetTarget, planIds: string[]) => void;
   /**
-   * Craft Sweep on the group (issue #696): applies one Sweep Strategy +
-   * Sweep Depth to every member independently. Returns a Promise so this
+   * Craft Sweep on the group (issue #696): applies one Sweep Strategy to
+   * every member independently, always across each member's own whole tree
+   * (issue #798 dropped the Sweep Depth choice). Returns a Promise so this
    * panel can disable the control for the duration, the same way a
    * synchronous single-plan Apply never needs to.
    */
-  onCraftSweep: (options: {
-    strategy: SweepStrategy;
-    depth: number;
-    depthChoice: DepthChoice;
-  }) => Promise<void>;
+  onCraftSweep: (options: { strategy: SweepStrategy; depth: number }) => Promise<void>;
   /**
    * Group Owned Overlay (issue #697): writes the group's own owned-stock
    * ledger, replacing it wholesale — the same "replace, don't merge"
@@ -371,18 +369,37 @@ export function BuildGroupPanel({
         meta={t('industry.groupMemberCount', { count: plans.length })}
         actions={
           <>
-            <Button size="sm" onClick={() => setRetargeting(true)}>
-              {t('industry.retargetGroupAction')}
-            </Button>
-            <Button
+            <IconButton
               size="sm"
+              icon={<Icon.RetargetGroup />}
+              label={t('industry.retargetGroupAction')}
+              onClick={() => setRetargeting(true)}
+            />
+            <IconButton
+              size="sm"
+              icon={
+                copyStatusFor(GROUP_COPY) === 'copied' ? (
+                  <Icon.Done />
+                ) : copyStatusFor(GROUP_COPY) === 'failed' ? (
+                  <Icon.Warn />
+                ) : (
+                  <Icon.CopyToClipboard />
+                )
+              }
+              // Both outcomes change the glyph as well as the tone, so neither
+              // is carried by colour alone (docs/DESIGN.md §7) — mirrors the
+              // single-plan copy control (`BuildPlanDetail.tsx`).
+              tone={copyStatusFor(GROUP_COPY) === 'failed' ? 'danger' : 'default'}
+              label={
+                copyStatusFor(GROUP_COPY) === 'copied'
+                  ? t('industry.copyShoppingListDone')
+                  : copyStatusFor(GROUP_COPY) === 'failed'
+                    ? t('industry.copyShoppingListFailed')
+                    : t('industry.copyShoppingList')
+              }
               onClick={() => void handleCopy(GROUP_COPY, rollup.shoppingMaterials)}
               disabled={!canCopy}
-            >
-              {copyStatusFor(GROUP_COPY) === 'copied'
-                ? t('industry.copyShoppingListDone')
-                : t('industry.copyShoppingList')}
-            </Button>
+            />
           </>
         }
       >
@@ -398,13 +415,14 @@ export function BuildGroupPanel({
             scope={craftSweepScope}
             disabled={sweeping}
             initialStrategy={group.craftSweepDefault?.strategy}
-            initialDepthChoice={group.craftSweepDefault?.depthChoice}
             confirmMessage={t('industry.craftSweepConfirmGroup', {
               count: craftSweepAffectedCount,
             })}
             onApply={(options) => {
               setSweeping(true);
-              void onCraftSweep(options).finally(() => setSweeping(false));
+              void onCraftSweep({ ...options, depth: craftSweepMaxDepth }).finally(() =>
+                setSweeping(false)
+              );
             }}
           />
         </div>

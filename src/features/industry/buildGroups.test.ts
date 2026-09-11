@@ -32,7 +32,6 @@ const craftSweepDefault = (
   overrides: Partial<BuildGroupCraftSweepDefault> = {}
 ): BuildGroupCraftSweepDefault => ({
   strategy: 'cost-effective',
-  depthChoice: 'all',
   ...overrides,
 });
 
@@ -208,10 +207,10 @@ describe('withGroupCraftSweepDefault', () => {
       value,
       1,
       'g1',
-      craftSweepDefault({ strategy: 'build', depthChoice: 3 })
+      craftSweepDefault({ strategy: 'build' })
     );
     expect(buildGroupsFor(next, 1)[0].craftSweepDefault).toEqual(
-      craftSweepDefault({ strategy: 'build', depthChoice: 3 })
+      craftSweepDefault({ strategy: 'build' })
     );
   });
 
@@ -222,16 +221,12 @@ describe('withGroupCraftSweepDefault', () => {
 });
 
 describe('parseBuildGroups — craftSweepDefault', () => {
-  it('keeps a group whose Craft Sweep default is well-formed, numeric depth included', () => {
+  it('keeps a group whose Craft Sweep default is well-formed', () => {
     const raw = {
-      1: [
-        { id: 'g1', name: 'G', order: 0, craftSweepDefault: craftSweepDefault({ depthChoice: 5 }) },
-      ],
+      1: [{ id: 'g1', name: 'G', order: 0, craftSweepDefault: craftSweepDefault() }],
     };
     expect(parseBuildGroups(raw)).toEqual({
-      1: [
-        { id: 'g1', name: 'G', order: 0, craftSweepDefault: craftSweepDefault({ depthChoice: 5 }) },
-      ],
+      1: [{ id: 'g1', name: 'G', order: 0, craftSweepDefault: craftSweepDefault() }],
     });
   });
 
@@ -242,18 +237,27 @@ describe('parseBuildGroups — craftSweepDefault', () => {
     expect(parseBuildGroups(raw)).toEqual({});
   });
 
-  it('drops a Craft Sweep default whose depthChoice is neither "all" nor a positive number', () => {
+  it('keeps a group whose stored Craft Sweep default still carries a pre-#798 depthChoice field — extra data, silently ignored', () => {
     const raw = {
       1: [
         {
           id: 'g1',
           name: 'G',
           order: 0,
-          craftSweepDefault: craftSweepDefault({ depthChoice: 0 }),
+          craftSweepDefault: { ...craftSweepDefault(), depthChoice: 'all' },
         },
       ],
     };
-    expect(parseBuildGroups(raw)).toEqual({});
+    expect(parseBuildGroups(raw)).toEqual({
+      1: [
+        {
+          id: 'g1',
+          name: 'G',
+          order: 0,
+          craftSweepDefault: { ...craftSweepDefault(), depthChoice: 'all' },
+        },
+      ],
+    });
   });
 
   it('keeps a group with no Craft Sweep default at all — the pre-#696 shape', () => {
