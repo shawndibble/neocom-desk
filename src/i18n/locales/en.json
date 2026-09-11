@@ -3085,7 +3085,7 @@
           "notificationFeed": "Your Alerts.",
           "notificationFeedNote": "Ones you have already been shown, so another device can catch up on what it missed. Kept for 30 days.",
           "settings": "The settings you chose on this page.",
-          "settingsNote": "Your notification preferences, the PI customs rates you overrode, your industry build groups, the defaults every page starts from — trade hub, industry facility, reaction facility, assumed ME and assumed TE, the PI expiring-soon window, the corp dark threshold, and the default characters shown — the appraisal price percentage you set on the Market page, and whether SP Extraction monitoring is on along with the SP threshold you set for it. Nothing else on this page leaves your device."
+          "settingsNote": "Your notification preferences, the PI customs rates you overrode, your industry build groups, the defaults every page starts from — trade hub, industry facility, reaction facility, assumed ME and assumed TE, the PI expiring-soon window, the corp dark threshold, and the default characters shown — the appraisal price percentage you set on the Market page, whether SP Extraction monitoring is on along with the SP threshold you set for it, and whether blueprint cost counts toward Industry profit. Nothing else on this page leaves your device."
         },
         "local": {
           "title": "Kept on this device only",
@@ -3256,6 +3256,8 @@
     "assumedMeHint": "New plans and sub-builds are quoted at this ME. A blueprint you do own always uses its real ME instead.",
     "assumedTeLabel": "Assumed TE for blueprints you don’t own",
     "assumedTeHint": "New plans start at this TE — an invented copy comes out at TE 4. A blueprint you do own always uses its real TE instead. Sub-builds are still timed at TE 0.",
+    "includeBlueprintCostLabel": "Count blueprint cost toward Industry profit",
+    "includeBlueprintCostHint": "When a plan needs a blueprint copy, what covering it costs is added to totalCost and subtracted from profit — on the plan's own page, the Industry index's Profit column, and every Build Group's rollup. Turn this off to price plans as if every blueprint were already owned.",
     "piExpiringLabel": "Warn me an extractor is expiring",
     "piExpiringHint": "How far ahead the Colonies list flags an extractor — and sorts it to the top.",
     "defaultCharacterFilterLabel": "Default characters shown",
