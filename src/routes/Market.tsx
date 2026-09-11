@@ -1346,7 +1346,7 @@ export function Market() {
                 <Spinner label={t('common.loading')} />
               </div>
             ) : filterResult && filterResult.visibleGroupIds.size === 0 ? (
-              <p className="pt-3 text-xs text-text-dim">{t('market.noResults')}</p>
+              <EmptyState title={t('market.noResults')} className="py-8" />
             ) : (
               <div className="mt-3 border-t border-line pt-2">
                 <MarketGroupTree
