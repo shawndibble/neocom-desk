@@ -600,17 +600,27 @@ export function BuildGroupPanel({
               // the per-plan table's bug (`MaterialsTable.tsx`'s own
               // `subBuilds.length > 0` check) — only display, not the ledger
               // math, is corrected: `rollup.tableMaterials` itself is untouched.
+              //
+              // A typeID can be built by one member and bought outright by
+              // another (a raw material to one plan, an intermediate to
+              // another) — `builtQuantity` is only ever a portion of the
+              // merged `quantity` then, never the whole of it, so `buyToShow`
+              // is what's left to source once the built portion is set aside,
+              // and the row still reads as a genuine (smaller) buy need
+              // instead of being wrongly cleared to "Built" or left
+              // overstated by the units another member is manufacturing.
               const builtQuantity = builtQuantityByType.get(material.typeID) ?? 0;
-              const built = builtQuantity > 0 && builtQuantity >= material.quantity;
+              const fullyBuilt = builtQuantity > 0 && builtQuantity >= material.quantity;
+              const buyToShow = Math.max(0, material.remainingQuantity - builtQuantity);
               return (
                 <li key={material.typeID} className="flex justify-between gap-2 px-2.5 py-1.5">
                   <span className="truncate">{nameForType(catalog, material.typeID)}</span>
                   <span className="shrink-0 tabular-nums text-text-dim">
-                    {built
+                    {fullyBuilt
                       ? t('industry.priceSourceBuilt')
                       : t('industry.groupMaterialNeed', {
                           quantity: material.quantity.toLocaleString(),
-                          remaining: material.remainingQuantity.toLocaleString(),
+                          remaining: buyToShow.toLocaleString(),
                         })}
                     {material.unpriced ? ` · ${t('industry.unpriced')}` : ''}
                   </span>
