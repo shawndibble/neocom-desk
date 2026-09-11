@@ -11,6 +11,7 @@ const PINNED_SYNCED_SETTING_KEYS: string[] = [
   'sync.industryAssumedMe',
   'sync.industryAssumedTe',
   'sync.industryBuildGroups',
+  'sync.industryExcludeBlueprintCost',
   'sync.industryFacilityDefaults',
   'sync.industryReactionFacilityDefaults',
   'sync.marketHub',

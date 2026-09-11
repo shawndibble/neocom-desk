@@ -61,19 +61,22 @@ export function buildVsBuy(inputs: IndustryInputs): BuildResult {
       reactionCtx,
       ownedPool,
       acquisitionFor: inputs.acquisitionFor,
+      excludeBlueprintCost: inputs.excludeBlueprintCost,
     })
   );
 
   // Blueprint Acquisition (issue #838) for the plan's own top-level product —
   // the same synthetic-row shape a nested sub-build gets from
   // `resolveSubBuild`, but built here since the top level has no parent node
-  // to resolve it from.
-  const acquisitionMaterial = inputs.blueprintAcquisition
-    ? acquisitionMaterialFor(
-        { me, te, ...inputs.blueprintAcquisition },
-        inputs.materialSourcing?.[inputs.blueprintAcquisition.blueprintTypeID]?.overridePrice
-      )
-    : null;
+  // to resolve it from. Suppressed by `excludeBlueprintCost` the same way a
+  // nested row is, in `resolveSubBuild` — tier resolution above is untouched.
+  const acquisitionMaterial =
+    inputs.blueprintAcquisition && !inputs.excludeBlueprintCost
+      ? acquisitionMaterialFor(
+          { me, te, ...inputs.blueprintAcquisition },
+          inputs.materialSourcing?.[inputs.blueprintAcquisition.blueprintTypeID]?.overridePrice
+        )
+      : null;
   const materials = acquisitionMaterial
     ? [acquisitionMaterial, ...resolvedMaterials]
     : resolvedMaterials;

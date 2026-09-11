@@ -488,4 +488,20 @@ describe('buildVsBuy — Blueprint Acquisition for the top-level product (issue 
     });
     expect(r.materials[0]).toMatchObject({ typeID: 1001, unitPrice: 1, lineCost: 1 });
   });
+
+  it("excludeBlueprintCost drops the row from materials/materialCost while leaving the resolved tier's me/te untouched", () => {
+    const withRow = buildVsBuy({
+      ...baseInputs,
+      blueprintAcquisition: { blueprintTypeID: 1001, line: { unitPrice: 750, owned: false } },
+    });
+    const withoutRow = buildVsBuy({
+      ...baseInputs,
+      blueprintAcquisition: { blueprintTypeID: 1001, line: { unitPrice: 750, owned: false } },
+      excludeBlueprintCost: true,
+    });
+    expect(withoutRow.materials.some((m) => m.typeID === 1001)).toBe(false);
+    expect(withoutRow.materials).toHaveLength(2);
+    expect(withoutRow.materialCost).toBe(withRow.materialCost - 750);
+    expect(withoutRow.totalCost).toBe(withRow.totalCost - 750);
+  });
 });

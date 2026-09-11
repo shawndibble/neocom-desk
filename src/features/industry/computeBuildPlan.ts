@@ -66,6 +66,8 @@ export interface ComputeBuildPlanInput {
   ignoreOwnedStock?: boolean;
   /** The Reaction Location (issue #698), when Include Reactions is on for this plan. */
   reactionFacility?: ReactionFacilityContext;
+  /** @see IndustryInputs.excludeBlueprintCost */
+  excludeBlueprintCost?: boolean;
 }
 
 export interface ComputeBuildPlanResult {
@@ -91,6 +93,7 @@ export function computeBuildPlan({
   blueprintAcquisition,
   ignoreOwnedStock,
   reactionFacility,
+  excludeBlueprintCost,
 }: ComputeBuildPlanInput): ComputeBuildPlanResult {
   const facility = FACILITY_PRESETS[plan.facility];
   const runs = clampInt(plan.runs, 1, MAX_JOB_RUNS);
@@ -127,6 +130,7 @@ export function computeBuildPlan({
       acquisitionFor,
       blueprintAcquisition,
       reactionFacility,
+      excludeBlueprintCost,
     });
     return { result, error: null };
   } catch (err) {

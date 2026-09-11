@@ -126,6 +126,16 @@ export interface ResolveMaterialOptions {
     ctx: SubBuildContext,
     materialPrices: HubPrices
   ) => AcquisitionResolution | null;
+  /**
+   * Excludes Blueprint Acquisition's own row from every node's inputs, without
+   * touching tier resolution: `resolveMaterial` still calls `acquisitionFor`
+   * and still scales quantities off the resolved tier's `me`, so a plan quotes
+   * the same build as it would with the row shown — only the row and its
+   * `lineCost` disappear from `materialCost`/`totalCost`. Mirrors
+   * `acquisitionFor`'s own "absent = no row" contract but keeps the tier,
+   * which dropping `acquisitionFor` entirely would not.
+   */
+  excludeBlueprintCost?: boolean;
 }
 
 /** A defined, non-negative, finite number, or `undefined` — the one input guard every optional-override read in this module shares. */
@@ -306,12 +316,13 @@ function resolveSubBuild(
   const sub = planSubBuild({ typeID, remainingQuantity: needed }, blueprint, me, ctx);
   if (!sub) return null;
 
-  const acquisitionMaterial = acquisition
-    ? acquisitionMaterialFor(
-        acquisition,
-        opts.sourcing?.[acquisition.blueprintTypeID]?.overridePrice
-      )
-    : null;
+  const acquisitionMaterial =
+    acquisition && !opts.excludeBlueprintCost
+      ? acquisitionMaterialFor(
+          acquisition,
+          opts.sourcing?.[acquisition.blueprintTypeID]?.overridePrice
+        )
+      : null;
 
   const inputs = acquisitionMaterial
     ? [acquisitionMaterial, ...sub.inputs.map((input) => resolveMaterial(input, opts))]

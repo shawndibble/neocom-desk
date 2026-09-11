@@ -99,6 +99,7 @@ import { useDetectedOwnedStock } from './useDetectedOwnedStock';
 import type { CorpOwnedStockState } from './corpOwnedStock';
 import type { CorpOwnedBlueprintsState } from './corpOwnedBlueprints';
 import { useAssumedMe } from './assumedMe';
+import { useExcludeBlueprintCost } from './excludeBlueprintCost';
 import { OwnedStockScopeControl } from './OwnedStockScopeControl';
 import { BuildPlanAutoBuildControl } from './BuildPlanAutoBuildControl';
 import { ResultsSummary } from './ResultsSummary';
@@ -310,6 +311,16 @@ export function BuildPlanDetail({
   useEffect(() => {
     void hydrateAssumedMe();
   }, [hydrateAssumedMe]);
+
+  // Whether Blueprint Acquisition's own row counts toward this plan's
+  // materials/totals at all (settings.excludeBlueprintCostLabel) — forwarded
+  // into computeBuildPlan unchanged; the resolved ME/TE tier above is
+  // unaffected either way.
+  const excludeBlueprintCost = useExcludeBlueprintCost((state) => state.value);
+  const hydrateExcludeBlueprintCost = useExcludeBlueprintCost((state) => state.hydrate);
+  useEffect(() => {
+    void hydrateExcludeBlueprintCost();
+  }, [hydrateExcludeBlueprintCost]);
 
   // Pre-fills a fresh plan's Reaction Location the first time Include
   // Reactions is turned on for it (issue #698) — read here, alongside
@@ -615,6 +626,7 @@ export function BuildPlanDetail({
         ? { blueprintTypeID: topLevelAcquisition.blueprintTypeID, line: topLevelAcquisition.line }
         : undefined,
       reactionFacility: reactionFacilityContext,
+      excludeBlueprintCost,
     });
   }, [
     plan,
@@ -628,6 +640,7 @@ export function BuildPlanDetail({
     acquisitionFor,
     topLevelAcquisition,
     reactionFacilityContext,
+    excludeBlueprintCost,
     t,
   ]);
 

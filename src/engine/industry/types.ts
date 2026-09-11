@@ -493,6 +493,15 @@ export interface IndustryInputs {
     /** `null` only when the resolved tier is an owned BPO — nothing to acquire. */
     line: AcquisitionLine | null;
   };
+  /**
+   * Excludes every Blueprint Acquisition row — this plan's own top-level row
+   * and every nested one — from `materials`/`materialCost`/`totalCost`,
+   * without disturbing tier resolution: `acquisitionFor` and
+   * `blueprintAcquisition` are still consulted for ME/TE, only their rows are
+   * suppressed. Forwarded into `ResolveMaterialOptions.excludeBlueprintCost`
+   * unchanged for every recursive call. See features/industry/excludeBlueprintCost.ts.
+   */
+  excludeBlueprintCost?: boolean;
 }
 
 export interface JobFeeBreakdown {

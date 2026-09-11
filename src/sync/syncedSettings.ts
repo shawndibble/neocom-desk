@@ -96,6 +96,15 @@
 // both are new, with no device-local life to seed from. See
 // features/character/spExtractionSettings.ts.
 //
+// sync.industryExcludeBlueprintCost: whether Blueprint Acquisition's own row
+// (issue #838) counts toward a Build Plan's materials/rollups at all —
+// "I don't want blueprint cost in my numbers" is a fact about how the pilot
+// accounts for a build, not about whichever screen happens to be open. Same
+// "set to another value, never unset" shape as the Defaults-panel preferences
+// above, so the tombstone-expiry edge does not bite it. No `legacyKey`: the
+// preference is new, with no device-local life to seed from. See
+// features/industry/excludeBlueprintCost.ts.
+//
 // sync.industryBuildGroups (issue #626): a blob like the two above, and for
 // the same reason — the key space is unbounded (one entry per Build Group, per
 // Character), so one key per group is not expressible against an exact-match
@@ -114,6 +123,7 @@ export const SYNCED_SETTING_KEYS: readonly string[] = [
   'sync.industryAssumedMe',
   'sync.industryAssumedTe',
   'sync.industryBuildGroups',
+  'sync.industryExcludeBlueprintCost',
   'sync.industryFacilityDefaults',
   'sync.industryReactionFacilityDefaults',
   'sync.marketHub',

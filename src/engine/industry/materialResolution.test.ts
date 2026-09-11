@@ -667,4 +667,30 @@ describe('resolveMaterial — Blueprint Acquisition (issue #838)', () => {
     const row = resolved.subBuild?.inputs[0];
     expect(row).toMatchObject({ typeID: MID_BLUEPRINT_TYPE, unitPrice: 42, lineCost: 42 });
   });
+
+  it('excludeBlueprintCost drops the row but keeps the resolved tier’s me for quantity scaling', () => {
+    const resolved = resolveMaterial(
+      material(MID_TYPE, 10),
+      baseOptions({
+        buildHere: new Set([MID_TYPE]),
+        recipeFor: recipeFor({
+          [MID_TYPE]: { method: 'manufacturing', blueprint: midBlueprint, me: 0 },
+        }),
+        materialPrices: { [LEAF_TYPE]: 100 },
+        acquisitionFor: () => ({
+          me: 8,
+          te: 16,
+          blueprintTypeID: MID_BLUEPRINT_TYPE,
+          line: { unitPrice: 500, owned: false },
+        }),
+        excludeBlueprintCost: true,
+      })
+    );
+    const inputs = resolved.subBuild?.inputs ?? [];
+    expect(inputs).toHaveLength(1);
+    expect(inputs[0].typeID).toBe(LEAF_TYPE);
+    // Still scaled at the resolved tier's ME8, not the recipe's own ME0 — the
+    // row is gone, but the tier that was already chosen still applies.
+    expect(inputs[0].quantity).toBeLessThan(50);
+  });
 });
