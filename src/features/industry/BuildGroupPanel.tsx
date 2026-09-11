@@ -342,9 +342,18 @@ export function BuildGroupPanel({
         ),
     [buyRows, ownedStockMap, scopedStock]
   );
+  // Unlike `bulkDetectedEntries`, this scans every merged material, not just
+  // `buyRows`: a material can carry an owned-stock ledger entry from before
+  // it became fully crafted (see `craftedTypeIds` above), and that entry is
+  // still live in `ownedStockMap` — still read by `rollUpBuildGroup` above —
+  // even though the Crafted section renders no input for it. "Use none" has
+  // to be able to reach it, or a stray entry becomes permanently stuck.
   const bulkClearTypeIds = useMemo(
-    () => buyRows.filter((m) => (ownedStockMap.get(m.typeID) ?? 0) > 0).map((m) => m.typeID),
-    [buyRows, ownedStockMap]
+    () =>
+      rollup.tableMaterials
+        .filter((m) => (ownedStockMap.get(m.typeID) ?? 0) > 0)
+        .map((m) => m.typeID),
+    [rollup.tableMaterials, ownedStockMap]
   );
 
   const buyMaterialColumns = useMemo<DataTableColumn<BuyMaterialRow>[]>(
@@ -724,9 +733,15 @@ export function BuildGroupPanel({
             />
           </div>
 
-          {buyRows.length === 0 ? (
+          {/* An empty buy table two different ways: genuinely nothing left
+              (every material owned, or there are none) reads "Nothing left
+              to buy," but a table empty because everything is crafted has
+              its own section right below explaining that — showing both
+              would call a crafted material "owned," which is exactly the
+              hangar-vs-job confusion the Crafted section exists to avoid. */}
+          {buyRows.length === 0 && craftedTypeIds.length === 0 ? (
             <EmptyState title={t('industry.groupNothingToBuy')} className="py-6" />
-          ) : (
+          ) : buyRows.length > 0 ? (
             <div className="overflow-x-auto">
               <DataTable
                 columns={buyMaterialColumns}
@@ -736,7 +751,7 @@ export function BuildGroupPanel({
                 density="compact"
               />
             </div>
-          )}
+          ) : null}
 
           {craftedTypeIds.length > 0 && (
             <div className="border-t border-line p-2.5">

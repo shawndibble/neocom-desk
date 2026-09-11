@@ -391,10 +391,30 @@ describe('BuildGroupPanel — built materials in the group needs list (issue #80
     const needsPanel = screen.getByText('Everything this group needs').closest('section')!;
     expect(within(needsPanel).getByText('Crafted in this group · 1')).toBeTruthy();
     expect(within(needsPanel).getAllByText('Crafted')).toHaveLength(1);
-    // Nothing else to buy — the buy table falls back to its empty state.
+    // Nothing else to buy, but the Crafted section already explains why —
+    // the "already owned" empty state would call a crafted material
+    // "owned," the exact confusion this section exists to avoid.
     expect(
-      within(needsPanel).getByText('Nothing left to buy — every material is already owned.')
-    ).toBeTruthy();
+      within(needsPanel).queryByText('Nothing left to buy — every material is already owned.')
+    ).toBeNull();
+  });
+
+  it('keeps a stray owned-stock ledger entry clearable after its material becomes fully crafted', async () => {
+    // The ledger entry (typeID 999) predates the built row covering all of
+    // it — a plausible sequence if a member's own build tree grew after the
+    // owned quantity was typed in. It has to stay reachable by "Use none"
+    // even though the Crafted section renders no input for it.
+    const user = userEvent.setup();
+    mockedUseComparedBuildResults.mockReturnValue([row('a', [builtMaterial(999, 1)])]);
+    const onOwnedStockChange = vi.fn();
+    renderPanel([plan('a', 'jita')], {
+      group: { ...GROUP, ownedStock: { 999: 1 } },
+      onOwnedStockChange,
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Use none' }));
+
+    expect(onOwnedStockChange).toHaveBeenCalledWith({});
   });
 
   it('still shows a genuine buy line in the merged table, unaffected by a crafted row elsewhere', () => {
