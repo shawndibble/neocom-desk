@@ -203,6 +203,15 @@ what the Advisor already computes per-planet; don't re-propose.
     hauling volume (ships/structures are exactly the common product types);
     fine for ordinary mineral/component _material_ lines, where the two
     coincide.
+17. **A PI pin's live state is either untrustworthy or deliberately unread.**
+    `contents`/`last_cycle_start` only refresh in-client (kills any haul-out
+    volume or stock-value readout — see the ADR 0005/0011 row below).
+    `routes[]` is trustworthy configuration but reading it to model exact
+    per-pin material split was proposed and rejected on its own terms — see
+    `docs/context/decisions/20260906-100845-unfed-factories-are-a-measurement-the-advisor-prints.md`,
+    which keeps the proportional-split convention on purpose. Between the two,
+    no PI feature can honestly report live stock levels or exact per-pin
+    routing.
 
 ## Filed candidates
 
@@ -256,11 +265,11 @@ what the Advisor already computes per-planet; don't re-propose.
 | LP transaction log / API-visible LP cashout audit                                                               | ESI has no LP transaction log.                                                                                                                                                                    |
 | PI Advisor: arbitrary-system search                                                                             | Kill-test 12.                                                                                                                                                                                     |
 | Multi-hop reaction-chain profitability                                                                          | Kill-test 6 (round 27 BOM-rollup rejection).                                                                                                                                                      |
-| Moon Survey / Metenox Yield Estimator                                                                           | Narrow reach + kill-test 13.                                                                                                                                                                      |
-| Metenox Moon Drill ongoing fuel/yield ledger (any framing, incl. a static no-depletion readout)                 | Narrow reach (moon-owning corp leadership only) + kill-test 13. Filed as #859, closed on rediscovering this entry.                                                                                |
+| Moon Survey / Metenox Yield Estimator; Metenox Moon Drill ongoing fuel/yield ledger (any framing)                | Narrow reach (moon-owning corp leadership only) + kill-test 13 for both. The ledger framing was filed as #859 and closed on rediscovering this entry.                                            |
 | Market Movers / Trending Items dashboard                                                                        | Kill-test 14.                                                                                                                                                                                     |
 | PI Colony Layout Template (save/reuse pin layout)                                                               | Superseded by Advisor's per-planet fitted plan.                                                                                                                                                   |
 | Upwell Fuel Monitor-style structure fuel tracker                                                                | Already covered — `structureFuel` in corp board.                                                                                                                                                  |
 | Hauler-capacity trip-count estimator (player-typed cargo m3, derived trip count)                                | Reopens the settled hauling-cost decision’s exact reasoning — an unverifiable, app-cannot-check number — just relabeled as division instead of ISK/m3.                                            |
 | Build Plan product output volume + haul distance to Trade Hub (hubHaulGaps mirror for a not-yet-listed product) | Kill-test 16 (assembled-volume defect hits ship products hardest, the common case); also overlaps Appraisal multi-hub compare once the product is pasted in — kill-test 3.                        |
-| PI colony output material volume (total m3 awaiting haul-out)                                                   | Resolved this run: needs `contents[].amount`, the exact field ADR 0005 named untrustworthy and ADR 0011 reaffirmed out of scope ("storage-fullness readouts... remain out of scope"). Kill-test 6, not 3.                     |
+| PI colony output material volume (total m3 awaiting haul-out); PI Factory Input Routing / misrouted-factory alert via `routes[]` | Kill-test 17 for both — a pin's live state is either untrustworthy (`contents`) or a deliberately-kept convention over exact routing (`routes[]`).                                              |
+| PI Advisor: buffer-headroom number (hours/percent) for the *winning* stop-tier recommendation                    | Same shape as two settled rejections (`20260906-124813-advisor-cards-say-what-to-do-not-what.md`, `...-the-advisor-drops-its-ceiling-and-colonised-chips.md`): a correct number that changes no pilot action gets cut even when the engine already computes it (kill-test 4 bait). A threshold-triggered warning folded into the existing directive text is the only shape that might survive, and even that wants its own scope write-up first. |
