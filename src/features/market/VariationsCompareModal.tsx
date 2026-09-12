@@ -11,9 +11,9 @@
  * Variations table fetches those independently) still lands in the matrix
  * without a refetch.
  */
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { EmptyState, Modal, Spinner, TypeIcon } from '@/components/ui';
+import { EmptyState, IskAmount, Modal, Spinner, TypeIcon } from '@/components/ui';
 import {
   buildCompareMatrix,
   type CompareAttributeGroup,
@@ -27,7 +27,6 @@ import type {
 import type { OrderBookSummary } from '@/engine/market/orderBook';
 import { getUniverseType } from '@/esi/endpoints';
 import { loadAttributeDictionary } from '@/sde/loadMarketSde';
-import { formatIsk } from '@/lib/isk';
 import { loadAttributeReferenceNames } from './attributeReferenceNames';
 import { formatAttributeValue } from './format';
 
@@ -48,8 +47,9 @@ interface FetchedData {
   names: AttributeReferenceNames;
 }
 
-function formatCell(kind: 'price' | 'attribute', cell: CompareCell): string {
-  if (kind === 'price') return formatIsk(cell.value, 2);
+/** A price is shorthand — the whole table is a side-by-side scan — with the exact figure one gesture away; an attribute keeps its own unit and precision. */
+function formatCell(kind: 'price' | 'attribute', cell: CompareCell): ReactNode {
+  if (kind === 'price') return <IskAmount value={cell.value} revealOn="tap" />;
   return (
     cell.displayValue ??
     `${formatAttributeValue(cell.value, cell.unit)}${cell.unit ? ` ${cell.unit}` : ''}`

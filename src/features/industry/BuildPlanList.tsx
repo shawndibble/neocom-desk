@@ -26,12 +26,12 @@ import {
   ContextMenuTrigger,
   EmptyState,
   IconButton,
+  IskAmount,
   TextInput,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import type { BuildPlanRecord } from '@/db';
 import { iskToneClass } from '@/features/character/format';
-import { formatIsk } from '@/lib/isk';
 import { BlueprintPicker } from './BlueprintPicker';
 import { BuildPlanRowContextMenu } from './BuildPlanRowContextMenu';
 import type { BuildGroup } from './buildGroups';
@@ -92,7 +92,9 @@ function ProfitCell({ profit }: { profit: number | null }) {
   return (
     <span className={`tabular-nums ${iskToneClass(profit)}`}>
       {profit > 0 ? '+' : ''}
-      {formatIsk(profit)}
+      {/* Tap: this cell is inert — the row's tap belongs to the plan-name
+          button and its context menu beside it. */}
+      <IskAmount value={profit} revealOn="tap" decimals={0} />
     </span>
   );
 }

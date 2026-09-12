@@ -197,7 +197,9 @@ describe('BpcSourcingPanel', () => {
     const table = await screen.findByRole('table', { name: 'BPC Search' });
     expect(within(table).getByText('Rifter Blueprint')).toBeInTheDocument();
     expect(within(table).getByText('10')).toBeInTheDocument();
-    expect(within(table).getByText('5,000,000.00')).toBeInTheDocument();
+    // The price cell shows shorthand ("5M"); its accessible name carries the
+    // exact figure.
+    expect(within(table).getByLabelText('5,000,000.00 ISK')).toBeInTheDocument();
   });
 
   it('narrows the table to a typed item-name search', async () => {
@@ -303,8 +305,12 @@ describe('BpcSourcingPanel', () => {
     expect(screen.getByText('3 offers on contract')).toBeInTheDocument();
     // Scoped to the chips: these figures also appear in the region strip and
     // the table, which is the point — all three have to agree.
-    expect(screen.getByText('Cheapest').parentElement).toHaveTextContent('3,000,000.00');
-    expect(screen.getByText('Median').parentElement).toHaveTextContent('5,000,000.00');
+    expect(screen.getByText('Cheapest').parentElement).toContainElement(
+      screen.getAllByLabelText('3,000,000.00 ISK')[0]
+    );
+    expect(screen.getByText('Median').parentElement).toContainElement(
+      screen.getAllByLabelText('5,000,000.00 ISK')[0]
+    );
     // The suggestion list closes once a blueprint is pinned.
     expect(screen.queryByRole('list', { name: 'Matching blueprints' })).not.toBeInTheDocument();
   });
@@ -347,7 +353,9 @@ describe('BpcSourcingPanel', () => {
 
     const table = await screen.findByRole('table', { name: 'BPC Search' });
     // Row 0 is the header; the cheapest row must lead under the default sort.
-    expect(within(table).getAllByRole('row')[1]).toHaveTextContent('1,000,000.00');
+    expect(
+      within(within(table).getAllByRole('row')[1]).getByLabelText('1,000,000.00 ISK')
+    ).toBeInTheDocument();
   });
 
   it('clearing the picked blueprint restores the full, browsable list', async () => {

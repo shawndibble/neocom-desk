@@ -17,7 +17,7 @@
  */
 import { Fragment, useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { EmptyState, Modal, Spinner, TypeIcon } from '@/components/ui';
+import { EmptyState, IskAmount, Modal, Spinner, TypeIcon } from '@/components/ui';
 import { groupItemAttributes, type AttributeGroup } from '@/engine/market/itemAttributes';
 import { parseItemDescription, type DescriptionRun } from '@/engine/market/itemDescription';
 import { summarizeOrderBook, type OrderBookSummary } from '@/engine/market/orderBook';
@@ -26,7 +26,6 @@ import { loadAttributeDictionary } from '@/sde/loadMarketSde';
 import { loadPi } from '@/sde/loadSde';
 import type { PiData } from '@/sde/types';
 import { formatDuration } from '@/lib/duration';
-import { formatIsk } from '@/lib/isk';
 import { getTradeHub } from '@/market/hubs';
 import { loadAttributeReferenceNames } from './attributeReferenceNames';
 import { formatAttributeValue, formatVolume } from './format';
@@ -163,7 +162,7 @@ export function ItemDetailModal({ typeId, itemName, onClose }: ItemDetailModalPr
                     <span className="tabular-nums text-text">
                       {priceState.status === 'loading'
                         ? '…'
-                        : priceCellText(priceState.summary.bestSell)}
+                        : priceCell(priceState.summary.bestSell)}
                     </span>
                   </span>
                   <span>
@@ -171,7 +170,7 @@ export function ItemDetailModal({ typeId, itemName, onClose }: ItemDetailModalPr
                     <span className="tabular-nums text-text">
                       {priceState.status === 'loading'
                         ? '…'
-                        : priceCellText(priceState.summary.bestBuy)}
+                        : priceCell(priceState.summary.bestBuy)}
                     </span>
                   </span>
                 </p>
@@ -216,9 +215,14 @@ export function ItemDetailModal({ typeId, itemName, onClose }: ItemDetailModalPr
   );
 }
 
-/** A side of the order book with no orders renders as '—', matching CompareDrawer/VariationsTable. */
-function priceCellText(price: number | null): string {
-  return price != null ? formatIsk(price, 2) : '—';
+/**
+ * A side of the order book with no orders renders as '—', matching
+ * CompareDrawer/VariationsTable — and so does the shorthand a real price gets,
+ * so the same figure reads the same way wherever the Market area shows it.
+ * The line is inert, so a tap is free to be the reveal.
+ */
+function priceCell(price: number | null): ReactNode {
+  return price != null ? <IskAmount value={price} revealOn="tap" /> : '—';
 }
 
 /**

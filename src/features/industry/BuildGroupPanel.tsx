@@ -15,7 +15,15 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, DataTable, EmptyState, IconButton, Panel, Spinner } from '@/components/ui';
+import {
+  Button,
+  DataTable,
+  EmptyState,
+  IconButton,
+  IskAmount,
+  Panel,
+  Spinner,
+} from '@/components/ui';
 import type { DataTableColumn } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import type { BuildPlanRecord } from '@/db';
@@ -751,7 +759,17 @@ export function BuildGroupPanel({
                     >
                       <span className="truncate">{plan.name}</span>
                       <span className="shrink-0 tabular-nums text-text-dim">
-                        {row?.result ? formatIsk(row.result.totalCost) : '—'}
+                        {row?.result ? (
+                          // Long press, not tap: the whole row is a button
+                          // that opens the plan.
+                          <IskAmount
+                            value={row.result.totalCost}
+                            revealOn="longPress"
+                            decimals={0}
+                          />
+                        ) : (
+                          '—'
+                        )}
                       </span>
                     </button>
                   </li>

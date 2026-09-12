@@ -10,6 +10,7 @@ import {
   FilterChip,
   FilterField,
   IconButton,
+  IskAmount,
   Panel,
   Select,
   SelectContent,
@@ -806,11 +807,25 @@ export function BpcSourcingPanel({ initialTypeId = null }: BpcSourcingPanelProps
         render: (row) => {
           const contract = asContract(row);
           if (!contract) return t('bpcContracts.notApplicable');
-          return contract.isAuction
-            ? contract.buyout !== undefined
-              ? t('bpcContracts.buyout', { price: formatIsk(contract.buyout, 2) })
-              : t('bpcContracts.startingBid', { price: formatIsk(contract.price, 2) })
-            : formatIsk(contract.price, 2);
+          // Only the plain ask becomes shorthand, so this column mixes
+          // precisions: "5M" on an exchange row, "Buyout: 5,000,000.00" on an
+          // auction one. An auction's figure is wrapped in
+          // "Buyout: {{price}}" / "Starting bid: {{price}}" — an i18next
+          // interpolation value, which takes a string, not a node, and
+          // splitting the suffix off would need a new short key
+          // (`contractSearch` has `buyoutShort`/`startingBidShort`;
+          // `bpcContracts` does not). Sorting is unaffected: `sortValue`
+          // reads `effectivePrice`. Long press, not tap: a row tap opens the
+          // contract.
+          return contract.isAuction ? (
+            contract.buyout !== undefined ? (
+              t('bpcContracts.buyout', { price: formatIsk(contract.buyout, 2) })
+            ) : (
+              t('bpcContracts.startingBid', { price: formatIsk(contract.price, 2) })
+            )
+          ) : (
+            <IskAmount value={contract.price} revealOn="longPress" />
+          );
         },
       },
       region: {
@@ -1081,13 +1096,13 @@ export function BpcSourcingPanel({ initialTypeId = null }: BpcSourcingPanelProps
                 {summary.cheapest !== null && (
                   <StatChip
                     label={t('bpcContracts.cheapestLabel')}
-                    value={formatIsk(summary.cheapest, 2)}
+                    value={<IskAmount value={summary.cheapest} revealOn="tap" />}
                   />
                 )}
                 {summary.median !== null && (
                   <StatChip
                     label={t('bpcContracts.medianLabel')}
-                    value={formatIsk(summary.median, 2)}
+                    value={<IskAmount value={summary.median} revealOn="tap" />}
                   />
                 )}
                 {summary.bestMe !== null && summary.bestTe !== null && (
@@ -1135,7 +1150,7 @@ export function BpcSourcingPanel({ initialTypeId = null }: BpcSourcingPanelProps
                       {regionNames.get(region.regionId) ?? `#${region.regionId}`}
                     </span>
                     <span className={cx('text-sm tabular-nums', index === 0 && 'text-accent')}>
-                      {formatIsk(region.cheapest, 2)}
+                      <IskAmount value={region.cheapest} revealOn="tap" />
                     </span>
                     <span className="text-[0.6875rem] tabular-nums text-text-dim">
                       {t('bpcContracts.regionOffers', { count: region.offerCount })}

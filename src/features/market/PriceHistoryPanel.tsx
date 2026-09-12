@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   EmptyState,
+  IskAmount,
   Select,
   SelectContent,
   SelectItem,
@@ -10,7 +11,6 @@ import {
   Spinner,
 } from '@/components/ui';
 import { loadPriceHistory } from './priceHistory';
-import { formatIsk } from '@/lib/isk';
 import {
   filterPriceHistoryRange,
   summarizePriceHistory,
@@ -166,13 +166,16 @@ function RangedHistory({ points, range, onRangeChange, itemName, now }: RangedHi
           {summary ? (
             <>
               <span>
-                {t('market.priceHistory.summaryHi')}: {formatIsk(summary.hi, 2)}
+                {t('market.priceHistory.summaryHi')}:{' '}
+                <IskAmount value={summary.hi} revealOn="tap" />
               </span>
               <span>
-                {t('market.priceHistory.summaryLo')}: {formatIsk(summary.lo, 2)}
+                {t('market.priceHistory.summaryLo')}:{' '}
+                <IskAmount value={summary.lo} revealOn="tap" />
               </span>
               <span>
-                {t('market.priceHistory.summaryMedian')}: {formatIsk(summary.median, 2)}
+                {t('market.priceHistory.summaryMedian')}:{' '}
+                <IskAmount value={summary.median} revealOn="tap" />
               </span>
             </>
           ) : (

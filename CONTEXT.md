@@ -168,6 +168,7 @@ here — they go one per file in `docs/context/decisions/`.
   other right now — usually variants of one thing. Distinct from the
   **Quickbar**, which is the durable list of items the user returns to across
   sessions. Different lifetimes, so two lists, not one.
+- **Completion Risk**: a condition that could stop a courier haul being delivered after its collateral is already put up — a delivery point that is a player structure, or an end no stargate route reaches. Stated as a condition and its consequence, never as a verdict about whether this player can complete it: the app cannot read a structure's access list and will not probe one. A nullsec end is _not_ a completion risk; it is noted informationally and is never hidden by the control that removes the other two.
 - **Contract Search**: The **Contracts** page's second tab (History / Search, issue #908). Search over every for-sale line of every public item_exchange/auction contract in New Eden — any item type — by item name, region, price, quantity and contract type. Reads the same **Public Contract Offers snapshot** as **BPC Sourcing**, but whole rather than narrowed to blueprint copies, so ME/TE/runs play no part in its columns or filters — a copy's own three numbers still seed a **Seeded Build Plan** from the row's context menu (issue #931). Public-contract data only: unlike BPC Sourcing it never merges in the Character's or corp's own assets. It shows one of two corpora at a time — **Items**, the offers above, or **Courier**, the **Public Courier Contracts snapshot** (issue #910) — because a haul has no item, quantity or price and an offer has no route, reward or collateral, so one merged table would leave half its columns blank whichever row you looked at. Distinct from the History tab beside it, which is one Character's own issued/accepted contracts read straight from ESI.
 - **Corp Access**: The single resolved state `useCorpAccess()` returns for the
   active Character, composing Corp Capability with granted scopes: `unknown`
@@ -667,6 +668,17 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   against the decoded pairs and renders a read-only, unauthenticated view; the
   app's first real unauthenticated content route. Stateless — nothing is
   stored server-side, and there is nothing to expire or revoke.
+- **Shorthand ISK**: An ISK figure rendered abbreviated (`1.3B`) by the
+  `IskAmount` component, with the exact value one gesture away — hover,
+  keyboard focus, or touch — and in the element's accessible name so a screen
+  reader announces it ungestured. Used on dense comparison tables and stat
+  chips, where column width is the scarce thing; never on the wallet journal,
+  transaction lists or editable ISK fields, which exist to be reconciled
+  against the game client digit by digit. A display treatment only: sorting,
+  CSV export and clipboard output all keep reading the underlying value, which
+  is what makes shorthand's one-fraction-digit rounding (`1,250,000,000` and
+  `1,254,000,000` both render `1.25B`-ish) safe to accept. See
+  `docs/context/decisions/` for the rule the rollout follows.
 - **Skill Plan**: An ordered list of skill-level entries a user intends to train. User-editable (drag and drop). Distinct from the in-game **Skill Queue**, which is the game's actual training queue.
 - **Stale-Serve**: showing a cached row whose **Freshness Window** has lapsed while the replacement is fetched behind it, rather than spinning until it lands. Only for a **Published Snapshot**, where a long window encodes a publish cadence; a game constant's long window asserts the value cannot change, so a lapsed one is fetched outright instead. A stale-serve that fails to revalidate must say so on the next read — it is never left standing as a loading state.
 - **Standing (corp)**: The `/corp` overview's top panel: the figures a corp

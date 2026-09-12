@@ -15,21 +15,52 @@
  * The price is that a player structure stays unnamed, unplaced and unbanded.
  * `CourierEndpoint` says so with `null` rather than guessing, and the table
  * shows the raw id — the honest answer, and one that still lets the route
- * search match the *other* end. Origin keeps its region regardless: the row
- * carries the contract's own region, which is where the pickup is.
+ * search match the *other* end. A pickup keeps its region regardless: the row
+ * carries the contract's own, which is where the pickup is, and a location that
+ * is one haul's pickup keeps it when it turns up as another's delivery.
  */
 import { classifySpace } from '@/engine/space';
 import { lookupNpcStation } from '@/sde/npcStations';
 import { lookupSolarSystem } from '@/sde/solarSystems';
+import { loadJumpGraph } from '@/sde/jumpGraph';
+import type { JumpGraph } from '@/engine/route/jumpRoute';
 import type { CourierEndpoint, PublicCourierContractRow } from '@/engine/contracts/courierSearch';
 
-async function resolveOne(locationId: number): Promise<CourierEndpoint | null> {
+/** Nothing local placed this id; which of the two reasons is the whole point. */
+function unplaced(
+  locationId: number,
+  resolution: 'structure' | 'unknown',
+  regionId: number | null
+): CourierEndpoint {
+  return {
+    locationId,
+    name: null,
+    systemName: null,
+    systemId: null,
+    regionId,
+    space: null,
+    resolution,
+    hasStargates: null,
+  };
+}
+
+async function resolveOne(
+  locationId: number,
+  graph: JumpGraph | undefined,
+  fallbackRegionId: number | null
+): Promise<CourierEndpoint> {
   const station = await lookupNpcStation(locationId);
-  // `null` (a player structure) and `undefined` (snapshot unreadable) are
-  // different conclusions everywhere else; here they lead to the same place —
-  // nothing local names this id — so both fall through to no entry at all.
-  if (!station) return null;
+  // `null` and `undefined` are opposite conclusions — "the table loaded and
+  // does not hold this id, so it is a player structure" versus "the table could
+  // not be read, so nothing is concluded". This used to collapse them, which
+  // was harmless while the only consequence was an unshowable name. It stopped
+  // being harmless once a scam flag rode on the answer (issue #944): one failed
+  // read would mark every haul on the board as a possible scam.
+  if (station === undefined) return unplaced(locationId, 'unknown', fallbackRegionId);
+  if (station === null) return unplaced(locationId, 'structure', fallbackRegionId);
+
   const system = await lookupSolarSystem(station.systemId);
+  const gates = graph?.get(station.systemId);
   return {
     locationId,
     name: station.name,
@@ -45,6 +76,12 @@ async function resolveOne(locationId: number): Promise<CourierEndpoint | null> {
     // and a status for the rest, and inventing either would be a claim about
     // where a haul goes that nothing local supports.
     space: system ? classifySpace(system.name, system.security) : null,
+    resolution: 'station',
+    // The graph keys *every* solar system, gateless ones with an empty list, so
+    // a present-but-empty entry is "no stargate touches this system" while a
+    // missing graph is "we could not read it". Those must not read alike: the
+    // first is a fact about New Eden, the second a gap in our snapshot.
+    hasStargates: gates === undefined ? null : gates.length > 0,
   };
 }
 
@@ -56,17 +93,31 @@ async function resolveOne(locationId: number): Promise<CourierEndpoint | null> {
 export async function loadCourierEndpoints(
   rows: readonly PublicCourierContractRow[]
 ): Promise<Map<number, CourierEndpoint>> {
+  // A location the snapshots cannot place still has a region whenever some
+  // haul is *posted* from it: the row carries the contract's own region, which
+  // is where the pickup is. A region belongs to the place rather than to the
+  // contract, so that answer is equally good for the same location appearing as
+  // another haul's destination — which is why this is keyed by location rather
+  // than by end. It is the only local fact left about a player structure, and
+  // the one that says a J-space pickup is in J-space at all.
+  //
+  // The gap it leaves: a structure that is only ever a destination has no
+  // region from anywhere, so a J-space delivery is named as a structure but not
+  // as gateless. Both answers are true; the second is simply not always
+  // knowable, and guessing it is not on offer.
+  const regionByLocation = new Map<number, number>();
   const ids = new Set<number>();
   for (const row of rows) {
     ids.add(row.originLocationId);
     ids.add(row.destinationLocationId);
+    regionByLocation.set(row.originLocationId, row.regionId);
   }
 
+  const graph = await loadJumpGraph();
   const endpoints = new Map<number, CourierEndpoint>();
   await Promise.all(
     [...ids].map(async (id) => {
-      const endpoint = await resolveOne(id);
-      if (endpoint) endpoints.set(id, endpoint);
+      endpoints.set(id, await resolveOne(id, graph, regionByLocation.get(id) ?? null));
     })
   );
   return endpoints;

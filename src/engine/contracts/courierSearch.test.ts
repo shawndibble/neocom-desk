@@ -40,6 +40,8 @@ const ENDPOINTS = new Map<number, CourierEndpoint>([
       systemId: JITA_SYSTEM,
       regionId: THE_FORGE,
       space: 'highsec',
+      resolution: 'station',
+      hasStargates: true,
     },
   ],
   [
@@ -51,6 +53,8 @@ const ENDPOINTS = new Map<number, CourierEndpoint>([
       systemId: AMARR_SYSTEM,
       regionId: DOMAIN,
       space: 'highsec',
+      resolution: 'station',
+      hasStargates: true,
     },
   ],
   [
@@ -62,6 +66,8 @@ const ENDPOINTS = new Map<number, CourierEndpoint>([
       systemId: RANCER_SYSTEM,
       regionId: SINQ_LAISON,
       space: 'lowsec',
+      resolution: 'station',
+      hasStargates: true,
     },
   ],
   [
@@ -73,6 +79,8 @@ const ENDPOINTS = new Map<number, CourierEndpoint>([
       systemId: WORMHOLE_SYSTEM,
       regionId: WORMHOLE_REGION,
       space: 'wormhole',
+      resolution: 'station',
+      hasStargates: true,
     },
   ],
 ]);
@@ -107,6 +115,8 @@ describe('resolveCourierRoutes', () => {
       systemId: JITA_SYSTEM,
       regionId: THE_FORGE,
       space: 'highsec',
+      resolution: 'station',
+      hasStargates: true,
     });
     expect(route.destination.name).toBe('Amarr VIII');
     expect(route.destination.regionId).toBe(DOMAIN);
@@ -129,6 +139,11 @@ describe('resolveCourierRoutes', () => {
       // And no band: nothing local places it, so there is no security status
       // to classify. A space filter excludes it rather than guessing highsec.
       space: null,
+      // Reached the fallback, which means this id was never in the index at
+      // all — nothing was concluded about it, which is not the same as
+      // concluding it is a player structure.
+      resolution: 'unknown',
+      hasStargates: null,
     });
   });
 

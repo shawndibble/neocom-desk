@@ -79,7 +79,12 @@ describe('CorpVitalsRail runway', () => {
     renderRail();
     // `total` is cosmetic and stays all-divisions — narrowing it to the
     // journal's division would be the opposite over-correction.
-    expect(screen.getByText('10,000,000,000.00')).toBeInTheDocument();
+    //
+    // The chip shows shorthand (issue #947); the exact sum is its accessible
+    // name, so assert on that — "10B" alone would still read the same after a
+    // 10,004,000,000 regression.
+    expect(screen.getByText('10B')).toBeInTheDocument();
+    expect(screen.getByLabelText('10,000,000,000.00 ISK')).toBeInTheDocument();
   });
 
   it('follows the journal division when it is not the master wallet', () => {

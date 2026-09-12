@@ -18,6 +18,7 @@ import {
   DataTable,
   EmptyState,
   IconButton,
+  IskAmount,
   PageHeader,
   Panel,
   Spinner,
@@ -26,7 +27,6 @@ import {
 import * as Icon from '@/components/ui/icons';
 import { beginEveLogin } from '@/app/loginFlow';
 import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
-import { formatIsk } from '@/lib/isk';
 import { formatVolume } from '@/features/market/format';
 import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
 import {
@@ -186,7 +186,7 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
       header: t('miningTax.overview.rawSellValue'),
       align: 'right',
       className: 'whitespace-nowrap',
-      render: (row) => `${formatIsk(row.valuation.rawValue)} ISK`,
+      render: (row) => <IskAmount value={row.valuation.rawValue} revealOn="tap" decimals={0} />,
       sortValue: (row) => row.valuation.rawValue,
     },
     {
@@ -194,7 +194,7 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
       header: t('miningTax.overview.refineValue'),
       align: 'right',
       className: 'whitespace-nowrap',
-      render: (row) => `${formatIsk(row.valuation.refineValue)} ISK`,
+      render: (row) => <IskAmount value={row.valuation.refineValue} revealOn="tap" decimals={0} />,
       sortValue: (row) => row.valuation.refineValue,
     },
     {
@@ -290,7 +290,7 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
                     {t('miningTax.overview.totalValueStat')}
                   </p>
                   <p className="mt-1 text-lg font-semibold tabular-nums">
-                    {formatIsk(totals.rawValue, 0)} ISK
+                    <IskAmount value={totals.rawValue} revealOn="tap" decimals={0} />
                   </p>
                 </Panel>
                 <Panel>
@@ -298,7 +298,11 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
                     {t('miningTax.overview.iskPerHourStat')}
                   </p>
                   <p className="mt-1 text-lg font-semibold tabular-nums">
-                    {totals.iskPerHour !== null ? `${formatIsk(totals.iskPerHour, 0)} ISK` : '—'}
+                    {totals.iskPerHour !== null ? (
+                      <IskAmount value={totals.iskPerHour} revealOn="tap" decimals={0} />
+                    ) : (
+                      '—'
+                    )}
                   </p>
                   <p className="text-[0.6875rem] text-text-dim">
                     {t('miningTax.overview.iskPerHourBasisHint')}

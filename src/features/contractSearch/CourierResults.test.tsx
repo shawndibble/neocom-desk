@@ -29,6 +29,10 @@ function endpoint(regionId: number, name: string): CourierEndpoint {
     systemId: 30000142,
     regionId,
     space: 'highsec',
+    // A plain named NPC station with gates: nothing here is about the scam
+    // markers (#944), so both ends stay unremarkable.
+    resolution: 'station',
+    hasStargates: true,
   };
 }
 

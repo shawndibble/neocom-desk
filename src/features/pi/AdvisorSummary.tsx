@@ -33,6 +33,7 @@
  */
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
+import { IskAmount } from '@/components/ui';
 import { formatIsk } from '@/lib/isk';
 import type { BlindSpot } from './blindSpotModel';
 import type { TotalColonyEarnings } from './colonyEarningsModel';
@@ -188,7 +189,9 @@ export function AdvisorSummary({ list, earnings, spots, controls }: AdvisorSumma
         {tuningIsk > 0 ? (
           <div className="flex items-baseline gap-2">
             <span className="text-3xl leading-none font-semibold text-isk-pos tabular-nums">
-              +{formatIsk(tuningIsk)}
+              {/* Shorthand: a headline gain is scanned, not reconciled. The bar's
+                  own legend below stays exact — it reads through i18next as a string. */}
+              +<IskAmount value={tuningIsk} revealOn="tap" decimals={0} />
             </span>
             <span className="text-[0.8125rem] leading-snug text-text-dim">
               {t('piAdvisor.summaryEarnIskPerHour')}
@@ -233,7 +236,7 @@ export function AdvisorSummary({ list, earnings, spots, controls }: AdvisorSumma
           <div className="mt-auto border-t border-line pt-2.5">
             <div className="flex items-baseline gap-2">
               <span className="text-base leading-none font-semibold text-text-dim tabular-nums">
-                +{formatIsk(rebuildIsk)}
+                +<IskAmount value={rebuildIsk} revealOn="tap" decimals={0} />
               </span>
               <span className="text-xs text-text-dim">
                 {t('piAdvisor.summaryEarnRebuildBody', {

@@ -107,9 +107,11 @@ describe('PriceHistoryPanel', () => {
       <PriceHistoryPanel regionId={10000002} typeId={34} itemName="Tritanium" now={FIXED_NOW} />
     );
     await waitFor(() => expect(screen.getByTestId('chart')).toBeInTheDocument());
-    expect(screen.getByText(/High: 30.00/)).toBeInTheDocument();
-    expect(screen.getByText(/Low: 10.00/)).toBeInTheDocument();
-    expect(screen.getByText(/Median: 20.00/)).toBeInTheDocument();
+    // Shorthand on screen (#947), so each figure is matched by its accessible
+    // name and still checked against the label it sits beside.
+    expect(screen.getByLabelText('30.00 ISK').parentElement).toHaveTextContent('High:');
+    expect(screen.getByLabelText('10.00 ISK').parentElement).toHaveTextContent('Low:');
+    expect(screen.getByLabelText('20.00 ISK').parentElement).toHaveTextContent('Median:');
   });
 
   it('narrows the chart to the selected date range', async () => {

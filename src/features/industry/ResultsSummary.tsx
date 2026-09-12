@@ -127,6 +127,13 @@ interface ResultsSummaryProps {
  * show (job cost needs live adjusted prices + system cost index, neither of
  * which are cached locally) — materials + time stay visible in the sibling
  * panel regardless.
+ *
+ * Every figure here stays on `formatIsk` at full precision, deliberately
+ * (issue #948): this is the ledger a player reads line by line to reconcile a
+ * plan's working — material cost, each job-fee component, tax, broker fee,
+ * break-even — where a rounded "1.3B" would hide the digits the arithmetic is
+ * being checked against. The shorthand read of the same numbers is one panel
+ * up, in `PlanVerdictHero`.
  */
 export function ResultsSummary({
   result,

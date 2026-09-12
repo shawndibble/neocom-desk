@@ -24,6 +24,7 @@ import {
   SelectValue,
   SearchInput,
   TextInput,
+  IskAmount,
   type DataTableColumn,
 } from '@/components/ui';
 import {
@@ -35,11 +36,13 @@ import {
 } from '@/engine/contracts/courierSearch';
 import { iskPerJump, iskPerVolume } from '@/engine/contracts/courierRates';
 import { SPACE_KINDS, type SpaceKind } from '@/engine/space';
+import { completableCourierRoutes } from '@/engine/contracts/courierRisk';
+import { EndpointRiskMarkers } from '@/features/contractSearch/courierRiskDisplay';
 import type { RoutePreferenceKind } from '@/engine/route/jumpRoute';
 import { localJumpCountsForRoutes } from '@/features/route/localRoute';
 import { CourierContractDetailModal } from '@/features/contractSearch/CourierContractDetailModal';
 import { loadCharacterRegionId } from '@/features/contractSearch/characterRegion';
-import { formatIsk, formatIskAuto } from '@/lib/isk';
+import { formatIskAuto } from '@/lib/isk';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
 
@@ -56,6 +59,8 @@ interface CourierUiFilter {
   destinationRegionId: number | null;
   /** Which bands the hauler will deliver into; every offered band is "no restriction". */
   destinationSpace: readonly SpaceKind[];
+  /** Drop the hauls that may not be deliverable at all. Off is no restriction. */
+  hideUncompletable: boolean;
   minReward: string;
   maxCollateral: string;
   maxVolume: string;
@@ -67,6 +72,7 @@ const EMPTY_UI_FILTER: CourierUiFilter = {
   originRegionId: null,
   destinationRegionId: null,
   destinationSpace: SPACE_KINDS,
+  hideUncompletable: false,
   minReward: '',
   maxCollateral: '',
   maxVolume: '',
@@ -411,6 +417,7 @@ function CourierFilterBar({
     filter.originRegionId !== null,
     filter.destinationRegionId !== null,
     narrowsSpace(filter.destinationSpace, spaceKinds),
+    filter.hideUncompletable,
     filter.minReward,
     filter.maxCollateral,
     filter.maxVolume,
@@ -517,6 +524,17 @@ function CourierFilterBar({
             onChange={(minDays) => setDraft({ ...draft, minDays })}
           />
           <RoutePreferenceField value={preference} onChange={onPreferenceChange} />
+          {/*
+            One control, not a per-flag set: a hauler either wants the jobs they
+            may not be able to deliver out of the way or they do not. What it
+            hides — and what it deliberately does not — is `blocksCompletion`'s
+            to decide.
+          */}
+          <FilterChip
+            label={t('contractSearch.hideUncompletableLabel')}
+            selected={draft.hideUncompletable}
+            onToggle={() => setDraft({ ...draft, hideUncompletable: !draft.hideUncompletable })}
+          />
         </>
       )}
     </FilterBar>
@@ -693,7 +711,13 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
     [uiFilter, spaceKinds]
   );
 
-  const matchingRows = useMemo(() => filterCourierContracts(rows, filter), [rows, filter]);
+  const matchingRows = useMemo(() => {
+    const matched = filterCourierContracts(rows, filter);
+    // Applied after the engine filter rather than inside it: what counts as
+    // "may not be able to complete" is the risk module's answer, and keeping it
+    // there stops a second definition drifting away from the flags on the row.
+    return uiFilter.hideUncompletable ? completableCourierRoutes(matched) : matched;
+  }, [rows, filter, uiFilter.hideUncompletable]);
   const jumps = useJumpCounts(matchingRows, preference);
 
   /**
@@ -760,6 +784,7 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
                 <span className="ml-1.5 text-[0.6875rem] text-text-dim">{originRegion(row)}</span>
               )}
               <EndpointSpace space={row.origin.space} />
+              <EndpointRiskMarkers endpoint={row.origin} end="origin" />
             </span>
             <span className="text-text-dim">
               {'→ '}
@@ -768,6 +793,7 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
                 <span className="ml-1.5 text-[0.6875rem]">{destinationRegion(row)}</span>
               )}
               <EndpointSpace space={row.destination.space} />
+              <EndpointRiskMarkers endpoint={row.destination} end="destination" />
             </span>
           </div>
         ),
@@ -778,7 +804,8 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
         align: 'right',
         className: 'tabular-nums whitespace-nowrap',
         sortValue: (row) => row.reward,
-        render: (row) => formatIsk(row.reward, 2),
+        // Long press, not tap: the row's own tap opens the haul's detail modal.
+        render: (row) => <IskAmount value={row.reward} revealOn="longPress" />,
       },
       {
         id: 'collateral',
@@ -790,7 +817,11 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
         // dash says "none asked", where "0.00 ISK" reads as a figure the issuer
         // actually typed.
         render: (row) =>
-          courierCollateral(row) === 0 ? '—' : formatIsk(courierCollateral(row), 2),
+          courierCollateral(row) === 0 ? (
+            '—'
+          ) : (
+            <IskAmount value={courierCollateral(row)} revealOn="longPress" />
+          ),
       },
       {
         id: 'jumps',
