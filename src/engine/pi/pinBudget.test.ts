@@ -13,6 +13,7 @@ import {
   singleFactoryChain,
   singleFactoryRate,
   spareCapacity,
+  type CheckThroughputOptions,
 } from './pinBudget';
 
 // The real snapshot, same reasoning as chain.test.ts: the pin counts below are
@@ -443,6 +444,78 @@ describe('checkThroughput', () => {
     });
     expect(check.verdict).toBe('ok');
     expect(check.bufferM3).toBe(22_000);
+    // hoursToFull is the same arithmetic the verdict is derived from, so the
+    // two must agree: a buffer that holds a full day's flow is more than a
+    // day from full.
+    expect(check.hoursToFull).toBeCloseTo(check.bufferM3 / check.flowPerHourM3, 6);
+    expect(check.hoursToFull).toBeGreaterThan(24);
+  });
+
+  it('reports hoursToFull in lockstep with the overflow verdict on every case above', () => {
+    // bufferNeedM3 > bufferM3  <=>  flow * bufferHours > bufferM3
+    //                          <=>  hoursToFull < bufferHours (flow > 0).
+    // So `buffer-overflow` and `hoursToFull < bufferHours` must never
+    // disagree — this is the cheapest guard against the new field drifting
+    // from the verdict it sits beside.
+    const cases: CheckThroughputOptions[] = [
+      {
+        blocks: 1,
+        pins: { launchpad: 1, storage: 1 },
+        infrastructure: FIXTURE_INFRASTRUCTURE,
+        sourcingFloor: 'P1',
+        linkCapacityPerHour: 40_000,
+        bufferHours: 24,
+      },
+      {
+        blocks: 1,
+        pins: { launchpad: 1 },
+        infrastructure: FIXTURE_INFRASTRUCTURE,
+        sourcingFloor: 'P0',
+        linkCapacityPerHour: 40_000,
+        bufferHours: 168,
+      },
+      {
+        blocks: 20,
+        pins: { launchpad: 1, storage: 1 },
+        infrastructure: FIXTURE_INFRASTRUCTURE,
+        sourcingFloor: 'P0',
+        linkCapacityPerHour: 1_250,
+        bufferHours: 1,
+      },
+    ];
+    for (const options of cases) {
+      const check = checkThroughput(chain, pi, options);
+      expect(check.hoursToFull).not.toBeNull();
+      expect(check.verdict === 'buffer-overflow').toBe(check.hoursToFull! < options.bufferHours);
+    }
+  });
+
+  it('reports null hours to fill for a colony with no flow, not Infinity', () => {
+    // A colony whose every node moves zero volume — every raw resource and
+    // every schematic priced at 0 m3 — has flowPerHourM3 of exactly 0.
+    // bufferM3 / 0 is Infinity in plain arithmetic, which would read as "this
+    // colony fills up in Infinity hours" rather than the true answer: it
+    // never fills, because nothing is moving at all.
+    const zeroVolumePi: PiData = {
+      ...pi,
+      raw: pi.raw.map((resource) => ({ ...resource, volume: 0 })),
+      schematics: Object.fromEntries(
+        Object.entries(pi.schematics).map(([id, schematic]) => [
+          id,
+          { ...schematic, volume: 0 },
+        ])
+      ),
+    };
+    const check = checkThroughput(chain, zeroVolumePi, {
+      blocks: 1,
+      pins: { launchpad: 1, storage: 1 },
+      infrastructure: FIXTURE_INFRASTRUCTURE,
+      sourcingFloor: 'P1',
+      linkCapacityPerHour: 40_000,
+      bufferHours: 24,
+    });
+    expect(check.flowPerHourM3).toBe(0);
+    expect(check.hoursToFull).toBeNull();
   });
 
   it('fails the buffer check before the link check, since overflow is what actually stalls a colony', () => {

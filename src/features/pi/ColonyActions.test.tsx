@@ -23,6 +23,8 @@ const scoredCandidate: ScoredStopTier = {
     flowPerHourM3: 100,
     bufferM3: 5_000,
     bufferNeedM3: 2_400,
+    // 5,000 m3 of buffer against 100 m3/hr of flow.
+    hoursToFull: 50,
     linkCapacityPerHour: 1_250,
   },
 };
