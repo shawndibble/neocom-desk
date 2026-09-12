@@ -583,8 +583,8 @@ describe('ContractSearchPanel — Courier mode', () => {
 
   it('says no collateral was asked for, rather than reporting a ratio of zero', async () => {
     // "0x" is arithmetically true and reads as a measured ratio, which is the
-    // opposite of what an absent collateral means — and the Collateral chip
-    // beside it already says "none asked" with a dash.
+    // opposite of what an absent collateral means — so the figure says "none
+    // asked for" in words under its dash.
     loadPublicCourierContracts.mockResolvedValue(
       cachedCourierSnapshot([courierRow({ contractId: 701, collateral: undefined })])
     );
@@ -598,7 +598,10 @@ describe('ContractSearchPanel — Courier mode', () => {
     await userEvent.click(rows[0]);
 
     const dialog = await screen.findByRole('dialog');
-    expect(within(dialog).getByText('Collateral / reward').parentElement).toHaveTextContent('—');
+    const collateral = within(dialog).getByText('Collateral').parentElement;
+    expect(collateral).toHaveTextContent('—');
+    expect(collateral).toHaveTextContent('none asked for');
+    expect(collateral).not.toHaveTextContent('0×');
   });
 
   it('has no collateral ratio against a haul that pays nothing', async () => {
@@ -618,9 +621,12 @@ describe('ContractSearchPanel — Courier mode', () => {
     await userEvent.click(rows[0]);
 
     const dialog = await screen.findByRole('dialog');
-    const ratio = within(dialog).getByText('Collateral / reward').parentElement;
-    expect(ratio).toHaveTextContent('—');
-    expect(ratio).not.toHaveTextContent('Infinity');
+    // The collateral itself still shows; only the ratio against the reward is
+    // unknowable, so that line is absent rather than infinite.
+    const collateral = within(dialog).getByText('Collateral').parentElement;
+    expect(collateral).toHaveTextContent('900M');
+    expect(collateral).not.toHaveTextContent('Infinity');
+    expect(collateral).not.toHaveTextContent('the reward');
   });
 
   it('keeps ISK per jump as the default sort, not the new rate', async () => {
@@ -650,7 +656,9 @@ describe('ContractSearchPanel — Courier mode', () => {
 
     const dialog = await screen.findByRole('dialog');
     // 900,000,000 ISK put up against a 12,000,000 ISK reward.
-    expect(within(dialog).getByText('Collateral / reward').parentElement).toHaveTextContent('75×');
+    expect(within(dialog).getByText('Collateral').parentElement).toHaveTextContent(
+      '75× the reward'
+    );
   });
 
   it('shows a location nothing local names as its id rather than inventing one', async () => {
@@ -699,6 +707,115 @@ describe('ContractSearchPanel — Courier mode', () => {
     expect(stated[COLLATERAL_CELL]).not.toBe('—');
   });
 
+  it('leads the detail with the rate the board itself ranks on', async () => {
+    // ISK/jump was missing from this modal entirely: a hauler could sort the
+    // table on it and then lose it on the one screen where the haul is
+    // actually judged.
+    await showCourier();
+    const rows = await waitFor(async () => {
+      const found = await bodyRows();
+      expect(found).toHaveLength(2);
+      return found;
+    });
+    const jitaToAmarr = rows.find(
+      (candidate) => !candidate.textContent?.includes(String(UNKNOWN_STRUCTURE))
+    )!;
+
+    await userEvent.click(jitaToAmarr);
+
+    const dialog = await screen.findByRole('dialog');
+    // 12,000,000 ISK over the four jumps Jita → Amarr takes.
+    expect(within(dialog).getByText('Per jump').parentElement).toHaveTextContent('3M');
+    // The exact rate sits under the compact one: compact notation rounds to a
+    // single fraction digit, and this is the figure hauls are compared on.
+    expect(within(dialog).getByText('Per jump').parentElement).toHaveTextContent(
+      '3,000,000 ISK over 4 jumps'
+    );
+  });
+
+  it('states a free haul as paying nothing per jump, not as having no rate', async () => {
+    // 0 is what this haul pays over its four jumps — a fact, unlike the dash
+    // an unmeasurable route earns. Only the rate that ranks the board is
+    // accented, so the zero reads as quiet rather than as a headline.
+    loadPublicCourierContracts.mockResolvedValue(
+      cachedCourierSnapshot([courierRow({ contractId: 703, reward: 0 })])
+    );
+    await showCourier();
+    const rows = await waitFor(async () => {
+      const found = await bodyRows();
+      expect(found).toHaveLength(1);
+      return found;
+    });
+
+    await userEvent.click(rows[0]);
+
+    const dialog = await screen.findByRole('dialog');
+    const perJump = within(dialog).getByText('Per jump').parentElement;
+    expect(perJump).toHaveTextContent('0 ISK over 4 jumps');
+    expect(perJump).not.toHaveTextContent('—');
+  });
+
+  it('quotes no rate per jump when no gate route reaches an end', async () => {
+    // "No distance" must never render as a rate: the haul to an unplaced
+    // structure has no route to measure, and a fabricated denominator would
+    // rank it against hauls that do.
+    await showCourier();
+    const rows = await waitFor(async () => {
+      const found = await bodyRows();
+      expect(found).toHaveLength(2);
+      return found;
+    });
+    const toStructure = rows.find((candidate) =>
+      candidate.textContent?.includes(String(UNKNOWN_STRUCTURE))
+    )!;
+
+    await userEvent.click(toStructure);
+
+    const dialog = await screen.findByRole('dialog');
+    const perJump = within(dialog).getByText('Per jump').parentElement;
+    expect(perJump).toHaveTextContent('—');
+    expect(perJump).not.toHaveTextContent('30M');
+  });
+
+  it("keeps both ends' region in the detail rather than clipping it off", async () => {
+    // The region is the one fact the route column could not already show, and
+    // it was exactly what the old truncated single line dropped.
+    await showCourier();
+    const rows = await waitFor(async () => {
+      const found = await bodyRows();
+      expect(found).toHaveLength(2);
+      return found;
+    });
+    const jitaToAmarr = rows.find(
+      (candidate) => !candidate.textContent?.includes(String(UNKNOWN_STRUCTURE))
+    )!;
+
+    await userEvent.click(jitaToAmarr);
+
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('Pick up').parentElement).toHaveTextContent('The Forge');
+    expect(within(dialog).getByText('Drop off').parentElement).toHaveTextContent('Domain');
+  });
+
+  it('names the two systems in the title rather than repeating both stations', async () => {
+    await showCourier();
+    const rows = await waitFor(async () => {
+      const found = await bodyRows();
+      expect(found).toHaveLength(2);
+      return found;
+    });
+    const jitaToAmarr = rows.find(
+      (candidate) => !candidate.textContent?.includes(String(UNKNOWN_STRUCTURE))
+    )!;
+
+    await userEvent.click(jitaToAmarr);
+
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByRole('heading')).toHaveTextContent('Courier · Jita → Amarr');
+    // The station itself is still in the body, said once.
+    expect(within(dialog).getAllByText(/Caldari Navy Assembly Plant/)).toHaveLength(1);
+  });
+
   it('states an absent deadline as unstated in the detail, which is where it lives', async () => {
     // A deadline is a constraint checked once on a haul under consideration,
     // so it is a filter and a detail figure rather than a column.
@@ -715,7 +832,7 @@ describe('ContractSearchPanel — Courier mode', () => {
     await userEvent.click(unstated);
 
     const dialog = await screen.findByRole('dialog');
-    expect(within(dialog).getByText('Days').parentElement).toHaveTextContent('—');
+    expect(within(dialog).getByText('Time to deliver').parentElement).toHaveTextContent('—');
   });
 
   it('swaps the item filters out for route filters, rather than stacking both', async () => {
@@ -1126,8 +1243,8 @@ describe('ContractSearchPanel — Courier completion risk', () => {
     expect(within(dialog).getByText(/keeps your collateral/)).toBeInTheDocument();
     // States the condition, never a verdict about this player's own access.
     expect(within(dialog).queryByText(/you do not have access/i)).not.toBeInTheDocument();
-    // The ratio a hauler judges the risk against sits in the same place.
-    expect(within(dialog).getByText('Collateral / reward')).toBeInTheDocument();
+    // The collateral the note is about sits in the same dialog.
+    expect(within(dialog).getByText('Collateral')).toBeInTheDocument();
   });
 });
 
