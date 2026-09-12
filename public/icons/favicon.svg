@@ -10,7 +10,7 @@
          0.32 of its tip radius, which makes a deep four-pointed star rather
          than the shallow puffed diamond drawn before; and every join is
          mitred, because nothing in the artwork is round.
-       * Weight. How fat the strokes are -- deliberately heavier than the
+       * Weight. How fat the strokes are — deliberately heavier than the
          artwork, which is drawn for 512px. At true scale the corner traces
          would be 1.2 units wide, a quarter of a pixel on a 16px tab strip,
          i.e. invisible. They are 2, and the hull is 3.
@@ -54,7 +54,7 @@
        is no plate behind it to match. -->
   <path fill-rule="evenodd" fill="var(--body)" d="M32 12 36.11 27.6 48.8 32 36.11 36.4 32 52 27.89 36.4 15.2 32 27.89 27.6Z M32 27.3 36.01 32 32 36.7 27.99 32Z"/>
   <!-- Traces run parallel to the hull edge each one hugs, inset by two units
-       from its inner face -- the artwork's relationship, and the reason they
+       from its inner face — the artwork's relationship, and the reason they
        are two segments rather than a symmetric bracket. -->
   <g fill="none" stroke="var(--trace)" stroke-width="2" stroke-linecap="butt" stroke-linejoin="miter">
     <path d="M25.9 15.1 15.5 21.6 15.5 26.6"/><path d="M38.1 15.1 48.5 21.6 48.5 26.6"/>
