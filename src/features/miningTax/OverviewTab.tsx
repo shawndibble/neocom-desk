@@ -1,7 +1,9 @@
 /**
  * Mining Yield Overview tab (issue #671): what a pilot actually mined —
- * ordinary belt/anomaly ore and ice, moon ore included — across every
- * tracked Character, as ISK/hr and a raw-vs-refined value comparison. Sits
+ * ordinary belt/anomaly ore and ice, moon ore included, and harvested gas
+ * (issue #880) — across every tracked Character, as ISK/hr and a
+ * raw-vs-refined value comparison. Gas reprocesses into nothing, so it
+ * contributes a real zero to the refined side rather than a missing one. Sits
  * beside the Tax tab (`TaxTab.tsx`) on the same route; the two read the same
  * ESI mining ledger but group and value it for entirely different questions
  * (see `docs/context/decisions/…-mining-yield-isk-hr-basis-is-calendar-time.md`

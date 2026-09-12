@@ -1,14 +1,17 @@
 /**
  * Composes the Mining Yield Overview tab's data (issue #671): every tracked
- * character's unfiltered ore/ice mining output, valued raw-vs-refined at
- * each entry's own mined-date price. Fetch/Dexie/SDE layer only — the pure
- * arithmetic lives in `src/engine/miningTax` (`valueMiningYield`).
+ * character's unfiltered ore/ice and harvested-gas mining output (issue
+ * #880), valued raw-vs-refined at each entry's own mined-date price.
+ * Fetch/Dexie/SDE layer only — the pure arithmetic lives in
+ * `src/engine/miningTax` (`valueMiningYield`).
  *
  * Raw ore is priced via its Compressed counterpart when one exists, the same
  * convention `pricing.ts` already uses for the Tax tab
  * (`docs/context/decisions/20260906-081307-…`) — not a new choice, reused for
  * consistency. Reprocessing output materials (minerals) have no compressed
- * form and price directly.
+ * form and price directly. Gas is deliberately absent from
+ * `compressedOreTypeIds` and so prices as itself through `pricingTypeId`'s
+ * fallback — raw Fullerites and serocins are what Reactions consume.
  */
 import { loadAllCharacterYields } from './ledger';
 import type { MiningYieldEntry } from '@/engine/miningTax/yieldGrouping';

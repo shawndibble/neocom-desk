@@ -5,7 +5,7 @@ import type { MiningLedgerRow } from './types';
 const VELDSPAR = 1230; // ordinary asteroid ore
 const ICE = 16262; // ordinary ice
 const MOON_ORE = 45490; // Zeolites — moon ore is still ore, so it counts here too
-const UNCLASSIFIED = 99999; // not on the ore/ice allowlist at all
+const UNCLASSIFIED = 99999; // on no allowlist the caller passes in at all
 
 const ALLOWLIST = new Set([VELDSPAR, ICE, MOON_ORE]);
 
@@ -56,7 +56,7 @@ describe('groupMiningYield', () => {
     expect(entry.oreLines).toEqual([{ typeId: VELDSPAR, quantity: 50 }]);
   });
 
-  it('drops rows outside the ore/ice allowlist rather than guessing at an unclassified type', () => {
+  it('drops rows outside the allowlist it is handed rather than guessing at an unclassified type', () => {
     const rows: MiningLedgerRow[] = [
       { date: '2026-09-04', quantity: 100, solar_system_id: 1, type_id: VELDSPAR },
       { date: '2026-09-04', quantity: 7, solar_system_id: 1, type_id: UNCLASSIFIED },

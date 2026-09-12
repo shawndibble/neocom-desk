@@ -1136,10 +1136,11 @@ async function main() {
   // way to walk everything under it. Anchoring on the parent id rather than the
   // name alone is what keeps "Moon Ores" from matching some unrelated group
   // CCP adds elsewhere in the tree later. Both parent ids are verified against
-  // a live dump: 1031 ("Ore") is the parent of "Standard Ores", "Ice Ores" and
-  // "Moon Ores" alike; 533 ("Materials") is the parent of "Gas Clouds
-  // Materials" — gas is deliberately *not* under the Ore root, which is the
-  // whole reason it needs a second traversal (issue #880).
+  // a live dump: 1031 ("Raw Materials") is the parent of "Standard Ores",
+  // "Ice Ores" and "Moon Ores" alike, and 1032 ("Gas Clouds Materials") is its
+  // *sibling* — both hang off 533 ("Materials"). That sibling relationship is
+  // the whole reason gas needs its own traversal rather than a fourth name in
+  // the ore/ice list (issue #880).
   const ORE_MARKET_GROUP_ROOT_ID = 1031;
   const MATERIALS_MARKET_GROUP_ROOT_ID = 533;
   function findMarketGroupRoot(groups, name, parentId = ORE_MARKET_GROUP_ROOT_ID) {
@@ -1202,11 +1203,17 @@ async function main() {
   // ESI reports is silently dropped.
   //
   // Its own file, and its own traversal, rather than a fourth name in
-  // ORE_AND_ICE_ROOT_GROUP_NAMES: gas hangs off "Materials" (533), not the Ore
-  // root the ore/ice walk is anchored to. Keeping it separate also keeps the
-  // Moon Mining Tax ledger's "recognized ore/ice vs. unclassified" split and
-  // compressedOreTypeIds' name-match pass below reading exactly what they read
-  // before — see the issue #880 decision doc.
+  // ORE_AND_ICE_ROOT_GROUP_NAMES: gas hangs off "Materials" (533) as a sibling
+  // of the "Raw Materials" root the ore/ice walk is anchored to. Keeping it
+  // separate also keeps the Moon Mining Tax ledger's "recognized ore/ice vs.
+  // unclassified" split and compressedOreTypeIds' name-match pass below
+  // reading exactly what they read before — see the issue #880 decision doc.
+  //
+  // The whole subtree is kept, compressed forms included, exactly as the
+  // ore/ice walk keeps "Compressed " ore. Those ~25 ids are inert — compression
+  // is a separate industry job, so no ledger row ever carries one — but
+  // excluding them would mean special-casing a child out of an otherwise clean
+  // tree walk, for no behaviour difference.
   const GAS_CLOUDS_GROUP_NAME = 'Gas Clouds Materials';
   const gasCloudsParent = findMarketGroupRoot(
     marketGroups,
@@ -1506,7 +1513,11 @@ async function main() {
     process.exitCode = 1;
   }
   console.log(`  gas cloud type ids: ${gasCloudTypeIds.length}`);
-  if (!gasCloudsParent || gasCloudMarketGroupIds.size === 0 || gasCloudTypeIds.length < 20) {
+  // 50 today: 25 raw (Fullerenes + Booster Gas Clouds) and 25 compressed. The
+  // threshold sits above 25 on purpose — a restructure that left only the
+  // Compressed Gas child standing would still clear a lower bar while every
+  // raw type the ledger actually reports had silently vanished.
+  if (!gasCloudsParent || gasCloudMarketGroupIds.size === 0 || gasCloudTypeIds.length < 40) {
     console.error(
       `  FAIL: gas cloud type ids came out empty or implausibly small — the "${GAS_CLOUDS_GROUP_NAME}" market group structure may have changed`
     );

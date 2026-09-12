@@ -11,15 +11,21 @@ _Recorded 2026-09-11 · issue #880._
   keeps the blast radius to the one surface the ticket asks for: widening
   `oreAndIceTypeIds` would silently change the Moon Mining Tax ledger's
   "unclassified ore" split and the `compressedOreTypeIds` name-match pass,
-  neither of which #880 asked to touch.
+  neither of which #880 asked to touch. The traversal keeps the whole subtree,
+  compressed gas included, exactly as the ore/ice walk keeps "Compressed " ore:
+  those ~25 ids are inert (compression is a separate industry job, so no ledger
+  row ever carries one) and excluding them would mean special-casing a child
+  out of an otherwise clean tree walk for no behaviour difference.
 
 - **The Moon Mining Tax tab's "unclassified ore" behaviour is unchanged: a
   gas type_id still flags there.** Tempting to also teach the Tax tab that gas
   is "recognized, just not moon ore," but that changes Tax tab behaviour for
-  exactly the population this ticket serves, and the banner already has an
-  escape hatch — "Ignore" (`typeOverrides.ts`), which joins the same broadened
-  set both tabs read. `ledger.test.ts` pins this boundary with an explicit
-  test so a later change is a deliberate one, not a drift.
+  exactly the population this ticket serves. The banner's existing "Ignore"
+  hatch (`typeOverrides.ts`) mechanically covers a gas harvester who wants it
+  quiet, its ore-centric name notwithstanding — it is not being redefined here,
+  and **Manual Ore Tag**'s glossary meaning is untouched. `ledger.test.ts` pins
+  this boundary with an explicit test so a later change is a deliberate one,
+  not a drift.
 
 - **Harvested gas prices as itself, not via its Compressed counterpart.**
   Ore/ice price through `compressedOreTypeIds` (`20260906-081307-…`) because a
