@@ -32,6 +32,7 @@ import {
   type CourierEndpoint,
   type CourierRouteRow,
 } from '@/engine/contracts/courierSearch';
+import { CourierContractDetailModal } from '@/features/contractSearch/CourierContractDetailModal';
 import { formatIsk } from '@/lib/isk';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
@@ -285,6 +286,7 @@ export function CourierResults({ rows, regionNames }: CourierResultsProps) {
   const timeZone = useTimeZone();
   const [uiFilter, setUiFilter] = useState<CourierUiFilter>(EMPTY_UI_FILTER);
   const [showAll, setShowAll] = useState(false);
+  const [selectedRow, setSelectedRow] = useState<CourierRouteRow | null>(null);
 
   const originRegions = useMemo(
     () => regionOptionsFor(rows, 'origin', regionNames),
@@ -430,6 +432,7 @@ export function CourierResults({ rows, regionNames }: CourierResultsProps) {
             // a unique key.
             rowKey={(row) => String(row.contractId)}
             defaultSort={{ columnId: 'reward', direction: 'desc' }}
+            onRowClick={setSelectedRow}
           />
           {!showAll && displayRows.length > ROW_CAP && (
             <div className="px-3 py-2">
@@ -439,6 +442,13 @@ export function CourierResults({ rows, regionNames }: CourierResultsProps) {
             </div>
           )}
         </>
+      )}
+      {selectedRow && (
+        <CourierContractDetailModal
+          row={selectedRow}
+          regionNames={regionNames}
+          onClose={() => setSelectedRow(null)}
+        />
       )}
     </>
   );
