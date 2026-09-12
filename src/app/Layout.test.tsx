@@ -1,7 +1,8 @@
+import { useEffect } from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { Link, MemoryRouter, Route, Routes } from 'react-router-dom';
 import '@/i18n';
 import { db } from '@/db';
 import { useActiveCharacter } from '@/stores/activeCharacter';
@@ -599,5 +600,126 @@ describe('Layout corp nav entry', () => {
     // No lock marker: there is no state in which this renders and is unusable,
     // so the amber dot would offer a re-login for a role nobody can grant here.
     expect(link).not.toHaveAttribute('title');
+  });
+});
+
+/**
+ * jsdom implements no Web Animations API, so `animate` is stubbed and these
+ * assert what `useRouteFade` is responsible for: that it fires on a real route
+ * change, stays quiet when only the query changed, honours reduced motion, and
+ * — the reason it animates in place rather than re-keying the outlet — never
+ * costs the route its component instance.
+ */
+describe('Layout route fade', () => {
+  let animate: ReturnType<typeof vi.fn>;
+  let reduceMotion: boolean;
+
+  /**
+   * A splat route, which is the case that made a `key` untenable: `/assets`
+   * and `/assets/60003760` are one match, and Assets keeps its search,
+   * filters and selection across the drill-down.
+   */
+  function renderRoutes(initial: string) {
+    const mounts: string[] = [];
+    function Page({ name }: { name: string }) {
+      useEffect(() => {
+        mounts.push(name);
+      }, [name]);
+      return (
+        <div>
+          {name} page
+          <Link to="/overview?tab=x">filter overview</Link>
+          <Link to="/assets/60003760">drill down</Link>
+        </div>
+      );
+    }
+    const view = render(
+      <MemoryRouter initialEntries={[initial]}>
+        <Routes>
+          <Route element={<Layout />}>
+            <Route path="/overview" element={<Page name="overview" />} />
+            <Route path="/wallet" element={<Page name="wallet" />} />
+            <Route path="/assets" element={<Page name="assets" />} />
+            <Route path="/assets/*" element={<Page name="assets" />} />
+          </Route>
+        </Routes>
+      </MemoryRouter>
+    );
+    return { ...view, mounts };
+  }
+
+  beforeEach(() => {
+    mockIsSyncConfigured.mockReturnValue(false);
+    mockedCorpAccess.mockReturnValue(corpAccess('none'));
+    reduceMotion = false;
+    animate = vi.fn(() => ({ cancel: vi.fn() }));
+    Object.defineProperty(Element.prototype, 'animate', {
+      value: animate,
+      writable: true,
+      configurable: true,
+    });
+    // Only the reduced-motion query is steered; every other query Layout asks
+    // (the `md` breakpoint behind the More sheet) keeps the setup's default.
+    vi.spyOn(window, 'matchMedia').mockImplementation(
+      (media: string) =>
+        ({
+          matches: media.includes('prefers-reduced-motion') ? reduceMotion : false,
+          media,
+          addEventListener: () => {},
+          removeEventListener: () => {},
+          addListener: () => {},
+          removeListener: () => {},
+          onchange: null,
+          dispatchEvent: () => false,
+        }) as unknown as MediaQueryList
+    );
+  });
+
+  it('fades the outlet in on a route change', async () => {
+    const user = userEvent.setup();
+    renderRoutes('/overview');
+    animate.mockClear();
+    await user.click(screen.getAllByRole('link', { name: 'Wallet' })[0]);
+    await waitFor(() => expect(screen.getByText('wallet page')).toBeInTheDocument());
+    expect(animate).toHaveBeenCalledWith([{ opacity: 0 }, { opacity: 1 }], {
+      duration: 140,
+      easing: 'ease-out',
+    });
+  });
+
+  it('does not fade when only the search string changes', async () => {
+    const user = userEvent.setup();
+    renderRoutes('/overview');
+    animate.mockClear();
+    // The shape an in-page filter produces — re-fading the whole view for a
+    // filter keystroke is the churn this guards against.
+    await user.click(screen.getByRole('link', { name: 'filter overview' }));
+    expect(animate).not.toHaveBeenCalled();
+  });
+
+  it('does not animate under prefers-reduced-motion', async () => {
+    reduceMotion = true;
+    const user = userEvent.setup();
+    renderRoutes('/overview');
+    animate.mockClear();
+    await user.click(screen.getAllByRole('link', { name: 'Wallet' })[0]);
+    await waitFor(() => expect(screen.getByText('wallet page')).toBeInTheDocument());
+    expect(animate).not.toHaveBeenCalled();
+  });
+
+  /**
+   * The regression an earlier `key={location.pathname}` introduced: six
+   * `ROUTE_ELEMENTS` entries match more than one pathname, and remounting on
+   * a drill-down discards the route's own state and re-runs its loader.
+   */
+  it('keeps the route mounted when the pathname changes inside one match', async () => {
+    const user = userEvent.setup();
+    const { mounts } = renderRoutes('/assets');
+    await waitFor(() => expect(mounts).toEqual(['assets']));
+    await user.click(screen.getByRole('link', { name: 'drill down' }));
+    await waitFor(() => expect(screen.getByText('assets page')).toBeInTheDocument());
+    expect(mounts).toEqual(['assets']);
+    // Still fades, though — it is a navigation, just not a new instance.
+    expect(animate).toHaveBeenCalled();
   });
 });
