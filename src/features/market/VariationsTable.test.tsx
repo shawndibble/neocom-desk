@@ -79,7 +79,8 @@ describe('VariationsTable', () => {
   it('shows the sell-side empty state when only a buy order exists, and vice versa', () => {
     renderTable({ rows: [ROWS[0]], totalCount: 1, prices: new Map([[588, summary(null, 90)]]) });
     expect(screen.getByText('No sell orders')).toBeInTheDocument();
-    expect(screen.getByText('90.00')).toBeInTheDocument();
+    // Shorthand on screen (#947); the exact figure is the accessible name.
+    expect(screen.getByLabelText('90.00 ISK')).toBeInTheDocument();
   });
 
   it('shows the shared "no orders" fallback when neither side has an order', () => {

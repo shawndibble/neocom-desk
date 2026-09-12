@@ -156,7 +156,8 @@ describe('PlanVerdictHero: verdict labels and prose', () => {
 describe('PlanVerdictHero: the big profit figure and qualifier line', () => {
   it('shows net profit as the big figure', () => {
     renderHero();
-    expect(screen.getByText('435 ISK')).toBeInTheDocument();
+    // Shorthand on the face, the exact figure in the accessible name.
+    expect(screen.getByLabelText('435 ISK')).toBeInTheDocument();
   });
 
   it('states the margin in the qualifier line', () => {

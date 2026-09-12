@@ -1772,6 +1772,13 @@ export function BuildPlanDetail({
              * closed, answered half the question and repeated a number the
              * open table states anyway.
              */
+            /*
+             * These three figures stay on `formatIsk` at full precision,
+             * deliberately (issue #948): collapsed or open, this panel is the
+             * Costs & revenue ledger, and the same number must not read
+             * "1.3B" folded and "1,284,500,000" unfolded. The shorthand read
+             * of profit lives in `PlanVerdictHero` above.
+             */
             collapsedSummary={
               pricesReady && (
                 <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-xs">

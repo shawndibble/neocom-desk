@@ -102,8 +102,9 @@ describe('AppraisalPanel', () => {
   it('renders a priced row with both sides', () => {
     renderPanel({ controller: controller({ result: outcome() }) });
     const row = screen.getByRole('row', { name: /Damage Control II/ });
-    expect(within(row).getByText('1,345,950')).toBeInTheDocument();
-    expect(within(row).getByText('1,382,400')).toBeInTheDocument();
+    // Totals render as shorthand (#947); the exact figure is the accessible name.
+    expect(within(row).getByLabelText('1,345,950 ISK')).toBeInTheDocument();
+    expect(within(row).getByLabelText('1,382,400 ISK')).toBeInTheDocument();
   });
 
   /** A null price is "nobody is trading this", not "this is free". */
@@ -214,7 +215,7 @@ describe('AppraisalPanel', () => {
     it('adds a refine column and total when a row carries refine data', () => {
       renderPanel({ controller: controller({ result: refineOutcome() }) });
       const veldsparRow = screen.getByRole('row', { name: /Veldspar/ });
-      expect(within(veldsparRow).getByText('8,000')).toBeInTheDocument();
+      expect(within(veldsparRow).getByLabelText('8,000 ISK')).toBeInTheDocument();
       expect(screen.getAllByText('Refine total').length).toBeGreaterThan(0);
     });
 
@@ -245,8 +246,9 @@ describe('AppraisalPanel', () => {
     it('does not bold the buy total on a row with no refine comparison', () => {
       renderPanel({ controller: controller({ result: refineOutcome() }) });
       const dcuRow = screen.getByRole('row', { name: /Damage Control II/ });
-      const buyCell = within(dcuRow).getByText('1,345,950');
-      expect(buyCell.className).not.toContain('text-accent');
+      // The highlight lives on the cell wrapper around the shorthand figure.
+      const buyCell = within(dcuRow).getByLabelText('1,345,950 ISK').parentElement;
+      expect(buyCell?.className).not.toContain('text-accent');
     });
   });
 

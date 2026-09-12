@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Panel, Spinner } from '@/components/ui';
+import { Button, IskAmount, Panel, Spinner } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import type { BuildResult } from '@/engine/industry/types';
 import { compareUseOrSell, type OwnedStockSale } from '@/engine/industry/ownedStockSale';
@@ -128,7 +128,17 @@ export function PlanVerdictHero({
               >
                 {/* The figure is the Sale Profitability statement (ADR 0006) — labelled, not restated as a pill. */}
                 <span className="sr-only">{t('industry.saleProfitabilityLabel')} </span>
-                {profit === null ? t('common.unknown') : `${formatIsk(profit)} ISK`}
+                {profit === null ? (
+                  t('common.unknown')
+                ) : (
+                  // Tap: the hero figure is inert, so its own tap is free to
+                  // reveal the exact profit. The pills beside it stay on
+                  // `formatIsk` — their amounts are i18next interpolation
+                  // values, which take a string, not a node.
+                  <>
+                    <IskAmount value={profit} revealOn="tap" decimals={0} /> ISK
+                  </>
+                )}
               </p>
             )}
             <p className="text-xs tabular-nums text-text-dim">

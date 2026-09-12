@@ -460,8 +460,9 @@ describe('ItemDetailModal best sell/buy price', () => {
 
     render(<ItemDetailModal typeId={TYPE_ID} itemName="Rifter" onClose={() => {}} />);
 
-    expect(await screen.findByText('450,000.00')).toBeInTheDocument();
-    expect(screen.getByText('420,000.00')).toBeInTheDocument();
+    // Shorthand on screen (#947); the exact figure is the accessible name.
+    expect(await screen.findByLabelText('450,000.00 ISK')).toBeInTheDocument();
+    expect(screen.getByLabelText('420,000.00 ISK')).toBeInTheDocument();
   });
 
   it('shows a dash for a side with no orders', async () => {
@@ -474,7 +475,7 @@ describe('ItemDetailModal best sell/buy price', () => {
 
     render(<ItemDetailModal typeId={TYPE_ID} itemName="Rifter" onClose={() => {}} />);
 
-    expect(await screen.findByText('500,000.00')).toBeInTheDocument();
+    expect(await screen.findByLabelText('500,000.00 ISK')).toBeInTheDocument();
     expect(screen.getByText('—')).toBeInTheDocument();
   });
 

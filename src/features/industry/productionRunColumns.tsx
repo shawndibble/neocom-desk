@@ -10,6 +10,15 @@ import { formatIsk } from '@/lib/isk';
 
 type T = (key: string) => string;
 
+/*
+ * ISK here stays on `formatIsk` at full precision, deliberately (issue #948).
+ * These columns feed the Production Runs table and the Production Log's
+ * Records tab, which is where a player reconciles logged costs and realized
+ * sales against the game client — the ledger side of the shorthand rule, not
+ * the scanning side. `RealizedProfitCell` and the panels' own money columns
+ * stay exact for the same reason.
+ */
+
 /**
  * The `DataTableColumn`s `ProductionRunsPanel` (one Build Plan's own runs)
  * and `ProductionLogPanel` (every run, every plan) share verbatim — every

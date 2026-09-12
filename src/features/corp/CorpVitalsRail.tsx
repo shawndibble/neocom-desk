@@ -12,7 +12,7 @@
  */
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import { Panel, StatChip } from '@/components/ui';
+import { IskAmount, Panel, StatChip } from '@/components/ui';
 import { formatIsk } from '@/lib/isk';
 import { VITALS_WINDOW_DAYS, vitalsFigures, type VitalsJournalEntry } from '@/engine/corp/vitals';
 import type { WalletDivision } from './divisions';
@@ -105,10 +105,13 @@ export function CorpVitalsRail({
           })}
         </div>
         <div className="flex flex-wrap gap-1.5">
-          <StatChip label={t('corp.vitals.total')} value={formatIsk(total, 2)} />
+          <StatChip
+            label={t('corp.vitals.total')}
+            value={<IskAmount value={total} revealOn="tap" />}
+          />
           <StatChip
             label={t('corp.vitals.net', { days: VITALS_WINDOW_DAYS })}
-            value={formatIsk(net, 2)}
+            value={<IskAmount value={net} revealOn="tap" />}
             tone={net < 0 ? 'danger' : 'success'}
           />
           <StatChip

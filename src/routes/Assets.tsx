@@ -8,6 +8,7 @@ import {
   DataAgeBadge,
   EmptyState,
   IconButton,
+  IskAmount,
   PageHeader,
   Panel,
   ReauthBanner,
@@ -1696,7 +1697,11 @@ export function Assets() {
                         {t('assets.itemCount', { count: currentTotals.itemCount })} ·{' '}
                       </span>
                       <span className="text-isk-pos">
-                        {formatIsk(currentTotals.estimatedValue)}
+                        <IskAmount
+                          value={currentTotals.estimatedValue}
+                          revealOn="tap"
+                          decimals={0}
+                        />
                       </span>
                     </span>
                   )}

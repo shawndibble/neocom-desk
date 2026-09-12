@@ -558,7 +558,7 @@ describe('Variations table (issue #145, formerly the Related Items strip of issu
 
     const table = await screen.findByRole('table', { name: 'Variations' });
     expect(await within(table).findByText('Kestrel')).toBeInTheDocument();
-    expect(within(table).getByText('1,500,000.00')).toBeInTheDocument();
+    expect(within(table).getByLabelText('1,500,000.00 ISK')).toBeInTheDocument();
 
     // Corax has a buy order but no sell order — the Sell cell says so
     // plainly rather than showing a fabricated zero, and the Buy cell still
@@ -566,7 +566,7 @@ describe('Variations table (issue #145, formerly the Related Items strip of issu
     const coraxRow = within(table).getByText('Corax').closest('tr');
     if (!coraxRow) throw new Error('expected a Corax row');
     expect(within(coraxRow).getByText('No sell orders')).toBeInTheDocument();
-    expect(within(coraxRow).getByText('700,000.00')).toBeInTheDocument();
+    expect(within(coraxRow).getByLabelText('700,000.00 ISK')).toBeInTheDocument();
 
     // Cormorant has no orders on either side — each cell independently says
     // so, never conflated with Corax's buy-only state.
@@ -810,7 +810,7 @@ describe('Variations table (issue #145, formerly the Related Items strip of issu
     const sellTable = await screen.findByRole('table', { name: 'Sell Orders' });
     expect(within(sellTable).getByText('850,000.00')).toBeInTheDocument();
     const table = await screen.findByRole('table', { name: 'Variations' });
-    expect(within(table).getByText('1,500,000.00')).toBeInTheDocument(); // Kestrel, unfiltered
+    expect(within(table).getByLabelText('1,500,000.00 ISK')).toBeInTheDocument(); // Kestrel, unfiltered
 
     const rows = within(sellTable).getAllByRole('row');
     const targetRow = rows.find((row) => within(row).queryByText('850,000.00'));
@@ -822,7 +822,7 @@ describe('Variations table (issue #145, formerly the Related Items strip of issu
     // Kestrel and Corax have no orders at all at that location — the table
     // degrades exactly as the on-screen tables do under the same filter.
     await waitFor(() => {
-      expect(within(table).queryByText('1,500,000.00')).not.toBeInTheDocument();
+      expect(within(table).queryByLabelText('1,500,000.00 ISK')).not.toBeInTheDocument();
     });
     expect(within(table).getAllByText('No orders').length).toBeGreaterThanOrEqual(2);
   });

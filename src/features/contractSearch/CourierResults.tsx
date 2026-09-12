@@ -24,6 +24,7 @@ import {
   SelectValue,
   SearchInput,
   TextInput,
+  IskAmount,
   type DataTableColumn,
 } from '@/components/ui';
 import {
@@ -38,7 +39,7 @@ import { SPACE_KINDS, type SpaceKind } from '@/engine/space';
 import type { RoutePreferenceKind } from '@/engine/route/jumpRoute';
 import { localJumpCountsForRoutes } from '@/features/route/localRoute';
 import { CourierContractDetailModal } from '@/features/contractSearch/CourierContractDetailModal';
-import { formatIsk, formatIskAuto } from '@/lib/isk';
+import { formatIskAuto } from '@/lib/isk';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
 
@@ -625,7 +626,8 @@ export function CourierResults({ rows, regionNames }: CourierResultsProps) {
         align: 'right',
         className: 'tabular-nums whitespace-nowrap',
         sortValue: (row) => row.reward,
-        render: (row) => formatIsk(row.reward, 2),
+        // Long press, not tap: the row's own tap opens the haul's detail modal.
+        render: (row) => <IskAmount value={row.reward} revealOn="longPress" />,
       },
       {
         id: 'collateral',
@@ -637,7 +639,11 @@ export function CourierResults({ rows, regionNames }: CourierResultsProps) {
         // dash says "none asked", where "0.00 ISK" reads as a figure the issuer
         // actually typed.
         render: (row) =>
-          courierCollateral(row) === 0 ? '—' : formatIsk(courierCollateral(row), 2),
+          courierCollateral(row) === 0 ? (
+            '—'
+          ) : (
+            <IskAmount value={courierCollateral(row)} revealOn="longPress" />
+          ),
       },
       {
         id: 'jumps',

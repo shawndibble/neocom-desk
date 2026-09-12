@@ -11,6 +11,7 @@ import {
   FilterBar,
   FilterChip,
   IconButton,
+  IskAmount,
   PageHeader,
   Panel,
   ReauthBanner,
@@ -44,7 +45,6 @@ import { ContractSearchPanel } from '@/features/contractSearch/ContractSearchPan
 import type { CachedResult } from '@/esi/cache';
 import { resolveNames } from '@/features/character/names';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
-import { formatIsk } from '@/lib/isk';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
 import { downloadCsv } from '@/lib/downloadCsv';
@@ -269,11 +269,13 @@ export function Contracts() {
         className: 'tabular-nums',
         sortValue: (contract) => contract.price ?? contract.reward,
         render: (contract) =>
-          contract.price !== undefined
-            ? formatIsk(contract.price, 2)
-            : contract.reward !== undefined
-              ? formatIsk(contract.reward, 2)
-              : t('common.unknown'),
+          contract.price !== undefined ? (
+            <IskAmount value={contract.price} revealOn="longPress" />
+          ) : contract.reward !== undefined ? (
+            <IskAmount value={contract.reward} revealOn="longPress" />
+          ) : (
+            t('common.unknown')
+          ),
       },
       {
         id: 'expires',

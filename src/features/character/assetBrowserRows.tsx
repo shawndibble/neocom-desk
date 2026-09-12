@@ -13,10 +13,9 @@
 
 import type { ReactElement, ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { IconButton } from '@/components/ui';
+import { IconButton, IskAmount } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
-import { formatIsk } from '@/lib/isk';
 import { formatVolume } from '@/features/market/format';
 import { securityStatusColor } from '@/engine/securityStatus';
 import { formatBadge } from './assetBrowserFormat';
@@ -168,7 +167,9 @@ export function LocationRow({
             <span aria-hidden="true">·</span>
             <span className="tabular-nums">{t('assets.itemCount', { count: itemCount })}</span>
             <span aria-hidden="true">·</span>
-            <span className="tabular-nums text-isk-pos">{formatIsk(estimatedValue)}</span>
+            <span className="tabular-nums text-isk-pos">
+              <IskAmount value={estimatedValue} revealOn="longPress" decimals={0} />
+            </span>
           </span>
         </span>
         <Icon.Descend size={Icon.ICON_SIZE.md} className="shrink-0 text-text-faint" />
@@ -312,7 +313,9 @@ export function ItemRow({
               <span aria-hidden="true">·</span>
               <span>{volumeText}</span>
               <span aria-hidden="true">·</span>
-              <span className="text-isk-pos">{formatIsk(estimatedValue)}</span>
+              <span className="text-isk-pos">
+                <IskAmount value={estimatedValue} revealOn="longPress" decimals={0} />
+              </span>
             </span>
           </span>
         </div>
@@ -370,7 +373,7 @@ export function SearchResultRow({
             <span className="truncate text-[0.6875rem] text-text-dim">{trail.join(' › ')}</span>
           </span>
           <span className="shrink-0 text-[0.6875rem] text-isk-pos tabular-nums">
-            {formatIsk(estimatedValue)}
+            <IskAmount value={estimatedValue} revealOn="longPress" decimals={0} />
           </span>
         </span>
       </Link>

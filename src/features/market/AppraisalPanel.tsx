@@ -14,7 +14,7 @@
  * `Panel` above an optional Compare Hubs `CollapsiblePanel` once something
  * has been appraised.
  */
-import { useState, type ReactElement } from 'react';
+import { useState, type ReactElement, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -22,11 +22,13 @@ import {
   DataTable,
   EmptyState,
   IconButton,
+  IskAmount,
   Panel,
   Spinner,
   StatChip,
   TextInput,
   type DataTableColumn,
+  type IskRevealGesture,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { fieldBaseClassName } from '@/components/ui/controlStyles';
@@ -35,7 +37,7 @@ import { countPasteLines } from '@/engine/market/appraisalPaste';
 import { iskToneClass } from '@/features/character/format';
 import type { BlueprintCatalog } from '@/features/industry/blueprintCatalog';
 import { writeToClipboard } from '@/lib/clipboard';
-import { formatIsk, formatIskAuto } from '@/lib/isk';
+import { formatIskAuto } from '@/lib/isk';
 import { downloadCsv } from '@/lib/downloadCsv';
 import type { TradeHub } from '@/market/hubs';
 import type { HubComparisonRow } from './appraisalData';
@@ -63,10 +65,21 @@ interface AppraisalPanelProps {
   defaultCompareExpanded?: boolean;
 }
 
-/** A missing price is a dash, never a zero — the house placeholder. */
-function iskCell(value: number | null, decimals: 'auto' | 0): string {
+/**
+ * A per-unit price, exact. A missing price is a dash, never a zero — the house
+ * placeholder. Stays on `formatIskAuto` rather than shorthand: an each-price
+ * runs from a 5 ISK mineral to a billion-ISK hull, and compact notation rounds
+ * the cheap end (4.99 and 5.01 both render "5") into nonsense.
+ */
+function eachCell(value: number | null): string {
   if (value === null) return '—';
-  return decimals === 'auto' ? formatIskAuto(value) : formatIsk(value);
+  return formatIskAuto(value);
+}
+
+/** A line or hub total as scannable shorthand, exact value one gesture away. */
+function totalCell(value: number | null, revealOn: IskRevealGesture): ReactNode {
+  if (value === null) return '—';
+  return <IskAmount value={value} revealOn={revealOn} decimals={0} />;
 }
 
 /**
@@ -80,10 +93,10 @@ function refineBeatsSellAsIs(row: AppraisalRow): boolean {
 }
 
 /** Bolds a total only when it actually won a real comparison — never on a row with nothing to compare against. */
-function comparisonCell(text: string, highlighted: boolean, suffix?: ReactElement | false) {
+function comparisonCell(total: ReactNode, highlighted: boolean, suffix?: ReactElement | false) {
   return (
     <span className={highlighted ? 'font-semibold text-accent' : undefined}>
-      {text}
+      {total}
       {suffix}
     </span>
   );
@@ -151,7 +164,7 @@ export function AppraisalPanel({
       header: t('market.appraisal.columnQuantity'),
       align: 'right',
       className: 'whitespace-nowrap tabular-nums',
-      // A count, not ISK — `formatIsk` would run `clampIskZero` over it.
+      // A count, not ISK — an ISK formatter would run `clampIskZero` over it.
       render: (row) => formatVolume(row.quantity),
       sortValue: (row) => row.quantity,
     },
@@ -172,7 +185,7 @@ export function AppraisalPanel({
       header: t('market.appraisal.columnBuyEach'),
       align: 'right',
       className: 'whitespace-nowrap tabular-nums text-text-dim',
-      render: (row) => iskCell(row.buyEach, 'auto'),
+      render: (row) => eachCell(row.buyEach),
       sortValue: (row) => row.buyEach ?? undefined,
     },
     {
@@ -180,7 +193,7 @@ export function AppraisalPanel({
       header: t('market.appraisal.columnSellEach'),
       align: 'right',
       className: 'whitespace-nowrap tabular-nums text-text-dim',
-      render: (row) => iskCell(row.sellEach, 'auto'),
+      render: (row) => eachCell(row.sellEach),
       sortValue: (row) => row.sellEach ?? undefined,
     },
     {
@@ -190,7 +203,7 @@ export function AppraisalPanel({
       className: 'whitespace-nowrap tabular-nums',
       render: (row) =>
         comparisonCell(
-          iskCell(row.buyTotal, 0),
+          totalCell(row.buyTotal, 'longPress'),
           row.refineTotal !== undefined && !refineBeatsSellAsIs(row)
         ),
       sortValue: (row) => row.buyTotal ?? undefined,
@@ -200,7 +213,7 @@ export function AppraisalPanel({
       header: t('market.appraisal.columnSellTotal'),
       align: 'right',
       className: 'whitespace-nowrap tabular-nums',
-      render: (row) => iskCell(row.sellTotal, 0),
+      render: (row) => totalCell(row.sellTotal, 'longPress'),
       sortValue: (row) => row.sellTotal ?? undefined,
     },
   ];
@@ -223,7 +236,7 @@ export function AppraisalPanel({
         row.refineTotal === undefined
           ? '—'
           : comparisonCell(
-              iskCell(row.refineTotal, 0),
+              totalCell(row.refineTotal, 'longPress'),
               refineBeatsSellAsIs(row),
               row.refinePricedAll === false && (
                 <span
@@ -278,7 +291,7 @@ export function AppraisalPanel({
       header: t('market.appraisal.columnSellTotal'),
       align: 'right',
       className: 'whitespace-nowrap tabular-nums',
-      render: (row) => iskCell(row.sell, 0),
+      render: (row) => totalCell(row.sell, 'tap'),
       sortValue: (row) => row.sell ?? undefined,
     },
     {
@@ -286,7 +299,7 @@ export function AppraisalPanel({
       header: t('market.appraisal.columnBuyTotal'),
       align: 'right',
       className: 'whitespace-nowrap tabular-nums',
-      render: (row) => iskCell(row.buy, 0),
+      render: (row) => totalCell(row.buy, 'tap'),
       sortValue: (row) => row.buy ?? undefined,
     },
   ];
@@ -445,25 +458,27 @@ export function AppraisalPanel({
               <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2">
                 <StatChip
                   label={t('market.appraisal.sellTotal')}
-                  value={formatIsk(totals.sell)}
+                  value={<IskAmount value={totals.sell} revealOn="tap" decimals={0} />}
                   tone="accent"
                   tooltip={t('market.appraisal.sellTotalHelp')}
                 />
                 <StatChip
                   label={t('market.appraisal.buyTotal')}
-                  value={formatIsk(totals.buy)}
+                  value={<IskAmount value={totals.buy} revealOn="tap" decimals={0} />}
                   tooltip={t('market.appraisal.buyTotalHelp')}
                 />
                 <StatChip
                   label={t('market.appraisal.spread')}
                   value={
-                    <span className={iskToneClass(totals.spread)}>{formatIsk(totals.spread)}</span>
+                    <span className={iskToneClass(totals.spread)}>
+                      <IskAmount value={totals.spread} revealOn="tap" decimals={0} />
+                    </span>
                   }
                 />
                 {hasRefine && (
                   <StatChip
                     label={t('market.appraisal.refineTotal')}
-                    value={formatIsk(totals.refine)}
+                    value={<IskAmount value={totals.refine} revealOn="tap" decimals={0} />}
                     tooltip={t('market.appraisal.refineTotalHelp')}
                   />
                 )}

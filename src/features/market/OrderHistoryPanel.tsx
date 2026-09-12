@@ -8,6 +8,7 @@ import {
   FilterBar,
   FilterChip,
   IconButton,
+  IskAmount,
   Panel,
   ReauthBanner,
   SearchInput,
@@ -23,7 +24,6 @@ import type { CachedResult } from '@/esi/cache';
 import { loadTypeNames } from '@/features/character/typeNames';
 import type { BlueprintCatalog } from '@/features/industry/blueprintCatalog';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
-import { formatIsk } from '@/lib/isk';
 import { downloadCsv } from '@/lib/downloadCsv';
 import { orderHistoryCsvColumns } from '@/features/character/ordersCsv';
 import type { MarketOrderHistory } from '@/esi/endpoints';
@@ -186,7 +186,7 @@ export function OrderHistoryPanel({
         align: 'right',
         className: 'tabular-nums',
         sortValue: (order) => order.price,
-        render: (order) => formatIsk(order.price, 2),
+        render: (order) => <IskAmount value={order.price} revealOn="longPress" />,
       },
       {
         id: 'remaining',

@@ -13,6 +13,7 @@ import {
   FilterBar,
   FilterField,
   IconButton,
+  IskAmount,
   Modal,
   PageHeader,
   SearchInput,
@@ -89,7 +90,6 @@ import {
   type SortDirection,
 } from '@/features/character/groups';
 import { formatCompactNumber } from '@/lib/compactNumber';
-import { formatIskCompact } from '@/lib/isk';
 
 const UNGROUPED_VALUE = '__ungrouped__';
 
@@ -273,7 +273,13 @@ function CharacterCard({
         />
         <StatChip
           label={t('characters.walletLabel')}
-          value={stats?.wallet === undefined ? t('common.unknown') : formatIskCompact(stats.wallet)}
+          value={
+            stats?.wallet === undefined ? (
+              t('common.unknown')
+            ) : (
+              <IskAmount value={stats.wallet} revealOn="tap" />
+            )
+          }
         />
         {queue && (
           <StatChip
@@ -556,7 +562,11 @@ function buildColumns(
       className: 'tabular-nums',
       sortValue: (row) => row.stats?.wallet,
       render: (row) =>
-        row.stats?.wallet === undefined ? t('common.unknown') : formatIskCompact(row.stats.wallet),
+        row.stats?.wallet === undefined ? (
+          t('common.unknown')
+        ) : (
+          <IskAmount value={row.stats.wallet} revealOn="longPress" />
+        ),
     },
     lastSynced: {
       id: 'lastSynced',
