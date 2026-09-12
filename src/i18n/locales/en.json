@@ -2031,7 +2031,6 @@
     "capacityClosest": "Nothing more fits as it stands — the closest is a {{pin}} at {{pinCpu}} tf / {{pinPowergrid}} MW.",
     "priceBasis": "Priced at lowest {{hub}} sell on both sides: what an input costs to buy, and what the output fetches if you list it rather than sell into a buy order.",
     "stopTierLabel": "Build up to",
-    "stopTierCardHint": "What this planet alone would earn rebuilt around one resource — a different question from \"Do this\" above, not an addition to it.",
     "stopTierValueSwitch": "{{isk}} an hour, at {{units}} an hour of output — what this colony would make rebuilt around it, not what it makes now",
     "stopTierValue": "{{isk}} an hour, at {{units}} an hour of output",
     "stopTierNeedsRate": "No build advice: no extractor here reports a complete program, so this colony has no rate of its own to size a chain against.",
