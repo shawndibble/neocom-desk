@@ -79,11 +79,19 @@ function parseNumeric(value: string): number | null {
 }
 
 /**
- * A location nothing local names still has to say *which* location it is —
- * the bare id, the same fallback the item results use for an unnamed type.
+ * The route column names each end by its *system*, not its station: a haul is
+ * read as Jita → Amarr, and the full "Jita IV - Moon 4 - Caldari Navy
+ * Assembly Plant" costs two lines of table width to say the same thing. The
+ * exact station is still one click away in the detail modal, which keeps it.
+ *
+ * Both fallbacks are reachable and mean different things. A station whose
+ * system the snapshot did not resolve still has its own name, which is a
+ * better answer than nothing; a location nothing local names at all — a
+ * player structure — shows the bare id, the same fallback the item results
+ * use for an unnamed type.
  */
-function endpointName(endpoint: CourierEndpoint): string {
-  return endpoint.name ?? `#${endpoint.locationId}`;
+function endpointSystemName(endpoint: CourierEndpoint): string {
+  return endpoint.systemName ?? endpoint.name ?? `#${endpoint.locationId}`;
 }
 
 function regionLabel(
@@ -335,18 +343,19 @@ export function CourierResults({ rows, regionNames }: CourierResultsProps) {
         id: 'route',
         header: t('contractSearch.routeColumn'),
         primary: true,
-        sortValue: (row) => `${endpointName(row.origin)} ${endpointName(row.destination)}`,
+        sortValue: (row) =>
+          `${endpointSystemName(row.origin)} ${endpointSystemName(row.destination)}`,
         render: (row) => (
           <div className="flex flex-col gap-0.5">
             <span>
-              {endpointName(row.origin)}
+              {endpointSystemName(row.origin)}
               {originRegion(row) && (
                 <span className="ml-1.5 text-[0.6875rem] text-text-dim">{originRegion(row)}</span>
               )}
             </span>
             <span className="text-text-dim">
               {'→ '}
-              {endpointName(row.destination)}
+              {endpointSystemName(row.destination)}
               {destinationRegion(row) && (
                 <span className="ml-1.5 text-[0.6875rem]">{destinationRegion(row)}</span>
               )}
