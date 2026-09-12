@@ -21,15 +21,45 @@
 import { classifySpace } from '@/engine/space';
 import { lookupNpcStation } from '@/sde/npcStations';
 import { lookupSolarSystem } from '@/sde/solarSystems';
+import { loadJumpGraph } from '@/sde/jumpGraph';
+import type { JumpGraph } from '@/engine/route/jumpRoute';
 import type { CourierEndpoint, PublicCourierContractRow } from '@/engine/contracts/courierSearch';
 
-async function resolveOne(locationId: number): Promise<CourierEndpoint | null> {
+/** Nothing local placed this id; which of the two reasons is the whole point. */
+function unplaced(
+  locationId: number,
+  resolution: 'structure' | 'unknown',
+  regionId: number | null
+): CourierEndpoint {
+  return {
+    locationId,
+    name: null,
+    systemName: null,
+    systemId: null,
+    regionId,
+    space: null,
+    resolution,
+    hasStargates: null,
+  };
+}
+
+async function resolveOne(
+  locationId: number,
+  graph: JumpGraph | undefined,
+  fallbackRegionId: number | null
+): Promise<CourierEndpoint> {
   const station = await lookupNpcStation(locationId);
-  // `null` (a player structure) and `undefined` (snapshot unreadable) are
-  // different conclusions everywhere else; here they lead to the same place —
-  // nothing local names this id — so both fall through to no entry at all.
-  if (!station) return null;
+  // `null` and `undefined` are opposite conclusions — "the table loaded and
+  // does not hold this id, so it is a player structure" versus "the table could
+  // not be read, so nothing is concluded". This used to collapse them, which
+  // was harmless while the only consequence was an unshowable name. It stopped
+  // being harmless once a scam flag rode on the answer (issue #944): one failed
+  // read would mark every haul on the board as a possible scam.
+  if (station === undefined) return unplaced(locationId, 'unknown', fallbackRegionId);
+  if (station === null) return unplaced(locationId, 'structure', fallbackRegionId);
+
   const system = await lookupSolarSystem(station.systemId);
+  const gates = graph?.get(station.systemId);
   return {
     locationId,
     name: station.name,
@@ -45,6 +75,12 @@ async function resolveOne(locationId: number): Promise<CourierEndpoint | null> {
     // and a status for the rest, and inventing either would be a claim about
     // where a haul goes that nothing local supports.
     space: system ? classifySpace(system.name, system.security) : null,
+    resolution: 'station',
+    // The graph keys *every* solar system, gateless ones with an empty list, so
+    // a present-but-empty entry is "no stargate touches this system" while a
+    // missing graph is "we could not read it". Those must not read alike: the
+    // first is a fact about New Eden, the second a gap in our snapshot.
+    hasStargates: gates === undefined ? null : gates.length > 0,
   };
 }
 
@@ -56,17 +92,23 @@ async function resolveOne(locationId: number): Promise<CourierEndpoint | null> {
 export async function loadCourierEndpoints(
   rows: readonly PublicCourierContractRow[]
 ): Promise<Map<number, CourierEndpoint>> {
+  // An origin the snapshots cannot place still has a region: the row carries
+  // the contract's own, which is where the pickup is. It is the only local fact
+  // left about a haul posted from a player structure, and the one that says a
+  // J-space pickup is J-space at all.
+  const regionByOrigin = new Map<number, number>();
   const ids = new Set<number>();
   for (const row of rows) {
     ids.add(row.originLocationId);
     ids.add(row.destinationLocationId);
+    regionByOrigin.set(row.originLocationId, row.regionId);
   }
 
+  const graph = await loadJumpGraph();
   const endpoints = new Map<number, CourierEndpoint>();
   await Promise.all(
     [...ids].map(async (id) => {
-      const endpoint = await resolveOne(id);
-      if (endpoint) endpoints.set(id, endpoint);
+      endpoints.set(id, await resolveOne(id, graph, regionByOrigin.get(id) ?? null));
     })
   );
   return endpoints;

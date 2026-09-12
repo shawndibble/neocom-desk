@@ -88,7 +88,36 @@ export interface CourierEndpoint {
    * tests while the suite stayed green.
    */
   space: SpaceKind | null;
+  /**
+   * What the local station table concluded about this id, which is three
+   * answers rather than two (issue #944). `stations.json` is the complete NPC
+   * station table, so an id it does not hold is a **player structure** by
+   * elimination — but only if the file was read at all. `unknown` is the
+   * snapshot being unreadable, which leaves every field below null for an
+   * entirely different reason.
+   *
+   * Collapsing the two was harmless while this only decided whether a name
+   * could be shown. It stopped being harmless the moment a risk flag rode on
+   * it: one failed read would otherwise mark every haul on the board as a
+   * possible scam.
+   */
+  resolution: EndpointResolution;
+  /**
+   * Whether any stargate touches this end's system, from the local jump graph
+   * — `null` when nothing places the endpoint, so there is no system to ask
+   * about. `false` is a statement about New Eden, not about our data: no gate
+   * route into or out of this system exists, which is true of every J-space
+   * system and of the Drifter and unreachable systems beside them.
+   */
+  hasStargates: boolean | null;
 }
+
+/**
+ * Which of `sde/npcStations.ts`'s three answers named this endpoint. Kept as a
+ * field rather than inferred from `name === null`, because the two nameless
+ * cases are opposite conclusions and only the producer knows which it reached.
+ */
+export type EndpointResolution = 'station' | 'structure' | 'unknown';
 
 /** A courier row with both ends resolved — what the filters and the table read. */
 export interface CourierRouteRow extends PublicCourierContractRow {
@@ -110,6 +139,12 @@ function endpointFor(
     systemId: null,
     regionId: fallbackRegionId,
     space: null,
+    // Nothing in the index at all, which the resolver no longer produces — it
+    // records every id it was asked about. Reaching here means the caller
+    // passed rows the index was never built from, so the honest answer is that
+    // nothing was concluded.
+    resolution: 'unknown',
+    hasStargates: null,
   };
 }
 

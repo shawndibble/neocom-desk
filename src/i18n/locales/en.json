@@ -3664,6 +3664,16 @@
     "courierEmptyTitle": "No public courier contracts synced yet",
     "courierEmptyHint": "The public contract index refreshes on its own schedule — check back shortly.",
     "destinationSpaceLabel": "Destination space",
+    "hideUncompletableLabel": "Hide hauls I may not be able to complete",
+    "riskHeading": "Before you accept",
+    "risk": {
+      "structureShort": "Structure",
+      "structureDetail": "The delivery point is a player structure. Docking there needs access its owner controls, and this app cannot check it. If you cannot dock, the contract expires undelivered and the issuer keeps your collateral.",
+      "noGateRouteShort": "No gate route",
+      "noGateRouteDetail": "No stargate route reaches this end. Wormhole space has no gate connections at all, so this haul cannot be flown gate to gate — this is how New Eden is built, not a gap in our distance data.",
+      "nullsecShort": "Nullsec",
+      "nullsecDetail": "One end is in nullsec. Getting there usually depends on sovereignty, standings or a jump network this app cannot see. Plenty of nullsec hauling is ordinary, well-paid work — this is a note, not a warning."
+    },
     "spaceUnknown": "Unknown space",
     "courierNoFilterMatchesUnplacedHint": "Some hauls end at a structure this app cannot place, so they carry no space band and a narrowed Destination space filter leaves them out. Select every band to see them again.",
     "loadingOffers": "Loading public contracts…",

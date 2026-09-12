@@ -8,7 +8,7 @@ import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharact
 import { DEFAULT_TIME_FORMAT, useTimeFormat } from '@/lib/timeFormat';
 import { isSyncConfigured } from '@/app/syncStatus';
 import { clearJumpGraphIndex } from '@/sde/jumpGraph';
-import { loadMarketTypes } from '@/sde/loadMarketSde';
+import { loadMarketTypes, loadSolarSystemJumps } from '@/sde/loadMarketSde';
 import { ContractSearchPanel } from '@/features/contractSearch/ContractSearchPanel';
 import type { PublicContractOfferRow } from '@/engine/contracts/contractOffers';
 import type { ChunkedSnapshotRead } from '@/features/contractSearch/chunkedSnapshot';
@@ -280,6 +280,9 @@ beforeEach(async () => {
     fromCache: false,
     truncated: false,
   });
+  // Restored per case: the jump-graph failure case below rejects persistently,
+  // and a leaked rejection would strand every later case with no distances.
+  vi.mocked(loadSolarSystemJumps).mockImplementation(async () => JUMPS);
   // Both SDE indexes memoize per session, so without this a case that swaps
   // the snapshot reads the previous case's map.
   clearNpcStationIndex();
@@ -530,8 +533,10 @@ describe('ContractSearchPanel — Courier mode', () => {
   it('ranks by reward and says so when the jump graph cannot be read', async () => {
     // A board that cannot measure distance must not report every haul as
     // having no route; it falls back to reward and states why.
-    const { loadSolarSystemJumps } = await import('@/sde/loadMarketSde');
-    vi.mocked(loadSolarSystemJumps).mockRejectedValueOnce(new Error('offline'));
+    // Persistent, not `...Once`: the graph is read by the endpoint resolution
+    // as well as by the distance pass, and a single rejection would leave the
+    // second read succeeding and the board measuring distances after all.
+    vi.mocked(loadSolarSystemJumps).mockRejectedValue(new Error('offline'));
     clearJumpGraphIndex();
     await showCourier();
 
@@ -1009,6 +1014,118 @@ describe('ContractSearchPanel — Courier endpoint space', () => {
 
     expect(await screen.findByText(/match your filters/i)).toBeInTheDocument();
     expect(screen.queryByText(/cannot place/i)).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * A courier contract is accepted by putting up collateral, so a haul that
+ * cannot be delivered costs real ISK (issue #944). None of these flags claims
+ * to know whether this player has access — only what the condition is and what
+ * it would cost.
+ */
+describe('ContractSearchPanel — Courier completion risk', () => {
+  const TO_STRUCTURE = courierRow({ contractId: 701, destinationLocationId: UNKNOWN_STRUCTURE });
+  const FROM_STRUCTURE = courierRow({ contractId: 702, originLocationId: UNKNOWN_STRUCTURE });
+  /** Posted in a J-space region, which is the one local fact a structure pickup leaves. */
+  const OUT_OF_WORMHOLE = courierRow({
+    contractId: 703,
+    regionId: 11000031,
+    originLocationId: UNKNOWN_STRUCTURE,
+  });
+  const TO_NULLSEC = courierRow({ contractId: 704, destinationLocationId: NULL_STATION });
+
+  async function showCourierWith(rows: PublicCourierContractRow[]) {
+    loadPublicCourierContracts.mockResolvedValue(cachedCourierSnapshot(rows));
+    const user = userEvent.setup();
+    renderWithRouter();
+    await bodyRows();
+    await user.click(screen.getByRole('button', { name: 'Courier' }));
+    await screen.findByRole('table');
+    return user;
+  }
+
+  async function courierRows() {
+    const table = await screen.findByRole('table');
+    const [, ...rest] = within(table).getAllByRole('rowgroup');
+    return within(rest[0]).getAllByRole('row');
+  }
+
+  it('flags a delivery to a player structure, beside the delivery end', async () => {
+    await showCourierWith([TO_STRUCTURE]);
+
+    const route = within((await courierRows())[0]).getAllByRole('cell')[0];
+    expect(within(route).getByText('Structure')).toBeInTheDocument();
+  });
+
+  it('does not flag a pickup from a player structure', async () => {
+    // A pickup that cannot be reached is simply never accepted. It is the
+    // delivery that is already paid for with collateral put up.
+    await showCourierWith([FROM_STRUCTURE]);
+
+    const route = within((await courierRows())[0]).getAllByRole('cell')[0];
+    expect(within(route).queryByText('Structure')).not.toBeInTheDocument();
+  });
+
+  it('never reads an unreadable station table as a board full of player structures', async () => {
+    // The worst possible failure direction for a safety feature: one failed
+    // file read marking every haul on the board as a likely scam.
+    const { loadNpcStations } = await import('@/sde/loadMarketSde');
+    vi.mocked(loadNpcStations).mockRejectedValue(new Error('offline'));
+    clearNpcStationIndex();
+    await showCourierWith([JITA_TO_AMARR, TO_STRUCTURE]);
+
+    expect(screen.queryByText('Structure')).not.toBeInTheDocument();
+    vi.mocked(loadNpcStations).mockImplementation(async () => STATIONS);
+  });
+
+  it('says a wormhole haul has no gate route, not an unknown distance', async () => {
+    // Structural, not a gap in our data: J-space has no stargates at all.
+    await showCourierWith([OUT_OF_WORMHOLE]);
+
+    const route = within((await courierRows())[0]).getAllByRole('cell')[0];
+    expect(within(route).getByText('No gate route')).toBeInTheDocument();
+  });
+
+  it('marks nullsec informationally, with no warning marker of its own', async () => {
+    // The space band already names it, which is a note. A second marker in a
+    // warning colour would turn that note into an alarm.
+    await showCourierWith([TO_NULLSEC]);
+
+    const route = within((await courierRows())[0]).getAllByRole('cell')[0];
+    expect(route).toHaveTextContent('Nullsec');
+    expect(within(route).queryByText('No gate route')).not.toBeInTheDocument();
+    expect(within(route).queryByText('Structure')).not.toBeInTheDocument();
+  });
+
+  it('hides what cannot be delivered on request, and keeps nullsec work', async () => {
+    const user = await showCourierWith([JITA_TO_AMARR, TO_STRUCTURE, OUT_OF_WORMHOLE, TO_NULLSEC]);
+    expect(await courierRows()).toHaveLength(4);
+
+    await user.click(screen.getByRole('button', { name: 'Filters' }));
+    await user.click(
+      screen.getByRole('button', { name: 'Hide hauls I may not be able to complete' })
+    );
+
+    // Nullsec stays: hiding legitimate nullsec work behind a safety control
+    // would quietly remove a real market rather than protect anyone.
+    const remaining = await courierRows();
+    expect(remaining).toHaveLength(2);
+    const routes = remaining.map((r) => within(r).getAllByRole('cell')[0].textContent ?? '');
+    expect(routes.some((route) => route.includes('Nullsec'))).toBe(true);
+    expect(routes.some((route) => route.includes('Structure'))).toBe(false);
+    expect(routes.some((route) => route.includes('No gate route'))).toBe(false);
+  });
+
+  it('spells each flag out in the detail, where the decision is made', async () => {
+    const user = await showCourierWith([TO_STRUCTURE]);
+    await user.click((await courierRows())[0]);
+
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText(/keeps your collateral/)).toBeInTheDocument();
+    // States the condition, never a verdict about this player's own access.
+    expect(within(dialog).queryByText(/you do not have access/i)).not.toBeInTheDocument();
+    // The ratio a hauler judges the risk against sits in the same place.
+    expect(within(dialog).getByText('Collateral / reward')).toBeInTheDocument();
   });
 });
 

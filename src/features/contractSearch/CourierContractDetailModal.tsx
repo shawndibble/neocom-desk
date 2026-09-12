@@ -22,6 +22,8 @@ import {
   type CourierRouteRow,
 } from '@/engine/contracts/courierSearch';
 import { collateralToRewardRatio, iskPerVolume } from '@/engine/contracts/courierRates';
+import { courierRisks } from '@/engine/contracts/courierRisk';
+import { riskExplanationKey, riskShortLabelKey } from '@/features/contractSearch/courierRiskLabels';
 
 /**
  * One decimal, for a figure read as a magnitude rather than an exact amount —
@@ -56,6 +58,10 @@ export function CourierContractDetailModal({
   const collateral = courierCollateral(row);
   const volumeRate = iskPerVolume(row.reward, row.volume);
   const collateralRatio = collateralToRewardRatio(collateral, row.reward);
+  // Spelled out here, where the decision is actually made — the row only has
+  // room for a marker. Every one names a condition and what it would cost;
+  // none claims to know whether this player in particular has access.
+  const risks = courierRisks(row);
 
   return (
     <Modal
@@ -101,6 +107,23 @@ export function CourierContractDetailModal({
             }
           />
         </div>
+
+        {risks.length > 0 && (
+          <section className="flex flex-col gap-1.5 rounded-xs border border-line bg-panel-2 p-3">
+            <h3 className="text-[0.6875rem] font-semibold tracking-widest text-warning uppercase">
+              {t('contractSearch.riskHeading')}
+            </h3>
+            <ul className="flex flex-col gap-1.5 text-sm">
+              {risks.map((kind) => (
+                <li key={kind}>
+                  <span className="text-text-dim">{t(riskShortLabelKey(kind))}</span>
+                  {' — '}
+                  {t(riskExplanationKey(kind))}
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
 
         <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-sm">
           <dt className="text-text-dim">{t('contractSearch.originLabel')}</dt>
