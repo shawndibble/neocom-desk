@@ -29,6 +29,7 @@ import {
   setRigSlot,
 } from '@/engine/industry/types';
 import { makeOrBuy, type MakeOrBuy } from '@/engine/industry/makeOrBuy';
+import { totalVolume } from '@/engine/industry/materialVolume';
 import {
   autoBuildHere,
   maxAutoBuildDepth,
@@ -59,7 +60,12 @@ import type { BuildPlanRecord } from '@/db';
 import type { CharacterBlueprint } from '@/esi/endpoints';
 import type { PiData } from '@/sde/types';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
-import { nameForType, toIndustryBlueprint, type BlueprintCatalog } from './blueprintCatalog';
+import {
+  nameForType,
+  toIndustryBlueprint,
+  volumeForType,
+  type BlueprintCatalog,
+} from './blueprintCatalog';
 import { computeBuildPlan } from './computeBuildPlan';
 import {
   acquisitionForLookup,
@@ -705,6 +711,18 @@ export function BuildPlanDetail({
   const visibleMaterials = useMemo(
     () => (result ? materialTableRows(result.materials) : []),
     [result]
+  );
+
+  // Same exclusion the volume column itself applies (issue #874): a built
+  // row's quantity is produced here, never hauled at that typeID — its own
+  // inputs already carry that volume as their own rows in this same list.
+  const materialVolume = useMemo(
+    () =>
+      totalVolume(
+        visibleMaterials.filter((material) => material.subBuilds.length === 0),
+        (typeID) => volumeForType(catalog, typeID)
+      ),
+    [visibleMaterials, catalog]
   );
 
   // Every material on the table, not just the blueprint's own: a mineral a
@@ -1678,6 +1696,7 @@ export function BuildPlanDetail({
               <MaterialsTable
                 materials={visibleMaterials}
                 nameFor={(typeID) => nameForType(catalog, typeID)}
+                volumeFor={(typeID) => volumeForType(catalog, typeID)}
                 sourcing={plan.materialSourcing}
                 pricesReady={pricesReady}
                 onSourcingChange={onSourcingChange}
@@ -1819,6 +1838,7 @@ export function BuildPlanDetail({
               costIndexSystemName={buildSystem?.name ?? hub.systemName}
               ownedSale={ownedSale}
               nameFor={(typeID) => nameForType(catalog, typeID)}
+              totalVolume={materialVolume}
               onOpenBreakdown={() => setBreakdownOpen(true)}
             />
           </CollapsiblePanel>

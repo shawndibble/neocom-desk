@@ -48,6 +48,7 @@ const {
   searchByProductName,
   toIndustryBlueprint,
   nameForType,
+  volumeForType,
   buildPlansByMaterialTypeID,
 } = await import('./blueprintCatalog');
 
@@ -185,5 +186,23 @@ describe('nameForType', () => {
   it('falls back to #typeID when unknown', async () => {
     const catalog = await loadBlueprintCatalog();
     expect(nameForType(catalog, 99999)).toBe('#99999');
+  });
+});
+
+describe('volumeForType', () => {
+  it('resolves a known typeID via types.json', async () => {
+    const catalog = await loadBlueprintCatalog();
+    expect(volumeForType(catalog, 34)).toBe(0.01);
+  });
+
+  it('returns null for an unknown typeID', async () => {
+    const catalog = await loadBlueprintCatalog();
+    expect(volumeForType(catalog, 99999)).toBeNull();
+  });
+
+  it('returns null for a negative or non-finite volume rather than trusting it', async () => {
+    const catalog = await loadBlueprintCatalog();
+    catalog.typesById['587'] = { ...catalog.typesById['587']!, volume: -1 };
+    expect(volumeForType(catalog, 587)).toBeNull();
   });
 });
