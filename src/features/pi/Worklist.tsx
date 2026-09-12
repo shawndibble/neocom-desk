@@ -36,6 +36,20 @@ function span(hours: number, t: TFunction): string {
 
 function Worth({ row }: { row: WorklistRow }) {
   const { t } = useTranslation();
+  // A haul row's worth is real and this model has not derived it: what a stall
+  // costs depends on earnings the worklist adapter is not given, so it carries
+  // a zero it never measured. Printing "+0 ISK" says the fix is worth nothing,
+  // which is the opposite of what a stalled colony means. So the column states
+  // the fact it does have — how much of the pilot's own window the colony
+  // spends standing still — and no money at all.
+  if (row.verb === 'haul' && row.window) {
+    const stalled = Math.max(0, 1 - row.window.hoursToFull / row.window.haulHours);
+    return (
+      <span className="text-right text-xs font-semibold whitespace-nowrap text-warning tabular-nums">
+        {t('piAdvisor.worklistStalled', { percent: Math.round(stalled * 100) })}
+      </span>
+    );
+  }
   // The extraction a removal pays for: the facilities it reaches. No ISK,
   // because this row genuinely has none — see `worklistModel.ts`.
   if (row.iskPerHour === null && row.unitsPerHour !== undefined) {
@@ -88,7 +102,7 @@ function Step({ row }: { row: WorklistRow }) {
     return (
       <>
         {t('piAdvisor.rowAddHeads', {
-          heads: row.heads ?? 0,
+          count: row.heads ?? 0,
           units: Math.round(row.unitsPerHour ?? 0).toLocaleString(),
           name: row.label,
         })}
@@ -142,12 +156,66 @@ function Row({ row, rank, dim }: { row: WorklistRow; rank: number; dim?: boolean
   );
 }
 
-export function Worklist({ list }: { list: WorklistData }) {
+/**
+ * Which of the two lists the table is showing.
+ *
+ * Two chips rather than a checkbox: the choice is between two readings of the
+ * same colonies — "what can I do without tearing anything down" and "what if I
+ * were willing to" — and a checkbox labelled "include rebuilds" makes the
+ * second look like extra rows of the first. It is not; nothing sums across the
+ * band. Tuning-only leads because it is the answer a pilot can act on today.
+ */
+export function WorklistToggle({
+  includeRebuilds,
+  onChange,
+  rebuildCount,
+}: {
+  includeRebuilds: boolean;
+  onChange: (includeRebuilds: boolean) => void;
+  rebuildCount: number;
+}) {
   const { t } = useTranslation();
-  const { tuning, rebuilds } = list;
+  // Nothing to include, so nothing to offer: a chip that toggles between an
+  // empty list and the same empty list is a control that does nothing.
+  if (rebuildCount === 0) return null;
+  const chip = (active: boolean) =>
+    `rounded-xs px-2.5 py-[3px] text-[0.625rem] font-semibold tracking-widest uppercase ${
+      active
+        ? 'border border-accent-dim bg-accent/10 text-accent'
+        : 'border border-line-bright text-text-dim hover:text-text'
+    }`;
+  return (
+    <div className="flex gap-1.5">
+      <button type="button" className={chip(!includeRebuilds)} onClick={() => onChange(false)}>
+        {t('piAdvisor.worklistTuningOnly')}
+      </button>
+      <button type="button" className={chip(includeRebuilds)} onClick={() => onChange(true)}>
+        {t('piAdvisor.worklistIncludeRebuilds')}
+      </button>
+    </div>
+  );
+}
+
+export function Worklist({
+  list,
+  includeRebuilds = true,
+}: {
+  list: WorklistData;
+  includeRebuilds?: boolean;
+}) {
+  const { t } = useTranslation();
+  const { tuning } = list;
+  const rebuilds = includeRebuilds ? list.rebuilds : [];
 
   if (tuning.length === 0 && rebuilds.length === 0) {
-    return <p className="px-3 py-4 text-xs text-text-dim">{t('piAdvisor.worklistEmpty')}</p>;
+    // "Nothing to change" would be a lie while rebuilds are merely hidden.
+    return (
+      <p className="px-3 py-4 text-xs text-text-dim">
+        {list.rebuilds.length > 0
+          ? t('piAdvisor.worklistTuningNone')
+          : t('piAdvisor.worklistEmpty')}
+      </p>
+    );
   }
 
   return (

@@ -34,8 +34,13 @@ export function BlindSpots({ spots }: { spots: readonly BlindSpot[] }) {
   }
 
   return (
-    <div className="space-y-2">
-      <p className="text-[0.6875rem] text-text-dim">{t('piAdvisor.blindHint')}</p>
+    <div>
+      {/*
+        The standing explanation of what this panel is for used to sit here,
+        above the rows. Every reader paid for it on every visit to learn
+        something the panel's own title already says, so it is gone — the rows
+        each name their planet and their reason, which is the content.
+      */}
       <ul className="space-y-1.5">
         {spots.map((spot) => (
           <li key={spot.key} className="flex items-baseline gap-2.5">

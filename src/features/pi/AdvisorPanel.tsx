@@ -36,28 +36,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
-import {
-  EmptyState,
-  InfoTooltip,
-  Panel,
-  ReauthBanner,
-  Modal,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-  Spinner,
-  StatChip,
-  TextInput,
-} from '@/components/ui';
-import * as Icon from '@/components/ui/icons';
-import { buttonClassName } from '@/components/ui';
+import { EmptyState, Panel, ReauthBanner, Modal, Spinner } from '@/components/ui';
 import { beginEveLogin } from '@/app/loginFlow';
 import { formatIsk } from '@/lib/isk';
 import { loadPi, loadPiPlanetRadius } from '@/sde/loadSde';
 import { db } from '@/db';
-import { DEFAULT_TRADE_HUB, TRADE_HUBS, getTradeHub, type TradeHub } from '@/market/hubs';
+import { DEFAULT_TRADE_HUB, getTradeHub, type TradeHub } from '@/market/hubs';
 import { loadPlanPrices } from './planPrices';
 import { clearPlanetRichness, scheduleSync, setPlanetRichness, setSyncedSetting } from '@/sync';
 import { ResourcePicker } from './ResourcePicker';
@@ -88,23 +72,25 @@ import { loadPiRosterSnapshot } from './roster';
 import { useAltColonies } from './altColoniesPref';
 import { colonyStopTierAdvice } from './stopTierModel';
 import { PI_CADENCE_DAYS, cadenceHours, useCadence } from './cadencePref';
-import { CadenceControls } from './CadenceControls';
+import { HowYouPlay } from './HowYouPlay';
 import { restartCadenceYield } from '@/engine/pi/restartCadence';
-import { Worklist } from './Worklist';
+import { Worklist, WorklistToggle } from './Worklist';
 import { buildWorklist } from './worklistModel';
 import { worklistColonies } from './worklistAdapter';
 import { BlindSpots } from './BlindSpots';
 import { blindSpots } from './blindSpotModel';
 import { AdvisorSummary } from './AdvisorSummary';
+import { ColonyStrip } from './ColonyStrip';
+import { colonyStripRows } from './colonyStripModel';
 import { builtColonyEarnings, totalColonyEarnings } from './colonyEarningsModel';
 import { extractorProgramsFromPins } from './adapters';
 import { colonyNetwork } from './networkModel';
 import { NetworkPanel } from './NetworkPanel';
 import { ColonyDetail } from './ColonyDetailModal';
-import { layoutLabel, useColonyPlan } from './colonyPlan';
-import { DirectiveRow, EstimateBadge, LoadMeter, SectionLabel } from './DirectiveRow';
+import { colonyPlan, layoutLabel, useColonyPlan } from './colonyPlan';
+import { DirectiveRow, EstimateBadge, SectionLabel } from './DirectiveRow';
 import { medianNewLinkLoad, unbuiltPlanAdvice, type UnbuiltPlanAdvice } from './unbuiltPlanModel';
-import { useMarketSourcing, type MarketSourcing } from './marketSourcingPref';
+import { useMarketSourcing } from './marketSourcingPref';
 import type { NetworkConversion, NetworkOpportunity } from '@/engine/pi/network';
 import {
   colonySpaceFor,
@@ -515,27 +501,6 @@ function PlanetCard({
   );
 }
 
-/** The card footer's Details control, which opens the tab's one modal. */
-function DetailsButton({ name, onClick }: { name: string; onClick: () => void }) {
-  const { t } = useTranslation();
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-label={t('piAdvisor.detailsLabel', { name })}
-      aria-haspopup="dialog"
-      // The shared control scale, not a hand-written height: this sits in a
-      // card footer beside nothing, but it is still a tap target and
-      // `controlHeightClassName` is what gives it the 44px touch tier
-      // (DESIGN.md §3).
-      className={buttonClassName({ size: 'sm', variant: 'ghost' })}
-    >
-      {t('piAdvisor.detailsAction')}
-      <Icon.Descend aria-hidden="true" size={Icon.ICON_SIZE.sm} />
-    </button>
-  );
-}
-
 /** A colony's build-up-to recommendation, memoised for one colony. */
 function useStopTier(
   advice: Extract<PlanetAdvice, { kind: 'built' }>,
@@ -586,124 +551,6 @@ interface ColonyCardProps {
   planetNames: ReadonlyMap<number, string>;
   /** Who owns a planet, when it is not this Character's — by planetId. */
   owners: ReadonlyMap<number, string>;
-}
-
-/**
- * A built colony, at a glance: what it pulls, what it makes, how full it is.
- *
- * Not what to do about it. That is one ranked list at the top of the tab now
- * (`worklistModel.ts`), because choosing between two planets' steps means
- * putting their figures in one column, which a grid of cards cannot do.
- * Everything else is behind Details.
- */
-function BuiltCard({ onOpenDetails, ...props }: ColonyCardProps & { onOpenDetails: () => void }) {
-  const { t } = useTranslation();
-  const { advice, pi, typeNames } = props;
-  const { colony } = advice;
-  const plan = useColonyPlan(colony, pi);
-  const name = advice.name ?? t('pi.planetLabel', { id: advice.planetId });
-
-  // A colony whose links cannot be costed gets no instructions at all — the
-  // same rule the unbuilt cards follow: name what is true, print no number
-  // that isn't.
-  const unmeasurable = colony.linkCount > 0 && colony.pinLoad.linkLoad === null;
-
-  return (
-    <PlanetCard
-      planetId={advice.planetId}
-      name={advice.name}
-      planetType={advice.planetType}
-      footer={
-        <>
-          <span className="text-[0.6875rem] text-text-faint tabular-nums">
-            {t('piAdvisor.freeFootnote', {
-              cpu: Math.round(plan.spare.cpu).toLocaleString(),
-              powergrid: Math.round(plan.spare.powergrid).toLocaleString(),
-            })}
-          </span>
-          <DetailsButton name={name} onClick={onOpenDetails} />
-        </>
-      }
-    >
-      <>
-        {!colony.detailLoaded && (
-          <p className="text-xs text-warning">{t('piAdvisor.detailUnavailable')}</p>
-        )}
-
-        {/* What it runs, as two aligned rows rather than two labelled lists. */}
-        <dl className="grid grid-cols-[auto_1fr_auto] items-baseline gap-x-2.5 gap-y-1 text-xs">
-          {colony.extractedPerHour.slice(0, 2).map((line, index) => (
-            <div key={line.typeId} className="contents">
-              <dt>
-                {index === 0 ? <SectionLabel>{t('piAdvisor.extractsLabel')}</SectionLabel> : null}
-              </dt>
-              <dd className="m-0 min-w-0 truncate">
-                {typeNames.get(line.typeId) ?? t('pi.unknownProduct')}
-              </dd>
-              <dd className="m-0 text-right text-text-dim tabular-nums">
-                {t('piAdvisor.unitsPerHour', {
-                  units: Math.round(line.unitsPerHour).toLocaleString(),
-                })}
-              </dd>
-            </div>
-          ))}
-          {colony.production.slice(0, 2).map((group, index) => (
-            <div key={String(group.schematicId)} className="contents">
-              <dt>
-                {index === 0 ? <SectionLabel>{t('piAdvisor.makesLabel')}</SectionLabel> : null}
-              </dt>
-              <dd className="m-0 min-w-0 truncate">
-                {group.schematicId !== undefined
-                  ? (props.schematicNames.get(group.schematicId) ?? t('pi.unknownSchematic'))
-                  : t('pi.unknownSchematic')}
-              </dd>
-              <dd className="m-0 text-right text-text-dim tabular-nums">
-                {t('piAdvisor.facilityCount', { count: group.count })}
-              </dd>
-            </div>
-          ))}
-        </dl>
-
-        {colony.detailLoaded && colony.extractedPerHour.length === 0 && (
-          <p className="text-xs text-text-dim">{t('piAdvisor.noMeasuredExtraction')}</p>
-        )}
-
-        <div className="grid grid-cols-2 gap-x-3.5 gap-y-1.5">
-          <LoadMeter
-            label={t('piAdvisor.cpu')}
-            used={colony.pinLoad.load.cpu}
-            budget={plan.budget.cpu}
-          />
-          <LoadMeter
-            label={t('piAdvisor.powergrid')}
-            used={colony.pinLoad.load.powergrid}
-            budget={plan.budget.powergrid}
-          />
-        </div>
-
-        {/*
-          The instructions used to live here, and again on every other card.
-          They are one ranked list at the top of the tab now — see
-          `worklistModel.ts` for why. What a card is genuinely better at is
-          what this colony *is*: what it pulls, what it makes, what it draws.
-          A card that also carried its own copy of the instruction printed the
-          same sentence twice on one page, which was the duplication the
-          rework set out to remove.
-
-          The one thing that stays is the refusal. A colony whose links cannot
-          be costed has no instructions anywhere, and saying so on the card it
-          belongs to is clearer than an absence in a list.
-        */}
-        {unmeasurable && (
-          <div className="mt-auto border-t border-line pt-2.5">
-            <p className="text-[0.6875rem] text-text-dim">
-              {t('piAdvisor.roomUnknownRadius', { count: colony.linkCount })}
-            </p>
-          </div>
-        )}
-      </>
-    </PlanetCard>
-  );
 }
 
 /**
@@ -784,28 +631,12 @@ function UnbuiltCard({
     ]
   );
 
-  // The whole card, when there is nowhere to put a Command Center.
-  if (noSlotFree) {
-    return (
-      <PlanetCard
-        planetId={advice.planetId}
-        name={advice.name}
-        planetType={advice.planetType}
-        dashed
-        dim
-      >
-        <p className="text-xs text-warning">
-          {slots.slots >= PLANET_SLOTS_MAX
-            ? t('piAdvisor.noSlotFreeMax', { total: slots.slots })
-            : t('piAdvisor.noSlotFree', {
-                used: colonyCount,
-                total: slots.slots,
-                level: slots.slots,
-              })}
-        </p>
-      </PlanetCard>
-    );
-  }
+  // No card at all when there is nowhere to put a Command Center. One dashed
+  // box per uncolonised planet, each repeating the same sentence about a
+  // *skill*, is several boxes' worth of page saying one thing that is not
+  // about any of the planets they are labelled with. `ColonyStrip` says it
+  // once, as the locked slot at the end of the pilot's own colony list.
+  if (noSlotFree) return null;
 
   return (
     <PlanetCard
@@ -1075,7 +906,10 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
   // control silently refused. Held per system, so switching systems shows that
   // system's own figure rather than the last one typed. `PlanPanel` holds its
   // rate the same way.
-  const [customsText, setCustomsText] = useState<{ systemId: number; text: string } | null>(null);
+  // Rebuilds are hidden until asked for. They are an alternative plan, not
+  // more of the list above them, and a page that opens with both reads as one
+  // longer worklist whose figures sum. They do not.
+  const [includeRebuilds, setIncludeRebuilds] = useState(false);
   const customsOverrides = customsEdits ?? snapshot?.customsOverrides ?? EMPTY_CUSTOMS;
 
   const writeCustoms = useCallback(
@@ -1318,243 +1152,162 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
     )
   );
 
-  const worklist = buildWorklist(
-    worklistColonies({
-      advice,
-      pinsByPlanet: new Map(
-        [...snapshot.details].map(([planetId, detail]) => [planetId, detail.pins])
-      ),
-      pi: snapshot.pi,
-      prices: snapshot.prices,
-      revenuePrices: snapshot.revenuePrices,
-      taxRate: activeRate,
-      haulHours,
-      opportunitiesByHost,
-      conversionsByHost,
-      typeNames: snapshot.typeNames,
-    })
+  const worklistInput = worklistColonies({
+    advice,
+    pinsByPlanet: new Map(
+      [...snapshot.details].map(([planetId, detail]) => [planetId, detail.pins])
+    ),
+    pi: snapshot.pi,
+    prices: snapshot.prices,
+    revenuePrices: snapshot.revenuePrices,
+    taxRate: activeRate,
+    haulHours,
+    opportunitiesByHost,
+    conversionsByHost,
+    typeNames: snapshot.typeNames,
+  });
+  const worklist = buildWorklist(worklistInput);
+
+  /**
+   * One line per colony: its binding load, what the worklist raised against
+   * it, and how long it lasts. Reuses the worklist's own throughput rather
+   * than measuring again — two readings of "when does this fill" that could
+   * disagree is exactly the bug #958 was about.
+   */
+  const hoursToFullBy = new Map(
+    worklistInput.map((colony) => [colony.planetId, colony.throughput?.hoursToFull ?? null])
   );
+  const stripRows = colonyStripRows({
+    colonies: builtHere.map((entry) => {
+      const plan = colonyPlan(entry.colony, snapshot.pi);
+      const { load } = entry.colony.pinLoad;
+      // The binding one, never a mean: a colony at 95% CPU and 40% Powergrid
+      // has no room, and 68% would say it has.
+      const used =
+        plan.budget.cpu > 0 && plan.budget.powergrid > 0
+          ? Math.max(load.cpu / plan.budget.cpu, load.powergrid / plan.budget.powergrid)
+          : null;
+      return {
+        planetId: entry.planetId,
+        name: entry.name,
+        planetType: entry.planetType,
+        load: used,
+        hoursToFull: hoursToFullBy.get(entry.planetId) ?? null,
+      };
+    }),
+    worklist,
+    haulHours,
+  });
+
+  /**
+   * The slot past the last colony, when the pilot cannot have it.
+   *
+   * Never off an assumed cap, for the reason `UnbuiltCard` gives: `planetSlots(null)`
+   * is one slot, and read as fact it tells a pilot at Interplanetary
+   * Consolidation V — five free slots — that they are full.
+   */
+  const lockedSlot =
+    !snapshot.slots.assumed && snapshot.colonyCount >= snapshot.slots.slots
+      ? {
+          level: snapshot.slots.slots,
+          total: snapshot.slots.slots,
+          atMax: snapshot.slots.slots >= PLANET_SLOTS_MAX,
+        }
+      : null;
 
   const openColony =
     advice.find(
       (entry): entry is Extract<PlanetAdvice, { kind: 'built' }> =>
         entry.kind === 'built' && entry.planetId === openPlanetId
     ) ?? null;
-  // Same two readings the ceiling has: a trained level is a fact, an
-  // untrained assumption is not, and only the first may be shown bare.
-  const slotsNumbers = t('piAdvisor.slotsValue', {
-    used: snapshot.colonyCount,
-    total: snapshot.slots.slots,
-  });
-  const slotsChipValue = snapshot.slots.assumed
-    ? t('piAdvisor.slotsAssumed', { value: slotsNumbers })
-    : slotsNumbers;
-
   return (
     <div className="space-y-3">
-      <Panel title={t('piAdvisor.controlsTitle')}>
-        <div className="flex flex-wrap items-end gap-3">
-          <label className="space-y-1">
-            <span className="block text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-              {t('piAdvisor.system')}
-            </span>
-            <Select
-              value={String(activeSystem.systemId)}
-              onValueChange={(value) => onSystemIdChange(Number(value))}
-            >
-              <SelectTrigger aria-label={t('piAdvisor.system')}>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {systems.map((system) => (
-                  <SelectItem key={system.systemId} value={String(system.systemId)}>
-                    {system.name ?? t('piAdvisor.systemLabel', { id: system.systemId })}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </label>
-          {/*
-            Two chips used to lead this row: the pilot's Command Center ceiling
-            and a "N / M planets" count of the system on screen. Both were
-            dropped — the ceiling is a fact about a skill that changes nothing a
-            pilot does on this tab and is stated where it bites (a colony behind
-            it says so in its own detail modal), and the planet count was read
-            as the colony allowance often enough that the allowance chip beside
-            it existed only to correct it. Removing the misread beats
-            annotating it.
-          */}
-          <div className="flex flex-wrap gap-2">
-            <StatChip
-              label={t('piAdvisor.slots')}
-              value={slotsChipValue}
-              tooltip={
-                snapshot.slots.assumed
-                  ? t('piAdvisor.slotsAssumedTooltip')
-                  : t('piAdvisor.slotsTooltip')
-              }
-              tone={
-                snapshot.slots.assumed
-                  ? 'warning'
-                  : snapshot.colonyCount >= snapshot.slots.slots
-                    ? 'accent'
-                    : undefined
-              }
-            />
-            {/* Derived, so it says so: a derived number that does not reads as measured. */}
-          </div>
-          {/*
-            A fact about the pilot, not about a planet — so one switch for the
-            tab rather than a control on every card. Off by default: buying P1
-            to feed a factory is a good strategy that assumes a hub within
-            reach, and the Advisor should not price a standing freight run
-            nobody agreed to.
-          */}
-          {/*
-            Editable, and that is the point. The derived figure is exact in
-            highsec — the NPC base less the character's Customs Code Expertise
-            — but outside it the office is player-owned, its tax is in no ESI
-            field, and `defaultCustomsRate` returns 0. Every margin on a
-            lowsec, nullsec or wormhole colony was overstated by whatever the
-            POCO owner charges, with nothing on screen to say otherwise. The
-            derived rate stays the default, so a highsec pilot never types a
-            number the app can work out exactly.
-          */}
-          <label className="space-y-1">
-            <span className="flex items-center gap-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-              {t('piAdvisor.customsRate')}
-              <InfoTooltip
-                label={t('common.aboutLabel', { label: t('piAdvisor.customsRate') })}
-                content={
-                  customsEdited
-                    ? t('piAdvisor.customsRateEdited')
-                    : customsTooltip(activeSystem.customsSource, t)
-                }
-              />
-            </span>
-            <div className="flex items-center gap-1.5">
-              <TextInput
-                type="number"
-                min={0}
-                max={100}
-                step={0.5}
-                inputMode="decimal"
-                aria-label={t('piAdvisor.customsRate')}
-                className="w-20"
-                value={
-                  customsText?.systemId === activeSystem.systemId
-                    ? customsText.text
-                    : String(customsRatePercent(activeRate))
-                }
-                onChange={(event) => {
-                  const { value } = event.target;
-                  setCustomsText({ systemId: activeSystem.systemId, text: value });
-                  const percent = Number(value);
-                  // An empty or half-typed field is shown but not stored — a
-                  // NaN would declare the system tax-free until the pilot
-                  // noticed. `withCustomsOverride` refuses it too; this stops
-                  // the control from looking like it accepted one.
-                  if (value === '' || !Number.isFinite(percent)) return;
-                  writeCustoms(
-                    withCustomsOverride(customsOverrides, activeSystem.systemId, percent / 100)
-                  );
-                }}
-              />
-              <span className="text-xs text-text-dim">%</span>
-              {customsEdited && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    // The typed text has to go too, or the box would keep
-                    // showing the override the pilot just cleared.
-                    setCustomsText(null);
-                    writeCustoms(withoutCustomsOverride(customsOverrides, activeSystem.systemId));
-                  }}
-                  className={buttonClassName({ size: 'md', variant: 'ghost' })}
-                >
-                  {t('piAdvisor.customsRateReset')}
-                </button>
-              )}
-            </div>
-          </label>
+      {/*
+        The tab's lead: the two questions it exists to answer, beside the
+        inputs that set both. The worklist below is the detail.
+      */}
+      <AdvisorSummary
+        list={worklist}
+        earnings={earnings}
+        spots={spots}
+        controls={
+          // Remounted per system, which is what clears a half-typed customs
+          // rate belonging to the system the pilot just left.
+          <HowYouPlay
+            key={activeSystem.systemId}
+            systems={systems}
+            activeSystemId={activeSystem.systemId}
+            onSystemIdChange={onSystemIdChange}
+            restartYield={restartYield}
+            customsPercent={customsRatePercent(activeRate)}
+            customsEdited={customsEdited}
+            customsTooltip={
+              customsEdited
+                ? t('piAdvisor.customsRateEdited')
+                : customsTooltip(activeSystem.customsSource, t)
+            }
+            onCustomsChange={(percent) =>
+              writeCustoms(
+                withCustomsOverride(customsOverrides, activeSystem.systemId, percent / 100)
+              )
+            }
+            onCustomsReset={() =>
+              writeCustoms(withoutCustomsOverride(customsOverrides, activeSystem.systemId))
+            }
+            sourcing={sourcing}
+            onSourcingChange={(value) => void setSourcing(value)}
+            alts={
+              snapshot.altAdvice.length > 0
+                ? {
+                    planned: altsPlanned,
+                    withAlts,
+                    onToggle: () => void setWithAlts(!withAlts),
+                  }
+                : null
+            }
+          />
+        }
+      />
 
-          {/*
-            The two habits every figure below is derived from. They sit beside
-            the customs rate because they are the same kind of input — a
-            standing fact about the pilot that re-prices the whole tab — and
-            because a ranking reads as fact when the control that decides it
-            is out of sight.
-          */}
-          <CadenceControls restartYield={restartYield} />
-
-          <label className="space-y-1">
-            <span className="flex items-center gap-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-              {t('piAdvisor.buyInputsLabel')}
-              <InfoTooltip
-                label={t('common.aboutLabel', { label: t('piAdvisor.buyInputsLabel') })}
-                content={t('piAdvisor.buyInputsHint')}
-              />
-            </span>
-            <Select
-              value={sourcing}
-              onValueChange={(value) => void setSourcing(value as MarketSourcing)}
-            >
-              <SelectTrigger aria-label={t('piAdvisor.buyInputsLabel')}>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">{t('piAdvisor.buyInputsNone')}</SelectItem>
-                {TRADE_HUBS.map((hub) => (
-                  <SelectItem key={hub.id} value={hub.id}>
-                    {hub.systemName}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </label>
-          {/*
-            Its own switch, under its own key, rather than the Colonies
-            panel's: that one sits on another tab and answers "show me", where
-            this answers "plan with" (see `altColoniesPref.ts`). Only offered
-            when there is something to plan with — a pilot with one Character
-            should not be handed a control that can do nothing.
-          */}
-          {snapshot.altAdvice.length > 0 && (
-            <label className="mt-2 flex items-start gap-2 text-xs text-text">
-              <input
-                type="checkbox"
-                checked={withAlts}
-                onChange={() => void setWithAlts(!withAlts)}
-                className="mt-0.5 size-4 shrink-0 cursor-pointer accent-accent"
-              />
-              <span>
-                <span className="font-medium">{t('piAdvisor.altColoniesLabel')}</span>
-                <span className="block text-[0.6875rem] text-text-dim">
-                  {withAlts && altsPlanned > 0
-                    ? t('piAdvisor.altColoniesCount', { count: altsPlanned })
-                    : t('piAdvisor.altColoniesHint')}
-                </span>
-              </span>
-            </label>
-          )}
-        </div>
+      <Panel
+        title={t('piAdvisor.worklistTitle')}
+        padded={false}
+        actions={
+          <WorklistToggle
+            includeRebuilds={includeRebuilds}
+            onChange={setIncludeRebuilds}
+            rebuildCount={worklist.rebuilds.length}
+          />
+        }
+      >
+        <Worklist list={worklist} includeRebuilds={includeRebuilds} />
       </Panel>
 
       {/*
-        The tab's lead. One ranked list across every planet, because "which of
-        these should I do" is a comparison, and the card grid never put two
-        planets' figures in one column. The cards survive below it as the
-        per-planet reference they are good at being.
+        What cannot be answered, beside the colonies it was not answered
+        about. Equal halves, because neither is a footnote to the other: one
+        says why a figure is missing, the other says which planet it is
+        missing from.
       */}
-      <AdvisorSummary list={worklist} earnings={earnings} />
+      <div className="grid gap-3 lg:grid-cols-2">
+        <Panel title={t('piAdvisor.blindTitle')}>
+          <BlindSpots spots={spots} />
+        </Panel>
 
-      <Panel title={t('piAdvisor.worklistTitle')}>
-        <Worklist list={worklist} />
-      </Panel>
-
-      <Panel title={t('piAdvisor.blindTitle')}>
-        <BlindSpots spots={spots} />
-      </Panel>
+        <Panel
+          title={t('piAdvisor.colonyStripTitle')}
+          padded={false}
+          // `actions`, not `meta`: this is the row legend, and it has to sit
+          // over the columns it names rather than trailing the title.
+          actions={
+            <span className="text-[0.625rem] text-text-faint">
+              {t('piAdvisor.colonyStripMeta', { hours: Math.round(haulHours) })}
+            </span>
+          }
+        >
+          <ColonyStrip rows={stripRows} onOpenPlanet={setOpenPlanetId} locked={lockedSlot} />
+        </Panel>
+      </div>
 
       {network && (
         <NetworkPanel
@@ -1571,27 +1324,14 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
       {advice.length === 0 ? (
         <EmptyState title={t('piAdvisor.noPlanetsTitle')} hint={t('piAdvisor.noPlanetsHint')} />
       ) : (
+        // Built colonies are rows in the strip above; what is left is the
+        // planets with no colony on them. Those keep their cards, because a
+        // card is where `ResourcePicker` lives — ticking what you would pull
+        // off a planet you have never landed on has no row-sized form, and
+        // dropping the card would drop the feature with it.
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {advice.map((entry) =>
-            entry.kind === 'built' ? (
-              <BuiltCard
-                key={entry.planetId}
-                onOpenDetails={() => setOpenPlanetId(entry.planetId)}
-                advice={entry}
-                pi={snapshot.pi}
-                hub={priceHub}
-                schematicNames={snapshot.schematicNames}
-                typeNames={snapshot.typeNames}
-                prices={snapshot.prices}
-                revenuePrices={snapshot.revenuePrices}
-                taxRate={activeRate}
-                ceiling={snapshot.ceiling}
-                opportunities={opportunitiesByHost.get(entry.planetId) ?? EMPTY_OPPORTUNITIES}
-                conversions={conversionsByHost.get(entry.planetId) ?? EMPTY_CONVERSIONS}
-                planetNames={planetNames}
-                owners={snapshot.altOwners}
-              />
-            ) : entry.kind === 'unbuilt' ? (
+            entry.kind === 'built' ? null : entry.kind === 'unbuilt' ? (
               <UnbuiltCard
                 key={entry.planetId}
                 advice={entry}

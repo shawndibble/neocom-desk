@@ -294,12 +294,14 @@ beforeEach(() => {
 describe('AdvisorPanel', () => {
   it('shows the built colony’s measured extraction rate, not its qty_per_cycle', async () => {
     renderPanel();
-    const card = await builtCard();
     // 1,874,985 units over 336 hours from the decay curve, so 5,580/hr.
-    // qty_per_cycle alone would claim 13,930.
-    expect(within(card).getByText('5,580/hr')).toBeInTheDocument();
-    expect(within(card).getByText('Base Metals')).toBeInTheDocument();
-    expect(within(card).getByText('Reactive Metals')).toBeInTheDocument();
+    // qty_per_cycle alone would claim 13,930. Built colonies are one row each
+    // in the "Your colonies" strip now; the measurement lives in the detail
+    // dialog its row opens.
+    const dialog = await openDetails();
+    expect(within(dialog).getByText('5,580/hr')).toBeInTheDocument();
+    expect(within(dialog).getByText('Base Metals')).toBeInTheDocument();
+    expect(within(dialog).getByText('Reactive Metals')).toBeInTheDocument();
   });
 
   it('reports the colony’s CPU and Powergrid against its OWN Command Center', async () => {
@@ -472,17 +474,45 @@ describe('AdvisorPanel', () => {
   });
 
   it('counts the colony slots the pilot’s skill actually allows', async () => {
-    // The header's "1 / 2 planets" is about this system. The pilot's own cap
-    // is Interplanetary Consolidation, and it was nowhere on this tab — a
-    // pilot at level IV read the system figure as their allowance.
+    // The cap is the pilot's own Interplanetary Consolidation, not a default.
+    // One colony against a level-IV pilot's five slots leaves room, so the
+    // locked row at the foot of "Your colonies" is absent.
     loadInterplanetaryConsolidation.mockResolvedValue(4);
+    const first = renderPanel();
+    await screen.findAllByText('Ashab III');
+    expect(screen.queryByText(/Interplanetary Consolidation/)).not.toBeInTheDocument();
+    first.unmount();
+
+    // Five colonies against that same level-IV cap: the locked row now
+    // appears naming level 5 — proof the 5 came from the skill rather than
+    // from a default of 1.
+    loadCharacterPlanets.mockResolvedValue({
+      cached: {
+        data: [
+          colony(40_000_001, 'temperate'),
+          { ...colony(40_000_003, 'barren'), solar_system_id: 30_002_188 },
+          { ...colony(40_000_004, 'barren'), solar_system_id: 30_002_189 },
+          { ...colony(40_000_005, 'barren'), solar_system_id: 30_002_190 },
+          { ...colony(40_000_006, 'barren'), solar_system_id: 30_002_191 },
+        ],
+        fetchedAt: new Date(),
+        fromCache: false,
+      },
+      needsReauth: false,
+    });
     renderPanel();
-    expect(await screen.findByText('1 / 5 used')).toBeInTheDocument();
+    expect(
+      await screen.findByText(
+        'Train Interplanetary Consolidation to level 5 to unlock another colony.'
+      )
+    ).toBeInTheDocument();
   });
 
   it('counts colonies in every system against the cap, not just the one on screen', async () => {
     // The cap is per character. A pilot showing one system while running
-    // colonies in three has one slot free, not four.
+    // colonies in four others is at the cap, not merely close to it — if the
+    // count only covered the system on screen (one colony here) it would
+    // think there was room and render no locked row.
     loadInterplanetaryConsolidation.mockResolvedValue(4);
     loadCharacterPlanets.mockResolvedValue({
       cached: {
@@ -491,6 +521,7 @@ describe('AdvisorPanel', () => {
           { ...colony(40_000_003, 'barren'), solar_system_id: 30_002_188 },
           { ...colony(40_000_004, 'barren'), solar_system_id: 30_002_189 },
           { ...colony(40_000_005, 'barren'), solar_system_id: 30_002_190 },
+          { ...colony(40_000_006, 'barren'), solar_system_id: 30_002_191 },
         ],
         fetchedAt: new Date(),
         fromCache: false,
@@ -498,24 +529,36 @@ describe('AdvisorPanel', () => {
       needsReauth: false,
     });
     renderPanel();
-    expect(await screen.findByText('4 / 5 used')).toBeInTheDocument();
+    expect(
+      await screen.findByText(
+        'Train Interplanetary Consolidation to level 5 to unlock another colony.'
+      )
+    ).toBeInTheDocument();
   });
 
   it('does not present an assumed colony cap as a fact', async () => {
     // Same rule the Command Center ceiling follows: a pilot whose /skills
-    // never loaded is not a pilot with one colony.
+    // never loaded is not a pilot with one colony. The default fixture's one
+    // colony meets the assumed one-slot cap, and still no locked row appears.
     loadInterplanetaryConsolidation.mockResolvedValue(null);
     renderPanel();
-    expect(await screen.findByText(/1 \/ 1 used \(assumed\)/)).toBeInTheDocument();
+    await screen.findAllByText('Ashab III');
+    expect(screen.queryByText(/Interplanetary Consolidation/)).not.toBeInTheDocument();
   });
 
-  it('tells an unbuilt planet it has no slot to be built in', async () => {
+  it('says the pilot is out of colony slots, and drops the unbuilt planet’s card entirely', async () => {
     // Naming resources for a planet the pilot cannot colonise is advice they
-    // cannot take. Ashab II is the unbuilt card in this fixture.
+    // cannot take. Ashab II is the unbuilt planet in this fixture; with no
+    // slot free it renders no card at all now — the fact lives once, as the
+    // locked row at the foot of "Your colonies".
     loadInterplanetaryConsolidation.mockResolvedValue(0);
     renderPanel();
-    const card = (await screen.findByText('Ashab II')).closest('div')?.parentElement as HTMLElement;
-    expect(within(card).getByText(/No colony slot free/)).toBeInTheDocument();
+    expect(
+      await screen.findByText(
+        'Train Interplanetary Consolidation to level 1 to unlock another colony.'
+      )
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Ashab II')).not.toBeInTheDocument();
   });
 
   it('tells every unbuilt planet how many colony slots are left', async () => {
@@ -1231,7 +1274,15 @@ describe('AdvisorPanel', () => {
     });
 
     renderPanel();
-    await screen.findAllByText('Somewhere I');
+    // 'Somewhere I' is no longer a reliable anchor: these six one-colony
+    // systems each add up to a pilot at the slot cap, so the colony strip
+    // shows only the locked row, and every unbuilt card for the active
+    // system's eight planets renders nothing (`UnbuiltCard` returns null with
+    // no slot free) — the name never reaches the screen at all. Wait on the
+    // "Your colonies" panel instead: it renders once the snapshot (and so all
+    // 48 planet lookups this test is timing) has resolved, whichever fixture
+    // shape the planets end up in.
+    await screen.findByText('Your colonies');
 
     expect(loadPlanetInfo.mock.calls.length).toBe(48);
     expect(peak).toBeLessThanOrEqual(ESI_FANOUT_CONCURRENCY);
@@ -1443,7 +1494,9 @@ describe('AdvisorPanel build advice', () => {
     // The point #702 defended survives the rework at a new address: a rebuild
     // figure must never read as layered on the steps above it. The card's own
     // disclaimer is gone with the card's stop-tier row, and the worklist says
-    // it instead — once, in a labelled band, where the two lists meet.
+    // it instead — once, in a labelled band, where the two lists meet. Rebuild
+    // rows are hidden until the pilot asks for them.
+    await userEvent.click(await screen.findByRole('button', { name: 'Include rebuilds' }));
     expect(screen.getByText('Worth more, but you tear the colony down first')).toBeInTheDocument();
     expect(screen.getByText(/never an addition/)).toBeInTheDocument();
   });
@@ -1458,6 +1511,8 @@ describe('AdvisorPanel build advice', () => {
     expect(
       within(dialog).getByText('Switch to extracting Microorganisms and sell it raw')
     ).toBeInTheDocument();
+    // Rebuild rows are hidden until the pilot asks for them.
+    await userEvent.click(await screen.findByRole('button', { name: 'Include rebuilds' }));
     expect(screen.getByText('Worth more, but you tear the colony down first')).toBeInTheDocument();
   });
 
@@ -1487,8 +1542,9 @@ describe('AdvisorPanel build advice', () => {
     renderPanel();
     // Ashab at 0.5 security is highsec: the 10% NPC base less 1% per level of
     // Customs Code Expertise IV. It is the field's default, not a value the
-    // pilot had to supply.
-    expect(await screen.findByLabelText('Customs rate')).toHaveValue(6);
+    // pilot had to supply. The control is collapsed to text until the pilot
+    // asks to edit it, so read the derived value straight off that text.
+    expect(await screen.findByText('6%')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Reset' })).not.toBeInTheDocument();
   });
 
@@ -1498,12 +1554,15 @@ describe('AdvisorPanel build advice', () => {
     // whatever the POCO owner charges, with nothing on screen to say so.
     priceEverything();
     renderPanel();
-    const field = await screen.findByLabelText('Customs rate');
+    // Collapsed by default; the number input only appears once the pilot asks
+    // to edit it.
+    await userEvent.click(await screen.findByRole('button', { name: 'Edit' }));
+    const field = screen.getByRole('spinbutton', { name: 'Customs rate' });
     fireEvent.change(field, { target: { value: '17' } });
 
     expect(setSyncedSetting).toHaveBeenCalledWith('sync.piCustomsRates', { [ASHAB]: 0.17 });
     // Repainted from the layered edit, with no reload.
-    expect(await screen.findByLabelText('Customs rate')).toHaveValue(17);
+    expect(screen.getByRole('spinbutton', { name: 'Customs rate' })).toHaveValue(17);
     // Scheduled off the write's own promise, so it lands a microtask later.
     await vi.waitFor(() => expect(scheduleSync).toHaveBeenCalledWith(1));
   });
@@ -1511,7 +1570,8 @@ describe('AdvisorPanel build advice', () => {
   it('ignores a half-typed rate rather than declaring the system tax-free', async () => {
     priceEverything();
     renderPanel();
-    const field = await screen.findByLabelText('Customs rate');
+    await userEvent.click(await screen.findByRole('button', { name: 'Edit' }));
+    const field = screen.getByRole('spinbutton', { name: 'Customs rate' });
     fireEvent.change(field, { target: { value: '' } });
 
     expect(setSyncedSetting).not.toHaveBeenCalled();
@@ -1520,11 +1580,15 @@ describe('AdvisorPanel build advice', () => {
   it('resets a customs rate back to the derived one', async () => {
     priceEverything();
     renderPanel();
-    fireEvent.change(await screen.findByLabelText('Customs rate'), { target: { value: '17' } });
+    await userEvent.click(await screen.findByRole('button', { name: 'Edit' }));
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Customs rate' }), {
+      target: { value: '17' },
+    });
     fireEvent.click(await screen.findByRole('button', { name: 'Reset' }));
 
     expect(setSyncedSetting).toHaveBeenLastCalledWith('sync.piCustomsRates', {});
-    expect(await screen.findByLabelText('Customs rate')).toHaveValue(6);
+    // Reset also collapses the control back to text.
+    expect(await screen.findByText('6%')).toBeInTheDocument();
   });
 
   it('says the hub is the gap when nothing is quoted, not that the planet is poor', async () => {
