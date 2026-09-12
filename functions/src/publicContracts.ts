@@ -7,12 +7,19 @@
  * `purgeFeed.ts` use, so this module is unit-testable from fixture CSV text
  * with no emulator.
  *
- * One snapshot comes out of it: `PublicContractOfferRow`, every for-sale
- * line of every public item_exchange/auction contract, any item type. A
- * second, blueprint-copies-only join used to sit alongside it feeding BPC
- * Sourcing its own collection; #907 retired that pipeline once BPC Sourcing
- * learned to take its blueprint slice out of this snapshot client-side, so
- * the archive is fetched once per cycle again rather than twice.
+ * Two snapshots come out of it, off that one pass. `PublicContractOfferRow`
+ * is every for-sale line of every public item_exchange/auction contract, any
+ * item type. A second, blueprint-copies-only join used to sit alongside it
+ * feeding BPC Sourcing its own collection; #907 retired that pipeline once BPC
+ * Sourcing learned to take its blueprint slice out of this snapshot
+ * client-side, so the archive is fetched once per cycle again rather than
+ * twice.
+ *
+ * `PublicCourierContractRow` (issue #909) is the second: public courier
+ * contracts, which carry no item lines at all and so are a route and a fee
+ * rather than a priced item. It is a separate collection because it is a
+ * separate row shape — not because it needs a separate crawl, which is the
+ * mistake #907 undid.
  *
  * Column names and sample values are pinned against a live EVE Ref
  * `public-contracts-latest.v2.tar.bz2` pull (2026-09-08, ~50k public
@@ -30,6 +37,11 @@ export interface ContractRecord {
   title: string;
   type: string;
   region_id: string;
+  end_location_id: string;
+  reward: string;
+  collateral: string;
+  volume: string;
+  days_to_complete: string;
 }
 
 export interface ContractItemRecord {
@@ -195,9 +207,9 @@ export function compactContractOfferRow(
 ): PublicContractOfferRow | null {
   if (item.is_included !== 'true') return null;
 
-  const me = blueprintColumn(item.material_efficiency);
-  const te = blueprintColumn(item.time_efficiency);
-  const runs = blueprintColumn(item.runs);
+  const me = numericColumn(item.material_efficiency);
+  const te = numericColumn(item.time_efficiency);
+  const runs = numericColumn(item.runs);
 
   return {
     contractId: contract.contractId,
@@ -216,8 +228,8 @@ export function compactContractOfferRow(
   };
 }
 
-/** One of the blueprint-only CSV columns: a number, or absent (blank or unparsable). */
-function blueprintColumn(value: string): number | undefined {
+/** One CSV column as a number, or absent when it is blank or unparsable. */
+function numericColumn(value: string): number | undefined {
   if (value === '') return undefined;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : undefined;
@@ -295,3 +307,167 @@ export const PUBLIC_CONTRACT_OFFERS_CHUNK_SIZE = 3000;
 
 export const PUBLIC_CONTRACT_OFFERS_COLLECTION = 'publicContractOffers';
 export const PUBLIC_CONTRACT_OFFERS_META_DOC = 'meta';
+
+const COURIER_CONTRACT_TYPE = 'courier';
+
+/**
+ * Whether this record is a courier contract still outstanding at `nowMs`: the
+ * gate `courierContractFrom` applies before it reads any other column, and the
+ * denominator the sync logs its kept-row count against. One definition rather
+ * than the same test restated at that call site, so widening either half
+ * cannot silently desync the two.
+ *
+ * Matched on `courier` by equality rather than as the complement of
+ * `SEARCHABLE_CONTRACT_TYPES`: ESI's `type` enum is
+ * `unknown | item_exchange | auction | courier | loan`, and neither `loan` nor
+ * `unknown` is a haul to take, so the complement would have published both as
+ * courier rows.
+ *
+ * Expiry is checked here for the same reason `eligibleContractFrom` checks it:
+ * EVE Ref's scrape is up to ~30 minutes stale, so an "outstanding" row in the
+ * CSV is not a guarantee it still is one.
+ */
+export function isOutstandingCourierContract(contract: ContractRecord, nowMs: number): boolean {
+  if (contract.type !== COURIER_CONTRACT_TYPE) return false;
+  const dateExpired = Date.parse(contract.date_expired);
+  return Number.isFinite(dateExpired) && dateExpired > nowMs;
+}
+
+/**
+ * One public courier contract: a haul rather than a purchase (issue #909).
+ *
+ * A courier contract has no `contract_items.csv` rows — nothing is being sold
+ * — so this shape comes straight off the contract record with no join, one row
+ * per contract, and it shares none of `PublicContractOfferRow`'s fields beyond
+ * identity. That is why it is its own snapshot rather than more rows in the
+ * offers collection: every reader of that one filters and sorts by `typeId`,
+ * `price` and `quantity`, none of which a courier row has.
+ *
+ * The four facts that define the job — both endpoints, what it pays, and how
+ * much there is to move — are required, and a row whose column for any of them
+ * is *blank* is dropped rather than converted: `Number('')` is 0 rather than
+ * NaN, so an absent `end_location_id` would publish a delivery to station 0
+ * and an absent `reward` a free haul, neither distinguishable from a stated
+ * one. A stated `0` is kept — that is a different fact, since a favour run
+ * really does pay nothing.
+ *
+ * In practice that drop should never fire: ESI documents `end_location_id`,
+ * `reward` and `collateral` as "for Couriers contract" and populates them on
+ * exactly these contracts, which is why the pre-#909 courier fixture — a
+ * retyped item_exchange row — has `end_location_id` blank. But none of those
+ * columns is in ESI's `required` set, so the rule is a guard against a schema
+ * change rather than an expected filter, and the sync logs outstanding courier
+ * contracts beside kept rows so that a guard which starts firing shows up
+ * instead of quietly publishing an empty snapshot.
+ *
+ * `collateral` and `daysToComplete` are carried only when stated — the same
+ * omit-don't-zero rule the offers rows apply to ME/TE/runs — rather than being
+ * required, since a contract stating neither is still a haul.
+ */
+export interface PublicCourierContractRow {
+  contractId: number;
+  regionId: number;
+  /** Where the haul is picked up (`start_location_id`). */
+  originLocationId: number;
+  /** Where it has to be delivered (`end_location_id`). */
+  destinationLocationId: number;
+  /** ISK paid on delivery. */
+  reward: number;
+  /** m³ of packaged cargo. */
+  volume: number;
+  /** ISK the hauler puts up, when the contract asks for any. */
+  collateral?: number;
+  /** Deadline once accepted, in days, when the contract states one. */
+  daysToComplete?: number;
+  /** Epoch ms. */
+  dateExpired: number;
+}
+
+/**
+ * Narrows one `contracts.csv` record to a `PublicCourierContractRow`, or null
+ * when it is not an outstanding, complete courier contract:
+ * `isOutstandingCourierContract` decides the first half, the required columns
+ * documented on the row shape the second.
+ */
+export function courierContractFrom(
+  contract: ContractRecord,
+  nowMs: number
+): PublicCourierContractRow | null {
+  if (!isOutstandingCourierContract(contract, nowMs)) return null;
+
+  const dateExpired = Date.parse(contract.date_expired);
+  const originLocationId = numericColumn(contract.start_location_id);
+  const destinationLocationId = numericColumn(contract.end_location_id);
+  const reward = numericColumn(contract.reward);
+  const volume = numericColumn(contract.volume);
+  if (
+    originLocationId === undefined ||
+    destinationLocationId === undefined ||
+    reward === undefined ||
+    volume === undefined
+  ) {
+    return null;
+  }
+
+  const collateral = numericColumn(contract.collateral);
+  const daysToComplete = numericColumn(contract.days_to_complete);
+
+  return {
+    contractId: Number(contract.contract_id),
+    regionId: Number(contract.region_id),
+    originLocationId,
+    destinationLocationId,
+    reward,
+    volume,
+    ...(collateral === undefined ? {} : { collateral }),
+    ...(daysToComplete === undefined ? {} : { daysToComplete }),
+    dateExpired,
+  };
+}
+
+/**
+ * Deterministic order, in place. One row per contract, so `contractId` alone
+ * is a total order here — unlike the offers rows, where one contract lists
+ * many item lines and the tie-break has to run down to the last
+ * distinguishing field.
+ */
+export function sortCourierContractRows(
+  rows: PublicCourierContractRow[]
+): PublicCourierContractRow[] {
+  return rows.sort((a, b) => a.contractId - b.contractId);
+}
+
+/**
+ * Every courier row in one call, over already-parsed records. No item
+ * argument, because there are no item lines to join. As with
+ * `filterAndCompactPublicContractOffers`, the scheduled sync drives the
+ * per-row seam directly rather than calling this — it never holds a record
+ * array — so this stays the composed, fixture-testable statement of that pass.
+ */
+export function filterAndCompactPublicCourierContracts(
+  contracts: readonly ContractRecord[],
+  nowMs: number
+): PublicCourierContractRow[] {
+  const rows: PublicCourierContractRow[] = [];
+  for (const contract of contracts) {
+    const row = courierContractFrom(contract, nowMs);
+    if (row) rows.push(row);
+  }
+  return sortCourierContractRows(rows);
+}
+
+/**
+ * The same 3,000 rows/chunk the offers snapshot uses, against the same 1MiB
+ * document limit — but nowhere near binding here. ADR 0013's live pull was
+ * ~50,300 public contracts, 48,963 item_exchange and 717 auction, so courier
+ * and loan together are under 620; at one row per contract this snapshot is a
+ * single chunk doc, and publishing it costs ~96 writes/day against the
+ * project's shared 20,000/day free tier. Sharing the offers value leaves one
+ * number to reason about rather than two, and `publicContracts.test.ts`
+ * measures the widest row this shape can produce against the document limit
+ * rather than assuming it stays small.
+ */
+export const PUBLIC_COURIER_CONTRACTS_CHUNK_SIZE = 3000;
+
+export const PUBLIC_COURIER_CONTRACTS_COLLECTION = 'publicCourierContracts';
+export const PUBLIC_COURIER_CONTRACTS_META_DOC = 'meta';
