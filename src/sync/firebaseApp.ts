@@ -2,7 +2,7 @@
 // editable data (ADR 0001): no EVE tokens ever flow through it except the
 // short-lived access token sent to the mintFirebaseToken callable. One named
 // exception: `features/bpcContracts/syncedContracts.ts` reads the shared,
-// admin-write-only `publicBpcContracts` collection through this same client
+// admin-write-only `publicContractOffers` collection through this same client
 // (ADR 0013) — not per-character data, but still nothing an EVE token touches.
 // Second named exception: `app/analytics.ts` reads `measurementId` off this
 // same app instance to init Firebase Analytics (GA4) — product usage

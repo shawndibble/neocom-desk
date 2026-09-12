@@ -336,11 +336,18 @@ describe('sortContractOfferRows', () => {
 describe('public contract offers snapshot sizing', () => {
   it('chunks coarsely enough to leave room in the free tier write budget', () => {
     // The 20,000 writes/day free tier is the project's budget, not this job's:
-    // dispatchProjections runs 288x/day beside it. ~370k rows at 48 runs/day
-    // must stay well inside it — the 2,000-row chunk the retired blueprint-only
-    // snapshot used would spend ~8.9k here on its own. A larger chunk trades
-    // write count for doc size; the next test is what holds the doc size honest.
-    expect(Math.ceil(370_000 / PUBLIC_CONTRACT_OFFERS_CHUNK_SIZE) * 48).toBeLessThan(7_000);
+    // dispatchProjections runs 288x/day beside it. The row count is #906's
+    // estimate, to be re-grounded once the sync's logged `rowCount` says what
+    // the live volume is; what this pins meanwhile is that the chunk size is
+    // not quietly shrunk back toward the 2,000 the retired blueprint-only
+    // snapshot used, which would spend ~8.9k writes/day here on its own. A
+    // larger chunk trades write count for doc size; the next test is what
+    // holds the doc size honest.
+    const ESTIMATED_ROWS = 370_000;
+    const RUNS_PER_DAY = 48;
+    const writesPerDay =
+      Math.ceil(ESTIMATED_ROWS / PUBLIC_CONTRACT_OFFERS_CHUNK_SIZE) * RUNS_PER_DAY;
+    expect(writesPerDay).toBeLessThan(7_000);
   });
 
   it('keeps a chunk of nothing but worst-case rows clear of the 1MiB document limit', () => {

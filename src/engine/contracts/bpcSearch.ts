@@ -6,7 +6,7 @@
  */
 import type { SpaceKind } from '@/engine/space';
 
-/** One synced row — a for-sale blueprint copy joined to its contract. Mirrors `functions/src/publicContracts.ts`'s `BpcContractRow`, which this module never imports (client and Functions are separate packages). */
+/** One searched row — a for-sale blueprint copy joined to its contract. Built out of the Public Contract Offers snapshot by `contractOffers.ts`; issue #907 retired the blueprint-only row the sync used to publish, so this shape is the client's alone. */
 export interface BpcContractRow {
   contractId: number;
   regionId: number;
