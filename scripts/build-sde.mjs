@@ -38,9 +38,8 @@ const FILES = [
   'invMetaGroups.csv',
   'mapRegions.csv',
   'mapSolarSystems.csv',
-  // Stargate adjacency, for the local jump graph (issue #942) — the whole
-  // reason a route distance can be a sortable column instead of one ESI
-  // request per opened row.
+  // Stargate adjacency, for the local jump graph (issue #942); see
+  // `solarSystemJumps` below.
   'mapSolarSystemJumps.csv',
   // Per-planet radius, for PI link cost (issue #440). Only the group-7 rows
   // are kept; see `piPlanetRadius` below.
@@ -308,6 +307,20 @@ function indexHeader(rows) {
 
 function num(s) {
   return s === '' ? null : Number(s);
+}
+
+/**
+ * A whole number, or null for anything that isn't one.
+ *
+ * `num` alone is not enough wherever the value becomes an id: it answers null
+ * only for an empty string, so a short row (`parseCsv` yields `['']`) reads
+ * `undefined` and converts to NaN. NaN survives a `=== null` guard, and
+ * `[NaN].includes(NaN)` is true, so it can slip a membership check too and
+ * reach a shipped snapshot as a `"NaN"` key or a null id.
+ */
+function intOrNull(s) {
+  const value = num(s);
+  return Number.isInteger(value) ? value : null;
 }
 
 const PROBE_MAX_RETRY_WAIT_MS = 10_000;
@@ -1347,19 +1360,13 @@ async function main() {
     const h = indexHeader(rows);
     for (let i = 1; i < rows.length; i++) {
       const r = rows[i];
-      const from = num(r[h.fromSolarSystemID]);
-      const to = num(r[h.toSolarSystemID]);
-      // Checked with `Number.isInteger`, not against `null`: `num` only
-      // answers null for an empty string, and a short row (a trailing blank
-      // line parses as `['']`) reads `undefined` and converts to NaN. NaN
-      // passes a `=== null` guard, and `[NaN].includes(NaN)` is true, so it
-      // would slip the symmetry check too and land a `"NaN"` key in the
-      // shipped file.
-      if (!Number.isInteger(from) || !Number.isInteger(to) || from === to) continue;
+      const from = intOrNull(r[h.fromSolarSystemID]);
+      const to = intOrNull(r[h.toSolarSystemID]);
+      if (from === null || to === null || from === to) continue;
+      // `??=` only fires for a `from` system absent from mapSolarSystems —
+      // every real one is seeded above — which lets the sanity check below
+      // report that rather than this loop throwing on it.
       (solarSystemJumps[from] ??= []).push(to);
-      // A gate whose `from` system is missing from mapSolarSystems would
-      // otherwise seed a key `systems.json` cannot name; the sanity check
-      // below catches that rather than this silently allowing it.
     }
     // Sorted and de-duplicated so the emitted file is byte-stable across
     // rebuilds (two systems joined by more than one gate are one edge here).
@@ -1388,14 +1395,13 @@ async function main() {
         name: r[h.stationName],
         systemId: Number(r[h.solarSystemID]),
       };
-      // `num()` rather than a bare `Number()`: a blank column would write
-      // `NaN`, which `JSON.stringify` emits as `null` — and `null` is not
-      // `undefined`, so `loadStationSummary`'s "no typeId, ask ESI" guard
-      // would pass it straight through as a type id. Leaving the key off
-      // instead reproduces the pre-#655 snapshot shape, which callers already
-      // fall back on.
-      const typeId = num(r[h.stationTypeID]);
-      if (typeId !== null && Number.isFinite(typeId)) entry.typeId = typeId;
+      // Leaving the key off for a blank column reproduces the pre-#655
+      // snapshot shape, which callers already fall back on. Writing NaN
+      // instead would reach them as `null` through `JSON.stringify`, and
+      // `loadStationSummary`'s "no typeId, ask ESI" guard tests for
+      // `undefined` — so it would pass null through as a type id.
+      const typeId = intOrNull(r[h.stationTypeID]);
+      if (typeId !== null) entry.typeId = typeId;
       npcStations.push(entry);
     }
     npcStations.sort((a, b) => a.id - b.id);

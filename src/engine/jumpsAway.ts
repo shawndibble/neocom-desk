@@ -4,10 +4,9 @@
  * only interprets the waypoint list `/route/` already returns (origin and
  * destination both included as stops).
  *
- * Round 14 held that this page needs no local pathfinding graph, and for one
- * station at a time it still does. A graph ships anyway now, for tables
- * wanting a distance on every row (`engine/route/jumpRoute.ts`); this module
- * is unaffected, and the Assets page still asks ESI.
+ * Round 14's "no local pathfinding graph" holds for one station at a time and
+ * is not a standing prohibition: a table wanting a distance on every row uses
+ * the local graph instead (`engine/route/jumpRoute.ts`). This page asks ESI.
  *
  * The "no location"/"no route" distinction the Assets page shows in its
  * tooltip is assembled by the caller, not here: this module only knows how to

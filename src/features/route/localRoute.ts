@@ -4,10 +4,8 @@
  * ESI's `/route/` and therefore costs one request per pair.
  *
  * This is what makes a distance affordable across a whole table: both
- * snapshots are local files indexed once per session, so resolving fifty rows
- * costs no requests at all and never touches the shared error budget. The ESI
- * resolver stays exactly as it is — the Assets page is deliberately untouched
- * by this ticket.
+ * snapshots are local files indexed once per session, so resolving a page of
+ * rows costs no requests at all and never touches the shared error budget.
  *
  * Three outcomes, and keeping them apart is the point:
  * - a route, with the systems it crosses;
@@ -20,36 +18,49 @@
  */
 import {
   findJumpRoute,
+  jumpDistancesFrom,
   type JumpRouteResult,
   type RoutePreferenceKind,
 } from '@/engine/route/jumpRoute';
 import { loadJumpGraph } from '@/sde/jumpGraph';
 import { loadSolarSystemsById } from '@/sde/solarSystems';
 
-/** A route, a definite absence of one, or an admission that we cannot tell. */
 export type LocalRouteResult = JumpRouteResult | { kind: 'unknown' };
+
+/**
+ * A security lookup for the pathfinder, or `undefined` where there is nothing
+ * to bias on.
+ *
+ * `shortest` never consults security, so it does not pay for `systems.json`
+ * (~98 KB gzipped) at all; a biased preference that cannot read the snapshot
+ * degrades to shortest rather than pretending to a safety judgement it has no
+ * data for.
+ */
+async function securityLookupFor(
+  preference: RoutePreferenceKind
+): Promise<((systemId: number) => number | undefined) | undefined> {
+  if (preference === 'shortest') return undefined;
+  const systems = await loadSolarSystemsById();
+  return systems ? (systemId) => systems.get(systemId)?.security : undefined;
+}
 
 /**
  * The stargate route between two solar systems under one preference.
  *
- * Never throws and never rejects: an unreadable snapshot answers `unknown`,
- * which is the same contract `lookupSolarSystem` and `lookupNpcStation`
- * already follow. A missing *systems* snapshot is not fatal on its own — the
- * search degrades to shortest-path, since a preference with no security to
- * read is only a longer way of counting jumps — but a missing *graph* is,
- * because there is nothing to search.
+ * Never throws and never rejects: an unreadable graph answers `unknown`, the
+ * same contract `lookupSolarSystem` and `lookupNpcStation` already follow.
+ *
+ * For many destinations from one origin, reach for `localJumpDistances`
+ * instead — one sweep answers all of them for about what two of these cost.
  */
 export async function findLocalRoute(
   originSystemId: number,
   destinationSystemId: number,
   preference: RoutePreferenceKind = 'shortest'
 ): Promise<LocalRouteResult> {
-  const [graph, systems] = await Promise.all([loadJumpGraph(), loadSolarSystemsById()]);
+  const [graph, securityOf] = await Promise.all([loadJumpGraph(), securityLookupFor(preference)]);
   if (!graph) return { kind: 'unknown' };
-  return findJumpRoute(graph, originSystemId, destinationSystemId, {
-    preference,
-    securityOf: systems ? (systemId) => systems.get(systemId)?.security : undefined,
-  });
+  return findJumpRoute(graph, originSystemId, destinationSystemId, { preference, securityOf });
 }
 
 /** A jump count, or which of the two reasons there isn't one. */
@@ -57,14 +68,9 @@ export type LocalJumpsResult =
   { kind: 'known'; jumps: number } | { kind: 'no-route' } | { kind: 'unknown' };
 
 /**
- * `findLocalRoute` for a caller that wants the number and not the systems
- * crossed.
- *
- * Deliberately *not* `engine/jumpsAway.ts`'s `JumpsAwayResult`: its two
- * reasons are the Assets page's own, and neither can say "a snapshot could
- * not be read". Reusing it would fold `unknown` into `no-route` at exactly
- * the API a sortable column consumes, so an offline first visit would report
- * "no gate route exists" for every haul in the game.
+ * Deliberately not `engine/jumpsAway.ts`'s `JumpsAwayResult`: its two reasons
+ * are the Assets page's own, and neither can say "a snapshot could not be
+ * read".
  */
 export async function findLocalJumps(
   originSystemId: number,
@@ -73,4 +79,28 @@ export async function findLocalJumps(
 ): Promise<LocalJumpsResult> {
   const route = await findLocalRoute(originSystemId, destinationSystemId, preference);
   return route.kind === 'route' ? { kind: 'known', jumps: route.systems.length - 1 } : route;
+}
+
+export type LocalJumpDistances =
+  { kind: 'known'; jumps: ReadonlyMap<number, number> } | { kind: 'unknown' };
+
+/**
+ * Jumps from one origin to every system it can reach, in one pass — the shape
+ * a table ranking hauls by distance should use.
+ *
+ * A system absent from the map is unreachable by stargate. The result is
+ * wrapped rather than returned bare because an empty map from an unreadable
+ * snapshot would otherwise be indistinguishable from an origin that reaches
+ * nothing, and those are the two meanings this module exists to keep apart.
+ */
+export async function localJumpDistances(
+  originSystemId: number,
+  preference: RoutePreferenceKind = 'shortest'
+): Promise<LocalJumpDistances> {
+  const [graph, securityOf] = await Promise.all([loadJumpGraph(), securityLookupFor(preference)]);
+  if (!graph) return { kind: 'unknown' };
+  return {
+    kind: 'known',
+    jumps: jumpDistancesFrom(graph, originSystemId, { preference, securityOf }),
+  };
 }
