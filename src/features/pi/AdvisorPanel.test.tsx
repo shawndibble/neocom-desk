@@ -474,17 +474,45 @@ describe('AdvisorPanel', () => {
   });
 
   it('counts the colony slots the pilot’s skill actually allows', async () => {
-    // The header's "1 / 2 planets" is about this system. The pilot's own cap
-    // is Interplanetary Consolidation, and it was nowhere on this tab — a
-    // pilot at level IV read the system figure as their allowance.
+    // The cap is the pilot's own Interplanetary Consolidation, not a default.
+    // One colony against a level-IV pilot's five slots leaves room, so the
+    // locked row at the foot of "Your colonies" is absent.
     loadInterplanetaryConsolidation.mockResolvedValue(4);
+    const first = renderPanel();
+    await screen.findAllByText('Ashab III');
+    expect(screen.queryByText(/Interplanetary Consolidation/)).not.toBeInTheDocument();
+    first.unmount();
+
+    // Five colonies against that same level-IV cap: the locked row now
+    // appears naming level 5 — proof the 5 came from the skill rather than
+    // from a default of 1.
+    loadCharacterPlanets.mockResolvedValue({
+      cached: {
+        data: [
+          colony(40_000_001, 'temperate'),
+          { ...colony(40_000_003, 'barren'), solar_system_id: 30_002_188 },
+          { ...colony(40_000_004, 'barren'), solar_system_id: 30_002_189 },
+          { ...colony(40_000_005, 'barren'), solar_system_id: 30_002_190 },
+          { ...colony(40_000_006, 'barren'), solar_system_id: 30_002_191 },
+        ],
+        fetchedAt: new Date(),
+        fromCache: false,
+      },
+      needsReauth: false,
+    });
     renderPanel();
-    expect(await screen.findByText('1 / 5 used')).toBeInTheDocument();
+    expect(
+      await screen.findByText(
+        'Train Interplanetary Consolidation to level 5 to unlock another colony.'
+      )
+    ).toBeInTheDocument();
   });
 
   it('counts colonies in every system against the cap, not just the one on screen', async () => {
     // The cap is per character. A pilot showing one system while running
-    // colonies in three has one slot free, not four.
+    // colonies in four others is at the cap, not merely close to it — if the
+    // count only covered the system on screen (one colony here) it would
+    // think there was room and render no locked row.
     loadInterplanetaryConsolidation.mockResolvedValue(4);
     loadCharacterPlanets.mockResolvedValue({
       cached: {
@@ -493,6 +521,7 @@ describe('AdvisorPanel', () => {
           { ...colony(40_000_003, 'barren'), solar_system_id: 30_002_188 },
           { ...colony(40_000_004, 'barren'), solar_system_id: 30_002_189 },
           { ...colony(40_000_005, 'barren'), solar_system_id: 30_002_190 },
+          { ...colony(40_000_006, 'barren'), solar_system_id: 30_002_191 },
         ],
         fetchedAt: new Date(),
         fromCache: false,
@@ -500,24 +529,36 @@ describe('AdvisorPanel', () => {
       needsReauth: false,
     });
     renderPanel();
-    expect(await screen.findByText('4 / 5 used')).toBeInTheDocument();
+    expect(
+      await screen.findByText(
+        'Train Interplanetary Consolidation to level 5 to unlock another colony.'
+      )
+    ).toBeInTheDocument();
   });
 
   it('does not present an assumed colony cap as a fact', async () => {
     // Same rule the Command Center ceiling follows: a pilot whose /skills
-    // never loaded is not a pilot with one colony.
+    // never loaded is not a pilot with one colony. The default fixture's one
+    // colony meets the assumed one-slot cap, and still no locked row appears.
     loadInterplanetaryConsolidation.mockResolvedValue(null);
     renderPanel();
-    expect(await screen.findByText(/1 \/ 1 used \(assumed\)/)).toBeInTheDocument();
+    await screen.findAllByText('Ashab III');
+    expect(screen.queryByText(/Interplanetary Consolidation/)).not.toBeInTheDocument();
   });
 
-  it('tells an unbuilt planet it has no slot to be built in', async () => {
+  it('says the pilot is out of colony slots, and drops the unbuilt planet’s card entirely', async () => {
     // Naming resources for a planet the pilot cannot colonise is advice they
-    // cannot take. Ashab II is the unbuilt card in this fixture.
+    // cannot take. Ashab II is the unbuilt planet in this fixture; with no
+    // slot free it renders no card at all now — the fact lives once, as the
+    // locked row at the foot of "Your colonies".
     loadInterplanetaryConsolidation.mockResolvedValue(0);
     renderPanel();
-    const card = (await screen.findByText('Ashab II')).closest('div')?.parentElement as HTMLElement;
-    expect(within(card).getByText(/No colony slot free/)).toBeInTheDocument();
+    expect(
+      await screen.findByText(
+        'Train Interplanetary Consolidation to level 1 to unlock another colony.'
+      )
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Ashab II')).not.toBeInTheDocument();
   });
 
   it('tells every unbuilt planet how many colony slots are left', async () => {
@@ -1233,7 +1274,15 @@ describe('AdvisorPanel', () => {
     });
 
     renderPanel();
-    await screen.findAllByText('Somewhere I');
+    // 'Somewhere I' is no longer a reliable anchor: these six one-colony
+    // systems each add up to a pilot at the slot cap, so the colony strip
+    // shows only the locked row, and every unbuilt card for the active
+    // system's eight planets renders nothing (`UnbuiltCard` returns null with
+    // no slot free) — the name never reaches the screen at all. Wait on the
+    // "Your colonies" panel instead: it renders once the snapshot (and so all
+    // 48 planet lookups this test is timing) has resolved, whichever fixture
+    // shape the planets end up in.
+    await screen.findByText('Your colonies');
 
     expect(loadPlanetInfo.mock.calls.length).toBe(48);
     expect(peak).toBeLessThanOrEqual(ESI_FANOUT_CONCURRENCY);
