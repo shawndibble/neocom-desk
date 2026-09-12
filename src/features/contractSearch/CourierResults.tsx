@@ -53,7 +53,7 @@ interface CourierUiFilter {
   routeQuery: string;
   originRegionId: number | null;
   destinationRegionId: number | null;
-  /** Which bands the hauler will deliver into; all four is "no restriction". */
+  /** Which bands the hauler will deliver into; every offered band is "no restriction". */
   destinationSpace: readonly SpaceKind[];
   minReward: string;
   maxCollateral: string;
@@ -345,29 +345,36 @@ function CourierFilterBar({
             and there is deliberately no "avoid lowsec" control beside it — that
             would be a safety claim about the whole trip made from data that
             only describes its two ends.
+
+            Hidden entirely when no band is on offer, rather than shown as a
+            label with nothing under it: that is the state while the endpoints
+            are still being placed, and the permanent state if the local station
+            snapshot cannot be read at all.
           */}
-          <div
-            role="group"
-            aria-label={t('contractSearch.destinationSpaceLabel')}
-            className="flex flex-wrap items-center gap-2"
-          >
-            <span className="text-text-dim">{t('contractSearch.destinationSpaceLabel')}</span>
-            {spaceKinds.map((kind) => (
-              <FilterChip
-                key={kind}
-                label={t(`common.spaceOption.${kind}`)}
-                selected={draft.destinationSpace.includes(kind)}
-                onToggle={() =>
-                  setDraft({
-                    ...draft,
-                    destinationSpace: draft.destinationSpace.includes(kind)
-                      ? draft.destinationSpace.filter((existing) => existing !== kind)
-                      : [...draft.destinationSpace, kind],
-                  })
-                }
-              />
-            ))}
-          </div>
+          {spaceKinds.length > 0 && (
+            <div
+              role="group"
+              aria-label={t('contractSearch.destinationSpaceLabel')}
+              className="flex flex-wrap items-center gap-2"
+            >
+              <span className="text-text-dim">{t('contractSearch.destinationSpaceLabel')}</span>
+              {spaceKinds.map((kind) => (
+                <FilterChip
+                  key={kind}
+                  label={t(`common.spaceOption.${kind}`)}
+                  selected={draft.destinationSpace.includes(kind)}
+                  onToggle={() =>
+                    setDraft({
+                      ...draft,
+                      destinationSpace: draft.destinationSpace.includes(kind)
+                        ? draft.destinationSpace.filter((existing) => existing !== kind)
+                        : [...draft.destinationSpace, kind],
+                    })
+                  }
+                />
+              ))}
+            </div>
+          )}
           <NumericFilterField
             label={t('contractSearch.minRewardLabel')}
             value={draft.minReward}
@@ -709,13 +716,16 @@ export function CourierResults({ rows, regionNames }: CourierResultsProps) {
    * had emptied, which is the opposite of saying which cause applies.
    */
   const excludedUnplacedDestinations = useMemo(() => {
-    if (displayRows.length > 0 || !narrowsSpace(uiFilter.destinationSpace, spaceKinds)) {
+    if (matchingRows.length > 0 || !narrowsSpace(uiFilter.destinationSpace, spaceKinds)) {
       return false;
     }
     return filterCourierContracts(rows, { ...filter, destinationSpace: null }).some(
       (row) => row.destination.space === null
     );
-  }, [displayRows, rows, filter, uiFilter.destinationSpace, spaceKinds]);
+    // `matchingRows`, not `displayRows`: the two always have the same length,
+    // and keying on the ranked copy would re-run this every time the jump
+    // counts land and reorder it.
+  }, [matchingRows, rows, filter, uiFilter.destinationSpace, spaceKinds]);
 
   return (
     <>

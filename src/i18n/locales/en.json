@@ -2325,12 +2325,6 @@
     "locationColumn": "Location",
     "spaceColumn": "Space",
     "spaceLabel": "Space",
-    "space": {
-      "highsec": "Highsec",
-      "lowsec": "Lowsec",
-      "nullsec": "Nullsec",
-      "wormhole": "Wormhole"
-    },
     "columnsButton": "Columns",
     "columnsMenuTitle": "Columns",
     "watchThisSearch": "Watch this search",

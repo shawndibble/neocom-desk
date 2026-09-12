@@ -946,6 +946,16 @@ describe('ContractSearchPanel — Courier endpoint space', () => {
     expect(chips).toEqual(['Highsec', 'Lowsec']);
   });
 
+  it('hides the band filter entirely when no haul on the board carries one', async () => {
+    // A label with no chips under it is what the endpoints-still-resolving
+    // state looks like, and the permanent state if the station snapshot cannot
+    // be read at all. Neither is worth a control.
+    const user = await showCourierWith([TO_STRUCTURE]);
+    await openFilters(user);
+
+    expect(screen.queryByRole('group', { name: 'Destination space' })).not.toBeInTheDocument();
+  });
+
   it('narrows the table to hauls ending in a chosen band', async () => {
     const user = await showCourierWith([JITA_TO_AMARR, TO_LOWSEC, TO_NULL]);
     await openFilters(user);

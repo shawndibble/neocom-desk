@@ -20,10 +20,15 @@ const AMARR_SYSTEM = 30002187;
 const RANCER = 60011740;
 const RANCER_SYSTEM = 30002809;
 const SINQ_LAISON = 10000032;
-/** A wormhole end: `J######` by name, so the classifier calls it wormhole whatever its security reads. */
-const THERA_STATION = 60015148;
-const THERA_SYSTEM = 31000005;
-const THERA_REGION = 11000031;
+/**
+ * A wormhole end. Invented ids and an invented J-name: this file hand-builds
+ * the endpoint map to exercise the *filter*, so the band is stated outright
+ * rather than classified — and no real NPC station sits in J-space, so
+ * borrowing real ids here would suggest a row the SDE cannot produce.
+ */
+const WORMHOLE_STATION = 69000001;
+const WORMHOLE_SYSTEM = 69000002;
+const WORMHOLE_REGION = 69000003;
 
 const ENDPOINTS = new Map<number, CourierEndpoint>([
   [
@@ -60,13 +65,13 @@ const ENDPOINTS = new Map<number, CourierEndpoint>([
     },
   ],
   [
-    THERA_STATION,
+    WORMHOLE_STATION,
     {
-      locationId: THERA_STATION,
-      name: 'Thera Sanctuary',
+      locationId: WORMHOLE_STATION,
+      name: 'Wormhole Refuge',
       systemName: 'J105443',
-      systemId: THERA_SYSTEM,
-      regionId: THERA_REGION,
+      systemId: WORMHOLE_SYSTEM,
+      regionId: WORMHOLE_REGION,
       space: 'wormhole',
     },
   ],
@@ -252,7 +257,7 @@ describe('filterCourierContracts — destination space', () => {
   const HAULS = [
     row({ contractId: 1, destinationLocationId: AMARR }),
     row({ contractId: 2, destinationLocationId: RANCER }),
-    row({ contractId: 3, destinationLocationId: THERA_STATION }),
+    row({ contractId: 3, destinationLocationId: WORMHOLE_STATION }),
     // A player structure: nothing local places it, so it has no band at all.
     row({ contractId: 4, destinationLocationId: STRUCTURE }),
   ];

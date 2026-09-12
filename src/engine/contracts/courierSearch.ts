@@ -153,8 +153,9 @@ export interface CourierContractFilter {
    * Which space bands the hauler is willing to deliver into. `null` or absent
    * is no restriction; an empty list asks for hauls ending in none of the four,
    * which is honestly empty rather than silently everything. The panel maps
-   * "all four selected" to `null`, so that is where "show everything" lives —
-   * the same reading BPC Search's Space filter uses.
+   * "every offered band selected" to `null`, so that is where "show
+   * everything" lives — and it measures against the bands its rows actually
+   * carry, so a band with nothing behind it cannot hold the filter open.
    *
    * Named for the endpoint, not the route, because that is all it knows: a
    * highsec pickup and a highsec delivery can still route through lowsec, and
