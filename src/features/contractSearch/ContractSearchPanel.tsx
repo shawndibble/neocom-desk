@@ -65,6 +65,10 @@ import {
 import { loadCourierEndpoints } from '@/features/contractSearch/courierEndpoints';
 import { CourierResults } from '@/features/contractSearch/CourierResults';
 import { loadRegionName } from '@/features/bpcContracts/regionNames';
+import {
+  PublicContractDetailModal,
+  type PublicContractDetailModalStatChip,
+} from '@/features/contracts/PublicContractDetailModal';
 import { isSyncConfigured } from '@/app/syncStatus';
 import { loadMarketTypes } from '@/sde/loadMarketSde';
 import type { CachedResult } from '@/esi/cache';
@@ -356,6 +360,7 @@ export function ContractSearchPanel() {
   const [selectedTypeId, setSelectedTypeId] = useState<number | null>(null);
   const [showAll, setShowAll] = useState(false);
   const [mode, setMode] = useState<ContractMode>('items');
+  const [selectedRow, setSelectedRow] = useState<PublicContractOfferRow | null>(null);
 
   // Freshness and the offline banner both name the snapshot actually on
   // screen: the two are published by the same job but cached separately, so a
@@ -526,6 +531,31 @@ export function ContractSearchPanel() {
 
   const visibleRows = showAll ? displayRows : displayRows.slice(0, ROW_CAP);
 
+  /**
+   * Same price rule the table's own column already renders (starting bid vs.
+   * buyout), spelled out as a full sentence for the modal header rather than
+   * the column's compact suffix.
+   */
+  const statChipsForRow = (row: PublicContractOfferRow): PublicContractDetailModalStatChip[] => {
+    const priceLabel = row.isAuction
+      ? row.buyout !== undefined
+        ? t('contractSearch.buyout', { price: formatIsk(row.buyout, 2) })
+        : t('contractSearch.startingBid', { price: formatIsk(row.price, 2) })
+      : formatIsk(row.price, 2);
+    const chips: PublicContractDetailModalStatChip[] = [
+      { label: t('contractSearch.priceColumn'), value: priceLabel },
+      { label: t('contractSearch.qtyColumn'), value: row.quantity.toLocaleString() },
+    ];
+    // ME/TE/runs are blueprint-only columns, absent on a plain item line.
+    if (row.isBlueprintCopy) {
+      chips.push(
+        { label: t('contractSearch.meTeLabel'), value: `${row.me ?? 0} / ${row.te ?? 0}` },
+        { label: t('contractSearch.runsLabel'), value: String(row.runs ?? 0) }
+      );
+    }
+    return chips;
+  };
+
   if (!hydrated || activeCharacterId === null) {
     return (
       <div className="flex justify-center py-16">
@@ -535,172 +565,192 @@ export function ContractSearchPanel() {
   }
 
   return (
-    <Panel
-      padded={false}
-      // No title of its own: the tab immediately above already reads
-      // "Search", and repeating it in the panel header beneath reads as a
-      // stutter. The table keeps its own accessible name from
-      // `contractSearch.title`.
-      meta={
-        activeResult?.data?.lastSyncedAt && (
-          <DataAgeBadge date={new Date(activeResult.data.lastSyncedAt)} />
-        )
-      }
-      actions={
-        <IconButton
-          icon={<Icon.Refresh />}
-          label={t('contractSearch.refresh')}
-          onClick={refresh}
-          disabled={loading}
-        />
-      }
-    >
-      {loading && !data ? (
-        <div className="flex justify-center py-16">
-          <Spinner label={t('common.loading')} />
-        </div>
-      ) : error ? (
-        <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
-      ) : !syncConfigured ? (
-        <EmptyState
-          title={t('contractSearch.notConfiguredTitle')}
-          hint={t('contractSearch.notConfiguredHint')}
-        />
-      ) : (
-        <>
-          {activeResult?.fromCache && (
-            <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">
-              {t('common.offlineTitle')}
-            </p>
-          )}
-          {/*
+    <>
+      <Panel
+        padded={false}
+        // No title of its own: the tab immediately above already reads
+        // "Search", and repeating it in the panel header beneath reads as a
+        // stutter. The table keeps its own accessible name from
+        // `contractSearch.title`.
+        meta={
+          activeResult?.data?.lastSyncedAt && (
+            <DataAgeBadge date={new Date(activeResult.data.lastSyncedAt)} />
+          )
+        }
+        actions={
+          <IconButton
+            icon={<Icon.Refresh />}
+            label={t('contractSearch.refresh')}
+            onClick={refresh}
+            disabled={loading}
+          />
+        }
+      >
+        {loading && !data ? (
+          <div className="flex justify-center py-16">
+            <Spinner label={t('common.loading')} />
+          </div>
+        ) : error ? (
+          <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
+        ) : !syncConfigured ? (
+          <EmptyState
+            title={t('contractSearch.notConfiguredTitle')}
+            hint={t('contractSearch.notConfiguredHint')}
+          />
+        ) : (
+          <>
+            {activeResult?.fromCache && (
+              <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">
+                {t('common.offlineTitle')}
+              </p>
+            )}
+            {/*
             Chips rather than a second `Tabs` bar: the page's own tab strip sits
             immediately above this panel, and stacking a full-width tablist
             under it reads as the same stutter the panel drops its title to
             avoid. Exactly one is always on — picking the active chip again
             leaves it on rather than clearing to no corpus at all.
           */}
-          <div
-            role="group"
-            aria-label={t('contractSearch.modeLabel')}
-            className="flex flex-wrap gap-2 border-b border-line px-3 py-2"
-          >
-            {CONTRACT_MODES.map((candidate) => (
-              <FilterChip
-                key={candidate}
-                label={t(`contractSearch.mode.${candidate}`)}
-                selected={mode === candidate}
-                onToggle={() => setMode(candidate)}
-              />
-            ))}
-          </div>
-          {modeRowCount === 0 ? (
-            // Nothing synced for the corpus on screen — distinct from
-            // `noFilterMatches` below, which is "rows exist, the filter just
-            // excludes them all". Per mode, so an empty courier snapshot never
-            // claims the offers never synced either.
-            <EmptyState
-              title={t(
-                mode === 'courier'
-                  ? 'contractSearch.courierEmptyTitle'
-                  : 'contractSearch.emptyTitle'
-              )}
-              hint={t(
-                mode === 'courier' ? 'contractSearch.courierEmptyHint' : 'contractSearch.emptyHint'
-              )}
-            />
-          ) : mode === 'courier' ? (
-            <CourierResults rows={courierRoutes} regionNames={regionNames} />
-          ) : (
-            <>
-              <ContractSearchFilterBar
-                filter={uiFilter}
-                onChange={changeFilter}
-                regionOptions={regionOptions}
-              />
-
-              {suggestions.length > 0 && (
-                <div className="border-b border-line bg-panel-2 px-3 py-2">
-                  <p className="pb-1.5 text-[0.6875rem] font-semibold tracking-widest text-accent uppercase">
-                    {t('contractSearch.suggestionsHeading')}
-                  </p>
-                  <ul
-                    aria-label={t('contractSearch.suggestionsLabel')}
-                    className="max-h-72 overflow-y-auto rounded-xs border border-line-bright bg-panel"
-                  >
-                    {suggestions.map((suggestion) => (
-                      <li key={suggestion.typeId} className="border-b border-line last:border-b-0">
-                        <button
-                          type="button"
-                          onClick={() => selectType(suggestion)}
-                          className="flex min-h-11 w-full items-center justify-between gap-3 px-3 py-2 text-left hover:bg-panel-2 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent md:min-h-9"
-                        >
-                          <span className="truncate">{suggestion.name}</span>
-                          <span className="shrink-0 text-[0.6875rem] text-text-dim">
-                            {t('contractSearch.suggestionOffers', {
-                              count: suggestion.stats.offerCount,
-                            })}
-                            {' · '}
-                            {formatIsk(suggestion.stats.cheapest, 2)}
-                          </span>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {summary !== null && (
-                <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2">
-                  <StatChip
-                    label={t('contractSearch.offersLabel')}
-                    value={summary.offerCount.toLocaleString()}
-                  />
-                  <StatChip
-                    label={t('contractSearch.cheapestLabel')}
-                    value={summary.cheapest === null ? '—' : formatIsk(summary.cheapest, 2)}
-                  />
-                  <StatChip
-                    label={t('contractSearch.medianLabel')}
-                    value={summary.median === null ? '—' : formatIsk(summary.median, 2)}
-                  />
-                  <Button size="sm" onClick={clearType}>
-                    {t('contractSearch.clearItem')}
-                  </Button>
-                </div>
-              )}
-
-              {displayRows.length === 0 ? (
-                <EmptyState
-                  title={t('contractSearch.noFilterMatches')}
-                  hint={t('contractSearch.noFilterMatchesHint')}
-                  className="py-8"
+            <div
+              role="group"
+              aria-label={t('contractSearch.modeLabel')}
+              className="flex flex-wrap gap-2 border-b border-line px-3 py-2"
+            >
+              {CONTRACT_MODES.map((candidate) => (
+                <FilterChip
+                  key={candidate}
+                  label={t(`contractSearch.mode.${candidate}`)}
+                  selected={mode === candidate}
+                  onToggle={() => setMode(candidate)}
                 />
-              ) : (
-                <>
-                  <DataTable
-                    label={t('contractSearch.title')}
-                    columns={columns}
-                    rows={visibleRows}
-                    // Index included deliberately: one contract lists the same
-                    // item once per stack, so contractId+typeId is not unique —
-                    // the duplicate React keys left stale rows in the table.
-                    rowKey={(row, index) => `${row.contractId}:${row.typeId}:${index}`}
-                    defaultSort={{ columnId: 'price', direction: 'asc' }}
+              ))}
+            </div>
+            {modeRowCount === 0 ? (
+              // Nothing synced for the corpus on screen — distinct from
+              // `noFilterMatches` below, which is "rows exist, the filter just
+              // excludes them all". Per mode, so an empty courier snapshot never
+              // claims the offers never synced either.
+              <EmptyState
+                title={t(
+                  mode === 'courier'
+                    ? 'contractSearch.courierEmptyTitle'
+                    : 'contractSearch.emptyTitle'
+                )}
+                hint={t(
+                  mode === 'courier'
+                    ? 'contractSearch.courierEmptyHint'
+                    : 'contractSearch.emptyHint'
+                )}
+              />
+            ) : mode === 'courier' ? (
+              <CourierResults rows={courierRoutes} regionNames={regionNames} />
+            ) : (
+              <>
+                <ContractSearchFilterBar
+                  filter={uiFilter}
+                  onChange={changeFilter}
+                  regionOptions={regionOptions}
+                />
+
+                {suggestions.length > 0 && (
+                  <div className="border-b border-line bg-panel-2 px-3 py-2">
+                    <p className="pb-1.5 text-[0.6875rem] font-semibold tracking-widest text-accent uppercase">
+                      {t('contractSearch.suggestionsHeading')}
+                    </p>
+                    <ul
+                      aria-label={t('contractSearch.suggestionsLabel')}
+                      className="max-h-72 overflow-y-auto rounded-xs border border-line-bright bg-panel"
+                    >
+                      {suggestions.map((suggestion) => (
+                        <li
+                          key={suggestion.typeId}
+                          className="border-b border-line last:border-b-0"
+                        >
+                          <button
+                            type="button"
+                            onClick={() => selectType(suggestion)}
+                            className="flex min-h-11 w-full items-center justify-between gap-3 px-3 py-2 text-left hover:bg-panel-2 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent md:min-h-9"
+                          >
+                            <span className="truncate">{suggestion.name}</span>
+                            <span className="shrink-0 text-[0.6875rem] text-text-dim">
+                              {t('contractSearch.suggestionOffers', {
+                                count: suggestion.stats.offerCount,
+                              })}
+                              {' · '}
+                              {formatIsk(suggestion.stats.cheapest, 2)}
+                            </span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {summary !== null && (
+                  <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2">
+                    <StatChip
+                      label={t('contractSearch.offersLabel')}
+                      value={summary.offerCount.toLocaleString()}
+                    />
+                    <StatChip
+                      label={t('contractSearch.cheapestLabel')}
+                      value={summary.cheapest === null ? '—' : formatIsk(summary.cheapest, 2)}
+                    />
+                    <StatChip
+                      label={t('contractSearch.medianLabel')}
+                      value={summary.median === null ? '—' : formatIsk(summary.median, 2)}
+                    />
+                    <Button size="sm" onClick={clearType}>
+                      {t('contractSearch.clearItem')}
+                    </Button>
+                  </div>
+                )}
+
+                {displayRows.length === 0 ? (
+                  <EmptyState
+                    title={t('contractSearch.noFilterMatches')}
+                    hint={t('contractSearch.noFilterMatchesHint')}
+                    className="py-8"
                   />
-                  {!showAll && displayRows.length > ROW_CAP && (
-                    <div className="px-3 py-2">
-                      <Button size="sm" onClick={() => setShowAll(true)}>
-                        {t('contractSearch.showAll', { count: displayRows.length })}
-                      </Button>
-                    </div>
-                  )}
-                </>
-              )}
-            </>
-          )}
-        </>
+                ) : (
+                  <>
+                    <DataTable
+                      label={t('contractSearch.title')}
+                      columns={columns}
+                      rows={visibleRows}
+                      // Index included deliberately: one contract lists the same
+                      // item once per stack, so contractId+typeId is not unique —
+                      // the duplicate React keys left stale rows in the table.
+                      rowKey={(row, index) => `${row.contractId}:${row.typeId}:${index}`}
+                      defaultSort={{ columnId: 'price', direction: 'asc' }}
+                      onRowClick={setSelectedRow}
+                    />
+                    {!showAll && displayRows.length > ROW_CAP && (
+                      <div className="px-3 py-2">
+                        <Button size="sm" onClick={() => setShowAll(true)}>
+                          {t('contractSearch.showAll', { count: displayRows.length })}
+                        </Button>
+                      </div>
+                    )}
+                  </>
+                )}
+              </>
+            )}
+          </>
+        )}
+      </Panel>
+      {selectedRow && activeCharacterId !== null && (
+        <PublicContractDetailModal
+          title={typeNames.get(selectedRow.typeId) ?? `#${selectedRow.typeId}`}
+          characterId={activeCharacterId}
+          contractId={selectedRow.contractId}
+          locationId={selectedRow.locationId}
+          regionName={regionNames.get(selectedRow.regionId) ?? `#${selectedRow.regionId}`}
+          dateExpired={selectedRow.dateExpired}
+          statChips={statChipsForRow(selectedRow)}
+          onClose={() => setSelectedRow(null)}
+        />
       )}
-    </Panel>
+    </>
   );
 }

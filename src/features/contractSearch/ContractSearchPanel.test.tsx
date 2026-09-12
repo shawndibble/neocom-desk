@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { db } from '@/db';
 import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharacter';
@@ -36,6 +37,22 @@ const loadRegionName = vi.fn(async (regionId: number) =>
 );
 vi.mock('@/features/bpcContracts/regionNames', () => ({
   loadRegionName: (...args: [number]) => loadRegionName(...args),
+}));
+
+const loadContractLocationName =
+  vi.fn<(characterId: number, locationId: number) => Promise<string | null>>();
+vi.mock('@/features/character/contractLocationName', () => ({
+  loadContractLocationName: (characterId: number, locationId: number) =>
+    loadContractLocationName(characterId, locationId),
+}));
+
+const loadPublicContractItems = vi.fn();
+vi.mock('@/features/bpcContracts/publicContractItems', () => ({
+  loadPublicContractItems: (...args: unknown[]) => loadPublicContractItems(...args),
+}));
+
+vi.mock('@/features/character/typeNames', () => ({
+  loadTypeNames: vi.fn(async () => new Map([[34, 'Tritanium']])),
 }));
 
 const CATALOG: MarketTypeEntry[] = [
@@ -153,6 +170,18 @@ beforeEach(async () => {
   loadPublicCourierContracts.mockResolvedValue(
     cachedCourierSnapshot([JITA_TO_AMARR, AMARR_TO_STRUCTURE])
   );
+  loadContractLocationName.mockReset();
+  loadContractLocationName.mockResolvedValue('Jita IV - Moon 4 - Caldari Navy Assembly Plant');
+  loadPublicContractItems.mockReset();
+  loadPublicContractItems.mockResolvedValue({
+    data: {
+      kind: 'items' as const,
+      items: [{ record_id: 1, type_id: 34, quantity: 100, is_included: true }],
+    },
+    fetchedAt: new Date(),
+    fromCache: false,
+    truncated: false,
+  });
   // Both SDE indexes memoize per session, so without this a case that swaps
   // the snapshot reads the previous case's map.
   clearNpcStationIndex();
@@ -277,6 +306,48 @@ describe('ContractSearchPanel', () => {
     render(<ContractSearchPanel />);
 
     expect(await screen.findByText('No public contracts synced yet')).toBeInTheDocument();
+  });
+});
+
+describe('ContractSearchPanel — contract detail modal', () => {
+  // The shared modal's contents list wraps each line in a Build Plan
+  // context-menu trigger, which navigates via `useNavigate` — a Router is
+  // otherwise unneeded by this panel.
+  function renderWithRouter() {
+    return render(
+      <MemoryRouter>
+        <ContractSearchPanel />
+      </MemoryRouter>
+    );
+  }
+
+  it('opens the shared contract detail modal on a row click, the same one BPC Search and Contracts History use', async () => {
+    const user = userEvent.setup();
+    renderWithRouter();
+
+    const rows = await bodyRows();
+    await user.click(rows[0]);
+
+    // rows[0] is Domain-region Tritanium (cheapest-first sort): the modal
+    // title is the item name, and its region reflects the clicked row, not
+    // whichever row rendered first in the snapshot.
+    expect(await screen.findByText('Everything on this contract')).toBeInTheDocument();
+    expect(screen.getByRole('dialog')).toHaveTextContent('Domain');
+    expect(loadPublicContractItems).toHaveBeenCalledWith(TRIT_DOMAIN.contractId);
+  });
+
+  it('closes on request, leaving the table underneath untouched', async () => {
+    const user = userEvent.setup();
+    renderWithRouter();
+
+    const rows = await bodyRows();
+    await user.click(rows[0]);
+    await screen.findByRole('dialog');
+
+    await user.click(screen.getByRole('button', { name: 'Close' }));
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(await bodyRows()).toHaveLength(3);
   });
 });
 
