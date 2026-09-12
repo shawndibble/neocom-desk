@@ -15,8 +15,9 @@
  * The price is that a player structure stays unnamed, unplaced and unbanded.
  * `CourierEndpoint` says so with `null` rather than guessing, and the table
  * shows the raw id — the honest answer, and one that still lets the route
- * search match the *other* end. Origin keeps its region regardless: the row
- * carries the contract's own region, which is where the pickup is.
+ * search match the *other* end. A pickup keeps its region regardless: the row
+ * carries the contract's own, which is where the pickup is, and a location that
+ * is one haul's pickup keeps it when it turns up as another's delivery.
  */
 import { classifySpace } from '@/engine/space';
 import { lookupNpcStation } from '@/sde/npcStations';

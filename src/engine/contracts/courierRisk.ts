@@ -20,12 +20,15 @@ import type { CourierRouteRow, CourierEndpoint } from './courierSearch';
 export type CourierRiskKind = 'player-structure' | 'no-gate-route' | 'nullsec';
 
 /**
- * Every J-space system sits in a region numbered from 11000001 up, and the
- * contract row carries its own region natively. That matters because a
- * wormhole endpoint is always a player structure — `stations.json` holds no
- * NPC station in any J-named system — so the endpoint itself carries no
- * system, no band and no gate count to judge. The region id is the one local
- * fact that survives.
+ * Every J-space system sits in the 11000000 region block, and the contract row
+ * carries its own region natively.
+ *
+ * This is the fallback for an endpoint nothing local places, which in this
+ * block means a J-named system: `stations.json` holds no NPC station in any of
+ * them, so such an endpoint has no system, no band and no gate count to judge,
+ * and the region id is the one local fact that survives. A *placeable* endpoint
+ * in the same block — Thera and the Drifter systems, which are not J-named and
+ * do have NPC stations — is answered by `hasStargates` directly.
  */
 export function isWormholeRegion(regionId: number | null): boolean {
   // Bounded above as well as below: the blocks past this one are Abyssal and

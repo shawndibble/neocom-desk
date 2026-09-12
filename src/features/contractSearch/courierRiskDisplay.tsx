@@ -5,13 +5,16 @@
  * the other half of the same picture — hauls priced to be *accepted*, where
  * this one covers hauls that are hard to *complete* — and the two must land as
  * one risk treatment on the row rather than two competing badge systems.
- * Anything added there extends `CourierRiskKind` and `courierRiskLabels.ts`;
- * this file should not need to change.
+ *
+ * What is reusable is the marker itself: the border, tone and short label
+ * below. #946's risks are properties of the *contract* rather than of one end,
+ * so they want a row-level sibling in this file reading the same
+ * `RISK_COPY`, not a second badge vocabulary.
  */
 import { useTranslation } from 'react-i18next';
 import { endpointRisks } from '@/engine/contracts/courierRisk';
 import type { CourierEndpoint } from '@/engine/contracts/courierSearch';
-import { MARKED_RISKS, riskCopy } from '@/features/contractSearch/courierRiskLabels';
+import { MARKED_RISKS, RISK_COPY } from '@/features/contractSearch/courierRiskLabels';
 
 /**
  * The markers for one end of a haul, beside the end they describe — so "this
@@ -43,10 +46,10 @@ export function EndpointRiskMarkers({
           // spells every flag out for everyone else, which is where the
           // decision is actually made. #947 is where this should converge on
           // the `Tooltip` the design system documents for explaining triggers.
-          title={t(riskCopy(kind).detail)}
+          title={t(RISK_COPY[kind].detail)}
           className="ml-1.5 rounded-xs border border-warning/40 px-1 text-[0.6875rem] text-warning"
         >
-          {t(riskCopy(kind).short)}
+          {t(RISK_COPY[kind].short)}
         </span>
       ))}
     </>

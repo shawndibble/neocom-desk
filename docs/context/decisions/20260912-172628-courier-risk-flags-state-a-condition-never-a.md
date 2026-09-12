@@ -77,11 +77,12 @@ _Recorded 2026-09-12 · issue #944._
   column it would add a card line below `sm`, which is the constraint the route
   cell markers were shaped to respect.
 
-- **The markers are the shared visual language.** #946 adds the other half of
-  the same picture — hauls priced to be _accepted_, where this covers hauls that
-  are hard to _complete_. It extends `CourierRiskKind` and
-  `courierRiskLabels.ts` rather than introducing a second badge system, and
-  should not need to touch the rendering at all.
+- **The marker is the shared visual language, not the component.** #946 adds
+  the other half of the same picture — hauls priced to be _accepted_, where this
+  covers hauls that are hard to _complete_. Its risks are properties of the
+  _contract_ rather than of one end, so it wants a row-level sibling beside
+  `EndpointRiskMarkers` reading the same border, tone and copy table — one risk
+  treatment on the row, not a second badge vocabulary.
 
 - **Only the delivery end carries the structure flag,** which is what the ticket
   asks for. An inaccessible _pickup_ is arguably the same trap — a public

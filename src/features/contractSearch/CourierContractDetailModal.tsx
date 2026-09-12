@@ -23,7 +23,7 @@ import {
 } from '@/engine/contracts/courierSearch';
 import { collateralToRewardRatio, iskPerVolume } from '@/engine/contracts/courierRates';
 import { courierRisks } from '@/engine/contracts/courierRisk';
-import { MARKED_RISKS, riskCopy } from '@/features/contractSearch/courierRiskLabels';
+import { MARKED_RISKS, RISK_COPY } from '@/features/contractSearch/courierRiskLabels';
 
 /**
  * One decimal, for a figure read as a magnitude rather than an exact amount —
@@ -124,9 +124,9 @@ export function CourierContractDetailModal({
             <ul className="flex flex-col gap-1.5 text-sm">
               {risks.map((kind) => (
                 <li key={kind}>
-                  <span className="text-text-dim">{t(riskCopy(kind).short)}</span>
+                  <span className="text-text-dim">{t(RISK_COPY[kind].short)}</span>
                   {' — '}
-                  {t(riskCopy(kind).detail)}
+                  {t(RISK_COPY[kind].detail)}
                 </li>
               ))}
             </ul>

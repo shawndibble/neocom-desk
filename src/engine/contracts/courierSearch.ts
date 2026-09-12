@@ -154,11 +154,9 @@ function endpointFor(
  * map. Pure: the caller builds `endpoints` from the SDE snapshots.
  *
  * An unresolved *origin* still gets a region — `regionId` on the row is the
- * contract's own region, which is where it was posted and therefore where the
- * pickup is. A destination has no such column of its own, so it is placed only
- * when some haul on the board is *posted* from the same location; a region is a
- * property of the place, not of the contract, so that reuse is sound where it
- * applies. Where it does not, the destination is genuinely unplaced.
+ * contract's own, which is where it was posted and therefore where the pickup
+ * is. A destination has no such column of its own; `courierEndpoints.ts`
+ * explains when one is placed anyway and what that leaves unanswerable.
  */
 export function resolveCourierRoutes(
   rows: readonly PublicCourierContractRow[],

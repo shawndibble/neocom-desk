@@ -5,11 +5,8 @@
  * rendering at all.
  *
  * Two registers per risk: a short label the row has room for, and the sentence
- * the detail modal spells out. **Neither asserts the hauler cannot complete the
- * contract.** The app cannot read a structure's access list, and probing one
- * per row is the ESI fan-out the local-snapshot approach exists to avoid, so
- * every string states a condition and its consequence rather than a verdict
- * about this player.
+ * the detail modal spells out. Neither asserts the hauler cannot complete the
+ * contract — see `engine/contracts/courierRisk.ts` for why that bound exists.
  */
 import type { CourierRiskKind } from '@/engine/contracts/courierRisk';
 
@@ -32,7 +29,7 @@ interface RiskCopy {
   detail: string;
 }
 
-const COPY: Record<CourierRiskKind, RiskCopy> = {
+export const RISK_COPY: Record<CourierRiskKind, RiskCopy> = {
   'player-structure': {
     short: 'contractSearch.risk.structureShort',
     detail: 'contractSearch.risk.structureDetail',
@@ -46,7 +43,3 @@ const COPY: Record<CourierRiskKind, RiskCopy> = {
     detail: 'contractSearch.risk.nullsecDetail',
   },
 };
-
-export function riskCopy(kind: CourierRiskKind): RiskCopy {
-  return COPY[kind];
-}

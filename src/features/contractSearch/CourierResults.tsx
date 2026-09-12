@@ -408,10 +408,9 @@ function CourierFilterBar({
           <RoutePreferenceField value={preference} onChange={onPreferenceChange} />
           {/*
             One control, not a per-flag set: a hauler either wants the jobs they
-            may not be able to deliver out of the way or they do not. Nullsec is
-            deliberately not among what it hides — plenty of nullsec hauling is
-            ordinary well-paid work, and removing it behind a safety control
-            would quietly take away a real market.
+            may not be able to deliver out of the way or they do not. What it
+            hides — and what it deliberately does not — is `blocksCompletion`'s
+            to decide.
           */}
           <FilterChip
             label={t('contractSearch.hideUncompletableLabel')}
