@@ -255,19 +255,35 @@ export function ActiveJobsPanel({
   // elsewhere in this app, and the only way to give the effect below no
   // synchronous `setState` call of its own (`react-hooks/set-state-in-effect`).
   const [jobsFanOut, setJobsFanOut] = useState<JobsFanOutSnapshot | null>(null);
+  // The per-Character ESI reads are caught inside `loadAllCharactersIndustryJobs`,
+  // so only its own Dexie reads can reject it — and `jobsFanOut === null` alone
+  // would then mean "still loading" forever, spinner and all. This flag ends the
+  // spinner without inventing an answer: `hasAnswered` stays false, so the panel
+  // lands in the "no data cached" empty state, exactly where
+  // `loadActiveJobsSnapshot`'s own catch puts the single-Character path.
+  const [jobsFanOutFailed, setJobsFanOutFailed] = useState(false);
   const [jobsFanOutRefreshCount, setJobsFanOutRefreshCount] = useState(0);
   useEffect(() => {
     if (!needsJobSlotFanOut) return;
     let cancelled = false;
-    void loadAllCharactersIndustryJobs().then((snapshot) => {
-      if (!cancelled) setJobsFanOut(snapshot);
-    });
+    void loadAllCharactersIndustryJobs()
+      .then((snapshot) => {
+        if (cancelled) return;
+        setJobsFanOut(snapshot);
+        // Cleared here rather than at the top of the effect: a synchronous
+        // `setState` in the effect body is what the retained-snapshot shape
+        // above exists to avoid (`react-hooks/set-state-in-effect`).
+        setJobsFanOutFailed(false);
+      })
+      .catch(() => {
+        if (!cancelled) setJobsFanOutFailed(true);
+      });
     return () => {
       cancelled = true;
     };
   }, [needsJobSlotFanOut, jobsFanOutRefreshCount]);
   const refreshJobsFanOut = useCallback(() => setJobsFanOutRefreshCount((c) => c + 1), []);
-  const jobsFanOutLoading = jobsFanOut === null;
+  const jobsFanOutLoading = jobsFanOut === null && !jobsFanOutFailed;
 
   // Skills for the job-slot header's max-per-category, for every character
   // the resolved filter names beyond the current one — the single-character
@@ -294,9 +310,14 @@ export function ActiveJobsPanel({
     void mapWithConcurrencyLimit(ids, ESI_FANOUT_CONCURRENCY, async (id) => {
       const result = await loadCharacterSkills(id);
       if (result) skillsById.set(id, jobSlotSkillsFromCharacterSkills(result.data.skills));
-    }).then(() => {
-      if (!cancelled) setJobsFanOutSkills(skillsById);
-    });
+    })
+      .then(() => {
+        if (!cancelled) setJobsFanOutSkills(skillsById);
+      })
+      // Nothing to record: `jobsFanOutSkills` starts empty and an absent
+      // Character already reads as "unknown" in the job-slot header. This only
+      // stops a Dexie failure here becoming an unhandled rejection.
+      .catch(() => {});
     return () => {
       cancelled = true;
     };
