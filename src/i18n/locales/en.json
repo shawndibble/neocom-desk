@@ -3544,6 +3544,28 @@
     "notConfiguredTitle": "Contract search isn't available",
     "notConfiguredHint": "This requires the app's sync backend, which isn't configured here.",
     "noFilterMatches": "No public contracts match your filters.",
-    "noFilterMatchesHint": "Clear the item search or widen the region, price and quantity filters."
+    "noFilterMatchesHint": "Clear the item search or widen the region, price and quantity filters.",
+    "modeLabel": "Contract kind",
+    "mode": {
+      "items": "Items",
+      "courier": "Courier"
+    },
+    "courierTitle": "Courier Contract Search",
+    "courierSearchPlaceholder": "Search pickup or drop-off…",
+    "originRegionLabel": "From region",
+    "destinationRegionLabel": "To region",
+    "minRewardLabel": "Min reward",
+    "maxCollateralLabel": "Max collateral",
+    "maxVolumeLabel": "Max volume (m³)",
+    "minDaysLabel": "Min days",
+    "routeColumn": "Route",
+    "rewardColumn": "Reward",
+    "collateralColumn": "Collateral",
+    "volumeColumn": "Volume",
+    "daysColumn": "Days",
+    "courierEmptyTitle": "No public courier contracts synced yet",
+    "courierEmptyHint": "The public contract index refreshes on its own schedule — check back shortly.",
+    "courierNoFilterMatches": "No courier contracts match your filters.",
+    "courierNoFilterMatchesHint": "Clear the route search or widen the region, reward, collateral and volume filters."
   }
 }
