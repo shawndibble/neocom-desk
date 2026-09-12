@@ -6,9 +6,8 @@
  * navigation instead of a change of owner for the table below.
  *
  * Labels arrive already translated, `FilterChip`'s own convention — the copy is
- * page-specific ("My jobs / Corp jobs" on Industry, "Personal / Corporation" on
- * Wallet), so it belongs to the page's own i18n namespace rather than a shared
- * corp one.
+ * page-specific, so it belongs to the page's own i18n namespace rather than a
+ * shared corp one.
  *
  * Rendering this at all is the caller's decision: `useCorpOwner().available` is
  * false for a Character with no capability, and then nothing here is mounted.

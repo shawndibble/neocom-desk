@@ -51,7 +51,8 @@ import {
   type AlertsFilter,
   type DisplayAlertGroup,
 } from '@/features/notifications/alertsFilter';
-import { readFeed, dismissFeedEntries } from '@/features/notifications/feed';
+import { readFeed } from '@/features/notifications/feed';
+import { dismissFeedEntriesAndSync } from '@/features/notifications/feedSync';
 import { isEntryMutedInFeed } from '@/features/notifications/feedSelection';
 import {
   hydrateNotificationPreferences,
@@ -177,7 +178,7 @@ export function Alerts() {
               <IconButton
                 icon={<Icon.DismissAll />}
                 label={t('alerts.dismissAll')}
-                onClick={() => void dismissFeedEntries(liveEntries.map((entry) => entry.id))}
+                onClick={() => void dismissFeedEntriesAndSync(liveEntries)}
               />
             )}
           </>
@@ -284,9 +285,7 @@ export function Alerts() {
                 group={group}
                 expanded={expandedKeys.has(group.key)}
                 onToggle={() => toggleExpanded(group.key)}
-                onDismissGroup={() =>
-                  void dismissFeedEntries(group.entries.map((entry) => entry.id))
-                }
+                onDismissGroup={() => void dismissFeedEntriesAndSync(group.entries)}
                 onToggleMute={() =>
                   void setFeedMutedForCharacters(group.characterIds, group.target, !group.muted)
                 }
@@ -295,7 +294,7 @@ export function Alerts() {
                 // them, and the name on each row is width the body copy could
                 // have had.
                 showCharacter={characters.length > 1}
-                onDismissEntry={(id) => void dismissFeedEntries([id])}
+                onDismissEntry={(entry) => void dismissFeedEntriesAndSync([entry])}
               />
             ))}
           </ul>

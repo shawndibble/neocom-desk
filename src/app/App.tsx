@@ -9,6 +9,7 @@ import { configureEsi } from '@/esi/client';
 import { triggerSync } from '@/sync';
 import { db } from '@/db';
 import { isSyncConfigured } from './syncStatus';
+import { useBackgroundSync } from './backgroundSync';
 import { prefetchCharacterData } from './prefetch';
 import { Login } from '@/routes/Login';
 import { Callback } from '@/routes/Callback';
@@ -184,6 +185,12 @@ export function App() {
     if (activeCharacterId === null || !isSyncConfigured()) return;
     void triggerSync(activeCharacterId).catch(() => {});
   }, [activeCharacterId]);
+
+  // The above covers the active Character at boot. This covers the rest of
+  // them, and covers a tab that has been open long enough for another device
+  // to have changed something — see backgroundSync.ts.
+  const characterIds = useLiveQuery(() => db.characters.toCollection().primaryKeys(), [], []);
+  useBackgroundSync(characterIds);
 
   // Same shape, for API-derived data: warm every granted surface into Dexie at
   // boot so a later page opens from cache rather than the network. Cancelled on

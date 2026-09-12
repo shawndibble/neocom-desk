@@ -15,7 +15,8 @@
  * the master + feed-channel switches, which this still honours so a pilot who
  * has turned notifications off entirely does not have feed rows pile up.
  */
-import { recordFeedEntry } from '@/features/notifications/feed';
+import { recordFeedEntryAndSync } from '@/features/notifications/feedSync';
+import type { NewNotificationFeedEntry } from '@/features/notifications/feed';
 import {
   hydrateNotificationPreferences,
   isFeedChannelEnabled,
@@ -41,7 +42,7 @@ export interface BpcWatchPollDependencies {
   loadRows: () => Promise<readonly BpcContractRow[] | null>;
   resolveTypeName: (typeId: number) => Promise<string>;
   saveWatchState: (id: string, state: BpcWatchState) => Promise<void>;
-  recordFeedEntry: typeof recordFeedEntry;
+  recordFeedEntry: (entry: NewNotificationFeedEntry) => Promise<void>;
   now: () => number;
 }
 
@@ -117,7 +118,7 @@ export function liveDependencies(): BpcWatchPollDependencies {
     },
     resolveTypeName: async (typeId) => (await loadTypeNames([typeId])).get(typeId) ?? `#${typeId}`,
     saveWatchState,
-    recordFeedEntry,
+    recordFeedEntry: recordFeedEntryAndSync,
     now: () => Date.now(),
   };
 }
