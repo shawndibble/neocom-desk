@@ -342,7 +342,11 @@ const GRACE = Symbol('grace');
  * Falls back to a plain await — the pre-existing behaviour, unchanged — for
  * the two cases a stale row must not be substituted into:
  * - **A manual Refresh** (`isRefreshInvalidated`). The user asked for new data
- *   and is watching the button; it must report what actually happened.
+ *   and is watching the button; it must report what actually happened. Note
+ *   this only reaches keys on the default window: `isRefreshInvalidated`
+ *   deliberately exempts longer ones, so a Refresh does not force a
+ *   `Published Snapshot` live — there is nothing newer to fetch until the
+ *   backend republishes, and `chunkedSnapshot.ts` documents that trade.
  * - **Keys whose window is longer than the default.** A lapsed 24h row is a
  *   station name; a re-render per distinct location for data that cannot have
  *   changed is all cost. A key whose long window is a *publish cadence* rather

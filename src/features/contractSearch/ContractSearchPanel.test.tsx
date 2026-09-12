@@ -10,13 +10,12 @@ import { isSyncConfigured } from '@/app/syncStatus';
 import { clearJumpGraphIndex } from '@/sde/jumpGraph';
 import { ContractSearchPanel } from '@/features/contractSearch/ContractSearchPanel';
 import type { PublicContractOfferRow } from '@/engine/contracts/contractOffers';
-import type { PublicContractOffersSnapshot } from '@/features/contractSearch/publicContractOffers';
+import type { ChunkedSnapshotRead } from '@/features/contractSearch/chunkedSnapshot';
 import type { CachedResult } from '@/esi/cache';
 import type { MarketTypeEntry, NpcStationEntry, SolarSystemEntry } from '@/sde/marketTypes';
 import { clearNpcStationIndex } from '@/sde/npcStations';
 import { clearSolarSystemIndex } from '@/sde/solarSystems';
 import type { PublicCourierContractRow } from '@/engine/contracts/courierSearch';
-import type { PublicCourierContractsSnapshot } from '@/features/contractSearch/publicCourierContracts';
 
 vi.mock('@/app/syncStatus', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/app/syncStatus')>();
@@ -183,26 +182,35 @@ const AMARR_TO_STRUCTURE = courierRow({
   daysToComplete: undefined,
 });
 
-function cachedCourierSnapshot(
-  rows: PublicCourierContractRow[]
-): CachedResult<PublicCourierContractsSnapshot> {
+/**
+ * What `loadChunkedSnapshot` hands back: the cached rows, plus whether a newer
+ * read is running behind them (#963). `revalidating` is false here — the
+ * stale-serve path has its own coverage in `chunkedSnapshot.test.ts`.
+ */
+function snapshotRead<TRow>(rows: TRow[], overrides: Partial<CachedResult<never>> = {}) {
   return {
-    data: { rows, lastSyncedAt: Date.parse('2026-09-12T18:30:00Z') },
-    fetchedAt: new Date(),
-    fromCache: false,
-    truncated: false,
+    cached: {
+      data: { rows, lastSyncedAt: Date.parse('2026-09-12T18:30:00Z') },
+      fetchedAt: new Date(),
+      fromCache: false,
+      truncated: false,
+      ...overrides,
+    },
+    revalidating: false,
   };
 }
 
+function cachedCourierSnapshot(
+  rows: PublicCourierContractRow[]
+): ChunkedSnapshotRead<PublicCourierContractRow> {
+  return snapshotRead(rows);
+}
+
 function cachedSnapshot(
-  rows: PublicContractOfferRow[]
-): CachedResult<PublicContractOffersSnapshot> {
-  return {
-    data: { rows, lastSyncedAt: Date.parse('2026-09-12T18:30:00Z') },
-    fetchedAt: new Date(),
-    fromCache: false,
-    truncated: false,
-  };
+  rows: PublicContractOfferRow[],
+  overrides: Partial<CachedResult<never>> = {}
+): ChunkedSnapshotRead<PublicContractOfferRow> {
+  return snapshotRead(rows, overrides);
 }
 
 beforeEach(async () => {
@@ -852,7 +860,7 @@ describe('ContractSearchPanel — progressive loading', () => {
   }
 
   it('renders the courier board while the offers snapshot is still in flight', async () => {
-    const offers = deferred<CachedResult<PublicContractOffersSnapshot>>();
+    const offers = deferred<ChunkedSnapshotRead<PublicContractOfferRow>>();
     loadPublicContractOffers.mockReturnValue(offers.promise);
     const user = userEvent.setup();
     renderWithRouter();
@@ -867,7 +875,7 @@ describe('ContractSearchPanel — progressive loading', () => {
   });
 
   it('renders the item board while the courier snapshot is still in flight', async () => {
-    const courier = deferred<CachedResult<PublicCourierContractsSnapshot>>();
+    const courier = deferred<ChunkedSnapshotRead<PublicCourierContractRow>>();
     loadPublicCourierContracts.mockReturnValue(courier.promise);
     renderWithRouter();
 
@@ -876,7 +884,7 @@ describe('ContractSearchPanel — progressive loading', () => {
   });
 
   it('says which corpus it is loading rather than showing a bare spinner', async () => {
-    const offers = deferred<CachedResult<PublicContractOffersSnapshot>>();
+    const offers = deferred<ChunkedSnapshotRead<PublicContractOfferRow>>();
     loadPublicContractOffers.mockReturnValue(offers.promise);
     renderWithRouter();
 
@@ -889,7 +897,7 @@ describe('ContractSearchPanel — progressive loading', () => {
   it('never claims an empty corpus while that corpus is still loading', async () => {
     // The whole point: "no contracts have synced" and "they have not arrived
     // yet" are different answers, and the second must not be given as the first.
-    const offers = deferred<CachedResult<PublicContractOffersSnapshot>>();
+    const offers = deferred<ChunkedSnapshotRead<PublicContractOfferRow>>();
     loadPublicContractOffers.mockReturnValue(offers.promise);
     renderWithRouter();
 
@@ -921,11 +929,72 @@ describe('ContractSearchPanel — progressive loading', () => {
     });
   });
 
-  it('states a refresh that fell back to cache, rather than repeating the offline banner', async () => {
+  it('keeps a loaded board on screen while a re-read runs behind it', async () => {
+    // Every re-read hands the hooks a *new* rows array off a new CachedResult,
+    // and `useRouteSnapshot` re-runs its loader on any global revalidation
+    // signal — not only on this panel's own Refresh. Dropping the resolved
+    // names on an input change would therefore blank a fully-loaded board
+    // whenever some other page's cache refreshed.
+    const user = userEvent.setup();
+    renderWithRouter();
+    await bodyRows();
+    await user.click(screen.getByRole('button', { name: 'Courier' }));
+    await screen.findByText('Jita');
+
+    const second = deferred<ChunkedSnapshotRead<PublicCourierContractRow>>();
+    loadPublicCourierContracts.mockReturnValue(second.promise);
+    await user.click(screen.getByRole('button', { name: 'Refresh' }));
+
+    // Rows, and their resolved names, both still there mid-re-read.
+    expect(screen.getByText('Jita')).toBeInTheDocument();
+    expect(screen.getByRole('table')).toBeInTheDocument();
+    second.settle(cachedCourierSnapshot([JITA_TO_AMARR, AMARR_TO_STRUCTURE]));
+  });
+
+  it('shows the hauls even when nothing can name their endpoints', async () => {
+    // A lookup that throws has to settle as "resolved, with nothing". Left as
+    // "still resolving" it would spin forever with no error to report, which is
+    // worse than the id the board honestly shows for a player structure anyway.
+    vi.mocked(loadRegionName).mockRejectedValue(new Error('offline'));
+    const user = userEvent.setup();
+    renderWithRouter();
+    await bodyRows();
+    await user.click(screen.getByRole('button', { name: 'Courier' }));
+
+    const table = await screen.findByRole('table');
+    const [, ...rest] = within(table).getAllByRole('rowgroup');
+    expect(within(rest[0]).getAllByRole('row')).toHaveLength(2);
+    await waitFor(() => {
+      expect(screen.queryByText('Naming regions…')).not.toBeInTheDocument();
+    });
+  });
+
+  it('says the courier snapshot is unavailable rather than spinning on it', async () => {
+    // `loadWithCache` swallows a failed read and answers with no rows at all,
+    // so the loader resolves cleanly with nothing. That is an answer — "none
+    // synced" — not a reason to keep spinning.
+    loadPublicCourierContracts.mockResolvedValue({ cached: null, revalidating: false });
+    const user = userEvent.setup();
+    renderWithRouter();
+    await bodyRows();
+    await user.click(screen.getByRole('button', { name: 'Courier' }));
+
+    expect(await screen.findByText('No public courier contracts synced yet')).toBeInTheDocument();
+  });
+
+  it('says a newer snapshot is on its way while the stored rows are showing', async () => {
     loadPublicContractOffers.mockResolvedValue({
       ...cachedSnapshot([TRIT_FORGE]),
-      fromCache: true,
+      revalidating: true,
     });
+    renderWithRouter();
+
+    await bodyRows();
+    expect(screen.getByText('Refreshing in the background…')).toBeInTheDocument();
+  });
+
+  it('states a refresh that fell back to cache, rather than repeating the offline banner', async () => {
+    loadPublicContractOffers.mockResolvedValue(cachedSnapshot([TRIT_FORGE], { fromCache: true }));
     const user = userEvent.setup();
     renderWithRouter();
 

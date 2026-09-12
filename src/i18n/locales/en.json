@@ -3643,6 +3643,8 @@
     "loadingOffers": "Loading public contracts…",
     "loadingCourier": "Loading courier contracts…",
     "namingRegions": "Naming regions…",
+    "namingTypes": "Loading item names…",
+    "refreshingInBackground": "Refreshing in the background…",
     "courierNoFilterMatches": "No courier contracts match your filters.",
     "courierNoFilterMatchesHint": "Clear the route search or widen the region, reward, collateral and volume filters."
   }

@@ -15,16 +15,15 @@
  * region on a cold cache, which is why that is the only stage worth naming in
  * the UI while it runs.
  */
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { loadMarketTypes } from '@/sde/loadMarketSde';
 import { loadRegionName } from '@/features/bpcContracts/regionNames';
-import { resolveCourierRoutes, type CourierRouteRow } from '@/engine/contracts/courierSearch';
-import type { PublicCourierContractRow } from '@/engine/contracts/courierSearch';
+import type { CourierEndpoint, PublicCourierContractRow } from '@/engine/contracts/courierSearch';
 import type { PublicContractOfferRow } from '@/engine/contracts/contractOffers';
 import { loadCourierEndpoints } from './courierEndpoints';
 
 const EMPTY_NAMES: ReadonlyMap<number, string> = new Map();
-const EMPTY_ROUTES: readonly CourierRouteRow[] = [];
+const EMPTY_ENDPOINTS: ReadonlyMap<number, CourierEndpoint> = new Map();
 
 /**
  * An answer that carries the input it was computed for, so "still resolving"
@@ -33,9 +32,16 @@ const EMPTY_ROUTES: readonly CourierRouteRow[] = [];
  * whose input is no longer current is stale by definition, so the view reads
  * as resolving the instant the input changes, with no extra render.
  *
- * `input` must be referentially stable across renders that mean the same
- * thing; every caller below either passes a value straight off a snapshot or
- * memoizes it.
+ * The previous answer is *kept* while the next one resolves, rather than
+ * falling back to the empty map. Every input here is a fresh array off a fresh
+ * `CachedResult`, and `useRouteSnapshot` re-runs its loader on every global
+ * revalidation signal — so blanking on an input change would wipe the names
+ * off a fully-loaded board whenever any other page's cache refreshed. A name
+ * map from the previous read is still correct for every id it holds: these are
+ * keyed by type, location and region id, none of which are reassigned.
+ *
+ * `resolve` and `fallback` must be module-level constants; every caller below
+ * passes one, which is what lets the effect depend on them honestly.
  */
 function useResolved<TInput, TValue>(
   input: TInput,
@@ -44,25 +50,26 @@ function useResolved<TInput, TValue>(
 ): { value: TValue; resolving: boolean } {
   const [answer, setAnswer] = useState<{ input: TInput; value: TValue } | null>(null);
 
-  // Latest-ref, so a caller passing an inline resolver cannot re-trigger the
-  // effect every render. The effect keys on the input alone.
-  const resolveRef = useRef(resolve);
-  useEffect(() => {
-    resolveRef.current = resolve;
-  });
-
   useEffect(() => {
     let cancelled = false;
-    void resolveRef.current(input).then((value) => {
-      if (!cancelled) setAnswer({ input, value });
-    });
+    void resolve(input)
+      // A lookup that throws must settle as "resolved, with nothing" rather
+      // than leave `resolving` true for the life of the mount. These used to
+      // run inside the route loader, where a throw surfaced as its `error`;
+      // behind the table there is no such reporting channel, and an unresolved
+      // id is what every consumer already renders anyway. Same trade as
+      // `features/market/useCompareRows.ts`.
+      .catch(() => fallback)
+      .then((value) => {
+        if (!cancelled) setAnswer({ input, value });
+      });
     return () => {
       cancelled = true;
     };
-  }, [input]);
+  }, [input, resolve, fallback]);
 
   const current = answer !== null && answer.input === input ? answer : null;
-  return { value: current?.value ?? fallback, resolving: current === null };
+  return { value: current?.value ?? answer?.value ?? fallback, resolving: current === null };
 }
 
 /**
@@ -98,27 +105,28 @@ async function resolveTypeNames(
 }
 
 /**
- * Courier rows with both ends placed. Local SDE snapshots only, so this costs
- * no requests at all — see `courierEndpoints.ts` for why it is not
- * `loadContractLocationName`.
+ * Both ends of every haul, as far as the local SDE snapshots reach, keyed by
+ * location id. Costs no requests at all — see `courierEndpoints.ts` for why it
+ * is not `loadContractLocationName`.
  *
- * The rows are returned resolved-or-not, never withheld: `resolveCourierRoutes`
- * against no endpoints at all still yields every haul, each end carrying its
- * raw location id, which is exactly what the board shows for a player
- * structure anyway.
+ * A map rather than the finished rows: `resolveCourierRoutes` turns rows plus
+ * whatever endpoints are known into rows, so the board always has every haul
+ * and an unplaced end simply carries its raw location id — which is what it
+ * shows for a player structure regardless. Resolving the *rows* here instead
+ * would mean the board had none at all until this settled.
  */
-export function useCourierRoutes(rows: readonly PublicCourierContractRow[]): {
-  value: readonly CourierRouteRow[];
+export function useCourierEndpoints(rows: readonly PublicCourierContractRow[]): {
+  value: ReadonlyMap<number, CourierEndpoint>;
   resolving: boolean;
 } {
-  return useResolved(rows, resolveRoutes, EMPTY_ROUTES);
+  return useResolved(rows, resolveEndpoints, EMPTY_ENDPOINTS);
 }
 
-async function resolveRoutes(
+async function resolveEndpoints(
   rows: readonly PublicCourierContractRow[]
-): Promise<readonly CourierRouteRow[]> {
-  if (rows.length === 0) return EMPTY_ROUTES;
-  return resolveCourierRoutes(rows, await loadCourierEndpoints(rows));
+): Promise<ReadonlyMap<number, CourierEndpoint>> {
+  if (rows.length === 0) return EMPTY_ENDPOINTS;
+  return loadCourierEndpoints(rows);
 }
 
 /**

@@ -69,8 +69,9 @@ describe('loadChunkedSnapshot', () => {
 
     const result = await loadChunkedSnapshot<{ id: number }>(SOURCE, CHARACTER_ID);
 
-    expect(result?.data.rows).toEqual([{ id: 1 }, { id: 2 }, { id: 3 }]);
-    expect(result?.data.lastSyncedAt).toBe(1_700_000_000_000);
+    expect(result.cached?.data.rows).toEqual([{ id: 1 }, { id: 2 }, { id: 3 }]);
+    expect(result.cached?.data.lastSyncedAt).toBe(1_700_000_000_000);
+    expect(result.revalidating).toBe(false);
   });
 
   it('renders a lapsed snapshot without waiting for the collection read', async () => {
@@ -89,9 +90,11 @@ describe('loadChunkedSnapshot', () => {
     const result = await pending;
 
     // Settled while the 124-doc read is still in flight — the whole point.
-    expect(result?.data.rows).toEqual([{ id: 'last-cycle' }]);
+    expect(result.cached?.data.rows).toEqual([{ id: 'last-cycle' }]);
     // Nothing has failed yet, so no view raises its offline banner.
-    expect(result?.fromCache).toBe(false);
+    expect(result.cached?.fromCache).toBe(false);
+    // But the board must be able to say a newer read is on its way.
+    expect(result.revalidating).toBe(true);
     released();
   });
 
@@ -100,7 +103,8 @@ describe('loadChunkedSnapshot', () => {
 
     const result = await loadChunkedSnapshot<{ id: string }>(SOURCE, CHARACTER_ID);
 
-    expect(result?.data.rows).toEqual([{ id: 'cold' }]);
+    expect(result.cached?.data.rows).toEqual([{ id: 'cold' }]);
+    expect(result.revalidating).toBe(false);
     expect(getDocs).toHaveBeenCalledTimes(1);
   });
 });

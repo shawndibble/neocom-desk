@@ -26,10 +26,38 @@ _Recorded 2026-09-12 · issue #963._
   courier board has done for player structures since #910. A row is never wrong
   while a name is missing, only less readable.
 
+- **The lookups resolve the _names_, never the rows.** `useCourierEndpoints`
+  answers with a map of location id to endpoint, and the board's rows are then
+  built from it synchronously. Resolving the finished rows instead would mean
+  the haul list was empty until the endpoints landed — so a board already
+  showing hauls would blank back to a spinner every time its snapshot was
+  re-read, which is the opposite of what this ticket is for.
+
+- **A lookup keeps its previous answer while the next one resolves.** Each
+  re-read hands the hooks a new array off a new cache result, and
+  `useRouteSnapshot` re-runs its loader on _any_ key's revalidation signal, not
+  only this panel's own Refresh. Falling back to the empty map on an input
+  change would therefore strip the names off a fully-loaded board whenever some
+  other page's cache refreshed. A name map from the previous read stays correct
+  for every id it holds — type, location and region ids are not reassigned.
+
+- **A lookup that throws settles as "resolved, with nothing".** These used to
+  run inside the route loader, where a throw surfaced as its `error`. Behind the
+  table there is no such channel, so an uncaught rejection would leave the board
+  spinning forever with nothing to report. An unresolved id is what every
+  consumer already renders.
+
 - **Region names commit once, not per region.** Both boards render a Region
   column and rebuild their column set when that map changes, so committing each
   name as it arrives would rebuild the columns once per region. A quiet
   "Naming regions…" note says the same thing for the duration.
+
+- **Stale-serve is stated, not silent.** A lapsed row renders immediately, so
+  the board says a newer read is on its way — derived from the row's own
+  `fetchedAt` against the window, which is the only signal that stays true
+  across the re-read the revalidation signal provokes, and which clears itself
+  when the fresher row lands. A read that _failed_ is not reported that way: it
+  comes back as `fromCache`, and the banner for that is the more alarming news.
 
 - **Progress is a stage, not a percentage.** A cold load has no denominator
   until the corpus lands, and once it lands the board is already on screen. So

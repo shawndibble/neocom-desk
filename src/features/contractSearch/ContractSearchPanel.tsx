@@ -56,18 +56,16 @@ import {
   type ContractTypeOption,
 } from '@/engine/contracts/contractSearch';
 import type { PublicContractOfferRow } from '@/engine/contracts/contractOffers';
-import type { PublicCourierContractRow } from '@/engine/contracts/courierSearch';
 import {
-  loadPublicContractOffers,
-  type PublicContractOffersSnapshot,
-} from '@/features/contractSearch/publicContractOffers';
-import {
-  loadPublicCourierContracts,
-  type PublicCourierContractsSnapshot,
-} from '@/features/contractSearch/publicCourierContracts';
+  resolveCourierRoutes,
+  type PublicCourierContractRow,
+} from '@/engine/contracts/courierSearch';
+import { loadPublicContractOffers } from '@/features/contractSearch/publicContractOffers';
+import { loadPublicCourierContracts } from '@/features/contractSearch/publicCourierContracts';
+import type { ChunkedSnapshotRead } from '@/features/contractSearch/chunkedSnapshot';
 import { CourierResults } from '@/features/contractSearch/CourierResults';
 import {
-  useCourierRoutes,
+  useCourierEndpoints,
   useListedTypeNames,
   useRegionNames,
 } from '@/features/contractSearch/contractSearchNames';
@@ -78,7 +76,6 @@ import {
   type PublicContractDetailModalStatChip,
 } from '@/features/contracts/PublicContractDetailModal';
 import { isSyncConfigured } from '@/app/syncStatus';
-import type { CachedResult } from '@/esi/cache';
 import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
 import { rankedSearch } from '@/lib/rankedSearch';
 import { formatIsk } from '@/lib/isk';
@@ -126,26 +123,32 @@ const NO_REGIONS: number[] = [];
  * difference between "synced, and empty" and "this build has no sync backend
  * at all", and only the loader is in a position to say which.
  */
-interface CorpusSnapshot<TSnapshot> {
-  result: CachedResult<TSnapshot> | null;
+interface CorpusSnapshot<TRow> {
+  read: ChunkedSnapshotRead<TRow>;
   syncConfigured: boolean;
 }
 
-const NOT_CONFIGURED = { result: null, syncConfigured: false } as const;
+const NOT_CONFIGURED = {
+  read: { cached: null, revalidating: false },
+  syncConfigured: false,
+} as const;
 
-async function loadOffersCorpus(
-  characterId: number
-): Promise<CorpusSnapshot<PublicContractOffersSnapshot>> {
-  if (!isSyncConfigured()) return NOT_CONFIGURED;
-  return { result: await loadPublicContractOffers(characterId), syncConfigured: true };
+/**
+ * Built at module level so each loader is one stable function reference —
+ * `useRouteSnapshot` keys its effect on the character and the refresh, and a
+ * loader identity that changed per render would reload on every one.
+ */
+function corpusLoader<TRow>(
+  read: (characterId: number) => Promise<ChunkedSnapshotRead<TRow>>
+): (characterId: number) => Promise<CorpusSnapshot<TRow>> {
+  return async (characterId) => {
+    if (!isSyncConfigured()) return NOT_CONFIGURED;
+    return { read: await read(characterId), syncConfigured: true };
+  };
 }
 
-async function loadCourierCorpus(
-  characterId: number
-): Promise<CorpusSnapshot<PublicCourierContractsSnapshot>> {
-  if (!isSyncConfigured()) return NOT_CONFIGURED;
-  return { result: await loadPublicCourierContracts(characterId), syncConfigured: true };
-}
+const loadOffersCorpus = corpusLoader(loadPublicContractOffers);
+const loadCourierCorpus = corpusLoader(loadPublicCourierContracts);
 
 /** The filter as the controls hold it: text fields stay strings until they are parsed into the engine's filter. */
 interface UiFilter {
@@ -303,10 +306,10 @@ export function ContractSearchPanel() {
   });
   const { hydrated, activeCharacterId } = offers;
 
-  const offersResult = offers.data?.result ?? null;
-  const courierResult = courier.data?.result ?? null;
+  const offersResult = offers.data?.read.cached ?? null;
+  const courierResult = courier.data?.read.cached ?? null;
   const rows = offersResult?.data?.rows ?? EMPTY_ROWS;
-  const courierRows = courierResult?.data?.rows ?? undefined;
+  const courierRows = courierResult?.data?.rows ?? EMPTY_COURIER_CONTRACT_ROWS;
 
   // Both loaders answer the same question, so either having loaded settles it;
   // `true` while both are still in flight keeps the not-configured empty state
@@ -317,12 +320,17 @@ export function ContractSearchPanel() {
   // Names fill in behind whichever table is showing — see
   // `contractSearchNames.ts`. None of them gate a board: every consumer
   // already renders an unresolved id honestly.
-  const { value: typeNames } = useListedTypeNames(rows);
-  const { value: courierRoutes, resolving: placingRoutes } = useCourierRoutes(
-    courierRows ?? EMPTY_COURIER_CONTRACT_ROWS
+  const { value: typeNames, resolving: namingTypes } = useListedTypeNames(rows);
+  const { value: endpoints } = useCourierEndpoints(courierRows);
+  // Synchronous, so the haul list never empties while its ends are being
+  // placed: an unresolved end shows its raw location id, exactly as a player
+  // structure does once resolution has finished.
+  const courierRoutes = useMemo(
+    () => resolveCourierRoutes(courierRows, endpoints),
+    [courierRows, endpoints]
   );
   const regionIds = useMemo(() => {
-    if (rows === EMPTY_ROWS && courierRoutes.length === 0) return NO_REGIONS;
+    if (rows.length === 0 && courierRoutes.length === 0) return NO_REGIONS;
     const ids = new Set<number>(rows.map((row) => row.regionId));
     for (const route of courierRoutes) {
       if (route.origin.regionId !== null) ids.add(route.origin.regionId);
@@ -347,15 +355,13 @@ export function ContractSearchPanel() {
   const active = mode === 'courier' ? courier : offers;
   /**
    * Per mode, and against that mode's own data: the board on screen spins only
-   * while *it* has nothing, never because the other corpus is still arriving.
-   * Courier additionally waits on its endpoints, since `courierRoutes` is what
-   * the count below is taken from.
+   * while *it* has nothing, never because the other corpus is still arriving,
+   * and never because a name lookup behind it has not answered.
    */
-  const modeLoading =
-    mode === 'courier'
-      ? courier.loading || placingRoutes || courierRows === undefined
-      : offers.loading;
+  const modeLoading = active.loading;
   const modeError = active.error;
+  /** Last cycle's rows are on screen and this cycle's are on the way (#963). */
+  const revalidating = active.data?.read.revalidating ?? false;
   // A manual Refresh still means "reload the tab", not "reload the mode I am
   // looking at" — the Data Age badge and offline banner are per corpus, but the
   // button above them is one button.
@@ -626,6 +632,15 @@ export function ContractSearchPanel() {
                 />
               ))}
             </div>
+            {revalidating && (
+              // The visible half of stale-serve: these rows are last publish
+              // cycle's and this cycle's are already on the way. Said beside
+              // the Data Age badge's own reading, not instead of it — the badge
+              // says how old, this says something is being done about it.
+              <p role="status" className="px-3 pt-2 text-[0.6875rem] text-text-dim uppercase">
+                {t('contractSearch.refreshingInBackground')}
+              </p>
+            )}
             {namingRegions && modeRowCount > 0 && (
               // The only name stage with real network cost: one ESI call per
               // distinct region on a cold cache. Said quietly, under the board
@@ -729,11 +744,21 @@ export function ContractSearchPanel() {
                 )}
 
                 {displayRows.length === 0 ? (
-                  <EmptyState
-                    title={t('contractSearch.noFilterMatches')}
-                    hint={t('contractSearch.noFilterMatchesHint')}
-                    className="py-8"
-                  />
+                  namingTypes && uiFilter.typeQuery.trim() !== '' ? (
+                    // Every type still reads `#34` until the market catalogue
+                    // lands, so a typed query matches nothing yet. "No matches"
+                    // would be a complete answer given mid-load; this says what
+                    // is actually true.
+                    <div className="flex justify-center py-8">
+                      <Spinner label={t('contractSearch.namingTypes')} />
+                    </div>
+                  ) : (
+                    <EmptyState
+                      title={t('contractSearch.noFilterMatches')}
+                      hint={t('contractSearch.noFilterMatchesHint')}
+                      className="py-8"
+                    />
+                  )
                 ) : (
                   <>
                     <DataTable
