@@ -10,7 +10,7 @@
  * "this character / all characters / pick some" — this ticket adds no new
  * account-level alt-linking, just this feature's own scoped selector.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
@@ -21,6 +21,7 @@ import {
   EmptyState,
   IconButton,
   InfoTooltip,
+  IskAmount,
   Modal,
   Panel,
   Spinner,
@@ -80,7 +81,11 @@ function unitMargin(row: OpportunityRow): number | null {
   return units > 0 ? row.result.profit / units : null;
 }
 
-function numericCell(value: number | null, format: (v: number) => string, unknown: string): string {
+function numericCell(
+  value: number | null,
+  format: (v: number) => ReactNode,
+  unknown: string
+): ReactNode {
   return value === null ? unknown : format(value);
 }
 
@@ -291,7 +296,13 @@ export function OpportunitiesPanel({
         const margin = unitMargin(row);
         return margin !== null ? iskToneClass(margin) : undefined;
       },
-      render: (row) => numericCell(unitMargin(row), (v) => formatIsk(v), unknown),
+      render: (row) =>
+        numericCell(
+          unitMargin(row),
+          // Tap: the figure is inert — the row's own controls are buttons of their own.
+          (v) => <IskAmount value={v} revealOn="tap" decimals={0} />,
+          unknown
+        ),
     },
     {
       id: 'margin',
@@ -317,7 +328,13 @@ export function OpportunitiesPanel({
       sortValue: (row) => row.result.iskPerHour ?? undefined,
       cellClassName: (row) =>
         row.result.iskPerHour !== null ? iskToneClass(row.result.iskPerHour) : undefined,
-      render: (row) => numericCell(row.result.iskPerHour, (v) => formatIsk(v), unknown),
+      render: (row) =>
+        numericCell(
+          row.result.iskPerHour,
+          // Tap: the figure is inert — the row's own controls are buttons of their own.
+          (v) => <IskAmount value={v} revealOn="tap" decimals={0} />,
+          unknown
+        ),
     },
     {
       id: 'orderDepth',

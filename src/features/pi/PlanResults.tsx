@@ -23,7 +23,15 @@
 import { useMemo, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { PlanetSlots } from './planetSlots';
-import { DataAgeBadge, DataTable, EmptyState, InfoTooltip, Panel, StatChip } from '@/components/ui';
+import {
+  DataAgeBadge,
+  DataTable,
+  EmptyState,
+  InfoTooltip,
+  IskAmount,
+  Panel,
+  StatChip,
+} from '@/components/ui';
 import type { DataTableColumn } from '@/components/ui';
 import type { PiTier, SourcingFloor } from '@/engine/pi/chain';
 import { formatIsk } from '@/lib/isk';
@@ -213,14 +221,32 @@ export function PlanVerdict({
   } else {
     body = (
       <>
+        {/*
+          Shorthand, despite the `LedgerRow` name: this is a projection a
+          player compares floors and products against, not a figure they
+          reconcile against the game client. The exact ISK is a hover, a focus
+          or a tap away, and is what a screen reader announces.
+        */}
         <div className="divide-y divide-line">
-          <LedgerRow label={t('piPlan.revenue')} value={formatIsk(breakdown.revenue)} />
-          <LedgerRow label={t('piPlan.inputCost')} value={formatIsk(-breakdown.sourcedCost)} />
-          <LedgerRow label={t('piPlan.customsIn')} value={formatIsk(-tax.importCost)} />
-          <LedgerRow label={t('piPlan.customsOut')} value={formatIsk(-tax.exportCost)} />
+          <LedgerRow
+            label={t('piPlan.revenue')}
+            value={<IskAmount value={breakdown.revenue} revealOn="tap" decimals={0} />}
+          />
+          <LedgerRow
+            label={t('piPlan.inputCost')}
+            value={<IskAmount value={-breakdown.sourcedCost} revealOn="tap" decimals={0} />}
+          />
+          <LedgerRow
+            label={t('piPlan.customsIn')}
+            value={<IskAmount value={-tax.importCost} revealOn="tap" decimals={0} />}
+          />
+          <LedgerRow
+            label={t('piPlan.customsOut')}
+            value={<IskAmount value={-tax.exportCost} revealOn="tap" decimals={0} />}
+          />
           <LedgerRow
             label={t('piPlan.customsBetween')}
-            value={formatIsk(-tax.betweenPlanetsCost)}
+            value={<IskAmount value={-tax.betweenPlanetsCost} revealOn="tap" decimals={0} />}
             tooltip={t('piPlan.customsBetweenTooltip')}
           />
           <LedgerRow
@@ -230,18 +256,18 @@ export function PlanVerdict({
           />
           <LedgerRow
             label={t('piPlan.totalCost')}
-            value={formatIsk(-breakdown.totalCost)}
+            value={<IskAmount value={-breakdown.totalCost} revealOn="tap" decimals={0} />}
             tooltip={t('piPlan.totalCostTooltip')}
           />
           <LedgerRow
             label={t('piPlan.marginPerUnit')}
-            value={formatIsk(breakdown.margin)}
+            value={<IskAmount value={breakdown.margin} revealOn="tap" decimals={0} />}
             tone={iskTone(breakdown.margin)}
             emphasized
           />
           <LedgerRow
             label={t('piPlan.marginPerDay')}
-            value={formatIsk(marginPerDay)}
+            value={<IskAmount value={marginPerDay} revealOn="tap" decimals={0} />}
             tone={iskTone(marginPerDay)}
             emphasized
           />
@@ -356,7 +382,12 @@ export function PlanChainTable({ rows, productName }: PlanChainTableProps) {
         cellClassName: (row) =>
           row.valueAddPerHour == null ? undefined : iskToneClass(row.valueAddPerHour),
         sortValue: (row) => row.valueAddPerHour ?? undefined,
-        render: (row) => (row.valueAddPerHour == null ? '—' : formatIsk(row.valueAddPerHour, 2)),
+        render: (row) =>
+          row.valueAddPerHour == null ? (
+            '—'
+          ) : (
+            <IskAmount value={row.valueAddPerHour} revealOn="tap" decimals={2} />
+          ),
       },
     ],
     [t]
@@ -434,7 +465,7 @@ export function PlanSensitivity({ grid, rates }: PlanSensitivityProps) {
                 <span className="sr-only">{t('piPlan.bestFloor')}: </span>
               </>
             )}
-            {formatIsk(cell.margin)}
+            <IskAmount value={cell.margin} revealOn="tap" decimals={0} />
           </span>
         );
       },

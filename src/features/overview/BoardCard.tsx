@@ -72,7 +72,13 @@ export function BoardCard({ title, meta, to, openLabel, children, footer }: Boar
 
 export interface NumberTileProps {
   label: string;
-  value: number | string;
+  /**
+   * A count, a pre-formatted string, or a node — an ISK figure arrives as
+   * `IskAmount`, which is shorthand with the exact value one gesture away.
+   * `zero`/`linked` below still only recognise the primitive forms, which is
+   * what keeps a node out of the link-and-tone logic it has no count for.
+   */
+  value: ReactNode;
   severity: DeadlineSeverity;
   /**
    * The page this count opens, already narrowed to what it counted. Optional:

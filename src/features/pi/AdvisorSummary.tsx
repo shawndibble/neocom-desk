@@ -31,6 +31,7 @@
  * failure the engine layer refuses; it would be undone here by not saying so.
  */
 import { useTranslation } from 'react-i18next';
+import { IskAmount } from '@/components/ui';
 import { formatIsk } from '@/lib/isk';
 import type { TotalColonyEarnings } from './colonyEarningsModel';
 import type { Worklist } from './worklistModel';
@@ -104,7 +105,8 @@ export function AdvisorSummary({ list, earnings }: AdvisorSummaryProps) {
             </span>
           ) : (
             <span className="text-base font-semibold tabular-nums">
-              {formatIsk(now)}
+              {/* Shorthand: the headline figure is scanned, not reconciled. */}
+              <IskAmount value={now} revealOn="tap" decimals={0} />
               <span className="ml-1 text-[0.6875rem] font-normal text-text-dim">ISK/hr</span>
             </span>
           )}

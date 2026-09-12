@@ -1,6 +1,13 @@
 import { useMemo, useState, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
-import { DataTable, IconButton, TextInput, Tooltip, type DataTableColumn } from '@/components/ui';
+import {
+  DataTable,
+  IconButton,
+  IskAmount,
+  TextInput,
+  Tooltip,
+  type DataTableColumn,
+} from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import type { MakeMethod, MakeOrBuy } from '@/engine/industry/makeOrBuy';
 import { rowVolume } from '@/engine/industry/materialVolume';
@@ -742,7 +749,15 @@ export function MaterialsTable({
           // because it is the only number not already on the row.
           const state = materialRowState(material, sourcing, pricesReady);
           return (
-            <span>{state.lineCost === null ? t('common.unknown') : formatIsk(state.lineCost)}</span>
+            <span>
+              {state.lineCost === null ? (
+                t('common.unknown')
+              ) : (
+                // Long press, not tap: the row's own tap belongs to its
+                // context menu.
+                <IskAmount value={state.lineCost} revealOn="longPress" decimals={0} />
+              )}
+            </span>
           );
         },
       },

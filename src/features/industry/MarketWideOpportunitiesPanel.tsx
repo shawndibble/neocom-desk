@@ -11,13 +11,13 @@ import {
   DataTable,
   EmptyState,
   InfoTooltip,
+  IskAmount,
   Panel,
   Spinner,
   StatChip,
   type DataTableColumn,
   type StatChipTone,
 } from '@/components/ui';
-import { formatIsk } from '@/lib/isk';
 import { iskToneClass } from '@/features/character/format';
 import type { OrderDepthLevel } from '@/engine/industry/opportunities';
 import type { MarketWideTreeMap } from '@/sde/types';
@@ -64,7 +64,14 @@ export function MarketWideOpportunitiesPanel({
       className: 'tabular-nums',
       sortValue: (row) => row.iskPerHour ?? undefined,
       cellClassName: (row) => (row.iskPerHour !== null ? iskToneClass(row.iskPerHour) : undefined),
-      render: (row) => (row.iskPerHour === null ? t('common.unknown') : formatIsk(row.iskPerHour)),
+      // Tap, not long press: the ranking's figures are inert — the row's only
+      // action is the button in its last cell.
+      render: (row) =>
+        row.iskPerHour === null ? (
+          t('common.unknown')
+        ) : (
+          <IskAmount value={row.iskPerHour} revealOn="tap" decimals={0} />
+        ),
     },
     {
       id: 'buildCost',
@@ -72,7 +79,7 @@ export function MarketWideOpportunitiesPanel({
       align: 'right',
       className: 'tabular-nums',
       sortValue: (row) => row.buildCost,
-      render: (row) => formatIsk(row.buildCost),
+      render: (row) => <IskAmount value={row.buildCost} revealOn="tap" decimals={0} />,
     },
     {
       id: 'orderDepth',

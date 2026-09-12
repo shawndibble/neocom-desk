@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   buttonClassName,
   DataTable,
   EmptyState,
+  IskAmount,
   LogoMark,
   Spinner,
   StatChip,
@@ -16,12 +17,23 @@ import {
   resolveAppraisalShare,
   type AppraisalShareView,
 } from '@/features/market/appraisalShareData';
-import { formatIsk, formatIskAuto } from '@/lib/isk';
+import { formatIskAuto } from '@/lib/isk';
 
-/** A missing price is a dash, never a zero — same house placeholder as `AppraisalPanel`. */
-function iskCell(value: number | null, decimals: 'auto' | 0): string {
+/**
+ * A per-unit price, exact — same split as `AppraisalPanel`, so a share link
+ * reads like the tab it was shared from. Stays on `formatIskAuto`: an
+ * each-price runs from a 5 ISK mineral to a billion-ISK hull, and shorthand
+ * rounds the cheap end into nonsense. A missing price is a dash, never a zero.
+ */
+function eachCell(value: number | null): string {
   if (value === null) return '—';
-  return decimals === 'auto' ? formatIskAuto(value) : formatIsk(value);
+  return formatIskAuto(value);
+}
+
+/** A line total as scannable shorthand, exact value one gesture away. */
+function totalCell(value: number | null): ReactNode {
+  if (value === null) return '—';
+  return <IskAmount value={value} revealOn="tap" decimals={0} />;
 }
 
 type LoadState =
@@ -90,7 +102,7 @@ export function AppraisalShared() {
       header: t('market.appraisal.columnBuyEach'),
       align: 'right',
       className: 'whitespace-nowrap tabular-nums text-text-dim',
-      render: (row) => iskCell(row.buyEach, 'auto'),
+      render: (row) => eachCell(row.buyEach),
       sortValue: (row) => row.buyEach ?? undefined,
     },
     {
@@ -98,7 +110,7 @@ export function AppraisalShared() {
       header: t('market.appraisal.columnSellEach'),
       align: 'right',
       className: 'whitespace-nowrap tabular-nums text-text-dim',
-      render: (row) => iskCell(row.sellEach, 'auto'),
+      render: (row) => eachCell(row.sellEach),
       sortValue: (row) => row.sellEach ?? undefined,
     },
     {
@@ -106,7 +118,7 @@ export function AppraisalShared() {
       header: t('market.appraisal.columnBuyTotal'),
       align: 'right',
       className: 'whitespace-nowrap tabular-nums',
-      render: (row) => iskCell(row.buyTotal, 0),
+      render: (row) => totalCell(row.buyTotal),
       sortValue: (row) => row.buyTotal ?? undefined,
     },
     {
@@ -114,7 +126,7 @@ export function AppraisalShared() {
       header: t('market.appraisal.columnSellTotal'),
       align: 'right',
       className: 'whitespace-nowrap tabular-nums',
-      render: (row) => iskCell(row.sellTotal, 0),
+      render: (row) => totalCell(row.sellTotal),
       sortValue: (row) => row.sellTotal ?? undefined,
     },
   ];
@@ -163,12 +175,16 @@ export function AppraisalShared() {
             />
             <StatChip
               label={t('market.appraisal.sellTotal')}
-              value={formatIsk(state.view.appraisal.totals.sell)}
+              value={
+                <IskAmount value={state.view.appraisal.totals.sell} revealOn="tap" decimals={0} />
+              }
               tone="accent"
             />
             <StatChip
               label={t('market.appraisal.buyTotal')}
-              value={formatIsk(state.view.appraisal.totals.buy)}
+              value={
+                <IskAmount value={state.view.appraisal.totals.buy} revealOn="tap" decimals={0} />
+              }
             />
             <StatChip
               label={t('appraisalShare.generatedLabel')}

@@ -5,14 +5,13 @@
  * leads. Clicking a row selects it, which re-anchors this table as a side
  * effect of the route's own selection state.
  */
-import type { ReactElement } from 'react';
+import type { ReactElement, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/Button';
 import { DataTable, type DataTableColumn } from '@/components/ui/DataTable';
-import { IconButton, TypeIcon } from '@/components/ui';
+import { IconButton, IskAmount, TypeIcon } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { downloadCsv } from '@/lib/downloadCsv';
-import { formatIsk } from '@/lib/isk';
 import type { OrderBookSummary } from '@/engine/market/orderBook';
 import type { BlueprintCatalog } from '@/features/industry/blueprintCatalog';
 import { ItemContextMenu } from './ItemContextMenu';
@@ -39,15 +38,20 @@ export interface VariationsTableProps {
   onShowInfo: (typeId: number, itemName: string) => void;
 }
 
-/** Loading, then this row's own side, then the other side's presence (matches the order-book tables' empty-state pair), then neither. */
-function priceCellText(
+/**
+ * Loading, then this row's own side, then the other side's presence (matches
+ * the order-book tables' empty-state pair), then neither. A real price is
+ * shorthand — this is a comparison board, scanned down a column — with the
+ * exact figure a long press away, since the row's own tap selects the item.
+ */
+function priceCell(
   summary: OrderBookSummary | undefined,
   side: 'sell' | 'buy',
   t: Translate
-): string {
+): ReactNode {
   if (summary === undefined) return t('common.loading');
   const own = side === 'sell' ? summary.bestSell : summary.bestBuy;
-  if (own !== null) return formatIsk(own, 2);
+  if (own !== null) return <IskAmount value={own} revealOn="longPress" />;
   const other = side === 'sell' ? summary.bestBuy : summary.bestSell;
   if (other !== null) return t(side === 'sell' ? 'market.emptySellTitle' : 'market.emptyBuyTitle');
   return t('market.variations.noOrders');
@@ -121,7 +125,7 @@ export function VariationsTable({
       align: 'right',
       className: 'tabular-nums',
       sortValue: (row) => prices.get(row.typeId)?.bestSell ?? undefined,
-      render: (row) => priceCellText(prices.get(row.typeId), 'sell', t),
+      render: (row) => priceCell(prices.get(row.typeId), 'sell', t),
     },
     {
       id: 'buy',
@@ -129,7 +133,7 @@ export function VariationsTable({
       align: 'right',
       className: 'tabular-nums',
       sortValue: (row) => prices.get(row.typeId)?.bestBuy ?? undefined,
-      render: (row) => priceCellText(prices.get(row.typeId), 'buy', t),
+      render: (row) => priceCell(prices.get(row.typeId), 'buy', t),
     },
   ];
 

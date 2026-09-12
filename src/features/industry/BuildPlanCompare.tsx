@@ -6,15 +6,15 @@
  * plan was open before compare mode started (CONTEXT.md round 25's two-pane
  * idiom: this is a state of the detail pane, not a separate route).
  */
+import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, DataTable, InfoTooltip, Panel } from '@/components/ui';
+import { Button, DataTable, InfoTooltip, IskAmount, Panel } from '@/components/ui';
 import type { DataTableColumn } from '@/components/ui';
 import type { BuildPlanRecord } from '@/db';
 import type { SkillLevels } from '@/engine/industry/types';
 import type { CharacterBlueprint } from '@/esi/endpoints';
 import type { PiData } from '@/sde/types';
 import { formatDuration } from '@/lib/duration';
-import { formatIsk } from '@/lib/isk';
 import { iskToneClass } from '@/features/character/format';
 import type { BlueprintCatalog } from './blueprintCatalog';
 import { formatPercent } from './format';
@@ -30,13 +30,19 @@ interface BuildPlanCompareProps {
   onDone: () => void;
 }
 
-/** A numeric cell: "…" while its row is still fetching, else the formatted value or "—" when unresolved (row.error) or unpriceable (BuildResult's own null). */
+/**
+ * A numeric cell: "…" while its row is still fetching, else the formatted
+ * value or "—" when unresolved (row.error) or unpriceable (BuildResult's own
+ * null). ISK cells pass an `IskAmount` node rather than a string — `revealOn`
+ * is "tap" throughout, because nothing in this table takes a row tap of its
+ * own. Sorting still reads `sortValue` off the raw number.
+ */
 function numericCell(
   row: ComparedBuildRow,
   value: number | null | undefined,
-  format: (v: number) => string,
+  format: (v: number) => ReactNode,
   unknown: string
-): string {
+): ReactNode {
   if (row.loading) return '…';
   if (value === null || value === undefined) return unknown;
   return format(value);
@@ -126,7 +132,12 @@ export function BuildPlanCompare({
       className: 'tabular-nums',
       sortValue: (row) => row.result?.totalCost ?? undefined,
       render: (row) =>
-        numericCell(row, row.result?.totalCost ?? null, (v) => formatIsk(v), unknown),
+        numericCell(
+          row,
+          row.result?.totalCost ?? null,
+          (v) => <IskAmount value={v} revealOn="tap" decimals={0} />,
+          unknown
+        ),
     },
     {
       id: 'profit',
@@ -136,7 +147,13 @@ export function BuildPlanCompare({
       sortValue: (row) => row.result?.profit ?? undefined,
       cellClassName: (row) =>
         row.result?.profit != null ? iskToneClass(row.result.profit) : undefined,
-      render: (row) => numericCell(row, row.result?.profit ?? null, (v) => formatIsk(v), unknown),
+      render: (row) =>
+        numericCell(
+          row,
+          row.result?.profit ?? null,
+          (v) => <IskAmount value={v} revealOn="tap" decimals={0} />,
+          unknown
+        ),
     },
     {
       id: 'margin',
@@ -153,7 +170,12 @@ export function BuildPlanCompare({
       className: 'tabular-nums',
       sortValue: (row) => row.result?.iskPerHour ?? undefined,
       render: (row) =>
-        numericCell(row, row.result?.iskPerHour ?? null, (v) => formatIsk(v), unknown),
+        numericCell(
+          row,
+          row.result?.iskPerHour ?? null,
+          (v) => <IskAmount value={v} revealOn="tap" decimals={0} />,
+          unknown
+        ),
     },
     {
       id: 'breakEvenPrice',
@@ -162,7 +184,12 @@ export function BuildPlanCompare({
       className: 'tabular-nums',
       sortValue: (row) => row.result?.breakEvenPrice ?? undefined,
       render: (row) =>
-        numericCell(row, row.result?.breakEvenPrice ?? null, (v) => formatIsk(v), unknown),
+        numericCell(
+          row,
+          row.result?.breakEvenPrice ?? null,
+          (v) => <IskAmount value={v} revealOn="tap" decimals={0} />,
+          unknown
+        ),
     },
   ];
 

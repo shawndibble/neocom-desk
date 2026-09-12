@@ -7,7 +7,7 @@
  */
 import { useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, DataTable, IconButton, Spinner } from '@/components/ui';
+import { Button, DataTable, IconButton, IskAmount, Spinner } from '@/components/ui';
 import type { DataTableColumn } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { useCompareSet } from './compareSet';
@@ -17,7 +17,6 @@ import type { GlobalMarketOverride } from '@/engine/market/locationMode';
 import { compareCsvColumns } from './compareCsv';
 import { formatVolume } from './format';
 import { downloadCsv } from '@/lib/downloadCsv';
-import { formatIsk } from '@/lib/isk';
 
 const DRAWER_ID = 'compare-drawer';
 const MIN_HEIGHT = 160;
@@ -112,11 +111,13 @@ export function CompareDrawer({
         align: 'right',
         className: 'tabular-nums',
         render: (row) =>
-          row.loading
-            ? '…'
-            : row.summary?.bestSell != null
-              ? formatIsk(row.summary.bestSell, 2)
-              : '—',
+          row.loading ? (
+            '…'
+          ) : row.summary?.bestSell != null ? (
+            <IskAmount value={row.summary.bestSell} revealOn="tap" />
+          ) : (
+            '—'
+          ),
         sortValue: (row) => row.summary?.bestSell ?? undefined,
       },
       {
@@ -125,11 +126,13 @@ export function CompareDrawer({
         align: 'right',
         className: 'tabular-nums',
         render: (row) =>
-          row.loading
-            ? '…'
-            : row.summary?.bestBuy != null
-              ? formatIsk(row.summary.bestBuy, 2)
-              : '—',
+          row.loading ? (
+            '…'
+          ) : row.summary?.bestBuy != null ? (
+            <IskAmount value={row.summary.bestBuy} revealOn="tap" />
+          ) : (
+            '—'
+          ),
         sortValue: (row) => row.summary?.bestBuy ?? undefined,
       },
       {
@@ -138,7 +141,13 @@ export function CompareDrawer({
         align: 'right',
         className: 'tabular-nums',
         render: (row) =>
-          row.loading ? '…' : row.summary?.spread != null ? formatIsk(row.summary.spread, 2) : '—',
+          row.loading ? (
+            '…'
+          ) : row.summary?.spread != null ? (
+            <IskAmount value={row.summary.spread} revealOn="tap" />
+          ) : (
+            '—'
+          ),
         sortValue: (row) => row.summary?.spread ?? undefined,
       },
       {

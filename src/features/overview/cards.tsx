@@ -8,10 +8,9 @@
  */
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import { Panel, SEVERITY_LABEL, SeverityIcon } from '@/components/ui';
+import { IskAmount, Panel, SEVERITY_LABEL, SeverityIcon } from '@/components/ui';
 import type { DeadlineSeverity } from '@/engine/severity';
 import { formatDuration } from '@/lib/duration';
-import { formatIskCompact } from '@/lib/isk';
 import { formatAge } from '@/lib/age';
 import {
   activityI18nKey,
@@ -184,11 +183,13 @@ export function MiningTaxCard({ data }: { data: MiningTaxBoardData | null }) {
         <NumberTile
           label={t('overview.board.iskUnpaid')}
           value={
-            data?.needsReauth
-              ? UNKNOWN
-              : data === null || data.unpaidIsk === 0
-                ? 0
-                : formatIskCompact(data.unpaidIsk)
+            data?.needsReauth ? (
+              UNKNOWN
+            ) : data === null || data.unpaidIsk === 0 ? (
+              0
+            ) : (
+              <IskAmount value={data.unpaidIsk} revealOn="tap" decimals={0} />
+            )
           }
           severity="warning"
         />
