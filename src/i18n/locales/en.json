@@ -359,7 +359,7 @@
     "facilityTaxTooltip": "Structure owner's cut of the job fee, set per-structure by its owner.",
     "includeReactions": "Include Reactions",
     "includeReactionsTooltipLabel": "About Include Reactions",
-    "includeReactionsTooltip": "Lets a reaction-produced material anywhere in this plan's tree be built here instead of only advisory — the recursive engine, the manual craft/buy toggle, and Craft Sweep's Reactions option all light up. Reveals a Reaction Location below: a second, independent facility a reaction sub-build is quoted against, since an engineering complex cannot host a reaction.",
+    "includeReactionsTooltip": "Lets this plan build its reaction materials instead of only buying them. Turning it on adds a Reaction Location below, because reactions need their own facility — an engineering complex cannot run them.",
     "reactionLocation": "Reaction location",
     "reactionLocationNotSet": "No reaction location set",
     "ownedStockScopeLabel": "Owned Material Source",
