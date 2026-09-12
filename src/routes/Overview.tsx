@@ -43,7 +43,8 @@ import { OverviewSubNav } from '@/features/character/OverviewSubNav';
 import { buildOpenOrderRows } from '@/features/market/openOrdersModel';
 import { alertGroupLabel, groupAlertsByType } from '@/features/notifications/alertGroups';
 import type { DisplayAlertGroup } from '@/features/notifications/alertsFilter';
-import { readFeed, dismissFeedEntries } from '@/features/notifications/feed';
+import { readFeed } from '@/features/notifications/feed';
+import { dismissFeedEntriesAndSync } from '@/features/notifications/feedSync';
 import { visibleFeedEntries } from '@/features/notifications/feedSelection';
 import { useNotificationPreferences } from '@/features/notifications/preferences';
 import { SummaryStrip } from '@/features/overview/SummaryStrip';
@@ -522,7 +523,7 @@ export function Overview() {
           <AlertsColumn
             groups={alertGroups}
             unread={visibleAlerts.length}
-            onDismissAll={() => void dismissFeedEntries(visibleAlerts.map((entry) => entry.id))}
+            onDismissAll={() => void dismissFeedEntriesAndSync(visibleAlerts)}
           />
         )}
       </div>

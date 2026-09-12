@@ -6,7 +6,9 @@ import { db } from '@/db';
 import { SkillRowContextMenu } from './SkillRowContextMenu';
 
 const scheduleSyncMock = vi.fn();
+import { IDLE_SYNC_STATUS } from '@/sync/statusFixtures';
 vi.mock('@/sync', () => ({
+  getSyncStatus: () => IDLE_SYNC_STATUS,
   scheduleSync: (characterId: number) => scheduleSyncMock(characterId),
 }));
 vi.mock('@/app/syncStatus', async (importOriginal) => ({

@@ -22,7 +22,9 @@ import {
   isEventEnabledFor,
 } from '@/features/notifications/preferences';
 
+import { IDLE_SYNC_STATUS } from '@/sync/statusFixtures';
 vi.mock('@/sync', () => ({
+  getSyncStatus: () => IDLE_SYNC_STATUS,
   setSyncedSetting: vi.fn(async () => {}),
   scheduleSync: vi.fn(),
 }));

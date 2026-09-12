@@ -63,7 +63,9 @@ const setPlanetRichness = vi.fn<(planetId: number, order: number[]) => Promise<v
 const clearPlanetRichness = vi.fn<(planetId: number) => Promise<void>>();
 const setSyncedSetting = vi.fn<(key: string, value: unknown) => Promise<void>>();
 const scheduleSync = vi.fn();
+import { IDLE_SYNC_STATUS } from '@/sync/statusFixtures';
 vi.mock('@/sync', () => ({
+  getSyncStatus: () => IDLE_SYNC_STATUS,
   setPlanetRichness: (planetId: number, order: number[]) => setPlanetRichness(planetId, order),
   clearPlanetRichness: (planetId: number) => clearPlanetRichness(planetId),
   setSyncedSetting: (key: string, value: unknown) => setSyncedSetting(key, value),

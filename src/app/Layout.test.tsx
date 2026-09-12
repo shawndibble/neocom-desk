@@ -24,7 +24,9 @@ function corpAccess(state: CorpAccessState) {
 }
 
 const mockSubscribe = vi.fn();
+import { IDLE_SYNC_STATUS } from '@/sync/statusFixtures';
 vi.mock('@/sync', () => ({
+  getSyncStatus: () => IDLE_SYNC_STATUS,
   subscribeSyncStatus: (listener: (s: unknown) => void) => mockSubscribe(listener),
 }));
 

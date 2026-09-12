@@ -1,0 +1,91 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { db } from '@/db';
+import { readFeed } from './feed';
+import {
+  dismissFeedEntriesAndSync,
+  dismissFeedKeysAndSync,
+  recordFeedEntryAndSync,
+} from './feedSync';
+
+const syncMock = vi.hoisted(() => ({ scheduleSync: vi.fn() }));
+vi.mock('@/sync', () => syncMock);
+
+const CHAR_A = 1;
+const CHAR_B = 2;
+
+function row(id: string, characterId: number) {
+  return {
+    id,
+    characterId,
+    eventId: 'someEvent',
+    title: 'Title',
+    body: 'Body',
+    firedAt: 1_756_000_000_000,
+  };
+}
+
+beforeEach(async () => {
+  vi.clearAllMocks();
+  await db.notificationFeed.clear();
+});
+
+describe('dismissFeedEntriesAndSync', () => {
+  it('dismisses locally and pushes the dismissal', async () => {
+    await db.notificationFeed.bulkPut([row('a', CHAR_A)]);
+
+    await dismissFeedEntriesAndSync([row('a', CHAR_A)]);
+
+    expect((await readFeed())[0]?.dismissedAt).toBeGreaterThan(0);
+    expect(syncMock.scheduleSync).toHaveBeenCalledWith(CHAR_A);
+  });
+
+  it('schedules nothing for an empty dismissal', async () => {
+    await dismissFeedEntriesAndSync([]);
+    expect(syncMock.scheduleSync).not.toHaveBeenCalled();
+  });
+
+  it('pushes once per character when one action spans several', async () => {
+    await db.notificationFeed.bulkPut([row('a', CHAR_A), row('b', CHAR_B), row('c', CHAR_A)]);
+
+    await dismissFeedEntriesAndSync([row('a', CHAR_A), row('b', CHAR_B), row('c', CHAR_A)]);
+
+    expect(syncMock.scheduleSync.mock.calls).toEqual([[CHAR_A], [CHAR_B]]);
+  });
+
+  it('leaves rows it was not given alone', async () => {
+    await db.notificationFeed.bulkPut([row('a', CHAR_A), row('b', CHAR_A)]);
+
+    await dismissFeedEntriesAndSync([row('a', CHAR_A)]);
+
+    const byId = new Map((await readFeed()).map((entry) => [entry.id, entry]));
+    expect(byId.get('b')?.dismissedAt).toBeUndefined();
+  });
+});
+
+describe('dismissFeedKeysAndSync', () => {
+  it('dismisses by Occurrence Key and pushes for every character given', async () => {
+    await db.notificationFeed.bulkPut([row('a', CHAR_A), row('b', CHAR_B)]);
+
+    await dismissFeedKeysAndSync([CHAR_A, CHAR_B], ['a', 'b']);
+
+    expect((await readFeed()).every((entry) => (entry.dismissedAt ?? 0) > 0)).toBe(true);
+    expect(syncMock.scheduleSync.mock.calls).toEqual([[CHAR_A], [CHAR_B]]);
+  });
+
+  it('pushes once per character when one retraction names a character twice', async () => {
+    await db.notificationFeed.bulkPut([row('a', CHAR_A), row('b', CHAR_A)]);
+
+    await dismissFeedKeysAndSync([CHAR_A, CHAR_A], ['a', 'b']);
+
+    expect(syncMock.scheduleSync.mock.calls).toEqual([[CHAR_A]]);
+  });
+});
+
+describe('recordFeedEntryAndSync', () => {
+  it('records the row and pushes it', async () => {
+    await recordFeedEntryAndSync(row('a', CHAR_A));
+
+    expect(await readFeed()).toHaveLength(1);
+    expect(syncMock.scheduleSync).toHaveBeenCalledWith(CHAR_A);
+  });
+});
