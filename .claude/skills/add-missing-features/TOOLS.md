@@ -8,85 +8,81 @@ skill's step 7). Kept under ~150 lines — compress on sight, don't just add.
 
 ## Tools surveyed
 
-Adam4EVE (market stats/PI profitability/industry indices), Ravworks
-(multi-item production planning, full material tree), EVE Tycoon (profit
-tracking, order mgmt, per-item stock), Slipway (what/where to build & sell),
-Janice/Iron Whales Appraiser (bulk appraisal, reprocessing, BPC pricing), EVE
-Blue Desk/EvE Blueprint (blueprint market platform), EVE Courier (routing,
-gatecamp check, arbitrage, contracts), Fuzzwork (blueprint calc, reprocessing,
-SDE dumps), EVE Ref (reference/market data), EVE Retroindustry (local
-BOM/make-vs-buy, multi-char asset/PI/wallet), ISK.GG (multi-region price
-history/depth charts), EVE Miner Hub (mining ledger aggregator), EQM
-(production econ, multi-hub appraisal, Corp Exchange, JF fuel), EveLens
-(EVEMon-style planning + Skill Farm ISK/hr), EVE Horizon (mfg+PI planning,
-hangar-sweep BOM netting, cross-colony coordination), EVE Forge (nested
-BOM/capital parts, reactions, invention, Gantt), EVE-Industry-Scanner-Tool
-(mfg/reaction/PI scoring across 5 hubs), EVE-HUB (PI planner, hub arbitrage,
-threat intel), EVE TradeLooper (cargo valuation, LP analysis, scanner), EVE
-Night Trade Tools (FIFO P&L, undercut alerts), IndustrialEVE (PI
-notifications), jEveAssets (multi-account asset mgr), EVEAIO (bug-bounty
-preview, unknown feature set), MONW (recursive BOM w/ have-subtraction, corp
-shared plans, structure pricing), Mudoteve/Solo Industry App (unit BOM
-netting, job queue sync), ArmedATLAS V2 (route planner + hauling arbitrage),
-PlanetFlow.APP (self-hosted corp PI, shareable templates), Cradle of War (ore
-reprocessing value + buy-order lookup), EVE Data Site (market history charts,
-PLEX ticker), PIM/EVE PI Manager (multi-char PI forecasting), Web-based PI
-Tracker (client-side P0-P1 tracker), JitaStocks (corp build mgmt, material
-reservation, LP↔ISK), Indeve (multi-product BOM, wallet-imported material
-cost), EVE Fleet Mining & Ratting Tool (payout split, ore/reprocess overview),
-FW LP Store shopping-cart tool (LP cart + ROI tracker in dev), EWT Planetary
-Interaction Tools (PI commodity/pricing checker, colony builder), EVE ONE
-(all-in-one companion: PI, market, in-progress industry suite), EVE Buddy
-(char/corp monitoring, PI overview, slot summary), Dr.MoonGoo/CLI Metenox
-Calculator (fuel-block/gas yield from scan input, no ledger), Eden Buyback
-(standalone buyback marketplace — cross-player), EVE Appraisal (bulk
-appraisal + Market Watcher watchlists/alerts), Evernus (desktop margin calc/
-multi-region market analysis/mfg planning), GESI (Google Sheets ESI add-on
-for jobs/orders/assets/wallet), Lazy Blacksmith (blueprint search/analysis,
-rehosted), EVE Orchestra (mining ledger/reprocessing/job tracking, corp
-mining tax), Alysii's PI Scheme (PI chain calculator, rehosted), EVE
-Planetary Planner (PI chain planner w/ market history, ~7yr active), Upwell
-Fuel Monitor (corp-director structure fuel tracker — already covered, see
-below), Esparto Industries (blueprint/reaction browser, reprocessing calc,
-moon-ore tax parsing, char sheet tabs — all already covered, tiny Discord),
-Industrial EVE (Colony Builder: save/import/share PI setup templates,
-region/system planet-type search — both dead on kill-test 12 / the PI Colony
-Layout Template row below), EVE Balance (paste-ore buyback calculator,
-refine-value-weighted per-m3 payout — already covered by
-`reprocessing.ts`/Appraisal refine-then-sell, #672).
-All confirmed live unless noted otherwise above.
+Industry/market-relevant tools, gap-analysed at least once (name: what it
+does). All confirmed live unless marked dead/abandoned.
 
-**Dead/abandoned, not gap-analysed this run:** EVE Panel (PI sim, iOS), EVE
+Adam4EVE (market stats/PI profitability/industry indices), Ravworks/Slipway
+(multi-item production planning, full material tree, what/where to build &
+sell), EVE Tycoon (profit tracking, order mgmt, per-item stock),
+Janice/Iron Whales Appraiser/EVE Appraisal (bulk appraisal, reprocessing, BPC
+pricing, watchlists/alerts), EVE Blue Desk/EvE Blueprint (blueprint market
+platform), EVE Courier (routing, gatecamp check, arbitrage, contracts),
+Fuzzwork (blueprint calc, reprocessing, SDE dumps), EVE Ref (reference/market
+data), EVE Retroindustry (local BOM/make-vs-buy, multi-char asset/PI/wallet),
+ISK.GG (multi-region price history/depth charts), EVE Miner Hub (mining
+ledger aggregator), EQM (production econ, multi-hub appraisal, Corp
+Exchange, JF fuel), EveLens (EVEMon-style planning + Skill Farm ISK/hr), EVE
+Horizon (mfg+PI planning, hangar-sweep BOM netting, cross-colony
+coordination), EVE Forge (nested BOM/capital parts, reactions, invention,
+Gantt), EVE-Industry-Scanner-Tool (mfg/reaction/PI scoring across 5 hubs),
+EVE-HUB (PI planner, hub arbitrage, threat intel), EVE TradeLooper (cargo
+valuation, LP analysis, scanner), EVE Night Trade Tools (FIFO P&L, undercut
+alerts), IndustrialEVE (PI notifications; its Colony Builder template feature
+is dead on kill-test 12), jEveAssets (multi-account asset mgr), EVEAIO
+(bug-bounty preview, unknown feature set), MONW (recursive BOM w/
+have-subtraction, corp shared plans, structure pricing), Mudoteve/Solo
+Industry App (unit BOM netting, job queue sync), ArmedATLAS V2 (route
+planner + hauling arbitrage), PlanetFlow.APP (self-hosted corp PI, shareable
+templates), Cradle of War / EVE Balance (ore reprocessing value + buy-order
+lookup — covered by `reprocessing.ts`/#672), EVE Data Site (market history
+charts, PLEX ticker), PIM/EVE PI Manager (multi-char PI forecasting),
+Web-based PI Tracker (client-side P0-P1 tracker), JitaStocks (corp build
+mgmt, material reservation, LP↔ISK), Indeve (multi-product BOM,
+wallet-imported material cost), EVE Fleet Mining & Ratting Tool (payout
+split, ore/reprocess overview), FW LP Store shopping-cart tool (LP cart + ROI
+tracker in dev), EWT Planetary Interaction Tools (PI commodity/pricing
+checker, colony builder), EVE ONE (all-in-one: PI, market, industry suite),
+EVE Buddy (char/corp monitoring, PI overview, slot summary), Dr.MoonGoo/CLI
+Metenox Calculator (fuel-block/gas yield from scan input, no ledger), Eden
+Buyback (standalone buyback marketplace — cross-player), Evernus (desktop
+margin calc/multi-region market analysis/mfg planning), GESI (Sheets ESI
+add-on for jobs/orders/assets/wallet), Lazy Blacksmith (blueprint
+search/analysis), EVE Orchestra (mining ledger/reprocessing/job tracking,
+corp mining tax), Alysii's PI Scheme / EVE Planetary Planner (PI chain
+calculators, one ~7yr active), Upwell Fuel Monitor (structure fuel tracker —
+already covered, `structureFuel`), Esparto Industries (blueprint/reaction
+browser, reprocessing calc, moon-ore tax parsing — all already covered).
+
+**Dead/abandoned, not gap-analysed:** EVE Panel (PI sim, iOS), EVE
 GURU/Production Ledger, EveTerminal.io, Mining Timer Tool, EVE Hauling
-Advisor (discontinued).
+Advisor.
 
-**Skimmed by thread title only, confirmed out of domain** (mapping/intel/
-fitting-sim/crew-sim/DPS-meters/multibox/dev-tooling/feature-request threads
-— no industry or market surface): EVE Crews, Nexum, EveWebMail, EVE-NAV,
-Capsuleers.app, Wayfinder, Atlas, MISMAPS/MISKILLZ, NPC Sites Help, Fly Safe,
-WHMapper, Socketkill, PEARL, EVE Hacking Simulator, EVE Nexus, Eve PvP Radar,
-EVE-O Preview family, EVE MCP Server, EVE Threat Checker, EVE Fit Assistant,
-SLH Local Scanner, EveBoosters.com, Dd24tool.de, ISKONOMY, EVE Market Order
-Assistant (write-scoped, paid), EVE Empire, EVE NewBro, EVE Link, ECT EVE
-Assets, PATT, W-Space Atlas, Pod, EveHunter, ADAPT, Helm, Nicotine,
+**Skimmed by thread title only, confirmed out of domain** (mapping, intel,
+fitting/crew sims, DPS meters, multibox, dev-tooling, one-off Q&A threads —
+no industry or market surface): EVE Crews, Nexum, EveWebMail, EVE-NAV,
+Capsuleers.app, Wayfinder, Atlas, MISMAPS/MISKILLZ, Fly Safe, WHMapper,
+Socketkill, PEARL, EVE Hacking Simulator, EVE Nexus, Eve PvP Radar, EVE-O
+Preview, EVE MCP Server, EVE Threat Checker, EVE Fit Assistant, SLH Local
+Scanner, EveBoosters.com, Dd24tool.de, ISKONOMY, EVE Market Order Assistant
+(write-scoped, paid), EVE Empire, EVE NewBro, EVE Link, ECT EVE Assets, PATT,
+W-Space Atlas, Pod, EveHunter, ADAPT, Helm, Nicotine,
 fleet-manager/HARUSPEX/EasyEve, icon server, contract-monitoring Discord bot,
-Ministry of Pantoscopic Observance, Modular All-in-One Desktop Tool
-(revisit if it publishes specifics), EVE Market Pro/"ALL IN ONE TOOL!"
-(abandoned), "Assets within structures" (Q&A thread), Ascension Labs Libs,
+Ministry of Pantoscopic Observance, Modular All-in-One Desktop Tool (revisit
+if it publishes specifics), EVE Market Pro (abandoned), Ascension Labs Libs,
 Z-S Overview Customiser, SMT Eve Map Tool, Eve-mentor-mcp, EVEMon Lives,
-Prove scan helper, "Looking for Agent Finder tool" (request), TT Route
-Planner (wormhole-only), OpsCore v2, WarBeacon, Project Eden, EVE 3D MAP,
-@strata-eve/esi SDK, Eve Missile Analyst, Hamburger Helper, EVE Preview
-Manager, Eve Ship Stats, Advanced Armor Layering, Grey Zone Automation,
-EVE411, Eve Skillsboard, EVE Intelligence Nexus, Rangefinder, Eveswitcher,
-Insurgency Tools, Battlefield.Space, EVE OQM integration, "Loyalty point
-wallet/logs" (dev-recruitment thread).
+OpsCore v2, WarBeacon, Project Eden, EVE 3D MAP, @strata-eve/esi SDK, Eve
+Missile Analyst, Eve Ship Stats, Grey Zone Automation, EVE411, Eve
+Skillsboard, EVE Intelligence Nexus, Rangefinder, Eveswitcher, Insurgency
+Tools, Battlefield.Space, EVE OQM integration, plus assorted one-off Q&A /
+request / dev-recruitment threads with no tool attached.
 
 **The forum category JSON paginates** (`more_topics_url`). Fetch page 0 _and_
-page 1 minimum, keep following while present. Pages 0–15 are fully surveyed;
-16+ is 2022-and-older ESI/SSO Q&A archive with no live industry/market tool
-found in a sweep of three more pages past 10 — re-check page 0 for new
-threads on the next run instead of going deeper.
+page 1 minimum each run, keep following while present. Pages 0–15 are fully
+surveyed; 16+ is 2022-and-older ESI/SSO Q&A archive with no live
+industry/market tool found in three more pages past 10 — re-check page 0/1
+for new threads each run instead of going deeper. A run finding no new
+threads on pages 0–1 is a valid, complete survey — it isn't evidence to go
+digging further back.
 
 ## Already covered — don't re-propose
 
@@ -244,6 +240,8 @@ what the Advisor already computes per-planet; don't re-propose.
 | #858 | SHIP    | Quickbar unrealized P&L against a player-entered cost basis, reusing existing price fetch           |
 | #874 | SHIP    | Materials Table / Group Rollup total m3 volume, hauling-trip planning                               |
 | #880 | NARROW  | Mining Yield Tracker: include gas cloud harvesting alongside ore/ice (needs human ESI verification) |
+| #925 | SHIP    | Skills: PI Skill ROI panel (Command Center Upgrades/Interplanetary Consolidation/Remote Sensing)    |
+| #926 | NARROW  | BPC Sourcing: watch a search, notify on a new/cheaper matching offer (own notification source)      |
 
 ## Killed / dropped candidates (never filed)
 
@@ -273,3 +271,4 @@ what the Advisor already computes per-planet; don't re-propose.
 | Build Plan product output volume + haul distance to Trade Hub (hubHaulGaps mirror for a not-yet-listed product)                  | Kill-test 16 (assembled-volume defect hits ship products hardest, the common case); also overlaps Appraisal multi-hub compare once the product is pasted in — kill-test 3.                                                                                                                                                                                                                                                                       |
 | PI colony output material volume (total m3 awaiting haul-out); PI Factory Input Routing / misrouted-factory alert via `routes[]` | Kill-test 17 for both — a pin's live state is either untrustworthy (`contents`) or a deliberately-kept convention over exact routing (`routes[]`).                                                                                                                                                                                                                                                                                               |
 | PI Advisor: buffer-headroom number (hours/percent) for the _winning_ stop-tier recommendation                                    | Same shape as two settled rejections (`20260906-124813-advisor-cards-say-what-to-do-not-what.md`, `...-the-advisor-drops-its-ceiling-and-colonised-chips.md`): a correct number that changes no pilot action gets cut even when the engine already computes it (kill-test 4 bait). A threshold-triggered warning folded into the existing directive text is the only shape that might survive, and even that wants its own scope write-up first. |
+| BPC Sourcing price-trend indicator (30-day low/typical badge on a search result)                                                 | New server-side historical retention on top of admin-write-only infra that today holds only the latest sync — real ongoing backend maintenance for a thin, easily-gamed (lumpy contract volume) payoff; reach identical to and overlapping the sibling watch/alert candidate (#926) once that ships the live listings.                                                                                                                           |
