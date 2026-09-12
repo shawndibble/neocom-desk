@@ -391,6 +391,9 @@ describe('Wallet', () => {
     await user.type(screen.getByPlaceholderText('Search description…'), 'nothing matches this');
 
     expect(await screen.findByText('No journal entries match this filter.')).toBeInTheDocument();
+    expect(
+      screen.getByText('Clear the search or reset the filters above to see every entry.')
+    ).toBeInTheDocument();
     expect(screen.queryByText(/reconnect to fetch/i)).not.toBeInTheDocument();
   });
 
