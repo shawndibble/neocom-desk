@@ -102,12 +102,16 @@ const RANCER = 60011740;
 const RANCER_SYSTEM = 30002809;
 const NULL_STATION = 60014437;
 const NULL_SYSTEM = 30001161;
+/** The single most dangerous system in highsec, and a 0.5 like hundreds of others. */
+const UEDAMA_STATION = 60011866;
+const UEDAMA_SYSTEM = 30002768;
 
 const STATIONS: NpcStationEntry[] = [
   { id: JITA, name: 'Jita IV - Moon 4 - Caldari Navy Assembly Plant', systemId: 30000142 },
   { id: AMARR, name: 'Amarr VIII (Oris) - Emperor Family Academy', systemId: 30002187 },
   { id: RANCER, name: 'Rancer III - Moon 1', systemId: RANCER_SYSTEM },
   { id: NULL_STATION, name: 'Outpost', systemId: NULL_SYSTEM },
+  { id: UEDAMA_STATION, name: 'Uedama V - Moon 3', systemId: UEDAMA_SYSTEM },
 ];
 const SYSTEMS: SolarSystemEntry[] = [
   { id: 30000142, name: 'Jita', security: 0.9, regionId: 10000002 },
@@ -123,6 +127,9 @@ const SYSTEMS: SolarSystemEntry[] = [
   // Exactly 0.0, which is a real nullsec value and a falsy one — a truthiness
   // guard anywhere on the security field would call this unknown.
   { id: NULL_SYSTEM, name: 'Vale', security: 0.0, regionId: 10000043 },
+  // Its real security, which rounds to 0.5 — the point being that the band
+  // alone says nothing and the name is what carries the warning.
+  { id: UEDAMA_SYSTEM, name: 'Uedama', security: 0.50544, regionId: 10000033 },
 ];
 
 /**
@@ -1229,6 +1236,18 @@ describe('ContractSearchPanel — Courier going rate', () => {
     await user.click(await screen.findByRole('option', { name: 'Only far above' }));
 
     expect(await courierRows()).toHaveLength(1);
+  });
+
+  it('names a delivery into a system haulers are most often killed in', async () => {
+    // Being a chokepoint is about traffic, not security: Uedama reads 0.5 like
+    // hundreds of other systems, so the band on the row says nothing and only
+    // the name carries the warning.
+    await showCourierWith([courierRow({ contractId: 950, destinationLocationId: UEDAMA_STATION })]);
+
+    const route = within((await courierRows())[0]).getAllByRole('cell')[0];
+    expect(within(route).getByText('Gank gate')).toBeInTheDocument();
+    // And the space band still reads as the ordinary highsec it is.
+    expect(route).toHaveTextContent('Highsec');
   });
 
   it('names the benchmark in the detail, and calls nothing a scam', async () => {

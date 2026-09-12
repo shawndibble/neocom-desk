@@ -34,12 +34,11 @@ import {
   type CourierEndpoint,
   type CourierRouteRow,
 } from '@/engine/contracts/courierSearch';
-import { iskPerJump, iskPerVolume } from '@/engine/contracts/courierRates';
+import { iskPerJump, iskPerVolume, rewardPerVolumeJump } from '@/engine/contracts/courierRates';
 import {
   corpusGoingRate,
   goingRateMultiple,
   paysFarAboveGoingRate,
-  rewardPerVolumeJump,
 } from '@/engine/contracts/courierGoingRate';
 import { SPACE_KINDS, type SpaceKind } from '@/engine/space';
 import { completableCourierRoutes } from '@/engine/contracts/courierRisk';
@@ -48,6 +47,7 @@ import type { RoutePreferenceKind } from '@/engine/route/jumpRoute';
 import { localJumpCountsForRoutes } from '@/features/route/localRoute';
 import { CourierContractDetailModal } from '@/features/contractSearch/CourierContractDetailModal';
 import { formatIskAuto } from '@/lib/isk';
+import { formatMagnitude } from '@/lib/magnitude';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
 
@@ -123,9 +123,6 @@ function narrowsSpace(selected: readonly SpaceKind[], offered: readonly SpaceKin
  */
 const OVER_RATE_FILTERS = ['all', 'only', 'hide'] as const;
 type OverRateFilter = (typeof OVER_RATE_FILTERS)[number];
-
-/** One decimal: a multiple is read as a magnitude, and further digits imply a precision it does not carry. */
-const MULTIPLE_FORMAT = new Intl.NumberFormat('en', { maximumFractionDigits: 1 });
 
 /** A blank or unparseable field is "no restriction", never `NaN` — which would silently exclude every row. */
 function parseNumeric(value: string): number | null {
@@ -675,14 +672,18 @@ export function CourierResults({ rows, regionNames }: CourierResultsProps) {
    * "far above" it either.
    */
   const ratedRows = useMemo(() => {
-    if (uiFilter.overRate === 'all') return matchingRows;
+    // Until the distances land no row has a multiple, so narrowing on one
+    // would empty the board and the empty state would report "nothing matched"
+    // — a complete answer given mid-load. The board shows everything until it
+    // can actually tell these apart.
+    if (uiFilter.overRate === 'all' || jumps.kind !== 'known') return matchingRows;
     const wantFlagged = uiFilter.overRate === 'only';
     return matchingRows.filter((row) => {
       const multiple = multipleFor(row);
       if (multiple === null) return !wantFlagged;
       return paysFarAboveGoingRate(multiple) === wantFlagged;
     });
-  }, [matchingRows, uiFilter.overRate, multipleFor]);
+  }, [matchingRows, uiFilter.overRate, multipleFor, jumps.kind]);
 
   const displayRows = useMemo(() => {
     const ranked = [...ratedRows];
@@ -815,7 +816,7 @@ export function CourierResults({ rows, regionNames }: CourierResultsProps) {
                   }
                 >
                   {t('contractSearch.goingRateMultiple', {
-                    multiple: MULTIPLE_FORMAT.format(multiple),
+                    multiple: formatMagnitude(multiple),
                   })}
                 </span>
               )}
@@ -927,7 +928,11 @@ export function CourierResults({ rows, regionNames }: CourierResultsProps) {
         <CourierContractDetailModal
           row={selectedRow}
           regionNames={regionNames}
-          jumps={jumpsByContract.get(selectedRow.contractId) ?? null}
+          jumps={
+            jumps.kind === 'known'
+              ? (jumpsByContract.get(selectedRow.contractId) ?? null)
+              : 'pending'
+          }
           goingRateMultiple={multipleFor(selectedRow)}
           preference={preference}
           onClose={() => setSelectedRow(null)}

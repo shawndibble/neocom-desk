@@ -23,6 +23,7 @@ export const MARKED_RISKS: readonly CourierRiskKind[] = [
   'player-structure',
   'no-gate-route',
   'over-rate',
+  'gank-chokepoint',
 ];
 
 /** Both registers for one risk, read together at every call site. */
@@ -45,6 +46,10 @@ export const RISK_COPY: Record<CourierRiskKind, RiskCopy> = {
   nullsec: {
     short: 'contractSearch.risk.nullsecShort',
     detail: 'contractSearch.risk.nullsecDetail',
+  },
+  'gank-chokepoint': {
+    short: 'contractSearch.risk.chokepointShort',
+    detail: 'contractSearch.risk.chokepointDetail',
   },
   'over-rate': {
     short: 'contractSearch.risk.overRateShort',

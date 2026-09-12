@@ -15,6 +15,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Modal, StatChip } from '@/components/ui';
 import { formatIsk, formatIskAuto } from '@/lib/isk';
+import { formatMagnitude } from '@/lib/magnitude';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
 import {
@@ -24,29 +25,25 @@ import {
 } from '@/engine/contracts/courierSearch';
 import { collateralToRewardRatio, iskPerVolume } from '@/engine/contracts/courierRates';
 import { courierRisks, type CourierRiskKind } from '@/engine/contracts/courierRisk';
+import { communityFloorReward, paysFarAboveGoingRate } from '@/engine/contracts/courierGoingRate';
 import {
-  communityFloorReward,
   forcesFreighter,
   hoursToExpiry,
-  paysFarAboveGoingRate,
   FREIGHTER_VOLUME_M3,
-} from '@/engine/contracts/courierGoingRate';
+} from '@/engine/contracts/courierRisk';
 import { routeExposure, type RouteExposure } from '@/features/contractSearch/routeExposure';
 import type { RoutePreferenceKind } from '@/engine/route/jumpRoute';
 import { MARKED_RISKS, RISK_COPY } from '@/features/contractSearch/courierRiskLabels';
 
-/**
- * One decimal, for a figure read as a magnitude rather than an exact amount —
- * a hold is "60,000 m³" and a collateral is "40x the reward"; further digits
- * imply a precision neither carries.
- */
-const MAGNITUDE_FORMAT = new Intl.NumberFormat('en', { maximumFractionDigits: 1 });
-
 export interface CourierContractDetailModalProps {
   row: CourierRouteRow;
   regionNames: ReadonlyMap<number, string>;
-  /** This haul's distance, or `null` where the board could not measure one. */
-  jumps: number | null;
+  /**
+   * This haul's distance: a count, `null` where the board measured and found
+   * none, or `'pending'` while the pass is still running. The third state
+   * matters — "still measuring" must not be reported as "no rate available".
+   */
+  jumps: number | 'pending' | null;
   /** How far above the corpus median it pays, or `null` where that cannot be stated. */
   goingRateMultiple: number | null;
   /** Which route the board is measuring, so the exposure below counts the same one. */
@@ -115,7 +112,8 @@ export function CourierContractDetailModal({
     ? [...endpointRisks, 'over-rate']
     : endpointRisks;
   const exposure = useRouteExposure(row, preference);
-  const floor = communityFloorReward(collateral, jumps);
+  const measuring = jumps === 'pending';
+  const floor = measuring ? null : communityFloorReward(collateral, jumps);
   // Pinned to when the detail opened rather than read each render: a figure
   // that ticks while the reader looks at it is a moving target, and "as of
   // when you opened this" is the honest reading of a countdown anyway.
@@ -141,7 +139,7 @@ export function CourierContractDetailModal({
           />
           <StatChip
             label={t('contractSearch.volumeColumn')}
-            value={`${MAGNITUDE_FORMAT.format(row.volume)} m³`}
+            value={`${formatMagnitude(row.volume)} m³`}
           />
           <StatChip
             label={t('contractSearch.daysColumn')}
@@ -165,7 +163,7 @@ export function CourierContractDetailModal({
               collateralRatio === null || collateral === 0
                 ? '—'
                 : t('contractSearch.collateralRatioValue', {
-                    ratio: MAGNITUDE_FORMAT.format(collateralRatio),
+                    ratio: formatMagnitude(collateralRatio),
                   })
             }
           />
@@ -186,8 +184,7 @@ export function CourierContractDetailModal({
                   <span className="text-text-dim">{t(RISK_COPY[kind].short)}</span>
                   {' — '}
                   {t(RISK_COPY[kind].detail, {
-                    multiple:
-                      goingRateMultiple === null ? '' : MAGNITUDE_FORMAT.format(goingRateMultiple),
+                    multiple: goingRateMultiple === null ? '' : formatMagnitude(goingRateMultiple),
                   })}
                 </li>
               ))}
@@ -208,11 +205,13 @@ export function CourierContractDetailModal({
           </h3>
           <ul className="flex flex-col gap-1.5 text-sm">
             <li>
-              {goingRateMultiple === null
-                ? t('contractSearch.goingRateUnavailable')
-                : t('contractSearch.goingRateAgainstCorpus', {
-                    multiple: MAGNITUDE_FORMAT.format(goingRateMultiple),
-                  })}
+              {measuring
+                ? t('contractSearch.goingRateMeasuring')
+                : goingRateMultiple === null
+                  ? t('contractSearch.goingRateUnavailable')
+                  : t('contractSearch.goingRateAgainstCorpus', {
+                      multiple: formatMagnitude(goingRateMultiple),
+                    })}
             </li>
             {floor !== null && (
               <li>
@@ -221,16 +220,54 @@ export function CourierContractDetailModal({
                 {t('contractSearch.communityFloorActual', { reward: formatIskAuto(row.reward) })}
               </li>
             )}
-            {forcesFreighter(row.volume) && (
-              <li className="text-warning">
-                {t('contractSearch.freighterVolumeNote', {
-                  volume: MAGNITUDE_FORMAT.format(FREIGHTER_VOLUME_M3),
+            {/*
+              The fourth signal, beside the other three rather than stranded in
+              the chip row above: a large collateral against a small reward is
+              the shape of a contract designed to be uncompletable.
+            */}
+            {collateralRatio !== null && collateral > 0 && (
+              <li>
+                {t('contractSearch.collateralRatioAgainstReward', {
+                  ratio: formatMagnitude(collateralRatio),
                 })}
               </li>
             )}
-            {exposure?.kind === 'known' && exposure.exposedSystems > 0 && (
-              <li>{t('contractSearch.lowsecCrossed', { count: exposure.exposedSystems })}</li>
+            {forcesFreighter(row.volume) && (
+              <li
+                // Warning-toned only where it is actually the ganking shape:
+                // the ticket's bait is an oversized load *on a lowsec route*.
+                // A 400,000 m³ Jita-to-Perimeter haul is a freighter job, which
+                // is worth stating and is not a warning.
+                className={
+                  exposure?.kind === 'known' && exposure.exposedSystems > 0 ? 'text-warning' : ''
+                }
+              >
+                {t('contractSearch.freighterVolumeNote', {
+                  volume: formatMagnitude(FREIGHTER_VOLUME_M3),
+                })}
+              </li>
             )}
+            {/*
+              Said either way: silence for a clean route reads the same as
+              silence for a route we could not work out, and the rule on this
+              surface is to state what is not in the figure.
+            */}
+            {exposure?.kind === 'known' && exposure.chokepoints.length > 0 && (
+              <li className="text-warning">
+                {t('contractSearch.routeExposureChokepoints', {
+                  systems: exposure.chokepoints.join(', '),
+                })}
+              </li>
+            )}
+            <li>
+              {exposure === null
+                ? t('contractSearch.routeExposureMeasuring')
+                : exposure.kind === 'known'
+                  ? t('contractSearch.routeExposureCrossed', { count: exposure.exposedSystems })
+                  : exposure.kind === 'no-route'
+                    ? t('contractSearch.routeExposureNoRoute')
+                    : t('contractSearch.routeExposureUnknown')}
+            </li>
             <li>{t('contractSearch.expiresInHours', { hours: expiresIn })}</li>
           </ul>
         </section>

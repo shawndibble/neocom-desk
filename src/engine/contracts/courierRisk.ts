@@ -15,6 +15,7 @@
  *
  * Pure, and derived entirely from fields the endpoints already carry.
  */
+import { isGankChokepoint } from '../route/chokepoints';
 import type { CourierRouteRow, CourierEndpoint } from './courierSearch';
 
 export type CourierRiskKind =
@@ -29,7 +30,14 @@ export type CourierRiskKind =
    * `endpointRisks` or `courierRisks`, and the board adds it from
    * `courierGoingRate.ts`.
    */
-  | 'over-rate';
+  | 'over-rate'
+  /**
+   * This end is one of the systems haulers are most often killed in — a
+   * property of traffic rather than of security status, so it comes from
+   * `route/chokepoints.ts`'s named list. Reported for either end: a pickup
+   * there is as exposed as a delivery.
+   */
+  | 'gank-chokepoint';
 
 /**
  * Every J-space system sits in the 11000000 region block, and the contract row
@@ -82,6 +90,7 @@ export function endpointRisks(
     // cannot reach. "No gate route" is the stronger and the correct answer.
     return risks;
   }
+  if (isGankChokepoint(endpoint.systemId)) risks.push('gank-chokepoint');
   if (endpoint.space === 'nullsec') risks.push('nullsec');
   return risks;
 }
@@ -99,7 +108,12 @@ export function courierRisks(row: CourierRouteRow): CourierRiskKind[] {
   return RISK_ORDER.filter((kind) => both.has(kind));
 }
 
-const RISK_ORDER: readonly CourierRiskKind[] = ['player-structure', 'no-gate-route', 'nullsec'];
+const RISK_ORDER: readonly CourierRiskKind[] = [
+  'player-structure',
+  'no-gate-route',
+  'gank-chokepoint',
+  'nullsec',
+];
 
 /**
  * Which risks can stop a haul being delivered at all, and so are the ones a
@@ -121,4 +135,28 @@ export function blocksCompletion(risks: readonly CourierRiskKind[]): boolean {
  */
 export function completableCourierRoutes(rows: readonly CourierRouteRow[]): CourierRouteRow[] {
   return rows.filter((row) => !blocksCompletion(courierRisks(row)));
+}
+
+/**
+ * The volume above which a freighter is the only hull that will carry the load.
+ *
+ * A freighter is slow, cannot cloak and is the easiest gank target in the game,
+ * so an oversized load on a route through lowsec is bait regardless of what it
+ * pays — which the going-rate multiple alone cannot see. Checked against the
+ * ticket's own figures: a freighter-gank contract at 50M for 350,000 m³ over 5
+ * jumps runs *0.8x* the going rate, below the median rather than above it.
+ */
+export const FREIGHTER_VOLUME_M3 = 350_000;
+
+export function forcesFreighter(volume: number): boolean {
+  return volume > FREIGHTER_VOLUME_M3;
+}
+
+/**
+ * Whole hours left to decide, floored at zero for a contract already lapsed.
+ * A short listing is one of the conditions the documented ganking shape travels
+ * with, which is why it sits here rather than among the date formatters.
+ */
+export function hoursToExpiry(dateExpired: number, now: number): number {
+  return Math.max(0, Math.floor((dateExpired - now) / 3_600_000));
 }

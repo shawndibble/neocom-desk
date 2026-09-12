@@ -1,16 +1,18 @@
 import { describe, it, expect } from 'vitest';
 import {
-  rewardPerVolumeJump,
   corpusGoingRate,
   goingRateMultiple,
   paysFarAboveGoingRate,
   communityFloorReward,
-  forcesFreighter,
-  hoursToExpiry,
   MIN_GOING_RATE_SAMPLE,
   FAR_ABOVE_MULTIPLE,
-  FREIGHTER_VOLUME_M3,
 } from '@/engine/contracts/courierGoingRate';
+import { rewardPerVolumeJump } from '@/engine/contracts/courierRates';
+import {
+  forcesFreighter,
+  hoursToExpiry,
+  FREIGHTER_VOLUME_M3,
+} from '@/engine/contracts/courierRisk';
 
 describe('rewardPerVolumeJump', () => {
   it('normalises a reward by both the size of the load and the length of the trip', () => {
@@ -48,8 +50,17 @@ describe('corpusGoingRate', () => {
   });
 
   it('takes the mean of the middle pair on an even sample', () => {
-    const rates = [...corpus(MIN_GOING_RATE_SAMPLE - 2, 10), 20, 40];
-    expect(corpusGoingRate(rates)).toBe(10);
+    // Discriminating on purpose: the two middle values differ, so lower-middle
+    // (10), upper-middle (30) and mean-of-pair (20) are three different
+    // answers and only one of them passes.
+    const rates = [
+      ...corpus(MIN_GOING_RATE_SAMPLE / 2 - 1, 10),
+      10,
+      30,
+      ...corpus(MIN_GOING_RATE_SAMPLE / 2 - 1, 40),
+    ];
+    expect(rates).toHaveLength(MIN_GOING_RATE_SAMPLE);
+    expect(corpusGoingRate(rates)).toBe(20);
   });
 
   it('ignores the hauls that have no rate rather than counting them as zero', () => {

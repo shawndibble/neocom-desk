@@ -49,9 +49,12 @@ _Recorded 2026-09-12 · issue #946._
   contract carries no item lines, so a zero volume is a figure the snapshot
   genuinely holds rather than a divisor, and an unplaced or unroutable endpoint
   has no distance. Both give `null` — the `null`-not-`Infinity` discipline
-  `courierRates.ts` already keeps — and such a row shows no multiple and is
-  removed by neither direction of the filter: "we cannot say" is not "within the
-  going rate", and it is not "far above" it either.
+  `courierRates.ts` already keeps — and such a row shows no multiple. The filter
+  keeps it under "hide far above" and drops it under "only far above": "we
+  cannot say" is not "far above", so it does not belong in a list of hauls that
+  are. While the distances are still being measured _no_ row has a multiple, so
+  the filter does not apply at all rather than emptying the board and reporting
+  "nothing matched" — a complete answer given mid-load.
 
 - **A same-system haul counts as one jump**, matching `iskPerJump`. Zero jumps
   is a real answer, not a missing one, and dividing by it would read as an
@@ -83,5 +86,28 @@ _Recorded 2026-09-12 · issue #946._
   `MARKED_RISKS` and `blocksCompletion` are different lists: paying well above
   the market earns a badge and is no obstacle to delivering anything.
 
+- **Gank chokepoints are a named list, not a rule** (asked for during the
+  ticket). Uedama, Sivala, Aufay, Balle, Tama, Rancer and Ahbazon: the systems
+  every profitable route funnels through, which is what makes camping them worth
+  doing. Security status is why the list is _needed_ rather than sufficient —
+  Uedama reads 0.505 and Balle 0.461, so both show as 0.5 systems and neither
+  stands out from the hundreds of others a route crosses. "Crosses a 0.5 system"
+  and "crosses Uedama" are different warnings, and only the second is one a
+  freighter pilot acts on. Anything claiming to _derive_ this would be inventing
+  a judgement the map does not contain, so it is explicit and the comment says
+  what each entry is for.
+
+  **Niarja is deliberately absent**, though every older guide names it: it moved
+  into Pochven in 2020 and reads -1.0 in the current SDE, and that displaced
+  traffic is what made Uedama what it is. Perimeter and Hatakani are out too —
+  the ganking there is aimed at bling ships undocking near Jita rather than at
+  anything crossing on a courier route. A test holds the Niarja exclusion so it
+  is not "fixed" back in.
+
+  An endpoint in one is a row marker, since that needs only the endpoint. A
+  route _through_ one is a detail-modal line, because it needs the path, and a
+  path per row is the fan-out the local snapshots exist to avoid.
+
 - **Not done here:** no ESI request, no cargo valuation, and no claim about
-  whether any particular contract is honest.
+  whether any particular contract is honest — including the chokepoints, which
+  say where a haul goes, never that anything will happen to the hauler there.

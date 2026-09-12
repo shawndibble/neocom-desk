@@ -20,31 +20,6 @@
  */
 
 /**
- * A reward normalised by both the size of the load and the length of the trip
- * — the corpus's own going rate is the median of this across every outstanding
- * public courier contract, so it must be a figure every row computes the same
- * way.
- *
- * `null` rather than a number for a haul that cannot state one: a courier
- * contract carries no item lines, so `volume: 0` is a figure the snapshot
- * genuinely holds rather than a divisor, and an unroutable or unplaced endpoint
- * has no jump count. A rate computed without distance is not the rate this
- * compares — the same `null`-not-`Infinity` discipline `courierRates.ts` keeps.
- */
-export function rewardPerVolumeJump(
-  reward: number,
-  volume: number,
-  jumps: number | null
-): number | null {
-  if (!(volume > 0) || jumps === null) return null;
-  // Zero jumps is a real answer — both ends in one system — not a missing one,
-  // and dividing by it would read as an infinite rate and top every outlier
-  // list. `iskPerJump` already settled this convention; diverging would give
-  // one row two different distances in two adjacent cells.
-  return reward / (volume * Math.max(jumps, 1));
-}
-
-/**
  * How many rates a median needs before it means anything.
  *
  * A median over a handful of rows is arithmetically fine and statistically
@@ -112,24 +87,4 @@ export function paysFarAboveGoingRate(multiple: number | null): boolean {
 export function communityFloorReward(collateral: number, jumps: number | null): number | null {
   if (!(collateral > 0) || jumps === null) return null;
   return (collateral / 1_000_000_000) * Math.max(jumps, 1) * 1_000_000;
-}
-
-/**
- * The volume above which a freighter is the only hull that will carry the load.
- *
- * A freighter is slow, cannot cloak and is the easiest gank target in the game,
- * so an oversized load on a route through lowsec is bait regardless of what it
- * pays — which the rate multiple alone cannot see. Checked against the ticket's
- * figures: a freighter-gank contract at 50M for 350,000 m³ over 5 jumps runs
- * *0.8x* the going rate, below the median rather than above it.
- */
-export const FREIGHTER_VOLUME_M3 = 350_000;
-
-export function forcesFreighter(volume: number): boolean {
-  return volume > FREIGHTER_VOLUME_M3;
-}
-
-/** Whole hours a hauler has left to decide, floored at zero for a lapsed contract. */
-export function hoursToExpiry(dateExpired: number, now: number): number {
-  return Math.max(0, Math.floor((dateExpired - now) / 3_600_000));
 }

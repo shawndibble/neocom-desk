@@ -12,8 +12,19 @@ export type SecurityBand = 'highsec' | 'lowsec' | 'nullsec';
  * — the only two callers. `securityStatusColor` below interpolates the raw
  * value and is deliberately untouched.
  */
+/**
+ * The security status rounded to one decimal — the number the game itself
+ * displays and enforces, and the only form any banding here is done on.
+ * Exported so a caller drawing its own line (issue #946 counts systems at 0.5
+ * or below, which is a different cut from `securityBand`'s) draws it on the
+ * same number rather than re-deriving the rounding.
+ */
+export function shownSecurity(security: number): number {
+  return Math.round(security * 10) / 10;
+}
+
 export function securityBand(security: number): SecurityBand {
-  const shown = Math.round(security * 10) / 10;
+  const shown = shownSecurity(security);
   if (shown >= 0.5) return 'highsec';
   if (shown >= 0.1) return 'lowsec';
   return 'nullsec';

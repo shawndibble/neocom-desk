@@ -19,12 +19,20 @@
 import { findLocalRoute } from '@/features/route/localRoute';
 import { loadSolarSystemsById } from '@/sde/solarSystems';
 import type { RoutePreferenceKind } from '@/engine/route/jumpRoute';
+import { shownSecurity } from '@/engine/securityStatus';
+import { chokepointsOnRoute } from '@/engine/route/chokepoints';
 
 /** Security at or below which a system is counted. 0.5 rounds to 0.5 and is included. */
 const EXPOSED_AT_OR_BELOW = 0.5;
 
 export type RouteExposure =
-  | { kind: 'known'; exposedSystems: number; totalSystems: number }
+  | {
+      kind: 'known';
+      exposedSystems: number;
+      totalSystems: number;
+      /** Named gank chokepoints on the way, in the order they are flown. */
+      chokepoints: string[];
+    }
   /** There is no gate route at all — a fact about New Eden, not a gap in the data. */
   | { kind: 'no-route' }
   /** A snapshot could not be read, so nothing is concluded. */
@@ -50,9 +58,14 @@ export async function routeExposure(
     // A system the snapshot does not hold is not counted as exposed: an
     // unknown security is not a low one, and guessing would inflate a figure
     // the hauler is about to weigh.
-    if (security !== undefined && Math.round(security * 10) / 10 <= EXPOSED_AT_OR_BELOW) {
+    if (security !== undefined && shownSecurity(security) <= EXPOSED_AT_OR_BELOW) {
       exposedSystems += 1;
     }
   }
-  return { kind: 'known', exposedSystems, totalSystems: route.systems.length };
+  return {
+    kind: 'known',
+    exposedSystems,
+    totalSystems: route.systems.length,
+    chokepoints: chokepointsOnRoute(route.systems),
+  };
 }
