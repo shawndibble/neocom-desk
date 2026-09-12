@@ -9,6 +9,13 @@
  * only (the ticket's explicit non-goal) and those dimensions mean nothing to
  * a stack of Tritanium. What the two genuinely share — the region lookup, the
  * ranked type search, the asking-price rule — is imported, not copied.
+ *
+ * It shows one of two corpora at a time (issue #910): Items, the offers above,
+ * and Courier, the public courier contracts of `publicCourierContracts`. Modes
+ * rather than one merged result set because a haul has no item, quantity or
+ * price and an offer has no route, reward or collateral — see
+ * `CourierResults.tsx` and #910's scope decision. This component owns what
+ * both need: the two snapshots, the region names, and which mode is showing.
  */
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -46,10 +53,17 @@ import {
   type ContractTypeOption,
 } from '@/engine/contracts/contractSearch';
 import type { PublicContractOfferRow } from '@/engine/contracts/contractOffers';
+import { resolveCourierRoutes, type CourierRouteRow } from '@/engine/contracts/courierSearch';
 import {
   loadPublicContractOffers,
   type PublicContractOffersSnapshot,
 } from '@/features/contractSearch/publicContractOffers';
+import {
+  loadPublicCourierContracts,
+  type PublicCourierContractsSnapshot,
+} from '@/features/contractSearch/publicCourierContracts';
+import { loadCourierEndpoints } from '@/features/contractSearch/courierEndpoints';
+import { CourierResults } from '@/features/contractSearch/CourierResults';
 import { loadRegionName } from '@/features/bpcContracts/regionNames';
 import { isSyncConfigured } from '@/app/syncStatus';
 import { loadMarketTypes } from '@/sde/loadMarketSde';
@@ -79,11 +93,19 @@ const ALL_REGIONS = 'all';
 
 const SALE_KINDS: ContractSaleKind[] = ['exchange', 'auction'];
 
+/** Which corpus the tab is showing. Items is the landing mode — it is what the tab was before #910. */
+const CONTRACT_MODES = ['items', 'courier'] as const;
+type ContractMode = (typeof CONTRACT_MODES)[number];
+
 const EMPTY_NAMES: ReadonlyMap<number, string> = new Map();
 const EMPTY_ROWS: readonly PublicContractOfferRow[] = [];
+const EMPTY_COURIER_ROWS: readonly CourierRouteRow[] = [];
 
 interface Snapshot {
   offersResult: CachedResult<PublicContractOffersSnapshot> | null;
+  courierResult: CachedResult<PublicCourierContractsSnapshot> | null;
+  /** Courier rows with both ends already named — resolved once here, not per render. */
+  courierRoutes: CourierRouteRow[];
   /** False when the app has no sync backend configured at all — a different story from "synced, but empty". */
   syncConfigured: boolean;
   regionNames: ReadonlyMap<number, string>;
@@ -92,6 +114,8 @@ interface Snapshot {
 
 const NOT_CONFIGURED: Snapshot = {
   offersResult: null,
+  courierResult: null,
+  courierRoutes: [],
   syncConfigured: false,
   regionNames: EMPTY_NAMES,
   typeNames: EMPTY_NAMES,
@@ -110,11 +134,26 @@ async function loadContractSearchSnapshot(
   signal: RouteSnapshotSignal
 ): Promise<Snapshot> {
   if (!isSyncConfigured()) return NOT_CONFIGURED;
-  const offersResult = await loadPublicContractOffers(characterId);
+  // Both snapshots, always. The courier one is a single chunk doc — ADR 0013's
+  // live pull put courier and loan together under 620 contracts against ~370k
+  // offer rows — so deferring it to the first Courier click would buy nothing
+  // and cost a fetch on the way in.
+  const [offersResult, courierResult] = await Promise.all([
+    loadPublicContractOffers(characterId),
+    loadPublicCourierContracts(characterId),
+  ]);
   const rows = offersResult?.data?.rows ?? [];
-  // Already superseded: skip both lookups, their results would be discarded.
+  const courierRows = courierResult?.data?.rows ?? [];
+  // Already superseded: skip the lookups, their results would be discarded.
   if (signal.cancelled) {
-    return { offersResult, syncConfigured: true, regionNames: EMPTY_NAMES, typeNames: EMPTY_NAMES };
+    return {
+      offersResult,
+      courierResult,
+      courierRoutes: [],
+      syncConfigured: true,
+      regionNames: EMPTY_NAMES,
+      typeNames: EMPTY_NAMES,
+    };
   }
 
   const listedTypeIds = new Set(rows.map((row) => row.typeId));
@@ -124,16 +163,35 @@ async function loadContractSearchSnapshot(
     if (listedTypeIds.has(entry.typeId)) typeNames.set(entry.typeId, entry.name);
   }
 
-  const regionIds = [...new Set(rows.map((row) => row.regionId))];
+  // Local SDE snapshots only, so this costs no requests at all — see
+  // `courierEndpoints.ts` for why it is not `loadContractLocationName`.
+  const endpoints = await loadCourierEndpoints(courierRows);
+  const courierRoutes = resolveCourierRoutes(courierRows, endpoints);
+
+  // One lookup per distinct region across both corpora: the offers' own, plus
+  // each end of every haul. A courier region resolved here is what names the
+  // From/To options in the Courier filter bar.
+  const regionIds = new Set<number>(rows.map((row) => row.regionId));
+  for (const route of courierRoutes) {
+    if (route.origin.regionId !== null) regionIds.add(route.origin.regionId);
+    if (route.destination.regionId !== null) regionIds.add(route.destination.regionId);
+  }
   const regionNames = new Map<number, string>();
   await Promise.all(
-    regionIds.map(async (regionId) => {
+    [...regionIds].map(async (regionId) => {
       const name = await loadRegionName(regionId);
       if (name !== null) regionNames.set(regionId, name);
     })
   );
 
-  return { offersResult, syncConfigured: true, regionNames, typeNames };
+  return {
+    offersResult,
+    courierResult,
+    courierRoutes,
+    syncConfigured: true,
+    regionNames,
+    typeNames,
+  };
 }
 
 /** The filter as the controls hold it: text fields stay strings until they are parsed into the engine's filter. */
@@ -290,11 +348,20 @@ export function ContractSearchPanel() {
   const regionNames = data?.regionNames ?? EMPTY_NAMES;
   const typeNames = data?.typeNames ?? EMPTY_NAMES;
   const rows = offersResult?.data?.rows ?? EMPTY_ROWS;
+  const courierResult = data?.courierResult ?? null;
+  const courierRoutes = data?.courierRoutes ?? EMPTY_COURIER_ROWS;
 
   const [uiFilter, setUiFilter] = useState<UiFilter>(EMPTY_UI_FILTER);
   /** The type the user picked out of the suggestion list, pinning the search to exactly one item. */
   const [selectedTypeId, setSelectedTypeId] = useState<number | null>(null);
   const [showAll, setShowAll] = useState(false);
+  const [mode, setMode] = useState<ContractMode>('items');
+
+  // Freshness and the offline banner both name the snapshot actually on
+  // screen: the two are published by the same job but cached separately, so a
+  // courier read served from Dexie under a live offers read is a real state.
+  const activeResult = mode === 'courier' ? courierResult : offersResult;
+  const modeRowCount = mode === 'courier' ? courierRoutes.length : rows.length;
 
   const typeOptions = useMemo(() => listedContractTypeOptions(rows, typeNames), [rows, typeNames]);
 
@@ -475,8 +542,8 @@ export function ContractSearchPanel() {
       // stutter. The table keeps its own accessible name from
       // `contractSearch.title`.
       meta={
-        offersResult?.data?.lastSyncedAt && (
-          <DataAgeBadge date={new Date(offersResult.data.lastSyncedAt)} />
+        activeResult?.data?.lastSyncedAt && (
+          <DataAgeBadge date={new Date(activeResult.data.lastSyncedAt)} />
         )
       }
       actions={
@@ -499,98 +566,136 @@ export function ContractSearchPanel() {
           title={t('contractSearch.notConfiguredTitle')}
           hint={t('contractSearch.notConfiguredHint')}
         />
-      ) : rows.length === 0 ? (
-        // Nothing synced at all — distinct from `noFilterMatches` below,
-        // which is "offers exist, the filter just excludes them all".
-        <EmptyState title={t('contractSearch.emptyTitle')} hint={t('contractSearch.emptyHint')} />
       ) : (
         <>
-          {offersResult?.fromCache && (
+          {activeResult?.fromCache && (
             <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">
               {t('common.offlineTitle')}
             </p>
           )}
-          <ContractSearchFilterBar
-            filter={uiFilter}
-            onChange={changeFilter}
-            regionOptions={regionOptions}
-          />
-
-          {suggestions.length > 0 && (
-            <div className="border-b border-line bg-panel-2 px-3 py-2">
-              <p className="pb-1.5 text-[0.6875rem] font-semibold tracking-widest text-accent uppercase">
-                {t('contractSearch.suggestionsHeading')}
-              </p>
-              <ul
-                aria-label={t('contractSearch.suggestionsLabel')}
-                className="max-h-72 overflow-y-auto rounded-xs border border-line-bright bg-panel"
-              >
-                {suggestions.map((suggestion) => (
-                  <li key={suggestion.typeId} className="border-b border-line last:border-b-0">
-                    <button
-                      type="button"
-                      onClick={() => selectType(suggestion)}
-                      className="flex min-h-11 w-full items-center justify-between gap-3 px-3 py-2 text-left hover:bg-panel-2 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent md:min-h-9"
-                    >
-                      <span className="truncate">{suggestion.name}</span>
-                      <span className="shrink-0 text-[0.6875rem] text-text-dim">
-                        {t('contractSearch.suggestionOffers', {
-                          count: suggestion.stats.offerCount,
-                        })}
-                        {' · '}
-                        {formatIsk(suggestion.stats.cheapest, 2)}
-                      </span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {summary !== null && (
-            <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2">
-              <StatChip
-                label={t('contractSearch.offersLabel')}
-                value={summary.offerCount.toLocaleString()}
+          {/*
+            Chips rather than a second `Tabs` bar: the page's own tab strip sits
+            immediately above this panel, and stacking a full-width tablist
+            under it reads as the same stutter the panel drops its title to
+            avoid. Exactly one is always on — picking the active chip again
+            leaves it on rather than clearing to no corpus at all.
+          */}
+          <div
+            role="group"
+            aria-label={t('contractSearch.modeLabel')}
+            className="flex flex-wrap gap-2 border-b border-line px-3 py-2"
+          >
+            {CONTRACT_MODES.map((candidate) => (
+              <FilterChip
+                key={candidate}
+                label={t(`contractSearch.mode.${candidate}`)}
+                selected={mode === candidate}
+                onToggle={() => setMode(candidate)}
               />
-              <StatChip
-                label={t('contractSearch.cheapestLabel')}
-                value={summary.cheapest === null ? '—' : formatIsk(summary.cheapest, 2)}
-              />
-              <StatChip
-                label={t('contractSearch.medianLabel')}
-                value={summary.median === null ? '—' : formatIsk(summary.median, 2)}
-              />
-              <Button size="sm" onClick={clearType}>
-                {t('contractSearch.clearItem')}
-              </Button>
-            </div>
-          )}
-
-          {displayRows.length === 0 ? (
+            ))}
+          </div>
+          {modeRowCount === 0 ? (
+            // Nothing synced for the corpus on screen — distinct from
+            // `noFilterMatches` below, which is "rows exist, the filter just
+            // excludes them all". Per mode, so an empty courier snapshot never
+            // claims the offers never synced either.
             <EmptyState
-              title={t('contractSearch.noFilterMatches')}
-              hint={t('contractSearch.noFilterMatchesHint')}
-              className="py-8"
+              title={t(
+                mode === 'courier'
+                  ? 'contractSearch.courierEmptyTitle'
+                  : 'contractSearch.emptyTitle'
+              )}
+              hint={t(
+                mode === 'courier' ? 'contractSearch.courierEmptyHint' : 'contractSearch.emptyHint'
+              )}
             />
+          ) : mode === 'courier' ? (
+            <CourierResults rows={courierRoutes} regionNames={regionNames} />
           ) : (
             <>
-              <DataTable
-                label={t('contractSearch.title')}
-                columns={columns}
-                rows={visibleRows}
-                // Index included deliberately: one contract lists the same
-                // item once per stack, so contractId+typeId is not unique —
-                // the duplicate React keys left stale rows in the table.
-                rowKey={(row, index) => `${row.contractId}:${row.typeId}:${index}`}
-                defaultSort={{ columnId: 'price', direction: 'asc' }}
+              <ContractSearchFilterBar
+                filter={uiFilter}
+                onChange={changeFilter}
+                regionOptions={regionOptions}
               />
-              {!showAll && displayRows.length > ROW_CAP && (
-                <div className="px-3 py-2">
-                  <Button size="sm" onClick={() => setShowAll(true)}>
-                    {t('contractSearch.showAll', { count: displayRows.length })}
+
+              {suggestions.length > 0 && (
+                <div className="border-b border-line bg-panel-2 px-3 py-2">
+                  <p className="pb-1.5 text-[0.6875rem] font-semibold tracking-widest text-accent uppercase">
+                    {t('contractSearch.suggestionsHeading')}
+                  </p>
+                  <ul
+                    aria-label={t('contractSearch.suggestionsLabel')}
+                    className="max-h-72 overflow-y-auto rounded-xs border border-line-bright bg-panel"
+                  >
+                    {suggestions.map((suggestion) => (
+                      <li key={suggestion.typeId} className="border-b border-line last:border-b-0">
+                        <button
+                          type="button"
+                          onClick={() => selectType(suggestion)}
+                          className="flex min-h-11 w-full items-center justify-between gap-3 px-3 py-2 text-left hover:bg-panel-2 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent md:min-h-9"
+                        >
+                          <span className="truncate">{suggestion.name}</span>
+                          <span className="shrink-0 text-[0.6875rem] text-text-dim">
+                            {t('contractSearch.suggestionOffers', {
+                              count: suggestion.stats.offerCount,
+                            })}
+                            {' · '}
+                            {formatIsk(suggestion.stats.cheapest, 2)}
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {summary !== null && (
+                <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2">
+                  <StatChip
+                    label={t('contractSearch.offersLabel')}
+                    value={summary.offerCount.toLocaleString()}
+                  />
+                  <StatChip
+                    label={t('contractSearch.cheapestLabel')}
+                    value={summary.cheapest === null ? '—' : formatIsk(summary.cheapest, 2)}
+                  />
+                  <StatChip
+                    label={t('contractSearch.medianLabel')}
+                    value={summary.median === null ? '—' : formatIsk(summary.median, 2)}
+                  />
+                  <Button size="sm" onClick={clearType}>
+                    {t('contractSearch.clearItem')}
                   </Button>
                 </div>
+              )}
+
+              {displayRows.length === 0 ? (
+                <EmptyState
+                  title={t('contractSearch.noFilterMatches')}
+                  hint={t('contractSearch.noFilterMatchesHint')}
+                  className="py-8"
+                />
+              ) : (
+                <>
+                  <DataTable
+                    label={t('contractSearch.title')}
+                    columns={columns}
+                    rows={visibleRows}
+                    // Index included deliberately: one contract lists the same
+                    // item once per stack, so contractId+typeId is not unique —
+                    // the duplicate React keys left stale rows in the table.
+                    rowKey={(row, index) => `${row.contractId}:${row.typeId}:${index}`}
+                    defaultSort={{ columnId: 'price', direction: 'asc' }}
+                  />
+                  {!showAll && displayRows.length > ROW_CAP && (
+                    <div className="px-3 py-2">
+                      <Button size="sm" onClick={() => setShowAll(true)}>
+                        {t('contractSearch.showAll', { count: displayRows.length })}
+                      </Button>
+                    </div>
+                  )}
+                </>
               )}
             </>
           )}

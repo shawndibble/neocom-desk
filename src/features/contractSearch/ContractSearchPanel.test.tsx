@@ -10,7 +10,11 @@ import { ContractSearchPanel } from '@/features/contractSearch/ContractSearchPan
 import type { PublicContractOfferRow } from '@/engine/contracts/contractOffers';
 import type { PublicContractOffersSnapshot } from '@/features/contractSearch/publicContractOffers';
 import type { CachedResult } from '@/esi/cache';
-import type { MarketTypeEntry } from '@/sde/marketTypes';
+import type { MarketTypeEntry, NpcStationEntry, SolarSystemEntry } from '@/sde/marketTypes';
+import { clearNpcStationIndex } from '@/sde/npcStations';
+import { clearSolarSystemIndex } from '@/sde/solarSystems';
+import type { PublicCourierContractRow } from '@/engine/contracts/courierSearch';
+import type { PublicCourierContractsSnapshot } from '@/features/contractSearch/publicCourierContracts';
 
 vi.mock('@/app/syncStatus', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/app/syncStatus')>();
@@ -20,6 +24,11 @@ vi.mock('@/app/syncStatus', async (importOriginal) => {
 const loadPublicContractOffers = vi.fn();
 vi.mock('@/features/contractSearch/publicContractOffers', () => ({
   loadPublicContractOffers: (...args: unknown[]) => loadPublicContractOffers(...args),
+}));
+
+const loadPublicCourierContracts = vi.fn();
+vi.mock('@/features/contractSearch/publicCourierContracts', () => ({
+  loadPublicCourierContracts: (...args: unknown[]) => loadPublicCourierContracts(...args),
 }));
 
 const loadRegionName = vi.fn(async (regionId: number) =>
@@ -34,8 +43,24 @@ const CATALOG: MarketTypeEntry[] = [
   { typeId: 35, name: 'Pyerite', marketGroupId: 18 },
   { typeId: 587, name: 'Rifter', marketGroupId: 61 },
 ];
+const JITA = 60003760;
+const AMARR = 60008494;
+/** A player structure: `stations.json` does not hold it, so nothing local names it. */
+const UNKNOWN_STRUCTURE = 1035466617946;
+
+const STATIONS: NpcStationEntry[] = [
+  { id: JITA, name: 'Jita IV - Moon 4 - Caldari Navy Assembly Plant', systemId: 30000142 },
+  { id: AMARR, name: 'Amarr VIII (Oris) - Emperor Family Academy', systemId: 30002187 },
+];
+const SYSTEMS: SolarSystemEntry[] = [
+  { id: 30000142, name: 'Jita', security: 0.9, regionId: 10000002 },
+  { id: 30002187, name: 'Amarr', security: 1, regionId: 10000043 },
+];
+
 vi.mock('@/sde/loadMarketSde', () => ({
   loadMarketTypes: vi.fn(async () => CATALOG),
+  loadNpcStations: vi.fn(async () => STATIONS),
+  loadSolarSystems: vi.fn(async () => SYSTEMS),
 }));
 
 const CHAR_ID = 91;
@@ -65,6 +90,44 @@ const PYERITE_AUCTION = row({
   quantity: 10,
 });
 
+function courierRow(overrides: Partial<PublicCourierContractRow> = {}): PublicCourierContractRow {
+  return {
+    contractId: 500,
+    regionId: 10000002,
+    originLocationId: JITA,
+    destinationLocationId: AMARR,
+    reward: 12_000_000,
+    volume: 60_000,
+    collateral: 900_000_000,
+    daysToComplete: 5,
+    dateExpired: Date.parse('2099-09-10T00:00:00Z'),
+    ...overrides,
+  };
+}
+
+const JITA_TO_AMARR = courierRow();
+/** Pays better, asks for no collateral and states no deadline — and ends somewhere nothing local names. */
+const AMARR_TO_STRUCTURE = courierRow({
+  contractId: 501,
+  regionId: 10000043,
+  originLocationId: AMARR,
+  destinationLocationId: UNKNOWN_STRUCTURE,
+  reward: 30_000_000,
+  collateral: undefined,
+  daysToComplete: undefined,
+});
+
+function cachedCourierSnapshot(
+  rows: PublicCourierContractRow[]
+): CachedResult<PublicCourierContractsSnapshot> {
+  return {
+    data: { rows, lastSyncedAt: Date.parse('2026-09-12T18:30:00Z') },
+    fetchedAt: new Date(),
+    fromCache: false,
+    truncated: false,
+  };
+}
+
 function cachedSnapshot(
   rows: PublicContractOfferRow[]
 ): CachedResult<PublicContractOffersSnapshot> {
@@ -86,6 +149,14 @@ beforeEach(async () => {
   loadPublicContractOffers.mockResolvedValue(
     cachedSnapshot([TRIT_FORGE, TRIT_DOMAIN, PYERITE_AUCTION])
   );
+  loadPublicCourierContracts.mockReset();
+  loadPublicCourierContracts.mockResolvedValue(
+    cachedCourierSnapshot([JITA_TO_AMARR, AMARR_TO_STRUCTURE])
+  );
+  // Both SDE indexes memoize per session, so without this a case that swaps
+  // the snapshot reads the previous case's map.
+  clearNpcStationIndex();
+  clearSolarSystemIndex();
   vi.mocked(isSyncConfigured).mockReturnValue(true);
 });
 
@@ -206,5 +277,104 @@ describe('ContractSearchPanel', () => {
     render(<ContractSearchPanel />);
 
     expect(await screen.findByText('No public contracts synced yet')).toBeInTheDocument();
+  });
+});
+
+describe('ContractSearchPanel — Courier mode', () => {
+  async function showCourier() {
+    const user = userEvent.setup();
+    render(<ContractSearchPanel />);
+    await bodyRows();
+    await user.click(screen.getByRole('button', { name: 'Courier' }));
+    return user;
+  }
+
+  it('lists the hauls with both ends named, best-paying first', async () => {
+    await showCourier();
+
+    const rows = await waitFor(async () => {
+      const found = await bodyRows();
+      expect(found).toHaveLength(2);
+      return found;
+    });
+    expect(within(rows[0]).getByText(/Amarr VIII \(Oris\)/)).toBeInTheDocument();
+    expect(within(rows[1]).getByText(/Jita IV - Moon 4/)).toBeInTheDocument();
+    // Region names come from the same lookup the item results use.
+    expect(within(rows[1]).getAllByText('The Forge').length).toBeGreaterThan(0);
+  });
+
+  it('shows a location nothing local names as its id rather than inventing one', async () => {
+    // Resolving a player structure costs one ESI call per id against an ACL
+    // that usually refuses, so the panel does not try — see courierEndpoints.ts.
+    await showCourier();
+
+    const rows = await waitFor(async () => {
+      const found = await bodyRows();
+      expect(found).toHaveLength(2);
+      return found;
+    });
+    expect(within(rows[0]).getByText(new RegExp(String(UNKNOWN_STRUCTURE)))).toBeInTheDocument();
+  });
+
+  it('says a haul asks for no collateral and states no deadline, rather than showing zeroes', async () => {
+    await showCourier();
+
+    const rows = await waitFor(async () => {
+      const found = await bodyRows();
+      expect(found).toHaveLength(2);
+      return found;
+    });
+    const cells = within(rows[0])
+      .getAllByRole('cell')
+      .map((cell) => cell.textContent);
+    expect(cells).toContain('—');
+  });
+
+  it('swaps the item filters out for route filters, rather than stacking both', async () => {
+    await showCourier();
+
+    expect(await screen.findByPlaceholderText('Search pickup or drop-off…')).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText('Search item name…')).not.toBeInTheDocument();
+  });
+
+  it('narrows the hauls by a route search over either end', async () => {
+    const user = await showCourier();
+    const search = await screen.findByPlaceholderText('Search pickup or drop-off…');
+
+    await user.type(search, 'jita');
+
+    await waitFor(async () => {
+      const rows = await bodyRows();
+      expect(rows).toHaveLength(1);
+      expect(within(rows[0]).getByText(/Jita IV - Moon 4/)).toBeInTheDocument();
+    });
+  });
+
+  it('says so when no haul matches, without claiming nothing synced', async () => {
+    const user = await showCourier();
+    const search = await screen.findByPlaceholderText('Search pickup or drop-off…');
+
+    await user.type(search, 'rens');
+
+    expect(await screen.findByText('No courier contracts match your filters.')).toBeInTheDocument();
+  });
+
+  it('reports an empty courier snapshot on its own terms, not as an empty offers one', async () => {
+    loadPublicCourierContracts.mockResolvedValue(cachedCourierSnapshot([]));
+    await showCourier();
+
+    expect(await screen.findByText('No public courier contracts synced yet')).toBeInTheDocument();
+    // The offers corpus is not empty, and the Items chip is still there to
+    // switch back to it.
+    expect(screen.getByRole('button', { name: 'Items' })).toBeInTheDocument();
+  });
+
+  it('keeps the item results reachable after a trip through Courier', async () => {
+    const user = await showCourier();
+    await screen.findByPlaceholderText('Search pickup or drop-off…');
+
+    await user.click(screen.getByRole('button', { name: 'Items' }));
+
+    expect(await screen.findByPlaceholderText('Search item name…')).toBeInTheDocument();
   });
 });
