@@ -35,7 +35,8 @@ export interface AlertGroupRowProps {
    * whether the device has more than one Character at all.
    */
   showCharacter: boolean;
-  onDismissEntry: (id: string) => void;
+  /** The whole row, not its id: the caller has to know which Character to sync the dismissal under. */
+  onDismissEntry: (entry: NotificationFeedRecord) => void;
 }
 
 export function AlertGroupRow({
@@ -147,7 +148,7 @@ export function AlertGroupRow({
                   ? (nameById.get(entry.characterId) ?? String(entry.characterId))
                   : null
               }
-              onDismiss={() => onDismissEntry(entry.id)}
+              onDismiss={() => onDismissEntry(entry)}
             />
           ))}
         </ul>

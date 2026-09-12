@@ -37,7 +37,8 @@ import {
   isBrowserChannelEnabled,
   isFeedChannelEnabled,
 } from './preferences';
-import { recordFeedEntry, feedHasOccurrence, dismissFeedEntries } from './feed';
+import { feedHasOccurrence } from './feed';
+import { dismissFeedKeysAndSync, recordFeedEntryAndSync } from './feedSync';
 import {
   isEventEnabledFor,
   isEveTypeAllowed,
@@ -129,9 +130,11 @@ export interface PollDependencies {
    * device to honour, so it would simply come back on the next pull. A
    * dismissal is the one thing `mergeFeedRecord` carries across in both
    * directions. Called with keys, not fires, because the row being addressed
-   * may have been written by another party entirely.
+   * may have been written by another party entirely — but still per Character,
+   * since the retraction has to be pushed under that Character's uid
+   * (`feedSync.dismissFeedKeysAndSync`).
    */
-  retractFromFeed: (occurrenceKeys: readonly string[]) => Promise<void>;
+  retractFromFeed: (characterId: number, occurrenceKeys: readonly string[]) => Promise<void>;
   /**
    * This poll's Scheduled Push upload (issue #358, ADR 0010, CONTEXT.md round
    * 45): every Character updated this poll, mapped to its whole 72-hour
@@ -458,8 +461,11 @@ async function runForegroundPollOnce(deps: PollDependencies): Promise<void> {
   // to differ. That is the whole safety argument — running after the delivery
   // loop does not add to it, since `mergeFeedRecord` takes the later
   // `dismissedAt` and so a dismissal sticks whichever order the two land in.
-  const retractedKeys = updates.flatMap((update) => update.retractedKeys);
-  if (retractedKeys.length > 0) await deps.retractFromFeed(retractedKeys);
+  for (const update of updates) {
+    if (update.retractedKeys.length > 0) {
+      await deps.retractFromFeed(update.characterId, update.retractedKeys);
+    }
+  }
 
   await deps.uploadProjection(
     new Map(updates.map((update) => [update.characterId, update.projectionRows]))
@@ -759,7 +765,7 @@ async function recordFeedNotification(
     // reports everything it missed in one poll, and stamping all of it `now`
     // would pile days of history onto one minute at the top of the feed.
     const firedAt = occurrenceFiredAt(fire, now);
-    await recordFeedEntry({
+    await recordFeedEntryAndSync({
       id: occurrenceKey(fire, now),
       characterId: character.characterId,
       eventId: fire.eventId,
@@ -817,7 +823,7 @@ export function liveDependencies(): PollDependencies {
     notify: sendBrowserNotification,
     recordToFeed: recordFeedNotification,
     alreadyDelivered: feedHasOccurrence,
-    retractFromFeed: dismissFeedEntries,
+    retractFromFeed: dismissFeedKeysAndSync,
     uploadProjection: uploadProjectionRows,
   };
 }

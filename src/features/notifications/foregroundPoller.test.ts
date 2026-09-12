@@ -658,7 +658,9 @@ describe('runForegroundPoll', () => {
     now = 3000;
     await runForegroundPoll(deps);
     expect(retractFromFeed).toHaveBeenCalledTimes(1);
-    expect(retractFromFeed.mock.calls[0][0]).toContain(
+    // Per Character, so the retraction can be pushed under that Character's uid.
+    expect(retractFromFeed.mock.calls[0][0]).toBe(CHAR.characterId);
+    expect(retractFromFeed.mock.calls[0][1]).toContain(
       `${CHAR.characterId}:planetaryExtractionDone:40000001:${OLD_EXPIRY}`
     );
   });
