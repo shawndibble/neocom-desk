@@ -112,6 +112,27 @@ describe('buildWorklist', () => {
   });
 
   /**
+   * The rebuild row is an instruction, not a score: a tier and a product name
+   * say what the planet would make, and leave the pilot to work out what to
+   * go and place. The pins travel with it. (This regressed once because the
+   * row was built without them and nothing asserted on it.)
+   */
+  it('carries the tier and the pins a rebuild would be made of', () => {
+    const list = buildWorklist([
+      colony({
+        rebuild: {
+          label: 'Non-CS Crystals',
+          tier: 0,
+          marginPerHour: 388_000,
+          pins: { extractorControlUnit: 3, basic: 10 },
+        },
+      }),
+    ]);
+    expect(list.rebuilds[0]?.tier).toBe(0);
+    expect(list.rebuilds[0]?.pins).toEqual({ extractorControlUnit: 3, basic: 10 });
+  });
+
+  /**
    * A removal that buys nothing is still worth doing — the Powergrid is being
    * held for no reason — but it cannot out-rank a step that earns. It sorts
    * last among tuning steps rather than being dropped or treated as zero ISK.

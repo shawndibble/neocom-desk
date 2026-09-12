@@ -19,6 +19,7 @@ import type { PiData } from '@/sde/types';
 import type { NetworkConversion, NetworkOpportunity } from '@/engine/pi/network';
 import type { PlanetAdvice } from './advisorModel';
 import { colonyPlan } from './colonyPlan';
+import type { IdleFacilityPlan } from './colonyActionModel';
 import { colonyStopTierAdvice } from './stopTierModel';
 import { colonyThroughputCheck } from './colonyThroughput';
 import type { WorklistColony, WorklistIdle, WorklistThroughput } from './worklistModel';
@@ -49,11 +50,10 @@ export interface WorklistAdapterInput {
  * the worklist renders. `fits` means it fits without removing anything, so the
  * two are not one instruction and the removal stands alone.
  */
-function idleOf(
-  plan: ReturnType<typeof colonyPlan>,
+export function idleStepFor(
+  idle: IdleFacilityPlan | null,
   typeNames: ReadonlyMap<number, string>
 ): WorklistIdle | null {
-  const { idle } = plan;
   if (!idle || idle.lines.length === 0) return null;
 
   const pinCount = idle.lines.reduce((sum, line) => sum + line.line.surplusPins, 0);
@@ -68,8 +68,13 @@ function idleOf(
   const { upgrade, wouldFeed } = idle;
   // The resource the binding shortfall is in — the one the heads would pull.
   const shortfall = idle.lines.find((line) => line.gap !== null)?.gap ?? null;
+  // `wouldFeed === 0` means the heads that fit would not bring a single idle
+  // facility back into service. "Add one extractor head, feeds 0 facilities"
+  // is not an instruction — it is the absence of one, and offering it puts a
+  // step worth nothing above steps worth something. The removal still stands
+  // on its own; it just has nothing to pair with.
   const enables =
-    upgrade.status === 'needs-removal' && upgrade.heads > 0 && shortfall !== null
+    upgrade.status === 'needs-removal' && upgrade.heads > 0 && wouldFeed > 0 && shortfall !== null
       ? {
           heads: upgrade.heads,
           unitsPerHour: upgrade.extraPerHour,
@@ -149,7 +154,7 @@ export function worklistColonies(input: WorklistAdapterInput): WorklistColony[] 
         planetId,
         name: entry.name,
         planetType: entry.planetType,
-        idle: idleOf(plan, typeNames),
+        idle: idleStepFor(plan.idle, typeNames),
         opportunities: (input.opportunitiesByHost.get(planetId) ?? []).map((line) => ({
           label: line.name,
           marginPerHour: line.marginPerHour,

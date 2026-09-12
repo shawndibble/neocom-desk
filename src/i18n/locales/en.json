@@ -2142,7 +2142,6 @@
     "customsRateReset": "Reset",
     "customsRateEdited": "Your own figure for this system, kept across your devices. Reset drops it back to the rate derived from the system’s security band and your Customs Code Expertise.",
     "layoutPin": "{{count}}× {{pin}}",
-    "rowAddHeads": "{{heads}} extractor heads on {{name}} — +{{units}}/hr, into the budget that frees up",
     "worklistFeeds_one": "feeds {{count}} facility",
     "worklistFeeds_other": "feeds {{count}} facilities",
     "blindTitle": "What the Advisor cannot see",
@@ -2168,7 +2167,9 @@
     "networkBlockedMore": "+{{count}} more",
     "summaryGainsOnly_one": "{{count}} step below earns more without fixing anything.",
     "summaryGainsOnly_other": "{{count}} steps below earn more without fixing anything.",
-    "rowRebuildAround": "{{name}} (P{{tier}}) — {{layout}}"
+    "rowRebuildAround": "{{name}} (P{{tier}}) — {{layout}}",
+    "rowAddHeads_one": "{{count}} extractor head on {{name}} — +{{units}}/hr, into the budget that frees up",
+    "rowAddHeads_other": "{{count}} extractor heads on {{name}} — +{{units}}/hr, into the budget that frees up"
   },
   "employmentHistory": {
     "title": "Employment",

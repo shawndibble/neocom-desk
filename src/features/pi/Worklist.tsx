@@ -88,7 +88,7 @@ function Step({ row }: { row: WorklistRow }) {
     return (
       <>
         {t('piAdvisor.rowAddHeads', {
-          heads: row.heads ?? 0,
+          count: row.heads ?? 0,
           units: Math.round(row.unitsPerHour ?? 0).toLocaleString(),
           name: row.label,
         })}
