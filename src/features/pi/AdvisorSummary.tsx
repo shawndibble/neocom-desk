@@ -14,6 +14,15 @@
  * carries only what is genuinely cumulative, and the rebuild figure sits below
  * a rule with a sentence saying it is an alternative.
  *
+ * ## A fault is not an opportunity
+ *
+ * The first card counts what is *wrong* — facilities nothing feeds, colonies
+ * that fill before the pilot returns. It used to count the whole worklist,
+ * which folded in every `add` and `swap`: those earn more, but nothing about
+ * them is broken, and a page that opens "4 things to put right" when two of
+ * them are optional purchases has misread its own question. The steps that
+ * merely earn are counted separately, in a quieter line.
+ *
  * ## A partial total says so
  *
  * `totalColonyEarnings` counts the colonies it could not price rather than
@@ -29,8 +38,6 @@ import type { Worklist } from './worklistModel';
 export interface AdvisorSummaryProps {
   list: Worklist;
   earnings: TotalColonyEarnings;
-  /** How many planets the tuning steps are spread across. */
-  planetCount: number;
 }
 
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
@@ -46,10 +53,15 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
   );
 }
 
-export function AdvisorSummary({ list, earnings, planetCount }: AdvisorSummaryProps) {
+export function AdvisorSummary({ list, earnings }: AdvisorSummaryProps) {
   const { t } = useTranslation();
   const { tuning, rebuilds } = list;
 
+  // `remove` and `haul` are faults: something is running that nothing feeds,
+  // or the colony has stopped because it filled up. `add` and `swap` are
+  // opportunities — worth doing, but not wrong.
+  const faults = tuning.filter((row) => row.verb === 'remove' || row.verb === 'haul');
+  const gains = tuning.length - faults.length;
   const tuningIsk = tuning.reduce((sum, row) => sum + (row.iskPerHour ?? 0), 0);
   const rebuildIsk = rebuilds.reduce((sum, row) => sum + (row.iskPerHour ?? 0), 0);
   const now = earnings.iskPerHour;
@@ -57,20 +69,27 @@ export function AdvisorSummary({ list, earnings, planetCount }: AdvisorSummaryPr
   return (
     <div className="grid gap-3 md:grid-cols-2">
       <Card title={t('piAdvisor.summaryFaultsTitle')}>
-        {tuning.length === 0 ? (
+        {faults.length === 0 ? (
           <p className="text-xs text-text-dim">{t('piAdvisor.summaryFaultsNone')}</p>
         ) : (
           <div className="flex items-baseline gap-2.5">
             <span className="text-3xl leading-none font-semibold text-warning tabular-nums">
-              {tuning.length}
+              {faults.length}
             </span>
             <span className="text-xs leading-snug text-text-dim">
               {t('piAdvisor.summaryFaultsBody', {
-                count: tuning.length,
-                planets: t('piAdvisor.summaryPlanets', { count: planetCount }),
+                count: faults.length,
+                planets: t('piAdvisor.summaryPlanets', {
+                  count: new Set(faults.map((row) => row.planetId)).size,
+                }),
               })}
             </span>
           </div>
+        )}
+        {gains > 0 && (
+          <p className="mt-auto text-[0.6875rem] text-text-dim">
+            {t('piAdvisor.summaryGainsOnly', { count: gains })}
+          </p>
         )}
       </Card>
 

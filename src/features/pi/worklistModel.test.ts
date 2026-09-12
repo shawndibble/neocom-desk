@@ -57,7 +57,12 @@ describe('buildWorklist', () => {
     const list = buildWorklist([
       colony({
         opportunities: [{ label: 'Biocells', marginPerHour: 71_200 }],
-        rebuild: { label: 'Non-CS Crystals', tier: 0, marginPerHour: 388_000 },
+        rebuild: {
+          label: 'Non-CS Crystals',
+          tier: 0,
+          marginPerHour: 388_000,
+          pins: { extractorControlUnit: 3, basic: 10 },
+        },
       }),
     ]);
     expect(list.tuning).toHaveLength(1);

@@ -2150,11 +2150,11 @@
     "blindNone": "Nothing is missing: every colony reports a complete set of programs, and every product the planets could make is priced.",
     "blindTag": "No data",
     "summaryFaultsTitle": "What is not working",
-    "summaryFaultsNone": "Nothing. Every facility is fed and every colony holds what it digs up until you come back.",
+    "summaryFaultsNone": "No faults. Every facility is fed, and every colony holds what it digs up until you come back.",
     "summaryFaultsCount_one": "{{count}} step",
     "summaryFaultsCount_other": "{{count}} steps",
-    "summaryFaultsBody_one": "{{count}} thing to put right, on {{planets}}.",
-    "summaryFaultsBody_other": "{{count}} things to put right, across {{planets}}.",
+    "summaryFaultsBody_one": "{{count}} fault to put right, on {{planets}}.",
+    "summaryFaultsBody_other": "{{count}} faults to put right, across {{planets}}.",
     "summaryPlanets_one": "{{count}} colony",
     "summaryPlanets_other": "{{count}} colonies",
     "summaryEarnTitle": "What more you could earn",
@@ -2164,7 +2164,11 @@
     "summaryEarnTuningNone": "Nothing to add without tearing a colony down.",
     "summaryEarnRebuild": "{{isk}} ISK/hr instead, rebuilding {{count}} from scratch.",
     "summaryEarnRebuildHint": "A separate plan, measured from the same starting point — never added to the steps above.",
-    "summaryEarnPartial": "{{count}} left out of the total: no measured extraction."
+    "summaryEarnPartial": "{{count}} left out of the total: no measured extraction.",
+    "networkBlockedMore": "+{{count}} more",
+    "summaryGainsOnly_one": "{{count}} step below earns more without fixing anything.",
+    "summaryGainsOnly_other": "{{count}} steps below earn more without fixing anything.",
+    "rowRebuildAround": "{{name}} (P{{tier}}) — {{layout}}"
   },
   "employmentHistory": {
     "title": "Employment",

@@ -62,9 +62,9 @@ import { loadPlanPrices } from './planPrices';
 import { clearPlanetRichness, scheduleSync, setPlanetRichness, setSyncedSetting } from '@/sync';
 import { ResourcePicker } from './ResourcePicker';
 import { assumedExtractionRate, type AssumedRate } from './richnessEstimate';
-import type { PiData, PiPinKind } from '@/sde/types';
+import type { PiData } from '@/sde/types';
 import type { CharacterPlanet, CharacterPlanetDetail, PlanetType } from '@/esi/endpoints';
-import type { PinCounts, PinLoad } from '@/engine/pi/types';
+import type { PinLoad } from '@/engine/pi/types';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
 import {
   loadSystemName,
@@ -101,7 +101,7 @@ import { extractorProgramsFromPins } from './adapters';
 import { colonyNetwork } from './networkModel';
 import { NetworkPanel } from './NetworkPanel';
 import { ColonyDetail } from './ColonyDetailModal';
-import { useColonyPlan } from './colonyPlan';
+import { layoutLabel, useColonyPlan } from './colonyPlan';
 import { DirectiveRow, EstimateBadge, LoadMeter, SectionLabel } from './DirectiveRow';
 import { medianNewLinkLoad, unbuiltPlanAdvice, type UnbuiltPlanAdvice } from './unbuiltPlanModel';
 import { useMarketSourcing, type MarketSourcing } from './marketSourcingPref';
@@ -871,21 +871,6 @@ function UnbuiltCard({
  * one line on the card that has to stay scannable — `buildPlanBasis` carries
  * the rest.
  */
-const LAYOUT_KINDS: readonly PiPinKind[] = [
-  'extractorControlUnit',
-  'basic',
-  'advanced',
-  'highTech',
-];
-
-function layoutLabel(pins: PinCounts, t: TFunction): string {
-  return LAYOUT_KINDS.filter((kind) => (pins[kind] ?? 0) > 0)
-    .map((kind) =>
-      t('piAdvisor.layoutPin', { count: pins[kind], pin: t(`piAdvisor.pinKind.${kind}`) })
-    )
-    .join(' → ');
-}
-
 function UnbuiltPlanLines({ plan }: { plan: UnbuiltPlanAdvice }) {
   const { t } = useTranslation();
   if (plan.status !== 'advised') {
@@ -1561,7 +1546,7 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
         planets' figures in one column. The cards survive below it as the
         per-planet reference they are good at being.
       */}
-      <AdvisorSummary list={worklist} earnings={earnings} planetCount={builtHere.length} />
+      <AdvisorSummary list={worklist} earnings={earnings} />
 
       <Panel title={t('piAdvisor.worklistTitle')}>
         <Worklist list={worklist} />

@@ -66,6 +66,11 @@ function groupBlockers(
   const order: NetworkBlocker[] = [];
   const byReason = new Map<NetworkBlocker, string[]>();
   for (const line of lines) {
+    // `inputs-spoken-for` says the greedy allocator gave this product's inputs
+    // to a better-paying one — i.e. the plan already made the better choice.
+    // There is nothing for a pilot to do about it, and a non-problem sitting in
+    // a list of real ones dilutes every line around it.
+    if (line.reason === 'inputs-spoken-for') continue;
     if (!byReason.has(line.reason)) {
       order.push(line.reason);
       byReason.set(line.reason, []);
@@ -76,21 +81,35 @@ function groupBlockers(
 }
 
 /**
- * The count itself, not a partial name list: "+18 more" still leaves the
- * question of which 18. The dotted underline + cursor-help is the only hint
- * this is a trigger — the tooltip carries every name in the group.
+ * The names, in the row.
+ *
+ * This was a count behind a tooltip — "1 product", dotted-underlined, with the
+ * name only on hover. Every reason here is a real "not optimized" signal, and
+ * `network.ts` has carried the name alongside the reason all along, so hiding
+ * it behind a gesture meant the signal was read by nobody who did not already
+ * know to hover. A long group still truncates, but it truncates *names*, which
+ * leaves a reader with something to act on rather than a number to interrogate.
  */
-function BlockedGroupCount({ names }: { names: string[] }) {
+const NAMES_SHOWN = 4;
+
+function BlockedNames({ names }: { names: string[] }) {
   const { t } = useTranslation();
+  const shown = names.slice(0, NAMES_SHOWN);
+  const rest = names.length - shown.length;
   return (
-    <Tooltip content={names.join(', ')} openOnTap>
-      <button
-        type="button"
-        className="cursor-help underline decoration-dotted decoration-text-dim underline-offset-2 hover:text-text focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
-      >
-        {t('piAdvisor.networkBlockedCount', { count: names.length })}
-      </button>
-    </Tooltip>
+    <span className="text-text">
+      {shown.join(', ')}
+      {rest > 0 && (
+        <Tooltip content={names.slice(NAMES_SHOWN).join(', ')} openOnTap>
+          <button
+            type="button"
+            className="ml-1 cursor-help underline decoration-dotted decoration-text-dim underline-offset-2 hover:text-text focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
+          >
+            {t('piAdvisor.networkBlockedMore', { count: rest })}
+          </button>
+        </Tooltip>
+      )}
+    </span>
   );
 }
 
@@ -235,7 +254,7 @@ export function NetworkPanel({
             <ul className="space-y-0.5 text-[0.6875rem] text-text-dim">
               {groupBlockers(blockers).map(({ reason, names }) => (
                 <li key={reason}>
-                  <BlockedGroupCount names={names} />{' '}
+                  <BlockedNames names={names} />{' '}
                   {t('piAdvisor.networkBlockedSuffix', {
                     reason: t(`piAdvisor.networkBlockedReason.${reason}`),
                   })}
