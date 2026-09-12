@@ -1,19 +1,14 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, FilterChip, IconButton, Modal, TextInput } from '@/components/ui';
+import { Button, FilterChip, Modal, TextInput } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import type { MiningTaxAssignmentRecord, MiningTaxPaymentMethod } from '@/db';
-import { invalidateFreshness } from '@/esi/cache';
-import type { WalletJournalEntry } from '@/esi/endpoints';
-import { loadWalletJournal } from '@/features/character/wallet';
-import { humanizeRefType } from '@/features/character/format';
 import { writeToClipboard } from '@/lib/clipboard';
 import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
 import { formatLocalDate } from '@/lib/localDate';
 import { markAssignmentsPaid } from './assignments';
 import { formatDateRange } from './groupRows';
-import { amountMatches, findPaymentCandidates } from './paymentMatches';
 
 export interface SettleUpRow {
   assignment: MiningTaxAssignmentRecord;
@@ -30,7 +25,7 @@ interface SettleUpDialogProps {
   onPaid: () => void;
 }
 
-type Step = 1 | 2 | 3;
+type Step = 1 | 2;
 /** Which of step 2's three copyable figures just went to the clipboard. */
 type CopyTarget = 'amount' | 'recipient' | 'reason';
 const METHODS: readonly MiningTaxPaymentMethod[] = ['donation', 'contract', 'other'];
@@ -40,10 +35,17 @@ const METHODS: readonly MiningTaxPaymentMethod[] = ['donation', 'contract', 'oth
  * bulk-pay confirmation): (1) the itemized entries with tick/untick and a
  * running total — the decision doc's "never a blind mark-all-paid" rule;
  * (2) the exact whole-ISK amount to send in the EVE client, copyable, with
- * the Payee name and a reason string, since the app cannot move ISK;
- * (3) record it — paid-on date, method, and an optional link to a recent
- * outgoing wallet-journal entry the app already caches. Steps 2 and 3 are
- * skippable for the quick case.
+ * the Payee name and a reason string, since the app cannot move ISK, plus
+ * recording the paid-on date and method once it's sent.
+ *
+ * This used to end with a third step offering to link the payment to a
+ * cached wallet-journal entry, but ESI's journal lags too far behind for that
+ * entry to exist yet at settle-up time — searching it always came up empty.
+ * A mining tax figure is specific enough (exact ISK, EVE day, and now method)
+ * that `paymentLinks.ts`'s existing "paying backwards" matcher can find the
+ * real transaction and attach it once ESI actually shows it, so this dialog
+ * no longer tries to link at pay time. Step 2 stays skippable via "Just mark
+ * paid" for the quick case.
  */
 export function SettleUpDialog({ open, onClose, rows, systemNames, onPaid }: SettleUpDialogProps) {
   const { t } = useTranslation();
@@ -53,8 +55,6 @@ export function SettleUpDialog({ open, onClose, rows, systemNames, onPaid }: Set
   const [paidOn, setPaidOn] = useState(() => formatLocalDate(new Date()));
   const [method, setMethod] = useState<MiningTaxPaymentMethod>('donation');
   const [contractId, setContractId] = useState('');
-  const [journalRefId, setJournalRefId] = useState<number | null>(null);
-  const [candidates, setCandidates] = useState<WalletJournalEntry[] | null>(null);
   const [copied, setCopied] = useState<CopyTarget | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -78,28 +78,6 @@ export function SettleUpDialog({ open, onClose, rows, systemNames, onPaid }: Set
     systems: systems.join('/'),
     range: dateRange,
   });
-
-  // Step 3 only: the paying character(s)' cached journal, narrowed to what
-  // could be this payment. Not on open — most settle-ups never get here.
-  useEffect(() => {
-    if (step !== 3 || candidates !== null) return;
-    let cancelled = false;
-    const characterIds = [...new Set(included.map((r) => r.assignment.characterId))];
-    void Promise.all(characterIds.map((id) => loadWalletJournal(id))).then((results) => {
-      if (cancelled) return;
-      const entries = results.flatMap((result) => result?.data ?? []);
-      setCandidates(findPaymentCandidates(entries, amountToSend, new Date()));
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [step, candidates, included, amountToSend]);
-
-  /** Manual re-fetch (issue: the payment just sent in step 2 may not have posted to ESI's journal yet). Bypasses the freshness window the same way any other Refresh button does. */
-  function refreshJournal() {
-    invalidateFreshness();
-    setCandidates(null);
-  }
 
   function toggle(id: string) {
     setExcluded((previous) => {
@@ -131,7 +109,6 @@ export function SettleUpDialog({ open, onClose, rows, systemNames, onPaid }: Set
               paidOn,
               method,
               amount: amountToSend,
-              ...(journalRefId !== null ? { journalRefId } : {}),
               ...(method === 'contract' &&
               contractId.trim() !== '' &&
               Number.isFinite(parsedContract)
@@ -187,7 +164,6 @@ export function SettleUpDialog({ open, onClose, rows, systemNames, onPaid }: Set
         <div className="flex flex-wrap gap-x-4 gap-y-1">
           {stepLabel(1, t('miningTax.settleUpStep1'))}
           {stepLabel(2, t('miningTax.settleUpStep2'))}
-          {stepLabel(3, t('miningTax.settleUpStep3'))}
         </div>
 
         {step === 1 && (
@@ -283,23 +259,8 @@ export function SettleUpDialog({ open, onClose, rows, systemNames, onPaid }: Set
               </div>
             </div>
             <p className="text-[0.6875rem] text-text-dim">{t('miningTax.settleUpPayHint')}</p>
-            <div className="flex flex-wrap gap-2 pt-1">
-              <Button variant="primary" size="sm" onClick={() => setStep(3)}>
-                {t('miningTax.settleUpNextRecord')}
-              </Button>
-              <Button size="sm" disabled={saving} onClick={() => void commit(false)}>
-                {t('miningTax.settleUpJustMarkPaid')}
-              </Button>
-              <Button size="sm" onClick={() => setStep(1)}>
-                {t('miningTax.settleUpBack')}
-              </Button>
-            </div>
-          </>
-        )}
 
-        {step === 3 && (
-          <>
-            <div className="flex flex-col gap-3 sm:flex-row">
+            <div className="flex flex-col gap-3 pt-1 sm:flex-row">
               <div className="space-y-1 sm:w-40 sm:shrink-0">
                 <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
                   {t('miningTax.settleUpPaidOnLabel')}
@@ -345,81 +306,7 @@ export function SettleUpDialog({ open, onClose, rows, systemNames, onPaid }: Set
                 />
               </div>
             )}
-            <div className="space-y-1">
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                  {t('miningTax.settleUpJournalLabel')}
-                </p>
-                <IconButton
-                  variant="plain"
-                  size="sm"
-                  icon={<Icon.Refresh />}
-                  label={t('miningTax.settleUpJournalRefresh')}
-                  onClick={refreshJournal}
-                  disabled={candidates === null}
-                />
-              </div>
-              {candidates === null ? (
-                <p className="text-xs text-text-dim">{t('common.loading')}</p>
-              ) : candidates.length === 0 ? (
-                <p className="text-xs text-text-dim">{t('miningTax.settleUpJournalEmpty')}</p>
-              ) : (
-                <ul className="divide-y divide-line rounded-xs border border-line bg-panel-2">
-                  <li>
-                    <label className="flex cursor-pointer items-center gap-2 px-2 py-1.5 text-xs">
-                      <input
-                        type="radio"
-                        name="journal-link"
-                        checked={journalRefId === null}
-                        onChange={() => setJournalRefId(null)}
-                      />
-                      <span className="text-text-dim">{t('miningTax.settleUpJournalNone')}</span>
-                    </label>
-                  </li>
-                  {candidates.map((entry) => {
-                    const match = amountMatches(entry, amountToSend);
-                    return (
-                      <li key={entry.id}>
-                        <label
-                          className={cx(
-                            'flex cursor-pointer items-center gap-2 px-2 py-1.5 text-xs',
-                            match && 'border-l border-accent'
-                          )}
-                        >
-                          <input
-                            type="radio"
-                            name="journal-link"
-                            checked={journalRefId === entry.id}
-                            onChange={() => setJournalRefId(entry.id)}
-                          />
-                          <span className="flex min-w-0 flex-1 flex-col">
-                            <span className="tabular-nums">
-                              {formatIsk(entry.amount ?? 0)} ISK · {entry.date.slice(0, 10)}
-                            </span>
-                            <span className="truncate text-text-dim">
-                              {humanizeRefType(entry.ref_type)}
-                              {entry.reason ? ` · ${entry.reason}` : ''}
-                            </span>
-                          </span>
-                          {match && (
-                            <span className="shrink-0 text-[0.6875rem] font-semibold tracking-widest text-success uppercase">
-                              {t('miningTax.settleUpJournalMatch')}
-                            </span>
-                          )}
-                        </label>
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-              <p className="text-[0.6875rem] text-text-dim">{t('miningTax.settleUpJournalHint')}</p>
-            </div>
-            <p className="text-xs">
-              {t('miningTax.settleUpSummary', {
-                count: included.length,
-                amount: `${formatIsk(total)} ISK`,
-              })}
-            </p>
+
             <div className="flex flex-wrap gap-2 pt-1">
               <Button
                 variant="primary"
@@ -429,7 +316,10 @@ export function SettleUpDialog({ open, onClose, rows, systemNames, onPaid }: Set
               >
                 {t('miningTax.settleUpRecordAction')}
               </Button>
-              <Button size="sm" onClick={() => setStep(2)}>
+              <Button size="sm" disabled={saving} onClick={() => void commit(false)}>
+                {t('miningTax.settleUpJustMarkPaid')}
+              </Button>
+              <Button size="sm" onClick={() => setStep(1)}>
                 {t('miningTax.settleUpBack')}
               </Button>
             </div>
