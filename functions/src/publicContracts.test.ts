@@ -15,6 +15,7 @@ import {
   PUBLIC_BPC_CONTRACTS_COLLECTION,
   PUBLIC_CONTRACT_ITEMS_CHUNK_SIZE,
   PUBLIC_CONTRACT_ITEMS_COLLECTION,
+  type PublicContractItemRow,
 } from './publicContracts.js';
 
 // Column order and sample values verified against a live EVE Ref
@@ -376,13 +377,15 @@ describe('compactContractItemRow', () => {
     });
   });
 
-  it('treats a blueprint original as a plain item: no copy flag, no runs', () => {
-    // A BPO carries is_blueprint_copy=false and runs=-1; the flag is about
-    // copy-ness, and -1 runs is not a number any search should be offered.
+  it('keeps a blueprint original unflagged and runless, but keeps its research', () => {
+    // A BPO carries is_blueprint_copy=false and runs=-1. The flag is about
+    // copy-ness so it stays off, and -1 runs is not a number any search
+    // should be offered — but a researched BPO's ME/TE is real information a
+    // buyer pays for, so it is not thrown away with the -1.
     const row = compactContractItemRow(blueprintOriginal, parent);
     expect(row).not.toHaveProperty('isBlueprintCopy');
     expect(row).not.toHaveProperty('runs');
-    expect(row?.typeId).toBe(32858);
+    expect(row).toMatchObject({ typeId: 32858, me: 10, te: 20 });
   });
 
   it('carries the parent buyout through when there is one', () => {
@@ -477,13 +480,41 @@ describe('filterAndCompactPublicContractItems', () => {
 });
 
 describe('sortContractItemRows', () => {
+  const row = (fields: Partial<PublicContractItemRow>) =>
+    fields as NonNullable<ReturnType<typeof compactContractItemRow>>;
+
   it('orders by contract then type, in place, independent of input order', () => {
-    const row = (contractId: number, typeId: number) =>
-      ({ contractId, typeId }) as NonNullable<ReturnType<typeof compactContractItemRow>>;
-    const rows = [row(2, 10), row(1, 99), row(1, 5)];
+    const rows = [
+      row({ contractId: 2, typeId: 10 }),
+      row({ contractId: 1, typeId: 99 }),
+      row({ contractId: 1, typeId: 5 }),
+    ];
 
     expect(sortContractItemRows(rows)).toBe(rows);
     expect(rows.map((r) => `${r.contractId}:${r.typeId}`)).toEqual(['1:5', '1:99', '2:10']);
+  });
+
+  it('breaks a same-contract, same-type tie rather than leaving CSV order to decide', () => {
+    // One contract listing the same type twice is routine once every item
+    // type is in scope — two ore stacks, or two copies of one blueprint at
+    // different ME. Without a tie-break, EVE Ref re-emitting those two lines
+    // in the other order rewrites the chunk doc with identical data.
+    const rows = [
+      row({ contractId: 1, typeId: 34, quantity: 500 }),
+      row({ contractId: 1, typeId: 34, quantity: 100 }),
+      row({ contractId: 1, typeId: 32858, quantity: 1, me: 10, te: 20, runs: 3 }),
+      row({ contractId: 1, typeId: 32858, quantity: 1, me: 2, te: 4, runs: 3 }),
+    ];
+
+    expect(
+      sortContractItemRows([...rows].reverse()).map((r) => [r.typeId, r.quantity, r.me])
+    ).toEqual(sortContractItemRows(rows).map((r) => [r.typeId, r.quantity, r.me]));
+    expect(rows.map((r) => `${r.typeId}/${r.quantity}/${r.me ?? '-'}`)).toEqual([
+      '34/100/-',
+      '34/500/-',
+      '32858/1/2',
+      '32858/1/10',
+    ]);
   });
 });
 
@@ -496,9 +527,14 @@ describe('public contract items snapshot sizing', () => {
     // The generalized snapshot holds ~3x the rows, so reusing the 2000-row
     // chunk would triple the per-sync write count against a shared 20k/day
     // free-tier budget. A larger chunk trades write count for doc size, and
-    // the ceiling is Firestore's 1MiB: at the blueprint snapshot's measured
-    // ~185 bytes/row, even an all-blueprint chunk stays near half of it.
+    // the ceiling is Firestore's 1MiB. WORST_CASE_ROW_BYTES is the measured
+    // ~185 bytes of a blueprint row in the older snapshot plus the
+    // `isBlueprintCopy` field this one adds; a chunk of nothing but those
+    // still leaves ~40% of the document limit spare.
+    const WORST_CASE_ROW_BYTES = 210;
     expect(PUBLIC_CONTRACT_ITEMS_CHUNK_SIZE).toBeGreaterThan(DEFAULT_CHUNK_SIZE);
-    expect(PUBLIC_CONTRACT_ITEMS_CHUNK_SIZE * 185).toBeLessThan(0.6 * 1024 * 1024);
+    expect(PUBLIC_CONTRACT_ITEMS_CHUNK_SIZE * WORST_CASE_ROW_BYTES).toBeLessThan(
+      0.65 * 1024 * 1024
+    );
   });
 });

@@ -28,10 +28,16 @@ runs: 0` onto roughly two thirds of the snapshot — bytes against the 1MiB
   Copy-ness is carried by an explicit `isBlueprintCopy?: true`, present only
   when true, so a reader asks for the flag instead of inferring it from
   `runs`. The flag means _copy_: a blueprint original carries
-  `is_blueprint_copy=false` and `runs=-1` and is a plain item row here.
-- **3,000 rows/chunk, against the blueprint snapshot's 2,000.** At the
-  measured ~185 bytes/row a 3,000-row chunk is ~555KB even if every row is a
-  blueprint — well under 1MiB — while keeping the write count down. The
+  `is_blueprint_copy=false` and `runs=-1`, so it gets no flag and no `runs`
+  — but its ME/TE is kept, because a researched BPO's research level is real
+  information a buyer pays for and dropping it would need a re-sync to
+  recover. Presence of `me`/`te` therefore means "a blueprint of some kind";
+  `isBlueprintCopy` means "a copy specifically".
+- **3,000 rows/chunk, against the blueprint snapshot's 2,000.** The blueprint
+  snapshot measured ~185 bytes/row; a blueprint row here carries the extra
+  `isBlueprintCopy` field, so the worst case is ~210 bytes/row and a chunk of
+  nothing but blueprints is ~615KB — under two thirds of the 1MiB limit,
+  with most rows (plain items, no ME/TE/runs) smaller than that. The
   binding constraint is the free tier's 20,000 writes/day, which is the
   _project's_ budget: `dispatchProjections` runs 288x/day and the blueprint
   sync 48x/day alongside. ~370k rows at 3,000/chunk is ~124 docs x 48 runs ≈
@@ -51,3 +57,10 @@ runs: 0` onto roughly two thirds of the snapshot — bytes against the 1MiB
   validation checkpoint is deliberate and cheap: the function logs
   `rowCount`, so the first live runs say what the real volume is and these
   numbers can come down.
+- **A fourth Cloud Scheduler job is accepted.** ADR 0013 budgeted its own job
+  against the 3 free per billing account (`dispatchProjections`,
+  `purgeNotificationFeed`, `syncPublicBpcContracts`), and running the two
+  syncs side by side spends a fourth. It costs cents a month and reverts to 3
+  when #907 retires the blueprint-only sync — the alternative, folding both
+  snapshots into one scheduled function, couples an expand step to the
+  contract step that is supposed to be able to fail independently.

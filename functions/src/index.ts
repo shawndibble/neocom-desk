@@ -501,6 +501,10 @@ export const syncPublicBpcContracts = onSchedule(
  * OOM-looping silently after deploy); over-provisioning costs pennies on a
  * 48-runs/day cron. The `rowCount` logged below is the checkpoint: the first
  * live runs say what the real volume is, and these numbers can come down.
+ *
+ * This is also the deployment's fourth Cloud Scheduler job, past the 3 free
+ * per billing account that ADR 0013 budgeted against — a few cents a month,
+ * and it goes back to 3 when #907 retires the blueprint-only sync.
  */
 export const syncPublicContractItems = onSchedule(
   { schedule: 'every 30 minutes', memory: '2GiB', timeoutSeconds: 540 },
@@ -524,7 +528,7 @@ export const syncPublicContractItems = onSchedule(
 
     logInfo('public contract items sync', {
       eligibleContracts: eligibleContracts.size,
-      rows: rows.length,
+      rowCount: rows.length,
     });
 
     // The lookup is dead once the join is done, and it is ~50k objects the

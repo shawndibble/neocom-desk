@@ -253,16 +253,19 @@ export const PUBLIC_BPC_CONTRACTS_META_DOC = 'meta';
  * `publicBpcContracts` snapshot keeps serving BPC Sourcing until #907 moves
  * it over — so this is a second shape alongside it, not a replacement of it.
  *
- * ME/TE/runs are present only on a blueprint copy. `Number('')` is 0, not
- * NaN, and a plain item line leaves all three columns blank: converting them
- * unconditionally would stamp `me: 0, te: 0, runs: 0` onto every ore stack in
- * the snapshot — bytes on the ~2/3 of rows that are not blueprints, and an
- * "ME 0" filter that matches all of them.
+ * ME/TE/runs are blueprint-only columns, blank on a plain item line, and
+ * `Number('')` is 0 rather than NaN — converting them unconditionally would
+ * stamp `me: 0, te: 0, runs: 0` onto every ore stack in the snapshot: bytes
+ * on the ~2/3 of rows that are not blueprints, and an "ME 0" filter that
+ * matches all of them. Each is therefore carried only when the column
+ * actually holds a number.
  *
- * `isBlueprintCopy` is likewise present only when true, so a reader asks for
- * the flag rather than inferring copy-ness from the presence of `runs`. It
- * means *copy*, not *blueprint*: a blueprint original carries
- * `is_blueprint_copy=false` and `runs=-1`, and is a plain item row here.
+ * That is a separate question from `isBlueprintCopy`, which is present only
+ * when true and means *copy*, not *blueprint*. A blueprint original is a
+ * plain row with no flag — but a researched BPO's ME/TE is real, saleable
+ * information, so it rides along like any other blueprint's. `runs` does not:
+ * a BPO's is `-1` ("infinite"), which is not a number any search should be
+ * offered, so only a finite non-negative count is kept.
  */
 export interface PublicContractItemRow {
   contractId: number;
@@ -298,6 +301,10 @@ export function compactContractItemRow(
 ): PublicContractItemRow | null {
   if (item.is_included !== 'true') return null;
 
+  const me = blueprintColumn(item.material_efficiency);
+  const te = blueprintColumn(item.time_efficiency);
+  const runs = blueprintColumn(item.runs);
+
   return {
     contractId: contract.contractId,
     regionId: contract.regionId,
@@ -307,21 +314,40 @@ export function compactContractItemRow(
     ...(contract.buyout === undefined ? {} : { buyout: contract.buyout }),
     isAuction: contract.isAuction,
     quantity: Number(item.quantity),
-    ...(item.is_blueprint_copy === 'true'
-      ? {
-          isBlueprintCopy: true as const,
-          me: Number(item.material_efficiency),
-          te: Number(item.time_efficiency),
-          runs: Number(item.runs),
-        }
-      : {}),
+    ...(item.is_blueprint_copy === 'true' ? { isBlueprintCopy: true as const } : {}),
+    ...(me === undefined ? {} : { me }),
+    ...(te === undefined ? {} : { te }),
+    ...(runs === undefined || runs < 0 ? {} : { runs }),
     dateExpired: contract.dateExpired,
   };
 }
 
-/** Same deterministic order as `sortBpcRows`, over the generalized rows. */
+/** One of the blueprint-only CSV columns: a number, or absent (blank or unparsable). */
+function blueprintColumn(value: string): number | undefined {
+  if (value === '') return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+/**
+ * Deterministic order, in place. `byContractThenType` alone is not a total
+ * order here the way it effectively was on the blueprint-only rows: one
+ * contract routinely lists the same type twice — two stacks of the same ore,
+ * two copies of one blueprint at different ME — and a tie there falls back to
+ * the CSV's incidental row order, which is what the sort exists to defeat.
+ * Tie-breaking down to the last distinguishing field means the only rows left
+ * in an unspecified order are ones that serialize identically, so the chunk
+ * doc's content is the same either way.
+ */
 export function sortContractItemRows(rows: PublicContractItemRow[]): PublicContractItemRow[] {
-  return rows.sort(byContractThenType);
+  return rows.sort(
+    (a, b) =>
+      byContractThenType(a, b) ||
+      a.quantity - b.quantity ||
+      (a.me ?? -1) - (b.me ?? -1) ||
+      (a.te ?? -1) - (b.te ?? -1) ||
+      (a.runs ?? -1) - (b.runs ?? -1)
+  );
 }
 
 /**
@@ -345,8 +371,11 @@ export function filterAndCompactPublicContractItems(
  * holds ~3x the rows:
  *
  * - Firestore's 1MiB per document. The blueprint snapshot measured ~370KB per
- *   2,000 rows (~185 bytes/row) and these rows are no larger — most carry no
- *   ME/TE/runs at all — so 3,000 is ~555KB even in an all-blueprint chunk.
+ *   2,000 rows (~185 bytes/row); a blueprint row here carries an extra
+ *   `isBlueprintCopy` field on top of that, so budget ~210 bytes/row and an
+ *   all-blueprint chunk of 3,000 comes to ~615KB. Most rows are smaller —
+ *   plain items carry no ME/TE/runs at all — so that is the ceiling, not the
+ *   expectation.
  * - The free tier's 20,000 writes/day, which is the *project's* budget, not
  *   this job's: `dispatchProjections` runs 288x/day beside it and the
  *   blueprint sync another 48. At ~370k rows this chunks to ~124 docs x 48

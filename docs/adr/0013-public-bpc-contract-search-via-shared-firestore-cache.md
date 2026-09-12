@@ -87,6 +87,16 @@ the one narrow, explicit exception to "Firebase is per-character sync only";
 `docs/ARCHITECTURE.md` is updated alongside this ADR to name it, not to
 retract the general rule.**
 
+> **Amended 2026-09-12 (issue #906).** There are now two such collections, not
+> one. `publicContractItems` is this same pipeline generalized past blueprint
+> copies to every item type, written by a second scheduled function on the
+> same cadence. The exception the paragraph above carves out is unchanged in
+> kind — shared, admin-write-only, no EVE token, no ESI call — only in count,
+> and it goes back to one collection when #907 moves BPC Sourcing over and
+> retires `publicBpcContracts`. Schema and sizing decisions for the new
+> collection (which filters were dropped, chunk size, function memory) are in
+> `docs/context/decisions/20260912-032407-generalized-public-contract-snapshot-schema-and-sizing.md`.
+
 The client reads the collection through `esi/cache.ts`'s
 `GLOBAL_CACHE_CHARACTER_ID` sentinel — the same trade `stations.ts` and the
 new `regionNames.ts` make for other character-independent public lookups —
