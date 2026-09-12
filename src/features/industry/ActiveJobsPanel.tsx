@@ -57,10 +57,6 @@ import {
   type JobSlotSkills,
   type JobSlotCharacterInput,
 } from '@/engine/industry/jobSlots';
-import { useCorpOwner } from '@/features/corp/owner';
-import { OwnerSwitch } from '@/features/corp/OwnerSwitch';
-import { useCorpSnapshot } from '@/features/corp/useCorpSnapshot';
-import { loadCorporationIndustryJobs, type CorpJobsLoadResult } from '@/features/corp/jobs';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
 import { CharacterBadge } from '@/features/character/assetBrowserRows';
@@ -174,11 +170,9 @@ async function loadActiveJobsSnapshot(characterId: number): Promise<Snapshot> {
  * Independent of the blueprint catalog/build-plan state: fetches its own
  * jobs + SDE type names, so it isn't blocked on that load.
  *
- * For a Character holding the corp industry capability it also offers "My jobs
- * / Corp jobs" (issue #298) — genuinely the same list with a different owner,
- * since the two ESI job shapes differ only in fields this list never renders.
- * For everyone else the switch is not rendered at all and this panel is exactly
- * what it was.
+ * Personal jobs only: this panel is chrome on every Industry page, and a
+ * corporation's industry jobs belong to the Corporation page, which loads
+ * them itself.
  */
 export function ActiveJobsPanel({
   characterId,
@@ -200,8 +194,8 @@ export function ActiveJobsPanel({
   const [activityFilter, setActivityFilter] = useState<ReadonlySet<number>>(new Set());
   const [statusFilter, setStatusFilter] = useState<ReadonlySet<JobStatusFilter>>(new Set());
   // The list is folded away by default: the header's one-line read (how many
-  // run, what finishes next, a bar per job) is what a pilot glancing at the
-  // page wants, and the six-column table is one click away when they don't.
+  // run, what finishes next) is what a pilot glancing at the page wants, and
+  // the six-column table is one click away when they don't.
   const [expanded, setExpanded] = useState(false);
   const { data, loading, refreshCount, refresh } = useRouteSnapshot(
     loadActiveJobsSnapshot,
@@ -209,33 +203,12 @@ export function ActiveJobsPanel({
     { cacheKey: 'industry:active-jobs' }
   );
 
-  const {
-    owner,
-    setOwner,
-    available: corpAvailable,
-    corporationId,
-  } = useCorpOwner('canReadIndustry');
-  const showingCorp = owner === 'corporation' && corporationId !== null;
-
-  // Nothing is fetched until the switch is actually flipped: the key is null
-  // while the personal side is showing, and it carries the corporation so a
-  // corp change resets rather than relabels.
-  const corp = useCorpSnapshot<CorpJobsLoadResult | null>(
-    showingCorp ? `${characterId}:${corporationId}` : null,
-    async () =>
-      corporationId === null ? null : loadCorporationIndustryJobs(characterId, corporationId),
-    { name: 'industry:corp-jobs', characterId }
-  );
-
   /**
    * The character-filter picker (issue #607): `'current'` by default —
    * today's exact behavior, no extra fan-out, and it keeps following the
    * active Character across a switch with no resync logic of its own
    * (`useResolvedCharacterFilter` re-resolves it whenever the active
-   * Character changes) — or All/a hand-picked subset once the pilot asks. Applies only to **My
-   * jobs**; Corp jobs are already "everyone in the corp," an orthogonal
-   * axis, so the picker is hidden while `showingCorp` (see
-   * `showCharacterFilter`, rendered in the panel header's `meta`).
+   * Character changes) — or All/a hand-picked subset once the pilot asks.
    */
   const [jobsCharacterFilter, setJobsCharacterFilter] = useState<CharacterFilterValue>('current');
   // Seeded once from the synced default (Settings' Defaults panel) the
@@ -256,16 +229,13 @@ export function ActiveJobsPanel({
   }
 
   const resolvedJobsFilter = useResolvedCharacterFilter(jobsCharacterFilter, characterId);
-  // Whether the resolved filter needs more than "my own" jobs — decoupled
-  // from the Corp Jobs toggle below because the job-slot header readout
-  // (issue #679) must follow this filter's character set even while Corp
-  // Jobs is showing: it always reports *personal* capacity, never the corp
-  // list's jobs.
+  // Set once the filter names anyone but the current Character: gates the
+  // whole list data path onto the fan-out below, and the job-slot readout
+  // (issue #679) onto the same Character set.
   const needsJobSlotFanOut =
     resolvedJobsFilter === 'all' ||
     resolvedJobsFilter.size !== 1 ||
     !resolvedJobsFilter.has(characterId);
-  const showingAllJobs = !showingCorp && needsJobSlotFanOut;
 
   const allCharacters = useLiveQuery(() => db.characters.toArray(), [], []);
   const jobsFilterCandidates = useMemo(
@@ -277,8 +247,7 @@ export function ActiveJobsPanel({
     [allCharacters]
   );
 
-  // Nothing fetched until the picker actually leaves "current" — same
-  // opt-in shape as the corp read above, just not a corp read. No separate
+  // Nothing fetched until the picker actually leaves "current". No separate
   // "loading" state: `jobsFanOut === null` already means "nothing to show
   // yet" (set once, on the first successful load), and a manual refresh
   // deliberately leaves the previous snapshot in place while it re-fetches —
@@ -342,26 +311,15 @@ export function ActiveJobsPanel({
   // react-hooks/exhaustive-deps rejects a dependency that is a fresh object
   // on every render.
   const types = useMemo(() => data?.types ?? {}, [data]);
-  // Each side keeps its own result, so the badge below reports the age of the
-  // data actually on screen — the two have different cache windows and must
-  // never share one value.
-  const result: JobsLoadResult | CorpJobsLoadResult | null = showingCorp
-    ? corp.data
-    : (data?.result ?? null);
-  const listLoading = showingCorp
-    ? corp.loading && corp.data === null
-    : showingAllJobs
-      ? jobsFanOutLoading
-      : // `&& !…data`: with a retained snapshot the panel keeps its rows while
-        // the re-read runs, so the spinner is only for having nothing at all
-        // to show.
-        loading && !data;
-  const listRefreshCount = showingCorp
-    ? corp.refreshCount
-    : showingAllJobs
-      ? jobsFanOutRefreshCount
-      : refreshCount;
-  const listRefresh = showingCorp ? corp.refresh : showingAllJobs ? refreshJobsFanOut : refresh;
+  const result: JobsLoadResult | null = data?.result ?? null;
+  const listLoading = needsJobSlotFanOut
+    ? jobsFanOutLoading
+    : // `&& !…data`: with a retained snapshot the panel keeps its rows while
+      // the re-read runs, so the spinner is only for having nothing at all
+      // to show.
+      loading && !data;
+  const listRefreshCount = needsJobSlotFanOut ? jobsFanOutRefreshCount : refreshCount;
+  const listRefresh = needsJobSlotFanOut ? refreshJobsFanOut : refresh;
 
   // Every derived note/badge below reads only the Characters the picker
   // actually selected — narrowing to two of five must not still show a
@@ -373,8 +331,7 @@ export function ActiveJobsPanel({
       ),
     [jobsFanOut, resolvedJobsFilter]
   );
-  // Always *personal* jobs + skills, regardless of `showingCorp` (issue
-  // #679's header readout) — the single-character branch reuses `data`
+  // Issue #679's header readout — the single-character branch reuses `data`
   // (loaded unconditionally above), the multi-character branch reuses the
   // fan-out state above, gated on the same `needsJobSlotFanOut` that drives
   // both.
@@ -404,9 +361,9 @@ export function ActiveJobsPanel({
     [jobsFanOut, resolvedJobsFilter]
   );
   // Per-character reauth notes for the multi-character path — the
-  // single-character paths (personal or corp) instead block the whole panel
-  // behind one `ReauthBanner` below, since there is only one Character's
-  // grant to ask about.
+  // single-Character path instead blocks the whole panel behind one
+  // `ReauthBanner` below, since there is only one Character's grant to ask
+  // about.
   const jobsFanOutReauth = useMemo(
     () => jobsFanOutSelectedEntries.filter((entry) => entry.result.needsReauth),
     [jobsFanOutSelectedEntries]
@@ -421,15 +378,15 @@ export function ActiveJobsPanel({
       .filter((t): t is number => t !== undefined);
     return times.length > 0 ? new Date(Math.min(...times)) : null;
   }, [jobsFanOutSelectedEntries]);
-  const dataAgeDate = showingAllJobs
+  const dataAgeDate = needsJobSlotFanOut
     ? jobsFanOutOldestFetchedAt
     : (result?.cached?.fetchedAt ?? null);
-  const fromCacheAny = showingAllJobs
+  const fromCacheAny = needsJobSlotFanOut
     ? jobsFanOutFromCacheAny
     : (result?.cached?.fromCache ?? false);
 
   const jobs = useMemo<JobRow[]>(() => {
-    const unsorted: JobRow[] = showingAllJobs
+    const unsorted: JobRow[] = needsJobSlotFanOut
       ? flattenJobsWithCharacter(jobsFanOut?.entries ?? [], resolvedJobsFilter)
       : (result?.cached?.data ?? []).map((job) => ({
           ...job,
@@ -437,12 +394,9 @@ export function ActiveJobsPanel({
           characterName: characterNameById.get(characterId) ?? '',
         }));
     return sortJobsBySoonest(unsorted);
-  }, [showingAllJobs, jobsFanOut, resolvedJobsFilter, result, characterId, characterNameById]);
+  }, [needsJobSlotFanOut, jobsFanOut, resolvedJobsFilter, result, characterId, characterNameById]);
   const summary = useMemo(() => summarizeJobs(jobs, now), [jobs, now]);
-  // A single blocking re-auth state only applies to the two single-Character
-  // paths — the multi-character path never blocks the whole panel behind one
-  // banner, since one alt's revoked grant must not hide everyone else's jobs.
-  const blockingNeedsReauth = !showingAllJobs && (result?.needsReauth ?? false);
+  const blockingNeedsReauth = !needsJobSlotFanOut && (result?.needsReauth ?? false);
   // Loading, re-auth and the empty states are the whole story; only a real
   // list has anything to fold.
   const collapsible = jobs.length > 0 && !listLoading && !blockingNeedsReauth;
@@ -456,24 +410,21 @@ export function ActiveJobsPanel({
   // at all — a centred "no active jobs" card left the idle panel _taller_
   // than the same panel with jobs in it. Not the same as `jobsEmptyTitle`
   // below, which means we have never fetched and genuinely don't know.
-  const hasAnswered = showingAllJobs ? jobsFanOut !== null : result?.cached != null;
+  const hasAnswered = needsJobSlotFanOut ? jobsFanOut !== null : result?.cached != null;
   const noneActive = jobs.length === 0 && !listLoading && !blockingNeedsReauth && hasAnswered;
-  // The owner switch still has to render when there are no corp jobs to show,
-  // or flipping to an empty Corp jobs list is a dead end with no way back.
   const showBody = showList && !noneActive;
   // The per-character notes sit outside `showBody` — a revoked grant is worth
   // saying with the list folded — so the body is only genuinely empty, and the
   // panel only genuinely one line, when these are absent too.
   const hasFanOutNotices =
-    showingAllJobs && (jobsFanOutReauth.length > 0 || jobsFanOutSkipped.length > 0);
+    needsJobSlotFanOut && (jobsFanOutReauth.length > 0 || jobsFanOutSkipped.length > 0);
   /**
    * Hidden outright for a one-Character account: "This character" and "All
    * characters" then resolve to the same pilot, so the picker is a control
    * that cannot change anything (`OpenOrdersPanel`'s `showCharacterStrip`
-   * precedent). Hidden on the corp side too — Corp jobs are already "everyone
-   * in the corp," an orthogonal axis to which of *my* pilots to include.
+   * precedent).
    */
-  const showCharacterFilter = !showingCorp && jobsFilterCandidates.length > 1;
+  const showCharacterFilter = jobsFilterCandidates.length > 1;
 
   // Menu entries only for activities actually present — an entry for an
   // activity type this character never runs would just be a permanently-dead
@@ -791,37 +742,6 @@ export function ActiveJobsPanel({
       meta={jobsMeta}
       actions={
         <span className="flex items-center gap-2">
-          {collapsible && !expanded && (
-            // One bar per job, desktop only: the fold's whole point is a
-            // glance, and at phone width the names would not fit beside them.
-            <span aria-hidden="true" className="hidden items-center gap-3 lg:flex">
-              {jobs.slice(0, 4).map((job) => {
-                const progress = Math.round(jobProgress(job, now) * 100);
-                return (
-                  <span
-                    key={job.job_id}
-                    className="flex items-center gap-1.5 text-[0.6875rem] text-text-dim"
-                  >
-                    <span className="max-w-28 truncate">
-                      {nameForBlueprint(job.blueprint_type_id)}
-                    </span>
-                    <span className="block h-1.5 w-14 overflow-hidden rounded-full bg-panel">
-                      <span
-                        className={`block h-full ${
-                          isJobDone(job, now)
-                            ? 'bg-success'
-                            : soon(job)
-                              ? 'bg-warning'
-                              : 'bg-accent'
-                        }`}
-                        style={{ width: `${progress}%` }}
-                      />
-                    </span>
-                  </span>
-                );
-              })}
-            </span>
-          )}
           {dataAgeDate && <DataAgeBadge date={dataAgeDate} />}
           {/* Grouped with `DataAgeBadge`, not appended after the caret: both
               are passive, hover-only readouts (nothing to click), while
@@ -837,13 +757,7 @@ export function ActiveJobsPanel({
             icon={<Icon.Download />}
             label={t('industry.exportCsvJobs')}
             disabled={jobs.length === 0}
-            onClick={() =>
-              downloadCsv(
-                showingCorp ? 'corp-industry-jobs' : 'industry-jobs',
-                jobs,
-                jobsCsvColumns(t, nameForBlueprint)
-              )
-            }
+            onClick={() => downloadCsv('industry-jobs', jobs, jobsCsvColumns(t, nameForBlueprint))}
           />
           <IconButton
             size="sm"
@@ -865,25 +779,8 @@ export function ActiveJobsPanel({
       }
       // Nothing renders below with the list folded and no per-character note
       // to make, so the panel sheds its padding and collapses to the header.
-      padded={showBody || corpAvailable || hasFanOutNotices}
+      padded={showBody || hasFanOutNotices}
     >
-      {/*
-        First row inside the body rather than beside the header's badge and two
-        icon buttons: at 390px that row has no space left, and the switch is a
-        change of what the list below shows, not a header action. Unlike the
-        character filter above it stays in the body — it is a two-option
-        segmented control, far wider than a dropdown trigger.
-      */}
-      {corpAvailable && (
-        <OwnerSwitch
-          className={showBody || hasFanOutNotices ? 'mb-2' : undefined}
-          value={owner}
-          onChange={setOwner}
-          label={t('industry.jobsOwnerLabel')}
-          personalLabel={t('industry.jobsOwnerPersonal')}
-          corporationLabel={t('industry.jobsOwnerCorporation')}
-        />
-      )}
       {hasFanOutNotices && (
         <div className="mb-2 space-y-2">
           {jobsFanOutReauth.map((entry) => (
@@ -910,11 +807,7 @@ export function ActiveJobsPanel({
       ) : blockingNeedsReauth ? (
         <ReauthBanner
           title={t('industry.jobsReauthTitle')}
-          // Only a 401 reaches here on the corp side — its 403 is the in-game
-          // role gate, which `corpAuthFailure.ts` deliberately does not call a
-          // re-auth — so the personal hint's "granted the new permission"
-          // story would be the wrong explanation for it.
-          hint={t(showingCorp ? 'industry.jobsCorpReauthHint' : 'industry.jobsReauthHint')}
+          hint={t('industry.jobsReauthHint')}
           actionLabel={t('industry.jobsReauthAction')}
           onLogin={() => void beginEveLogin()}
         />
@@ -923,7 +816,7 @@ export function ActiveJobsPanel({
         // already taken "answered, none running" out of the body.
         <EmptyState
           title={t('industry.jobsEmptyTitle')}
-          hint={t(showingCorp ? 'industry.jobsCorpEmptyHint' : 'industry.jobsEmptyHint')}
+          hint={t('industry.jobsEmptyHint')}
           className="py-4"
         />
       ) : (
