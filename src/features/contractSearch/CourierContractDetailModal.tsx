@@ -21,9 +21,17 @@ import {
   type CourierEndpoint,
   type CourierRouteRow,
 } from '@/engine/contracts/courierSearch';
+import { collateralToRewardRatio, iskPerVolume } from '@/engine/contracts/courierRates';
 
 /** Same precision the table's own Volume column uses. */
 const VOLUME_FORMAT = new Intl.NumberFormat('en', { maximumFractionDigits: 1 });
+
+/**
+ * One decimal. A collateral ratio is read as a rough magnitude — 40x is the
+ * signal, not 40.3x — and more digits would imply a precision the figure does
+ * not carry.
+ */
+const RATIO_FORMAT = new Intl.NumberFormat('en', { maximumFractionDigits: 1 });
 
 export interface CourierContractDetailModalProps {
   row: CourierRouteRow;
@@ -49,6 +57,8 @@ export function CourierContractDetailModal({
   const { t } = useTranslation();
   const timeZone = useTimeZone();
   const collateral = courierCollateral(row);
+  const volumeRate = iskPerVolume(row.reward, row.volume);
+  const collateralRatio = collateralToRewardRatio(collateral, row.reward);
 
   return (
     <Modal
@@ -70,6 +80,27 @@ export function CourierContractDetailModal({
           <StatChip
             label={t('contractSearch.daysColumn')}
             value={row.daysToComplete == null ? '—' : String(row.daysToComplete)}
+          />
+          <StatChip
+            label={t('contractSearch.iskPerVolumeColumn')}
+            value={volumeRate === null ? '—' : formatIsk(volumeRate, 2)}
+          />
+          {/*
+           * The scam signal the player community names first: a contract
+           * asking far more in collateral than it pays is one built to be
+           * forfeited rather than completed. Shown here rather than as a
+           * column — both raw figures already sit side by side in the table,
+           * and the max-collateral filter is where the concern is acted on.
+           */}
+          <StatChip
+            label={t('contractSearch.collateralRatioLabel')}
+            value={
+              collateralRatio === null
+                ? '—'
+                : t('contractSearch.collateralRatioValue', {
+                    ratio: RATIO_FORMAT.format(collateralRatio),
+                  })
+            }
           />
         </div>
 

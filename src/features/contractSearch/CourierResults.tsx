@@ -32,6 +32,7 @@ import {
   type CourierEndpoint,
   type CourierRouteRow,
 } from '@/engine/contracts/courierSearch';
+import { iskPerJump, iskPerVolume } from '@/engine/contracts/courierRates';
 import type { RoutePreferenceKind } from '@/engine/route/jumpRoute';
 import { localJumpCountsForRoutes } from '@/features/route/localRoute';
 import { CourierContractDetailModal } from '@/features/contractSearch/CourierContractDetailModal';
@@ -394,32 +395,23 @@ function useJumpCounts(
     : PENDING;
 }
 
-/**
- * ISK per jump — the rate a hauler ranks on, since the cost of a haul is the
- * trip and the trip is jumps.
- *
- * A same-system haul is zero jumps and a real job, so it divides by one trip
- * rather than by zero: the whole reward is earned without leaving the system,
- * which is the best rate on the board and should read that way.
- */
-function iskPerJump(reward: number, jumps: number | null): number | null {
-  if (jumps === null) return null;
-  return reward / Math.max(jumps, 1);
-}
-
 interface CourierResultsProps {
   rows: readonly CourierRouteRow[];
   regionNames: ReadonlyMap<number, string>;
 }
 
 /**
- * Public courier contracts as hauls: route, distance, pay rate and risk.
+ * Public courier contracts as hauls: route, distance, pay rates and risk.
+ *
+ * Two rates, and the order matters. ISK/jump ranks the board, because a
+ * hauler's cost is the trip; ISK/m³ sits beside it for the narrower question
+ * of filling one hold from several contracts along a lane, where space rather
+ * than distance is scarce.
  *
  * Volume and deadline are filters and detail-modal figures rather than
- * columns. Both are constraints a hauler settles once — does this fit my
- * hull, am I given long enough — not figures worth ranking fifty rows by, and
- * the table's width is owed to the ones that are. Dropping the pair is also
- * what keeps a stacked card at the height it had before ISK/jump arrived.
+ * columns — both are constraints a hauler settles once (does this fit my
+ * hull, am I given long enough) rather than figures worth ranking fifty rows
+ * by, and the table's width is owed to the ones that are.
  */
 export function CourierResults({ rows, regionNames }: CourierResultsProps) {
   const { t } = useTranslation();
@@ -581,6 +573,18 @@ export function CourierResults({ rows, regionNames }: CourierResultsProps) {
         render: (row) => {
           if (jumps.kind === 'pending') return <span className="text-text-dim">…</span>;
           const rate = iskPerJump(row.reward, jumpsByContract.get(row.contractId) ?? null);
+          return rate === null ? <span className="text-text-dim">—</span> : formatIsk(rate, 0);
+        },
+      },
+      {
+        id: 'iskPerVolume',
+        header: t('contractSearch.iskPerVolumeColumn'),
+        align: 'right',
+        className: 'tabular-nums whitespace-nowrap',
+        // Same rule as the rates above: no figure sinks the row either way.
+        sortValue: (row) => iskPerVolume(row.reward, row.volume) ?? undefined,
+        render: (row) => {
+          const rate = iskPerVolume(row.reward, row.volume);
           return rate === null ? <span className="text-text-dim">—</span> : formatIsk(rate, 0);
         },
       },

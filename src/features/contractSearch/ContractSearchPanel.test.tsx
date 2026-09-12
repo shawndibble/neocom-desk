@@ -123,10 +123,11 @@ vi.mock('@/sde/loadMarketSde', () => ({
   loadSolarSystemJumps: vi.fn(async () => JUMPS),
 }));
 
-/** Column order: route, reward, collateral, jumps, ISK/jump, expires. */
+/** Column order: route, reward, collateral, jumps, ISK/jump, ISK/m³, expires. */
 const COLLATERAL_CELL = 2;
 const JUMPS_CELL = 3;
 const ISK_PER_JUMP_CELL = 4;
+const ISK_PER_VOLUME_CELL = 5;
 
 const CHAR_ID = 91;
 
@@ -481,6 +482,54 @@ describe('ContractSearchPanel — Courier mode', () => {
     await showCourier();
 
     expect(await screen.findByText(/Jump distances are unavailable right now/)).toBeInTheDocument();
+  });
+
+  it('shows what a haul pays per cubic metre, beside the rate it ranks on', async () => {
+    // The secondary figure: a hauler filling one hold from several contracts
+    // is short of space, not distance. It sits beside ISK/jump rather than
+    // replacing it as the sort.
+    await showCourier();
+
+    const rows = await waitFor(async () => {
+      const found = await bodyRows();
+      expect(found).toHaveLength(2);
+      return found;
+    });
+    const cells = within(rows[0])
+      .getAllByRole('cell')
+      .map((cell) => cell.textContent);
+    // 12,000,000 ISK over 60,000 m³.
+    expect(cells[ISK_PER_VOLUME_CELL]).toBe('200');
+  });
+
+  it('keeps ISK per jump as the default sort, not the new rate', async () => {
+    await showCourier();
+    await waitFor(async () => {
+      expect(await bodyRows()).toHaveLength(2);
+    });
+    // The header a table sorts by is the one carrying aria-sort.
+    const sorted = screen
+      .getAllByRole('columnheader')
+      .find((header) => header.getAttribute('aria-sort') === 'descending');
+    expect(sorted).toHaveTextContent('ISK/jump');
+  });
+
+  it('states the collateral against the reward in the detail, where the risk is judged', async () => {
+    await showCourier();
+    const rows = await waitFor(async () => {
+      const found = await bodyRows();
+      expect(found).toHaveLength(2);
+      return found;
+    });
+    const withCollateral = rows.find(
+      (candidate) => !candidate.textContent?.includes(String(UNKNOWN_STRUCTURE))
+    )!;
+
+    await userEvent.click(withCollateral);
+
+    const dialog = await screen.findByRole('dialog');
+    // 900,000,000 ISK put up against a 12,000,000 ISK reward.
+    expect(within(dialog).getByText('Collateral / reward').parentElement).toHaveTextContent('75×');
   });
 
   it('shows a location nothing local names as its id rather than inventing one', async () => {
