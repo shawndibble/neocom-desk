@@ -164,6 +164,17 @@ snapshot is a whole rendered board and cannot be forgotten by `corp:` prefix.
 `{ name, characterId }`, folding its own key (character + corporation +
 division) into the retained name.
 
+Session-only is the load-bearing limit, not an implementation detail: the
+**first** visit to a route after an app load still composes its snapshot from
+scratch, and that is the one window a spinner is still on screen. `prefetch.ts`
+does not close it — that warms `esiCache`, so the composition reads local rows
+instead of the network, but it warms endpoints, not composed view snapshots.
+Closing it means either running route loaders at boot (a burst of exactly the
+kind `prefetch.ts` is written to avoid) or persisting snapshots across reloads
+(shape drift across deploys, which `routeSnapshotCache.ts` argues against in
+its own header). Neither is a change to make inside one route. What a view may
+show in the meantime is `docs/DESIGN.md` §6a.
+
 **Name lookups are cache-first.** `features/character/names.ts`
 (`resolveNames`) and `typeNames.ts` (`resolveViaEsi`) both used to POST
 `/universe/names` first and read `esiCache` only as an offline fallback, so
