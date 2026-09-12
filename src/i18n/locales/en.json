@@ -3569,6 +3569,8 @@
     "maxVolumeLabel": "Max volume (m³)",
     "minDaysLabel": "Min days",
     "routeColumn": "Route",
+    "originLabel": "Origin",
+    "destinationLabel": "Destination",
     "rewardColumn": "Reward",
     "collateralColumn": "Collateral",
     "volumeColumn": "Volume",

@@ -456,4 +456,38 @@ describe('ContractSearchPanel — Courier mode', () => {
 
     expect(await screen.findByPlaceholderText('Search item name…')).toBeInTheDocument();
   });
+
+  it('opens a courier-specific detail modal on a row click, with no item contents section', async () => {
+    const user = await showCourier();
+    const rows = await waitFor(async () => {
+      const found = await bodyRows();
+      expect(found).toHaveLength(2);
+      return found;
+    });
+
+    await user.click(rows[0]);
+
+    // rows[0] is the best-paying haul (Amarr -> the unnamed structure).
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveTextContent('Amarr VIII (Oris)');
+    // No "Everything on this contract" section, and no fetch for one: a
+    // courier haul has no item list, unlike the Items-mode modal.
+    expect(screen.queryByText('Everything on this contract')).not.toBeInTheDocument();
+    expect(loadPublicContractItems).not.toHaveBeenCalled();
+  });
+
+  it('closes the courier detail modal on request', async () => {
+    const user = await showCourier();
+    const rows = await waitFor(async () => {
+      const found = await bodyRows();
+      expect(found).toHaveLength(2);
+      return found;
+    });
+
+    await user.click(rows[0]);
+    await screen.findByRole('dialog');
+    await user.click(screen.getByRole('button', { name: 'Close' }));
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
 });
