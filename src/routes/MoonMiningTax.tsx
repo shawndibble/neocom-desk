@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { DataAgeBadge, PageHeader, Spinner, Tabs } from '@/components/ui';
+import { Spinner, Tabs } from '@/components/ui';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { TaxTab } from '@/features/miningTax/TaxTab';
 import { OverviewTab } from '@/features/miningTax/OverviewTab';
@@ -18,18 +18,27 @@ type MiningTab = 'tax' | 'overview';
  * this shell only resolves the active Character gate they'd otherwise each
  * repeat.
  *
- * Each tab reports its own `fetchedAt` up via `onDataAgeChange` so the shared
- * `PageHeader` can show it in its `meta` slot next to the title, the same
- * place every other route puts a `DataAgeBadge` — the tab-local row it used
- * to sit in otherwise had nothing else on its left. Switching tabs resets it
- * rather than showing the other tab's stale figure.
+ * Which is why each tab, not this shell, renders the page's `PageHeader`: the
+ * header's `actions` cluster is that tab's own controls (refresh, and on Tax
+ * the Payees and Ore tags dialogs), every one of them reading the snapshot
+ * hook the tab owns. A shell-owned header would have to take all of that back
+ * up through props to render it.
+ *
+ * That also retires the `onDataAgeChange` callback #896 added. Its only job
+ * was carrying a tab's `fetchedAt` up to a header the tab didn't render, so
+ * the badge could sit beside the title instead of in a tab-local row. The
+ * badge still sits beside the title — the tab reads `fetchedAt` straight from
+ * its own snapshot now, and there is no timestamp to report anywhere, nor a
+ * stale one to reset on tab switch.
+ *
+ * The tab bar is the one piece both tabs share, so it is built once here and
+ * handed down.
  */
 export function MoonMiningTax() {
   const { t } = useTranslation();
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   const hydrated = useActiveCharacter((state) => state.hydrated);
   const [tab, setTab] = useState<MiningTab>('tax');
-  const [dataAge, setDataAge] = useState<Date | null>(null);
 
   if (!hydrated) {
     return (
@@ -40,26 +49,21 @@ export function MoonMiningTax() {
   }
   if (activeCharacterId === null) return <Navigate to="/characters" replace />;
 
+  const tabBar = (
+    <Tabs
+      label={t('miningTax.title')}
+      value={tab}
+      onChange={(id) => setTab(id as MiningTab)}
+      tabs={[
+        { id: 'tax', label: t('miningTax.taxTab') },
+        { id: 'overview', label: t('miningTax.overviewTab') },
+      ]}
+    />
+  );
+
   return (
     <div className="mx-auto max-w-6xl space-y-4">
-      <PageHeader title={t('miningTax.title')} meta={dataAge && <DataAgeBadge date={dataAge} />} />
-      <Tabs
-        label={t('miningTax.title')}
-        value={tab}
-        onChange={(id) => {
-          setDataAge(null);
-          setTab(id as MiningTab);
-        }}
-        tabs={[
-          { id: 'tax', label: t('miningTax.taxTab') },
-          { id: 'overview', label: t('miningTax.overviewTab') },
-        ]}
-      />
-      {tab === 'tax' ? (
-        <TaxTab onDataAgeChange={setDataAge} />
-      ) : (
-        <OverviewTab onDataAgeChange={setDataAge} />
-      )}
+      {tab === 'tax' ? <TaxTab tabBar={tabBar} /> : <OverviewTab tabBar={tabBar} />}
     </div>
   );
 }
