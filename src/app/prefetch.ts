@@ -197,12 +197,31 @@ export function prefetchTasksFor(
   tasks: readonly PrefetchTask[] = PREFETCH_TASKS
 ): readonly PrefetchTask[] {
   const held = new Set(granted);
-  return tasks.filter((task) =>
-    task.endpoints.every((endpoint) => {
-      const { scope } = ESI_REGISTRY[endpoint];
-      return !isScopeRequired(scope) || held.has(scope);
-    })
-  );
+  return tasks.filter((task) => grantCovers(held, task.endpoints));
+}
+
+/**
+ * Whether `held` satisfies every scope `endpoints` requires — the single
+ * definition of "may this Character be asked for this", shared with
+ * `routeWarm.ts`.
+ *
+ * Exported because the answer is **not** a route's `ScopeGate`. A route can be
+ * `UNGATED` and still compose scope-gated reads: `/calendar` is ungated because
+ * the page has something to show without any one grant, yet `loadCalendarBoard`
+ * pulls calendar, skill-queue, industry-job, planet, contract and order
+ * endpoints. Gating a speculative read on the route's own lock therefore asks
+ * the wrong question, and asking ESI without the grant answers 403, which
+ * `esi/cache.ts` turns into the shell-wide re-auth notice. Every speculative
+ * read has to ask this instead.
+ */
+export function grantCovers(
+  held: ReadonlySet<string>,
+  endpoints: readonly EsiEndpointId[]
+): boolean {
+  return endpoints.every((endpoint) => {
+    const { scope } = ESI_REGISTRY[endpoint];
+    return !isScopeRequired(scope) || held.has(scope);
+  });
 }
 
 /** Cancels a run whose Character is no longer the active one. */

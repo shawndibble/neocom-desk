@@ -173,9 +173,15 @@ instead of the network, but it warms endpoints, not composed view snapshots.
 it: `Layout`'s rail links compose their route's snapshot on pointer-enter and
 on focus, so the click lands on a warm cache. Same thin-orchestrator shape as
 `prefetch.ts` — it calls the view's own loader, so no second composition path
-can drift — and it inherits the same scope rule, skipping any route
-`useLockedRoutes` reports as locked, since warming a route the Character never
-granted would paint the shell-wide re-auth notice for a pointer sweep.
+can drift — and it inherits the same scope rule, declaring the endpoints each
+loader reaches and filtering them against the stored grant through
+`prefetch.ts`'s `grantCovers`, since asking for an ungranted endpoint answers
+403 and paints the shell-wide re-auth notice for a pointer sweep. Note that
+this is deliberately **not** the route's `locked` flag: an `UNGATED` route can
+still compose scope-gated reads — `/calendar` pulls six — so a lock-based gate
+would read as unlocked for everyone and warm blindly. "Is this route gated" and
+"may this Character be asked for this" are different questions, and only the
+second one is safe to act on.
 `ROUTE_WARMERS` is deliberately incomplete: a route qualifies only once its
 loader lives outside its own component file, because exporting one from a
 `.tsx` route trips `react-refresh/only-export-components`, which CI fails on.
