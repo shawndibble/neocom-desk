@@ -15,6 +15,7 @@ import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import { formatIsk } from '@/lib/isk';
 import { VerbTag, type DirectiveVerb } from './DirectiveRow';
+import { layoutLabel } from './colonyPlan';
 import type { Worklist as WorklistData, WorklistRow } from './worklistModel';
 
 /** Every worklist verb is a directive verb; `haul` reads as a fault, like `remove`. */
@@ -90,6 +91,17 @@ function Step({ row }: { row: WorklistRow }) {
           heads: row.heads ?? 0,
           units: Math.round(row.unitsPerHour ?? 0).toLocaleString(),
           name: row.label,
+        })}
+      </>
+    );
+  }
+  if (row.verb === 'rebuild' && row.pins) {
+    return (
+      <>
+        {t('piAdvisor.rowRebuildAround', {
+          name: row.label,
+          tier: row.tier ?? 0,
+          layout: layoutLabel(row.pins, t),
         })}
       </>
     );
