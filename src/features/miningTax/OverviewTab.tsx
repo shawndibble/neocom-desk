@@ -10,13 +10,15 @@
  * and the vocabulary note in the issue: this is deliberately not the Tax
  * tab's `MiningLedgerEntry`/`Assignment`/`Payee` model).
  */
-import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
+  DataAgeBadge,
   DataTable,
   EmptyState,
   IconButton,
+  PageHeader,
   Panel,
   Spinner,
   type DataTableColumn,
@@ -61,25 +63,17 @@ function dateRangeLabel(dates: readonly string[]): string {
 }
 
 interface OverviewTabProps {
-  /**
-   * Reports this tab's own `data.fetchedAt` up to the route shell, which owns
-   * the page's one `PageHeader` and shows it beside the title (see the
-   * matching note on `TaxTab`).
-   */
-  onDataAgeChange?: (fetchedAt: Date | null) => void;
+  /** The route's shared tab bar, rendered under this tab's own `PageHeader`. See `MoonMiningTax`. */
+  tabBar: ReactNode;
 }
 
-export function OverviewTab({ onDataAgeChange }: OverviewTabProps) {
+export function OverviewTab({ tabBar }: OverviewTabProps) {
   const { t } = useTranslation();
   const { data, error, loading, activeCharacterId, refresh } = useRouteSnapshot(
     loadSnapshot,
     undefined,
     { cacheKey: 'miningYieldOverview' }
   );
-
-  useEffect(() => {
-    onDataAgeChange?.(data?.fetchedAt ?? null);
-  }, [data?.fetchedAt, onDataAgeChange]);
 
   const [characterFilter, setCharacterFilter] = useState<CharacterFilterValue>('all');
   const resolvedCharacterFilter = useResolvedCharacterFilter(characterFilter, activeCharacterId);
@@ -218,27 +212,34 @@ export function OverviewTab({ onDataAgeChange }: OverviewTabProps) {
 
   return (
     <div className="space-y-4">
-      <div className="flex min-h-9 flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          {characters.length > 0 && (
-            <CharacterFilterControl
-              characters={characters.map((c) => ({
-                characterId: c.characterId,
-                characterName: c.characterName,
-              }))}
-              activeCharacterId={activeCharacterId}
-              value={characterFilter}
-              onChange={setCharacterFilter}
+      {/* Same shape as `TaxTab`: this tab owns its snapshot, so it owns the
+          header whose actions drive it. */}
+      <PageHeader
+        title={t('miningTax.title')}
+        meta={data?.fetchedAt ? <DataAgeBadge date={data.fetchedAt} /> : undefined}
+        actions={
+          <>
+            {characters.length > 0 && (
+              <CharacterFilterControl
+                characters={characters.map((c) => ({
+                  characterId: c.characterId,
+                  characterName: c.characterName,
+                }))}
+                activeCharacterId={activeCharacterId}
+                value={characterFilter}
+                onChange={setCharacterFilter}
+              />
+            )}
+            <IconButton
+              icon={<Icon.Refresh />}
+              label={t('miningTax.refresh')}
+              onClick={refresh}
+              disabled={loading}
             />
-          )}
-        </div>
-        <IconButton
-          icon={<Icon.Refresh />}
-          label={t('miningTax.refresh')}
-          onClick={refresh}
-          disabled={loading}
-        />
-      </div>
+          </>
+        }
+      />
+      {tabBar}
 
       {loading && !data ? (
         <div className="flex justify-center py-16">

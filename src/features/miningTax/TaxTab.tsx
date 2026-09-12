@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
+  DataAgeBadge,
   DataTable,
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -9,6 +10,7 @@ import {
   DropdownMenuTrigger,
   EmptyState,
   IconButton,
+  PageHeader,
   Panel,
   Spinner,
   type DataTableColumn,
@@ -173,26 +175,17 @@ function statusLabel(t: (key: string) => string, status: MiningTaxRowStatus): st
  * `activeCharacterId` are already guaranteed here.
  */
 interface TaxTabProps {
-  /**
-   * Reports this tab's own `data.fetchedAt` up to the route shell, which owns
-   * the page's one `PageHeader` and shows it beside the title — the tab still
-   * owns its fetch lifecycle (see the file-level note on `MoonMiningTax`),
-   * this just surfaces the timestamp for display elsewhere.
-   */
-  onDataAgeChange?: (fetchedAt: Date | null) => void;
+  /** The route's shared tab bar, rendered under this tab's own `PageHeader`. See `MoonMiningTax`. */
+  tabBar: ReactNode;
 }
 
-export function TaxTab({ onDataAgeChange }: TaxTabProps) {
+export function TaxTab({ tabBar }: TaxTabProps) {
   const { t } = useTranslation();
   const { data, error, loading, activeCharacterId, refresh } = useRouteSnapshot(
     loadSnapshot,
     undefined,
     { cacheKey: 'moonMiningTax' }
   );
-
-  useEffect(() => {
-    onDataAgeChange?.(data?.fetchedAt ?? null);
-  }, [data?.fetchedAt, onDataAgeChange]);
 
   const [characterFilter, setCharacterFilter] = useState<CharacterFilterValue>('all');
   const [payeeFilter, setPayeeFilter] = useState<ReadonlySet<string> | 'all'>('all');
@@ -790,20 +783,35 @@ export function TaxTab({ onDataAgeChange }: TaxTabProps) {
 
   return (
     <div className="space-y-4">
-      <div className="flex min-h-9 flex-wrap items-center gap-1.5">
-        {payeeManagerDefaultCharacterId !== null && (
-          <Button onClick={() => setPayeeManagerCharacterId(payeeManagerDefaultCharacterId)}>
-            {t('miningTax.managePayeesAction')}
-          </Button>
-        )}
-        <Button onClick={() => setOreTagsOpen(true)}>{t('miningTax.oreTagsAction')}</Button>
-        <IconButton
-          icon={<Icon.Refresh />}
-          label={t('miningTax.refresh')}
-          onClick={refresh}
-          disabled={loading}
-        />
-      </div>
+      {/*
+        The tab's controls ride the page title's own line rather than a strip
+        of their own below the tab bar: they act on this tab's whole snapshot,
+        which is what `PageHeader.actions` is for, and the strip they replace
+        held nothing else. Rendering the header here rather than in the route
+        shell is what lets the `DataAgeBadge` read `fetchedAt` directly — see
+        the note on `MoonMiningTax`.
+      */}
+      <PageHeader
+        title={t('miningTax.title')}
+        meta={data?.fetchedAt ? <DataAgeBadge date={data.fetchedAt} /> : undefined}
+        actions={
+          <>
+            {payeeManagerDefaultCharacterId !== null && (
+              <Button onClick={() => setPayeeManagerCharacterId(payeeManagerDefaultCharacterId)}>
+                {t('miningTax.managePayeesAction')}
+              </Button>
+            )}
+            <Button onClick={() => setOreTagsOpen(true)}>{t('miningTax.oreTagsAction')}</Button>
+            <IconButton
+              icon={<Icon.Refresh />}
+              label={t('miningTax.refresh')}
+              onClick={refresh}
+              disabled={loading}
+            />
+          </>
+        }
+      />
+      {tabBar}
 
       {loading && !data ? (
         <div className="flex justify-center py-16">
@@ -916,27 +924,15 @@ export function TaxTab({ onDataAgeChange }: TaxTabProps) {
               behind the toggle; unassigned ore gets its own card so a
               balance is never silently short of it. */}
           <div className="space-y-1.5">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                {t('miningTax.balancesLabel')} ·{' '}
-                {owedBalances.length > 0
-                  ? t('miningTax.balancesAcross', {
-                      amount: formatIsk(owedTotal),
-                      count: owedBalances.length,
-                    })
-                  : t('miningTax.balancesNothing')}
-              </p>
-              {settledCount > 0 && (
-                <label className="flex items-center gap-1.5 text-[0.6875rem] text-text-dim">
-                  <input
-                    type="checkbox"
-                    checked={showSettled}
-                    onChange={(e) => setShowSettled(e.target.checked)}
-                  />
-                  {t('miningTax.showSettledPayees', { count: settledCount })}
-                </label>
-              )}
-            </div>
+            <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+              {t('miningTax.balancesLabel')} ·{' '}
+              {owedBalances.length > 0
+                ? t('miningTax.balancesAcross', {
+                    amount: formatIsk(owedTotal),
+                    count: owedBalances.length,
+                  })
+                : t('miningTax.balancesNothing')}
+            </p>
             {(visibleBalances.length > 0 ||
               unassigned.entryCount > 0 ||
               linkSuggestions.length > 0) && (
@@ -1105,6 +1101,27 @@ export function TaxTab({ onDataAgeChange }: TaxTabProps) {
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>
+
+            {/*
+              Settled Payees are hidden from the Balances strip by default —
+              a balance of zero is not a thing to act on. The control belongs
+              with the other three filters rather than on the strip's own
+              label, and is a pressed/unpressed `Button` rather than a
+              checkbox so all four read as one row of the same control. Only
+              offered when hiding is actually doing something: with nothing
+              settled the toggle would change nothing on screen.
+            */}
+            {settledCount > 0 && (
+              <Button
+                size="sm"
+                className="ml-auto"
+                variant={showSettled ? 'primary' : 'ghost'}
+                aria-pressed={showSettled}
+                onClick={() => setShowSettled((previous) => !previous)}
+              >
+                {t('miningTax.settledPayeesFilter')}
+              </Button>
+            )}
           </div>
 
           <SelectionToolbar

@@ -1386,6 +1386,7 @@
     "payeesSelected": "{{count}} payee(s)",
     "payeeOptionWithCharacter": "{{payee}} ({{character}})",
     "statusFilterLabel": "Status ({{count}})",
+    "settledPayeesFilter": "Settled payees",
     "status": {
       "unassigned": "Unassigned",
       "needsReview": "Needs Review",
@@ -1446,7 +1447,6 @@
     "balancesLabel": "You owe",
     "balancesAcross": "{{amount}} ISK across {{count}} payee(s)",
     "balancesNothing": "Nothing outstanding",
-    "showSettledPayees": "Show settled payees ({{count}} hidden)",
     "balanceEntries": "{{count}} entries",
     "settleUpAction": "Settle up",
     "nothingToSettle": "Nothing to settle",
