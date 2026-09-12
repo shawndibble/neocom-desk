@@ -33,9 +33,9 @@
 //   purpose (`lib/useSyncedSetting.ts`) and stay out of this list for the same
 //   reason: clearing one would strand an older bundle on the default.
 // - App bookkeeping. `activeCharacterId`, `corp.rosterBaseline`, the
-//   notification preference/permission/poller keys, `installPromptSeen`,
-//   `lastSeenVersion`, and every `sync.` key (planSync's namespace, which
-//   `createLocalSetting` rejects outright).
+//   notification preference/permission/poller keys, `installPrompt.seen`, and
+//   every `sync.` key (planSync's namespace, which `createLocalSetting`
+//   rejects outright).
 export const VIEW_PREFERENCE_KEYS: readonly string[] = [
   'assetsItemSort',
   'assetsRoutePreference',

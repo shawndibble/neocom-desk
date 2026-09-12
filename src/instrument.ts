@@ -25,8 +25,8 @@ if (dsn) {
   Sentry.init({
     dsn,
     environment: import.meta.env.MODE,
-    // Same version string the "what's new" panel reads (vite.config.ts's
-    // `define`), so an issue points at a release that exists.
+    // Must match the shipped build, so an issue points at a release that
+    // exists — and at the sourcemaps uploaded for it.
     release: `neocom-desk@${__APP_VERSION__}`,
 
     /**

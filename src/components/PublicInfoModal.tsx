@@ -2,11 +2,10 @@
  * Shared, read-only public-info lookup (CONTEXT.md rounds 49-50): a tabbed
  * Character / Corporation / Alliance view any feature can open by id + kind,
  * via `openPublicInfoModal`/`usePublicInfoModal` (`stores/publicInfoModal.ts`).
- * Mounted once in `App.tsx` — same "always mounted, driven by a global
- * signal" shape as `WhatsNewPanel`, needed here because unlike every other
- * detail modal in this repo (`ContractDetailModal`, `ItemDetailModal`), this
- * one is opened from several unrelated features rather than one route that
- * already owns local `selected` state.
+ * Mounted once in `App.tsx`, needed here because unlike a per-route detail
+ * modal (`ContractDetailModal`, `ItemDetailModal`), this one is opened from
+ * several unrelated features rather than one route that already owns local
+ * `selected` state.
  *
  * Opening with a character id resolves the whole chain (character -> its
  * corp -> its alliance) in one shot, per the issue; opening directly with a

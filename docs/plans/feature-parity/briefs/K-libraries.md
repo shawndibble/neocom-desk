@@ -117,7 +117,7 @@ Two compat notes that matter:
 | 5   | CSV serialization                            | **BUILD — SHIPPED**           | — (`papaparse` 5.7.0 declined)              |          0 | Built as `src/lib/csv.ts`, BOM and formula-injection guard included. `toCsv` owns the BOM — do not prepend one at the call site.                                                                                                 |
 | 6   | XML parsing (`.emp`)                         | **NATIVE**                    | `DOMParser` at a feature-layer seam         |          0 | Browser `DOMParser` cannot do XXE at all; `fast-xml-parser` has 4 CVEs. Native wins the _security_ axis.                                                                                                                         |
 | 7   | Gzip decompression                           | **NATIVE**                    | `DecompressionStream('gzip')`               |          0 | Baseline widely available since May 2023. `pako` buys nothing and is worse for bomb defence.                                                                                                                                     |
-| 8   | "What's new" panel                           | **BUILD**                     | — (structured JSON)                         |          0 | A Markdown body cannot go through i18next — a renderer fights CLAUDE.md, costs 18–40 KB, and adds XSS surface.                                                                                                                   |
+| 8   | "What's new" panel — dropped                 | **BUILD**                     | — (structured JSON)                         |          0 | A Markdown body cannot go through i18next — a renderer fights CLAUDE.md, costs 18–40 KB, and adds XSS surface.                                                                                                                   |
 | 9   | Date / duration formatting                   | **ALREADY HAVE / NATIVE**     | `Intl.NumberFormat` + `src/lib/duration.ts` |          0 | Everything needed is `Date.parse` + `toLocaleString` + `Intl.NumberFormat`. A date lib would be a regression.                                                                                                                    |
 | 10a | Firestore SDK size                           | **SWAP — SHIPPED**            | `firebase/firestore/lite`                   | **−102.5** | No `onSnapshot` anywhere; every API used exists in `lite`. `firebaseApp.ts` and `planSync.ts` both import from `firebase/firestore/lite` now.                                                                                    |
 | 10b | Firebase in entry chunk                      | **DEFER — SHIPPED**           | `await import('./planSync')`                |    **−58** | `src/sync/index.ts` is now the code-splitting boundary it recommends: every Firebase-reaching export is a thin `await import('./planSync')` wrapper; `App.tsx`'s `triggerSync` import resolves to that wrapper, not to Firebase. |
@@ -457,7 +457,11 @@ file.stream()
 The `byteLimitTransform` is the only code you write, and it is the code that
 actually provides the bomb defence.
 
-## 8. Markdown / changelog rendering — **BUILD, structured JSON**
+## 8. Markdown / changelog rendering — **BUILD, structured JSON** (feature dropped)
+
+> **The "what's new" panel this served was removed — do not re-file or
+> re-implement.** See `docs/context/decisions/20260912-111504-remove-the-whats-new-modal.md`. The build-vs-buy reasoning below still holds for
+> any future Markdown-rendering need.
 
 There is no changelog, "what's new", or release-notes anything in the repo today
 (grepped `src/`, `docs/`, `public/` — zero hits), so this is fully greenfield and

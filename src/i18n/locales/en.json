@@ -2661,10 +2661,6 @@
     "install": "Install",
     "installIosCta": "Install Neocom Desk: tap Share, then Add to Home Screen."
   },
-  "whatsNew": {
-    "title": "What's new in v{{version}}",
-    "dismiss": "Got it"
-  },
   "market": {
     "title": "Market",
     "locationMode": "Location",
