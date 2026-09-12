@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { findJumpRoute, type JumpGraph } from './jumpRoute';
+import { findJumpRoute, jumpDistancesFrom, type JumpGraph } from './jumpRoute';
 
 /**
  * A hand-built stand-in for the stargate graph, shaped so the three
@@ -139,5 +139,56 @@ describe('findJumpRoute', () => {
 
   it('defaults to the shortest route when no options are given at all', () => {
     expect(findJumpRoute(GRAPH, HUB, FAR)).toEqual({ kind: 'route', systems: [HUB, LOW, FAR] });
+  });
+});
+
+describe('jumpDistancesFrom', () => {
+  it('answers every reachable system in one pass, the origin at zero', () => {
+    const distances = jumpDistancesFrom(GRAPH, HUB, { preference: 'shortest', securityOf });
+    expect(Object.fromEntries(distances)).toEqual({
+      [HUB]: 0,
+      [LOW]: 1,
+      [A]: 1,
+      [FAR]: 2,
+      [B]: 2,
+      [C]: 3,
+      [UNCHARTED]: 3,
+    });
+  });
+
+  it('counts jumps along the preferred route, not its weighted cost', () => {
+    // Under prefer-highsec the route to FAR is the four-jump highsec one, so
+    // the distance is 4 — the trip's length, never the penalty arithmetic
+    // that chose it.
+    const distances = jumpDistancesFrom(GRAPH, HUB, { preference: 'prefer-highsec', securityOf });
+    expect(distances.get(FAR)).toBe(4);
+    expect(distances.get(C)).toBe(3);
+  });
+
+  it('omits what no stargate reaches rather than claiming a distance', () => {
+    const distances = jumpDistancesFrom(GRAPH, HUB, { preference: 'shortest', securityOf });
+    expect(distances.has(ISLAND)).toBe(false);
+  });
+
+  it('reaches nothing at all from a gateless system, but still places itself', () => {
+    const distances = jumpDistancesFrom(GRAPH, ISLAND);
+    expect(Object.fromEntries(distances)).toEqual({ [ISLAND]: 0 });
+  });
+
+  it('answers nothing for an origin the snapshot does not know', () => {
+    expect(jumpDistancesFrom(GRAPH, NOT_A_SYSTEM).size).toBe(0);
+  });
+
+  it('agrees with the pair lookup for every destination it reports', () => {
+    // The two share one search; this pins them together so a future change to
+    // either cannot silently drift.
+    const distances = jumpDistancesFrom(GRAPH, HUB, { preference: 'prefer-highsec', securityOf });
+    for (const [destination, jumps] of distances) {
+      const route = findJumpRoute(GRAPH, HUB, destination, {
+        preference: 'prefer-highsec',
+        securityOf,
+      });
+      expect(route.kind === 'route' && route.systems.length - 1).toBe(jumps);
+    }
   });
 });

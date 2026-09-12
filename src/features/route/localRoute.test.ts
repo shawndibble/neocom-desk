@@ -8,15 +8,14 @@ vi.mock('@/sde/loadMarketSde', () => ({
   loadSolarSystems: () => loadSolarSystems(),
 }));
 
-import { findLocalJumps, findLocalRoute } from './localRoute';
+import { findLocalJumps, findLocalRoute, localJumpDistances } from './localRoute';
 import { clearJumpGraphIndex } from '@/sde/jumpGraph';
 import { clearSolarSystemIndex } from '@/sde/solarSystems';
 
 /**
- * Fixtures mirror what `build-sde.mjs` actually emits: every solar system
- * gets a key, and a gateless one maps to an empty array. An earlier version
- * of this file keyed the wormhole with `[]` while the emitter keyed nothing
- * at all, so the same-system case passed here and failed in production.
+ * Fixtures mirror what `build-sde.mjs` emits: every solar system gets a key,
+ * a gateless one an empty array. A fixture that keys only gated systems
+ * passes here and fails in production.
  */
 
 const HUB = 30000001;
@@ -110,12 +109,17 @@ describe('findLocalRoute', () => {
     });
   });
 
-  it('indexes the snapshots once across repeated lookups', async () => {
-    await findLocalRoute(HUB, FAR);
-    await findLocalRoute(FAR, HUB);
-    await findLocalRoute(HUB, C);
+  it('indexes the graph once across repeated lookups', async () => {
+    await findLocalRoute(HUB, FAR, 'prefer-highsec');
+    await findLocalRoute(FAR, HUB, 'prefer-highsec');
+    await findLocalRoute(HUB, C, 'prefer-highsec');
     expect(loadSolarSystemJumps).toHaveBeenCalledTimes(1);
     expect(loadSolarSystems).toHaveBeenCalledTimes(1);
+  });
+
+  it('never fetches the systems snapshot for a shortest route, which cannot use it', async () => {
+    await findLocalRoute(HUB, FAR, 'shortest');
+    expect(loadSolarSystems).not.toHaveBeenCalled();
   });
 
   it('defaults to the shortest route when no preference is given', async () => {
@@ -143,9 +147,40 @@ describe('findLocalJumps', () => {
   });
 
   it('says unknown, NOT no-route, when the graph snapshot cannot be read', async () => {
-    // The distinction that matters: an offline first visit must not report
-    // "no gate route exists" for every haul in the game.
     loadSolarSystemJumps.mockRejectedValue(new Error('offline'));
     await expect(findLocalJumps(HUB, FAR)).resolves.toEqual({ kind: 'unknown' });
+  });
+});
+
+describe('localJumpDistances', () => {
+  it('answers every reachable system from one origin in a single sweep', async () => {
+    const result = await localJumpDistances(HUB);
+    expect(result.kind).toBe('known');
+    expect(result.kind === 'known' && Object.fromEntries(result.jumps)).toEqual({
+      [HUB]: 0,
+      [LOW]: 1,
+      [A]: 1,
+      [FAR]: 2,
+      [B]: 2,
+      [C]: 3,
+    });
+  });
+
+  it('omits a system no stargate reaches', async () => {
+    const result = await localJumpDistances(HUB);
+    expect(result.kind === 'known' && result.jumps.has(WORMHOLE)).toBe(false);
+  });
+
+  it('says unknown rather than an empty map when the graph cannot be read', async () => {
+    // An empty map would read as "this origin reaches nothing", which is a
+    // different claim from "we could not load the graph".
+    loadSolarSystemJumps.mockRejectedValue(new Error('offline'));
+    await expect(localJumpDistances(HUB)).resolves.toEqual({ kind: 'unknown' });
+  });
+
+  it('reads the security snapshot when the preference needs it', async () => {
+    const result = await localJumpDistances(HUB, 'prefer-highsec');
+    // The long all-highsec way round, so FAR is four jumps rather than two.
+    expect(result.kind === 'known' && result.jumps.get(FAR)).toBe(4);
   });
 });

@@ -45,7 +45,31 @@ _Recorded 2026-09-12 · issue #942._
   `JumpsAwayResult`, whose two reasons are the Assets page's own and cannot
   express `unknown`.
 
+- **A distance for many rows is one sweep from the origin, not one search per
+  row.** `jumpDistancesFrom` runs Dijkstra to exhaustion and answers every
+  reachable system at once; measured on the shipped graph, that costs about
+  what two single-pair lookups do, so 500 rows across 5 hub origins is ~9 ms
+  against ~420 ms of unbroken main-thread work done pairwise. The pair API
+  stays for a single opened row. This matters because the ESI resolver being
+  replaced _does_ cache each pair, so a per-row local search would have made
+  the local path the slower of the two.
+
 - **The Assets page keeps its ESI `/route/` resolver.** Migrating existing
   callers onto the local graph is its own change with its own regression
   surface; this ships the graph, not a migration. Rules out touching
   `features/character/routeDistance.ts` here.
+
+  Two seams are left open by that deferral, recorded so they are decided
+  rather than rediscovered:
+
+  - **Result shape.** `JumpsAwayResult` is two-valued (`known` | `unknown`);
+    `LocalJumpsResult` is three-valued, and the bullet above argues the
+    three-valued one is the honest shape. Migrating means deciding whether the
+    ESI path gains `no-route` or the local path loses it.
+  - **Preference vocabulary.** Three now describe one concept:
+    `RoutePreference` (`shortest`/`safest`, a persisted device-local setting),
+    `RoutePreferenceKind` (the engine's three), and ESI's own
+    `shortest`/`secure`/`insecure` behind `routeFlagFor`. The engine's is the
+    superset. Unifying is cheap today and becomes a stored-value migration
+    once a second persisted preference control ships, so it should happen
+    before that, not after.

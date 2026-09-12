@@ -37,10 +37,7 @@ export type JumpGraph = ReadonlyMap<number, readonly number[]>;
  */
 export type RoutePreferenceKind = 'shortest' | 'prefer-highsec' | 'avoid-highsec';
 
-export type JumpRouteResult =
-  | { kind: 'route'; systems: number[] }
-  /** The two ends genuinely do not connect by stargate. Never "zero jumps". */
-  | { kind: 'no-route' };
+export type JumpRouteResult = { kind: 'route'; systems: number[] } | { kind: 'no-route' };
 
 export interface FindJumpRouteOptions {
   preference?: RoutePreferenceKind;
@@ -122,26 +119,75 @@ class CostQueue {
     }
     return top;
   }
-
-  get size(): number {
-    return this.heap.length;
-  }
 }
 
 function reconstruct(cameFrom: ReadonlyMap<number, number>, destination: number): number[] {
-  const systems = [destination];
-  let current = destination;
-  for (let step = cameFrom.get(current); step !== undefined; step = cameFrom.get(current)) {
-    current = step;
-    systems.push(current);
+  const systems: number[] = [];
+  for (let id: number | undefined = destination; id !== undefined; id = cameFrom.get(id)) {
+    systems.push(id);
   }
   return systems.reverse();
 }
 
+interface SearchResult {
+  /** Predecessor on the best path, for every system reached but the origin. */
+  cameFrom: ReadonlyMap<number, number>;
+  /** Jumps along that path — the trip's length, not its preference-weighted cost. */
+  jumps: ReadonlyMap<number, number>;
+  /** Set when the search was given a `stopAt` and reached it. */
+  reachedStopAt: boolean;
+}
+
+/**
+ * One Dijkstra from `origin`, shared by both public entry points.
+ *
+ * `stopAt` is what keeps a single-pair lookup cheap: with it the search
+ * returns as soon as that system settles, and without it every reachable
+ * system settles, which is what makes a whole table's worth of distances cost
+ * one sweep instead of one sweep per row.
+ *
+ * Jumps are tracked beside cost because the two differ under a biased
+ * preference — a 4-jump highsec route costs less than a 2-jump route through
+ * lowsec, and it is the jump count a reader is shown.
+ */
+function search(
+  graph: JumpGraph,
+  originSystemId: number,
+  stepCost: (systemId: number) => number,
+  stopAt?: number
+): SearchResult {
+  const best = new Map<number, number>([[originSystemId, 0]]);
+  const jumps = new Map<number, number>([[originSystemId, 0]]);
+  const cameFrom = new Map<number, number>();
+  const settled = new Set<number>();
+  const queue = new CostQueue();
+  queue.push(originSystemId, 0);
+
+  for (let next = queue.pop(); next !== undefined; next = queue.pop()) {
+    const { systemId, cost } = next;
+    // A system can sit in the heap more than once; the first pop is its final
+    // cost, so later copies are stale and skipped rather than re-expanded.
+    if (settled.has(systemId)) continue;
+    settled.add(systemId);
+    if (systemId === stopAt) return { cameFrom, jumps, reachedStopAt: true };
+    for (const neighbour of graph.get(systemId) ?? []) {
+      const neighbourCost = cost + stepCost(neighbour);
+      // Also rejects an already-settled neighbour: its recorded cost is final,
+      // and every weight is positive, so no later path can undercut it.
+      if (neighbourCost >= (best.get(neighbour) ?? Number.POSITIVE_INFINITY)) continue;
+      best.set(neighbour, neighbourCost);
+      jumps.set(neighbour, (jumps.get(systemId) ?? 0) + 1);
+      cameFrom.set(neighbour, systemId);
+      queue.push(neighbour, neighbourCost);
+    }
+  }
+
+  return { cameFrom, jumps, reachedStopAt: false };
+}
+
 /**
  * The stargate route between two systems, as the ordered list of systems
- * crossed — both ends included, so the jump count is `systems.length - 1` and
- * `engine/jumpsAway.ts`'s `jumpsAwayFromRoute` reads it unchanged.
+ * crossed — both ends included, so the jump count is `systems.length - 1`.
  *
  * Same system for both ends is zero jumps, which is a real answer and
  * deliberately not `no-route` — including in a gateless system, where you are
@@ -160,32 +206,32 @@ export function findJumpRoute(
   }
 
   const stepCost = stepCostFor(options.preference ?? 'shortest', options.securityOf);
-  const best = new Map<number, number>([[originSystemId, 0]]);
-  const cameFrom = new Map<number, number>();
-  const settled = new Set<number>();
-  const queue = new CostQueue();
-  queue.push(originSystemId, 0);
+  const { cameFrom, reachedStopAt } = search(graph, originSystemId, stepCost, destinationSystemId);
+  if (!reachedStopAt) return { kind: 'no-route' };
+  return { kind: 'route', systems: reconstruct(cameFrom, destinationSystemId) };
+}
 
-  while (queue.size > 0) {
-    const next = queue.pop();
-    if (!next) break;
-    const { systemId, cost } = next;
-    // A node can sit in the heap more than once; the first pop is its final
-    // cost, so later copies are stale and skipped rather than re-expanded.
-    if (settled.has(systemId)) continue;
-    settled.add(systemId);
-    if (systemId === destinationSystemId) {
-      return { kind: 'route', systems: reconstruct(cameFrom, destinationSystemId) };
-    }
-    for (const neighbour of graph.get(systemId) ?? []) {
-      if (settled.has(neighbour)) continue;
-      const neighbourCost = cost + stepCost(neighbour);
-      if (neighbourCost >= (best.get(neighbour) ?? Number.POSITIVE_INFINITY)) continue;
-      best.set(neighbour, neighbourCost);
-      cameFrom.set(neighbour, systemId);
-      queue.push(neighbour, neighbourCost);
-    }
-  }
-
-  return { kind: 'no-route' };
+/**
+ * Jumps from one origin to *every* system it can reach, in one pass.
+ *
+ * A table ranking hauls by distance asks the same origin about many
+ * destinations, and one sweep to exhaustion costs about what two single-pair
+ * lookups do while answering all of them — so a per-row call is the shape to
+ * avoid, not a cost to absorb. The ESI resolver this replaces caches each
+ * pair (`features/character/routeDistance.ts`); reaching for a pair at a time
+ * here would make the local path the slower of the two, which is the opposite
+ * of the point.
+ *
+ * The origin maps to 0. A system absent from the result is unreachable by
+ * stargate — a fact, not a gap — and an origin the graph does not hold yields
+ * an empty map rather than a map claiming it can reach itself.
+ */
+export function jumpDistancesFrom(
+  graph: JumpGraph,
+  originSystemId: number,
+  options: FindJumpRouteOptions = {}
+): ReadonlyMap<number, number> {
+  if (!graph.has(originSystemId)) return new Map();
+  const stepCost = stepCostFor(options.preference ?? 'shortest', options.securityOf);
+  return search(graph, originSystemId, stepCost).jumps;
 }
