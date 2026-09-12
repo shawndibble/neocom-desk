@@ -4,6 +4,7 @@ import { piFixture } from '@/sde/__fixtures__/pi';
 import type { CharacterBlueprint } from '@/esi/endpoints';
 import { FACILITY_PRESETS } from '@/engine/industry/types';
 import type { SubBuildContext } from '@/engine/industry/subBuild';
+import type { BlueprintTierPools } from './recipes';
 
 const BLUEPRINTS: BlueprintMap = {
   '9841': {
@@ -95,8 +96,13 @@ vi.mock('@/sde/loadSde', () => ({
 }));
 
 const { loadBlueprintCatalog } = await import('./blueprintCatalog');
-const { acquisitionForLookup, buildPlanTypeIds, materialRecipe, recipeInputTypeIds } =
-  await import('./recipes');
+const {
+  acquisitionForLookup,
+  buildPlanTypeIds,
+  cloneBlueprintPools,
+  materialRecipe,
+  recipeInputTypeIds,
+} = await import('./recipes');
 
 const catalog = await loadBlueprintCatalog();
 
@@ -426,6 +432,144 @@ describe('acquisitionForLookup', () => {
       te: 20,
       blueprintTypeID: 9841,
       line: { unitPrice: null, owned: false },
+    });
+  });
+
+  it('pools owned copies across two branches needing the same blueprint type (issue #860) — only one branch gets the free/owned line', () => {
+    const acquisitionFor = acquisitionForLookup({
+      catalog,
+      pi: PI,
+      // One BPC, 5 runs — enough to fully cover only one of two branches.
+      ownedBlueprints: [
+        {
+          item_id: 1,
+          type_id: 9841,
+          runs: 5,
+          material_efficiency: 6,
+          time_efficiency: 12,
+          quantity: 1,
+          location_id: 1,
+          location_flag: 'Hangar',
+        },
+      ],
+      blueprintAcquisition: { offersFor: () => [], hubPrices: { 9841: 777 } },
+    });
+
+    // Branch A calls first — the owned copy fully covers its 5 runs.
+    const branchA = acquisitionFor(9840, 5, ctx, { 34: 10 });
+    expect(branchA).toEqual({
+      me: 6,
+      te: 12,
+      blueprintTypeID: 9841,
+      line: { unitPrice: 0, owned: true },
+    });
+
+    // Branch B needs the same 5 runs of the same blueprint type — the owned
+    // copy is already claimed by Branch A, so Branch B must fall back to the
+    // BPO sell-price cascade instead of also reporting itself as free.
+    const branchB = acquisitionFor(9840, 5, ctx, { 34: 10 });
+    expect(branchB).toEqual({
+      me: 0,
+      te: 0,
+      blueprintTypeID: 9841,
+      line: { unitPrice: 777, owned: false },
+    });
+  });
+
+  it('does not pool across two different acquisitionForLookup closures (unrelated resolution passes)', () => {
+    const owned = [
+      {
+        item_id: 1,
+        type_id: 9841,
+        runs: 5,
+        material_efficiency: 6,
+        time_efficiency: 12,
+        quantity: 1,
+        location_id: 1,
+        location_flag: 'Hangar',
+      },
+    ] as const;
+    const sources = {
+      catalog,
+      pi: PI,
+      ownedBlueprints: owned,
+      blueprintAcquisition: { offersFor: () => [], hubPrices: { 9841: 777 } },
+    };
+
+    // Two independent plan resolutions (e.g. two separate build plans) each
+    // get their own closure and must each see the full owned stock.
+    expect(acquisitionForLookup(sources)(9840, 5, ctx, { 34: 10 })).toEqual({
+      me: 6,
+      te: 12,
+      blueprintTypeID: 9841,
+      line: { unitPrice: 0, owned: true },
+    });
+    expect(acquisitionForLookup(sources)(9840, 5, ctx, { 34: 10 })).toEqual({
+      me: 6,
+      te: 12,
+      blueprintTypeID: 9841,
+      line: { unitPrice: 0, owned: true },
+    });
+  });
+
+  it("cloneBlueprintPools lets two independent closures share the top-level claim without sharing each other's further claims (Group Owned Overlay, issue #860)", () => {
+    const sources = {
+      catalog,
+      pi: PI,
+      // One BPC, 10 runs — the top-level claim only takes 3, leaving 7 for
+      // whatever nested resolution each pass runs on its own.
+      ownedBlueprints: [
+        {
+          item_id: 1,
+          type_id: 9841,
+          runs: 10,
+          material_efficiency: 6,
+          time_efficiency: 12,
+          quantity: 1,
+          location_id: 1,
+          location_flag: 'Hangar',
+        },
+      ],
+      blueprintAcquisition: { offersFor: () => [], hubPrices: { 9841: 777 } },
+    };
+
+    const sharedPools: BlueprintTierPools = new Map();
+    const forTopLevel = acquisitionForLookup(sources, sharedPools);
+    // The top-level product's own claim — resolved once, shared by both a
+    // real pass and a Group Owned Overlay pass.
+    const topLevel = forTopLevel(9840, 3, ctx, { 34: 10 });
+    expect(topLevel).toEqual({
+      me: 6,
+      te: 12,
+      blueprintTypeID: 9841,
+      line: { unitPrice: 0, owned: true },
+    });
+
+    // Two independent nested-resolution passes, each seeded from the state
+    // right after the top-level claim above (7 runs remaining) — never from
+    // each other.
+    const poolsForPassA = cloneBlueprintPools(sharedPools);
+    const poolsForPassB = cloneBlueprintPools(sharedPools);
+    const forPassA = acquisitionForLookup(sources, poolsForPassA);
+    const forPassB = acquisitionForLookup(sources, poolsForPassB);
+
+    // Pass A's own nested node claims all 7 remaining runs.
+    expect(forPassA(9840, 7, ctx, { 34: 10 })).toEqual({
+      me: 6,
+      te: 12,
+      blueprintTypeID: 9841,
+      line: { unitPrice: 0, owned: true },
+    });
+
+    // Pass B's own nested node needs the same 7 runs — if the pools were
+    // shared, Pass A's claim above would have already drained them and Pass
+    // B would wrongly see a shortfall. Isolated pools mean Pass B still sees
+    // its own full 7 remaining.
+    expect(forPassB(9840, 7, ctx, { 34: 10 })).toEqual({
+      me: 6,
+      te: 12,
+      blueprintTypeID: 9841,
+      line: { unitPrice: 0, owned: true },
     });
   });
 });

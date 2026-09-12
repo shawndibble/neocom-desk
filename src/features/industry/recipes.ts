@@ -20,10 +20,13 @@ import { effectiveMaterials } from '@/engine/industry/materials';
 import { sizeRuns } from '@/engine/industry/runSizing';
 import type { SubBuildContext } from '@/engine/industry/subBuild';
 import {
+  claimBlueprintTier,
+  pooledOwnedCopies,
   resolveTierOption,
   selectBlueprintTier,
   tierOptions,
   type BpcOffer,
+  type OwnedBlueprintPool,
 } from '@/engine/industry/blueprintAcquisition';
 import type { CharacterBlueprint } from '@/esi/endpoints';
 import type { PiData } from '@/sde/types';
@@ -203,8 +206,40 @@ function materialCostAtMeFor(
  * `sources.blueprintAcquisition` is absent, so a caller can pass this through
  * unconditionally without branching on whether the feature is configured.
  */
+export type BlueprintTierPools = Map<number, OwnedBlueprintPool>;
+
+/**
+ * Deep-clones `pools` — a snapshot a caller can hand to a second, independent
+ * `acquisitionForLookup` closure so it starts from today's claimed-so-far
+ * state without sharing its own further claims back onto `pools` (issue
+ * #860's Group Owned Overlay case: `useComparedBuildResults.ts` re-resolves
+ * the same tree twice, once for real, once with owned *material* stock
+ * ignored, and those two nested resolutions must not claim from each other's
+ * blueprint stock even though both should see the top-level product's own
+ * claim already made).
+ */
+export function cloneBlueprintPools(pools: BlueprintTierPools): BlueprintTierPools {
+  const cloned: BlueprintTierPools = new Map();
+  for (const [typeID, pool] of pools) cloned.set(typeID, new Map(pool));
+  return cloned;
+}
+
+/**
+ * `blueprintPools` is shared by every call this closure resolves — the
+ * top-level product and every nested sub-build all call the same closure
+ * instance (see `BuildPlanDetail.tsx`) — so two branches needing the same
+ * blueprint type see each other's claims instead of both counting the same
+ * owned copies as free (issue #860). Defaults to a closure-private pool
+ * nothing else can reach, for a caller with only one resolution pass to run
+ * (`BuildPlanDetail.tsx`); a caller running more than one independent pass
+ * over the same plan (`useComparedBuildResults.ts`'s Group Owned Overlay)
+ * must pass its own pool per pass — never one pool shared across passes,
+ * the same way `buildVsBuy.ts` creates its own fresh `ownedPool` every call
+ * rather than sharing one across unrelated resolutions.
+ */
 export function acquisitionForLookup(
-  sources: RecipeSources
+  sources: RecipeSources,
+  blueprintPools: BlueprintTierPools = new Map()
 ): (
   productTypeID: number,
   needed: number,
@@ -222,8 +257,17 @@ export function acquisitionForLookup(
     // Reaction formulas cannot be copied — never search BPC Sourcing for one.
     const isReaction = entry.blueprint.activity === 'reaction';
 
+    let pool = blueprintPools.get(blueprintTypeID);
+    if (!pool) {
+      pool = new Map();
+      blueprintPools.set(blueprintTypeID, pool);
+    }
+
     const tierInputs = {
-      ownedCopies: ownedCopiesFor(blueprintTypeID, sources.ownedBlueprints),
+      ownedCopies: pooledOwnedCopies(
+        ownedCopiesFor(blueprintTypeID, sources.ownedBlueprints),
+        pool
+      ),
       neededRuns: needed,
       materialCostAtMe: materialCostAtMeFor(blueprint, needed, ctx, materialPrices),
       bpcOffers: isReaction ? [] : acquisitionSources.offersFor(blueprintTypeID),
@@ -249,6 +293,7 @@ export function acquisitionForLookup(
     } else {
       resolved = selectBlueprintTier(tierInputs);
     }
+    claimBlueprintTier(pool, resolved, needed);
 
     return { me: resolved.me, te: resolved.te, blueprintTypeID, line: resolved.line };
   };

@@ -219,6 +219,57 @@ export function resolveTierOption(option: TierOption, neededRuns: number): Bluep
 }
 
 /**
+ * Runs remaining per ME/TE tier for one blueprint type, shared across every
+ * buildable node in a build-plan resolution pass that needs that same type —
+ * the same "first claim wins the stock" contract `materialResolution.ts`'s
+ * `ownedPool` applies to materials, but keyed per tier since a blueprint's
+ * owned copies are not fungible across ME/TE the way material units are.
+ */
+export type OwnedBlueprintPool = Map<string, number>;
+
+/**
+ * Seeds `pool` from `copies` the first time this blueprint type is reached
+ * (an empty pool), then returns every tier's *remaining* runs — reduced by
+ * whatever an earlier node already claimed via `claimBlueprintTier` — shaped
+ * as `SelectBlueprintTierInputs.ownedCopies` expects. A later call with the
+ * same (already-seeded) pool ignores `copies` entirely, so callers can pass
+ * the same raw owned-copies list every time without re-deriving it.
+ */
+export function pooledOwnedCopies(
+  copies: readonly OwnedBlueprintCopy[],
+  pool: OwnedBlueprintPool
+): OwnedBlueprintCopy[] {
+  if (pool.size === 0) {
+    for (const candidate of ownedTierCandidates(copies)) {
+      pool.set(tierKey(candidate.me, candidate.te), candidate.ownedRuns);
+    }
+  }
+  return [...pool.entries()].map(([key, runs]) => {
+    const [me, te] = key.split(':').map(Number);
+    return { me, te, runs: runs === INFINITE_RUNS ? -1 : runs };
+  });
+}
+
+/**
+ * Claims whatever `resolved`'s winning tier actually used out of `pool`, so
+ * the next node needing this same blueprint type sees the reduced remainder
+ * instead of the same stock two branches both think they can use for free.
+ * A BPO tier (`INFINITE_RUNS`) is never decremented — one original covers
+ * every branch that reaches it. A no-op for a tier `pool` never seeded (an
+ * unmatched override, or nothing owned) — nothing to claim from.
+ */
+export function claimBlueprintTier(
+  pool: OwnedBlueprintPool,
+  resolved: BlueprintTierResult,
+  neededRuns: number
+): void {
+  const key = tierKey(resolved.me, resolved.te);
+  const remaining = pool.get(key);
+  if (remaining === undefined || remaining === INFINITE_RUNS) return;
+  pool.set(key, remaining - Math.min(neededRuns, remaining));
+}
+
+/**
  * Picks the cheapest overall ME/TE tier for one buildable node: every tier
  * the Character owns any runs at, plus the cheapest purchasable tier (BPC
  * Sourcing first, else the BPO's own sell price) — never mixing tiers within

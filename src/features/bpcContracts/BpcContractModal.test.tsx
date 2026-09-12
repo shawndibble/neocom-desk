@@ -60,7 +60,12 @@ const ROW: BpcContractRow = {
 };
 
 function items(list: PublicContractItem[]) {
-  return { data: list, fetchedAt: new Date(), fromCache: false, truncated: false };
+  return {
+    data: { kind: 'items' as const, items: list },
+    fetchedAt: new Date(),
+    fromCache: false,
+    truncated: false,
+  };
 }
 
 /** Reports where the router ended up, so a navigating menu action is assertable. */
@@ -129,6 +134,24 @@ describe('BpcContractModal — where the contract is', () => {
     renderModal();
 
     expect(await screen.findByText('Unknown location (#60003760)')).toBeInTheDocument();
+  });
+});
+
+describe('BpcContractModal — contract no longer listed', () => {
+  it('shows a distinct message for a 404 rather than the generic load-failed one', async () => {
+    // ESI 404s a contract_id it no longer recognizes as public (expired,
+    // fulfilled, withdrawn) — an ordinary outcome, not a fetch failure.
+    loadPublicContractItems.mockResolvedValue({
+      data: { kind: 'not-found' as const },
+      fetchedAt: new Date(),
+      fromCache: false,
+      truncated: false,
+    });
+
+    renderModal();
+
+    expect(await screen.findByText('Contract no longer listed')).toBeInTheDocument();
+    expect(screen.queryByText('Could not load')).not.toBeInTheDocument();
   });
 });
 

@@ -126,7 +126,7 @@ export default defineConfig({
       registerType: 'prompt',
       manifest: {
         name: appStrings.name,
-        short_name: 'Neocom',
+        short_name: appStrings.name,
         description: appStrings.tagline,
         theme_color: '#0d1117',
         background_color: '#0d1117',
