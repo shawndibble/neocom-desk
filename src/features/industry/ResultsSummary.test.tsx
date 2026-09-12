@@ -70,6 +70,7 @@ function renderSummary(overrides: Partial<Parameters<typeof ResultsSummary>[0]> 
               onOpenBreakdown={vi.fn()}
               ownedSale={null}
               nameFor={(typeID) => (typeID === 34 ? 'Tritanium' : `Type ${typeID}`)}
+              totalVolume={{ volume: 1234.5, anyUnknown: false }}
               {...overrides}
             />
           }
@@ -433,5 +434,19 @@ describe('ResultsSummary: use or sell the owned materials', () => {
     renderSummary({ ownedSale: unpriced });
 
     expect(screen.getByText(/not enough price data to compare/i)).toBeTruthy();
+  });
+});
+
+describe('ResultsSummary: total volume (issue #874)', () => {
+  it('shows the total volume alongside the total cost', () => {
+    renderSummary({ totalVolume: { volume: 1234.5, anyUnknown: false } });
+
+    expect(screen.getByText('1,234.5 m³')).toBeInTheDocument();
+  });
+
+  it('flags the total when a material’s volume could not be resolved, rather than hiding the gap', () => {
+    renderSummary({ totalVolume: { volume: 10, anyUnknown: true } });
+
+    expect(screen.getByText(/at least/i)).toBeInTheDocument();
   });
 });

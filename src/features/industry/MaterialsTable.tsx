@@ -3,10 +3,12 @@ import { useTranslation } from 'react-i18next';
 import { DataTable, IconButton, TextInput, Tooltip, type DataTableColumn } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import type { MakeMethod, MakeOrBuy } from '@/engine/industry/makeOrBuy';
+import { rowVolume } from '@/engine/industry/materialVolume';
 import type { MaterialSourcing, MaterialSourcingMap } from '@/engine/industry/types';
 import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
 import { maskNumber, unmaskNumber } from '@/lib/numberMask';
+import { formatVolume } from './format';
 import { materialRowState } from './materialRow';
 import { suggestedOwnedQuantity } from '@/engine/industry/ownedStock';
 import { OwnedStockHint } from './OwnedStockHint';
@@ -17,6 +19,8 @@ interface MaterialsTableProps {
   /** Engine cost lines — already resolved against the plan's sourcing overrides and hub prices. */
   materials: readonly MaterialTableRow[];
   nameFor: (typeID: number) => string;
+  /** Per-unit m3 volume for a typeID, baked SDE data; null when unresolvable (issue #874). */
+  volumeFor: (typeID: number) => number | null;
   /** The plan's raw overrides. Needed to tell an override apart from a hub price of the same value. */
   sourcing: MaterialSourcingMap | undefined;
   /** False when the market snapshot couldn't be fetched — hub prices fall back to placeholder text. */
@@ -351,6 +355,7 @@ function MakeOrBuyMarker({ advice, remaining }: { advice: MakeOrBuy; remaining: 
 export function MaterialsTable({
   materials,
   nameFor,
+  volumeFor,
   sourcing,
   pricesReady,
   onSourcingChange,
@@ -509,6 +514,21 @@ export function MaterialsTable({
             )}
           </span>
         ),
+      },
+      {
+        id: 'volume',
+        header: t('industry.volume'),
+        align: 'right',
+        className: 'tabular-nums',
+        render: (material) => {
+          // A built row's own volume is never hauled at this typeID — its
+          // inputs carry that volume in their own rows further down this
+          // same flat list, exactly like its line total shows runs instead
+          // of a purchase figure.
+          if (material.subBuilds.length > 0) return null;
+          const volume = rowVolume(material, volumeFor);
+          return <span>{volume === null ? t('common.unknown') : formatVolume(volume)}</span>;
+        },
       },
       {
         id: 'owned',
@@ -730,6 +750,7 @@ export function MaterialsTable({
     [
       t,
       nameFor,
+      volumeFor,
       sourcing,
       pricesReady,
       onSourcingChange,

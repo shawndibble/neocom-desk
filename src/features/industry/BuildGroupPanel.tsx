@@ -21,6 +21,7 @@ import * as Icon from '@/components/ui/icons';
 import type { BuildPlanRecord } from '@/db';
 import type { BuildStrategy } from '@/engine/industry/autoMakeOrBuy';
 import { rollUpBuildGroup, type BuildGroupMember } from '@/engine/industry/groupRollup';
+import { rowVolume, totalVolume } from '@/engine/industry/materialVolume';
 import {
   filterStockByScope,
   suggestedOwnedQuantity,
@@ -37,11 +38,16 @@ import { unmaskNumber } from '@/lib/numberMask';
 import { getTradeHub } from '@/market/hubs';
 import type { PiData } from '@/sde/types';
 import { useAssumedMe } from './assumedMe';
-import { nameForType, toIndustryBlueprint, type BlueprintCatalog } from './blueprintCatalog';
+import {
+  nameForType,
+  toIndustryBlueprint,
+  volumeForType,
+  type BlueprintCatalog,
+} from './blueprintCatalog';
 import type { BuildGroup } from './buildGroups';
 import { AutoBuildControl } from './AutoBuildControl';
 import { groupCraftScope, groupAutoBuildMaxDepth } from './autoBuildGroup';
-import { formatPercent } from './format';
+import { formatPercent, formatVolume } from './format';
 import { profitOf, verdictOf } from './groupIndexStats';
 import { SourcingInput } from './MaterialsTable';
 import { OwnedStockHint } from './OwnedStockHint';
@@ -287,6 +293,33 @@ export function BuildGroupPanel({
   const groupProfit = profitOf(rollup.totalCost, rollup.buyCost);
   const groupVerdict = verdictOf(groupProfit);
 
+  // Materials merge Need/Owned/Still-to-buy into one table now (issue: group
+  // page redesign) — but a material fully covered by this group's own build
+  // tree (`builtQuantityByType` above) was never bought at all, so it moves to
+  // its own "Crafted" list below rather than sitting in the buy table showing
+  // "Covered" for a reason that has nothing to do with the owned-stock ledger.
+  const { buyRows, craftedTypeIds } = useMemo(() => {
+    const buyRows: BuyMaterialRow[] = [];
+    const craftedTypeIds: number[] = [];
+    for (const line of rollup.tableMaterials) {
+      const builtQuantity = builtQuantityByType.get(line.typeID) ?? 0;
+      if (builtQuantity > 0 && builtQuantity >= line.quantity) {
+        craftedTypeIds.push(line.typeID);
+        continue;
+      }
+      buyRows.push({ ...line, buyToShow: Math.max(0, line.remainingQuantity - builtQuantity) });
+    }
+    return { buyRows, craftedTypeIds };
+  }, [rollup.tableMaterials, builtQuantityByType]);
+
+  // Same rows the buy table itself shows a volume for (issue #874) — a
+  // fully crafted material is excluded here for the same reason it never
+  // reaches `buyRows`: it is produced inside the group, never hauled.
+  const groupVolume = useMemo(
+    () => totalVolume(buyRows, (typeID) => volumeForType(catalog, typeID)),
+    [buyRows, catalog]
+  );
+
   // The verdict band's sub-line: percent + hub only when there's a real
   // comparison to state (buyCost known and non-zero on the relevant side);
   // material cost, job fees, and job time are always known once pricing
@@ -297,8 +330,12 @@ export function BuildGroupPanel({
       amount: formatIsk(rollup.topLevelJobFees),
     });
     const duration = formatDuration(rollup.seconds);
+    const volume = t(
+      groupVolume.anyUnknown ? 'industry.groupVerdictVolumeAtLeast' : 'industry.groupVerdictVolume',
+      { volume: formatVolume(groupVolume.volume) }
+    );
     if (groupProfit === null || rollup.buyCost === null) {
-      return [material, jobFees, duration].join(' · ');
+      return [material, jobFees, duration, volume].join(' · ');
     }
     const pct =
       groupVerdict === 'build'
@@ -320,10 +357,11 @@ export function BuildGroupPanel({
           ? 'industry.groupVerdictMoreAt'
           : 'industry.groupVerdictMore';
     const comparison = pct === null ? null : t(comparisonKey, { percent: formatPercent(pct), hub });
-    return [comparison, material, jobFees, duration].filter(Boolean).join(' · ');
+    return [comparison, material, jobFees, duration, volume].filter(Boolean).join(' · ');
   }, [
     groupProfit,
     groupVerdict,
+    groupVolume,
     rollup.buyCost,
     rollup.totalCost,
     rollup.materialCost,
@@ -333,25 +371,6 @@ export function BuildGroupPanel({
     rollup.hubIds,
     t,
   ]);
-
-  // Materials merge Need/Owned/Still-to-buy into one table now (issue: group
-  // page redesign) — but a material fully covered by this group's own build
-  // tree (`builtQuantityByType` above) was never bought at all, so it moves to
-  // its own "Crafted" list below rather than sitting in the buy table showing
-  // "Covered" for a reason that has nothing to do with the owned-stock ledger.
-  const { buyRows, craftedTypeIds } = useMemo(() => {
-    const buyRows: BuyMaterialRow[] = [];
-    const craftedTypeIds: number[] = [];
-    for (const line of rollup.tableMaterials) {
-      const builtQuantity = builtQuantityByType.get(line.typeID) ?? 0;
-      if (builtQuantity > 0 && builtQuantity >= line.quantity) {
-        craftedTypeIds.push(line.typeID);
-        continue;
-      }
-      buyRows.push({ ...line, buyToShow: Math.max(0, line.remainingQuantity - builtQuantity) });
-    }
-    return { buyRows, craftedTypeIds };
-  }, [rollup.tableMaterials, builtQuantityByType]);
 
   /** One write path for the ledger: every caller mutates a copy of `group.ownedStock`, this commits it. */
   const updateOwnedStock = useCallback(
@@ -421,6 +440,16 @@ export function BuildGroupPanel({
         align: 'right',
         className: 'tabular-nums text-text-dim',
         render: (material) => material.quantity.toLocaleString(),
+      },
+      {
+        id: 'volume',
+        header: t('industry.volume'),
+        align: 'right',
+        className: 'tabular-nums',
+        render: (material) => {
+          const volume = rowVolume(material, (typeID) => volumeForType(catalog, typeID));
+          return <span>{volume === null ? t('common.unknown') : formatVolume(volume)}</span>;
+        },
       },
       {
         id: 'owned',

@@ -32,7 +32,7 @@ const CATALOG: BlueprintCatalog = {
   byBlueprintTypeID: new Map(),
   byProductTypeID: new Map(),
   typesById: {
-    '34': { name: 'Tritanium' },
+    '34': { name: 'Tritanium', volume: 0.01 },
     '35': { name: 'Pyerite' },
   } as unknown as BlueprintCatalog['typesById'],
 };
@@ -447,5 +447,36 @@ describe('BuildGroupPanel — built materials in the group needs list (issue #80
     const buyRow = within(needsPanel).getByText('#999').closest('tr')!;
     expect(within(buyRow).getByText('15', { selector: 'td:nth-of-type(2)' })).toBeTruthy();
     expect(within(buyRow).getByText('5')).toBeTruthy();
+  });
+});
+
+describe('BuildGroupPanel — total volume (issue #874)', () => {
+  it('shows each row’s own volume in the merged materials table', () => {
+    mockedUseComparedBuildResults.mockReturnValue([row('a', [material(34, 100)])]);
+    renderPanel([plan('a', 'jita')]);
+
+    const buyRow = screen.getByText('Tritanium').closest('tr')!;
+    // 100 x 0.01 m3 = 1 m3.
+    expect(within(buyRow).getByText('1 m³')).toBeTruthy();
+  });
+
+  it('shows unknown rather than a bogus figure for a material with no resolvable volume', () => {
+    mockedUseComparedBuildResults.mockReturnValue([row('a', [material(35, 50)])]);
+    renderPanel([plan('a', 'jita')]);
+
+    const buyRow = screen.getByText('Pyerite').closest('tr')!;
+    expect(within(buyRow).getByText('—')).toBeTruthy();
+  });
+
+  it('states the group’s total volume in the verdict qualifiers, without corrupting it when one material is unresolvable', () => {
+    mockedUseComparedBuildResults.mockReturnValue([
+      row('a', [material(34, 100), material(35, 50)]),
+    ]);
+    renderPanel([plan('a', 'jita')]);
+
+    // Only the Tritanium line (100 x 0.01 = 1 m3) is resolvable; Pyerite has
+    // no volume in CATALOG, so the total must reflect just that 1 m3 and say
+    // so is a lower bound, not silently a whole-group NaN or a bare "1 m³".
+    expect(screen.getByText(/volume at least 1 m³/i)).toBeTruthy();
   });
 });
