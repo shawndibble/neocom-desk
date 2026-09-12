@@ -8,7 +8,7 @@
  * panel owns the snapshot, the mode and the region names; this owns
  * everything that is only true of a haul.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -38,6 +38,7 @@ import { SPACE_KINDS, type SpaceKind } from '@/engine/space';
 import type { RoutePreferenceKind } from '@/engine/route/jumpRoute';
 import { localJumpCountsForRoutes } from '@/features/route/localRoute';
 import { CourierContractDetailModal } from '@/features/contractSearch/CourierContractDetailModal';
+import { loadCharacterRegionId } from '@/features/contractSearch/characterRegion';
 import { formatIsk, formatIskAuto } from '@/lib/isk';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
@@ -211,6 +212,105 @@ function RegionFilterField({
   );
 }
 
+/**
+ * What the shortcut knows about where the character is. `unknown` until it is
+ * asked — deliberately, because asking is what may cost a request, and the
+ * board must not spend one on a control the hauler may never touch.
+ */
+type MyRegion =
+  | { kind: 'unknown' }
+  | { kind: 'region'; regionId: number }
+  /** Asked, and there is no answer: no grant, offline, or a system the snapshot cannot place. */
+  | { kind: 'unavailable' };
+
+/**
+ * "From my region": sets the origin filter to the region the active character
+ * is standing in (issue #940).
+ *
+ * Region, not station or system, and the label says so. ESI answers this
+ * question with a solar system; the filter beside it is region-scoped, so
+ * naming anything finer would claim a precision the control does not have.
+ *
+ * Resolved on click rather than on mount, which is what keeps the promise of
+ * at most one request: a hauler who never presses it pays nothing, and one who
+ * has already loaded Assets this session pays nothing either — the location
+ * loader's cache row is still inside its freshness window and answers without
+ * a call.
+ *
+ * Afterwards the button can only be in one of three honest states. A region
+ * that no haul in the current snapshot starts in disables the control and says
+ * so, rather than setting a value the dropdown beside it has no option for —
+ * that would leave the filter showing something its own control cannot
+ * represent, and an empty table under it. An unresolvable location disables it
+ * quietly: a character whose grant predates `esi-location.read_location.v1`
+ * should find a convenience missing, never a re-auth banner.
+ */
+function MyRegionButton({
+  characterId,
+  options,
+  onPick,
+}: {
+  characterId: number;
+  options: RegionOption[];
+  onPick: (regionId: number) => void;
+}) {
+  const { t } = useTranslation();
+  const [resolved, setResolved] = useState<MyRegion>({ kind: 'unknown' });
+  const [pending, setPending] = useState(false);
+  // The await sits between mount and set, and the sheet this lives in can
+  // close over it — same guard as every other async effect on this board.
+  const liveRef = useRef(true);
+  useEffect(() => {
+    liveRef.current = true;
+    return () => {
+      liveRef.current = false;
+    };
+  }, []);
+
+  const eligible =
+    resolved.kind === 'region' && options.some((option) => option.id === resolved.regionId);
+  // Disabled while in flight as much as for the answer: on a phone a double
+  // tap is exactly how "at most one request" becomes two.
+  const disabled =
+    pending || resolved.kind === 'unavailable' || (resolved.kind === 'region' && !eligible);
+
+  const message =
+    resolved.kind === 'unavailable'
+      ? t('contractSearch.fromMyRegionUnavailable')
+      : resolved.kind === 'region' && !eligible
+        ? t('contractSearch.noHaulsFromMyRegion')
+        : null;
+
+  async function handleClick() {
+    if (resolved.kind === 'region') {
+      if (eligible) onPick(resolved.regionId);
+      return;
+    }
+    setPending(true);
+    const regionId = await loadCharacterRegionId(characterId);
+    if (!liveRef.current) return;
+    setPending(false);
+    if (regionId === null) {
+      setResolved({ kind: 'unavailable' });
+      return;
+    }
+    setResolved({ kind: 'region', regionId });
+    if (options.some((option) => option.id === regionId)) onPick(regionId);
+  }
+
+  return (
+    <FilterField label={t('contractSearch.fromMyRegion')} stretch={false}>
+      <div className="flex flex-col items-start gap-1">
+        <Button size="sm" disabled={disabled} onClick={() => void handleClick()}>
+          {t('contractSearch.fromMyRegion')}
+        </Button>
+        {/* The reason, not just a dead button: "disabled" alone reads as broken. */}
+        {message && <span className="text-xs text-text-dim">{message}</span>}
+      </div>
+    </FilterField>
+  );
+}
+
 /** A bare numeric bound — reward floor, collateral ceiling, cargo ceiling, deadline floor. */
 function NumericFilterField({
   label,
@@ -276,6 +376,7 @@ function RoutePreferenceField({
 interface CourierFilterBarProps {
   filter: CourierUiFilter;
   onChange: (filter: CourierUiFilter) => void;
+  characterId: number;
   originRegions: RegionOption[];
   destinationRegions: RegionOption[];
   spaceKinds: readonly SpaceKind[];
@@ -286,6 +387,7 @@ interface CourierFilterBarProps {
 function CourierFilterBar({
   filter,
   onChange,
+  characterId,
   originRegions,
   destinationRegions,
   spaceKinds,
@@ -333,6 +435,11 @@ function CourierFilterBar({
             value={draft.originRegionId}
             options={originRegions}
             onChange={(originRegionId) => setDraft({ ...draft, originRegionId })}
+          />
+          <MyRegionButton
+            characterId={characterId}
+            options={originRegions}
+            onPick={(originRegionId) => setDraft({ ...draft, originRegionId })}
           />
           <RegionFilterField
             label={t('contractSearch.destinationRegionLabel')}
@@ -487,6 +594,8 @@ function useJumpCounts(
 interface CourierResultsProps {
   rows: readonly CourierRouteRow[];
   regionNames: ReadonlyMap<number, string>;
+  /** Non-null: the panel above this one does not render a board without an active character. */
+  characterId: number;
 }
 
 /**
@@ -502,7 +611,7 @@ interface CourierResultsProps {
  * hull, am I given long enough) rather than figures worth ranking fifty rows
  * by, and the table's width is owed to the ones that are.
  */
-export function CourierResults({ rows, regionNames }: CourierResultsProps) {
+export function CourierResults({ rows, regionNames, characterId }: CourierResultsProps) {
   const { t } = useTranslation();
   const timeZone = useTimeZone();
   const [uiFilter, setUiFilter] = useState<CourierUiFilter>(EMPTY_UI_FILTER);
@@ -732,6 +841,7 @@ export function CourierResults({ rows, regionNames }: CourierResultsProps) {
       <CourierFilterBar
         filter={uiFilter}
         onChange={changeFilter}
+        characterId={characterId}
         originRegions={originRegions}
         destinationRegions={destinationRegions}
         spaceKinds={spaceKinds}
