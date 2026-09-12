@@ -449,6 +449,26 @@ describe('EntryList marker row attributes', () => {
     expect(screen.queryByText('Remap marker')).not.toBeInTheDocument();
   });
 
+  it("adds the plan's implant bonuses, so the spread reads as the in-game remap screen does", () => {
+    const attributes = {
+      intelligence: 17,
+      memory: 17,
+      perception: 27,
+      willpower: 21,
+      charisma: 17,
+    };
+    render(
+      <EntryList
+        rows={rows}
+        bandsAt={new Map()}
+        {...defaultProps}
+        markerAttributesFor={() => attributes}
+        markerImplants={{ perception: 4, willpower: 4, intelligence: 5 }}
+      />
+    );
+    expect(screen.getByText('PER 31 / WIL 25 / INT 22 / MEM 17 / CHA 17')).toBeInTheDocument();
+  });
+
   it('opens the manual attribute editor when the marker row is clicked, whichever text it shows', async () => {
     const user = userEvent.setup();
     const onEditMarker = vi.fn();

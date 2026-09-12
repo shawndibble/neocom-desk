@@ -59,15 +59,12 @@
 import type { PiData } from '@/sde/types';
 import { colonyEarnings, type ColonyEarnings } from '@/engine/pi/colonyEarnings';
 import type { BuiltColonyAdvice } from './advisorModel';
-import { colonyFactoryBalance, colonyOutputPerHour } from './factoryBalanceModel';
-
-/**
- * Same role as `factoryBalance.ts`'s own `EPSILON` and `chain.ts`'s
- * `CEIL_EPSILON`: absorbs float drift so a colony whose extraction exactly
- * saturates its own factories nets to true zero rather than a signed trace.
- * Relative to the produced rate rather than a fixed floor — see the call site.
- */
-const NET_EPSILON = 1e-9;
+import {
+  colonyFactoryBalance,
+  colonyLocalDrawPerHour,
+  colonyOutputPerHour,
+  netAgainstDraw,
+} from './factoryBalanceModel';
 
 export interface ColonyEarningsPrices {
   /** ISK per unit by typeID, the ask. A type the hub does not quote is absent, never zero. */
@@ -98,36 +95,22 @@ export function saleableOutputPerHour(colony: BuiltColonyAdvice, pi: PiData): Ma
     produced.set(typeId, (produced.get(typeId) ?? 0) + unitsPerHour);
   }
 
-  // Every measured line's own draw, scaled from `demandPerHour`'s built-pin
-  // figure down to the fed pins it is actually crediting output at, then
-  // summed per input across every line wanting it — the same input can feed
-  // two schematics, same as `factoryBalance.ts`'s own sharing rule.
-  const consumedLocally = new Map<number, number>();
-  for (const line of balance) {
-    if (line.status !== 'measured' || line.pins <= 0) continue;
-    const fedPins = Math.min(line.pins, line.feedablePins);
-    if (fedPins <= 0) continue;
-    for (const input of line.demandPerHour) {
-      const perPin = input.unitsPerHour / line.pins;
-      consumedLocally.set(
-        input.typeId,
-        (consumedLocally.get(input.typeId) ?? 0) + perPin * fedPins
-      );
-    }
-  }
+  // Every line's own draw, measured or not. This used to skip anything that
+  // was not `measured`, which meant a line with one imported input — Nanites
+  // want Reactive Metals, which a temperate planet has none of — was credited
+  // for its output at all eight built pins and charged nothing for the
+  // Bacteria it takes off this same planet to make it. The colony then had
+  // that Bacteria counted as sellable on top of the Nanites made out of it.
+  // See `colonyLocalDrawPerHour`, which both this and the network plan's
+  // supply pool now read.
+  const consumedLocally = colonyLocalDrawPerHour(balance, pi);
 
-  const saleable = new Map<number, number>();
-  for (const [typeId, unitsPerHour] of produced) {
-    const net = unitsPerHour - (consumedLocally.get(typeId) ?? 0);
-    // Relative, not absolute: these rates run from 5 ISK ore to 21,201
-    // units/hr, so a fixed floor would be too loose at the low end or too
-    // tight at the high one. A colony whose extraction exactly saturates its
-    // own factories nets to something like 4.5e-13 in float, not zero, and
-    // without this a phantom trace of P0 the hub does not quote would land
-    // in `unpriced` and suppress a real colony's earnings line for it.
-    if (net > unitsPerHour * NET_EPSILON) saleable.set(typeId, net);
-  }
-  return saleable;
+  // The threshold inside is relative, not absolute, and that matters here:
+  // a colony whose extraction exactly saturates its own factories nets to
+  // something like 4.5e-13 in float rather than zero, and a phantom trace of
+  // P0 the hub does not quote would land in `unpriced` and suppress a real
+  // colony's earnings line for it.
+  return netAgainstDraw(produced, consumedLocally);
 }
 
 /** This colony's current earnings, priced at hub rates. */

@@ -285,6 +285,8 @@ export function buildWorklist(colonies: readonly WorklistColony[]): Worklist {
       verb: 'rebuild',
       label: colony.rebuild.label,
       iskPerHour: colony.rebuild.marginPerHour,
+      tier: colony.rebuild.tier,
+      pins: colony.rebuild.pins,
     }))
     .sort((a, b) => (b.iskPerHour ?? 0) - (a.iskPerHour ?? 0) || a.planetId - b.planetId);
 

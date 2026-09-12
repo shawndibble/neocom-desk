@@ -26,7 +26,7 @@ import {
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { PRIORITY_ORDER } from '@/engine/planPriority';
-import type { AttributeName, Attributes, PlanPriority } from '@/engine/types';
+import type { AttributeName, Attributes, Implants, PlanPriority } from '@/engine/types';
 import { formatDuration, stepFinish } from '@/lib/duration';
 import { formatLocalDate } from '@/lib/localDate';
 import type { AttributePair } from './attributePairBands';
@@ -537,6 +537,8 @@ interface MarkerRowProps {
   markerIndex: number;
   /** This marker's target attribute spread — a manual override, or "Optimize at my markers"' result, once either is known. */
   attributes?: Attributes;
+  /** The plan's implant lens, so the spread reads as the in-game remap screen does. */
+  implants: Implants;
   onRemove: (markerIndex: number) => void;
   /** Opens the manual attribute editor (RemapMarkerModal) for this marker. */
   onEdit: (markerIndex: number) => void;
@@ -559,6 +561,7 @@ const MarkerRow = memo(function MarkerRow({
   id,
   markerIndex,
   attributes,
+  implants,
   onRemove,
   onEdit,
 }: MarkerRowProps) {
@@ -587,7 +590,7 @@ const MarkerRow = memo(function MarkerRow({
           onClick={() => onEdit(markerIndex)}
           className="flex-1 truncate text-left tabular-nums hover:underline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
         >
-          {remapInstruction(attributes)}
+          {remapInstruction(attributes, implants)}
         </button>
       ) : (
         <>
@@ -615,6 +618,9 @@ const MarkerRow = memo(function MarkerRow({
   );
 });
 
+/** Stable identity: a literal default would be a new object on every render, defeating MarkerRow's memo. */
+const EMPTY_IMPLANTS: Implants = {};
+
 interface EntryListProps {
   /** Pre-merged entry + marker + prereq rows (see queueRows.ts), in schedule order. */
   rows: readonly MergedRow[];
@@ -634,6 +640,8 @@ interface EntryListProps {
   onRemoveMarker: (markerIndex: number) => void;
   /** A marker's target attribute spread, once known. Undefined when no "Optimize at my markers" result covers it yet. */
   markerAttributesFor?: (markerIndex: number) => Attributes | undefined;
+  /** Implant bonuses a marker's spread is shown with (PlanEditor's What-If lens). Omitted reads as no implants. */
+  markerImplants?: Implants;
   /** Opens the manual attribute editor (RemapMarkerModal) for a marker. */
   onEditMarker: (markerIndex: number) => void;
   onSetPriority: (skillTypeID: number, priority: PlanPriority) => void;
@@ -668,6 +676,7 @@ export function EntryList({
   onRemove,
   onRemoveMarker,
   markerAttributesFor,
+  markerImplants = EMPTY_IMPLANTS,
   onEditMarker,
   onSetPriority,
   onPromotePrereq,
@@ -755,6 +764,7 @@ export function EntryList({
                       id={row.id}
                       markerIndex={row.markerIndex}
                       attributes={markerAttributesFor?.(row.markerIndex)}
+                      implants={markerImplants}
                       onRemove={onRemoveMarker}
                       onEdit={onEditMarker}
                     />

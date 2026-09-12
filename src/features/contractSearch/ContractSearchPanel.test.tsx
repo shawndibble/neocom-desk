@@ -86,9 +86,28 @@ const UNKNOWN_STRUCTURE = 1035466617946;
 /** A 0.3 system joining the two hubs directly — two jumps instead of four. */
 const LOWSEC_SHORTCUT = 30000200;
 
+/**
+ * One station per band the app can actually produce, so the route cell and the
+ * Destination space filter run through the real `classifySpace` rather than
+ * only at engine level (issue #939).
+ *
+ * There is deliberately no wormhole station here. Endpoints are named out of
+ * `stations.json`, which holds NPC stations only, and none of its 5,210 sits in
+ * a J-named system — wormhole hauls end at player structures, which nothing
+ * local places at all. A J-named NPC station in this fixture would be a shape
+ * the SDE build cannot emit, and a test built on one proves nothing about
+ * production.
+ */
+const RANCER = 60011740;
+const RANCER_SYSTEM = 30002809;
+const NULL_STATION = 60014437;
+const NULL_SYSTEM = 30001161;
+
 const STATIONS: NpcStationEntry[] = [
   { id: JITA, name: 'Jita IV - Moon 4 - Caldari Navy Assembly Plant', systemId: 30000142 },
   { id: AMARR, name: 'Amarr VIII (Oris) - Emperor Family Academy', systemId: 30002187 },
+  { id: RANCER, name: 'Rancer III - Moon 1', systemId: RANCER_SYSTEM },
+  { id: NULL_STATION, name: 'Outpost', systemId: NULL_SYSTEM },
 ];
 const SYSTEMS: SolarSystemEntry[] = [
   { id: 30000142, name: 'Jita', security: 0.9, regionId: 10000002 },
@@ -100,6 +119,10 @@ const SYSTEMS: SolarSystemEntry[] = [
   // And one lowsec hop that halves the trip, which is what makes the three
   // route preferences give three different answers rather than one.
   { id: LOWSEC_SHORTCUT, name: 'Ohide', security: 0.3, regionId: 10000043 },
+  { id: RANCER_SYSTEM, name: 'Rancer', security: 0.4, regionId: 10000043 },
+  // Exactly 0.0, which is a real nullsec value and a falsy one — a truthiness
+  // guard anywhere on the security field would call this unknown.
+  { id: NULL_SYSTEM, name: 'Vale', security: 0.0, regionId: 10000043 },
 ];
 
 /**
@@ -848,6 +871,144 @@ describe('ContractSearchPanel — Build Plan from an item row', () => {
       'aria-disabled',
       'true'
     );
+  });
+});
+
+/**
+ * Endpoint space, never route space (issue #939). The band describes the two
+ * ends a haul is posted between; nothing here claims the trip between them is
+ * safe, and there is deliberately no control that would.
+ */
+describe('ContractSearchPanel — Courier endpoint space', () => {
+  const TO_LOWSEC = courierRow({ contractId: 601, destinationLocationId: RANCER });
+  const TO_NULL = courierRow({ contractId: 602, destinationLocationId: NULL_STATION });
+  /** A player structure: `stations.json` does not hold it, so it has no band. */
+  const TO_STRUCTURE = courierRow({ contractId: 604, destinationLocationId: UNKNOWN_STRUCTURE });
+
+  async function showCourierWith(rows: PublicCourierContractRow[]) {
+    loadPublicCourierContracts.mockResolvedValue(cachedCourierSnapshot(rows));
+    const user = userEvent.setup();
+    renderWithRouter();
+    await bodyRows();
+    await user.click(screen.getByRole('button', { name: 'Courier' }));
+    await screen.findByRole('table');
+    return user;
+  }
+
+  /**
+   * Opens the funnel, since the courier bar is `collapsible`. At pointer width
+   * — which is what jsdom reports — that shows the controls on a line below
+   * the search box and each one commits as it is touched; the Apply/Cancel
+   * pair belongs to the narrow-width sheet.
+   */
+  async function openFilters(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(screen.getByRole('button', { name: 'Filters' }));
+  }
+
+  function spaceGroup() {
+    return screen.getByRole('group', { name: 'Destination space' });
+  }
+
+  async function courierRows() {
+    const table = await screen.findByRole('table');
+    const [, ...rest] = within(table).getAllByRole('rowgroup');
+    return within(rest[0]).getAllByRole('row');
+  }
+
+  it('bands both ends of every haul', async () => {
+    await showCourierWith([JITA_TO_AMARR, TO_LOWSEC, TO_NULL]);
+
+    const cells = (await courierRows()).map(
+      (r) => within(r).getAllByRole('cell')[0].textContent ?? ''
+    );
+
+    // Origin is Jita on all three, so every cell opens with a highsec pickup.
+    expect(cells.every((cell) => cell.includes('Highsec'))).toBe(true);
+    expect(cells.some((cell) => cell.includes('Lowsec'))).toBe(true);
+    expect(cells.some((cell) => cell.includes('Nullsec'))).toBe(true);
+  });
+
+  it('says a destination it cannot place has unknown space, rather than guessing', async () => {
+    await showCourierWith([TO_STRUCTURE]);
+
+    expect(within((await courierRows())[0]).getByText('Unknown space')).toBeInTheDocument();
+  });
+
+  it('offers only the bands these hauls actually end in', async () => {
+    // A chip for a band no row carries can never match, and deselecting it
+    // would read as a no-op while silently dropping every unplaced destination.
+    const user = await showCourierWith([JITA_TO_AMARR, TO_LOWSEC]);
+    await openFilters(user);
+
+    const chips = within(spaceGroup())
+      .getAllByRole('button')
+      .map((b) => b.textContent);
+    expect(chips).toEqual(['Highsec', 'Lowsec']);
+  });
+
+  it('hides the band filter entirely when no haul on the board carries one', async () => {
+    // A label with no chips under it is what the endpoints-still-resolving
+    // state looks like, and the permanent state if the station snapshot cannot
+    // be read at all. Neither is worth a control.
+    const user = await showCourierWith([TO_STRUCTURE]);
+    await openFilters(user);
+
+    expect(screen.queryByRole('group', { name: 'Destination space' })).not.toBeInTheDocument();
+  });
+
+  it('narrows the table to hauls ending in a chosen band', async () => {
+    const user = await showCourierWith([JITA_TO_AMARR, TO_LOWSEC, TO_NULL]);
+    await openFilters(user);
+
+    for (const band of ['Highsec', 'Nullsec']) {
+      await user.click(within(spaceGroup()).getByRole('button', { name: band }));
+    }
+
+    const rows = await courierRows();
+    expect(rows).toHaveLength(1);
+    expect(within(rows[0]).getAllByRole('cell')[0]).toHaveTextContent('Rancer');
+  });
+
+  it('keeps an unplaceable destination while every offered band is selected', async () => {
+    // The control the hauler never narrowed must not exclude anything.
+    await showCourierWith([JITA_TO_AMARR, TO_STRUCTURE]);
+
+    expect(await courierRows()).toHaveLength(2);
+  });
+
+  it('names the endpoint, not the route, so nothing reads as a safety claim', async () => {
+    const user = await showCourierWith([JITA_TO_AMARR]);
+    await openFilters(user);
+
+    // The band describes two endpoints. A highsec pickup and a highsec
+    // delivery can still route through lowsec, and this app cannot know — so
+    // the control is named for the end it filters on.
+    expect(spaceGroup()).toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: /route/i })).not.toBeInTheDocument();
+  });
+
+  it('says why a narrowed band filter dropped the hauls it cannot place', async () => {
+    const user = await showCourierWith([TO_LOWSEC, TO_STRUCTURE]);
+    await openFilters(user);
+
+    await user.click(within(spaceGroup()).getByRole('button', { name: 'Lowsec' }));
+
+    // Not the generic "nothing matched": the board excluded these itself, and
+    // must say so rather than presenting its own exclusion as an absence.
+    expect(await screen.findByText(/cannot place/i)).toBeInTheDocument();
+  });
+
+  it('does not blame unplaceable destinations for an emptiness another filter caused', async () => {
+    const user = await showCourierWith([TO_LOWSEC, TO_STRUCTURE]);
+    await openFilters(user);
+
+    // Narrow a band *and* set a reward floor nothing clears. The band filter is
+    // not why the table is empty, so it must not be offered as the reason.
+    await user.click(within(spaceGroup()).getByRole('button', { name: 'Lowsec' }));
+    await user.type(screen.getByLabelText('Min reward'), '999999999999');
+
+    expect(await screen.findByText(/match your filters/i)).toBeInTheDocument();
+    expect(screen.queryByText(/cannot place/i)).not.toBeInTheDocument();
   });
 });
 

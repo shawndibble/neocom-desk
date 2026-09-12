@@ -391,7 +391,7 @@ function BpcFilterBar({
             {SPACE_KINDS.map((kind) => (
               <FilterChip
                 key={kind}
-                label={t(`bpcContracts.space.${kind}`)}
+                label={t(`common.spaceOption.${kind}`)}
                 selected={draft.spaceKinds.includes(kind)}
                 onToggle={() => {
                   const next = draft.spaceKinds.includes(kind)
@@ -851,7 +851,7 @@ export function BpcSourcingPanel({ initialTypeId = null }: BpcSourcingPanelProps
         header: t('bpcContracts.spaceColumn'),
         sortValue: (row) => row.space ?? '',
         render: (row) =>
-          row.space ? t(`bpcContracts.space.${row.space}`) : t('bpcContracts.notApplicable'),
+          row.space ? t(`common.spaceOption.${row.space}`) : t('bpcContracts.notApplicable'),
       },
       expires: {
         id: 'expires',

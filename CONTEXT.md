@@ -229,6 +229,7 @@ here — they go one per file in `docs/context/decisions/`.
 - **EIV (Estimated Item Value)**: The SCC's reference price for the materials
   a manufacturing job consumes, at ME0 quantities. Used only to size the
   **Job Fee** — it is not what the materials actually cost to buy.
+- **Endpoint Space**: which of the four bands — highsec, lowsec, nullsec, wormhole — one end of a courier haul sits in, classified from the local SDE entry that names its system. Describes an _endpoint_, never the route between two of them: a highsec pickup and a highsec delivery can still route through lowsec, and no control on the courier board implies otherwise. An end the local snapshot cannot place has no band at all and is excluded by a narrowed band filter rather than assigned one.
 - **Error Budget**: ESI's allowance of 100 non-2xx/3xx responses per 60
   seconds, counted **globally across every route** for the whole client — not
   per endpoint and not per Character. Spend it and ESI answers 420 to
@@ -250,6 +251,13 @@ here — they go one per file in `docs/context/decisions/`.
   the single event is fetched/toggled like every other, and each raw `type`
   string gets its own independent opt-out underneath, discovered as it fires
   rather than enumerated from a closed list.
+- **Exportable Rate**: What one PI colony has going spare an hour, by product
+  typeID — what its own factories make, less its **Local Draw**. This, never
+  gross production, is what a **Colony Network** plan may spend: a colony
+  making Bacteria for its own Nanite pins has none to route anywhere. A product
+  it wholly consumes is absent from the map rather than zero, because every
+  read of it asks "can this set supply the product", not "how much". Carried as
+  `NetworkColony.exportablePerHour`, computed by `colonyExportablePerHour`.
 - **Facility Preset**: Industry location model: NPC station or player structure type + rig level. Manufacturing structures (Raitaru/Azbel/Sotiyo, engineering complexes) and reaction structures (Athanor/Tatara, refineries — no NPC-station equivalent) each use their own **Industry Activity**'s rig bonuses and security-multiplier table (issue #460); the two never mix on one facility. Drives ME/time/cost bonuses in a Build Plan.
 - **Fit Import**: Pasting EFT fit text into Industry to get a **Build Group** holding one **Build Plan** per buildable item in the fit, named from the paste's own `[Ship, Fit]` header. Counts quantities the way a fit expresses them — one line per copy fitted _and_ the `xN` suffix, both reaching the same total — and reports what it could not build (faction, named and meta modules have no blueprint, and a fifth of a routine paste is normally one of those) rather than dropping it silently. New plans take their ME from the assumed-ME preference and their TE from the assumed-TE one rather than 0, since most of a T2 fit needs an invented BPC (ME2 / TE4 without a decryptor) and quoting it unresearched overstates the group's cost and understates its job time. Distinct from the Skill Planner's clipboard import, which reads the same text for the skills it demands; the two share `parseEftFit` and nothing else.
 - **Foreground Poller**: Client-side interval (5 minutes) that checks each
@@ -349,6 +357,11 @@ here — they go one per file in `docs/context/decisions/`.
   Structure timers, Moon chunks, Industry jobs — showing that kind's most urgent
   few and counting the rest. Fed by the one engine ranking, never a second one,
   and gated on the Corp Capability that opens its own read.
+- **Local Draw**: What a PI colony's own factories take an hour off the
+  products that colony makes, by input typeID. Counted for every factory line
+  whatever its status — a line one of whose inputs is imported still eats the
+  local one — and at the same pin count that line's output is credited at. The
+  subtrahend of the **Exportable Rate**; see `colonyLocalDrawPerHour`.
 - **Location Mode**: The Market Browser's one location control, in one of two
   mutually exclusive modes — **Region** (every station in that region) or
   **Trade Hub** (that hub's region, filtered to the hub's station).

@@ -16,6 +16,8 @@
  * only narrows the row set.
  */
 
+import type { SpaceKind } from '@/engine/space';
+
 /**
  * One row of the shared snapshot: an outstanding public courier contract.
  * Mirrors `functions/src/publicContracts.ts`'s `PublicCourierContractRow`,
@@ -71,6 +73,21 @@ export interface CourierEndpoint {
    */
   systemId: number | null;
   regionId: number | null;
+  /**
+   * Which of the four space bands this end sits in, from the same
+   * `classifySpace` the BPC Search Space filter uses (issue #939) — the local
+   * SDE entry that names the system carries its security status too, so this
+   * costs nothing beyond keeping a field that was already being read.
+   *
+   * `null` for the same player-structure case that leaves the name null: the
+   * snapshot does not hold the location, so there is no system and no security
+   * to band. "Unknown" is the honest answer, and it is not "highsec".
+   *
+   * Required rather than optional on purpose: an optional field lets a
+   * hand-built fixture omit it silently, and the band would then go missing in
+   * tests while the suite stayed green.
+   */
+  space: SpaceKind | null;
 }
 
 /** A courier row with both ends resolved — what the filters and the table read. */
@@ -86,7 +103,14 @@ function endpointFor(
 ): CourierEndpoint {
   const resolved = endpoints.get(locationId);
   if (resolved) return resolved;
-  return { locationId, name: null, systemName: null, systemId: null, regionId: fallbackRegionId };
+  return {
+    locationId,
+    name: null,
+    systemName: null,
+    systemId: null,
+    regionId: fallbackRegionId,
+    space: null,
+  };
 }
 
 /**
@@ -125,6 +149,20 @@ export interface CourierContractFilter {
   minDaysToComplete?: number | null;
   /** Free text matched against either end's station or system name. */
   routeQuery?: string | null;
+  /**
+   * Which space bands the hauler is willing to deliver into. `null` or absent
+   * is no restriction; an empty list asks for hauls ending in none of the four,
+   * which is honestly empty rather than silently everything. The panel maps
+   * "every offered band selected" to `null`, so that is where "show
+   * everything" lives — and it measures against the bands its rows actually
+   * carry, so a band with nothing behind it cannot hold the filter open.
+   *
+   * Named for the endpoint, not the route, because that is all it knows: a
+   * highsec pickup and a highsec delivery can still route through lowsec, and
+   * answering that would cost one route lookup per row against ESI's shared
+   * error budget — the fan-out all three courier scope decisions refuse.
+   */
+  destinationSpace?: readonly SpaceKind[] | null;
 }
 
 /**
@@ -158,6 +196,14 @@ export function filterCourierContracts(
     if (
       filter.destinationRegionId != null &&
       row.destination.regionId !== filter.destinationRegionId
+    ) {
+      return false;
+    }
+    // An unplaced destination has no band, and "unknown" is not a match — the
+    // same rule the region filters above apply, for the same reason.
+    if (
+      filter.destinationSpace != null &&
+      (row.destination.space === null || !filter.destinationSpace.includes(row.destination.space))
     ) {
       return false;
     }

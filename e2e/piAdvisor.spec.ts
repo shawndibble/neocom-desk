@@ -19,10 +19,14 @@ import { CHARACTER_ID } from './support/fixtureData';
 const SYSTEM_ID = 30_000_142;
 const PLANET_ID = 40_000_002;
 const NEIGHBOUR_ID = 40_000_005;
+const STORAGE_PLANET_ID = 40_000_006;
 
 /** Temperate — the planet type that yields Microorganisms. */
 const TEMPERATE_TYPE_ID = 11;
+const BARREN_TYPE_ID = 2016;
 const MICROORGANISMS = 2073;
+/** Barren's P0 — what the storage colony below pulls. */
+const BASE_METALS = 2267;
 
 const INSTALLED_AT = '2026-09-01T00:00:00Z';
 const EXPIRES_AT = '2026-09-15T00:00:00Z';
@@ -35,6 +39,15 @@ const COLONIES = [
     owner_id: CHARACTER_ID,
     upgrade_level: 5,
     num_pins: 7,
+    last_update: '2026-09-10T00:00:00Z',
+  },
+  {
+    solar_system_id: SYSTEM_ID,
+    planet_id: STORAGE_PLANET_ID,
+    planet_type: 'barren',
+    owner_id: CHARACTER_ID,
+    upgrade_level: 5,
+    num_pins: 3,
     last_update: '2026-09-10T00:00:00Z',
   },
 ];
@@ -87,16 +100,54 @@ const COLONY_DETAIL = {
   ],
 };
 
+/**
+ * A colony that does nothing but dig and hold: ten heads into one Launchpad,
+ * no factory to consume any of it. It fills well inside a daily haul, which is
+ * the fault the summary is meant to name planet by planet rather than count.
+ */
+const STORAGE_COLONY_DETAIL = {
+  links: [{ source_pin_id: 11, destination_pin_id: 13 }],
+  pins: [
+    { pin_id: 11, type_id: 2254, latitude: 2, longitude: 2 }, // Command Center
+    {
+      pin_id: 12,
+      type_id: 3068, // Extractor Control Unit
+      latitude: 2.1,
+      longitude: 2.1,
+      extractor_details: {
+        product_type_id: BASE_METALS,
+        cycle_time: 1800,
+        qty_per_cycle: 40_000,
+        head_radius: 0.02,
+        heads: Array.from({ length: 10 }, (_, index) => ({
+          head_id: index,
+          latitude: 2.1 + index / 100,
+          longitude: 2.1,
+        })),
+      },
+      install_time: INSTALLED_AT,
+      expiry_time: EXPIRES_AT,
+      last_cycle_start: INSTALLED_AT,
+    },
+    { pin_id: 13, type_id: 2256, latitude: 2.2, longitude: 2.2 }, // Launchpad
+  ],
+};
+
 const SYSTEM = {
   system_id: SYSTEM_ID,
   name: 'Efa',
   security_status: 0.9,
-  planets: [{ planet_id: PLANET_ID }, { planet_id: NEIGHBOUR_ID }],
+  planets: [
+    { planet_id: PLANET_ID },
+    { planet_id: NEIGHBOUR_ID },
+    { planet_id: STORAGE_PLANET_ID },
+  ],
 };
 
 const PLANETS: Record<number, { name: string; type_id: number }> = {
   [PLANET_ID]: { name: 'Efa II', type_id: TEMPERATE_TYPE_ID },
   [NEIGHBOUR_ID]: { name: 'Efa IV', type_id: TEMPERATE_TYPE_ID },
+  [STORAGE_PLANET_ID]: { name: 'Efa VI', type_id: BARREN_TYPE_ID },
 };
 
 test.beforeEach(async ({ page }) => {
@@ -111,6 +162,8 @@ test.beforeEach(async ({ page }) => {
 
     if (pathname === `/characters/${CHARACTER_ID}/planets`) return json(COLONIES);
     if (pathname === `/characters/${CHARACTER_ID}/planets/${PLANET_ID}`) return json(COLONY_DETAIL);
+    if (pathname === `/characters/${CHARACTER_ID}/planets/${STORAGE_PLANET_ID}`)
+      return json(STORAGE_COLONY_DETAIL);
     if (pathname === `/universe/systems/${SYSTEM_ID}`) return json(SYSTEM);
 
     // The factories' schematic, so the card names what they make rather than
@@ -125,6 +178,37 @@ test.beforeEach(async ({ page }) => {
       if (info) return json({ ...info, planet_id: Number(planet[1]), system_id: SYSTEM_ID });
     }
     return route.fallback();
+  });
+
+  /*
+    The shared fixture prices one type (Tritanium), which leaves every colony
+    here unpriceable — and an unpriced tab cannot render the figures this
+    spec's screenshot exists to check: what the colonies earn now, what tuning
+    adds, and what a rebuild would earn instead. So every requested type comes
+    back quoted, at a price that rises with tier so a made product out-earns
+    the ore it is made from.
+  */
+  await page.route('https://market.fuzzwork.co.uk/**', async (route) => {
+    const types = new URL(route.request().url()).searchParams.get('types') ?? '';
+    const body: Record<string, unknown> = {};
+    for (const raw of types.split(',').filter(Boolean)) {
+      const typeId = Number(raw);
+      // P0 ore is cheap; anything made from it is worth more. The exact
+      // figures do not matter — the ordering between them does.
+      const sell = typeId === MICROORGANISMS || typeId === BASE_METALS ? 12 : 1_400;
+      // `orderCount` is not decoration: `parseSide` reports a side with no
+      // orders as null rather than 0, so an aggregate without it is an
+      // unpriced type however good its `min` looks.
+      body[raw] = {
+        buy: { max: sell * 0.9, volume: 500_000, orderCount: 40 },
+        sell: { min: sell, volume: 500_000, orderCount: 40 },
+      };
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(body),
+    });
   });
 
   // The shared fixture answers `/planets` with an empty list and the app warms
