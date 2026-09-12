@@ -39,7 +39,6 @@ import type { PinLoad } from '@/engine/pi/types';
 import { localResourcesFor } from './advisorModel';
 import type { MaxColonyBudget } from './colonyBudget';
 import type { AssumedRate } from './richnessEstimate';
-import { ADVISOR_BUFFER_HOURS } from './stopTierModel';
 
 /**
  * Heads a hypothetical extractor is fitted with: a full complement, matching
@@ -84,6 +83,8 @@ export interface UnbuiltPlanInput {
   /** What a sale fetches — highest hub buy, falling back to the ask. */
   revenuePrices: Readonly<Record<number, number>>;
   taxRate: number;
+  /** How long this colony would be left to fill before the pilot hauls it — see `cadencePref.ts`. */
+  bufferHours: number;
 }
 
 /**
@@ -142,7 +143,7 @@ export function unbuiltPlanAdvice(input: UnbuiltPlanInput): UnbuiltPlanAdvice {
       // Never guessed, same as the built colonies' line — the engine answers
       // `link-capacity-unknown` rather than picking a level.
       linkCapacityPerHour: null,
-      bufferHours: ADVISOR_BUFFER_HOURS,
+      bufferHours: input.bufferHours,
     },
     pi
   );

@@ -344,6 +344,15 @@ export interface ThroughputCheck {
   bufferM3: number;
   /** m3 the buffer must hold, being `flowPerHourM3 * bufferHours`. */
   bufferNeedM3: number;
+  /**
+   * Hours until the buffer fills at `flowPerHourM3`, being `bufferM3 /
+   * flowPerHourM3` — the figure a pilot actually wants ("fills up in 19
+   * hours"), where `verdict` only says whether that beats `bufferHours`.
+   * `null` for a colony with no flow at all: dividing by zero would read as
+   * `Infinity`, which looks like a confident "never" rather than the honest
+   * "nothing is moving to fill it".
+   */
+  hoursToFull: number | null;
   /** m3/hr one link carries, as supplied; null when unknown. */
   linkCapacityPerHour: number | null;
 }

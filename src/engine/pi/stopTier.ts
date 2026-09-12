@@ -54,6 +54,61 @@
  * no measured link load has no honest budget to pass and must not invent one;
  * see CONTEXT.md round 56.
  *
+ * ## Extra extractors do not yield the measured mean rate (issue #957)
+ *
+ * `extractionRatePerHour` is one number: the colony's own measured mean rate
+ * for one extractor program. Both scorers used to multiply it straight
+ * through by `blocks` — every extractor a layout fits, credited at that same
+ * mean. In game, extra Extractor Control Units and extra heads land on
+ * poorer ground than the ones already placed, so a real colony's Nth
+ * extractor does not match its first.
+ *
+ * That silently favoured "sell it raw": it is the one candidate that spends
+ * its whole budget on extractors, so it fits the most of them, and crediting
+ * every one at the mean overstated it more than any made tier, on top of the
+ * genuine economics that already make P0 -> P1 close at a 10% customs rate.
+ *
+ * `extraExtractorYieldFactor` is the fix, and `extractionFalloffRatio` below
+ * is where it is spent — once, so both kinds of candidate apply it the same
+ * way. Given `n` extractors of one resource, that resource's extraction is
+ * credited with `rate * (1 + (n - 1) * factor)` instead of `rate * n`: the
+ * first extractor stands at the full mean, every one after it counts for
+ * `factor` of it.
+ *
+ * `scoreRawResource`'s `n` is just `fit.blocks` — its one-resource block is
+ * built as a literal single ECU (`recommendStopTier`'s `rawFit`), so one
+ * block is one extractor. `scoreProduct` cannot reuse `blocks` the same way:
+ * `pinBudget.ts`'s `chainBlockPins` ceils each P0 input **independently**
+ * against the extraction rate (`Math.ceil(demand / rate)`, "two resources
+ * cannot share one extractor"), so whenever a chain's own per-factory demand
+ * for one P0 outruns the rate, that resource gets more than one ECU per
+ * block — `n` is `blocks * that ceiling`, not `blocks` alone. Reusing
+ * `blocks` as if it were always the true extractor count would under-charge
+ * a made candidate whose blocks each carry several ECUs of the same
+ * resource, which is the same species of bias this ticket exists to remove,
+ * just smaller and on the other side. So `scoreProduct` reproduces that
+ * per-P0 ceiling itself (`extractorsPerBlock`, mirroring `chainBlockPins`'s
+ * own formula — `pinBudget.ts` cannot be asked to export it without touching
+ * a file this fix does not own) and takes the *smallest* resulting ratio
+ * across its P0 inputs: the scarcest input's extractor count is what
+ * actually bottlenecks the chain's real output, the same reasoning
+ * `chainBlockPins` already applies by ceiling per type rather than pooling
+ * demand.
+ *
+ * Applying the same formula at each candidate's own true extractor count is
+ * deliberate and load-bearing: if only the raw candidate paid this, or made
+ * candidates paid it in name only, the fix would trade one structural tilt
+ * for the opposite one, and the raw-vs-made tie-break would move by more
+ * than the part this ticket is about.
+ *
+ * There is no published formula tying scan richness to `qty_per_cycle` —
+ * `docs/research/pi-cpu-power-mechanics.md`, "Open questions" — so this is
+ * deliberately *not* a decay curve fitted to anything. It is a flat
+ * multiplier, honestly labelled as a guess: seeing `DEFAULT_EXTRA_EXTRACTOR_
+ * YIELD_FACTOR` used be enough to know a real number was never measured. A
+ * fabricated curve would assert precision nobody has; a flat, named
+ * placeholder does not.
+ *
  * Pure: budget, prices, tax rate, extraction rate, link capacity and buffer
  * policy are all parameters. No fetch, no clock, no payload imports.
  */
@@ -108,7 +163,42 @@ export interface StopTierOptions {
    * honest answer for a planet with no colony on it to measure one from.
    */
   newLinkCost?: PinLoad;
+  /**
+   * Fraction of `extractionRatePerHour` each extractor *beyond the first* of
+   * a given resource is credited with, in both scorers alike. Omitted means
+   * `DEFAULT_EXTRA_EXTRACTOR_YIELD_FACTOR` — see that constant and the module
+   * header's "Extra extractors do not yield the measured mean rate" section.
+   * A caller with a better-measured number overrides it here; nothing in
+   * this module invents one on its own.
+   */
+  extraExtractorYieldFactor?: number;
 }
+
+/**
+ * `extraExtractorYieldFactor`'s own fallback.
+ *
+ * UNLIKE EVERY OTHER PI NUMBER THIS ENGINE TOUCHES THIS ONE IS NOT DERIVED
+ * FROM ANY SOURCE AT ALL. `EXTRACTOR_HEADS_MAX` in `pinBudget.ts` is at least
+ * a secondary-source figure someone read off a wiki page; this one has no
+ * source to read, because no published formula ties scan richness to
+ * `qty_per_cycle` (`docs/research/pi-cpu-power-mechanics.md`, "Open
+ * questions"). What is certain is only the direction: a layout's second and
+ * later extractors of one resource land on worse ground than its first, so
+ * crediting all of them at the colony's own measured mean overstates the
+ * layout, and overstates it more the more of them it fits.
+ *
+ * This number is therefore a flat, hand-maintained, conservative placeholder
+ * — not a measured constant, and not a decay curve. It exists to stop "sell
+ * it raw" from being overstated *by construction* (issue #957), not to model
+ * the real in-game falloff, which nobody has published. Conservative here
+ * means erring toward under-correcting: a number close to 1 changes today's
+ * recommendation less than a smaller one would, and this module would rather
+ * under-fix a real bias than assert a fabricated curve's precision. A caller
+ * with a measured number should pass `extraExtractorYieldFactor` and skip
+ * this default entirely; it is not a hard limit the way `EXTRACTOR_HEADS_MAX`
+ * is, only this module's own fallback when the caller supplies nothing.
+ */
+export const DEFAULT_EXTRA_EXTRACTOR_YIELD_FACTOR = 0.8;
 
 /**
  * Every made tier sits on the planet being scored, so nothing between them is
@@ -258,6 +348,65 @@ function priceOf(typeId: number, prices: Readonly<Record<number, number>>): numb
 }
 
 /**
+ * What fraction of a naive `n * rate` figure this module credits a resource's
+ * extraction with, once every extractor after the first counts for only
+ * `factor` of the mean rate: `(1 + (n - 1) * factor) / n`.
+ *
+ * Called at each candidate's own true per-resource extractor count `n`, so
+ * two candidates with the same real extractor count always pay the same
+ * ratio regardless of which kind of candidate they are — see the module
+ * header. `n` is always at least 1 here: callers only reach this after a
+ * does-not-fit fit, or a zero-block resource ceiling, has already returned.
+ */
+function extractionFalloffRatio(n: number, factor: number): number {
+  return (1 + (n - 1) * factor) / n;
+}
+
+/**
+ * How many ECUs one ratio block needs for a single P0 input, at this
+ * extraction rate — the same ceiling `chainBlockPins` in `pinBudget.ts`
+ * applies per P0 type ("two resources cannot share one extractor"),
+ * reproduced here because that function hands back only the aggregate
+ * `PinCounts` for the whole block, not this per-resource count, and the
+ * falloff has to key on the per-resource figure — see the module header.
+ *
+ * `CEILING_EPSILON` mirrors `pinBudget.ts`'s own `FLOOR_EPSILON`: both exist
+ * only to keep float drift (3.0000000001, say) from ceiling up to 4 when the
+ * true answer is 3.
+ */
+const CEILING_EPSILON = 1e-9;
+
+function extractorsPerBlock(demandPerHour: number, ratePerHour: number): number {
+  return Math.ceil(demandPerHour / ratePerHour - CEILING_EPSILON);
+}
+
+/**
+ * The falloff ratio a made-tier candidate actually pays: the smallest of its
+ * own P0 inputs' ratios, each computed at that input's true extractor count
+ * (`blocks * extractorsPerBlock(...)` for that one resource). The scarcest
+ * input is what bottlenecks the chain's real output, so the candidate's
+ * output is scaled by that input's own ratio, not by `blocks` treated as if
+ * it were always one extractor per resource.
+ *
+ * A chain reaching this point always has at least one P0 node — `scoreProduct`
+ * only calls this after `planColony` has already sized extraction against
+ * `sourcingFloor: 'P0'` — so `Math.min` is never asked to reduce an empty list.
+ */
+function madeTierFalloffRatio(
+  chain: PiChain,
+  blocks: number,
+  ratePerHour: number,
+  factor: number
+): number {
+  const ratios = chain.nodes
+    .filter((node) => node.tier === 0)
+    .map((node) =>
+      extractionFalloffRatio(blocks * extractorsPerBlock(node.unitsPerHour, ratePerHour), factor)
+    );
+  return Math.min(...ratios);
+}
+
+/**
  * The last two steps both kinds of candidate share: reject the layout if it
  * cannot move or hold its own output, otherwise score it.
  *
@@ -322,13 +471,10 @@ function scoreRawResource(
   // A made chain's P0 is billed differently, and CONTEXT.md round 56 records
   // why that asymmetry is inherited rather than fixed here.
   const marginPerUnit = price - opts.taxRate * CUSTOMS_TAXABLE_VALUE[0];
-  return rejectOrScore(
-    base,
-    fit,
-    throughput,
-    fit.blocks * opts.extractionRatePerHour,
-    marginPerUnit
-  );
+  const factor = opts.extraExtractorYieldFactor ?? DEFAULT_EXTRA_EXTRACTOR_YIELD_FACTOR;
+  const unitsPerHour =
+    fit.blocks * opts.extractionRatePerHour * extractionFalloffRatio(fit.blocks, factor);
+  return rejectOrScore(base, fit, throughput, unitsPerHour, marginPerUnit);
 }
 
 /** A made-tier candidate: steps 1-5 through `planColony`, then step 6's score. */
@@ -377,13 +523,17 @@ function scoreProduct(typeId: number, pi: PiData, opts: StopTierOptions): StopTi
   if (cost.status !== 'costed') return { ...base, status: 'needs-price', missing: [typeId] };
 
   // `blocks * targetPerHour`: the chain was expanded at ONE factory's rate.
-  return rejectOrScore(
-    base,
-    plan.fit,
-    plan.throughput,
-    plan.fit.blocks * plan.chain.targetPerHour,
-    cost.margin
-  );
+  // That assumes every extractor feeding it hits the colony's own measured
+  // mean, which `scoreRawResource` no longer assumes for its own candidate —
+  // see the module header. `madeTierFalloffRatio` applies the identical
+  // falloff here, at this candidate's own true per-resource extractor count,
+  // so the two stay comparable.
+  const factor = opts.extraExtractorYieldFactor ?? DEFAULT_EXTRA_EXTRACTOR_YIELD_FACTOR;
+  const unitsPerHour =
+    plan.fit.blocks *
+    plan.chain.targetPerHour *
+    madeTierFalloffRatio(plan.chain, plan.fit.blocks, opts.extractionRatePerHour, factor);
+  return rejectOrScore(base, plan.fit, plan.throughput, unitsPerHour, cost.margin);
 }
 
 /**

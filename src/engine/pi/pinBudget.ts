@@ -584,6 +584,16 @@ export function checkThroughput(
   // Overflow is checked first because it is what actually stalls a colony:
   // a full launchpad stops extraction dead, where a saturated link only
   // slows the flow down.
+  //
+  // `linkCapacityPerHour === null` is reachable on every colony this app can
+  // measure, not just a hypothetical one: `stopTierModel.ts` (the only caller
+  // that ever threads a built colony's own numbers through `planColony`)
+  // passes `linkCapacityPerHour: null` unconditionally, because whether the
+  // link-upgrade axis shares a skill with the CPU/Powergrid table is
+  // unconfirmed (CONTEXT.md round 51). So `link-capacity` never fires today —
+  // deliberately, not by accident of a bug here. This axis stays unanswered
+  // until a caller can supply a real figure; it does not mean the check below
+  // is broken.
   const verdict =
     bufferNeedM3 > bufferM3
       ? 'buffer-overflow'
@@ -593,7 +603,12 @@ export function checkThroughput(
           ? 'link-capacity'
           : 'ok';
 
-  return { verdict, flowPerHourM3, bufferM3, bufferNeedM3, linkCapacityPerHour };
+  // `null`, not `Infinity`: a colony with no flow at all (an empty layout, or
+  // every node priced at zero volume) never fills, and `Infinity` reads as a
+  // confident answer about a colony that in fact moves nothing.
+  const hoursToFull = flowPerHourM3 > 0 ? bufferM3 / flowPerHourM3 : null;
+
+  return { verdict, flowPerHourM3, bufferM3, bufferNeedM3, hoursToFull, linkCapacityPerHour };
 }
 
 export interface PlanColonyOptions extends ChainBlockOptions, ThroughputOptions {

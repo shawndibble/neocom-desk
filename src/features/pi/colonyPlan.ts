@@ -117,7 +117,20 @@ export interface ColonyPlan {
  * modal read the same object rather than two equal ones.
  */
 export function useColonyPlan(colony: BuiltColonyAdvice, pi: PiData): ColonyPlan {
-  return useMemo(() => {
+  return useMemo(() => colonyPlan(colony, pi), [colony, pi]);
+}
+
+/**
+ * The same answer, without a hook.
+ *
+ * The Advisor's worklist needs this for every colony at once, and a hook
+ * cannot be called in a loop — so the derivation lives here and
+ * `useColonyPlan` only memoises it. Two copies of this arithmetic is exactly
+ * how a card and the list would come to disagree about whether a facility is
+ * idle, which is what this module exists to prevent.
+ */
+export function colonyPlan(colony: BuiltColonyAdvice, pi: PiData): ColonyPlan {
+  {
     const budget = colony.budget;
     // A new pin is not reachable without a new link, and a link's cost is
     // distance-based — so the only honest price for one the colony has not
@@ -144,7 +157,7 @@ export function useColonyPlan(colony: BuiltColonyAdvice, pi: PiData): ColonyPlan
       closest: full ? nearestPin(spare.cpu, spare.powergrid, pi, newLinkCost) : null,
       idle: idleFacilityPlan({ colony, balance, pi, spare, newLinkCost }),
     };
-  }, [colony, pi]);
+  }
 }
 
 /** How many instructions a card shows before the rest go to the modal. */
