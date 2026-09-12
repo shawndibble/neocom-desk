@@ -16,7 +16,6 @@
  */
 import {
   loadChunkedSnapshot,
-  type ChunkedSnapshot,
   type ChunkedSnapshotRead,
   type ChunkedSnapshotSource,
 } from '@/features/contractSearch/chunkedSnapshot';
@@ -34,8 +33,6 @@ const SOURCE: ChunkedSnapshotSource = {
   /** How often the backend republishes the snapshot. */
   staleAfterMs: 30 * 60_000,
 };
-
-export type PublicContractOffersSnapshot = ChunkedSnapshot<PublicContractOfferRow>;
 
 export function loadPublicContractOffers(
   characterId: number

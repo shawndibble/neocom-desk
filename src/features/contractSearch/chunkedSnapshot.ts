@@ -126,6 +126,10 @@ export async function loadChunkedSnapshot<TRow>(
     // never lands is stated rather than left standing as "loading".
     { staleAfterMs: source.staleAfterMs, allowStaleServe: true }
   );
+  // `fetchedAt` alone, where `esi/cache.ts`'s own freshness test also honours a
+  // stored `expiresAt`: that field comes from an ESI `Expires` header, and this
+  // payload is read from Firestore, which sends none. Nothing writes it for
+  // these keys, so the two tests cannot disagree.
   const lapsed = cached !== null && cached.fetchedAt.getTime() + source.staleAfterMs <= Date.now();
   return { cached, revalidating: lapsed && !cached.fromCache };
 }

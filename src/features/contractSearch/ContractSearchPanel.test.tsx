@@ -115,8 +115,15 @@ const JUMPS = {
   [LOWSEC_SHORTCUT]: [30000142, 30002187],
 };
 
+/** What `regions.json` ships: the whole k-space table, so nothing asks ESI. */
+const REGIONS = [
+  { id: 10000002, name: 'The Forge' },
+  { id: 10000043, name: 'Domain' },
+];
+
 vi.mock('@/sde/loadMarketSde', () => ({
   loadMarketTypes: vi.fn(async () => CATALOG),
+  loadMarketRegions: vi.fn(async () => REGIONS),
   loadNpcStations: vi.fn(async () => STATIONS),
   loadSolarSystems: vi.fn(async () => SYSTEMS),
   loadSolarSystemJumps: vi.fn(async () => JUMPS),
@@ -908,89 +915,15 @@ describe('ContractSearchPanel — progressive loading', () => {
     expect(await screen.findByText('No public contracts synced yet')).toBeInTheDocument();
   });
 
-  it('shows the rows while region names are still being looked up, and says so', async () => {
-    // Region naming is the one name stage with real network cost — one ESI
-    // call per distinct region on a cold cache. It fills in behind the table
-    // rather than holding it: the Region column reads `#10000002` meanwhile.
-    const regions = deferred<string>();
-    loadRegionName.mockReturnValue(regions.promise);
+  it('names regions out of the local SDE, not one ESI call per region', async () => {
+    // `public/data/market/regions.json` is 78 entries and 2.7 KB; the ESI
+    // lookup it replaces was a round-trip per distinct region on a cold cache,
+    // and the only network-bound name stage of the whole load.
     renderWithRouter();
 
     const rows = await bodyRows();
-    expect(rows).toHaveLength(3);
-    expect(within(rows[0]).getByText('#10000043')).toBeInTheDocument();
-    // By text, not by role name: `role="status"` takes its name from the
-    // author, not from its content, so a role query would never match it.
-    expect(screen.getByText('Naming regions…')).toBeInTheDocument();
-
-    regions.settle('The Forge');
-    await waitFor(() => {
-      expect(screen.queryByText('Naming regions…')).not.toBeInTheDocument();
-    });
-  });
-
-  it('keeps a loaded board on screen while a re-read runs behind it', async () => {
-    // Every re-read hands the hooks a *new* rows array off a new CachedResult,
-    // and `useRouteSnapshot` re-runs its loader on any global revalidation
-    // signal — not only on this panel's own Refresh. Dropping the resolved
-    // names on an input change would therefore blank a fully-loaded board
-    // whenever some other page's cache refreshed.
-    const user = userEvent.setup();
-    renderWithRouter();
-    await bodyRows();
-    await user.click(screen.getByRole('button', { name: 'Courier' }));
-    await screen.findByText('Jita');
-
-    const second = deferred<ChunkedSnapshotRead<PublicCourierContractRow>>();
-    loadPublicCourierContracts.mockReturnValue(second.promise);
-    await user.click(screen.getByRole('button', { name: 'Refresh' }));
-
-    // Rows, and their resolved names, both still there mid-re-read.
-    expect(screen.getByText('Jita')).toBeInTheDocument();
-    expect(screen.getByRole('table')).toBeInTheDocument();
-    second.settle(cachedCourierSnapshot([JITA_TO_AMARR, AMARR_TO_STRUCTURE]));
-  });
-
-  it('shows the hauls even when nothing can name their endpoints', async () => {
-    // A lookup that throws has to settle as "resolved, with nothing". Left as
-    // "still resolving" it would spin forever with no error to report, which is
-    // worse than the id the board honestly shows for a player structure anyway.
-    vi.mocked(loadRegionName).mockRejectedValue(new Error('offline'));
-    const user = userEvent.setup();
-    renderWithRouter();
-    await bodyRows();
-    await user.click(screen.getByRole('button', { name: 'Courier' }));
-
-    const table = await screen.findByRole('table');
-    const [, ...rest] = within(table).getAllByRole('rowgroup');
-    expect(within(rest[0]).getAllByRole('row')).toHaveLength(2);
-    await waitFor(() => {
-      expect(screen.queryByText('Naming regions…')).not.toBeInTheDocument();
-    });
-  });
-
-  it('says the courier snapshot is unavailable rather than spinning on it', async () => {
-    // `loadWithCache` swallows a failed read and answers with no rows at all,
-    // so the loader resolves cleanly with nothing. That is an answer — "none
-    // synced" — not a reason to keep spinning.
-    loadPublicCourierContracts.mockResolvedValue({ cached: null, revalidating: false });
-    const user = userEvent.setup();
-    renderWithRouter();
-    await bodyRows();
-    await user.click(screen.getByRole('button', { name: 'Courier' }));
-
-    expect(await screen.findByText('No public courier contracts synced yet')).toBeInTheDocument();
-  });
-
-  it('says a newer snapshot is on its way while the stored rows are showing', async () => {
-    loadPublicContractOffers.mockResolvedValue({
-      ...cachedSnapshot([TRIT_FORGE]),
-      revalidating: true,
-    });
-    renderWithRouter();
-
-    await bodyRows();
-    expect(screen.getByText('Refreshing in the background…')).toBeInTheDocument();
+    expect(within(rows[0]).getByText('Domain')).toBeInTheDocument();
+    expect(loadRegionName).not.toHaveBeenCalled();
   });
 
   it('states a refresh that fell back to cache, rather than repeating the offline banner', async () => {

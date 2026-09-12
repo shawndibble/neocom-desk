@@ -9,14 +9,14 @@
  * location id), which is what makes filling in late safe: a row is never
  * wrong while a name is missing, only less readable.
  *
- * Measured (2026-09-12): the parsing and scanning here is single-digit
- * milliseconds — 5 ms for the 19,551-entry catalogue scan, 3 ms for 1,240
- * station lookups. The wait is `loadRegionName`'s one ESI call per distinct
- * region on a cold cache, which is why that is the only stage worth naming in
- * the UI while it runs.
+ * Measured (2026-09-12): all of it is single-digit milliseconds once the
+ * snapshots are in hand — 5 ms for the 19,551-entry catalogue scan, 3 ms for
+ * 1,240 station lookups. What each stage really costs is the file it pulls, so
+ * the one that matters is the 1.45 MB market catalogue, and only the Items
+ * board reads it.
  */
 import { useEffect, useMemo, useState } from 'react';
-import { loadMarketTypes } from '@/sde/loadMarketSde';
+import { loadMarketRegions, loadMarketTypes } from '@/sde/loadMarketSde';
 import { loadRegionName } from '@/features/bpcContracts/regionNames';
 import type { CourierEndpoint, PublicCourierContractRow } from '@/engine/contracts/courierSearch';
 import type { PublicContractOfferRow } from '@/engine/contracts/contractOffers';
@@ -68,8 +68,8 @@ function useResolved<TInput, TValue>(
     };
   }, [input, resolve, fallback]);
 
-  const current = answer !== null && answer.input === input ? answer : null;
-  return { value: current?.value ?? answer?.value ?? fallback, resolving: current === null };
+  const resolving = answer === null || answer.input !== input;
+  return { value: answer?.value ?? fallback, resolving };
 }
 
 /**
@@ -130,18 +130,23 @@ async function resolveEndpoints(
 }
 
 /**
- * One lookup per distinct region, committed as a single map when they have all
- * answered rather than per region as it lands. Both boards render a Region
- * column and rebuild their column set when this map changes, so a per-region
- * commit would rebuild it once per region — dozens of times, for a cosmetic
- * gain over a stage note that says the same thing.
+ * Names for every distinct region across both corpora.
+ *
+ * Out of `public/data/market/regions.json` — 78 entries, 2.7 KB, one fetch —
+ * rather than `loadRegionName`'s one `GET /universe/regions/{id}` per region.
+ * On a cold cache that lookup was the single network-bound stage of the whole
+ * load, and it was spending dozens of round-trips re-learning constants the
+ * SDE snapshot already ships. ESI is kept only for an id that file does not
+ * carry, so a region outside the k-space table still resolves rather than
+ * being reported as unnameable.
  */
 export function useRegionNames(regionIds: readonly number[]): {
   value: ReadonlyMap<number, string>;
   resolving: boolean;
 } {
   // Sorted and joined so the effect keys on which regions, not on the order
-  // two independently-loaded corpora happened to contribute them in.
+  // two independently-loaded corpora happened to contribute them in — and so a
+  // re-read that yields the same regions does not re-run the lookup at all.
   const key = useMemo(() => [...regionIds].sort((a, b) => a - b).join(','), [regionIds]);
   const ids = useMemo(() => (key === '' ? [] : key.split(',').map(Number)), [key]);
   return useResolved(ids, resolveRegionNames, EMPTY_NAMES);
@@ -151,9 +156,19 @@ async function resolveRegionNames(
   regionIds: readonly number[]
 ): Promise<ReadonlyMap<number, string>> {
   if (regionIds.length === 0) return EMPTY_NAMES;
+  const catalog = await loadMarketRegions();
+  const local = new Map(catalog.map((entry) => [entry.id, entry.name]));
+
   const names = new Map<number, string>();
+  const missing: number[] = [];
+  for (const regionId of regionIds) {
+    const name = local.get(regionId);
+    if (name === undefined) missing.push(regionId);
+    else names.set(regionId, name);
+  }
+
   await Promise.all(
-    regionIds.map(async (regionId) => {
+    missing.map(async (regionId) => {
       const name = await loadRegionName(regionId);
       if (name !== null) names.set(regionId, name);
     })

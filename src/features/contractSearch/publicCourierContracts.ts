@@ -8,13 +8,13 @@
  *
  * Far smaller than the offers snapshot: ADR 0013's live pull put courier and
  * loan contracts together under 620 against ~370k offer rows, so this is a
- * single chunk doc. That is why the panel loads it alongside the offers
- * snapshot unconditionally rather than per mode — deferring it to the first
- * Courier click would buy nothing and cost a fetch on the way in.
+ * single chunk doc. That is why the panel reads it on mount rather than on the
+ * first Courier click — deferring it would buy nothing and cost a fetch on the
+ * way in. It is read *separately* from the offers snapshot, though: see
+ * `ContractSearchPanel.tsx` for why pairing the two was the wrong trade.
  */
 import {
   loadChunkedSnapshot,
-  type ChunkedSnapshot,
   type ChunkedSnapshotRead,
   type ChunkedSnapshotSource,
 } from '@/features/contractSearch/chunkedSnapshot';
@@ -27,8 +27,6 @@ const SOURCE: ChunkedSnapshotSource = {
   /** Published by the same job as the offers snapshot, so the same window. */
   staleAfterMs: 30 * 60_000,
 };
-
-export type PublicCourierContractsSnapshot = ChunkedSnapshot<PublicCourierContractRow>;
 
 export function loadPublicCourierContracts(
   characterId: number

@@ -62,7 +62,6 @@ import {
 } from '@/engine/contracts/courierSearch';
 import { loadPublicContractOffers } from '@/features/contractSearch/publicContractOffers';
 import { loadPublicCourierContracts } from '@/features/contractSearch/publicCourierContracts';
-import type { ChunkedSnapshotRead } from '@/features/contractSearch/chunkedSnapshot';
 import { CourierResults } from '@/features/contractSearch/CourierResults';
 import {
   useCourierEndpoints,
@@ -105,50 +104,23 @@ const SALE_KINDS: ContractSaleKind[] = ['exchange', 'auction'];
 const CONTRACT_MODES = ['items', 'courier'] as const;
 type ContractMode = (typeof CONTRACT_MODES)[number];
 
+/**
+ * Guarded so a build with no sync backend reads nothing at all — not even the
+ * cache. `chunkedSnapshot.ts` refuses the Firestore call on its own, so this is
+ * belt and braces rather than the only check; what it buys is that an
+ * unconfigured build does no work on the way to saying so.
+ */
+const NO_SNAPSHOT = { cached: null, revalidating: false } as const;
+
+const loadOffers = async (characterId: number) =>
+  isSyncConfigured() ? loadPublicContractOffers(characterId) : NO_SNAPSHOT;
+
+const loadCourier = async (characterId: number) =>
+  isSyncConfigured() ? loadPublicCourierContracts(characterId) : NO_SNAPSHOT;
+
+/** Stable identities: the name hooks key their effects on these references. */
 const EMPTY_ROWS: readonly PublicContractOfferRow[] = [];
-/** Stable identity: the routes hook keys its effect on this array's reference. */
 const EMPTY_COURIER_CONTRACT_ROWS: readonly PublicCourierContractRow[] = [];
-const NO_REGIONS: number[] = [];
-
-/**
- * One corpus, on its own. The two used to arrive together out of a single
- * loader, on the argument that the courier snapshot is one small chunk doc
- * against the offers snapshot's ~124 — which is true, and is exactly why
- * pairing them was the wrong trade: a hauler opening Courier waited on ~370k
- * item-offer rows to be shown ~620 hauls (issue #963). Fetched separately,
- * each board renders the moment its own snapshot lands, and the cheap one is
- * no longer held behind the expensive one.
- *
- * `syncConfigured` rides along rather than being read at render: it is the
- * difference between "synced, and empty" and "this build has no sync backend
- * at all", and only the loader is in a position to say which.
- */
-interface CorpusSnapshot<TRow> {
-  read: ChunkedSnapshotRead<TRow>;
-  syncConfigured: boolean;
-}
-
-const NOT_CONFIGURED = {
-  read: { cached: null, revalidating: false },
-  syncConfigured: false,
-} as const;
-
-/**
- * Built at module level so each loader is one stable function reference —
- * `useRouteSnapshot` keys its effect on the character and the refresh, and a
- * loader identity that changed per render would reload on every one.
- */
-function corpusLoader<TRow>(
-  read: (characterId: number) => Promise<ChunkedSnapshotRead<TRow>>
-): (characterId: number) => Promise<CorpusSnapshot<TRow>> {
-  return async (characterId) => {
-    if (!isSyncConfigured()) return NOT_CONFIGURED;
-    return { read: await read(characterId), syncConfigured: true };
-  };
-}
-
-const loadOffersCorpus = corpusLoader(loadPublicContractOffers);
-const loadCourierCorpus = corpusLoader(loadPublicCourierContracts);
 
 /** The filter as the controls hold it: text fields stay strings until they are parsed into the engine's filter. */
 interface UiFilter {
@@ -293,29 +265,36 @@ interface Suggestion extends ContractTypeOption {
 export function ContractSearchPanel() {
   const { t } = useTranslation();
   const timeZone = useTimeZone();
-  // One hook per corpus, so neither board waits on the other's snapshot.
-  // `staleWhileRevalidate` keeps the rows on screen across a manual Refresh,
-  // which matters more now that a Refresh no longer blanks both boards at once.
-  const offers = useRouteSnapshot(loadOffersCorpus, undefined, {
+  /**
+   * One hook per corpus, so neither board waits on the other's snapshot. The
+   * two used to arrive together out of a single loader, on the argument that
+   * the courier snapshot is one small chunk doc against the offers snapshot's
+   * ~124 — which is true, and is exactly why pairing them was the wrong trade:
+   * a hauler opening Courier waited on ~370k item-offer rows to be shown ~620
+   * hauls (issue #963).
+   *
+   * `staleWhileRevalidate` keeps the rows on screen across a manual Refresh,
+   * which matters more now that a Refresh no longer blanks both boards at once.
+   */
+  const offers = useRouteSnapshot(loadOffers, undefined, {
     cacheKey: 'contractSearchOffers',
     staleWhileRevalidate: true,
   });
-  const courier = useRouteSnapshot(loadCourierCorpus, undefined, {
+  const courier = useRouteSnapshot(loadCourier, undefined, {
     cacheKey: 'contractSearchCourier',
     staleWhileRevalidate: true,
   });
   const { hydrated, activeCharacterId } = offers;
 
-  const offersResult = offers.data?.read.cached ?? null;
-  const courierResult = courier.data?.read.cached ?? null;
+  const offersResult = offers.data?.cached ?? null;
+  const courierResult = courier.data?.cached ?? null;
   const rows = offersResult?.data?.rows ?? EMPTY_ROWS;
   const courierRows = courierResult?.data?.rows ?? EMPTY_COURIER_CONTRACT_ROWS;
 
-  // Both loaders answer the same question, so either having loaded settles it;
-  // `true` while both are still in flight keeps the not-configured empty state
-  // from flashing on a configured build.
-  const syncConfigured =
-    (offers.data?.syncConfigured ?? true) && (courier.data?.syncConfigured ?? true);
+  // A pure read of the build's own env, so it needs no loader to report it —
+  // this distinguishes "this build has no sync backend at all" from "synced,
+  // and empty", which is what the two boards' own empty states say.
+  const syncConfigured = isSyncConfigured();
 
   // Names fill in behind whichever table is showing — see
   // `contractSearchNames.ts`. None of them gate a board: every consumer
@@ -330,7 +309,6 @@ export function ContractSearchPanel() {
     [courierRows, endpoints]
   );
   const regionIds = useMemo(() => {
-    if (rows.length === 0 && courierRoutes.length === 0) return NO_REGIONS;
     const ids = new Set<number>(rows.map((row) => row.regionId));
     for (const route of courierRoutes) {
       if (route.origin.regionId !== null) ids.add(route.origin.regionId);
@@ -338,7 +316,7 @@ export function ContractSearchPanel() {
     }
     return [...ids];
   }, [rows, courierRoutes]);
-  const { value: regionNames, resolving: namingRegions } = useRegionNames(regionIds);
+  const { value: regionNames } = useRegionNames(regionIds);
 
   const [uiFilter, setUiFilter] = useState<UiFilter>(EMPTY_UI_FILTER);
   /** The type the user picked out of the suggestion list, pinning the search to exactly one item. */
@@ -361,7 +339,7 @@ export function ContractSearchPanel() {
   const modeLoading = active.loading;
   const modeError = active.error;
   /** Last cycle's rows are on screen and this cycle's are on the way (#963). */
-  const revalidating = active.data?.read.revalidating ?? false;
+  const revalidating = active.data?.revalidating ?? false;
   // A manual Refresh still means "reload the tab", not "reload the mode I am
   // looking at" — the Data Age badge and offline banner are per corpus, but the
   // button above them is one button.
@@ -639,15 +617,6 @@ export function ContractSearchPanel() {
               // says how old, this says something is being done about it.
               <p role="status" className="px-3 pt-2 text-[0.6875rem] text-text-dim uppercase">
                 {t('contractSearch.refreshingInBackground')}
-              </p>
-            )}
-            {namingRegions && modeRowCount > 0 && (
-              // The only name stage with real network cost: one ESI call per
-              // distinct region on a cold cache. Said quietly, under the board
-              // rather than over it, because the rows are already readable —
-              // the Region column shows `#10000002` until this lands.
-              <p role="status" className="px-3 pt-2 text-[0.6875rem] text-text-dim uppercase">
-                {t('contractSearch.namingRegions')}
               </p>
             )}
             {modeLoading && modeRowCount === 0 ? (

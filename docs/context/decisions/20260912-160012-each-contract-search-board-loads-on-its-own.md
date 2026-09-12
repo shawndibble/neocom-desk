@@ -47,10 +47,14 @@ _Recorded 2026-09-12 · issue #963._
   spinning forever with nothing to report. An unresolved id is what every
   consumer already renders.
 
-- **Region names commit once, not per region.** Both boards render a Region
-  column and rebuild their column set when that map changes, so committing each
-  name as it arrives would rebuild the columns once per region. A quiet
-  "Naming regions…" note says the same thing for the duration.
+- **Region names come out of the local SDE, not ESI.**
+  `public/data/market/regions.json` is 78 entries and 2.7 KB and already ships;
+  `loadRegionName`'s one `GET /universe/regions/{id}` per region was the single
+  network-bound name stage, spending dozens of round-trips on constants the app
+  already had. ESI is kept only for an id that table does not carry, so a region
+  outside it still resolves rather than being reported as unnameable. With that
+  gone every name stage is a local file read, which is why none of them report
+  progress: there is nothing left to wait on worth naming.
 
 - **Stale-serve is stated, not silent.** A lapsed row renders immediately, so
   the board says a newer read is on its way — derived from the row's own
@@ -61,8 +65,8 @@ _Recorded 2026-09-12 · issue #963._
 
 - **Progress is a stage, not a percentage.** A cold load has no denominator
   until the corpus lands, and once it lands the board is already on screen. So
-  the spinner names which corpus it is waiting for, and the only name stage with
-  real network cost names itself while it runs. No synthesized completion bar.
+  the spinner names which corpus it is waiting for, and nothing invents a
+  completion bar out of a total it does not have.
 
 - **A published snapshot opts into stale-serve; a game constant still does not.**
   `esi/cache.ts` refused to substitute a lapsed row for any key whose window is
