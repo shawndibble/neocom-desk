@@ -87,7 +87,10 @@ import { systemAdvice, type PlanetAdvice, type SystemPlanet } from './advisorMod
 import { loadPiRosterSnapshot } from './roster';
 import { useAltColonies } from './altColoniesPref';
 import { colonyStopTierAdvice } from './stopTierModel';
-import { cadenceHours, useCadence } from './cadencePref';
+import { PI_CADENCE_DAYS, cadenceHours, useCadence } from './cadencePref';
+import { CadenceControls } from './CadenceControls';
+import { restartCadenceYield } from '@/engine/pi/restartCadence';
+import { extractorProgramsFromPins } from './adapters';
 import { colonyNetwork } from './networkModel';
 import { NetworkPanel } from './NetworkPanel';
 import { ColonyDirectives, StopTierCardHint, StopTierRow } from './ColonyActions';
@@ -1021,6 +1024,7 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
   useEffect(() => {
     void hydrateBuyInputs();
   }, [hydrateBuyInputs]);
+  const { restartDays } = useCadence((state) => state.value);
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
@@ -1136,6 +1140,31 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
     );
     return assumedExtractionRate(measured);
   }, [advice]);
+
+  /**
+   * What the chosen restart cadence gives, against the best cadence on offer,
+   * on this character's own ground.
+   *
+   * Averaged over every extractor program that carries an install-time
+   * baseline rather than read off one: the ratio barely moves between
+   * programs — the decay curve's shape is the same whatever the quantity — but
+   * picking one pin would leave the figure jumping between refreshes as
+   * programs expire and restart. Null when no program can be projected at
+   * all, which is a refusal the control renders rather than a 100%.
+   */
+  const restartYield = useMemo(() => {
+    const programs = [...(snapshot?.details.values() ?? [])].flatMap((detail) =>
+      extractorProgramsFromPins(detail.pins)
+    );
+    const hours = PI_CADENCE_DAYS.map((days) => days * 24);
+    const chosenHours = restartDays * 24;
+    const ratios = programs
+      .map((program) => restartCadenceYield({ program, cadences: hours }))
+      .map((scored) => scored.find((entry) => entry.hours === chosenHours)?.relativeToBest)
+      .filter((ratio): ratio is number => ratio !== undefined);
+    if (ratios.length === 0) return null;
+    return ratios.reduce((sum, ratio) => sum + ratio, 0) / ratios.length;
+  }, [snapshot, restartDays]);
 
   if (failed) {
     return <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />;
@@ -1403,6 +1432,15 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
               )}
             </div>
           </label>
+
+          {/*
+            The two habits every figure below is derived from. They sit beside
+            the customs rate because they are the same kind of input — a
+            standing fact about the pilot that re-prices the whole tab — and
+            because a ranking reads as fact when the control that decides it
+            is out of sight.
+          */}
+          <CadenceControls restartYield={restartYield} />
 
           <label className="space-y-1">
             <span className="flex items-center gap-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
