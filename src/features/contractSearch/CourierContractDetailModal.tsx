@@ -13,7 +13,7 @@
  */
 import { useTranslation } from 'react-i18next';
 import { Modal, StatChip } from '@/components/ui';
-import { formatIsk } from '@/lib/isk';
+import { formatIsk, formatIskAuto } from '@/lib/isk';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
 import {
@@ -21,9 +21,14 @@ import {
   type CourierEndpoint,
   type CourierRouteRow,
 } from '@/engine/contracts/courierSearch';
+import { collateralToRewardRatio, iskPerVolume } from '@/engine/contracts/courierRates';
 
-/** Same precision the table's own Volume column uses. */
-const VOLUME_FORMAT = new Intl.NumberFormat('en', { maximumFractionDigits: 1 });
+/**
+ * One decimal, for a figure read as a magnitude rather than an exact amount —
+ * a hold is "60,000 m³" and a collateral is "40x the reward"; further digits
+ * imply a precision neither carries.
+ */
+const MAGNITUDE_FORMAT = new Intl.NumberFormat('en', { maximumFractionDigits: 1 });
 
 export interface CourierContractDetailModalProps {
   row: CourierRouteRow;
@@ -49,6 +54,8 @@ export function CourierContractDetailModal({
   const { t } = useTranslation();
   const timeZone = useTimeZone();
   const collateral = courierCollateral(row);
+  const volumeRate = iskPerVolume(row.reward, row.volume);
+  const collateralRatio = collateralToRewardRatio(collateral, row.reward);
 
   return (
     <Modal
@@ -65,11 +72,33 @@ export function CourierContractDetailModal({
           />
           <StatChip
             label={t('contractSearch.volumeColumn')}
-            value={`${VOLUME_FORMAT.format(row.volume)} m³`}
+            value={`${MAGNITUDE_FORMAT.format(row.volume)} m³`}
           />
           <StatChip
             label={t('contractSearch.daysColumn')}
             value={row.daysToComplete == null ? '—' : String(row.daysToComplete)}
+          />
+          <StatChip
+            label={t('contractSearch.iskPerVolumeColumn')}
+            value={volumeRate === null ? '—' : formatIskAuto(volumeRate)}
+          />
+          {/*
+           * Here rather than as a column: both raw figures already sit side
+           * by side in the table, and the max-collateral filter is where the
+           * concern is acted on.
+           */}
+          <StatChip
+            label={t('contractSearch.collateralRatioLabel')}
+            value={
+              // A haul asking no collateral says so the same way the chip
+              // beside it does. "0x" is arithmetically true and reads as a
+              // measured ratio, which is the opposite of "none was asked for".
+              collateralRatio === null || collateral === 0
+                ? '—'
+                : t('contractSearch.collateralRatioValue', {
+                    ratio: MAGNITUDE_FORMAT.format(collateralRatio),
+                  })
+            }
           />
         </div>
 

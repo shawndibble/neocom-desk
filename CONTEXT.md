@@ -326,6 +326,14 @@ here — they go one per file in `docs/context/decisions/`.
   ISK/jump for a hauler who will only fly highsec than for one who will not.
   A haul with an unplaced end, or two ends no stargate connects, has no rate
   at all — never a rate of zero.
+- **ISK/m³**: What a public courier haul pays per cubic metre of the cargo it
+  asks you to move — reward divided by volume (issue #938). Deliberately the
+  _secondary_ rate: the board ranks on **ISK/jump**, because a hauler's cost is
+  the trip. This one answers the narrower question of a hauler filling one hold
+  from several contracts along a lane, where space rather than distance is the
+  scarce thing. A haul stating no volume has no ISK/m³ at all — never an
+  infinite one — since a stated `0` survives ingestion and reaches the client
+  as a real row.
 - **Route Preference**: Which trip a distance describes — prefer highsec,
   shortest, or avoid highsec, the three the local jump graph supports
   (`engine/route/jumpRoute.ts`, issue #942). A reader's choice rather than a
