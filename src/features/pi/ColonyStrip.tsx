@@ -63,7 +63,7 @@ function Row({ row, onOpen }: { row: ColonyStripRow; onOpen: () => void }) {
       // what pressing it does.
       aria-label={t('piAdvisor.detailsLabel', { name })}
       aria-haspopup="dialog"
-      className="grid w-full grid-cols-[1fr_4.5rem_5rem] items-center gap-x-3 gap-y-1 border-b border-line px-3 py-2 text-left last:border-b-0 hover:bg-panel-2 sm:grid-cols-[1fr_6.5rem_4.5rem_5rem]"
+      className="group grid w-full grid-cols-[1fr_4.5rem_5rem] items-center gap-x-3 gap-y-1 border-b border-line px-3 py-2 text-left last:border-b-0 hover:bg-panel-2 sm:grid-cols-[1fr_6.5rem_4.5rem_5rem_auto]"
     >
       <span className="min-w-0 truncate text-[0.8125rem]">
         {name}{' '}
@@ -101,19 +101,65 @@ function Row({ row, onOpen }: { row: ColonyStripRow; onOpen: () => void }) {
       >
         {row.hoursToFull === null ? t('piAdvisor.colonyUnknown') : span(row.hoursToFull, t)}
       </span>
+
+      {/*
+        Not a nested <button>: the whole row already is one, and a button
+        inside a button is invalid markup that browsers resolve by dropping
+        one of them. This is the affordance only — without it the row reads as
+        a line of text and nobody discovers that it opens anything.
+      */}
+      <span
+        aria-hidden="true"
+        className="col-start-3 row-start-1 hidden items-center gap-0.5 justify-self-end rounded-xs border border-line-bright px-1.5 py-[3px] text-[0.625rem] font-semibold tracking-widest text-text-dim uppercase group-hover:border-accent-dim group-hover:text-accent sm:col-start-5 sm:flex"
+      >
+        {t('piAdvisor.detailsAction')}
+      </span>
     </button>
   );
 }
 
-export function ColonyStrip({
-  rows,
-  onOpenPlanet,
-}: {
+/**
+ * The slot the pilot does not have yet.
+ *
+ * A skill-locked colony used to be a whole dashed card at the foot of the tab
+ * — planet name, planet type, and one sentence saying the pilot cannot build
+ * there. Repeated per uncolonised planet, that was several boxes all carrying
+ * the same fact about a *skill*, none of it about the planets they were
+ * labelled with. It is one fact, so it is one row, at the end of the list of
+ * slots it is about.
+ */
+function LockedRow({ level, total, atMax }: { level: number; total: number; atMax: boolean }) {
+  const { t } = useTranslation();
+  return (
+    <div className="flex items-center gap-2.5 border-t border-line px-3 py-2">
+      <span className="inline-flex h-[1.125rem] shrink-0 items-center rounded-xs border border-line-bright px-1.5 text-[0.625rem] font-bold tracking-widest text-text-faint uppercase">
+        {t('piAdvisor.colonySlotLockedTag')}
+      </span>
+      <span className="min-w-0 text-xs text-text-dim">
+        {atMax
+          ? t('piAdvisor.colonySlotLockedMax', { total })
+          : t('piAdvisor.colonySlotLocked', { level })}
+      </span>
+    </div>
+  );
+}
+
+export interface ColonyStripProps {
   rows: readonly ColonyStripRow[];
   onOpenPlanet: (planetId: number) => void;
-}) {
+  /**
+   * The slot beyond the last colony, when the pilot cannot have it. Null when
+   * a slot is free — there is nothing locked to report — and null on an
+   * *assumed* skill level, which is the same rule the ceiling follows: an
+   * assumed figure may be shown, never acted on, and "train to level 1" aimed
+   * at a pilot who already has level V is worse than silence.
+   */
+  locked: { level: number; total: number; atMax: boolean } | null;
+}
+
+export function ColonyStrip({ rows, onOpenPlanet, locked }: ColonyStripProps) {
   const { t } = useTranslation();
-  if (rows.length === 0) {
+  if (rows.length === 0 && !locked) {
     return <p className="px-3 py-4 text-xs text-text-dim">{t('piAdvisor.colonyStripEmpty')}</p>;
   }
   return (
@@ -121,6 +167,7 @@ export function ColonyStrip({
       {rows.map((row) => (
         <Row key={row.planetId} row={row} onOpen={() => onOpenPlanet(row.planetId)} />
       ))}
+      {locked && <LockedRow {...locked} />}
     </div>
   );
 }

@@ -67,47 +67,38 @@ function CadenceRow({
   hint,
   value,
   onChange,
-  footnote,
 }: {
   label: string;
   hint: string;
   value: PiCadenceDays;
   onChange: (days: PiCadenceDays) => void;
-  footnote: React.ReactNode;
 }) {
   const { t } = useTranslation();
   return (
-    <div>
-      <Assume
-        label={
-          <>
-            {label}
-            <InfoTooltip label={t('common.aboutLabel', { label })} content={hint} />
-          </>
-        }
+    <Assume
+      label={
+        <>
+          {label}
+          <InfoTooltip label={t('common.aboutLabel', { label })} content={hint} />
+        </>
+      }
+    >
+      <Select
+        value={String(value)}
+        onValueChange={(next) => onChange(Number(next) as PiCadenceDays)}
       >
-        <Select
-          value={String(value)}
-          onValueChange={(next) => onChange(Number(next) as PiCadenceDays)}
-        >
-          <SelectTrigger
-            size="sm"
-            aria-label={label}
-            className="w-24 border-accent/70 bg-accent/10"
-          >
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {PI_CADENCE_DAYS.map((days) => (
-              <SelectItem key={days} value={String(days)}>
-                {t('piAdvisor.cadenceDays', { count: days })}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </Assume>
-      <Footnote>{footnote}</Footnote>
-    </div>
+        <SelectTrigger size="sm" aria-label={label} className="w-24 border-accent/70 bg-accent/10">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {PI_CADENCE_DAYS.map((days) => (
+            <SelectItem key={days} value={String(days)}>
+              {t('piAdvisor.cadenceDays', { count: days })}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </Assume>
   );
 }
 
@@ -129,10 +120,6 @@ export interface HowYouPlayProps {
   onCustomsReset: () => void;
   sourcing: MarketSourcing;
   onSourcingChange: (sourcing: MarketSourcing) => void;
-  colonyCount: number;
-  slots: { slots: number; assumed: boolean };
-  /** Distinct characters with a colony in this system. */
-  pilots: number;
   /** Only offered when there is something to plan with. */
   alts: { planned: number; withAlts: boolean; onToggle: () => void } | null;
 }
@@ -151,20 +138,21 @@ export function HowYouPlay(props: HowYouPlayProps) {
 
   const write = (patch: Partial<PiCadence>) => void setCadence({ ...cadence, ...patch });
 
+  // What this cadence costs, on the pilot's own ground. It used to sit under
+  // the control as a footnote and now rides on the tooltip: the figure is the
+  // only reason to prefer one cadence over another, so it cannot be dropped —
+  // but a standing sentence under every row made this column twice the height
+  // of the two cards beside it.
+  //
   // A cadence already at the top of the curve gets a different sentence rather
   // than "you pull 100% of the best": the percentage prices a trade-off, and
   // no trade-off is being made there.
-  const restartFootnote =
+  const restartYieldSentence =
     props.restartYield === null
       ? t('piAdvisor.cadenceRestartYieldUnknown')
       : props.restartYield >= 1
         ? t('piAdvisor.cadenceRestartYieldBest')
         : t('piAdvisor.cadenceRestartYield', { percent: Math.round(props.restartYield * 100) });
-
-  const slotsValue = t('piAdvisor.slotsValue', {
-    used: props.colonyCount,
-    total: props.slots.slots,
-  });
 
   return (
     <div className="flex flex-col rounded-xs border border-line bg-panel">
@@ -199,17 +187,15 @@ export function HowYouPlay(props: HowYouPlayProps) {
         */}
         <CadenceRow
           label={t('piAdvisor.cadenceRestartLabel')}
-          hint={t('piAdvisor.cadenceRestartHint')}
+          hint={`${t('piAdvisor.cadenceRestartHint')} ${restartYieldSentence}`}
           value={cadence.restartDays}
           onChange={(restartDays) => write({ restartDays })}
-          footnote={restartFootnote}
         />
         <CadenceRow
           label={t('piAdvisor.cadenceHaulLabel')}
           hint={t('piAdvisor.cadenceHaulHint')}
           value={cadence.haulDays}
           onChange={(haulDays) => write({ haulDays })}
-          footnote={t('piAdvisor.cadenceHaulFootnote')}
         />
 
         <div className="h-px bg-line" />
@@ -319,22 +305,6 @@ export function HowYouPlay(props: HowYouPlayProps) {
               ))}
             </SelectContent>
           </Select>
-        </Assume>
-
-        {/*
-          Derived, so it says so: an untrained Command Center skill is an
-          assumption, and only a trained level may be shown bare.
-        */}
-        <Assume label={t('piAdvisor.coloniesInPlan')}>
-          <span className="text-[0.8125rem] tabular-nums">
-            {props.slots.assumed ? t('piAdvisor.slotsAssumed', { value: slotsValue }) : slotsValue}
-            {props.pilots > 1 && (
-              <span className="text-text-dim">
-                {' · '}
-                {t('piAdvisor.pilotsCount', { count: props.pilots })}
-              </span>
-            )}
-          </span>
         </Assume>
 
         {/*

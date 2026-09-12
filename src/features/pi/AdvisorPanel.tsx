@@ -631,28 +631,12 @@ function UnbuiltCard({
     ]
   );
 
-  // The whole card, when there is nowhere to put a Command Center.
-  if (noSlotFree) {
-    return (
-      <PlanetCard
-        planetId={advice.planetId}
-        name={advice.name}
-        planetType={advice.planetType}
-        dashed
-        dim
-      >
-        <p className="text-xs text-warning">
-          {slots.slots >= PLANET_SLOTS_MAX
-            ? t('piAdvisor.noSlotFreeMax', { total: slots.slots })
-            : t('piAdvisor.noSlotFree', {
-                used: colonyCount,
-                total: slots.slots,
-                level: slots.slots,
-              })}
-        </p>
-      </PlanetCard>
-    );
-  }
+  // No card at all when there is nowhere to put a Command Center. One dashed
+  // box per uncolonised planet, each repeating the same sentence about a
+  // *skill*, is several boxes' worth of page saying one thing that is not
+  // about any of the planets they are labelled with. `ColonyStrip` says it
+  // once, as the locked slot at the end of the pilot's own colony list.
+  if (noSlotFree) return null;
 
   return (
     <PlanetCard
@@ -1215,15 +1199,21 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
     haulHours,
   });
 
-  /** Distinct characters with a colony in the plan — one unless alts joined it. */
-  const pilots =
-    1 +
-    new Set(
-      altsInPlan
-        .filter((entry) => entry.kind === 'built')
-        .map((entry) => snapshot.altOwners.get(entry.planetId))
-        .filter((name): name is string => name !== undefined)
-    ).size;
+  /**
+   * The slot past the last colony, when the pilot cannot have it.
+   *
+   * Never off an assumed cap, for the reason `UnbuiltCard` gives: `planetSlots(null)`
+   * is one slot, and read as fact it tells a pilot at Interplanetary
+   * Consolidation V — five free slots — that they are full.
+   */
+  const lockedSlot =
+    !snapshot.slots.assumed && snapshot.colonyCount >= snapshot.slots.slots
+      ? {
+          level: snapshot.slots.slots,
+          total: snapshot.slots.slots,
+          atMax: snapshot.slots.slots >= PLANET_SLOTS_MAX,
+        }
+      : null;
 
   const openColony =
     advice.find(
@@ -1266,9 +1256,6 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
             }
             sourcing={sourcing}
             onSourcingChange={(value) => void setSourcing(value)}
-            colonyCount={snapshot.colonyCount}
-            slots={snapshot.slots}
-            pilots={pilots}
             alts={
               snapshot.altAdvice.length > 0
                 ? {
@@ -1318,7 +1305,7 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
             </span>
           }
         >
-          <ColonyStrip rows={stripRows} onOpenPlanet={setOpenPlanetId} />
+          <ColonyStrip rows={stripRows} onOpenPlanet={setOpenPlanetId} locked={lockedSlot} />
         </Panel>
       </div>
 

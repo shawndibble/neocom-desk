@@ -178,23 +178,20 @@ export function AdvisorSummary({ list, earnings, spots, controls }: AdvisorSumma
         )}
       </Card>
 
-      <Card
-        title={t('piAdvisor.summaryEarnTitle')}
-        meta={
-          <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-            {t('piAdvisor.summaryEarnIskPerHour')}
-          </span>
-        }
-      >
+      <Card title={t('piAdvisor.summaryEarnTitle')}>
+        {/*
+          The unit sits on the figure, not in the header. It used to be a
+          header label with a sentence under the number explaining where the
+          number came from — but the bar and legend directly below already say
+          that, so the sentence was restating its own illustration.
+        */}
         {tuningIsk > 0 ? (
           <div className="flex items-baseline gap-2">
             <span className="text-3xl leading-none font-semibold text-isk-pos tabular-nums">
               +{formatIsk(tuningIsk)}
             </span>
             <span className="text-[0.8125rem] leading-snug text-text-dim">
-              {t('piAdvisor.summaryEarnBy', {
-                steps: t('piAdvisor.summaryFaultsCount', { count: tuning.length }),
-              })}
+              {t('piAdvisor.summaryEarnIskPerHour')}
             </span>
           </div>
         ) : (
