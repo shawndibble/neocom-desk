@@ -730,9 +730,10 @@ describe('Layout route fade', () => {
 
 /**
  * Only the wiring is asserted here — which gestures count as intent, and that
- * `locked` reaches `warmRoute` — because what warming then does (skipping a
- * locked or already-warm route, deduping, swallowing failures) is
- * `routeWarm.test.ts`'s subject and does not want restating per link.
+ * the Character's stored grant reaches `warmRoute` — because what warming then
+ * does with it (filtering on the loader's endpoints, skipping an already-warm
+ * route, deduping, swallowing failures) is `routeWarm.test.ts`'s subject and
+ * does not want restating per link.
  */
 describe('Layout intent warming', () => {
   beforeEach(() => {
@@ -742,38 +743,55 @@ describe('Layout intent warming', () => {
     mockedWarmRoute.mockClear();
   });
 
-  it('warms a rail destination when the pointer reaches it', async () => {
-    const user = userEvent.setup();
-    renderLayout();
-    await user.hover(screen.getAllByRole('link', { name: 'Wallet' })[0]);
-    expect(mockedWarmRoute).toHaveBeenCalledWith('/wallet', CHARACTER_ID, false);
-  });
-
-  // Tabbing to a link is the same declaration of intent as pointing at it.
-  it('warms on keyboard focus too', async () => {
-    renderLayout();
-    screen.getAllByRole('link', { name: 'Wallet' })[0].focus();
-    await waitFor(() =>
-      expect(mockedWarmRoute).toHaveBeenCalledWith('/wallet', CHARACTER_ID, false)
-    );
-  });
-
-  // `/assets` is scope-gated (`routeScopes.ts`), so a Character holding no
-  // grant locks it — `/wallet` above is `UNGATED` and never locks.
-  it('passes the route’s locked state through, so a missing grant warms nothing', async () => {
-    const user = userEvent.setup();
+  /**
+   * The grant arrives from Dexie a tick after mount, and the handler reads
+   * whatever is current when the gesture happens — so these wait for it to
+   * land before hovering, which is also what a real pointer does.
+   * `/assets` is scope-gated, so its lock marker appearing is the signal that
+   * scopes have resolved to something.
+   */
+  async function renderWithGrant(scopes: string[]) {
     await db.tokens.put({
       characterId: CHARACTER_ID,
       accessToken: 'a',
       refreshToken: 'r',
       expiresAt: Date.now() + 60_000,
-      scopes: [],
+      scopes,
     });
     renderLayout();
     await waitFor(() =>
       expect(screen.getAllByRole('link', { name: 'Assets' })[0]).toHaveAttribute('title')
     );
-    await user.hover(screen.getAllByRole('link', { name: 'Assets' })[0]);
-    expect(mockedWarmRoute).toHaveBeenCalledWith('/assets', CHARACTER_ID, true);
+    mockedWarmRoute.mockClear();
+  }
+
+  it('warms a rail destination when the pointer reaches it', async () => {
+    const user = userEvent.setup();
+    await renderWithGrant(['esi-calendar.read_calendar_events.v1']);
+    await user.hover(screen.getAllByRole('link', { name: 'Wallet' })[0]);
+    expect(mockedWarmRoute).toHaveBeenCalledWith('/wallet', CHARACTER_ID, [
+      'esi-calendar.read_calendar_events.v1',
+    ]);
+  });
+
+  // Tabbing to a link is the same declaration of intent as pointing at it.
+  it('warms on keyboard focus too', async () => {
+    await renderWithGrant([]);
+    screen.getAllByRole('link', { name: 'Wallet' })[0].focus();
+    expect(mockedWarmRoute).toHaveBeenCalledWith('/wallet', CHARACTER_ID, []);
+  });
+
+  /**
+   * The grant, not the route's lock, is what `warmRoute` filters on — an
+   * `UNGATED` route can still compose scope-gated reads. Passing `undefined`
+   * through matters just as much: it is how the first frames of a cold load
+   * report "not known yet", which must refuse rather than warm blindly.
+   */
+  it('passes an unknown grant through as undefined rather than as empty', async () => {
+    const user = userEvent.setup();
+    useActiveCharacter.setState({ activeCharacterId: null, hydrated: false });
+    renderLayout();
+    await user.hover(screen.getAllByRole('link', { name: 'Wallet' })[0]);
+    expect(mockedWarmRoute).toHaveBeenCalledWith('/wallet', null, undefined);
   });
 });

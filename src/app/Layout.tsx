@@ -10,7 +10,7 @@ import { SyncStatusDot } from './SyncStatusDot';
 import { useSyncStatus } from './useSyncStatus';
 import { CharacterAvatar, characterAvatarBoxClassName, LogoMark, Modal } from '@/components/ui';
 import { AuthFailureNotice } from './AuthFailureNotice';
-import { useLockedRoutes } from './useGrantedScopes';
+import { useGrantedScopes, useLockedRoutes } from './useGrantedScopes';
 import { warmRoute } from './routeWarm';
 import { useKeyboardShortcuts } from './useKeyboardShortcuts';
 import { NotificationPermissionPrompt } from '@/features/notifications/NotificationPermissionPrompt';
@@ -124,17 +124,24 @@ interface NavItemProps {
 function NavItem({ to, label, locked, onClick }: NavItemProps) {
   const { t } = useTranslation();
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
+  const granted = useGrantedScopes();
   /*
    * Compose this route's snapshot while the pointer is still travelling to the
    * link (`routeWarm.ts`). `focus` covers the keyboard, where tabbing to a link
    * is the same declaration of intent. Both are fire-and-forget: `warmRoute`
    * never rejects, and it no-ops for a route that is already warm, already
-   * warming, locked, or simply has no warmer.
+   * warming, short of a grant, or simply has no warmer.
    *
-   * Desktop rail only. The mobile tab bar and More sheet have no hover, and on
-   * a phone the same gesture that would "hover" is already the tap.
+   * The grant, not `locked`, is what gates it — an `UNGATED` route can still
+   * compose scope-gated reads, so `routeWarm.ts` filters on the endpoints its
+   * loader actually reaches.
+   *
+   * `MobileMoreSheet` renders this same component, so its links warm too; that
+   * is harmless rather than intended, since a touch device fires neither event
+   * until the tap itself. Only the bottom tab bar, which builds its own
+   * `NavLink`s, is outside this.
    */
-  const warm = () => void warmRoute(to, activeCharacterId, locked);
+  const warm = () => void warmRoute(to, activeCharacterId, granted);
   // The marker rides on `title`, not extra text: a second string inside the
   // link would rewrite its accessible name from "Assets" to "Assets, needs a
   // new login", which is not what the link is called.
