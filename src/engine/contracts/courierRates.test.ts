@@ -50,9 +50,6 @@ describe('collateralToRewardRatio', () => {
   });
 
   it('has no ratio against a reward of zero, rather than an infinite one', () => {
-    // A free haul with collateral attached is exactly the shape worth
-    // flagging, so it must not render as "Infinity×" and must not be silently
-    // dropped either — the caller decides how to show "no ratio".
     expect(collateralToRewardRatio(1_000_000_000, 0)).toBeNull();
   });
 });

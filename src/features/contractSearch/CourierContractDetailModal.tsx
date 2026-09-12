@@ -13,7 +13,7 @@
  */
 import { useTranslation } from 'react-i18next';
 import { Modal, StatChip } from '@/components/ui';
-import { formatIsk } from '@/lib/isk';
+import { formatIsk, formatIskAuto } from '@/lib/isk';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
 import {
@@ -23,15 +23,12 @@ import {
 } from '@/engine/contracts/courierSearch';
 import { collateralToRewardRatio, iskPerVolume } from '@/engine/contracts/courierRates';
 
-/** Same precision the table's own Volume column uses. */
-const VOLUME_FORMAT = new Intl.NumberFormat('en', { maximumFractionDigits: 1 });
-
 /**
- * One decimal. A collateral ratio is read as a rough magnitude — 40x is the
- * signal, not 40.3x — and more digits would imply a precision the figure does
- * not carry.
+ * One decimal, for a figure read as a magnitude rather than an exact amount —
+ * a hold is "60,000 m³" and a collateral is "40x the reward"; further digits
+ * imply a precision neither carries.
  */
-const RATIO_FORMAT = new Intl.NumberFormat('en', { maximumFractionDigits: 1 });
+const MAGNITUDE_FORMAT = new Intl.NumberFormat('en', { maximumFractionDigits: 1 });
 
 export interface CourierContractDetailModalProps {
   row: CourierRouteRow;
@@ -75,7 +72,7 @@ export function CourierContractDetailModal({
           />
           <StatChip
             label={t('contractSearch.volumeColumn')}
-            value={`${VOLUME_FORMAT.format(row.volume)} m³`}
+            value={`${MAGNITUDE_FORMAT.format(row.volume)} m³`}
           />
           <StatChip
             label={t('contractSearch.daysColumn')}
@@ -83,22 +80,23 @@ export function CourierContractDetailModal({
           />
           <StatChip
             label={t('contractSearch.iskPerVolumeColumn')}
-            value={volumeRate === null ? '—' : formatIsk(volumeRate, 2)}
+            value={volumeRate === null ? '—' : formatIskAuto(volumeRate)}
           />
           {/*
-           * The scam signal the player community names first: a contract
-           * asking far more in collateral than it pays is one built to be
-           * forfeited rather than completed. Shown here rather than as a
-           * column — both raw figures already sit side by side in the table,
-           * and the max-collateral filter is where the concern is acted on.
+           * Here rather than as a column: both raw figures already sit side
+           * by side in the table, and the max-collateral filter is where the
+           * concern is acted on.
            */}
           <StatChip
             label={t('contractSearch.collateralRatioLabel')}
             value={
-              collateralRatio === null
+              // A haul asking no collateral says so the same way the chip
+              // beside it does. "0x" is arithmetically true and reads as a
+              // measured ratio, which is the opposite of "none was asked for".
+              collateralRatio === null || collateral === 0
                 ? '—'
                 : t('contractSearch.collateralRatioValue', {
-                    ratio: RATIO_FORMAT.format(collateralRatio),
+                    ratio: MAGNITUDE_FORMAT.format(collateralRatio),
                   })
             }
           />

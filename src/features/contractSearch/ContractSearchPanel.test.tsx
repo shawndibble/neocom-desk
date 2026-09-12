@@ -502,6 +502,68 @@ describe('ContractSearchPanel — Courier mode', () => {
     expect(cells[ISK_PER_VOLUME_CELL]).toBe('200');
   });
 
+  it('has no rate per cubic metre for a haul that states no cargo', async () => {
+    // A stated zero survives ingestion — the publisher's parser rejects only
+    // an empty column — so this row genuinely reaches the client. It must
+    // read as unavailable, never as an infinite rate.
+    loadPublicCourierContracts.mockResolvedValue(
+      cachedCourierSnapshot([courierRow({ contractId: 700, volume: 0 })])
+    );
+    await showCourier();
+
+    const rows = await waitFor(async () => {
+      const found = await bodyRows();
+      expect(found).toHaveLength(1);
+      return found;
+    });
+    const cells = within(rows[0])
+      .getAllByRole('cell')
+      .map((cell) => cell.textContent);
+    expect(cells[ISK_PER_VOLUME_CELL]).toBe('—');
+  });
+
+  it('says no collateral was asked for, rather than reporting a ratio of zero', async () => {
+    // "0x" is arithmetically true and reads as a measured ratio, which is the
+    // opposite of what an absent collateral means — and the Collateral chip
+    // beside it already says "none asked" with a dash.
+    loadPublicCourierContracts.mockResolvedValue(
+      cachedCourierSnapshot([courierRow({ contractId: 701, collateral: undefined })])
+    );
+    await showCourier();
+
+    const rows = await waitFor(async () => {
+      const found = await bodyRows();
+      expect(found).toHaveLength(1);
+      return found;
+    });
+    await userEvent.click(rows[0]);
+
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('Collateral / reward').parentElement).toHaveTextContent('—');
+  });
+
+  it('has no collateral ratio against a haul that pays nothing', async () => {
+    // A free haul carrying collateral is exactly the shape worth showing, so
+    // it must render rather than being dropped — but the ratio is unknowable,
+    // not infinite.
+    loadPublicCourierContracts.mockResolvedValue(
+      cachedCourierSnapshot([courierRow({ contractId: 702, reward: 0 })])
+    );
+    await showCourier();
+
+    const rows = await waitFor(async () => {
+      const found = await bodyRows();
+      expect(found).toHaveLength(1);
+      return found;
+    });
+    await userEvent.click(rows[0]);
+
+    const dialog = await screen.findByRole('dialog');
+    const ratio = within(dialog).getByText('Collateral / reward').parentElement;
+    expect(ratio).toHaveTextContent('—');
+    expect(ratio).not.toHaveTextContent('Infinity');
+  });
+
   it('keeps ISK per jump as the default sort, not the new rate', async () => {
     await showCourier();
     await waitFor(async () => {

@@ -4,10 +4,10 @@
  * modal read the same rules rather than each dividing for itself.
  *
  * Every one of them returns `null` for a denominator that makes the figure
- * unknowable, and never `Infinity` or `NaN`. That is not defensive
- * programming: the publisher's numeric parser rejects only an empty column,
- * so a stated `0` volume, reward or collateral is kept deliberately and
- * reaches the client as a real row.
+ * unknowable, rather than `Infinity`. That is not defensive programming: the
+ * publisher's numeric parser rejects only an empty column, so a stated `0`
+ * volume, reward or collateral is kept deliberately and reaches the client as
+ * a real row.
  *
  * `null` therefore means "no such figure", which the UI must show as
  * unavailable and sort last — distinct from a figure that genuinely is zero.
@@ -44,9 +44,10 @@ export function iskPerJump(reward: number, jumps: number | null): number | null 
  *
  * The scam signal the player community names first: a contract asking far
  * more in collateral than it pays is one built to be forfeited rather than
- * completed. A ratio against a reward of zero is unknowable rather than
- * infinite — and a free haul carrying collateral is exactly the shape worth
- * showing, so the caller must render that case rather than drop it.
+ * completed.
+ *
+ * A haul asking for nothing gives a true ratio of zero, which is not the same
+ * statement as "none was asked for" — the caller decides which to show.
  */
 export function collateralToRewardRatio(collateral: number, reward: number): number | null {
   if (!(reward > 0)) return null;

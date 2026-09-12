@@ -36,7 +36,7 @@ import { iskPerJump, iskPerVolume } from '@/engine/contracts/courierRates';
 import type { RoutePreferenceKind } from '@/engine/route/jumpRoute';
 import { localJumpCountsForRoutes } from '@/features/route/localRoute';
 import { CourierContractDetailModal } from '@/features/contractSearch/CourierContractDetailModal';
-import { formatIsk } from '@/lib/isk';
+import { formatIsk, formatIskAuto } from '@/lib/isk';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
 
@@ -573,7 +573,7 @@ export function CourierResults({ rows, regionNames }: CourierResultsProps) {
         render: (row) => {
           if (jumps.kind === 'pending') return <span className="text-text-dim">…</span>;
           const rate = iskPerJump(row.reward, jumpsByContract.get(row.contractId) ?? null);
-          return rate === null ? <span className="text-text-dim">—</span> : formatIsk(rate, 0);
+          return rate === null ? <span className="text-text-dim">—</span> : formatIskAuto(rate);
         },
       },
       {
@@ -581,11 +581,14 @@ export function CourierResults({ rows, regionNames }: CourierResultsProps) {
         header: t('contractSearch.iskPerVolumeColumn'),
         align: 'right',
         className: 'tabular-nums whitespace-nowrap',
-        // Same rule as the rates above: no figure sinks the row either way.
         sortValue: (row) => iskPerVolume(row.reward, row.volume) ?? undefined,
+        // `formatIskAuto`, not whole ISK: this rate spans orders of magnitude
+        // the ISK/jump column never sees, and whole-ISK formatting clamps
+        // anything under half an ISK to "0" — which would print a low-paying
+        // bulk haul exactly like the deliberate zero of a favour run.
         render: (row) => {
           const rate = iskPerVolume(row.reward, row.volume);
-          return rate === null ? <span className="text-text-dim">—</span> : formatIsk(rate, 0);
+          return rate === null ? <span className="text-text-dim">—</span> : formatIskAuto(rate);
         },
       },
       {
