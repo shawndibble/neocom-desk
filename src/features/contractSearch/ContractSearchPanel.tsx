@@ -651,7 +651,11 @@ export function ContractSearchPanel() {
                 )}
               />
             ) : mode === 'courier' ? (
-              <CourierResults rows={courierRoutes} regionNames={regionNames} />
+              <CourierResults
+                rows={courierRoutes}
+                regionNames={regionNames}
+                characterId={activeCharacterId}
+              />
             ) : (
               <>
                 <ContractSearchFilterBar

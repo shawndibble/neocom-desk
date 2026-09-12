@@ -31,7 +31,6 @@ import {
   courierCollateral,
   filterCourierContracts,
   type CourierContractFilter,
-  type CourierEndpoint,
   type CourierRouteRow,
 } from '@/engine/contracts/courierSearch';
 import { iskPerJump, iskPerVolume, rewardPerVolumeJump } from '@/engine/contracts/courierRates';
@@ -45,7 +44,12 @@ import { completableCourierRoutes } from '@/engine/contracts/courierRisk';
 import { EndpointRiskMarkers } from '@/features/contractSearch/courierRiskDisplay';
 import type { RoutePreferenceKind } from '@/engine/route/jumpRoute';
 import { localJumpCountsForRoutes } from '@/features/route/localRoute';
-import { CourierContractDetailModal } from '@/features/contractSearch/CourierContractDetailModal';
+import {
+  CourierContractDetailModal,
+  type CourierJumps,
+} from '@/features/contractSearch/CourierContractDetailModal';
+import { endpointSystemName } from '@/features/contractSearch/courierEndpointNames';
+import { loadCharacterRegionId } from '@/features/contractSearch/characterRegion';
 import { formatIskAuto } from '@/lib/isk';
 import { formatMagnitude } from '@/lib/magnitude';
 import { formatTimestamp } from '@/lib/timestamp';
@@ -129,22 +133,6 @@ function parseNumeric(value: string): number | null {
   if (value.trim() === '') return null;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
-}
-
-/**
- * The route column names each end by its *system*, not its station: a haul is
- * read as Jita → Amarr, and the full "Jita IV - Moon 4 - Caldari Navy
- * Assembly Plant" costs two lines of table width to say the same thing. The
- * exact station is still one click away in the detail modal, which keeps it.
- *
- * Both fallbacks are reachable and mean different things. A station whose
- * system the snapshot did not resolve still has its own name, which is a
- * better answer than nothing; a location nothing local names at all — a
- * player structure — shows the bare id, the same fallback the item results
- * use for an unnamed type.
- */
-function endpointSystemName(endpoint: CourierEndpoint): string {
-  return endpoint.systemName ?? endpoint.name ?? `#${endpoint.locationId}`;
 }
 
 /**
@@ -235,6 +223,109 @@ function RegionFilterField({
   );
 }
 
+/**
+ * What the shortcut knows about where the character is. `unknown` until it is
+ * asked — deliberately, because asking is what may cost a request, and the
+ * board must not spend one on a control the hauler may never touch.
+ */
+type MyRegion =
+  | { kind: 'unknown' }
+  | { kind: 'region'; regionId: number }
+  /** Asked, and there is no answer: no grant, offline, or a system the snapshot cannot place. */
+  | { kind: 'unavailable' };
+
+/**
+ * One shared instance, for the same reason `PENDING` below is one: this is the
+ * default every render that has no answer yet hands the control, and a fresh
+ * object would re-render it continuously.
+ */
+const UNASKED: MyRegion = { kind: 'unknown' };
+
+/**
+ * "From my region": sets the origin filter to the region the active character
+ * is standing in (issue #940).
+ *
+ * Region, not station or system, and the label says so. ESI answers this
+ * question with a solar system; the filter beside it is region-scoped, so
+ * naming anything finer would claim a precision the control does not have.
+ *
+ * The answer is *not* held here. `FilterBar` unmounts its controls whenever
+ * the funnel closes or the sheet is dismissed, so state kept in this component
+ * would be thrown away every time the hauler collapsed the bar — and the next
+ * press would have to ask ESI all over again to re-learn something it had
+ * already been told. The board above owns it instead; this only renders it.
+ *
+ * Three honest states once it has been asked. A region that no haul in the
+ * current snapshot starts in disables the control and says so, rather than
+ * setting a value the dropdown beside it has no option for — that would leave
+ * the filter showing something its own control cannot represent, and an empty
+ * table under it. An unresolvable location disables it with a plain reason: a
+ * character whose grant predates `esi-location.read_location.v1` should find a
+ * convenience missing, never a re-auth banner.
+ */
+function MyRegionButton({
+  state,
+  pending,
+  options,
+  onResolve,
+  onPick,
+}: {
+  state: MyRegion;
+  pending: boolean;
+  options: RegionOption[];
+  /** Asks the board to resolve the location, and answers with what it found. */
+  onResolve: () => Promise<MyRegion>;
+  onPick: (regionId: number) => void;
+}) {
+  const { t } = useTranslation();
+
+  const offered = (regionId: number) => options.some((option) => option.id === regionId);
+  const eligible = state.kind === 'region' && offered(state.regionId);
+  // Disabled while in flight as much as for the answer: on a phone a double
+  // tap is exactly how "at most one request" becomes two.
+  const disabled =
+    pending || state.kind === 'unavailable' || (state.kind === 'region' && !eligible);
+
+  const message =
+    state.kind === 'unavailable'
+      ? t('contractSearch.fromMyRegionUnavailable')
+      : state.kind === 'region' && !eligible
+        ? t('contractSearch.noHaulsFromMyRegion')
+        : null;
+
+  async function handleClick() {
+    // Already known and offered — the only way this click is reachable with an
+    // answer in hand, since every other answer disables the button.
+    if (state.kind === 'region') {
+      onPick(state.regionId);
+      return;
+    }
+    const resolved = await onResolve();
+    if (resolved.kind === 'region' && offered(resolved.regionId)) onPick(resolved.regionId);
+  }
+
+  // A plain group rather than a `FilterField`: the button's own text is its
+  // caption, and `FilterField` would stack an identical one above it in the
+  // sheet. Same shape as the space chips below.
+  return (
+    <div className="flex flex-col items-start gap-1">
+      <Button size="sm" disabled={disabled} onClick={() => void handleClick()}>
+        {t('contractSearch.fromMyRegion')}
+      </Button>
+      {/*
+        The reason, announced and not only drawn: the button goes unfocusable
+        in the same commit that renders this, so a screen reader following the
+        control would otherwise be told nothing at all about why it died.
+      */}
+      {message && (
+        <span role="status" className="text-xs text-text-dim">
+          {message}
+        </span>
+      )}
+    </div>
+  );
+}
+
 /** A bare numeric bound — reward floor, collateral ceiling, cargo ceiling, deadline floor. */
 function NumericFilterField({
   label,
@@ -300,6 +391,9 @@ function RoutePreferenceField({
 interface CourierFilterBarProps {
   filter: CourierUiFilter;
   onChange: (filter: CourierUiFilter) => void;
+  myRegion: MyRegion;
+  myRegionPending: boolean;
+  onResolveMyRegion: () => Promise<MyRegion>;
   originRegions: RegionOption[];
   destinationRegions: RegionOption[];
   spaceKinds: readonly SpaceKind[];
@@ -310,6 +404,9 @@ interface CourierFilterBarProps {
 function CourierFilterBar({
   filter,
   onChange,
+  myRegion,
+  myRegionPending,
+  onResolveMyRegion,
   originRegions,
   destinationRegions,
   spaceKinds,
@@ -359,6 +456,13 @@ function CourierFilterBar({
             value={draft.originRegionId}
             options={originRegions}
             onChange={(originRegionId) => setDraft({ ...draft, originRegionId })}
+          />
+          <MyRegionButton
+            state={myRegion}
+            pending={myRegionPending}
+            onResolve={onResolveMyRegion}
+            options={originRegions}
+            onPick={(originRegionId) => setDraft({ ...draft, originRegionId })}
           />
           <RegionFilterField
             label={t('contractSearch.destinationRegionLabel')}
@@ -503,6 +607,9 @@ type JumpsState =
  */
 const PENDING: JumpsState = { kind: 'pending' };
 
+/** The modal's own pending value, stable for the same reason `PENDING` is. */
+const PENDING_JUMPS: CourierJumps = { kind: 'pending' };
+
 function useJumpCounts(
   rows: readonly CourierRouteRow[],
   preference: RoutePreferenceKind
@@ -541,6 +648,8 @@ function useJumpCounts(
 interface CourierResultsProps {
   rows: readonly CourierRouteRow[];
   regionNames: ReadonlyMap<number, string>;
+  /** Non-null: the panel above this one does not render a board without an active character. */
+  characterId: number;
 }
 
 /**
@@ -556,13 +665,47 @@ interface CourierResultsProps {
  * hull, am I given long enough) rather than figures worth ranking fifty rows
  * by, and the table's width is owed to the ones that are.
  */
-export function CourierResults({ rows, regionNames }: CourierResultsProps) {
+export function CourierResults({ rows, regionNames, characterId }: CourierResultsProps) {
   const { t } = useTranslation();
   const timeZone = useTimeZone();
   const [uiFilter, setUiFilter] = useState<CourierUiFilter>(EMPTY_UI_FILTER);
   const [preference, setPreference] = useState<RoutePreferenceKind>(DEFAULT_ROUTE_PREFERENCE);
   const [showAll, setShowAll] = useState(false);
   const [selectedRow, setSelectedRow] = useState<CourierRouteRow | null>(null);
+
+  // Where the character is (issue #940), owned here rather than by the control
+  // that shows it, because `FilterBar` unmounts its controls on every collapse.
+  //
+  // Both pieces carry the character they were learned for, so a character
+  // switch invalidates them *during render* rather than through an effect that
+  // resets them — the same shape as `useJumpCounts` above, and for the same
+  // reason: an answer about someone else is stale by definition, and a
+  // resolve still in flight when the switch happens cannot land on the new
+  // character's board.
+  const [myRegionAnswer, setMyRegionAnswer] = useState<{
+    characterId: number;
+    state: MyRegion;
+  } | null>(null);
+  const [myRegionPendingFor, setMyRegionPendingFor] = useState<number | null>(null);
+  const myRegion =
+    myRegionAnswer && myRegionAnswer.characterId === characterId ? myRegionAnswer.state : UNASKED;
+  const myRegionPending = myRegionPendingFor === characterId;
+
+  const resolveMyRegion = useCallback(async (): Promise<MyRegion> => {
+    setMyRegionPendingFor(characterId);
+    let next: MyRegion;
+    try {
+      const regionId = await loadCharacterRegionId(characterId);
+      next = regionId === null ? { kind: 'unavailable' } : { kind: 'region', regionId };
+    } catch {
+      // A snapshot or cache read that throws is still just "no answer" — and
+      // it must not leave the button stuck pending and silently dead.
+      next = { kind: 'unavailable' };
+    }
+    setMyRegionAnswer({ characterId, state: next });
+    setMyRegionPendingFor((pendingFor) => (pendingFor === characterId ? null : pendingFor));
+    return next;
+  }, [characterId]);
 
   const originRegions = useMemo(
     () => regionOptionsFor(rows, 'origin', regionNames),
@@ -881,6 +1024,9 @@ export function CourierResults({ rows, regionNames }: CourierResultsProps) {
       <CourierFilterBar
         filter={uiFilter}
         onChange={changeFilter}
+        myRegion={myRegion}
+        myRegionPending={myRegionPending}
+        onResolveMyRegion={resolveMyRegion}
         originRegions={originRegions}
         destinationRegions={destinationRegions}
         spaceKinds={spaceKinds}
@@ -928,10 +1074,14 @@ export function CourierResults({ rows, regionNames }: CourierResultsProps) {
         <CourierContractDetailModal
           row={selectedRow}
           regionNames={regionNames}
+          // The board already read the graph for every row, so the modal is
+          // handed the answer rather than resolving its own. `unknown` folds
+          // into a `null` count: an unreadable snapshot and a route that does
+          // not exist are both "no distance to quote" at this surface.
           jumps={
-            jumps.kind === 'known'
-              ? (jumpsByContract.get(selectedRow.contractId) ?? null)
-              : 'pending'
+            jumps.kind === 'pending'
+              ? PENDING_JUMPS
+              : { kind: 'known', count: jumpsByContract.get(selectedRow.contractId) ?? null }
           }
           goingRateMultiple={multipleFor(selectedRow)}
           preference={preference}
