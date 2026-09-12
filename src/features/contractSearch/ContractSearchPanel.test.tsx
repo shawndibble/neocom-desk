@@ -8,6 +8,7 @@ import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharact
 import { DEFAULT_TIME_FORMAT, useTimeFormat } from '@/lib/timeFormat';
 import { isSyncConfigured } from '@/app/syncStatus';
 import { clearJumpGraphIndex } from '@/sde/jumpGraph';
+import { loadMarketTypes } from '@/sde/loadMarketSde';
 import { ContractSearchPanel } from '@/features/contractSearch/ContractSearchPanel';
 import type { PublicContractOfferRow } from '@/engine/contracts/contractOffers';
 import type { ChunkedSnapshotRead } from '@/features/contractSearch/chunkedSnapshot';
@@ -924,6 +925,44 @@ describe('ContractSearchPanel — progressive loading', () => {
     const rows = await bodyRows();
     expect(within(rows[0]).getByText('Domain')).toBeInTheDocument();
     expect(loadRegionName).not.toHaveBeenCalled();
+  });
+
+  it('falls back to ESI for a region the local table does not carry', async () => {
+    // `regions.json` is the k-space table; a contract posted somewhere outside
+    // it must still get a name rather than be reported as unnameable.
+    const WORMHOLE_REGION = 11000031;
+    vi.mocked(loadRegionName).mockResolvedValue('Thera');
+    loadPublicContractOffers.mockResolvedValue(
+      cachedSnapshot([row({ contractId: 9, regionId: WORMHOLE_REGION })])
+    );
+    renderWithRouter();
+
+    const rows = await bodyRows();
+    await waitFor(() => {
+      expect(within(rows[0]).getByText('Thera')).toBeInTheDocument();
+    });
+    expect(loadRegionName).toHaveBeenCalledWith(WORMHOLE_REGION);
+    expect(loadRegionName).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not call a typed query unmatched while the item names are still loading', async () => {
+    // The rows land before the 1.45 MB catalogue does, so every item reads
+    // `#34` and a typed query ranks nothing. "No contracts match your filters"
+    // would be a complete answer given mid-load.
+    const catalog = deferred<MarketTypeEntry[]>();
+    vi.mocked(loadMarketTypes).mockReturnValue(catalog.promise);
+    const user = userEvent.setup();
+    renderWithRouter();
+
+    await screen.findByRole('table');
+    await user.type(screen.getByPlaceholderText('Search item name…'), 'tritanium');
+
+    expect(await screen.findByRole('status', { name: 'Loading item names…' })).toBeInTheDocument();
+    expect(screen.queryByText('No contracts match your filters')).not.toBeInTheDocument();
+
+    catalog.settle(CATALOG);
+    // Named at last, and now the query has something to rank against.
+    expect(await screen.findAllByText('Tritanium')).not.toHaveLength(0);
   });
 
   it('states a refresh that fell back to cache, rather than repeating the offline banner', async () => {
