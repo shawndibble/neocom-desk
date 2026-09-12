@@ -190,8 +190,8 @@ precisely where "feels part of the overall application" fails.
 | `roster.ts`              | `features/character/roster.ts`          | 02, 07, 09, 14 — cache-only by default, capped-concurrency live mode                     |
 | `rankedSearch`           | shared with `features/market/search.ts` | 04. `SkillPicker.tsx:26` has no relevance ranking at all today                           |
 | `csv.ts` + `download.ts` | `src/lib/`                              | The serializer and download trigger only. Item 12's export surfaces land in Phase 2      |
-| `useLocalSetting<T>`     | `src/lib/`                              | 11, 18, and 09's density toggle                                                          |
-| **Settings route**       | `routes/Settings.tsx`                   | 11, 15b, 18. **No Settings surface exists anywhere in the app** — three items assume one |
+| `useLocalSetting<T>`     | `src/lib/`                              | 18 and 09's density toggle                                                               |
+| **Settings route**       | `routes/Settings.tsx`                   | 15b, 18. **No Settings surface exists anywhere in the app** — both items assume one      |
 
 Multi-character ESI access was expected to be a blocker and **is not**:
 `configureEsi`'s `getToken` is parameterized per `characterId`
@@ -231,7 +231,7 @@ No new ESI scopes. No re-auth prompt. Ordered by dependency, then value.
 | 01   | Remap schedule timeline                     | S      | Projected finish date and step→row mapping are genuinely absent, but neither forces an engine change                                                                                                                                                                               |
 | 05   | Plan header + live optimization badge       | S      | **Only S because of the Phase 0 O(R) fix.** Exact for the single-remap default; `remapCount ≥ 2` needs an explicit ruling                                                                                                                                                          |
 | 02   | Queue health across Characters              | S      | Cached-only v1 via `esiCache.bulkGet` — no schema bump, no new fetch path                                                                                                                                                                                                          |
-| 11   | "What's new" after update                   | S      | Needs `__APP_VERSION__` define + bundled `changelog.json`. Fetching GitHub Releases would add an external dependency to a deliberately closed list                                                                                                                                 |
+| 11   | ~~"What’s new" after update~~               | —      | **Dropped.** Built, then removed — see `docs/context/decisions/20260912-111504-remove-the-whats-new-modal.md`. Do not re-file                                                                                                                                                      |
 | 18   | Font scaling                                | S      | Only S because of the Phase 0 rem sweep and the Phase 1 Settings route                                                                                                                                                                                                             |
 | 10   | Keyboard shortcuts                          | S      | Only S because Phase 0 supplies the modal system and Phase 1 the Settings route — two of its four shortcuts had no target                                                                                                                                                          |
 | 06   | Import `.emp` / plan XML                    | S/M    | **The switching-cost lever.** Verified against EVEMon source: gzip'd XML, `<plan>` root, `<entry skillID skill level priority type>`. Its `priority` attribute is item 08's field arriving free                                                                                    |
@@ -704,5 +704,5 @@ splits, test plans, i18n keys, design tokens, sync/Dexie impact and open questio
 | [G — new-scope views](./briefs/G-newscope-views.md)                  | 13, 16                     |
 | [H — Doctrine Designer](./briefs/H-doctrine.md)                      | 14                         |
 | [I — niche tabs](./briefs/I-niche-tabs.md)                           | 20                         |
-| [J — shell polish](./briefs/J-shell-polish.md)                       | 11, 18                     |
+| [J — shell polish](./briefs/J-shell-polish.md)                       | 18                         |
 | [K — library survey](./briefs/K-libraries.md)                        | build-vs-buy, all surfaces |
