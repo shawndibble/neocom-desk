@@ -1,8 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { PublicContractOfferRow } from '@/engine/contracts/contractOffers';
 import {
-  EMPTY_CONTRACT_OFFER_FILTER,
-  activeContractOfferFilterCount,
   contractOfferPriceSummary,
   contractOfferStats,
   filterContractOffers,
@@ -27,7 +25,7 @@ function offer(over: Partial<PublicContractOfferRow> = {}): PublicContractOfferR
 describe('filterContractOffers', () => {
   it('passes every row through an empty filter', () => {
     const rows = [offer({ typeId: 34 }), offer({ typeId: 35 })];
-    expect(filterContractOffers(rows, EMPTY_CONTRACT_OFFER_FILTER)).toEqual(rows);
+    expect(filterContractOffers(rows, {})).toEqual(rows);
   });
 
   it('keeps only the searched types, and an empty type set matches nothing', () => {
@@ -62,6 +60,15 @@ describe('filterContractOffers', () => {
     expect(filterContractOffers(rows, { maxPrice: 1_000_000 })).toEqual([noBuyout]);
   });
 
+  it('ignores a zero buyout on an auction too — nobody set a buyout of nothing', () => {
+    // The sync only treats a *blank* buyout column as absent, so an auction
+    // with no buyout arrives here as `buyout: 0`. Read as a real ceiling it
+    // would slip under every maxPrice and price the row at nothing.
+    const rows = [offer({ isAuction: true, price: 5_000_000, buyout: 0 })];
+    expect(offerAskingPrice(rows[0])).toBe(5_000_000);
+    expect(filterContractOffers(rows, { maxPrice: 1_000_000 })).toEqual(rows);
+  });
+
   it('ignores a zero buyout on a non-auction row', () => {
     // EVE Ref emits `buyout: 0` on plain item_exchange rows; reading it as a
     // real ceiling would make every such row look free.
@@ -76,25 +83,6 @@ describe('offerAskingPrice', () => {
     expect(offerAskingPrice(offer({ isAuction: true, price: 5, buyout: 100 }))).toBe(100);
     expect(offerAskingPrice(offer({ isAuction: true, price: 5 }))).toBe(5);
     expect(offerAskingPrice(offer({ isAuction: false, price: 42 }))).toBe(42);
-  });
-});
-
-describe('activeContractOfferFilterCount', () => {
-  it('counts only the dimensions actually restricting the result', () => {
-    expect(activeContractOfferFilterCount(EMPTY_CONTRACT_OFFER_FILTER)).toBe(0);
-    expect(
-      activeContractOfferFilterCount({
-        typeIds: new Set([34]),
-        regionId: 10000002,
-        maxPrice: 5,
-        minQuantity: 2,
-        saleKind: 'auction',
-      })
-    ).toBe(5);
-  });
-
-  it('counts an empty-but-present type set — it is a search that matched nothing, not an absent one', () => {
-    expect(activeContractOfferFilterCount({ typeIds: new Set() })).toBe(1);
   });
 });
 

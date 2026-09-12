@@ -43,8 +43,17 @@ _Recorded 2026-09-12 · issue #908._
   and filters on ME/TE/runs, both of which this tab's ticket rules out, and
   ME/TE/runs are absent — not zero — on a plain item line. Folding the two
   together would mean a filter with a mode flag and a row type that is half
-  optional. What is genuinely shared is imported rather than copied:
-  `loadRegionName`, `rankedSearch`, and the asking-price rule.
+  optional. `loadRegionName` and `rankedSearch` are imported rather than
+  copied. The asking-price rule deliberately is not: `offerAskingPrice` reads
+  like `bpcSearch.ts`'s `effectivePrice` but treats a `buyout` of `0` as no
+  buyout at all, which that one does not. The sync only counts a _blank_
+  buyout column as absent, so a zero arrives as a real number; read as a
+  price it shows the row as free and slips it under every ceiling. Extracting
+  one shared helper would have meant changing BPC Search's pricing on a
+  premise this ticket could not verify from here — whether EVE Ref ever emits
+  `buyout: 0` on an auction row specifically. The guard is correct either
+  way, and lives only where this ticket can stand behind it; hoisting it is
+  the follow-up if that premise is ever confirmed.
 - **Item names come from the market catalogue
   (`public/data/market/types.json`), not `loadTypeNames`.** The slim
   `public/data/types.json` that `loadTypeNames` consults first covers only
@@ -60,6 +69,15 @@ _Recorded 2026-09-12 · issue #908._
   region rides along on every row for free. Rules out nothing permanent —
   adding the column later is the same `loadContractLocationInfo` call BPC
   Search already makes.
+- **The row cap takes the cheapest offers, not the first ones the snapshot
+  lists.** `DataTable` sorts only the rows it is handed, so capping the
+  snapshot's own contract-then-type order would leave the table claiming a
+  price-ascending default sort over an arbitrary 50 — and the Cheapest chip
+  above it naming a price no visible row carries. Sorting before the cap is
+  what makes the default view honestly "the 50 cheapest offers". The residue
+  is that re-sorting by another column re-orders those 50 rather than the
+  whole result set; Show all lifts that, and the alternative (handing
+  `DataTable` the full corpus) is what the cap exists to prevent.
 - **No column picker and no detail modal on this table.** Five columns is a
   picker with nothing to hide, and `BpcContractModal` speaks `BpcContractRow`,
   not a general offer. Both are additive later; neither is in the acceptance

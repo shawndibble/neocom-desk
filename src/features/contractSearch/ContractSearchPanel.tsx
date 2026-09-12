@@ -177,9 +177,9 @@ function ContractSearchFilterBar({
   regionOptions,
 }: ContractSearchFilterBarProps) {
   const { t } = useTranslation();
-  // Hand-counted rather than `activeContractOfferFilterCount`: that one reads
-  // the parsed engine filter, where a half-typed "1e" is already `null` — the
-  // badge should count the fields the user has actually touched.
+  // Counted off the controls, not off the parsed engine filter: a half-typed
+  // "1e" parses to `null` there, and the badge should say the field has been
+  // touched rather than silently drop back to zero mid-keystroke.
   const activeCount = [
     filter.typeQuery,
     filter.regionId !== null,
@@ -344,8 +344,19 @@ export function ContractSearchPanel() {
     );
   }, [selectedTypeId, uiFilter.typeQuery, typeOptions]);
 
+  /**
+   * Cheapest first *before* the row cap, not after it. `DataTable` sorts only
+   * the rows it is handed, so capping the snapshot's own contract-then-type
+   * order would leave the table claiming a price-ascending sort over an
+   * arbitrary 50 — and the Cheapest chip naming a price no visible row
+   * carries. Sorting first makes the capped view honestly "the 50 cheapest
+   * offers"; Show all lifts it.
+   */
   const displayRows = useMemo(
-    () => filterContractOffers(nonTypeRows, { typeIds }),
+    () =>
+      filterContractOffers(nonTypeRows, { typeIds }).sort(
+        (a, b) => offerAskingPrice(a) - offerAskingPrice(b)
+      ),
     [nonTypeRows, typeIds]
   );
 
@@ -421,9 +432,9 @@ export function ContractSearchPanel() {
               // An auction's number is a starting bid unless the seller set a
               // buyout, so the figure alone would read as a fixed ask.
               <span className="ml-1 text-[0.6875rem] text-text-dim uppercase">
-                {row.buyout === undefined
-                  ? t('contractSearch.startingBidShort')
-                  : t('contractSearch.buyoutShort')}
+                {row.buyout
+                  ? t('contractSearch.buyoutShort')
+                  : t('contractSearch.startingBidShort')}
               </span>
             )}
           </>

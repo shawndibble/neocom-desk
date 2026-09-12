@@ -40,9 +40,15 @@ const CACHE_KEY = 'publicContractOffersAll';
  * same reason `syncedContracts.ts` does it: against a twice-hourly publish,
  * `STALE_AFTER.default`'s ten minutes just re-downloads a byte-identical
  * snapshot up to three times per cycle, which this read can afford even less
- * than that one. The panel's Refresh still bypasses it, and the UI shows the
- * snapshot's own `lastSyncedAt` rather than when this browser last read
- * Firestore.
+ * than that one.
+ *
+ * A window this long also puts the entry out of a manual Refresh's reach:
+ * `isRefreshInvalidated` deliberately only bypasses keys on the default
+ * window, so the panel's Refresh re-runs the loader but reads this entry back
+ * until the 30 minutes lapse. That is the honest behaviour for a snapshot the
+ * backend republishes on its own clock — there is nothing newer to fetch —
+ * and the UI names the snapshot's own `lastSyncedAt` rather than when this
+ * browser last read Firestore, so what is on screen still says how old it is.
  */
 const SNAPSHOT_PUBLISH_INTERVAL_MS = 30 * 60_000;
 

@@ -110,6 +110,23 @@ describe('ContractSearchPanel', () => {
     ]);
   });
 
+  it('caps the table at the 50 cheapest offers, not the first 50 the snapshot lists', async () => {
+    // Snapshot order is contract-then-type, so the cheapest row can sit well
+    // past the cap. Slicing before sorting would show 50 arbitrary rows under
+    // a header that claims cheapest-first.
+    const dear = Array.from({ length: 60 }, (_, i) =>
+      row({ contractId: 100 + i, price: 10_000_000 - i, quantity: 1 })
+    );
+    const cheapest = row({ contractId: 999, price: 1, quantity: 7 });
+    loadPublicContractOffers.mockResolvedValue(cachedSnapshot([...dear, cheapest]));
+    render(<ContractSearchPanel />);
+
+    const rows = await bodyRows();
+    expect(rows).toHaveLength(50);
+    expect(within(rows[0]).getByText('7')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Show all (61 total)' })).toBeInTheDocument();
+  });
+
   it('names the region each offer sits in', async () => {
     render(<ContractSearchPanel />);
 
@@ -123,6 +140,17 @@ describe('ContractSearchPanel', () => {
 
     const rows = await bodyRows();
     expect(within(rows[2]).getByText('buyout')).toBeInTheDocument();
+  });
+
+  it('calls a zero-buyout auction what it is — a starting bid, at its own price', async () => {
+    loadPublicContractOffers.mockResolvedValue(
+      cachedSnapshot([row({ typeId: 35, isAuction: true, price: 3_000_000, buyout: 0 })])
+    );
+    render(<ContractSearchPanel />);
+
+    const rows = await bodyRows();
+    expect(within(rows[0]).getByText('bid')).toBeInTheDocument();
+    expect(within(rows[0]).queryByText('buyout')).not.toBeInTheDocument();
   });
 
   it('narrows to one item type when a suggestion is picked, and summarises its offers', async () => {

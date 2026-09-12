@@ -31,14 +31,6 @@ export interface ContractOfferFilter {
   saleKind?: ContractSaleKind | null;
 }
 
-export const EMPTY_CONTRACT_OFFER_FILTER: ContractOfferFilter = {
-  typeIds: null,
-  regionId: null,
-  maxPrice: null,
-  minQuantity: null,
-  saleKind: null,
-};
-
 /**
  * A row's `buyout` is only meaningful on an auction. EVE Ref emits `buyout:
  * 0` on plain item_exchange rows, so a reader that took `buyout ?? price`
@@ -47,7 +39,11 @@ export const EMPTY_CONTRACT_OFFER_FILTER: ContractOfferFilter = {
  */
 function buyoutOf(row: PublicContractOfferRow): number | null {
   if (!row.isAuction) return null;
-  return row.buyout ?? null;
+  // `> 0`, not just present: the sync writes whatever the archive's `buyout`
+  // column parses to and only treats a blank as absent, so a zero reaches
+  // here as a real number. Zero is not a price a seller set — read as one it
+  // would show the row as free and let it under every ceiling.
+  return row.buyout != null && row.buyout > 0 ? row.buyout : null;
 }
 
 /**
@@ -91,21 +87,6 @@ export function filterContractOffers(
     }
     return true;
   });
-}
-
-/**
- * How many dimensions are actually restricting the result, for the filter
- * bar's badge. An empty-but-present `typeIds` counts: it restricts the result
- * to nothing, which is the state a user most needs the badge to explain.
- */
-export function activeContractOfferFilterCount(filter: ContractOfferFilter): number {
-  return [
-    filter.typeIds != null,
-    filter.regionId != null,
-    filter.maxPrice != null,
-    filter.minQuantity != null,
-    filter.saleKind != null,
-  ].filter(Boolean).length;
 }
 
 export interface ContractTypeOption {
