@@ -1,9 +1,15 @@
 /**
- * Reads the public BPC contract search's synced snapshot (issue #608, ADR
- * 0013): a small, shared, admin-write-only Firestore collection populated by
- * the `syncPublicBpcContracts` scheduled function — not per-character data,
- * so it goes through `esi/cache.ts`'s `GLOBAL_CACHE_CHARACTER_ID` sentinel,
- * same trade every other character-independent public lookup makes (`stations.ts`,
+ * Reads the Public Contract Offers snapshot (issues #906, #907, ADR 0013): a
+ * shared, admin-write-only Firestore collection populated by the
+ * `syncPublicContractOffers` scheduled function, narrowed here to the
+ * blueprint copies BPC Search searches. Until #907 that narrowing was a
+ * second, blueprint-only ingestion pipeline and its own collection; the
+ * snapshot now carries every for-sale item type and each consumer takes the
+ * slice it wants.
+ *
+ * It is not per-character data, so it goes through `esi/cache.ts`'s
+ * `GLOBAL_CACHE_CHARACTER_ID` sentinel, same trade every other
+ * character-independent public lookup makes (`stations.ts`,
  * `regionNames.ts`). Reading still requires being signed in to Firebase as
  * *some* character (the collection's rule is `request.auth != null`), which
  * `ensureSignedIn` already is on every character switch for the sync feature
@@ -20,10 +26,14 @@ import {
   type CachedResult,
 } from '@/esi/cache';
 import type { BpcContractRow } from '@/engine/contracts/bpcSearch';
+import {
+  bpcRowsFromContractOffers,
+  type PublicContractOfferRow,
+} from '@/engine/contracts/contractOffers';
 
-const COLLECTION = 'publicBpcContracts';
+const COLLECTION = 'publicContractOffers';
 const META_DOC_ID = 'meta';
-const CACHE_KEY = 'publicBpcContracts';
+const CACHE_KEY = 'publicContractOffers';
 
 export interface PublicBpcContractsSnapshot {
   rows: BpcContractRow[];
@@ -32,13 +42,20 @@ export interface PublicBpcContractsSnapshot {
 }
 
 interface ChunkDocData {
-  rows: BpcContractRow[];
+  rows: PublicContractOfferRow[];
 }
 
 interface MetaDocData {
   lastSyncedAt: number;
 }
 
+/**
+ * Each chunk is narrowed as it is read rather than after the whole snapshot is
+ * accumulated: the shared collection holds roughly three times the rows the
+ * blueprint-only one did, and only the blueprint copies are worth retaining
+ * (or caching). The extra rows are then transient — one chunk at a time —
+ * instead of a 3x heap and a 3x Dexie entry.
+ */
 async function fetchSnapshot(characterId: number): Promise<PublicBpcContractsSnapshot | null> {
   if (!isSyncConfigured()) return null;
   await ensureSignedIn(characterId);
@@ -50,7 +67,7 @@ async function fetchSnapshot(characterId: number): Promise<PublicBpcContractsSna
     if (docSnap.id === META_DOC_ID) {
       lastSyncedAt = (docSnap.data() as MetaDocData).lastSyncedAt ?? null;
     } else {
-      rows.push(...(docSnap.data() as ChunkDocData).rows);
+      rows.push(...bpcRowsFromContractOffers((docSnap.data() as ChunkDocData).rows));
     }
   }
   return { rows, lastSyncedAt };
