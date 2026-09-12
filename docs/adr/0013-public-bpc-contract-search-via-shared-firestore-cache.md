@@ -88,7 +88,7 @@ the one narrow, explicit exception to "Firebase is per-character sync only";
 retract the general rule.**
 
 > **Amended 2026-09-12 (issue #906).** There are now two such collections, not
-> one. `publicContractItems` is this same pipeline generalized past blueprint
+> one. `publicContractOffers` is this same pipeline generalized past blueprint
 > copies to every item type, written by a second scheduled function on the
 > same cadence. The exception the paragraph above carves out is unchanged in
 > kind — shared, admin-write-only, no EVE token, no ESI call — only in count,

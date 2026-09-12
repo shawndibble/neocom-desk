@@ -14,8 +14,8 @@ _Recorded 2026-09-12 · issue #906._
   Contracts Search tab should revisit this deliberately if it wants to show a
   contract's full both-sides contents, since that changes the sizing.
 - **A second collection and a second row shape, not a widened
-  `BpcContractRow`.** `publicContractItems` is written by a new
-  `syncPublicContractItems`; `publicBpcContracts` and `syncPublicBpcContracts`
+  `BpcContractRow`.** `publicContractOffers` is written by a new
+  `syncPublicContractOffers`; `publicBpcContracts` and `syncPublicBpcContracts`
   are behaviourally untouched and keep backing BPC Sourcing until #907 moves
   it over. The cost is that the EVE Ref archive is fetched twice per 30-minute
   cycle. That is accepted as the expand half of an expand/contract with a
@@ -35,9 +35,12 @@ runs: 0` onto roughly two thirds of the snapshot — bytes against the 1MiB
   `isBlueprintCopy` means "a copy specifically".
 - **3,000 rows/chunk, against the blueprint snapshot's 2,000.** The blueprint
   snapshot measured ~185 bytes/row; a blueprint row here carries the extra
-  `isBlueprintCopy` field, so the worst case is ~210 bytes/row and a chunk of
-  nothing but blueprints is ~615KB — under two thirds of the 1MiB limit,
-  with most rows (plain items, no ME/TE/runs) smaller than that. The
+  `isBlueprintCopy` field, so ~210 bytes/row is the expected blueprint case
+  and a chunk of nothing but blueprints is ~615KB — under two thirds of the
+  1MiB limit, with most rows (plain items, no ME/TE/runs) smaller than that.
+  A unit test measures the _widest_ row the shape can produce and asserts a
+  full chunk of them still fits, rather than pinning a byte constant that
+  would go stale the moment a field is added. The
   binding constraint is the free tier's 20,000 writes/day, which is the
   _project's_ budget: `dispatchProjections` runs 288x/day and the blueprint
   sync 48x/day alongside. ~370k rows at 3,000/chunk is ~124 docs x 48 runs ≈
@@ -57,6 +60,13 @@ runs: 0` onto roughly two thirds of the snapshot — bytes against the 1MiB
   validation checkpoint is deliberate and cheap: the function logs
   `rowCount`, so the first live runs say what the real volume is and these
   numbers can come down.
+- **The collection is `publicContractOffers`, not `publicContractItems`.**
+  `src/features/bpcContracts/publicContractItems.ts` already exists and is
+  something else entirely — a per-contract, on-open ESI read of one contract's
+  items. Two things named the same, one a live single-contract fetch and one a
+  twice-hourly 370k-row bulk snapshot, is how #907 gets wired to the wrong
+  data path. "Offer" is already the glossary's word for one for-sale row in
+  this snapshot, so it names the thing and disambiguates in one move.
 - **A fourth Cloud Scheduler job is accepted.** ADR 0013 budgeted its own job
   against the 3 free per billing account (`dispatchProjections`,
   `purgeNotificationFeed`, `syncPublicBpcContracts`), and running the two

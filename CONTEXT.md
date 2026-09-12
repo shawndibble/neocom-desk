@@ -545,7 +545,7 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   device that has not been opened inside that window stops receiving Scheduled
   Pushes until it is, which is the accepted consequence of holding no tokens
   server-side.
-- **Public Contract Items snapshot**: the shared, read-only Firestore collection (`publicContractItems`) holding every for-sale line of every public item_exchange/auction contract, any item type — the same twice-hourly EVE Ref crawl behind **BPC Sourcing**, generalized past blueprint copies (issue #906). "For sale" is the whole of it: a line the contract issuer is _asking_ for is not in the snapshot. It runs alongside the blueprint-only `publicBpcContracts` collection, which BPC Sourcing still reads until that search moves over.
+- **Public Contract Offers snapshot**: the shared, read-only Firestore collection (`publicContractOffers`) holding every for-sale line of every public item_exchange/auction contract, any item type — the same twice-hourly EVE Ref crawl behind **BPC Sourcing**, generalized past blueprint copies (issue #906). "For sale" is the whole of it: a line the contract issuer is _asking_ for is not in the snapshot. It runs alongside the blueprint-only `publicBpcContracts` collection, which BPC Sourcing still reads until that search moves over.
 - **Pull Cursor**: How far a sync pass has read one remote collection for one
   Character — the highest `updatedAt` it has actually observed there, plus when
   it last read that collection unfiltered. The next pass asks Firestore only

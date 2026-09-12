@@ -9,13 +9,13 @@ import {
   chunkRows,
   chunkDocId,
   DEFAULT_CHUNK_SIZE,
-  compactContractItemRow,
-  filterAndCompactPublicContractItems,
-  sortContractItemRows,
+  compactContractOfferRow,
+  filterAndCompactPublicContractOffers,
+  sortContractOfferRows,
   PUBLIC_BPC_CONTRACTS_COLLECTION,
-  PUBLIC_CONTRACT_ITEMS_CHUNK_SIZE,
-  PUBLIC_CONTRACT_ITEMS_COLLECTION,
-  type PublicContractItemRow,
+  PUBLIC_CONTRACT_OFFERS_CHUNK_SIZE,
+  PUBLIC_CONTRACT_OFFERS_COLLECTION,
+  type PublicContractOfferRow,
 } from './publicContracts.js';
 
 // Column order and sample values verified against a live EVE Ref
@@ -316,7 +316,7 @@ describe('chunkDocId', () => {
   });
 });
 
-describe('compactContractItemRow', () => {
+describe('compactContractOfferRow', () => {
   const parent = {
     contractId: 1,
     regionId: 10000002,
@@ -337,7 +337,7 @@ describe('compactContractItemRow', () => {
 
   it('keeps a plain item line, which the blueprint-only join drops', () => {
     expect(compactBpcItemRow(notBlueprint, parent)).toBeNull();
-    expect(compactContractItemRow(notBlueprint, parent)).toEqual({
+    expect(compactContractOfferRow(notBlueprint, parent)).toEqual({
       contractId: 1,
       regionId: 10000002,
       locationId: 60003760,
@@ -353,7 +353,7 @@ describe('compactContractItemRow', () => {
     // Number('') is 0, not NaN: writing these unconditionally would put
     // `me: 0, te: 0, runs: 0` on every ore stack in New Eden, both inflating
     // the chunk docs and making an "ME 0" search match all of them.
-    const row = compactContractItemRow(notBlueprint, parent);
+    const row = compactContractOfferRow(notBlueprint, parent);
     expect(row).not.toHaveProperty('me');
     expect(row).not.toHaveProperty('te');
     expect(row).not.toHaveProperty('runs');
@@ -361,7 +361,7 @@ describe('compactContractItemRow', () => {
   });
 
   it('flags a blueprint copy and carries its ME/TE/runs', () => {
-    expect(compactContractItemRow(bpc, parent)).toEqual({
+    expect(compactContractOfferRow(bpc, parent)).toEqual({
       contractId: 1,
       regionId: 10000002,
       locationId: 60003760,
@@ -382,22 +382,22 @@ describe('compactContractItemRow', () => {
     // copy-ness so it stays off, and -1 runs is not a number any search
     // should be offered — but a researched BPO's ME/TE is real information a
     // buyer pays for, so it is not thrown away with the -1.
-    const row = compactContractItemRow(blueprintOriginal, parent);
+    const row = compactContractOfferRow(blueprintOriginal, parent);
     expect(row).not.toHaveProperty('isBlueprintCopy');
     expect(row).not.toHaveProperty('runs');
     expect(row).toMatchObject({ typeId: 32858, me: 10, te: 20 });
   });
 
   it('carries the parent buyout through when there is one', () => {
-    expect(compactContractItemRow(bpc, { ...parent, buyout: 9000000 })?.buyout).toBe(9000000);
+    expect(compactContractOfferRow(bpc, { ...parent, buyout: 9000000 })?.buyout).toBe(9000000);
   });
 
   it('rejects an item the issuer wants rather than offers', () => {
-    expect(compactContractItemRow(requested, parent)).toBeNull();
+    expect(compactContractOfferRow(requested, parent)).toBeNull();
   });
 });
 
-describe('filterAndCompactPublicContractItems', () => {
+describe('filterAndCompactPublicContractOffers', () => {
   const contracts = contractsCsv([
     // eligible: item_exchange, not yet expired
     `0.0,1,${FUTURE},2026-08-11T18:10:34Z,0,,98745702,2120819548,5000000.0,0.0,60003760,"Mixed bundle",item_exchange,10.0,2026-09-08T18:08:11Z,10000002,60003760,30000142,20000020,false,`,
@@ -426,7 +426,7 @@ describe('filterAndCompactPublicContractItems', () => {
   ]);
 
   const rows = () =>
-    filterAndCompactPublicContractItems(
+    filterAndCompactPublicContractOffers(
       parseContractsCsv(contracts),
       parseContractItemsCsv(items),
       NOW
@@ -462,11 +462,11 @@ describe('filterAndCompactPublicContractItems', () => {
   });
 
   it('is empty given no rows', () => {
-    expect(filterAndCompactPublicContractItems([], [], NOW)).toEqual([]);
+    expect(filterAndCompactPublicContractOffers([], [], NOW)).toEqual([]);
   });
 
   it('sorts deterministically by contract then type, independent of input order', () => {
-    const backwards = filterAndCompactPublicContractItems(
+    const backwards = filterAndCompactPublicContractOffers(
       parseContractsCsv(contracts).reverse(),
       parseContractItemsCsv(items).reverse(),
       NOW
@@ -479,9 +479,9 @@ describe('filterAndCompactPublicContractItems', () => {
   });
 });
 
-describe('sortContractItemRows', () => {
-  const row = (fields: Partial<PublicContractItemRow>) =>
-    fields as NonNullable<ReturnType<typeof compactContractItemRow>>;
+describe('sortContractOfferRows', () => {
+  const row = (fields: Partial<PublicContractOfferRow>) =>
+    fields as NonNullable<ReturnType<typeof compactContractOfferRow>>;
 
   it('orders by contract then type, in place, independent of input order', () => {
     const rows = [
@@ -490,7 +490,7 @@ describe('sortContractItemRows', () => {
       row({ contractId: 1, typeId: 5 }),
     ];
 
-    expect(sortContractItemRows(rows)).toBe(rows);
+    expect(sortContractOfferRows(rows)).toBe(rows);
     expect(rows.map((r) => `${r.contractId}:${r.typeId}`)).toEqual(['1:5', '1:99', '2:10']);
   });
 
@@ -507,8 +507,8 @@ describe('sortContractItemRows', () => {
     ];
 
     expect(
-      sortContractItemRows([...rows].reverse()).map((r) => [r.typeId, r.quantity, r.me])
-    ).toEqual(sortContractItemRows(rows).map((r) => [r.typeId, r.quantity, r.me]));
+      sortContractOfferRows([...rows].reverse()).map((r) => [r.typeId, r.quantity, r.me])
+    ).toEqual(sortContractOfferRows(rows).map((r) => [r.typeId, r.quantity, r.me]));
     expect(rows.map((r) => `${r.typeId}/${r.quantity}/${r.me ?? '-'}`)).toEqual([
       '34/100/-',
       '34/500/-',
@@ -518,23 +518,47 @@ describe('sortContractItemRows', () => {
   });
 });
 
-describe('public contract items snapshot sizing', () => {
+describe('public contract offers snapshot sizing', () => {
   it('writes to a collection separate from the blueprint-only one', () => {
-    expect(PUBLIC_CONTRACT_ITEMS_COLLECTION).not.toBe(PUBLIC_BPC_CONTRACTS_COLLECTION);
+    expect(PUBLIC_CONTRACT_OFFERS_COLLECTION).not.toBe(PUBLIC_BPC_CONTRACTS_COLLECTION);
   });
 
-  it('chunks larger than the blueprint-only snapshot, but well under the 1MiB doc limit', () => {
-    // The generalized snapshot holds ~3x the rows, so reusing the 2000-row
-    // chunk would triple the per-sync write count against a shared 20k/day
-    // free-tier budget. A larger chunk trades write count for doc size, and
-    // the ceiling is Firestore's 1MiB. WORST_CASE_ROW_BYTES is the measured
-    // ~185 bytes of a blueprint row in the older snapshot plus the
-    // `isBlueprintCopy` field this one adds; a chunk of nothing but those
-    // still leaves ~40% of the document limit spare.
-    const WORST_CASE_ROW_BYTES = 210;
-    expect(PUBLIC_CONTRACT_ITEMS_CHUNK_SIZE).toBeGreaterThan(DEFAULT_CHUNK_SIZE);
-    expect(PUBLIC_CONTRACT_ITEMS_CHUNK_SIZE * WORST_CASE_ROW_BYTES).toBeLessThan(
-      0.65 * 1024 * 1024
+  it('chunks larger than the blueprint-only snapshot, to spend fewer writes on 3x the rows', () => {
+    // Reusing the 2,000-row chunk would have tripled the per-sync write count
+    // against a 20k/day free-tier budget shared with dispatchProjections and
+    // the blueprint sync. A larger chunk trades write count for doc size; the
+    // next test is what holds the doc size honest.
+    expect(PUBLIC_CONTRACT_OFFERS_CHUNK_SIZE).toBeGreaterThan(DEFAULT_CHUNK_SIZE);
+  });
+
+  it('keeps a chunk of nothing but worst-case rows clear of the 1MiB document limit', () => {
+    // Measured off a real row rather than asserted against a byte constant:
+    // the point of this guard is to fail when a later row-shape change grows
+    // the row — #908 adding a contract title is the obvious one — and a
+    // hardcoded average would sail straight past that. Firestore's own
+    // accounting isn't JSON, but it tracks closely enough to trip well before
+    // a live `set()` does.
+    const widest = compactContractOfferRow(
+      parseContractItemsCsv(
+        itemsCsv([
+          'true,true,1053870035543,10,2100000000,5283227785,300,20,32858,2026-09-01T11:31:43Z,234920481',
+        ])
+      )[0],
+      {
+        contractId: 2349204819,
+        regionId: 10000043,
+        locationId: 1043607688037,
+        price: 999999999999.99,
+        buyout: 999999999999.99,
+        isAuction: true,
+        dateExpired: Date.parse(FUTURE),
+      }
     );
+
+    // Every optional field populated, or it isn't the worst case.
+    expect(widest).toMatchObject({ buyout: expect.any(Number), isBlueprintCopy: true, runs: 300 });
+    expect(
+      PUBLIC_CONTRACT_OFFERS_CHUNK_SIZE * Buffer.byteLength(JSON.stringify(widest))
+    ).toBeLessThan(1024 * 1024);
   });
 });

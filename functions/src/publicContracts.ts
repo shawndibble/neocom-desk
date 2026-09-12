@@ -9,7 +9,7 @@
  *
  * Two snapshots share all of that. `BpcContractRow` and
  * `compactBpcItemRow` are the original blueprint-copies-only join behind BPC
- * Sourcing; `PublicContractItemRow` and `compactContractItemRow` (issue #906)
+ * Sourcing; `PublicContractOfferRow` and `compactContractOfferRow` (issue #906)
  * are the generalized one over every item type, feeding a separate
  * collection. They differ only in which item lines earn a row and what that
  * row carries — the contract narrowing, ordering and chunking below are the
@@ -267,7 +267,7 @@ export const PUBLIC_BPC_CONTRACTS_META_DOC = 'meta';
  * a BPO's is `-1` ("infinite"), which is not a number any search should be
  * offered, so only a finite non-negative count is kept.
  */
-export interface PublicContractItemRow {
+export interface PublicContractOfferRow {
   contractId: number;
   regionId: number;
   locationId: number;
@@ -295,10 +295,10 @@ export interface PublicContractItemRow {
  * #906 generalizes the *item type* — the `is_blueprint_copy` gate — not the
  * direction of the exchange.
  */
-export function compactContractItemRow(
+export function compactContractOfferRow(
   item: ContractItemRecord,
   contract: EligibleContract
-): PublicContractItemRow | null {
+): PublicContractOfferRow | null {
   if (item.is_included !== 'true') return null;
 
   const me = blueprintColumn(item.material_efficiency);
@@ -339,7 +339,7 @@ function blueprintColumn(value: string): number | undefined {
  * in an unspecified order are ones that serialize identically, so the chunk
  * doc's content is the same either way.
  */
-export function sortContractItemRows(rows: PublicContractItemRow[]): PublicContractItemRow[] {
+export function sortContractOfferRows(rows: PublicContractOfferRow[]): PublicContractOfferRow[] {
   return rows.sort(
     (a, b) =>
       byContractThenType(a, b) ||
@@ -352,16 +352,16 @@ export function sortContractItemRows(rows: PublicContractItemRow[]): PublicContr
 
 /**
  * The generalized join in one call, over already-parsed records — the
- * fixture-testable statement of what `syncPublicContractItems`' streaming
+ * fixture-testable statement of what `syncPublicContractOffers`' streaming
  * pass adds up to, exactly as `filterAndCompactBpcContracts` is for the
  * blueprint-only sync.
  */
-export function filterAndCompactPublicContractItems(
+export function filterAndCompactPublicContractOffers(
   contracts: readonly ContractRecord[],
   items: readonly ContractItemRecord[],
   nowMs: number
-): PublicContractItemRow[] {
-  return sortContractItemRows(joinContractItems(contracts, items, nowMs, compactContractItemRow));
+): PublicContractOfferRow[] {
+  return sortContractOfferRows(joinContractItems(contracts, items, nowMs, compactContractOfferRow));
 }
 
 /**
@@ -372,17 +372,18 @@ export function filterAndCompactPublicContractItems(
  *
  * - Firestore's 1MiB per document. The blueprint snapshot measured ~370KB per
  *   2,000 rows (~185 bytes/row); a blueprint row here carries an extra
- *   `isBlueprintCopy` field on top of that, so budget ~210 bytes/row and an
- *   all-blueprint chunk of 3,000 comes to ~615KB. Most rows are smaller —
- *   plain items carry no ME/TE/runs at all — so that is the ceiling, not the
- *   expectation.
+ *   `isBlueprintCopy` field on top of that, so ~210 bytes/row is the expected
+ *   blueprint case and most rows are smaller (plain items carry no ME/TE/runs
+ *   at all). The binding number is the *widest* row this shape can produce,
+ *   which `publicContracts.test.ts` measures rather than assumes — so a later
+ *   field addition fails that test before it fails a live `set()`.
  * - The free tier's 20,000 writes/day, which is the *project's* budget, not
  *   this job's: `dispatchProjections` runs 288x/day beside it and the
  *   blueprint sync another 48. At ~370k rows this chunks to ~124 docs x 48
  *   runs/day ≈ 6.0k writes, and ~3.0k for the blueprint sync it runs
  *   alongside. Keeping 2,000 here would have cost ~8.9k for this job alone.
  */
-export const PUBLIC_CONTRACT_ITEMS_CHUNK_SIZE = 3000;
+export const PUBLIC_CONTRACT_OFFERS_CHUNK_SIZE = 3000;
 
-export const PUBLIC_CONTRACT_ITEMS_COLLECTION = 'publicContractItems';
-export const PUBLIC_CONTRACT_ITEMS_META_DOC = 'meta';
+export const PUBLIC_CONTRACT_OFFERS_COLLECTION = 'publicContractOffers';
+export const PUBLIC_CONTRACT_OFFERS_META_DOC = 'meta';
