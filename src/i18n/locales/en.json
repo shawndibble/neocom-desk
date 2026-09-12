@@ -1201,6 +1201,7 @@
   "common": {
     "close": "Close",
     "save": "Save",
+    "cancel": "Cancel",
     "loading": "Loading",
     "loadingEllipsis": "Loading…",
     "unknown": "—",
@@ -2279,7 +2280,13 @@
       "wormhole": "Wormhole"
     },
     "columnsButton": "Columns",
-    "columnsMenuTitle": "Columns"
+    "columnsMenuTitle": "Columns",
+    "watchThisSearch": "Watch this search",
+    "watchNamePlaceholder": "Name this watch…",
+    "watchedSearchesHeading": "Watched searches",
+    "removeWatch": "Remove watch: {{name}}",
+    "renameWatch": "Rename watch: {{name}}",
+    "updateWatchToCurrentSearch": "Update \"{{name}}\" to the current search"
   },
   "contacts": {
     "title": "Contacts",
@@ -2491,6 +2498,11 @@
         "title": "Price alert",
         "aboveBody": "{{item}} reached {{price}} ISK, at or above your {{target}} ISK target.",
         "belowBody": "{{item}} reached {{price}} ISK, at or below your {{target}} ISK target."
+      },
+      "bpcSearchWatchMatch": {
+        "title": "BPC Sourcing watch",
+        "bodyNew": "\"{{watch}}\": new matching offer — {{item}} at {{price}} ISK.",
+        "bodyCheaper": "\"{{watch}}\": cheaper matching offer — {{item}} now at {{price}} ISK."
       },
       "corpIndustryJobReady": {
         "title": "Corp industry job ready for delivery",
