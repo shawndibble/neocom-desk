@@ -165,6 +165,17 @@ service cloud.firestore {
       allow read: if request.auth != null;
       allow write: if false;
     }
+
+    // The same snapshot generalized to every item type, not just blueprint
+    // copies (issue #906): written only by the syncPublicContractOffers
+    // scheduled function, read by any signed-in client. Runs alongside
+    // publicBpcContracts above, which stays until #907 moves BPC Sourcing
+    // over. Rules end in an implicit deny, so without this block the new
+    // collection is unreadable no matter what the sync writes.
+    match /publicContractOffers/{docId} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
     // Everything else: implicit deny.
   }
 }

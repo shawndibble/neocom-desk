@@ -19,7 +19,10 @@ no app server. Two kinds of data:
   short-lived access token per sign-in (ADR 0001). One narrow, explicit
   exception: `publicBpcContracts` (ADR 0013) is a shared, admin-write-only
   collection — not per-Character data — fed by a scheduled function that
-  holds no EVE token and calls no ESI endpoint at all.
+  holds no EVE token and calls no ESI endpoint at all. `publicContractOffers`
+  (issue #906) is the same thing generalized past blueprint copies to every
+  item type, written by a second scheduled function alongside it; nothing
+  reads it yet.
 
 Auth is browser-only OAuth2 PKCE against `login.eveonline.com`; refresh
 tokens never leave the device. Market prices come from Fuzzwork aggregates,

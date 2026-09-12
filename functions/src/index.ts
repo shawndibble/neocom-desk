@@ -39,12 +39,19 @@ import {
   chunkDocId,
   chunkRows,
   compactBpcItemRow,
+  compactContractOfferRow,
   eligibleContractFrom,
   sortBpcRows,
+  sortContractOfferRows,
+  DEFAULT_CHUNK_SIZE,
   PUBLIC_BPC_CONTRACTS_COLLECTION,
   PUBLIC_BPC_CONTRACTS_META_DOC,
+  PUBLIC_CONTRACT_OFFERS_CHUNK_SIZE,
+  PUBLIC_CONTRACT_OFFERS_COLLECTION,
+  PUBLIC_CONTRACT_OFFERS_META_DOC,
   type BpcContractRow,
   type EligibleContract,
+  type PublicContractOfferRow,
 } from './publicContracts.js';
 
 initializeApp();
@@ -337,22 +344,43 @@ async function commitInPages(
 const PUBLIC_BPC_CHUNK_DOCS_PER_BATCH = 8;
 
 /**
- * Replaces the public-BPC-contracts snapshot wholesale: chunk docs 0..N-1 are
- * overwritten, any leftover chunk from a previously-larger run is deleted
- * (`meta`'s stored `chunkCount` is how a shrinking dataset's stale chunks are
- * found — nothing else records how many there used to be), and `meta` itself
- * is updated last so a reader never sees a `chunkCount` ahead of what's
- * actually been written this run.
+ * Same reasoning as `PUBLIC_BPC_CHUNK_DOCS_PER_BATCH`, one size down: the
+ * generalized snapshot's chunks hold 3,000 rows rather than 2,000, so five of
+ * them keep the encode-at-commit transient in the same ~3MB neighbourhood
+ * eight of the smaller ones do.
  */
-async function writePublicBpcContractsSnapshot(
+const PUBLIC_CONTRACT_OFFERS_CHUNK_DOCS_PER_BATCH = 5;
+
+/** Where one chunked snapshot lives, and how coarsely it is written. */
+interface ChunkedSnapshot {
+  collection: string;
+  metaDoc: string;
+  chunkSize: number;
+  chunkDocsPerBatch: number;
+}
+
+/**
+ * Replaces a chunked snapshot wholesale: chunk docs 0..N-1 are overwritten,
+ * any leftover chunk from a previously-larger run is deleted (`meta`'s stored
+ * `chunkCount` is how a shrinking dataset's stale chunks are found — nothing
+ * else records how many there used to be), and `meta` itself is updated last
+ * so a reader never sees a `chunkCount` ahead of what's actually been written
+ * this run.
+ *
+ * Shared by both public-contract syncs (issues #608 and #906). They publish
+ * different rows to different collections at different chunk sizes; how a
+ * snapshot is replaced is not one of the things they differ in.
+ */
+async function writeChunkedSnapshot<Row>(
   db: Firestore,
-  rows: readonly BpcContractRow[]
+  snapshot: ChunkedSnapshot,
+  rows: readonly Row[]
 ): Promise<void> {
-  const collection = db.collection(PUBLIC_BPC_CONTRACTS_COLLECTION);
-  const metaRef = collection.doc(PUBLIC_BPC_CONTRACTS_META_DOC);
+  const collection = db.collection(snapshot.collection);
+  const metaRef = collection.doc(snapshot.metaDoc);
   const previousChunkCount = ((await metaRef.get()).data()?.chunkCount as number | undefined) ?? 0;
 
-  const chunks = chunkRows(rows);
+  const chunks = chunkRows(rows, snapshot.chunkSize);
   const ops: ((batch: FirebaseFirestore.WriteBatch) => void)[] = chunks.map((chunk, index) => {
     const ref = collection.doc(chunkDocId(index));
     return (batch) => batch.set(ref, { rows: chunk });
@@ -361,13 +389,41 @@ async function writePublicBpcContractsSnapshot(
     const ref = collection.doc(chunkDocId(i));
     ops.push((batch) => batch.delete(ref));
   }
-  await commitInPages(db, ops, PUBLIC_BPC_CHUNK_DOCS_PER_BATCH);
+  await commitInPages(db, ops, snapshot.chunkDocsPerBatch);
 
   await metaRef.set({
     lastSyncedAt: Date.now(),
     chunkCount: chunks.length,
     rowCount: rows.length,
   });
+}
+
+const PUBLIC_BPC_CONTRACTS_SNAPSHOT: ChunkedSnapshot = {
+  collection: PUBLIC_BPC_CONTRACTS_COLLECTION,
+  metaDoc: PUBLIC_BPC_CONTRACTS_META_DOC,
+  chunkSize: DEFAULT_CHUNK_SIZE,
+  chunkDocsPerBatch: PUBLIC_BPC_CHUNK_DOCS_PER_BATCH,
+};
+
+const PUBLIC_CONTRACT_OFFERS_SNAPSHOT: ChunkedSnapshot = {
+  collection: PUBLIC_CONTRACT_OFFERS_COLLECTION,
+  metaDoc: PUBLIC_CONTRACT_OFFERS_META_DOC,
+  chunkSize: PUBLIC_CONTRACT_OFFERS_CHUNK_SIZE,
+  chunkDocsPerBatch: PUBLIC_CONTRACT_OFFERS_CHUNK_DOCS_PER_BATCH,
+};
+
+async function writePublicBpcContractsSnapshot(
+  db: Firestore,
+  rows: readonly BpcContractRow[]
+): Promise<void> {
+  await writeChunkedSnapshot(db, PUBLIC_BPC_CONTRACTS_SNAPSHOT, rows);
+}
+
+async function writePublicContractOffersSnapshot(
+  db: Firestore,
+  rows: readonly PublicContractOfferRow[]
+): Promise<void> {
+  await writeChunkedSnapshot(db, PUBLIC_CONTRACT_OFFERS_SNAPSHOT, rows);
 }
 
 /**
@@ -419,5 +475,70 @@ export const syncPublicBpcContracts = onSchedule(
     // write would otherwise be encoding rows alongside.
     eligibleContracts.clear();
     await writePublicBpcContractsSnapshot(getFirestore(), sortBpcRows(rows));
+  }
+);
+
+/**
+ * syncPublicContractOffers: the same pipeline as `syncPublicBpcContracts`
+ * above, minus the blueprint-copy filter (issue #906). Every for-sale line of
+ * every public item_exchange/auction contract, any item type, republished to
+ * `publicContractOffers` for signed-in clients to search.
+ *
+ * It runs *alongside* the blueprint-only sync rather than replacing it: this
+ * is the expand half of an expand/contract. `publicBpcContracts` still backs
+ * BPC Sourcing until #907 moves it over, at which point this function and its
+ * collection become the single source and the older pair is retired. Until
+ * then the archive is fetched twice per cycle — deliberate duplication with a
+ * scheduled end, not a shared fetch worth building.
+ *
+ * Memory is 2GiB against the blueprint sync's 1GiB, and the timeout 540s
+ * against 300s. Neither is measured at this volume; both are provisioned for
+ * ~3x the rows on the evidence that exists. That evidence is specific: a
+ * 512MiB ceiling died at 527MiB *during the write* with ~122k rows, having
+ * survived the streaming parse — so the ceiling scales with the retained rows
+ * and their encoding, which is exactly what triples here. Under-provisioning
+ * reproduces a failure this project has already had (every scheduled run
+ * OOM-looping silently after deploy); over-provisioning costs pennies on a
+ * 48-runs/day cron. The `rowCount` logged below is the checkpoint: the first
+ * live runs say what the real volume is, and these numbers can come down.
+ *
+ * 540s is the gen2 ceiling, not a chosen value, so there is no knob left if
+ * the ~3x estimate is badly low: a run that can't finish inside it needs the
+ * write restructured (incremental chunk commits, or the join split by region)
+ * rather than a config bump. `rowCount` is the early warning for that too.
+ *
+ * This is also the deployment's fourth Cloud Scheduler job, past the 3 free
+ * per billing account that ADR 0013 budgeted against — a few cents a month,
+ * and it goes back to 3 when #907 retires the blueprint-only sync.
+ */
+export const syncPublicContractOffers = onSchedule(
+  { schedule: 'every 30 minutes', memory: '2GiB', timeoutSeconds: 540 },
+  async () => {
+    const nowMs = Date.now();
+    const eligibleContracts = new Map<string, EligibleContract>();
+    const rows: PublicContractOfferRow[] = [];
+
+    await streamPublicContractsCsvs({
+      onContract: (record) => {
+        const eligible = eligibleContractFrom(record, nowMs);
+        if (eligible) eligibleContracts.set(record.contract_id, eligible);
+      },
+      onItem: (record) => {
+        const contract = eligibleContracts.get(record.contract_id);
+        if (!contract) return;
+        const row = compactContractOfferRow(record, contract);
+        if (row) rows.push(row);
+      },
+    });
+
+    logInfo('public contract offers sync', {
+      eligibleContracts: eligibleContracts.size,
+      rowCount: rows.length,
+    });
+
+    // The lookup is dead once the join is done, and it is ~50k objects the
+    // write would otherwise be encoding rows alongside.
+    eligibleContracts.clear();
+    await writePublicContractOffersSnapshot(getFirestore(), sortContractOfferRows(rows));
   }
 );
