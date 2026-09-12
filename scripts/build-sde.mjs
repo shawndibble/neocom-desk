@@ -1131,13 +1131,20 @@ async function main() {
   }
   marketTypes.sort((a, b) => a.typeId - b.typeId);
 
-  // Shared by both moonOreTypes.json and oreAndIceTypeIds.json below: one way
-  // to find a named root under invMarketGroups' "Ore" tree (verified against
-  // a live dump — 1031 is the parent of "Standard Ores", "Ice Ores" and
-  // "Moon Ores" alike), and one way to walk everything under it.
+  // Shared by moonOreTypes.json, oreAndIceTypeIds.json and gasCloudTypeIds.json
+  // below: one way to find a named market group under a known parent, and one
+  // way to walk everything under it. Anchoring on the parent id rather than the
+  // name alone is what keeps "Moon Ores" from matching some unrelated group
+  // CCP adds elsewhere in the tree later. Both parent ids are verified against
+  // a live dump: 1031 ("Raw Materials") is the parent of "Standard Ores",
+  // "Ice Ores" and "Moon Ores" alike, and 1032 ("Gas Clouds Materials") is its
+  // *sibling* — both hang off 533 ("Materials"). That sibling relationship is
+  // the whole reason gas needs its own traversal rather than a fourth name in
+  // the ore/ice list (issue #880).
   const ORE_MARKET_GROUP_ROOT_ID = 1031;
-  function findMarketGroupRoot(groups, name) {
-    return groups.find((g) => g.name === name && g.parentId === ORE_MARKET_GROUP_ROOT_ID);
+  const MATERIALS_MARKET_GROUP_ROOT_ID = 533;
+  function findMarketGroupRoot(groups, name, parentId = ORE_MARKET_GROUP_ROOT_ID) {
+    return groups.find((g) => g.name === name && g.parentId === parentId);
   }
   const marketGroupsByParent = new Map();
   for (const g of marketGroups) {
@@ -1185,6 +1192,38 @@ async function main() {
   }
   const oreAndIceTypeIds = marketTypes
     .filter((t) => oreAndIceMarketGroupIds.has(t.marketGroupId))
+    .map((t) => t.typeId)
+    .sort((a, b) => a - b);
+
+  // --- gasCloudTypeIds.json: every harvestable gas cloud type — Fullerites,
+  // Mykoserocin and Cytoserocin, plus the compressed forms the tree nests
+  // alongside them (issue #880). The personal mining ledger reports gas
+  // harvesting through the same endpoint as ore and ice, so the Mining Yield
+  // tracker unions this list into its allowlist; without it, every gas row
+  // ESI reports is silently dropped.
+  //
+  // Its own file, and its own traversal, rather than a fourth name in
+  // ORE_AND_ICE_ROOT_GROUP_NAMES: gas hangs off "Materials" (533) as a sibling
+  // of the "Raw Materials" root the ore/ice walk is anchored to. Keeping it
+  // separate also keeps the Moon Mining Tax ledger's "recognized ore/ice vs.
+  // unclassified" split and compressedOreTypeIds' name-match pass below
+  // reading exactly what they read before — see the issue #880 decision doc.
+  //
+  // The whole subtree is kept, compressed forms included, exactly as the
+  // ore/ice walk keeps "Compressed " ore. Those ~25 ids are inert — compression
+  // is a separate industry job, so no ledger row ever carries one — but
+  // excluding them would mean special-casing a child out of an otherwise clean
+  // tree walk, for no behaviour difference.
+  const GAS_CLOUDS_GROUP_NAME = 'Gas Clouds Materials';
+  const gasCloudsParent = findMarketGroupRoot(
+    marketGroups,
+    GAS_CLOUDS_GROUP_NAME,
+    MATERIALS_MARKET_GROUP_ROOT_ID
+  );
+  const gasCloudMarketGroupIds = new Set();
+  if (gasCloudsParent) collectMarketGroupIds(gasCloudsParent.id, gasCloudMarketGroupIds);
+  const gasCloudTypeIds = marketTypes
+    .filter((t) => gasCloudMarketGroupIds.has(t.marketGroupId))
     .map((t) => t.typeId)
     .sort((a, b) => a - b);
 
@@ -1407,6 +1446,7 @@ async function main() {
     ['pi-planet-radius.json', piPlanetRadiusKm],
     ['moonOreTypes.json', moonOreTypeIds],
     ['oreAndIceTypeIds.json', oreAndIceTypeIds],
+    ['gasCloudTypeIds.json', gasCloudTypeIds],
     ['compressedOreTypeIds.json', compressedOreTypeIds],
   ];
   console.log('Writing outputs...');
@@ -1469,6 +1509,23 @@ async function main() {
   if (oreAndIceTypeIds.length < moonOreTypeIds.length + 100) {
     console.error(
       '  FAIL: ore/ice type ids came out implausibly small — the ore/ice market group structure may have changed'
+    );
+    process.exitCode = 1;
+  }
+  console.log(`  gas cloud type ids: ${gasCloudTypeIds.length}`);
+  // 50 today: 25 raw (Fullerenes + Booster Gas Clouds) and 25 compressed. The
+  // threshold sits above 25 on purpose — a restructure that left only the
+  // Compressed Gas child standing would still clear a lower bar while every
+  // raw type the ledger actually reports had silently vanished.
+  if (!gasCloudsParent || gasCloudMarketGroupIds.size === 0 || gasCloudTypeIds.length < 40) {
+    console.error(
+      `  FAIL: gas cloud type ids came out empty or implausibly small — the "${GAS_CLOUDS_GROUP_NAME}" market group structure may have changed`
+    );
+    process.exitCode = 1;
+  }
+  if (gasCloudTypeIds.some((id) => oreAndIceTypeIds.includes(id))) {
+    console.error(
+      '  FAIL: gasCloudTypeIds overlaps oreAndIceTypeIds — the two allowlists are meant to be disjoint'
     );
     process.exitCode = 1;
   }
