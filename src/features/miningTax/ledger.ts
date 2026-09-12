@@ -15,7 +15,7 @@ import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurren
 import { groupMiningLedger } from '@/engine/miningTax/groupLedger';
 import { groupMiningYield, type MiningYieldEntry } from '@/engine/miningTax/yieldGrouping';
 import type { MiningLedgerEntry, MiningLedgerRow } from '@/engine/miningTax/types';
-import { loadMoonOreTypeIds, loadOreAndIceTypeIds } from '@/sde/loadSde';
+import { loadGasCloudTypeIds, loadMoonOreTypeIds, loadOreAndIceTypeIds } from '@/sde/loadSde';
 import { loadManualIgnoredTypeIds, loadManualMoonOreTypeIds } from './typeOverrides';
 
 export const KEYS = { ledger: 'miningTax:ledger' } as const;
@@ -99,7 +99,7 @@ export async function loadAllCharacterLedgers(): Promise<CharacterMiningLedger[]
 export interface CharacterMiningYield {
   characterId: number;
   characterName: string;
-  /** Every ore/ice entry, moon ore included — the Mining Yield Overview tab (issue #671), unfiltered by `groupMiningLedger`'s moon-ore-only allowlist. */
+  /** Every ore/ice and gas entry, moon ore included — the Mining Yield Overview tab (issues #671, #880), unfiltered by `groupMiningLedger`'s moon-ore-only allowlist. */
   entries: MiningYieldEntry[];
   needsReauth: boolean;
   fetchedAt: Date | null;
@@ -114,17 +114,30 @@ export interface CharacterMiningYield {
  * already loaded this refresh). Same allowlist union and fan-out shape as
  * `loadAllCharacterLedgers`; see that function's doc for why "ignored"
  * type_ids still count here.
+ *
+ * Gas cloud harvesting counts too (issue #880): the same ESI ledger reports
+ * it, and a pilot's total mining output is the point of this tab. Gas joins
+ * the allowlist *here only* — `loadAllCharacterLedgers` above is deliberately
+ * left reading the ore/ice set alone, so the Tax tab's moon-ore-vs-
+ * unclassified split is exactly what it was.
  */
 export async function loadAllCharacterYields(): Promise<CharacterMiningYield[]> {
   const characters: CharacterRecord[] = await db.characters.toArray();
   if (characters.length === 0) return [];
 
-  const [oreAndIceTypeIds, manualMoonOreOverrides, manualIgnored] = await Promise.all([
-    loadOreAndIceTypeIds(),
-    loadManualMoonOreTypeIds(),
-    loadManualIgnoredTypeIds(),
+  const [oreAndIceTypeIds, gasCloudTypeIds, manualMoonOreOverrides, manualIgnored] =
+    await Promise.all([
+      loadOreAndIceTypeIds(),
+      loadGasCloudTypeIds(),
+      loadManualMoonOreTypeIds(),
+      loadManualIgnoredTypeIds(),
+    ]);
+  const harvestedSet = new Set([
+    ...oreAndIceTypeIds,
+    ...gasCloudTypeIds,
+    ...manualMoonOreOverrides,
+    ...manualIgnored,
   ]);
-  const oreAndIceSet = new Set([...oreAndIceTypeIds, ...manualMoonOreOverrides, ...manualIgnored]);
 
   const results: CharacterMiningYield[] = characters.map((c) => ({
     characterId: c.characterId,
@@ -141,7 +154,7 @@ export async function loadAllCharacterYields(): Promise<CharacterMiningYield[]> 
     if (!cached) return;
     result.fetchedAt = cached.fetchedAt;
     result.fromCache = cached.fromCache;
-    result.entries = groupMiningYield(cached.data, result.characterId, oreAndIceSet);
+    result.entries = groupMiningYield(cached.data, result.characterId, harvestedSet);
   });
 
   return results;

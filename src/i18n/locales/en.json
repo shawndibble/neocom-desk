@@ -1502,7 +1502,7 @@
       "rateChartTitle": "ISK/hr trend",
       "compareChartTitle": "Raw vs. refined value by type",
       "emptyTitle": "No mining ledger entries in this window",
-      "emptyHint": "Mine some ore or ice and check back — ESI's personal mining ledger updates daily."
+      "emptyHint": "Mine some ore, ice or gas and check back — ESI's personal mining ledger updates daily."
     }
   },
   "assets": {

@@ -26,11 +26,13 @@ interface EntryGroup {
 
 /**
  * Groups a character's raw ESI mining ledger rows into one Mining Yield entry
- * per (date, solar system), summing quantity per ore type and keeping
- * anything on `oreAndIceTypeIds` — moon ore included, since a pilot's total
- * mining output is the point here, not just the ore that is someone else's
- * rent. See `groupMiningLedger` (`./groupLedger.ts`) for the moon-ore-only
- * variant the Tax tab still uses; the two are intentionally separate modules.
+ * per (date, solar system), summing quantity per type and keeping anything on
+ * `harvestedTypeIds` — moon ore and harvested gas included, since a pilot's
+ * total mining output is the point here, not just the ore that is someone
+ * else's rent. Which types that set spans is the caller's call (`ledger.ts`
+ * unions ore/ice, gas and the manual tags); this module only groups. See
+ * `groupMiningLedger` (`./groupLedger.ts`) for the moon-ore-only variant the
+ * Tax tab still uses; the two are intentionally separate modules.
  *
  * `row.date` is carried through byte-for-byte as the grouping key — never
  * routed through a `Date`/`toLocaleDateString` — so the EVE/UTC calendar day
@@ -39,12 +41,12 @@ interface EntryGroup {
 export function groupMiningYield(
   rows: readonly MiningLedgerRow[],
   characterId: number,
-  oreAndIceTypeIds: ReadonlySet<number>
+  harvestedTypeIds: ReadonlySet<number>
 ): MiningYieldEntry[] {
   const byKey = new Map<string, EntryGroup>();
 
   for (const row of rows) {
-    if (!oreAndIceTypeIds.has(row.type_id)) continue;
+    if (!harvestedTypeIds.has(row.type_id)) continue;
     const key = `${row.date}:${row.solar_system_id}`;
     let group = byKey.get(key);
     if (!group) {
