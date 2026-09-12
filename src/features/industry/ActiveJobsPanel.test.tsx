@@ -49,6 +49,9 @@ afterEach(() => {
   server.resetHandlers();
   configureEsi({ getToken: null });
   vi.useRealTimers();
+  // The fan-out failure test spies on `db.tokens`; left in place it would
+  // reject every later test's scope check too.
+  vi.restoreAllMocks();
 });
 afterAll(() => server.close());
 
@@ -905,6 +908,37 @@ describe('ActiveJobsPanel: cross-character view (issue #607)', () => {
     const table = screen.getByRole('table', { name: 'Active jobs' });
     expect(within(table).getByText('Pilot One')).toBeInTheDocument();
     expect(within(table).getByText('Pilot Two')).toBeInTheDocument();
+  });
+
+  it('clears the spinner when the cross-character fan-out itself fails, rather than spinning forever', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(NOW);
+    await seedSecondCharacter();
+    // The per-character ESI reads are already caught inside
+    // `loadAllCharactersIndustryJobs`; only its own Dexie reads can reject it,
+    // so that is what this breaks.
+    vi.spyOn(db.tokens, 'get').mockRejectedValue(new Error('IndexedDB unavailable'));
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+    render(
+      <MemoryRouter>
+        <ActiveJobsPanel
+          characterId={CHAR_ID}
+          onAddToQuickbar={() => {}}
+          quickbarAvailable={true}
+          onShowInfo={() => {}}
+        />
+      </MemoryRouter>
+    );
+
+    await user.click(await screen.findByRole('button', { name: 'This character' }));
+    await user.click(await screen.findByRole('button', { name: 'All characters' }));
+
+    // "No data cached", not "None" — a failed read must not read as an answer
+    // of zero running jobs.
+    expect(await screen.findByText('No active jobs cached')).toBeInTheDocument();
+    expect(screen.queryByRole('status', { name: 'Loading' })).not.toBeInTheDocument();
+    expect(screen.queryByText('None')).not.toBeInTheDocument();
   });
 
   it('sums open manufacturing slots across both characters once "All characters" is picked (issue #679)', async () => {
