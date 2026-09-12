@@ -120,6 +120,12 @@ describe('Wallet', () => {
     expect(screen.queryByText('#1000419')).not.toBeInTheDocument();
   });
 
+  it('explains EverMarks with an info tooltip beside the label', async () => {
+    render(<App />);
+    expect(await screen.findByText('EverMarks')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'About EverMarks' })).toBeInTheDocument();
+  });
+
   it('shows the empty state under Loyalty Points when there is no non-EverMarks LP', async () => {
     server.use(
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/loyalty/points`, () =>

@@ -10,6 +10,7 @@ import {
   FilterBar,
   FilterField,
   IconButton,
+  InfoTooltip,
   PageHeader,
   Panel,
   ReauthBanner,
@@ -1216,8 +1217,12 @@ export function Wallet() {
                   )}
                 </div>
                 <div>
-                  <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                  <p className="flex items-center gap-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
                     {t('wallet.everMarks')}
+                    <InfoTooltip
+                      label={t('wallet.everMarksTooltipLabel')}
+                      content={t('wallet.everMarksTooltip')}
+                    />
                   </p>
                   <p className="text-lg font-medium tabular-nums">
                     {loyaltyResult && !loyaltyNeedsReauth
