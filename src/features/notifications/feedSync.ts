@@ -15,9 +15,12 @@
  * session to sync with — a push arrives with no Character context and no
  * minted token (ADR 0001) — so pulling `@/sync` into `feed.ts`'s import graph
  * would put the whole sync driver in the worker bundle to serve a caller that
- * can never use it. A row the worker records still syncs; it does so on the
- * next page-context sync, which the merge (`feed.mergeFeedRecord`) is already
- * built to absorb.
+ * can never use it. `@/sync`'s own `await import('./planSync')` split does
+ * not save it either: `vite.config.ts` builds the worker with
+ * `injectManifest` and no `type: 'module'`, and rollup inlines dynamic
+ * imports into a single-file IIFE. A row the worker records still syncs; it
+ * does so on the next page-context sync, which the merge
+ * (`feed.mergeFeedRecord`) is already built to absorb.
  *
  * So: `feed.ts` owns the local write, this module owns the write *plus* the
  * push, and only page-context callers import it.
@@ -30,27 +33,20 @@ import {
   type NotificationFeedEntry,
 } from './feed';
 
-/** The `characterId` a row has to sync under — all a push needs from the row. */
-type FeedRowOwner = Pick<NotificationFeedEntry, 'characterId'>;
-
 /**
- * Distinct owners, in first-seen order. One dismissal action routinely spans
- * Characters — the Alerts page lists them together and "dismiss all" means
- * every row on screen — and each Character syncs under its own uid
- * (`sync/planSync.syncFeed`), so each needs its own scheduled sync. Deliberately
- * one per Character rather than one per row, the same shape
+ * Dismisses the given rows and pushes each affected Character's dismissals.
+ *
+ * One dismissal action routinely spans Characters — the Alerts page lists them
+ * together and "dismiss all" means every row on screen — and each Character
+ * syncs under its own uid (`sync/planSync.syncFeed`). So the sync is scheduled
+ * once per Character rather than once per row, the same shape
  * `miningTax/assignments.ts` uses for its bulk writes.
  */
-export function charactersOf(rows: readonly FeedRowOwner[]): number[] {
-  return [...new Set(rows.map((row) => row.characterId))];
-}
-
-/** Dismisses the given rows and pushes each affected Character's dismissals. */
 export async function dismissFeedEntriesAndSync(
-  rows: readonly (FeedRowOwner & Pick<NotificationFeedEntry, 'id'>)[]
+  rows: readonly Pick<NotificationFeedEntry, 'id' | 'characterId'>[]
 ): Promise<void> {
   await dismissFeedEntries(rows.map((row) => row.id));
-  for (const characterId of charactersOf(rows)) scheduleSync(characterId);
+  for (const characterId of new Set(rows.map((row) => row.characterId))) scheduleSync(characterId);
 }
 
 /**

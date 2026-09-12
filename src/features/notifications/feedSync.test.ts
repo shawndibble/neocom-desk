@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { db } from '@/db';
 import { readFeed } from './feed';
 import {
-  charactersOf,
   dismissFeedEntriesAndSync,
   dismissFeedKeysAndSync,
   recordFeedEntryAndSync,
@@ -30,20 +29,6 @@ beforeEach(async () => {
   await db.notificationFeed.clear();
 });
 
-describe('charactersOf', () => {
-  it('collapses repeats so one character gets one sync', () => {
-    expect(charactersOf([row('a', CHAR_A), row('b', CHAR_A)])).toEqual([CHAR_A]);
-  });
-
-  it('keeps every distinct character', () => {
-    expect(charactersOf([row('a', CHAR_A), row('b', CHAR_B)])).toEqual([CHAR_A, CHAR_B]);
-  });
-
-  it('schedules nothing for an empty dismissal', () => {
-    expect(charactersOf([])).toEqual([]);
-  });
-});
-
 describe('dismissFeedEntriesAndSync', () => {
   it('dismisses locally and pushes the dismissal', async () => {
     await db.notificationFeed.bulkPut([row('a', CHAR_A)]);
@@ -52,6 +37,11 @@ describe('dismissFeedEntriesAndSync', () => {
 
     expect((await readFeed())[0]?.dismissedAt).toBeGreaterThan(0);
     expect(syncMock.scheduleSync).toHaveBeenCalledWith(CHAR_A);
+  });
+
+  it('schedules nothing for an empty dismissal', async () => {
+    await dismissFeedEntriesAndSync([]);
+    expect(syncMock.scheduleSync).not.toHaveBeenCalled();
   });
 
   it('pushes once per character when one action spans several', async () => {

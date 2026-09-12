@@ -34,7 +34,11 @@ const subscribeSyncStatusMock = vi.fn((listener: (s: unknown) => void) => {
   listener({ state: 'idle', lastSyncedAt: null, error: null });
   return () => {};
 });
+const IDLE_SYNC_STATUS = vi.hoisted(() =>
+  Object.freeze({ state: 'idle', lastSyncedAt: null, error: null })
+);
 vi.mock('@/sync', () => ({
+  getSyncStatus: () => IDLE_SYNC_STATUS,
   markPlanDeleted: (characterId: number, id: string) => markPlanDeletedMock(characterId, id),
   scheduleSync: (characterId: number) => scheduleSyncMock(characterId),
   triggerSync: (characterId: number) => triggerSyncMock(characterId),

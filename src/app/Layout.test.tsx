@@ -24,7 +24,11 @@ function corpAccess(state: CorpAccessState) {
 }
 
 const mockSubscribe = vi.fn();
+const IDLE_SYNC_STATUS = vi.hoisted(() =>
+  Object.freeze({ state: 'idle', lastSyncedAt: null, error: null })
+);
 vi.mock('@/sync', () => ({
+  getSyncStatus: () => IDLE_SYNC_STATUS,
   subscribeSyncStatus: (listener: (s: unknown) => void) => mockSubscribe(listener),
 }));
 

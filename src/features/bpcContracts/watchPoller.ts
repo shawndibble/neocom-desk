@@ -16,6 +16,7 @@
  * has turned notifications off entirely does not have feed rows pile up.
  */
 import { recordFeedEntryAndSync } from '@/features/notifications/feedSync';
+import type { NewNotificationFeedEntry } from '@/features/notifications/feed';
 import {
   hydrateNotificationPreferences,
   isFeedChannelEnabled,
@@ -41,7 +42,7 @@ export interface BpcWatchPollDependencies {
   loadRows: () => Promise<readonly BpcContractRow[] | null>;
   resolveTypeName: (typeId: number) => Promise<string>;
   saveWatchState: (id: string, state: BpcWatchState) => Promise<void>;
-  recordFeedEntry: typeof recordFeedEntryAndSync;
+  recordFeedEntry: (entry: NewNotificationFeedEntry) => Promise<void>;
   now: () => number;
 }
 

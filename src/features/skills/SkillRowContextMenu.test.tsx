@@ -6,7 +6,11 @@ import { db } from '@/db';
 import { SkillRowContextMenu } from './SkillRowContextMenu';
 
 const scheduleSyncMock = vi.fn();
+const IDLE_SYNC_STATUS = vi.hoisted(() =>
+  Object.freeze({ state: 'idle', lastSyncedAt: null, error: null })
+);
 vi.mock('@/sync', () => ({
+  getSyncStatus: () => IDLE_SYNC_STATUS,
   scheduleSync: (characterId: number) => scheduleSyncMock(characterId),
 }));
 vi.mock('@/app/syncStatus', async (importOriginal) => ({
