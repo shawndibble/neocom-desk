@@ -61,11 +61,19 @@ const EPSILON = 1e-9;
 export interface NetworkColony {
   planetId: number;
   /**
-   * What this colony puts out an hour, by typeID — measured, from its own
-   * factories' pin counts and its own extraction. A type it does not make is
-   * absent, never zero.
+   * What this colony has *going spare* an hour, by typeID: what its own
+   * factories make, less what its own factories eat of it.
+   *
+   * Not gross output, and the distinction is load-bearing. A colony making
+   * Bacteria for its own Nanite pins has none to route anywhere, and a planner
+   * handed its production proposed a second consumer for material the first
+   * one was already short of. See `colonyExportablePerHour`.
+   *
+   * A type it does not make — or makes and wholly consumes — is absent, never
+   * zero. Every read below tests `(… ?? 0) > 0`, so absence reads as "this set
+   * cannot supply it", which is the question each of those reads is asking.
    */
-  outputPerHour: ReadonlyMap<number, number>;
+  exportablePerHour: ReadonlyMap<number, number>;
   /**
    * CPU and Powergrid free for new pins, already net of everything this colony
    * draws today including its links.
@@ -324,7 +332,9 @@ function costerFor(opts: NetworkOptions, pi: PiData) {
       const ownSourcedIds = new Set(
         chain.nodes
           .filter((node) => node.tier === 1)
-          .filter((node) => opts.colonies.some((c) => (c.outputPerHour.get(node.typeId) ?? 0) > 0))
+          .filter((node) =>
+            opts.colonies.some((c) => (c.exportablePerHour.get(node.typeId) ?? 0) > 0)
+          )
           .map((node) => node.typeId)
       );
       const cost = chainCost(chain, {
@@ -365,7 +375,7 @@ function candidates(
     if (tier !== 2 && tier !== 3) continue;
 
     const bought = schematic.inputs.map(
-      (input) => !opts.colonies.some((c) => (c.outputPerHour.get(input.typeID) ?? 0) > 0)
+      (input) => !opts.colonies.some((c) => (c.exportablePerHour.get(input.typeID) ?? 0) > 0)
     );
     if (bought.some(Boolean) && !opts.allowMarketSourcing) {
       // Partly reachable only: the set makes at least one of its inputs. A
@@ -382,7 +392,7 @@ function candidates(
     const selfSufficient =
       !bought.some(Boolean) &&
       opts.colonies.some((colony) =>
-        schematic.inputs.every((input) => (colony.outputPerHour.get(input.typeID) ?? 0) > 0)
+        schematic.inputs.every((input) => (colony.exportablePerHour.get(input.typeID) ?? 0) > 0)
       );
     if (selfSufficient) continue;
 
@@ -487,7 +497,7 @@ export function planNetwork(opts: NetworkOptions, pi: PiData): NetworkPlan {
   const supplyByColony = new Map<number, Map<number, number>>();
   for (const colony of opts.colonies) {
     const own = new Map<number, number>();
-    for (const [typeId, units] of colony.outputPerHour) if (units > 0) own.set(typeId, units);
+    for (const [typeId, units] of colony.exportablePerHour) if (units > 0) own.set(typeId, units);
     supplyByColony.set(colony.planetId, own);
   }
   const pooled = (typeId: number): number => {
@@ -660,7 +670,7 @@ export function planNetwork(opts: NetworkOptions, pi: PiData): NetworkPlan {
       if (factories < 1) continue;
       const value = factories * margin.marginPerFactory;
       const localInputs = candidate.demandPerFactory.filter(
-        (input) => (colony.outputPerHour.get(input.typeId) ?? 0) > 0
+        (input) => (colony.exportablePerHour.get(input.typeId) ?? 0) > 0
       ).length;
       if (!host || value > host.value || (value === host.value && localInputs > host.localInputs)) {
         host = { colony, factories, value, localInputs, margin };

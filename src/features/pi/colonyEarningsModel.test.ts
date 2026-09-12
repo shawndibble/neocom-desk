@@ -17,6 +17,7 @@ const MICROORGANISMS = 2073;
 const AQUEOUS_LIQUIDS = 2268;
 const BACTERIA = 2393;
 const TEST_CULTURES = 2319;
+const NANITES = 2463;
 
 /** The Bacteria schematic, which is what ESI reports on a factory pin. */
 const BACTERIA_SCHEMATIC = 131;
@@ -24,6 +25,8 @@ const BACTERIA_SCHEMATIC = 131;
 const WATER_SCHEMATIC = 121;
 /** The Test Cultures schematic — Advanced Industry Facility, made from Bacteria and Water. */
 const TEST_CULTURES_SCHEMATIC = 86;
+/** Nanites — Advanced, from Bacteria and Reactive Metals, the second of which no temperate planet has. */
+const NANITES_SCHEMATIC = 78;
 
 function colony(overrides: Partial<BuiltColonyAdvice> = {}): BuiltColonyAdvice {
   return {
@@ -192,5 +195,32 @@ describe('totalColonyEarnings', () => {
       unpriced: [],
       coloniesWithoutFigure: 0,
     });
+  });
+});
+
+describe('saleableOutputPerHour, against a line with one imported input', () => {
+  it('does not sell the Bacteria its own Nanite pins are eating', () => {
+    // The reported colony: 6,865 Microorganisms an hour into four Bacteria
+    // pins, feeding eight Advanced pins on Nanites. Nanites also want Reactive
+    // Metals, which this planet has none of, so that line reads
+    // `inputs-not-local` — and its 320/hr appetite for the Bacteria made here
+    // used to vanish with it, leaving 45.8/hr on the books as sellable.
+    const saleable = saleableOutputPerHour(
+      colony({
+        extractors: [
+          { pinId: 1, productTypeId: MICROORGANISMS, ratePerHour: 6_865, expiryMs: null },
+        ],
+        extractedPerHour: [{ typeId: MICROORGANISMS, unitsPerHour: 6_865 }],
+        production: [
+          { schematicId: BACTERIA_SCHEMATIC, count: 4 },
+          { schematicId: NANITES_SCHEMATIC, count: 8 },
+        ],
+      }),
+      pi
+    );
+    expect(saleable.has(BACTERIA)).toBe(false);
+    // What the colony genuinely has to sell: the Nanites themselves, credited
+    // at the built pin count the imported route is assumed to feed.
+    expect(saleable.get(NANITES)).toBeCloseTo(8 * 5, 6);
   });
 });

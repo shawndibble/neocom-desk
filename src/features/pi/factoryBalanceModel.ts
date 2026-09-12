@@ -68,6 +68,23 @@ export function surplusLoad(balance: readonly FactoryBalance[], pi: PiData): Pin
 }
 
 /**
+ * The pins a line is actually running on, which is what both credits its
+ * output and charges its inputs.
+ *
+ * A measured line runs on the pins its own inputs can feed. A line whose
+ * inputs arrive from off the planet has no measurable feeding here by
+ * construction, so it is taken at its built count — the pilot who set up those
+ * routes is feeding it.
+ *
+ * Extracted into one place because it is the rule this whole module turns on:
+ * when the credit and the charge disagreed about it, a colony was paid for
+ * eight pins of Nanites and billed for none of the Bacteria they eat.
+ */
+function effectivePins(line: FactoryBalance): number {
+  return line.status === 'measured' ? Math.min(line.pins, line.feedablePins) : line.pins;
+}
+
+/**
  * What this colony actually puts out an hour, by product typeID.
  *
  * The *fed* rate, not the built one: eight Basic factories on an extractor
@@ -90,9 +107,124 @@ export function colonyOutputPerHour(
     const schematic = pi.schematics[String(line.typeId)];
     if (!schematic || schematic.cycleTime <= 0) continue;
     const perPin = (schematic.quantity * SECONDS_PER_HOUR) / schematic.cycleTime;
-    const pins = line.status === 'measured' ? Math.min(line.pins, line.feedablePins) : line.pins;
+    const pins = effectivePins(line);
     if (pins <= 0) continue;
     out.set(line.typeId, (out.get(line.typeId) ?? 0) + perPin * pins);
   }
   return out;
+}
+
+/**
+ * Same role as `factoryBalance.ts`'s own `EPSILON`: absorbs float drift so a
+ * colony whose production exactly saturates its own factories nets to true
+ * zero rather than a signed trace. Relative to the produced rate rather than a
+ * fixed floor — these rates run from single units to five figures an hour.
+ */
+const NET_EPSILON = 1e-9;
+
+/**
+ * What this colony's own factories draw an hour, by input typeID.
+ *
+ * The counterpart to `colonyOutputPerHour`, and the reason it exists: that
+ * function reports what each line *makes*, and nothing reported what a line
+ * takes off the same planet to make it. A colony extracting Microorganisms
+ * into four Bacteria pins, feeding eight Advanced pins on Nanites, was
+ * credited with the Bacteria as if it were spare — while the Nanite pins
+ * above it wanted seven times that much.
+ *
+ * ## An imported input does not make the local one free
+ *
+ * `factoryBalance` marks a whole line `inputs-not-local` as soon as *one* of
+ * its inputs is neither extracted nor made here — Nanites want Reactive
+ * Metals, which a temperate planet has none of. Everything downstream then
+ * stopped reasoning about that line's other input, the one this colony does
+ * make. So the line was credited for its output at all eight built pins and
+ * charged for its Bacteria at zero, and the difference was offered to the
+ * network planner as supply to spend.
+ *
+ * Both sides now read `effectivePins`, so a line is charged on exactly the
+ * pins it is credited on. That is a deliberate pairing rather than a proof:
+ * crediting output at eight pins assumes *every* input arrives, imported ones
+ * included, while charging the local input at eight pins assumes the local one
+ * fills them. Both cannot be maximal at once, and they diverge on a colony
+ * importing some Bacteria *and* making its own — the whole draw is charged
+ * against what it makes, so its real surplus nets low.
+ *
+ * That error is one-directional, and its direction is what each caller needs.
+ * The network planner understates what is going spare, which is the side that
+ * cannot invent a facility nobody can feed. `saleableOutputPerHour`
+ * understates earnings, which is the same direction this app takes everywhere
+ * a figure cannot be measured exactly.
+ *
+ * Inputs this colony does not produce are counted too, harmlessly: every
+ * caller subtracts this from a map of local output, where an imported type has
+ * no entry to take from.
+ *
+ * ## Not `demandPerHour`, and not `demandByInput`
+ *
+ * Both already exist and neither can be used here, so this recomputes from the
+ * schematic on purpose. `demandPerHour` lives only on a *measured* line —
+ * reading it is exactly the bug, and the code this replaced did precisely that
+ * before its `status !== 'measured'` guard dropped the line that mattered.
+ * `factoryBalance`'s own `demandByInput` scales every line at built pins,
+ * which is right for an imported-input line and wrong for a measured one.
+ */
+export function colonyLocalDrawPerHour(
+  balance: readonly FactoryBalance[],
+  pi: PiData
+): Map<number, number> {
+  const draw = new Map<number, number>();
+  for (const line of balance) {
+    const schematic = pi.schematics[String(line.typeId)];
+    if (!schematic || schematic.cycleTime <= 0) continue;
+    const pins = effectivePins(line);
+    if (pins <= 0) continue;
+    for (const input of schematic.inputs) {
+      const perPin = (input.quantity * SECONDS_PER_HOUR) / schematic.cycleTime;
+      draw.set(input.typeID, (draw.get(input.typeID) ?? 0) + perPin * pins);
+    }
+  }
+  return draw;
+}
+
+/**
+ * What this colony can actually send somewhere else an hour: what it makes,
+ * less what it eats of what it makes.
+ *
+ * This is the map a network plan may spend. `colonyOutputPerHour` is not —
+ * it answers "what does this colony produce", which is a different question
+ * from "what is going spare", and treating the first as the second is how a
+ * planner came to propose a factory on material that was already committed.
+ *
+ * A product whose local draw meets or exceeds its production is absent rather
+ * than zero, so a caller iterating this map never has to special-case it.
+ */
+export function colonyExportablePerHour(
+  balance: readonly FactoryBalance[],
+  pi: PiData
+): Map<number, number> {
+  return netAgainstDraw(colonyOutputPerHour(balance, pi), colonyLocalDrawPerHour(balance, pi));
+}
+
+/**
+ * `produced` less `draw`, keeping only what is genuinely left over.
+ *
+ * Shared because the subtraction is done twice over different `produced` maps
+ * — this colony's factory output for the network's supply pool, and that plus
+ * its extraction for what it has to sell — and the float reasoning behind the
+ * threshold should not have to be rediscovered at the second call site.
+ *
+ * A product whose draw meets or exceeds its production comes back absent
+ * rather than zero, so a caller iterating the result never special-cases it.
+ */
+export function netAgainstDraw(
+  produced: ReadonlyMap<number, number>,
+  draw: ReadonlyMap<number, number>
+): Map<number, number> {
+  const net = new Map<number, number>();
+  for (const [typeId, unitsPerHour] of produced) {
+    const left = unitsPerHour - (draw.get(typeId) ?? 0);
+    if (left > unitsPerHour * NET_EPSILON) net.set(typeId, left);
+  }
+  return net;
 }
