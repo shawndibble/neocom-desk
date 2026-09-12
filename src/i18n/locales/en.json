@@ -229,7 +229,7 @@
     "pasteFromClipboard": "Paste from clipboard",
     "pasteFromClipboardFailed": "Couldn't read the clipboard — paste manually instead.",
     "markerAttributesModalTitle": "Remap marker attributes",
-    "markerAttributesModalHint": "Set the attributes this remap should target. Every point spent on one attribute comes off another — a legal remap always totals {{total}}, {{min}}–{{max}} per attribute.",
+    "markerAttributesModalHint": "Set the attributes this remap should target, before implants. Every point spent on one attribute comes off another — a legal remap always totals {{total}}, {{min}}–{{max}} per attribute. The marker row in your plan shows these numbers with your implants added, the way EVE's remap screen does.",
     "markerAttributesRemaining_one": "{{count}} point left to allocate",
     "markerAttributesRemaining_other": "{{count}} points left to allocate",
     "markerAttributesOverBudget_one": "{{count}} point over budget — lower another attribute first",
