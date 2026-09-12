@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import '@/i18n';
 import { db } from '@/db';
 import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharacter';
@@ -54,6 +54,23 @@ vi.mock('@/features/bpcContracts/publicContractItems', () => ({
 vi.mock('@/features/character/typeNames', () => ({
   loadTypeNames: vi.fn(async () => new Map([[34, 'Tritanium']])),
 }));
+
+// Only reached by a right-click: the row context menu resolves the item's
+// product through the real `plannableProductTypeID`, off this one blueprint.
+vi.mock('@/sde/loadSde', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/sde/loadSde')>();
+  return {
+    ...actual,
+    loadBlueprints: vi.fn(async () => ({
+      '638': {
+        name: 'Rifter Blueprint',
+        time: 1200,
+        materials: [],
+        products: [{ typeID: 587, quantity: 1 }],
+      },
+    })),
+  };
+});
 
 const CATALOG: MarketTypeEntry[] = [
   { typeId: 34, name: 'Tritanium', marketGroupId: 18 },
@@ -195,9 +212,24 @@ async function bodyRows() {
   return within(rest[0]).getAllByRole('row');
 }
 
+/**
+ * Always inside a Router: every item row wraps itself in a Build Plan
+ * context-menu trigger (#931) and the detail modal's contents list does the
+ * same, and both navigate via `useNavigate`. The real panel only ever renders
+ * under `/contracts`, so this matches production rather than propping the
+ * test up.
+ */
+function renderWithRouter() {
+  return render(
+    <MemoryRouter>
+      <ContractSearchPanel />
+    </MemoryRouter>
+  );
+}
+
 describe('ContractSearchPanel', () => {
   it('lists every synced offer, any item type, cheapest first', async () => {
-    render(<ContractSearchPanel />);
+    renderWithRouter();
 
     const rows = await bodyRows();
     expect(rows).toHaveLength(3);
@@ -219,7 +251,7 @@ describe('ContractSearchPanel', () => {
     );
     const cheapest = row({ contractId: 999, price: 1, quantity: 7 });
     loadPublicContractOffers.mockResolvedValue(cachedSnapshot([...dear, cheapest]));
-    render(<ContractSearchPanel />);
+    renderWithRouter();
 
     const rows = await bodyRows();
     expect(rows).toHaveLength(50);
@@ -228,7 +260,7 @@ describe('ContractSearchPanel', () => {
   });
 
   it('names the region each offer sits in', async () => {
-    render(<ContractSearchPanel />);
+    renderWithRouter();
 
     const rows = await bodyRows();
     expect(within(rows[0]).getByText('Domain')).toBeInTheDocument();
@@ -236,7 +268,7 @@ describe('ContractSearchPanel', () => {
   });
 
   it("marks an auction's price as a buyout rather than a fixed ask", async () => {
-    render(<ContractSearchPanel />);
+    renderWithRouter();
 
     const rows = await bodyRows();
     expect(within(rows[2]).getByText('buyout')).toBeInTheDocument();
@@ -246,7 +278,7 @@ describe('ContractSearchPanel', () => {
     loadPublicContractOffers.mockResolvedValue(
       cachedSnapshot([row({ typeId: 35, isAuction: true, price: 3_000_000, buyout: 0 })])
     );
-    render(<ContractSearchPanel />);
+    renderWithRouter();
 
     const rows = await bodyRows();
     expect(within(rows[0]).getByText('bid')).toBeInTheDocument();
@@ -255,7 +287,7 @@ describe('ContractSearchPanel', () => {
 
   it('narrows to one item type when a suggestion is picked, and summarises its offers', async () => {
     const user = userEvent.setup();
-    render(<ContractSearchPanel />);
+    renderWithRouter();
     await bodyRows();
 
     await user.type(screen.getByPlaceholderText('Search item name…'), 'trit');
@@ -270,7 +302,7 @@ describe('ContractSearchPanel', () => {
 
   it('narrows on a free-text query even when no suggestion is picked', async () => {
     const user = userEvent.setup();
-    render(<ContractSearchPanel />);
+    renderWithRouter();
     await bodyRows();
 
     await user.type(screen.getByPlaceholderText('Search item name…'), 'pyer');
@@ -284,7 +316,7 @@ describe('ContractSearchPanel', () => {
 
   it('says so when a query matches no listed item, rather than falling back to everything', async () => {
     const user = userEvent.setup();
-    render(<ContractSearchPanel />);
+    renderWithRouter();
     await bodyRows();
 
     await user.type(screen.getByPlaceholderText('Search item name…'), 'zzzz');
@@ -295,7 +327,7 @@ describe('ContractSearchPanel', () => {
   it('shows the not-configured state when the app has no sync backend', async () => {
     vi.mocked(isSyncConfigured).mockReturnValue(false);
     loadPublicContractOffers.mockResolvedValue(null);
-    render(<ContractSearchPanel />);
+    renderWithRouter();
 
     expect(await screen.findByText("Contract search isn't available")).toBeInTheDocument();
     expect(loadPublicContractOffers).not.toHaveBeenCalled();
@@ -303,24 +335,13 @@ describe('ContractSearchPanel', () => {
 
   it('distinguishes a configured-but-empty snapshot from a missing backend', async () => {
     loadPublicContractOffers.mockResolvedValue(cachedSnapshot([]));
-    render(<ContractSearchPanel />);
+    renderWithRouter();
 
     expect(await screen.findByText('No public contracts synced yet')).toBeInTheDocument();
   });
 });
 
 describe('ContractSearchPanel — contract detail modal', () => {
-  // The shared modal's contents list wraps each line in a Build Plan
-  // context-menu trigger, which navigates via `useNavigate` — a Router is
-  // otherwise unneeded by this panel.
-  function renderWithRouter() {
-    return render(
-      <MemoryRouter>
-        <ContractSearchPanel />
-      </MemoryRouter>
-    );
-  }
-
   it('opens the shared contract detail modal on a row click, the same one BPC Search and Contracts History use', async () => {
     const user = userEvent.setup();
     renderWithRouter();
@@ -354,7 +375,7 @@ describe('ContractSearchPanel — contract detail modal', () => {
 describe('ContractSearchPanel — Courier mode', () => {
   async function showCourier() {
     const user = userEvent.setup();
-    render(<ContractSearchPanel />);
+    renderWithRouter();
     await bodyRows();
     await user.click(screen.getByRole('button', { name: 'Courier' }));
     return user;
@@ -489,5 +510,61 @@ describe('ContractSearchPanel — Courier mode', () => {
     await user.click(screen.getByRole('button', { name: 'Close' }));
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+});
+
+describe('ContractSearchPanel — Build Plan from an item row', () => {
+  /** Reads where the menu navigated to; `MemoryRouter` never touches `window.location`. */
+  function LocationProbe() {
+    const { pathname, search } = useLocation();
+    return <span data-testid="location">{`${pathname}${search}`}</span>;
+  }
+
+  function renderWithProbe() {
+    return render(
+      <MemoryRouter>
+        <ContractSearchPanel />
+        <LocationProbe />
+      </MemoryRouter>
+    );
+  }
+
+  const BPC_ROW = row({
+    contractId: 9,
+    typeId: 638,
+    price: 5_000_000,
+    isBlueprintCopy: true,
+    me: 10,
+    te: 20,
+    runs: 5,
+  });
+
+  it("plans the copy a blueprint row names, at that copy's own ME/TE/runs", async () => {
+    loadPublicContractOffers.mockResolvedValue(cachedSnapshot([BPC_ROW]));
+    renderWithProbe();
+
+    const rows = await bodyRows();
+    fireEvent.contextMenu(rows[0]);
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Build Plan' }));
+
+    // 587 (Rifter), not 638 (its blueprint): `/industry?product=` takes the
+    // product, so handing it the blueprint's own typeID creates nothing.
+    await waitFor(() => {
+      expect(screen.getByTestId('location')).toHaveTextContent(
+        '/industry?product=587&me=10&te=20&runs=5'
+      );
+    });
+  });
+
+  it('plans a plain item row as itself, with no seed', async () => {
+    // Tritanium builds nothing and carries no ME/TE/runs, so the menu has
+    // nothing to offer — the seed keys must not appear as fabricated zeroes.
+    loadPublicContractOffers.mockResolvedValue(cachedSnapshot([TRIT_FORGE]));
+    renderWithProbe();
+
+    const rows = await bodyRows();
+    fireEvent.contextMenu(rows[0]);
+
+    expect(await screen.findByRole('menuitem')).toHaveAttribute('aria-disabled', 'true');
   });
 });

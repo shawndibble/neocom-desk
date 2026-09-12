@@ -89,6 +89,34 @@ export function seedFromContractItem(item: {
 }
 
 /**
+ * A seed from one Public Contract Offers snapshot row — again a structural
+ * subset rather than `PublicContractOfferRow` itself, for the same decoupling
+ * reason as `seedFromContractItem`, and with the same all-or-nothing rule.
+ *
+ * A second shape exists because the snapshot renames ESI's fields as it
+ * publishes (`material_efficiency` -> `me`, `time_efficiency` -> `te`), so only
+ * `runs` would have matched. It is deliberately the *same* rule and not merely
+ * a similar one: since #933 a Contract Search item line is reachable both by
+ * the row's own context menu and by the detail modal's, and the two must seed
+ * a plan identically or one copy opens as two plans.
+ *
+ * A BPO's unlimited runs needs no special case here the way BPC Sourcing's
+ * `runs === -1` guard does: the publisher already drops a negative `runs`
+ * instead of carrying it, so it arrives absent and falls out as unseeded.
+ */
+export function seedFromOfferRow(row: {
+  isBlueprintCopy?: boolean;
+  me?: number;
+  te?: number;
+  runs?: number;
+}): BuildPlanSeed | null {
+  if (!row.isBlueprintCopy) return null;
+  const { me, te, runs } = row;
+  if (me === undefined || te === undefined || runs === undefined) return null;
+  return { me, te, runs };
+}
+
+/**
  * Whether an existing plan is the one a seeded click already created.
  *
  * Matched on the three values rather than on a marker stored on the plan:
