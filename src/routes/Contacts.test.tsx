@@ -129,6 +129,17 @@ describe('Contacts', () => {
     expect(screen.queryByText('Bad Alliance')).not.toBeInTheDocument();
   });
 
+  it('points at the standing chips when the filter leaves no contacts', async () => {
+    render(<App />);
+    await screen.findByText('Good Friend');
+
+    const chips = screen.getByRole('group', { name: 'Standing' });
+    for (const chip of within(chips).getAllByRole('button')) fireEvent.click(chip);
+
+    expect(await screen.findByText('No contacts match the selected filters')).toBeInTheDocument();
+    expect(screen.getByText('Turn on a standing above to see contacts.')).toBeInTheDocument();
+  });
+
   it('falls back to cached contacts offline', async () => {
     await db.esiCache.put({
       characterId: CHAR_ID,

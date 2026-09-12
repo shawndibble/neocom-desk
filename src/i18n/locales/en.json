@@ -2284,6 +2284,7 @@
     "emptyTitle": "No contacts cached",
     "emptyHint": "Reconnect to fetch this character's contacts.",
     "noResults": "No contacts match the selected filters",
+    "noResultsHint": "Turn on a standing above to see contacts.",
     "name": "Name",
     "type": "Type",
     "typeCharacter": "Player",
