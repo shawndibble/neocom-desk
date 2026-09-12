@@ -49,8 +49,10 @@ import { materialPricesFor } from './priceBasis';
 import {
   acquisitionForLookup,
   buildPlanTypeIds,
+  cloneBlueprintPools,
   recipeForLookup,
   withoutAcquisitionCost,
+  type BlueprintTierPools,
 } from './recipes';
 import { facilityContextFor } from './planFacilityContext';
 import { useAssumedMe } from './assumedMe';
@@ -214,7 +216,14 @@ async function computeRow(
       },
     };
     const recipeFor = recipeForLookup(recipeSources);
-    const rawAcquisitionFor = acquisitionForLookup(recipeSources);
+    // Shared by `topLevelAcquisition` below and `result`'s own nested
+    // resolution (issue #860) — both need to see the same blueprint copies
+    // claimed once, not once each. The Group Owned Overlay pass further
+    // down gets its own independent pool instead of this one, the same way
+    // `buildVsBuy.ts` gives material `ownedPool` a fresh map per call rather
+    // than sharing one across unrelated resolutions.
+    const blueprintPools: BlueprintTierPools = new Map();
+    const rawAcquisitionFor = acquisitionForLookup(recipeSources, blueprintPools);
     const acquisitionFor = includeBlueprintCost
       ? rawAcquisitionFor
       : withoutAcquisitionCost(rawAcquisitionFor);
@@ -227,7 +236,6 @@ async function computeRow(
       materialPrices,
       skills,
       recipeFor,
-      acquisitionFor,
     };
 
     // Top-level Blueprint Acquisition (issue #838), mirroring
@@ -252,11 +260,17 @@ async function computeRow(
     const blueprintAcquisition = topLevelAcquisition
       ? { blueprintTypeID: topLevelAcquisition.blueprintTypeID, line: topLevelAcquisition.line }
       : undefined;
+    // Snapshot right after the top-level's own claim, before `result`'s
+    // nested resolution below claims anything further — the Group Owned
+    // Overlay pass starts from here, not from `blueprintPools`'s final state,
+    // so the two passes' nested resolutions never claim from each other.
+    const blueprintPoolsAfterTopLevel = cloneBlueprintPools(blueprintPools);
 
     const planForCompute = { ...plan, me: resolvedMe, te: resolvedTe };
     const { result, error } = computeBuildPlan({
       plan: planForCompute,
       ...common,
+      acquisitionFor,
       blueprintAcquisition,
     });
     // Same snapshot, priced a second time with owned-stock deduction
@@ -270,9 +284,17 @@ async function computeRow(
     let groupResult: BuildResult | null = null;
     let groupError: string | null = null;
     if (computeGroupResult) {
+      const groupAcquisitionForRaw = acquisitionForLookup(
+        recipeSources,
+        blueprintPoolsAfterTopLevel
+      );
+      const groupAcquisitionFor = includeBlueprintCost
+        ? groupAcquisitionForRaw
+        : withoutAcquisitionCost(groupAcquisitionForRaw);
       ({ result: groupResult, error: groupError } = computeBuildPlan({
         plan: planForCompute,
         ...common,
+        acquisitionFor: groupAcquisitionFor,
         blueprintAcquisition,
         ignoreOwnedStock: true,
       }));

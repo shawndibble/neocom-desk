@@ -1,10 +1,15 @@
 import { describe, it, expect } from 'vitest';
 import {
+  claimBlueprintTier,
+  pooledOwnedCopies,
   resolveTierOption,
   selectBlueprintTier,
   tierOptions,
 } from '@/engine/industry/blueprintAcquisition';
-import type { OwnedBlueprintCopy } from '@/engine/industry/blueprintAcquisition';
+import type {
+  OwnedBlueprintCopy,
+  OwnedBlueprintPool,
+} from '@/engine/industry/blueprintAcquisition';
 
 /** Material cost doubles per ME point lost, floors at 100 for ME10 — enough spread to make tier choice matter without a real formula. */
 function costAtMe(me: number): number | null {
@@ -251,5 +256,91 @@ describe('tierOptions', () => {
         assumedMeForUnowned: 0,
       })
     ).toEqual([]);
+  });
+});
+
+describe('pooledOwnedCopies / claimBlueprintTier (issue #860)', () => {
+  it('seeds the pool from the raw owned copies on first use', () => {
+    const pool: OwnedBlueprintPool = new Map();
+    const owned: OwnedBlueprintCopy[] = [{ me: 6, te: 12, runs: 5 }];
+    expect(pooledOwnedCopies(owned, pool)).toEqual([{ me: 6, te: 12, runs: 5 }]);
+  });
+
+  it('a second branch sees the reduced remainder after an earlier branch claimed runs at that tier', () => {
+    const pool: OwnedBlueprintPool = new Map();
+    const owned: OwnedBlueprintCopy[] = [{ me: 6, te: 12, runs: 5 }];
+
+    // Branch A needs 5 runs, fully covered by the owned tier.
+    const copiesForA = pooledOwnedCopies(owned, pool);
+    const resolvedA = selectBlueprintTier({
+      ownedCopies: copiesForA,
+      neededRuns: 5,
+      materialCostAtMe: () => 100,
+      bpcOffers: [],
+      bpoSellPrice: null,
+      assumedMeForUnowned: 0,
+    });
+    expect(resolvedA).toEqual({ me: 6, te: 12, line: { unitPrice: 0, owned: true } });
+    claimBlueprintTier(pool, resolvedA, 5);
+
+    // Branch B needs the same blueprint type — the tier is now fully claimed,
+    // so it must not also see 5 free owned runs.
+    const copiesForB = pooledOwnedCopies(owned, pool);
+    expect(copiesForB).toEqual([{ me: 6, te: 12, runs: 0 }]);
+    const resolvedB = selectBlueprintTier({
+      ownedCopies: copiesForB,
+      neededRuns: 5,
+      materialCostAtMe: () => 100,
+      bpcOffers: [],
+      bpoSellPrice: 200,
+      assumedMeForUnowned: 0,
+    });
+    expect(resolvedB).toEqual({ me: 0, te: 0, line: { unitPrice: 200, owned: false } });
+  });
+
+  it('never decrements a BPO (infinite-runs) tier — one original covers every branch', () => {
+    const pool: OwnedBlueprintPool = new Map();
+    const owned: OwnedBlueprintCopy[] = [{ me: 10, te: 20, runs: -1 }];
+
+    const copiesForA = pooledOwnedCopies(owned, pool);
+    const resolvedA = selectBlueprintTier({
+      ownedCopies: copiesForA,
+      neededRuns: 5,
+      materialCostAtMe: () => 100,
+      bpcOffers: [],
+      bpoSellPrice: null,
+      assumedMeForUnowned: 0,
+    });
+    claimBlueprintTier(pool, resolvedA, 5);
+
+    const copiesForB = pooledOwnedCopies(owned, pool);
+    expect(copiesForB).toEqual([{ me: 10, te: 20, runs: -1 }]);
+  });
+
+  it('leaves an untouched tier unaffected when only a sibling tier is claimed', () => {
+    const pool: OwnedBlueprintPool = new Map();
+    const owned: OwnedBlueprintCopy[] = [
+      { me: 6, te: 12, runs: 3 },
+      { me: 8, te: 16, runs: 4 },
+    ];
+    const copies = pooledOwnedCopies(owned, pool);
+    claimBlueprintTier(pool, { me: 6, te: 12, line: { unitPrice: 0, owned: true } }, 3);
+
+    const afterClaim = pooledOwnedCopies(copies, pool);
+    expect(afterClaim).toEqual(
+      expect.arrayContaining([
+        { me: 6, te: 12, runs: 0 },
+        { me: 8, te: 16, runs: 4 },
+      ])
+    );
+  });
+
+  it('is a no-op when claiming against a tier the pool never seeded (an unmatched override)', () => {
+    const pool: OwnedBlueprintPool = new Map();
+    pooledOwnedCopies([{ me: 6, te: 12, runs: 5 }], pool);
+    claimBlueprintTier(pool, { me: 10, te: 20, line: { unitPrice: null, owned: false } }, 5);
+    expect(pooledOwnedCopies([{ me: 6, te: 12, runs: 5 }], pool)).toEqual([
+      { me: 6, te: 12, runs: 5 },
+    ]);
   });
 });
