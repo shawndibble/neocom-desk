@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -400,11 +400,45 @@ function MobileMoreSheet({ open, onClose, activeCharacter, locked }: MobileMoreS
   );
 }
 
+/**
+ * Fades the route outlet in whenever the pathname changes.
+ *
+ * Runs the animation on the live element rather than replaying a CSS one,
+ * because the only way to restart a CSS animation is to remount — and the
+ * outlet must keep its instance (see the call site). `useLayoutEffect`, so the
+ * first frame at the new route is already at opacity 0; an effect after paint
+ * would flash the content in at full opacity and then fade it.
+ *
+ * The `animate` guard is a real capability check, not a test shim: jsdom
+ * implements no Web Animations API, so this must degrade to an instant swap
+ * exactly as it does in a browser that lacks it.
+ */
+function useRouteFade(pathname: string) {
+  const ref = useRef<HTMLDivElement>(null);
+  const running = useRef<Animation | null>(null);
+
+  useLayoutEffect(() => {
+    const node = ref.current;
+    if (node === null || typeof node.animate !== 'function') return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    // Navigating again mid-fade would otherwise leave two animations driving
+    // the same property, and the abandoned one still holds its own opacity.
+    running.current?.cancel();
+    running.current = node.animate([{ opacity: 0 }, { opacity: 1 }], {
+      duration: 140,
+      easing: 'ease-out',
+    });
+  }, [pathname]);
+
+  return ref;
+}
+
 /** App chrome: Neocom-style left rail on desktop, bottom tab bar on mobile. */
 export function Layout() {
   const { t } = useTranslation();
   useKeyboardShortcuts();
   const location = useLocation();
+  const outletRef = useRouteFade(location.pathname);
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   const activeCharacter = useLiveQuery(
     () => (activeCharacterId === null ? undefined : db.characters.get(activeCharacterId)),
@@ -511,14 +545,15 @@ export function Layout() {
       <main className="min-w-0 flex-1 p-4 pb-[calc(5rem+env(safe-area-inset-bottom))] md:pb-4">
         <AuthFailureNotice />
         {/*
-          Keyed on the pathname so each route's content mounts fresh and
-          replays `page-fade` (styles/index.css) — a CSS animation only
-          restarts on a new element. Costs no extra unmount: every route in
-          App.tsx is a static path, so a changed pathname already renders a
-          different element. Search/hash changes don't re-key, which is what
-          keeps an in-page filter from re-fading the whole view.
+          Deliberately not `key={location.pathname}`, which would replay a CSS
+          animation by remounting. Six entries in App.tsx's `ROUTE_ELEMENTS`
+          match more than one pathname (`/assets/*`, `/corp/assets/*`, and the
+          four `:param` routes), and React Router keeps one component instance
+          across those — so re-keying would throw away Assets' search, filters
+          and selection on every drill-down and re-run its loader. Animating
+          the element in place keeps the instance and still replays.
         */}
-        <div key={location.pathname} className="page-fade">
+        <div ref={outletRef}>
           <Outlet />
         </div>
       </main>

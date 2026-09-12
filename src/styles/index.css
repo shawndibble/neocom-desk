@@ -20,43 +20,12 @@
 }
 
 /*
- * Same-document route change (Layout's outlet wrapper), as opposed to the
- * `@view-transition` rule above, which covers a full document reload and is
- * unrelated to this.
- *
- * Deliberately NOT `document.startViewTransition()`, which this replaced
- * (issue #878). A view transition cross-fades a snapshot of the outgoing page
- * against the incoming one, so it needs both to be laid out — but routes here
- * reach their real height only once their data lands, and a route that has
- * nothing cached yet is a short spinner at transition time. The incoming
- * snapshot was therefore captured at the wrong size, scaled to the outgoing
- * page's box for the length of the fade, and snapped to its true layout the
- * instant the transition ended. Chromium's own guidance is to finish loading
- * before calling `startViewTransition()`, which a route whose data arrives
- * asynchronously cannot do.
- *
- * Fading only the incoming content sidesteps all of it: nothing is snapshotted
- * or scaled, the outgoing page is simply gone, and content that grows the page
- * as it loads does so in normal layout instead of fighting an animated box.
- *
- * Opacity only, and never a transform — the outlet is the whole main content
- * area, so any movement reads as the entire app sliding rather than a page
- * turn.
+ * The same-document route change has no rule here: `Layout`'s `useRouteFade`
+ * animates the outlet directly, because restarting a CSS animation would mean
+ * remounting the outlet and several routes must keep their instance across a
+ * pathname change. Why it is a plain fade rather than a view transition is
+ * `docs/DESIGN.md` §6b.
  */
-@media (prefers-reduced-motion: no-preference) {
-  .page-fade {
-    animation: page-fade-in 0.14s ease-out;
-  }
-}
-
-@keyframes page-fade-in {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
 
 /*
  * Scan only the app source. Tailwind's automatic content detection walks every

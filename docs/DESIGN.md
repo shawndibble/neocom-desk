@@ -415,13 +415,20 @@ tradeoffs, not something to add to a route ad hoc.
 
 ## 6b. Route transitions
 
-- **The route outlet fades in. That is the whole effect.** Layout wraps the
-  outlet in `.page-fade` (`styles/index.css`), keyed on the pathname, under a
-  `prefers-reduced-motion: no-preference` guard.
+- **The route outlet fades in. That is the whole effect.** Layout's
+  `useRouteFade` animates the outlet on every pathname change, skipping it
+  under `prefers-reduced-motion: reduce`.
 - **Opacity only — never a transform.** The outlet is the entire main content
   area, so any movement reads as the whole app sliding rather than a page turn.
+- **Animate the element; never re-key the outlet to replay a CSS animation.**
+  Restarting a CSS animation requires a new element, and six `ROUTE_ELEMENTS`
+  entries in `app/App.tsx` match more than one pathname (`/assets/*`,
+  `/corp/assets/*`, and the four `:param` routes). React Router keeps one
+  component instance across those, so a `key` would throw away Assets' search,
+  filters and selection on every drill-down and re-run its loader — churn far
+  worse than the fade is worth.
 - **Do not reach for `document.startViewTransition()` here.** It was tried and
-  removed (issue #878): it cross-fades a snapshot of the outgoing page against
+  removed (PR #878): it cross-fades a snapshot of the outgoing page against
   the incoming one, so it needs both laid out at their true size — but a route
   reaches its real height only once its data lands, and a route with nothing
   retained is a short spinner at transition time. The incoming snapshot was

@@ -171,9 +171,12 @@ does not close it — that warms `esiCache`, so the composition reads local rows
 instead of the network, but it warms endpoints, not composed view snapshots.
 Closing it means either running route loaders at boot (a burst of exactly the
 kind `prefetch.ts` is written to avoid) or persisting snapshots across reloads
-(shape drift across deploys, which `routeSnapshotCache.ts` argues against in
-its own header). Neither is a change to make inside one route. What a view may
-show in the meantime is `docs/DESIGN.md` §6a.
+— which `routeSnapshotCache.ts`'s own header already argues against on the
+grounds that `esiCache` is the durable copy and a second persisted one would
+need its own purge and freshness rules, and which would additionally have to
+survive a stored snapshot's shape drifting across deploys. Neither is a change
+to make inside one route. What a view may show in the meantime is
+`docs/DESIGN.md` §6a.
 
 **Name lookups are cache-first.** `features/character/names.ts`
 (`resolveNames`) and `typeNames.ts` (`resolveViaEsi`) both used to POST
