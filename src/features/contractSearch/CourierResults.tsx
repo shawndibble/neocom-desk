@@ -72,6 +72,34 @@ const EMPTY_UI_FILTER: CourierUiFilter = {
   minDays: '',
 };
 
+/**
+ * Only the bands these hauls actually end in — the same rule `regionOptionsFor`
+ * below applies to regions, so a chosen band can never land on an empty table.
+ *
+ * It is not a nicety here. Endpoints are named out of `stations.json`, which
+ * holds NPC stations only, and **no NPC station sits in a J-named system**
+ * (checked against the shipped snapshot: 0 of 5,210, against 2,597 J-named
+ * systems). Wormhole hauls terminate at player structures, which nothing local
+ * places at all. So a fixed four-chip row would offer a Wormhole chip that
+ * cannot match anything — and, worse, deselecting it would look like a no-op
+ * while silently dropping every haul whose destination has no band.
+ *
+ * Derived from the rows rather than hardcoded, so this corrects itself if the
+ * SDE ever does place a station in J-space.
+ */
+function offeredSpaceKinds(rows: readonly CourierRouteRow[]): SpaceKind[] {
+  return SPACE_KINDS.filter((kind) => rows.some((row) => row.destination.space === kind));
+}
+
+/**
+ * Whether the hauler has actually narrowed anything. Measured against the bands
+ * on offer, not all four: with every offered band selected this must be no
+ * filter at all, so a destination that has no band stays visible.
+ */
+function narrowsSpace(selected: readonly SpaceKind[], offered: readonly SpaceKind[]): boolean {
+  return offered.some((kind) => !selected.includes(kind));
+}
+
 /** A blank or unparseable field is "no restriction", never `NaN` — which would silently exclude every row. */
 function parseNumeric(value: string): number | null {
   if (value.trim() === '') return null;
@@ -250,6 +278,7 @@ interface CourierFilterBarProps {
   onChange: (filter: CourierUiFilter) => void;
   originRegions: RegionOption[];
   destinationRegions: RegionOption[];
+  spaceKinds: readonly SpaceKind[];
   preference: RoutePreferenceKind;
   onPreferenceChange: (preference: RoutePreferenceKind) => void;
 }
@@ -259,6 +288,7 @@ function CourierFilterBar({
   onChange,
   originRegions,
   destinationRegions,
+  spaceKinds,
   preference,
   onPreferenceChange,
 }: CourierFilterBarProps) {
@@ -270,7 +300,7 @@ function CourierFilterBar({
     filter.routeQuery,
     filter.originRegionId !== null,
     filter.destinationRegionId !== null,
-    filter.destinationSpace.length !== SPACE_KINDS.length,
+    narrowsSpace(filter.destinationSpace, spaceKinds),
     filter.minReward,
     filter.maxCollateral,
     filter.maxVolume,
@@ -322,7 +352,7 @@ function CourierFilterBar({
             className="flex flex-wrap items-center gap-2"
           >
             <span className="text-text-dim">{t('contractSearch.destinationSpaceLabel')}</span>
-            {SPACE_KINDS.map((kind) => (
+            {spaceKinds.map((kind) => (
               <FilterChip
                 key={kind}
                 label={t(`common.spaceOption.${kind}`)}
@@ -481,24 +511,26 @@ export function CourierResults({ rows, regionNames }: CourierResultsProps) {
     () => regionOptionsFor(rows, 'destination', regionNames),
     [rows, regionNames]
   );
+  const spaceKinds = useMemo(() => offeredSpaceKinds(rows), [rows]);
 
   const filter = useMemo<CourierContractFilter>(
     () => ({
       routeQuery: uiFilter.routeQuery,
       originRegionId: uiFilter.originRegionId,
       destinationRegionId: uiFilter.destinationRegionId,
-      // All four selected is not a filter at all — a haul whose destination
-      // nothing local places has no band, and must not be excluded by a
-      // control the hauler never narrowed. Same reading as BPC Search's own
-      // Space filter.
-      destinationSpace:
-        uiFilter.destinationSpace.length === SPACE_KINDS.length ? null : uiFilter.destinationSpace,
+      // Every offered band selected is not a filter at all — a haul whose
+      // destination nothing local places has no band, and must not be excluded
+      // by a control the hauler never narrowed. Same reading as BPC Search's
+      // own Space filter.
+      destinationSpace: narrowsSpace(uiFilter.destinationSpace, spaceKinds)
+        ? uiFilter.destinationSpace
+        : null,
       minReward: parseNumeric(uiFilter.minReward),
       maxCollateral: parseNumeric(uiFilter.maxCollateral),
       maxVolume: parseNumeric(uiFilter.maxVolume),
       minDaysToComplete: parseNumeric(uiFilter.minDays),
     }),
-    [uiFilter]
+    [uiFilter, spaceKinds]
   );
 
   const matchingRows = useMemo(() => filterCourierContracts(rows, filter), [rows, filter]);
@@ -669,10 +701,21 @@ export function CourierResults({ rows, regionNames }: CourierResultsProps) {
    * filter eating rows, so when it is the reason the table is empty, the empty
    * state says so rather than repeating the generic "nothing matched" — the
    * board must not present an exclusion it made as an absence in the data.
+   *
+   * "The reason" is the whole point, so this asks the actual question: with the
+   * band filter lifted and every *other* filter still applied, would an
+   * unplaced destination be on screen? Testing the unfiltered rows instead
+   * would blame the band filter for an empty table a minimum reward or a region
+   * had emptied, which is the opposite of saying which cause applies.
    */
-  const excludedUnplacedDestinations =
-    uiFilter.destinationSpace.length !== SPACE_KINDS.length &&
-    rows.some((row) => row.destination.space === null);
+  const excludedUnplacedDestinations = useMemo(() => {
+    if (displayRows.length > 0 || !narrowsSpace(uiFilter.destinationSpace, spaceKinds)) {
+      return false;
+    }
+    return filterCourierContracts(rows, { ...filter, destinationSpace: null }).some(
+      (row) => row.destination.space === null
+    );
+  }, [displayRows, rows, filter, uiFilter.destinationSpace, spaceKinds]);
 
   return (
     <>
@@ -681,6 +724,7 @@ export function CourierResults({ rows, regionNames }: CourierResultsProps) {
         onChange={changeFilter}
         originRegions={originRegions}
         destinationRegions={destinationRegions}
+        spaceKinds={spaceKinds}
         preference={preference}
         onPreferenceChange={changePreference}
       />

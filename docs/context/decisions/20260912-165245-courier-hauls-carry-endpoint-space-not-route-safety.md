@@ -32,11 +32,26 @@ _Recorded 2026-09-12 · issue #939._
   the empty state names that cause when it is the one that applies, rather than
   presenting the board's own exclusion as an absence in the data.
 
-- **All four bands selected is no filter at all.** Deselecting every band asks
+- **The chips offer only the bands these hauls actually end in.** Checked
+  against the shipped snapshot: **no NPC station sits in a J-named system** — 0
+  of 5,210, against 2,597 J-named systems. Endpoints are named out of
+  `stations.json`, which holds NPC stations only, so wormhole hauls end at
+  player structures that nothing local places at all, and a fixed four-chip row
+  would offer a Wormhole chip that can never match. Worse, deselecting it would
+  read as a no-op while silently dropping every haul whose destination has no
+  band. Derived from the rows — the rule `regionOptionsFor` already applies one
+  function above — so it corrects itself if the SDE ever does place a station in
+  J-space. (Thera is the one wormhole-space system with NPC stations; it is not
+  J-named and reads `-0.99`, so `classifySpace` bands it nullsec. That is the
+  shared classifier's answer and BPC Search gives the same one; changing it is
+  not this ticket's to make.)
+
+- **Every offered band selected is no filter at all.** Deselecting every band asks
   for hauls ending in none of them and is honestly empty; "show everything"
-  lives in the all-selected case, which the panel maps to no filter so unplaced
-  destinations stay visible. This is BPC Search's own reading, kept identical so
-  the two surfaces cannot diverge.
+  lives in the all-offered-selected case, which the panel maps to no filter so
+  unplaced destinations stay visible. Measured against what is on offer rather
+  than against all four, since a band with no rows behind it must not be able to
+  hold the filter open.
 
 - **No new column and no new card line.** The band rides inside the existing
   two-line route cell beside the region label already there, so the table's
