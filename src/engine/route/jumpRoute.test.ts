@@ -17,8 +17,10 @@ const FAR = 30000003;
 const A = 30000004;
 const B = 30000005;
 const C = 30000006;
-/** Reachable from nothing — the disconnected case. */
+/** In the graph with no stargates at all — J-space's real shape. */
 const ISLAND = 30000007;
+/** Not in the graph: not a solar system this snapshot knows. */
+const NOT_A_SYSTEM = 39999999;
 /** In the graph, but absent from the security lookup. */
 const UNCHARTED = 30000008;
 
@@ -100,21 +102,28 @@ describe('findJumpRoute', () => {
     expect(result).toEqual({ kind: 'no-route' });
   });
 
-  it('says no-route when the origin is not in the graph at all', () => {
-    const result = findJumpRoute(GRAPH, 39999999, FAR, { preference: 'shortest', securityOf });
+  it('still reports zero jumps within a gateless system, where you are already there', () => {
+    // The snapshot keys every solar system, J-space included, so a haul that
+    // starts and ends in one wormhole is zero jumps — not the no-route its
+    // empty adjacency would otherwise imply.
+    const result = findJumpRoute(GRAPH, ISLAND, ISLAND, { preference: 'shortest', securityOf });
+    expect(result).toEqual({ kind: 'route', systems: [ISLAND] });
+  });
+
+  it('says no-route when the origin is not a system the snapshot knows', () => {
+    const result = findJumpRoute(GRAPH, NOT_A_SYSTEM, FAR, { preference: 'shortest', securityOf });
     expect(result).toEqual({ kind: 'no-route' });
   });
 
-  it('says no-route when the destination is not in the graph at all', () => {
-    const result = findJumpRoute(GRAPH, HUB, 39999999, { preference: 'shortest', securityOf });
+  it('says no-route when the destination is not a system the snapshot knows', () => {
+    const result = findJumpRoute(GRAPH, HUB, NOT_A_SYSTEM, { preference: 'shortest', securityOf });
     expect(result).toEqual({ kind: 'no-route' });
   });
 
-  it('says no-route for a wormhole-shaped id no stargate reaches, never a distance', () => {
-    // J-space carries no stargates, so a wormhole system is simply absent
-    // from the graph. That is a fact about the game, and the caller must be
-    // able to tell it apart from a route it merely failed to compute.
-    const result = findJumpRoute(GRAPH, HUB, 31000042, { preference: 'shortest', securityOf });
+  it('claims no distance for an unknown id even to itself, rather than zero jumps', () => {
+    // Zero jumps would be a confident answer about a place the snapshot has
+    // never heard of; no-route is the honest one.
+    const result = findJumpRoute(GRAPH, NOT_A_SYSTEM, NOT_A_SYSTEM, { preference: 'shortest' });
     expect(result).toEqual({ kind: 'no-route' });
   });
 

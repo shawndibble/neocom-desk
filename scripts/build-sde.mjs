@@ -1333,11 +1333,15 @@ async function main() {
   // two halves of a pair arrive as separate rows and each one is recorded on
   // its own `from` system; no edge is mirrored by hand.
   //
-  // A system with no stargates at all simply gets no key. That is not a gap
-  // for wormhole space — J-space carries no stargates, so "absent" is the
-  // true answer there, and the engine reads absence as no-route rather than
-  // as zero jumps.
+  // Every solar system gets a key, gateless ones included — an empty array
+  // says "this is a system, and it has no stargates", which is the literal
+  // truth for J-space. Emitting only gated systems made absence mean both
+  // that and "not a system at all", which collapsed a same-system haul in any
+  // of them into no-route when the answer is zero jumps. Membership here
+  // discriminates the way `stations.json`'s completeness does for "station or
+  // player structure".
   const solarSystemJumps = {};
+  for (const sys of solarSystems) solarSystemJumps[sys.id] = [];
   {
     const rows = raw['mapSolarSystemJumps.csv'];
     const h = indexHeader(rows);
@@ -1345,11 +1349,17 @@ async function main() {
       const r = rows[i];
       const from = num(r[h.fromSolarSystemID]);
       const to = num(r[h.toSolarSystemID]);
-      // A blank or unparseable endpoint is a row that names no gate. Dropping
-      // it beats recording an edge to system 0, which would be a real-looking
-      // jump to a place that does not exist.
-      if (from === null || to === null || from === to) continue;
+      // Checked with `Number.isInteger`, not against `null`: `num` only
+      // answers null for an empty string, and a short row (a trailing blank
+      // line parses as `['']`) reads `undefined` and converts to NaN. NaN
+      // passes a `=== null` guard, and `[NaN].includes(NaN)` is true, so it
+      // would slip the symmetry check too and land a `"NaN"` key in the
+      // shipped file.
+      if (!Number.isInteger(from) || !Number.isInteger(to) || from === to) continue;
       (solarSystemJumps[from] ??= []).push(to);
+      // A gate whose `from` system is missing from mapSolarSystems would
+      // otherwise seed a key `systems.json` cannot name; the sanity check
+      // below catches that rather than this silently allowing it.
     }
     // Sorted and de-duplicated so the emitted file is byte-stable across
     // rebuilds (two systems joined by more than one gate are one edge here).
@@ -1631,7 +1641,9 @@ async function main() {
   console.log(`  solar systems: ${solarSystems.length}`);
   console.log(`  npc stations: ${npcStations.length}`);
   console.log(
-    `  gated systems: ${Object.keys(solarSystemJumps).length} (${Object.values(solarSystemJumps).reduce((n, a) => n + a.length, 0)} directed edges)`
+    `  jump graph: ${Object.keys(solarSystemJumps).length} systems, ` +
+      `${Object.values(solarSystemJumps).filter((a) => a.length > 0).length} with stargates, ` +
+      `${Object.values(solarSystemJumps).reduce((n, a) => n + a.length, 0)} directed edges`
   );
   console.log(`  market regions: ${marketRegions.length}`);
   console.log(
@@ -1681,6 +1693,14 @@ async function main() {
     const unknown = Object.keys(solarSystemJumps).filter((id) => !systemIds.has(Number(id)));
     if (unknown.length > 0) {
       console.error(`  FAIL: ${unknown.length} gated systems missing from systems.json`);
+      process.exitCode = 1;
+    }
+    // The converse, which is what makes membership a reliable "is this a
+    // system": every system must have a key, even a gateless one.
+    if (Object.keys(solarSystemJumps).length !== solarSystems.length) {
+      console.error(
+        `  FAIL: jump graph holds ${Object.keys(solarSystemJumps).length} systems, systems.json has ${solarSystems.length}`
+      );
       process.exitCode = 1;
     }
   }

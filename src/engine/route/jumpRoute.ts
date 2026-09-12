@@ -17,9 +17,10 @@
 import { securityBand } from '@/engine/securityStatus';
 
 /**
- * Adjacency by solar system id. A system with no entry has no stargates that
- * this snapshot knows of — which for wormhole space is not a gap but the
- * truth, since J-space carries no stargates at all.
+ * Adjacency by solar system id. Every system the snapshot knows has an entry;
+ * an empty one is a system with no stargates, which is J-space's real shape
+ * rather than a gap. An id with no entry at all is therefore not a system
+ * this snapshot knows — the distinction a same-system route depends on.
  */
 export type JumpGraph = ReadonlyMap<number, readonly number[]>;
 
@@ -103,7 +104,7 @@ class CostQueue {
   pop(): { systemId: number; cost: number } | undefined {
     const top = this.heap[0];
     const last = this.heap.pop();
-    if (last && this.heap.length > 0) {
+    if (last !== undefined && this.heap.length > 0) {
       this.heap[0] = last;
       let index = 0;
       for (;;) {
@@ -143,9 +144,9 @@ function reconstruct(cameFrom: ReadonlyMap<number, number>, destination: number)
  * `engine/jumpsAway.ts`'s `jumpsAwayFromRoute` reads it unchanged.
  *
  * Same system for both ends is zero jumps, which is a real answer and
- * deliberately not `no-route`. An end the graph does not hold — a wormhole
- * system, or an id from a snapshot this one predates — is `no-route`, which
- * is deliberately not zero jumps.
+ * deliberately not `no-route` — including in a gateless system, where you are
+ * already where you are going. An id the snapshot holds no entry for is not a
+ * system it knows, and that is `no-route`, deliberately not zero jumps.
  */
 export function findJumpRoute(
   graph: JumpGraph,

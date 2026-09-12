@@ -1,9 +1,13 @@
 /**
  * Jumps-away display state for a station/structure row on the Assets page
- * (issue #87): a pure mapping from a resolved ESI route to a jump count. ESI's
- * `/route/` resolves server-side (CONTEXT.md round 14), so this never needs a
- * local pathfinding graph — it only interprets the waypoint list `/route/`
- * already returns (origin and destination both included as stops).
+ * (issue #87): a pure mapping from a resolved ESI route to a jump count — it
+ * only interprets the waypoint list `/route/` already returns (origin and
+ * destination both included as stops).
+ *
+ * Round 14 held that this page needs no local pathfinding graph, and for one
+ * station at a time it still does. A graph ships anyway now, for tables
+ * wanting a distance on every row (`engine/route/jumpRoute.ts`); this module
+ * is unaffected, and the Assets page still asks ESI.
  *
  * The "no location"/"no route" distinction the Assets page shows in its
  * tooltip is assembled by the caller, not here: this module only knows how to

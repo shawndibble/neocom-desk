@@ -12,14 +12,23 @@ import { findLocalJumps, findLocalRoute } from './localRoute';
 import { clearJumpGraphIndex } from '@/sde/jumpGraph';
 import { clearSolarSystemIndex } from '@/sde/solarSystems';
 
+/**
+ * Fixtures mirror what `build-sde.mjs` actually emits: every solar system
+ * gets a key, and a gateless one maps to an empty array. An earlier version
+ * of this file keyed the wormhole with `[]` while the emitter keyed nothing
+ * at all, so the same-system case passed here and failed in production.
+ */
+
 const HUB = 30000001;
 const LOW = 30000002;
 const FAR = 30000003;
 const A = 30000004;
 const B = 30000005;
 const C = 30000006;
-/** J-space: no stargates, so it is simply absent from the graph. */
+/** J-space: keyed like every system, but with no stargates. */
 const WORMHOLE = 31000042;
+/** Not a system the snapshot knows at all. */
+const NOT_A_SYSTEM = 39999999;
 
 const JUMPS = {
   [HUB]: [LOW, A],
@@ -68,6 +77,24 @@ describe('findLocalRoute', () => {
     await expect(findLocalRoute(HUB, WORMHOLE, 'shortest')).resolves.toEqual({ kind: 'no-route' });
   });
 
+  it('reports zero jumps inside one wormhole, which is keyed like any system', async () => {
+    await expect(findLocalRoute(WORMHOLE, WORMHOLE)).resolves.toEqual({
+      kind: 'route',
+      systems: [WORMHOLE],
+    });
+  });
+
+  it('says no-route for an id that is not a system at all', async () => {
+    await expect(findLocalRoute(HUB, NOT_A_SYSTEM)).resolves.toEqual({ kind: 'no-route' });
+  });
+
+  it('answers unknown rather than throwing when the snapshot holds a malformed entry', async () => {
+    loadSolarSystemJumps.mockResolvedValue({ [HUB]: 'not-an-array', [FAR]: [HUB] });
+    // The bad entry is dropped, so HUB is not a system the graph knows —
+    // no-route, and crucially not a mid-search throw.
+    await expect(findLocalRoute(HUB, FAR)).resolves.toEqual({ kind: 'no-route' });
+  });
+
   it('says unknown, not no-route, when the graph snapshot cannot be read', async () => {
     loadSolarSystemJumps.mockRejectedValue(new Error('offline'));
     await expect(findLocalRoute(HUB, FAR, 'shortest')).resolves.toEqual({ kind: 'unknown' });
@@ -111,18 +138,14 @@ describe('findLocalJumps', () => {
     await expect(findLocalJumps(HUB, HUB)).resolves.toEqual({ kind: 'known', jumps: 0 });
   });
 
-  it('reports no distance for an unreachable destination', async () => {
-    await expect(findLocalJumps(HUB, WORMHOLE)).resolves.toEqual({
-      kind: 'unknown',
-      reason: 'noRoute',
-    });
+  it('says no-route for an unreachable destination — a fact about New Eden', async () => {
+    await expect(findLocalJumps(HUB, WORMHOLE)).resolves.toEqual({ kind: 'no-route' });
   });
 
-  it('reports no distance when the graph snapshot cannot be read', async () => {
+  it('says unknown, NOT no-route, when the graph snapshot cannot be read', async () => {
+    // The distinction that matters: an offline first visit must not report
+    // "no gate route exists" for every haul in the game.
     loadSolarSystemJumps.mockRejectedValue(new Error('offline'));
-    await expect(findLocalJumps(HUB, FAR)).resolves.toEqual({
-      kind: 'unknown',
-      reason: 'noRoute',
-    });
+    await expect(findLocalJumps(HUB, FAR)).resolves.toEqual({ kind: 'unknown' });
   });
 });

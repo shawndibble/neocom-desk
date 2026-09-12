@@ -23,9 +23,8 @@ import {
   type JumpRouteResult,
   type RoutePreferenceKind,
 } from '@/engine/route/jumpRoute';
-import { jumpsAwayFromRoute, type JumpsAwayResult } from '@/engine/jumpsAway';
 import { loadJumpGraph } from '@/sde/jumpGraph';
-import { loadSolarSystemIndex } from '@/sde/solarSystems';
+import { loadSolarSystemsById } from '@/sde/solarSystems';
 
 /** A route, a definite absence of one, or an admission that we cannot tell. */
 export type LocalRouteResult = JumpRouteResult | { kind: 'unknown' };
@@ -45,7 +44,7 @@ export async function findLocalRoute(
   destinationSystemId: number,
   preference: RoutePreferenceKind = 'shortest'
 ): Promise<LocalRouteResult> {
-  const [graph, systems] = await Promise.all([loadJumpGraph(), loadSolarSystemIndex()]);
+  const [graph, systems] = await Promise.all([loadJumpGraph(), loadSolarSystemsById()]);
   if (!graph) return { kind: 'unknown' };
   return findJumpRoute(graph, originSystemId, destinationSystemId, {
     preference,
@@ -53,20 +52,25 @@ export async function findLocalRoute(
   });
 }
 
+/** A jump count, or which of the two reasons there isn't one. */
+export type LocalJumpsResult =
+  { kind: 'known'; jumps: number } | { kind: 'no-route' } | { kind: 'unknown' };
+
 /**
- * The same answer as a jump count, in the shape the Assets page's tooltip
- * already speaks (`engine/jumpsAway.ts`) — so a caller that only wants a
- * number can take this and ignore the systems crossed.
+ * `findLocalRoute` for a caller that wants the number and not the systems
+ * crossed.
  *
- * Both `no-route` and `unknown` arrive here as `noRoute`, which is correct
- * for a *count*: neither is a distance. A caller that needs to tell a
- * wormhole apart from an unreadable snapshot must use `findLocalRoute`.
+ * Deliberately *not* `engine/jumpsAway.ts`'s `JumpsAwayResult`: its two
+ * reasons are the Assets page's own, and neither can say "a snapshot could
+ * not be read". Reusing it would fold `unknown` into `no-route` at exactly
+ * the API a sortable column consumes, so an offline first visit would report
+ * "no gate route exists" for every haul in the game.
  */
 export async function findLocalJumps(
   originSystemId: number,
   destinationSystemId: number,
   preference: RoutePreferenceKind = 'shortest'
-): Promise<JumpsAwayResult> {
+): Promise<LocalJumpsResult> {
   const route = await findLocalRoute(originSystemId, destinationSystemId, preference);
-  return jumpsAwayFromRoute(route.kind === 'route' ? route.systems : null);
+  return route.kind === 'route' ? { kind: 'known', jumps: route.systems.length - 1 } : route;
 }

@@ -12,6 +12,10 @@
  * offline visit has no graph at all. That is the `undefined` case below, and
  * it is deliberately distinct from "the graph loaded and these two systems do
  * not connect" — one is "we cannot say", the other is a fact about New Eden.
+ *
+ * Every system has an entry, gateless ones mapping to an empty array, so
+ * membership answers "is this a solar system" rather than "does it have
+ * stargates".
  */
 import { loadSolarSystemJumps } from './loadMarketSde';
 import type { JumpGraph } from '@/engine/route/jumpRoute';
@@ -23,7 +27,11 @@ function loadJumpGraphIndex(): Promise<JumpGraph | null> {
     .then((data): JumpGraph => {
       const graph = new Map<number, readonly number[]>();
       for (const [systemId, neighbours] of Object.entries(data)) {
-        graph.set(Number(systemId), neighbours);
+        // Shape-checked rather than trusted: the pathfinder iterates these
+        // arrays, so one non-array value from a malformed or truncated
+        // snapshot would throw mid-search — past the point where the
+        // "never throws" contract can still answer `unknown`.
+        if (Array.isArray(neighbours)) graph.set(Number(systemId), neighbours);
       }
       return graph;
     })

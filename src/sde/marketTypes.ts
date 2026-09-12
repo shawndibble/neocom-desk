@@ -32,10 +32,11 @@ export interface SolarSystemEntry {
  * (issue #942). Keys are system ids as strings, because that is what JSON
  * object keys are; values are the ids that system has a gate to.
  *
- * A system with no stargates has no key at all. For wormhole space that is
- * the true answer rather than a missing one — J-space carries no stargates —
- * so a reader must treat absence as "no gate route exists", never as zero
- * jumps. See `engine/route/jumpRoute.ts`.
+ * Every solar system has a key; a gateless one maps to an empty array. So
+ * membership answers "is this a solar system" — the discriminating role
+ * `stations.json`'s completeness plays for "station or player structure" —
+ * while an empty array says J-space carries no stargates, which is a fact
+ * rather than a gap. See `engine/route/jumpRoute.ts`.
  */
 export type JumpGraphData = Readonly<Record<string, readonly number[]>>;
 
