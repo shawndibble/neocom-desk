@@ -15,7 +15,15 @@ import type { SolarSystemEntry } from './marketTypes';
 
 let index: Promise<ReadonlyMap<number, SolarSystemEntry> | null> | null = null;
 
-function loadSolarSystemsById(): Promise<ReadonlyMap<number, SolarSystemEntry> | null> {
+/**
+ * The whole snapshot as a lookup, or `null` if it could not be read.
+ *
+ * Exported, unlike `npcStations.ts`'s deliberately module-local equivalent,
+ * because a pathfind reads a security status per system *inside* one pass and
+ * awaiting each id would serialise the search. Prefer `lookupSolarSystem` for
+ * one-off reads.
+ */
+export function loadSolarSystemsById(): Promise<ReadonlyMap<number, SolarSystemEntry> | null> {
   index ??= loadSolarSystems()
     .then((entries): ReadonlyMap<number, SolarSystemEntry> => {
       const map = new Map<number, SolarSystemEntry>();
