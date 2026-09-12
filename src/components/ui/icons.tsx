@@ -60,6 +60,7 @@ import {
   Hammer,
   Code,
   Info as InfoGlyph,
+  ListBullets,
   LockKey,
   MagnifyingGlass,
   Moon,
@@ -127,6 +128,8 @@ export const Back = withWeight(CaretLeft);
 export const Descend = withWeight(CaretRight);
 /** A disclosure that is currently open. */
 export const Expanded = withWeight(CaretDown);
+/** Flattens a drill-down tree into one flat list of every item beneath it. Deliberately not `Sort`, which marks a sortable column — this changes what the view contains, not the order it comes in. */
+export const FlatList = withWeight(ListBullets);
 /** A column that can be sorted but currently isn't. */
 export const Sort = withWeight(CaretUpDown);
 /** Ascending: a sorted-ascending column, or "move this row up". */
