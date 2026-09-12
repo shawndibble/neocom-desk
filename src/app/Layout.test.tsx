@@ -1,7 +1,8 @@
+import { useEffect } from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { Link, MemoryRouter, Route, Routes } from 'react-router-dom';
 import '@/i18n';
 import { db } from '@/db';
 import { useActiveCharacter } from '@/stores/activeCharacter';
@@ -599,5 +600,73 @@ describe('Layout corp nav entry', () => {
     // No lock marker: there is no state in which this renders and is unusable,
     // so the amber dot would offer a re-login for a role nobody can grant here.
     expect(link).not.toHaveAttribute('title');
+  });
+});
+
+/**
+ * The fade itself is a CSS animation, which jsdom neither runs nor reports —
+ * so these assert the two things the component is actually responsible for:
+ * that the wrapper carries the class the animation is defined on, and that it
+ * re-keys on a pathname change (a CSS animation only replays on a new element)
+ * but not on a search-only one, which is what keeps an in-page filter from
+ * re-fading the whole view.
+ */
+describe('Layout route fade wrapper', () => {
+  function renderWithMounts(initial: string) {
+    const mounts: string[] = [];
+    function Page({ name }: { name: string }) {
+      useEffect(() => {
+        mounts.push(name);
+      }, [name]);
+      return (
+        <div>
+          {name} page
+          <Link to={`/${name}?tab=x`}>filter {name}</Link>
+        </div>
+      );
+    }
+    const view = render(
+      <MemoryRouter initialEntries={[initial]}>
+        <Routes>
+          <Route element={<Layout />}>
+            <Route path="/overview" element={<Page name="overview" />} />
+            <Route path="/wallet" element={<Page name="wallet" />} />
+          </Route>
+        </Routes>
+      </MemoryRouter>
+    );
+    return { ...view, mounts };
+  }
+
+  beforeEach(() => {
+    mockIsSyncConfigured.mockReturnValue(false);
+    mockedCorpAccess.mockReturnValue(corpAccess('none'));
+  });
+
+  it('wraps the outlet in the element the fade animation targets', async () => {
+    const { container } = renderWithMounts('/overview');
+    const wrapper = container.querySelector('.page-fade');
+    expect(wrapper).not.toBeNull();
+    expect(within(wrapper as HTMLElement).getByText('overview page')).toBeInTheDocument();
+  });
+
+  it('remounts the outlet on a pathname change, so the fade replays', async () => {
+    const user = userEvent.setup();
+    const { mounts } = renderWithMounts('/overview');
+    await waitFor(() => expect(mounts).toEqual(['overview']));
+    await user.click(screen.getAllByRole('link', { name: 'Wallet' })[0]);
+    await waitFor(() => expect(screen.getByText('wallet page')).toBeInTheDocument());
+    expect(mounts).toEqual(['overview', 'wallet']);
+  });
+
+  it('does not remount when only the search string changes', async () => {
+    const user = userEvent.setup();
+    const { mounts } = renderWithMounts('/overview');
+    await waitFor(() => expect(mounts).toEqual(['overview']));
+    // Navigating to the same pathname with a query is the shape an in-page
+    // filter produces; the key is the pathname alone, so the page stays put
+    // rather than re-fading under the user.
+    await user.click(screen.getByRole('link', { name: 'filter overview' }));
+    expect(mounts).toEqual(['overview']);
   });
 });

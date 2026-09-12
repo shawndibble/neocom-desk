@@ -20,43 +20,42 @@
 }
 
 /*
- * Same-document route change (`PageTransitionOutlet`, wrapped in `.page-outlet`
- * below), as opposed to the `@view-transition` rule above (a full document
- * reload). Named `app-outlet` rather than left to share the document's
- * implicit `root` group: `root` is also what the cross-document rule above
- * animates, and an unnamed rule here would silently retime that reload fade
- * too. Browsers without View Transition support just swap the outlet with no
- * animation — this rule only refines browsers that already ran one via
- * `startViewTransition()`.
+ * Same-document route change (Layout's outlet wrapper), as opposed to the
+ * `@view-transition` rule above, which covers a full document reload and is
+ * unrelated to this.
  *
- * A quick fade is enough: the outlet is the whole main content area
- * (everything below the rail/tab bar stays in place, outside this named
- * group), so a slide would read as the entire app chrome sliding rather than
- * a page turn. `PageTransitionOutlet` already skips calling
- * `startViewTransition()` under reduced motion, so no duplicate `@media`
- * guard is needed here.
+ * Deliberately NOT `document.startViewTransition()`, which this replaced
+ * (issue #878). A view transition cross-fades a snapshot of the outgoing page
+ * against the incoming one, so it needs both to be laid out — but routes here
+ * reach their real height only once their data lands, and a route that has
+ * nothing cached yet is a short spinner at transition time. The incoming
+ * snapshot was therefore captured at the wrong size, scaled to the outgoing
+ * page's box for the length of the fade, and snapped to its true layout the
+ * instant the transition ended. Chromium's own guidance is to finish loading
+ * before calling `startViewTransition()`, which a route whose data arrives
+ * asynchronously cannot do.
+ *
+ * Fading only the incoming content sidesteps all of it: nothing is snapshotted
+ * or scaled, the outgoing page is simply gone, and content that grows the page
+ * as it loads does so in normal layout instead of fighting an animated box.
+ *
+ * Opacity only, and never a transform — the outlet is the whole main content
+ * area, so any movement reads as the entire app sliding rather than a page
+ * turn.
  */
-.page-outlet {
-  view-transition-name: app-outlet;
+@media (prefers-reduced-motion: no-preference) {
+  .page-fade {
+    animation: page-fade-in 0.14s ease-out;
+  }
 }
 
-::view-transition-old(app-outlet),
-::view-transition-new(app-outlet) {
-  animation-duration: 0.12s;
-  animation-timing-function: ease-out;
-}
-
-/*
- * The browser's default ::view-transition-group animation morphs the old
- * outlet's captured box into the new one's (interpolating size/position),
- * on top of the old/new cross-fade above. Routes here vary wildly in height
- * (e.g. a short page to Industry's tall one), so that morph reads as the
- * page squashing down to the old size and then snapping to full size the
- * instant the transition ends. Disabling it leaves just the opacity
- * cross-fade, with no resize animation.
- */
-::view-transition-group(app-outlet) {
-  animation: none;
+@keyframes page-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 /*
