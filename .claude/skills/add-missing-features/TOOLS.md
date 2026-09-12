@@ -51,7 +51,9 @@ below), Esparto Industries (blueprint/reaction browser, reprocessing calc,
 moon-ore tax parsing, char sheet tabs — all already covered, tiny Discord),
 Industrial EVE (Colony Builder: save/import/share PI setup templates,
 region/system planet-type search — both dead on kill-test 12 / the PI Colony
-Layout Template row below).
+Layout Template row below), EVE Balance (paste-ore buyback calculator,
+refine-value-weighted per-m3 payout — already covered by
+`reprocessing.ts`/Appraisal refine-then-sell, #672).
 All confirmed live unless noted otherwise above.
 
 **Dead/abandoned, not gap-analysed this run:** EVE Panel (PI sim, iOS), EVE
