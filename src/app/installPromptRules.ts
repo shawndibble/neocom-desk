@@ -1,8 +1,8 @@
 /**
  * Device-local "has this device already been offered install" flag —
- * persisted under a plain (non-`sync.`-prefixed) key, same category as
- * `lastSeenVersion.ts`. Browser install-prompt permission is inherently
- * per-device (CONTEXT.md round 20), so this must never sync.
+ * persisted under a plain (non-`sync.`-prefixed) key: device state, not
+ * Editable Data. Browser install-prompt permission is inherently per-device
+ * (CONTEXT.md round 20), so this must never sync.
  */
 import { createLocalSetting } from '@/lib/useLocalSetting';
 

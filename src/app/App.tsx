@@ -45,7 +45,6 @@ import { NotFound } from '@/routes/NotFound';
 import { Layout } from './Layout';
 import { AnalyticsPageViewTracker } from './AnalyticsPageViewTracker';
 import { ReloadPrompt } from './ReloadPrompt';
-import { WhatsNewPanel } from './WhatsNewPanel';
 import { InstallPrompt } from './InstallPrompt';
 import { BootScreen } from './BootScreen';
 import { RequireCharacter } from './RequireCharacter';
@@ -231,7 +230,6 @@ export function App() {
           <Route path="*" element={<NotFound />} />
         </SentryRoutes>
         <ReloadPrompt />
-        <WhatsNewPanel />
         <PublicInfoModal />
         <SkillDetailModal />
         <InstallPrompt />

@@ -110,8 +110,8 @@ export default defineConfig({
   // Port pinned: the EVE SSO dev callback URL must match exactly, so the
   // port cannot be allowed to drift when 5173 happens to be busy.
   server: { port: 5173, strictPort: true },
-  // Read once at build/dev/test start, not hand-maintained in source — the
-  // "what's new" panel (src/app/WhatsNewPanel.tsx) is the consumer.
+  // Read once at build/dev/test start, not hand-maintained in source — Sentry
+  // tags every release with it (src/instrument.ts).
   define: { __APP_VERSION__: JSON.stringify(version) },
   plugins: [
     react(),
