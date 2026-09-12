@@ -477,6 +477,6 @@ describe('BuildGroupPanel — total volume (issue #874)', () => {
     // Only the Tritanium line (100 x 0.01 = 1 m3) is resolvable; Pyerite has
     // no volume in CATALOG, so the total must reflect just that 1 m3 and say
     // so is a lower bound, not silently a whole-group NaN or a bare "1 m³".
-    expect(screen.getByText(/at least 1 m³ volume/i)).toBeTruthy();
+    expect(screen.getByText(/volume at least 1 m³/i)).toBeTruthy();
   });
 });
