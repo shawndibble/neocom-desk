@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
-import { Link, NavLink } from 'react-router-dom';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
@@ -10,8 +10,8 @@ import { SyncStatusDot } from './SyncStatusDot';
 import { useSyncStatus } from './useSyncStatus';
 import { CharacterAvatar, characterAvatarBoxClassName, LogoMark, Modal } from '@/components/ui';
 import { AuthFailureNotice } from './AuthFailureNotice';
-import { PageTransitionOutlet } from './PageTransitionOutlet';
-import { useLockedRoutes } from './useGrantedScopes';
+import { useGrantedScopes, useLockedRoutes } from './useGrantedScopes';
+import { warmRoute } from './routeWarm';
 import { useKeyboardShortcuts } from './useKeyboardShortcuts';
 import { NotificationPermissionPrompt } from '@/features/notifications/NotificationPermissionPrompt';
 import { ForegroundNotificationPoller } from '@/features/notifications/ForegroundNotificationPoller';
@@ -123,6 +123,25 @@ interface NavItemProps {
  */
 function NavItem({ to, label, locked, onClick }: NavItemProps) {
   const { t } = useTranslation();
+  const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
+  const granted = useGrantedScopes();
+  /*
+   * Compose this route's snapshot while the pointer is still travelling to the
+   * link (`routeWarm.ts`). `focus` covers the keyboard, where tabbing to a link
+   * is the same declaration of intent. Both are fire-and-forget: `warmRoute`
+   * never rejects, and it no-ops for a route that is already warm, already
+   * warming, short of a grant, or simply has no warmer.
+   *
+   * The grant, not `locked`, is what gates it — an `UNGATED` route can still
+   * compose scope-gated reads, so `routeWarm.ts` filters on the endpoints its
+   * loader actually reaches.
+   *
+   * `MobileMoreSheet` renders this same component, so its links warm too; that
+   * is harmless rather than intended, since a touch device fires neither event
+   * until the tap itself. Only the bottom tab bar, which builds its own
+   * `NavLink`s, is outside this.
+   */
+  const warm = () => void warmRoute(to, activeCharacterId, granted);
   // The marker rides on `title`, not extra text: a second string inside the
   // link would rewrite its accessible name from "Assets" to "Assets, needs a
   // new login", which is not what the link is called.
@@ -130,6 +149,8 @@ function NavItem({ to, label, locked, onClick }: NavItemProps) {
     <NavLink
       to={to}
       onClick={onClick}
+      onMouseEnter={warm}
+      onFocus={warm}
       className={navClass}
       title={locked ? t('reauth.navLocked') : undefined}
     >
@@ -401,10 +422,45 @@ function MobileMoreSheet({ open, onClose, activeCharacter, locked }: MobileMoreS
   );
 }
 
+/**
+ * Fades the route outlet in whenever the pathname changes.
+ *
+ * Runs the animation on the live element rather than replaying a CSS one,
+ * because the only way to restart a CSS animation is to remount — and the
+ * outlet must keep its instance (see the call site). `useLayoutEffect`, so the
+ * first frame at the new route is already at opacity 0; an effect after paint
+ * would flash the content in at full opacity and then fade it.
+ *
+ * The `animate` guard is a real capability check, not a test shim: jsdom
+ * implements no Web Animations API, so this must degrade to an instant swap
+ * exactly as it does in a browser that lacks it.
+ */
+function useRouteFade(pathname: string) {
+  const ref = useRef<HTMLDivElement>(null);
+  const running = useRef<Animation | null>(null);
+
+  useLayoutEffect(() => {
+    const node = ref.current;
+    if (node === null || typeof node.animate !== 'function') return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    // Navigating again mid-fade would otherwise leave two animations driving
+    // the same property, and the abandoned one still holds its own opacity.
+    running.current?.cancel();
+    running.current = node.animate([{ opacity: 0 }, { opacity: 1 }], {
+      duration: 140,
+      easing: 'ease-out',
+    });
+  }, [pathname]);
+
+  return ref;
+}
+
 /** App chrome: Neocom-style left rail on desktop, bottom tab bar on mobile. */
 export function Layout() {
   const { t } = useTranslation();
   useKeyboardShortcuts();
+  const location = useLocation();
+  const outletRef = useRouteFade(location.pathname);
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   const activeCharacter = useLiveQuery(
     () => (activeCharacterId === null ? undefined : db.characters.get(activeCharacterId)),
@@ -510,14 +566,17 @@ export function Layout() {
 
       <main className="min-w-0 flex-1 p-4 pb-[calc(5rem+env(safe-area-inset-bottom))] md:pb-4">
         <AuthFailureNotice />
-        {/* `page-outlet` (styles/index.css) gives this box its own named
-            view-transition group, distinct from the document's implicit
-            `root` group the cross-document reload transition above it in
-            that file also targets — without a name of its own the two would
-            share `::view-transition-old(root)`/`new(root)` and this rule
-            would silently retime the reload fade too. */}
-        <div className="page-outlet">
-          <PageTransitionOutlet />
+        {/*
+          Deliberately not `key={location.pathname}`, which would replay a CSS
+          animation by remounting. Six entries in App.tsx's `ROUTE_ELEMENTS`
+          match more than one pathname (`/assets/*`, `/corp/assets/*`, and the
+          four `:param` routes), and React Router keeps one component instance
+          across those — so re-keying would throw away Assets' search, filters
+          and selection on every drill-down and re-run its loader. Animating
+          the element in place keeps the instance and still replays.
+        */}
+        <div ref={outletRef}>
+          <Outlet />
         </div>
       </main>
 

@@ -62,6 +62,16 @@ export const loadMoonOreTypeIds = cached<number[]>('moonOreTypes.json');
  */
 export const loadOreAndIceTypeIds = cached<number[]>('oreAndIceTypeIds.json');
 /**
+ * TypeIDs of every harvestable gas cloud type — Fullerites, Mykoserocin and
+ * Cytoserocin, plus their compressed forms (issue #880). Its own list rather
+ * than part of `loadOreAndIceTypeIds`'s: gas sits under an entirely different
+ * market-group root than ore/ice ("Gas Clouds Materials" under Materials, not
+ * the Ore tree), and only the Mining Yield tracker wants it. The Moon Mining
+ * Tax ledger's ore/ice-vs-unclassified split is deliberately left alone — see
+ * `docs/context/decisions/20260911-223903-…`.
+ */
+export const loadGasCloudTypeIds = cached<number[]>('gasCloudTypeIds.json');
+/**
  * Raw ore/ice typeId -> its "Compressed " counterpart's typeId, for every
  * pair the SDE's naming convention resolves (issue #523's corp-tax-parity
  * decision). Matched by name at build time (`scripts/build-sde.mjs`), not

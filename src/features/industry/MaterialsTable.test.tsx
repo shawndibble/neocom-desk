@@ -47,6 +47,13 @@ const NAMES: Record<number, string> = {
 };
 const nameFor = (typeID: number) => NAMES[typeID] ?? `#${typeID}`;
 
+const VOLUMES: Record<number, number> = {
+  34: 0.01,
+  35: 0.01,
+  9840: 0.4,
+};
+const volumeFor = (typeID: number) => VOLUMES[typeID] ?? null;
+
 const MATERIALS: readonly EffectiveMaterial[] = [
   { typeID: 34, baseQuantity: 1000, quantity: 1000 },
   { typeID: 35, baseQuantity: 200, quantity: 200 },
@@ -78,6 +85,7 @@ function Harness({
     <MaterialsTable
       materials={asRows(materialCostLines(MATERIALS, hubPrices, sourcing))}
       nameFor={nameFor}
+      volumeFor={volumeFor}
       sourcing={sourcing}
       pricesReady={pricesReady}
       detection={detection}
@@ -494,6 +502,7 @@ function renderTable(props: Partial<React.ComponentProps<typeof MaterialsTable>>
       <MaterialsTable
         materials={MENU_LINES}
         nameFor={nameFor}
+        volumeFor={volumeFor}
         sourcing={undefined}
         pricesReady
         onSourcingChange={vi.fn()}
@@ -535,6 +544,22 @@ describe('MaterialsTable', () => {
     renderTable();
     const row = screen.getByText('Mechanical Parts').closest('tr');
     expect(within(row!).getByText('No price')).toBeInTheDocument();
+  });
+
+  it('shows a row’s own volume (quantity x per-unit volume)', () => {
+    renderTable();
+    // MENU_LINES: typeID 34, quantity 100, volume 0.01 -> 1 m3.
+    const row = screen.getByText('Tritanium').closest('tr');
+    expect(within(row!).getByText('1 m³')).toBeInTheDocument();
+  });
+
+  it('renders unknown rather than a bogus figure when the type has no resolvable volume', () => {
+    renderTable({
+      materials: asRows(materialCostLines(MENU_MATERIALS, { 34: 10 })),
+      volumeFor: () => null,
+    });
+    const row = screen.getByText('Tritanium').closest('tr');
+    expect(within(row!).getByText('—')).toBeInTheDocument();
   });
 
   it('renders rows unwrapped, and stays focus-inert, when no row menu is supplied', () => {
@@ -1044,6 +1069,16 @@ describe('MaterialsTable build-here control', () => {
     // column. The job fee is in the modal with the rest of the job.
     expect(built.getByText('3 runs')).toBeInTheDocument();
     expect(built.queryByText(/in fees/)).toBeNull();
+  });
+
+  it('shows no volume figure for a built row — its own inputs already carry that volume', () => {
+    renderTable({ materials: building(), canBuildHere: buildable, onToggleBuildHere: vi.fn() });
+    const built = within(row('Mechanical Parts'));
+
+    // 9840 at quantity 10 with volume 0.4 would be "4 m³" if this row priced
+    // itself as bought; it must not, since this quantity is produced here and
+    // never hauled at this typeID.
+    expect(built.queryByText('4 m³')).toBeNull();
   });
 
   it('offers the build control on every row — nothing is indented as a sub-input', () => {

@@ -76,7 +76,7 @@ export interface LinkSuggestion {
 }
 
 /** UTC calendar day index, from either a `YYYY-MM-DD` EVE date or a full ISO timestamp. */
-function utcDay(date: string): number {
+export function utcDay(date: string): number {
   const iso = date.length === 10 ? `${date}T00:00:00Z` : date;
   return Math.floor(Date.parse(iso) / DAY_MS);
 }
@@ -122,6 +122,84 @@ export function unlinkedPayments(
 ): MadePayment[] {
   const linked = linkedRefIds(assignments);
   return payments.filter((p) => !linked[p.kind].has(p.refId));
+}
+
+/**
+ * One Settle-up "Record payment" that has no live wallet/contract link yet —
+ * every Assignment it covers, grouped by the shared `paymentId`
+ * (`markAssignmentsPaid`'s `PaymentInput`). These are exactly the Assignments
+ * `unlinkedPayments`'s doc comment calls out as staying eligible forever: once
+ * Settle-up marks them `paid`, they drop out of `computePayeeBalances`'s
+ * "owed" set, so `suggestLink`'s dialog never offers them a link again. This
+ * is the other half — matching them automatically, later, once ESI actually
+ * shows the transaction.
+ */
+export interface RecordedPaymentGroup {
+  paymentId: string;
+  amount: number;
+  /** The pilot's own recorded paid-on date — a local calendar date, not an EVE one. */
+  paidOn: string;
+  /** Whichever of the pilot's characters could plausibly have sent it — a lump sum can cover alts' Assignments together. */
+  characterIds: ReadonlySet<number>;
+  assignments: readonly MiningTaxAssignmentRecord[];
+}
+
+export function unlinkedRecordedPayments(
+  assignments: readonly MiningTaxAssignmentRecord[]
+): RecordedPaymentGroup[] {
+  const groups = new Map<
+    string,
+    { amount: number; paidOn: string; members: MiningTaxAssignmentRecord[] }
+  >();
+  for (const a of assignments) {
+    const { payment } = a;
+    if (a.status !== 'paid' || !payment) continue;
+    if (payment.journalRefId !== undefined || payment.contractId !== undefined) continue;
+    const group = groups.get(payment.paymentId);
+    if (group) group.members.push(a);
+    else
+      groups.set(payment.paymentId, {
+        amount: payment.amount,
+        paidOn: payment.paidOn,
+        members: [a],
+      });
+  }
+  return [...groups.entries()].map(([paymentId, { amount, paidOn, members }]) => ({
+    paymentId,
+    amount,
+    paidOn,
+    characterIds: new Set(members.map((m) => m.characterId)),
+    assignments: members,
+  }));
+}
+
+/** How far a real transaction's date may drift from the pilot's own recorded paid-on date — slack for ESI's post-lag and the local/EVE calendar gap, not a second guess at when the ISK actually moved. */
+const RECORDED_LINK_WINDOW_DAYS = 3;
+
+/**
+ * Silently attaches an already-recorded Settle-up payment to the real
+ * transaction behind it, once ESI shows one — no confirmation dialog, unlike
+ * `suggestLink`. A mining tax lump sum is specific enough (exact ISK, the
+ * pilot's own recorded date, one of their own characters) that asking to
+ * confirm would be busywork; an *ambiguous* match (more than one plausible
+ * transaction) is simply never auto-linked rather than guessed.
+ */
+export function autoMatchRecordedPayments(
+  payments: readonly MadePayment[],
+  groups: readonly RecordedPaymentGroup[]
+): { group: RecordedPaymentGroup; payment: MadePayment }[] {
+  const matches: { group: RecordedPaymentGroup; payment: MadePayment }[] = [];
+  for (const group of groups) {
+    const candidates = payments.filter(
+      (p) =>
+        group.characterIds.has(p.characterId) &&
+        p.amount !== null &&
+        amountsMatch(group.amount, p.amount) &&
+        Math.abs(utcDay(p.date) - utcDay(group.paidOn)) <= RECORDED_LINK_WINDOW_DAYS
+    );
+    if (candidates.length === 1) matches.push({ group, payment: candidates[0] });
+  }
+  return matches;
 }
 
 /**

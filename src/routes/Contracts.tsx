@@ -359,7 +359,11 @@ export function Contracts() {
             typeOptions={typeOptions}
           />
           {filteredContracts.length === 0 ? (
-            <EmptyState title={t('contracts.noFilterMatches')} className="py-8" />
+            <EmptyState
+              title={t('contracts.noFilterMatches')}
+              hint={t('contracts.noFilterMatchesHint')}
+              className="py-8"
+            />
           ) : (
             <>
               <DataTable

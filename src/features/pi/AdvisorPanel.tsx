@@ -1378,7 +1378,7 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
                     setCustomsText(null);
                     writeCustoms(withoutCustomsOverride(customsOverrides, activeSystem.systemId));
                   }}
-                  className={buttonClassName({ size: 'sm', variant: 'ghost' })}
+                  className={buttonClassName({ size: 'md', variant: 'ghost' })}
                 >
                   {t('piAdvisor.customsRateReset')}
                 </button>

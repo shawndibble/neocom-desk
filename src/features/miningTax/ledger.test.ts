@@ -5,11 +5,13 @@ import { tagAsIgnored, tagAsMoonOre } from './typeOverrides';
 
 const MOON_ORE = 45490; // Zeolites
 const ORDINARY_ORE = 1230; // Veldspar — recognized, not moon ore
+const GAS = 30370; // Fullerite-C50 — harvested gas, on neither ore/ice list
 const UNKNOWN_TYPE = 999999; // recognized by neither list — allowlist gap
 
 const sdeMock = vi.hoisted(() => ({
   loadMoonOreTypeIds: vi.fn(async () => [MOON_ORE]),
   loadOreAndIceTypeIds: vi.fn(async () => [MOON_ORE, ORDINARY_ORE]),
+  loadGasCloudTypeIds: vi.fn(async () => [GAS]),
 }));
 vi.mock('@/sde/loadSde', () => sdeMock);
 
@@ -21,6 +23,7 @@ beforeEach(async () => {
   vi.clearAllMocks();
   sdeMock.loadMoonOreTypeIds.mockResolvedValue([MOON_ORE]);
   sdeMock.loadOreAndIceTypeIds.mockResolvedValue([MOON_ORE, ORDINARY_ORE]);
+  sdeMock.loadGasCloudTypeIds.mockResolvedValue([GAS]);
   await db.characters.clear();
   await db.esiCache.clear();
   await db.settings.clear();
@@ -136,6 +139,24 @@ describe('loadAllCharacterLedgers', () => {
     expect(ledger.entries).toEqual([]);
     expect(ledger.fetchedAt).toBeNull();
   });
+
+  it('leaves the Tax tab untouched by the Yield tracker gas allowlist (issue #880)', async () => {
+    await seedCharacter(CHAR_A, 'Pilot A');
+    await seedLedger(CHAR_A, [
+      { date: '2026-09-04', quantity: 100, solar_system_id: 1, type_id: MOON_ORE },
+      { date: '2026-09-04', quantity: 50, solar_system_id: 1, type_id: GAS },
+    ]);
+
+    const [ledger] = await loadAllCharacterLedgers();
+
+    // Gas is never moon ore, so it stays out of the tax entries; and the Tax
+    // tab still calls it unclassified, exactly as before #880 widened only
+    // the Yield tracker's allowlist. "Ignore" (typeOverrides) remains the
+    // way a gas harvester silences that banner.
+    expect(ledger.entries[0].oreLines).toEqual([{ typeId: MOON_ORE, quantity: 100 }]);
+    expect(ledger.unclassifiedTypeIds).toEqual([GAS]);
+    expect(sdeMock.loadGasCloudTypeIds).not.toHaveBeenCalled();
+  });
 });
 
 describe('loadAllCharacterYields', () => {
@@ -163,6 +184,40 @@ describe('loadAllCharacterYields', () => {
         ],
       },
     ]);
+  });
+
+  it('includes gas cloud harvesting alongside ore and ice, in the same (date, system) entry (issue #880)', async () => {
+    await seedCharacter(CHAR_A, 'Pilot A');
+    await seedLedger(CHAR_A, [
+      { date: '2026-09-04', quantity: 500, solar_system_id: 1, type_id: ORDINARY_ORE },
+      { date: '2026-09-04', quantity: 40, solar_system_id: 1, type_id: GAS },
+      { date: '2026-09-04', quantity: 20, solar_system_id: 1, type_id: GAS },
+    ]);
+
+    const [yield_] = await loadAllCharacterYields();
+
+    expect(yield_.entries).toEqual([
+      {
+        characterId: CHAR_A,
+        date: '2026-09-04',
+        solarSystemId: 1,
+        oreLines: [
+          { typeId: ORDINARY_ORE, quantity: 500 },
+          { typeId: GAS, quantity: 60 },
+        ],
+      },
+    ]);
+  });
+
+  it('leaves a character with no gas activity unchanged by the gas allowlist', async () => {
+    await seedCharacter(CHAR_A, 'Pilot A');
+    await seedLedger(CHAR_A, [
+      { date: '2026-09-04', quantity: 500, solar_system_id: 1, type_id: ORDINARY_ORE },
+    ]);
+
+    const [yield_] = await loadAllCharacterYields();
+
+    expect(yield_.entries[0].oreLines).toEqual([{ typeId: ORDINARY_ORE, quantity: 500 }]);
   });
 
   it('drops a type_id recognized by neither the ore/ice allowlist nor a manual tag', async () => {

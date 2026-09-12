@@ -10,6 +10,7 @@ import {
   FilterBar,
   FilterField,
   IconButton,
+  InfoTooltip,
   PageHeader,
   Panel,
   ReauthBanner,
@@ -198,7 +199,11 @@ function JournalTable({
     <>
       <JournalFilterBar filter={filter} onChange={onFilterChange} refTypeOptions={refTypeOptions} />
       {filteredJournal.length === 0 ? (
-        <EmptyState title={t('wallet.journalNoFilterMatches')} className="py-8" />
+        <EmptyState
+          title={t('wallet.journalNoFilterMatches')}
+          hint={t('wallet.journalNoFilterMatchesHint')}
+          className="py-8"
+        />
       ) : (
         <DataTable
           label={label}
@@ -1216,8 +1221,12 @@ export function Wallet() {
                   )}
                 </div>
                 <div>
-                  <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                  <p className="flex items-center gap-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
                     {t('wallet.everMarks')}
+                    <InfoTooltip
+                      label={t('wallet.everMarksTooltipLabel')}
+                      content={t('wallet.everMarksTooltip')}
+                    />
                   </p>
                   <p className="text-lg font-medium tabular-nums">
                     {loyaltyResult && !loyaltyNeedsReauth

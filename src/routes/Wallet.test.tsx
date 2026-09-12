@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
@@ -118,6 +118,22 @@ describe('Wallet', () => {
     expect(screen.getByText('5,000')).toBeInTheDocument();
     // The Paragon corp itself doesn't also show up as a loyalty-table row.
     expect(screen.queryByText('#1000419')).not.toBeInTheDocument();
+  });
+
+  it('explains EverMarks with an info tooltip beside the label', async () => {
+    render(<App />);
+    const label = await screen.findByText('EverMarks');
+    // The glyph is a sibling of the label text, not a tooltip parked elsewhere
+    // on the panel — that adjacency is the whole point of the affordance.
+    const trigger = within(label.closest('p') as HTMLElement).getByRole('button', {
+      name: 'About EverMarks',
+    });
+
+    fireEvent.pointerMove(trigger);
+
+    // Radix's first hover in a session goes through its own open delay
+    // (zeroed, but still a real timer), so this waits rather than reads.
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(/Paragon corporation/);
   });
 
   it('shows the empty state under Loyalty Points when there is no non-EverMarks LP', async () => {
@@ -375,6 +391,9 @@ describe('Wallet', () => {
     await user.type(screen.getByPlaceholderText('Search description…'), 'nothing matches this');
 
     expect(await screen.findByText('No journal entries match this filter.')).toBeInTheDocument();
+    expect(
+      screen.getByText('Clear the search or reset the filters above to see every entry.')
+    ).toBeInTheDocument();
     expect(screen.queryByText(/reconnect to fetch/i)).not.toBeInTheDocument();
   });
 

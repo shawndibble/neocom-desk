@@ -167,6 +167,38 @@ snapshot is a whole rendered board and cannot be forgotten by `corp:` prefix.
 `{ name, characterId }`, folding its own key (character + corporation +
 division) into the retained name.
 
+Session-only is the load-bearing limit, not an implementation detail: the
+**first** visit to a route after an app load still composes its snapshot from
+scratch, and that is the one window a spinner is still on screen. `prefetch.ts`
+does not close it — that warms `esiCache`, so the composition reads local rows
+instead of the network, but it warms endpoints, not composed view snapshots.
+**Intent warming** (`app/routeWarm.ts`) narrows that window rather than closing
+it: `Layout`'s rail links compose their route's snapshot on pointer-enter and
+on focus, so the click lands on a warm cache. Same thin-orchestrator shape as
+`prefetch.ts` — it calls the view's own loader, so no second composition path
+can drift — and it inherits the same scope rule, declaring the endpoints each
+loader reaches and filtering them against the stored grant through
+`prefetch.ts`'s `grantCovers`, since asking for an ungranted endpoint answers
+403 and paints the shell-wide re-auth notice for a pointer sweep. Note that
+this is deliberately **not** the route's `locked` flag: an `UNGATED` route can
+still compose scope-gated reads — `/calendar` pulls six — so a lock-based gate
+would read as unlocked for everyone and warm blindly. "Is this route gated" and
+"may this Character be asked for this" are different questions, and only the
+second one is safe to act on.
+`ROUTE_WARMERS` is deliberately incomplete: a route qualifies only once its
+loader lives outside its own component file, because exporting one from a
+`.tsx` route trips `react-refresh/only-export-components`, which CI fails on.
+Today that is `/calendar` alone; moving the other loaders into `features/` —
+where `docs/ARCHITECTURE.md` puts loading anyway — is what adds the rest.
+
+Fully closing the window would mean running route loaders at boot (a burst of
+exactly the kind `prefetch.ts` is written to avoid) or persisting snapshots
+across reloads — which `routeSnapshotCache.ts`'s own header already argues
+against on the grounds that `esiCache` is the durable copy and a second
+persisted one would need its own purge and freshness rules, and which would
+additionally have to survive a stored snapshot's shape drifting across
+deploys. What a view may show in the meantime is `docs/DESIGN.md` §6a.
+
 **Name lookups are cache-first.** `features/character/names.ts`
 (`resolveNames`) and `typeNames.ts` (`resolveViaEsi`) both used to POST
 `/universe/names` first and read `esiCache` only as an offline fallback, so

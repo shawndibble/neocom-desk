@@ -12,6 +12,7 @@ import {
 } from '@/components/ui';
 import type { DataTableColumn } from '@/components/ui';
 import type { BuildResult } from '@/engine/industry/types';
+import type { MaterialVolumeTotals } from '@/engine/industry/materialVolume';
 import {
   compareUseOrSell,
   type LiquidationBasis,
@@ -21,7 +22,7 @@ import {
 import { marketItemUrl } from '@/engine/market/urlState';
 import { formatDuration } from '@/lib/duration';
 import { formatIsk } from '@/lib/isk';
-import { formatCostIndex, formatPercent } from './format';
+import { formatCostIndex, formatPercent, formatVolume } from './format';
 
 interface CostRowProps {
   label: string;
@@ -116,6 +117,8 @@ interface ResultsSummaryProps {
   ownedSale: { instant: OwnedStockSale; order: OwnedStockSale } | null;
   /** Resolves a material typeID to its name, for the per-material sale rows. */
   nameFor: (typeID: number) => string;
+  /** Grand total m3 across the materials table, for hauling-trip planning (issue #874). */
+  totalVolume: MaterialVolumeTotals;
 }
 
 /**
@@ -138,6 +141,7 @@ export function ResultsSummary({
   onOpenBreakdown,
   ownedSale,
   nameFor,
+  totalVolume,
 }: ResultsSummaryProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -285,6 +289,14 @@ export function ResultsSummary({
         </Disclosure>
 
         <CostRow label={t('industry.totalCost')} value={formatIsk(result.totalCost)} emphasized />
+        <CostRow
+          label={t('industry.totalVolume')}
+          value={
+            totalVolume.anyUnknown
+              ? t('industry.totalVolumeAtLeast', { volume: formatVolume(totalVolume.volume) })
+              : formatVolume(totalVolume.volume)
+          }
+        />
         <CostRow label={t('industry.time')} value={formatDuration(result.seconds)} />
         {systemCostIndex !== null && (
           <CostRow

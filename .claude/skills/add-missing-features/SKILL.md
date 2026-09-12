@@ -282,9 +282,45 @@ gh pr list --head chore/add-missing-features-ledger --state open --json number,u
   same branch. Do not open a second PR.
 - **No open PR is found**: branch a sibling worktree off current
   `origin/main` using that same branch name, commit your update, push, and
-  open the PR.
+  open the PR with `node scripts/next-ticket/open-pr.mjs "<title>" <body-file>`
+  (also arms auto-merge — see below). Both scripts are generic over any PR
+  number; nothing here is `/next-ticket`-specific.
 
-Remove the worktree when done.
+`npm ci` in the worktree before committing. Before pushing, run
+`npx prettier --check .claude/skills/add-missing-features/TOOLS.md`
+(`--write` to fix) — CI's `format:check` job runs over the whole repo on
+every push regardless of what changed, and a ledger edit failing it on
+whitespace alone is exactly the kind of round-trip worth catching locally.
+`npm run typecheck` and `test:run` don't apply to a Markdown-only change.
+
+### Get it merged — a PR left open is a run left unfinished
+
+Filing tickets and leaving the ledger PR to rot is not done; a stuck PR here
+blocks every later run's "is a PR already open" check from ever resolving.
+Reuse the same generic scripts `/next-ticket` uses to drive an arbitrary PR
+number to green — see `.claude/commands/next-ticket.md`'s "Pre-commit hook,
+then CI" and step 8 for the full mechanics this mirrors:
+
+- If the PR was already open (pushed a commit to it rather than opening it
+  fresh), auto-merge may not be armed — `open-pr.mjs` only arms it on
+  creation. Arm or re-arm it: `gh pr merge <n> --merge --auto`. `--merge`,
+  not `--squash` — this branch is reused run over run, and a squash would
+  make the next run's rebase-and-append fight a rewritten history.
+- Loop up to **3 rounds** (lower than `/next-ticket`'s 5 — a docs-only
+  change has a much narrower failure surface):
+  `node scripts/next-ticket/drive-ci.mjs <n>`, same status contract as
+  documented there (`conflict` / `green` / `missing-checks` / `pending` /
+  `checks-failed`). On `checks-failed`, diagnose in a sub-agent with
+  `node scripts/next-ticket/fetch-ci-failure.mjs <run-id>` (never pull raw
+  CI logs into this context), fix on the branch — almost always
+  `format:check` on `TOOLS.md` itself, since that's the one file this run
+  touches — commit, push, and restart the round.
+- Still not green after 3 rounds: leave the PR open, say so plainly in the
+  terminal report (PR URL and the remaining failure), and stop. Do not
+  delete the branch or force anything through — the next run's "is a PR
+  already open" check is exactly what picks this back up.
+
+Remove the worktree when done, merged or not.
 
 ## Report
 

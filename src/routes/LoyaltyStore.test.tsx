@@ -254,3 +254,23 @@ describe('LoyaltyStore item context menu (issue #716)', () => {
     expect(screen.queryByRole('menuitem', { name: 'View in Market' })).not.toBeInTheDocument();
   });
 });
+
+describe('LoyaltyStore blueprint badge (issue #882)', () => {
+  it('renders the BP badge at the shared 0.6875rem chip rung', () => {
+    useLoyaltyStoreOffers.mockReturnValue({
+      corpName: 'Federal Navy Academy',
+      offersFetchedAt: null,
+      offersFromCache: false,
+      rows: [BLUEPRINT_ROW],
+      catalog: null,
+      playerLp: 12_000,
+      hub: TRADE_HUBS[0]!,
+      ready: true,
+      useOwnMaterialsFor: new Set<number>(),
+      toggleUseOwnMaterials: () => {},
+    });
+    renderStore();
+
+    expect(screen.getByText('BP')).toHaveClass('text-[0.6875rem]');
+  });
+});

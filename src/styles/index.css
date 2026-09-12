@@ -20,31 +20,12 @@
 }
 
 /*
- * Same-document route change (`PageTransitionOutlet`, wrapped in `.page-outlet`
- * below), as opposed to the `@view-transition` rule above (a full document
- * reload). Named `app-outlet` rather than left to share the document's
- * implicit `root` group: `root` is also what the cross-document rule above
- * animates, and an unnamed rule here would silently retime that reload fade
- * too. Browsers without View Transition support just swap the outlet with no
- * animation — this rule only refines browsers that already ran one via
- * `startViewTransition()`.
- *
- * A quick fade is enough: the outlet is the whole main content area
- * (everything below the rail/tab bar stays in place, outside this named
- * group), so a slide would read as the entire app chrome sliding rather than
- * a page turn. `PageTransitionOutlet` already skips calling
- * `startViewTransition()` under reduced motion, so no duplicate `@media`
- * guard is needed here.
+ * The same-document route change has no rule here: `Layout`'s `useRouteFade`
+ * animates the outlet directly, because restarting a CSS animation would mean
+ * remounting the outlet and several routes must keep their instance across a
+ * pathname change. Why it is a plain fade rather than a view transition is
+ * `docs/DESIGN.md` §6b.
  */
-.page-outlet {
-  view-transition-name: app-outlet;
-}
-
-::view-transition-old(app-outlet),
-::view-transition-new(app-outlet) {
-  animation-duration: 0.12s;
-  animation-timing-function: ease-out;
-}
 
 /*
  * Scan only the app source. Tailwind's automatic content detection walks every

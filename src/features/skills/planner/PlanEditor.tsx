@@ -1588,7 +1588,7 @@ export function PlanEditor({
                   </label>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button size="sm">{t('plans.columns')}</Button>
+                      <IconButton icon={<Icon.ColumnsPicker />} label={t('plans.columns')} />
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       {(

@@ -67,6 +67,21 @@ export function nameForType(catalog: BlueprintCatalog, typeID: number): string {
   return catalog.typesById[String(typeID)]?.name ?? `#${typeID}`;
 }
 
+/**
+ * Per-unit volume (m3) for a typeID from the baked SDE; null when unknown or
+ * out of a sane range, exactly like `buyPricedLine`'s range check on a raw
+ * price — this reaches past the engine into the same raw type map. Note this
+ * is *assembled* volume (`scripts/build-sde.mjs`), not packaged: correct for
+ * ordinary minerals/components, but can overstate a ship-hull material line
+ * 10-100x (issue #874) — flagged at the call site, not corrected here.
+ */
+export function volumeForType(catalog: BlueprintCatalog, typeID: number): number | null {
+  const candidate = catalog.typesById[String(typeID)]?.volume;
+  return typeof candidate === 'number' && Number.isFinite(candidate) && candidate >= 0
+    ? candidate
+    : null;
+}
+
 /** Case-insensitive substring search over product names. */
 export function searchByProductName(
   catalog: BlueprintCatalog,

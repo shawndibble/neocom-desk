@@ -1496,7 +1496,7 @@ export function Assets() {
           <>
             <div className="ml-auto flex items-center gap-1.5">
               <IconButton
-                icon={<Icon.Sort />}
+                icon={<Icon.FlatList />}
                 label={t('assets.allItemsToggle')}
                 pressed={allItemsView}
                 onClick={() => setAllItemsView((v) => !v)}

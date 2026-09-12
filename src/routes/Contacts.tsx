@@ -291,7 +291,11 @@ export function Contacts() {
             </p>
           )}
           {filteredContacts.length === 0 ? (
-            <EmptyState title={t('contacts.noResults')} className="py-8" />
+            <EmptyState
+              title={t('contacts.noResults')}
+              hint={t('contacts.noResultsHint')}
+              className="py-8"
+            />
           ) : (
             <DataTable
               label={t('contacts.title')}

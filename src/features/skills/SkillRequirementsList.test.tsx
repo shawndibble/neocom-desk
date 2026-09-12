@@ -30,4 +30,17 @@ describe('SkillRequirementsList', () => {
 
     expect(useSkillDetailModalStore.getState().request).toEqual({ typeID: 3301 });
   });
+  it('renders its section headings and level badge at the shared 0.6875rem chip rung (#882)', () => {
+    const { container } = render(
+      <SkillRequirementsList
+        prereqs={[{ typeID: 3300, name: 'Spaceship Command', level: 1, trained: true }]}
+        unlocks={[]}
+      />
+    );
+
+    for (const heading of container.querySelectorAll('h3')) {
+      expect(heading).toHaveClass('text-[0.6875rem]');
+    }
+    expect(container.querySelector('[data-trained]')).toHaveClass('text-[0.6875rem]');
+  });
 });
