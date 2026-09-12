@@ -1,0 +1,53 @@
+# Scope decisions — generalized public-contract snapshot schema and sizing (issue #906)
+
+_Recorded 2026-09-12 · issue #906._
+
+- **Only the `is_blueprint_copy` filter is dropped; `is_included` stays.** ADR
+  0013's join drops an item line for two independent reasons — it isn't a
+  blueprint copy, and it isn't offered for sale (`is_included=false` means the
+  contract issuer _wants_ that item). #906 generalizes the item type, not the
+  direction of the exchange: the snapshot answers "what can I buy", and a line
+  the issuer is asking for is not an offer at any price. This also keeps the
+  volume on the ticket's own ~3x estimate, which is the number the chunk size
+  and function memory below are sized against; carrying wanted lines too would
+  push past it. Rules out, for now, a "who is buying X" search — #908's
+  Contracts Search tab should revisit this deliberately if it wants to show a
+  contract's full both-sides contents, since that changes the sizing.
+- **A second collection and a second row shape, not a widened
+  `BpcContractRow`.** `publicContractItems` is written by a new
+  `syncPublicContractItems`; `publicBpcContracts` and `syncPublicBpcContracts`
+  are behaviourally untouched and keep backing BPC Sourcing until #907 moves
+  it over. The cost is that the EVE Ref archive is fetched twice per 30-minute
+  cycle. That is accepted as the expand half of an expand/contract with a
+  scheduled end, rather than building a shared fetch that #907 would delete.
+- **ME/TE/runs are omitted from a non-blueprint row rather than zeroed.**
+  `Number('')` is `0`, not `NaN`, and a plain item line leaves all three CSV
+  columns blank. Converting unconditionally would write `me: 0, te: 0,
+runs: 0` onto roughly two thirds of the snapshot — bytes against the 1MiB
+  doc limit, and an "ME 0" filter that matches every ore stack in New Eden.
+  Copy-ness is carried by an explicit `isBlueprintCopy?: true`, present only
+  when true, so a reader asks for the flag instead of inferring it from
+  `runs`. The flag means _copy_: a blueprint original carries
+  `is_blueprint_copy=false` and `runs=-1` and is a plain item row here.
+- **3,000 rows/chunk, against the blueprint snapshot's 2,000.** At the
+  measured ~185 bytes/row a 3,000-row chunk is ~555KB even if every row is a
+  blueprint — well under 1MiB — while keeping the write count down. The
+  binding constraint is the free tier's 20,000 writes/day, which is the
+  _project's_ budget: `dispatchProjections` runs 288x/day and the blueprint
+  sync 48x/day alongside. ~370k rows at 3,000/chunk is ~124 docs x 48 runs ≈
+  6.0k writes/day, plus ~3.0k for the blueprint sync — under half the budget,
+  where reusing 2,000 would have spent ~8.9k on this job alone. Rules out
+  going larger (4,000 rows ≈ 740KB is too close to the doc limit to absorb a
+  row-shape change later).
+- **Memory 2GiB / timeout 540s, provisioned rather than measured.** No local
+  or CI path exercises this function against the live 37MB archive, so this is
+  reasoned from the one hard datapoint ADR 0013 recorded: a 512MiB ceiling
+  died at 527MiB _during the write_ with ~122k rows, having survived the
+  streaming parse. The ceiling therefore scales with the retained rows and
+  their encoding — exactly what triples here — so 1GiB is not safe at ~370k
+  rows. The asymmetry decides it: under-provisioning reproduces a failure this
+  project has already had (every scheduled run OOM-looping silently after
+  deploy), while over-provisioning costs pennies on a 48-runs/day cron. The
+  validation checkpoint is deliberate and cheap: the function logs
+  `rowCount`, so the first live runs say what the real volume is and these
+  numbers can come down.
