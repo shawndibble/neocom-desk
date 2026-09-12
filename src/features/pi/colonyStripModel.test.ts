@@ -82,7 +82,10 @@ describe('colonyStripRows', () => {
 
   it('flags a colony that fills before the pilot comes back', () => {
     const rows = colonyStripRows({
-      colonies: [colony({ planetId: 1, hoursToFull: 19 }), colony({ planetId: 2, hoursToFull: 200 })],
+      colonies: [
+        colony({ planetId: 1, hoursToFull: 19 }),
+        colony({ planetId: 2, hoursToFull: 200 }),
+      ],
       worklist: EMPTY,
       haulHours: 168,
     });

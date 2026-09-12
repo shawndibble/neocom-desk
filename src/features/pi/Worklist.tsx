@@ -36,6 +36,20 @@ function span(hours: number, t: TFunction): string {
 
 function Worth({ row }: { row: WorklistRow }) {
   const { t } = useTranslation();
+  // A haul row's worth is real and this model has not derived it: what a stall
+  // costs depends on earnings the worklist adapter is not given, so it carries
+  // a zero it never measured. Printing "+0 ISK" says the fix is worth nothing,
+  // which is the opposite of what a stalled colony means. So the column states
+  // the fact it does have — how much of the pilot's own window the colony
+  // spends standing still — and no money at all.
+  if (row.verb === 'haul' && row.window) {
+    const stalled = Math.max(0, 1 - row.window.hoursToFull / row.window.haulHours);
+    return (
+      <span className="text-right text-xs font-semibold whitespace-nowrap text-warning tabular-nums">
+        {t('piAdvisor.worklistStalled', { percent: Math.round(stalled * 100) })}
+      </span>
+    );
+  }
   // The extraction a removal pays for: the facilities it reaches. No ISK,
   // because this row genuinely has none — see `worklistModel.ts`.
   if (row.iskPerHour === null && row.unitsPerHour !== undefined) {

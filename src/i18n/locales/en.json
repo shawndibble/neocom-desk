@@ -2202,7 +2202,8 @@
     "colonyStateSteps_one": "{{count}} step",
     "colonyStateSteps_other": "{{count}} steps",
     "colonyStateClear": "as is",
-    "colonyUnknown": "unknown"
+    "colonyUnknown": "unknown",
+    "worklistStalled": "stalls {{percent}}% of the time"
   },
   "employmentHistory": {
     "title": "Employment",

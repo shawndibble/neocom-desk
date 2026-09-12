@@ -36,13 +36,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
-import {
-  EmptyState,
-  Panel,
-  ReauthBanner,
-  Modal,
-  Spinner,
-} from '@/components/ui';
+import { EmptyState, Panel, ReauthBanner, Modal, Spinner } from '@/components/ui';
 import { beginEveLogin } from '@/app/loginFlow';
 import { formatIsk } from '@/lib/isk';
 import { loadPi, loadPiPlanetRadius } from '@/sde/loadSde';
@@ -506,7 +500,6 @@ function PlanetCard({
     </div>
   );
 }
-
 
 /** A colony's build-up-to recommendation, memoised for one colony. */
 function useStopTier(
@@ -1176,17 +1169,17 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
   );
 
   const worklistInput = worklistColonies({
-      advice,
-      pinsByPlanet: new Map(
-        [...snapshot.details].map(([planetId, detail]) => [planetId, detail.pins])
-      ),
-      pi: snapshot.pi,
-      prices: snapshot.prices,
-      revenuePrices: snapshot.revenuePrices,
-      taxRate: activeRate,
-      haulHours,
-      opportunitiesByHost,
-      conversionsByHost,
+    advice,
+    pinsByPlanet: new Map(
+      [...snapshot.details].map(([planetId, detail]) => [planetId, detail.pins])
+    ),
+    pi: snapshot.pi,
+    prices: snapshot.prices,
+    revenuePrices: snapshot.revenuePrices,
+    taxRate: activeRate,
+    haulHours,
+    opportunitiesByHost,
+    conversionsByHost,
     typeNames: snapshot.typeNames,
   });
   const worklist = buildWorklist(worklistInput);
@@ -1317,7 +1310,9 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
         <Panel
           title={t('piAdvisor.colonyStripTitle')}
           padded={false}
-          meta={
+          // `actions`, not `meta`: this is the row legend, and it has to sit
+          // over the columns it names rather than trailing the title.
+          actions={
             <span className="text-[0.625rem] text-text-faint">
               {t('piAdvisor.colonyStripMeta', { hours: Math.round(haulHours) })}
             </span>

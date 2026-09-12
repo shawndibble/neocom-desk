@@ -37,9 +37,13 @@ function State({ row }: { row: ColonyStripRow }) {
   // A colony nothing can be read from has not been found to be fine — saying
   // "as is" there would claim a check that never ran.
   if (row.load === null && row.hoursToFull === null) {
-    return <span className="text-right text-xs text-text-faint">{t('piAdvisor.colonyUnknown')}</span>;
+    return (
+      <span className="text-right text-xs text-text-faint">{t('piAdvisor.colonyUnknown')}</span>
+    );
   }
-  return <span className="text-right text-xs text-text-dim">{t('piAdvisor.colonyStateClear')}</span>;
+  return (
+    <span className="text-right text-xs text-text-dim">{t('piAdvisor.colonyStateClear')}</span>
+  );
 }
 
 function Row({ row, onOpen }: { row: ColonyStripRow; onOpen: () => void }) {

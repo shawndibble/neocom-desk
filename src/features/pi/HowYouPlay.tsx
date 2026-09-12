@@ -90,7 +90,11 @@ function CadenceRow({
           value={String(value)}
           onValueChange={(next) => onChange(Number(next) as PiCadenceDays)}
         >
-          <SelectTrigger size="sm" aria-label={label} className="w-24 border-accent/70 bg-accent/10">
+          <SelectTrigger
+            size="sm"
+            aria-label={label}
+            className="w-24 border-accent/70 bg-accent/10"
+          >
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -164,7 +168,7 @@ export function HowYouPlay(props: HowYouPlayProps) {
 
   return (
     <div className="flex flex-col rounded-xs border border-line bg-panel">
-      <div className="border-b border-line bg-panel-2 px-3.5 py-2">
+      <div className="flex items-center border-b border-line bg-panel-2 px-3.5 py-2">
         <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
           {t('piAdvisor.howYouPlayTitle')}
         </span>

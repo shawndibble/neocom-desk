@@ -294,12 +294,14 @@ beforeEach(() => {
 describe('AdvisorPanel', () => {
   it('shows the built colony’s measured extraction rate, not its qty_per_cycle', async () => {
     renderPanel();
-    const card = await builtCard();
     // 1,874,985 units over 336 hours from the decay curve, so 5,580/hr.
-    // qty_per_cycle alone would claim 13,930.
-    expect(within(card).getByText('5,580/hr')).toBeInTheDocument();
-    expect(within(card).getByText('Base Metals')).toBeInTheDocument();
-    expect(within(card).getByText('Reactive Metals')).toBeInTheDocument();
+    // qty_per_cycle alone would claim 13,930. Built colonies are one row each
+    // in the "Your colonies" strip now; the measurement lives in the detail
+    // dialog its row opens.
+    const dialog = await openDetails();
+    expect(within(dialog).getByText('5,580/hr')).toBeInTheDocument();
+    expect(within(dialog).getByText('Base Metals')).toBeInTheDocument();
+    expect(within(dialog).getByText('Reactive Metals')).toBeInTheDocument();
   });
 
   it('reports the colony’s CPU and Powergrid against its OWN Command Center', async () => {
@@ -1443,7 +1445,9 @@ describe('AdvisorPanel build advice', () => {
     // The point #702 defended survives the rework at a new address: a rebuild
     // figure must never read as layered on the steps above it. The card's own
     // disclaimer is gone with the card's stop-tier row, and the worklist says
-    // it instead — once, in a labelled band, where the two lists meet.
+    // it instead — once, in a labelled band, where the two lists meet. Rebuild
+    // rows are hidden until the pilot asks for them.
+    await userEvent.click(await screen.findByRole('button', { name: 'Include rebuilds' }));
     expect(screen.getByText('Worth more, but you tear the colony down first')).toBeInTheDocument();
     expect(screen.getByText(/never an addition/)).toBeInTheDocument();
   });
@@ -1458,6 +1462,8 @@ describe('AdvisorPanel build advice', () => {
     expect(
       within(dialog).getByText('Switch to extracting Microorganisms and sell it raw')
     ).toBeInTheDocument();
+    // Rebuild rows are hidden until the pilot asks for them.
+    await userEvent.click(await screen.findByRole('button', { name: 'Include rebuilds' }));
     expect(screen.getByText('Worth more, but you tear the colony down first')).toBeInTheDocument();
   });
 
@@ -1487,8 +1493,9 @@ describe('AdvisorPanel build advice', () => {
     renderPanel();
     // Ashab at 0.5 security is highsec: the 10% NPC base less 1% per level of
     // Customs Code Expertise IV. It is the field's default, not a value the
-    // pilot had to supply.
-    expect(await screen.findByLabelText('Customs rate')).toHaveValue(6);
+    // pilot had to supply. The control is collapsed to text until the pilot
+    // asks to edit it, so read the derived value straight off that text.
+    expect(await screen.findByText('6%')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Reset' })).not.toBeInTheDocument();
   });
 
@@ -1498,12 +1505,15 @@ describe('AdvisorPanel build advice', () => {
     // whatever the POCO owner charges, with nothing on screen to say so.
     priceEverything();
     renderPanel();
-    const field = await screen.findByLabelText('Customs rate');
+    // Collapsed by default; the number input only appears once the pilot asks
+    // to edit it.
+    await userEvent.click(await screen.findByRole('button', { name: 'Edit' }));
+    const field = screen.getByRole('spinbutton', { name: 'Customs rate' });
     fireEvent.change(field, { target: { value: '17' } });
 
     expect(setSyncedSetting).toHaveBeenCalledWith('sync.piCustomsRates', { [ASHAB]: 0.17 });
     // Repainted from the layered edit, with no reload.
-    expect(await screen.findByLabelText('Customs rate')).toHaveValue(17);
+    expect(screen.getByRole('spinbutton', { name: 'Customs rate' })).toHaveValue(17);
     // Scheduled off the write's own promise, so it lands a microtask later.
     await vi.waitFor(() => expect(scheduleSync).toHaveBeenCalledWith(1));
   });
@@ -1511,7 +1521,8 @@ describe('AdvisorPanel build advice', () => {
   it('ignores a half-typed rate rather than declaring the system tax-free', async () => {
     priceEverything();
     renderPanel();
-    const field = await screen.findByLabelText('Customs rate');
+    await userEvent.click(await screen.findByRole('button', { name: 'Edit' }));
+    const field = screen.getByRole('spinbutton', { name: 'Customs rate' });
     fireEvent.change(field, { target: { value: '' } });
 
     expect(setSyncedSetting).not.toHaveBeenCalled();
@@ -1520,11 +1531,15 @@ describe('AdvisorPanel build advice', () => {
   it('resets a customs rate back to the derived one', async () => {
     priceEverything();
     renderPanel();
-    fireEvent.change(await screen.findByLabelText('Customs rate'), { target: { value: '17' } });
+    await userEvent.click(await screen.findByRole('button', { name: 'Edit' }));
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Customs rate' }), {
+      target: { value: '17' },
+    });
     fireEvent.click(await screen.findByRole('button', { name: 'Reset' }));
 
     expect(setSyncedSetting).toHaveBeenLastCalledWith('sync.piCustomsRates', {});
-    expect(await screen.findByLabelText('Customs rate')).toHaveValue(6);
+    // Reset also collapses the control back to text.
+    expect(await screen.findByText('6%')).toBeInTheDocument();
   });
 
   it('says the hub is the gap when nothing is quoted, not that the planet is poor', async () => {
