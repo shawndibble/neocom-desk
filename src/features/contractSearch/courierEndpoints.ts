@@ -33,6 +33,9 @@ async function resolveOne(locationId: number): Promise<CourierEndpoint | null> {
     locationId,
     name: station.name,
     systemName: system?.name ?? null,
+    // Kept, not just spent on the name lookup above: a route is measured
+    // between systems, so this is what makes a jump count possible at all.
+    systemId: station.systemId,
     regionId: system?.regionId ?? null,
   };
 }

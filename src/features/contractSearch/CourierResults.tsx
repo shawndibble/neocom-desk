@@ -8,7 +8,7 @@
  * panel owns the snapshot, the mode and the region names; this owns
  * everything that is only true of a haul.
  */
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -32,6 +32,8 @@ import {
   type CourierEndpoint,
   type CourierRouteRow,
 } from '@/engine/contracts/courierSearch';
+import type { RoutePreferenceKind } from '@/engine/route/jumpRoute';
+import { localJumpCountsForRoutes } from '@/features/route/localRoute';
 import { CourierContractDetailModal } from '@/features/contractSearch/CourierContractDetailModal';
 import { formatIsk } from '@/lib/isk';
 import { formatTimestamp } from '@/lib/timestamp';
@@ -193,11 +195,46 @@ function NumericFilterField({
   );
 }
 
+/**
+ * Which trip the distances describe. A hauler who only flies highsec and one
+ * who will cross a 0.4 system for a shorter run are asking different
+ * questions of the same contract, and they get different jump counts — so
+ * this is a control, not a constant.
+ */
+function RoutePreferenceField({
+  value,
+  onChange,
+}: {
+  value: RoutePreferenceKind;
+  onChange: (preference: RoutePreferenceKind) => void;
+}) {
+  const { t } = useTranslation();
+  const label = t('contractSearch.routePreferenceLabel');
+  return (
+    <FilterField label={label}>
+      <Select value={value} onValueChange={(next) => onChange(next as RoutePreferenceKind)}>
+        <SelectTrigger aria-label={label} className="w-44">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {ROUTE_PREFERENCES.map((preference) => (
+            <SelectItem key={preference} value={preference}>
+              {t(`contractSearch.routePreference.${preference}`)}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </FilterField>
+  );
+}
+
 interface CourierFilterBarProps {
   filter: CourierUiFilter;
   onChange: (filter: CourierUiFilter) => void;
   originRegions: RegionOption[];
   destinationRegions: RegionOption[];
+  preference: RoutePreferenceKind;
+  onPreferenceChange: (preference: RoutePreferenceKind) => void;
 }
 
 function CourierFilterBar({
@@ -205,6 +242,8 @@ function CourierFilterBar({
   onChange,
   originRegions,
   destinationRegions,
+  preference,
+  onPreferenceChange,
 }: CourierFilterBarProps) {
   const { t } = useTranslation();
   // Counted off the controls, not off the parsed engine filter, for the same
@@ -277,10 +316,95 @@ function CourierFilterBar({
             width="w-24"
             onChange={(minDays) => setDraft({ ...draft, minDays })}
           />
+          <RoutePreferenceField value={preference} onChange={onPreferenceChange} />
         </>
       )}
     </FilterBar>
   );
+}
+
+/**
+ * The preferences offered, in the order a hauler weighs them. Deliberately
+ * component state rather than a saved setting: a second *persisted* route
+ * preference is what would force unifying this vocabulary with the Assets
+ * page's own `RoutePreference` and ESI's flag names, and that unification is
+ * recorded as work to do before such a control ships, not as part of this one.
+ */
+const ROUTE_PREFERENCES: readonly RoutePreferenceKind[] = [
+  'prefer-highsec',
+  'shortest',
+  'avoid-highsec',
+];
+
+/**
+ * Highsec-preferring by default: it is the trip most haulers will actually
+ * fly, and a rate quoted against a route nobody would take is the wrong
+ * number to rank on.
+ */
+const DEFAULT_ROUTE_PREFERENCE: RoutePreferenceKind = 'prefer-highsec';
+
+/**
+ * Jumps for every filtered row, recomputed when the rows or the preference
+ * change.
+ *
+ * Async because the graph is a snapshot read, which is why this is state and
+ * not a `useMemo` — and why `pending` is its own outcome. A board mid-load
+ * must not read as "no route exists", which is what an empty result would say.
+ *
+ * Resolved in one batched pass (`localJumpCountsForRoutes`) rather than per
+ * row: the pass groups by origin and sweeps where an origin repeats, so cost
+ * tracks distinct origins instead of row count.
+ */
+type JumpsState =
+  { kind: 'pending' } | { kind: 'known'; counts: readonly (number | null)[] } | { kind: 'unknown' };
+
+function useJumpCounts(
+  rows: readonly CourierRouteRow[],
+  preference: RoutePreferenceKind
+): JumpsState {
+  // The answer carries the inputs it was computed for, so "pending" is
+  // *derived* during render rather than written by the effect: an answer whose
+  // inputs are no longer the current ones is stale by definition, and the
+  // board reads as loading the instant they change, with no extra render.
+  const [answer, setAnswer] = useState<{
+    rows: readonly CourierRouteRow[];
+    preference: RoutePreferenceKind;
+    state: JumpsState;
+  } | null>(null);
+
+  useEffect(() => {
+    let current = true;
+    void localJumpCountsForRoutes(
+      rows.map((row) => ({
+        originSystemId: row.origin.systemId,
+        destinationSystemId: row.destination.systemId,
+      })),
+      preference
+    ).then((state) => {
+      // A later preference or filter has already superseded this answer.
+      if (current) setAnswer({ rows, preference, state });
+    });
+    return () => {
+      current = false;
+    };
+  }, [rows, preference]);
+
+  return answer && answer.rows === rows && answer.preference === preference
+    ? answer.state
+    : { kind: 'pending' };
+}
+
+/**
+ * ISK per jump — the rate a hauler ranks on, since the cost of a haul is the
+ * trip and the trip is jumps.
+ *
+ * A same-system haul is zero jumps and a real job, so it divides by one trip
+ * rather than by zero: the whole reward is earned without leaving the system,
+ * which is the best rate on the board and should read that way.
+ */
+function iskPerJump(reward: number, jumps: number | null): number | null {
+  if (jumps === null) return null;
+  return reward / Math.max(jumps, 1);
 }
 
 interface CourierResultsProps {
@@ -288,11 +412,12 @@ interface CourierResultsProps {
   regionNames: ReadonlyMap<number, string>;
 }
 
-/** Public courier contracts as hauls: route, reward, collateral, cargo, deadline. */
+/** Public courier contracts as hauls: route, distance, pay rate, cargo and risk. */
 export function CourierResults({ rows, regionNames }: CourierResultsProps) {
   const { t } = useTranslation();
   const timeZone = useTimeZone();
   const [uiFilter, setUiFilter] = useState<CourierUiFilter>(EMPTY_UI_FILTER);
+  const [preference, setPreference] = useState<RoutePreferenceKind>(DEFAULT_ROUTE_PREFERENCE);
   const [showAll, setShowAll] = useState(false);
   const [selectedRow, setSelectedRow] = useState<CourierRouteRow | null>(null);
 
@@ -318,19 +443,51 @@ export function CourierResults({ rows, regionNames }: CourierResultsProps) {
     [uiFilter]
   );
 
+  const matchingRows = useMemo(() => filterCourierContracts(rows, filter), [rows, filter]);
+  const jumps = useJumpCounts(matchingRows, preference);
+
   /**
-   * Best-paying first *before* the row cap, for the same reason the item
-   * results sort cheapest-first before theirs: `DataTable` sorts only the rows
-   * it is handed, so capping the snapshot's own contract-id order would leave
-   * the table claiming a reward sort over an arbitrary 50.
+   * Best rate first *before* the row cap: `DataTable` sorts only the rows it
+   * is handed, so capping an unranked set would leave the table claiming an
+   * ISK/jump sort over an arbitrary 50.
+   *
+   * Changing the preference changes every jump count and therefore this
+   * order, which is why the whole filtered set is ranked here rather than the
+   * visible page. Until the counts arrive the rate is unknown for every row,
+   * so the fallback order is by reward — the board stays useful mid-load
+   * instead of shuffling from an order that means nothing.
    */
-  const displayRows = useMemo(
-    () => filterCourierContracts(rows, filter).sort((a, b) => b.reward - a.reward),
-    [rows, filter]
-  );
+  const displayRows = useMemo(() => {
+    const ranked = [...matchingRows];
+    if (jumps.kind !== 'known') return ranked.sort((a, b) => b.reward - a.reward);
+    const rateByContract = new Map<number, number | null>();
+    matchingRows.forEach((row, index) => {
+      rateByContract.set(row.contractId, iskPerJump(row.reward, jumps.counts[index] ?? null));
+    });
+    // A haul with no measurable distance has no rate, and sorts last rather
+    // than as zero — "we cannot say" is not "pays nothing".
+    return ranked.sort(
+      (a, b) => (rateByContract.get(b.contractId) ?? -1) - (rateByContract.get(a.contractId) ?? -1)
+    );
+  }, [matchingRows, jumps]);
+
+  /** Jumps are resolved against the filtered set, so a row's count is found by its own id. */
+  const jumpsByContract = useMemo(() => {
+    const byContract = new Map<number, number | null>();
+    if (jumps.kind !== 'known') return byContract;
+    matchingRows.forEach((row, index) => {
+      byContract.set(row.contractId, jumps.counts[index] ?? null);
+    });
+    return byContract;
+  }, [matchingRows, jumps]);
 
   function changeFilter(next: CourierUiFilter) {
     setUiFilter(next);
+    setShowAll(false);
+  }
+
+  function changePreference(next: RoutePreferenceKind) {
+    setPreference(next);
     setShowAll(false);
   }
 
@@ -392,17 +549,38 @@ export function CourierResults({ rows, regionNames }: CourierResultsProps) {
         render: (row) => `${VOLUME_FORMAT.format(row.volume)} m³`,
       },
       {
-        id: 'days',
-        header: t('contractSearch.daysColumn'),
+        id: 'jumps',
+        header: t('contractSearch.jumpsColumn'),
         align: 'right',
         className: 'tabular-nums',
-        // A contract that states no deadline sorts last rather than as zero:
-        // zero would rank it below the tightest real deadline in the list,
-        // which is the opposite of what not stating one means.
-        sortValue: (row) => row.daysToComplete ?? Number.POSITIVE_INFINITY,
-        // The header already says Days; a bare figure keeps the column as
-        // narrow as the number in it.
-        render: (row) => (row.daysToComplete == null ? '—' : String(row.daysToComplete)),
+        // No distance sorts last rather than as zero: zero would rank an
+        // unmeasurable haul above every real one under the default sort.
+        sortValue: (row) => jumpsByContract.get(row.contractId) ?? Number.POSITIVE_INFINITY,
+        render: (row) => {
+          if (jumps.kind === 'pending') return <span className="text-text-dim">…</span>;
+          const count = jumpsByContract.get(row.contractId) ?? null;
+          if (count === null) {
+            return (
+              <span className="text-text-dim" title={t('contractSearch.jumpsUnavailableHint')}>
+                —
+              </span>
+            );
+          }
+          return String(count);
+        },
+      },
+      {
+        id: 'iskPerJump',
+        header: t('contractSearch.iskPerJumpColumn'),
+        align: 'right',
+        className: 'tabular-nums whitespace-nowrap',
+        sortValue: (row) =>
+          iskPerJump(row.reward, jumpsByContract.get(row.contractId) ?? null) ?? -1,
+        render: (row) => {
+          if (jumps.kind === 'pending') return <span className="text-text-dim">…</span>;
+          const rate = iskPerJump(row.reward, jumpsByContract.get(row.contractId) ?? null);
+          return rate === null ? <span className="text-text-dim">—</span> : formatIsk(rate, 0);
+        },
       },
       {
         id: 'expires',
@@ -412,7 +590,7 @@ export function CourierResults({ rows, regionNames }: CourierResultsProps) {
         render: (row) => formatTimestamp(new Date(row.dateExpired), timeZone),
       },
     ];
-  }, [t, regionNames, timeZone]);
+  }, [t, regionNames, timeZone, jumps.kind, jumpsByContract]);
 
   const visibleRows = showAll ? displayRows : displayRows.slice(0, ROW_CAP);
 
@@ -423,6 +601,8 @@ export function CourierResults({ rows, regionNames }: CourierResultsProps) {
         onChange={changeFilter}
         originRegions={originRegions}
         destinationRegions={destinationRegions}
+        preference={preference}
+        onPreferenceChange={changePreference}
       />
       {displayRows.length === 0 ? (
         <EmptyState
@@ -432,6 +612,11 @@ export function CourierResults({ rows, regionNames }: CourierResultsProps) {
         />
       ) : (
         <>
+          {jumps.kind === 'unknown' && (
+            <p className="px-3 pt-2 text-[0.6875rem] text-text-dim">
+              {t('contractSearch.jumpsSnapshotUnavailable')}
+            </p>
+          )}
           <DataTable
             label={t('contractSearch.courierTitle')}
             columns={columns}
@@ -440,7 +625,7 @@ export function CourierResults({ rows, regionNames }: CourierResultsProps) {
             // contract lists an item line per stack — so `contractId` alone is
             // a unique key.
             rowKey={(row) => String(row.contractId)}
-            defaultSort={{ columnId: 'reward', direction: 'desc' }}
+            defaultSort={{ columnId: 'iskPerJump', direction: 'desc' }}
             onRowClick={setSelectedRow}
           />
           {!showAll && displayRows.length > ROW_CAP && (

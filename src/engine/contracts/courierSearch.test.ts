@@ -13,9 +13,30 @@ const STRUCTURE = 1035466617946;
 const THE_FORGE = 10000002;
 const DOMAIN = 10000043;
 
+const JITA_SYSTEM = 30000142;
+const AMARR_SYSTEM = 30002187;
+
 const ENDPOINTS = new Map<number, CourierEndpoint>([
-  [JITA, { locationId: JITA, name: 'Jita IV - Moon 4', systemName: 'Jita', regionId: THE_FORGE }],
-  [AMARR, { locationId: AMARR, name: 'Amarr VIII', systemName: 'Amarr', regionId: DOMAIN }],
+  [
+    JITA,
+    {
+      locationId: JITA,
+      name: 'Jita IV - Moon 4',
+      systemName: 'Jita',
+      systemId: JITA_SYSTEM,
+      regionId: THE_FORGE,
+    },
+  ],
+  [
+    AMARR,
+    {
+      locationId: AMARR,
+      name: 'Amarr VIII',
+      systemName: 'Amarr',
+      systemId: AMARR_SYSTEM,
+      regionId: DOMAIN,
+    },
+  ],
 ]);
 
 function row(overrides: Partial<PublicCourierContractRow> = {}): PublicCourierContractRow {
@@ -45,6 +66,7 @@ describe('resolveCourierRoutes', () => {
       locationId: JITA,
       name: 'Jita IV - Moon 4',
       systemName: 'Jita',
+      systemId: JITA_SYSTEM,
       regionId: THE_FORGE,
     });
     expect(route.destination.name).toBe('Amarr VIII');
@@ -61,6 +83,9 @@ describe('resolveCourierRoutes', () => {
       locationId: STRUCTURE,
       name: null,
       systemName: null,
+      // No system either, so this haul has no measurable distance — the case
+      // the jumps column renders as unavailable.
+      systemId: null,
       regionId: null,
     });
   });

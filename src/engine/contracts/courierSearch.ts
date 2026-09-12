@@ -64,6 +64,13 @@ export interface CourierEndpoint {
   /** Station name, or `null` for a location nothing local names. */
   name: string | null;
   systemName: string | null;
+  /**
+   * The solar system this end sits in — what a stargate route is measured
+   * between, and `null` for the same player-structure case that leaves the
+   * name null. A haul with either end unplaced has no distance, which is why
+   * the table shows those rows as unavailable rather than as zero jumps.
+   */
+  systemId: number | null;
   regionId: number | null;
 }
 
@@ -80,7 +87,7 @@ function endpointFor(
 ): CourierEndpoint {
   const resolved = endpoints.get(locationId);
   if (resolved) return resolved;
-  return { locationId, name: null, systemName: null, regionId: fallbackRegionId };
+  return { locationId, name: null, systemName: null, systemId: null, regionId: fallbackRegionId };
 }
 
 /**
