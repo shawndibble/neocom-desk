@@ -359,7 +359,7 @@ export function LoyaltyStore() {
               // `shrink-0` + `whitespace-nowrap`: as a flex item next to a
               // long item name the badge was being squeezed until "BP" broke
               // across two lines, one letter each.
-              <span className="shrink-0 rounded-xs border border-warning/40 px-1 text-[0.5625rem] font-bold tracking-wide whitespace-nowrap text-warning uppercase">
+              <span className="shrink-0 rounded-xs border border-warning/40 px-1 text-[0.6875rem] font-bold tracking-wide whitespace-nowrap text-warning uppercase">
                 BP
               </span>
             )}
