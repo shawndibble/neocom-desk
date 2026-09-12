@@ -28,6 +28,7 @@
 import type { AppRoutePath } from './routeScopes';
 import type { RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { readRouteSnapshot, writeRouteSnapshot } from '@/lib/routeSnapshotCache';
+import { onCachePurged } from '@/esi/cachePurge';
 import { loadCalendarBoard } from '@/features/character/calendarBoardData';
 
 export interface RouteWarmer {
@@ -76,6 +77,24 @@ export type WarmablePath = keyof typeof ROUTE_WARMERS;
  */
 const inFlight = new Set<string>();
 
+/**
+ * Bumped by every cache purge, so a warm that started before one can tell and
+ * drop its result instead of writing it back.
+ *
+ * A purge is how a scope revoke, an owner change or a corp change gets data off
+ * the screen, and `routeSnapshotCache.ts` forgets bluntly for exactly that
+ * reason: "over-forgetting costs one Dexie re-read, under-forgetting is a
+ * privacy bug." A warm holds a composed snapshot across an await with nothing
+ * watching it — `useRouteSnapshot`'s own load at least dies with the component
+ * — so without this it would re-add rows the purge had just removed. Counted
+ * rather than compared per character because the cache-wide tier purges
+ * everything with `null`, and a warm must lose that race too.
+ */
+let purgeGeneration = 0;
+onCachePurged(() => {
+  purgeGeneration += 1;
+});
+
 /** Test seam: module state otherwise outlives a `beforeEach`. */
 export function resetWarmState(): void {
   inFlight.clear();
@@ -109,11 +128,15 @@ export async function warmRoute(
   const token = `${cacheKey}:${characterId}`;
   if (inFlight.has(token)) return;
   inFlight.add(token);
+  const startedAt = purgeGeneration;
   try {
     // Never cancelled: unlike the hook's signal, nothing here is waiting on the
     // result, and a warm that abandons its own work halfway leaves the cache
     // empty for the click that prompted it.
     const data = await load(characterId, { cancelled: false });
+    // Dropped rather than stored if a purge landed while this was composing —
+    // see `purgeGeneration`. The next hover simply warms again.
+    if (purgeGeneration !== startedAt) return;
     writeRouteSnapshot(cacheKey, characterId, data);
   } catch {
     // Swallowed by design; see the doc comment above.

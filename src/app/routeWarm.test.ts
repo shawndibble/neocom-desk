@@ -11,6 +11,7 @@ vi.mock('@/features/character/calendarBoardData', () => ({
 
 const { ROUTE_WARMERS, warmRoute, resetWarmState } = await import('./routeWarm');
 const { readRouteSnapshot, resetRouteSnapshots } = await import('@/lib/routeSnapshotCache');
+const { purgeCharacterCache } = await import('@/esi/cachePurge');
 
 const CHARACTER = 42;
 
@@ -101,6 +102,26 @@ describe('warmRoute', () => {
   it('swallows a loader failure and leaves the cache empty', async () => {
     loadCalendar.mockRejectedValue(new Error('offline'));
     await expect(warmRoute('/calendar', CHARACTER, false)).resolves.toBeUndefined();
+    expect(readRouteSnapshot('calendar', CHARACTER)).toBeNull();
+  });
+
+  /**
+   * A purge is how a scope revoke or owner change gets data off the screen,
+   * and a warm holds a composed snapshot across an await with nothing watching
+   * it. Writing that back afterwards would put the purged rows straight back
+   * into the cache the view reads.
+   */
+  it('drops its result if a cache purge lands while it is composing', async () => {
+    let release: (value: unknown) => void = () => {};
+    loadCalendar.mockReturnValue(
+      new Promise((resolve) => {
+        release = resolve;
+      })
+    );
+    const warming = warmRoute('/calendar', CHARACTER, false);
+    await purgeCharacterCache(CHARACTER);
+    release({ rows: ['a'] });
+    await warming;
     expect(readRouteSnapshot('calendar', CHARACTER)).toBeNull();
   });
 
