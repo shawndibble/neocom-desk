@@ -408,10 +408,14 @@ Known limit, deliberately not papered over: retention is in-memory and
 session-lived, so the **first** visit to a route after an app load still spins
 while the view composes its snapshot. `app/prefetch.ts` warms the Dexie
 `esiCache` at boot, so that work is local rather than network-bound, but it
-warms endpoints, not composed view snapshots. Making a first visit instant as
-well means either warming route loaders at boot or persisting snapshots across
-reloads — both are real projects with their own burst and schema-drift
-tradeoffs, not something to add to a route ad hoc.
+warms endpoints, not composed view snapshots. `app/routeWarm.ts` narrows the
+window where it can — a rail link composes its route on hover and on focus, so
+the click often lands warm — but only for the routes listed in
+`ROUTE_WARMERS`, and it buys the pointer's travel time rather than guaranteeing
+anything. Making a first visit reliably instant means either warming route
+loaders at boot or persisting snapshots across reloads — both are real projects
+with their own burst and schema-drift tradeoffs, not something to add to a
+route ad hoc.
 
 ## 6b. Route transitions
 

@@ -28,6 +28,10 @@ vi.mock('@/sync', () => ({
   subscribeSyncStatus: (listener: (s: unknown) => void) => mockSubscribe(listener),
 }));
 
+// Warming itself is `routeWarm.test.ts`'s subject; Layout only owns the wiring.
+vi.mock('./routeWarm', () => ({ warmRoute: vi.fn() }));
+const mockedWarmRoute = vi.mocked((await import('./routeWarm')).warmRoute);
+
 const mockIsSyncConfigured = vi.fn();
 vi.mock('./syncStatus', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./syncStatus')>()),
@@ -721,5 +725,55 @@ describe('Layout route fade', () => {
     expect(mounts).toEqual(['assets']);
     // Still fades, though — it is a navigation, just not a new instance.
     expect(animate).toHaveBeenCalled();
+  });
+});
+
+/**
+ * Only the wiring is asserted here — which gestures count as intent, and that
+ * `locked` reaches `warmRoute` — because what warming then does (skipping a
+ * locked or already-warm route, deduping, swallowing failures) is
+ * `routeWarm.test.ts`'s subject and does not want restating per link.
+ */
+describe('Layout intent warming', () => {
+  beforeEach(() => {
+    mockIsSyncConfigured.mockReturnValue(false);
+    mockedCorpAccess.mockReturnValue(corpAccess('none'));
+    useActiveCharacter.setState({ activeCharacterId: CHARACTER_ID, hydrated: true });
+    mockedWarmRoute.mockClear();
+  });
+
+  it('warms a rail destination when the pointer reaches it', async () => {
+    const user = userEvent.setup();
+    renderLayout();
+    await user.hover(screen.getAllByRole('link', { name: 'Wallet' })[0]);
+    expect(mockedWarmRoute).toHaveBeenCalledWith('/wallet', CHARACTER_ID, false);
+  });
+
+  // Tabbing to a link is the same declaration of intent as pointing at it.
+  it('warms on keyboard focus too', async () => {
+    renderLayout();
+    screen.getAllByRole('link', { name: 'Wallet' })[0].focus();
+    await waitFor(() =>
+      expect(mockedWarmRoute).toHaveBeenCalledWith('/wallet', CHARACTER_ID, false)
+    );
+  });
+
+  // `/assets` is scope-gated (`routeScopes.ts`), so a Character holding no
+  // grant locks it — `/wallet` above is `UNGATED` and never locks.
+  it('passes the route’s locked state through, so a missing grant warms nothing', async () => {
+    const user = userEvent.setup();
+    await db.tokens.put({
+      characterId: CHARACTER_ID,
+      accessToken: 'a',
+      refreshToken: 'r',
+      expiresAt: Date.now() + 60_000,
+      scopes: [],
+    });
+    renderLayout();
+    await waitFor(() =>
+      expect(screen.getAllByRole('link', { name: 'Assets' })[0]).toHaveAttribute('title')
+    );
+    await user.hover(screen.getAllByRole('link', { name: 'Assets' })[0]);
+    expect(mockedWarmRoute).toHaveBeenCalledWith('/assets', CHARACTER_ID, true);
   });
 });
