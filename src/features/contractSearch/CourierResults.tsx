@@ -15,6 +15,7 @@ import {
   DataTable,
   EmptyState,
   FilterBar,
+  FilterChip,
   FilterField,
   Select,
   SelectContent,
@@ -33,6 +34,7 @@ import {
   type CourierRouteRow,
 } from '@/engine/contracts/courierSearch';
 import { iskPerJump, iskPerVolume } from '@/engine/contracts/courierRates';
+import { SPACE_KINDS, type SpaceKind } from '@/engine/space';
 import type { RoutePreferenceKind } from '@/engine/route/jumpRoute';
 import { localJumpCountsForRoutes } from '@/features/route/localRoute';
 import { CourierContractDetailModal } from '@/features/contractSearch/CourierContractDetailModal';
@@ -51,6 +53,8 @@ interface CourierUiFilter {
   routeQuery: string;
   originRegionId: number | null;
   destinationRegionId: number | null;
+  /** Which bands the hauler will deliver into; all four is "no restriction". */
+  destinationSpace: readonly SpaceKind[];
   minReward: string;
   maxCollateral: string;
   maxVolume: string;
@@ -61,6 +65,7 @@ const EMPTY_UI_FILTER: CourierUiFilter = {
   routeQuery: '',
   originRegionId: null,
   destinationRegionId: null,
+  destinationSpace: SPACE_KINDS,
   minReward: '',
   maxCollateral: '',
   maxVolume: '',
@@ -88,6 +93,24 @@ function parseNumeric(value: string): number | null {
  */
 function endpointSystemName(endpoint: CourierEndpoint): string {
   return endpoint.systemName ?? endpoint.name ?? `#${endpoint.locationId}`;
+}
+
+/**
+ * Where this end sits, in the same four bands BPC Search's Space filter uses.
+ *
+ * Endpoint security, never route security: a highsec pickup and a highsec
+ * delivery can still route through lowsec, and this app cannot know — a
+ * per-row route lookup is the ESI fan-out all three courier scope decisions
+ * refuse. So the band describes the end it sits beside and claims nothing
+ * about the trip between them.
+ */
+function EndpointSpace({ space }: { space: SpaceKind | null }) {
+  const { t } = useTranslation();
+  return (
+    <span className="ml-1.5 text-[0.6875rem] text-text-dim">
+      {space === null ? t('contractSearch.spaceUnknown') : t(`common.spaceOption.${space}`)}
+    </span>
+  );
 }
 
 function regionLabel(
@@ -247,6 +270,7 @@ function CourierFilterBar({
     filter.routeQuery,
     filter.originRegionId !== null,
     filter.destinationRegionId !== null,
+    filter.destinationSpace.length !== SPACE_KINDS.length,
     filter.minReward,
     filter.maxCollateral,
     filter.maxVolume,
@@ -258,9 +282,9 @@ function CourierFilterBar({
       value={filter}
       onChange={onChange}
       activeCount={activeCount}
-      // Six controls is the set `collapsible` exists for: laid out inline they
-      // wrap to two rows above the table they exist to narrow. The item bar
-      // beside this one carries four and stays open.
+      // Well past the set `collapsible` exists for: laid out inline these wrap
+      // to two rows above the table they exist to narrow. The item bar beside
+      // this one carries four and stays open.
       collapsible
       className="border-b border-line px-3 py-2"
       search={
@@ -286,6 +310,34 @@ function CourierFilterBar({
             options={destinationRegions}
             onChange={(destinationRegionId) => setDraft({ ...draft, destinationRegionId })}
           />
+          {/*
+            Named for the endpoint, not the route: this says where a haul ends,
+            and there is deliberately no "avoid lowsec" control beside it — that
+            would be a safety claim about the whole trip made from data that
+            only describes its two ends.
+          */}
+          <div
+            role="group"
+            aria-label={t('contractSearch.destinationSpaceLabel')}
+            className="flex flex-wrap items-center gap-2"
+          >
+            <span className="text-text-dim">{t('contractSearch.destinationSpaceLabel')}</span>
+            {SPACE_KINDS.map((kind) => (
+              <FilterChip
+                key={kind}
+                label={t(`common.spaceOption.${kind}`)}
+                selected={draft.destinationSpace.includes(kind)}
+                onToggle={() =>
+                  setDraft({
+                    ...draft,
+                    destinationSpace: draft.destinationSpace.includes(kind)
+                      ? draft.destinationSpace.filter((existing) => existing !== kind)
+                      : [...draft.destinationSpace, kind],
+                  })
+                }
+              />
+            ))}
+          </div>
           <NumericFilterField
             label={t('contractSearch.minRewardLabel')}
             value={draft.minReward}
@@ -435,6 +487,12 @@ export function CourierResults({ rows, regionNames }: CourierResultsProps) {
       routeQuery: uiFilter.routeQuery,
       originRegionId: uiFilter.originRegionId,
       destinationRegionId: uiFilter.destinationRegionId,
+      // All four selected is not a filter at all — a haul whose destination
+      // nothing local places has no band, and must not be excluded by a
+      // control the hauler never narrowed. Same reading as BPC Search's own
+      // Space filter.
+      destinationSpace:
+        uiFilter.destinationSpace.length === SPACE_KINDS.length ? null : uiFilter.destinationSpace,
       minReward: parseNumeric(uiFilter.minReward),
       maxCollateral: parseNumeric(uiFilter.maxCollateral),
       maxVolume: parseNumeric(uiFilter.maxVolume),
@@ -509,6 +567,7 @@ export function CourierResults({ rows, regionNames }: CourierResultsProps) {
               {originRegion(row) && (
                 <span className="ml-1.5 text-[0.6875rem] text-text-dim">{originRegion(row)}</span>
               )}
+              <EndpointSpace space={row.origin.space} />
             </span>
             <span className="text-text-dim">
               {'→ '}
@@ -516,6 +575,7 @@ export function CourierResults({ rows, regionNames }: CourierResultsProps) {
               {destinationRegion(row) && (
                 <span className="ml-1.5 text-[0.6875rem]">{destinationRegion(row)}</span>
               )}
+              <EndpointSpace space={row.destination.space} />
             </span>
           </div>
         ),
@@ -603,6 +663,17 @@ export function CourierResults({ rows, regionNames }: CourierResultsProps) {
 
   const visibleRows = showAll ? displayRows : displayRows.slice(0, ROW_CAP);
 
+  /**
+   * A narrowed space filter drops every haul whose destination nothing local
+   * places, because "unknown" is not a band. To a player that reads as the
+   * filter eating rows, so when it is the reason the table is empty, the empty
+   * state says so rather than repeating the generic "nothing matched" — the
+   * board must not present an exclusion it made as an absence in the data.
+   */
+  const excludedUnplacedDestinations =
+    uiFilter.destinationSpace.length !== SPACE_KINDS.length &&
+    rows.some((row) => row.destination.space === null);
+
   return (
     <>
       <CourierFilterBar
@@ -616,7 +687,11 @@ export function CourierResults({ rows, regionNames }: CourierResultsProps) {
       {displayRows.length === 0 ? (
         <EmptyState
           title={t('contractSearch.courierNoFilterMatches')}
-          hint={t('contractSearch.courierNoFilterMatchesHint')}
+          hint={t(
+            excludedUnplacedDestinations
+              ? 'contractSearch.courierNoFilterMatchesUnplacedHint'
+              : 'contractSearch.courierNoFilterMatchesHint'
+          )}
           className="py-8"
         />
       ) : (

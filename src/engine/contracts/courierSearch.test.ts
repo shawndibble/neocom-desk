@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import type { SpaceKind } from '@/engine/space';
 import {
   filterCourierContracts,
   resolveCourierRoutes,
@@ -16,6 +17,14 @@ const DOMAIN = 10000043;
 const JITA_SYSTEM = 30000142;
 const AMARR_SYSTEM = 30002187;
 
+const RANCER = 60011740;
+const RANCER_SYSTEM = 30002809;
+const SINQ_LAISON = 10000032;
+/** A wormhole end: `J######` by name, so the classifier calls it wormhole whatever its security reads. */
+const THERA_STATION = 60015148;
+const THERA_SYSTEM = 31000005;
+const THERA_REGION = 11000031;
+
 const ENDPOINTS = new Map<number, CourierEndpoint>([
   [
     JITA,
@@ -25,6 +34,7 @@ const ENDPOINTS = new Map<number, CourierEndpoint>([
       systemName: 'Jita',
       systemId: JITA_SYSTEM,
       regionId: THE_FORGE,
+      space: 'highsec',
     },
   ],
   [
@@ -35,6 +45,29 @@ const ENDPOINTS = new Map<number, CourierEndpoint>([
       systemName: 'Amarr',
       systemId: AMARR_SYSTEM,
       regionId: DOMAIN,
+      space: 'highsec',
+    },
+  ],
+  [
+    RANCER,
+    {
+      locationId: RANCER,
+      name: 'Rancer III - Moon 1',
+      systemName: 'Rancer',
+      systemId: RANCER_SYSTEM,
+      regionId: SINQ_LAISON,
+      space: 'lowsec',
+    },
+  ],
+  [
+    THERA_STATION,
+    {
+      locationId: THERA_STATION,
+      name: 'Thera Sanctuary',
+      systemName: 'J105443',
+      systemId: THERA_SYSTEM,
+      regionId: THERA_REGION,
+      space: 'wormhole',
     },
   ],
 ]);
@@ -68,6 +101,7 @@ describe('resolveCourierRoutes', () => {
       systemName: 'Jita',
       systemId: JITA_SYSTEM,
       regionId: THE_FORGE,
+      space: 'highsec',
     });
     expect(route.destination.name).toBe('Amarr VIII');
     expect(route.destination.regionId).toBe(DOMAIN);
@@ -87,6 +121,9 @@ describe('resolveCourierRoutes', () => {
       // the jumps column renders as unavailable.
       systemId: null,
       regionId: null,
+      // And no band: nothing local places it, so there is no security status
+      // to classify. A space filter excludes it rather than guessing highsec.
+      space: null,
     });
   });
 
@@ -202,5 +239,55 @@ describe('filterCourierContracts', () => {
 
   it('combines every set filter', () => {
     expect(ids({ originRegionId: DOMAIN, minReward: 10_000_000, maxVolume: 50_000 })).toEqual([2]);
+  });
+});
+
+/**
+ * Endpoint security, never route security (issue #939). A highsec pickup and a
+ * highsec delivery can still route through lowsec, and nothing here claims
+ * otherwise — this narrows on where a haul *ends*, which is the one thing the
+ * local snapshots can answer without a request per row.
+ */
+describe('filterCourierContracts — destination space', () => {
+  const HAULS = [
+    row({ contractId: 1, destinationLocationId: AMARR }),
+    row({ contractId: 2, destinationLocationId: RANCER }),
+    row({ contractId: 3, destinationLocationId: THERA_STATION }),
+    // A player structure: nothing local places it, so it has no band at all.
+    row({ contractId: 4, destinationLocationId: STRUCTURE }),
+  ];
+
+  function matching(destinationSpace: readonly SpaceKind[] | null) {
+    return filterCourierContracts(routes(HAULS), { destinationSpace }).map((r) => r.contractId);
+  }
+
+  it('keeps only hauls ending in a chosen band', () => {
+    expect(matching(['highsec'])).toEqual([1]);
+    expect(matching(['lowsec'])).toEqual([2]);
+    expect(matching(['wormhole'])).toEqual([3]);
+  });
+
+  it('accepts several bands at once', () => {
+    expect(matching(['highsec', 'wormhole'])).toEqual([1, 3]);
+  });
+
+  it('excludes a destination nothing local places, rather than guessing a band', () => {
+    // It already drops out of the destination-region filter for the same
+    // reason. "Unknown" is not a band, and is certainly not "highsec".
+    expect(matching(['highsec', 'lowsec', 'nullsec', 'wormhole'])).not.toContain(4);
+  });
+
+  it('treats an absent filter as no restriction, unplaced destinations included', () => {
+    expect(matching(null)).toEqual([1, 2, 3, 4]);
+    expect(filterCourierContracts(routes(HAULS), {}).map((r) => r.contractId)).toEqual([
+      1, 2, 3, 4,
+    ]);
+  });
+
+  it('matches nothing when no band is chosen', () => {
+    // Deselecting every band asks for hauls ending in none of them, which is
+    // an empty answer — not a silent "show everything". The panel maps
+    // all-selected to no filter at all, which is where "show everything" lives.
+    expect(matching([])).toEqual([]);
   });
 });

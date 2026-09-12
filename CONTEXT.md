@@ -240,6 +240,7 @@ here — they go one per file in `docs/context/decisions/`.
   response, spaces requests out before the budget is gone, and shuts a
   **circuit** on a 420/429 so callers fail fast into the cache instead of each
   retrying into a closed door.
+- **Endpoint Space**: which of the four bands — highsec, lowsec, nullsec, wormhole — one end of a courier haul sits in, classified from the local SDE entry that names its system. Describes an _endpoint_, never the route between two of them: a highsec pickup and a highsec delivery can still route through lowsec, and no control on the courier board implies otherwise. An end the local snapshot cannot place has no band at all and is excluded by a narrowed band filter rather than assigned one.
 - **EVE Notification**: The single Notification Event (`eveNotification`,
   issue #274) covering everything `GET /characters/{character_id}/notifications/`
   pushes — a different, non-overlapping source from every other Notification
