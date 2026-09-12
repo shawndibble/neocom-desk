@@ -148,8 +148,11 @@ clobber them either:
 
 - `favicon.svg` is hand-drawn vector, because a raster favicon cannot carry
   `prefers-color-scheme` or scale to whatever size a browser asks for.
-- `badge-96.png` is a hand-drawn silhouette of the hull hexagon alone (see
-  `notificationOptions.ts` for why it drops the rest of the mark).
+- `badge-96.png` is a hand-drawn silhouette of the mark's own positive
+  space -- the hull hexagon as a ring, a solid star inside it, everything
+  else punched out -- rather than a filled shape with the star cut from it
+  (see `notificationOptions.ts` for why it drops the diamond and the corner
+  traces).
 
 Both are drawn from `logo-mark.png`'s geometry, so a change to the artwork's
 shape has to be carried into them by hand.
