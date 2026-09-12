@@ -253,6 +253,19 @@ describe('Contracts market/issuer links and filters (issue #417)', () => {
     expect(within(table).queryByText('Courier')).not.toBeInTheDocument();
   });
 
+  it('tells the pilot how to get back to every contract when no contract matches the filters', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText('Rifter fit');
+
+    await user.type(screen.getByPlaceholderText('Search issuer or title…'), 'zzzznomatch');
+
+    expect(screen.getByText('No contracts match your filters.')).toBeInTheDocument();
+    expect(
+      screen.getByText('Clear the search or reset the status/type filters to see every contract.')
+    ).toBeInTheDocument();
+  });
+
   it('the truncation notice has a retry action', async () => {
     let page2Requests = 0;
     server.use(
