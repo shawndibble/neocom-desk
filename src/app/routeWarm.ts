@@ -18,8 +18,14 @@
  * Two things it must not do, both inherited from `prefetch.ts`:
  * - **Warm what the Character never granted.** A blind call to a scope-gated
  *   endpoint answers 403, which `esi/cache.ts` reports to the shell-wide
- *   re-auth notice — so warming a locked route would paint that banner for
- *   merely sweeping the pointer down the rail. Callers pass `locked`.
+ *   re-auth notice — so an unfiltered warm would paint that banner for merely
+ *   sweeping the pointer down the rail. Each warmer therefore declares the
+ *   endpoints its loader reaches and is filtered against the stored grant with
+ *   `prefetch.ts`'s own `grantCovers`. Deliberately **not** the route's
+ *   `locked` flag, which asks a different question: `/calendar` is `UNGATED`
+ *   (the page has something to show without any one grant) yet composes six
+ *   scope-gated reads, so a lock-based gate would have warmed it for everyone
+ *   and been the very banner this guards against.
  * - **Burst.** Warming reads inside `STALE_AFTER`, so a warm normally costs
  *   Dexie reads and CPU, not requests. A lapsed row still revalidates behind
  *   the view exactly as it would have on mount — that is `esi/cache.ts`'s
@@ -29,6 +35,8 @@ import type { AppRoutePath } from './routeScopes';
 import type { RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { readRouteSnapshot, writeRouteSnapshot } from '@/lib/routeSnapshotCache';
 import { onCachePurged } from '@/esi/cachePurge';
+import type { EsiEndpointId } from '@/esi/registry';
+import { grantCovers } from './prefetch';
 import { loadCalendarBoard } from '@/features/character/calendarBoardData';
 
 export interface RouteWarmer {
@@ -39,6 +47,14 @@ export interface RouteWarmer {
    * `routeWarm.test.ts` guards by reading each route's own source.
    */
   readonly cacheKey: string;
+  /**
+   * Every ESI endpoint the loader reaches, the same declaration
+   * `PrefetchTask` makes and read the same way — scope requirements come from
+   * `ESI_REGISTRY`, so no scope string is copied here and an endpoint that
+   * changes scope upstream re-gates this for free. Under-declaring is not a
+   * slow page, it is a spurious "log in again" banner on hover.
+   */
+  readonly endpoints: readonly EsiEndpointId[];
   /** The route's own loader, imported rather than re-implemented. */
   readonly load: (characterId: number, signal: RouteSnapshotSignal) => Promise<unknown>;
 }
@@ -48,8 +64,9 @@ export interface RouteWarmer {
  * be — `/calendar` is the only route whose loader this module can reach today.
  *
  * Some routes will never qualify: `/overview` holds six independent card keys
- * and is the landing route anyway, `/industry` and `/market` compose no route
- * snapshot, and `/alerts` reads Dexie live through `useLiveQuery`.
+ * and is the landing route anyway, `/industry` and `/market` retain per-panel
+ * snapshots (`industry:active-jobs`, `market:open-orders`, …) rather than one
+ * for the route, and `/alerts` reads Dexie live through `useLiveQuery`.
  *
  * The other eight are **pending, not excluded**. Each keeps its loader as a
  * module-private function inside its own route component file, and exporting
@@ -65,15 +82,34 @@ export interface RouteWarmer {
  * a path with no entry, so their rail links behave exactly as they do today.
  */
 export const ROUTE_WARMERS = {
-  '/calendar': { cacheKey: 'calendar', load: loadCalendarBoard },
+  '/calendar': {
+    cacheKey: 'calendar',
+    // Every read `loadCalendarBoard` fans out to; the board is a union of six
+    // sources, not just the calendar itself.
+    endpoints: [
+      'getCharacterCalendar',
+      'getCharacterSkillQueue',
+      'getCharacterIndustryJobs',
+      'getCharacterPlanets',
+      'getCharacterContracts',
+      'getCharacterOrders',
+    ],
+    load: loadCalendarBoard,
+  },
 } satisfies Partial<Record<AppRoutePath, RouteWarmer>>;
 
 export type WarmablePath = keyof typeof ROUTE_WARMERS;
 
 /**
- * In-flight warms, keyed by cache key and Character. A rail hover fires on
- * every pointer entry and the click that follows mounts the route, so without
- * this the same composition could run two or three times over.
+ * In-flight warms, keyed by cache key and Character, since a rail hover fires
+ * on every pointer entry.
+ *
+ * It does not deduplicate against the mount that follows the click:
+ * `useRouteSnapshot` knows nothing of this set, so a click landing mid-warm
+ * composes a second time. That costs CPU and Dexie reads but no extra ESI
+ * traffic — `esi/cache.ts` collapses concurrent reads of a key itself — and
+ * the alternative, having the hook wait on a speculative warm, would put a
+ * hover on the critical path of a navigation.
  */
 const inFlight = new Set<string>();
 
@@ -106,7 +142,14 @@ function isWarmable(path: string): path is WarmablePath {
 
 /**
  * Composes `path`'s snapshot into `routeSnapshotCache` unless it is already
- * there, already being composed, or locked for this Character.
+ * there, already being composed, or reaches a scope this Character has not
+ * granted.
+ *
+ * `granted` is the Character's stored scopes, `undefined` while they are still
+ * unknown — which is a refusal, not a permissive default. `useGrantedScopes`
+ * reports `undefined` for the first frames of every cold load, and warming
+ * through that window would issue exactly the blind calls the grant filter
+ * exists to prevent.
  *
  * Never throws and never rejects, for the same reason `prefetchCharacterData`
  * doesn't: a warm is speculative, and the view will report a real failure when
@@ -115,12 +158,13 @@ function isWarmable(path: string): path is WarmablePath {
 export async function warmRoute(
   path: string,
   characterId: number | null,
-  locked: boolean
+  granted: readonly string[] | undefined
 ): Promise<void> {
-  if (characterId === null || locked || !isWarmable(path)) return;
+  if (characterId === null || granted === undefined || !isWarmable(path)) return;
   // Widened to the interface: `satisfies` keeps each entry's literal type, and
   // a loader that ignores the signal declares only its first parameter.
-  const { cacheKey, load }: RouteWarmer = ROUTE_WARMERS[path];
+  const { cacheKey, endpoints, load }: RouteWarmer = ROUTE_WARMERS[path];
+  if (!grantCovers(new Set(granted), endpoints)) return;
   // Already rendered once this session: the hook would read this same row on
   // mount, so recomposing it would spend the hover for nothing.
   if (readRouteSnapshot(cacheKey, characterId) !== null) return;
