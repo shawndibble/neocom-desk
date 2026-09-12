@@ -141,6 +141,7 @@ export function worklistColonies(input: WorklistAdapterInput): WorklistColony[] 
               label: stopTier.advice.best.name,
               tier: stopTier.advice.best.tier,
               marginPerHour: stopTier.advice.best.marginPerHour,
+              pins: stopTier.advice.best.pins,
             }
           : null;
 

@@ -15,7 +15,7 @@ import { useMemo } from 'react';
 import type { TFunction } from 'i18next';
 import type { PiData, PiPinKind } from '@/sde/types';
 import { EXTRACTOR_HEADS_MAX, spareCapacity } from '@/engine/pi/pinBudget';
-import type { PinLoad } from '@/engine/pi/types';
+import type { PinCounts, PinLoad } from '@/engine/pi/types';
 import type { BuiltColonyAdvice } from './advisorModel';
 import { colonyFactoryBalance } from './factoryBalanceModel';
 import { idleFacilityPlan, type IdleFacilityPlan } from './colonyActionModel';
@@ -86,6 +86,22 @@ export function nearestPin(
  * extractor" and "6 high-tech plants" wants to hear about the six. Two, because
  * the sentence this lands in is a caveat on another number, not a list.
  */
+/** The pins a fitted layout is made of, as "2x Extractor Control Unit -> 6x Basic". */
+export const LAYOUT_KINDS: readonly PiPinKind[] = [
+  'extractorControlUnit',
+  'basic',
+  'advanced',
+  'highTech',
+];
+
+export function layoutLabel(pins: PinCounts, t: TFunction): string {
+  return LAYOUT_KINDS.filter((kind) => (pins[kind] ?? 0) > 0)
+    .map((kind) =>
+      t('piAdvisor.layoutPin', { count: pins[kind], pin: t(`piAdvisor.pinKind.${kind}`) })
+    )
+    .join(' → ');
+}
+
 export function roomSummary(headroom: Record<PiPinKind, number>, t: TFunction): string {
   return [...HEADROOM_KINDS]
     .filter((kind) => (headroom[kind] ?? 0) > 0)

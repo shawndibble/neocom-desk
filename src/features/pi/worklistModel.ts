@@ -47,7 +47,7 @@
  *    treated as zero ISK, either of which would misrepresent it.
  */
 import type { PlanetType } from '@/esi/endpoints';
-import type { PinLoad } from '@/engine/pi/types';
+import type { PinCounts, PinLoad } from '@/engine/pi/types';
 
 export type WorklistVerb = 'haul' | 'remove' | 'add' | 'swap' | 'rebuild';
 
@@ -73,6 +73,9 @@ export interface WorklistRow {
   pinCount?: number;
   /** On a `haul` row: what the colony can hold, against what the pilot's cadence needs. */
   window?: { hoursToFull: number; haulHours: number };
+  /** On a `rebuild` row: the tier and the pins the layout is made of. */
+  tier?: number;
+  pins?: PinCounts;
   /** On the `add` row a removal pays for: the extraction it buys, and what that feeds. */
   heads?: number;
   unitsPerHour?: number;
@@ -116,6 +119,15 @@ export interface WorklistRebuild {
   label: string;
   tier: number;
   marginPerHour: number;
+  /**
+   * The pins the fitted layout is built from. A tier and a product name say
+   * what the planet would make; they do not say what a pilot would have to go
+   * and place, which is the difference between a score and an instruction.
+   *
+   * Counts rather than a formatted string: naming a pin is i18n's job, and
+   * this module has no `t` and should not grow one.
+   */
+  pins: PinCounts;
 }
 
 /** How long this colony lasts before it fills, against how long it is left. */

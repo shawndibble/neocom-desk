@@ -100,7 +100,7 @@ describe('NetworkPanel', () => {
     expect(screen.getByText(/this system’s 6% customs rate/)).toBeInTheDocument();
   });
 
-  it('groups blocked products by reason into a count, not one bullet each', () => {
+  it('names the blocked products in the row, rather than counting them', () => {
     render(
       <NetworkPanel
         hub={DEFAULT_TRADE_HUB}
@@ -115,11 +115,37 @@ describe('NetworkPanel', () => {
       />
     );
     expect(screen.getByText('— the customs office takes more than it earns')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '2 products' })).toBeInTheDocument();
-    expect(screen.queryByText('Oxides')).not.toBeInTheDocument();
+    // The name is the actionable part and `network.ts` has always carried it.
+    // Behind a hover it was read by nobody who did not already know to hover.
+    expect(screen.getByText('Oxides, Coolant')).toBeInTheDocument();
   });
 
-  it('names every blocked product in the count’s tooltip, however many there are', () => {
+  /**
+   * The one reason a pilot can do nothing about: the greedy allocator gave
+   * this product's inputs to a better-paying one, which is the plan already
+   * making the better choice. Listing it beside real problems dilutes them.
+   */
+  it('says nothing about a product whose inputs went to a better-paying one', () => {
+    render(
+      <NetworkPanel
+        hub={DEFAULT_TRADE_HUB}
+        plan={plan(
+          [opportunity({ hostPlanetId: 1, marginPerHour: 500 })],
+          blocked('inputs-spoken-for', ['Oxides'])
+        )}
+        buyInputs
+        assumesRemoval={false}
+        planetNames={planetNames}
+        taxRate={0.06}
+      />
+    );
+    expect(
+      screen.queryByText(/its inputs went to a better-paying product/)
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/Oxides/)).not.toBeInTheDocument();
+  });
+
+  it('shows the first few names and keeps the rest behind an overflow', () => {
     const names = ['A', 'B', 'C', 'D', 'E', 'F', 'G'];
     render(
       <NetworkPanel
@@ -134,8 +160,11 @@ describe('NetworkPanel', () => {
         taxRate={0.06}
       />
     );
-    const trigger = screen.getByRole('button', { name: '7 products' });
+    // Truncating *names* leaves a reader something to act on; truncating to a
+    // bare count leaves them a number to interrogate.
+    expect(screen.getByText('A, B, C, D')).toBeInTheDocument();
+    const trigger = screen.getByRole('button', { name: '+3 more' });
     fireEvent.focus(trigger);
-    expect(screen.getByRole('tooltip')).toHaveTextContent('A, B, C, D, E, F, G');
+    expect(screen.getByRole('tooltip')).toHaveTextContent('E, F, G');
   });
 });
