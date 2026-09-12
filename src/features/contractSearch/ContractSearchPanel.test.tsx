@@ -123,10 +123,10 @@ vi.mock('@/sde/loadMarketSde', () => ({
   loadSolarSystemJumps: vi.fn(async () => JUMPS),
 }));
 
-/** Column order: route, reward, collateral, volume, jumps, ISK/jump, expires. */
+/** Column order: route, reward, collateral, jumps, ISK/jump, expires. */
 const COLLATERAL_CELL = 2;
-const JUMPS_CELL = 4;
-const ISK_PER_JUMP_CELL = 5;
+const JUMPS_CELL = 3;
+const ISK_PER_JUMP_CELL = 4;
 
 const CHAR_ID = 91;
 
@@ -449,10 +449,8 @@ describe('ContractSearchPanel — Courier mode', () => {
   });
 
   it('re-measures every haul when the route preference changes', async () => {
-    // A hauler who only flies highsec and one who will cross a 0.3 system are
-    // asking different questions of the same contract. Four jumps the safe
-    // way, two through lowsec — so the preference is a control, and the whole
-    // filtered set is re-ranked on it, not just the visible page.
+    // Four jumps the safe way, two through lowsec — and the whole filtered
+    // set is re-ranked on the change, not just the visible page.
     await showCourier();
 
     const rows = await waitFor(async () => {
@@ -531,10 +529,9 @@ describe('ContractSearchPanel — Courier mode', () => {
     expect(stated[COLLATERAL_CELL]).not.toBe('—');
   });
 
-  it('states an absent deadline as unstated in the detail, where the deadline now lives', async () => {
-    // The Days column gave way to Jumps and ISK/jump (the table's seven-column
-    // ceiling); a deadline is checked once on a haul already under
-    // consideration, not ranked across fifty rows.
+  it('states an absent deadline as unstated in the detail, which is where it lives', async () => {
+    // A deadline is a constraint checked once on a haul under consideration,
+    // so it is a filter and a detail figure rather than a column.
     await showCourier();
     const rows = await waitFor(async () => {
       const found = await bodyRows();

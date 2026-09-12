@@ -45,13 +45,6 @@ const ROW_CAP = 50;
 /** `Select` has no null value, so "no region chosen" needs a sentinel option. */
 const ALL_REGIONS = 'all';
 
-/**
- * One decimal, the same precision the industry tables give a hauling volume.
- * `toLocaleString` would give between none and three, which down a
- * `tabular-nums` column is a ragged edge where the point should line up.
- */
-const VOLUME_FORMAT = new Intl.NumberFormat('en', { maximumFractionDigits: 1 });
-
 /** The filter as the controls hold it: text fields stay strings until they are parsed into the engine's filter. */
 interface CourierUiFilter {
   routeQuery: string;
@@ -358,6 +351,14 @@ const DEFAULT_ROUTE_PREFERENCE: RoutePreferenceKind = 'prefer-highsec';
 type JumpsState =
   { kind: 'pending' } | { kind: 'known'; counts: readonly (number | null)[] } | { kind: 'unknown' };
 
+/**
+ * One shared instance. A fresh object here would change identity on every
+ * render, and this value is a dependency of the row ranking, the jump lookup
+ * and the column set — so all three would recompute continuously for exactly
+ * as long as the board is loading, which is when the filtered set is largest.
+ */
+const PENDING: JumpsState = { kind: 'pending' };
+
 function useJumpCounts(
   rows: readonly CourierRouteRow[],
   preference: RoutePreferenceKind
@@ -373,7 +374,7 @@ function useJumpCounts(
   } | null>(null);
 
   useEffect(() => {
-    let current = true;
+    let cancelled = false;
     void localJumpCountsForRoutes(
       rows.map((row) => ({
         originSystemId: row.origin.systemId,
@@ -381,17 +382,16 @@ function useJumpCounts(
       })),
       preference
     ).then((state) => {
-      // A later preference or filter has already superseded this answer.
-      if (current) setAnswer({ rows, preference, state });
+      if (!cancelled) setAnswer({ rows, preference, state });
     });
     return () => {
-      current = false;
+      cancelled = true;
     };
   }, [rows, preference]);
 
   return answer && answer.rows === rows && answer.preference === preference
     ? answer.state
-    : { kind: 'pending' };
+    : PENDING;
 }
 
 /**
@@ -412,7 +412,15 @@ interface CourierResultsProps {
   regionNames: ReadonlyMap<number, string>;
 }
 
-/** Public courier contracts as hauls: route, distance, pay rate, cargo and risk. */
+/**
+ * Public courier contracts as hauls: route, distance, pay rate and risk.
+ *
+ * Volume and deadline are filters and detail-modal figures rather than
+ * columns. Both are constraints a hauler settles once — does this fit my
+ * hull, am I given long enough — not figures worth ranking fifty rows by, and
+ * the table's width is owed to the ones that are. Dropping the pair is also
+ * what keeps a stacked card at the height it had before ISK/jump arrived.
+ */
 export function CourierResults({ rows, regionNames }: CourierResultsProps) {
   const { t } = useTranslation();
   const timeZone = useTimeZone();
@@ -541,21 +549,14 @@ export function CourierResults({ rows, regionNames }: CourierResultsProps) {
           courierCollateral(row) === 0 ? '—' : formatIsk(courierCollateral(row), 2),
       },
       {
-        id: 'volume',
-        header: t('contractSearch.volumeColumn'),
-        align: 'right',
-        className: 'tabular-nums whitespace-nowrap',
-        sortValue: (row) => row.volume,
-        render: (row) => `${VOLUME_FORMAT.format(row.volume)} m³`,
-      },
-      {
         id: 'jumps',
         header: t('contractSearch.jumpsColumn'),
         align: 'right',
         className: 'tabular-nums',
-        // No distance sorts last rather than as zero: zero would rank an
-        // unmeasurable haul above every real one under the default sort.
-        sortValue: (row) => jumpsByContract.get(row.contractId) ?? Number.POSITIVE_INFINITY,
+        // `undefined`, never a stand-in figure: `DataTable` sinks a valueless
+        // row to the end in *either* direction, where a large or small
+        // sentinel would lead the table on one of them.
+        sortValue: (row) => jumpsByContract.get(row.contractId) ?? undefined,
         render: (row) => {
           if (jumps.kind === 'pending') return <span className="text-text-dim">…</span>;
           const count = jumpsByContract.get(row.contractId) ?? null;
@@ -574,8 +575,9 @@ export function CourierResults({ rows, regionNames }: CourierResultsProps) {
         header: t('contractSearch.iskPerJumpColumn'),
         align: 'right',
         className: 'tabular-nums whitespace-nowrap',
+        /** Same rule as Jumps above: no rate sinks the row, in either direction. */
         sortValue: (row) =>
-          iskPerJump(row.reward, jumpsByContract.get(row.contractId) ?? null) ?? -1,
+          iskPerJump(row.reward, jumpsByContract.get(row.contractId) ?? null) ?? undefined,
         render: (row) => {
           if (jumps.kind === 'pending') return <span className="text-text-dim">…</span>;
           const rate = iskPerJump(row.reward, jumpsByContract.get(row.contractId) ?? null);

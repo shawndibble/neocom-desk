@@ -20,17 +20,13 @@ import {
   type JumpGraph,
 } from './jumpRoute';
 
-/**
- * One row's two ends. Either may be `null` — a haul into a player structure
- * has no system this app can place, and that is a haul with no measurable
- * distance rather than a short one.
- */
+/** One row's two ends; `null` where the location resolves to no system. */
 export interface RouteEnds {
   originSystemId: number | null;
   destinationSystemId: number | null;
 }
 
-/** Above this many destinations, one sweep beats that many single lookups. */
+/** From this many destinations up, one sweep beats that many single lookups. */
 const SWEEP_THRESHOLD = 2;
 
 /**
@@ -56,7 +52,14 @@ export function jumpCountsForRoutes(
     if (indexes.length >= SWEEP_THRESHOLD) {
       const distances = jumpDistancesFrom(graph, originSystemId, options);
       for (const index of indexes) {
-        counts[index] = distances.get(routes[index].destinationSystemId as number) ?? null;
+        const destinationSystemId = routes[index].destinationSystemId as number;
+        // The same membership guard the single-lookup path applies. A
+        // truncated snapshot can leave an id inside a neighbour array with no
+        // entry of its own, and a sweep would then reach it while a lookup
+        // called it unroutable — one haul, two answers, decided by how many
+        // destinations happened to share its origin.
+        if (!graph.has(destinationSystemId)) continue;
+        counts[index] = distances.get(destinationSystemId) ?? null;
       }
       continue;
     }
