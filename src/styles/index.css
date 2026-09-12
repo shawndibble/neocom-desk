@@ -47,6 +47,19 @@
 }
 
 /*
+ * The browser's default ::view-transition-group animation morphs the old
+ * outlet's captured box into the new one's (interpolating size/position),
+ * on top of the old/new cross-fade above. Routes here vary wildly in height
+ * (e.g. a short page to Industry's tall one), so that morph reads as the
+ * page squashing down to the old size and then snapping to full size the
+ * instant the transition ends. Disabling it leaves just the opacity
+ * cross-fade, with no resize animation.
+ */
+::view-transition-group(app-outlet) {
+  animation: none;
+}
+
+/*
  * Scan only the app source. Tailwind's automatic content detection walks every
  * non-gitignored file, so Markdown under `docs/` that merely *mentions* a class
  * name emits real utility rules into the shipped stylesheet.
