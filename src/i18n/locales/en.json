@@ -2139,6 +2139,9 @@
   },
   "contracts": {
     "title": "Contracts",
+    "tabsLabel": "Contracts sections",
+    "historyTab": "History",
+    "searchTab": "Search",
     "refresh": "Refresh",
     "emptyTitle": "No contracts cached",
     "emptyHint": "Reconnect to fetch this character's contracts.",
@@ -3506,5 +3509,41 @@
     "openWithCount": "Filters ({{count}} active)",
     "apply": "Apply",
     "cancel": "Cancel"
+  },
+  "contractSearch": {
+    "title": "Contract Search",
+    "refresh": "Refresh",
+    "searchPlaceholder": "Search item name…",
+    "regionLabel": "Region",
+    "allRegions": "All regions",
+    "maxPriceLabel": "Max price",
+    "minQuantityLabel": "Min qty",
+    "saleKindLabel": "Contract type",
+    "saleKind": {
+      "exchange": "Item Exchange",
+      "auction": "Auction"
+    },
+    "itemColumn": "Item",
+    "qtyColumn": "Qty",
+    "priceColumn": "Price",
+    "regionColumn": "Region",
+    "expiresColumn": "Expires",
+    "startingBidShort": "bid",
+    "buyoutShort": "buyout",
+    "suggestionsHeading": "Pick an item",
+    "suggestionsLabel": "Matching items",
+    "suggestionOffers_one": "{{count}} offer",
+    "suggestionOffers_other": "{{count}} offers",
+    "offersLabel": "Offers",
+    "cheapestLabel": "Cheapest",
+    "medianLabel": "Median",
+    "clearItem": "Clear item",
+    "showAll": "Show all ({{count}} total)",
+    "emptyTitle": "No public contracts synced yet",
+    "emptyHint": "The public contract index refreshes on its own schedule — check back shortly.",
+    "notConfiguredTitle": "Contract search isn't available",
+    "notConfiguredHint": "This requires the app's sync backend, which isn't configured here.",
+    "noFilterMatches": "No public contracts match your filters.",
+    "noFilterMatchesHint": "Clear the item search or widen the region, price and quantity filters."
   }
 }

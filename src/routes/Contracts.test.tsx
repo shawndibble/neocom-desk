@@ -28,6 +28,16 @@ vi.mock('@/sde/loadSde', () => ({
   loadMarketWideTrees: vi.fn(async () => ({})),
 }));
 
+// The Search tab reads a Firestore snapshot. Forced off here so this file
+// stays about the tab strip and the character-contracts table: whether a sync
+// backend is configured otherwise depends on whether a `.env` happens to sit
+// beside the checkout, which would make these tests environment-dependent.
+// `ContractSearchPanel.test.tsx` covers the configured path.
+vi.mock('@/app/syncStatus', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/app/syncStatus')>();
+  return { ...actual, isSyncConfigured: vi.fn(() => false) };
+});
+
 const CHAR_ID = 91;
 
 const contractPage1 = [
@@ -390,5 +400,77 @@ describe('Contracts row context menu (issue #676)', () => {
     await user.click(await screen.findByText('Rifter fit'));
 
     expect(await screen.findByRole('dialog')).toBeInTheDocument();
+  });
+});
+
+describe('Contracts tab strip (issue #908)', () => {
+  const SEARCH_UNAVAILABLE = "Contract search isn't available";
+
+  it('lands on History, with the character contracts table and no tab in the URL', async () => {
+    render(<App />);
+    expect(await screen.findByText('Rifter fit')).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'History' })).toHaveAttribute('aria-selected', 'true');
+    expect(window.location.search).toBe('');
+  });
+
+  it('swaps the contracts table for the public search when Search is picked', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText('Rifter fit');
+
+    await user.click(screen.getByRole('tab', { name: 'Search' }));
+
+    expect(await screen.findByText(SEARCH_UNAVAILABLE)).toBeInTheDocument();
+    expect(screen.queryByRole('table', { name: 'Contracts' })).not.toBeInTheDocument();
+    expect(window.location.search).toBe('?tab=search');
+  });
+
+  it('opens the Search tab from a deep link, and drops the tab again on the way back', async () => {
+    const user = userEvent.setup();
+    window.history.pushState({}, '', '/contracts?tab=search');
+    render(<App />);
+
+    expect(await screen.findByText(SEARCH_UNAVAILABLE)).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Search' })).toHaveAttribute('aria-selected', 'true');
+
+    await user.click(screen.getByRole('tab', { name: 'History' }));
+
+    expect(await screen.findByText('Rifter fit')).toBeInTheDocument();
+    // History is the default, so it stays out of the URL entirely.
+    expect(window.location.search).toBe('');
+  });
+
+  it('reaches Search even when this character has no contracts of its own', async () => {
+    // The empty-history state used to be the whole page; the Search tab reads
+    // a public snapshot and must not be gated behind it.
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/contracts`, () =>
+        HttpResponse.json([], { headers: { 'X-Pages': '1' } })
+      )
+    );
+    const user = userEvent.setup();
+    render(<App />);
+    expect(await screen.findByText(/no contracts cached/i)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('tab', { name: 'Search' }));
+
+    expect(await screen.findByText(SEARCH_UNAVAILABLE)).toBeInTheDocument();
+    expect(screen.queryByText(/no contracts cached/i)).not.toBeInTheDocument();
+  });
+
+  it('reaches Search even when the contracts scope was revoked', async () => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/contracts`, () =>
+        HttpResponse.json({ error: 'missing scope' }, { status: 403 })
+      )
+    );
+    const user = userEvent.setup();
+    render(<App />);
+    expect(await screen.findByText('Log in again to see your contracts')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('tab', { name: 'Search' }));
+
+    expect(await screen.findByText(SEARCH_UNAVAILABLE)).toBeInTheDocument();
+    expect(screen.queryByText('Log in again to see your contracts')).not.toBeInTheDocument();
   });
 });

@@ -168,6 +168,7 @@ here — they go one per file in `docs/context/decisions/`.
   other right now — usually variants of one thing. Distinct from the
   **Quickbar**, which is the durable list of items the user returns to across
   sessions. Different lifetimes, so two lists, not one.
+- **Contract Search**: The **Contracts** page's second tab (History / Search, issue #908). Search over every for-sale line of every public item_exchange/auction contract in New Eden — any item type — by item name, region, price, quantity and contract type. Reads the same **Public Contract Offers snapshot** as **BPC Sourcing**, but whole rather than narrowed to blueprint copies, so ME/TE/runs play no part in it. Public-contract data only: unlike BPC Sourcing it never merges in the Character's or corp's own assets. Distinct from the History tab beside it, which is one Character's own issued/accepted contracts read straight from ESI.
 - **Corp Access**: The single resolved state `useCorpAccess()` returns for the
   active Character, composing Corp Capability with granted scopes: `unknown`
   (not resolved yet), `none` (no Corp Role), `roles-without-grant` (holds a
@@ -545,7 +546,7 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   device that has not been opened inside that window stops receiving Scheduled
   Pushes until it is, which is the accepted consequence of holding no tokens
   server-side.
-- **Public Contract Offers snapshot**: the shared, read-only Firestore collection (`publicContractOffers`) holding every for-sale line of every public item_exchange/auction contract, any item type — the same twice-hourly EVE Ref crawl behind **BPC Sourcing**, generalized past blueprint copies (issue #906). "For sale" is the whole of it: a line the contract issuer is _asking_ for is not in the snapshot. It is the only public-contract snapshot: **BPC Sourcing** reads it too, narrowing it to blueprint copies in the browser, which is what let the blueprint-only `publicBpcContracts` collection and its sync be retired (issue #907).
+- **Public Contract Offers snapshot**: the shared, read-only Firestore collection (`publicContractOffers`) holding every for-sale line of every public item_exchange/auction contract, any item type — the same twice-hourly EVE Ref crawl behind **BPC Sourcing**, generalized past blueprint copies (issue #906). "For sale" is the whole of it: a line the contract issuer is _asking_ for is not in the snapshot. It is the only public-contract snapshot, and has two readers: **BPC Sourcing** narrows it to blueprint copies in the browser — which is what let the blueprint-only `publicBpcContracts` collection and its sync be retired (issue #907) — and **Contract Search** takes it whole (issue #908). The two read and cache it separately rather than sharing one full-size entry.
 - **Pull Cursor**: How far a sync pass has read one remote collection for one
   Character — the highest `updatedAt` it has actually observed there, plus when
   it last read that collection unfiltered. The next pass asks Firestore only
