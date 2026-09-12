@@ -743,6 +743,59 @@ export interface ProductionOrderWatchRecord {
   updatedAt: number;
 }
 
+/**
+ * A BPC Sourcing watch (issue #926): a pilot's saved search over the shared
+ * Public Contract Offers snapshot, notified on a genuinely new or cheaper
+ * matching offer. Device-local, like the Quickbar and every other synced-cache
+ * user list — the filter is a personal search, not shared Editable Data.
+ *
+ * Carries no `characterId`: unlike every other per-character record in this
+ * file, the search this watches is Character-independent (the shared public
+ * snapshot, not one Character's own ESI state) — see
+ * `engine/contracts/bpcWatch.ts`'s module doc for why this is its own
+ * standalone mechanism rather than a `NotificationEventDef`.
+ *
+ * `typeIds`/`spaceKinds` are plain arrays, not `Set`s: Dexie/IndexedDB
+ * structured-clones a stored `Set` fine, but every other filter-shaped record
+ * in this codebase stores arrays, and `engine/contracts/bpcSearch.ts`'s
+ * `BpcSearchFilter` only needs a `Set` at the point it filters rows — the
+ * conversion lives at `features/bpcContracts/watches.ts`'s boundary, same as
+ * `activeSpaceKinds` already converts `useSpaceFilter`'s stored array in
+ * `BpcSourcingPanel.tsx`.
+ */
+export interface BpcSearchWatchRecord {
+  id: string;
+  name: string;
+  typeIds: number[] | null;
+  regionId: number | null;
+  minMe: number | null;
+  minTe: number | null;
+  minRuns: number | null;
+  maxPrice: number | null;
+  /**
+   * Deliberately *not* `SpaceKind[]` at the type level (that would pull
+   * `engine/space` into `src/db`, which ARCHITECTURE.md's module map keeps
+   * dependency-free of feature code) — `features/bpcContracts/watches.ts`
+   * narrows this back to `SpaceKind[]` at its own boundary.
+   */
+  spaceKinds: string[] | null;
+  /**
+   * This watch's diff baseline (`engine/contracts/bpcWatch.ts`'s
+   * `BpcWatchState`), persisted so a poll days later still knows what it
+   * already told the pilot about. Reset to empty whenever the filter itself
+   * changes (`features/bpcContracts/watches.ts`'s `updateWatch`) — a changed
+   * search is a fresh, unobserved one, the same re-arm-on-edit rule
+   * `20260909-192510-quickbar-price-alerts-re-arm-key-hub-price.md` applies to
+   * a Quickbar price alert's target.
+   */
+  seenContractIds: number[];
+  minPriceSeen: number | null;
+  /** Epoch ms of the create. */
+  createdAt: number;
+  /** Epoch ms of the last edit (a rename or a filter change). */
+  updatedAt: number;
+}
+
 export const db = new Dexie('neocom') as Dexie & {
   characters: EntityTable<CharacterRecord, 'characterId'>;
   tokens: EntityTable<TokenRecord, 'characterId'>;
@@ -759,6 +812,7 @@ export const db = new Dexie('neocom') as Dexie & {
   productionOrderWatches: EntityTable<ProductionOrderWatchRecord, 'id'>;
   payees: EntityTable<PayeeRecord, 'id'>;
   miningTaxAssignments: EntityTable<MiningTaxAssignmentRecord, 'id'>;
+  bpcSearchWatches: EntityTable<BpcSearchWatchRecord, 'id'>;
 };
 
 db.version(1).stores({
@@ -897,4 +951,26 @@ db.version(10).stores({
   productionOrderWatches: 'id, characterId, runId',
   payees: 'id, characterId',
   miningTaxAssignments: 'id, characterId, [characterId+date+solarSystemId]',
+});
+
+// Additive: v10 stores unchanged, plus BPC Sourcing watches (issue #926).
+// Device-local and character-independent (see `BpcSearchWatchRecord`), so
+// unlike every other new table added here it carries no `characterId` index.
+db.version(11).stores({
+  characters: 'characterId, corporationId',
+  tokens: 'characterId',
+  settings: 'key',
+  skillPlans: 'id, characterId',
+  esiCache: '[characterId+key]',
+  buildPlans: 'id, characterId',
+  quickbars: 'id, characterId',
+  stationPins: 'id, characterId, locationId',
+  planetRichness: 'id, characterId, planetId',
+  notificationFeed: 'id, characterId, firedAt',
+  productionRuns: 'id, characterId, buildPlanId',
+  productionSaleLinks: 'id, characterId, runId',
+  productionOrderWatches: 'id, characterId, runId',
+  payees: 'id, characterId',
+  miningTaxAssignments: 'id, characterId, [characterId+date+solarSystemId]',
+  bpcSearchWatches: 'id',
 });
