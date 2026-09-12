@@ -497,11 +497,8 @@ export function Mail() {
                     const party = tab === 'sent' ? recipientSummary(header) : sender;
                     return (
                       <li key={header.mail_id}>
-                        {/* The context menu wraps the row button rather than
-                            adding anything inside it: the row keeps exactly one
-                            focusable element, and the menu's sender comes from
-                            `header.from`, not the rendered text, which on Sent
-                            is the recipient summary. */}
+                        {/* Wraps the row button rather than adding anything inside
+                            it, so the row keeps exactly one focusable element. */}
                         <MailRowContextMenu mailId={header.mail_id} senderId={header.from}>
                           <button
                             type="button"
@@ -535,8 +532,8 @@ export function Mail() {
                             )}
                           >
                             {/* Unread marker, in a fixed-width gutter so read and
-                              unread rows keep one left edge — the empty gutter
-                              is itself the "read" signal. */}
+                                unread rows keep one left edge — the empty gutter
+                                is itself the "read" signal. */}
                             <span
                               aria-hidden="true"
                               className="mt-1.5 flex w-1.5 shrink-0 justify-center"
@@ -546,8 +543,8 @@ export function Mail() {
 
                             <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                               {/* The subject wraps rather than truncating: a
-                                clipped subject was the readability complaint,
-                                and it is the field that identifies a mail. */}
+                                  clipped subject was the readability complaint,
+                                  and it is the field that identifies a mail. */}
                               <span
                                 className={cx(
                                   'line-clamp-2 text-sm break-words',
@@ -558,13 +555,13 @@ export function Mail() {
                               </span>
                               <span className="flex items-center gap-1.5 text-xs text-text-dim">
                                 {/* Glyph *and* the folder's name, not the glyph
-                                  alone: DESIGN.md §5 blesses a bare decorative
-                                  icon only "beside its own visible text label",
-                                  and dropping the name would have made folder
-                                  identity harder to see than the uppercase tag
-                                  this replaced — the opposite of the point,
-                                  now that several folders share one list by
-                                  default. */}
+                                    alone: DESIGN.md §5 blesses a bare decorative
+                                    icon only "beside its own visible text label",
+                                    and dropping the name would have made folder
+                                    identity harder to see than the uppercase tag
+                                    this replaced — the opposite of the point,
+                                    now that several folders share one list by
+                                    default. */}
                                 <FolderIcon
                                   aria-hidden="true"
                                   size={Icon.ICON_SIZE.sm}
@@ -589,10 +586,10 @@ export function Mail() {
                             </span>
 
                             {/* The dot and the bold weight say "unread" in
-                              colour and typography only — DESIGN.md §7's
-                              "colour is never the sole signal" wants it in
-                              words too. The folder needs no such gloss: its
-                              name is rendered above. */}
+                                colour and typography only — DESIGN.md §7's
+                                "colour is never the sole signal" wants it in
+                                words too. The folder needs no such gloss: its
+                                name is rendered above. */}
                             {!isRead && <span className="sr-only">{t('mail.unread')}</span>}
                           </button>
                         </MailRowContextMenu>
