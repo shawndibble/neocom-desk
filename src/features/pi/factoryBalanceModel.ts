@@ -68,6 +68,23 @@ export function surplusLoad(balance: readonly FactoryBalance[], pi: PiData): Pin
 }
 
 /**
+ * The pins a line is actually running on, which is what both credits its
+ * output and charges its inputs.
+ *
+ * A measured line runs on the pins its own inputs can feed. A line whose
+ * inputs arrive from off the planet has no measurable feeding here by
+ * construction, so it is taken at its built count — the pilot who set up those
+ * routes is feeding it.
+ *
+ * Extracted into one place because it is the rule this whole module turns on:
+ * when the credit and the charge disagreed about it, a colony was paid for
+ * eight pins of Nanites and billed for none of the Bacteria they eat.
+ */
+function effectivePins(line: FactoryBalance): number {
+  return line.status === 'measured' ? Math.min(line.pins, line.feedablePins) : line.pins;
+}
+
+/**
  * What this colony actually puts out an hour, by product typeID.
  *
  * The *fed* rate, not the built one: eight Basic factories on an extractor
@@ -81,6 +98,22 @@ export function surplusLoad(balance: readonly FactoryBalance[], pi: PiData): Pin
  * set up those routes is feeding it; assuming otherwise would erase a working
  * P2 colony from the network it is already part of.
  */
+export function colonyOutputPerHour(
+  balance: readonly FactoryBalance[],
+  pi: PiData
+): Map<number, number> {
+  const out = new Map<number, number>();
+  for (const line of balance) {
+    const schematic = pi.schematics[String(line.typeId)];
+    if (!schematic || schematic.cycleTime <= 0) continue;
+    const perPin = (schematic.quantity * SECONDS_PER_HOUR) / schematic.cycleTime;
+    const pins = effectivePins(line);
+    if (pins <= 0) continue;
+    out.set(line.typeId, (out.get(line.typeId) ?? 0) + perPin * pins);
+  }
+  return out;
+}
+
 /**
  * Same role as `factoryBalance.ts`'s own `EPSILON`: absorbs float drift so a
  * colony whose production exactly saturates its own factories nets to true
@@ -109,16 +142,32 @@ const NET_EPSILON = 1e-9;
  * charged for its Bacteria at zero, and the difference was offered to the
  * network planner as supply to spend.
  *
- * The fix is the symmetry `colonyOutputPerHour` already assumes: a line whose
- * inputs arrive from off the planet is taken at its built pin count, because
- * the pilot who set up those routes is feeding it. If that is the reason to
- * credit its output at eight pins, it is the same reason to charge its inputs
- * at eight pins. A measured line is charged at the pins its inputs can
- * actually feed, which is what it is credited at.
+ * Both sides now read `effectivePins`, so a line is charged on exactly the
+ * pins it is credited on. That is a deliberate pairing rather than a proof:
+ * crediting output at eight pins assumes *every* input arrives, imported ones
+ * included, while charging the local input at eight pins assumes the local one
+ * fills them. Both cannot be maximal at once, and they diverge on a colony
+ * importing some Bacteria *and* making its own — the whole draw is charged
+ * against what it makes, so its real surplus nets low.
+ *
+ * That error is one-directional, and its direction is what each caller needs.
+ * The network planner understates what is going spare, which is the side that
+ * cannot invent a facility nobody can feed. `saleableOutputPerHour`
+ * understates earnings, which is the same direction this app takes everywhere
+ * a figure cannot be measured exactly.
  *
  * Inputs this colony does not produce are counted too, harmlessly: every
  * caller subtracts this from a map of local output, where an imported type has
  * no entry to take from.
+ *
+ * ## Not `demandPerHour`, and not `demandByInput`
+ *
+ * Both already exist and neither can be used here, so this recomputes from the
+ * schematic on purpose. `demandPerHour` lives only on a *measured* line —
+ * reading it is exactly the bug, and the code this replaced did precisely that
+ * before its `status !== 'measured'` guard dropped the line that mattered.
+ * `factoryBalance`'s own `demandByInput` scales every line at built pins,
+ * which is right for an imported-input line and wrong for a measured one.
  */
 export function colonyLocalDrawPerHour(
   balance: readonly FactoryBalance[],
@@ -128,7 +177,7 @@ export function colonyLocalDrawPerHour(
   for (const line of balance) {
     const schematic = pi.schematics[String(line.typeId)];
     if (!schematic || schematic.cycleTime <= 0) continue;
-    const pins = line.status === 'measured' ? Math.min(line.pins, line.feedablePins) : line.pins;
+    const pins = effectivePins(line);
     if (pins <= 0) continue;
     for (const input of schematic.inputs) {
       const perPin = (input.quantity * SECONDS_PER_HOUR) / schematic.cycleTime;
@@ -154,27 +203,28 @@ export function colonyExportablePerHour(
   balance: readonly FactoryBalance[],
   pi: PiData
 ): Map<number, number> {
-  const draw = colonyLocalDrawPerHour(balance, pi);
-  const exportable = new Map<number, number>();
-  for (const [typeId, unitsPerHour] of colonyOutputPerHour(balance, pi)) {
-    const net = unitsPerHour - (draw.get(typeId) ?? 0);
-    if (net > unitsPerHour * NET_EPSILON) exportable.set(typeId, net);
-  }
-  return exportable;
+  return netAgainstDraw(colonyOutputPerHour(balance, pi), colonyLocalDrawPerHour(balance, pi));
 }
 
-export function colonyOutputPerHour(
-  balance: readonly FactoryBalance[],
-  pi: PiData
+/**
+ * `produced` less `draw`, keeping only what is genuinely left over.
+ *
+ * Shared because the subtraction is done twice over different `produced` maps
+ * — this colony's factory output for the network's supply pool, and that plus
+ * its extraction for what it has to sell — and the float reasoning behind the
+ * threshold should not have to be rediscovered at the second call site.
+ *
+ * A product whose draw meets or exceeds its production comes back absent
+ * rather than zero, so a caller iterating the result never special-cases it.
+ */
+export function netAgainstDraw(
+  produced: ReadonlyMap<number, number>,
+  draw: ReadonlyMap<number, number>
 ): Map<number, number> {
-  const out = new Map<number, number>();
-  for (const line of balance) {
-    const schematic = pi.schematics[String(line.typeId)];
-    if (!schematic || schematic.cycleTime <= 0) continue;
-    const perPin = (schematic.quantity * SECONDS_PER_HOUR) / schematic.cycleTime;
-    const pins = line.status === 'measured' ? Math.min(line.pins, line.feedablePins) : line.pins;
-    if (pins <= 0) continue;
-    out.set(line.typeId, (out.get(line.typeId) ?? 0) + perPin * pins);
+  const net = new Map<number, number>();
+  for (const [typeId, unitsPerHour] of produced) {
+    const left = unitsPerHour - (draw.get(typeId) ?? 0);
+    if (left > unitsPerHour * NET_EPSILON) net.set(typeId, left);
   }
-  return out;
+  return net;
 }

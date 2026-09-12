@@ -150,7 +150,7 @@ function buildNetworkColonies(input: NetworkModelInput): {
       // for its own Nanite pins has none to route anywhere, and handing the
       // planner its gross output is what let it propose a second consumer for
       // material the first one was already short of.
-      outputPerHour: colonyExportablePerHour(balance, input.pi),
+      exportablePerHour: colonyExportablePerHour(balance, input.pi),
       spare: {
         cpu: Math.max(0, colony.budget.cpu - colony.pinLoad.load.cpu) + freed.cpu,
         powergrid:

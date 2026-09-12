@@ -63,15 +63,8 @@ import {
   colonyFactoryBalance,
   colonyLocalDrawPerHour,
   colonyOutputPerHour,
+  netAgainstDraw,
 } from './factoryBalanceModel';
-
-/**
- * Same role as `factoryBalance.ts`'s own `EPSILON` and `chain.ts`'s
- * `CEIL_EPSILON`: absorbs float drift so a colony whose extraction exactly
- * saturates its own factories nets to true zero rather than a signed trace.
- * Relative to the produced rate rather than a fixed floor — see the call site.
- */
-const NET_EPSILON = 1e-9;
 
 export interface ColonyEarningsPrices {
   /** ISK per unit by typeID, the ask. A type the hub does not quote is absent, never zero. */
@@ -112,18 +105,12 @@ export function saleableOutputPerHour(colony: BuiltColonyAdvice, pi: PiData): Ma
   // supply pool now read.
   const consumedLocally = colonyLocalDrawPerHour(balance, pi);
 
-  const saleable = new Map<number, number>();
-  for (const [typeId, unitsPerHour] of produced) {
-    const net = unitsPerHour - (consumedLocally.get(typeId) ?? 0);
-    // Relative, not absolute: these rates run from 5 ISK ore to 21,201
-    // units/hr, so a fixed floor would be too loose at the low end or too
-    // tight at the high one. A colony whose extraction exactly saturates its
-    // own factories nets to something like 4.5e-13 in float, not zero, and
-    // without this a phantom trace of P0 the hub does not quote would land
-    // in `unpriced` and suppress a real colony's earnings line for it.
-    if (net > unitsPerHour * NET_EPSILON) saleable.set(typeId, net);
-  }
-  return saleable;
+  // The threshold inside is relative, not absolute, and that matters here:
+  // a colony whose extraction exactly saturates its own factories nets to
+  // something like 4.5e-13 in float rather than zero, and a phantom trace of
+  // P0 the hub does not quote would land in `unpriced` and suppress a real
+  // colony's earnings line for it.
+  return netAgainstDraw(produced, consumedLocally);
 }
 
 /** This colony's current earnings, priced at hub rates. */

@@ -169,6 +169,29 @@ describe('colonyExportablePerHour', () => {
     expect(colonyExportablePerHour(balance, pi).get(NANITES)).toBeCloseTo(8 * 5, 6);
   });
 
+  it('reports nothing spare when the draw exactly meets production', () => {
+    // 6,000 Microorganisms an hour is exactly one Bacteria pin, or 40
+    // Bacteria; one Nanite pin eats exactly 40. The subtraction lands on a
+    // float trace rather than a true zero, and `NET_EPSILON` is what keeps
+    // that trace from being offered to a planner as supply.
+    const balance = colonyFactoryBalance(
+      colony({
+        extractors: [
+          { pinId: 1, productTypeId: MICROORGANISMS, ratePerHour: 6_000, expiryMs: null },
+        ],
+        extractedPerHour: [{ typeId: MICROORGANISMS, unitsPerHour: 6_000 }],
+        production: [
+          { schematicId: BACTERIA_SCHEMATIC, count: 1 },
+          { schematicId: NANITES_SCHEMATIC, count: 1 },
+        ],
+      }),
+      pi
+    );
+    expect(colonyOutputPerHour(balance, pi).get(BACTERIA)).toBeCloseTo(40, 6);
+    expect(colonyLocalDrawPerHour(balance, pi).get(BACTERIA)).toBeCloseTo(40, 6);
+    expect(colonyExportablePerHour(balance, pi).has(BACTERIA)).toBe(false);
+  });
+
   it('leaves a colony with no local consumer exporting everything it makes', () => {
     const balance = colonyFactoryBalance(colony(), pi);
     expect(colonyExportablePerHour(balance, pi).get(BACTERIA)).toBeCloseTo(
