@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import type { ReactElement } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useHighlightParam } from '@/lib/useHighlightParam';
 import {
@@ -16,6 +16,7 @@ import {
   ReauthBanner,
   SearchInput,
   Spinner,
+  Tabs,
   Tooltip,
   type DataTableColumn,
 } from '@/components/ui';
@@ -34,6 +35,12 @@ import {
   EMPTY_CONTRACTS_FILTER,
   type ContractsFilter,
 } from '@/features/character/contractsFilter';
+import {
+  contractsTabs,
+  readContractsTab,
+  type ContractsTab,
+} from '@/features/character/contractsTabs';
+import { ContractSearchPanel } from '@/features/contractSearch/ContractSearchPanel';
 import type { CachedResult } from '@/esi/cache';
 import { resolveNames } from '@/features/character/names';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
@@ -191,6 +198,25 @@ export function Contracts() {
   // The contract a `contractAccepted` alert pointed at, if any.
   const highlightedContractId = useHighlightParam();
 
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tab = readContractsTab(searchParams.get('tab'));
+  const setTab = useCallback(
+    (next: ContractsTab) => {
+      setSearchParams(
+        (previous) => {
+          const params = new URLSearchParams(previous);
+          // History is the default, so it stays out of the URL rather than
+          // leaving `?tab=history` on every visit that never touched the strip.
+          if (next === 'history') params.delete('tab');
+          else params.set('tab', next);
+          return params;
+        },
+        { replace: true }
+      );
+    },
+    [setSearchParams]
+  );
+
   const columns = useMemo<DataTableColumn<Contract>[]>(
     () => [
       {
@@ -293,36 +319,57 @@ export function Contracts() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
+      {/* The badge and both actions describe this character's own contract
+          history, and mean nothing on the Search tab — which reads a shared
+          public snapshot and carries its own age badge and Refresh. */}
       <PageHeader
         title={t('contracts.title')}
-        meta={contractsResult && <DataAgeBadge date={contractsResult.fetchedAt} />}
+        meta={
+          tab === 'history' && contractsResult ? (
+            <DataAgeBadge date={contractsResult.fetchedAt} />
+          ) : undefined
+        }
         actions={
-          <>
-            <IconButton
-              icon={<Icon.Download />}
-              label={t('contracts.exportCsv')}
-              disabled={filteredContracts.length === 0}
-              onClick={() =>
-                downloadCsv(
-                  'contracts',
-                  filteredContracts,
-                  contractsCsvColumns(t, (id) => issuerNames.get(id) ?? `#${id}`),
-                  new Date(),
-                  contractsTruncated
-                )
-              }
-            />
-            <IconButton
-              icon={<Icon.Refresh />}
-              label={t('contracts.refresh')}
-              onClick={refresh}
-              disabled={loading}
-            />
-          </>
+          tab === 'history' ? (
+            <>
+              <IconButton
+                icon={<Icon.Download />}
+                label={t('contracts.exportCsv')}
+                disabled={filteredContracts.length === 0}
+                onClick={() =>
+                  downloadCsv(
+                    'contracts',
+                    filteredContracts,
+                    contractsCsvColumns(t, (id) => issuerNames.get(id) ?? `#${id}`),
+                    new Date(),
+                    contractsTruncated
+                  )
+                }
+              />
+              <IconButton
+                icon={<Icon.Refresh />}
+                label={t('contracts.refresh')}
+                onClick={refresh}
+                disabled={loading}
+              />
+            </>
+          ) : undefined
         }
       />
 
-      {loading && !data ? (
+      <Tabs
+        tabs={contractsTabs(t)}
+        value={tab}
+        onChange={(id) => setTab(id as ContractsTab)}
+        label={t('contracts.tabsLabel')}
+      />
+
+      {/* Switched outside the history chain below, not inside it: Search needs
+          neither this character's contracts nor its `contracts` scope, so a
+          character with an empty history or a 403 must still reach it. */}
+      {tab === 'search' ? (
+        <ContractSearchPanel />
+      ) : loading && !data ? (
         <div className="flex justify-center py-16">
           <Spinner label={t('common.loading')} />
         </div>
@@ -387,7 +434,7 @@ export function Contracts() {
         </Panel>
       )}
 
-      {selectedContract && activeCharacterId !== null && (
+      {tab === 'history' && selectedContract && activeCharacterId !== null && (
         <ContractDetailModal
           characterId={activeCharacterId}
           contract={selectedContract}
