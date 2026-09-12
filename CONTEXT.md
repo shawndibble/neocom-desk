@@ -264,6 +264,8 @@ here — they go one per file in `docs/context/decisions/`.
   the Notification Feed already shows as delivered (Occurrence Key, round
   44/#360).
 - **Freshness Window** (round 25): how long a cached row is served without asking ESI again. Ten minutes for a Character's own data, a day for game constants. Distinct from **Data Age**, which reports how old the shown data is; the window decides whether to go and get newer.
+- **Stale-Serve**: showing a cached row whose **Freshness Window** has lapsed while the replacement is fetched behind it, rather than spinning until it lands. Only for a **Published Snapshot**, where a long window encodes a publish cadence; a game constant's long window asserts the value cannot change, so a lapsed one is fetched outright instead. A stale-serve that fails to revalidate must say so on the next read — it is never left standing as a loading state.
+- **Published Snapshot**: a payload the backend republishes on its own clock and every signed-in client reads whole — the public contract offers and public courier contracts collections. Its **Freshness Window** is matched to that publish cadence, so it is longer than a Character's own data and immune to a manual Refresh: there is nothing newer to fetch until the next publish.
 - **Group Owned Overlay**: A **Build Group**'s own "I own this" ledger —
   manual entry or ESI-asset auto-detection with a location scope, the same
   detect-plus-scope mechanism a Build Plan's own owned-stock entry already

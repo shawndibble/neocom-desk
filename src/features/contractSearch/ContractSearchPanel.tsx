@@ -56,7 +56,7 @@ import {
   type ContractTypeOption,
 } from '@/engine/contracts/contractSearch';
 import type { PublicContractOfferRow } from '@/engine/contracts/contractOffers';
-import { resolveCourierRoutes, type CourierRouteRow } from '@/engine/contracts/courierSearch';
+import type { PublicCourierContractRow } from '@/engine/contracts/courierSearch';
 import {
   loadPublicContractOffers,
   type PublicContractOffersSnapshot,
@@ -65,9 +65,12 @@ import {
   loadPublicCourierContracts,
   type PublicCourierContractsSnapshot,
 } from '@/features/contractSearch/publicCourierContracts';
-import { loadCourierEndpoints } from '@/features/contractSearch/courierEndpoints';
 import { CourierResults } from '@/features/contractSearch/CourierResults';
-import { loadRegionName } from '@/features/bpcContracts/regionNames';
+import {
+  useCourierRoutes,
+  useListedTypeNames,
+  useRegionNames,
+} from '@/features/contractSearch/contractSearchNames';
 import { BuildPlanContextMenu } from '@/features/industry/BuildPlanContextMenu';
 import { seedFromOfferRow } from '@/features/industry/planSeed';
 import {
@@ -75,9 +78,8 @@ import {
   type PublicContractDetailModalStatChip,
 } from '@/features/contracts/PublicContractDetailModal';
 import { isSyncConfigured } from '@/app/syncStatus';
-import { loadMarketTypes } from '@/sde/loadMarketSde';
 import type { CachedResult } from '@/esi/cache';
-import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
+import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
 import { rankedSearch } from '@/lib/rankedSearch';
 import { formatIsk } from '@/lib/isk';
 import { formatTimestamp } from '@/lib/timestamp';
@@ -106,101 +108,43 @@ const SALE_KINDS: ContractSaleKind[] = ['exchange', 'auction'];
 const CONTRACT_MODES = ['items', 'courier'] as const;
 type ContractMode = (typeof CONTRACT_MODES)[number];
 
-const EMPTY_NAMES: ReadonlyMap<number, string> = new Map();
 const EMPTY_ROWS: readonly PublicContractOfferRow[] = [];
-const EMPTY_COURIER_ROWS: readonly CourierRouteRow[] = [];
-
-interface Snapshot {
-  offersResult: CachedResult<PublicContractOffersSnapshot> | null;
-  courierResult: CachedResult<PublicCourierContractsSnapshot> | null;
-  /** Courier rows with both ends already named — resolved once here, not per render. */
-  courierRoutes: CourierRouteRow[];
-  /** False when the app has no sync backend configured at all — a different story from "synced, but empty". */
-  syncConfigured: boolean;
-  regionNames: ReadonlyMap<number, string>;
-  typeNames: ReadonlyMap<number, string>;
-}
-
-const NOT_CONFIGURED: Snapshot = {
-  offersResult: null,
-  courierResult: null,
-  courierRoutes: [],
-  syncConfigured: false,
-  regionNames: EMPTY_NAMES,
-  typeNames: EMPTY_NAMES,
-};
+/** Stable identity: the routes hook keys its effect on this array's reference. */
+const EMPTY_COURIER_CONTRACT_ROWS: readonly PublicCourierContractRow[] = [];
+const NO_REGIONS: number[] = [];
 
 /**
- * Names come from the market catalogue (`public/data/market/types.json`), not
- * `loadTypeNames`: the slim `types.json` the latter reads first only covers
- * skill- and blueprint-referenced types, so a general contract corpus would
- * send most of its ids to the batched `POST /universe/names` fan-out on every
- * tab open. The catalogue already names every published market type, is
- * fetched lazily, and is what the Market Browser's own search runs against.
+ * One corpus, on its own. The two used to arrive together out of a single
+ * loader, on the argument that the courier snapshot is one small chunk doc
+ * against the offers snapshot's ~124 — which is true, and is exactly why
+ * pairing them was the wrong trade: a hauler opening Courier waited on ~370k
+ * item-offer rows to be shown ~620 hauls (issue #963). Fetched separately,
+ * each board renders the moment its own snapshot lands, and the cheap one is
+ * no longer held behind the expensive one.
+ *
+ * `syncConfigured` rides along rather than being read at render: it is the
+ * difference between "synced, and empty" and "this build has no sync backend
+ * at all", and only the loader is in a position to say which.
  */
-async function loadContractSearchSnapshot(
-  characterId: number,
-  signal: RouteSnapshotSignal
-): Promise<Snapshot> {
+interface CorpusSnapshot<TSnapshot> {
+  result: CachedResult<TSnapshot> | null;
+  syncConfigured: boolean;
+}
+
+const NOT_CONFIGURED = { result: null, syncConfigured: false } as const;
+
+async function loadOffersCorpus(
+  characterId: number
+): Promise<CorpusSnapshot<PublicContractOffersSnapshot>> {
   if (!isSyncConfigured()) return NOT_CONFIGURED;
-  // Both snapshots, always. The courier one is a single chunk doc — ADR 0013's
-  // live pull put courier and loan together under 620 contracts against ~370k
-  // offer rows — so deferring it to the first Courier click would buy nothing
-  // and cost a fetch on the way in.
-  const [offersResult, courierResult] = await Promise.all([
-    loadPublicContractOffers(characterId),
-    loadPublicCourierContracts(characterId),
-  ]);
-  const rows = offersResult?.data?.rows ?? [];
-  const courierRows = courierResult?.data?.rows ?? [];
-  // Already superseded: skip the lookups, their results would be discarded.
-  if (signal.cancelled) {
-    return {
-      offersResult,
-      courierResult,
-      courierRoutes: [],
-      syncConfigured: true,
-      regionNames: EMPTY_NAMES,
-      typeNames: EMPTY_NAMES,
-    };
-  }
+  return { result: await loadPublicContractOffers(characterId), syncConfigured: true };
+}
 
-  const listedTypeIds = new Set(rows.map((row) => row.typeId));
-  const catalog = await loadMarketTypes();
-  const typeNames = new Map<number, string>();
-  for (const entry of catalog) {
-    if (listedTypeIds.has(entry.typeId)) typeNames.set(entry.typeId, entry.name);
-  }
-
-  // Local SDE snapshots only, so this costs no requests at all — see
-  // `courierEndpoints.ts` for why it is not `loadContractLocationName`.
-  const endpoints = await loadCourierEndpoints(courierRows);
-  const courierRoutes = resolveCourierRoutes(courierRows, endpoints);
-
-  // One lookup per distinct region across both corpora: the offers' own, plus
-  // each end of every haul. A courier region resolved here is what names the
-  // From/To options in the Courier filter bar.
-  const regionIds = new Set<number>(rows.map((row) => row.regionId));
-  for (const route of courierRoutes) {
-    if (route.origin.regionId !== null) regionIds.add(route.origin.regionId);
-    if (route.destination.regionId !== null) regionIds.add(route.destination.regionId);
-  }
-  const regionNames = new Map<number, string>();
-  await Promise.all(
-    [...regionIds].map(async (regionId) => {
-      const name = await loadRegionName(regionId);
-      if (name !== null) regionNames.set(regionId, name);
-    })
-  );
-
-  return {
-    offersResult,
-    courierResult,
-    courierRoutes,
-    syncConfigured: true,
-    regionNames,
-    typeNames,
-  };
+async function loadCourierCorpus(
+  characterId: number
+): Promise<CorpusSnapshot<PublicCourierContractsSnapshot>> {
+  if (!isSyncConfigured()) return NOT_CONFIGURED;
+  return { result: await loadPublicCourierContracts(characterId), syncConfigured: true };
 }
 
 /** The filter as the controls hold it: text fields stay strings until they are parsed into the engine's filter. */
@@ -346,19 +290,47 @@ interface Suggestion extends ContractTypeOption {
 export function ContractSearchPanel() {
   const { t } = useTranslation();
   const timeZone = useTimeZone();
-  const { data, error, loading, hydrated, activeCharacterId, refresh } = useRouteSnapshot(
-    loadContractSearchSnapshot,
-    undefined,
-    { cacheKey: 'contractSearch' }
-  );
+  // One hook per corpus, so neither board waits on the other's snapshot.
+  // `staleWhileRevalidate` keeps the rows on screen across a manual Refresh,
+  // which matters more now that a Refresh no longer blanks both boards at once.
+  const offers = useRouteSnapshot(loadOffersCorpus, undefined, {
+    cacheKey: 'contractSearchOffers',
+    staleWhileRevalidate: true,
+  });
+  const courier = useRouteSnapshot(loadCourierCorpus, undefined, {
+    cacheKey: 'contractSearchCourier',
+    staleWhileRevalidate: true,
+  });
+  const { hydrated, activeCharacterId } = offers;
 
-  const offersResult = data?.offersResult ?? null;
-  const syncConfigured = data?.syncConfigured ?? true;
-  const regionNames = data?.regionNames ?? EMPTY_NAMES;
-  const typeNames = data?.typeNames ?? EMPTY_NAMES;
+  const offersResult = offers.data?.result ?? null;
+  const courierResult = courier.data?.result ?? null;
   const rows = offersResult?.data?.rows ?? EMPTY_ROWS;
-  const courierResult = data?.courierResult ?? null;
-  const courierRoutes = data?.courierRoutes ?? EMPTY_COURIER_ROWS;
+  const courierRows = courierResult?.data?.rows ?? undefined;
+
+  // Both loaders answer the same question, so either having loaded settles it;
+  // `true` while both are still in flight keeps the not-configured empty state
+  // from flashing on a configured build.
+  const syncConfigured =
+    (offers.data?.syncConfigured ?? true) && (courier.data?.syncConfigured ?? true);
+
+  // Names fill in behind whichever table is showing — see
+  // `contractSearchNames.ts`. None of them gate a board: every consumer
+  // already renders an unresolved id honestly.
+  const { value: typeNames } = useListedTypeNames(rows);
+  const { value: courierRoutes, resolving: placingRoutes } = useCourierRoutes(
+    courierRows ?? EMPTY_COURIER_CONTRACT_ROWS
+  );
+  const regionIds = useMemo(() => {
+    if (rows === EMPTY_ROWS && courierRoutes.length === 0) return NO_REGIONS;
+    const ids = new Set<number>(rows.map((row) => row.regionId));
+    for (const route of courierRoutes) {
+      if (route.origin.regionId !== null) ids.add(route.origin.regionId);
+      if (route.destination.regionId !== null) ids.add(route.destination.regionId);
+    }
+    return [...ids];
+  }, [rows, courierRoutes]);
+  const { value: regionNames, resolving: namingRegions } = useRegionNames(regionIds);
 
   const [uiFilter, setUiFilter] = useState<UiFilter>(EMPTY_UI_FILTER);
   /** The type the user picked out of the suggestion list, pinning the search to exactly one item. */
@@ -372,6 +344,25 @@ export function ContractSearchPanel() {
   // courier read served from Dexie under a live offers read is a real state.
   const activeResult = mode === 'courier' ? courierResult : offersResult;
   const modeRowCount = mode === 'courier' ? courierRoutes.length : rows.length;
+  const active = mode === 'courier' ? courier : offers;
+  /**
+   * Per mode, and against that mode's own data: the board on screen spins only
+   * while *it* has nothing, never because the other corpus is still arriving.
+   * Courier additionally waits on its endpoints, since `courierRoutes` is what
+   * the count below is taken from.
+   */
+  const modeLoading =
+    mode === 'courier'
+      ? courier.loading || placingRoutes || courierRows === undefined
+      : offers.loading;
+  const modeError = active.error;
+  // A manual Refresh still means "reload the tab", not "reload the mode I am
+  // looking at" — the Data Age badge and offline banner are per corpus, but the
+  // button above them is one button.
+  const refresh = () => {
+    offers.refresh();
+    courier.refresh();
+  };
 
   const typeOptions = useMemo(() => listedContractTypeOptions(rows, typeNames), [rows, typeNames]);
 
@@ -587,17 +578,11 @@ export function ContractSearchPanel() {
             icon={<Icon.Refresh />}
             label={t('contractSearch.refresh')}
             onClick={refresh}
-            disabled={loading}
+            disabled={offers.loading || courier.loading}
           />
         }
       >
-        {loading && !data ? (
-          <div className="flex justify-center py-16">
-            <Spinner label={t('common.loading')} />
-          </div>
-        ) : error ? (
-          <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
-        ) : !syncConfigured ? (
+        {!syncConfigured ? (
           <EmptyState
             title={t('contractSearch.notConfiguredTitle')}
             hint={t('contractSearch.notConfiguredHint')}
@@ -606,7 +591,18 @@ export function ContractSearchPanel() {
           <>
             {activeResult?.fromCache && (
               <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">
-                {t('common.offlineTitle')}
+                {/*
+                  A Refresh that still falls back to cache is a more alarming
+                  case than the first load finding cache — same banner, different
+                  copy. It is also how a background revalidation that failed
+                  reaches the screen: `esi/cache.ts` re-serves the stored row
+                  with `fromCache` set once the late call reports a failure, so
+                  a refresh that never lands is stated rather than left standing
+                  as a loading state.
+                */}
+                {active.refreshCount > 0
+                  ? t('common.refreshFailedTitle')
+                  : t('common.offlineTitle')}
               </p>
             )}
             {/*
@@ -630,7 +626,28 @@ export function ContractSearchPanel() {
                 />
               ))}
             </div>
-            {modeRowCount === 0 ? (
+            {namingRegions && modeRowCount > 0 && (
+              // The only name stage with real network cost: one ESI call per
+              // distinct region on a cold cache. Said quietly, under the board
+              // rather than over it, because the rows are already readable —
+              // the Region column shows `#10000002` until this lands.
+              <p role="status" className="px-3 pt-2 text-[0.6875rem] text-text-dim uppercase">
+                {t('contractSearch.namingRegions')}
+              </p>
+            )}
+            {modeLoading && modeRowCount === 0 ? (
+              <div className="flex flex-col items-center gap-2 py-16">
+                <Spinner
+                  label={t(
+                    mode === 'courier'
+                      ? 'contractSearch.loadingCourier'
+                      : 'contractSearch.loadingOffers'
+                  )}
+                />
+              </div>
+            ) : modeError ? (
+              <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
+            ) : modeRowCount === 0 ? (
               // Nothing synced for the corpus on screen — distinct from
               // `noFilterMatches` below, which is "rows exist, the filter just
               // excludes them all". Per mode, so an empty courier snapshot never

@@ -33,7 +33,7 @@ vi.mock('@/features/contractSearch/publicCourierContracts', () => ({
   loadPublicCourierContracts: (...args: unknown[]) => loadPublicCourierContracts(...args),
 }));
 
-const loadRegionName = vi.fn(async (regionId: number) =>
+const loadRegionName = vi.fn<(regionId: number) => Promise<string>>(async (regionId) =>
   regionId === 10000002 ? 'The Forge' : 'Domain'
 );
 vi.mock('@/features/bpcContracts/regionNames', () => ({
@@ -222,6 +222,13 @@ beforeEach(async () => {
   loadPublicCourierContracts.mockResolvedValue(
     cachedCourierSnapshot([JITA_TO_AMARR, AMARR_TO_STRUCTURE])
   );
+  // Restored per case: one progressive-loading test below holds this pending
+  // on purpose, and a leaked never-settling lookup would strand every later
+  // case's Region column on its id placeholder.
+  loadRegionName.mockReset();
+  loadRegionName.mockImplementation(async (regionId: number) =>
+    regionId === 10000002 ? 'The Forge' : 'Domain'
+  );
   loadContractLocationName.mockReset();
   loadContractLocationName.mockResolvedValue('Jita IV - Moon 4 - Caldari Navy Assembly Plant');
   loadPublicContractItems.mockReset();
@@ -243,6 +250,14 @@ beforeEach(async () => {
 
 async function bodyRows() {
   const table = await screen.findByRole('table');
+  // The name lookups commit a render *after* the rows now (issue #963): the
+  // boards no longer wait on the market catalogue, the endpoint resolution or
+  // the region names before showing anything. So waiting for the table alone
+  // races them, and a cell read straight afterwards can still hold the `#34`
+  // placeholder the column honestly shows until its name lands. An empty
+  // `waitFor` yields a macrotask inside `act`, which is enough for every
+  // already-settled lookup to flush.
+  await waitFor(() => {});
   const [, ...rest] = within(table).getAllByRole('rowgroup');
   return within(rest[0]).getAllByRole('row');
 }
@@ -817,5 +832,108 @@ describe('ContractSearchPanel — Build Plan from an item row', () => {
       'aria-disabled',
       'true'
     );
+  });
+});
+
+/**
+ * The two corpora used to arrive out of one loader, so neither board rendered
+ * until both had landed — a hauler waited on ~370k item-offer rows to be shown
+ * ~620 hauls (issue #963). These cases hold each board's independence, and
+ * hold the line that a board mid-load must not read as a finished one.
+ */
+describe('ContractSearchPanel — progressive loading', () => {
+  /** A loader the test decides when, and whether, to settle. */
+  function deferred<T>() {
+    let settle!: (value: T) => void;
+    const promise = new Promise<T>((resolve) => {
+      settle = resolve;
+    });
+    return { promise, settle };
+  }
+
+  it('renders the courier board while the offers snapshot is still in flight', async () => {
+    const offers = deferred<CachedResult<PublicContractOffersSnapshot>>();
+    loadPublicContractOffers.mockReturnValue(offers.promise);
+    const user = userEvent.setup();
+    renderWithRouter();
+
+    await user.click(screen.getByRole('button', { name: 'Courier' }));
+
+    const table = await screen.findByRole('table');
+    const [, ...rest] = within(table).getAllByRole('rowgroup');
+    expect(within(rest[0]).getAllByRole('row')).toHaveLength(2);
+    // Still pending — the hauls above did not wait for it.
+    offers.settle(cachedSnapshot([TRIT_FORGE]));
+  });
+
+  it('renders the item board while the courier snapshot is still in flight', async () => {
+    const courier = deferred<CachedResult<PublicCourierContractsSnapshot>>();
+    loadPublicCourierContracts.mockReturnValue(courier.promise);
+    renderWithRouter();
+
+    expect(await bodyRows()).toHaveLength(3);
+    courier.settle(cachedCourierSnapshot([JITA_TO_AMARR]));
+  });
+
+  it('says which corpus it is loading rather than showing a bare spinner', async () => {
+    const offers = deferred<CachedResult<PublicContractOffersSnapshot>>();
+    loadPublicContractOffers.mockReturnValue(offers.promise);
+    renderWithRouter();
+
+    expect(
+      await screen.findByRole('status', { name: 'Loading public contracts…' })
+    ).toBeInTheDocument();
+    offers.settle(cachedSnapshot([TRIT_FORGE]));
+  });
+
+  it('never claims an empty corpus while that corpus is still loading', async () => {
+    // The whole point: "no contracts have synced" and "they have not arrived
+    // yet" are different answers, and the second must not be given as the first.
+    const offers = deferred<CachedResult<PublicContractOffersSnapshot>>();
+    loadPublicContractOffers.mockReturnValue(offers.promise);
+    renderWithRouter();
+
+    await screen.findByRole('status', { name: 'Loading public contracts…' });
+    expect(screen.queryByText('No public contracts synced yet')).not.toBeInTheDocument();
+
+    offers.settle(cachedSnapshot([]));
+    expect(await screen.findByText('No public contracts synced yet')).toBeInTheDocument();
+  });
+
+  it('shows the rows while region names are still being looked up, and says so', async () => {
+    // Region naming is the one name stage with real network cost — one ESI
+    // call per distinct region on a cold cache. It fills in behind the table
+    // rather than holding it: the Region column reads `#10000002` meanwhile.
+    const regions = deferred<string>();
+    loadRegionName.mockReturnValue(regions.promise);
+    renderWithRouter();
+
+    const rows = await bodyRows();
+    expect(rows).toHaveLength(3);
+    expect(within(rows[0]).getByText('#10000043')).toBeInTheDocument();
+    // By text, not by role name: `role="status"` takes its name from the
+    // author, not from its content, so a role query would never match it.
+    expect(screen.getByText('Naming regions…')).toBeInTheDocument();
+
+    regions.settle('The Forge');
+    await waitFor(() => {
+      expect(screen.queryByText('Naming regions…')).not.toBeInTheDocument();
+    });
+  });
+
+  it('states a refresh that fell back to cache, rather than repeating the offline banner', async () => {
+    loadPublicContractOffers.mockResolvedValue({
+      ...cachedSnapshot([TRIT_FORGE]),
+      fromCache: true,
+    });
+    const user = userEvent.setup();
+    renderWithRouter();
+
+    await bodyRows();
+    expect(screen.getByText('Showing cached data')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Refresh' }));
+
+    expect(await screen.findByText('Refresh failed — showing cached data')).toBeInTheDocument();
   });
 });

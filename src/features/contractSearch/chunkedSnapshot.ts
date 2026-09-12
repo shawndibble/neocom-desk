@@ -97,6 +97,13 @@ export function loadChunkedSnapshot<TRow>(
     GLOBAL_CACHE_CHARACTER_ID,
     source.cacheKey,
     () => fetchSnapshot<TRow>(source, characterId),
-    { staleAfterMs: source.staleAfterMs }
+    // A long window here is a publish cadence, not a claim that the payload is
+    // a constant, so the lapsed row is the right thing to render while the
+    // next read runs (issue #963). Without this the whole collection — 124
+    // chunk docs for the offers snapshot — is a blocking spinner every time
+    // the window lapses, for rows that are at most one publish cycle old.
+    // `fromCache` still reports a revalidation that failed, so a refresh that
+    // never lands is stated rather than left standing as "loading".
+    { staleAfterMs: source.staleAfterMs, allowStaleServe: true }
   );
 }
