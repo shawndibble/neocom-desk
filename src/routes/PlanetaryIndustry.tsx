@@ -305,7 +305,7 @@ function FlatSection({
 
 /** Uppercase micro-heading style shared by Production and Infrastructure's `FlatSection` titles — the same treatment `RoleCard`'s header bar used to give every section, now carried by the text alone. */
 const SECTION_EYEBROW_CLASS =
-  'text-[0.6875rem] font-semibold tracking-widest text-text-faint uppercase';
+  'text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase';
 
 /** A label/value pair inside a card body — the hero card's Expires/Banked/Reset now row. */
 function CardStat({
@@ -319,7 +319,7 @@ function CardStat({
 }) {
   return (
     <div>
-      <div className="text-[0.625rem] font-semibold tracking-widest text-text-faint uppercase">
+      <div className="text-[0.625rem] font-semibold tracking-widest text-text-dim uppercase">
         {label}
       </div>
       <div className={`text-sm font-medium tabular-nums ${accent ? 'text-accent' : 'text-text'}`}>

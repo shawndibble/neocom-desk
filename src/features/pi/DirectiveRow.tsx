@@ -181,7 +181,7 @@ export function LoadMeter({
   const tight = percent >= 90;
   return (
     <div className="flex items-center gap-1.5">
-      <span className="text-[0.625rem] font-semibold tracking-widest text-text-faint uppercase">
+      <span className="text-[0.625rem] font-semibold tracking-widest text-text-dim uppercase">
         {label}
       </span>
       <div
@@ -207,7 +207,7 @@ export function LoadMeter({
 /** A card or modal section's micro-heading. */
 export function SectionLabel({ children }: { children: ReactNode }) {
   return (
-    <span className="text-[0.625rem] font-semibold tracking-widest text-text-faint uppercase">
+    <span className="text-[0.625rem] font-semibold tracking-widest text-text-dim uppercase">
       {children}
     </span>
   );
