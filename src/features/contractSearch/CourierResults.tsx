@@ -31,7 +31,6 @@ import {
   courierCollateral,
   filterCourierContracts,
   type CourierContractFilter,
-  type CourierEndpoint,
   type CourierRouteRow,
 } from '@/engine/contracts/courierSearch';
 import { iskPerJump, iskPerVolume } from '@/engine/contracts/courierRates';
@@ -40,7 +39,11 @@ import { completableCourierRoutes } from '@/engine/contracts/courierRisk';
 import { EndpointRiskMarkers } from '@/features/contractSearch/courierRiskDisplay';
 import type { RoutePreferenceKind } from '@/engine/route/jumpRoute';
 import { localJumpCountsForRoutes } from '@/features/route/localRoute';
-import { CourierContractDetailModal } from '@/features/contractSearch/CourierContractDetailModal';
+import {
+  CourierContractDetailModal,
+  type CourierJumps,
+} from '@/features/contractSearch/CourierContractDetailModal';
+import { endpointSystemName } from '@/features/contractSearch/courierEndpointNames';
 import { loadCharacterRegionId } from '@/features/contractSearch/characterRegion';
 import { formatIskAuto } from '@/lib/isk';
 import { formatTimestamp } from '@/lib/timestamp';
@@ -112,22 +115,6 @@ function parseNumeric(value: string): number | null {
   if (value.trim() === '') return null;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
-}
-
-/**
- * The route column names each end by its *system*, not its station: a haul is
- * read as Jita → Amarr, and the full "Jita IV - Moon 4 - Caldari Navy
- * Assembly Plant" costs two lines of table width to say the same thing. The
- * exact station is still one click away in the detail modal, which keeps it.
- *
- * Both fallbacks are reachable and mean different things. A station whose
- * system the snapshot did not resolve still has its own name, which is a
- * better answer than nothing; a location nothing local names at all — a
- * player structure — shows the bare id, the same fallback the item results
- * use for an unnamed type.
- */
-function endpointSystemName(endpoint: CourierEndpoint): string {
-  return endpoint.systemName ?? endpoint.name ?? `#${endpoint.locationId}`;
 }
 
 /**
@@ -584,6 +571,9 @@ type JumpsState =
  */
 const PENDING: JumpsState = { kind: 'pending' };
 
+/** The modal's own pending value, stable for the same reason `PENDING` is. */
+const PENDING_JUMPS: CourierJumps = { kind: 'pending' };
+
 function useJumpCounts(
   rows: readonly CourierRouteRow[],
   preference: RoutePreferenceKind
@@ -966,6 +956,15 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
         <CourierContractDetailModal
           row={selectedRow}
           regionNames={regionNames}
+          // The board already read the graph for every row, so the modal is
+          // handed the answer rather than resolving its own. `unknown` folds
+          // into a `null` count: an unreadable snapshot and a route that does
+          // not exist are both "no distance to quote" at this surface.
+          jumps={
+            jumps.kind === 'pending'
+              ? PENDING_JUMPS
+              : { kind: 'known', count: jumpsByContract.get(selectedRow.contractId) ?? null }
+          }
           onClose={() => setSelectedRow(null)}
         />
       )}
