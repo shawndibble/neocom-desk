@@ -3578,6 +3578,16 @@
     "collateralColumn": "Collateral",
     "volumeColumn": "Volume",
     "daysColumn": "Days",
+    "jumpsColumn": "Jumps",
+    "iskPerJumpColumn": "ISK/jump",
+    "jumpsUnavailableHint": "No stargate route — one end is a player structure, or nothing connects them.",
+    "jumpsSnapshotUnavailable": "Jump distances are unavailable right now, so hauls are ranked by reward.",
+    "routePreferenceLabel": "Route",
+    "routePreference": {
+      "prefer-highsec": "Prefer highsec",
+      "shortest": "Shortest",
+      "avoid-highsec": "Avoid highsec"
+    },
     "courierEmptyTitle": "No public courier contracts synced yet",
     "courierEmptyHint": "The public contract index refreshes on its own schedule — check back shortly.",
     "courierNoFilterMatches": "No courier contracts match your filters.",

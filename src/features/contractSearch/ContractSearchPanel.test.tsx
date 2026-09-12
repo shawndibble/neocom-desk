@@ -7,6 +7,7 @@ import { db } from '@/db';
 import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharacter';
 import { DEFAULT_TIME_FORMAT, useTimeFormat } from '@/lib/timeFormat';
 import { isSyncConfigured } from '@/app/syncStatus';
+import { clearJumpGraphIndex } from '@/sde/jumpGraph';
 import { ContractSearchPanel } from '@/features/contractSearch/ContractSearchPanel';
 import type { PublicContractOfferRow } from '@/engine/contracts/contractOffers';
 import type { PublicContractOffersSnapshot } from '@/features/contractSearch/publicContractOffers';
@@ -82,6 +83,8 @@ const JITA = 60003760;
 const AMARR = 60008494;
 /** A player structure: `stations.json` does not hold it, so nothing local names it. */
 const UNKNOWN_STRUCTURE = 1035466617946;
+/** A 0.3 system joining the two hubs directly — two jumps instead of four. */
+const LOWSEC_SHORTCUT = 30000200;
 
 const STATIONS: NpcStationEntry[] = [
   { id: JITA, name: 'Jita IV - Moon 4 - Caldari Navy Assembly Plant', systemId: 30000142 },
@@ -90,13 +93,40 @@ const STATIONS: NpcStationEntry[] = [
 const SYSTEMS: SolarSystemEntry[] = [
   { id: 30000142, name: 'Jita', security: 0.9, regionId: 10000002 },
   { id: 30002187, name: 'Amarr', security: 1, regionId: 10000043 },
+  // Three highsec hops between them, so a route has a length to report.
+  { id: 30000144, name: 'Perimeter', security: 0.9, regionId: 10000002 },
+  { id: 30000146, name: 'Urlen', security: 0.9, regionId: 10000002 },
+  { id: 30002186, name: 'Niarja', security: 0.5, regionId: 10000043 },
+  // And one lowsec hop that halves the trip, which is what makes the three
+  // route preferences give three different answers rather than one.
+  { id: LOWSEC_SHORTCUT, name: 'Ohide', security: 0.3, regionId: 10000043 },
 ];
+
+/**
+ * Jita and Amarr, four jumps apart down a single chain — enough for the
+ * courier table's distance and ISK/jump columns to have a real answer, and
+ * for the structure-ended haul beside them to have none.
+ */
+const JUMPS = {
+  30000142: [30000144, LOWSEC_SHORTCUT],
+  30000144: [30000142, 30000146],
+  30000146: [30000144, 30002186],
+  30002186: [30000146, 30002187],
+  30002187: [30002186, LOWSEC_SHORTCUT],
+  [LOWSEC_SHORTCUT]: [30000142, 30002187],
+};
 
 vi.mock('@/sde/loadMarketSde', () => ({
   loadMarketTypes: vi.fn(async () => CATALOG),
   loadNpcStations: vi.fn(async () => STATIONS),
   loadSolarSystems: vi.fn(async () => SYSTEMS),
+  loadSolarSystemJumps: vi.fn(async () => JUMPS),
 }));
+
+/** Column order: route, reward, collateral, jumps, ISK/jump, expires. */
+const COLLATERAL_CELL = 2;
+const JUMPS_CELL = 3;
+const ISK_PER_JUMP_CELL = 4;
 
 const CHAR_ID = 91;
 
@@ -175,6 +205,9 @@ function cachedSnapshot(
 }
 
 beforeEach(async () => {
+  // The jump graph memoizes its index for the session, so without this a
+  // later test inherits whichever snapshot an earlier one happened to load.
+  clearJumpGraphIndex();
   await db.settings.clear();
   await db.esiCache.clear();
   await db.settings.put({ key: ACTIVE_CHARACTER_KEY, value: CHAR_ID });
@@ -380,7 +413,7 @@ describe('ContractSearchPanel — Courier mode', () => {
     return user;
   }
 
-  it('names both ends by system rather than by station, best-paying first', async () => {
+  it('names both ends by system rather than by station', async () => {
     await showCourier();
 
     const rows = await waitFor(async () => {
@@ -388,13 +421,66 @@ describe('ContractSearchPanel — Courier mode', () => {
       expect(found).toHaveLength(2);
       return found;
     });
+    const [measurable] = rows;
     // The system, not the station it sits in: the full station name belongs
     // to the detail modal, which still shows it.
-    expect(within(rows[0]).getByText(/Amarr/)).toBeInTheDocument();
-    expect(within(rows[1]).getByText(/Jita/)).toBeInTheDocument();
-    expect(within(rows[1]).queryByText(/Jita IV - Moon 4/)).not.toBeInTheDocument();
+    expect(within(measurable).getByText(/Jita/)).toBeInTheDocument();
+    expect(within(measurable).queryByText(/Jita IV - Moon 4/)).not.toBeInTheDocument();
     // Region names come from the same lookup the item results use.
-    expect(within(rows[1]).getAllByText('The Forge').length).toBeGreaterThan(0);
+    expect(within(measurable).getAllByText('The Forge').length).toBeGreaterThan(0);
+  });
+
+  it('ranks by ISK per jump, so a haul with no measurable distance sorts last', async () => {
+    // The cost of a haul is the trip, and the trip is jumps. A haul with no
+    // measurable distance has no rate, and "we cannot say" sorts below every
+    // real figure rather than above it — which under the old reward sort is
+    // exactly where the richer-looking structure-ended haul did not sit.
+    await showCourier();
+
+    const rows = await waitFor(async () => {
+      const found = await bodyRows();
+      expect(found).toHaveLength(2);
+      return found;
+    });
+    await waitFor(() => {
+      expect(within(rows[0]).getAllByRole('cell')[JUMPS_CELL]).toHaveTextContent('4');
+    });
+    expect(within(rows[1]).getByText(new RegExp(String(UNKNOWN_STRUCTURE)))).toBeInTheDocument();
+  });
+
+  it('re-measures every haul when the route preference changes', async () => {
+    // Four jumps the safe way, two through lowsec — and the whole filtered
+    // set is re-ranked on the change, not just the visible page.
+    await showCourier();
+
+    const rows = await waitFor(async () => {
+      const found = await bodyRows();
+      expect(found).toHaveLength(2);
+      return found;
+    });
+    await waitFor(() => {
+      expect(within(rows[0]).getAllByRole('cell')[JUMPS_CELL]).toHaveTextContent('4');
+    });
+
+    await userEvent.click(screen.getByRole('button', { name: /filters/i }));
+    await userEvent.click(screen.getByRole('combobox', { name: 'Route' }));
+    await userEvent.click(screen.getByRole('option', { name: 'Shortest' }));
+
+    await waitFor(async () => {
+      const refreshed = await bodyRows();
+      expect(within(refreshed[0]).getAllByRole('cell')[JUMPS_CELL]).toHaveTextContent('2');
+    });
+  });
+
+  it('ranks by reward and says so when the jump graph cannot be read', async () => {
+    // A board that cannot measure distance must not report every haul as
+    // having no route; it falls back to reward and states why.
+    const { loadSolarSystemJumps } = await import('@/sde/loadMarketSde');
+    vi.mocked(loadSolarSystemJumps).mockRejectedValueOnce(new Error('offline'));
+    clearJumpGraphIndex();
+    await showCourier();
+
+    expect(await screen.findByText(/Jump distances are unavailable right now/)).toBeInTheDocument();
   });
 
   it('shows a location nothing local names as its id rather than inventing one', async () => {
@@ -407,7 +493,10 @@ describe('ContractSearchPanel — Courier mode', () => {
       expect(found).toHaveLength(2);
       return found;
     });
-    expect(within(rows[0]).getByText(new RegExp(String(UNKNOWN_STRUCTURE)))).toBeInTheDocument();
+    const unnamed = rows.find((candidate) =>
+      candidate.textContent?.includes(String(UNKNOWN_STRUCTURE))
+    );
+    expect(unnamed).toBeDefined();
   });
 
   it('says a haul asks for no collateral and states no deadline, rather than showing zeroes', async () => {
@@ -418,18 +507,45 @@ describe('ContractSearchPanel — Courier mode', () => {
       expect(found).toHaveLength(2);
       return found;
     });
-    // Two dashes, not "at least one": the row has both an absent collateral
-    // and an absent deadline, so `toContain` would still pass with collateral
-    // rendering "0.00 ISK" — which is the thing this guards against.
-    const cells = within(rows[0])
+    const withoutCollateral = rows.find((candidate) =>
+      candidate.textContent?.includes(String(UNKNOWN_STRUCTURE))
+    )!;
+    const withCollateral = rows.find((candidate) => candidate !== withoutCollateral)!;
+    // Asserted by position rather than by counting dashes: the collateral
+    // cell specifically must not render "0.00 ISK", which a count would let
+    // through as long as some other cell happened to be a dash.
+    const cells = within(withoutCollateral)
       .getAllByRole('cell')
       .map((cell) => cell.textContent);
-    expect(cells.filter((text) => text === '—')).toHaveLength(2);
-    // And the haul that states both shows neither as a dash.
-    const stated = within(rows[1])
+    expect(cells[COLLATERAL_CELL]).toBe('—');
+    // This haul also ends in a player structure, so it has no distance and no
+    // rate — two more dashes, for a different reason.
+    expect(cells[JUMPS_CELL]).toBe('—');
+    expect(cells[ISK_PER_JUMP_CELL]).toBe('—');
+    // The haul that states a collateral shows a figure, not a dash.
+    const stated = within(withCollateral)
       .getAllByRole('cell')
       .map((cell) => cell.textContent);
-    expect(stated.filter((text) => text === '—')).toHaveLength(0);
+    expect(stated[COLLATERAL_CELL]).not.toBe('—');
+  });
+
+  it('states an absent deadline as unstated in the detail, which is where it lives', async () => {
+    // A deadline is a constraint checked once on a haul under consideration,
+    // so it is a filter and a detail figure rather than a column.
+    await showCourier();
+    const rows = await waitFor(async () => {
+      const found = await bodyRows();
+      expect(found).toHaveLength(2);
+      return found;
+    });
+
+    const unstated = rows.find((candidate) =>
+      candidate.textContent?.includes(String(UNKNOWN_STRUCTURE))
+    )!;
+    await userEvent.click(unstated);
+
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('Days').parentElement).toHaveTextContent('—');
   });
 
   it('swaps the item filters out for route filters, rather than stacking both', async () => {

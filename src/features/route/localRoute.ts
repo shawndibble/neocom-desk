@@ -22,6 +22,7 @@ import {
   type JumpRouteResult,
   type RoutePreferenceKind,
 } from '@/engine/route/jumpRoute';
+import { jumpCountsForRoutes, type RouteEnds } from '@/engine/route/jumpCounts';
 import { loadJumpGraph } from '@/sde/jumpGraph';
 import { loadSolarSystemsById } from '@/sde/solarSystems';
 
@@ -103,4 +104,27 @@ export async function localJumpDistances(
     kind: 'known',
     jumps: jumpDistancesFrom(graph, originSystemId, { preference, securityOf }),
   };
+}
+
+export type LocalJumpCounts =
+  { kind: 'known'; counts: readonly (number | null)[] } | { kind: 'unknown' };
+
+/**
+ * Jumps for a whole table of routes in one pass — the shape a board ranking
+ * hauls by distance wants, and the only one that does not scale with row
+ * count.
+ *
+ * A `null` count is a haul with no distance to give: an end in a player
+ * structure this app cannot place, or two ends no stargate connects. That is
+ * per row. `unknown` is the whole answer being unavailable because the graph
+ * could not be read — a board shows the first as an unavailable cell and the
+ * second as a column that cannot be ranked at all.
+ */
+export async function localJumpCountsForRoutes(
+  routes: readonly RouteEnds[],
+  preference: RoutePreferenceKind = 'shortest'
+): Promise<LocalJumpCounts> {
+  const [graph, securityOf] = await Promise.all([loadJumpGraph(), securityLookupFor(preference)]);
+  if (!graph) return { kind: 'unknown' };
+  return { kind: 'known', counts: jumpCountsForRoutes(graph, routes, { preference, securityOf }) };
 }

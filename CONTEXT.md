@@ -317,6 +317,23 @@ here — they go one per file in `docs/context/decisions/`.
 - **Item Detail**: The modal view of one item's own properties — fitting cost,
   volume, bonuses, description. Read live from ESI per item, not from the SDE
   snapshot, so it is the one Market Browser panel that needs the network.
+- **ISK/jump**: What a public courier haul pays per stargate jump of the trip
+  it asks for — reward divided by the jump count, and the figure the Courier
+  board ranks on (issue #943). A hauler's cost is the trip, and the trip is
+  jumps; **volume** is a gate ("does this fit my hull"), not a rate, which is
+  why it is a filter rather than the ranking figure. The count follows the
+  reader's own **Route Preference**, so the same contract has a different
+  ISK/jump for a hauler who will only fly highsec than for one who will not.
+  A haul with an unplaced end, or two ends no stargate connects, has no rate
+  at all — never a rate of zero.
+- **Route Preference**: Which trip a distance describes — prefer highsec,
+  shortest, or avoid highsec, the three the local jump graph supports
+  (`engine/route/jumpRoute.ts`, issue #942). A reader's choice rather than a
+  fixed rule, because haulers genuinely differ on whether a 0.4 system is
+  worth a shorter run. Distinct from the Assets page's own two-value
+  `RoutePreference` setting and from ESI's `shortest`/`secure`/`insecure`
+  flags; unifying the three vocabularies is recorded as work owed before a
+  second _persisted_ preference control ships.
 - **Job Fee**: The ISK ESI charges to install a manufacturing job, separate
   from material cost. Sized from EIV, the system's **Cost Index**, a fixed
   SCC surcharge, and the facility's tax.
