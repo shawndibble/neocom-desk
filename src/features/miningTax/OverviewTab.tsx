@@ -8,11 +8,10 @@
  * and the vocabulary note in the issue: this is deliberately not the Tax
  * tab's `MiningLedgerEntry`/`Assignment`/`Payee` model).
  */
-import { lazy, Suspense, useMemo, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
-  DataAgeBadge,
   DataTable,
   EmptyState,
   IconButton,
@@ -59,13 +58,26 @@ function dateRangeLabel(dates: readonly string[]): string {
   return first === last ? first : `${first} – ${last}`;
 }
 
-export function OverviewTab() {
+interface OverviewTabProps {
+  /**
+   * Reports this tab's own `data.fetchedAt` up to the route shell, which owns
+   * the page's one `PageHeader` and shows it beside the title (see the
+   * matching note on `TaxTab`).
+   */
+  onDataAgeChange?: (fetchedAt: Date | null) => void;
+}
+
+export function OverviewTab({ onDataAgeChange }: OverviewTabProps) {
   const { t } = useTranslation();
   const { data, error, loading, activeCharacterId, refresh } = useRouteSnapshot(
     loadSnapshot,
     undefined,
     { cacheKey: 'miningYieldOverview' }
   );
+
+  useEffect(() => {
+    onDataAgeChange?.(data?.fetchedAt ?? null);
+  }, [data?.fetchedAt, onDataAgeChange]);
 
   const [characterFilter, setCharacterFilter] = useState<CharacterFilterValue>('all');
   const resolvedCharacterFilter = useResolvedCharacterFilter(characterFilter, activeCharacterId);
@@ -206,7 +218,6 @@ export function OverviewTab() {
     <div className="space-y-4">
       <div className="flex min-h-9 flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          {data?.fetchedAt && <DataAgeBadge date={data.fetchedAt} />}
           {characters.length > 0 && (
             <CharacterFilterControl
               characters={characters.map((c) => ({

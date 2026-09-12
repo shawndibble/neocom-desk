@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
-  DataAgeBadge,
   DataTable,
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -170,13 +169,27 @@ function statusLabel(t: (key: string) => string, status: MiningTaxRowStatus): st
  * Character before mounting this, so a hydrated store and a non-null
  * `activeCharacterId` are already guaranteed here.
  */
-export function TaxTab() {
+interface TaxTabProps {
+  /**
+   * Reports this tab's own `data.fetchedAt` up to the route shell, which owns
+   * the page's one `PageHeader` and shows it beside the title — the tab still
+   * owns its fetch lifecycle (see the file-level note on `MoonMiningTax`),
+   * this just surfaces the timestamp for display elsewhere.
+   */
+  onDataAgeChange?: (fetchedAt: Date | null) => void;
+}
+
+export function TaxTab({ onDataAgeChange }: TaxTabProps) {
   const { t } = useTranslation();
   const { data, error, loading, activeCharacterId, refresh } = useRouteSnapshot(
     loadSnapshot,
     undefined,
     { cacheKey: 'moonMiningTax' }
   );
+
+  useEffect(() => {
+    onDataAgeChange?.(data?.fetchedAt ?? null);
+  }, [data?.fetchedAt, onDataAgeChange]);
 
   const [characterFilter, setCharacterFilter] = useState<CharacterFilterValue>('all');
   const [payeeFilter, setPayeeFilter] = useState<ReadonlySet<string> | 'all'>('all');
@@ -728,24 +741,19 @@ export function TaxTab() {
 
   return (
     <div className="space-y-4">
-      <div className="flex min-h-9 flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          {data?.fetchedAt && <DataAgeBadge date={data.fetchedAt} />}
-        </div>
-        <div className="flex items-center gap-1.5">
-          {payeeManagerDefaultCharacterId !== null && (
-            <Button onClick={() => setPayeeManagerCharacterId(payeeManagerDefaultCharacterId)}>
-              {t('miningTax.managePayeesAction')}
-            </Button>
-          )}
-          <Button onClick={() => setOreTagsOpen(true)}>{t('miningTax.oreTagsAction')}</Button>
-          <IconButton
-            icon={<Icon.Refresh />}
-            label={t('miningTax.refresh')}
-            onClick={refresh}
-            disabled={loading}
-          />
-        </div>
+      <div className="flex min-h-9 flex-wrap items-center gap-1.5">
+        {payeeManagerDefaultCharacterId !== null && (
+          <Button onClick={() => setPayeeManagerCharacterId(payeeManagerDefaultCharacterId)}>
+            {t('miningTax.managePayeesAction')}
+          </Button>
+        )}
+        <Button onClick={() => setOreTagsOpen(true)}>{t('miningTax.oreTagsAction')}</Button>
+        <IconButton
+          icon={<Icon.Refresh />}
+          label={t('miningTax.refresh')}
+          onClick={refresh}
+          disabled={loading}
+        />
       </div>
 
       {loading && !data ? (
