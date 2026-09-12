@@ -21,7 +21,10 @@ no app server. Two kinds of data:
   admin-write-only collection — not per-Character data — fed by a scheduled
   function that holds no EVE token and calls no ESI endpoint at all. It holds
   every for-sale contract line of every item type; BPC Sourcing takes its
-  blueprint-copy slice out of it client-side.
+  blueprint-copy slice out of it client-side. The same scheduled function, off
+  the same archive fetch, also writes `publicCourierContracts` (issue #909):
+  public courier contracts as a route and a fee, a sibling collection because
+  they carry no item lines. Ingestion only so far — nothing reads it yet.
 
 Auth is browser-only OAuth2 PKCE against `login.eveonline.com`; refresh
 tokens never leave the device. Market prices come from Fuzzwork aggregates,

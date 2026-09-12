@@ -9,7 +9,12 @@ import {
   filterAndCompactPublicContractOffers,
   sortContractOfferRows,
   PUBLIC_CONTRACT_OFFERS_CHUNK_SIZE,
+  courierContractFrom,
+  filterAndCompactPublicCourierContracts,
+  sortCourierContractRows,
+  PUBLIC_COURIER_CONTRACTS_CHUNK_SIZE,
   type PublicContractOfferRow,
+  type PublicCourierContractRow,
 } from './publicContracts.js';
 
 // Column order and sample values verified against a live EVE Ref
@@ -378,6 +383,177 @@ describe('public contract offers snapshot sizing', () => {
     expect(widest).toMatchObject({ buyout: expect.any(Number), isBlueprintCopy: true, runs: 300 });
     expect(
       PUBLIC_CONTRACT_OFFERS_CHUNK_SIZE * Buffer.byteLength(JSON.stringify(widest))
+    ).toBeLessThan(1024 * 1024);
+  });
+});
+
+// Courier contracts (issue #909) publish their own row shape to their own
+// snapshot, off this same single archive pass. The `eligibleContractFrom`
+// tests above are what pin the other half: a courier contract is still no
+// part of the offers snapshot.
+describe('courierContractFrom', () => {
+  const [
+    courier,
+    noDestination,
+    blankOptionals,
+    loan,
+    lapsedCourier,
+    noReward,
+    noVolume,
+    realZeros,
+  ] = parseContractsCsv(
+    contractsCsv([
+      `5000000.0,10,${FUTURE},2026-08-11T18:10:34Z,7,60008494,98745702,2120819548,,1200000.0,60003760,"Jita to Amarr",courier,12500.0,2026-09-08T18:08:11Z,10000002,60003760,30000142,20000020,false,`,
+      `5000000.0,11,${FUTURE},2026-08-11T18:10:34Z,7,,98745702,2120819548,,1200000.0,60003760,"Nowhere",courier,12500.0,2026-09-08T18:08:11Z,10000002,60003760,30000142,20000020,false,`,
+      `,12,${FUTURE},2026-08-11T18:10:34Z,,60008494,98745702,2120819548,,1200000.0,60003760,"No collateral stated",courier,12500.0,2026-09-08T18:08:11Z,10000002,60003760,30000142,20000020,false,`,
+      `5000000.0,13,${FUTURE},2026-08-11T18:10:34Z,7,60008494,98745702,2120819548,,1200000.0,60003760,"Lend me ISK",loan,12500.0,2026-09-08T18:08:11Z,10000002,60003760,30000142,20000020,false,`,
+      `5000000.0,14,${PAST},2026-08-11T18:10:34Z,7,60008494,98745702,2120819548,,1200000.0,60003760,"Lapsed haul",courier,12500.0,2026-09-08T18:08:11Z,10000002,60003760,30000142,20000020,false,`,
+      `5000000.0,15,${FUTURE},2026-08-11T18:10:34Z,7,60008494,98745702,2120819548,,,60003760,"Unpaid",courier,12500.0,2026-09-08T18:08:11Z,10000002,60003760,30000142,20000020,false,`,
+      `5000000.0,16,${FUTURE},2026-08-11T18:10:34Z,7,60008494,98745702,2120819548,,1200000.0,60003760,"Empty hold",courier,,2026-09-08T18:08:11Z,10000002,60003760,30000142,20000020,false,`,
+      `0.0,17,${FUTURE},2026-08-11T18:10:34Z,0,60008494,98745702,2120819548,,0.0,60003760,"Favour run",courier,12500.0,2026-09-08T18:08:11Z,10000002,60003760,30000142,20000020,false,`,
+    ])
+  );
+
+  it('narrows a courier contract to the haul it describes', () => {
+    expect(courierContractFrom(courier, NOW)).toEqual({
+      contractId: 10,
+      regionId: 10000002,
+      originLocationId: 60003760,
+      destinationLocationId: 60008494,
+      reward: 1200000,
+      volume: 12500,
+      collateral: 5000000,
+      daysToComplete: 7,
+      dateExpired: Date.parse(FUTURE),
+    });
+  });
+
+  it('rejects a contract type that is not a haul', () => {
+    // Matched on `courier` by equality rather than taken as the complement of
+    // the offers snapshot's type set: `loan` is neither searchable by item nor
+    // a haul, and the complement would have published it as one.
+    expect(courierContractFrom(loan, NOW)).toBeNull();
+    expect(courierContractFrom(courier, NOW)).not.toBeNull();
+  });
+
+  it('rejects a courier contract that lapsed between the scrape and this run', () => {
+    expect(courierContractFrom(lapsedCourier, NOW)).toBeNull();
+  });
+
+  it('rejects a haul missing an endpoint, a reward or a volume', () => {
+    // `Number('')` is 0, not NaN, so an absent column converted
+    // unconditionally would publish a delivery to station 0, a free haul, or
+    // an empty hold — each indistinguishable from a real value, and none of
+    // them a job anyone can take or rank.
+    expect(courierContractFrom(noDestination, NOW)).toBeNull();
+    expect(courierContractFrom(noReward, NOW)).toBeNull();
+    expect(courierContractFrom(noVolume, NOW)).toBeNull();
+  });
+
+  it('omits an unstated collateral or deadline rather than writing zeros', () => {
+    const row = courierContractFrom(blankOptionals, NOW);
+    expect(row).not.toHaveProperty('collateral');
+    expect(row).not.toHaveProperty('daysToComplete');
+  });
+
+  it('keeps a real zero collateral, reward or deadline as the value it is', () => {
+    // A favour run genuinely posts no collateral and pays nothing, and that
+    // is not the same fact as the column being blank.
+    expect(courierContractFrom(realZeros, NOW)).toMatchObject({
+      collateral: 0,
+      reward: 0,
+      daysToComplete: 0,
+    });
+  });
+});
+
+describe('filterAndCompactPublicCourierContracts', () => {
+  const contracts = contractsCsv([
+    // item_exchange: belongs to the offers snapshot, not this one
+    `0.0,1,${FUTURE},2026-08-11T18:10:34Z,0,,98745702,2120819548,5000000.0,0.0,60003760,"Mixed bundle",item_exchange,10.0,2026-09-08T18:08:11Z,10000002,60003760,30000142,20000020,false,`,
+    // auction: likewise
+    `0.0,2,${FUTURE},2026-08-11T18:10:34Z,0,,98745702,2120819548,1000000.0,0.0,60008494,"Auctioned ship",auction,10.0,2026-09-08T18:08:11Z,10000043,60008494,30002187,20000322,false,9000000.0`,
+    `5000000.0,20,${FUTURE},2026-08-11T18:10:34Z,7,60008494,98745702,2120819548,,1200000.0,60003760,"Jita to Amarr",courier,12500.0,2026-09-08T18:08:11Z,10000002,60003760,30000142,20000020,false,`,
+    `1000000.0,21,${FUTURE},2026-08-11T18:10:34Z,3,60003760,98745702,2120819548,,300000.0,60008494,"Amarr to Jita",courier,5000.0,2026-09-08T18:08:11Z,10000043,60008494,30002187,20000322,false,`,
+    // lapsed courier: excluded
+    `1000000.0,22,${PAST},2026-08-11T18:10:34Z,3,60003760,98745702,2120819548,,300000.0,60008494,"Lapsed",courier,5000.0,2026-09-08T18:08:11Z,10000043,60008494,30002187,20000322,false,`,
+  ]);
+
+  const rows = () => filterAndCompactPublicCourierContracts(parseContractsCsv(contracts), NOW);
+
+  it('keeps only outstanding courier contracts, one row each', () => {
+    expect(rows().map((r) => r.contractId)).toEqual([20, 21]);
+  });
+
+  it('carries the route, reward, collateral and volume through', () => {
+    expect(rows()[0]).toMatchObject({
+      regionId: 10000002,
+      originLocationId: 60003760,
+      destinationLocationId: 60008494,
+      reward: 1200000,
+      collateral: 5000000,
+      volume: 12500,
+      daysToComplete: 7,
+    });
+  });
+
+  it('is empty given no rows', () => {
+    expect(filterAndCompactPublicCourierContracts([], NOW)).toEqual([]);
+  });
+
+  it('sorts deterministically, independent of input order', () => {
+    const backwards = filterAndCompactPublicCourierContracts(
+      parseContractsCsv(contracts).reverse(),
+      NOW
+    );
+    expect(backwards.map((r) => r.contractId)).toEqual([20, 21]);
+  });
+});
+
+describe('sortCourierContractRows', () => {
+  it('orders by contract id, in place, independent of input order', () => {
+    // One row per contract, so the contract id alone is a total order here —
+    // unlike the offers rows, where one contract lists many item lines.
+    const rows = [
+      { contractId: 3 },
+      { contractId: 1 },
+      { contractId: 2 },
+    ] as PublicCourierContractRow[];
+
+    expect(sortCourierContractRows(rows)).toBe(rows);
+    expect(rows.map((r) => r.contractId)).toEqual([1, 2, 3]);
+  });
+});
+
+describe('public courier contracts snapshot sizing', () => {
+  it('costs a rounding error against the free tier write budget', () => {
+    // ADR 0013's live pull was ~50,300 public contracts, 48,963 of them
+    // item_exchange and 717 auction, so every remaining type together —
+    // courier and loan — is under 620. One row per contract rather than one
+    // per item line, so this snapshot is a single chunk doc plus its meta
+    // doc: ~96 writes/day beside the offers sync's ~6.0k.
+    const ESTIMATED_ROWS = 620;
+    const RUNS_PER_DAY = 48;
+    const chunkAndMetaDocs = Math.ceil(ESTIMATED_ROWS / PUBLIC_COURIER_CONTRACTS_CHUNK_SIZE) + 1;
+    expect(chunkAndMetaDocs * RUNS_PER_DAY).toBeLessThan(200);
+  });
+
+  it('keeps a chunk of nothing but worst-case rows clear of the 1MiB document limit', () => {
+    // Measured off a real row, like the offers snapshot's own guard: a later
+    // field addition should fail here before it fails a live `set()`.
+    const widest = courierContractFrom(
+      parseContractsCsv(
+        contractsCsv([
+          `999999999999.99,2349204819,${FUTURE},2026-08-11T18:10:34Z,30,1043607688037,98745702,2120819548,,999999999999.99,1043607688781,"Widest",courier,1300000.0,2026-09-08T18:08:11Z,10000043,60005668,30002197,20000323,false,`,
+        ])
+      )[0],
+      NOW
+    );
+
+    // Every optional field populated, or it isn't the worst case.
+    expect(widest).toMatchObject({ collateral: expect.any(Number), daysToComplete: 30 });
+    expect(
+      PUBLIC_COURIER_CONTRACTS_CHUNK_SIZE * Buffer.byteLength(JSON.stringify(widest))
     ).toBeLessThan(1024 * 1024);
   });
 });

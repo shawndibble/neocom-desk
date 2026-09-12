@@ -169,6 +169,14 @@ service cloud.firestore {
       allow read: if request.auth != null;
       allow write: if false;
     }
+    // The courier half of the same crawl (#909): public courier contracts as a
+    // route and a fee, which carry no item lines and so none of the offer row's
+    // fields. Same sync, same admin-only write, same signed-in read — a
+    // sibling collection only because it is a different row shape.
+    match /publicCourierContracts/{docId} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
     // Everything else: implicit deny.
   }
 }

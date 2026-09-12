@@ -39,13 +39,20 @@ import {
   chunkDocId,
   chunkRows,
   compactContractOfferRow,
+  courierContractFrom,
   eligibleContractFrom,
   sortContractOfferRows,
+  sortCourierContractRows,
+  COURIER_CONTRACT_TYPE,
   PUBLIC_CONTRACT_OFFERS_CHUNK_SIZE,
   PUBLIC_CONTRACT_OFFERS_COLLECTION,
   PUBLIC_CONTRACT_OFFERS_META_DOC,
+  PUBLIC_COURIER_CONTRACTS_CHUNK_SIZE,
+  PUBLIC_COURIER_CONTRACTS_COLLECTION,
+  PUBLIC_COURIER_CONTRACTS_META_DOC,
   type EligibleContract,
   type PublicContractOfferRow,
+  type PublicCourierContractRow,
 } from './publicContracts.js';
 
 initializeApp();
@@ -334,8 +341,11 @@ async function commitInPages(
  * itself had been made cheap. Five chunks of 3,000 rows keep that transient
  * near 3MB. The total write count is unchanged — this only affects how many
  * are in flight together.
+ *
+ * Shared by both public-contract snapshots: what a page of chunk docs costs to
+ * encode is not what an offers chunk and a courier chunk differ in.
  */
-const PUBLIC_CONTRACT_OFFERS_CHUNK_DOCS_PER_BATCH = 5;
+const PUBLIC_CONTRACT_CHUNK_DOCS_PER_BATCH = 5;
 
 /** Where one chunked snapshot lives, and how coarsely it is written. */
 interface ChunkedSnapshot {
@@ -388,7 +398,21 @@ const PUBLIC_CONTRACT_OFFERS_SNAPSHOT: ChunkedSnapshot = {
   collection: PUBLIC_CONTRACT_OFFERS_COLLECTION,
   metaDoc: PUBLIC_CONTRACT_OFFERS_META_DOC,
   chunkSize: PUBLIC_CONTRACT_OFFERS_CHUNK_SIZE,
-  chunkDocsPerBatch: PUBLIC_CONTRACT_OFFERS_CHUNK_DOCS_PER_BATCH,
+  chunkDocsPerBatch: PUBLIC_CONTRACT_CHUNK_DOCS_PER_BATCH,
+};
+
+/**
+ * The courier half of the same crawl (issue #909). Its own collection because
+ * a courier row shares none of an offer row's fields beyond identity — see
+ * `PublicCourierContractRow` — and `writeChunkedSnapshot` replaces one
+ * snapshot from one row array, so two shapes in one collection is not a thing
+ * this writer can express in the first place.
+ */
+const PUBLIC_COURIER_CONTRACTS_SNAPSHOT: ChunkedSnapshot = {
+  collection: PUBLIC_COURIER_CONTRACTS_COLLECTION,
+  metaDoc: PUBLIC_COURIER_CONTRACTS_META_DOC,
+  chunkSize: PUBLIC_COURIER_CONTRACTS_CHUNK_SIZE,
+  chunkDocsPerBatch: PUBLIC_CONTRACT_CHUNK_DOCS_PER_BATCH,
 };
 
 async function writePublicContractOffersSnapshot(
@@ -396,6 +420,13 @@ async function writePublicContractOffersSnapshot(
   rows: readonly PublicContractOfferRow[]
 ): Promise<void> {
   await writeChunkedSnapshot(db, PUBLIC_CONTRACT_OFFERS_SNAPSHOT, rows);
+}
+
+async function writePublicCourierContractsSnapshot(
+  db: Firestore,
+  rows: readonly PublicCourierContractRow[]
+): Promise<void> {
+  await writeChunkedSnapshot(db, PUBLIC_COURIER_CONTRACTS_SNAPSHOT, rows);
 }
 
 /**
@@ -412,6 +443,13 @@ async function writePublicContractOffersSnapshot(
  * joined against it row by row. Holding the two CSVs as text and parsing them
  * whole needed ~1.1GB of heap for 37MB of input; the streaming pass peaks far
  * below that against the same live data.
+ *
+ * It publishes a second snapshot off the same pass: `publicCourierContracts`,
+ * every outstanding public courier contract as a route and a fee (issue #909).
+ * Courier contracts have no item lines to join, so they cost one more
+ * accumulator and ~2 more writes per run — deliberately not a second scheduled
+ * function or a second archive fetch, which is the shape #907 spent a ticket
+ * undoing.
  *
  * This is the only public-contract sync. #906 added it beside a
  * blueprint-copies-only one as the expand half of an expand/contract, and
@@ -446,11 +484,19 @@ export const syncPublicContractOffers = onSchedule(
     const nowMs = Date.now();
     const eligibleContracts = new Map<string, EligibleContract>();
     const rows: PublicContractOfferRow[] = [];
+    const courierRows: PublicCourierContractRow[] = [];
+    let courierContractsSeen = 0;
 
     await streamPublicContractsCsvs({
       onContract: (record) => {
         const eligible = eligibleContractFrom(record, nowMs);
-        if (eligible) eligibleContracts.set(record.contract_id, eligible);
+        if (eligible) {
+          eligibleContracts.set(record.contract_id, eligible);
+          return;
+        }
+        if (record.type === COURIER_CONTRACT_TYPE) courierContractsSeen += 1;
+        const courier = courierContractFrom(record, nowMs);
+        if (courier) courierRows.push(courier);
       },
       onItem: (record) => {
         const contract = eligibleContracts.get(record.contract_id);
@@ -460,14 +506,24 @@ export const syncPublicContractOffers = onSchedule(
       },
     });
 
+    // `courierContractsSeen` against `courierRowCount` is the only thing that
+    // tells an empty courier snapshot apart from one whose rows were all
+    // dropped for a missing endpoint, reward or volume — the same reason
+    // publicContractsArchive.ts throws on a reordered archive rather than
+    // publishing silence. If the two diverge, EVE Ref is not populating a
+    // column `courierContractFrom` treats as required.
     logInfo('public contract offers sync', {
       eligibleContracts: eligibleContracts.size,
       rowCount: rows.length,
+      courierContractsSeen,
+      courierRowCount: courierRows.length,
     });
 
     // The lookup is dead once the join is done, and it is ~50k objects the
     // write would otherwise be encoding rows alongside.
     eligibleContracts.clear();
-    await writePublicContractOffersSnapshot(getFirestore(), sortContractOfferRows(rows));
+    const db = getFirestore();
+    await writePublicContractOffersSnapshot(db, sortContractOfferRows(rows));
+    await writePublicCourierContractsSnapshot(db, sortCourierContractRows(courierRows));
   }
 );
