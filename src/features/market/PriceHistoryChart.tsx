@@ -55,7 +55,7 @@ function HistoryTooltip({
   const point = payload[0]?.payload as MarketHistoryPoint | undefined;
   if (!point) return null;
   return (
-    <div className="rounded-xs border border-line bg-panel-2 px-2 py-1.5 text-xs text-text shadow-lg">
+    <div className="rounded-xs border border-line bg-panel-2 px-2 py-1.5 text-xs text-text shadow-lg shadow-black/50">
       <p className="font-semibold">{label}</p>
       <p>
         {t('market.priceHistory.average')}: {formatIsk(point.average, 2)}
