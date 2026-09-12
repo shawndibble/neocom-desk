@@ -31,15 +31,29 @@ _Recorded 2026-09-12 · issue #944._
   625 Drifter and unreachable systems beside them, which is the honest superset
   — the claim is about New Eden, not about wormholes specifically.
 
-  The one case the graph cannot see is a J-space _pickup_, whose endpoint is an
-  unplaceable structure. The contract's own `regionId` survives there, and every
-  J-space system sits in the 11000000 region block, so that is the fallback.
+  The graph can only answer for an endpoint it can place, and a J-space endpoint
+  is always a structure. The contract's own `regionId` covers the _pickup_: a
+  region belongs to the place rather than to the contract, so the region a haul
+  is posted in is the region its origin sits in, and every J-space system is in
+  the 11000000 block. A structure that is only ever a _destination_ has no
+  region from anywhere, so a J-space delivery is named as a structure but not as
+  gateless. Both are true; the second is simply not always knowable, and
+  guessing it is not on offer. It is still hidden by the completion control,
+  which acts on the structure flag.
 
 - **A missing graph and a gateless system must not read alike.**
   `hasStargates` is `false` for "no stargate touches this system" and `null` for
   "we could not read the graph" — the same distinction the flag above turns on,
   and the reason the jumps column already says "distances are unavailable"
   rather than reporting every haul as routeless.
+
+- **A place no gate reaches gets no sovereignty note beside it.**
+  `classifySpace` bands wormhole space by the `J######` name, so Thera —
+  wormhole space, four NPC stations, no stargates — falls through to its raw
+  security and reads nullsec. Printing both would tell the hauler the trip
+  depends on sovereignty, standings or a jump network, none of which is true of
+  anywhere a gate cannot reach. "No gate route" is the stronger claim and the
+  correct one, so it stands alone.
 
 - **Nullsec gets no marker of its own.** The route cell already names each end's
   space band (#939), which is informational text rather than a warning — exactly
@@ -68,6 +82,13 @@ _Recorded 2026-09-12 · issue #944._
   are hard to _complete_. It extends `CourierRiskKind` and
   `courierRiskLabels.ts` rather than introducing a second badge system, and
   should not need to touch the rendering at all.
+
+- **Only the delivery end carries the structure flag,** which is what the ticket
+  asks for. An inaccessible _pickup_ is arguably the same trap — a public
+  courier contract is accepted remotely and the collateral taken then, so a
+  hauler who cannot dock to collect the cargo loses it just the same. Left out
+  because the ticket names the delivery point specifically; raised in the PR
+  rather than widened here.
 
 - **Not done here:** no structure is probed, no ESI request is added, and no
   flag is derived from anything but the local snapshots the board already reads.

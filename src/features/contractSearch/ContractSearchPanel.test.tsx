@@ -1058,8 +1058,10 @@ describe('ContractSearchPanel — Courier completion risk', () => {
   });
 
   it('does not flag a pickup from a player structure', async () => {
-    // A pickup that cannot be reached is simply never accepted. It is the
-    // delivery that is already paid for with collateral put up.
+    // The ticket scopes the flag to the delivery point. An inaccessible pickup
+    // is arguably the same trap — the contract is accepted remotely and the
+    // collateral taken then — but widening it is a follow-up, not a silent
+    // change here.
     await showCourierWith([FROM_STRUCTURE]);
 
     const route = within((await courierRows())[0]).getAllByRole('cell')[0];

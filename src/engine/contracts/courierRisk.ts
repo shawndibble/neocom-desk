@@ -28,7 +28,10 @@ export type CourierRiskKind = 'player-structure' | 'no-gate-route' | 'nullsec';
  * fact that survives.
  */
 export function isWormholeRegion(regionId: number | null): boolean {
-  return regionId !== null && regionId >= 11_000_000;
+  // Bounded above as well as below: the blocks past this one are Abyssal and
+  // the unreachable dev regions, which are not wormhole space and have their
+  // own reasons for being unreachable. An unbounded test would name them wrong.
+  return regionId !== null && regionId >= 11_000_000 && regionId < 12_000_000;
 }
 
 /** No stargate reaches this end — a statement about New Eden, not about our data. */
@@ -41,9 +44,10 @@ function unreachableByGates(endpoint: CourierEndpoint): boolean {
  * built from, so a marker rendered beside an endpoint and the sentence in the
  * detail modal can never disagree about which end is at issue.
  *
- * `player-structure` is a delivery-only conclusion: a pickup that cannot be
- * reached is simply never accepted, while a delivery is already paid for with
- * collateral put up.
+ * `player-structure` is a delivery-only conclusion, which is the shape the
+ * ticket asks for. An inaccessible *pickup* is arguably the same trap — a
+ * public courier contract is accepted remotely and the collateral is taken
+ * then — but widening it is a call for #944's follow-up, not a silent one here.
  */
 export function endpointRisks(
   endpoint: CourierEndpoint,
@@ -53,7 +57,16 @@ export function endpointRisks(
   if (end === 'destination' && endpoint.resolution === 'structure') {
     risks.push('player-structure');
   }
-  if (unreachableByGates(endpoint)) risks.push('no-gate-route');
+  if (unreachableByGates(endpoint)) {
+    risks.push('no-gate-route');
+    // And nothing else. `classifySpace` bands wormhole space by the `J######`
+    // name, so Thera — wormhole space, four NPC stations, no stargates — falls
+    // through to its raw security and reads `nullsec`. Adding that note beside
+    // this flag would tell the hauler the trip depends on sovereignty,
+    // standings or a jump network, none of which is true of anywhere a gate
+    // cannot reach. "No gate route" is the stronger and the correct answer.
+    return risks;
+  }
   if (endpoint.space === 'nullsec') risks.push('nullsec');
   return risks;
 }

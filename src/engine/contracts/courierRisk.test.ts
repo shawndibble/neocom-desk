@@ -114,6 +114,22 @@ describe('courierRisks', () => {
     expect(kinds(nullsec, station())).toContain('nullsec');
   });
 
+  it('does not add a sovereignty note to a place no gate reaches', () => {
+    // Thera is wormhole space with four NPC stations and no stargates, and
+    // `classifySpace` bands wormhole space by the `J######` name — so Thera
+    // falls through to its raw security and reads nullsec. Printing both would
+    // tell the hauler the trip depends on sovereignty, standings or a jump
+    // network, none of which is true of anywhere a gate cannot reach.
+    const thera = station({
+      locationId: 60015148,
+      systemName: 'Thera',
+      regionId: 11000031,
+      space: 'nullsec',
+      hasStargates: false,
+    });
+    expect(kinds(station(), thera)).toEqual(['no-gate-route']);
+  });
+
   it('reports every condition that applies, in a fixed order', () => {
     const nullStructure: CourierEndpoint = { ...STRUCTURE, regionId: 11000031 };
     expect(kinds(station({ space: 'nullsec' }), nullStructure)).toEqual([

@@ -11,11 +11,7 @@
 import { useTranslation } from 'react-i18next';
 import { endpointRisks } from '@/engine/contracts/courierRisk';
 import type { CourierEndpoint } from '@/engine/contracts/courierSearch';
-import {
-  MARKED_RISKS,
-  riskExplanationKey,
-  riskShortLabelKey,
-} from '@/features/contractSearch/courierRiskLabels';
+import { MARKED_RISKS, riskCopy } from '@/features/contractSearch/courierRiskLabels';
 
 /**
  * The markers for one end of a haul, beside the end they describe — so "this
@@ -45,11 +41,12 @@ export function EndpointRiskMarkers({
           key={kind}
           // `title` carries the full sentence for a pointer; the detail modal
           // spells every flag out for everyone else, which is where the
-          // decision is actually made.
-          title={t(riskExplanationKey(kind))}
+          // decision is actually made. #947 is where this should converge on
+          // the `Tooltip` the design system documents for explaining triggers.
+          title={t(riskCopy(kind).detail)}
           className="ml-1.5 rounded-xs border border-warning/40 px-1 text-[0.6875rem] text-warning"
         >
-          {t(riskShortLabelKey(kind))}
+          {t(riskCopy(kind).short)}
         </span>
       ))}
     </>

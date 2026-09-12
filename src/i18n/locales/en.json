@@ -3666,11 +3666,12 @@
     "destinationSpaceLabel": "Destination space",
     "hideUncompletableLabel": "Hide hauls I may not be able to complete",
     "riskHeading": "Before you accept",
+    "riskNoteHeading": "Worth knowing",
     "risk": {
       "structureShort": "Structure",
       "structureDetail": "The delivery point is a player structure. Docking there needs access its owner controls, and this app cannot check it. If you cannot dock, the contract expires undelivered and the issuer keeps your collateral.",
       "noGateRouteShort": "No gate route",
-      "noGateRouteDetail": "No stargate route reaches this end. Wormhole space has no gate connections at all, so this haul cannot be flown gate to gate — this is how New Eden is built, not a gap in our distance data.",
+      "noGateRouteDetail": "No stargate reaches this end's system, so this haul cannot be flown gate to gate. Wormhole space has no gate connections at all, and a handful of other systems are likewise unreachable. This is how New Eden is built, not a gap in our distance data.",
       "nullsecShort": "Nullsec",
       "nullsecDetail": "One end is in nullsec. Getting there usually depends on sovereignty, standings or a jump network this app cannot see. Plenty of nullsec hauling is ordinary, well-paid work — this is a note, not a warning."
     },

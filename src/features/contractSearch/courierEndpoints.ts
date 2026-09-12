@@ -92,23 +92,31 @@ async function resolveOne(
 export async function loadCourierEndpoints(
   rows: readonly PublicCourierContractRow[]
 ): Promise<Map<number, CourierEndpoint>> {
-  // An origin the snapshots cannot place still has a region: the row carries
-  // the contract's own, which is where the pickup is. It is the only local fact
-  // left about a haul posted from a player structure, and the one that says a
-  // J-space pickup is J-space at all.
-  const regionByOrigin = new Map<number, number>();
+  // A location the snapshots cannot place still has a region whenever some
+  // haul is *posted* from it: the row carries the contract's own region, which
+  // is where the pickup is. A region belongs to the place rather than to the
+  // contract, so that answer is equally good for the same location appearing as
+  // another haul's destination — which is why this is keyed by location rather
+  // than by end. It is the only local fact left about a player structure, and
+  // the one that says a J-space pickup is in J-space at all.
+  //
+  // The gap it leaves: a structure that is only ever a destination has no
+  // region from anywhere, so a J-space delivery is named as a structure but not
+  // as gateless. Both answers are true; the second is simply not always
+  // knowable, and guessing it is not on offer.
+  const regionByLocation = new Map<number, number>();
   const ids = new Set<number>();
   for (const row of rows) {
     ids.add(row.originLocationId);
     ids.add(row.destinationLocationId);
-    regionByOrigin.set(row.originLocationId, row.regionId);
+    regionByLocation.set(row.originLocationId, row.regionId);
   }
 
   const graph = await loadJumpGraph();
   const endpoints = new Map<number, CourierEndpoint>();
   await Promise.all(
     [...ids].map(async (id) => {
-      endpoints.set(id, await resolveOne(id, graph, regionByOrigin.get(id) ?? null));
+      endpoints.set(id, await resolveOne(id, graph, regionByLocation.get(id) ?? null));
     })
   );
   return endpoints;

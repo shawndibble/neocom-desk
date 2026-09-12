@@ -24,22 +24,29 @@ import type { CourierRiskKind } from '@/engine/contracts/courierRisk';
  */
 export const MARKED_RISKS: readonly CourierRiskKind[] = ['player-structure', 'no-gate-route'];
 
-const SHORT_LABEL: Record<CourierRiskKind, string> = {
-  'player-structure': 'contractSearch.risk.structureShort',
-  'no-gate-route': 'contractSearch.risk.noGateRouteShort',
-  nullsec: 'contractSearch.risk.nullsecShort',
-};
-
-const EXPLANATION: Record<CourierRiskKind, string> = {
-  'player-structure': 'contractSearch.risk.structureDetail',
-  'no-gate-route': 'contractSearch.risk.noGateRouteDetail',
-  nullsec: 'contractSearch.risk.nullsecDetail',
-};
-
-export function riskShortLabelKey(kind: CourierRiskKind): string {
-  return SHORT_LABEL[kind];
+/** Both registers for one risk, read together at every call site. */
+interface RiskCopy {
+  /** The row has room for this much. */
+  short: string;
+  /** What the detail modal spells out, where the decision is actually made. */
+  detail: string;
 }
 
-export function riskExplanationKey(kind: CourierRiskKind): string {
-  return EXPLANATION[kind];
+const COPY: Record<CourierRiskKind, RiskCopy> = {
+  'player-structure': {
+    short: 'contractSearch.risk.structureShort',
+    detail: 'contractSearch.risk.structureDetail',
+  },
+  'no-gate-route': {
+    short: 'contractSearch.risk.noGateRouteShort',
+    detail: 'contractSearch.risk.noGateRouteDetail',
+  },
+  nullsec: {
+    short: 'contractSearch.risk.nullsecShort',
+    detail: 'contractSearch.risk.nullsecDetail',
+  },
+};
+
+export function riskCopy(kind: CourierRiskKind): RiskCopy {
+  return COPY[kind];
 }
