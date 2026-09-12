@@ -3,7 +3,14 @@ import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
 import type { PayeeBalance } from './balances';
 import type { GroupMember } from './groupRows';
 import type { MoonMiningTaxRow } from './snapshot';
-import { suggestLink, unlinkedPayments, withinLinkWindow, type MadePayment } from './paymentLinks';
+import {
+  autoMatchRecordedPayments,
+  suggestLink,
+  unlinkedPayments,
+  unlinkedRecordedPayments,
+  withinLinkWindow,
+  type MadePayment,
+} from './paymentLinks';
 
 const CHAR_A = 1;
 const TYPE_A = 45490;
@@ -255,5 +262,101 @@ describe('suggestLink', () => {
     b.owed = 0;
 
     expect(suggestLink(payment(), [b])).toBeNull();
+  });
+});
+
+function recorded(overrides: Partial<MiningTaxAssignmentRecord> = {}): MiningTaxAssignmentRecord {
+  return assignment({
+    status: 'paid',
+    payment: {
+      paymentId: 'p1',
+      paidOn: '2026-09-06',
+      method: 'donation',
+      amount: 100,
+    },
+    ...overrides,
+  });
+}
+
+describe('unlinkedRecordedPayments', () => {
+  it('groups Settle-up-recorded, still-unlinked Assignments by paymentId', () => {
+    const a1 = recorded({ id: 'a1' });
+    const a2 = recorded({ id: 'a2', date: '2026-09-05' });
+
+    const [group] = unlinkedRecordedPayments([a1, a2]);
+
+    expect(group.paymentId).toBe('p1');
+    expect(group.amount).toBe(100);
+    expect(group.paidOn).toBe('2026-09-06');
+    expect(group.characterIds).toEqual(new Set([CHAR_A]));
+    expect(group.assignments.map((a) => a.id)).toEqual(['a1', 'a2']);
+  });
+
+  it('excludes an Assignment already linked to a journal entry or contract', () => {
+    const linked = recorded({ payment: { ...recorded().payment!, journalRefId: 11 } });
+    expect(unlinkedRecordedPayments([linked])).toEqual([]);
+  });
+
+  it('excludes a bare "just mark paid" Assignment with no payment recorded at all', () => {
+    expect(unlinkedRecordedPayments([assignment({ status: 'paid' })])).toEqual([]);
+  });
+
+  it('excludes an outstanding Assignment', () => {
+    expect(unlinkedRecordedPayments([assignment({ status: 'outstanding' })])).toEqual([]);
+  });
+});
+
+describe('autoMatchRecordedPayments', () => {
+  it('auto-links an exact amount from the paying character, near the recorded date', () => {
+    const [group] = unlinkedRecordedPayments([recorded()]);
+
+    const result = autoMatchRecordedPayments([payment({ amount: 100 })], [group]);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].group.paymentId).toBe('p1');
+    expect(result[0].payment.key).toBe('journal:11');
+  });
+
+  it('never guesses between two equally plausible transactions', () => {
+    const [group] = unlinkedRecordedPayments([recorded()]);
+
+    const result = autoMatchRecordedPayments(
+      [
+        payment({ amount: 100, key: 'journal:11' }),
+        payment({ amount: 100, key: 'journal:12', refId: 12 }),
+      ],
+      [group]
+    );
+
+    expect(result).toEqual([]);
+  });
+
+  it('rejects a mismatched amount', () => {
+    const [group] = unlinkedRecordedPayments([recorded()]);
+    expect(autoMatchRecordedPayments([payment({ amount: 150 })], [group])).toEqual([]);
+  });
+
+  it('rejects a transaction from a character not covered by the recorded payment', () => {
+    const [group] = unlinkedRecordedPayments([recorded()]);
+    expect(
+      autoMatchRecordedPayments([payment({ amount: 100, characterId: 999 })], [group])
+    ).toEqual([]);
+  });
+
+  it('rejects a transaction too far from the recorded paid-on date', () => {
+    const [group] = unlinkedRecordedPayments([recorded()]);
+    expect(
+      autoMatchRecordedPayments([payment({ amount: 100, date: '2026-10-01T00:00:00Z' })], [group])
+    ).toEqual([]);
+  });
+
+  it('never auto-links a payment-in-kind contract, which carries no ISK figure', () => {
+    const [group] = unlinkedRecordedPayments([recorded()]);
+    expect(
+      autoMatchRecordedPayments(
+        [payment({ kind: 'contract', key: 'contract:5', refId: 5, amount: null })],
+        [group]
+      )
+    ).toEqual([]);
   });
 });
