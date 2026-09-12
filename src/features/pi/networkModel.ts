@@ -21,7 +21,7 @@ import type { PlanetAdvice } from './advisorModel';
 
 /** Schematic cycle times are in seconds. */
 const SECONDS_PER_HOUR = 3_600;
-import { colonyFactoryBalance, colonyOutputPerHour, surplusLoad } from './factoryBalanceModel';
+import { colonyExportablePerHour, colonyFactoryBalance, surplusLoad } from './factoryBalanceModel';
 
 export interface NetworkModelInput {
   advice: readonly PlanetAdvice[];
@@ -146,7 +146,11 @@ function buildNetworkColonies(input: NetworkModelInput): {
     const hostTaxRate = hostRateFor(entry.planetId, input.taxRateByPlanet, input.taxRate);
     colonies.push({
       planetId: entry.planetId,
-      outputPerHour: colonyOutputPerHour(balance, input.pi),
+      // What is going spare, not what is produced. A colony making Bacteria
+      // for its own Nanite pins has none to route anywhere, and handing the
+      // planner its gross output is what let it propose a second consumer for
+      // material the first one was already short of.
+      outputPerHour: colonyExportablePerHour(balance, input.pi),
       spare: {
         cpu: Math.max(0, colony.budget.cpu - colony.pinLoad.load.cpu) + freed.cpu,
         powergrid:
