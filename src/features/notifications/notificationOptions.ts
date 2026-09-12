@@ -9,9 +9,11 @@
  * - **`icon`** — without it Android draws a generic browser glyph rather than
  *   the app's mark.
  * - **`badge`** — the monochrome status-bar shape, masked to a silhouette at
- *   roughly 24dp. `badge-96.png` is deliberately just the hull hexagon from
- *   `favicon.svg`, not the full mark: the star body, its diamond hole and the
- *   four corner traces silt into a blob at that size.
+ *   roughly 24dp. `badge-96.png` is the mark's own positive space: the hull
+ *   hexagon as a ring plus a solid star, not a filled shape with the star
+ *   punched out of it. The diamond hole inside the star and the four corner
+ *   traces stay out — they silt into a blob at that size — but the ring and
+ *   star read down to 16px.
  * - **`tag`** + **`renotify`** — without a tag, three wallet changes stack
  *   into three separate bubbles. The tag is per Character *and* per event, so
  *   a second wallet alert replaces the first without an industry alert
