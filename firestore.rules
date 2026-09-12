@@ -156,8 +156,9 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
-    // Public contract search (issues #608, #906, ADR 0013): the only
-    // top-level collection that isn't per-Character sync data. Written only
+    // Public contract search (issues #608, #906, ADR 0013): one of the two
+    // top-level collections that aren't per-Character sync data — the other is
+    // publicCourierContracts just below, fed by the same job. Written only
     // by the syncPublicContractOffers scheduled function (admin privileges);
     // read by any signed-in client, since the underlying data (EVE's public
     // contract market) is not scoped to a Character or its ownerHash at all.

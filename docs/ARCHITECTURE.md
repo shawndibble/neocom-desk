@@ -17,7 +17,8 @@ no app server. Two kinds of data:
   Function, `mintFirebaseToken`). Firebase exists _only_ for this sync path —
   it is not a general backend and never sees EVE tokens beyond one
   short-lived access token per sign-in (ADR 0001). One narrow, explicit
-  exception: `publicContractOffers` (ADR 0013, issues #906/#907) is a shared,
+  exception, in two collections fed by one job:
+  `publicContractOffers` (ADR 0013, issues #906/#907) is a shared,
   admin-write-only collection — not per-Character data — fed by a scheduled
   function that holds no EVE token and calls no ESI endpoint at all. It holds
   every for-sale contract line of every item type; BPC Sourcing takes its

@@ -41,9 +41,9 @@ import {
   compactContractOfferRow,
   courierContractFrom,
   eligibleContractFrom,
+  isOutstandingCourierContract,
   sortContractOfferRows,
   sortCourierContractRows,
-  COURIER_CONTRACT_TYPE,
   PUBLIC_CONTRACT_OFFERS_CHUNK_SIZE,
   PUBLIC_CONTRACT_OFFERS_COLLECTION,
   PUBLIC_CONTRACT_OFFERS_META_DOC,
@@ -485,7 +485,7 @@ export const syncPublicContractOffers = onSchedule(
     const eligibleContracts = new Map<string, EligibleContract>();
     const rows: PublicContractOfferRow[] = [];
     const courierRows: PublicCourierContractRow[] = [];
-    let courierContractsSeen = 0;
+    let outstandingCourierContracts = 0;
 
     await streamPublicContractsCsvs({
       onContract: (record) => {
@@ -494,7 +494,7 @@ export const syncPublicContractOffers = onSchedule(
           eligibleContracts.set(record.contract_id, eligible);
           return;
         }
-        if (record.type === COURIER_CONTRACT_TYPE) courierContractsSeen += 1;
+        if (isOutstandingCourierContract(record, nowMs)) outstandingCourierContracts += 1;
         const courier = courierContractFrom(record, nowMs);
         if (courier) courierRows.push(courier);
       },
@@ -506,16 +506,18 @@ export const syncPublicContractOffers = onSchedule(
       },
     });
 
-    // `courierContractsSeen` against `courierRowCount` is the only thing that
-    // tells an empty courier snapshot apart from one whose rows were all
-    // dropped for a missing endpoint, reward or volume — the same reason
+    // `outstandingCourierContracts` against `courierRowCount` is the only
+    // thing that tells an empty courier snapshot apart from one whose rows were
+    // all dropped for a blank endpoint, reward or volume — the same reason
     // publicContractsArchive.ts throws on a reordered archive rather than
-    // publishing silence. If the two diverge, EVE Ref is not populating a
-    // column `courierContractFrom` treats as required.
+    // publishing silence. The two counts share a gate
+    // (`isOutstandingCourierContract`), so expiry and contract type are already
+    // excluded from both and cannot open a gap: any gap at all is EVE Ref
+    // leaving a column blank that `courierContractFrom` requires.
     logInfo('public contract offers sync', {
       eligibleContracts: eligibleContracts.size,
       rowCount: rows.length,
-      courierContractsSeen,
+      outstandingCourierContracts,
       courierRowCount: courierRows.length,
     });
 

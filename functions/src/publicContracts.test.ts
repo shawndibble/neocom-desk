@@ -10,6 +10,7 @@ import {
   sortContractOfferRows,
   PUBLIC_CONTRACT_OFFERS_CHUNK_SIZE,
   courierContractFrom,
+  isOutstandingCourierContract,
   filterAndCompactPublicCourierContracts,
   sortCourierContractRows,
   PUBLIC_COURIER_CONTRACTS_CHUNK_SIZE,
@@ -467,6 +468,32 @@ describe('courierContractFrom', () => {
   });
 });
 
+describe('isOutstandingCourierContract', () => {
+  const [courier, incomplete, loan, lapsed] = parseContractsCsv(
+    contractsCsv([
+      `5000000.0,30,${FUTURE},2026-08-11T18:10:34Z,7,60008494,98745702,2120819548,,1200000.0,60003760,"Jita to Amarr",courier,12500.0,2026-09-08T18:08:11Z,10000002,60003760,30000142,20000020,false,`,
+      `5000000.0,31,${FUTURE},2026-08-11T18:10:34Z,7,,98745702,2120819548,,1200000.0,60003760,"Nowhere",courier,12500.0,2026-09-08T18:08:11Z,10000002,60003760,30000142,20000020,false,`,
+      `5000000.0,32,${FUTURE},2026-08-11T18:10:34Z,7,60008494,98745702,2120819548,,1200000.0,60003760,"Lend me ISK",loan,12500.0,2026-09-08T18:08:11Z,10000002,60003760,30000142,20000020,false,`,
+      `5000000.0,33,${PAST},2026-08-11T18:10:34Z,7,60008494,98745702,2120819548,,1200000.0,60003760,"Lapsed haul",courier,12500.0,2026-09-08T18:08:11Z,10000002,60003760,30000142,20000020,false,`,
+    ])
+  );
+
+  it('counts an outstanding courier contract, and nothing else', () => {
+    expect(isOutstandingCourierContract(courier, NOW)).toBe(true);
+    expect(isOutstandingCourierContract(loan, NOW)).toBe(false);
+    expect(isOutstandingCourierContract(lapsed, NOW)).toBe(false);
+  });
+
+  it('still counts a courier contract that courierContractFrom goes on to drop', () => {
+    // The whole point of the two sharing this gate: the sync logs this count
+    // beside the rows it kept, so a required column going blank shows up as a
+    // gap between them. Contract type and expiry must not be able to open that
+    // gap themselves, or the gap says nothing.
+    expect(isOutstandingCourierContract(incomplete, NOW)).toBe(true);
+    expect(courierContractFrom(incomplete, NOW)).toBeNull();
+  });
+});
+
 describe('filterAndCompactPublicCourierContracts', () => {
   const contracts = contractsCsv([
     // item_exchange: belongs to the offers snapshot, not this one
@@ -555,5 +582,28 @@ describe('public courier contracts snapshot sizing', () => {
     expect(
       PUBLIC_COURIER_CONTRACTS_CHUNK_SIZE * Buffer.byteLength(JSON.stringify(widest))
     ).toBeLessThan(1024 * 1024);
+  });
+
+  it('chunks a courier row set at this snapshot chunk size, in order', () => {
+    // One row past a full chunk: the write path in index.ts writes chunk `i`
+    // for every `i < chunks.length` and deletes any leftover past that, so a
+    // set that spills has to spill in order rather than reshuffling.
+    const rows: PublicCourierContractRow[] = Array.from(
+      { length: PUBLIC_COURIER_CONTRACTS_CHUNK_SIZE + 1 },
+      (_, i) => ({
+        contractId: i + 1,
+        regionId: 10000002,
+        originLocationId: 60003760,
+        destinationLocationId: 60008494,
+        reward: 1200000,
+        volume: 12500,
+        dateExpired: Date.parse(FUTURE),
+      })
+    );
+
+    const chunks = chunkRows(sortCourierContractRows(rows), PUBLIC_COURIER_CONTRACTS_CHUNK_SIZE);
+
+    expect(chunks.map((chunk) => chunk.length)).toEqual([PUBLIC_COURIER_CONTRACTS_CHUNK_SIZE, 1]);
+    expect(chunks.flat().map((r) => r.contractId)).toEqual(rows.map((r) => r.contractId));
   });
 });

@@ -97,8 +97,15 @@ retract the general rule.**
 > block. Everything below still describes the live design; read
 > `publicBpcContracts` as `publicContractOffers` and "blueprint copies only"
 > as "filtered to blueprint copies on read". The exception this ADR carves out
-> is unchanged in kind and back to one collection. Schema and sizing decisions
-> are in
+> is unchanged in kind. It now covers two collections rather than one: #909
+> added `publicCourierContracts` alongside `publicContractOffers` — public
+> courier contracts as a route and a fee, which carry no item lines and so
+> none of an offer row's fields — written by the same `syncPublicContractOffers`
+> job off the same single archive fetch, under the same admin-write-only,
+> signed-in-read rules. Two collections because they are two row shapes, not
+> because either needs its own crawl; the one-crawl-per-cycle budget this ADR
+> sizes against is unchanged, and so is the scheduled-job count. Schema and
+> sizing decisions are in
 > `docs/context/decisions/20260912-032407-generalized-public-contract-snapshot-schema-and-sizing.md`;
 > the migration's own decisions are in the #907 file alongside it.
 
@@ -140,10 +147,12 @@ for free, even though the "live" fetch here is Firestore rather than ESI.
   dataset, the feature goes stale (the last-synced snapshot keeps being
   served) rather than failing outright, same posture ADR 0002 accepted for
   Fuzzwork.
-- **Firebase is no longer purely "sync my own Character's data."** One
-  collection, admin-write-only, holding public market data with no owner —
+- **Firebase is no longer purely "sync my own Character's data."**
+  Admin-write-only collections holding public market data with no owner —
   narrow and explicit, but a real precedent the next such feature can point
-  to instead of re-litigating.
+  to instead of re-litigating. One at the time of this ADR; two since #909
+  (see the amendment above), which is the precedent being pointed at rather
+  than a widening of it.
 - **No EVE token is newly at risk.** The scheduled function holds no EVE
   token and makes no ESI call at all (mirrors ADR 0010's core promise, just
   for a different reason: this data source is EVE Ref, not ESI).

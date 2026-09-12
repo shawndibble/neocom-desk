@@ -308,13 +308,30 @@ export const PUBLIC_CONTRACT_OFFERS_CHUNK_SIZE = 3000;
 export const PUBLIC_CONTRACT_OFFERS_COLLECTION = 'publicContractOffers';
 export const PUBLIC_CONTRACT_OFFERS_META_DOC = 'meta';
 
+const COURIER_CONTRACT_TYPE = 'courier';
+
 /**
- * Matched by equality rather than as the complement of
- * `SEARCHABLE_CONTRACT_TYPES`: `loan` is the fourth public contract type ESI
- * emits, and it is neither a priced item to search nor a haul to take, so a
- * complement would have published loans as courier rows.
+ * Whether this record is a courier contract still outstanding at `nowMs`: the
+ * gate `courierContractFrom` applies before it reads any other column, and the
+ * denominator the sync logs its kept-row count against. One definition rather
+ * than the same test restated at that call site, so widening either half
+ * cannot silently desync the two.
+ *
+ * Matched on `courier` by equality rather than as the complement of
+ * `SEARCHABLE_CONTRACT_TYPES`: ESI's `type` enum is
+ * `unknown | item_exchange | auction | courier | loan`, and neither `loan` nor
+ * `unknown` is a haul to take, so the complement would have published both as
+ * courier rows.
+ *
+ * Expiry is checked here for the same reason `eligibleContractFrom` checks it:
+ * EVE Ref's scrape is up to ~30 minutes stale, so an "outstanding" row in the
+ * CSV is not a guarantee it still is one.
  */
-export const COURIER_CONTRACT_TYPE = 'courier';
+export function isOutstandingCourierContract(contract: ContractRecord, nowMs: number): boolean {
+  if (contract.type !== COURIER_CONTRACT_TYPE) return false;
+  const dateExpired = Date.parse(contract.date_expired);
+  return Number.isFinite(dateExpired) && dateExpired > nowMs;
+}
 
 /**
  * One public courier contract: a haul rather than a purchase (issue #909).
@@ -327,13 +344,25 @@ export const COURIER_CONTRACT_TYPE = 'courier';
  * `price` and `quantity`, none of which a courier row has.
  *
  * The four facts that define the job — both endpoints, what it pays, and how
- * much there is to move — are required. `Number('')` is 0 rather than NaN, so
- * converting an absent column unconditionally would publish a delivery to
- * station 0, a free haul, or an empty hold, none distinguishable from a real
- * value; `courierContractFrom` drops such a row instead. `collateral` and
- * `daysToComplete` are carried only when stated, the same omit-don't-zero rule
- * the offers rows apply to ME/TE/runs — a real `0` collateral (a favour run)
- * is a different fact from a blank column.
+ * much there is to move — are required, and a row whose column for any of them
+ * is *blank* is dropped rather than converted: `Number('')` is 0 rather than
+ * NaN, so an absent `end_location_id` would publish a delivery to station 0
+ * and an absent `reward` a free haul, neither distinguishable from a stated
+ * one. A stated `0` is kept — that is a different fact, since a favour run
+ * really does pay nothing.
+ *
+ * In practice that drop should never fire: ESI documents `end_location_id`,
+ * `reward` and `collateral` as "for Couriers contract" and populates them on
+ * exactly these contracts, which is why the pre-#909 courier fixture — a
+ * retyped item_exchange row — has `end_location_id` blank. But none of those
+ * columns is in ESI's `required` set, so the rule is a guard against a schema
+ * change rather than an expected filter, and the sync logs outstanding courier
+ * contracts beside kept rows so that a guard which starts firing shows up
+ * instead of quietly publishing an empty snapshot.
+ *
+ * `collateral` and `daysToComplete` are carried only when stated — the same
+ * omit-don't-zero rule the offers rows apply to ME/TE/runs — rather than being
+ * required, since a contract stating neither is still a haul.
  */
 export interface PublicCourierContractRow {
   contractId: number;
@@ -356,21 +385,17 @@ export interface PublicCourierContractRow {
 
 /**
  * Narrows one `contracts.csv` record to a `PublicCourierContractRow`, or null
- * when it is not an outstanding, complete courier contract.
- *
- * Expiry is checked the same way and for the same reason as
- * `eligibleContractFrom`: EVE Ref's scrape is up to ~30 minutes stale, so an
- * "outstanding" row in the CSV is not a guarantee it still is one.
+ * when it is not an outstanding, complete courier contract:
+ * `isOutstandingCourierContract` decides the first half, the required columns
+ * documented on the row shape the second.
  */
 export function courierContractFrom(
   contract: ContractRecord,
   nowMs: number
 ): PublicCourierContractRow | null {
-  if (contract.type !== COURIER_CONTRACT_TYPE) return null;
+  if (!isOutstandingCourierContract(contract, nowMs)) return null;
 
   const dateExpired = Date.parse(contract.date_expired);
-  if (!Number.isFinite(dateExpired) || dateExpired <= nowMs) return null;
-
   const originLocationId = numericColumn(contract.start_location_id);
   const destinationLocationId = numericColumn(contract.end_location_id);
   const reward = numericColumn(contract.reward);
