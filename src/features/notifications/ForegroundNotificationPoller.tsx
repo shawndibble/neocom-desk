@@ -1,6 +1,10 @@
 import { useEffect } from 'react';
 import { runForegroundPoll, liveDependencies, POLL_INTERVAL_MS } from './foregroundPoller';
 import { refreshAppBadge } from './appBadge';
+import {
+  runBpcWatchPoll,
+  liveDependencies as bpcWatchLiveDependencies,
+} from '@/features/bpcContracts/watchPoller';
 
 /**
  * Mounts the Foreground Poller (CONTEXT.md round 20): renders nothing, just
@@ -25,6 +29,9 @@ export function ForegroundNotificationPoller() {
     function poll() {
       if (cancelled || document.hidden) return;
       void runForegroundPoll(liveDependencies());
+      // A standalone loop, not a `pollDomains.ts` registry entry (issue #926,
+      // `watchPoller.ts`'s module doc) — it only borrows this cadence.
+      void runBpcWatchPoll(bpcWatchLiveDependencies());
     }
 
     poll();

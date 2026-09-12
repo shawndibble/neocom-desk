@@ -225,7 +225,7 @@ describe('schema upgrade v6 -> v7', () => {
   });
 
   it('the shipped database is at its current version with v7’s index live', () => {
-    expect(db.verno).toBe(10);
+    expect(db.verno).toBe(11);
     expect(db.characters.schema.indexes.map((i) => i.name)).toContain('corporationId');
   });
 });
@@ -262,6 +262,7 @@ describe('schema upgrade v8 -> v9 (Production Log, issue #525)', () => {
     const tables = db.tables.map((table) => table.name).sort();
     expect(tables).toEqual(
       [
+        'bpcSearchWatches',
         'buildPlans',
         'characters',
         'esiCache',
@@ -288,5 +289,12 @@ describe('schema upgrade v9 -> v10', () => {
     expect(db.miningTaxAssignments.schema.indexes.map((i) => i.name).sort()).toEqual(
       ['[characterId+date+solarSystemId]', 'characterId'].sort()
     );
+  });
+});
+
+describe('schema upgrade v10 -> v11 (BPC Sourcing watches, issue #926)', () => {
+  it('adds bpcSearchWatches, unindexed beyond its own id — device-local and character-independent', () => {
+    expect(db.bpcSearchWatches.schema.indexes.map((i) => i.name)).toEqual([]);
+    expect(db.bpcSearchWatches.schema.primKey.name).toBe('id');
   });
 });

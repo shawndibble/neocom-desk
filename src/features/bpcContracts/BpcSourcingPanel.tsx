@@ -62,6 +62,15 @@ import {
 } from '@/features/bpcContracts/bpcSearchColumns';
 import { useSpaceFilter } from '@/features/bpcContracts/bpcSpaceFilterPref';
 import { BpcContractModal } from '@/features/bpcContracts/BpcContractModal';
+import {
+  createWatch,
+  deleteWatch,
+  listWatches,
+  renameWatch,
+  updateWatchFilter,
+  type BpcWatchFilterInput,
+} from '@/features/bpcContracts/watches';
+import type { BpcSearchWatchRecord } from '@/db';
 import { BuildPlanContextMenu } from '@/features/industry/BuildPlanContextMenu';
 import { loadCharacterBlueprints } from '@/features/industry/data';
 import { loadBlueprints } from '@/sde/loadSde';
@@ -206,6 +215,19 @@ const ROW_CAP = 50;
 
 /** Both on by default: an existing user must keep seeing today's contract results, plus their owned blueprints, not a narrower default. */
 const DEFAULT_SOURCES: ReadonlySet<BpcSearchSource> = new Set(['contract', 'owned']);
+
+/** `engineFilter`'s `Set`-shaped fields, flattened to the arrays a watch persists (`db.BpcSearchWatchRecord`). */
+function bpcWatchFilterInput(filter: BpcSearchFilter): BpcWatchFilterInput {
+  return {
+    typeIds: filter.typeIds ? [...filter.typeIds] : null,
+    regionId: filter.regionId ?? null,
+    minMe: filter.minMe ?? null,
+    minTe: filter.minTe ?? null,
+    minRuns: filter.minRuns ?? null,
+    maxPrice: filter.maxPrice ?? null,
+    spaceKinds: filter.spaceKinds ? [...filter.spaceKinds] : null,
+  };
+}
 
 interface BpcFilterBarProps {
   filter: UiFilter;
@@ -607,6 +629,51 @@ export function BpcSourcingPanel({ initialTypeId = null }: BpcSourcingPanelProps
     return { ...nonTypeFilter, typeIds };
   }, [nonTypeFilter, uiFilter.typeQuery, typeOptions, selectedTypeId]);
 
+  // BPC Sourcing watches (issue #926): a pilot's saved searches, notified on
+  // a genuinely new or cheaper matching offer by the standalone
+  // `watchPoller.ts` loop. Loaded once on mount — device-local Dexie data,
+  // not part of `useRouteSnapshot`'s per-Character cache key.
+  const [watches, setWatches] = useState<BpcSearchWatchRecord[]>([]);
+  const [watchNameDraft, setWatchNameDraft] = useState<string | null>(null);
+  /** The watch currently being renamed, or `null` — at most one row edits at a time. */
+  const [renamingWatchId, setRenamingWatchId] = useState<string | null>(null);
+  const [renameDraft, setRenameDraft] = useState('');
+  useEffect(() => {
+    void listWatches().then(setWatches);
+  }, []);
+
+  async function saveCurrentSearchAsWatch() {
+    const name = watchNameDraft?.trim();
+    if (!name) return;
+    const watch = await createWatch(name, bpcWatchFilterInput(engineFilter));
+    setWatches((prev) => [...prev, watch]);
+    setWatchNameDraft(null);
+  }
+
+  async function removeWatch(watch: BpcSearchWatchRecord) {
+    await deleteWatch(watch.id);
+    setWatches((prev) => prev.filter((w) => w.id !== watch.id));
+  }
+
+  function startRenamingWatch(watch: BpcSearchWatchRecord) {
+    setRenamingWatchId(watch.id);
+    setRenameDraft(watch.name);
+  }
+
+  async function commitWatchRename(watch: BpcSearchWatchRecord) {
+    const name = renameDraft.trim();
+    setRenamingWatchId(null);
+    if (!name || name === watch.name) return;
+    const renamed = await renameWatch(watch, name);
+    setWatches((prev) => prev.map((w) => (w.id === renamed.id ? renamed : w)));
+  }
+
+  /** Replaces a watch's saved search with the tab's current filter, re-arming it (`updateWatchFilter`'s doc comment). */
+  async function updateWatchToCurrentSearch(watch: BpcSearchWatchRecord) {
+    const updated = await updateWatchFilter(watch, bpcWatchFilterInput(engineFilter));
+    setWatches((prev) => prev.map((w) => (w.id === updated.id ? updated : w)));
+  }
+
   // This filter path stays exactly as it was pre-multiselect (space already
   // narrowed via `spaceFilteredRows`) — the source toggle below only gates
   // what gets merged in alongside it.
@@ -880,6 +947,88 @@ export function BpcSourcingPanel({ initialTypeId = null }: BpcSourcingPanelProps
             spaceKinds={spaceFilter}
             onSpaceKindsChange={(next) => void setSpaceFilter(next)}
           />
+
+          <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2">
+            {watchNameDraft === null ? (
+              <Button variant="ghost" onClick={() => setWatchNameDraft('')}>
+                {t('bpcContracts.watchThisSearch')}
+              </Button>
+            ) : (
+              <>
+                <TextInput
+                  autoFocus
+                  value={watchNameDraft}
+                  onChange={(e) => setWatchNameDraft(e.target.value)}
+                  placeholder={t('bpcContracts.watchNamePlaceholder')}
+                  aria-label={t('bpcContracts.watchNamePlaceholder')}
+                />
+                <Button
+                  variant="primary"
+                  onClick={() => void saveCurrentSearchAsWatch()}
+                  disabled={watchNameDraft.trim() === ''}
+                >
+                  {t('common.save')}
+                </Button>
+                <Button variant="ghost" onClick={() => setWatchNameDraft(null)}>
+                  {t('common.cancel')}
+                </Button>
+              </>
+            )}
+          </div>
+
+          {watches.length > 0 && (
+            <div className="border-b border-line bg-panel-2 px-3 py-2">
+              <p className="pb-1.5 text-[0.6875rem] font-semibold tracking-widest text-accent uppercase">
+                {t('bpcContracts.watchedSearchesHeading')}
+              </p>
+              <ul className="flex flex-col gap-1">
+                {watches.map((watch) =>
+                  renamingWatchId === watch.id ? (
+                    <li
+                      key={watch.id}
+                      className="flex items-center gap-2 rounded-xs border border-line bg-panel px-2 py-1"
+                    >
+                      <TextInput
+                        autoFocus
+                        value={renameDraft}
+                        onChange={(e) => setRenameDraft(e.target.value)}
+                        aria-label={t('bpcContracts.watchNamePlaceholder')}
+                        className="flex-1"
+                      />
+                      <Button variant="primary" onClick={() => void commitWatchRename(watch)}>
+                        {t('common.save')}
+                      </Button>
+                      <Button variant="ghost" onClick={() => setRenamingWatchId(null)}>
+                        {t('common.cancel')}
+                      </Button>
+                    </li>
+                  ) : (
+                    <li
+                      key={watch.id}
+                      className="flex items-center gap-2 rounded-xs border border-line bg-panel px-2 py-1"
+                    >
+                      <span className="min-w-0 flex-1 truncate text-sm">{watch.name}</span>
+                      <IconButton
+                        icon={<Icon.Refresh />}
+                        label={t('bpcContracts.updateWatchToCurrentSearch', { name: watch.name })}
+                        onClick={() => void updateWatchToCurrentSearch(watch)}
+                      />
+                      <IconButton
+                        icon={<Icon.Rename />}
+                        label={t('bpcContracts.renameWatch', { name: watch.name })}
+                        onClick={() => startRenamingWatch(watch)}
+                      />
+                      <IconButton
+                        icon={<Icon.Close />}
+                        label={t('bpcContracts.removeWatch', { name: watch.name })}
+                        onClick={() => void removeWatch(watch)}
+                      />
+                    </li>
+                  )
+                )}
+              </ul>
+            </div>
+          )}
 
           {/* Inset on its own ground with an accent edge, because as a plain
               list flush against the filter bar it read as more page furniture
