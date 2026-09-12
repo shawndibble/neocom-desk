@@ -1637,6 +1637,10 @@
     "to": "To:",
     "recipientMore": "{{name}} +{{count}} more",
     "mailingList": "Mailing list",
+    "contextMenu": {
+      "viewSender": "View sender",
+      "copyMailId": "Copy mail ID"
+    },
     "unread": "Unread",
     "unreadCount": "{{count}} unread",
     "foldersLabel": "Mail folders",
