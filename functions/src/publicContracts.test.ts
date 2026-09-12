@@ -2,19 +2,13 @@ import { describe, it, expect } from 'vitest';
 import {
   parseContractsCsv,
   parseContractItemsCsv,
-  filterAndCompactBpcContracts,
   eligibleContractFrom,
-  compactBpcItemRow,
-  sortBpcRows,
   chunkRows,
   chunkDocId,
-  DEFAULT_CHUNK_SIZE,
   compactContractOfferRow,
   filterAndCompactPublicContractOffers,
   sortContractOfferRows,
-  PUBLIC_BPC_CONTRACTS_COLLECTION,
   PUBLIC_CONTRACT_OFFERS_CHUNK_SIZE,
-  PUBLIC_CONTRACT_OFFERS_COLLECTION,
   type PublicContractOfferRow,
 } from './publicContracts.js';
 
@@ -64,122 +58,9 @@ describe('parseContractsCsv / parseContractItemsCsv', () => {
   });
 });
 
-describe('filterAndCompactBpcContracts', () => {
-  const contracts = contractsCsv([
-    // eligible: item_exchange, not yet expired
-    `0.0,1,${FUTURE},2026-08-11T18:10:34Z,0,,98745702,2120819548,5000000.0,0.0,60003760,"BPC bundle",item_exchange,10.0,2026-09-08T18:08:11Z,10000002,60003760,30000142,20000020,false,`,
-    // eligible: auction, with a buyout
-    `0.0,2,${FUTURE},2026-08-11T18:10:34Z,0,,98745702,2120819548,1000000.0,0.0,60008494,"Auctioned BPC",auction,10.0,2026-09-08T18:08:11Z,10000043,60008494,30002187,20000322,false,9000000.0`,
-    // ineligible type: courier carries no priced item to search
-    `0.0,3,${FUTURE},2026-08-11T18:10:34Z,0,,98745702,2120819548,,0.0,60003760,"Courier run",courier,10.0,2026-09-08T18:08:11Z,10000002,60003760,30000142,20000020,false,`,
-    // already expired by the time this job runs
-    `0.0,4,${PAST},2026-08-11T18:10:34Z,0,,98745702,2120819548,5000000.0,0.0,60003760,"Lapsed",item_exchange,10.0,2026-09-08T18:08:11Z,10000002,60003760,30000142,20000020,false,`,
-  ]);
-
-  const items = itemsCsv([
-    // BPC, included, on the eligible item_exchange contract 1
-    'true,true,1,10,1,1001,3,18,32858,2026-09-01T11:31:43Z,1',
-    // a second BPC on the same contract (bundle)
-    'true,true,2,4,1,1002,5,10,32880,2026-09-01T11:31:43Z,1',
-    // BPC, included, on the eligible auction contract 2
-    'true,true,3,0,1,1003,1,0,20185,2026-09-01T11:31:43Z,2',
-    // BPC, but is_included=false (requested from the buyer, not for sale) — excluded
-    'true,false,4,10,1,1004,1,10,32858,2026-09-01T11:31:43Z,1',
-    // not a blueprint at all — excluded
-    '"",true,5,,1,1005,,,47789,2026-09-01T11:31:43Z,1',
-    // a BPC on the courier contract (ineligible contract type) — excluded
-    'true,true,6,10,1,1006,1,10,32858,2026-09-01T11:31:43Z,3',
-    // a BPC on the lapsed contract — excluded
-    'true,true,7,10,1,1007,1,10,32858,2026-09-01T11:31:43Z,4',
-    // a BPC whose contract_id matches nothing in contracts.csv — excluded
-    'true,true,8,10,1,1008,1,10,32858,2026-09-01T11:31:43Z,999',
-  ]);
-
-  it('joins BPC item rows to their eligible, unexpired parent contract', () => {
-    const rows = filterAndCompactBpcContracts(
-      parseContractsCsv(contracts),
-      parseContractItemsCsv(items),
-      NOW
-    );
-
-    expect(rows.map((r) => `${r.contractId}:${r.typeId}`)).toEqual([
-      '1:32858',
-      '1:32880',
-      '2:20185',
-    ]);
-  });
-
-  it('carries region, location, price, ME/TE/runs and the auction flag through', () => {
-    const [row] = filterAndCompactBpcContracts(
-      parseContractsCsv(contracts),
-      parseContractItemsCsv(items),
-      NOW
-    );
-
-    expect(row).toMatchObject({
-      contractId: 1,
-      regionId: 10000002,
-      locationId: 60003760,
-      typeId: 32858,
-      price: 5000000,
-      isAuction: false,
-      me: 10,
-      te: 18,
-      runs: 3,
-      quantity: 1,
-    });
-    expect(row.buyout).toBeUndefined();
-    expect(row.dateExpired).toBe(Date.parse(FUTURE));
-  });
-
-  it('carries buyout only when the contract has one', () => {
-    const rows = filterAndCompactBpcContracts(
-      parseContractsCsv(contracts),
-      parseContractItemsCsv(items),
-      NOW
-    );
-    const auctionRow = rows.find((r) => r.contractId === 2);
-    expect(auctionRow?.isAuction).toBe(true);
-    expect(auctionRow?.buyout).toBe(9000000);
-  });
-
-  it('excludes a BPC item requested from the buyer rather than offered for sale', () => {
-    const rows = filterAndCompactBpcContracts(
-      parseContractsCsv(contracts),
-      parseContractItemsCsv(items),
-      NOW
-    );
-    expect(
-      rows.some((r) => r.typeId === 32858 && r.quantity === 1 && r.me === 10 && r.te === 10)
-    ).toBe(false);
-  });
-
-  it('is empty given no rows', () => {
-    expect(filterAndCompactBpcContracts([], [], NOW)).toEqual([]);
-  });
-
-  it('sorts deterministically by contract then type, independent of input order', () => {
-    const shuffledItems = itemsCsv([
-      'true,true,3,0,1,1003,1,0,20185,2026-09-01T11:31:43Z,2',
-      'true,true,2,4,1,1002,5,10,32880,2026-09-01T11:31:43Z,1',
-      'true,true,1,10,1,1001,3,18,32858,2026-09-01T11:31:43Z,1',
-    ]);
-    const rows = filterAndCompactBpcContracts(
-      parseContractsCsv(contracts),
-      parseContractItemsCsv(shuffledItems),
-      NOW
-    );
-    expect(rows.map((r) => `${r.contractId}:${r.typeId}`)).toEqual([
-      '1:32858',
-      '1:32880',
-      '2:20185',
-    ]);
-  });
-});
-
-// The per-row seams the streaming sync drives directly. They are what
-// `filterAndCompactBpcContracts` is built from, so the suite above still
-// covers the whole join; these pin the pieces in isolation.
+// The per-row seams the streaming sync drives directly, pinned in isolation;
+// `filterAndCompactPublicContractOffers` below covers the composed join they
+// add up to.
 describe('eligibleContractFrom', () => {
   const [itemExchange, auction, courier, lapsed] = parseContractsCsv(
     contractsCsv([
@@ -224,66 +105,6 @@ describe('eligibleContractFrom', () => {
   });
 });
 
-describe('compactBpcItemRow', () => {
-  const parent = {
-    contractId: 1,
-    regionId: 10000002,
-    locationId: 60003760,
-    price: 5000000,
-    isAuction: false,
-    dateExpired: Date.parse(FUTURE),
-  };
-
-  const [bpc, requested, notBlueprint] = parseContractItemsCsv(
-    itemsCsv([
-      'true,true,1,10,1,1001,3,18,32858,2026-09-01T11:31:43Z,1',
-      'true,false,4,10,1,1004,1,10,32858,2026-09-01T11:31:43Z,1',
-      '"",true,5,,1,1005,,,47789,2026-09-01T11:31:43Z,1',
-    ])
-  );
-
-  it('joins a for-sale BPC to its parent contract', () => {
-    expect(compactBpcItemRow(bpc, parent)).toEqual({
-      contractId: 1,
-      regionId: 10000002,
-      locationId: 60003760,
-      typeId: 32858,
-      price: 5000000,
-      isAuction: false,
-      me: 10,
-      te: 18,
-      runs: 3,
-      quantity: 1,
-      dateExpired: Date.parse(FUTURE),
-    });
-  });
-
-  it('carries the parent buyout through when there is one', () => {
-    expect(compactBpcItemRow(bpc, { ...parent, buyout: 9000000 })?.buyout).toBe(9000000);
-  });
-
-  it('rejects a BPC the issuer wants rather than offers', () => {
-    expect(compactBpcItemRow(requested, parent)).toBeNull();
-  });
-
-  it('rejects an item that is not a blueprint copy', () => {
-    expect(compactBpcItemRow(notBlueprint, parent)).toBeNull();
-  });
-});
-
-describe('sortBpcRows', () => {
-  it('orders by contract then type, in place, independent of input order', () => {
-    const row = (contractId: number, typeId: number) =>
-      ({ contractId, typeId }) as ReturnType<typeof compactBpcItemRow> & object;
-    const rows = [row(2, 20185), row(1, 32880), row(1, 32858)];
-    expect(sortBpcRows(rows as never).map((r) => `${r.contractId}:${r.typeId}`)).toEqual([
-      '1:32858',
-      '1:32880',
-      '2:20185',
-    ]);
-  });
-});
-
 describe('chunkRows', () => {
   it('splits rows into fixed-size chunks, in order', () => {
     const rows = Array.from({ length: 5 }, (_, i) => i);
@@ -296,11 +117,6 @@ describe('chunkRows', () => {
 
   it('returns a single chunk when rows fit within one chunk size', () => {
     expect(chunkRows([1, 2, 3], 10)).toEqual([[1, 2, 3]]);
-  });
-
-  it('defaults to DEFAULT_CHUNK_SIZE', () => {
-    const rows = Array.from({ length: DEFAULT_CHUNK_SIZE + 1 }, (_, i) => i);
-    expect(chunkRows(rows)).toHaveLength(2);
   });
 
   it('rejects a non-positive chunk size', () => {
@@ -335,8 +151,7 @@ describe('compactContractOfferRow', () => {
     ])
   );
 
-  it('keeps a plain item line, which the blueprint-only join drops', () => {
-    expect(compactBpcItemRow(notBlueprint, parent)).toBeNull();
+  it('keeps a plain item line, not only a blueprint', () => {
     expect(compactContractOfferRow(notBlueprint, parent)).toEqual({
       contractId: 1,
       regionId: 10000002,
@@ -519,16 +334,20 @@ describe('sortContractOfferRows', () => {
 });
 
 describe('public contract offers snapshot sizing', () => {
-  it('writes to a collection separate from the blueprint-only one', () => {
-    expect(PUBLIC_CONTRACT_OFFERS_COLLECTION).not.toBe(PUBLIC_BPC_CONTRACTS_COLLECTION);
-  });
-
-  it('chunks larger than the blueprint-only snapshot, to spend fewer writes on 3x the rows', () => {
-    // Reusing the 2,000-row chunk would have tripled the per-sync write count
-    // against a 20k/day free-tier budget shared with dispatchProjections and
-    // the blueprint sync. A larger chunk trades write count for doc size; the
-    // next test is what holds the doc size honest.
-    expect(PUBLIC_CONTRACT_OFFERS_CHUNK_SIZE).toBeGreaterThan(DEFAULT_CHUNK_SIZE);
+  it('chunks coarsely enough to leave room in the free tier write budget', () => {
+    // The 20,000 writes/day free tier is the project's budget, not this job's:
+    // dispatchProjections runs 288x/day beside it. The row count is #906's
+    // estimate, to be re-grounded once the sync's logged `rowCount` says what
+    // the live volume is; what this pins meanwhile is that the chunk size is
+    // not quietly shrunk back toward the 2,000 the retired blueprint-only
+    // snapshot used, which would spend ~8.9k writes/day here on its own. A
+    // larger chunk trades write count for doc size; the next test is what
+    // holds the doc size honest.
+    const ESTIMATED_ROWS = 370_000;
+    const RUNS_PER_DAY = 48;
+    const writesPerDay =
+      Math.ceil(ESTIMATED_ROWS / PUBLIC_CONTRACT_OFFERS_CHUNK_SIZE) * RUNS_PER_DAY;
+    expect(writesPerDay).toBeLessThan(7_000);
   });
 
   it('keeps a chunk of nothing but worst-case rows clear of the 1MiB document limit', () => {

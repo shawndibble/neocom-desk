@@ -7,13 +7,12 @@
  * `purgeFeed.ts` use, so this module is unit-testable from fixture CSV text
  * with no emulator.
  *
- * Two snapshots share all of that. `BpcContractRow` and
- * `compactBpcItemRow` are the original blueprint-copies-only join behind BPC
- * Sourcing; `PublicContractOfferRow` and `compactContractOfferRow` (issue #906)
- * are the generalized one over every item type, feeding a separate
- * collection. They differ only in which item lines earn a row and what that
- * row carries — the contract narrowing, ordering and chunking below are the
- * same code for both.
+ * One snapshot comes out of it: `PublicContractOfferRow`, every for-sale
+ * line of every public item_exchange/auction contract, any item type. A
+ * second, blueprint-copies-only join used to sit alongside it feeding BPC
+ * Sourcing its own collection; #907 retired that pipeline once BPC Sourcing
+ * learned to take its blueprint slice out of this snapshot client-side, so
+ * the archive is fetched once per cycle again rather than twice.
  *
  * Column names and sample values are pinned against a live EVE Ref
  * `public-contracts-latest.v2.tar.bz2` pull (2026-09-08, ~50k public
@@ -42,23 +41,6 @@ export interface ContractItemRecord {
   time_efficiency: string;
   type_id: string;
   contract_id: string;
-}
-
-/** One searchable BPC-for-sale row: a contract_items.csv row joined to its parent contract. */
-export interface BpcContractRow {
-  contractId: number;
-  regionId: number;
-  locationId: number;
-  typeId: number;
-  price: number;
-  buyout?: number;
-  isAuction: boolean;
-  me: number;
-  te: number;
-  runs: number;
-  quantity: number;
-  /** Epoch ms. */
-  dateExpired: number;
 }
 
 export function parseContractsCsv(csvText: string): ContractRecord[] {
@@ -128,35 +110,6 @@ export function eligibleContractFrom(
 }
 
 /**
- * Joins one `contract_items.csv` record to its already-narrowed parent, or
- * null when the item is not a BPC offered for sale. `is_included` false means
- * the item is what the *contract issuer wants*, not what they're selling (an
- * item_exchange contract can ask for one item and offer another) — excluded,
- * since this feature searches BPCs for sale, not BPCs wanted.
- */
-export function compactBpcItemRow(
-  item: ContractItemRecord,
-  contract: EligibleContract
-): BpcContractRow | null {
-  if (item.is_blueprint_copy !== 'true' || item.is_included !== 'true') return null;
-
-  return {
-    contractId: contract.contractId,
-    regionId: contract.regionId,
-    locationId: contract.locationId,
-    typeId: Number(item.type_id),
-    price: contract.price,
-    ...(contract.buyout === undefined ? {} : { buyout: contract.buyout }),
-    isAuction: contract.isAuction,
-    me: Number(item.material_efficiency),
-    te: Number(item.time_efficiency),
-    runs: Number(item.runs),
-    quantity: Number(item.quantity),
-    dateExpired: contract.dateExpired,
-  };
-}
-
-/**
  * Deterministic order: a chunk's content should only change where the
  * underlying data changed, not from a CSV parse's incidental row order.
  */
@@ -167,69 +120,13 @@ function byContractThenType(
   return a.contractId - b.contractId || a.typeId - b.typeId;
 }
 
-/** Deterministic order, in place. See `byContractThenType`. */
-export function sortBpcRows(rows: BpcContractRow[]): BpcContractRow[] {
-  return rows.sort(byContractThenType);
-}
-
-/**
- * The unsorted join, over already-parsed records: narrow the contracts to a
- * lookup, then hand each item that matches one to `compact`, which decides
- * whether the line is worth a row and what shape it takes. Both snapshots
- * differ only in that decision.
- */
-function joinContractItems<Row>(
-  contracts: readonly ContractRecord[],
-  items: readonly ContractItemRecord[],
-  nowMs: number,
-  compact: (item: ContractItemRecord, contract: EligibleContract) => Row | null
-): Row[] {
-  const eligibleContracts = new Map<string, EligibleContract>();
-  for (const contract of contracts) {
-    const eligible = eligibleContractFrom(contract, nowMs);
-    if (eligible) eligibleContracts.set(contract.contract_id, eligible);
-  }
-
-  const rows: Row[] = [];
-  for (const item of items) {
-    const contract = eligibleContracts.get(item.contract_id);
-    if (!contract) continue;
-    const row = compact(item, contract);
-    if (row) rows.push(row);
-  }
-
-  return rows;
-}
-
-/**
- * The whole join in one call, over already-parsed records. The scheduled sync
- * drives the per-row seams above directly instead — it never holds either
- * record array — so this stays as the composed, fixture-testable statement of
- * what that streaming pass adds up to.
- */
-export function filterAndCompactBpcContracts(
-  contracts: readonly ContractRecord[],
-  items: readonly ContractItemRecord[],
-  nowMs: number
-): BpcContractRow[] {
-  return sortBpcRows(joinContractItems(contracts, items, nowMs, compactBpcItemRow));
-}
-
-/**
- * ~2,000 rows/chunk keeps a chunk doc comfortably under Firestore's 1MiB
- * limit (measured well under 400KB against the live 2026-09-08 pull) while
- * keeping the chunk count — and so the per-sync write count — small: the
- * ~123k BPC rows seen that day chunk to roughly 65 docs, not thousands.
- */
-export const DEFAULT_CHUNK_SIZE = 2000;
-
 /**
  * Fixed-size, order-preserving chunks. Pairs with a wholesale chunk-doc
  * replace in index.ts: writing chunk `i` for every `i < chunks.length` and
  * deleting any chunk doc at or past that count left over from a previous,
  * larger run is how a shrinking dataset doesn't leave stale chunks behind.
  */
-export function chunkRows<T>(rows: readonly T[], chunkSize: number = DEFAULT_CHUNK_SIZE): T[][] {
+export function chunkRows<T>(rows: readonly T[], chunkSize: number): T[][] {
   if (chunkSize <= 0) throw new Error('chunkSize must be positive');
   const chunks: T[][] = [];
   for (let i = 0; i < rows.length; i += chunkSize) {
@@ -243,15 +140,12 @@ export function chunkDocId(index: number): string {
   return `chunk-${String(index).padStart(4, '0')}`;
 }
 
-export const PUBLIC_BPC_CONTRACTS_COLLECTION = 'publicBpcContracts';
-export const PUBLIC_BPC_CONTRACTS_META_DOC = 'meta';
-
 /**
  * One searchable public-contract line: a `contract_items.csv` row joined to
  * its parent contract, for *any* item type rather than only blueprint copies
- * (issue #906). `BpcContractRow` above stays exactly as it is — the
- * `publicBpcContracts` snapshot keeps serving BPC Sourcing until #907 moves
- * it over — so this is a second shape alongside it, not a replacement of it.
+ * (issue #906). BPC Sourcing reads this shape too, taking its blueprint-copy
+ * slice client-side (issue #907), so it is the only row shape this module
+ * publishes.
  *
  * ME/TE/runs are blueprint-only columns, blank on a plain item line, and
  * `Number('')` is 0 rather than NaN — converting them unconditionally would
@@ -351,24 +245,39 @@ export function sortContractOfferRows(rows: PublicContractOfferRow[]): PublicCon
 }
 
 /**
- * The generalized join in one call, over already-parsed records — the
- * fixture-testable statement of what `syncPublicContractOffers`' streaming
- * pass adds up to, exactly as `filterAndCompactBpcContracts` is for the
- * blueprint-only sync.
+ * The whole join in one call, over already-parsed records: narrow the
+ * contracts to a lookup, then hand every item that matches one to
+ * `compactContractOfferRow`, which decides whether the line is worth a row.
+ * The scheduled sync drives those per-row seams directly instead — it never
+ * holds either record array — so this stays as the composed,
+ * fixture-testable statement of what that streaming pass adds up to.
  */
 export function filterAndCompactPublicContractOffers(
   contracts: readonly ContractRecord[],
   items: readonly ContractItemRecord[],
   nowMs: number
 ): PublicContractOfferRow[] {
-  return sortContractOfferRows(joinContractItems(contracts, items, nowMs, compactContractOfferRow));
+  const eligibleContracts = new Map<string, EligibleContract>();
+  for (const contract of contracts) {
+    const eligible = eligibleContractFrom(contract, nowMs);
+    if (eligible) eligibleContracts.set(contract.contract_id, eligible);
+  }
+
+  const rows: PublicContractOfferRow[] = [];
+  for (const item of items) {
+    const contract = eligibleContracts.get(item.contract_id);
+    if (!contract) continue;
+    const row = compactContractOfferRow(item, contract);
+    if (row) rows.push(row);
+  }
+
+  return sortContractOfferRows(rows);
 }
 
 /**
- * 3,000 rows/chunk, against the blueprint-only snapshot's 2,000.
- *
- * Both limits this sits between are shared, and the generalized snapshot
- * holds ~3x the rows:
+ * 3,000 rows/chunk, against the 2,000 the retired blueprint-only snapshot
+ * used. Both limits this sits between are shared, and this snapshot holds
+ * ~3x the rows that one did:
  *
  * - Firestore's 1MiB per document. The blueprint snapshot measured ~370KB per
  *   2,000 rows (~185 bytes/row); a blueprint row here carries an extra
@@ -378,10 +287,9 @@ export function filterAndCompactPublicContractOffers(
  *   which `publicContracts.test.ts` measures rather than assumes — so a later
  *   field addition fails that test before it fails a live `set()`.
  * - The free tier's 20,000 writes/day, which is the *project's* budget, not
- *   this job's: `dispatchProjections` runs 288x/day beside it and the
- *   blueprint sync another 48. At ~370k rows this chunks to ~124 docs x 48
- *   runs/day ≈ 6.0k writes, and ~3.0k for the blueprint sync it runs
- *   alongside. Keeping 2,000 here would have cost ~8.9k for this job alone.
+ *   this job's: `dispatchProjections` runs 288x/day beside it. At ~370k rows
+ *   this chunks to ~124 docs x 48 runs/day ≈ 6.0k writes. Keeping 2,000 here
+ *   would have cost ~8.9k for this job alone.
  */
 export const PUBLIC_CONTRACT_OFFERS_CHUNK_SIZE = 3000;
 

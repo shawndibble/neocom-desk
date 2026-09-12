@@ -87,15 +87,20 @@ the one narrow, explicit exception to "Firebase is per-character sync only";
 `docs/ARCHITECTURE.md` is updated alongside this ADR to name it, not to
 retract the general rule.**
 
-> **Amended 2026-09-12 (issue #906).** There are now two such collections, not
-> one. `publicContractOffers` is this same pipeline generalized past blueprint
-> copies to every item type, written by a second scheduled function on the
-> same cadence. The exception the paragraph above carves out is unchanged in
-> kind — shared, admin-write-only, no EVE token, no ESI call — only in count,
-> and it goes back to one collection when #907 moves BPC Sourcing over and
-> retires `publicBpcContracts`. Schema and sizing decisions for the new
-> collection (which filters were dropped, chunk size, function memory) are in
-> `docs/context/decisions/20260912-032407-generalized-public-contract-snapshot-schema-and-sizing.md`.
+> **Amended 2026-09-12 (issues #906, #907).** The collection is now
+> `publicContractOffers`, written by `syncPublicContractOffers`: this same
+> pipeline generalized past blueprint copies to every item type. #906 added it
+> alongside `publicBpcContracts`; #907 moved BPC Sourcing onto it — the
+> blueprint-copy filter this ADR describes as an ingestion step now runs in
+> the browser, in `src/engine/contracts/contractOffers.ts` — and retired
+> `publicBpcContracts`, `syncPublicBpcContracts` and their Firestore rules
+> block. Everything below still describes the live design; read
+> `publicBpcContracts` as `publicContractOffers` and "blueprint copies only"
+> as "filtered to blueprint copies on read". The exception this ADR carves out
+> is unchanged in kind and back to one collection. Schema and sizing decisions
+> are in
+> `docs/context/decisions/20260912-032407-generalized-public-contract-snapshot-schema-and-sizing.md`;
+> the migration's own decisions are in the #907 file alongside it.
 
 The client reads the collection through `esi/cache.ts`'s
 `GLOBAL_CACHE_CHARACTER_ID` sentinel — the same trade `stations.ts` and the
