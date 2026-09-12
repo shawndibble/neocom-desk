@@ -229,6 +229,7 @@ here — they go one per file in `docs/context/decisions/`.
 - **EIV (Estimated Item Value)**: The SCC's reference price for the materials
   a manufacturing job consumes, at ME0 quantities. Used only to size the
   **Job Fee** — it is not what the materials actually cost to buy.
+- **Endpoint Space**: which of the four bands — highsec, lowsec, nullsec, wormhole — one end of a courier haul sits in, classified from the local SDE entry that names its system. Describes an _endpoint_, never the route between two of them: a highsec pickup and a highsec delivery can still route through lowsec, and no control on the courier board implies otherwise. An end the local snapshot cannot place has no band at all and is excluded by a narrowed band filter rather than assigned one.
 - **Error Budget**: ESI's allowance of 100 non-2xx/3xx responses per 60
   seconds, counted **globally across every route** for the whole client — not
   per endpoint and not per Character. Spend it and ESI answers 420 to

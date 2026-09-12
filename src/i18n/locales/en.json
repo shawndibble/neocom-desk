@@ -2350,12 +2350,6 @@
     "locationColumn": "Location",
     "spaceColumn": "Space",
     "spaceLabel": "Space",
-    "space": {
-      "highsec": "Highsec",
-      "lowsec": "Lowsec",
-      "nullsec": "Nullsec",
-      "wormhole": "Wormhole"
-    },
     "columnsButton": "Columns",
     "columnsMenuTitle": "Columns",
     "watchThisSearch": "Watch this search",
@@ -3669,6 +3663,9 @@
     },
     "courierEmptyTitle": "No public courier contracts synced yet",
     "courierEmptyHint": "The public contract index refreshes on its own schedule — check back shortly.",
+    "destinationSpaceLabel": "Destination space",
+    "spaceUnknown": "Unknown space",
+    "courierNoFilterMatchesUnplacedHint": "Some hauls end at a structure this app cannot place, so they carry no space band and a narrowed Destination space filter leaves them out. Select every band to see them again.",
     "loadingOffers": "Loading public contracts…",
     "loadingCourier": "Loading courier contracts…",
     "namingTypes": "Loading item names…",
