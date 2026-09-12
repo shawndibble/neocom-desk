@@ -56,7 +56,7 @@ const ROOMY = { cpu: 100_000, powergrid: 100_000 };
 function colony(planetId: number, typeId: number, unitsPerHour: number): NetworkColony {
   return {
     planetId,
-    outputPerHour: new Map([[typeId, unitsPerHour]]),
+    exportablePerHour: new Map([[typeId, unitsPerHour]]),
     spare: ROOMY,
     newLinkCost: { cpu: 30, powergrid: 21 },
   };
@@ -199,7 +199,7 @@ describe('planNetwork', () => {
     const selfSufficient: NetworkColony[] = [
       {
         planetId: 1,
-        outputPerHour: new Map([
+        exportablePerHour: new Map([
           [BACTERIA, 200],
           [WATER, 200],
         ]),
@@ -351,7 +351,7 @@ describe('planNetwork', () => {
     for (const line of named) {
       const schematic = pi.schematics[String(line.typeId)];
       const made = schematic.inputs.filter((input) =>
-        EFA.some((entry) => (entry.outputPerHour.get(input.typeID) ?? 0) > 0)
+        EFA.some((entry) => (entry.exportablePerHour.get(input.typeID) ?? 0) > 0)
       );
       expect(made.length).toBeGreaterThan(0);
       expect(made.length).toBeLessThan(schematic.inputs.length);

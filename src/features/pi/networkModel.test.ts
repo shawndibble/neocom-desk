@@ -17,6 +17,8 @@ const WATER = 3645;
 const TEST_CULTURES = 2319;
 const BACTERIA_SCHEMATIC = 131;
 const WATER_SCHEMATIC = 121;
+const NANITES = 2463;
+const NANITES_SCHEMATIC = 78;
 const PLASMOIDS = 2389;
 const SUPERCONDUCTORS = 9838;
 
@@ -83,7 +85,7 @@ describe('networkColonies', () => {
     // same here; the next test is where the two differ.
     const colonies = networkColonies(input);
     expect(colonies).toHaveLength(2);
-    expect(colonies[0].outputPerHour.get(BACTERIA)).toBeCloseTo(200, 6);
+    expect(colonies[0].exportablePerHour.get(BACTERIA)).toBeCloseTo(200, 6);
   });
 
   it('routes only the material that exists, not what the pins could take', () => {
@@ -91,7 +93,7 @@ describe('networkColonies', () => {
     // would route 320 Bacteria an hour that nobody makes.
     const starved = [built(1, BACTERIA_SCHEMATIC, MICROORGANISMS, 30_000, 8), PAIR[1]];
     const colonies = networkColonies({ ...input, advice: starved });
-    expect(colonies[0].outputPerHour.get(BACTERIA)).toBeCloseTo(200, 6);
+    expect(colonies[0].exportablePerHour.get(BACTERIA)).toBeCloseTo(200, 6);
   });
 
   it('offers the budget the unfed factories are holding, and says it assumed that', () => {
@@ -276,5 +278,60 @@ describe('conversions', () => {
       built(2, WATER_SCHEMATIC, AQUEOUS_LIQUIDS, 48_000, 8),
     ];
     expect(colonyNetwork({ ...input, advice: roomy })?.plan.conversions).toEqual([]);
+  });
+});
+
+describe('a colony whose own factories eat what it makes', () => {
+  /**
+   * The reported colony, Efa II: 6,865 Microorganisms an hour into four Basic
+   * pins on Bacteria, feeding eight Advanced pins on Nanites.
+   *
+   * Nanites want Reactive Metals as well, which no temperate planet yields, so
+   * that line reads `inputs-not-local` — and its 320/hr appetite for the
+   * Bacteria made here is the whole point. 6,865 Microorganisms feeds 1.14
+   * Bacteria pins, or 45.8 Bacteria an hour, against the 320 those Nanite pins
+   * want. There is none going spare.
+   */
+  function nanitesOverBacteria(): PlanetAdvice {
+    const base = built(1, BACTERIA_SCHEMATIC, MICROORGANISMS, 6_865, 4);
+    if (base.kind !== 'built') throw new Error('unreachable');
+    return {
+      ...base,
+      colony: {
+        ...base.colony,
+        production: [
+          { schematicId: BACTERIA_SCHEMATIC, count: 4 },
+          { schematicId: NANITES_SCHEMATIC, count: 8 },
+        ],
+      },
+    };
+  }
+
+  const withWater: PlanetAdvice[] = [nanitesOverBacteria(), PAIR[1]];
+
+  it('has no Bacteria to offer the plan, though it makes some', () => {
+    const colonies = networkColonies({ ...input, advice: withWater });
+    const efa = colonies.find((colony) => colony.planetId === 1);
+    // It makes 45.8 an hour and eats every unit of it, so the map says
+    // absent — which is what every read in `planNetwork` tests for.
+    expect(efa?.exportablePerHour.has(BACTERIA)).toBe(false);
+    // What it genuinely has spare: the Nanites, which nothing here consumes.
+    expect(efa?.exportablePerHour.get(NANITES)).toBeCloseTo(8 * 5, 6);
+  });
+
+  it('is never offered a Test Cultures facility on Bacteria it cannot spare', () => {
+    // The bug, end to end. Test Cultures is Bacteria + Water, and the Water
+    // colony is right there, so the planner used to place it on Efa II and
+    // name its Bacteria "made here" — against a Nanite line already 274/hr
+    // short of the same product.
+    const plan = colonyNetwork({ ...input, advice: withWater })?.plan;
+    expect(plan?.opportunities.some((line) => line.name === 'Test Cultures')).toBe(false);
+  });
+
+  it('still places a facility when the Bacteria really is spare', () => {
+    // The same two colonies with nothing eating the Bacteria: the offer this
+    // fix must not have killed along with the bad one.
+    const plan = colonyNetwork({ ...input, advice: PAIR })?.plan;
+    expect(plan?.opportunities.some((line) => line.name === 'Test Cultures')).toBe(true);
   });
 });

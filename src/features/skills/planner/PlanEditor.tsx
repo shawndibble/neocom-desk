@@ -1081,7 +1081,7 @@ export function PlanEditor({
                 {segment.remap
                   ? t('plans.segmentRemap', {
                       skill: stepLabel(anchor),
-                      attributes: remapInstruction(segment.attributes),
+                      attributes: remapInstruction(segment.attributes, effectiveImplants),
                     })
                   : t('plans.segmentCurrent', { skill: stepLabel(anchor) })}
               </p>
@@ -1650,6 +1650,7 @@ export function PlanEditor({
                   onRemove={requestRemoveEntry}
                   onRemoveMarker={handleRemoveMarker}
                   markerAttributesFor={markerAttributesFor}
+                  markerImplants={effectiveImplants}
                   onEditMarker={setEditingMarkerIndex}
                   onSetPriority={handleSetPriority}
                 />
