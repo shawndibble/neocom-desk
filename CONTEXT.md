@@ -168,7 +168,7 @@ here — they go one per file in `docs/context/decisions/`.
   other right now — usually variants of one thing. Distinct from the
   **Quickbar**, which is the durable list of items the user returns to across
   sessions. Different lifetimes, so two lists, not one.
-- **Contract Search**: The **Contracts** page's second tab (History / Search, issue #908). Search over every for-sale line of every public item_exchange/auction contract in New Eden — any item type — by item name, region, price, quantity and contract type. Reads the same **Public Contract Offers snapshot** as **BPC Sourcing**, but whole rather than narrowed to blueprint copies, so ME/TE/runs play no part in it. Public-contract data only: unlike BPC Sourcing it never merges in the Character's or corp's own assets. It shows one of two corpora at a time — **Items**, the offers above, or **Courier**, the **Public Courier Contracts snapshot** (issue #910) — because a haul has no item, quantity or price and an offer has no route, reward or collateral, so one merged table would leave half its columns blank whichever row you looked at. Distinct from the History tab beside it, which is one Character's own issued/accepted contracts read straight from ESI.
+- **Contract Search**: The **Contracts** page's second tab (History / Search, issue #908). Search over every for-sale line of every public item_exchange/auction contract in New Eden — any item type — by item name, region, price, quantity and contract type. Reads the same **Public Contract Offers snapshot** as **BPC Sourcing**, but whole rather than narrowed to blueprint copies, so ME/TE/runs play no part in its columns or filters — a copy's own three numbers still seed a **Seeded Build Plan** from the row's context menu (issue #931). Public-contract data only: unlike BPC Sourcing it never merges in the Character's or corp's own assets. It shows one of two corpora at a time — **Items**, the offers above, or **Courier**, the **Public Courier Contracts snapshot** (issue #910) — because a haul has no item, quantity or price and an offer has no route, reward or collateral, so one merged table would leave half its columns blank whichever row you looked at. Distinct from the History tab beside it, which is one Character's own issued/accepted contracts read straight from ESI.
 - **Corp Access**: The single resolved state `useCorpAccess()` returns for the
   active Character, composing Corp Capability with granted scopes: `unknown`
   (not resolved yet), `none` (no Corp Role), `roles-without-grant` (holds a
@@ -613,13 +613,14 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   `scopesForGroup(group)` from the grouped ones, both from the same registry.
   `corp` is the only group today.
 - **Seeded Build Plan**: A **Build Plan** opened from a BPC Sourcing **Offer**,
-  or from a blueprint line in a BPC contract's contents list, at that copy's
-  own ME, TE and runs rather than at the usual defaults, so a pilot shopping
-  or bundle-checking a copy sees what _that_ copy builds (issues #637, #638).
-  A contract line seeds only when ESI reports all three numbers for it —
-  optional there, unlike an Offer's, which always carries them. Named for the
-  copy it quotes ("Rifter 10/20 ×5"), since a Character can hold a plain plan
-  and several seeded plans for one blueprint at once.
+  from a blueprint line in a BPC contract's contents list, or from a
+  **Contract Search** item row (issue #931), at that copy's own ME, TE and
+  runs rather than at the usual defaults, so a pilot shopping or
+  bundle-checking a copy sees what _that_ copy builds (issues #637, #638).
+  A contract line or search row seeds only when all three numbers are
+  reported for it — optional in both, unlike an Offer's, which always carries
+  them. Named for the copy it quotes ("Rifter 10/20 ×5"), since a Character
+  can hold a plain plan and several seeded plans for one blueprint at once.
 - **Share Link**: A URL an **Appraisal** generates (issue #831) encoding only
   the pasted pile's `typeId:quantity` pairs plus its **Trade Hub**,
   **Price Percent** and a generation timestamp — never priced numbers.

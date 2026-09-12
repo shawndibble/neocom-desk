@@ -16,6 +16,9 @@
  * price and an offer has no route, reward or collateral — see
  * `CourierResults.tsx` and #910's scope decision. This component owns what
  * both need: the two snapshots, the region names, and which mode is showing.
+ *
+ * Mounts under a Router: every item row is a Build Plan context-menu
+ * trigger (#931), and so is each line of the detail modal's contents.
  */
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -65,6 +68,8 @@ import {
 import { loadCourierEndpoints } from '@/features/contractSearch/courierEndpoints';
 import { CourierResults } from '@/features/contractSearch/CourierResults';
 import { loadRegionName } from '@/features/bpcContracts/regionNames';
+import { BuildPlanContextMenu } from '@/features/industry/BuildPlanContextMenu';
+import { seedFromOfferRow } from '@/features/industry/planSeed';
 import {
   PublicContractDetailModal,
   type PublicContractDetailModalStatChip,
@@ -724,6 +729,17 @@ export function ContractSearchPanel() {
                       rowKey={(row, index) => `${row.contractId}:${row.typeId}:${index}`}
                       defaultSort={{ columnId: 'price', direction: 'asc' }}
                       onRowClick={setSelectedRow}
+                      // The shortcut past the detail modal, which offers the
+                      // same action per line since #933 — hence the shared
+                      // `planSeed` rule, so neither path quotes the copy
+                      // differently.
+                      rowContextMenu={(row, tr) => (
+                        <BuildPlanContextMenu
+                          typeId={row.typeId}
+                          seed={seedFromOfferRow(row)}
+                          trigger={tr}
+                        />
+                      )}
                     />
                     {!showAll && displayRows.length > ROW_CAP && (
                       <div className="px-3 py-2">

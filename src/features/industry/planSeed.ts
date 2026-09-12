@@ -89,6 +89,29 @@ export function seedFromContractItem(item: {
 }
 
 /**
+ * `seedFromContractItem`'s rule against a Public Contract Offers snapshot row.
+ * A near-twin rather than a shared helper only because the snapshot renames
+ * ESI's fields as it publishes (`material_efficiency` -> `me`,
+ * `time_efficiency` -> `te`). The rule must stay identical: since #933 one
+ * Contract Search line is reachable by both menus, and a copy seeded
+ * differently per path would open as two plans.
+ *
+ * No `runs === -1` guard like BPC Sourcing's — the publisher drops a negative
+ * `runs`, so a BPO arrives absent-runs and falls out unseeded.
+ */
+export function seedFromOfferRow(row: {
+  isBlueprintCopy?: boolean;
+  me?: number;
+  te?: number;
+  runs?: number;
+}): BuildPlanSeed | null {
+  if (!row.isBlueprintCopy) return null;
+  const { me, te, runs } = row;
+  if (me === undefined || te === undefined || runs === undefined) return null;
+  return { me, te, runs };
+}
+
+/**
  * Whether an existing plan is the one a seeded click already created.
  *
  * Matched on the three values rather than on a marker stored on the plan:

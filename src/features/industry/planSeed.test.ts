@@ -5,6 +5,7 @@ import {
   matchesPlanSeed,
   parsePlanSeed,
   seedFromContractItem,
+  seedFromOfferRow,
   type BuildPlanSeed,
 } from './planSeed';
 
@@ -145,5 +146,51 @@ describe('matchesPlanSeed', () => {
     expect(matchesPlanSeed({ me: 0, te: 20, runs: 5 }, seed)).toBe(false);
     expect(matchesPlanSeed({ me: 10, te: 0, runs: 5 }, seed)).toBe(false);
     expect(matchesPlanSeed({ me: 10, te: 20, runs: 1 }, seed)).toBe(false);
+  });
+});
+
+describe('seedFromOfferRow', () => {
+  it('seeds from a snapshot row reporting all three numbers', () => {
+    expect(seedFromOfferRow({ isBlueprintCopy: true, me: 10, te: 20, runs: 5 })).toEqual({
+      me: 10,
+      te: 20,
+      runs: 5,
+    });
+  });
+
+  it('accepts an unresearched copy (ME 0 / TE 0)', () => {
+    expect(seedFromOfferRow({ isBlueprintCopy: true, me: 0, te: 0, runs: 1 })).toEqual({
+      me: 0,
+      te: 0,
+      runs: 1,
+    });
+  });
+
+  it('falls back to no seed when the row omits any one of the three', () => {
+    // The publisher drops a blank ME/TE and a negative `runs` rather than
+    // zeroing them, so a BPO's unlimited runs arrives as absent — unseeded
+    // beats a fabricated run count.
+    expect(seedFromOfferRow({ isBlueprintCopy: true, te: 20, runs: 5 })).toBeNull();
+    expect(seedFromOfferRow({ isBlueprintCopy: true, me: 10, runs: 5 })).toBeNull();
+    expect(seedFromOfferRow({ isBlueprintCopy: true, me: 10, te: 20 })).toBeNull();
+    expect(seedFromOfferRow({ isBlueprintCopy: true })).toBeNull();
+  });
+
+  it('never seeds a row that is not a blueprint copy', () => {
+    expect(seedFromOfferRow({ me: 10, te: 20, runs: 5 })).toBeNull();
+  });
+
+  it('agrees with the contract-item path on the same copy', () => {
+    // Contract Search reaches one item line two ways since #933 — the row's
+    // own context menu and the detail modal's — and a pilot who used both
+    // would otherwise land on two different plans for one copy.
+    expect(seedFromOfferRow({ isBlueprintCopy: true, me: 10, te: 20, runs: 5 })).toEqual(
+      seedFromContractItem({
+        is_blueprint_copy: true,
+        material_efficiency: 10,
+        time_efficiency: 20,
+        runs: 5,
+      })
+    );
   });
 });
