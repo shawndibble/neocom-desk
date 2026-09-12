@@ -46,7 +46,7 @@ function BalanceTooltip({ active, payload }: TooltipContentProps): React.ReactEl
   const point = payload[0]?.payload as ChartPoint | undefined;
   if (!point) return null;
   return (
-    <div className="rounded-xs border border-line bg-panel-2 px-2 py-1.5 text-xs text-text tabular-nums shadow-lg">
+    <div className="rounded-xs border border-line bg-panel-2 px-2 py-1.5 text-xs text-text tabular-nums shadow-lg shadow-black/50">
       <p className="font-semibold">{point.tooltipLabel}</p>
       <p>
         {t('wallet.balanceCol')}: {formatIsk(point.balance, 2)}
