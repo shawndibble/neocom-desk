@@ -1132,6 +1132,125 @@ describe('ContractSearchPanel — Courier completion risk', () => {
 });
 
 /**
+ * Over-payment is the documented bait in courier scams, so the rate comparison
+ * is the strongest signal available — and it is provable arithmetic rather than
+ * an accusation (issue #946). Nothing here may call a contract a scam.
+ */
+describe('ContractSearchPanel — Courier going rate', () => {
+  /**
+   * Twenty ordinary hauls, which is the floor a median needs before it means
+   * anything, plus one that pays far above them. All Jita→Amarr, so every row
+   * has the same distance and the rate differences are the rewards alone.
+   */
+  function corpus(count: number, reward: number, volume = 45_000) {
+    return Array.from({ length: count }, (_, i) =>
+      courierRow({ contractId: 800 + i, reward, volume })
+    );
+  }
+  const ORDINARY = corpus(20, 15_000_000);
+  const BAIT = courierRow({ contractId: 900, reward: 900_000_000, volume: 45_000 });
+
+  async function showCourierWith(rows: PublicCourierContractRow[]) {
+    loadPublicCourierContracts.mockResolvedValue(cachedCourierSnapshot(rows));
+    const user = userEvent.setup();
+    renderWithRouter();
+    await bodyRows();
+    await user.click(screen.getByRole('button', { name: 'Courier' }));
+    await screen.findByRole('table');
+    return user;
+  }
+
+  async function courierRows() {
+    const table = await screen.findByRole('table');
+    const [, ...rest] = within(table).getAllByRole('rowgroup');
+    return within(rest[0]).getAllByRole('row');
+  }
+
+  it('shows every haul as a multiple of the market going rate', async () => {
+    await showCourierWith([...ORDINARY, BAIT]);
+
+    // Ranked by ISK/jump, so the one paying 60x the others leads.
+    const first = await waitFor(async () => {
+      const found = (await courierRows())[0];
+      expect(found.textContent).toMatch(/going rate/);
+      return found;
+    });
+    expect(first.textContent).toMatch(/60x going rate/);
+    // And the ordinary hauls are the benchmark, so they sit at 1x.
+    const rest = (await courierRows()).slice(1);
+    expect(rest.every((r) => (r.textContent ?? '').includes('1x going rate'))).toBe(true);
+  });
+
+  it('flags the haul that pays far above the going rate', async () => {
+    await showCourierWith([...ORDINARY, BAIT]);
+
+    const flagged = await waitFor(async () => {
+      const found = (await courierRows())[0];
+      expect(within(found).getByText(/60x going rate/)).toBeInTheDocument();
+      return found;
+    });
+    // Marked, not merely stated: the outlier is styled as one.
+    expect(within(flagged).getByText(/60x going rate/).className).toMatch(/warning/);
+  });
+
+  it('shows no multiple at all for a corpus too small to have a median', async () => {
+    // A median over three rows is arithmetically fine and statistically
+    // meaningless, and this one decides whether a contract is called an
+    // outlier. The whole comparison degrades to silence.
+    await showCourierWith([JITA_TO_AMARR, AMARR_TO_STRUCTURE]);
+
+    const rows = await courierRows();
+    expect(rows.map((r) => r.textContent ?? '').join(' ')).not.toMatch(/going rate/);
+  });
+
+  it('states no rate for a haul with no measurable distance', async () => {
+    // An unplaced endpoint has no jump count, and a rate computed without
+    // distance is not the rate this compares.
+    await showCourierWith([...ORDINARY, AMARR_TO_STRUCTURE]);
+
+    const unmeasurable = await waitFor(async () => {
+      const found = (await courierRows()).find((r) =>
+        (r.textContent ?? '').includes(`#${UNKNOWN_STRUCTURE}`)
+      );
+      expect(found).toBeDefined();
+      return found!;
+    });
+    expect(unmeasurable.textContent).not.toMatch(/going rate/);
+  });
+
+  it('narrows to, or away from, the hauls far above the going rate', async () => {
+    const user = await showCourierWith([...ORDINARY, BAIT]);
+    await waitFor(async () => {
+      expect(await courierRows()).toHaveLength(21);
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Filters' }));
+    await user.click(screen.getByRole('combobox', { name: 'Pay vs going rate' }));
+    await user.click(await screen.findByRole('option', { name: 'Only far above' }));
+
+    expect(await courierRows()).toHaveLength(1);
+  });
+
+  it('names the benchmark in the detail, and calls nothing a scam', async () => {
+    const user = await showCourierWith([...ORDINARY, BAIT]);
+    await waitFor(async () => {
+      expect((await courierRows())[0].textContent).toMatch(/going rate/);
+    });
+    await user.click((await courierRows())[0]);
+
+    const dialog = await screen.findByRole('dialog');
+    // The benchmark is named, not merely applied.
+    expect(within(dialog).getByText(/median reward per m³ per jump/)).toBeInTheDocument();
+    // The community floor, where collateral and distance are both known.
+    expect(within(dialog).getByText(/1M per 1B collateral per jump/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/Expires in/)).toBeInTheDocument();
+    // The bound the whole design rests on.
+    expect(within(dialog).queryByText(/scam/i)).not.toBeInTheDocument();
+    expect(within(dialog).queryByText(/fraud|bad faith|dishonest/i)).not.toBeInTheDocument();
+  });
+});
+
+/**
  * The two corpora used to arrive out of one loader, so neither board rendered
  * until both had landed — a hauler waited on ~370k item-offer rows to be shown
  * ~620 hauls (issue #963). These cases hold each board's independence, and

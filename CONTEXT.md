@@ -273,6 +273,7 @@ here — they go one per file in `docs/context/decisions/`.
   the Notification Feed already shows as delivered (Occurrence Key, round
   44/#360).
 - **Freshness Window** (round 25): how long a cached row is served without asking ESI again. Ten minutes for a Character's own data, a day for game constants. Distinct from **Data Age**, which reports how old the shown data is; the window decides whether to go and get newer.
+- **Going Rate**: the median reward per m³ per jump across every outstanding public courier contract — the market's own price for hauling, computed from the snapshot with nothing typed in. A haul's pay is shown as a multiple of it, and one at or above 8x is flagged, a threshold set to clear ordinary small-parcel work (~3.6x) while still catching the cheapest documented bait (~20x). States a figure, never a verdict: the app cannot value a courier contract's cargo or read intent. Unavailable rather than guessed where a haul has no distance or no stated volume, or where the corpus is too small for a median to mean anything.
 - **Group Owned Overlay**: A **Build Group**'s own "I own this" ledger —
   manual entry or ESI-asset auto-detection with a location scope, the same
   detect-plus-scope mechanism a Build Plan's own owned-stock entry already

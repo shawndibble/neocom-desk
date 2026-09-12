@@ -17,7 +17,19 @@
  */
 import type { CourierRouteRow, CourierEndpoint } from './courierSearch';
 
-export type CourierRiskKind = 'player-structure' | 'no-gate-route' | 'nullsec';
+export type CourierRiskKind =
+  | 'player-structure'
+  | 'no-gate-route'
+  | 'nullsec'
+  /**
+   * Pays far above what the market pays for a haul this size over this
+   * distance (issue #946). Unlike the three above it is a property of the
+   * *contract* rather than of one of its ends, and it needs a jump count and
+   * the corpus median to state at all — so it is never produced by
+   * `endpointRisks` or `courierRisks`, and the board adds it from
+   * `courierGoingRate.ts`.
+   */
+  | 'over-rate';
 
 /**
  * Every J-space system sits in the 11000000 region block, and the contract row
