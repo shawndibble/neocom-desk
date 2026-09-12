@@ -324,10 +324,18 @@ describe('ContractSearchPanel — Courier mode', () => {
       expect(found).toHaveLength(2);
       return found;
     });
+    // Two dashes, not "at least one": the row has both an absent collateral
+    // and an absent deadline, so `toContain` would still pass with collateral
+    // rendering "0.00 ISK" — which is the thing this guards against.
     const cells = within(rows[0])
       .getAllByRole('cell')
       .map((cell) => cell.textContent);
-    expect(cells).toContain('—');
+    expect(cells.filter((text) => text === '—')).toHaveLength(2);
+    // And the haul that states both shows neither as a dash.
+    const stated = within(rows[1])
+      .getAllByRole('cell')
+      .map((cell) => cell.textContent);
+    expect(stated.filter((text) => text === '—')).toHaveLength(0);
   });
 
   it('swaps the item filters out for route filters, rather than stacking both', async () => {

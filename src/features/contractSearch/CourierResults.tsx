@@ -42,6 +42,13 @@ const ROW_CAP = 50;
 /** `Select` has no null value, so "no region chosen" needs a sentinel option. */
 const ALL_REGIONS = 'all';
 
+/**
+ * One decimal, the same precision the industry tables give a hauling volume.
+ * `toLocaleString` would give between none and three, which down a
+ * `tabular-nums` column is a ragged edge where the point should line up.
+ */
+const VOLUME_FORMAT = new Intl.NumberFormat('en', { maximumFractionDigits: 1 });
+
 /** The filter as the controls hold it: text fields stay strings until they are parsed into the engine's filter. */
 interface CourierUiFilter {
   routeQuery: string;
@@ -113,6 +120,70 @@ function regionOptionsFor(
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
+/** The From/To pair: the same control twice, differing only in which end of the haul it reads. */
+function RegionFilterField({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: number | null;
+  options: RegionOption[];
+  onChange: (regionId: number | null) => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <FilterField label={label}>
+      <Select
+        value={value === null ? ALL_REGIONS : String(value)}
+        onValueChange={(next) => onChange(next === ALL_REGIONS ? null : Number(next))}
+      >
+        <SelectTrigger aria-label={label} className="w-44">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value={ALL_REGIONS}>{t('contractSearch.allRegions')}</SelectItem>
+          {options.map((region) => (
+            <SelectItem key={region.id} value={String(region.id)}>
+              {region.name}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </FilterField>
+  );
+}
+
+/** A bare numeric bound — reward floor, collateral ceiling, cargo ceiling, deadline floor. */
+function NumericFilterField({
+  label,
+  value,
+  width,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  /** The field carries the width it needs *in the row*; the sheet stretches it regardless. */
+  width: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <FilterField label={label}>
+      <TextInput
+        type="number"
+        inputMode="numeric"
+        min={0}
+        aria-label={label}
+        placeholder={label}
+        className={width}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+      />
+    </FilterField>
+  );
+}
+
 interface CourierFilterBarProps {
   filter: CourierUiFilter;
   onChange: (filter: CourierUiFilter) => void;
@@ -161,102 +232,42 @@ function CourierFilterBar({
     >
       {(draft, setDraft) => (
         <>
-          <FilterField label={t('contractSearch.originRegionLabel')}>
-            <Select
-              value={draft.originRegionId === null ? ALL_REGIONS : String(draft.originRegionId)}
-              onValueChange={(value) =>
-                setDraft({ ...draft, originRegionId: value === ALL_REGIONS ? null : Number(value) })
-              }
-            >
-              <SelectTrigger aria-label={t('contractSearch.originRegionLabel')} className="w-44">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={ALL_REGIONS}>{t('contractSearch.allRegions')}</SelectItem>
-                {originRegions.map((region) => (
-                  <SelectItem key={region.id} value={String(region.id)}>
-                    {region.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </FilterField>
-          <FilterField label={t('contractSearch.destinationRegionLabel')}>
-            <Select
-              value={
-                draft.destinationRegionId === null ? ALL_REGIONS : String(draft.destinationRegionId)
-              }
-              onValueChange={(value) =>
-                setDraft({
-                  ...draft,
-                  destinationRegionId: value === ALL_REGIONS ? null : Number(value),
-                })
-              }
-            >
-              <SelectTrigger
-                aria-label={t('contractSearch.destinationRegionLabel')}
-                className="w-44"
-              >
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={ALL_REGIONS}>{t('contractSearch.allRegions')}</SelectItem>
-                {destinationRegions.map((region) => (
-                  <SelectItem key={region.id} value={String(region.id)}>
-                    {region.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </FilterField>
-          <FilterField label={t('contractSearch.minRewardLabel')}>
-            <TextInput
-              type="number"
-              inputMode="numeric"
-              min={0}
-              aria-label={t('contractSearch.minRewardLabel')}
-              placeholder={t('contractSearch.minRewardLabel')}
-              className="w-32"
-              value={draft.minReward}
-              onChange={(event) => setDraft({ ...draft, minReward: event.target.value })}
-            />
-          </FilterField>
-          <FilterField label={t('contractSearch.maxCollateralLabel')}>
-            <TextInput
-              type="number"
-              inputMode="numeric"
-              min={0}
-              aria-label={t('contractSearch.maxCollateralLabel')}
-              placeholder={t('contractSearch.maxCollateralLabel')}
-              className="w-32"
-              value={draft.maxCollateral}
-              onChange={(event) => setDraft({ ...draft, maxCollateral: event.target.value })}
-            />
-          </FilterField>
-          <FilterField label={t('contractSearch.maxVolumeLabel')}>
-            <TextInput
-              type="number"
-              inputMode="numeric"
-              min={0}
-              aria-label={t('contractSearch.maxVolumeLabel')}
-              placeholder={t('contractSearch.maxVolumeLabel')}
-              className="w-32"
-              value={draft.maxVolume}
-              onChange={(event) => setDraft({ ...draft, maxVolume: event.target.value })}
-            />
-          </FilterField>
-          <FilterField label={t('contractSearch.minDaysLabel')}>
-            <TextInput
-              type="number"
-              inputMode="numeric"
-              min={0}
-              aria-label={t('contractSearch.minDaysLabel')}
-              placeholder={t('contractSearch.minDaysLabel')}
-              className="w-24"
-              value={draft.minDays}
-              onChange={(event) => setDraft({ ...draft, minDays: event.target.value })}
-            />
-          </FilterField>
+          <RegionFilterField
+            label={t('contractSearch.originRegionLabel')}
+            value={draft.originRegionId}
+            options={originRegions}
+            onChange={(originRegionId) => setDraft({ ...draft, originRegionId })}
+          />
+          <RegionFilterField
+            label={t('contractSearch.destinationRegionLabel')}
+            value={draft.destinationRegionId}
+            options={destinationRegions}
+            onChange={(destinationRegionId) => setDraft({ ...draft, destinationRegionId })}
+          />
+          <NumericFilterField
+            label={t('contractSearch.minRewardLabel')}
+            value={draft.minReward}
+            width="w-32"
+            onChange={(minReward) => setDraft({ ...draft, minReward })}
+          />
+          <NumericFilterField
+            label={t('contractSearch.maxCollateralLabel')}
+            value={draft.maxCollateral}
+            width="w-32"
+            onChange={(maxCollateral) => setDraft({ ...draft, maxCollateral })}
+          />
+          <NumericFilterField
+            label={t('contractSearch.maxVolumeLabel')}
+            value={draft.maxVolume}
+            width="w-32"
+            onChange={(maxVolume) => setDraft({ ...draft, maxVolume })}
+          />
+          <NumericFilterField
+            label={t('contractSearch.minDaysLabel')}
+            value={draft.minDays}
+            width="w-24"
+            onChange={(minDays) => setDraft({ ...draft, minDays })}
+          />
         </>
       )}
     </FilterBar>
@@ -367,7 +378,7 @@ export function CourierResults({ rows, regionNames }: CourierResultsProps) {
         align: 'right',
         className: 'tabular-nums whitespace-nowrap',
         sortValue: (row) => row.volume,
-        render: (row) => `${row.volume.toLocaleString()} m³`,
+        render: (row) => `${VOLUME_FORMAT.format(row.volume)} m³`,
       },
       {
         id: 'days',
