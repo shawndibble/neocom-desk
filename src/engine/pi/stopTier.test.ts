@@ -2,7 +2,12 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { PiData } from '@/sde/types';
-import { localChainTargets, recommendStopTier, type StopTierOptions } from './stopTier';
+import {
+  DEFAULT_EXTRA_EXTRACTOR_YIELD_FACTOR,
+  localChainTargets,
+  recommendStopTier,
+  type StopTierOptions,
+} from './stopTier';
 
 // The real snapshot, same reasoning as pinBudget.test.ts: the pin counts and
 // margins below are claims about the shipped recipe graph and the shipped
@@ -64,6 +69,12 @@ function options(overrides: Partial<StopTierOptions> = {}): StopTierOptions {
     taxRate: 0.1,
     linkCapacityPerHour: null,
     bufferHours: 24,
+    // 1 = no falloff. Every test above this option's own describe block is
+    // about something else (block scaling, tax, tie-breaking, blockers) and
+    // was written and hand-checked against the un-fallen-off numbers, so it
+    // stays pinned to "off" here rather than picking up whatever the engine's
+    // own default happens to be.
+    extraExtractorYieldFactor: 1,
     ...overrides,
   };
 }
@@ -345,5 +356,151 @@ describe('recommendStopTier', () => {
     // candidate in the middle.
     expect(advice.best.typeId).toBe(AQUEOUS_LIQUIDS);
     expect(advice.best.marginPerHour).toBeGreaterThan(18_000 * (999.5 + step) - 1);
+  });
+
+  describe('extra extractors do not yield the measured mean rate (issue #957)', () => {
+    it('leaves a one-extractor fit unchanged, whatever the factor', () => {
+      // Test Cultures fits exactly one block at the default options — see
+      // "scores a made tier..." above for the derivation.
+      const advice = recommendStopTier(options({ extraExtractorYieldFactor: 0.3 }), pi);
+      expect(advice.kind).toBe('recommended');
+      if (advice.kind !== 'recommended') return;
+      const cultures = advice.entries.find((entry) => entry.typeId === TEST_CULTURES);
+      expect(cultures?.status).toBe('scored');
+      if (cultures?.status !== 'scored') return;
+      expect(cultures.blocks).toBe(1);
+      expect(cultures.unitsPerHour).toBe(5);
+      expect(cultures.marginPerHour).toBeCloseTo(433_400, 6);
+    });
+
+    it('reduces a raw candidate’s output once more than one extractor fits', () => {
+      // Microorganisms at 500 ISK fits three ECUs at the default options — see
+      // "scores selling the raw resource..." above. At factor 1 (no falloff)
+      // that is 3 * 6,000 = 18,000/hr; at 0.5, the second and third extractor
+      // each count for half: 6,000 * (1 + 2 * 0.5) = 12,000/hr.
+      const priced = { ...PRICES, [MICROORGANISMS]: 500 };
+      const advice = recommendStopTier(
+        options({ prices: priced, extraExtractorYieldFactor: 0.5 }),
+        pi
+      );
+      expect(advice.kind).toBe('recommended');
+      if (advice.kind !== 'recommended') return;
+      expect(advice.best.typeId).toBe(MICROORGANISMS);
+      expect(advice.best.blocks).toBe(3);
+      expect(advice.best.unitsPerHour).toBeCloseTo(12_000, 6);
+      // Per-unit margin is untouched — only the colony's output is.
+      expect(advice.best.marginPerUnit).toBeCloseTo(499.5, 6);
+      expect(advice.best.marginPerHour).toBeCloseTo(12_000 * 499.5, 6);
+    });
+
+    it('reduces a made-tier candidate at the same extractor count by the same factor', () => {
+      // Bacteria fits three blocks (three ECUs, one per block, same as the
+      // raw case above) at the default options — see "scores the whole
+      // colony..." above. The whole point of #957 is that this candidate
+      // must pay the same falloff the raw one does, at the same block count,
+      // so the raw-vs-made tie-break only moves by the part this ticket is
+      // about.
+      const baseline = recommendStopTier(options({ extraExtractorYieldFactor: 1 }), pi);
+      const fallenOff = recommendStopTier(options({ extraExtractorYieldFactor: 0.5 }), pi);
+      expect(baseline.kind).toBe('recommended');
+      expect(fallenOff.kind).toBe('recommended');
+      if (baseline.kind !== 'recommended' || fallenOff.kind !== 'recommended') return;
+
+      const bacteriaBefore = baseline.entries.find((entry) => entry.typeId === BACTERIA);
+      const bacteriaAfter = fallenOff.entries.find((entry) => entry.typeId === BACTERIA);
+      expect(bacteriaBefore?.status).toBe('scored');
+      expect(bacteriaAfter?.status).toBe('scored');
+      if (bacteriaBefore?.status !== 'scored' || bacteriaAfter?.status !== 'scored') return;
+      expect(bacteriaBefore.blocks).toBe(3);
+      expect(bacteriaAfter.blocks).toBe(3);
+      // 120/hr at factor 1 (3 * 40), reduced to 120 * (1 + 2*0.5)/3 = 80/hr.
+      expect(bacteriaBefore.unitsPerHour).toBe(120);
+      expect(bacteriaAfter.unitsPerHour).toBeCloseTo(80, 6);
+      // Per-unit margin is untouched by the falloff.
+      expect(bacteriaAfter.marginPerUnit).toBeCloseTo(bacteriaBefore.marginPerUnit, 6);
+
+      // The made-tier reduction ratio at three extractors must equal the raw
+      // candidate's reduction ratio at three extractors — the same fit, the
+      // same factor, so the same ratio, independent of either candidate's
+      // own price or margin.
+      const madeRatio = bacteriaAfter.unitsPerHour / bacteriaBefore.unitsPerHour;
+
+      const rawBaseline = recommendStopTier(
+        options({ prices: { ...PRICES, [MICROORGANISMS]: 500 }, extraExtractorYieldFactor: 1 }),
+        pi
+      );
+      const rawFallenOff = recommendStopTier(
+        options({ prices: { ...PRICES, [MICROORGANISMS]: 500 }, extraExtractorYieldFactor: 0.5 }),
+        pi
+      );
+      expect(rawBaseline.kind).toBe('recommended');
+      expect(rawFallenOff.kind).toBe('recommended');
+      if (rawBaseline.kind !== 'recommended' || rawFallenOff.kind !== 'recommended') return;
+      const rawRatio = rawFallenOff.best.unitsPerHour / rawBaseline.best.unitsPerHour;
+
+      expect(madeRatio).toBeCloseTo(rawRatio, 10);
+    });
+
+    it('applies the documented conservative default when the caller passes none', () => {
+      const opts = options({ prices: { ...PRICES, [MICROORGANISMS]: 500 } });
+      delete opts.extraExtractorYieldFactor;
+      const advice = recommendStopTier(opts, pi);
+      expect(advice.kind).toBe('recommended');
+      if (advice.kind !== 'recommended') return;
+      expect(advice.best.typeId).toBe(MICROORGANISMS);
+      expect(advice.best.blocks).toBe(3);
+      expect(advice.best.unitsPerHour).toBeCloseTo(
+        6_000 * (1 + (3 - 1) * DEFAULT_EXTRA_EXTRACTOR_YIELD_FACTOR),
+        6
+      );
+      // Sanity check that the default is actually a falloff, not a no-op —
+      // otherwise this test would pass even if the default were 1.
+      expect(DEFAULT_EXTRA_EXTRACTOR_YIELD_FACTOR).toBeLessThan(1);
+    });
+
+    it('keys a made-tier candidate’s falloff on its true extractor count, not on blocks', () => {
+      // At the default 6,000/hr, Bacteria's own per-factory demand for
+      // Microorganisms (150/unit * 40 units/hr = 6,000/hr) exactly matches the
+      // extraction rate, so one ratio block needs exactly one ECU and `blocks`
+      // and "true extractor count" happen to coincide — which is why the test
+      // above this one cannot tell them apart. Halving the rate forces two
+      // ECUs of Microorganisms into every block (`pinBudget.ts`'s
+      // `chainBlockPins` ceils each P0 type's own demand against the rate), so
+      // a made candidate's real extractor count is now double its `blocks` —
+      // exactly the case `madeTierFalloffRatio` exists to get right rather
+      // than silently under-charging.
+      const rate = 3_000;
+      const baseline = recommendStopTier(
+        options({ extractionRatePerHour: rate, extraExtractorYieldFactor: 1 }),
+        pi
+      );
+      const fallenOff = recommendStopTier(
+        options({ extractionRatePerHour: rate, extraExtractorYieldFactor: 0.5 }),
+        pi
+      );
+      expect(baseline.kind).toBe('recommended');
+      expect(fallenOff.kind).toBe('recommended');
+      if (baseline.kind !== 'recommended' || fallenOff.kind !== 'recommended') return;
+
+      const before = baseline.entries.find((entry) => entry.typeId === BACTERIA);
+      const after = fallenOff.entries.find((entry) => entry.typeId === BACTERIA);
+      expect(before?.status).toBe('scored');
+      expect(after?.status).toBe('scored');
+      if (before?.status !== 'scored' || after?.status !== 'scored') return;
+
+      // Confirms the premise: each block now carries 2 ECUs of Microorganisms,
+      // not 1, so `blocks` alone is not this candidate's true extractor count.
+      expect(before.pins.extractorControlUnit).toBe(2 * before.blocks);
+
+      const trueExtractorCount = before.pins.extractorControlUnit ?? 0;
+      const expectedRatio = (1 + (trueExtractorCount - 1) * 0.5) / trueExtractorCount;
+      expect(after.unitsPerHour / before.unitsPerHour).toBeCloseTo(expectedRatio, 10);
+
+      // The bug this guards against: keying the ratio on `blocks` instead of
+      // the true count would compute a shallower (larger) ratio than the
+      // correct one, since blocks < trueExtractorCount here.
+      const wrongRatioKeyedOnBlocks = (1 + (before.blocks - 1) * 0.5) / before.blocks;
+      expect(expectedRatio).toBeLessThan(wrongRatioKeyedOnBlocks);
+    });
   });
 });
