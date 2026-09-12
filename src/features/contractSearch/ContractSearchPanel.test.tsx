@@ -380,7 +380,7 @@ describe('ContractSearchPanel — Courier mode', () => {
     return user;
   }
 
-  it('lists the hauls with both ends named, best-paying first', async () => {
+  it('names both ends by system rather than by station, best-paying first', async () => {
     await showCourier();
 
     const rows = await waitFor(async () => {
@@ -388,8 +388,11 @@ describe('ContractSearchPanel — Courier mode', () => {
       expect(found).toHaveLength(2);
       return found;
     });
-    expect(within(rows[0]).getByText(/Amarr VIII \(Oris\)/)).toBeInTheDocument();
-    expect(within(rows[1]).getByText(/Jita IV - Moon 4/)).toBeInTheDocument();
+    // The system, not the station it sits in: the full station name belongs
+    // to the detail modal, which still shows it.
+    expect(within(rows[0]).getByText(/Amarr/)).toBeInTheDocument();
+    expect(within(rows[1]).getByText(/Jita/)).toBeInTheDocument();
+    expect(within(rows[1]).queryByText(/Jita IV - Moon 4/)).not.toBeInTheDocument();
     // Region names come from the same lookup the item results use.
     expect(within(rows[1]).getAllByText('The Forge').length).toBeGreaterThan(0);
   });
@@ -445,7 +448,7 @@ describe('ContractSearchPanel — Courier mode', () => {
     await waitFor(async () => {
       const rows = await bodyRows();
       expect(rows).toHaveLength(1);
-      expect(within(rows[0]).getByText(/Jita IV - Moon 4/)).toBeInTheDocument();
+      expect(within(rows[0]).getByText(/Jita/)).toBeInTheDocument();
     });
   });
 
