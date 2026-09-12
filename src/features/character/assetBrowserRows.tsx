@@ -159,7 +159,7 @@ export function LocationRow({
         </span>
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
           <span className="truncate text-sm font-medium">{label}</span>
-          <span className="flex flex-wrap items-center gap-x-1.5 text-[0.6875rem] text-text-faint">
+          <span className="flex flex-wrap items-center gap-x-1.5 text-[0.6875rem] text-text-dim">
             {unresolvedParent ? (
               <span className="text-warning">{t('assets.unresolved.rowHint')}</span>
             ) : (
@@ -244,7 +244,7 @@ export function ContainerRow({
           )}
           {characterBadge && <CharacterBadge characterName={characterBadge} t={t} />}
         </span>
-        <span className="shrink-0 text-[0.6875rem] text-text-faint tabular-nums">
+        <span className="shrink-0 text-[0.6875rem] text-text-dim tabular-nums">
           {formatBadge({ itemCount, estimatedValue }, t)}
         </span>
         <Icon.Descend size={Icon.ICON_SIZE.sm} className="shrink-0 text-text-faint" />
@@ -307,7 +307,7 @@ export function ItemRow({
               <span className="truncate text-sm">{name}</span>
               {characterBadge && <CharacterBadge characterName={characterBadge} t={t} />}
             </span>
-            <span className="flex flex-wrap items-center gap-x-1.5 text-[0.6875rem] text-text-faint tabular-nums">
+            <span className="flex flex-wrap items-center gap-x-1.5 text-[0.6875rem] text-text-dim tabular-nums">
               <span>×{quantity.toLocaleString()}</span>
               <span aria-hidden="true">·</span>
               <span>{volumeText}</span>
@@ -367,7 +367,7 @@ export function SearchResultRow({
         <span className="flex min-w-0 items-baseline gap-2">
           <span className="flex min-w-0 flex-1 items-baseline gap-1.5">
             <SecurityValue security={security} t={t} />
-            <span className="truncate text-[0.6875rem] text-text-faint">{trail.join(' › ')}</span>
+            <span className="truncate text-[0.6875rem] text-text-dim">{trail.join(' › ')}</span>
           </span>
           <span className="shrink-0 text-[0.6875rem] text-isk-pos tabular-nums">
             {formatIsk(estimatedValue)}

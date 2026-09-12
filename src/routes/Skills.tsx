@@ -415,7 +415,7 @@ export function Skills() {
                         <Caret expanded={expanded} />
                         {group.groupName}
                       </span>
-                      <span className="shrink-0 text-[0.6875rem] tabular-nums text-text-faint">
+                      <span className="shrink-0 text-[0.6875rem] tabular-nums text-text-dim">
                         {skillsToShow.length}
                       </span>
                     </button>
