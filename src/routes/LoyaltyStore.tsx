@@ -151,7 +151,7 @@ function OfferDetail({
 
       <div className="flex flex-wrap gap-6">
         <div>
-          <div className="text-[0.625rem] font-semibold tracking-widest text-text-faint uppercase">
+          <div className="text-[0.625rem] font-semibold tracking-widest text-text-dim uppercase">
             {t('loyaltyStore.colIskPerLp')}
           </div>
           <div className={`text-2xl font-semibold tabular-nums ${iskPerLpTone(profit.iskPerLp)}`}>
@@ -159,7 +159,7 @@ function OfferDetail({
           </div>
         </div>
         <div>
-          <div className="text-[0.625rem] font-semibold tracking-widest text-text-faint uppercase">
+          <div className="text-[0.625rem] font-semibold tracking-widest text-text-dim uppercase">
             {t('loyaltyStore.netProfit')}
           </div>
           <div className={`text-lg font-semibold tabular-nums ${iskPerLpTone(profit.profit)}`}>

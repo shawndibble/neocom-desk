@@ -340,7 +340,7 @@ const EntryRow = memo(function EntryRow({
       onClick={() => onRemove(entry.skillTypeID, entry.targetLevel)}
       aria-label={t('plans.removeEntry', { name: rowLabel })}
     >
-      <span aria-hidden="true">✕</span>
+      <Icon.Close size={Icon.ICON_SIZE.sm} aria-hidden="true" />
     </Button>
   );
 
@@ -609,7 +609,7 @@ const MarkerRow = memo(function MarkerRow({
         aria-label={t('plans.removeMarker')}
         onClick={() => onRemove(markerIndex)}
       >
-        <span aria-hidden="true">✕</span>
+        <Icon.Close size={Icon.ICON_SIZE.sm} aria-hidden="true" />
       </Button>
     </li>
   );
