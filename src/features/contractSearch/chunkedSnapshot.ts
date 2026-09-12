@@ -89,14 +89,47 @@ async function fetchSnapshot<TRow>(
   return { rows, lastSyncedAt };
 }
 
-export function loadChunkedSnapshot<TRow>(
+/**
+ * What one read of a snapshot yielded, and whether a newer one is still on its
+ * way.
+ *
+ * `revalidating` is the visible half of `allowStaleServe`: the rows below
+ * lapsed their window, so they are last cycle's and a live read is running
+ * behind them. It is derived from the row's own `fetchedAt` rather than
+ * reported by the cache, because that is the only thing that stays true across
+ * the re-read the revalidation signal provokes — the flag clears by itself
+ * when the fresher row lands.
+ *
+ * A read that *failed* is not reported here: it comes back as `fromCache` on
+ * the cached result, which is the more alarming news and the one the view
+ * should say instead.
+ */
+export interface ChunkedSnapshotRead<TRow> {
+  cached: CachedResult<ChunkedSnapshot<TRow>> | null;
+  revalidating: boolean;
+}
+
+export async function loadChunkedSnapshot<TRow>(
   source: ChunkedSnapshotSource,
   characterId: number
-): Promise<CachedResult<ChunkedSnapshot<TRow>> | null> {
-  return loadWithCache(
+): Promise<ChunkedSnapshotRead<TRow>> {
+  const cached = await loadWithCache(
     GLOBAL_CACHE_CHARACTER_ID,
     source.cacheKey,
     () => fetchSnapshot<TRow>(source, characterId),
-    { staleAfterMs: source.staleAfterMs }
+    // A long window here is a publish cadence, not a claim that the payload is
+    // a constant, so the lapsed row is the right thing to render while the
+    // next read runs (issue #963). Without this the whole collection — 124
+    // chunk docs for the offers snapshot — is a blocking spinner every time
+    // the window lapses, for rows that are at most one publish cycle old.
+    // `fromCache` still reports a revalidation that failed, so a refresh that
+    // never lands is stated rather than left standing as "loading".
+    { staleAfterMs: source.staleAfterMs, allowStaleServe: true }
   );
+  // `fetchedAt` alone, where `esi/cache.ts`'s own freshness test also honours a
+  // stored `expiresAt`: that field comes from an ESI `Expires` header, and this
+  // payload is read from Firestore, which sends none. Nothing writes it for
+  // these keys, so the two tests cannot disagree.
+  const lapsed = cached !== null && cached.fetchedAt.getTime() + source.staleAfterMs <= Date.now();
+  return { cached, revalidating: lapsed && !cached.fromCache };
 }

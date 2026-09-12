@@ -157,6 +157,23 @@ export interface LoadWithCacheStatusOptions {
   expiresCapture?: ExpiresCapture;
   /** Freshness window for this key; see `STALE_AFTER`. Defaults to `STALE_AFTER.default`. */
   staleAfterMs?: number;
+  /**
+   * Let a lapsed row be shown while the live call runs behind it, even though
+   * this key's window is longer than `STALE_AFTER.default`. Off by default —
+   * see `loadPastWindow` for why a long window normally forbids substitution.
+   *
+   * For a *published snapshot*: a payload that genuinely changes, but only on
+   * a backend's own publish clock, so its long window exists to stop
+   * pointless refetches rather than to assert the value is a constant. Last
+   * cycle's rows are the right thing to render while this cycle's arrive; a
+   * station name, by contrast, has nothing to re-render for.
+   *
+   * Opting in buys the whole stale-serve contract, not just the substitution:
+   * the late result is written and signalled (`onCacheRevalidated`), and a
+   * revalidation that *fails* comes back as `fromCache: true` on the next
+   * read, so a view can say so rather than leaving a refresh unreported.
+   */
+  allowStaleServe?: boolean;
 }
 
 /**
@@ -325,10 +342,15 @@ const GRACE = Symbol('grace');
  * Falls back to a plain await — the pre-existing behaviour, unchanged — for
  * the two cases a stale row must not be substituted into:
  * - **A manual Refresh** (`isRefreshInvalidated`). The user asked for new data
- *   and is watching the button; it must report what actually happened.
- * - **`STALE_AFTER.static` keys.** A lapsed 24h row is a station name; a
- *   re-render per distinct location for data that cannot have changed is all
- *   cost.
+ *   and is watching the button; it must report what actually happened. Note
+ *   this only reaches keys on the default window: `isRefreshInvalidated`
+ *   deliberately exempts longer ones, so a Refresh does not force a
+ *   `Published Snapshot` live — there is nothing newer to fetch until the
+ *   backend republishes, and `chunkedSnapshot.ts` documents that trade.
+ * - **Keys whose window is longer than the default.** A lapsed 24h row is a
+ *   station name; a re-render per distinct location for data that cannot have
+ *   changed is all cost. A key whose long window is a *publish cadence* rather
+ *   than a claim of immutability opts back in with `allowStaleServe`.
  */
 async function loadPastWindow<T>(
   characterId: number,
@@ -337,7 +359,9 @@ async function loadPastWindow<T>(
   options: LoadWithCacheStatusOptions,
   runLive: () => Promise<StatusResult<T>>
 ): Promise<StatusResult<T>> {
-  if (staleAfterMs > STALE_AFTER.default) return withDedupe(characterId, key, runLive);
+  if (staleAfterMs > STALE_AFTER.default && options.allowStaleServe !== true) {
+    return withDedupe(characterId, key, runLive);
+  }
 
   const dkey = dedupeKey(characterId, key);
   const held = await heldAfterFailure<T>(characterId, key, staleAfterMs, options, dkey);

@@ -3644,6 +3644,10 @@
     },
     "courierEmptyTitle": "No public courier contracts synced yet",
     "courierEmptyHint": "The public contract index refreshes on its own schedule — check back shortly.",
+    "loadingOffers": "Loading public contracts…",
+    "loadingCourier": "Loading courier contracts…",
+    "namingTypes": "Loading item names…",
+    "refreshingInBackground": "Refreshing in the background…",
     "courierNoFilterMatches": "No courier contracts match your filters.",
     "courierNoFilterMatchesHint": "Clear the route search or widen the region, reward, collateral and volume filters."
   }

@@ -911,6 +911,71 @@ describe('grace period past the freshness window', () => {
     await pending;
   });
 
+  it('serves the stored row for a long-window key that opts in with allowStaleServe', async () => {
+    // A published snapshot is not a game constant: it *does* change, just on
+    // the backend's own clock. Its long window is there to stop pointless
+    // refetches, not to make a lapsed row unshowable — so the opt-in restores
+    // the substitution the blanket long-window rule above removes.
+    const snapshotKey = 'publicCourierContracts';
+    await db.esiCache.put({
+      characterId: GLOBAL_CACHE_CHARACTER_ID,
+      key: snapshotKey,
+      value: 'last-nights-snapshot',
+      fetchedAt: Date.now() - 30 * 60_000 - 60_000,
+    });
+    const { fetchLive, settle } = deferredFetch('fresh-snapshot');
+
+    const pending = loadWithCacheStatus<string>(GLOBAL_CACHE_CHARACTER_ID, snapshotKey, fetchLive, {
+      staleAfterMs: 30 * 60_000,
+      allowStaleServe: true,
+    });
+    await expireGrace();
+    const result = await pending;
+
+    // Resolved while the Firestore read is still in flight: the board renders
+    // last night's hauls now rather than a spinner for the whole fetch.
+    expect(result.cached?.data).toBe('last-nights-snapshot');
+    expect(result.cached?.fromCache).toBe(false);
+    settle(true);
+  });
+
+  it('reports a failed background refresh on the next read of an opted-in key', async () => {
+    // The honesty rule: serving a stale row instantly is only allowed because
+    // a revalidation that fails eventually says so.
+    const snapshotKey = 'publicCourierContracts';
+    await db.esiCache.put({
+      characterId: GLOBAL_CACHE_CHARACTER_ID,
+      key: snapshotKey,
+      value: 'last-nights-snapshot',
+      fetchedAt: Date.now() - 30 * 60_000 - 60_000,
+    });
+    const options = { staleAfterMs: 30 * 60_000, allowStaleServe: true };
+    const failing = deferredFetch('never', new Error('offline'));
+    const signalled = nextRevalidation();
+
+    const first = loadWithCacheStatus<string>(
+      GLOBAL_CACHE_CHARACTER_ID,
+      snapshotKey,
+      failing.fetchLive,
+      options
+    );
+    await expireGrace();
+    expect((await first).cached?.fromCache).toBe(false);
+
+    failing.settle(false);
+    await signalled;
+
+    // The re-read the signal provokes is what carries the bad news.
+    const second = await loadWithCacheStatus<string>(
+      GLOBAL_CACHE_CHARACTER_ID,
+      snapshotKey,
+      async () => 'unused',
+      options
+    );
+    expect(second.cached?.data).toBe('last-nights-snapshot');
+    expect(second.cached?.fromCache).toBe(true);
+  });
+
   it('applies to the paginated path too, not just the singular one', async () => {
     await seedStaleRow(['a', 'b']);
     let settle!: () => void;

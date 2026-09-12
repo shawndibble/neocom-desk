@@ -8,15 +8,15 @@ import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharact
 import { DEFAULT_TIME_FORMAT, useTimeFormat } from '@/lib/timeFormat';
 import { isSyncConfigured } from '@/app/syncStatus';
 import { clearJumpGraphIndex } from '@/sde/jumpGraph';
+import { loadMarketTypes } from '@/sde/loadMarketSde';
 import { ContractSearchPanel } from '@/features/contractSearch/ContractSearchPanel';
 import type { PublicContractOfferRow } from '@/engine/contracts/contractOffers';
-import type { PublicContractOffersSnapshot } from '@/features/contractSearch/publicContractOffers';
+import type { ChunkedSnapshotRead } from '@/features/contractSearch/chunkedSnapshot';
 import type { CachedResult } from '@/esi/cache';
 import type { MarketTypeEntry, NpcStationEntry, SolarSystemEntry } from '@/sde/marketTypes';
 import { clearNpcStationIndex } from '@/sde/npcStations';
 import { clearSolarSystemIndex } from '@/sde/solarSystems';
 import type { PublicCourierContractRow } from '@/engine/contracts/courierSearch';
-import type { PublicCourierContractsSnapshot } from '@/features/contractSearch/publicCourierContracts';
 
 vi.mock('@/app/syncStatus', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/app/syncStatus')>();
@@ -33,7 +33,7 @@ vi.mock('@/features/contractSearch/publicCourierContracts', () => ({
   loadPublicCourierContracts: (...args: unknown[]) => loadPublicCourierContracts(...args),
 }));
 
-const loadRegionName = vi.fn(async (regionId: number) =>
+const loadRegionName = vi.fn<(regionId: number) => Promise<string>>(async (regionId) =>
   regionId === 10000002 ? 'The Forge' : 'Domain'
 );
 vi.mock('@/features/bpcContracts/regionNames', () => ({
@@ -116,8 +116,15 @@ const JUMPS = {
   [LOWSEC_SHORTCUT]: [30000142, 30002187],
 };
 
+/** What `regions.json` ships: the whole k-space table, so nothing asks ESI. */
+const REGIONS = [
+  { id: 10000002, name: 'The Forge' },
+  { id: 10000043, name: 'Domain' },
+];
+
 vi.mock('@/sde/loadMarketSde', () => ({
   loadMarketTypes: vi.fn(async () => CATALOG),
+  loadMarketRegions: vi.fn(async () => REGIONS),
   loadNpcStations: vi.fn(async () => STATIONS),
   loadSolarSystems: vi.fn(async () => SYSTEMS),
   loadSolarSystemJumps: vi.fn(async () => JUMPS),
@@ -183,26 +190,35 @@ const AMARR_TO_STRUCTURE = courierRow({
   daysToComplete: undefined,
 });
 
-function cachedCourierSnapshot(
-  rows: PublicCourierContractRow[]
-): CachedResult<PublicCourierContractsSnapshot> {
+/**
+ * What `loadChunkedSnapshot` hands back: the cached rows, plus whether a newer
+ * read is running behind them (#963). `revalidating` is false here — the
+ * stale-serve path has its own coverage in `chunkedSnapshot.test.ts`.
+ */
+function snapshotRead<TRow>(rows: TRow[], overrides: Partial<CachedResult<never>> = {}) {
   return {
-    data: { rows, lastSyncedAt: Date.parse('2026-09-12T18:30:00Z') },
-    fetchedAt: new Date(),
-    fromCache: false,
-    truncated: false,
+    cached: {
+      data: { rows, lastSyncedAt: Date.parse('2026-09-12T18:30:00Z') },
+      fetchedAt: new Date(),
+      fromCache: false,
+      truncated: false,
+      ...overrides,
+    },
+    revalidating: false,
   };
 }
 
+function cachedCourierSnapshot(
+  rows: PublicCourierContractRow[]
+): ChunkedSnapshotRead<PublicCourierContractRow> {
+  return snapshotRead(rows);
+}
+
 function cachedSnapshot(
-  rows: PublicContractOfferRow[]
-): CachedResult<PublicContractOffersSnapshot> {
-  return {
-    data: { rows, lastSyncedAt: Date.parse('2026-09-12T18:30:00Z') },
-    fetchedAt: new Date(),
-    fromCache: false,
-    truncated: false,
-  };
+  rows: PublicContractOfferRow[],
+  overrides: Partial<CachedResult<never>> = {}
+): ChunkedSnapshotRead<PublicContractOfferRow> {
+  return snapshotRead(rows, overrides);
 }
 
 beforeEach(async () => {
@@ -221,6 +237,13 @@ beforeEach(async () => {
   loadPublicCourierContracts.mockReset();
   loadPublicCourierContracts.mockResolvedValue(
     cachedCourierSnapshot([JITA_TO_AMARR, AMARR_TO_STRUCTURE])
+  );
+  // Restored per case: one progressive-loading test below holds this pending
+  // on purpose, and a leaked never-settling lookup would strand every later
+  // case's Region column on its id placeholder.
+  loadRegionName.mockReset();
+  loadRegionName.mockImplementation(async (regionId: number) =>
+    regionId === 10000002 ? 'The Forge' : 'Domain'
   );
   loadContractLocationName.mockReset();
   loadContractLocationName.mockResolvedValue('Jita IV - Moon 4 - Caldari Navy Assembly Plant');
@@ -243,6 +266,14 @@ beforeEach(async () => {
 
 async function bodyRows() {
   const table = await screen.findByRole('table');
+  // The name lookups commit a render *after* the rows now (issue #963): the
+  // boards no longer wait on the market catalogue, the endpoint resolution or
+  // the region names before showing anything. So waiting for the table alone
+  // races them, and a cell read straight afterwards can still hold the `#34`
+  // placeholder the column honestly shows until its name lands. An empty
+  // `waitFor` yields a macrotask inside `act`, which is enough for every
+  // already-settled lookup to flush.
+  await waitFor(() => {});
   const [, ...rest] = within(table).getAllByRole('rowgroup');
   return within(rest[0]).getAllByRole('row');
 }
@@ -817,5 +848,133 @@ describe('ContractSearchPanel — Build Plan from an item row', () => {
       'aria-disabled',
       'true'
     );
+  });
+});
+
+/**
+ * The two corpora used to arrive out of one loader, so neither board rendered
+ * until both had landed — a hauler waited on ~370k item-offer rows to be shown
+ * ~620 hauls (issue #963). These cases hold each board's independence, and
+ * hold the line that a board mid-load must not read as a finished one.
+ */
+describe('ContractSearchPanel — progressive loading', () => {
+  /** A loader the test decides when, and whether, to settle. */
+  function deferred<T>() {
+    let settle!: (value: T) => void;
+    const promise = new Promise<T>((resolve) => {
+      settle = resolve;
+    });
+    return { promise, settle };
+  }
+
+  it('renders the courier board while the offers snapshot is still in flight', async () => {
+    const offers = deferred<ChunkedSnapshotRead<PublicContractOfferRow>>();
+    loadPublicContractOffers.mockReturnValue(offers.promise);
+    const user = userEvent.setup();
+    renderWithRouter();
+
+    await user.click(screen.getByRole('button', { name: 'Courier' }));
+
+    const table = await screen.findByRole('table');
+    const [, ...rest] = within(table).getAllByRole('rowgroup');
+    expect(within(rest[0]).getAllByRole('row')).toHaveLength(2);
+    // Still pending — the hauls above did not wait for it.
+    offers.settle(cachedSnapshot([TRIT_FORGE]));
+  });
+
+  it('renders the item board while the courier snapshot is still in flight', async () => {
+    const courier = deferred<ChunkedSnapshotRead<PublicCourierContractRow>>();
+    loadPublicCourierContracts.mockReturnValue(courier.promise);
+    renderWithRouter();
+
+    expect(await bodyRows()).toHaveLength(3);
+    courier.settle(cachedCourierSnapshot([JITA_TO_AMARR]));
+  });
+
+  it('says which corpus it is loading rather than showing a bare spinner', async () => {
+    const offers = deferred<ChunkedSnapshotRead<PublicContractOfferRow>>();
+    loadPublicContractOffers.mockReturnValue(offers.promise);
+    renderWithRouter();
+
+    expect(
+      await screen.findByRole('status', { name: 'Loading public contracts…' })
+    ).toBeInTheDocument();
+    offers.settle(cachedSnapshot([TRIT_FORGE]));
+  });
+
+  it('never claims an empty corpus while that corpus is still loading', async () => {
+    // The whole point: "no contracts have synced" and "they have not arrived
+    // yet" are different answers, and the second must not be given as the first.
+    const offers = deferred<ChunkedSnapshotRead<PublicContractOfferRow>>();
+    loadPublicContractOffers.mockReturnValue(offers.promise);
+    renderWithRouter();
+
+    await screen.findByRole('status', { name: 'Loading public contracts…' });
+    expect(screen.queryByText('No public contracts synced yet')).not.toBeInTheDocument();
+
+    offers.settle(cachedSnapshot([]));
+    expect(await screen.findByText('No public contracts synced yet')).toBeInTheDocument();
+  });
+
+  it('names regions out of the local SDE, not one ESI call per region', async () => {
+    // `public/data/market/regions.json` is 78 entries and 2.7 KB; the ESI
+    // lookup it replaces was a round-trip per distinct region on a cold cache,
+    // and the only network-bound name stage of the whole load.
+    renderWithRouter();
+
+    const rows = await bodyRows();
+    expect(within(rows[0]).getByText('Domain')).toBeInTheDocument();
+    expect(loadRegionName).not.toHaveBeenCalled();
+  });
+
+  it('falls back to ESI for a region the local table does not carry', async () => {
+    // `regions.json` is the k-space table; a contract posted somewhere outside
+    // it must still get a name rather than be reported as unnameable.
+    const WORMHOLE_REGION = 11000031;
+    vi.mocked(loadRegionName).mockResolvedValue('Thera');
+    loadPublicContractOffers.mockResolvedValue(
+      cachedSnapshot([row({ contractId: 9, regionId: WORMHOLE_REGION })])
+    );
+    renderWithRouter();
+
+    const rows = await bodyRows();
+    await waitFor(() => {
+      expect(within(rows[0]).getByText('Thera')).toBeInTheDocument();
+    });
+    expect(loadRegionName).toHaveBeenCalledWith(WORMHOLE_REGION);
+    expect(loadRegionName).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not call a typed query unmatched while the item names are still loading', async () => {
+    // The rows land before the 1.45 MB catalogue does, so every item reads
+    // `#34` and a typed query ranks nothing. "No contracts match your filters"
+    // would be a complete answer given mid-load.
+    const catalog = deferred<MarketTypeEntry[]>();
+    vi.mocked(loadMarketTypes).mockReturnValue(catalog.promise);
+    const user = userEvent.setup();
+    renderWithRouter();
+
+    await screen.findByRole('table');
+    await user.type(screen.getByPlaceholderText('Search item name…'), 'tritanium');
+
+    expect(await screen.findByRole('status', { name: 'Loading item names…' })).toBeInTheDocument();
+    expect(screen.queryByText('No contracts match your filters')).not.toBeInTheDocument();
+
+    catalog.settle(CATALOG);
+    // Named at last, and now the query has something to rank against.
+    expect(await screen.findAllByText('Tritanium')).not.toHaveLength(0);
+  });
+
+  it('states a refresh that fell back to cache, rather than repeating the offline banner', async () => {
+    loadPublicContractOffers.mockResolvedValue(cachedSnapshot([TRIT_FORGE], { fromCache: true }));
+    const user = userEvent.setup();
+    renderWithRouter();
+
+    await bodyRows();
+    expect(screen.getByText('Showing cached data')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Refresh' }));
+
+    expect(await screen.findByText('Refresh failed — showing cached data')).toBeInTheDocument();
   });
 });

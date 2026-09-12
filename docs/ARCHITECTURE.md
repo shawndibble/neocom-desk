@@ -150,7 +150,12 @@ lands in `revalidationFailures` (keyed like `inFlightLoads`), which
 `heldAfterFailure` reads to give the re-read its `fromCache: true` /
 `needsReauth` / `cached: null` — and to stop it starting another slow call, so
 the signal cannot loop. No substitution happens for a manual refresh (it must
-report what actually happened) or for `STALE_AFTER.static` keys.
+report what actually happened) or for a key whose window is longer than
+`STALE_AFTER.default` — a lapsed 24h row is a station name, and re-rendering
+for a constant is all cost. A key whose long window encodes a _publish
+cadence_ rather than immutability opts back in with `allowStaleServe`, which
+is how the Contract Search snapshots render last cycle's rows while this
+cycle's arrive (#963).
 
 **Retained route snapshots.** All of the above kept the _rows_ local; it did
 not keep them _rendered_. `useRouteSnapshot` holds its result in `useState`,

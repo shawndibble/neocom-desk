@@ -16,10 +16,9 @@
  */
 import {
   loadChunkedSnapshot,
-  type ChunkedSnapshot,
+  type ChunkedSnapshotRead,
   type ChunkedSnapshotSource,
 } from '@/features/contractSearch/chunkedSnapshot';
-import type { CachedResult } from '@/esi/cache';
 import type { PublicContractOfferRow } from '@/engine/contracts/contractOffers';
 
 const SOURCE: ChunkedSnapshotSource = {
@@ -35,10 +34,8 @@ const SOURCE: ChunkedSnapshotSource = {
   staleAfterMs: 30 * 60_000,
 };
 
-export type PublicContractOffersSnapshot = ChunkedSnapshot<PublicContractOfferRow>;
-
 export function loadPublicContractOffers(
   characterId: number
-): Promise<CachedResult<PublicContractOffersSnapshot> | null> {
+): Promise<ChunkedSnapshotRead<PublicContractOfferRow>> {
   return loadChunkedSnapshot<PublicContractOfferRow>(SOURCE, characterId);
 }
