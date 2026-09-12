@@ -8,7 +8,7 @@
  * panel owns the snapshot, the mode and the region names; this owns
  * everything that is only true of a haul.
  */
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -224,6 +224,13 @@ type MyRegion =
   | { kind: 'unavailable' };
 
 /**
+ * One shared instance, for the same reason `PENDING` below is one: this is the
+ * default every render that has no answer yet hands the control, and a fresh
+ * object would re-render it continuously.
+ */
+const UNASKED: MyRegion = { kind: 'unknown' };
+
+/**
  * "From my region": sets the origin filter to the region the active character
  * is standing in (issue #940).
  *
@@ -231,83 +238,80 @@ type MyRegion =
  * question with a solar system; the filter beside it is region-scoped, so
  * naming anything finer would claim a precision the control does not have.
  *
- * Resolved on click rather than on mount, which is what keeps the promise of
- * at most one request: a hauler who never presses it pays nothing, and one who
- * has already loaded Assets this session pays nothing either — the location
- * loader's cache row is still inside its freshness window and answers without
- * a call.
+ * The answer is *not* held here. `FilterBar` unmounts its controls whenever
+ * the funnel closes or the sheet is dismissed, so state kept in this component
+ * would be thrown away every time the hauler collapsed the bar — and the next
+ * press would have to ask ESI all over again to re-learn something it had
+ * already been told. The board above owns it instead; this only renders it.
  *
- * Afterwards the button can only be in one of three honest states. A region
- * that no haul in the current snapshot starts in disables the control and says
- * so, rather than setting a value the dropdown beside it has no option for —
- * that would leave the filter showing something its own control cannot
- * represent, and an empty table under it. An unresolvable location disables it
- * quietly: a character whose grant predates `esi-location.read_location.v1`
- * should find a convenience missing, never a re-auth banner.
+ * Three honest states once it has been asked. A region that no haul in the
+ * current snapshot starts in disables the control and says so, rather than
+ * setting a value the dropdown beside it has no option for — that would leave
+ * the filter showing something its own control cannot represent, and an empty
+ * table under it. An unresolvable location disables it with a plain reason: a
+ * character whose grant predates `esi-location.read_location.v1` should find a
+ * convenience missing, never a re-auth banner.
  */
 function MyRegionButton({
-  characterId,
+  state,
+  pending,
   options,
+  onResolve,
   onPick,
 }: {
-  characterId: number;
+  state: MyRegion;
+  pending: boolean;
   options: RegionOption[];
+  /** Asks the board to resolve the location, and answers with what it found. */
+  onResolve: () => Promise<MyRegion>;
   onPick: (regionId: number) => void;
 }) {
   const { t } = useTranslation();
-  const [resolved, setResolved] = useState<MyRegion>({ kind: 'unknown' });
-  const [pending, setPending] = useState(false);
-  // The await sits between mount and set, and the sheet this lives in can
-  // close over it — same guard as every other async effect on this board.
-  const liveRef = useRef(true);
-  useEffect(() => {
-    liveRef.current = true;
-    return () => {
-      liveRef.current = false;
-    };
-  }, []);
 
-  const eligible =
-    resolved.kind === 'region' && options.some((option) => option.id === resolved.regionId);
+  const offered = (regionId: number) => options.some((option) => option.id === regionId);
+  const eligible = state.kind === 'region' && offered(state.regionId);
   // Disabled while in flight as much as for the answer: on a phone a double
   // tap is exactly how "at most one request" becomes two.
   const disabled =
-    pending || resolved.kind === 'unavailable' || (resolved.kind === 'region' && !eligible);
+    pending || state.kind === 'unavailable' || (state.kind === 'region' && !eligible);
 
   const message =
-    resolved.kind === 'unavailable'
+    state.kind === 'unavailable'
       ? t('contractSearch.fromMyRegionUnavailable')
-      : resolved.kind === 'region' && !eligible
+      : state.kind === 'region' && !eligible
         ? t('contractSearch.noHaulsFromMyRegion')
         : null;
 
   async function handleClick() {
-    if (resolved.kind === 'region') {
-      if (eligible) onPick(resolved.regionId);
+    // Already known and offered — the only way this click is reachable with an
+    // answer in hand, since every other answer disables the button.
+    if (state.kind === 'region') {
+      onPick(state.regionId);
       return;
     }
-    setPending(true);
-    const regionId = await loadCharacterRegionId(characterId);
-    if (!liveRef.current) return;
-    setPending(false);
-    if (regionId === null) {
-      setResolved({ kind: 'unavailable' });
-      return;
-    }
-    setResolved({ kind: 'region', regionId });
-    if (options.some((option) => option.id === regionId)) onPick(regionId);
+    const resolved = await onResolve();
+    if (resolved.kind === 'region' && offered(resolved.regionId)) onPick(resolved.regionId);
   }
 
+  // A plain group rather than a `FilterField`: the button's own text is its
+  // caption, and `FilterField` would stack an identical one above it in the
+  // sheet. Same shape as the space chips below.
   return (
-    <FilterField label={t('contractSearch.fromMyRegion')} stretch={false}>
-      <div className="flex flex-col items-start gap-1">
-        <Button size="sm" disabled={disabled} onClick={() => void handleClick()}>
-          {t('contractSearch.fromMyRegion')}
-        </Button>
-        {/* The reason, not just a dead button: "disabled" alone reads as broken. */}
-        {message && <span className="text-xs text-text-dim">{message}</span>}
-      </div>
-    </FilterField>
+    <div className="flex flex-col items-start gap-1">
+      <Button size="sm" disabled={disabled} onClick={() => void handleClick()}>
+        {t('contractSearch.fromMyRegion')}
+      </Button>
+      {/*
+        The reason, announced and not only drawn: the button goes unfocusable
+        in the same commit that renders this, so a screen reader following the
+        control would otherwise be told nothing at all about why it died.
+      */}
+      {message && (
+        <span role="status" className="text-xs text-text-dim">
+          {message}
+        </span>
+      )}
+    </div>
   );
 }
 
@@ -376,7 +380,9 @@ function RoutePreferenceField({
 interface CourierFilterBarProps {
   filter: CourierUiFilter;
   onChange: (filter: CourierUiFilter) => void;
-  characterId: number;
+  myRegion: MyRegion;
+  myRegionPending: boolean;
+  onResolveMyRegion: () => Promise<MyRegion>;
   originRegions: RegionOption[];
   destinationRegions: RegionOption[];
   spaceKinds: readonly SpaceKind[];
@@ -387,7 +393,9 @@ interface CourierFilterBarProps {
 function CourierFilterBar({
   filter,
   onChange,
-  characterId,
+  myRegion,
+  myRegionPending,
+  onResolveMyRegion,
   originRegions,
   destinationRegions,
   spaceKinds,
@@ -437,7 +445,9 @@ function CourierFilterBar({
             onChange={(originRegionId) => setDraft({ ...draft, originRegionId })}
           />
           <MyRegionButton
-            characterId={characterId}
+            state={myRegion}
+            pending={myRegionPending}
+            onResolve={onResolveMyRegion}
             options={originRegions}
             onPick={(originRegionId) => setDraft({ ...draft, originRegionId })}
           />
@@ -618,6 +628,40 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
   const [preference, setPreference] = useState<RoutePreferenceKind>(DEFAULT_ROUTE_PREFERENCE);
   const [showAll, setShowAll] = useState(false);
   const [selectedRow, setSelectedRow] = useState<CourierRouteRow | null>(null);
+
+  // Where the character is (issue #940), owned here rather than by the control
+  // that shows it, because `FilterBar` unmounts its controls on every collapse.
+  //
+  // Both pieces carry the character they were learned for, so a character
+  // switch invalidates them *during render* rather than through an effect that
+  // resets them — the same shape as `useJumpCounts` above, and for the same
+  // reason: an answer about someone else is stale by definition, and a
+  // resolve still in flight when the switch happens cannot land on the new
+  // character's board.
+  const [myRegionAnswer, setMyRegionAnswer] = useState<{
+    characterId: number;
+    state: MyRegion;
+  } | null>(null);
+  const [myRegionPendingFor, setMyRegionPendingFor] = useState<number | null>(null);
+  const myRegion =
+    myRegionAnswer && myRegionAnswer.characterId === characterId ? myRegionAnswer.state : UNASKED;
+  const myRegionPending = myRegionPendingFor === characterId;
+
+  const resolveMyRegion = useCallback(async (): Promise<MyRegion> => {
+    setMyRegionPendingFor(characterId);
+    let next: MyRegion;
+    try {
+      const regionId = await loadCharacterRegionId(characterId);
+      next = regionId === null ? { kind: 'unavailable' } : { kind: 'region', regionId };
+    } catch {
+      // A snapshot or cache read that throws is still just "no answer" — and
+      // it must not leave the button stuck pending and silently dead.
+      next = { kind: 'unavailable' };
+    }
+    setMyRegionAnswer({ characterId, state: next });
+    setMyRegionPendingFor((pendingFor) => (pendingFor === characterId ? null : pendingFor));
+    return next;
+  }, [characterId]);
 
   const originRegions = useMemo(
     () => regionOptionsFor(rows, 'origin', regionNames),
@@ -841,7 +885,9 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
       <CourierFilterBar
         filter={uiFilter}
         onChange={changeFilter}
-        characterId={characterId}
+        myRegion={myRegion}
+        myRegionPending={myRegionPending}
+        onResolveMyRegion={resolveMyRegion}
         originRegions={originRegions}
         destinationRegions={destinationRegions}
         spaceKinds={spaceKinds}
