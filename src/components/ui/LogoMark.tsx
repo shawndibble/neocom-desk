@@ -9,6 +9,12 @@ interface LogoMarkProps {
  * bevels and the outer glow read as dirt below ~64px, which is every size this
  * component is used at.
  *
+ * Simplified, not redrawn -- the geometry is the artwork's own, shared with
+ * `public/icons/favicon.svg` so the tab strip and the app cannot show two
+ * different marks. See that file for what each number is and which of them are
+ * measured off the artwork (the shape) versus tuned for legibility at 16px
+ * (the stroke widths). Change one file, change both.
+ *
  * Decorative by default -- every placement so far sits beside the app name, so
  * a second accessible name would only be read out twice.
  */
@@ -22,20 +28,25 @@ export function LogoMark({ className = '' }: LogoMarkProps) {
       className={`text-accent ${className}`}
     >
       <path
-        d="M32 6 54.5 19 54.5 45 32 58 9.5 45 9.5 19Z"
+        d="M32 6.05 53 19.2 53 44.8 32 57.95 11 44.8 11 19.2Z"
         stroke="#cbd6e2"
         strokeWidth="3"
-        strokeLinejoin="round"
+        strokeLinejoin="miter"
       />
-      <path d="M32 11 39 25 48 32 39 39 32 53 25 39 16 32 25 25Z" fill="#e6edf4" />
+      <path
+        d="M32 12 36.11 27.6 48.8 32 36.11 36.4 32 52 27.89 36.4 15.2 32 27.89 27.6Z"
+        fill="#e6edf4"
+      />
       {/* Reads as a hole, which is the point. `bg` rather than transparent so it
-          stays dark on `panel` surfaces too, where the two differ by a shade. */}
-      <path d="M32 28 36 32 32 36 28 32Z" fill="var(--color-bg)" />
-      <g stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M22.7 17.9 15.1 22.25 15.1 29" />
-        <path d="M41.3 17.9 48.9 22.25 48.9 29" />
-        <path d="M22.7 46.1 15.1 41.75 15.1 35" />
-        <path d="M41.3 46.1 48.9 41.75 48.9 35" />
+          stays dark on `panel` surfaces too, where the two differ by a shade.
+          This is why the diamond is its own path here and an evenodd hole in
+          favicon.svg, which has no surface behind it to match. */}
+      <path d="M32 27.3 36.01 32 32 36.7 27.99 32Z" fill="var(--color-bg)" />
+      <g stroke="currentColor" strokeWidth="2" strokeLinecap="butt" strokeLinejoin="miter">
+        <path d="M25.9 15.1 15.5 21.6 15.5 26.6" />
+        <path d="M38.1 15.1 48.5 21.6 48.5 26.6" />
+        <path d="M25.9 48.9 15.5 42.4 15.5 37.4" />
+        <path d="M38.1 48.9 48.5 42.4 48.5 37.4" />
       </g>
     </svg>
   );

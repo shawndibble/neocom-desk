@@ -1,5 +1,21 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Neocom Desk">
-  <!-- No plate: the mark sits straight on the tab strip, which is near-black in
+  <!-- Geometry measured off assets/brand/logo-mark.png, which is the only
+       source of truth for the mark's *shape*. The stroke widths are not, and
+       must not be "corrected" to match it. Two separate concerns:
+
+       * Shape. Where the points sit, taken from the artwork. Three things this
+         file used to get wrong, all of which made it read as a different mark:
+         the hull is 7% taller than a regular hexagon (its width is 0.81 of its
+         vertex-to-vertex height, not 0.87); the star's waist vertices sit at
+         0.32 of its tip radius, which makes a deep four-pointed star rather
+         than the shallow puffed diamond drawn before; and every join is
+         mitred, because nothing in the artwork is round.
+       * Weight. How fat the strokes are -- deliberately heavier than the
+         artwork, which is drawn for 512px. At true scale the corner traces
+         would be 1.2 units wide, a quarter of a pixel on a 16px tab strip,
+         i.e. invisible. They are 2, and the hull is 3.
+
+       No plate: the mark sits straight on the tab strip, which is near-black in
        one theme and near-white in the other. Two independent defences, because
        a favicon has to survive both:
 
@@ -20,22 +36,28 @@
   <!-- Keyline pass: the same geometry drawn fat and dark underneath. Widths are
        the top pass +2, i.e. one unit of dark each side (at a 16px favicon the
        viewBox is scaled by a quarter, so anything fatter closes the gaps between
-       the star arms and the hull and the mark silts up into a solid blob). -->
-  <g stroke="#0a0e14" fill="#0a0e14" stroke-linejoin="round" stroke-linecap="round">
-    <path d="M32 6 54.5 19 54.5 45 32 58 9.5 45 9.5 19Z" fill="none" stroke-width="5"/>
-    <path fill-rule="evenodd" stroke-width="2" d="M32 11 39 25 48 32 39 39 32 53 25 39 16 32 25 25Z M32 28 36 32 32 36 28 32Z"/>
-    <g fill="none" stroke-width="5">
-      <path d="M22.7 17.9 15.1 22.25 15.1 29"/><path d="M41.3 17.9 48.9 22.25 48.9 29"/>
-      <path d="M22.7 46.1 15.1 41.75 15.1 35"/><path d="M41.3 46.1 48.9 41.75 48.9 35"/>
+       the star arms and the hull and the mark silts up into a solid blob). The
+       star is the exception at +1: now that its arms are the artwork's narrow
+       spikes rather than a fat diamond, a full unit each side swallows the
+       notches between them and it goes back to being a blob from the inside. -->
+  <g stroke="#0a0e14" fill="#0a0e14" stroke-linejoin="miter" stroke-linecap="butt">
+    <path d="M32 6.05 53 19.2 53 44.8 32 57.95 11 44.8 11 19.2Z" fill="none" stroke-width="5"/>
+    <path fill-rule="evenodd" stroke-width="1" d="M32 12 36.11 27.6 48.8 32 36.11 36.4 32 52 27.89 36.4 15.2 32 27.89 27.6Z M32 27.3 36.01 32 32 36.7 27.99 32Z"/>
+    <g fill="none" stroke-width="4">
+      <path d="M25.9 15.1 15.5 21.6 15.5 26.6"/><path d="M38.1 15.1 48.5 21.6 48.5 26.6"/>
+      <path d="M25.9 48.9 15.5 42.4 15.5 37.4"/><path d="M38.1 48.9 48.5 42.4 48.5 37.4"/>
     </g>
   </g>
-  <path d="M32 6 54.5 19 54.5 45 32 58 9.5 45 9.5 19Z" fill="none" stroke="var(--hull)" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M32 6.05 53 19.2 53 44.8 32 57.95 11 44.8 11 19.2Z" fill="none" stroke="var(--hull)" stroke-width="3" stroke-linejoin="miter"/>
   <!-- One path, evenodd: the inner diamond is a hole punched through the body,
        not a plate-coloured patch laid over it, so it stays a hole now that there
        is no plate behind it to match. -->
-  <path fill-rule="evenodd" fill="var(--body)" d="M32 11 39 25 48 32 39 39 32 53 25 39 16 32 25 25Z M32 28 36 32 32 36 28 32Z"/>
-  <g fill="none" stroke="var(--trace)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M22.7 17.9 15.1 22.25 15.1 29"/><path d="M41.3 17.9 48.9 22.25 48.9 29"/>
-    <path d="M22.7 46.1 15.1 41.75 15.1 35"/><path d="M41.3 46.1 48.9 41.75 48.9 35"/>
+  <path fill-rule="evenodd" fill="var(--body)" d="M32 12 36.11 27.6 48.8 32 36.11 36.4 32 52 27.89 36.4 15.2 32 27.89 27.6Z M32 27.3 36.01 32 32 36.7 27.99 32Z"/>
+  <!-- Traces run parallel to the hull edge each one hugs, inset by two units
+       from its inner face -- the artwork's relationship, and the reason they
+       are two segments rather than a symmetric bracket. -->
+  <g fill="none" stroke="var(--trace)" stroke-width="2" stroke-linecap="butt" stroke-linejoin="miter">
+    <path d="M25.9 15.1 15.5 21.6 15.5 26.6"/><path d="M38.1 15.1 48.5 21.6 48.5 26.6"/>
+    <path d="M25.9 48.9 15.5 42.4 15.5 37.4"/><path d="M38.1 48.9 48.5 42.4 48.5 37.4"/>
   </g>
 </svg>

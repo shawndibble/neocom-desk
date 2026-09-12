@@ -136,13 +136,32 @@ Rules:
 
 ## 2b. Brand assets
 
-Sources live in `assets/brand/` (not shipped). Everything under
-`public/icons/` and `public/brand/` is generated — edit the sources and rerun
-`python3 scripts/generate-brand-assets.py`, never hand-patch the output.
+Sources live in `assets/brand/` (not shipped). Most of `public/icons/` and
+`public/brand/` is generated — edit the sources and rerun
+`python3 scripts/generate-brand-assets.py`, never hand-patch the output. The
+script writes exactly `icon-192`, `icon-512`, `icon-512-maskable`,
+`apple-touch-icon-180`, `favicon.ico` and `brand/lockup.png`.
+
+Two files in that directory are **not** generated and are the exceptions to the
+rule above — rerunning the script will not update them, and it will not
+clobber them either:
+
+- `favicon.svg` is hand-drawn vector, because a raster favicon cannot carry
+  `prefers-color-scheme` or scale to whatever size a browser asks for.
+- `badge-96.png` is a hand-drawn silhouette of the hull hexagon alone (see
+  `notificationOptions.ts` for why it drops the rest of the mark).
+
+Both are drawn from `logo-mark.png`'s geometry, so a change to the artwork's
+shape has to be carried into them by hand.
 
 - `LogoMark` (`src/components/ui/`) is the mark for UI use: inline SVG, corner
   brackets on `currentColor` so `--color-accent` drives them. Simplified from
-  the artwork, because the bevels and glow read as dirt below ~64px.
+  the artwork, because the bevels and glow read as dirt below ~64px. Its path
+  data is shared with `favicon.svg` — the same mark must not differ between
+  the tab strip and the app, so the two files change together. `favicon.svg`
+  is where the geometry is documented: which numbers are measured off the
+  artwork (the shape) and which are deliberately heavier than it (the stroke
+  widths, tuned so the mark survives a 16px tab strip).
 - `public/brand/lockup.png` is the full mark-plus-wordmark artwork. Unused by
   any route today (the login page now uses `LogoMark` plus the text wordmark,
   like everywhere else) but kept for future marketing use — it is still the
