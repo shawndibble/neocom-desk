@@ -41,7 +41,6 @@ import { recommendStopTier, type StopTierAdvice } from '@/engine/pi/stopTier';
 import { localResourcesFor, type BuiltColonyAdvice } from './advisorModel';
 import { productBySchematicId } from './products';
 
-
 export type ColonyStopTierAdvice =
   | {
       status: 'advised';

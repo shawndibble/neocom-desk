@@ -46,7 +46,10 @@ function CadenceSelect({
         {label}
         <InfoTooltip label={t('common.aboutLabel', { label })} content={hint} />
       </span>
-      <Select value={String(value)} onValueChange={(next) => onChange(Number(next) as PiCadenceDays)}>
+      <Select
+        value={String(value)}
+        onValueChange={(next) => onChange(Number(next) as PiCadenceDays)}
+      >
         <SelectTrigger aria-label={label}>
           <SelectValue />
         </SelectTrigger>
@@ -58,7 +61,9 @@ function CadenceSelect({
           ))}
         </SelectContent>
       </Select>
-      {footnote && <span className="block max-w-56 text-[0.6875rem] text-text-dim">{footnote}</span>}
+      {footnote && (
+        <span className="block max-w-56 text-[0.6875rem] text-text-dim">{footnote}</span>
+      )}
     </label>
   );
 }

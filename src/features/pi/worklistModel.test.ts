@@ -73,12 +73,16 @@ describe('buildWorklist', () => {
    * adjacent, because "remove these" without "and put this in their place"
    * is half an instruction.
    */
-  it('pairs a removal with the step its freed budget pays for, and ranks it there', () => {
+  it('pairs a removal with the extraction its freed budget pays for, and keeps them adjacent', () => {
     const list = buildWorklist([
       colony({
         planetId: 1,
         name: 'Efa II',
-        idle: { pinCount: 4, freed: FREED, enables: { label: '8 extractor heads', marginPerHour: 96_400 } },
+        idle: {
+          pinCount: 4,
+          freed: FREED,
+          enables: { heads: 8, unitsPerHour: 13_100, resource: 'Microorganisms', wouldFeed: 4 },
+        },
       }),
       colony({
         planetId: 2,
@@ -86,13 +90,20 @@ describe('buildWorklist', () => {
         opportunities: [{ label: 'Biocells', marginPerHour: 71_200 }],
       }),
     ]);
+    // The earning step leads: it has an ISK figure, and the pair does not.
     expect(list.tuning.map((row) => [row.verb, row.planetName])).toEqual([
+      ['add', 'Efa IV'],
       ['remove', 'Efa II'],
       ['add', 'Efa II'],
-      ['add', 'Efa IV'],
     ]);
-    expect(list.tuning[0]?.freed).toEqual(FREED);
-    expect(list.tuning[0]?.iskPerHour).toBeNull();
+    const remove = list.tuning[1];
+    const addsExtraction = list.tuning[2];
+    expect(remove?.freed).toEqual(FREED);
+    expect(remove?.iskPerHour).toBeNull();
+    // No fabricated ISK on the extraction it buys — units and facilities fed.
+    expect(addsExtraction?.iskPerHour).toBeNull();
+    expect(addsExtraction?.unitsPerHour).toBe(13_100);
+    expect(addsExtraction?.wouldFeed).toBe(4);
   });
 
   /**
@@ -102,7 +113,11 @@ describe('buildWorklist', () => {
    */
   it('keeps a removal that enables nothing, ranked below every earning step', () => {
     const list = buildWorklist([
-      colony({ planetId: 1, name: 'Adacyne III', idle: { pinCount: 2, freed: FREED, enables: null } }),
+      colony({
+        planetId: 1,
+        name: 'Adacyne III',
+        idle: { pinCount: 2, freed: FREED, enables: null },
+      }),
       colony({
         planetId: 2,
         name: 'Efa IV',

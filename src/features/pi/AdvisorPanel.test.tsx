@@ -218,6 +218,17 @@ async function openDetails(planet = 'Ashab III') {
   return screen.getByRole('dialog');
 }
 
+/**
+ * A built colony's own card — not its worklist row, which prints the same
+ * planet name and, for a built colony, is always on screen too. Found off
+ * the card's own Details button, whose accessible name is unique per planet,
+ * rather than off the name text, which no longer is.
+ */
+async function builtCard(planet = 'Ashab III') {
+  const button = await screen.findByRole('button', { name: `Details for ${planet}` });
+  return button.closest('div.flex.flex-col') as HTMLElement;
+}
+
 beforeEach(() => {
   // A module-scoped store outlives the test that set it, and buying changes
   // what every card says. Back to the shipped default each time.
@@ -283,13 +294,12 @@ beforeEach(() => {
 describe('AdvisorPanel', () => {
   it('shows the built colony’s measured extraction rate, not its qty_per_cycle', async () => {
     renderPanel();
-    const card = (await screen.findByText('Ashab III')).closest('div')?.parentElement;
-    expect(card).not.toBeNull();
+    const card = await builtCard();
     // 1,874,985 units over 336 hours from the decay curve, so 5,580/hr.
     // qty_per_cycle alone would claim 13,930.
-    expect(within(card as HTMLElement).getByText('5,580/hr')).toBeInTheDocument();
-    expect(within(card as HTMLElement).getByText('Base Metals')).toBeInTheDocument();
-    expect(within(card as HTMLElement).getByText('Reactive Metals')).toBeInTheDocument();
+    expect(within(card).getByText('5,580/hr')).toBeInTheDocument();
+    expect(within(card).getByText('Base Metals')).toBeInTheDocument();
+    expect(within(card).getByText('Reactive Metals')).toBeInTheDocument();
   });
 
   it('reports the colony’s CPU and Powergrid against its OWN Command Center', async () => {
@@ -298,11 +308,9 @@ describe('AdvisorPanel', () => {
     // factory (200/800) and one launchpad (3,600/700). The denominator is the
     // colony's upgrade_level 4 budget, NOT the pilot's level-5 ceiling —
     // sizing it off the skill would claim 25,415 / 19,000 here.
-    // The pilot's level-5 ceiling (25,415 tf) does appear — in the header
-    // chip, which is what that chip is for. It must not appear as any card's
-    // denominator, and the card now carries percentages rather than figures.
-    const card = (await screen.findByText('Ashab III')).closest('div')
-      ?.parentElement as HTMLElement;
+    // The pilot's level-5 ceiling (25,415 tf) must not appear as any card's
+    // denominator.
+    const card = await builtCard();
     expect(within(card).queryByText(/25,415/)).not.toBeInTheDocument();
 
     const dialog = await openDetails();
@@ -333,7 +341,7 @@ describe('AdvisorPanel', () => {
       ])
     );
     renderPanel();
-    await screen.findByText('Ashab III');
+    await screen.findAllByText('Ashab III');
     expect(screen.queryByText(/does not recognise/)).not.toBeInTheDocument();
   });
 
@@ -342,7 +350,7 @@ describe('AdvisorPanel', () => {
       planetId === 40_000_002 ? null : (PLANET_INFO[planetId] ?? null)
     );
     renderPanel();
-    await screen.findByText('Ashab III');
+    await screen.findAllByText('Ashab III');
     expect(screen.getByText(/has not loaded/)).toBeInTheDocument();
     expect(screen.queryByText('No colony can be placed on this planet.')).not.toBeInTheDocument();
   });
@@ -353,7 +361,7 @@ describe('AdvisorPanel', () => {
     expect(await screen.findByText('Could not load')).toBeInTheDocument();
 
     rerender(<AdvisorPanel characterId={2} systemId={null} onSystemIdChange={vi.fn()} />);
-    expect(await screen.findByText('Ashab III')).toBeInTheDocument();
+    expect((await screen.findAllByText('Ashab III')).length).toBeGreaterThan(0);
     expect(screen.queryByText('Could not load')).not.toBeInTheDocument();
   });
 
@@ -387,7 +395,7 @@ describe('AdvisorPanel', () => {
     // caveat that followed it ("any one of those, not all of them") was a
     // repair to a shape that should not have been a list at all.
     renderPanel();
-    await screen.findByText('Ashab III');
+    await screen.findAllByText('Ashab III');
     expect(screen.getAllByText('Do this').length).toBeGreaterThan(0);
     expect(screen.queryByText(/Any one of those/)).not.toBeInTheDocument();
     expect(screen.queryByText(/x high-tech plant/)).not.toBeInTheDocument();
@@ -568,7 +576,7 @@ describe('AdvisorPanel', () => {
     // margins are Amarr's, not Jita's read through an Amarr-shaped label.
     useMarketSourcing.setState({ value: 'amarr', hydrated: true });
     renderPanel();
-    await screen.findByText('Ashab III');
+    await screen.findAllByText('Ashab III');
 
     expect(loadPlanPrices).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'amarr' }),
@@ -580,7 +588,7 @@ describe('AdvisorPanel', () => {
     // 'none' refuses to plan a purchase; it does not refuse to value the
     // output, which still has to be priced somewhere.
     renderPanel();
-    await screen.findByText('Ashab III');
+    await screen.findAllByText('Ashab III');
 
     expect(loadPlanPrices).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'jita' }),
@@ -694,14 +702,15 @@ describe('AdvisorPanel', () => {
     );
     renderPanel();
     // 5,580/hr against five pins wanting 30,000/hr keeps one fed, so four
-    // draw budget and make nothing. The card states that as the action —
-    // remove them — with the measurement that justifies it in the same line,
+    // draw budget and make nothing. The worklist states that as the action —
+    // remove them — with the measurement that justifies it in the same row,
     // rather than as a separate observation the pilot has to act on themselves.
     const what = await screen.findByText('4× Basic Industry Facility — nothing feeds them');
-    const row = what.closest('div')?.parentElement as HTMLElement;
+    const row = what.closest('div') as HTMLElement;
     expect(within(row).getByText('Remove')).toBeInTheDocument();
     // Four Basic Industry Facilities at 200 tf / 800 MW.
-    expect(row).toHaveTextContent('+800 tf · 3,200 MW');
+    expect(row).toHaveTextContent('frees 800 tf');
+    expect(row).toHaveTextContent('3,200 MW');
 
     // The measurement that justifies it is one click away, not gone.
     const dialog = await openDetails();
@@ -753,7 +762,7 @@ describe('AdvisorPanel', () => {
     // The default fixture's single factory is fed, so there is no line — a
     // reassurance on every card would bury the ones with something to act on.
     renderPanel();
-    await screen.findByText('Ashab III');
+    await screen.findAllByText('Ashab III');
     expect(screen.queryByText(/pins are fed/)).not.toBeInTheDocument();
   });
 
@@ -910,14 +919,13 @@ describe('AdvisorPanel', () => {
     expect((await screen.findAllByText(/Plasmoids \d+\/hr · buy at /)).length).toBeGreaterThan(0);
     // The Water is routed, not bought, so it must not appear as a purchase.
     expect(screen.queryByText(/Water \d+\/hr · buy at /)).not.toBeInTheDocument();
-    // And the two are still told apart in words, one click into the host card
-    // — whichever of the two planets the plan put the factory on.
-    const host = screen
-      .getAllByRole('button', { name: /^Details for / })
-      .map((button) => button.closest('div.flex.flex-col') as HTMLElement)
-      .find((card) => within(card).queryByText(/Plasmoids \d+\/hr · buy at /));
-    fireEvent.click(within(host as HTMLElement).getByRole('button', { name: /^Details for / }));
-    const dialog = screen.getByRole('dialog');
+    // And the two are still told apart in words, one click into the host
+    // colony's own detail modal — the card dropped its per-input chips, so
+    // the host is read off the "Together" panel's own sentence, which names
+    // it, rather than off a chip on the card itself.
+    const opportunity = await screen.findByText(/Superconductors — \d+× .+ on .+/);
+    const host = opportunity.textContent?.match(/ on (.+)$/)?.[1] ?? '';
+    const dialog = await openDetails(host);
     expect(within(dialog).getByText(/an hour of inputs you have to buy/)).toBeInTheDocument();
   });
 
@@ -935,7 +943,7 @@ describe('AdvisorPanel', () => {
       [TEST_CULTURES]: 10_000,
     });
     renderPanel();
-    await screen.findByText('Ashab III');
+    await screen.findAllByText('Ashab III');
     expect(screen.getByText(/would also be reachable by hauling inputs in/)).toBeInTheDocument();
   });
 
@@ -984,7 +992,9 @@ describe('AdvisorPanel', () => {
     // alt supplies the second P1, so the pair reaches a P2 that neither
     // character reaches alone — and the route names whose planet it is, because
     // "route in from Ashab IV" is not actionable if you have to log in as
-    // somebody else to do it.
+    // somebody else to do it. The card dropped its per-input chips along with
+    // the rest of `ColonyDirectives`, so the attribution now lives in the
+    // host colony's own detail modal (`ColonyReasoning`, unchanged).
     useAltColonies.setState({ value: true, hydrated: true });
     loadPiRosterSnapshot.mockResolvedValue({
       colonies: [
@@ -1025,11 +1035,12 @@ describe('AdvisorPanel', () => {
       ])
     );
     renderPanel();
-    await screen.findByText('Ashab III');
+    await screen.findAllByText('Ashab III');
     expect(
       (await screen.findAllByText(/Test Cultures — \d+× Advanced Industry Facility/)).length
     ).toBeGreaterThan(0);
-    expect(screen.getByText(/\(Alt Pilot\)/)).toBeInTheDocument();
+    const dialog = await openDetails();
+    expect(within(dialog).getByText(/\(Alt Pilot\)/)).toBeInTheDocument();
     // Cache-only for the alt's system: page open must not spend ESI just
     // because an alt has a colony there, even when that system is also the
     // active Character's own (as here) — the alt path always reads cache.
@@ -1040,7 +1051,7 @@ describe('AdvisorPanel', () => {
     // One colony is the per-planet question, and its own card already answers
     // it. A panel headed "Together" over a single planet is noise.
     renderPanel();
-    await screen.findByText('Ashab III');
+    await screen.findAllByText('Ashab III');
     expect(screen.queryByText('Together')).not.toBeInTheDocument();
   });
 
@@ -1144,7 +1155,10 @@ describe('AdvisorPanel', () => {
     );
     renderPanel();
 
-    expect(await screen.findByText(/Headroom unknown/)).toBeInTheDocument();
+    // Named twice on purpose, same as the "Together" opportunity above: the
+    // card's own roomUnknownRadius line survives the rework, and the
+    // blind-spots panel names the same refusal by planet.
+    expect((await screen.findAllByText(/Headroom unknown/)).length).toBeGreaterThan(0);
   });
 
   it('offers an unbuilt planet’s resources as a pick, and waits for one', async () => {
@@ -1421,11 +1435,17 @@ describe('AdvisorPanel build advice', () => {
     // three extractors' worth of raw Microorganisms.
     priceEverything({ [BACTERIA]: 10_000 });
     renderPanel();
-    expect(await screen.findByText('Bacteria (P1)')).toBeInTheDocument();
-    expect(screen.getByText('Build up to')).toBeInTheDocument();
-    // Card-level, not just the modal (#702): a pilot reading the card alone
-    // needs to know this number isn't layered on "Do this" above it.
-    expect(screen.getByText(/a different question from "Do this" above/)).toBeInTheDocument();
+    // `StopTierRow` — the "Build up to" recommendation — now renders in the
+    // colony's own detail modal only; the rework dropped it from the card.
+    const dialog = await openDetails();
+    expect(within(dialog).getByText('Bacteria (P1)')).toBeInTheDocument();
+    expect(within(dialog).getByText('Build up to')).toBeInTheDocument();
+    // The point #702 defended survives the rework at a new address: a rebuild
+    // figure must never read as layered on the steps above it. The card's own
+    // disclaimer is gone with the card's stop-tier row, and the worklist says
+    // it instead — once, in a labelled band, where the two lists meet.
+    expect(screen.getByText('Worth more, but you tear the colony down first')).toBeInTheDocument();
+    expect(screen.getByText(/never an addition/)).toBeInTheDocument();
   });
 
   it('recommends selling the ore when no made tier beats it', async () => {
@@ -1433,10 +1453,12 @@ describe('AdvisorPanel build advice', () => {
     // eats plus the extractor capacity it costs, so the raw floor wins.
     priceEverything();
     renderPanel();
+    // Same relocation as above: this recommendation is modal-only now.
+    const dialog = await openDetails();
     expect(
-      await screen.findByText('Switch to extracting Microorganisms and sell it raw')
+      within(dialog).getByText('Switch to extracting Microorganisms and sell it raw')
     ).toBeInTheDocument();
-    expect(screen.getByText(/a different question from "Do this" above/)).toBeInTheDocument();
+    expect(screen.getByText('Worth more, but you tear the colony down first')).toBeInTheDocument();
   });
 
   it('says “keep” only when the winning ore is the one already coming out', async () => {
@@ -1448,10 +1470,13 @@ describe('AdvisorPanel build advice', () => {
     // extracted ore's when checking the arithmetic.
     priceEverything();
     renderPanel();
-    await screen.findByText('Switch to extracting Microorganisms and sell it raw');
+    // The recommendation lives in the colony's own detail modal now.
+    const dialog = await openDetails();
+    expect(
+      within(dialog).getByText('Switch to extracting Microorganisms and sell it raw')
+    ).toBeInTheDocument();
     expect(screen.queryByText(/^Keep selling/)).not.toBeInTheDocument();
     // And the output figure is flagged as a rebuilt colony's, not this one's.
-    const dialog = await openDetails();
     expect(
       within(dialog).getByText(/what this colony would make rebuilt around it/)
     ).toBeInTheDocument();
@@ -1563,8 +1588,13 @@ describe('AdvisorPanel build advice', () => {
       ])
     );
     renderPanel();
+    // The refusal is `StopTierRow`'s, which now renders in the modal only —
+    // the blind-spots panel says the same absence in its own, more general
+    // words (`noMeasuredExtraction`), so this specific sentence has to be
+    // read where `StopTierRow` still prints it.
+    const dialog = await openDetails();
     expect(
-      await screen.findByText(/no rate of its own to size a chain against/)
+      within(dialog).getByText(/no rate of its own to size a chain against/)
     ).toBeInTheDocument();
   });
 });

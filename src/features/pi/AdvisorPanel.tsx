@@ -90,10 +90,16 @@ import { colonyStopTierAdvice } from './stopTierModel';
 import { PI_CADENCE_DAYS, cadenceHours, useCadence } from './cadencePref';
 import { CadenceControls } from './CadenceControls';
 import { restartCadenceYield } from '@/engine/pi/restartCadence';
+import { Worklist } from './Worklist';
+import { buildWorklist } from './worklistModel';
+import { worklistColonies } from './worklistAdapter';
+import { BlindSpots } from './BlindSpots';
+import { blindSpots } from './blindSpotModel';
+import { AdvisorSummary } from './AdvisorSummary';
+import { builtColonyEarnings, totalColonyEarnings } from './colonyEarningsModel';
 import { extractorProgramsFromPins } from './adapters';
 import { colonyNetwork } from './networkModel';
 import { NetworkPanel } from './NetworkPanel';
-import { ColonyDirectives, StopTierCardHint, StopTierRow } from './ColonyActions';
 import { ColonyDetail } from './ColonyDetailModal';
 import { useColonyPlan } from './colonyPlan';
 import { DirectiveRow, EstimateBadge, LoadMeter, SectionLabel } from './DirectiveRow';
@@ -583,16 +589,18 @@ interface ColonyCardProps {
 }
 
 /**
- * A built colony, at a glance: what it runs, how full it is, and the two
- * things worth doing about it. Everything else is behind Details.
+ * A built colony, at a glance: what it pulls, what it makes, how full it is.
+ *
+ * Not what to do about it. That is one ranked list at the top of the tab now
+ * (`worklistModel.ts`), because choosing between two planets' steps means
+ * putting their figures in one column, which a grid of cards cannot do.
+ * Everything else is behind Details.
  */
 function BuiltCard({ onOpenDetails, ...props }: ColonyCardProps & { onOpenDetails: () => void }) {
   const { t } = useTranslation();
-  const { advice, pi, typeNames, prices, revenuePrices, taxRate, opportunities, conversions } =
-    props;
+  const { advice, pi, typeNames } = props;
   const { colony } = advice;
   const plan = useColonyPlan(colony, pi);
-  const stopTier = useStopTier(advice, pi, prices, revenuePrices, taxRate);
   const name = advice.name ?? t('pi.planetLabel', { id: advice.planetId });
 
   // A colony whose links cannot be costed gets no instructions at all — the
@@ -673,30 +681,26 @@ function BuiltCard({ onOpenDetails, ...props }: ColonyCardProps & { onOpenDetail
           />
         </div>
 
-        <div className="space-y-2 border-t border-line pt-2.5">
-          <SectionLabel>{t('piAdvisor.actionsLabel')}</SectionLabel>
-          {unmeasurable ? (
+        {/*
+          The instructions used to live here, and again on every other card.
+          They are one ranked list at the top of the tab now — see
+          `worklistModel.ts` for why. What a card is genuinely better at is
+          what this colony *is*: what it pulls, what it makes, what it draws.
+          A card that also carried its own copy of the instruction printed the
+          same sentence twice on one page, which was the duplication the
+          rework set out to remove.
+
+          The one thing that stays is the refusal. A colony whose links cannot
+          be costed has no instructions anywhere, and saying so on the card it
+          belongs to is clearer than an absence in a list.
+        */}
+        {unmeasurable && (
+          <div className="mt-auto border-t border-line pt-2.5">
             <p className="text-[0.6875rem] text-text-dim">
               {t('piAdvisor.roomUnknownRadius', { count: colony.linkCount })}
             </p>
-          ) : (
-            <ColonyDirectives
-              hub={props.hub}
-              idle={plan.idle}
-              pi={pi}
-              opportunities={opportunities}
-              conversions={conversions}
-              planetNames={props.planetNames}
-              owners={props.owners}
-            />
-          )}
-        </div>
-
-        <div className="mt-auto space-y-2 border-t border-line pt-2.5">
-          <SectionLabel>{t('piAdvisor.stopTierLabel')}</SectionLabel>
-          <StopTierRow result={stopTier} extractedPerHour={colony.extractedPerHour} />
-          <StopTierCardHint result={stopTier} extractedPerHour={colony.extractedPerHour} />
-        </div>
+          </div>
+        )}
       </>
     </PlanetCard>
   );
@@ -1024,7 +1028,7 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
   useEffect(() => {
     void hydrateBuyInputs();
   }, [hydrateBuyInputs]);
-  const { restartDays } = useCadence((state) => state.value);
+  const { restartDays, haulDays } = useCadence((state) => state.value);
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
@@ -1290,6 +1294,62 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
       .filter((entry) => entry.name !== null)
       .map((entry) => [entry.planetId, entry.name as string])
   );
+  const haulHours = cadenceHours({ restartDays, haulDays }).haulHours;
+  // One stop-tier answer per colony, read twice: the worklist takes the
+  // recommendations, the blind-spot list takes the refusals. Computing it in
+  // each place is how the two would come to disagree about whether a planet
+  // could be advised on at all.
+  const stopTierByPlanet = new Map(
+    advice
+      .filter((entry): entry is Extract<PlanetAdvice, { kind: 'built' }> => entry.kind === 'built')
+      .map((entry) => [
+        entry.planetId,
+        colonyStopTierAdvice({
+          colony: entry.colony,
+          planetType: entry.planetType,
+          pi: snapshot.pi,
+          prices: snapshot.prices,
+          revenuePrices: snapshot.revenuePrices,
+          taxRate: activeRate,
+          bufferHours: haulHours,
+        }),
+      ])
+  );
+  const spots = blindSpots({ advice, stopTierByPlanet });
+
+  // What the colonies earn as they stand — the baseline every "you could earn
+  // more" figure on this tab is added to, and which the page had no way to
+  // state before #956.
+  const builtHere = advice.filter(
+    (entry): entry is Extract<PlanetAdvice, { kind: 'built' }> => entry.kind === 'built'
+  );
+  const earnings = totalColonyEarnings(
+    builtHere.map((entry) =>
+      builtColonyEarnings(entry.colony, snapshot.pi, {
+        prices: snapshot.prices,
+        revenuePrices: snapshot.revenuePrices,
+        taxRate: activeRate,
+      })
+    )
+  );
+
+  const worklist = buildWorklist(
+    worklistColonies({
+      advice,
+      pinsByPlanet: new Map(
+        [...snapshot.details].map(([planetId, detail]) => [planetId, detail.pins])
+      ),
+      pi: snapshot.pi,
+      prices: snapshot.prices,
+      revenuePrices: snapshot.revenuePrices,
+      taxRate: activeRate,
+      haulHours,
+      opportunitiesByHost,
+      conversionsByHost,
+      typeNames: snapshot.typeNames,
+    })
+  );
+
   const openColony =
     advice.find(
       (entry): entry is Extract<PlanetAdvice, { kind: 'built' }> =>
@@ -1493,6 +1553,22 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
             </label>
           )}
         </div>
+      </Panel>
+
+      {/*
+        The tab's lead. One ranked list across every planet, because "which of
+        these should I do" is a comparison, and the card grid never put two
+        planets' figures in one column. The cards survive below it as the
+        per-planet reference they are good at being.
+      */}
+      <AdvisorSummary list={worklist} earnings={earnings} planetCount={builtHere.length} />
+
+      <Panel title={t('piAdvisor.worklistTitle')}>
+        <Worklist list={worklist} />
+      </Panel>
+
+      <Panel title={t('piAdvisor.blindTitle')}>
+        <BlindSpots spots={spots} />
       </Panel>
 
       {network && (

@@ -11,7 +11,9 @@ import { colonyThroughputCheck, peakRatePerHour } from './colonyThroughput';
 // The real snapshot, same reasoning as pinBudget.test.ts: the volumes and
 // schematic rates below are claims about the shipped recipe graph, so a
 // hand-made stub would pin nothing.
-const pi = JSON.parse(readFileSync(resolve(process.cwd(), 'public/data/pi.json'), 'utf8')) as PiData;
+const pi = JSON.parse(
+  readFileSync(resolve(process.cwd(), 'public/data/pi.json'), 'utf8')
+) as PiData;
 
 const MICROORGANISMS = 2073;
 const BACTERIA = 2393;

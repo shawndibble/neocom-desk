@@ -35,6 +35,15 @@ function span(hours: number, t: TFunction): string {
 
 function Worth({ row }: { row: WorklistRow }) {
   const { t } = useTranslation();
+  // The extraction a removal pays for: the facilities it reaches. No ISK,
+  // because this row genuinely has none — see `worklistModel.ts`.
+  if (row.iskPerHour === null && row.unitsPerHour !== undefined) {
+    return (
+      <span className="text-right text-xs font-semibold whitespace-nowrap tabular-nums text-accent">
+        {t('piAdvisor.worklistFeeds', { count: row.wouldFeed ?? 0 })}
+      </span>
+    );
+  }
   // A removal's value is budget, not money. Rendering a zero here would say
   // "this is worth nothing", which is the opposite of what it means.
   if (row.iskPerHour === null) {
@@ -75,7 +84,15 @@ function Step({ row }: { row: WorklistRow }) {
     );
   }
   if (row.key.endsWith(':add:freed')) {
-    return <>{t('piAdvisor.rowAddFreed', { label: row.label })}</>;
+    return (
+      <>
+        {t('piAdvisor.rowAddHeads', {
+          heads: row.heads ?? 0,
+          units: Math.round(row.unitsPerHour ?? 0).toLocaleString(),
+          name: row.label,
+        })}
+      </>
+    );
   }
   return <>{row.label}</>;
 }

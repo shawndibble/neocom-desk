@@ -33,15 +33,18 @@
  *    every other figure the page prints for it is being thrown away. There is
  *    no point tuning a colony that is standing still.
  * 2. **Then steps that earn**, by ISK an hour, across planets.
- * 3. **Then a removal that buys nothing.** Idle facilities hold CPU and
+ * 3. **Then a removal whose freed budget buys extraction**, ranked by how many
+ *    starved facilities that extraction would feed. It earns — but what those
+ *    units are finally worth depends on which facility they reach and what it
+ *    makes, and this model has not walked that chain. Ranking it on a priced
+ *    figure it does not have would be inventing one, so it ranks below every
+ *    step that *does* have one, on an integer it genuinely has. The removal and
+ *    the extraction it pays for stay adjacent, because "remove these four"
+ *    without "and put eight heads in their place" is half an instruction.
+ * 4. **Last, a removal that buys nothing.** Idle facilities hold CPU and
  *    Powergrid for no return, so pulling them is real — but it earns nothing,
  *    and a step that earns must out-rank it. It is not dropped and it is not
  *    treated as zero ISK, either of which would misrepresent it.
- *
- * A removal whose freed budget *does* buy something is a different case: it is
- * ranked at what that purchase earns and stays adjacent to it, because "remove
- * these four" without "and put eight extractor heads in their place" is half
- * an instruction. `idleFacilityPlan` has already sized that purchase.
  */
 import type { PlanetType } from '@/esi/endpoints';
 import type { PinLoad } from '@/engine/pi/types';
@@ -70,6 +73,10 @@ export interface WorklistRow {
   pinCount?: number;
   /** On a `haul` row: what the colony can hold, against what the pilot's cadence needs. */
   window?: { hoursToFull: number; haulHours: number };
+  /** On the `add` row a removal pays for: the extraction it buys, and what that feeds. */
+  heads?: number;
+  unitsPerHour?: number;
+  wouldFeed?: number;
 }
 
 export interface Worklist {
@@ -89,8 +96,19 @@ export interface WorklistOpportunity {
 export interface WorklistIdle {
   pinCount: number;
   freed: PinLoad;
-  /** The purchase the freed budget pays for, already sized. Null when it buys nothing that fits. */
-  enables: { label: string; marginPerHour: number } | null;
+  /**
+   * The extraction the freed budget pays for, already sized by
+   * `extractionUpgrade`. Null when it buys nothing that fits.
+   *
+   * Deliberately carries no ISK figure. `ExtractionUpgrade` reports heads and
+   * units, and what those units are finally worth depends on which of the
+   * starved facilities they end up feeding and what that facility makes —
+   * a chain this model has not walked. Pricing the raw P0 instead would be a
+   * number that looks derived and is not, which is the one thing this tab
+   * must not print. So the row is ranked on facilities fed, an integer the
+   * model actually has.
+   */
+  enables: { heads: number; unitsPerHour: number; resource: string; wouldFeed: number } | null;
 }
 
 /** What the colony would earn rebuilt around one resource. */
@@ -129,7 +147,7 @@ export interface WorklistColony {
  * removal below it, whatever the ISK figures are, so the two cannot be
  * shuffled into the middle by a large or small margin elsewhere.
  */
-const BAND = { overflow: 0, earning: 1, freesOnly: 2 } as const;
+const BAND = { overflow: 0, earning: 1, feeds: 2, freesOnly: 3 } as const;
 
 interface Ranked {
   band: number;
@@ -183,15 +201,20 @@ function rankColony(colony: WorklistColony): Ranked[] {
     out.push(
       enables
         ? {
-            band: BAND.earning,
-            isk: enables.marginPerHour,
+            // Below every step with a real ISK figure and above a removal that
+            // buys nothing: it earns, but by how much this model cannot say.
+            band: BAND.feeds,
+            isk: enables.wouldFeed,
             row: remove,
             follows: {
               ...base(colony),
               key: `${planetId}:add:freed`,
               verb: 'add',
-              label: enables.label,
-              iskPerHour: enables.marginPerHour,
+              label: enables.resource,
+              iskPerHour: null,
+              heads: enables.heads,
+              unitsPerHour: enables.unitsPerHour,
+              wouldFeed: enables.wouldFeed,
             },
           }
         : { band: BAND.freesOnly, isk: 0, row: remove }
@@ -234,27 +257,23 @@ export function buildWorklist(colonies: readonly WorklistColony[]): Worklist {
   // Band first, then ISK, then planet — the last so a refresh that leaves two
   // equal steps in a different order does not reshuffle the list under a
   // pilot who is halfway down it.
-  ranked.sort(
-    (a, b) => a.band - b.band || b.isk - a.isk || a.row.planetId - b.row.planetId
-  );
+  ranked.sort((a, b) => a.band - b.band || b.isk - a.isk || a.row.planetId - b.row.planetId);
 
   const tuning = ranked.flatMap((entry) =>
     entry.follows ? [entry.row, entry.follows] : [entry.row]
   );
 
   const rebuilds = colonies
-    .filter((colony): colony is WorklistColony & { rebuild: WorklistRebuild } =>
-      colony.rebuild !== null
+    .filter(
+      (colony): colony is WorklistColony & { rebuild: WorklistRebuild } => colony.rebuild !== null
     )
-    .map(
-      (colony): WorklistRow => ({
-        ...base(colony),
-        key: `${colony.planetId}:rebuild`,
-        verb: 'rebuild',
-        label: colony.rebuild.label,
-        iskPerHour: colony.rebuild.marginPerHour,
-      })
-    )
+    .map((colony): WorklistRow => ({
+      ...base(colony),
+      key: `${colony.planetId}:rebuild`,
+      verb: 'rebuild',
+      label: colony.rebuild.label,
+      iskPerHour: colony.rebuild.marginPerHour,
+    }))
     .sort((a, b) => (b.iskPerHour ?? 0) - (a.iskPerHour ?? 0) || a.planetId - b.planetId);
 
   return { tuning, rebuilds };

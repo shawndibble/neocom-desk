@@ -67,7 +67,10 @@ describe('restartCadenceYield', () => {
     // A program installed for 3 days and one installed for 14 days, off the
     // same baseline, must price a weekly restart identically — the function
     // reads only `installTimeMs`/`qtyPerCycle`/`cycleTimeMs`, never `expiryTimeMs`.
-    const threeDayProgram: ExtractorYieldProgram = { ...program, expiryTimeMs: INSTALL_MS + 3 * 24 * HOUR_MS };
+    const threeDayProgram: ExtractorYieldProgram = {
+      ...program,
+      expiryTimeMs: INSTALL_MS + 3 * 24 * HOUR_MS,
+    };
     const a = restartCadenceYield({ program, cadences: [7 * DAY_H] });
     const b = restartCadenceYield({ program: threeDayProgram, cadences: [7 * DAY_H] });
     expect(a).toEqual(b);

@@ -9,3 +9,6 @@ test-results
 .env
 .DS_Store
 .auth-profile
+
+# Screenshots the Advisor spec captures for review. Artifacts, not fixtures.
+e2e-output/

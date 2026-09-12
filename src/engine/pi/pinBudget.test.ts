@@ -500,10 +500,7 @@ describe('checkThroughput', () => {
       ...pi,
       raw: pi.raw.map((resource) => ({ ...resource, volume: 0 })),
       schematics: Object.fromEntries(
-        Object.entries(pi.schematics).map(([id, schematic]) => [
-          id,
-          { ...schematic, volume: 0 },
-        ])
+        Object.entries(pi.schematics).map(([id, schematic]) => [id, { ...schematic, volume: 0 }])
       ),
     };
     const check = checkThroughput(chain, zeroVolumePi, {
