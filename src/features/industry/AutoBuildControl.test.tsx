@@ -5,7 +5,7 @@ import '@/i18n';
 import { AutoBuildControl } from './AutoBuildControl';
 
 const strategySelect = () => screen.getByRole('combobox', { name: 'Build Strategy' });
-const applyButton = () => screen.getByRole('button', { name: 'Apply Auto Build' });
+const applyButton = () => screen.getByRole('button', { name: 'Apply' });
 
 describe('AutoBuildControl', () => {
   it('opens on Cost-effective', () => {
@@ -75,7 +75,7 @@ describe('AutoBuildControl', () => {
 
     await user.click(applyButton());
     const dialog = await screen.findByRole('dialog');
-    await user.click(within(dialog).getByRole('button', { name: 'Apply Auto Build' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Apply' }));
 
     expect(onApply).toHaveBeenCalledWith({ strategy: 'build' });
   });
@@ -87,7 +87,7 @@ describe('AutoBuildControl', () => {
 
     await user.click(applyButton());
     const dialog = await screen.findByRole('dialog');
-    await user.click(within(dialog).getByRole('button', { name: 'Apply Auto Build' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Apply' }));
 
     expect(onApply).toHaveBeenCalledWith({ strategy: 'cost-effective' });
   });

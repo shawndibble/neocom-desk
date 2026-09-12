@@ -542,161 +542,166 @@ export function BuildGroupPanel({
 
   return (
     <div className="space-y-4">
-      <Panel
-        title={group.name}
-        meta={t('industry.groupMemberCount', { count: plans.length })}
-        actions={
-          <>
-            <IconButton
-              size="sm"
-              icon={<Icon.RetargetGroup />}
-              label={t('industry.retargetGroupAction')}
-              onClick={() => setRetargeting(true)}
-            />
-            <IconButton
-              size="sm"
-              icon={
-                copyStatusFor(GROUP_COPY) === 'copied' ? (
-                  <Icon.Done />
-                ) : copyStatusFor(GROUP_COPY) === 'failed' ? (
-                  <Icon.Warn />
-                ) : (
-                  <Icon.CopyToClipboard />
-                )
-              }
-              // Both outcomes change the glyph as well as the tone, so neither
-              // is carried by colour alone (docs/DESIGN.md §7) — mirrors the
-              // single-plan copy control (`BuildPlanDetail.tsx`).
-              tone={copyStatusFor(GROUP_COPY) === 'failed' ? 'danger' : 'default'}
-              label={
-                copyStatusFor(GROUP_COPY) === 'copied'
-                  ? t('industry.copyShoppingListDone')
-                  : copyStatusFor(GROUP_COPY) === 'failed'
-                    ? t('industry.copyShoppingListFailed')
-                    : t('industry.copyShoppingList')
-              }
-              onClick={() => void handleCopy(GROUP_COPY, rollup.shoppingMaterials)}
-              disabled={!canCopy}
-            />
-          </>
-        }
-      >
-        {loading && (
-          <div className="flex justify-center py-4">
-            <Spinner label={t('common.loading')} />
-          </div>
-        )}
-
-        {/* The group's own Acquisition Verdict, up front, as a single band —
-            the headline profit figure and the numbers that qualify it on one
-            line under it, mirroring `PlanVerdictHero`'s single-plan hero so a
-            group and its members never disagree about what "Build"/"Buy"
-            mean. */}
-        {!loading && (
-          <div
-            className={cx(
-              'mb-3 flex flex-wrap items-baseline gap-x-3 gap-y-1 rounded-xs border p-3',
-              groupProfit === null
-                ? 'border-line'
-                : groupVerdict === 'build'
-                  ? 'border-accent-dim bg-accent/5'
-                  : 'border-warning/50 bg-warning/10'
-            )}
-          >
-            <p
-              className={cx(
-                'inline-flex items-center gap-1.5 text-base font-semibold tabular-nums',
-                groupProfit === null ? 'text-text-dim' : iskToneClass(groupProfit)
-              )}
-            >
-              <span className="sr-only">{t('industry.acquisitionVerdictLabel')} </span>
-              {groupProfit === null ? (
-                <Icon.Info size={Icon.ICON_SIZE.sm} aria-hidden="true" className="shrink-0" />
-              ) : groupVerdict === 'build' ? (
-                <Icon.Done size={Icon.ICON_SIZE.sm} aria-hidden="true" className="shrink-0" />
+      {/* A plain header, not a boxed Panel (group page redesign) — the group
+          name is this page's own title, not a panel among panels, so it
+          reads the way a page heading does rather than sitting in a frame. */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2">
+          <h1 className="truncate text-sm font-semibold tracking-wide text-text uppercase">
+            {group.name}
+          </h1>
+          <span className="shrink-0 text-xs text-text-dim">
+            {t('industry.groupMemberCount', { count: plans.length })}
+          </span>
+        </div>
+        <div className="flex items-center gap-1">
+          <IconButton
+            size="sm"
+            icon={<Icon.RetargetGroup />}
+            label={t('industry.retargetGroupAction')}
+            onClick={() => setRetargeting(true)}
+          />
+          <IconButton
+            size="sm"
+            icon={
+              copyStatusFor(GROUP_COPY) === 'copied' ? (
+                <Icon.Done />
+              ) : copyStatusFor(GROUP_COPY) === 'failed' ? (
+                <Icon.Warn />
               ) : (
-                <Icon.Warn size={Icon.ICON_SIZE.sm} aria-hidden="true" className="shrink-0" />
-              )}
-              {groupProfit === null
-                ? t('industry.verdictUnknown')
-                : groupVerdict === 'build'
-                  ? t('industry.verdictBuild', { amount: formatIsk(groupProfit) })
-                  : t('industry.verdictBuy', { amount: formatIsk(-groupProfit) })}
-            </p>
-            <p className="text-xs tabular-nums text-text-dim">{verdictQualifiers}</p>
-          </div>
-        )}
-
-        <div className="mb-3">
-          <AutoBuildControl
-            maxDepth={autoBuildMaxDepth}
-            scope={autoBuildScope}
-            disabled={applyingAutoBuild}
-            initialStrategy={group.autoBuildDefault?.strategy}
-            confirmMessage={t('industry.autoBuildConfirmGroup', {
-              count: autoBuildAffectedCount,
-            })}
-            onApply={(options) => {
-              setApplyingAutoBuild(true);
-              void onAutoBuild({ ...options, depth: autoBuildMaxDepth }).finally(() =>
-                setApplyingAutoBuild(false)
-              );
-            }}
+                <Icon.CopyToClipboard />
+              )
+            }
+            // Both outcomes change the glyph as well as the tone, so neither
+            // is carried by colour alone (docs/DESIGN.md §7) — mirrors the
+            // single-plan copy control (`BuildPlanDetail.tsx`).
+            tone={copyStatusFor(GROUP_COPY) === 'failed' ? 'danger' : 'default'}
+            label={
+              copyStatusFor(GROUP_COPY) === 'copied'
+                ? t('industry.copyShoppingListDone')
+                : copyStatusFor(GROUP_COPY) === 'failed'
+                  ? t('industry.copyShoppingListFailed')
+                  : t('industry.copyShoppingList')
+            }
+            onClick={() => void handleCopy(GROUP_COPY, rollup.shoppingMaterials)}
+            disabled={!canCopy}
           />
         </div>
+      </div>
 
-        <p className="text-xs text-text-dim">{t('industry.groupEstimateNote')}</p>
+      {loading && (
+        <div className="flex justify-center py-4">
+          <Spinner label={t('common.loading')} />
+        </div>
+      )}
 
-        {/* Shown as a line rather than as the button's own label: the message
-            is about the clipboard, not about which list, and it is a sentence
-            long — it would not fit on any of the controls that can raise it. */}
-        {copyState?.status === 'failed' && (
-          <p role="alert" className="mt-2 text-xs text-danger">
-            {t('industry.copyShoppingListFailed')}
+      {/* The group's own Acquisition Verdict, up front, as a single band —
+          the headline profit figure and the numbers that qualify it on one
+          line under it, mirroring `PlanVerdictHero`'s single-plan hero so a
+          group and its members never disagree about what "Build"/"Buy"
+          mean. */}
+      {!loading && (
+        <div
+          className={cx(
+            'flex flex-wrap items-baseline gap-x-3 gap-y-1 rounded-xs border p-3',
+            groupProfit === null
+              ? 'border-line'
+              : groupVerdict === 'build'
+                ? 'border-accent-dim bg-accent/5'
+                : 'border-warning/50 bg-warning/10'
+          )}
+        >
+          <p
+            className={cx(
+              'inline-flex items-center gap-1.5 text-base font-semibold tabular-nums',
+              groupProfit === null ? 'text-text-dim' : iskToneClass(groupProfit)
+            )}
+          >
+            <span className="sr-only">{t('industry.acquisitionVerdictLabel')} </span>
+            {groupProfit === null ? (
+              <Icon.Info size={Icon.ICON_SIZE.sm} aria-hidden="true" className="shrink-0" />
+            ) : groupVerdict === 'build' ? (
+              <Icon.Done size={Icon.ICON_SIZE.sm} aria-hidden="true" className="shrink-0" />
+            ) : (
+              <Icon.Warn size={Icon.ICON_SIZE.sm} aria-hidden="true" className="shrink-0" />
+            )}
+            {groupProfit === null
+              ? t('industry.verdictUnknown')
+              : groupVerdict === 'build'
+                ? t('industry.verdictBuild', { amount: formatIsk(groupProfit) })
+                : t('industry.verdictBuy', { amount: formatIsk(-groupProfit) })}
           </p>
-        )}
+          <p className="text-xs tabular-nums text-text-dim">{verdictQualifiers}</p>
+        </div>
+      )}
 
-        {/* A mixture is a shopping trip with two stops, not a dead end (issue
-            #631). The header control above stays disabled — there is no one
-            list it could copy — and each hub gets its own paste here rather
-            than in `actions`, where five buttons would not survive a phone. */}
-        {!rollup.singleHub && (
-          <div className="mt-2 space-y-2">
-            <p role="alert" className="text-xs text-warning">
-              {t('industry.groupMixedHubs', {
-                hubs: rollup.hubIds.map(hubLabel).join(', '),
-              })}
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {rollup.shoppingByHub.map((block) => (
-                <Button
-                  key={block.hubId}
-                  size="sm"
-                  onClick={() => void handleCopy(block.hubId, block.materials)}
-                  // Same rules as the whole-group control: a hub whose every
-                  // material is already owned would copy an empty string, and
-                  // one still missing a member would copy a short list.
-                  disabled={incompleteHubs.has(block.hubId) || !hasShoppingList(block.materials)}
-                >
-                  {copyStatusFor(block.hubId) === 'copied'
-                    ? t('industry.copyHubShoppingListDone', { hub: hubLabel(block.hubId) })
-                    : t('industry.copyHubShoppingList', { hub: hubLabel(block.hubId) })}
-                </Button>
-              ))}
-            </div>
-          </div>
-        )}
-        {rollup.unpriceable && (
-          <p className="mt-2 text-xs text-warning">{t('industry.groupUnpriceable')}</p>
-        )}
-        {failed.length > 0 && (
-          <ul className="mt-2 text-xs text-danger">
-            {failed.map((row) => (
-              <li key={row.planId}>{t('industry.compareUnresolvedFor', { plan: row.planName })}</li>
+      <AutoBuildControl
+        maxDepth={autoBuildMaxDepth}
+        scope={autoBuildScope}
+        disabled={applyingAutoBuild}
+        initialStrategy={group.autoBuildDefault?.strategy}
+        confirmMessage={t('industry.autoBuildConfirmGroup', {
+          count: autoBuildAffectedCount,
+        })}
+        onApply={(options) => {
+          setApplyingAutoBuild(true);
+          void onAutoBuild({ ...options, depth: autoBuildMaxDepth }).finally(() =>
+            setApplyingAutoBuild(false)
+          );
+        }}
+      />
+
+      <p className="text-xs text-text-dim">{t('industry.groupEstimateNote')}</p>
+
+      {/* Shown as a line rather than as the button's own label: the message
+          is about the clipboard, not about which list, and it is a sentence
+          long — it would not fit on any of the controls that can raise it. */}
+      {copyState?.status === 'failed' && (
+        <p role="alert" className="text-xs text-danger">
+          {t('industry.copyShoppingListFailed')}
+        </p>
+      )}
+
+      {/* A mixture is a shopping trip with two stops, not a dead end (issue
+          #631). The header control above stays disabled — there is no one
+          list it could copy — and each hub gets its own paste here rather
+          than in `actions`, where five buttons would not survive a phone. */}
+      {!rollup.singleHub && (
+        <div className="space-y-2">
+          <p role="alert" className="text-xs text-warning">
+            {t('industry.groupMixedHubs', {
+              hubs: rollup.hubIds.map(hubLabel).join(', '),
+            })}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {rollup.shoppingByHub.map((block) => (
+              <Button
+                key={block.hubId}
+                size="sm"
+                onClick={() => void handleCopy(block.hubId, block.materials)}
+                // Same rules as the whole-group control: a hub whose every
+                // material is already owned would copy an empty string, and
+                // one still missing a member would copy a short list.
+                disabled={incompleteHubs.has(block.hubId) || !hasShoppingList(block.materials)}
+              >
+                {copyStatusFor(block.hubId) === 'copied'
+                  ? t('industry.copyHubShoppingListDone', { hub: hubLabel(block.hubId) })
+                  : t('industry.copyHubShoppingList', { hub: hubLabel(block.hubId) })}
+              </Button>
             ))}
-          </ul>
-        )}
-      </Panel>
+          </div>
+        </div>
+      )}
+      {rollup.unpriceable && (
+        <p className="text-xs text-warning">{t('industry.groupUnpriceable')}</p>
+      )}
+      {failed.length > 0 && (
+        <ul className="text-xs text-danger">
+          {failed.map((row) => (
+            <li key={row.planId}>{t('industry.compareUnresolvedFor', { plan: row.planName })}</li>
+          ))}
+        </ul>
+      )}
 
       {/* Full-width now that the plan/group list has its own route (issue:
           group page redesign) — Members and Materials sit side by side
