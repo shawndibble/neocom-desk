@@ -10,9 +10,7 @@ const setSyncedSettingMock = vi
   .fn<(key: string, value: unknown) => Promise<void>>()
   .mockResolvedValue(undefined);
 const scheduleSyncMock = vi.fn<(characterId: number) => void>();
-const IDLE_SYNC_STATUS = vi.hoisted(() =>
-  Object.freeze({ state: 'idle', lastSyncedAt: null, error: null })
-);
+import { IDLE_SYNC_STATUS } from '@/sync/statusFixtures';
 vi.mock('@/sync', () => ({
   getSyncStatus: () => IDLE_SYNC_STATUS,
   setSyncedSetting: (key: string, value: unknown) => setSyncedSettingMock(key, value),

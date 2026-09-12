@@ -8,9 +8,7 @@ const mocks = vi.hoisted(() => ({
   scheduleSync: vi.fn(),
 }));
 vi.mock('@/auth/session', () => ({ completeLogin: mocks.completeLogin }));
-const IDLE_SYNC_STATUS = vi.hoisted(() =>
-  Object.freeze({ state: 'idle', lastSyncedAt: null, error: null })
-);
+import { IDLE_SYNC_STATUS } from '@/sync/statusFixtures';
 vi.mock('@/sync', () => ({
   getSyncStatus: () => IDLE_SYNC_STATUS,
   backfillAccountWideData: mocks.backfillAccountWideData,

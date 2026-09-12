@@ -24,9 +24,7 @@ vi.mock('@/app/syncStatus', async (importOriginal) => ({
 // the barrel exactly like this, and the factory under test must stay
 // initializable under one — which is why its allow-list check imports the leaf
 // module instead.
-const IDLE_SYNC_STATUS = vi.hoisted(() =>
-  Object.freeze({ state: 'idle', lastSyncedAt: null, error: null })
-);
+import { IDLE_SYNC_STATUS } from '@/sync/statusFixtures';
 vi.mock('@/sync', () => ({
   getSyncStatus: () => IDLE_SYNC_STATUS,
   setSyncedSetting: (key: string, value: unknown) => setSyncedSetting(key, value),

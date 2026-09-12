@@ -63,13 +63,21 @@ describe('dismissFeedEntriesAndSync', () => {
 });
 
 describe('dismissFeedKeysAndSync', () => {
-  it('dismisses by Occurrence Key and pushes for the character given', async () => {
-    await db.notificationFeed.bulkPut([row('a', CHAR_A)]);
+  it('dismisses by Occurrence Key and pushes for every character given', async () => {
+    await db.notificationFeed.bulkPut([row('a', CHAR_A), row('b', CHAR_B)]);
 
-    await dismissFeedKeysAndSync(CHAR_A, ['a']);
+    await dismissFeedKeysAndSync([CHAR_A, CHAR_B], ['a', 'b']);
 
-    expect((await readFeed())[0]?.dismissedAt).toBeGreaterThan(0);
-    expect(syncMock.scheduleSync).toHaveBeenCalledWith(CHAR_A);
+    expect((await readFeed()).every((entry) => (entry.dismissedAt ?? 0) > 0)).toBe(true);
+    expect(syncMock.scheduleSync.mock.calls).toEqual([[CHAR_A], [CHAR_B]]);
+  });
+
+  it('pushes once per character when one retraction names a character twice', async () => {
+    await db.notificationFeed.bulkPut([row('a', CHAR_A), row('b', CHAR_A)]);
+
+    await dismissFeedKeysAndSync([CHAR_A, CHAR_A], ['a', 'b']);
+
+    expect(syncMock.scheduleSync.mock.calls).toEqual([[CHAR_A]]);
   });
 });
 

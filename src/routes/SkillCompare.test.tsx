@@ -22,9 +22,7 @@ vi.mock('virtual:pwa-register/react', () => ({
 // Real src/sync would attempt actual Firebase network calls. Not exercised by
 // this route (no Editable Data of its own is synced), but App.tsx wires
 // triggerSync globally on every character switch.
-const IDLE_SYNC_STATUS = vi.hoisted(() =>
-  Object.freeze({ state: 'idle', lastSyncedAt: null, error: null })
-);
+import { IDLE_SYNC_STATUS } from '@/sync/statusFixtures';
 vi.mock('@/sync', () => ({
   getSyncStatus: () => IDLE_SYNC_STATUS,
   markPlanDeleted: vi.fn(),

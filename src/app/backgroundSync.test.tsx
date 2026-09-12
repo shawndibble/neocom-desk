@@ -4,7 +4,6 @@ import {
   BACKGROUND_SYNC_MIN_GAP_MS,
   BACKGROUND_SYNC_TICK_MS,
   idsToSweep,
-  shouldSweep,
   useBackgroundSync,
 } from './backgroundSync';
 
@@ -31,21 +30,19 @@ beforeEach(() => {
   setVisibility('visible');
 });
 
-describe('shouldSweep', () => {
-  it('sweeps when nothing has swept yet', () => {
-    expect(shouldSweep(null, NOW)).toBe(true);
+describe('idsToSweep', () => {
+  it('sweeps a Character nothing has swept yet', () => {
+    expect(idsToSweep([1], new Map(), NOW)).toEqual([1]);
   });
 
   it('holds off inside the gap, so a tab flicked back and forth syncs once', () => {
-    expect(shouldSweep(NOW, NOW + BACKGROUND_SYNC_MIN_GAP_MS - 1)).toBe(false);
+    expect(idsToSweep([1], new Map([[1, NOW]]), NOW + BACKGROUND_SYNC_MIN_GAP_MS - 1)).toEqual([]);
   });
 
   it('sweeps again once the gap has passed', () => {
-    expect(shouldSweep(NOW, NOW + BACKGROUND_SYNC_MIN_GAP_MS)).toBe(true);
+    expect(idsToSweep([1], new Map([[1, NOW]]), NOW + BACKGROUND_SYNC_MIN_GAP_MS)).toEqual([1]);
   });
-});
 
-describe('idsToSweep', () => {
   it('holds off only the Characters that are not due', () => {
     const lastSweptAt = new Map([
       [1, NOW],

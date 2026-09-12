@@ -10,13 +10,11 @@ const INITIAL_SYNC_STATUS: SyncStatus = { state: 'idle', lastSyncedAt: null, err
  * always wins over whatever the last known sync state was (see
  * `syncStatus.ts`'s `syncDisplayState`).
  *
- * Scoped to the active Character. `subscribeSyncStatus` is one stream
- * carrying every Character's status, which was harmless while only the active
- * Character ever synced; `backgroundSync.ts` now syncs the ones nobody is
- * looking at, so unfiltered, a single alt with a dead refresh token would
- * paint the nav dot red and put its error on a page about somebody else. A
- * status with no `characterId` predates the first sync (`sync/status.ts`) and
- * belongs to nobody in particular, so it still applies.
+ * Scoped to the active Character: `subscribeSyncStatus` is one stream
+ * carrying every Character's status, and `backgroundSync.ts` syncs Characters
+ * nobody is looking at, whose failures are not this UI's to report. A status
+ * with no `characterId` predates the first sync (`sync/status.ts`) and belongs
+ * to nobody in particular, so it still applies.
  */
 export function useSyncStatus(): { status: SyncStatus; online: boolean } {
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);

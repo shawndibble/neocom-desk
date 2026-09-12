@@ -36,11 +36,9 @@ import {
 /**
  * Dismisses the given rows and pushes each affected Character's dismissals.
  *
- * One dismissal action routinely spans Characters — the Alerts page lists them
- * together and "dismiss all" means every row on screen — and each Character
- * syncs under its own uid (`sync/planSync.syncFeed`). So the sync is scheduled
- * once per Character rather than once per row, the same shape
- * `miningTax/assignments.ts` uses for its bulk writes.
+ * One per Character, not one per row: the Alerts page lists Characters
+ * together, so "dismiss all" routinely spans them, and each syncs under its
+ * own uid (`sync/planSync.syncFeed`).
  */
 export async function dismissFeedEntriesAndSync(
   rows: readonly Pick<NotificationFeedEntry, 'id' | 'characterId'>[]
@@ -51,15 +49,20 @@ export async function dismissFeedEntriesAndSync(
 
 /**
  * The same, for a caller holding Occurrence Keys rather than rows — the
- * Foreground Poller's retraction, which knows the Character it is retracting
- * for but has already reduced its fires to keys.
+ * Foreground Poller's retraction, which knows which Characters it is
+ * retracting for but has already reduced its fires to keys.
+ *
+ * Keys and Characters arrive as two lists rather than paired up because the
+ * dismissal does not need the pairing and the badge does not want it: one
+ * `dismissFeedEntries` is one table scan and one badge recomputation, where a
+ * call per Character would be N of each.
  */
 export async function dismissFeedKeysAndSync(
-  characterId: number,
+  characterIds: readonly number[],
   occurrenceKeys: readonly string[]
 ): Promise<void> {
   await dismissFeedEntries(occurrenceKeys);
-  scheduleSync(characterId);
+  for (const characterId of new Set(characterIds)) scheduleSync(characterId);
 }
 
 /**

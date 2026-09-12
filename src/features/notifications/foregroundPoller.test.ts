@@ -657,9 +657,10 @@ describe('runForegroundPoll', () => {
     });
     now = 3000;
     await runForegroundPoll(deps);
+    // One call for the whole poll, so the badge is recomputed once — with the
+    // Characters alongside, so each can push its own retraction.
     expect(retractFromFeed).toHaveBeenCalledTimes(1);
-    // Per Character, so the retraction can be pushed under that Character's uid.
-    expect(retractFromFeed.mock.calls[0][0]).toBe(CHAR.characterId);
+    expect(retractFromFeed.mock.calls[0][0]).toEqual([CHAR.characterId]);
     expect(retractFromFeed.mock.calls[0][1]).toContain(
       `${CHAR.characterId}:planetaryExtractionDone:40000001:${OLD_EXPIRY}`
     );
