@@ -55,8 +55,9 @@ vi.mock('@/features/character/typeNames', () => ({
   loadTypeNames: vi.fn(async () => new Map([[34, 'Tritanium']])),
 }));
 
-// Only reached by a right-click: the row context menu resolves the item's
-// product through the real `plannableProductTypeID`, off this one blueprint.
+// The whole SDE for these tests: one blueprint (638) printing one product
+// (587), so the real `plannableProductTypeID` resolves both menu readings —
+// a blueprint row to what it makes, a 587 row to itself.
 vi.mock('@/sde/loadSde', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/sde/loadSde')>();
   return {
@@ -213,11 +214,9 @@ async function bodyRows() {
 }
 
 /**
- * Always inside a Router: every item row wraps itself in a Build Plan
- * context-menu trigger (#931) and the detail modal's contents list does the
- * same, and both navigate via `useNavigate`. The real panel only ever renders
- * under `/contracts`, so this matches production rather than propping the
- * test up.
+ * Always inside a Router: every item row is a Build Plan context-menu trigger
+ * (#931), as is each detail-modal line, and both call `useNavigate`. Matches
+ * production — the panel only ever renders under `/contracts`.
  */
 function renderWithRouter() {
   return render(
@@ -556,15 +555,37 @@ describe('ContractSearchPanel — Build Plan from an item row', () => {
     });
   });
 
-  it('plans a plain item row as itself, with no seed', async () => {
-    // Tritanium builds nothing and carries no ME/TE/runs, so the menu has
-    // nothing to offer — the seed keys must not appear as fabricated zeroes.
+  it('plans a plain item row as itself, unseeded', async () => {
+    // 587 is directly producible, so the plan targets the row's own item. The
+    // regex is anchored on purpose: a non-copy row must carry no me/te/runs,
+    // and a substring match would pass with fabricated zeroes appended.
+    loadPublicContractOffers.mockResolvedValue(
+      cachedSnapshot([row({ contractId: 8, typeId: 587 })])
+    );
+    renderWithProbe();
+
+    const rows = await bodyRows();
+    fireEvent.contextMenu(rows[0]);
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Build Plan' }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('location')).toHaveTextContent(/^\/industry\?product=587$/);
+    });
+  });
+
+  it('offers nothing on a row no blueprint builds', async () => {
+    // Asserted by label, not by `aria-disabled`: the transient "checking…"
+    // state is disabled too, so the attribute alone passes before the index
+    // loads — and Tritanium is neither a blueprint nor a blueprint's product.
     loadPublicContractOffers.mockResolvedValue(cachedSnapshot([TRIT_FORGE]));
     renderWithProbe();
 
     const rows = await bodyRows();
     fireEvent.contextMenu(rows[0]);
 
-    expect(await screen.findByRole('menuitem')).toHaveAttribute('aria-disabled', 'true');
+    expect(await screen.findByRole('menuitem', { name: 'No blueprint options' })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
   });
 });

@@ -89,20 +89,15 @@ export function seedFromContractItem(item: {
 }
 
 /**
- * A seed from one Public Contract Offers snapshot row — again a structural
- * subset rather than `PublicContractOfferRow` itself, for the same decoupling
- * reason as `seedFromContractItem`, and with the same all-or-nothing rule.
+ * `seedFromContractItem`'s rule against a Public Contract Offers snapshot row.
+ * A near-twin rather than a shared helper only because the snapshot renames
+ * ESI's fields as it publishes (`material_efficiency` -> `me`,
+ * `time_efficiency` -> `te`). The rule must stay identical: since #933 one
+ * Contract Search line is reachable by both menus, and a copy seeded
+ * differently per path would open as two plans.
  *
- * A second shape exists because the snapshot renames ESI's fields as it
- * publishes (`material_efficiency` -> `me`, `time_efficiency` -> `te`), so only
- * `runs` would have matched. It is deliberately the *same* rule and not merely
- * a similar one: since #933 a Contract Search item line is reachable both by
- * the row's own context menu and by the detail modal's, and the two must seed
- * a plan identically or one copy opens as two plans.
- *
- * A BPO's unlimited runs needs no special case here the way BPC Sourcing's
- * `runs === -1` guard does: the publisher already drops a negative `runs`
- * instead of carrying it, so it arrives absent and falls out as unseeded.
+ * No `runs === -1` guard like BPC Sourcing's — the publisher drops a negative
+ * `runs`, so a BPO arrives absent-runs and falls out unseeded.
  */
 export function seedFromOfferRow(row: {
   isBlueprintCopy?: boolean;

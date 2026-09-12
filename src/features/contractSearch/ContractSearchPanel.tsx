@@ -729,12 +729,10 @@ export function ContractSearchPanel() {
                       rowKey={(row, index) => `${row.contractId}:${row.typeId}:${index}`}
                       defaultSort={{ columnId: 'price', direction: 'asc' }}
                       onRowClick={setSelectedRow}
-                      // Right-click plans the row's own item, the same as on
-                      // BPC Search. Left-click still opens the detail modal,
-                      // which offers the same action per line since #933 —
-                      // this is the shortcut that skips the modal, not a
-                      // second way to reach a different plan, so both paths
-                      // seed from the one rule in `planSeed`.
+                      // The shortcut past the detail modal, which offers the
+                      // same action per line since #933 — hence the shared
+                      // `planSeed` rule, so neither path quotes the copy
+                      // differently.
                       rowContextMenu={(row, tr) => (
                         <BuildPlanContextMenu
                           typeId={row.typeId}
