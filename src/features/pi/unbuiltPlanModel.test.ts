@@ -44,6 +44,7 @@ function input(overrides: Partial<UnbuiltPlanInput> = {}): UnbuiltPlanInput {
     prices: PRICES,
     revenuePrices: PRICES,
     taxRate: 0.1,
+    bufferHours: 24,
     ...overrides,
   };
 }

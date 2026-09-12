@@ -67,6 +67,10 @@ function input(overrides: Partial<ColonyStopTierInput> = {}): ColonyStopTierInpu
     pi,
     prices: PRICES,
     taxRate: 0.1,
+    // The window this module used to hardcode, kept so every expectation
+    // below still measures what it measured before the cadence became a
+    // preference.
+    bufferHours: 24,
     ...overrides,
   };
 }

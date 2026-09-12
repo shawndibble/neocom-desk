@@ -87,6 +87,7 @@ import { systemAdvice, type PlanetAdvice, type SystemPlanet } from './advisorMod
 import { loadPiRosterSnapshot } from './roster';
 import { useAltColonies } from './altColoniesPref';
 import { colonyStopTierAdvice } from './stopTierModel';
+import { cadenceHours, useCadence } from './cadencePref';
 import { colonyNetwork } from './networkModel';
 import { NetworkPanel } from './NetworkPanel';
 import { ColonyDirectives, StopTierCardHint, StopTierRow } from './ColonyActions';
@@ -534,6 +535,9 @@ function useStopTier(
   revenuePrices: Readonly<Record<number, number>>,
   taxRate: number
 ) {
+  // The pilot's own haul window, not a constant. A layout that cannot survive
+  // being ignored is only a fault relative to how long they actually leave it.
+  const { haulHours } = cadenceHours(useCadence((state) => state.value));
   return useMemo(
     () =>
       colonyStopTierAdvice({
@@ -543,8 +547,9 @@ function useStopTier(
         prices,
         revenuePrices,
         taxRate,
+        bufferHours: haulHours,
       }),
-    [advice.colony, advice.planetType, pi, prices, revenuePrices, taxRate]
+    [advice.colony, advice.planetType, pi, prices, revenuePrices, taxRate, haulHours]
   );
 }
 
@@ -743,6 +748,7 @@ function UnbuiltCard({
   const localResources = advice.localResources.map((resource) => resource.typeID);
   const nameByType = new Map(advice.localResources.map((r) => [r.typeID, r.name]));
 
+  const { haulHours } = cadenceHours(useCadence((state) => state.value));
   const plan = useMemo(
     () =>
       unbuiltPlanAdvice({
@@ -755,8 +761,20 @@ function UnbuiltCard({
         prices,
         revenuePrices,
         taxRate,
+        bufferHours: haulHours,
       }),
-    [advice.planetType, picked, pi, ceiling, rate, assumedLinkCost, prices, revenuePrices, taxRate]
+    [
+      advice.planetType,
+      picked,
+      pi,
+      ceiling,
+      rate,
+      assumedLinkCost,
+      prices,
+      revenuePrices,
+      taxRate,
+      haulHours,
+    ]
   );
 
   // The whole card, when there is nowhere to put a Command Center.

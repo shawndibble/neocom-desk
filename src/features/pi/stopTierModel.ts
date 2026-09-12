@@ -41,14 +41,6 @@ import { recommendStopTier, type StopTierAdvice } from '@/engine/pi/stopTier';
 import { localResourcesFor, type BuiltColonyAdvice } from './advisorModel';
 import { productBySchematicId } from './products';
 
-/**
- * How long a colony is left to fill before someone hauls. The throughput
- * check needs one, and no ESI field answers it — it is a habit, not a fact.
- * A day is the shortest span that catches a layout which cannot survive being
- * ignored overnight, which is the failure worth flagging; a longer figure
- * would start rejecting layouts that are fine for anyone who logs in daily.
- */
-export const ADVISOR_BUFFER_HOURS = 24;
 
 export type ColonyStopTierAdvice =
   | {
@@ -80,6 +72,17 @@ export interface ColonyStopTierInput {
   /** What a sale fetches — highest hub buy, falling back to the ask. */
   revenuePrices?: Readonly<Record<number, number>>;
   taxRate: number;
+  /**
+   * How long a colony is left to fill before the pilot hauls it empty.
+   *
+   * A parameter, not a constant: no ESI field answers it, and the figure it
+   * is answering — whether a layout can survive being ignored — is a fact
+   * about the pilot's week rather than about the planet. It used to be a
+   * hardcoded 24 hours here, which quietly rejected every layout a pilot who
+   * hauls weekly would have been fine with. `features/pi/cadencePref.ts` is
+   * where it now comes from.
+   */
+  bufferHours: number;
 }
 
 /**
@@ -170,7 +173,7 @@ export function colonyStopTierAdvice(input: ColonyStopTierInput): ColonyStopTier
       // table is unconfirmed, so the engine answers `link-capacity-unknown`
       // rather than picking a level (CONTEXT.md round 51).
       linkCapacityPerHour: null,
-      bufferHours: ADVISOR_BUFFER_HOURS,
+      bufferHours: input.bufferHours,
     },
     pi
   );
