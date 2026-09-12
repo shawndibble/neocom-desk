@@ -2145,6 +2145,7 @@
     "exportCsv": "Export CSV",
     "searchPlaceholder": "Search issuer or title…",
     "noFilterMatches": "No contracts match your filters.",
+    "noFilterMatchesHint": "Clear the search or reset the status/type filters to see every contract.",
     "showAll": "Show all ({{count}} total)",
     "staleTooltip": "Outstanding and past its deadline — lapsed and unclaimed.",
     "fetchTruncatedRetry": "Retry",
