@@ -654,6 +654,17 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   against the decoded pairs and renders a read-only, unauthenticated view; the
   app's first real unauthenticated content route. Stateless — nothing is
   stored server-side, and there is nothing to expire or revoke.
+- **Shorthand ISK**: An ISK figure rendered abbreviated (`1.3B`) by the
+  `IskAmount` component, with the exact value one gesture away — hover,
+  keyboard focus, or touch — and in the element's accessible name so a screen
+  reader announces it ungestured. Used on dense comparison tables and stat
+  chips, where column width is the scarce thing; never on the wallet journal,
+  transaction lists or editable ISK fields, which exist to be reconciled
+  against the game client digit by digit. A display treatment only: sorting,
+  CSV export and clipboard output all keep reading the underlying value, which
+  is what makes shorthand's one-fraction-digit rounding (`1,250,000,000` and
+  `1,254,000,000` both render `1.25B`-ish) safe to accept. See
+  `docs/context/decisions/` for the rule the rollout follows.
 - **Skill Plan**: An ordered list of skill-level entries a user intends to train. User-editable (drag and drop). Distinct from the in-game **Skill Queue**, which is the game's actual training queue.
 - **Stale-Serve**: showing a cached row whose **Freshness Window** has lapsed while the replacement is fetched behind it, rather than spinning until it lands. Only for a **Published Snapshot**, where a long window encodes a publish cadence; a game constant's long window asserts the value cannot change, so a lapsed one is fetched outright instead. A stale-serve that fails to revalidate must say so on the next read — it is never left standing as a loading state.
 - **Standing (corp)**: The `/corp` overview's top panel: the figures a corp

@@ -1217,7 +1217,8 @@
       "lowsec": "Lowsec",
       "nullsec": "Nullsec",
       "wormhole": "Wormhole"
-    }
+    },
+    "iskExact": "{{amount}} ISK"
   },
   "wallet": {
     "title": "Wallet",

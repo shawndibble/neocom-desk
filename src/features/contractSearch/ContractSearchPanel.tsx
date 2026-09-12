@@ -41,6 +41,7 @@ import {
   Spinner,
   StatChip,
   TextInput,
+  IskAmount,
   type DataTableColumn,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
@@ -479,7 +480,8 @@ export function ContractSearchPanel() {
         sortValue: (row) => offerAskingPrice(row),
         render: (row) => (
           <>
-            {formatIsk(offerAskingPrice(row), 2)}
+            {/* Long press, not tap: the row's own tap opens the offer's detail modal. */}
+            <IskAmount value={offerAskingPrice(row)} revealOn="longPress" />
             {row.isAuction && (
               // An auction's number is a starting bid unless the seller set a
               // buyout, so the figure alone would read as a fixed ask.
@@ -700,11 +702,23 @@ export function ContractSearchPanel() {
                     />
                     <StatChip
                       label={t('contractSearch.cheapestLabel')}
-                      value={summary.cheapest === null ? '—' : formatIsk(summary.cheapest, 2)}
+                      value={
+                        summary.cheapest === null ? (
+                          '—'
+                        ) : (
+                          <IskAmount value={summary.cheapest} revealOn="tap" />
+                        )
+                      }
                     />
                     <StatChip
                       label={t('contractSearch.medianLabel')}
-                      value={summary.median === null ? '—' : formatIsk(summary.median, 2)}
+                      value={
+                        summary.median === null ? (
+                          '—'
+                        ) : (
+                          <IskAmount value={summary.median} revealOn="tap" />
+                        )
+                      }
                     />
                     <Button size="sm" onClick={clearType}>
                       {t('contractSearch.clearItem')}
