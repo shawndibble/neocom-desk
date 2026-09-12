@@ -16,6 +16,7 @@ import {
 import * as Icon from '@/components/ui/icons';
 import { beginEveLogin } from '@/app/loginFlow';
 import { IssuerLink } from '@/features/character/IssuerLink';
+import { MailRowContextMenu } from '@/features/character/MailRowContextMenu';
 import {
   loadMailHeaders,
   loadMailBody,
@@ -496,61 +497,67 @@ export function Mail() {
                     const party = tab === 'sent' ? recipientSummary(header) : sender;
                     return (
                       <li key={header.mail_id}>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSelectedId(header.mail_id);
-                            markLocalRead(header.mail_id);
-                            // Gated on ESI's flag, not `isRead` (which also covers
-                            // local state) — a failed write must get another
-                            // chance on every reopen, not just the next reload.
-                            if (!header.is_read) {
-                              void markMailReadOnEsi(activeCharacterId, header.mail_id);
-                            }
-                          }}
-                          // `aria-current={false}` renders the string "false",
-                          // which is a valid token meaning "not current" — so
-                          // this is tidiness, not a bug fix: it drops an
-                          // attribute from every unselected row rather than
-                          // spelling out the default.
-                          aria-current={isSelected ? 'true' : undefined}
-                          className={cx(
-                            'flex w-full min-w-0 items-start gap-2 border-l-2 py-1.5 pr-3 pl-2.5 text-left transition-colors',
-                            'focus-visible:-outline-offset-2 focus-visible:outline-2 focus-visible:outline-accent',
-                            // Selection used to be `bg-panel-2` alone — the same
-                            // fill hover already paints, so the open mail was
-                            // invisible the moment the pointer moved. The accent
-                            // edge carries it now, with the fill still there as
-                            // the second, non-colour signal beside it.
-                            isSelected
-                              ? 'border-l-accent bg-panel-2'
-                              : 'border-l-transparent hover:bg-panel-2/60'
-                          )}
-                        >
-                          {/* Unread marker, in a fixed-width gutter so read and
+                        {/* The context menu wraps the row button rather than
+                            adding anything inside it: the row keeps exactly one
+                            focusable element, and the menu's sender comes from
+                            `header.from`, not the rendered text, which on Sent
+                            is the recipient summary. */}
+                        <MailRowContextMenu mailId={header.mail_id} senderId={header.from}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedId(header.mail_id);
+                              markLocalRead(header.mail_id);
+                              // Gated on ESI's flag, not `isRead` (which also covers
+                              // local state) — a failed write must get another
+                              // chance on every reopen, not just the next reload.
+                              if (!header.is_read) {
+                                void markMailReadOnEsi(activeCharacterId, header.mail_id);
+                              }
+                            }}
+                            // `aria-current={false}` renders the string "false",
+                            // which is a valid token meaning "not current" — so
+                            // this is tidiness, not a bug fix: it drops an
+                            // attribute from every unselected row rather than
+                            // spelling out the default.
+                            aria-current={isSelected ? 'true' : undefined}
+                            className={cx(
+                              'flex w-full min-w-0 items-start gap-2 border-l-2 py-1.5 pr-3 pl-2.5 text-left transition-colors',
+                              'focus-visible:-outline-offset-2 focus-visible:outline-2 focus-visible:outline-accent',
+                              // Selection used to be `bg-panel-2` alone — the same
+                              // fill hover already paints, so the open mail was
+                              // invisible the moment the pointer moved. The accent
+                              // edge carries it now, with the fill still there as
+                              // the second, non-colour signal beside it.
+                              isSelected
+                                ? 'border-l-accent bg-panel-2'
+                                : 'border-l-transparent hover:bg-panel-2/60'
+                            )}
+                          >
+                            {/* Unread marker, in a fixed-width gutter so read and
                               unread rows keep one left edge — the empty gutter
                               is itself the "read" signal. */}
-                          <span
-                            aria-hidden="true"
-                            className="mt-1.5 flex w-1.5 shrink-0 justify-center"
-                          >
-                            {!isRead && <span className="size-1.5 rounded-full bg-accent" />}
-                          </span>
+                            <span
+                              aria-hidden="true"
+                              className="mt-1.5 flex w-1.5 shrink-0 justify-center"
+                            >
+                              {!isRead && <span className="size-1.5 rounded-full bg-accent" />}
+                            </span>
 
-                          <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                            {/* The subject wraps rather than truncating: a
+                            <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                              {/* The subject wraps rather than truncating: a
                                 clipped subject was the readability complaint,
                                 and it is the field that identifies a mail. */}
-                            <span
-                              className={cx(
-                                'line-clamp-2 text-sm break-words',
-                                isRead ? 'font-normal text-text-dim' : 'font-semibold text-text'
-                              )}
-                            >
-                              {header.subject || t('mail.noSubject')}
-                            </span>
-                            <span className="flex items-center gap-1.5 text-xs text-text-dim">
-                              {/* Glyph *and* the folder's name, not the glyph
+                              <span
+                                className={cx(
+                                  'line-clamp-2 text-sm break-words',
+                                  isRead ? 'font-normal text-text-dim' : 'font-semibold text-text'
+                                )}
+                              >
+                                {header.subject || t('mail.noSubject')}
+                              </span>
+                              <span className="flex items-center gap-1.5 text-xs text-text-dim">
+                                {/* Glyph *and* the folder's name, not the glyph
                                   alone: DESIGN.md §5 blesses a bare decorative
                                   icon only "beside its own visible text label",
                                   and dropping the name would have made folder
@@ -558,36 +565,37 @@ export function Mail() {
                                   this replaced — the opposite of the point,
                                   now that several folders share one list by
                                   default. */}
-                              <FolderIcon
-                                aria-hidden="true"
-                                size={Icon.ICON_SIZE.sm}
-                                className="shrink-0"
-                              />
-                              <span className="shrink-0 tracking-wide uppercase">
-                                {t(TAB_LABEL_KEY[tab])}
-                              </span>
-                              <span aria-hidden="true" className="shrink-0 text-text-faint">
-                                ·
-                              </span>
-                              <span className="min-w-0 truncate">{party}</span>
-                              {header.timestamp && (
-                                // `text-text-dim`, not the `text-text-faint` this
-                                // shipped with: DESIGN.md §1 restricts faint to
-                                // decoration, and a received date is content.
-                                <span className="ml-auto shrink-0 tabular-nums">
-                                  {formatDateOnly(new Date(header.timestamp), timeZone)}
+                                <FolderIcon
+                                  aria-hidden="true"
+                                  size={Icon.ICON_SIZE.sm}
+                                  className="shrink-0"
+                                />
+                                <span className="shrink-0 tracking-wide uppercase">
+                                  {t(TAB_LABEL_KEY[tab])}
                                 </span>
-                              )}
+                                <span aria-hidden="true" className="shrink-0 text-text-faint">
+                                  ·
+                                </span>
+                                <span className="min-w-0 truncate">{party}</span>
+                                {header.timestamp && (
+                                  // `text-text-dim`, not the `text-text-faint` this
+                                  // shipped with: DESIGN.md §1 restricts faint to
+                                  // decoration, and a received date is content.
+                                  <span className="ml-auto shrink-0 tabular-nums">
+                                    {formatDateOnly(new Date(header.timestamp), timeZone)}
+                                  </span>
+                                )}
+                              </span>
                             </span>
-                          </span>
 
-                          {/* The dot and the bold weight say "unread" in
+                            {/* The dot and the bold weight say "unread" in
                               colour and typography only — DESIGN.md §7's
                               "colour is never the sole signal" wants it in
                               words too. The folder needs no such gloss: its
                               name is rendered above. */}
-                          {!isRead && <span className="sr-only">{t('mail.unread')}</span>}
-                        </button>
+                            {!isRead && <span className="sr-only">{t('mail.unread')}</span>}
+                          </button>
+                        </MailRowContextMenu>
                       </li>
                     );
                   })}
