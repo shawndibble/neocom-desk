@@ -20,8 +20,8 @@ _Recorded 2026-09-12 · issue #943._
   flagged non-delegable on: the player picks.
 
 - **That preference lives in component state and is deliberately not
-  persisted.** `docs/context/decisions/20260912-130200-route-distance-comes-
-from-a-local-stargate-graph.md` records that unifying the three
+  persisted.** The local-stargate-graph decision (issue #942, recorded
+  2026-09-12) holds that unifying the three
   route-preference vocabularies becomes a stored-value migration once a second
   _persisted_ control ships, and should therefore happen first. Keeping this
   one unsaved leaves the count at three and leaves that unification ahead of
