@@ -30,6 +30,18 @@ function loadSolarSystemsById(): Promise<ReadonlyMap<number, SolarSystemEntry> |
 }
 
 /**
+ * The whole snapshot as a lookup, or `null` if it could not be read.
+ *
+ * Exported for a caller that needs many lookups synchronously inside one
+ * pass — `features/route/localRoute.ts` reads a security status per system
+ * *during* a pathfind, where awaiting each id would serialise the search.
+ * Prefer `lookupSolarSystem` for one-off reads.
+ */
+export function loadSolarSystemIndex(): Promise<ReadonlyMap<number, SolarSystemEntry> | null> {
+  return loadSolarSystemsById();
+}
+
+/**
  * The snapshot's entry for one system id, or `null` if the snapshot loaded
  * and holds no such id (should not happen — every system is in it), or
  * `undefined` if the snapshot itself could not be read (offline first visit;

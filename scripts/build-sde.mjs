@@ -38,6 +38,10 @@ const FILES = [
   'invMetaGroups.csv',
   'mapRegions.csv',
   'mapSolarSystems.csv',
+  // Stargate adjacency, for the local jump graph (issue #942) — the whole
+  // reason a route distance can be a sortable column instead of one ESI
+  // request per opened row.
+  'mapSolarSystemJumps.csv',
   // Per-planet radius, for PI link cost (issue #440). Only the group-7 rows
   // are kept; see `piPlanetRadius` below.
   'mapDenormalize.csv',
@@ -55,6 +59,9 @@ const PROBE_CACHE_FILE = join(CACHE_DIR, 'market-regions-probe.json');
 // Delve: canary region with no NPC station that still carries busy
 // player-structure markets (CONTEXT.md — "31 nullsec regions have none").
 const DELVE_REGION_ID = 10000060;
+// Jita: the game's busiest system, used as the jump graph's canary — if the
+// stargate join ever produces nothing, it shows up here first.
+const JITA_SYSTEM_ID = 30000142;
 const MARKET_REGIONS_MIN = 78;
 const MARKET_REGIONS_MAX = 116;
 // A region whose every solar system sits within this many meters of the
@@ -1318,6 +1325,39 @@ async function main() {
     [...regionAllSystemsSynthetic].filter(([, synthetic]) => synthetic).map(([id]) => id)
   );
 
+  // --- market/jumps.json: mapSolarSystemJumps -> JumpGraphData ---
+  //
+  // Adjacency by solar system id, which is all a pathfinder needs — the CSV's
+  // constellation and region columns describe the systems, and `systems.json`
+  // already carries that. Fuzzwork lists every gate in both directions, so the
+  // two halves of a pair arrive as separate rows and each one is recorded on
+  // its own `from` system; no edge is mirrored by hand.
+  //
+  // A system with no stargates at all simply gets no key. That is not a gap
+  // for wormhole space — J-space carries no stargates, so "absent" is the
+  // true answer there, and the engine reads absence as no-route rather than
+  // as zero jumps.
+  const solarSystemJumps = {};
+  {
+    const rows = raw['mapSolarSystemJumps.csv'];
+    const h = indexHeader(rows);
+    for (let i = 1; i < rows.length; i++) {
+      const r = rows[i];
+      const from = num(r[h.fromSolarSystemID]);
+      const to = num(r[h.toSolarSystemID]);
+      // A blank or unparseable endpoint is a row that names no gate. Dropping
+      // it beats recording an edge to system 0, which would be a real-looking
+      // jump to a place that does not exist.
+      if (from === null || to === null || from === to) continue;
+      (solarSystemJumps[from] ??= []).push(to);
+    }
+    // Sorted and de-duplicated so the emitted file is byte-stable across
+    // rebuilds (two systems joined by more than one gate are one edge here).
+    for (const key of Object.keys(solarSystemJumps)) {
+      solarSystemJumps[key] = [...new Set(solarSystemJumps[key])].sort((a, b) => a - b);
+    }
+  }
+
   // --- market/stations.json: staStations -> NpcStationEntry[] ---
   //
   // The complete NPC station table, which is why it is read as more than a
@@ -1461,6 +1501,7 @@ async function main() {
     ['types.json', marketTypes],
     ['systems.json', solarSystems],
     ['stations.json', npcStations],
+    ['jumps.json', solarSystemJumps],
     ['regions.json', marketRegions],
     ['globalMarkets.json', globalMarkets],
     ['attributes.json', attributeDictionary],
@@ -1589,6 +1630,9 @@ async function main() {
   console.log(`  market types: ${marketTypes.length}`);
   console.log(`  solar systems: ${solarSystems.length}`);
   console.log(`  npc stations: ${npcStations.length}`);
+  console.log(
+    `  gated systems: ${Object.keys(solarSystemJumps).length} (${Object.values(solarSystemJumps).reduce((n, a) => n + a.length, 0)} directed edges)`
+  );
   console.log(`  market regions: ${marketRegions.length}`);
   console.log(
     `  global market regions: ${globalMarketRegions.length} (${globalMarketRegions.map((r) => r.name).join(', ') || 'none'})`
@@ -1602,6 +1646,7 @@ async function main() {
     marketTypes.length === 0 ||
     solarSystems.length === 0 ||
     npcStations.length === 0 ||
+    Object.keys(solarSystemJumps).length === 0 ||
     marketRegions.length === 0 ||
     Object.keys(attributeDictionary).length === 0 ||
     Object.keys(variationTypes).length === 0 ||
@@ -1609,6 +1654,35 @@ async function main() {
   ) {
     console.error('  FAIL: a market payload came out empty');
     process.exitCode = 1;
+  }
+  {
+    // Every stargate connects both ways in game, so the emitted graph must be
+    // symmetric. An asymmetry means rows were dropped, and a one-way gate
+    // would silently give a route in one direction and "no route" back.
+    let asymmetric = 0;
+    for (const [from, tos] of Object.entries(solarSystemJumps)) {
+      for (const to of tos) {
+        if (!solarSystemJumps[to]?.includes(Number(from))) asymmetric++;
+      }
+    }
+    if (asymmetric > 0) {
+      console.error(`  FAIL: ${asymmetric} one-way stargate edges in the jump graph`);
+      process.exitCode = 1;
+    }
+    // Jita is the busiest system in the game and has never had fewer than a
+    // handful of gates; zero here means the join silently produced nothing.
+    if (!(solarSystemJumps[JITA_SYSTEM_ID]?.length > 0)) {
+      console.error('  FAIL: Jita has no stargates in the jump graph');
+      process.exitCode = 1;
+    }
+    // Every gated system must also be a system we can name and place, or a
+    // route can cross somewhere `systems.json` cannot describe.
+    const systemIds = new Set(solarSystems.map((sys) => sys.id));
+    const unknown = Object.keys(solarSystemJumps).filter((id) => !systemIds.has(Number(id)));
+    if (unknown.length > 0) {
+      console.error(`  FAIL: ${unknown.length} gated systems missing from systems.json`);
+      process.exitCode = 1;
+    }
   }
   if (!marketRegions.some((r) => r.id === DELVE_REGION_ID)) {
     console.error(

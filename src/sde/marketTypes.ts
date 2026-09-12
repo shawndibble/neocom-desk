@@ -27,6 +27,18 @@ export interface SolarSystemEntry {
   regionId: number;
 }
 
+/**
+ * public/data/market/jumps.json — stargate adjacency by solar system id
+ * (issue #942). Keys are system ids as strings, because that is what JSON
+ * object keys are; values are the ids that system has a gate to.
+ *
+ * A system with no stargates has no key at all. For wormhole space that is
+ * the true answer rather than a missing one — J-space carries no stargates —
+ * so a reader must treat absence as "no gate route exists", never as zero
+ * jumps. See `engine/route/jumpRoute.ts`.
+ */
+export type JumpGraphData = Readonly<Record<string, readonly number[]>>;
+
 /** One entry in public/data/market/stations.json — an NPC station. */
 export interface NpcStationEntry {
   id: number;

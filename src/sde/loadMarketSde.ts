@@ -9,6 +9,7 @@ import type {
   MarketGroupNode,
   MarketTypeEntry,
   SolarSystemEntry,
+  JumpGraphData,
   NpcStationEntry,
   MarketRegionEntry,
   GlobalMarketEntry,
@@ -37,6 +38,7 @@ export const loadMarketGroups = cached<MarketGroupNode[]>('groups.json');
 export const loadMarketTypes = cached<MarketTypeEntry[]>('types.json');
 export const loadSolarSystems = cached<SolarSystemEntry[]>('systems.json');
 export const loadNpcStations = cached<NpcStationEntry[]>('stations.json');
+export const loadSolarSystemJumps = cached<JumpGraphData>('jumps.json');
 export const loadMarketRegions = cached<MarketRegionEntry[]>('regions.json');
 export const loadGlobalMarkets = cached<GlobalMarketEntry[]>('globalMarkets.json');
 export const loadAttributeDictionary = cached<AttributeDictionary>('attributes.json');
