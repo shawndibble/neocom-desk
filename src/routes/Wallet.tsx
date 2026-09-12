@@ -199,7 +199,11 @@ function JournalTable({
     <>
       <JournalFilterBar filter={filter} onChange={onFilterChange} refTypeOptions={refTypeOptions} />
       {filteredJournal.length === 0 ? (
-        <EmptyState title={t('wallet.journalNoFilterMatches')} className="py-8" />
+        <EmptyState
+          title={t('wallet.journalNoFilterMatches')}
+          hint={t('wallet.journalNoFilterMatchesHint')}
+          className="py-8"
+        />
       ) : (
         <DataTable
           label={label}
