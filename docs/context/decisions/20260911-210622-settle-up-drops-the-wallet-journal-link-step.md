@@ -13,18 +13,30 @@ _Recorded 2026-09-11._
   keep the optional field unchanged; a manual link from `RowDetailModal` (if any
   is added later) or a future `journal` sync pass could still fill it in
   after the fact.
-- **No replacement "link it later" UI for this specific case.** A pilot pays
-  a lump sum through Settle up, ESI eventually shows the transaction, but the
-  Assignments are already `status: 'paid'` and so drop out of
-  `computePayeeBalances`'s "owed" set — `paymentLinks.ts`'s existing
-  suggestion engine (`suggestLinks`/`LinkPaymentDialog`, issue #540) only ever
-  offers a payment against a Payee's _outstanding_ balance, by design. Losing
-  the never-actually-working live search costs nothing today: a mining tax
-  figure is specific enough (exact ISK, the EVE day, and the recorded method)
-  that this is a non-issue in practice, and no one has asked to re-verify a
-  Settle-up payment against the journal after the fact. If that's ever
-  wanted, it's a new feature — matching an already-`paid` Assignment's
-  `payment` against a later wallet entry — not a fix to this dialog.
+- **A recorded-but-unlinked Settle-up payment is matched and attached
+  automatically later, with no confirmation dialog.** Once Settle up marks an
+  Assignment `paid`, it drops out of `computePayeeBalances`'s "owed" set, so
+  `suggestLink`'s existing dialog (`LinkPaymentDialog`, issue #540) — which
+  only ever offers a payment against a Payee's _outstanding_ balance — would
+  never surface it again. `paymentLinks.ts` gains
+  `unlinkedRecordedPayments` (every `paid`, not-yet-linked Settle-up payment,
+  grouped by its shared `paymentId`) and `autoMatchRecordedPayments`, which
+  attaches a `MadePayment` only when its amount, paying character, and date
+  (within `RECORDED_LINK_WINDOW_DAYS` of the pilot's own recorded `paidOn`)
+  match exactly one candidate — an _ambiguous_ match (more than one
+  plausible transaction) is never guessed. Direct request: unlike
+  `suggestLink`'s dialog, this never prompts — a mining tax lump sum (exact
+  ISK, a specific paying character, the pilot's own recorded date) is
+  specific enough that asking to confirm would be busywork. `TaxTab` runs
+  this in a `useEffect` keyed off the same `madePayments`/`everyAssignment`
+  it already loads for `LinkPaymentDialog`'s suggestions, writes through the
+  new `linkRecordedPayment` (patches `journalRefId`/`contractId` onto every
+  Assignment sharing that `paymentId`, leaving the rest of `payment` alone),
+  and guards against re-attempting an already-tried `paymentId` with a ref —
+  it deliberately does not call `refresh()` (that always re-hits ESI); the
+  same-render exclusion from `linkSuggestions` keeps the "unlinked payments"
+  card in sync immediately, and the write itself is picked up on the next
+  real reload like any other Assignment field.
 - **Dropped as dead weight along with the step:** `findPaymentCandidates` and
   the `WalletJournalEntry`-based `amountMatches` from `paymentMatches.ts` (no
   other caller), and the `settleUpStep3`/`settleUpNextRecord`/`settleUpJournal*`/

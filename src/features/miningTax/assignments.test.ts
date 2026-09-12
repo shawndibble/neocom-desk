@@ -7,6 +7,7 @@ import {
   dismissEntries,
   dismissEntry,
   joinAssignments,
+  linkRecordedPayment,
   markAssignmentsPaid,
   resolveNeedsReview,
   splitAssignment,
@@ -237,6 +238,61 @@ describe('markAssignmentsPaid', () => {
 
   it('is a no-op for an empty list', async () => {
     await markAssignmentsPaid([]);
+    expect(syncMock.scheduleSync).not.toHaveBeenCalled();
+  });
+});
+
+describe('linkRecordedPayment', () => {
+  it('attaches a journal ref to a recorded payment, leaving every other field alone', async () => {
+    const a = await createAssignment({
+      characterId: CHAR_A,
+      date: '2026-09-04',
+      solarSystemId: 1,
+      payeeId: 'p',
+      oreLines: [{ typeId: TYPE_A, quantity: 10 }],
+      taxPct: 10,
+      estimatedValue: 100,
+      taxOwed: 10,
+      markPaid: false,
+    });
+    await markAssignmentsPaid([a], {
+      paidOn: '2026-09-06',
+      method: 'donation',
+      amount: 10,
+    });
+    const recorded = (await db.miningTaxAssignments.get(a.id)) as MiningTaxAssignmentRecord;
+    vi.clearAllMocks();
+
+    await linkRecordedPayment([recorded], { journalRefId: 42 });
+
+    const updated = await db.miningTaxAssignments.get(a.id);
+    expect(updated?.payment?.journalRefId).toBe(42);
+    expect(updated?.payment?.paidOn).toBe('2026-09-06');
+    expect(updated?.payment?.method).toBe('donation');
+    expect(updated?.payment?.amount).toBe(10);
+    expect(syncMock.scheduleSync).toHaveBeenCalledWith(CHAR_A);
+  });
+
+  it('leaves an Assignment with no recorded payment untouched', async () => {
+    const a = await createAssignment({
+      characterId: CHAR_A,
+      date: '2026-09-04',
+      solarSystemId: 1,
+      payeeId: 'p',
+      oreLines: [{ typeId: TYPE_A, quantity: 10 }],
+      taxPct: 10,
+      estimatedValue: 100,
+      taxOwed: 10,
+      markPaid: true,
+    });
+
+    await linkRecordedPayment([a], { journalRefId: 42 });
+
+    expect((await db.miningTaxAssignments.get(a.id))?.payment).toBeUndefined();
+  });
+
+  it('is a no-op for an empty list', async () => {
+    await linkRecordedPayment([], { journalRefId: 1 });
     expect(syncMock.scheduleSync).not.toHaveBeenCalled();
   });
 });

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -47,6 +47,7 @@ import { SecurityValue } from '@/features/character/assetBrowserRows';
 import {
   deleteAssignment,
   dismissEntry,
+  linkRecordedPayment,
   markAssignmentsPaid,
   resolveNeedsReview,
 } from '@/features/miningTax/assignments';
@@ -64,8 +65,10 @@ import { BulkDismissDialog } from '@/features/miningTax/BulkDismissDialog';
 import { SelectionToolbar } from '@/features/miningTax/SelectionToolbar';
 import { loadMadePayments } from '@/features/miningTax/madePayments';
 import {
+  autoMatchRecordedPayments,
   suggestLinks,
   unlinkedPayments,
+  unlinkedRecordedPayments,
   type MadePayment,
 } from '@/features/miningTax/paymentLinks';
 import { LinkPaymentDialog } from '@/features/miningTax/LinkPaymentDialog';
@@ -332,14 +335,60 @@ export function TaxTab({ onDataAgeChange }: TaxTabProps) {
     };
   }, [trackedCharacterIds]);
 
+  const everyAssignment = useMemo(
+    () => allDisplayRows.flatMap((dr) => allMembers(dr).map((m) => m.assignment)),
+    [allDisplayRows]
+  );
+
+  // Settle-up payments already recorded (paid-on/method/amount) but never
+  // live-linked, because step 2 stopped trying to search the wallet journal
+  // at pay time (it always missed — ESI hadn't posted the transaction yet).
+  // An exact amount + recorded-date + paying-character match is unambiguous
+  // enough to attach silently, once the real transaction actually shows up —
+  // see `autoMatchRecordedPayments`'s own doc comment for why this skips the
+  // confirmation dialog `suggestLink` uses.
+  const recordedMatches = useMemo(() => {
+    const candidates = unlinkedPayments(madePayments, everyAssignment);
+    return autoMatchRecordedPayments(candidates, unlinkedRecordedPayments(everyAssignment));
+  }, [everyAssignment, madePayments]);
+
+  // Attempted once per `paymentId`, not on every render this effect's deps
+  // happen to recompute — the write lands in Dexie but nothing here forces a
+  // `refresh()` (that always re-hits ESI); the exclusion below already keeps
+  // the card in sync for this render, and the next real reload picks up the
+  // persisted link like any other Assignment field.
+  const attemptedLinksRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const fresh = recordedMatches.filter(
+      ({ group }) => !attemptedLinksRef.current.has(group.paymentId)
+    );
+    if (fresh.length === 0) return;
+    for (const { group } of fresh) attemptedLinksRef.current.add(group.paymentId);
+    void Promise.all(
+      fresh.map(({ group, payment }) =>
+        linkRecordedPayment(
+          group.assignments,
+          payment.kind === 'journal'
+            ? { journalRefId: payment.refId }
+            : { contractId: payment.refId }
+        )
+      )
+    );
+  }, [recordedMatches]);
+
   // Payments nothing accounts for, each with the Payee and entries it most
   // likely settled. Only payments with a plausible target survive
   // `suggestLinks`, which is what lets the card stay a quiet offer rather than
-  // a standing alert.
+  // a standing alert. Excludes whatever `recordedMatches` just claimed
+  // automatically — those never need the confirmation dialog.
   const linkSuggestions = useMemo(() => {
-    const everyAssignment = allDisplayRows.flatMap((dr) => allMembers(dr).map((m) => m.assignment));
-    return suggestLinks(unlinkedPayments(madePayments, everyAssignment), balances);
-  }, [allDisplayRows, madePayments, balances]);
+    const candidates = unlinkedPayments(madePayments, everyAssignment);
+    const autoLinked = new Set(recordedMatches.map((m) => m.payment.key));
+    return suggestLinks(
+      candidates.filter((p) => !autoLinked.has(p.key)),
+      balances
+    );
+  }, [everyAssignment, madePayments, balances, recordedMatches]);
 
   const visibleRows = useMemo(
     () => payeeFiltered.filter((dr) => statusFilter.has(dr.status)),

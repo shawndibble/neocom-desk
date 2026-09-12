@@ -248,6 +248,29 @@ export async function markAssignmentsPaid(
     scheduleSync(characterId);
 }
 
+/**
+ * Attaches a real wallet-journal or contract id to an already-recorded
+ * Settle-up payment (`paymentLinks.ts`'s `autoMatchRecordedPayments`) — every
+ * other field of `payment` is left exactly as the pilot recorded it. Never
+ * called for a manual link through the dialog; that path goes through
+ * `markAssignmentsPaid` instead, since it may also change which Assignments a
+ * payment covers.
+ */
+export async function linkRecordedPayment(
+  assignments: readonly MiningTaxAssignmentRecord[],
+  ref: { journalRefId: number } | { contractId: number }
+): Promise<void> {
+  if (assignments.length === 0) return;
+  const now = Date.now();
+  const updated = assignments.map((a): MiningTaxAssignmentRecord => {
+    if (!a.payment) return a;
+    return { ...a, payment: { ...a.payment, ...ref }, updatedAt: now };
+  });
+  await db.miningTaxAssignments.bulkPut(updated);
+  for (const characterId of new Set(assignments.map((a) => a.characterId)))
+    scheduleSync(characterId);
+}
+
 export interface SplitInput {
   /** Units to move out of `original`, per ore type — each at most what `original` holds of that type; zero-quantity lines are ignored. */
   moves: readonly MiningTaxOreLine[];
