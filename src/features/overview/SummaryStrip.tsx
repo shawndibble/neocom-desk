@@ -53,7 +53,7 @@ export function SummaryStrip({
   const { t } = useTranslation();
   return (
     <section className="rounded-xs border border-line bg-panel/85 backdrop-blur-sm">
-      <div className="flex flex-wrap items-center gap-x-8 gap-y-3 p-3">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-3 p-3 sm:gap-x-8">
         <Cell label={t('overview.board.nextDeadline')}>
           {deadline === null ? (
             <Value muted>{t('overview.board.noDeadline')}</Value>
@@ -111,11 +111,27 @@ export function SummaryStrip({
 
 function Cell({ label, children }: { label: string; children: ReactNode }) {
   return (
-    // `basis-40` is what makes the row wrap rather than crush: `flex-1` with
+    // The basis is what makes the row wrap rather than crush: `flex-1` with
     // `min-w-0` alone lets a cell shrink below its own content, which at phone
     // width overlapped the three labels and clipped each value to a character.
-    // A floor means the third cell drops to its own line instead.
-    <span className="flex min-w-0 flex-1 basis-40 flex-col gap-0.5">
+    // A floor means a cell drops to its own line instead.
+    //
+    // It is `basis-32` under `sm`, not `basis-40`, because a phone hands this
+    // strip about 334px: 390px of viewport less the shell's `p-4` and the
+    // panel's own `p-3`. Two 160px cells and a 32px gap need 352px, so every
+    // cell used to take a line of its own with 174px of it empty. 128px cells
+    // and a 16px gap need 272px, which fits the deadline and what is training
+    // side by side — the two the board is opened to read — at 360px, the
+    // common Android width, as well as at 375 and 390.
+    //
+    // 144px cells were tried first and are the wrong floor by a hair: they
+    // need 304px against the 304px a 360px viewport has, so that width lands
+    // exactly on the boundary and renders stacked. Below 360 the strip goes
+    // back to a cell per line, which is the old behaviour and still readable.
+    //
+    // This is a wrap floor, not a width. Both cells still `flex-1`, so at 390
+    // they take about 159px each and only a long skill name truncates.
+    <span className="flex min-w-0 flex-1 basis-32 flex-col gap-0.5 sm:basis-40">
       <span className="text-[0.6875rem] tracking-widest text-text-dim uppercase">{label}</span>
       {children}
     </span>

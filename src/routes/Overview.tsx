@@ -36,7 +36,7 @@ import { maxMarketOrders } from '@/engine/market/orderSlots';
 import { rememberSpSummary, getLastKnownSpSummary } from '@/stores/characterSp';
 import { loadWalletBalanceWithStatus } from '@/features/character/wallet';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
-import { formatDuration } from '@/lib/duration';
+import { formatCountdown } from '@/lib/duration';
 import { formatIsk } from '@/lib/isk';
 import { CharacterHeader } from '@/features/character/CharacterHeader';
 import { OverviewSubNav } from '@/features/character/OverviewSubNav';
@@ -444,7 +444,7 @@ export function Overview() {
           soonest === null
             ? null
             : {
-                label: formatDuration(Math.max(0, soonest.at - now) / 1000),
+                label: formatCountdown(Math.max(0, soonest.at - now) / 1000),
                 note: soonest.note,
                 severity: soonest.severity,
                 to: soonest.to,
@@ -462,7 +462,7 @@ export function Overview() {
                   trainingFinishMs === null
                     ? null
                     : t('overview.timeLeft', {
-                        duration: formatDuration(Math.max(0, trainingFinishMs - now) / 1000),
+                        duration: formatCountdown(Math.max(0, trainingFinishMs - now) / 1000),
                       }),
                   queueDepth ? t('overview.board.queued', { count: queueDepth.count }) : null,
                 ]
