@@ -16,9 +16,9 @@
  *   `sortMobileTabs` re-sorts whatever the Settings chips hand over.
  *
  * The More sheet renders `mobileSheetPaths` — the complement — so a path is in
- * exactly one of the two places. Deriving it is the point: hand-maintained
- * lists on both sides eventually leave a route reachable from neither, which
- * on a phone means unreachable.
+ * exactly one of the two places, by construction rather than by upkeep: two
+ * hand-kept lists eventually leave a route in neither, which on a phone means
+ * unreachable.
  */
 import type { AppRoutePath } from '@/app/routeScopes';
 import { createLocalSetting } from './useLocalSetting';
@@ -64,8 +64,8 @@ export const DEFAULT_MOBILE_TABS: readonly MobileTabPath[] = [
   '/industry',
 ];
 
-/** `nav.*` i18n key per path, shared by the bar, the sheet and the picker. */
-export const MOBILE_TAB_LABEL_KEYS: Record<MobileTabPath, string> = {
+/** `nav.*` i18n key per path — the one name each destination goes by, read by the rail, the bar, the sheet and the picker. */
+export const NAV_LABEL_KEYS: Record<MobileTabPath, string> = {
   '/overview': 'nav.overview',
   '/alerts': 'nav.alerts',
   '/skills': 'nav.skills',
@@ -85,21 +85,30 @@ function isMobileTabPath(value: unknown): value is MobileTabPath {
   return (MOBILE_TAB_CHOICES as readonly string[]).includes(value as string);
 }
 
-/** Sorts a chosen set into `MOBILE_TAB_CHOICES` order. */
+/** Canonical order, and known paths only — it filters the choices, not the input. */
 export function sortMobileTabs(paths: readonly MobileTabPath[]): MobileTabPath[] {
   return MOBILE_TAB_CHOICES.filter((path) => paths.includes(path));
 }
 
-/** What the More sheet lists: everything not in the bar, in canonical order. */
+/**
+ * The bar to render for a set held in memory. `parseMobileTabs` vets what is
+ * stored; this vets what `setValue` was handed, which it accepts unchecked —
+ * a short bar would otherwise render with a hole this session and snap back to
+ * the default on the next cold load, with nothing to say why.
+ */
+export function barTabs(tabs: readonly MobileTabPath[]): MobileTabPath[] {
+  return parseMobileTabs([...tabs]) ?? [...DEFAULT_MOBILE_TABS];
+}
+
+/** The sheet's rows: everything the bar does not hold, in canonical order. */
 export function mobileSheetPaths(tabs: readonly MobileTabPath[]): MobileTabPath[] {
   return MOBILE_TAB_CHOICES.filter((path) => !tabs.includes(path));
 }
 
 /**
- * Accepts a stored row only if it is exactly the bar the invariants describe:
- * `MOBILE_TAB_COUNT` known paths, no repeats. Anything else — a hand-edited
- * row, a path this version dropped, a value written by a later version — falls
- * back to the default rather than rendering a bar with a hole in it.
+ * Accepts a row only if it is exactly the bar the invariants describe:
+ * `MOBILE_TAB_COUNT` known paths, no repeats. A hand-edited row, a path this
+ * version dropped, a value written by a later one — all rejected.
  *
  * Order is repaired rather than rejected: a valid set stored the other way
  * round is still the pilot's choice.

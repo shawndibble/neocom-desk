@@ -34,6 +34,10 @@ interface FilterChipProps {
    * capability isn't available right now (e.g. Corp Assets without the
    * Director role) rather than one that is merely off. Pair with `tooltip`
    * explaining why; this component only renders the state.
+   *
+   * With a `tooltip` it reports `aria-disabled` rather than the native
+   * attribute, which takes neither hover nor focus — and so would leave the
+   * explanation unreadable by either route.
    */
   disabled?: boolean;
   /**
@@ -68,18 +72,27 @@ export function FilterChip({
   tooltip,
 }: FilterChipProps) {
   const hasGloss = countLabel !== undefined;
+  /*
+   * A chip with a reason to give stays hoverable and focusable so the bubble
+   * can be read; one with no tooltip keeps the native attribute. Either way
+   * the click does nothing.
+   */
+  const explained = disabled && tooltip !== undefined;
   const chip = (
     <button
       type="button"
       aria-pressed={selected}
-      disabled={disabled}
-      onClick={onToggle}
+      disabled={disabled && !explained}
+      aria-disabled={explained || undefined}
+      onClick={explained ? undefined : onToggle}
       className={cx(
-        'inline-flex items-center gap-1.5 rounded-xs border px-2.5 text-[0.6875rem] font-semibold tracking-widest whitespace-nowrap uppercase transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:pointer-events-none disabled:opacity-40',
+        'inline-flex items-center gap-1.5 rounded-xs border px-2.5 text-[0.6875rem] font-semibold tracking-widest whitespace-nowrap uppercase transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:pointer-events-none disabled:opacity-40 aria-disabled:cursor-default aria-disabled:opacity-40',
         controlHeightClassName[size],
         selected
           ? 'border-accent-dim bg-accent/15 text-accent'
-          : 'border-line bg-panel-2 text-text-dim hover:border-line-bright hover:text-text',
+          : 'border-line bg-panel-2 text-text-dim',
+        // No hover affordance on a chip that cannot be toggled.
+        !selected && !explained && 'hover:border-line-bright hover:text-text',
         className
       )}
     >

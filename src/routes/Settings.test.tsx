@@ -1179,10 +1179,23 @@ describe('Settings — phone tab bar', () => {
     await screen.findByRole('heading', { level: 1, name: /settings/i });
 
     const group = await screen.findByRole('group', { name: /phone tab bar links/i });
-    expect(within(group).getByRole('button', { name: /^wallet$/i })).toBeDisabled();
+    const wallet = within(group).getByRole('button', { name: /^wallet$/i });
+    // `aria-disabled`, not the native attribute: the chip has to stay
+    // hoverable and focusable for its own explanation to be readable.
+    expect(wallet).toHaveAttribute('aria-disabled', 'true');
+    await user.click(wallet);
+    expect(within(group).getByRole('button', { name: /^wallet$/i })).toHaveAttribute(
+      'aria-pressed',
+      'false'
+    );
+    await user.hover(wallet);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(/the bar holds four/i);
+
     // A chosen one still unpicks — that is the way out of a full bar.
     await user.click(within(group).getByRole('button', { name: /^skills$/i }));
-    expect(within(group).getByRole('button', { name: /^wallet$/i })).toBeEnabled();
+    expect(within(group).getByRole('button', { name: /^wallet$/i })).not.toHaveAttribute(
+      'aria-disabled'
+    );
   });
 
   it('puts the default four back', async () => {

@@ -37,6 +37,10 @@ _Recorded 2026-09-13._
   leaves the previous bar standing until a replacement is picked, so the
   preference on disk is always renderable; unpicked chips go inert at four
   rather than evicting a choice the pilot never named.
-- **Lock dots stay off the tab bar.** The tab is 10px text with `px-1` and no
-  room for the marker; the sheet still shows it for everything the bar does not
-  hold.
+- **A locked destination is marked wherever it is shown, bar included.** The
+  first cut kept the amber dot out of the tab bar on space grounds, which was
+  wrong once the bar became the pilot's own choice: the sheet lists only what
+  the bar does _not_ hold, so promoting a gated route into the bar hid its
+  marker on the phone entirely. One `NavItem` now renders the rail, the sheet
+  and the tab, so the marker, the unread badge and the accessible name cannot
+  say different things in the three places a destination appears.
