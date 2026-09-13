@@ -50,15 +50,33 @@ const contactsPayload = [
   { contact_id: 1001, contact_type: 'character' as const, standing: 10, is_watched: true },
   { contact_id: 1002, contact_type: 'corporation' as const, standing: 0 },
   { contact_id: 1003, contact_type: 'alliance' as const, standing: -10, is_blocked: true },
+  { contact_id: 1004, contact_type: 'corporation' as const, standing: -5 },
+  // Stranger Pilot is a 0-standing contact flying for Hostile Corp, which the
+  // reader holds at -5 — the "a second entry of yours also covers this pilot"
+  // case.
+  { contact_id: 1005, contact_type: 'character' as const, standing: 0 },
+];
+
+// Good Friend flies for the signed-in pilot's own corp; Stranger Pilot flies
+// for Hostile Corp, in no alliance.
+const affiliationPayload = [
+  { character_id: 1001, corporation_id: 2001 },
+  { character_id: 1005, corporation_id: 1004 },
+  { character_id: CHAR_ID, corporation_id: 2001, alliance_id: 3001 },
 ];
 
 const server = setupServer(
   http.get(`${ESI}/characters/${CHAR_ID}/contacts`, () => HttpResponse.json(contactsPayload)),
+  http.post(`${ESI}/characters/affiliation`, () => HttpResponse.json(affiliationPayload)),
   http.post(`${ESI}/universe/names`, () =>
     HttpResponse.json([
       { id: 1001, name: 'Good Friend', category: 'character' },
       { id: 1002, name: 'Neutral Corp', category: 'corporation' },
       { id: 1003, name: 'Bad Alliance', category: 'alliance' },
+      { id: 1004, name: 'Hostile Corp', category: 'corporation' },
+      { id: 1005, name: 'Stranger Pilot', category: 'character' },
+      { id: 2001, name: 'Home Corp', category: 'corporation' },
+      { id: 3001, name: 'Home Alliance', category: 'alliance' },
     ])
   )
 );
@@ -105,19 +123,60 @@ describe('Contacts', () => {
 
     // Scoped to the table: the same words label the type filter chips above it.
     const table = within(screen.getByRole('table', { name: 'Contacts' }));
-    expect(table.getByText('Player')).toBeInTheDocument();
-    expect(table.getByText('Corp')).toBeInTheDocument();
+    expect(table.getAllByText('Player').length).toBe(2);
+    expect(table.getAllByText('Corp').length).toBe(2);
     expect(table.getByText('Alliance')).toBeInTheDocument();
     expect(screen.queryByText('character')).toBeNull();
     expect(screen.queryByText('corporation')).toBeNull();
   });
 
-  it('keeps real columns at phone width instead of collapsing rows into cards', async () => {
+  it('collapses rows into cards at phone width, now that a row carries two entity names', async () => {
     render(<App />);
     await screen.findByText('Good Friend');
 
-    // `.dt-stack` is the below-`sm` collapse; four short columns don't need it.
-    expect(screen.getByRole('table', { name: 'Contacts' })).not.toHaveClass('dt-stack');
+    // `.dt-stack` is the below-`sm` collapse. The Corp / Alliance column
+    // prints names too long to squeeze into a 390px row — see
+    // docs/context/decisions/20260912-210929-*.
+    expect(screen.getByRole('table', { name: 'Contacts' })).toHaveClass('dt-stack');
+  });
+
+  it('shows where a player contact is now', async () => {
+    render(<App />);
+    await screen.findByText('Good Friend');
+
+    // Good Friend's corp, which the contact row itself never names.
+    expect(await screen.findByText('Home Corp')).toBeInTheDocument();
+    // Hostile Corp twice: its own contact row, and Stranger Pilot's corp line.
+    expect(screen.getAllByText('Hostile Corp').length).toBe(2);
+  });
+
+  it('says nothing about the affiliation of a corp or alliance contact — it is its own', async () => {
+    render(<App />);
+    await screen.findByText('Neutral Corp');
+
+    const table = within(screen.getByRole('table', { name: 'Contacts' }));
+    // Three from this column (Neutral Corp, Bad Alliance, Hostile Corp), and
+    // three more from Flags, which draws the same dash for an unflagged row.
+    expect(table.getAllByText('—').length).toBe(6);
+  });
+
+  it('badges a contact who flies for the reader\u2019s own corporation', async () => {
+    render(<App />);
+    await screen.findByText('Good Friend');
+
+    expect(await screen.findByRole('img', { name: 'In your corporation' })).toBeInTheDocument();
+    expect(screen.queryByRole('img', { name: 'In your alliance' })).not.toBeInTheDocument();
+  });
+
+  it("tags a pilot whose corp is separately one of the reader's contacts", async () => {
+    render(<App />);
+    await screen.findByText('Stranger Pilot');
+
+    // Stranger Pilot is 0 personally; Neutral Corp, which they fly for, is a
+    // contact too. The tag sits against the corp, not in the Standing column.
+    // Twice: Hostile Corp's own row, and the tag on Stranger Pilot's corp line.
+    const tags = await screen.findAllByRole('img', { name: 'Bad standing (-5)' });
+    expect(tags.length).toBe(2);
   });
 
   it('filters by standing category', async () => {
@@ -171,7 +230,7 @@ describe('Contacts', () => {
     await screen.findByText('Good Friend');
 
     const types = within(screen.getByRole('group', { name: 'Type' }));
-    expect(types.getByRole('button', { name: /Player/ })).toHaveTextContent('1');
+    expect(types.getByRole('button', { name: /Player/ })).toHaveTextContent('2');
     expect(types.getByRole('button', { name: /Faction/ })).toHaveTextContent('0');
   });
 
@@ -332,7 +391,7 @@ describe('Contacts standing tag (issue #403)', () => {
     render(<App />);
     await screen.findByText('Good Friend');
 
-    expect(screen.getByRole('img', { name: 'Neutral standing (0)' })).toBeInTheDocument();
+    expect(screen.getAllByRole('img', { name: 'Neutral standing (0)' }).length).toBe(2);
     expect(screen.getByRole('img', { name: 'Terrible standing (-10)' })).toBeInTheDocument();
   });
 });
