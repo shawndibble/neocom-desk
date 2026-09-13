@@ -10,6 +10,7 @@ import { useTranslation } from 'react-i18next';
 import { Button, DataTable, IconButton, IskAmount, Spinner } from '@/components/ui';
 import type { DataTableColumn } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
+import { KEYBOARD_OVERLAY_ATTRIBUTE } from '@/lib/shortcuts';
 import { useCompareSet } from './compareSet';
 import { useCompareRows, type CompareRow } from './useCompareRows';
 import type { LocationMode } from './locationMode';
@@ -193,6 +194,13 @@ export function CompareDrawer({
         <section
           id={DRAWER_ID}
           aria-label={t('market.compare.title')}
+          // Not a dialog and deliberately not announced as one (see the module
+          // doc), but it does own the keyboard while open: without this the
+          // global shortcut listener sees no overlay and a bare letter
+          // navigates away mid-comparison. The Escape handler just below
+          // already assumed this ownership; the attribute is what tells
+          // `app/useKeyboardShortcuts.ts` about it.
+          {...{ [KEYBOARD_OVERLAY_ATTRIBUTE]: '' }}
           onKeyDown={(event) => {
             if (event.key === 'Escape') {
               event.stopPropagation();

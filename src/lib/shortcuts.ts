@@ -9,12 +9,41 @@ export interface MarketFocusSearchState {
   readonly focusSearch: true;
 }
 
+/**
+ * Marks an element that owns the keyboard while it is on screen but is not a
+ * native `<dialog>` and carries no menu/listbox/dialog role the guard in
+ * `app/useKeyboardShortcuts.ts` already recognises — today that means the
+ * Market Compare drawer, deliberately a non-modal `<section>` so the order
+ * book beside it stays live (`features/market/CompareDrawer.tsx`).
+ *
+ * An explicit opt-in attribute rather than a borrowed `role="dialog"`: the
+ * drawer is not a dialog, and saying it is to get a keyboard guard would
+ * announce it as one to every screen reader.
+ */
+export const KEYBOARD_OVERLAY_ATTRIBUTE = 'data-keyboard-overlay';
+
+/**
+ * Present in the DOM only while something owns the keyboard. `[role="dialog"]`
+ * covers the Radix primitives that render a plain `div` — Popover and
+ * HoverCard — which `dialog[open]` cannot match, since that selector needs the
+ * native element.
+ */
+export const OVERLAY_SELECTOR = `dialog[open], [role="menu"], [role="listbox"], [role="dialog"], [${KEYBOARD_OVERLAY_ATTRIBUTE}]`;
+
 export interface ShortcutDef {
   readonly id: string;
   /** Matches `KeyboardEvent.key` exactly; the listener only checks this with no modifier held. */
   readonly key: string;
   /** What the key looks like on screen — kept separate from `key` since `key` must match the DOM event verbatim ('Escape', not 'Esc'). */
   readonly displayKey: string;
+  /**
+   * True for a key that is *typed* with Shift on a common layout — `?` is
+   * Shift+/ on a US keyboard. Without it the listener drops every Shift-held
+   * press, which made the one key every user already reaches for
+   * unreachable. Matching still goes through `key`, so a layout that types
+   * the same character without Shift reaches the same shortcut.
+   */
+  readonly allowsShift?: true;
   /** i18next key for the action's description, shown in the Settings shortcut list. */
   readonly descriptionKey: string;
   /**
@@ -53,6 +82,16 @@ export const SHORTCUTS: readonly ShortcutDef[] = [
     displayKey: ',',
     descriptionKey: 'shortcuts.openSettings',
     run: (navigate) => navigate('/settings'),
+  },
+  {
+    id: 'show-shortcuts',
+    key: '?',
+    displayKey: '?',
+    allowsShift: true,
+    descriptionKey: 'shortcuts.showShortcuts',
+    // The list this opens is the one rendered from this very array, under the
+    // `#shortcuts` anchor on Settings' General tab.
+    run: (navigate) => navigate('/settings#shortcuts'),
   },
   {
     id: 'close',

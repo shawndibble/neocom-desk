@@ -47,6 +47,7 @@ import {
   normalizeFacilityDefaults,
   type FacilityDefaults,
 } from '@/features/industry/facilityDefaults';
+import { useReactionFacilityDefaults } from '@/features/industry/reactionFacilityDefaults';
 import { useExpiringWindowHours, EXPIRING_WINDOW_HOUR_OPTIONS } from '@/features/pi/expiringWindow';
 import {
   useSpExtractionMonitoringEnabled,
@@ -649,6 +650,8 @@ function DefaultsPanel() {
   const setIncludeBlueprintCost = useIncludeBlueprintCost((state) => state.setValue);
   const facilityDefaults = useFacilityDefaults((state) => state.value);
   const setFacilityDefaults = useFacilityDefaults((state) => state.setValue);
+  const reactionFacilityDefaults = useReactionFacilityDefaults((state) => state.value);
+  const setReactionFacilityDefaults = useReactionFacilityDefaults((state) => state.setValue);
   const expiringHours = useExpiringWindowHours((state) => state.value);
   const setExpiringHours = useExpiringWindowHours((state) => state.setValue);
   const defaultCharacterFilter = useDefaultCharacterFilter((state) => state.value);
@@ -665,6 +668,7 @@ function DefaultsPanel() {
   const assumedTeHydrated = useHydratedStore(useAssumedTe);
   const includeBlueprintCostHydrated = useHydratedStore(useIncludeBlueprintCost);
   const facilityHydrated = useHydratedStore(useFacilityDefaults);
+  const reactionFacilityHydrated = useHydratedStore(useReactionFacilityDefaults);
   const expiringHydrated = useHydratedStore(useExpiringWindowHours);
   const defaultCharacterFilterHydrated = useHydratedStore(useDefaultCharacterFilter);
   const spExtractionEnabledHydrated = useHydratedStore(useSpExtractionMonitoringEnabled);
@@ -675,12 +679,23 @@ function DefaultsPanel() {
     assumedTeHydrated &&
     includeBlueprintCostHydrated &&
     facilityHydrated &&
+    reactionFacilityHydrated &&
     expiringHydrated &&
     defaultCharacterFilterHydrated &&
     spExtractionEnabledHydrated &&
     spExtractionThresholdHydrated;
 
   const facilityPreset = FACILITY_PRESETS[facilityDefaults.facility];
+  // Split by activity so neither picker offers a facility the activity cannot
+  // use — a reaction never runs in an NPC station or an Azbel, and a
+  // manufacturing job never runs in a refinery. The same filtering the
+  // Build Location picker already does (CONTEXT.md round 25).
+  const manufacturingPresets = Object.values(FACILITY_PRESETS).filter(
+    (preset) => preset.activity === 'manufacturing'
+  );
+  const reactionPresets = Object.values(FACILITY_PRESETS).filter(
+    (preset) => preset.activity === 'reaction'
+  );
 
   // Only for the picker's "This character" preview and quick-select — the
   // stored default itself keeps meaning "whichever Character I'm on" even on
@@ -751,7 +766,7 @@ function DefaultsPanel() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {Object.values(FACILITY_PRESETS).map((preset) => (
+              {manufacturingPresets.map((preset) => (
                 <SelectItem key={preset.kind} value={preset.kind}>
                   {preset.name}
                 </SelectItem>
@@ -808,6 +823,103 @@ function DefaultsPanel() {
               </div>
             </div>
           )}
+        </div>
+
+        {/*
+          The Reaction Location a Build Plan starts at the first time Include
+          Reactions is turned on for it. Its own synced key
+          (`features/industry/reactionFacilityDefaults.ts`) rather than a field
+          on the manufacturing record above: a pilot's refinery and their
+          factory are two separate standing facts, and the two pickers share no
+          facility between them.
+
+          Every reaction facility is a player structure, so the rig and tax
+          rows below are unconditional here — unlike the manufacturing block
+          above, where an NPC station has neither.
+        */}
+        <div className="space-y-1.5 border-t border-line pt-3">
+          <label htmlFor="settings-reaction-facility" className="block text-xs font-semibold">
+            {t('settings.reactionFacilityLabel')}
+          </label>
+          <p className="text-xs text-text-dim">{t('settings.reactionFacilityHint')}</p>
+          <Select
+            value={reactionFacilityDefaults.facility}
+            onValueChange={(value) =>
+              void setReactionFacilityDefaults({
+                ...reactionFacilityDefaults,
+                facility: value as FacilityDefaults['facility'],
+              })
+            }
+          >
+            <SelectTrigger
+              id="settings-reaction-facility"
+              aria-label={t('settings.reactionFacilityLabel')}
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {reactionPresets.map((preset) => (
+                <SelectItem key={preset.kind} value={preset.kind}>
+                  {preset.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <div className="space-y-3 border-l-2 border-line pt-2 pl-3">
+            <div
+              role="group"
+              aria-label={t('settings.reactionRigLevelLabel')}
+              className="space-y-3"
+            >
+              <p className="text-xs font-semibold">{t('settings.reactionRigLevelLabel')}</p>
+              {reactionFacilityDefaults.rigFit.map((kind, slot) => (
+                <ChipRow
+                  // A slot's position is its identity, not the kind fitted in it.
+                  key={slot}
+                  label={t('industry.rigSlotLabel', { slot: slot + 1 })}
+                  options={RIG_KIND_OPTIONS}
+                  selected={kind}
+                  onSelect={(picked) =>
+                    void setReactionFacilityDefaults({
+                      ...reactionFacilityDefaults,
+                      rigFit: setRigSlot(reactionFacilityDefaults.rigFit, slot, picked),
+                    })
+                  }
+                  labelFor={(kind) => t(rigKindLabelKey(kind))}
+                />
+              ))}
+            </div>
+            <div className="space-y-1.5">
+              <label
+                htmlFor="settings-reaction-facility-tax"
+                className="block text-xs font-semibold"
+              >
+                {t('settings.reactionFacilityTaxLabel')}
+              </label>
+              <p className="text-xs text-text-dim">{t('settings.facilityTaxHint')}</p>
+              <TextInput
+                id="settings-reaction-facility-tax"
+                type="number"
+                min={0}
+                step={0.01}
+                value={reactionFacilityDefaults.facilityTaxPct ?? ''}
+                placeholder={String(
+                  FACILITY_PRESETS[reactionFacilityDefaults.facility].defaultTaxPct
+                )}
+                onChange={(event) => {
+                  const raw = event.target.value.trim();
+                  const parsed = Number(raw);
+                  void setReactionFacilityDefaults({
+                    ...reactionFacilityDefaults,
+                    // Empty means "use the preset's own", the same as above.
+                    facilityTaxPct:
+                      raw === '' || !Number.isFinite(parsed) || parsed < 0 ? null : parsed,
+                  });
+                }}
+              />
+            </div>
+          </div>
         </div>
 
         <div className="space-y-1.5 border-t border-line pt-3">
@@ -1053,25 +1165,34 @@ export function Settings() {
           <MobileTabsPanel />
           <DefaultsPanel />
           <CorpDefaultsPanel />
-          <Panel title={t('shortcuts.title')}>
-            {/* `max-w-md` inside the full-width page frame: a description and its
+          {/*
+            Anchor for the `?` shortcut, which navigates to
+            `/settings#shortcuts` (lib/shortcuts.ts). No TAB_FOR_HASH entry is
+            needed: an unmapped hash already falls back to the General tab,
+            which is the one holding this Panel, and the scroll effect above
+            finds this id.
+          */}
+          <div id="shortcuts" className="scroll-mt-4">
+            <Panel title={t('shortcuts.title')}>
+              {/* `max-w-md` inside the full-width page frame: a description and its
                 key are a pair, and at the page's own width `justify-between` threw
                 them a thousand pixels apart with nothing in between. The page
                 keeps one container width app-wide (§3); content that a wide row
                 would make unreadable constrains itself, here. */}
-            <dl className="max-w-md divide-y divide-line text-xs">
-              {SHORTCUTS.map((shortcut) => (
-                <div key={shortcut.id} className="flex items-center justify-between gap-4 py-2">
-                  <dt className="text-text-dim">{t(shortcut.descriptionKey)}</dt>
-                  <dd>
-                    <kbd className="rounded-xs border border-line bg-panel-2 px-1.5 py-0.5 font-mono text-[0.6875rem] text-text">
-                      {shortcut.displayKey}
-                    </kbd>
-                  </dd>
-                </div>
-              ))}
-            </dl>
-          </Panel>
+              <dl className="max-w-md divide-y divide-line text-xs">
+                {SHORTCUTS.map((shortcut) => (
+                  <div key={shortcut.id} className="flex items-center justify-between gap-4 py-2">
+                    <dt className="text-text-dim">{t(shortcut.descriptionKey)}</dt>
+                    <dd>
+                      <kbd className="rounded-xs border border-line bg-panel-2 px-1.5 py-0.5 font-mono text-[0.6875rem] text-text">
+                        {shortcut.displayKey}
+                      </kbd>
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            </Panel>
+          </div>
           {/*
             Anchor for anything that needs to send a Character here to grant corp
             access — with corp UI hidden rather than locked, this row is the only

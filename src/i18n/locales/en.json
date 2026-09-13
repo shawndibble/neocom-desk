@@ -3406,6 +3406,10 @@
     "rigLevelLabel": "Rigs",
     "facilityTaxLabel": "Facility tax (%)",
     "facilityTaxHint": "What the structure owner charges. Leave blank to use the standard rate.",
+    "reactionFacilityLabel": "Default reaction location",
+    "reactionFacilityHint": "The refinery a build plan assumes the first time you turn on Include Reactions for it. Used only when the plan has no reaction location yet.",
+    "reactionRigLevelLabel": "Reactor rigs",
+    "reactionFacilityTaxLabel": "Reaction location tax (%)",
     "assumedMeLabel": "Assumed ME for blueprints you don’t own",
     "assumedMeHint": "New plans and sub-builds are quoted at this ME. A blueprint you do own always uses its real ME instead.",
     "assumedTeLabel": "Assumed TE for blueprints you don’t own",
@@ -3435,6 +3439,7 @@
     "jumpToSearch": "Jump to search",
     "switchCharacter": "Switch character",
     "openSettings": "Open Settings",
+    "showShortcuts": "Show this shortcut list",
     "close": "Close the open dialog"
   },
   "activityLog": {

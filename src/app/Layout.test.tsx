@@ -10,6 +10,7 @@ import { useAuthFailure } from '@/stores/authFailure';
 import { NO_CORP_CAPABILITIES } from '@/engine/corpRoles';
 import { useCorpAccess, type CorpAccessState } from '@/features/corp/useCorpAccess';
 import { DEFAULT_MOBILE_TABS, useMobileTabs } from '@/lib/mobileTabs';
+import { KEYBOARD_OVERLAY_ATTRIBUTE } from '@/lib/shortcuts';
 import { Layout } from './Layout';
 
 vi.mock('@/features/corp/useCorpAccess', () => ({ useCorpAccess: vi.fn() }));
@@ -532,6 +533,59 @@ describe('Layout keyboard shortcuts (issue #25)', () => {
 
     await user.keyboard('{Control>}/{/Control}');
     expect(screen.queryByText('market page')).not.toBeInTheDocument();
+  });
+
+  it('"?" opens the shortcut list, even though the layout types it with Shift', async () => {
+    const user = userEvent.setup();
+    renderLayoutWithRoutes();
+    await screen.findByText('overview page');
+
+    await user.keyboard('?');
+    expect(await screen.findByText('settings page')).toBeInTheDocument();
+  });
+
+  it('does not turn a capital letter into a shortcut', async () => {
+    const user = userEvent.setup();
+    renderLayoutWithRoutes();
+    await screen.findByText('overview page');
+
+    // Shift no longer blocks every press — only `?` opted in — so Shift+C has
+    // to stay an ordinary capital C rather than becoming a second way to
+    // reach the character switcher.
+    await user.keyboard('{Shift>}c{/Shift}');
+    expect(screen.queryByText('characters page')).not.toBeInTheDocument();
+  });
+
+  it('defers to a non-modal overlay that marked itself, like the Compare drawer', async () => {
+    const user = userEvent.setup();
+    renderLayoutWithRoutes();
+    await screen.findByText('overview page');
+
+    // Stands in for `features/market/CompareDrawer.tsx`: a plain <section>
+    // that owns the keyboard while open but is deliberately not a dialog.
+    const drawer = document.createElement('section');
+    drawer.setAttribute(KEYBOARD_OVERLAY_ATTRIBUTE, '');
+    document.body.append(drawer);
+
+    await user.keyboard('c');
+    expect(screen.queryByText('characters page')).not.toBeInTheDocument();
+    drawer.remove();
+  });
+
+  it('defers to a Radix popover, which renders role="dialog" on a plain div', async () => {
+    const user = userEvent.setup();
+    renderLayoutWithRoutes();
+    await screen.findByText('overview page');
+
+    // `dialog[open]` cannot match this — that selector needs the native
+    // element — so the guard has to name the role too.
+    const popover = document.createElement('div');
+    popover.setAttribute('role', 'dialog');
+    document.body.append(popover);
+
+    await user.keyboard('c');
+    expect(screen.queryByText('characters page')).not.toBeInTheDocument();
+    popover.remove();
   });
 
   it('defers to an open dialog rather than also navigating', async () => {

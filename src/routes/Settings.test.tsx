@@ -28,6 +28,11 @@ import {
   DEFAULT_FACILITY_DEFAULTS,
   FACILITY_DEFAULTS_SETTING_KEY,
 } from '@/features/industry/facilityDefaults';
+import {
+  useReactionFacilityDefaults,
+  DEFAULT_REACTION_FACILITY_DEFAULTS,
+  REACTION_FACILITY_DEFAULTS_SETTING_KEY,
+} from '@/features/industry/reactionFacilityDefaults';
 import { useExpiringWindowHours } from '@/features/pi/expiringWindow';
 import { useDarkThreshold } from '@/features/corp/darkThreshold';
 import { useDefaultCharacterFilter } from '@/features/character/defaultCharacterFilter';
@@ -84,6 +89,10 @@ beforeEach(async () => {
   useAssumedMe.setState({ value: 0, hydrated: false });
   useAssumedTe.setState({ value: 0, hydrated: false });
   useFacilityDefaults.setState({ value: DEFAULT_FACILITY_DEFAULTS, hydrated: false });
+  useReactionFacilityDefaults.setState({
+    value: DEFAULT_REACTION_FACILITY_DEFAULTS,
+    hydrated: false,
+  });
   useExpiringWindowHours.setState({ value: 24, hydrated: false });
   useDarkThreshold.setState({ value: 30, hydrated: false });
   useDefaultCharacterFilter.setState({ value: 'current', hydrated: false });
@@ -1025,7 +1034,7 @@ describe('Settings defaults', () => {
     expect(await screen.findByRole('combobox', { name: /default facility/i })).toHaveTextContent(
       /npc/i
     );
-    expect(screen.queryByRole('group', { name: /rigs/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: 'Rigs' })).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/facility tax/i)).not.toBeInTheDocument();
   });
 
@@ -1050,7 +1059,7 @@ describe('Settings defaults', () => {
     render(<App />);
     await screen.findByRole('heading', { level: 1, name: /settings/i });
 
-    expect(await screen.findByRole('group', { name: /rigs/i })).toBeInTheDocument();
+    expect(await screen.findByRole('group', { name: 'Rigs' })).toBeInTheDocument();
     expect(screen.getByLabelText(/facility tax/i)).toHaveValue(5);
     expect(await db.settings.get(FACILITY_DEFAULTS_SETTING_KEY)).toMatchObject({
       value: { facility: 'azbel', rigLevel: 't2', facilityTaxPct: 5 },
@@ -1065,8 +1074,72 @@ describe('Settings defaults', () => {
     render(<App />);
     await screen.findByRole('heading', { level: 1, name: /settings/i });
 
-    expect(await screen.findByRole('group', { name: /rigs/i })).toBeInTheDocument();
+    expect(await screen.findByRole('group', { name: 'Rigs' })).toBeInTheDocument();
     expect(screen.getByLabelText(/facility tax/i)).toHaveValue(2);
+  });
+
+  it('offers a reaction location default, which nothing could set before', async () => {
+    render(<App />);
+    await screen.findByRole('heading', { level: 1, name: /settings/i });
+
+    // `sync.industryReactionFacilityDefaults` was allow-listed, promised in
+    // the FAQ and read by BuildPlanDetail, with no control anywhere — so
+    // every plan's first Reaction Location was an unfitted Athanor forever.
+    expect(
+      await screen.findByRole('combobox', { name: /default reaction location/i })
+    ).toHaveTextContent(/athanor/i);
+    expect(screen.getByRole('group', { name: 'Reactor rigs' })).toBeInTheDocument();
+    expect(screen.getByLabelText(/reaction location tax/i)).toBeInTheDocument();
+  });
+
+  it('only offers refineries as a reaction location, and never offers one as the build facility', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByRole('heading', { level: 1, name: /settings/i });
+
+    await user.click(await screen.findByRole('combobox', { name: /default reaction location/i }));
+    const reactionOptions = within(screen.getByRole('listbox')).getAllByRole('option');
+    // `stringContaining`, not the bare name: the selected option also renders
+    // a check glyph inside its own label.
+    expect(reactionOptions.map((option) => option.textContent)).toEqual([
+      expect.stringContaining('Athanor'),
+      expect.stringContaining('Tatara'),
+    ]);
+    await user.keyboard('{Escape}');
+
+    await user.click(await screen.findByRole('combobox', { name: /default facility/i }));
+    const buildOptions = within(screen.getByRole('listbox')).getAllByRole('option');
+    expect(buildOptions.map((option) => option.textContent)).not.toEqual(
+      expect.arrayContaining([expect.stringContaining('Athanor')])
+    );
+  });
+
+  it('persists a reaction location tax', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByRole('heading', { level: 1, name: /settings/i });
+
+    await user.type(await screen.findByLabelText(/reaction location tax/i), '3');
+
+    await waitFor(async () => {
+      expect(await db.settings.get(REACTION_FACILITY_DEFAULTS_SETTING_KEY)).toMatchObject({
+        value: { facility: 'athanor', facilityTaxPct: 3 },
+      });
+    });
+  });
+
+  it('shows a stored reaction location on a cold load rather than the default', async () => {
+    await db.settings.put({
+      key: REACTION_FACILITY_DEFAULTS_SETTING_KEY,
+      value: { facility: 'tatara', rigFit: ['meT2', 'none', 'none'], facilityTaxPct: 4 },
+    });
+    render(<App />);
+    await screen.findByRole('heading', { level: 1, name: /settings/i });
+
+    expect(
+      await screen.findByRole('combobox', { name: /default reaction location/i })
+    ).toHaveTextContent(/tatara/i);
+    expect(screen.getByLabelText(/reaction location tax/i)).toHaveValue(4);
   });
 
   it('offers the PI expiring-soon window, defaulting to 24 hours', async () => {
