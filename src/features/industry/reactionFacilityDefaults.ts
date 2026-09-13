@@ -39,6 +39,15 @@ export const DEFAULT_REACTION_FACILITY_DEFAULTS: ReactionFacilityDefaults = {
 const RIG_KINDS: readonly RigKind[] = ['none', 'meT1', 'meT2', 'teT1', 'teT2'];
 
 /**
+ * The only facilities this setting may hold — the same restriction the
+ * Reaction Location picker applies, so a control offering these can never
+ * produce a value `normalizeReactionFacilityDefaults` would reject.
+ */
+export const REACTION_FACILITY_PRESETS = Object.values(FACILITY_PRESETS).filter(
+  (preset) => preset.activity === 'reaction'
+);
+
+/**
  * A facility whose preset isn't a reaction one is incoherent for this
  * setting — normalised to the default rather than rejected outright, the
  * same "the facility is what the pilot chose" reasoning

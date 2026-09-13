@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { SHORTCUTS } from '@/lib/shortcuts';
+import { OVERLAY_SELECTOR, SHORTCUTS } from '@/lib/shortcuts';
 
 function isTypingTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
@@ -19,18 +19,23 @@ export function useKeyboardShortcuts(): void {
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
-      if (event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
+      // Shift stays out of this list: `?` is typed with it. Opt-in below.
+      if (event.ctrlKey || event.metaKey || event.altKey) return;
       if (isTypingTarget(event.target)) return;
-      // An open overlay — the native <dialog> (Modal.tsx) or a Radix menu/
-      // listbox (DropdownMenu/ContextMenu/Select, none of which force-mount
-      // while closed) — owns the keyboard until it's dismissed, rather than
-      // also acting on whatever else is bound.
-      if (document.querySelector('dialog[open], [role="menu"], [role="listbox"]')) return;
+      // An open overlay owns the keyboard until it's dismissed, rather than
+      // also acting on whatever else is bound. What counts as one lives in
+      // `lib/shortcuts.ts`'s OVERLAY_SELECTOR — the native <dialog>
+      // (Modal.tsx), the Radix primitives (none of which force-mount while
+      // closed), and anything that opts in with the overlay attribute.
+      if (document.querySelector(OVERLAY_SELECTOR)) return;
 
       // Lower-cased so Caps Lock (which reports `event.key` as 'C', not 'c',
       // with `shiftKey: false`) doesn't silently defeat a letter shortcut.
       const key = event.key.toLowerCase();
       const shortcut = SHORTCUTS.find((candidate) => candidate.key.toLowerCase() === key);
+      // Shift narrows rather than widens: Shift+C stays an ordinary capital C
+      // rather than a second way to fire the character switcher.
+      if (event.shiftKey && !shortcut?.allowsShift) return;
       if (!shortcut?.run) return;
 
       event.preventDefault();

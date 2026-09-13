@@ -36,7 +36,13 @@ import { formatAge } from '@/lib/age';
 import { formatTimestamp } from '@/lib/timestamp';
 import { SHORTCUTS } from '@/lib/shortcuts';
 import { TRADE_HUBS, type TradeHub } from '@/market/hubs';
-import { FACILITY_PRESETS, RIG_KIND_OPTIONS, setRigSlot } from '@/engine/industry/types';
+import {
+  FACILITY_PRESETS,
+  RIG_KIND_OPTIONS,
+  setRigSlot,
+  type FacilityKind,
+  type FacilityPreset,
+} from '@/engine/industry/types';
 import { rigKindLabelKey } from '@/features/industry/rigFitLabels';
 import { useMarketHub } from '@/features/market/hub';
 import { useAssumedMe, MIN_ASSUMED_ME, MAX_ASSUMED_ME } from '@/features/industry/assumedMe';
@@ -47,6 +53,10 @@ import {
   normalizeFacilityDefaults,
   type FacilityDefaults,
 } from '@/features/industry/facilityDefaults';
+import {
+  useReactionFacilityDefaults,
+  REACTION_FACILITY_PRESETS,
+} from '@/features/industry/reactionFacilityDefaults';
 import { useExpiringWindowHours, EXPIRING_WINDOW_HOUR_OPTIONS } from '@/features/pi/expiringWindow';
 import {
   useSpExtractionMonitoringEnabled,
@@ -87,6 +97,12 @@ const TAB_FOR_HASH: Readonly<Record<string, SettingsTab>> = {
   // worth being addressable from outside the app (a forum post, a README),
   // which a tab with no hash of its own would not be.
   faq: 'faq',
+  // The `?` shortcut's target (lib/shortcuts.ts). Only the mount-time
+  // initializer falls back to General for an unmapped hash; a *later* hash
+  // change leaves the tab alone, so without this entry pressing `?` while
+  // already on Settings' FAQ or Notifications tab changed the URL and
+  // nothing else — no panel, nothing to scroll to.
+  shortcuts: 'general',
 };
 
 const FONT_SCALE_LABEL_KEYS = {
@@ -629,6 +645,105 @@ function MobileTabsPanel() {
 }
 
 /**
+ * One facility-defaults record's controls: which facility, its rig fit, and
+ * the owner-set tax. Rendered twice in {@link DefaultsPanel} — once for where
+ * a Build Plan manufactures, once for its Reaction Location — because
+ * `FacilityDefaults` and `ReactionFacilityDefaults` are the same three fields
+ * over different preset sets, and the two only ever drifted apart by accident
+ * when they were two copies of this markup.
+ *
+ * Normalising stays with the caller: what an incoherent pick means differs
+ * per record (an NPC station drops rigs and tax; a non-reaction facility is
+ * refused outright), and only the caller knows which store it is writing.
+ */
+function FacilityDefaultsFields({
+  idPrefix,
+  value,
+  onChange,
+  presets,
+  showRigAndTax,
+  labels,
+}: {
+  idPrefix: string;
+  value: FacilityDefaults;
+  onChange: (next: FacilityDefaults) => void;
+  presets: readonly FacilityPreset[];
+  showRigAndTax: boolean;
+  labels: { facility: string; hint: string; rigGroup: string; tax: string };
+}) {
+  const { t } = useTranslation();
+  return (
+    <div className="space-y-1.5 border-t border-line pt-3">
+      <label htmlFor={`${idPrefix}-facility`} className="block text-xs font-semibold">
+        {labels.facility}
+      </label>
+      <p className="text-xs text-text-dim">{labels.hint}</p>
+      <Select
+        value={value.facility}
+        onValueChange={(picked) => onChange({ ...value, facility: picked as FacilityKind })}
+      >
+        <SelectTrigger id={`${idPrefix}-facility`} aria-label={labels.facility}>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {presets.map((preset) => (
+            <SelectItem key={preset.kind} value={preset.kind}>
+              {preset.name}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
+      {showRigAndTax && (
+        <div className="space-y-3 border-l-2 border-line pt-2 pl-3">
+          <div role="group" aria-label={labels.rigGroup} className="space-y-3">
+            <p className="text-xs font-semibold">{labels.rigGroup}</p>
+            {value.rigFit.map((kind, slot) => (
+              <ChipRow
+                // A slot's position is its identity, not the kind fitted in it.
+                key={slot}
+                label={t('industry.rigSlotLabel', { slot: slot + 1 })}
+                options={RIG_KIND_OPTIONS}
+                selected={kind}
+                onSelect={(picked) =>
+                  onChange({ ...value, rigFit: setRigSlot(value.rigFit, slot, picked) })
+                }
+                labelFor={(kind) => t(rigKindLabelKey(kind))}
+              />
+            ))}
+          </div>
+          <div className="space-y-1.5">
+            <label htmlFor={`${idPrefix}-facility-tax`} className="block text-xs font-semibold">
+              {labels.tax}
+            </label>
+            <p className="text-xs text-text-dim">{t('settings.facilityTaxHint')}</p>
+            <TextInput
+              id={`${idPrefix}-facility-tax`}
+              type="number"
+              min={0}
+              step={0.01}
+              value={value.facilityTaxPct ?? ''}
+              placeholder={String(FACILITY_PRESETS[value.facility].defaultTaxPct)}
+              onChange={(event) => {
+                const raw = event.target.value.trim();
+                const parsed = Number(raw);
+                onChange({
+                  ...value,
+                  // Empty means "use the preset's own", which is what a plan
+                  // with no tax of its own already does.
+                  facilityTaxPct:
+                    raw === '' || !Number.isFinite(parsed) || parsed < 0 ? null : parsed,
+                });
+              }}
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
  * What a page assumes when the pilot has not said otherwise. Every control
  * here defaults to exactly what the app did before it was settable, so an
  * existing pilot's numbers do not move until they ask them to.
@@ -649,6 +764,8 @@ function DefaultsPanel() {
   const setIncludeBlueprintCost = useIncludeBlueprintCost((state) => state.setValue);
   const facilityDefaults = useFacilityDefaults((state) => state.value);
   const setFacilityDefaults = useFacilityDefaults((state) => state.setValue);
+  const reactionFacilityDefaults = useReactionFacilityDefaults((state) => state.value);
+  const setReactionFacilityDefaults = useReactionFacilityDefaults((state) => state.setValue);
   const expiringHours = useExpiringWindowHours((state) => state.value);
   const setExpiringHours = useExpiringWindowHours((state) => state.setValue);
   const defaultCharacterFilter = useDefaultCharacterFilter((state) => state.value);
@@ -665,6 +782,7 @@ function DefaultsPanel() {
   const assumedTeHydrated = useHydratedStore(useAssumedTe);
   const includeBlueprintCostHydrated = useHydratedStore(useIncludeBlueprintCost);
   const facilityHydrated = useHydratedStore(useFacilityDefaults);
+  const reactionFacilityHydrated = useHydratedStore(useReactionFacilityDefaults);
   const expiringHydrated = useHydratedStore(useExpiringWindowHours);
   const defaultCharacterFilterHydrated = useHydratedStore(useDefaultCharacterFilter);
   const spExtractionEnabledHydrated = useHydratedStore(useSpExtractionMonitoringEnabled);
@@ -675,6 +793,7 @@ function DefaultsPanel() {
     assumedTeHydrated &&
     includeBlueprintCostHydrated &&
     facilityHydrated &&
+    reactionFacilityHydrated &&
     expiringHydrated &&
     defaultCharacterFilterHydrated &&
     spExtractionEnabledHydrated &&
@@ -727,88 +846,47 @@ function DefaultsPanel() {
           </Select>
         </div>
 
-        <div className="space-y-1.5 border-t border-line pt-3">
-          <label htmlFor="settings-facility" className="block text-xs font-semibold">
-            {t('settings.facilityLabel')}
-          </label>
-          <p className="text-xs text-text-dim">{t('settings.facilityHint')}</p>
-          <Select
-            value={facilityDefaults.facility}
-            onValueChange={(value) =>
-              void setFacilityDefaults(
-                // Normalised on the way in: an NPC station fits no rigs and its
-                // tax is fixed, so switching to one has to drop both rather
-                // than leave a combination that cannot exist. Same rule
-                // `BuildPlanDetail` applies to a plan.
-                normalizeFacilityDefaults({
-                  ...facilityDefaults,
-                  facility: value as FacilityDefaults['facility'],
-                })
-              )
-            }
-          >
-            <SelectTrigger id="settings-facility" aria-label={t('settings.facilityLabel')}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {Object.values(FACILITY_PRESETS).map((preset) => (
-                <SelectItem key={preset.kind} value={preset.kind}>
-                  {preset.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <FacilityDefaultsFields
+          idPrefix="settings"
+          value={facilityDefaults}
+          // Normalised on the way in: an NPC station fits no rigs and its tax
+          // is fixed, so switching to one has to drop both rather than leave a
+          // combination that cannot exist. Same rule `BuildPlanDetail` applies
+          // to a plan.
+          onChange={(next) => void setFacilityDefaults(normalizeFacilityDefaults(next))}
+          presets={Object.values(FACILITY_PRESETS)}
+          // Rig and owner-set tax only exist for a player structure.
+          showRigAndTax={facilityPreset.structure}
+          labels={{
+            facility: t('settings.facilityLabel'),
+            hint: t('settings.facilityHint'),
+            rigGroup: t('settings.rigLevelLabel'),
+            tax: t('settings.facilityTaxLabel'),
+          }}
+        />
 
-          {/* Rig and owner-set tax only exist for a player structure. */}
-          {facilityPreset.structure && (
-            <div className="space-y-3 border-l-2 border-line pt-2 pl-3">
-              <div role="group" aria-label={t('settings.rigLevelLabel')} className="space-y-3">
-                <p className="text-xs font-semibold">{t('settings.rigLevelLabel')}</p>
-                {facilityDefaults.rigFit.map((kind, slot) => (
-                  <ChipRow
-                    // A slot's position is its identity, not the kind fitted in it.
-                    key={slot}
-                    label={t('industry.rigSlotLabel', { slot: slot + 1 })}
-                    options={RIG_KIND_OPTIONS}
-                    selected={kind}
-                    onSelect={(picked) =>
-                      void setFacilityDefaults({
-                        ...facilityDefaults,
-                        rigFit: setRigSlot(facilityDefaults.rigFit, slot, picked),
-                      })
-                    }
-                    labelFor={(kind) => t(rigKindLabelKey(kind))}
-                  />
-                ))}
-              </div>
-              <div className="space-y-1.5">
-                <label htmlFor="settings-facility-tax" className="block text-xs font-semibold">
-                  {t('settings.facilityTaxLabel')}
-                </label>
-                <p className="text-xs text-text-dim">{t('settings.facilityTaxHint')}</p>
-                <TextInput
-                  id="settings-facility-tax"
-                  type="number"
-                  min={0}
-                  step={0.01}
-                  value={facilityDefaults.facilityTaxPct ?? ''}
-                  placeholder={String(facilityPreset.defaultTaxPct)}
-                  onChange={(event) => {
-                    const raw = event.target.value.trim();
-                    const parsed = Number(raw);
-                    void setFacilityDefaults({
-                      ...facilityDefaults,
-                      // Empty means "use the preset's own", which is what a
-                      // plan with no tax of its own already does.
-                      facilityTaxPct:
-                        raw === '' || !Number.isFinite(parsed) || parsed < 0 ? null : parsed,
-                    });
-                  }}
-                />
-              </div>
-            </div>
-          )}
-        </div>
+        {/*
+          The Reaction Location a Build Plan starts at the first time Include
+          Reactions is turned on for it. Its own synced key
+          (`features/industry/reactionFacilityDefaults.ts`): a pilot's refinery
+          and their factory are two standing facts that share no facility.
+
+          `showRigAndTax` is unconditional — every reaction facility is a
+          player structure, unlike an NPC station above.
+        */}
+        <FacilityDefaultsFields
+          idPrefix="settings-reaction"
+          value={reactionFacilityDefaults}
+          onChange={(next) => void setReactionFacilityDefaults(next)}
+          presets={REACTION_FACILITY_PRESETS}
+          showRigAndTax
+          labels={{
+            facility: t('settings.reactionLocationLabel'),
+            hint: t('settings.reactionLocationHint'),
+            rigGroup: t('settings.reactionLocationRigLabel'),
+            tax: t('settings.reactionLocationTaxLabel'),
+          }}
+        />
 
         <div className="space-y-1.5 border-t border-line pt-3">
           <label htmlFor="settings-assumed-me" className="block text-xs font-semibold">
@@ -1053,25 +1131,30 @@ export function Settings() {
           <MobileTabsPanel />
           <DefaultsPanel />
           <CorpDefaultsPanel />
-          <Panel title={t('shortcuts.title')}>
-            {/* `max-w-md` inside the full-width page frame: a description and its
+          {/* Anchor for the `?` shortcut, which navigates to
+              `/settings#shortcuts` (lib/shortcuts.ts). TAB_FOR_HASH maps that
+              hash to this tab; the scroll effect above finds this id. */}
+          <div id="shortcuts" className="scroll-mt-4">
+            <Panel title={t('shortcuts.title')}>
+              {/* `max-w-md` inside the full-width page frame: a description and its
                 key are a pair, and at the page's own width `justify-between` threw
                 them a thousand pixels apart with nothing in between. The page
                 keeps one container width app-wide (§3); content that a wide row
                 would make unreadable constrains itself, here. */}
-            <dl className="max-w-md divide-y divide-line text-xs">
-              {SHORTCUTS.map((shortcut) => (
-                <div key={shortcut.id} className="flex items-center justify-between gap-4 py-2">
-                  <dt className="text-text-dim">{t(shortcut.descriptionKey)}</dt>
-                  <dd>
-                    <kbd className="rounded-xs border border-line bg-panel-2 px-1.5 py-0.5 font-mono text-[0.6875rem] text-text">
-                      {shortcut.displayKey}
-                    </kbd>
-                  </dd>
-                </div>
-              ))}
-            </dl>
-          </Panel>
+              <dl className="max-w-md divide-y divide-line text-xs">
+                {SHORTCUTS.map((shortcut) => (
+                  <div key={shortcut.id} className="flex items-center justify-between gap-4 py-2">
+                    <dt className="text-text-dim">{t(shortcut.descriptionKey)}</dt>
+                    <dd>
+                      <kbd className="rounded-xs border border-line bg-panel-2 px-1.5 py-0.5 font-mono text-[0.6875rem] text-text">
+                        {shortcut.displayKey}
+                      </kbd>
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            </Panel>
+          </div>
           {/*
             Anchor for anything that needs to send a Character here to grant corp
             access — with corp UI hidden rather than locked, this row is the only

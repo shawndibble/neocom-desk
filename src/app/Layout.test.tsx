@@ -10,6 +10,7 @@ import { useAuthFailure } from '@/stores/authFailure';
 import { NO_CORP_CAPABILITIES } from '@/engine/corpRoles';
 import { useCorpAccess, type CorpAccessState } from '@/features/corp/useCorpAccess';
 import { DEFAULT_MOBILE_TABS, useMobileTabs } from '@/lib/mobileTabs';
+import { KEYBOARD_OVERLAY_ATTRIBUTE } from '@/lib/shortcuts';
 import { Layout } from './Layout';
 
 vi.mock('@/features/corp/useCorpAccess', () => ({ useCorpAccess: vi.fn() }));
@@ -532,6 +533,56 @@ describe('Layout keyboard shortcuts (issue #25)', () => {
 
     await user.keyboard('{Control>}/{/Control}');
     expect(screen.queryByText('market page')).not.toBeInTheDocument();
+  });
+
+  it('"?" opens the shortcut list, even though the layout types it with Shift', async () => {
+    const user = userEvent.setup();
+    renderLayoutWithRoutes();
+    await screen.findByText('overview page');
+
+    // `{Shift>}?{/Shift}`, not a bare '?': user-event's US keymap has no
+    // entry for '?', so a bare press dispatches `shiftKey: false` and would
+    // pass even with `allowsShift` deleted — testing nothing.
+    await user.keyboard('{Shift>}?{/Shift}');
+    expect(await screen.findByText('settings page')).toBeInTheDocument();
+  });
+
+  it('does not turn a capital letter into a shortcut', async () => {
+    const user = userEvent.setup();
+    renderLayoutWithRoutes();
+    await screen.findByText('overview page');
+
+    // Shift no longer blocks every press — only `?` opted in — so Shift+C has
+    // to stay an ordinary capital C rather than becoming a second way to
+    // reach the character switcher.
+    await user.keyboard('{Shift>}c{/Shift}');
+    expect(screen.queryByText('characters page')).not.toBeInTheDocument();
+  });
+
+  // Two overlays `dialog[open]` cannot match: the Compare drawer, a plain
+  // <section> that opts in (features/market/CompareDrawer.tsx), and a Radix
+  // Popover, which puts the role on a plain div.
+  it.each([
+    ['an overlay that marked itself', 'section', KEYBOARD_OVERLAY_ATTRIBUTE, ''],
+    ['a Radix popover', 'div', 'role', 'dialog'],
+  ])('defers to %s', async (_label, tag, attribute, attributeValue) => {
+    const user = userEvent.setup();
+    renderLayoutWithRoutes();
+    await screen.findByText('overview page');
+
+    const overlay = document.createElement(tag);
+    overlay.setAttribute(attribute, attributeValue);
+    document.body.append(overlay);
+
+    // `finally`: RTL's cleanup only unmounts React trees, and OVERLAY_SELECTOR
+    // matches anywhere in the document — a node leaked by a failed assertion
+    // would silently green every shortcut test after it.
+    try {
+      await user.keyboard('c');
+      expect(screen.queryByText('characters page')).not.toBeInTheDocument();
+    } finally {
+      overlay.remove();
+    }
   });
 
   it('defers to an open dialog rather than also navigating', async () => {

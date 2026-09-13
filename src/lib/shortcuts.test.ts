@@ -9,6 +9,17 @@ describe('SHORTCUTS', () => {
     expect(new Set(keys).size).toBe(keys.length);
   });
 
+  it('lets only a shift-typed key opt into firing with Shift held', () => {
+    // The listener drops a Shift-held press unless the shortcut asked for it,
+    // so `allowsShift` on a key that is not typed with Shift would quietly
+    // add a capital-letter duplicate of that shortcut.
+    for (const shortcut of SHORTCUTS) {
+      if (!shortcut.allowsShift) continue;
+      expect(shortcut.key).toBe(shortcut.key.toUpperCase());
+      expect(shortcut.key).toBe(shortcut.key.toLowerCase());
+    }
+  });
+
   it('leaves Escape without a run — the native <dialog> already closes on it', () => {
     const close = SHORTCUTS.find((s) => s.id === 'close');
     expect(close?.key).toBe('Escape');
