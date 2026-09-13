@@ -78,7 +78,7 @@ import {
 import { isSyncConfigured } from '@/app/syncStatus';
 import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
 import { rankedSearch } from '@/lib/rankedSearch';
-import { formatIsk } from '@/lib/isk';
+import { CONTRACT_ISK_CENTS_BELOW, formatIskAuto } from '@/lib/isk';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
 
@@ -521,9 +521,11 @@ export function ContractSearchPanel() {
   const statChipsForRow = (row: PublicContractOfferRow): PublicContractDetailModalStatChip[] => {
     const priceLabel = row.isAuction
       ? row.buyout !== undefined
-        ? t('contractSearch.buyout', { price: formatIsk(row.buyout, 2) })
-        : t('contractSearch.startingBid', { price: formatIsk(row.price, 2) })
-      : formatIsk(row.price, 2);
+        ? t('contractSearch.buyout', { price: formatIskAuto(row.buyout, CONTRACT_ISK_CENTS_BELOW) })
+        : t('contractSearch.startingBid', {
+            price: formatIskAuto(row.price, CONTRACT_ISK_CENTS_BELOW),
+          })
+      : formatIskAuto(row.price, CONTRACT_ISK_CENTS_BELOW);
     const chips: PublicContractDetailModalStatChip[] = [
       { label: t('contractSearch.priceColumn'), value: priceLabel },
       { label: t('contractSearch.qtyColumn'), value: row.quantity.toLocaleString() },
@@ -685,7 +687,7 @@ export function ContractSearchPanel() {
                                 count: suggestion.stats.offerCount,
                               })}
                               {' · '}
-                              {formatIsk(suggestion.stats.cheapest, 2)}
+                              {formatIskAuto(suggestion.stats.cheapest, CONTRACT_ISK_CENTS_BELOW)}
                             </span>
                           </button>
                         </li>
@@ -761,6 +763,7 @@ export function ContractSearchPanel() {
                       rowContextMenu={(row, tr) => (
                         <BuildPlanContextMenu
                           typeId={row.typeId}
+                          itemName={typeNames.get(row.typeId)}
                           seed={seedFromOfferRow(row)}
                           trigger={tr}
                         />

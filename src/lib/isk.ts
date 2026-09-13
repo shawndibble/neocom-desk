@@ -37,13 +37,22 @@ export function formatIsk(value: number, decimals = 0): string {
 }
 
 /**
- * ISK with cents only where they could matter — under 100 ISK, where a
- * fraction is a real difference (a mineral priced at 4.99 vs 5.01). Above
- * that the decimals are noise nobody reads on a six- or seven-figure price.
+ * ISK with cents only where they could matter — at or below `centsBelow`, where a
+ * fraction is a real difference (a mineral priced at 4.99 vs 5.01). Above it
+ * the decimals are noise nobody reads on a six- or seven-figure price.
+ *
+ * `centsBelow` is a parameter rather than a second near-copy of this function,
+ * for the reason the module header gives: three earlier copies of these
+ * helpers diverged silently. The contract screens pass 1,000 — a contract is
+ * priced in whole ISK far more often than a market order is, and a trailing
+ * `.00` on a billion-ISK bundle is the loudest kind of noise.
  */
-export function formatIskAuto(value: number): string {
-  return formatIsk(value, Math.abs(value) > 100 ? 0 : 2);
+export function formatIskAuto(value: number, centsBelow = 100): string {
+  return formatIsk(value, Math.abs(value) > centsBelow ? 0 : 2);
 }
+
+/** The `formatIskAuto` threshold every contract screen shares. */
+export const CONTRACT_ISK_CENTS_BELOW = 1000;
 
 /**
  * Grouped digits for an editable ISK field at rest — commas, and up to 2

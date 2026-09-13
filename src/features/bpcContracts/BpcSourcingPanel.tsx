@@ -81,7 +81,7 @@ import type { CharacterBlueprint } from '@/esi/endpoints';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { cx } from '@/lib/cx';
 import { rankedSearch } from '@/lib/rankedSearch';
-import { formatIsk } from '@/lib/isk';
+import { CONTRACT_ISK_CENTS_BELOW, formatIskAuto } from '@/lib/isk';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
 
@@ -819,9 +819,13 @@ export function BpcSourcingPanel({ initialTypeId = null }: BpcSourcingPanelProps
           // contract.
           return contract.isAuction ? (
             contract.buyout !== undefined ? (
-              t('bpcContracts.buyout', { price: formatIsk(contract.buyout, 2) })
+              t('bpcContracts.buyout', {
+                price: formatIskAuto(contract.buyout, CONTRACT_ISK_CENTS_BELOW),
+              })
             ) : (
-              t('bpcContracts.startingBid', { price: formatIsk(contract.price, 2) })
+              t('bpcContracts.startingBid', {
+                price: formatIskAuto(contract.price, CONTRACT_ISK_CENTS_BELOW),
+              })
             )
           ) : (
             <IskAmount value={contract.price} revealOn="longPress" />
@@ -1192,6 +1196,7 @@ export function BpcSourcingPanel({ initialTypeId = null }: BpcSourcingPanelProps
                   // of a fabricated run count.
                   <BuildPlanContextMenu
                     typeId={row.typeId}
+                    itemName={blueprintNames.get(row.typeId)}
                     seed={row.runs === -1 ? null : { me: row.me, te: row.te, runs: row.runs }}
                     trigger={tr}
                   />

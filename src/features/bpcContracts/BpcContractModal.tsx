@@ -6,7 +6,7 @@
  * lives in the shared modal.
  */
 import { useTranslation } from 'react-i18next';
-import { formatIsk } from '@/lib/isk';
+import { CONTRACT_ISK_CENTS_BELOW, formatIskAuto } from '@/lib/isk';
 import { PublicContractDetailModal } from '@/features/contracts/PublicContractDetailModal';
 import type { BpcContractRow } from '@/engine/contracts/bpcSearch';
 
@@ -29,9 +29,9 @@ export function BpcContractModal({
 
   const priceLabel = row.isAuction
     ? row.buyout !== undefined
-      ? t('bpcContracts.buyout', { price: formatIsk(row.buyout, 2) })
-      : t('bpcContracts.startingBid', { price: formatIsk(row.price, 2) })
-    : formatIsk(row.price, 2);
+      ? t('bpcContracts.buyout', { price: formatIskAuto(row.buyout, CONTRACT_ISK_CENTS_BELOW) })
+      : t('bpcContracts.startingBid', { price: formatIskAuto(row.price, CONTRACT_ISK_CENTS_BELOW) })
+    : formatIskAuto(row.price, CONTRACT_ISK_CENTS_BELOW);
 
   return (
     <PublicContractDetailModal

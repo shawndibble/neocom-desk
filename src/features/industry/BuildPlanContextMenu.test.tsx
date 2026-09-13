@@ -27,12 +27,17 @@ function LocationProbe() {
   return <div data-testid="location">{`${location.pathname}${location.search}`}</div>;
 }
 
-function renderMenu(typeId: number, seed?: { me: number; te: number; runs: number }) {
+function renderMenu(
+  typeId: number,
+  seed?: { me: number; te: number; runs: number },
+  itemName?: string
+) {
   return render(
     <MemoryRouter initialEntries={['/bpc-contracts']}>
       <BuildPlanContextMenu
         typeId={typeId}
         {...(seed ? { seed } : {})}
+        {...(itemName ? { itemName } : {})}
         trigger={
           <button type="button" data-testid="row">
             Rifter Blueprint
@@ -105,12 +110,33 @@ describe('BuildPlanContextMenu', () => {
 
   it('offers one label whether or not the row carries a seed', async () => {
     // Per the decision recorded with #636: one action, one vocabulary — a
-    // seeded row must not grow a second, differently-worded menu entry.
+    // seeded row must not grow a second, differently-worded Build Plan entry
+    // beside the plain one.
     renderMenu(638, { me: 10, te: 20, runs: 5 });
     fireEvent.contextMenu(screen.getByTestId('row'));
 
-    expect(await screen.findAllByRole('menuitem')).toHaveLength(1);
-    expect(screen.getByRole('menuitem')).toHaveTextContent('Build Plan');
+    const buildPlanItems = (await screen.findAllByRole('menuitem')).filter((entry) =>
+      entry.textContent?.includes('Build Plan')
+    );
+    expect(buildPlanItems).toHaveLength(1);
+  });
+
+  it('offers the market and clipboard actions a bare type ID is enough for', async () => {
+    renderMenu(638);
+    fireEvent.contextMenu(screen.getByTestId('row'));
+
+    expect(await screen.findByRole('menuitem', { name: 'View in Market' })).toBeInTheDocument();
+    // No name was passed, so there is nothing to copy or to compare by.
+    expect(screen.queryByRole('menuitem', { name: 'Copy name' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Add to Compare' })).not.toBeInTheDocument();
+  });
+
+  it('adds the name-bearing actions once the surface knows what the row is called', async () => {
+    renderMenu(638, undefined, 'Rifter Blueprint');
+    fireEvent.contextMenu(screen.getByTestId('row'));
+
+    expect(await screen.findByRole('menuitem', { name: 'Copy name' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Add to Compare' })).toBeInTheDocument();
   });
 
   it('does not load the 1.4MB blueprint file until the menu is actually opened', async () => {

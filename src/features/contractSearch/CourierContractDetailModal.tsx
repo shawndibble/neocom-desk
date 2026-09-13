@@ -13,7 +13,7 @@
  */
 import { useTranslation } from 'react-i18next';
 import { Modal, StatChip } from '@/components/ui';
-import { formatIsk, formatIskAuto } from '@/lib/isk';
+import { CONTRACT_ISK_CENTS_BELOW, formatIskAuto } from '@/lib/isk';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
 import {
@@ -75,10 +75,13 @@ export function CourierContractDetailModal({
     >
       <div className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center gap-2">
-          <StatChip label={t('contractSearch.rewardColumn')} value={formatIsk(row.reward, 2)} />
+          <StatChip
+            label={t('contractSearch.rewardColumn')}
+            value={formatIskAuto(row.reward, CONTRACT_ISK_CENTS_BELOW)}
+          />
           <StatChip
             label={t('contractSearch.collateralColumn')}
-            value={collateral === 0 ? '—' : formatIsk(collateral, 2)}
+            value={collateral === 0 ? '—' : formatIskAuto(collateral, CONTRACT_ISK_CENTS_BELOW)}
           />
           <StatChip
             label={t('contractSearch.volumeColumn')}
