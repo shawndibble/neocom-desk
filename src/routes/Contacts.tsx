@@ -5,11 +5,13 @@ import {
   DataAgeBadge,
   DataTable,
   EmptyState,
+  FilterBar,
   FilterChip,
   IconButton,
   PageHeader,
   Panel,
   ReauthBanner,
+  SearchInput,
   Spinner,
   StandingIcon,
   Tooltip,
@@ -19,6 +21,18 @@ import * as Icon from '@/components/ui/icons';
 import { ICON_SIZE } from '@/components/ui/icons';
 import { beginEveLogin } from '@/app/loginFlow';
 import { loadContacts } from '@/features/character/contacts';
+import {
+  ALL_CONTACT_TYPES,
+  EMPTY_CONTACTS_FILTER,
+  STANDING_CATEGORIES,
+  activeContactsFilterCount,
+  contactCountsByStanding,
+  contactCountsByType,
+  filterContacts,
+  type ContactType,
+  type ContactsFilter,
+  type StandingCategory,
+} from '@/features/character/contactsFilter';
 import { ContactContextMenu } from '@/features/character/ContactContextMenu';
 import type { CachedResult } from '@/esi/cache';
 import type { CharacterContact } from '@/esi/endpoints';
@@ -47,16 +61,6 @@ const CONTACT_TYPE_KEY: Record<CharacterContact['contact_type'], string> = {
   alliance: 'contacts.typeAlliance',
   faction: 'contacts.typeFaction',
 };
-
-type StandingCategory = 'good' | 'neutral' | 'bad';
-
-const STANDING_CATEGORIES: readonly StandingCategory[] = ['good', 'neutral', 'bad'];
-
-function standingCategory(standing: number): StandingCategory {
-  if (standing > 0) return 'good';
-  if (standing < 0) return 'bad';
-  return 'neutral';
-}
 
 /** Stable identity, so the fallback doesn't invalidate the column memo every render. */
 const NO_NAMES: ReadonlyMap<number, string> = new Map();
@@ -90,7 +94,94 @@ function FlagBadge({ icon, label, tone }: { icon: ReactElement; label: string; t
   );
 }
 
-/** Contacts: standings, blocked/watched state, filterable by standing category. */
+interface ContactCounts {
+  standing: Record<StandingCategory, number>;
+  type: Record<ContactType, number>;
+}
+
+const STANDING_FILTER_KEY: Record<StandingCategory, string> = {
+  good: 'contacts.filterGood',
+  neutral: 'contacts.filterNeutral',
+  bad: 'contacts.filterBad',
+};
+
+/** Toggling one member of a set-valued criterion, which is how both chip groups edit. */
+function toggled<T>(set: ReadonlySet<T>, member: T): Set<T> {
+  const next = new Set(set);
+  if (next.has(member)) next.delete(member);
+  else next.add(member);
+  return next;
+}
+
+interface ContactsFilterBarProps {
+  filter: ContactsFilter;
+  onChange: (filter: ContactsFilter) => void;
+  counts: ContactCounts;
+}
+
+/**
+ * Search plus a chip per contact type and per standing category. Both groups
+ * show every member with its count, zeros included — so "you have no alliance
+ * contacts" is on screen rather than inferred from a missing chip.
+ */
+function ContactsFilterBar({ filter, onChange, counts }: ContactsFilterBarProps) {
+  const { t } = useTranslation();
+  return (
+    <FilterBar
+      value={filter}
+      onChange={onChange}
+      activeCount={activeContactsFilterCount(filter)}
+      search={
+        <SearchInput
+          value={filter.text}
+          onChange={(event) => onChange({ ...filter, text: event.target.value })}
+          placeholder={t('contacts.searchPlaceholder')}
+          aria-label={t('contacts.searchPlaceholder')}
+          className="min-w-48 flex-1"
+        />
+      }
+    >
+      {(draft, setDraft) => (
+        <>
+          <div
+            role="group"
+            aria-label={t('contacts.typeFilterLabel')}
+            className="flex flex-wrap gap-2"
+          >
+            {ALL_CONTACT_TYPES.map((type) => (
+              <FilterChip
+                key={type}
+                label={t(CONTACT_TYPE_KEY[type])}
+                selected={draft.types.has(type)}
+                onToggle={() => setDraft({ ...draft, types: toggled(draft.types, type) })}
+                count={counts.type[type]}
+              />
+            ))}
+          </div>
+          <div
+            role="group"
+            aria-label={t('contacts.standingFilterLabel')}
+            className="flex flex-wrap gap-2"
+          >
+            {STANDING_CATEGORIES.map((category) => (
+              <FilterChip
+                key={category}
+                label={t(STANDING_FILTER_KEY[category])}
+                selected={draft.standings.has(category)}
+                onToggle={() =>
+                  setDraft({ ...draft, standings: toggled(draft.standings, category) })
+                }
+                count={counts.standing[category]}
+              />
+            ))}
+          </div>
+        </>
+      )}
+    </FilterBar>
+  );
+}
+
+/** Contacts: standings, blocked/watched state, searchable and filterable by type and standing. */
 export function Contacts() {
   const { t } = useTranslation();
   const { data, error, loading, hydrated, activeCharacterId, refresh } = useRouteSnapshot(
@@ -99,9 +190,7 @@ export function Contacts() {
     { cacheKey: 'contacts' }
   );
 
-  const [standingFilter, setStandingFilter] = useState<ReadonlySet<StandingCategory>>(
-    () => new Set(STANDING_CATEGORIES)
-  );
+  const [filter, setFilter] = useState<ContactsFilter>(EMPTY_CONTACTS_FILTER);
 
   const contactsResult = data?.contactsResult ?? null;
   const contactsNeedsReauth = data?.contactsNeedsReauth ?? false;
@@ -110,43 +199,34 @@ export function Contacts() {
 
   const contacts = useMemo(() => contactsResult?.data ?? [], [contactsResult]);
 
-  const countByCategory = useMemo(() => {
-    const counts: Record<StandingCategory, number> = { good: 0, neutral: 0, bad: 0 };
-    for (const contact of contacts) counts[standingCategory(contact.standing)] += 1;
-    return counts;
-  }, [contacts]);
+  const counts = useMemo(
+    () => ({
+      standing: contactCountsByStanding(contacts),
+      type: contactCountsByType(contacts),
+    }),
+    [contacts]
+  );
 
   // Refreshing bumps useRouteSnapshot's epoch, which clears `data` (and so
-  // `contactsResult`/`countByCategory`) until the new load lands — remember
+  // `contactsResult`/`counts`) until the new load lands — remember
   // the last successful counts so the filter chips (and the user's active
   // selection) stay on screen through a refresh instead of disappearing.
   // Switching character bumps the same epoch, so the remembered counts must
   // be dropped there too — otherwise the outgoing character's chips would
   // linger under the incoming one until its own load lands.
-  const [lastGoodCounts, setLastGoodCounts] = useState<Record<StandingCategory, number> | null>(
-    null
-  );
+  const [lastGoodCounts, setLastGoodCounts] = useState<ContactCounts | null>(null);
   const [lastGoodCharacterId, setLastGoodCharacterId] = useState(activeCharacterId);
   if (activeCharacterId !== lastGoodCharacterId) {
     setLastGoodCharacterId(activeCharacterId);
     setLastGoodCounts(null);
-  } else if (contactsResult && !contactsNeedsReauth && lastGoodCounts !== countByCategory) {
-    setLastGoodCounts(countByCategory);
+  } else if (contactsResult && !contactsNeedsReauth && lastGoodCounts !== counts) {
+    setLastGoodCounts(counts);
   }
 
   const filteredContacts = useMemo(
-    () => contacts.filter((contact) => standingFilter.has(standingCategory(contact.standing))),
-    [contacts, standingFilter]
+    () => filterContacts(contacts, filter, contactNames),
+    [contacts, filter, contactNames]
   );
-
-  function toggleStandingFilter(category: StandingCategory) {
-    setStandingFilter((previous) => {
-      const next = new Set(previous);
-      if (next.has(category)) next.delete(category);
-      else next.add(category);
-      return next;
-    });
-  }
 
   function contactRowContextMenu(contact: CharacterContact, tr: ReactElement) {
     return (
@@ -243,26 +323,7 @@ export function Contacts() {
       />
 
       {lastGoodCounts && (
-        <div role="group" aria-label={t('contacts.standing')} className="flex flex-wrap gap-2">
-          <FilterChip
-            label={t('contacts.filterGood')}
-            selected={standingFilter.has('good')}
-            onToggle={() => toggleStandingFilter('good')}
-            count={lastGoodCounts.good}
-          />
-          <FilterChip
-            label={t('contacts.filterNeutral')}
-            selected={standingFilter.has('neutral')}
-            onToggle={() => toggleStandingFilter('neutral')}
-            count={lastGoodCounts.neutral}
-          />
-          <FilterChip
-            label={t('contacts.filterBad')}
-            selected={standingFilter.has('bad')}
-            onToggle={() => toggleStandingFilter('bad')}
-            count={lastGoodCounts.bad}
-          />
-        </div>
+        <ContactsFilterBar filter={filter} onChange={setFilter} counts={lastGoodCounts} />
       )}
 
       {loading && !data ? (
