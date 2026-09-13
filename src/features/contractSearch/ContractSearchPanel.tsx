@@ -20,17 +20,15 @@
  * Mounts under a Router: every item row is a Build Plan context-menu
  * trigger (#931), and so is each line of the detail modal's contents.
  */
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
-  DataAgeBadge,
   DataTable,
   EmptyState,
   FilterBar,
   FilterChip,
   FilterField,
-  IconButton,
   Panel,
   Select,
   SelectContent,
@@ -44,7 +42,6 @@ import {
   IskAmount,
   type DataTableColumn,
 } from '@/components/ui';
-import * as Icon from '@/components/ui/icons';
 import {
   contractOfferPriceSummary,
   contractOfferStats,
@@ -262,8 +259,35 @@ interface Suggestion extends ContractTypeOption {
   stats: ContractOfferStats;
 }
 
+/**
+ * What the page header needs to draw this panel's freshness badge and Refresh
+ * button (issue-less UI move): the age of the snapshot *currently on screen*,
+ * which is per mode, plus the reload both corpora share.
+ *
+ * Reported upward rather than lifted: the two `useRouteSnapshot` calls below
+ * cannot move into `Contracts.tsx` without also running on the History tab,
+ * where neither public snapshot is wanted — hooks can't be conditional, and
+ * the hook has no "skip" flag.
+ */
+export interface ContractSearchStatus {
+  /** ms since epoch of the snapshot behind the visible board, or null while nothing has landed. */
+  lastSyncedAt: number | null;
+  /** Either corpus is in flight — the shared Refresh acts on both. */
+  loading: boolean;
+  /** Stable identity: both underlying `refresh`es are `useCallback([])`. */
+  refresh: () => void;
+}
+
+interface ContractSearchPanelProps {
+  /**
+   * Called whenever the freshness/refresh state changes. The page header owns
+   * the badge and the Refresh button; this panel owns the data behind them.
+   */
+  onStatusChange?: (status: ContractSearchStatus) => void;
+}
+
 /** Search every public item_exchange/auction contract line, any item type. Read-only, cached for offline. */
-export function ContractSearchPanel() {
+export function ContractSearchPanel({ onStatusChange }: ContractSearchPanelProps) {
   const { t } = useTranslation();
   const timeZone = useTimeZone();
   /**
@@ -344,10 +368,18 @@ export function ContractSearchPanel() {
   // A manual Refresh still means "reload the tab", not "reload the mode I am
   // looking at" — the Data Age badge and offline banner are per corpus, but the
   // button above them is one button.
-  const refresh = () => {
-    offers.refresh();
-    courier.refresh();
-  };
+  const offersRefresh = offers.refresh;
+  const courierRefresh = courier.refresh;
+  const refresh = useCallback(() => {
+    offersRefresh();
+    courierRefresh();
+  }, [offersRefresh, courierRefresh]);
+
+  const lastSyncedAt = activeResult?.data?.lastSyncedAt ?? null;
+  const headerLoading = offers.loading || courier.loading;
+  useEffect(() => {
+    onStatusChange?.({ lastSyncedAt, loading: headerLoading, refresh });
+  }, [onStatusChange, lastSyncedAt, headerLoading, refresh]);
 
   const typeOptions = useMemo(() => listedContractTypeOptions(rows, typeNames), [rows, typeNames]);
 
@@ -556,18 +588,37 @@ export function ContractSearchPanel() {
         // "Search", and repeating it in the panel header beneath reads as a
         // stutter. The table keeps its own accessible name from
         // `contractSearch.title`.
+        //
+        // The corpus switch takes the header strip the freshness badge and
+        // Refresh used to hold — those now sit on the page header beside the
+        // route title, the way every other route draws them, and this strip
+        // would otherwise be a hairline holding nothing while the chips kept a
+        // whole rule of vertical space to themselves.
+        //
+        // Chips rather than a second `Tabs` bar: the page's own tab strip sits
+        // immediately above this panel, and stacking a full-width tablist under
+        // it reads as the same stutter the panel drops its title to avoid.
+        // Exactly one is always on — picking the active chip again leaves it on
+        // rather than clearing to no corpus at all. Gone entirely when the
+        // build has no sync backend: there is nothing to switch between, and
+        // dropping it takes the empty header with it.
         meta={
-          activeResult?.data?.lastSyncedAt && (
-            <DataAgeBadge date={new Date(activeResult.data.lastSyncedAt)} />
+          syncConfigured && (
+            <div
+              role="group"
+              aria-label={t('contractSearch.modeLabel')}
+              className="flex flex-wrap gap-2"
+            >
+              {CONTRACT_MODES.map((candidate) => (
+                <FilterChip
+                  key={candidate}
+                  label={t(`contractSearch.mode.${candidate}`)}
+                  selected={mode === candidate}
+                  onToggle={() => setMode(candidate)}
+                />
+              ))}
+            </div>
           )
-        }
-        actions={
-          <IconButton
-            icon={<Icon.Refresh />}
-            label={t('contractSearch.refresh')}
-            onClick={refresh}
-            disabled={offers.loading || courier.loading}
-          />
         }
       >
         {!syncConfigured ? (
@@ -593,27 +644,6 @@ export function ContractSearchPanel() {
                   : t('common.offlineTitle')}
               </p>
             )}
-            {/*
-            Chips rather than a second `Tabs` bar: the page's own tab strip sits
-            immediately above this panel, and stacking a full-width tablist
-            under it reads as the same stutter the panel drops its title to
-            avoid. Exactly one is always on — picking the active chip again
-            leaves it on rather than clearing to no corpus at all.
-          */}
-            <div
-              role="group"
-              aria-label={t('contractSearch.modeLabel')}
-              className="flex flex-wrap gap-2 border-b border-line px-3 py-2"
-            >
-              {CONTRACT_MODES.map((candidate) => (
-                <FilterChip
-                  key={candidate}
-                  label={t(`contractSearch.mode.${candidate}`)}
-                  selected={mode === candidate}
-                  onToggle={() => setMode(candidate)}
-                />
-              ))}
-            </div>
             {revalidating && (
               // The visible half of stale-serve: these rows are last publish
               // cycle's and this cycle's are already on the way. Said beside

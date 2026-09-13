@@ -11,6 +11,7 @@ import { usePublicInfo } from '@/stores/publicInfo';
 import { usePublicInfoModalStore } from '@/stores/publicInfoModal';
 import { DEFAULT_TIME_FORMAT, TIME_FORMAT_SETTING_KEY, useTimeFormat } from '@/lib/timeFormat';
 import { formatTimestamp } from '@/lib/timestamp';
+import { isSyncConfigured } from '@/app/syncStatus';
 import { App } from '@/app/App';
 
 vi.mock('virtual:pwa-register/react', () => ({
@@ -37,6 +38,18 @@ vi.mock('@/app/syncStatus', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/app/syncStatus')>();
   return { ...actual, isSyncConfigured: vi.fn(() => false) };
 });
+
+// Only ever reached by the Search-tab header case at the bottom of this file,
+// which turns `isSyncConfigured` back on; everywhere else the mock above keeps
+// the panel out of these loaders entirely.
+const loadPublicContractOffers = vi.fn();
+vi.mock('@/features/contractSearch/publicContractOffers', () => ({
+  loadPublicContractOffers: (...args: unknown[]) => loadPublicContractOffers(...args),
+}));
+const loadPublicCourierContracts = vi.fn();
+vi.mock('@/features/contractSearch/publicCourierContracts', () => ({
+  loadPublicCourierContracts: (...args: unknown[]) => loadPublicCourierContracts(...args),
+}));
 
 const CHAR_ID = 91;
 
@@ -484,5 +497,60 @@ describe('Contracts tab strip (issue #908)', () => {
 
     expect(await screen.findByText(SEARCH_UNAVAILABLE)).toBeInTheDocument();
     expect(screen.queryByText('Log in again to see your contracts')).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * The Search tab's freshness badge and Refresh live on the *page* header, not
+ * in the results panel — `ContractSearchPanel` reports them upward. Only a
+ * route-level render proves that round trip: the panel's own suite stubs the
+ * page header, so a callback that never fired would still pass there.
+ */
+describe('Contracts Search tab page header', () => {
+  const SYNCED_AT = Date.parse('2026-09-12T18:30:00Z');
+  /** No rows, so neither board pulls the SDE catalogue — the header is what is under test. */
+  const EMPTY_SNAPSHOT = {
+    cached: {
+      data: { rows: [], lastSyncedAt: SYNCED_AT },
+      fetchedAt: new Date(SYNCED_AT),
+      fromCache: false,
+      truncated: false,
+    },
+    revalidating: false,
+  };
+
+  beforeEach(() => {
+    vi.mocked(isSyncConfigured).mockReturnValue(true);
+    loadPublicContractOffers.mockReset();
+    loadPublicContractOffers.mockResolvedValue(EMPTY_SNAPSHOT);
+    loadPublicCourierContracts.mockReset();
+    loadPublicCourierContracts.mockResolvedValue(EMPTY_SNAPSHOT);
+  });
+
+  afterEach(() => {
+    vi.mocked(isSyncConfigured).mockReturnValue(false);
+  });
+
+  it("shows the public snapshot's age beside the page title, and an enabled Refresh", async () => {
+    window.history.pushState({}, '', '/contracts?tab=search');
+    const { container } = render(<App />);
+
+    // The panel drew this pair itself before; it now has to reach the route.
+    await waitFor(() =>
+      expect(
+        container.querySelector(`time[datetime="${new Date(SYNCED_AT).toISOString()}"]`)
+      ).not.toBeNull()
+    );
+    // Enabled is the discriminating assertion: no reported status leaves it off.
+    expect(screen.getByRole('button', { name: 'Refresh' })).toBeEnabled();
+  });
+
+  it('puts the Items/Courier switch in the results panel header the badge vacated', async () => {
+    window.history.pushState({}, '', '/contracts?tab=search');
+    render(<App />);
+
+    const modes = await screen.findByRole('group', { name: 'Contract kind' });
+    expect(within(modes).getByRole('button', { name: 'Items' })).toBeInTheDocument();
+    expect(within(modes).getByRole('button', { name: 'Courier' })).toBeInTheDocument();
   });
 });

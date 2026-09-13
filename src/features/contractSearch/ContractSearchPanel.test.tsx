@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -9,7 +10,10 @@ import { DEFAULT_TIME_FORMAT, useTimeFormat } from '@/lib/timeFormat';
 import { isSyncConfigured } from '@/app/syncStatus';
 import { clearJumpGraphIndex } from '@/sde/jumpGraph';
 import { loadMarketTypes, loadSolarSystemJumps } from '@/sde/loadMarketSde';
-import { ContractSearchPanel } from '@/features/contractSearch/ContractSearchPanel';
+import {
+  ContractSearchPanel,
+  type ContractSearchStatus,
+} from '@/features/contractSearch/ContractSearchPanel';
 import type { PublicContractOfferRow } from '@/engine/contracts/contractOffers';
 import type { ChunkedSnapshotRead } from '@/features/contractSearch/chunkedSnapshot';
 import type { CachedResult } from '@/esi/cache';
@@ -312,6 +316,28 @@ async function bodyRows() {
 }
 
 /**
+ * The panel no longer draws its own Refresh: it reports freshness and the
+ * reload upward, and `routes/Contracts.tsx` renders both in the page header.
+ * This stands in for that header, so a test can still click Refresh without
+ * mounting the whole route.
+ */
+function SearchTabHarness() {
+  const [status, setStatus] = useState<ContractSearchStatus | null>(null);
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => status?.refresh()}
+        disabled={status === null || status.loading}
+      >
+        Refresh
+      </button>
+      <ContractSearchPanel onStatusChange={setStatus} />
+    </>
+  );
+}
+
+/**
  * Always inside a Router: every item row is a Build Plan context-menu trigger
  * (#931), as is each detail-modal line, and both call `useNavigate`. Matches
  * production — the panel only ever renders under `/contracts`.
@@ -319,7 +345,7 @@ async function bodyRows() {
 function renderWithRouter() {
   return render(
     <MemoryRouter>
-      <ContractSearchPanel />
+      <SearchTabHarness />
     </MemoryRouter>
   );
 }
