@@ -45,7 +45,7 @@ import {
   tabScrollerClassName,
 } from '@/components/ui/tabStyles';
 import { MINUTE_MS } from '@/lib/age';
-import { formatDuration } from '@/lib/duration';
+import { formatCountdown } from '@/lib/duration';
 import { formatIsk } from '@/lib/isk';
 import { REPO_URL } from '@/lib/links';
 import type { DeadlineSeverity } from '@/engine/severity';
@@ -272,7 +272,7 @@ export function Login() {
                   <p
                     className={`text-2xl leading-tight font-medium tabular-nums ${SEVERITY_TEXT.warning}`}
                   >
-                    {formatDuration(PREVIEW.deadlineSeconds)}
+                    {formatCountdown(PREVIEW.deadlineSeconds)}
                   </p>
                   <p className="truncate text-xs text-text-dim">
                     {t('overview.board.batch.running', { count: PREVIEW.deadlineColonies })}
@@ -283,7 +283,7 @@ export function Login() {
                   <p className="text-sm font-medium">{PREVIEW.trainingSkill}</p>
                   <p className="truncate text-xs text-text-dim">
                     {t('overview.timeLeft', {
-                      duration: formatDuration(PREVIEW.trainingSeconds),
+                      duration: formatCountdown(PREVIEW.trainingSeconds),
                     })}
                     {' · '}
                     {t('overview.board.queued', { count: PREVIEW.queued })}

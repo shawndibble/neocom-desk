@@ -509,6 +509,34 @@ describe('Overview board', () => {
   });
 
   /*
+   * The other half of `formatCountdown`: with a day on the clock the minutes
+   * place is dropped, so the same hero cell that reads "2h 5\dm" above reads
+   * "2d 0h" here — hours kept at zero so the cell does not change shape from
+   * one day to the next.
+   */
+  it('drops the minutes from the hero countdown once it has a day to show', async () => {
+    await grantScopes([INDUSTRY_SCOPE]);
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/industry/jobs`, () =>
+        HttpResponse.json([industryJob({ jobId: 7, endsInHours: 48 })])
+      )
+    );
+    render(<App />);
+
+    const hero = await screen.findByText('Next deadline');
+    const cell = hero.parentElement as HTMLElement;
+
+    await waitFor(() => {
+      expect(within(cell).getByRole('link')).toHaveAttribute('href', '/industry');
+    });
+    const link = within(cell).getByRole('link');
+    // Either side of the boundary is fine — the 48-hour fixture lands on
+    // "2d 0h" and a slow box rounds it down to "1d 23h". What must hold is
+    // that neither shape carries a minutes part.
+    expect(within(link).getByText(/^(2d 0h|1d 23h)$/)).toBeInTheDocument();
+  });
+
+  /*
    * "A card that disappears when there is nothing wrong is a card you cannot
    * tell from a card that failed to load." Every domain has to be present on a
    * character that has never done any of it.
