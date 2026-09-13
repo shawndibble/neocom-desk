@@ -1110,6 +1110,19 @@ describe('Settings defaults', () => {
     expect(screen.getByLabelText(/reaction location tax/i)).toBeInTheDocument();
   });
 
+  it('groups the default facility options by activity, since the pick decides which plans it serves', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByRole('heading', { level: 1, name: /settings/i });
+
+    await user.click(await screen.findByRole('combobox', { name: /default facility/i }));
+    const listbox = screen.getByRole('listbox');
+    // A flat list let a pilot pick a Tatara believing they had set *the*
+    // default; `newBuildPlan` then serves it to reaction plans only.
+    expect(within(listbox).getByRole('group', { name: /manufacturing/i })).toBeInTheDocument();
+    expect(within(listbox).getByRole('group', { name: /reactions/i })).toBeInTheDocument();
+  });
+
   it('only offers refineries as a reaction location', async () => {
     const user = userEvent.setup();
     render(<App />);

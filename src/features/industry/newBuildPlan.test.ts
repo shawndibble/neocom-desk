@@ -188,6 +188,29 @@ describe('newBuildPlan — carried defaults', () => {
     expect(created.buildSystemName).toBe('Badivefi');
   });
 
+  it('applies a refinery default to reaction plans only, leaving manufacturing at the fallback', () => {
+    // The Settings-level default holds one facility and counts only for plans
+    // of its own kind. This is why the Settings picker offers refineries at
+    // all — it is the only way to say "my reaction plans start at my rigged
+    // Tatara" — and why filtering them out would remove that, not fix a bug.
+    const stored = {
+      facility: 'tatara',
+      rigFit: ['meT2', 'teT1', 'none'],
+      facilityTaxPct: 2,
+    } as const;
+
+    const reaction = newBuildPlan(1, entry('reaction'), null, null, stored);
+    expect(reaction.facility).toBe('tatara');
+    expect(reaction.rigFit).toEqual(['meT2', 'teT1', 'none']);
+    expect(reaction.facilityTaxPct).toBe(2);
+
+    // Not corruption — the guard holds. The cost is silence: the pilot set a
+    // default and manufacturing plans carry none.
+    const manufacturing = newBuildPlan(1, entry('manufacturing'), null, null, stored);
+    expect(manufacturing.facility).toBe('npcStation');
+    expect(manufacturing.rigFit).toEqual(EMPTY_RIG_FIT);
+  });
+
   it('refuses a facility from a plan of the other activity', () => {
     // A Raitaru cannot host a reaction, so the hardcoded fallback wins over
     // the pilot's own most recent plan here.
