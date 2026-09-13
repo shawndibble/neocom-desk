@@ -106,6 +106,64 @@ describe('createAssignment', () => {
 });
 
 describe('updateAssignment', () => {
+  async function grouped() {
+    const assignment = await createAssignment({
+      characterId: CHAR_A,
+      date: '2026-09-04',
+      solarSystemId: 30000142,
+      payeeId: 'payee-1',
+      oreLines: [{ typeId: TYPE_A, quantity: 100 }],
+      taxPct: 10,
+      estimatedValue: 1000,
+      taxOwed: 100,
+      markPaid: false,
+    });
+    const joined = { ...assignment, groupId: 'g1' };
+    await db.miningTaxAssignments.put(joined);
+    vi.clearAllMocks();
+    return joined;
+  }
+
+  it('ejects a joined member from its group when its Payee changes', async () => {
+    const joined = await grouped();
+
+    const updated = await updateAssignment(joined, {
+      payeeId: 'payee-2',
+      taxPct: 10,
+      estimatedValue: 1000,
+      taxOwed: 100,
+    });
+
+    expect(updated.groupId).toBeUndefined();
+    expect((await db.miningTaxAssignments.get(joined.id))?.groupId).toBeUndefined();
+  });
+
+  it('ejects a joined member when only its tax rate changes', async () => {
+    const joined = await grouped();
+
+    const updated = await updateAssignment(joined, {
+      payeeId: 'payee-1',
+      taxPct: 15,
+      estimatedValue: 1000,
+      taxOwed: 150,
+    });
+
+    expect(updated.groupId).toBeUndefined();
+  });
+
+  it('keeps a joined member in its group when only the ISK figures are corrected', async () => {
+    const joined = await grouped();
+
+    const updated = await updateAssignment(joined, {
+      payeeId: 'payee-1',
+      taxPct: 10,
+      estimatedValue: 1250,
+      taxOwed: 125,
+    });
+
+    expect(updated.groupId).toBe('g1');
+  });
+
   it('overwrites payeeId/taxPct/estimatedValue/taxOwed, leaving oreLines, status and paidAt untouched', async () => {
     const assignment = await createAssignment({
       characterId: CHAR_A,

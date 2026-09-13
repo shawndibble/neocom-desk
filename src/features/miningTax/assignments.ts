@@ -135,6 +135,13 @@ export interface UpdateAssignmentInput {
  * a record happens through Undo + a fresh Assign, not this edit — and
  * `status`/`paidAt`, so correcting a Paid record's ISK doesn't silently
  * un-pay it.
+ *
+ * Moving a *joined* member onto a different Payee or rate does drop its
+ * `groupId`, though. A group is one obligation billed to one Payee at one
+ * rate and renders as a single row under a single Payee name, so a member on
+ * other terms is no longer part of it — and leaving it in made the row claim
+ * ore had gone somewhere it had not. `coalesce.ts` applies the same rule to
+ * records already stored in that state.
  */
 export async function updateAssignment(
   assignment: MiningTaxAssignmentRecord,
@@ -148,6 +155,8 @@ export async function updateAssignment(
     taxOwed: input.taxOwed,
     updatedAt: Date.now(),
   };
+  const termsChanged = input.payeeId !== assignment.payeeId || input.taxPct !== assignment.taxPct;
+  if (termsChanged) delete updated.groupId;
   await db.miningTaxAssignments.put(updated);
   scheduleSync(assignment.characterId);
   return updated;

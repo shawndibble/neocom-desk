@@ -360,3 +360,76 @@ describe('autoMatchRecordedPayments', () => {
     ).toEqual([]);
   });
 });
+
+describe('suggestLink — paying back taxes', () => {
+  /** Three months of unpaid tax, oldest first, each worth its own round figure. */
+  function backlog() {
+    return balance(payee({ entityId: LANDLORD_ID }), [
+      assignment({ id: 'a1', date: '2026-09-01', taxOwed: 5_000_000 }),
+      assignment({ id: 'a2', date: '2026-09-02', taxOwed: 4_000_000 }),
+      assignment({ id: 'a3', date: '2026-09-03', taxOwed: 3_000_000 }),
+    ]);
+  }
+
+  it('ticks only the oldest entries the payment can actually cover', () => {
+    const result = suggestLink(payment({ amount: 9_000_000 }), [backlog()]);
+
+    expect(result?.members.map((m) => m.assignment.id)).toEqual(['a1', 'a2']);
+  });
+
+  it('stops before the entry that would overshoot, rather than ticking the lot', () => {
+    // 5M + 4M fits inside 10M; adding a3 would claim 12M was paid.
+    const result = suggestLink(payment({ amount: 10_000_000 }), [backlog()]);
+
+    expect(result?.members.map((m) => m.assignment.id)).toEqual(['a1', 'a2']);
+    expect(result?.confidence).toBe('identity');
+  });
+
+  it('offers the oldest entry alone when the payment cannot even cover that', () => {
+    const result = suggestLink(payment({ amount: 1_000_000 }), [backlog()]);
+
+    expect(result?.members.map((m) => m.assignment.id)).toEqual(['a1']);
+  });
+
+  it('still ticks the whole balance when that is exactly what was paid', () => {
+    const result = suggestLink(payment({ amount: 12_000_000 }), [backlog()]);
+
+    expect(result?.members.map((m) => m.assignment.id)).toEqual(['a1', 'a2', 'a3']);
+    expect(result?.confidence).toBe('identity-and-amount');
+  });
+
+  it('orders oldest-first regardless of how the balance listed its members', () => {
+    const b = balance(payee({ entityId: LANDLORD_ID }), [
+      assignment({ id: 'a3', date: '2026-09-03', taxOwed: 3_000_000 }),
+      assignment({ id: 'a1', date: '2026-09-01', taxOwed: 5_000_000 }),
+      assignment({ id: 'a2', date: '2026-09-02', taxOwed: 4_000_000 }),
+    ]);
+
+    const result = suggestLink(payment({ amount: 9_000_000 }), [b]);
+
+    expect(result?.members.map((m) => m.assignment.id)).toEqual(['a1', 'a2']);
+  });
+
+  it('leaves a payment in kind ticking the whole in-window balance — its cargo carries no ISK figure', () => {
+    const result = suggestLink(payment({ kind: 'contract', key: 'contract:11', amount: null }), [
+      backlog(),
+    ]);
+
+    expect(result?.members.map((m) => m.assignment.id)).toEqual(['a1', 'a2', 'a3']);
+    expect(result?.confidence).toBe('identity');
+  });
+
+  it('never guesses a partial cover for a Payee it cannot identify', () => {
+    const anonymous = balance(payee(), [
+      assignment({ id: 'a1', date: '2026-09-01', taxOwed: 5_000_000 }),
+      assignment({ id: 'a2', date: '2026-09-02', taxOwed: 4_000_000 }),
+    ]);
+
+    const result = suggestLink(
+      payment({ counterpartyId: undefined, counterpartyName: 'Someone Else', amount: 5_500_000 }),
+      [anonymous]
+    );
+
+    expect(result).toBeNull();
+  });
+});

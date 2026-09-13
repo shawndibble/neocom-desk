@@ -238,6 +238,40 @@ function bestSubset(members: readonly GroupMember[], amount: number | null): Gro
 }
 
 /**
+ * What a payment that settles only *part* of a balance most likely paid off:
+ * the oldest entries, taken in order, for as long as the next one still fits
+ * inside the figure sent. Back taxes are paid oldest-first, and a lump sum
+ * rarely lands on an exact entry boundary, so `bestSubset` finds nothing at
+ * all for the commonest real case.
+ *
+ * Deliberately a prefix and never a general subset-sum (`bestSubset`'s rule
+ * still holds): "the oldest N you could afford" is how the debt was actually
+ * worked down, whereas "whichever four of seven happen to add up" is a
+ * coincidence dressed as a finding.
+ *
+ * Never returns an empty list: the first entry is admitted whatever it costs,
+ * so a payment too small to cover even the oldest still offers that one entry
+ * and the dialog shows a single short-by warning, rather than pre-ticking a
+ * balance the payment plainly did not settle.
+ * Callers use this only once a Payee is identified; with nobody identifiable,
+ * a partial figure is not evidence of anything.
+ */
+function oldestAffordable(members: readonly GroupMember[], amount: number): GroupMember[] {
+  const oldestFirst = [...members].sort((a, b) =>
+    a.assignment.date.localeCompare(b.assignment.date)
+  );
+  const covered: GroupMember[] = [];
+  let running = 0;
+  for (const m of oldestFirst) {
+    const next = running + m.assignment.taxOwed;
+    if (covered.length > 0 && !amountsMatch(next, amount) && next > amount) break;
+    covered.push(m);
+    running = next;
+  }
+  return covered;
+}
+
+/**
  * The best guess at what one payment paid off, or `null` when nothing plausible
  * lines up — an unmatched payment is simply never offered, which is what keeps
  * the entry point from nagging without a table of waved-away payments.
@@ -278,14 +312,17 @@ export function suggestLink(
         };
       }
     }
-    // No amount agreed, but we know (or think we know) who was paid — which is
-    // also the only path a payment in kind, carrying no ISK figure at all, can
-    // take.
+    // No amount agreed, but we know (or think we know) who was paid. With a
+    // real ISK figure that means a part payment — back taxes — so only the
+    // oldest entries it could actually cover are pre-ticked; ticking the whole
+    // balance would claim the payment settled more than it did. A payment in
+    // kind carries no figure at all, so its whole in-window balance stands.
     const first = identified[0];
     return {
       payment,
       balance: first.balance,
-      members: first.inWindow,
+      members:
+        payment.amount === null ? first.inWindow : oldestAffordable(first.inWindow, payment.amount),
       confidence: viaEntity ? 'identity' : 'name',
     };
   }
