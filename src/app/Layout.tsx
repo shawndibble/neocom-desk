@@ -197,7 +197,16 @@ function AlertsNavItem({ onClick, variant = 'rail' }: AlertsNavItemProps) {
       {unread > 0 && (
         <span
           aria-hidden="true"
-          className={`${tab ? 'ml-1' : 'ml-auto'} shrink-0 rounded-xs bg-panel-2 px-1.5 text-[0.6875rem] font-medium tabular-nums text-text-dim`}
+          /*
+           * Tab variant: `ml-1` because `mobileNavClass` centres its content,
+           * a hairline border because the chip's `bg-panel-2` is also the
+           * active tab's own ground and would otherwise vanish on the one tab
+           * it matters most on, and a size under the tab's `text-[0.625rem]`
+           * label so the count never outweighs the thing it counts.
+           */
+          className={`shrink-0 rounded-xs bg-panel-2 px-1.5 font-medium tabular-nums text-text-dim ${
+            tab ? 'ml-1 border border-line text-[0.5625rem]' : 'ml-auto text-[0.6875rem]'
+          }`}
         >
           {unread}
         </span>
