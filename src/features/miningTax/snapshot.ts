@@ -8,6 +8,7 @@ import { loadAllCharacterLedgers } from './ledger';
 import { loadPayees } from './payees';
 import { loadAssignments } from './assignments';
 import { reconcileAssignments } from './reconcile';
+import { coalesceAssignments } from './coalesce';
 import { computeOwnership } from '@/engine/miningTax/ownership';
 import type { MiningLedgerEntry } from '@/engine/miningTax/types';
 
@@ -59,6 +60,13 @@ export interface MoonMiningTaxSnapshot {
 
 export async function loadMoonMiningTaxSnapshot(): Promise<MoonMiningTaxSnapshot> {
   const ledgers = await loadAllCharacterLedgers();
+
+  // Before reconcile, not after: reconcile's growth diff is defined per
+  // Mining Ledger Entry over the Assignments covering it, so it has to see
+  // one fused record rather than two halves of the same obligation. Needs no
+  // ledger of its own — it only ever compares stored Assignments with each
+  // other.
+  await Promise.all(ledgers.map((ledger) => coalesceAssignments(ledger.characterId)));
 
   await Promise.all(
     ledgers
