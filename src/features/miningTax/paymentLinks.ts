@@ -249,9 +249,10 @@ function bestSubset(members: readonly GroupMember[], amount: number | null): Gro
  * worked down, whereas "whichever four of seven happen to add up" is a
  * coincidence dressed as a finding.
  *
- * Never returns an empty list — a payment too small to cover even the oldest
- * entry still offers that one entry, so the dialog shows one short-by warning
- * rather than pre-ticking a balance the payment plainly did not settle.
+ * Never returns an empty list: the first entry is admitted whatever it costs,
+ * so a payment too small to cover even the oldest still offers that one entry
+ * and the dialog shows a single short-by warning, rather than pre-ticking a
+ * balance the payment plainly did not settle.
  * Callers use this only once a Payee is identified; with nobody identifiable,
  * a partial figure is not evidence of anything.
  */
@@ -267,7 +268,7 @@ function oldestAffordable(members: readonly GroupMember[], amount: number): Grou
     covered.push(m);
     running = next;
   }
-  return covered.length > 0 ? covered : [oldestFirst[0]];
+  return covered;
 }
 
 /**

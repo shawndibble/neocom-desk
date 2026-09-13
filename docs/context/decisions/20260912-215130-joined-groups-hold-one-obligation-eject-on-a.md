@@ -18,11 +18,20 @@ _Recorded 2026-09-12._
   leaves one obligation stored as two: the same date listed twice inside a
   group, with no way back to a single line. They are fused — quantities summed
   per ore type, `estimatedValue`/`taxOwed` added, `collectsGrowth` inherited
-  if either half held it. Fused only when character, EVE/UTC date, solar
-  system, Payee, tax % and `groupId` all match, the status is `outstanding`,
-  and neither half carries a recorded payment: a genuine split to a second
-  Payee must survive, a fused record cannot be half paid, and
-  `paymentLinks.ts` references the ids a fuse deletes.
+  if either half held it _and_ something else still covers the entry. Fused
+  only when character, EVE/UTC date, solar system, Payee and tax % all match,
+  the status is `outstanding`, and neither half carries a recorded payment: a
+  genuine split to a second Payee must survive, a fused record cannot be half
+  paid, and `paymentLinks.ts` references the ids a fuse deletes.
+
+- **`groupId`s need only be compatible, not equal.** A loose half fuses into a
+  grouped one and the survivor stays in the group: that is exactly the state
+  "edit the Payee back onto the group it was ejected from" produces, and
+  demanding equal ids would leave the pilot looking at one day listed twice
+  under one Payee with no way back but a Combine step. Two _rival_ groups over
+  one entry still refuse, and so does a loose half sitting beside them — which
+  group it belongs to is not knowable, and guessing moves ore between two
+  obligations.
 
 - **Both repairs run at load time, not behind a button.** The two states are
   already in stored ledgers, and a button heals only the group a pilot thinks

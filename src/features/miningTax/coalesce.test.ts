@@ -160,19 +160,49 @@ describe('coalesceAssignments', () => {
     expect(await db.miningTaxAssignments.count()).toBe(2);
   });
 
-  it('carries the growth-collector flag onto the fused record', async () => {
+  it('carries the growth-collector flag on while a third Assignment still covers the entry', async () => {
     await db.miningTaxAssignments.bulkPut([
       assignment({ id: 'a1' }),
-      assignment({
-        id: 'a2',
-        collectsGrowth: true,
-        oreLines: [{ typeId: TYPE_B, quantity: 7 }],
-      }),
+      assignment({ id: 'a2', collectsGrowth: true, oreLines: [{ typeId: TYPE_B, quantity: 7 }] }),
+      assignment({ id: 'a3', payeeId: 'p2', oreLines: [{ typeId: TYPE_B, quantity: 3 }] }),
+    ]);
+
+    await coalesceAssignments(CHAR_A);
+
+    const stored = await db.miningTaxAssignments.orderBy('id').toArray();
+    expect(stored.map((a) => a.id)).toEqual(['a1', 'a3']);
+    expect(stored[0].collectsGrowth).toBe(true);
+  });
+
+  it('drops the growth-collector flag once the fused record is alone on its entry', async () => {
+    await db.miningTaxAssignments.bulkPut([
+      assignment({ id: 'a1', collectsGrowth: true }),
+      assignment({ id: 'a2', oreLines: [{ typeId: TYPE_B, quantity: 7 }] }),
     ]);
 
     await coalesceAssignments(CHAR_A);
 
     const [stored] = await db.miningTaxAssignments.toArray();
-    expect(stored.collectsGrowth).toBe(true);
+    expect(stored.collectsGrowth).toBeUndefined();
+  });
+
+  it('fuses a half whose Payee was edited back onto the group it was ejected from', async () => {
+    // The whole point of the repair: the pilot moves ore out, changes their
+    // mind, and the day goes back to one line without a Combine step.
+    await db.miningTaxAssignments.bulkPut([
+      assignment({ id: 'a1', groupId: 'g1' }),
+      assignment({ id: 'a2', oreLines: [{ typeId: TYPE_B, quantity: 7 }] }),
+      assignment({ id: 'a3', groupId: 'g1', date: '2026-09-13' }),
+    ]);
+
+    await coalesceAssignments(CHAR_A);
+
+    const stored = await db.miningTaxAssignments.orderBy('id').toArray();
+    expect(stored.map((a) => a.id)).toEqual(['a1', 'a3']);
+    expect(stored[0].groupId).toBe('g1');
+    expect(stored[0].oreLines).toEqual([
+      { typeId: TYPE_A, quantity: 100 },
+      { typeId: TYPE_B, quantity: 7 },
+    ]);
   });
 });

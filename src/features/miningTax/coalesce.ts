@@ -77,6 +77,9 @@ export async function coalesceAssignments(characterId: number): Promise<void> {
       updatedAt: now,
     };
     if (merge.collectsGrowth) keep.collectsGrowth = true;
+    else delete keep.collectsGrowth;
+    if (merge.groupId !== undefined) keep.groupId = merge.groupId;
+    else delete keep.groupId;
     working.set(keep.id, keep);
     rewritten.add(keep.id);
     for (const id of merge.absorbedIds) {

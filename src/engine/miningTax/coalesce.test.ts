@@ -52,10 +52,11 @@ describe('planEntryMerges', () => {
     expect(plan.oreLines).toEqual([{ typeId: 100, quantity: 21910 }]);
   });
 
-  it('keeps the growth-collector flag when either half carried it', () => {
+  it('keeps the growth-collector flag when a third Assignment still covers the entry', () => {
     const [plan] = planEntryMerges([
       make({ id: 'a' }),
       make({ id: 'b', collectsGrowth: true, oreLines: [{ typeId: 200, quantity: 5 }] }),
+      make({ id: 'c', payeeId: 'payee-2', oreLines: [{ typeId: 300, quantity: 1 }] }),
     ]);
     expect(plan.collectsGrowth).toBe(true);
   });
@@ -80,6 +81,47 @@ describe('planEntryMerges', () => {
       make({ id: 'b', groupId: 'g1', oreLines: [{ typeId: 200, quantity: 5 }] }),
     ]);
     expect(plans).toHaveLength(1);
+    expect(plans[0].groupId).toBe('g1');
+  });
+
+  it('fuses a grouped half with a loose one, and the survivor stays in the group', () => {
+    // The Payee edited back onto a member that a previous edit had ejected:
+    // one entry, one Payee, one rate is one obligation however it got there.
+    const plans = planEntryMerges([
+      make({ id: 'b', oreLines: [{ typeId: 200, quantity: 5 }] }),
+      make({ id: 'a', groupId: 'g1' }),
+    ]);
+    expect(plans).toHaveLength(1);
+    expect(plans[0].keepId).toBe('a');
+    expect(plans[0].groupId).toBe('g1');
+  });
+
+  it('carries no group id when neither half had one', () => {
+    const [plan] = planEntryMerges([
+      make({ id: 'a' }),
+      make({ id: 'b', oreLines: [{ typeId: 200, quantity: 5 }] }),
+    ]);
+    expect(plan.groupId).toBeUndefined();
+  });
+
+  it('leaves a loose half alone when two rival groups both cover the entry', () => {
+    // Which group the loose half belongs to is not knowable, and guessing
+    // would move ore between two obligations.
+    expect(
+      planEntryMerges([
+        make({ id: 'a', groupId: 'g1' }),
+        make({ id: 'b', groupId: 'g2' }),
+        make({ id: 'c' }),
+      ])
+    ).toEqual([]);
+  });
+
+  it('clears the growth-collector flag when the fused record ends up alone on its entry', () => {
+    const [plan] = planEntryMerges([
+      make({ id: 'a', collectsGrowth: true }),
+      make({ id: 'b', oreLines: [{ typeId: 200, quantity: 5 }] }),
+    ]);
+    expect(plan.collectsGrowth).toBe(false);
   });
 
   it('never fuses anything but an outstanding Assignment', () => {

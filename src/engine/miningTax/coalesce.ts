@@ -17,7 +17,7 @@
  * coalesce.ts`) is testable without Dexie — and so the merge arithmetic is the
  * inverse of `split.ts`'s `planSplit` rather than a second, drifting copy.
  */
-import type { OreLine } from './types';
+import { entryKey, type OreLine } from './types';
 
 /** The fields the two repairs read off a stored Assignment — deliberately narrower than the Dexie record. */
 export interface CoalescableAssignment {
@@ -51,8 +51,15 @@ export interface EntryMerge {
    */
   estimatedValue: number;
   taxOwed: number;
-  /** Set when any half collected this entry's later ore, so the fused record keeps collecting it. */
+  /**
+   * Set when any half collected this entry's later ore *and* something else
+   * still covers the entry. A fused record left alone on its entry always
+   * collects, so the flag is cleared rather than stored meaninglessly
+   * (`ownership.ts`, and `MiningTaxAssignmentRecord.collectsGrowth`).
+   */
   collectsGrowth: boolean;
+  /** The joined group the fused record belongs to — whichever half carried one, or absent when neither did. */
+  groupId?: string;
 }
 
 /** The Payee and rate that decide whether two records are the same obligation. */
@@ -85,8 +92,12 @@ function bucket<T>(items: readonly T[], key: (item: T) => string): Map<string, T
  *   Ledger Entry. Ownership is defined per entry (`ownership.ts`).
  * - Same Payee and tax % — a split to a *second* Payee is the whole point of
  *   `splitAssignment` and must survive.
- * - Same `groupId` (both ungrouped counts as the same) — fusing across two
- *   joined groups would silently move ore between them.
+ * - Compatible `groupId`s: equal, or one of them absent. A loose half joining
+ *   a grouped one is exactly the state "edit the Payee back" produces, and
+ *   refusing it would leave the pilot staring at one day listed twice on one
+ *   Payee with no way back. Two *rival* groups over one entry do refuse — and
+ *   so does a loose half sitting beside them, since which group it belongs to
+ *   is not knowable and guessing moves ore between obligations.
  * - `outstanding`, with no recorded payment. A fused record cannot be half
  *   paid, and `paymentLinks.ts`/`madePayments.ts` reference the ids a fuse
  *   would delete. `needs-review` is left alone too: its `reviewDiff` is a
@@ -96,16 +107,28 @@ function bucket<T>(items: readonly T[], key: (item: T) => string): Map<string, T
  * unchanged data picks the same one however Dexie ordered the read.
  */
 export function planEntryMerges(assignments: readonly CoalescableAssignment[]): EntryMerge[] {
+  // Every Assignment on an entry, whatever its status — a fused record is the
+  // entry's sole coverer only if nothing else, fusable or not, covers it too.
+  const coverageByEntry = new Map<string, number>();
+  for (const a of assignments) {
+    const key = entryKey(a.characterId, a.date, a.solarSystemId);
+    coverageByEntry.set(key, (coverageByEntry.get(key) ?? 0) + 1);
+  }
+
   const fusable = assignments.filter((a) => a.status === 'outstanding' && !a.hasPayment);
   const buckets = bucket(
     fusable,
-    (a) => `${a.characterId}:${a.date}:${a.solarSystemId}:${a.groupId ?? ''}:${termsKey(a)}`
+    (a) => `${entryKey(a.characterId, a.date, a.solarSystemId)}:${termsKey(a)}`
   );
 
   const merges: EntryMerge[] = [];
   for (const members of buckets.values()) {
     if (members.length < 2) continue;
+    const groupIds = new Set(members.map((m) => m.groupId).filter((id) => id !== undefined));
+    if (groupIds.size > 1) continue;
     const [keep, ...absorbed] = [...members].sort(byId);
+    const entry = entryKey(keep.characterId, keep.date, keep.solarSystemId);
+    const soleAfterMerge = (coverageByEntry.get(entry) ?? 0) - absorbed.length === 1;
     const quantityByType = new Map<number, number>();
     for (const member of members) {
       for (const line of member.oreLines) {
@@ -120,7 +143,8 @@ export function planEntryMerges(assignments: readonly CoalescableAssignment[]): 
         .sort((a, b) => a.typeId - b.typeId),
       estimatedValue: members.reduce((sum, m) => sum + m.estimatedValue, 0),
       taxOwed: members.reduce((sum, m) => sum + m.taxOwed, 0),
-      collectsGrowth: members.some((m) => m.collectsGrowth === true),
+      collectsGrowth: !soleAfterMerge && members.some((m) => m.collectsGrowth === true),
+      ...(groupIds.size === 1 ? { groupId: [...groupIds][0] } : {}),
     });
   }
   return merges;
