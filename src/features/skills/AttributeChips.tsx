@@ -85,7 +85,7 @@ export function AttributeChips({
                     <span
                       tabIndex={0}
                       aria-label={breakdown}
-                      className="cursor-help rounded-xs underline decoration-dotted underline-offset-2 focus-visible:outline-2 focus-visible:outline-accent"
+                      className="cursor-help rounded-xs focus-visible:outline-2 focus-visible:outline-accent"
                     >
                       <span aria-hidden="true">{effective}</span>
                     </span>
