@@ -4,10 +4,9 @@ import { onUpgradeBlocked } from '@/db/blockedSignal';
 /**
  * Report a blocked IndexedDB upgrade to Sentry; returns an unsubscribe.
  *
- * Wired from the shell so `src/db` keeps no Sentry dependency — it is imported
- * by the service worker (docs/ARCHITECTURE.md §2, same shape as the ESI
- * signals). A report, not a recovery: Dexie's defaults already handle the
- * connection. `captureMessage` is a no-op without a DSN.
+ * Wired from the shell — `src/db` cannot import Sentry itself (see
+ * `blockedSignal.ts`). A report, not a recovery; `captureMessage` is a no-op
+ * without a DSN.
  */
 export function subscribeToUpgradeBlockedReports(): () => void {
   return onUpgradeBlocked(({ oldVersion, newVersion }) => {

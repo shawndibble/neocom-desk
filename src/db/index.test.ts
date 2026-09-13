@@ -1,6 +1,7 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import Dexie from 'dexie';
 import { db } from './index';
+import { onUpgradeBlocked, type UpgradeBlockedEvent } from './blockedSignal';
 
 beforeEach(async () => {
   await db.characters.clear();
@@ -296,5 +297,46 @@ describe('schema upgrade v10 -> v11 (BPC Sourcing watches, issue #926)', () => {
   it('adds bpcSearchWatches, unindexed beyond its own id — device-local and character-independent', () => {
     expect(db.bpcSearchWatches.schema.indexes.map((i) => i.name)).toEqual([]);
     expect(db.bpcSearchWatches.schema.primKey.name).toBe('id');
+  });
+});
+
+describe('a blocked upgrade', () => {
+  function fireBlocked(oldVersion: number, newVersion: number | null) {
+    // Dexie exposes its event hubs as callable `.fire()`, which is how the
+    // real `req.onblocked` reaches subscribers — there is no way to provoke a
+    // genuine cross-connection block in a single-process test.
+    (db.on as unknown as { blocked: { fire: (event: unknown) => void } }).blocked.fire({
+      oldVersion,
+      newVersion,
+    });
+  }
+
+  it('closes the connection, so the pending open rejects instead of hanging', () => {
+    const close = vi.spyOn(db, 'close').mockImplementation(() => {});
+    try {
+      fireBlocked(100, 110);
+      // The whole point: `req.onblocked` never rejects the open, so without
+      // this the read stays pending forever and no error path is ever
+      // reached. `close()` cancels an in-flight open with DatabaseClosed,
+      // which `useLiveQuery` rethrows into ErrorBoundary.
+      expect(close).toHaveBeenCalledOnce();
+    } finally {
+      close.mockRestore();
+    }
+  });
+
+  it('reports the versions before closing', () => {
+    const close = vi.spyOn(db, 'close').mockImplementation(() => {});
+    const seen: UpgradeBlockedEvent[] = [];
+    const unsubscribe = onUpgradeBlocked((event) => seen.push(event));
+    try {
+      fireBlocked(100, 110);
+      // Closing loses the versions (DatabaseClosed carries none), so the
+      // signal has to fire first or the diagnosis is gone.
+      expect(seen).toEqual([{ oldVersion: 100, newVersion: 110 }]);
+    } finally {
+      unsubscribe();
+      close.mockRestore();
+    }
   });
 });

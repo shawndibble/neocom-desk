@@ -16,9 +16,9 @@ export const BOOT_STALL_MS = 10_000;
  * `RequireCharacter` and `Login` so no gate is tempted to treat "not loaded
  * yet" as "logged out".
  *
- * Both gates wait on Dexie, and a blocked IndexedDB upgrade leaves that read
- * pending rather than rejecting, so this screen — alone among the app's waits
- * — needs its own escape hatch (`bootRecovery.ts`).
+ * These gates wait on Dexie with nothing behind them to catch a read that
+ * never resolves, so the screen carries its own escape hatch
+ * (`bootRecovery.ts`).
  */
 export function BootScreen() {
   const { t } = useTranslation();

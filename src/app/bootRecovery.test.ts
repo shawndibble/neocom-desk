@@ -15,8 +15,6 @@ describe('recoverFromStalledBoot', () => {
     const waiting = { postMessage: vi.fn() };
     const env = makeEnv({ getRegistration: vi.fn().mockResolvedValue({ waiting }) });
     await recoverFromStalledBoot(env);
-    // Promoting the new bundle is what evicts the active one holding the old
-    // schema version.
     expect(waiting.postMessage).toHaveBeenCalledWith({ type: 'SKIP_WAITING' });
     expect(env.reload).toHaveBeenCalledOnce();
   });
@@ -35,9 +33,8 @@ describe('recoverFromStalledBoot', () => {
   });
 
   it('reloads even when the registration lookup never settles', async () => {
-    // The failure this whole path exists to escape. `try`/`catch` cannot help
-    // here — a promise that never settles is not a rejection — so an unbounded
-    // await would leave the button inert and the user back on the spinner.
+    // The hang bootRecovery.ts exists to escape; an unbounded await here
+    // would leave the button inert.
     const env = makeEnv({ getRegistration: vi.fn().mockReturnValue(new Promise(() => {})) });
     await recoverFromStalledBoot(env);
     expect(env.reload).toHaveBeenCalledOnce();

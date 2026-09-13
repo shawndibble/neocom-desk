@@ -28,8 +28,8 @@ export const useActiveCharacter = create<ActiveCharacterState>((set) => ({
     try {
       record = await db.settings.get(ACTIVE_CHARACTER_KEY);
     } catch (error) {
-      // Reported, not swallowed: this is one of the failures that used to be
-      // invisible, and a forced re-pick is its user-visible symptom.
+      // Reported, not swallowed — a forced re-pick is this failure's only
+      // user-visible symptom.
       captureException(error);
       record = undefined;
     }

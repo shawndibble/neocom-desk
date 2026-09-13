@@ -24,8 +24,7 @@ describe('reportBootStallOnce', () => {
     reportBootStallOnce(10_000);
     reportBootStallOnce(10_000);
     reportBootStallOnce(10_000);
-    // Three render sites, each re-arming a timer on a wedged database: without
-    // the latch one stuck session files an unbounded number of events.
+    // One stuck session, not one event per remount.
     expect(captureMessage).toHaveBeenCalledOnce();
   });
 });

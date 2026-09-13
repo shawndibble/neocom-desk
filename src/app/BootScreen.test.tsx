@@ -71,10 +71,9 @@ describe('BootScreen', () => {
 
 describe('a gate whose Dexie read never settles', () => {
   it('reaches the escape hatch through RequireCharacter', () => {
-    // The symptom itself, not just the component: `useLiveQuery` sits at
-    // `undefined` for as long as the read is pending, which is forever when an
-    // upgrade is blocked. The gate must still mount BootScreen with a live
-    // timer, or the watchdog never runs where it is actually needed.
+    // The symptom itself, not just the component: a pending read leaves
+    // `useLiveQuery` at `undefined`, and the gate must still mount BootScreen
+    // with a live timer.
     render(
       <MemoryRouter initialEntries={['/mail']}>
         <RequireCharacter />
