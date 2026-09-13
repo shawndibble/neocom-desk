@@ -169,10 +169,17 @@ export const ROUTE_REQUIREMENTS = {
   // A page gate on the calendar scope alone would blank five panels that still
   // work; the filter menu names the sources that need a new login instead.
   '/calendar': UNGATED,
-  '/contracts': {
-    endpoints: ['getCharacterContracts', 'postUniverseNames'],
-    strings: 'contracts',
-  },
+  /*
+   * UNGATED, and not because it needs no scope — History needs
+   * `read_character_contracts`. The page gates that scope per *tab* instead,
+   * the same shape as `/wallet` above: the History branch already renders its
+   * own `ReauthBanner` from `loadContracts`' `needsReauth`, and the Search tab
+   * beside it reads a shared public snapshot that needs neither the scope nor
+   * this Character's data at all. A page gate would put a re-login wall in
+   * front of Search — which is the tab the page now lands on — to protect the
+   * one tab that already explains itself.
+   */
+  '/contracts': UNGATED,
   // Now a redirect into Industry's BPC Search tab, kept so existing links
   // still land. Ungated because it gates nothing: the search reads a shared
   // Firestore snapshot plus public getUniverseRegion lookups, neither of them

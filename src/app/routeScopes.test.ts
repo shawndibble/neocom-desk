@@ -20,9 +20,6 @@ describe('scope derivation', () => {
   it('derives a gated route’s scopes from the registry, not from a copied string', () => {
     expect(requiredScopesForRoute('/mail')).toEqual(['esi-mail.read_mail.v1']);
     expect(requiredScopesForRoute('/assets')).toEqual(['esi-assets.read_assets.v1']);
-    expect(requiredScopesForRoute('/contracts')).toEqual([
-      'esi-contracts.read_character_contracts.v1',
-    ]);
     expect(requiredScopesForRoute('/clones')).toEqual(['esi-clones.read_clones.v1']);
   });
 
@@ -40,6 +37,10 @@ describe('scope derivation', () => {
     expect(requiredScopesForRoute('/overview')).toEqual([]);
     expect(requiredScopesForRoute('/skills')).toEqual([]);
     expect(requiredScopesForRoute('/industry')).toEqual([]);
+    // /contracts is the other shape of ungated: History does need
+    // read_character_contracts, but the page gates it per tab so the Search
+    // tab it lands on — a shared public snapshot — is reachable without it.
+    expect(requiredScopesForRoute('/contracts')).toEqual([]);
   });
 
   it('only names scopes the app actually asks for at login', () => {
@@ -81,7 +82,6 @@ describe('gated routes', () => {
       '/assets/*',
       '/clones',
       '/contacts',
-      '/contracts',
       '/mail',
       '/moon-mining',
       '/planetary-industry',
