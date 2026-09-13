@@ -3790,15 +3790,15 @@
     "expiresInHours": "Expires in {{hours}}h",
     "risk": {
       "structureShort": "Structure",
-      "structureDetail": "The delivery point is a player structure. Docking there needs access its owner controls, and this app cannot check it. If you cannot dock, the contract expires undelivered and the issuer keeps your collateral.",
+      "structureDetail": "Docking needs access the owner controls, and we cannot check it. No dock, no delivery — the issuer keeps your collateral.",
       "noGateRouteShort": "No gate route",
-      "noGateRouteDetail": "No stargate reaches this end's system, so this haul cannot be flown gate to gate. Wormhole space has no gate connections at all, and a handful of other systems are likewise unreachable. This is how New Eden is built, not a gap in our distance data.",
+      "noGateRouteDetail": "No stargate reaches this end, so it cannot be flown gate to gate. Wormhole space never has gates.",
       "overRateShort": "Over rate",
-      "overRateDetail": "This haul pays {{multiple}}x the median reward per cubic metre per jump across every outstanding public courier contract. That is a figure, not a judgement — the app cannot value a courier contract’s cargo, which carries no item lines, or read anyone’s intent. A reward well above what the market pays is worth a second look before you put up collateral.",
+      "overRateDetail": "Pays {{multiple}}x the going rate benchmarked below. Worth a second look before you put up collateral.",
       "nullsecShort": "Nullsec",
-      "nullsecDetail": "One end is in nullsec. Getting there usually depends on sovereignty, standings or a jump network this app cannot see. Plenty of nullsec hauling is ordinary, well-paid work — this is a note, not a warning.",
+      "nullsecDetail": "One end is in nullsec, so getting there can need sovereignty, standings or a jump network we cannot see. Ordinary paid work, not a warning.",
       "chokepointShort": "Gank gate",
-      "chokepointDetail": "One end of this haul is in a system haulers are most often killed in — the chokepoints every profitable route funnels through, which is what makes camping them worth doing. Being a chokepoint is about traffic, not security status: Uedama reads 0.5 like hundreds of other systems. This says where the haul goes, not that anything will happen to you there."
+      "chokepointDetail": "One end sits in a system haulers are most often killed in. That is about traffic, not security status — and not a prediction."
     },
     "spaceUnknown": "Unknown space",
     "courierNoFilterMatchesUnplacedHint": "Some hauls end at a structure this app cannot place, so they carry no space band and a narrowed Destination space filter leaves them out. Select every band to see them again.",
