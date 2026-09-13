@@ -89,7 +89,12 @@ const server = setupServer(
   http.put(
     'https://esi.evetech.net/characters/:characterId/mail/:mailId/',
     () => new HttpResponse(null, { status: 204 })
-  )
+  ),
+  // No contacts and no affiliation by default — the standing cross-reference
+  // tests below override these per-scenario. `:characterId` rather than a
+  // literal id: the character-switch test below re-fires this for CHAR_ID_2.
+  http.get('https://esi.evetech.net/characters/:characterId/contacts', () => HttpResponse.json([])),
+  http.post('https://esi.evetech.net/characters/affiliation', () => HttpResponse.json([]))
 );
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
@@ -326,6 +331,51 @@ describe('Mail', () => {
     expect(await screen.findByText(/Corp Recruiter/)).toBeInTheDocument();
   });
 
+  describe('Contact standing cross-reference', () => {
+    it('shows a standing tag next to a personally-blocked sender', async () => {
+      server.use(
+        http.get(`https://esi.evetech.net/characters/${CHAR_ID}/contacts`, () =>
+          HttpResponse.json([
+            { contact_id: 90000001, contact_type: 'character', standing: -10, is_blocked: true },
+          ])
+        )
+      );
+      const user = userEvent.setup();
+      render(<App />);
+      await user.click(await screen.findByText('Fleet up!'));
+      expect(
+        await screen.findByRole('img', { name: 'Your contact: Terrible standing (-10)' })
+      ).toBeInTheDocument();
+    });
+
+    it('shows no tag for a sender who is a stranger', async () => {
+      const user = userEvent.setup();
+      render(<App />);
+      await user.click(await screen.findByText('Fleet up!'));
+      await screen.findByText(/Corp Recruiter/);
+      expect(screen.queryByRole('img')).not.toBeInTheDocument();
+    });
+
+    it("inherits the sender's corp entry when the sender has no personal contact of their own", async () => {
+      server.use(
+        http.get(`https://esi.evetech.net/characters/${CHAR_ID}/contacts`, () =>
+          HttpResponse.json([{ contact_id: 99, contact_type: 'corporation', standing: -10 }])
+        ),
+        http.post('https://esi.evetech.net/characters/affiliation', () =>
+          HttpResponse.json([{ character_id: 90000001, corporation_id: 99 }])
+        )
+      );
+      const user = userEvent.setup();
+      render(<App />);
+      await user.click(await screen.findByText('Fleet up!'));
+      expect(
+        await screen.findByRole('img', {
+          name: 'Terrible standing (-10) — your entry on their corp, not on them',
+        })
+      ).toBeInTheDocument();
+    });
+  });
+
   it('does not render an Export CSV button', async () => {
     render(<App />);
     await screen.findByText('Fleet up!');
@@ -412,6 +462,46 @@ describe('Mail', () => {
 
     const olderRow = (await screen.findByText('Older mail')).closest('li');
     expect(olderRow).toHaveTextContent('Market Bot');
+  });
+
+  it('resolves standing for mail fetched by "load more" too, including an inherited corp entry', async () => {
+    const fullPage = Array.from({ length: 50 }, (_, i) => ({
+      mail_id: 1000 - i,
+      from: 90000001,
+      subject: `Mail ${1000 - i}`,
+      timestamp: '2026-08-05T00:00:00Z',
+      labels: [],
+    }));
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/mail`, ({ request }) => {
+        const param = new URL(request.url).searchParams.get('last_mail_id');
+        if (param === null) return HttpResponse.json(fullPage);
+        return HttpResponse.json([
+          { mail_id: 5, from: 90000002, subject: 'Older mail', labels: [] },
+        ]);
+      }),
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/contacts`, () =>
+        HttpResponse.json([{ contact_id: 77, contact_type: 'corporation', standing: -10 }])
+      ),
+      http.post('https://esi.evetech.net/characters/affiliation', () =>
+        HttpResponse.json([{ character_id: 90000002, corporation_id: 77 }])
+      ),
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/mail/5`, () =>
+        HttpResponse.json({ from: 90000002, subject: 'Older mail', body: 'Hi.', read: false })
+      )
+    );
+
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText('Mail 1000');
+    await user.click(screen.getByRole('button', { name: /load more/i }));
+    await user.click(await screen.findByText('Older mail'));
+
+    expect(
+      await screen.findByRole('img', {
+        name: 'Terrible standing (-10) — your entry on their corp, not on them',
+      })
+    ).toBeInTheDocument();
   });
 
   async function addSecondCharacter() {

@@ -37,6 +37,8 @@ import { BuildPlanContextMenu } from '@/features/industry/BuildPlanContextMenu';
 import { useMarketHub } from '@/features/market/hub';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import { IssuerLink } from './IssuerLink';
+import { StandingTag } from './StandingTag';
+import type { EffectiveStanding } from './contactStandings';
 import { CONTRACT_ISK_CENTS_BELOW, formatIskAuto } from '@/lib/isk';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
@@ -46,6 +48,8 @@ export interface ContractDetailModalProps {
   characterId: number;
   contract: Contract;
   issuerName: string;
+  /** Omitted (not just null) by a caller that hasn't computed one — same as null, no tag renders. */
+  issuerStanding?: EffectiveStanding | null;
   onClose: () => void;
 }
 
@@ -70,6 +74,7 @@ export function ContractDetailModal({
   characterId,
   contract,
   issuerName,
+  issuerStanding = null,
   onClose,
 }: ContractDetailModalProps) {
   const { t } = useTranslation();
@@ -191,8 +196,9 @@ export function ContractDetailModal({
             <dd>{t(CONTRACT_STATUS_KEY[contract.status])}</dd>
 
             <dt className="text-text-dim uppercase">{t('contracts.detailIssuedBy')}</dt>
-            <dd>
+            <dd className="flex items-center gap-1.5">
               <IssuerLink issuerId={contract.issuer_id} name={issuerName} />
+              <StandingTag standing={issuerStanding} />
             </dd>
 
             <dt className="text-text-dim uppercase">{t('contracts.detailAvailability')}</dt>

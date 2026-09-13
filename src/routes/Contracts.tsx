@@ -27,6 +27,14 @@ import { loadContracts } from '@/features/character/contracts';
 import { ContractContextMenu } from '@/features/character/ContractContextMenu';
 import { ContractDetailModal } from '@/features/character/ContractDetailModal';
 import { IssuerLink } from '@/features/character/IssuerLink';
+import { StandingTag } from '@/features/character/StandingTag';
+import { loadContacts } from '@/features/character/contacts';
+import {
+  buildContactStandingIndex,
+  type ContactStandingIndex,
+} from '@/features/character/contactStandings';
+import { resolveAffiliations } from '@/features/character/affiliations';
+import { characterStanding } from '@/features/character/entityStanding';
 import { CONTRACT_STATUS_KEY, CONTRACT_TYPE_KEY } from '@/features/character/contractLabels';
 import {
   activeContractsFilterCount,
@@ -52,7 +60,7 @@ import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
 import { downloadCsv } from '@/lib/downloadCsv';
 import { contractsCsvColumns } from '@/features/character/contractsCsv';
-import type { Contract } from '@/esi/endpoints';
+import type { CharacterAffiliation, Contract } from '@/esi/endpoints';
 
 interface Snapshot {
   contractsResult: CachedResult<Contract[]> | null;
@@ -61,6 +69,14 @@ interface Snapshot {
   /** Fewer pages came back than ESI advertised — the list below is partial. */
   contractsTruncated: boolean;
   issuerNames: Map<number, string>;
+  /**
+   * This character's own contact list, indexed once per snapshot. Empty
+   * (never missing) when the contacts scope isn't granted — a stranger's tag
+   * is simply absent, not an error the page needs to surface.
+   */
+  standingIndex: ContactStandingIndex;
+  /** Each issuer's corp/alliance/faction, so an issuer with no personal contact entry can still match one the pilot holds on their corp. */
+  issuerAffiliations: Map<number, CharacterAffiliation>;
 }
 
 const STATUS_TONE: Record<Contract['status'], string> = {
@@ -81,6 +97,8 @@ const ROW_CAP = 50;
 
 /** Stable identity, so the fallback doesn't invalidate the column memo every render. */
 const NO_NAMES: ReadonlyMap<number, string> = new Map();
+const NO_STANDING_INDEX: ContactStandingIndex = new Map();
+const NO_AFFILIATIONS: ReadonlyMap<number, CharacterAffiliation> = new Map();
 
 /**
  * Lapsed and unclaimed — still `outstanding` past its accept-by deadline.
@@ -102,10 +120,22 @@ async function loadContractsSnapshot(
   const { cached: contractsResult, needsReauth: contractsNeedsReauth } =
     await loadContracts(characterId);
   const contractsTruncated = contractsResult?.truncated ?? false;
-  // Already superseded: skip the name lookup, its result would be discarded.
+  // Already superseded: skip the name/standing lookups, their results would be discarded.
   const issuerIds = signal.cancelled ? [] : (contractsResult?.data ?? []).map((c) => c.issuer_id);
-  const issuerNames = await resolveNames(issuerIds);
-  return { contractsResult, contractsNeedsReauth, contractsTruncated, issuerNames };
+  const [issuerNames, contactsStatus, issuerAffiliations] = await Promise.all([
+    resolveNames(issuerIds),
+    signal.cancelled ? Promise.resolve(null) : loadContacts(characterId),
+    resolveAffiliations(issuerIds),
+  ]);
+  const standingIndex = buildContactStandingIndex(contactsStatus?.cached?.data ?? []);
+  return {
+    contractsResult,
+    contractsNeedsReauth,
+    contractsTruncated,
+    issuerNames,
+    standingIndex,
+    issuerAffiliations,
+  };
 }
 
 interface ContractsFilterBarProps {
@@ -194,6 +224,8 @@ export function Contracts() {
   const contractsNeedsReauth = data?.contractsNeedsReauth ?? false;
   const contractsTruncated = data?.contractsTruncated ?? false;
   const issuerNames = data?.issuerNames ?? NO_NAMES;
+  const standingIndex = data?.standingIndex ?? NO_STANDING_INDEX;
+  const issuerAffiliations = data?.issuerAffiliations ?? NO_AFFILIATIONS;
 
   const [selectedContract, setSelectedContract] = useState<Contract | null>(null);
   const [filter, setFilter] = useState<ContractsFilter>(EMPTY_CONTRACTS_FILTER);
@@ -266,11 +298,16 @@ export function Contracts() {
         header: t('contracts.issuer'),
         sortValue: (contract) => issuerNames.get(contract.issuer_id) ?? `#${contract.issuer_id}`,
         render: (contract) => (
-          <IssuerLink
-            issuerId={contract.issuer_id}
-            name={issuerNames.get(contract.issuer_id) ?? `#${contract.issuer_id}`}
-            className="text-left"
-          />
+          <span className="inline-flex items-center gap-1.5">
+            <IssuerLink
+              issuerId={contract.issuer_id}
+              name={issuerNames.get(contract.issuer_id) ?? `#${contract.issuer_id}`}
+              className="text-left"
+            />
+            <StandingTag
+              standing={characterStanding(standingIndex, contract.issuer_id, issuerAffiliations)}
+            />
+          </span>
         ),
       },
       {
@@ -296,7 +333,7 @@ export function Contracts() {
         render: (contract) => formatTimestamp(new Date(contract.date_expired), timeZone),
       },
     ],
-    [t, issuerNames, timeZone]
+    [t, issuerNames, timeZone, standingIndex, issuerAffiliations]
   );
 
   const contracts = useMemo(
@@ -467,6 +504,11 @@ export function Contracts() {
           issuerName={
             issuerNames.get(selectedContract.issuer_id) ?? `#${selectedContract.issuer_id}`
           }
+          issuerStanding={characterStanding(
+            standingIndex,
+            selectedContract.issuer_id,
+            issuerAffiliations
+          )}
           onClose={() => setSelectedContract(null)}
         />
       )}

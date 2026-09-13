@@ -55,6 +55,13 @@ const TIER_GLYPH: Record<StandingTier, readonly (readonly [number, number, numbe
 
 interface StandingIconProps {
   value: number;
+  /**
+   * Overrides the tooltip/accessible name. Default is the bare tier + number
+   * ("Excellent standing (10)"); a caller that needs to say *why* the
+   * standing applies — `StandingTag`'s own vs. inherited-from-corp phrasing —
+   * passes its own label rather than this component growing that logic.
+   */
+  label?: string;
   className?: string;
 }
 
@@ -70,17 +77,19 @@ interface StandingIconProps {
  * a tab stop on every row of a long contact list costs more than the tag is
  * worth.
  */
-export function StandingIcon({ value, className = '' }: StandingIconProps) {
+export function StandingIcon({ value, label, className = '' }: StandingIconProps) {
   const { t } = useTranslation();
   const clamped = Math.max(-10, Math.min(10, value));
   const tier = standingTier(clamped);
-  const label = t('contacts.standingTierValue', {
-    tier: t(`contacts.tier.${tier}`),
-    value: clamped,
-  });
+  const resolvedLabel =
+    label ??
+    t('contacts.standingTierValue', {
+      tier: t(`contacts.tier.${tier}`),
+      value: clamped,
+    });
   return (
-    <Tooltip content={label} openOnTap>
-      <span role="img" aria-label={label} className={`inline-flex shrink-0 ${className}`}>
+    <Tooltip content={resolvedLabel} openOnTap>
+      <span role="img" aria-label={resolvedLabel} className={`inline-flex shrink-0 ${className}`}>
         <svg
           viewBox="0 0 9 9"
           width="1rem"

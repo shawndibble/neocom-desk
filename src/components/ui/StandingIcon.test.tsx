@@ -34,6 +34,15 @@ describe('StandingIcon', () => {
     expect(screen.getByRole('img', { name: 'Terrible standing (-10)' })).toBeInTheDocument();
   });
 
+  // `StandingTag` needs to say *why* a standing applies (own vs. inherited),
+  // which the bare tier+number default can't express.
+  it('uses a caller-supplied label instead of the bare tier + number', () => {
+    render(<StandingIcon value={-10} label="Your contact: Terrible standing (-10)" />);
+    expect(
+      screen.getByRole('img', { name: 'Your contact: Terrible standing (-10)' })
+    ).toBeInTheDocument();
+  });
+
   // DESIGN.md §7: colour is never the only signal. The client separates
   // terrible from bad, and good from excellent, by hue alone — two reds and
   // two blues — so the tag has to carry the magnitude in the mark as well.
