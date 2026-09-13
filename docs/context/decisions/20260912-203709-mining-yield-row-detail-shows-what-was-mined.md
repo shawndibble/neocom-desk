@@ -32,3 +32,11 @@ _Recorded 2026-09-12._
 - **Part-batch leftovers are shown, never rounded up.** Ore short of a whole
   `portionSize` refines into nothing, so the modal names the leftover units
   instead of quietly implying the whole pile refines.
+
+- **The Overview tab's Volume column now reads real m³.** It formatted the bare
+  unit count through `formatVolume` and headed it "Volume" — units presented as
+  a volume. The detail modal shows quantity × the type's own unit volume, and a
+  row whose modal disagrees with the row itself (by ~1000× on ice) is worse than
+  either number alone, so the column and the Volume-mined stat convert with it.
+  A type the SDE bake carries no volume for renders an em dash rather than a
+  total that silently omits it.

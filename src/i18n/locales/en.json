@@ -1487,7 +1487,7 @@
     "statusColumn": "Status",
     "unknownPayee": "Unknown Payee",
     "overview": {
-      "volumeColumn": "Volume",
+      "volumeColumn": "Volume (m³)",
       "rawSellValue": "Raw sell value",
       "refineValue": "Refined value",
       "pricingColumn": "Pricing",
@@ -1521,7 +1521,7 @@
         "leftOverHint": "{{units}} units fall short of a whole batch and refine into nothing.",
         "pricingTitle": "How this is priced",
         "priceBasisHint": "Jita average on {{date}}, not today's price. Raw ore is priced as its compressed form.",
-        "refineBasisHint": "Refining uses {{character}}'s skills at an NPC station's 50% base rate ({{efficiency}}% yield), with no station tax deducted.",
+        "refineBasisHint": "Refining uses {{character}}'s Reprocessing and Reprocessing Efficiency skills at an NPC station's 50% base rate ({{efficiency}}% yield), with no station tax deducted.",
         "partialPricingHint": "Some types had no market history on this date. Their value is left out of both totals rather than guessed."
       }
     }

@@ -55,6 +55,26 @@ function loadSnapshot(): Promise<MiningYieldSnapshot> {
   return loadMiningYieldSnapshot();
 }
 
+/**
+ * A row's mined m³ — units times the type's own unit volume, not the bare
+ * unit count this column used to format through `formatVolume`. `complete`
+ * is false when the SDE bake carries no volume for one of the types, so the
+ * caller can render an em dash rather than a total that silently omits it.
+ */
+function entryVolume(
+  row: MiningYieldRow,
+  typeVolumes: ReadonlyMap<number, number>
+): { m3: number; complete: boolean } {
+  let m3 = 0;
+  let complete = true;
+  for (const line of row.entry.oreLines) {
+    const unit = typeVolumes.get(line.typeId);
+    if (unit === undefined) complete = false;
+    else m3 += unit * line.quantity;
+  }
+  return { m3, complete };
+}
+
 function dateRangeLabel(dates: readonly string[]): string {
   if (dates.length === 0) return '—';
   const sorted = [...dates].sort();
@@ -92,24 +112,29 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
   );
 
   const totals = useMemo(() => {
+    const typeVolumes = data?.typeVolumes ?? new Map<number, number>();
     let rawValue = 0;
     let refineValue = 0;
     let volume = 0;
+    let volumeComplete = true;
     const dates: string[] = [];
     for (const row of visibleRows) {
       rawValue += row.valuation.rawValue;
       refineValue += row.valuation.refineValue;
       dates.push(row.entry.date);
-      for (const line of row.entry.oreLines) volume += line.quantity;
+      const rowVolume = entryVolume(row, typeVolumes);
+      volume += rowVolume.m3;
+      if (!rowVolume.complete) volumeComplete = false;
     }
     return {
       rawValue,
       refineValue,
       volume,
+      volumeComplete,
       dates,
       iskPerHour: iskPerCalendarHour(rawValue, dates),
     };
-  }, [visibleRows]);
+  }, [visibleRows, data]);
 
   const dailyRate: DailyRatePoint[] = useMemo(() => {
     const byDate = new Map<string, number>();
@@ -180,8 +205,14 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
       header: t('miningTax.overview.volumeColumn'),
       align: 'right',
       className: 'whitespace-nowrap tabular-nums',
-      render: (row) => formatVolume(row.entry.oreLines.reduce((sum, l) => sum + l.quantity, 0)),
-      sortValue: (row) => row.entry.oreLines.reduce((sum, l) => sum + l.quantity, 0),
+      render: (row) => {
+        const volume = entryVolume(row, data?.typeVolumes ?? new Map());
+        return volume.complete ? formatVolume(volume.m3) : '—';
+      },
+      sortValue: (row) => {
+        const volume = entryVolume(row, data?.typeVolumes ?? new Map());
+        return volume.complete ? volume.m3 : undefined;
+      },
     },
     {
       id: 'rawValue',
@@ -315,7 +346,7 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
                     {t('miningTax.overview.volumeStat')}
                   </p>
                   <p className="mt-1 text-lg font-semibold tabular-nums">
-                    {formatVolume(totals.volume)}
+                    {totals.volumeComplete ? `${formatVolume(totals.volume)} m³` : '—'}
                   </p>
                 </Panel>
                 <Panel>

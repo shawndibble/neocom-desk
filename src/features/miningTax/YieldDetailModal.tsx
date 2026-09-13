@@ -282,13 +282,19 @@ export function YieldDetailModal({
             <p className="border-b border-line bg-panel-2 px-2.5 py-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
               {t('miningTax.overview.detail.oreMinedTitle')}
             </p>
-            <DataTable
-              columns={oreColumns}
-              rows={valuation.lines}
-              rowKey={(line) => line.typeId}
-              label={t('miningTax.overview.detail.oreMinedTitle')}
-              defaultSort={{ columnId: 'raw', direction: 'desc' }}
-            />
+            {/* `overflow-hidden` above is what rounds the corners, so it
+                cannot scroll — the table gets its own scroller, per
+                DESIGN.md §4a. Between `sm` and `lg` these five columns are
+                un-stacked in a narrow box and would otherwise clip. */}
+            <div className="overflow-x-auto">
+              <DataTable
+                columns={oreColumns}
+                rows={valuation.lines}
+                rowKey={(line) => line.typeId}
+                label={t('miningTax.overview.detail.oreMinedTitle')}
+                defaultSort={{ columnId: 'raw', direction: 'desc' }}
+              />
+            </div>
           </div>
 
           <div className="space-y-3">
@@ -301,12 +307,14 @@ export function YieldDetailModal({
                   {t('miningTax.overview.detail.refinesIntoNone')}
                 </p>
               ) : (
-                <DataTable
-                  columns={refinedColumns}
-                  rows={refinedRows}
-                  rowKey={(material) => material.typeId}
-                  label={t('miningTax.overview.detail.refinesIntoTitle')}
-                />
+                <div className="overflow-x-auto">
+                  <DataTable
+                    columns={refinedColumns}
+                    rows={refinedRows}
+                    rowKey={(material) => material.typeId}
+                    label={t('miningTax.overview.detail.refinesIntoTitle')}
+                  />
+                </div>
               )}
               {/* The portion trap, stated rather than rounded away:
                   `reprocessing.ts` returns nothing at all for a part batch. */}

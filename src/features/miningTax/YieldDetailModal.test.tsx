@@ -115,7 +115,11 @@ describe('YieldDetailModal', () => {
   it('states the mined-date price basis and the refining assumption', () => {
     renderModal();
     expect(screen.getByText(/Jita average on 2026-09-08/)).toBeInTheDocument();
-    expect(screen.getByText(/NPC station's 50% base rate \(50.0% yield\)/)).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /Reprocessing and Reprocessing Efficiency skills at an NPC station's 50% base rate \(50.0% yield\)/
+      )
+    ).toBeInTheDocument();
     expect(screen.getByText(/no market history on this date/)).toBeInTheDocument();
   });
 });
