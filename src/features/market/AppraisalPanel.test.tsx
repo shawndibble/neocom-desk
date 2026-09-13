@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import type { Appraisal } from '@/engine/market/appraisal';
+import { configureClipboard } from '@/lib/clipboard';
 import { TRADE_HUBS } from '@/market/hubs';
 import { AppraisalPanel } from './AppraisalPanel';
 import type { AppraisalController } from './useAppraisal';
@@ -177,6 +178,40 @@ describe('AppraisalPanel', () => {
       renderPanel({ controller: controller({ result: outcome(), compare: COMPARE_ROWS }) });
       const list = await compareCards();
       expect(within(hubCard(list, TRADE_HUBS[0].systemName)).getByText('—')).toBeInTheDocument();
+    });
+
+    /**
+     * The clipboard gets the *exact* figure, never the "4.0K" shorthand the
+     * card renders — a pasted appraisal total that had been rounded for
+     * display would be wrong wherever it landed.
+     */
+    it('copies a total in full when it is clicked, and says so', async () => {
+      const written: string[] = [];
+      configureClipboard(async (text) => {
+        written.push(text);
+      });
+      renderPanel({ controller: controller({ result: outcome(), compare: COMPARE_ROWS }) });
+      const list = await compareCards();
+      const amarr = hubCard(list, TRADE_HUBS[1].systemName);
+
+      // COMPARE_ROWS indexes Amarr at 1: sell 4,000, buy 2,000.
+      await userEvent.click(within(amarr).getByRole('button', { name: 'Copy 4,000 ISK' }));
+      expect(written).toEqual(['4,000']);
+      expect(screen.getByRole('status')).toHaveTextContent('Copied to clipboard');
+
+      await userEvent.click(within(amarr).getByRole('button', { name: 'Copy 2,000 ISK' }));
+      expect(written).toEqual(['4,000', '2,000']);
+
+      configureClipboard(null);
+    });
+
+    it('leaves a hub with no orders on a side unclickable', async () => {
+      renderPanel({ controller: controller({ result: outcome(), compare: COMPARE_ROWS }) });
+      const list = await compareCards();
+      // Jita's buy is null here, so only its sell total is a copy target.
+      expect(within(hubCard(list, TRADE_HUBS[0].systemName)).getAllByRole('button')).toHaveLength(
+        1
+      );
     });
   });
 

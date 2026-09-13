@@ -2847,6 +2847,8 @@
       "compareHubsTitle": "Compare hubs",
       "compareHubsShow": "Show hub comparison",
       "compareHubsHide": "Hide hub comparison",
+      "copyTotal": "Copy {{amount}}",
+      "copiedToClipboard": "Copied to clipboard",
       "columnHub": "Hub"
     },
     "priceHistory": {

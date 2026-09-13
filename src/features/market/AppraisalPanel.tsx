@@ -11,14 +11,13 @@
  * The Browser's own two-column grid holds two halves: the paste box, one
  * `Panel`, narrower on the left since it does not need the width the Market
  * Group tree does; and the result column, which stacks the primary result
- * `Panel` above an optional Compare Hubs `CollapsiblePanel` once something
+ * `Panel` above an optional, foldable Compare Hubs section once something
  * has been appraised.
  */
 import { useState, type ReactElement, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
-  CollapsiblePanel,
   DataTable,
   EmptyState,
   IconButton,
@@ -31,6 +30,7 @@ import {
   type IskRevealGesture,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
+import { Caret } from '@/components/ui/Disclosure';
 import { fieldBaseClassName } from '@/components/ui/controlStyles';
 import type { AppraisalRow } from '@/engine/market/appraisal';
 import { countPasteLines } from '@/engine/market/appraisalPaste';
@@ -484,17 +484,34 @@ export function AppraisalPanel({
         </Panel>
 
         {compare !== null && (
-          <CollapsiblePanel
-            title={t('market.appraisal.compareHubsTitle')}
-            expanded={compareExpanded}
-            onToggle={() => setCompareExpanded((open) => !open)}
-            labels={{
-              show: t('market.appraisal.compareHubsShow'),
-              hide: t('market.appraisal.compareHubsHide'),
-            }}
-          >
-            <HubCompareCards rows={compare} />
-          </CollapsiblePanel>
+          // Deliberately not a panel: the hub cards are panel surfaces
+          // themselves, so framing them put a box around five boxes. The fold
+          // survives as a bare heading-plus-caret row on the page ground — the
+          // caret stays its own `IconButton` rather than swallowing the
+          // heading, so the toggle's accessible name is not an `aria-label`
+          // overriding visible text (WCAG 2.5.3).
+          <section aria-labelledby="market-appraisal-compare-hubs">
+            <div className="flex min-h-9 items-center gap-1">
+              <h2
+                id="market-appraisal-compare-hubs"
+                className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
+              >
+                {t('market.appraisal.compareHubsTitle')}
+              </h2>
+              <IconButton
+                size="sm"
+                icon={<Caret expanded={compareExpanded} />}
+                label={
+                  compareExpanded
+                    ? t('market.appraisal.compareHubsHide')
+                    : t('market.appraisal.compareHubsShow')
+                }
+                aria-expanded={compareExpanded}
+                onClick={() => setCompareExpanded((open) => !open)}
+              />
+            </div>
+            {compareExpanded && <HubCompareCards rows={compare} />}
+          </section>
         )}
       </div>
     </div>
