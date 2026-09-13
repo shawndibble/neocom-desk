@@ -205,9 +205,9 @@ export function Contracts() {
       setSearchParams(
         (previous) => {
           const params = new URLSearchParams(previous);
-          // History is the default, so it stays out of the URL rather than
-          // leaving `?tab=history` on every visit that never touched the strip.
-          if (next === 'history') params.delete('tab');
+          // Search is the default, so it stays out of the URL rather than
+          // leaving `?tab=search` on every visit that never touched the strip.
+          if (next === 'search') params.delete('tab');
           else params.set('tab', next);
           return params;
         },

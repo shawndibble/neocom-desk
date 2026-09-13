@@ -45,7 +45,11 @@ export const NOTIFICATION_ROUTES: Record<NotificationEventId, string> = {
   newMail: '/mail',
   newCalendarEvent: '/calendar',
   calendarEventStarting: '/calendar',
-  contractAccepted: '/contracts',
+  // `?tab=` because Search, not History, is the page's default tab — and this
+  // alert is about a row in *History*. `notificationUrlForSubject` then adds
+  // `?highlight=`, which `useHighlightParam` spends on arrival whether or not
+  // a row matched; landing on the wrong tab would burn it for nothing.
+  contractAccepted: '/contracts?tab=history',
   // `?tab=` deep-links straight to the tab that actually shows the event,
   // not just the page — `Wallet.tsx` reads it once on mount.
   walletBalanceChanged: '/wallet?tab=journal',

@@ -3,24 +3,27 @@ import type { TFunction } from 'i18next';
 import { contractsTabs, readContractsTab } from '@/features/character/contractsTabs';
 
 describe('readContractsTab', () => {
-  it('reads the Search tab out of the query string', () => {
-    expect(readContractsTab('search')).toBe('search');
+  it('reads the History tab out of the query string', () => {
+    expect(readContractsTab('history')).toBe('history');
   });
 
-  it('falls back to History for an absent, unknown or stale value', () => {
-    expect(readContractsTab(null)).toBe('history');
-    expect(readContractsTab('history')).toBe('history');
-    expect(readContractsTab('sourcing')).toBe('history');
-    expect(readContractsTab('')).toBe('history');
+  it('falls back to Search for an absent, unknown or stale value', () => {
+    expect(readContractsTab(null)).toBe('search');
+    expect(readContractsTab('sourcing')).toBe('search');
+    expect(readContractsTab('')).toBe('search');
+  });
+
+  it('still honours the `?tab=search` links written before Search became the default', () => {
+    expect(readContractsTab('search')).toBe('search');
   });
 });
 
 describe('contractsTabs', () => {
-  it('lists History first, then Search, labelled through i18n', () => {
+  it('lists Search first, then History, labelled through i18n', () => {
     const t = ((key: string) => key) as unknown as TFunction;
     expect(contractsTabs(t)).toEqual([
-      { id: 'history', label: 'contracts.historyTab' },
       { id: 'search', label: 'contracts.searchTab' },
+      { id: 'history', label: 'contracts.historyTab' },
     ]);
   });
 });

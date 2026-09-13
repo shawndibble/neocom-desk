@@ -38,10 +38,12 @@ describe('notificationUrlForSubject', () => {
     expect(notificationUrlForSubject('marketOrderFilled', 34)).toEqual(
       '/market?section=transactions&highlight=34'
     );
+    expect(notificationUrlForSubject('contractAccepted', 5)).toEqual(
+      '/contracts?tab=history&highlight=5'
+    );
   });
 
   it('appends it to a route that carries none, without inventing a second `?`', () => {
-    expect(notificationUrlForSubject('contractAccepted', 5)).toEqual('/contracts?highlight=5');
     expect(notificationUrlForSubject('industryJobComplete', 9)).toEqual('/industry?highlight=9');
     expect(notificationUrlForSubject('corpMemberJoined', 12)).toEqual('/corp/members?highlight=12');
   });
