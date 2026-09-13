@@ -799,7 +799,10 @@ export function Wallet() {
       {
         id: 'lpStoreAffordance',
         header: '',
-        align: 'right',
+        // Sized to the glyph (same as the Tax tab's edit affordance): without
+        // a width this column takes a share of the table's leftover space and
+        // the caret drifts in from the right edge.
+        className: 'w-6 px-2',
         render: () => (
           <Icon.Descend
             size={Icon.ICON_SIZE.sm}

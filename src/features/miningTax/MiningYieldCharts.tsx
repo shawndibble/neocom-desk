@@ -16,8 +16,8 @@ import {
   type TooltipContentProps,
 } from 'recharts';
 import { useTranslation } from 'react-i18next';
-import { GROUPED_NUMBER_Y_AXIS_MARGIN_LEFT, GROUPED_NUMBER_Y_AXIS_WIDTH } from '@/lib/chartAxis';
-import { formatIsk } from '@/lib/isk';
+import { COMPACT_ISK_Y_AXIS_MARGIN_LEFT, COMPACT_ISK_Y_AXIS_WIDTH } from '@/lib/chartAxis';
+import { formatIsk, formatIskCompact } from '@/lib/isk';
 
 export interface DailyRatePoint {
   date: string;
@@ -99,7 +99,7 @@ export default function MiningYieldCharts({ dailyRate, typeComparison }: MiningY
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
               data={dailyRate}
-              margin={{ top: 8, right: 8, left: GROUPED_NUMBER_Y_AXIS_MARGIN_LEFT, bottom: 0 }}
+              margin={{ top: 8, right: 8, left: COMPACT_ISK_Y_AXIS_MARGIN_LEFT, bottom: 0 }}
             >
               <CartesianGrid stroke="var(--color-line)" strokeDasharray="3 3" />
               <XAxis
@@ -111,8 +111,8 @@ export default function MiningYieldCharts({ dailyRate, typeComparison }: MiningY
               <YAxis
                 stroke="var(--color-text-dim)"
                 tick={{ fontSize: 11, fill: 'var(--color-text-dim)' }}
-                width={GROUPED_NUMBER_Y_AXIS_WIDTH}
-                tickFormatter={(value: number) => formatIsk(value, 0)}
+                width={COMPACT_ISK_Y_AXIS_WIDTH}
+                tickFormatter={(value: number) => formatIskCompact(value)}
               />
               <Tooltip content={(props) => <RateTooltip {...props} />} />
               <Bar
@@ -137,7 +137,7 @@ export default function MiningYieldCharts({ dailyRate, typeComparison }: MiningY
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
               data={typeComparison}
-              margin={{ top: 8, right: 8, left: GROUPED_NUMBER_Y_AXIS_MARGIN_LEFT, bottom: 0 }}
+              margin={{ top: 8, right: 8, left: COMPACT_ISK_Y_AXIS_MARGIN_LEFT, bottom: 0 }}
             >
               <CartesianGrid stroke="var(--color-line)" strokeDasharray="3 3" />
               <XAxis
@@ -152,8 +152,8 @@ export default function MiningYieldCharts({ dailyRate, typeComparison }: MiningY
               <YAxis
                 stroke="var(--color-text-dim)"
                 tick={{ fontSize: 11, fill: 'var(--color-text-dim)' }}
-                width={GROUPED_NUMBER_Y_AXIS_WIDTH}
-                tickFormatter={(value: number) => formatIsk(value, 0)}
+                width={COMPACT_ISK_Y_AXIS_WIDTH}
+                tickFormatter={(value: number) => formatIskCompact(value)}
               />
               <Tooltip content={(props) => <CompareTooltip {...props} />} />
               <Legend wrapperStyle={{ fontSize: '0.6875rem' }} />
