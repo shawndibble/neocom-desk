@@ -1673,23 +1673,14 @@ export function BuildPlanDetail({
                     </span>
                   }
                   action={
-                    (bulkDetectedPatches.length > 0 || bulkClearPatches.length > 0) && (
-                      <div className="flex gap-2">
-                        {bulkDetectedPatches.length > 0 && (
-                          <Button
-                            size="sm"
-                            onClick={() => onSourcingChangeMany(bulkDetectedPatches)}
-                          >
-                            {t('industry.useAllOwned')}
-                          </Button>
-                        )}
-                        {bulkClearPatches.length > 0 && (
-                          <Button size="sm" onClick={() => onSourcingChangeMany(bulkClearPatches)}>
-                            {t('industry.useNoneOwned')}
-                          </Button>
-                        )}
-                      </div>
-                    )
+                    <div className="flex gap-2">
+                      <Button size="sm" onClick={() => onSourcingChangeMany(bulkDetectedPatches)}>
+                        {t('industry.useAllOwned')}
+                      </Button>
+                      <Button size="sm" onClick={() => onSourcingChangeMany(bulkClearPatches)}>
+                        {t('industry.useNoneOwned')}
+                      </Button>
+                    </div>
                   }
                 />
               </div>
