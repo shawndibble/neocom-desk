@@ -21,6 +21,22 @@ export interface OreLineValuation {
   rawValue: number;
   /** 0 when the type has no reprocessing data, or its yield had no priced material. */
   refineValue: number;
+  /**
+   * What this line's whole batches actually return, floored per material the
+   * way the game returns whole units. Empty when the type has no reprocessing
+   * data at all, and equally when the quantity mined does not cover one whole
+   * portion — see `unitsLeftOver`.
+   */
+  refineOutputs: ReprocessingMaterial[];
+  /** Whole portions `quantity` covers. 0 for a type with no reprocessing data. */
+  batches: number;
+  /**
+   * Units that cannot make up a whole portion and so refine into nothing —
+   * the portion trap `reprocessing.ts` requires callers to SHOW rather than
+   * round away. 0 for a type with no reprocessing data, where nothing was
+   * refinable in the first place and "left over" would be a lie.
+   */
+  unitsLeftOver: number;
 }
 
 export interface EntryValuation {
@@ -35,6 +51,13 @@ export interface EntryValuation {
    */
   pricedAll: boolean;
   lines: OreLineValuation[];
+  /**
+   * The reprocessing efficiency every `refineValue` above was computed at —
+   * the character's skills over an NPC station's 50% base rate, with no
+   * station tax deducted. `reprocessing.ts` requires a caller showing refine
+   * values to state that assumption, and it cannot be restated without this.
+   */
+  efficiency: number;
 }
 
 /**
@@ -71,6 +94,9 @@ export function valueMiningYield(
 
     const reprocessing = reprocessingByTypeId.get(line.typeId);
     let lineRefineValue = 0;
+    let refineOutputs: ReprocessingMaterial[] = [];
+    let batches = 0;
+    let unitsLeftOver = 0;
     if (reprocessing) {
       const yielded = reprocessingYield({
         portionSize: reprocessing.portionSize,
@@ -80,6 +106,9 @@ export function valueMiningYield(
       });
       const value = reprocessingValue(yielded.outputs, materialPrices);
       lineRefineValue = value.total;
+      refineOutputs = yielded.outputs;
+      batches = yielded.batches;
+      unitsLeftOver = yielded.unitsLeftOver;
       if (!value.pricedAll) pricedAll = false;
     } else {
       pricedAll = false;
@@ -91,8 +120,11 @@ export function valueMiningYield(
       quantity: line.quantity,
       rawValue: lineRawValue,
       refineValue: lineRefineValue,
+      refineOutputs,
+      batches,
+      unitsLeftOver,
     });
   }
 
-  return { rawValue, refineValue, pricedAll, lines };
+  return { rawValue, refineValue, pricedAll, lines, efficiency };
 }

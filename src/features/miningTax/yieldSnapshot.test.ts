@@ -10,6 +10,7 @@ vi.mock('./ledger', () => ledgerMock);
 const sdeMock = vi.hoisted(() => ({
   loadCompressedOreTypeIds: vi.fn(),
   loadReprocessing: vi.fn(),
+  loadTypes: vi.fn(),
 }));
 vi.mock('@/sde/loadSde', () => sdeMock);
 
@@ -31,6 +32,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   sdeMock.loadCompressedOreTypeIds.mockResolvedValue({});
   sdeMock.loadReprocessing.mockResolvedValue({});
+  sdeMock.loadTypes.mockResolvedValue({});
   skillsMock.loadCorrectedSkills.mockResolvedValue({ trained: new Map() });
   typeNamesMock.loadTypeNames.mockResolvedValue(new Map());
   systemSecurityMock.loadSystemNameAndSecurity.mockResolvedValue({
@@ -93,5 +95,26 @@ describe('loadMiningYieldSnapshot', () => {
     });
 
     await expect(loadMiningYieldSnapshot()).rejects.toThrow('Service unavailable');
+  });
+
+  it('carries per-unit volume and the names of the materials the ore refines into', async () => {
+    // Detail-modal inputs: an unnamed "#34" in a refining list is no use to a
+    // miner, and m³ is what an ore hold is measured in.
+    sdeMock.loadTypes.mockResolvedValue({ [String(TRADABLE)]: { volume: 0.1 } });
+    sdeMock.loadReprocessing.mockResolvedValue({
+      [String(TRADABLE)]: { portionSize: 100, materials: [{ typeID: 34, quantity: 400 }] },
+    });
+    priceHistoryMock.loadPriceHistory.mockResolvedValue({
+      points: [{ date: '2026-09-01', average: 10, volume: 1 }],
+      fetchedAt: Date.now(),
+    });
+
+    const snapshot = await loadMiningYieldSnapshot();
+
+    expect(snapshot.typeVolumes.get(TRADABLE)).toBe(0.1);
+    expect(typeNamesMock.loadTypeNames).toHaveBeenCalledWith(
+      expect.arrayContaining([TRADABLE, 34])
+    );
+    expect(snapshot.rows[0].materialUnitPrices.get(34)).toBe(10);
   });
 });
