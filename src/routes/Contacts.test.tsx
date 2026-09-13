@@ -103,9 +103,11 @@ describe('Contacts', () => {
     render(<App />);
     await screen.findByText('Good Friend');
 
-    expect(screen.getByText('Player')).toBeInTheDocument();
-    expect(screen.getByText('Corp')).toBeInTheDocument();
-    expect(screen.getByText('Alliance')).toBeInTheDocument();
+    // Scoped to the table: the same words label the type filter chips above it.
+    const table = within(screen.getByRole('table', { name: 'Contacts' }));
+    expect(table.getByText('Player')).toBeInTheDocument();
+    expect(table.getByText('Corp')).toBeInTheDocument();
+    expect(table.getByText('Alliance')).toBeInTheDocument();
     expect(screen.queryByText('character')).toBeNull();
     expect(screen.queryByText('corporation')).toBeNull();
   });
@@ -129,7 +131,7 @@ describe('Contacts', () => {
     expect(screen.queryByText('Bad Alliance')).not.toBeInTheDocument();
   });
 
-  it('points at the standing chips when the filter leaves no contacts', async () => {
+  it('points at the filters when they leave no contacts', async () => {
     render(<App />);
     await screen.findByText('Good Friend');
 
@@ -137,7 +139,40 @@ describe('Contacts', () => {
     for (const chip of within(chips).getAllByRole('button')) fireEvent.click(chip);
 
     expect(await screen.findByText('No contacts match the selected filters')).toBeInTheDocument();
-    expect(screen.getByText('Turn on a standing above to see contacts.')).toBeInTheDocument();
+    expect(screen.getByText('Widen the filters above to see contacts.')).toBeInTheDocument();
+  });
+
+  it('searches contacts by name', async () => {
+    render(<App />);
+    await screen.findByText('Good Friend');
+
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Name' }), {
+      target: { value: 'neutral' },
+    });
+
+    expect(await screen.findByText('Neutral Corp')).toBeInTheDocument();
+    expect(screen.queryByText('Good Friend')).not.toBeInTheDocument();
+    expect(screen.queryByText('Bad Alliance')).not.toBeInTheDocument();
+  });
+
+  it('filters by contact type', async () => {
+    render(<App />);
+    await screen.findByText('Good Friend');
+
+    const types = screen.getByRole('group', { name: 'Type' });
+    fireEvent.click(within(types).getByRole('button', { name: /Player/ }));
+
+    expect(await screen.findByText('Neutral Corp')).toBeInTheDocument();
+    expect(screen.queryByText('Good Friend')).not.toBeInTheDocument();
+  });
+
+  it('counts every contact type on its chip, zeros included', async () => {
+    render(<App />);
+    await screen.findByText('Good Friend');
+
+    const types = within(screen.getByRole('group', { name: 'Type' }));
+    expect(types.getByRole('button', { name: /Player/ })).toHaveTextContent('1');
+    expect(types.getByRole('button', { name: /Faction/ })).toHaveTextContent('0');
   });
 
   it('falls back to cached contacts offline', async () => {
