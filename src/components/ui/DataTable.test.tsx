@@ -160,6 +160,17 @@ describe('DataTable', () => {
     expect(cells[0]).not.toHaveClass('text-right');
   });
 
+  it('centers both the header and the cells of a centered column', () => {
+    renderTable({
+      columns: [columns[0], { ...columns[1], align: 'center' }],
+    });
+    expect(screen.getByRole('columnheader', { name: 'Amount' })).toHaveClass('text-center');
+    expect(screen.getByRole('columnheader', { name: 'Item' })).not.toHaveClass('text-center');
+    const cells = screen.getAllByRole('cell');
+    expect(cells[1]).toHaveClass('text-center');
+    expect(cells[0]).not.toHaveClass('text-center');
+  });
+
   it("applies headerClassName to a non-sortable column's header, without touching its cells", () => {
     renderTable({
       columns: [{ ...columns[0], headerClassName: 'whitespace-nowrap' }, columns[1]],
