@@ -59,6 +59,7 @@ import type { AppRoutePath } from './routeScopes';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useFontScale } from '@/lib/fontScale';
 import { useTimeFormat } from '@/lib/timeFormat';
+import { useMobileTabs } from '@/lib/mobileTabs';
 
 // Wire authenticated ESI calls to stored tokens once, at module load. Wrapped
 // (tokenProvider.ts) so a dead refresh grant is reported centrally instead of
@@ -171,6 +172,15 @@ export function App() {
   useEffect(() => {
     void hydrateTimeFormat();
   }, [hydrateTimeFormat]);
+
+  // And the phone's chosen bottom tabs, for the same reason one level lower:
+  // `Layout` is the only reader, but it renders on every route, so hydrating
+  // it there would still paint the default bar first on a cold load. Here it
+  // is read once, before the shell mounts.
+  const hydrateMobileTabs = useMobileTabs((state) => state.hydrate);
+  useEffect(() => {
+    void hydrateMobileTabs();
+  }, [hydrateMobileTabs]);
 
   // `esi` publishes auth failures; the store is subscribed here so `esi` keeps
   // no dependency on `src/stores` (docs/ARCHITECTURE.md §2).
