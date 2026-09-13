@@ -3391,6 +3391,14 @@
       "local": "My local time",
       "eve": "EVE time (UTC)"
     },
+    "mobileTabs": {
+      "title": "Phone tab bar",
+      "hint": "Pick the four links the bottom bar shows on a phone. Everything else moves into the More menu. Stays on this device.",
+      "group": "Phone tab bar links",
+      "chosen": "{{count}} of {{total}} picked",
+      "full": "Unpick one first — the bar holds four.",
+      "reset": "Use the default four"
+    },
     "tradeHubLabel": "Default trade hub",
     "tradeHubHint": "Prices shown in the Market browser, the LP store and item lookups. Moon mining tax uses each payee’s own hub instead.",
     "facilityLabel": "Default facility",

@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -16,6 +16,13 @@ import { useKeyboardShortcuts } from './useKeyboardShortcuts';
 import { NotificationPermissionPrompt } from '@/features/notifications/NotificationPermissionPrompt';
 import { ForegroundNotificationPoller } from '@/features/notifications/ForegroundNotificationPoller';
 import { useUnreadAlertCount } from '@/features/notifications/useUnreadAlertCount';
+import {
+  MOBILE_TAB_LABEL_KEYS,
+  mobileSheetPaths,
+  sortMobileTabs,
+  useMobileTabs,
+  type MobileTabPath,
+} from '@/lib/mobileTabs';
 import { CorpGrantPrompt } from '@/features/corp/CorpGrantPrompt';
 import { useCorpAccess } from '@/features/corp/useCorpAccess';
 import { useActiveCorporationId } from '@/features/corp/owner';
@@ -369,21 +376,38 @@ interface MobileMoreSheetProps {
   onClose: () => void;
   activeCharacter: ActiveCharacter | undefined;
   locked: ReadonlySet<AppRoutePath>;
+  tabs: readonly MobileTabPath[];
+  unreadAlerts: number;
 }
 
 /**
- * Mobile-only overflow sheet: the Character-section views that don't fit as
- * primary bottom-tab items — PI among them, since Alerts earns a tab and the
- * bar holds four — plus Market (which isn't Character-scoped, but the tab bar
- * is full at 4 + More). Settings and the active Character trail the
- * list, below a divider — Settings has no other route on a phone, and the
- * Character link is the only way to switch or add one. A real modal, not a
- * drawer: it covers the viewport, so the tab bar underneath must not stay
- * reachable — hence the shared `Modal` and its dismissal contract. Links
- * close it on click so it never hangs over the next route.
+ * Mobile-only overflow sheet: everything the bottom tab bar does not hold.
+ *
+ * The rows are `mobileSheetPaths(tabs)` — the complement of the bar, in the
+ * desktop rail's order — rather than a list maintained here. The pilot chooses
+ * the bar's four in Settings, so a hand-kept list on this side would put a
+ * path in both places, or in neither, which on a phone means a route nobody
+ * can reach.
+ *
+ * Three entries sit outside that rotation, because nothing may evict them:
+ * Corp (hidden rather than locked, and this is the phone's only route to it),
+ * and Settings plus the active Character below the divider — Settings has no
+ * other route on a phone, and the Character link is the only way to switch or
+ * add one. A real modal, not a drawer: it covers the viewport, so the tab bar
+ * underneath must not stay reachable — hence the shared `Modal` and its
+ * dismissal contract. Links close it on click so it never hangs over the next
+ * route.
  */
-function MobileMoreSheet({ open, onClose, activeCharacter, locked }: MobileMoreSheetProps) {
+function MobileMoreSheet({
+  open,
+  onClose,
+  activeCharacter,
+  locked,
+  tabs,
+  unreadAlerts,
+}: MobileMoreSheetProps) {
   const { t } = useTranslation();
+  const rows = mobileSheetPaths(tabs);
 
   return (
     <Modal open={open} id={MORE_SHEET_ID} onClose={onClose} title={t('nav.more')} placement="sheet">
@@ -392,63 +416,23 @@ function MobileMoreSheet({ open, onClose, activeCharacter, locked }: MobileMoreS
           between two of them left almost no dead zone for a thumb to miss
           into on this phone-only sheet. */}
       <div className="space-y-2 pb-3">
-        {/* The phone's only route to /corp: the tab bar is full at 4 + More. */}
         <CorpNavItem onClick={onClose} />
-        {/*
-          From here down, same relative order as the desktop rail's
-          Progression/Economy/Social groups (Skills and Industry lead
-          Progression there, but sit in the primary tab bar here, not this
-          sheet) — one order to learn, not two.
-        */}
-        <NavItem
-          to="/planetary-industry"
-          label={t('nav.pi')}
-          locked={locked.has('/planetary-industry')}
-          onClick={onClose}
-        />
-        <NavItem
-          to="/market"
-          label={t('nav.market')}
-          locked={locked.has('/market')}
-          onClick={onClose}
-        />
-        <NavItem
-          to="/wallet"
-          label={t('nav.wallet')}
-          locked={locked.has('/wallet')}
-          onClick={onClose}
-        />
-        <NavItem
-          to="/moon-mining"
-          label={t('nav.miningTax')}
-          locked={locked.has('/moon-mining')}
-          onClick={onClose}
-        />
-        <NavItem
-          to="/assets"
-          label={t('nav.assets')}
-          locked={locked.has('/assets')}
-          onClick={onClose}
-        />
-        <NavItem
-          to="/contracts"
-          label={t('nav.contracts')}
-          locked={locked.has('/contracts')}
-          onClick={onClose}
-        />
-        <NavItem to="/mail" label={t('nav.mail')} locked={locked.has('/mail')} onClick={onClose} />
-        <NavItem
-          to="/calendar"
-          label={t('nav.calendar')}
-          locked={locked.has('/calendar')}
-          onClick={onClose}
-        />
-        <NavItem
-          to="/contacts"
-          label={t('nav.contacts')}
-          locked={locked.has('/contacts')}
-          onClick={onClose}
-        />
+        {rows.map((path) =>
+          /* Alerts keeps its count wherever it lands — the number is the
+             reason to look at it, and it is the one row here that reports
+             something rather than naming a place. */
+          path === '/alerts' ? (
+            <AlertsNavItem key={path} unread={unreadAlerts} onClick={onClose} />
+          ) : (
+            <NavItem
+              key={path}
+              to={path}
+              label={t(MOBILE_TAB_LABEL_KEYS[path])}
+              locked={locked.has(path)}
+              onClick={onClose}
+            />
+          )
+        )}
         <FooterDivider />
         <NavItem to="/settings" label={t('nav.settings')} locked={false} onClick={onClose} />
         <CharacterFooterLink
@@ -512,6 +496,19 @@ export function Layout() {
   const [moreOpen, setMoreOpen] = useState(false);
   // Read once for both renderings of the Alerts entry — see `AlertsNavItem`.
   const unreadAlerts = useUnreadAlertCount();
+  /*
+   * The phone's four tabs. Hydrated in `App`, beside the other preferences the
+   * shell itself reads, so this paints the pilot's bar rather than the default
+   * one on every route they land on.
+   */
+  const chosenTabs = useMobileTabs((state) => state.value);
+  /*
+   * Sorted here rather than trusted from the row: the bar reads in the rail's
+   * order no matter who wrote the preference — a row from a later version, an
+   * import, a hand edit. `mobileSheetPaths` derives the sheet from the same
+   * canonical list, so the two stay complements.
+   */
+  const tabs = useMemo(() => sortMobileTabs(chosenTabs), [chosenTabs]);
   const moreButtonRef = useRef<HTMLButtonElement>(null);
 
   // The More sheet is mounted conditionally (`!isDesktop &&` below), not
@@ -631,28 +628,26 @@ export function Layout() {
         </div>
       </main>
 
-      {/* Mobile bottom tab bar: 4 primary destinations + More. Fixed-width
-          items (see MOBILE_NAV_ITEM) so the bar never overflows the
-          viewport; `env(safe-area-inset-bottom)` keeps it clear of the
+      {/* Mobile bottom tab bar: the pilot's four destinations + More. Which
+          four is a device-local preference (`lib/mobileTabs.ts`, set in
+          Settings); the count is fixed, so the fixed-width items (see
+          MOBILE_NAV_ITEM) still never overflow the viewport.
+          `env(safe-area-inset-bottom)` keeps the bar clear of the
           home-indicator gesture area on notched phones. */}
       <nav
         aria-label={t('nav.mobileLabel')}
         className="fixed inset-x-0 bottom-0 z-40 flex items-stretch border-t border-line bg-panel/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-sm md:hidden"
       >
-        <NavLink to="/overview" className={mobileNavClass}>
-          <span className="truncate">{t('nav.overview')}</span>
-        </NavLink>
-        {/* Second, as in the rail: the bar is the rail's order with gaps, and
-            an alert is what the Overview board is summarising. PI moved to the
-            More sheet to make room — it is a place you go to plan, while this
-            is the tab that tells you something needs you now. */}
-        <MobileAlertsTab unread={unreadAlerts} />
-        <NavLink to="/skills" className={mobileNavClass}>
-          <span className="truncate">{t('nav.skills')}</span>
-        </NavLink>
-        <NavLink to="/industry" className={mobileNavClass}>
-          <span className="truncate">{t('nav.industry')}</span>
-        </NavLink>
+        {tabs.map((path) =>
+          /* Alerts is a count, not just a place — see `MobileAlertsTab`. */
+          path === '/alerts' ? (
+            <MobileAlertsTab key={path} unread={unreadAlerts} />
+          ) : (
+            <NavLink key={path} to={path} className={mobileNavClass}>
+              <span className="truncate">{t(MOBILE_TAB_LABEL_KEYS[path])}</span>
+            </NavLink>
+          )
+        )}
         <button
           type="button"
           ref={moreButtonRef}
@@ -681,6 +676,8 @@ export function Layout() {
           onClose={() => setMoreOpen(false)}
           activeCharacter={activeCharacter}
           locked={locked}
+          tabs={tabs}
+          unreadAlerts={unreadAlerts}
         />
       )}
     </div>

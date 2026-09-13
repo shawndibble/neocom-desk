@@ -21,6 +21,15 @@ import {
 } from '@/components/ui';
 import type { LocalSettingStore } from '@/lib/useLocalSetting';
 import { useFontScale, FONT_SCALE_STEPS, type FontScale } from '@/lib/fontScale';
+import {
+  DEFAULT_MOBILE_TABS,
+  MOBILE_TAB_CHOICES,
+  MOBILE_TAB_COUNT,
+  MOBILE_TAB_LABEL_KEYS,
+  sortMobileTabs,
+  useMobileTabs,
+  type MobileTabPath,
+} from '@/lib/mobileTabs';
 import { useTimeFormat, useTimeZone, TIME_FORMATS } from '@/lib/timeFormat';
 import { VIEW_PREFERENCE_KEYS } from '@/lib/viewPreferenceKeys';
 import { formatAge } from '@/lib/age';
@@ -538,6 +547,92 @@ function useHydratedStore<T>(store: LocalSettingStore<T>): boolean {
 }
 
 /**
+ * Which four links the phone's bottom tab bar holds.
+ *
+ * Device-local, like the text scale above it and unlike everything in
+ * `DefaultsPanel`: this answers for a screen — the one that has a tab bar at
+ * all — not for the pilot. The panel renders on a desktop too, because the
+ * phone is where it is read and a laptop is where it is comfortably set.
+ *
+ * The chips edit a **draft**, and the preference is written only when the
+ * draft is a full bar of `MOBILE_TAB_COUNT`. A three-item bar is not a state
+ * the nav has: persisting one would leave a hole in the bar, and
+ * `parseMobileTabs` would throw the row away on the next cold load and snap
+ * the pilot back to the default. So unpicking one leaves the old bar standing
+ * until a replacement is picked, which is also the swap the pilot came to make.
+ *
+ * Unpicked chips go inert at four rather than silently evicting somebody's
+ * choice — with no slots on screen there is no way to say *which* one a fifth
+ * pick would replace.
+ */
+function MobileTabsPanel() {
+  const { t } = useTranslation();
+  const tabs = useMobileTabs((state) => state.value);
+  const setTabs = useMobileTabs((state) => state.setValue);
+
+  const [draft, setDraft] = useState<readonly MobileTabPath[]>(tabs);
+  // `App` hydrates this store in an effect, so the stored bar can land after
+  // this panel's first render. Adjusted during render rather than in an effect
+  // of its own — the same pattern the tab-from-hash state below uses — so the
+  // chips never paint the default set and then swap under the reader.
+  const [prevTabs, setPrevTabs] = useState(tabs);
+  if (tabs !== prevTabs) {
+    setPrevTabs(tabs);
+    setDraft(tabs);
+  }
+
+  const full = draft.length >= MOBILE_TAB_COUNT;
+
+  function toggle(path: MobileTabPath) {
+    const next = draft.includes(path)
+      ? draft.filter((chosen) => chosen !== path)
+      : sortMobileTabs([...draft, path]);
+    setDraft(next);
+    if (next.length === MOBILE_TAB_COUNT) void setTabs(next);
+  }
+
+  function reset() {
+    setDraft(DEFAULT_MOBILE_TABS);
+    void setTabs(DEFAULT_MOBILE_TABS);
+  }
+
+  return (
+    <Panel title={t('settings.mobileTabs.title')}>
+      <div className="space-y-2">
+        <p className="text-xs text-text-dim">{t('settings.mobileTabs.hint')}</p>
+        <div
+          role="group"
+          aria-label={t('settings.mobileTabs.group')}
+          className="flex flex-wrap gap-2"
+        >
+          {MOBILE_TAB_CHOICES.map((path) => {
+            const selected = draft.includes(path);
+            return (
+              <FilterChip
+                key={path}
+                label={t(MOBILE_TAB_LABEL_KEYS[path])}
+                selected={selected}
+                disabled={!selected && full}
+                tooltip={!selected && full ? t('settings.mobileTabs.full') : undefined}
+                onToggle={() => toggle(path)}
+              />
+            );
+          })}
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <p className="text-xs text-text-dim" aria-live="polite">
+            {t('settings.mobileTabs.chosen', { count: draft.length, total: MOBILE_TAB_COUNT })}
+          </p>
+          <Button size="sm" onClick={reset}>
+            {t('settings.mobileTabs.reset')}
+          </Button>
+        </div>
+      </div>
+    </Panel>
+  );
+}
+
+/**
  * What a page assumes when the pilot has not said otherwise. Every control
  * here defaults to exactly what the app did before it was settable, so an
  * existing pilot's numbers do not move until they ask them to.
@@ -959,6 +1054,7 @@ export function Settings() {
               </div>
             </div>
           </Panel>
+          <MobileTabsPanel />
           <DefaultsPanel />
           <CorpDefaultsPanel />
           <Panel title={t('shortcuts.title')}>

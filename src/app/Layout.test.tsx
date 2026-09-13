@@ -9,6 +9,7 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useAuthFailure } from '@/stores/authFailure';
 import { NO_CORP_CAPABILITIES } from '@/engine/corpRoles';
 import { useCorpAccess, type CorpAccessState } from '@/features/corp/useCorpAccess';
+import { DEFAULT_MOBILE_TABS, useMobileTabs } from '@/lib/mobileTabs';
 import { Layout } from './Layout';
 
 vi.mock('@/features/corp/useCorpAccess', () => ({ useCorpAccess: vi.fn() }));
@@ -91,6 +92,8 @@ beforeEach(async () => {
   mockedCorpAccess.mockReturnValue(corpAccess('none'));
   await db.tokens.clear();
   await db.characters.clear();
+  // Module-scope singleton: a bar chosen by one test must not reach the next.
+  useMobileTabs.setState({ value: DEFAULT_MOBILE_TABS, hydrated: true });
 });
 
 describe('Layout sync status dot', () => {
@@ -825,5 +828,73 @@ describe('Layout site name', () => {
 
     await user.click(screen.getByRole('link', { name: 'Neocom Desk' }));
     expect(await screen.findByText('overview page')).toBeInTheDocument();
+  });
+});
+
+describe("Layout mobile tab bar follows the pilot's choice", () => {
+  it("renders the chosen four, in the rail's order rather than the picked one", () => {
+    mockIsSyncConfigured.mockReturnValue(false);
+    useMobileTabs.setState({
+      value: ['/mail', '/wallet', '/overview', '/assets'],
+      hydrated: true,
+    });
+    renderLayout();
+
+    const mobileNav = screen.getByRole('navigation', { name: 'Mobile navigation' });
+    expect(
+      within(mobileNav)
+        .getAllByRole('link')
+        .map((link) => link.textContent)
+    ).toEqual(['Overview', 'Wallet', 'Assets', 'Mail']);
+  });
+
+  it('moves the links it replaced into the More sheet', async () => {
+    mockIsSyncConfigured.mockReturnValue(false);
+    useMobileTabs.setState({
+      value: ['/mail', '/wallet', '/overview', '/assets'],
+      hydrated: true,
+    });
+    const user = userEvent.setup();
+    renderLayout();
+
+    const mobileNav = screen.getByRole('navigation', { name: 'Mobile navigation' });
+    await user.click(within(mobileNav).getByRole('button', { name: 'More' }));
+    const sheet = screen.getByRole('dialog', { name: 'More' });
+
+    // Everything the default bar held, bar Overview — which is still a tab.
+    for (const evicted of ['Alerts', 'Skills', 'Industry']) {
+      expect(within(sheet).getByRole('link', { name: evicted })).toBeInTheDocument();
+    }
+    // And nothing is in both places at once.
+    for (const chosen of ['Wallet', 'Assets', 'Mail']) {
+      expect(within(sheet).queryByRole('link', { name: chosen })).not.toBeInTheDocument();
+    }
+  });
+
+  it('keeps Corp, Settings and the Character in the sheet whatever the bar holds', async () => {
+    mockIsSyncConfigured.mockReturnValue(false);
+    mockedCorpAccess.mockReturnValue(corpAccess('ready'));
+    await db.characters.put({
+      characterId: CHARACTER_ID,
+      name: 'Pilot One',
+      ownerHash: 'oh',
+      addedAt: 0,
+      corporationId: 98000001,
+    });
+    useActiveCharacter.setState({ activeCharacterId: CHARACTER_ID, hydrated: true });
+    useMobileTabs.setState({
+      value: ['/mail', '/wallet', '/overview', '/assets'],
+      hydrated: true,
+    });
+    const user = userEvent.setup();
+    renderLayout();
+
+    const mobileNav = screen.getByRole('navigation', { name: 'Mobile navigation' });
+    await user.click(within(mobileNav).getByRole('button', { name: 'More' }));
+    const sheet = screen.getByRole('dialog', { name: 'More' });
+
+    expect(await within(sheet).findByRole('link', { name: 'Corporation' })).toBeInTheDocument();
+    expect(await within(sheet).findByRole('link', { name: 'Settings' })).toBeInTheDocument();
+    expect(within(sheet).getByRole('link', { name: 'Pilot One' })).toBeInTheDocument();
   });
 });

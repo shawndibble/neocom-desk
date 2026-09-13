@@ -32,6 +32,7 @@ import { useExpiringWindowHours } from '@/features/pi/expiringWindow';
 import { useDarkThreshold } from '@/features/corp/darkThreshold';
 import { useDefaultCharacterFilter } from '@/features/character/defaultCharacterFilter';
 import { VIEW_PREFERENCE_KEYS } from '@/lib/viewPreferenceKeys';
+import { DEFAULT_MOBILE_TABS, MOBILE_TABS_KEY, useMobileTabs } from '@/lib/mobileTabs';
 
 vi.mock('virtual:pwa-register/react', () => ({
   useRegisterSW: () => ({
@@ -86,6 +87,7 @@ beforeEach(async () => {
   useExpiringWindowHours.setState({ value: 24, hydrated: false });
   useDarkThreshold.setState({ value: 30, hydrated: false });
   useDefaultCharacterFilter.setState({ value: 'current', hydrated: false });
+  useMobileTabs.setState({ value: DEFAULT_MOBILE_TABS, hydrated: false });
   useNotificationPreferences.setState({ value: DEFAULT_NOTIFICATION_PREFERENCES, hydrated: false });
   useNotificationPromptState.setState({
     value: { ...DEFAULT_NOTIFICATION_PROMPT_STATE, seen: true },
@@ -1132,5 +1134,78 @@ describe('Reset saved view preferences', () => {
     expect(await db.settings.get('overviewGroups')).toBeDefined();
     expect(await db.settings.get('characters.starred')).toBeDefined();
     expect(await db.settings.get(ACTIVE_CHARACTER_KEY)).toBeDefined();
+  });
+});
+
+describe('Settings — phone tab bar', () => {
+  it("writes the pilot's four, device-local and in the rail's order", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByRole('heading', { level: 1, name: /settings/i });
+
+    const group = await screen.findByRole('group', { name: /phone tab bar links/i });
+    // Swap one out for one in: unpick Industry, pick Wallet.
+    await user.click(within(group).getByRole('button', { name: /^industry$/i }));
+    await user.click(within(group).getByRole('button', { name: /^wallet$/i }));
+
+    await waitFor(async () => {
+      expect((await db.settings.get(MOBILE_TABS_KEY))?.value).toEqual([
+        '/overview',
+        '/alerts',
+        '/skills',
+        '/wallet',
+      ]);
+    });
+    // The key has no `sync.` prefix, which is what keeps it on this device.
+    expect(MOBILE_TABS_KEY.startsWith('sync.')).toBe(false);
+  });
+
+  it('holds the old bar until a replacement is picked, so it is never short', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByRole('heading', { level: 1, name: /settings/i });
+
+    const group = await screen.findByRole('group', { name: /phone tab bar links/i });
+    await user.click(within(group).getByRole('button', { name: /^skills$/i }));
+
+    expect(screen.getByText(/3 of 4 picked/i)).toBeInTheDocument();
+    // Nothing written yet: a three-item bar is not a bar.
+    expect(await db.settings.get(MOBILE_TABS_KEY)).toBeUndefined();
+  });
+
+  it('goes inert at four rather than guessing which tab a fifth pick replaces', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByRole('heading', { level: 1, name: /settings/i });
+
+    const group = await screen.findByRole('group', { name: /phone tab bar links/i });
+    expect(within(group).getByRole('button', { name: /^wallet$/i })).toBeDisabled();
+    // A chosen one still unpicks — that is the way out of a full bar.
+    await user.click(within(group).getByRole('button', { name: /^skills$/i }));
+    expect(within(group).getByRole('button', { name: /^wallet$/i })).toBeEnabled();
+  });
+
+  it('puts the default four back', async () => {
+    await db.settings.put({
+      key: MOBILE_TABS_KEY,
+      value: ['/mail', '/wallet', '/overview', '/assets'],
+    });
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByRole('heading', { level: 1, name: /settings/i });
+
+    const group = await screen.findByRole('group', { name: /phone tab bar links/i });
+    await waitFor(() =>
+      expect(within(group).getByRole('button', { name: /^wallet$/i })).toHaveAttribute(
+        'aria-pressed',
+        'true'
+      )
+    );
+
+    await user.click(screen.getByRole('button', { name: /use the default four/i }));
+
+    await waitFor(async () => {
+      expect((await db.settings.get(MOBILE_TABS_KEY))?.value).toEqual([...DEFAULT_MOBILE_TABS]);
+    });
   });
 });
