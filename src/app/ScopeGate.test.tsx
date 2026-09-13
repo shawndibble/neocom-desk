@@ -89,7 +89,7 @@ describe('ScopeGate', () => {
 
   it('shows no banner on any gated route for a character holding every scope', async () => {
     await seedGrant(SCOPES);
-    for (const path of ['/assets', '/mail', '/calendar', '/contracts'] as const) {
+    for (const path of ['/assets', '/mail', '/calendar'] as const) {
       const { unmount } = renderGate(path);
       await grantResolved();
       expect(screen.getByText('Mail from Aura'), path).toBeInTheDocument();
@@ -100,7 +100,18 @@ describe('ScopeGate', () => {
 
   it('never gates an ungated route, even on an empty grant', async () => {
     await seedGrant([]);
-    for (const path of ['/market', '/overview', '/skills', '/industry', '/wallet'] as const) {
+    // /contracts is in this list rather than the gated one above: its History
+    // tab does need read_character_contracts, but it raises its own banner for
+    // that, and the Search tab the page lands on reads a shared public
+    // snapshot. A page gate would wall off the tab that works.
+    for (const path of [
+      '/market',
+      '/overview',
+      '/skills',
+      '/industry',
+      '/wallet',
+      '/contracts',
+    ] as const) {
       const { unmount } = renderGate(path);
       await grantResolved();
       expect(screen.getByText('Mail from Aura'), path).toBeInTheDocument();
