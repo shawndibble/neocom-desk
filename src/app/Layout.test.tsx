@@ -121,7 +121,7 @@ describe('Layout mobile "More" sheet (UX-REVIEW #4)', () => {
       within(mobileNav)
         .getAllByRole('link')
         .map((link) => link.textContent)
-    ).toEqual(['Overview', 'Skills', 'Industry', 'PI']);
+    ).toEqual(['Overview', 'Alerts', 'Skills', 'Industry']);
     expect(within(mobileNav).getByRole('button', { name: 'More' })).toBeInTheDocument();
   });
 
@@ -151,7 +151,7 @@ describe('Layout mobile "More" sheet (UX-REVIEW #4)', () => {
     expect(within(sheet).queryByRole('link', { name: 'Employment' })).not.toBeInTheDocument();
   });
 
-  it('orders the sheet to match the desktop rail: Market, Wallet, Assets, Contracts, Mail, Calendar, Contacts', async () => {
+  it('orders the sheet to match the desktop rail: PI, Market, Wallet, Assets, Contracts, Mail, Calendar, Contacts', async () => {
     mockIsSyncConfigured.mockReturnValue(false);
     const user = userEvent.setup();
     renderLayout();
@@ -160,10 +160,20 @@ describe('Layout mobile "More" sheet (UX-REVIEW #4)', () => {
     await user.click(within(mobileNav).getByRole('button', { name: 'More' }));
     const sheet = screen.getByRole('dialog', { name: 'More' });
 
-    // PI now lives in the primary tab bar, not the sheet.
-    expect(within(sheet).queryByRole('link', { name: 'PI' })).not.toBeInTheDocument();
+    // Alerts now lives in the primary tab bar, not the sheet; PI traded places
+    // with it and leads the sheet's Progression/Economy/Social run.
+    expect(within(sheet).queryByRole('link', { name: 'Alerts' })).not.toBeInTheDocument();
 
-    const labels = ['Market', 'Wallet', 'Assets', 'Contracts', 'Mail', 'Calendar', 'Contacts'];
+    const labels = [
+      'PI',
+      'Market',
+      'Wallet',
+      'Assets',
+      'Contracts',
+      'Mail',
+      'Calendar',
+      'Contacts',
+    ];
     const links = labels.map((label) => within(sheet).getByRole('link', { name: label }));
     for (let i = 1; i < links.length; i++) {
       expect(

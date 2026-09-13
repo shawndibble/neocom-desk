@@ -170,10 +170,14 @@ function NavItem({ to, label, locked, onClick }: NavItemProps) {
  * dot, because "some alerts" and "seventy alerts" are different situations and
  * an accent tint conveys neither (DESIGN.md §7). Zero renders nothing: a badge
  * reading "0" is a badge you stop looking at.
+ *
+ * `unread` is a prop rather than a `useUnreadAlertCount()` call of its own:
+ * the rail and the bottom tab bar are both mounted on every route (one is
+ * merely `hidden`), so a hook here would open two Dexie live queries over the
+ * same feed. `Layout` reads the count once and hands it to both.
  */
-function AlertsNavItem({ onClick }: { onClick?: () => void }) {
+function AlertsNavItem({ unread, onClick }: { unread: number; onClick?: () => void }) {
   const { t } = useTranslation();
-  const unread = useUnreadAlertCount();
   return (
     <NavLink
       to="/alerts"
@@ -186,6 +190,36 @@ function AlertsNavItem({ onClick }: { onClick?: () => void }) {
         <span
           aria-hidden="true"
           className="ml-auto shrink-0 rounded-xs bg-panel-2 px-1.5 text-[0.6875rem] font-medium tabular-nums text-text-dim"
+        >
+          {unread}
+        </span>
+      )}
+    </NavLink>
+  );
+}
+
+/**
+ * Alerts as a bottom-tab item.
+ *
+ * Same count, same accessible name as the rail's — an Alerts tab that shows no
+ * number is worth less than the sheet row it replaced, since the number is the
+ * whole reason to look. `ml-1` rather than the rail's `ml-auto`: this tab
+ * centres its label in an equal share of the bar, so the badge sits beside the
+ * word instead of being pushed to an edge the tab does not really have.
+ */
+function MobileAlertsTab({ unread }: { unread: number }) {
+  const { t } = useTranslation();
+  return (
+    <NavLink
+      to="/alerts"
+      className={mobileNavClass}
+      aria-label={unread > 0 ? t('nav.alertsWithCount', { count: unread }) : undefined}
+    >
+      <span className="truncate">{t('nav.alerts')}</span>
+      {unread > 0 && (
+        <span
+          aria-hidden="true"
+          className="ml-1 shrink-0 rounded-xs bg-panel-2 px-1 tabular-nums text-text-dim"
         >
           {unread}
         </span>
@@ -339,8 +373,9 @@ interface MobileMoreSheetProps {
 
 /**
  * Mobile-only overflow sheet: the Character-section views that don't fit as
- * primary bottom-tab items, plus Market (which isn't Character-scoped, but the
- * tab bar is full at 4 + More). Settings and the active Character trail the
+ * primary bottom-tab items — PI among them, since Alerts earns a tab and the
+ * bar holds four — plus Market (which isn't Character-scoped, but the tab bar
+ * is full at 4 + More). Settings and the active Character trail the
  * list, below a divider — Settings has no other route on a phone, and the
  * Character link is the only way to switch or add one. A real modal, not a
  * drawer: it covers the viewport, so the tab bar underneath must not stay
@@ -357,15 +392,20 @@ function MobileMoreSheet({ open, onClose, activeCharacter, locked }: MobileMoreS
           between two of them left almost no dead zone for a thumb to miss
           into on this phone-only sheet. */}
       <div className="space-y-2 pb-3">
-        <AlertsNavItem onClick={onClose} />
         {/* The phone's only route to /corp: the tab bar is full at 4 + More. */}
         <CorpNavItem onClick={onClose} />
         {/*
           From here down, same relative order as the desktop rail's
-          Progression/Economy/Social groups (Skills, Industry and PI lead
+          Progression/Economy/Social groups (Skills and Industry lead
           Progression there, but sit in the primary tab bar here, not this
           sheet) — one order to learn, not two.
         */}
+        <NavItem
+          to="/planetary-industry"
+          label={t('nav.pi')}
+          locked={locked.has('/planetary-industry')}
+          onClick={onClose}
+        />
         <NavItem
           to="/market"
           label={t('nav.market')}
@@ -470,6 +510,8 @@ export function Layout() {
   const locked = useLockedRoutes(NAV_PATHS);
 
   const [moreOpen, setMoreOpen] = useState(false);
+  // Read once for both renderings of the Alerts entry — see `AlertsNavItem`.
+  const unreadAlerts = useUnreadAlertCount();
   const moreButtonRef = useRef<HTMLButtonElement>(null);
 
   // The More sheet is mounted conditionally (`!isDesktop &&` below), not
@@ -524,7 +566,7 @@ export function Layout() {
             are correspondence — things other people sent you on purpose —
             which is a different errand.
           */}
-          <AlertsNavItem />
+          <AlertsNavItem unread={unreadAlerts} />
           {/*
             Beside Overview rather than inside a group: the two are the same
             kind of destination — "this pilot" and "this corporation" — and the
@@ -600,14 +642,16 @@ export function Layout() {
         <NavLink to="/overview" className={mobileNavClass}>
           <span className="truncate">{t('nav.overview')}</span>
         </NavLink>
+        {/* Second, as in the rail: the bar is the rail's order with gaps, and
+            an alert is what the Overview board is summarising. PI moved to the
+            More sheet to make room — it is a place you go to plan, while this
+            is the tab that tells you something needs you now. */}
+        <MobileAlertsTab unread={unreadAlerts} />
         <NavLink to="/skills" className={mobileNavClass}>
           <span className="truncate">{t('nav.skills')}</span>
         </NavLink>
         <NavLink to="/industry" className={mobileNavClass}>
           <span className="truncate">{t('nav.industry')}</span>
-        </NavLink>
-        <NavLink to="/planetary-industry" className={mobileNavClass}>
-          <span className="truncate">{t('nav.pi')}</span>
         </NavLink>
         <button
           type="button"
