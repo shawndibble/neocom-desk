@@ -2,6 +2,7 @@ import { useMemo, useState, type ReactElement } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
+  Button,
   DataAgeBadge,
   DataTable,
   EmptyState,
@@ -14,6 +15,7 @@ import {
   SearchInput,
   Spinner,
   StandingIcon,
+  Tabs,
   Tooltip,
   type DataTableColumn,
 } from '@/components/ui';
@@ -35,6 +37,12 @@ import {
   type StandingCategory,
 } from '@/features/character/contactsFilter';
 import { ContactContextMenu } from '@/features/character/ContactContextMenu';
+import {
+  loadContactsAcrossCharacters,
+  mergeContactsAcrossCharacters,
+  type AcrossCharactersRow,
+  type CharacterContactList,
+} from '@/features/character/contactsAcrossCharacters';
 import type { CachedResult } from '@/esi/cache';
 import type { CharacterAffiliation, CharacterContact } from '@/esi/endpoints';
 import { resolveNames } from '@/features/character/names';
@@ -61,6 +69,12 @@ interface Snapshot {
   affiliations: Map<number, CharacterAffiliation>;
   /** The signed-in character's own corp and alliance, for the "yours" badges. */
   ownAffiliation: OwnAffiliation;
+  /**
+   * Every Character's contacts as last cached on this device, for the second
+   * tab. Cache-only — a Dexie read, no network — so the ordinary visit pays
+   * nothing for it; the tab offers a live fetch of its own.
+   */
+  acrossLists: CharacterContactList[];
 }
 
 /**
@@ -85,6 +99,7 @@ function entityName(names: ReadonlyMap<number, string>, id: number): string {
 const NO_NAMES: ReadonlyMap<number, string> = new Map();
 const NO_AFFILIATIONS: ReadonlyMap<number, CharacterAffiliation> = new Map();
 const NO_OWN_AFFILIATION: OwnAffiliation = {};
+const NO_LISTS: readonly CharacterContactList[] = [];
 
 async function loadContactsSnapshot(
   characterId: number,
@@ -113,9 +128,14 @@ async function loadContactsSnapshot(
   const affiliationIds = [...affiliations.values()].flatMap((a) =>
     a.alliance_id === undefined ? [a.corporation_id] : [a.corporation_id, a.alliance_id]
   );
+  // The second tab lists contacts this character may not hold at all, so its
+  // ids go into the same batch — otherwise every row belonging only to an alt
+  // would print as `#id`.
+  const acrossLists = await loadContactsAcrossCharacters();
   const contactNames = await resolveNames([
     ...contacts.map((c) => c.contact_id),
     ...affiliationIds,
+    ...acrossLists.flatMap((list) => list.contacts.map((c) => c.contact_id)),
   ]);
   return {
     contactsResult,
@@ -124,6 +144,7 @@ async function loadContactsSnapshot(
     contactNames,
     affiliations,
     ownAffiliation,
+    acrossLists,
   };
 }
 
@@ -268,6 +289,161 @@ function AffiliationLine({
   );
 }
 
+interface AcrossCharactersPanelProps {
+  lists: readonly CharacterContactList[];
+  names: ReadonlyMap<number, string>;
+  filter: ContactsFilter;
+}
+
+/**
+ * The same contacts, every Character at once: who holds each one, who does
+ * not, and where they set it differently.
+ *
+ * Reads what each Character last cached rather than fetching them all on
+ * arrival — a pilot with a dozen alts would otherwise pay a dozen paginated
+ * fetches for opening a tab. The button fetches them on demand, and the hint
+ * below the table says which of the two is on screen.
+ */
+function AcrossCharactersPanel({ lists, names, filter }: AcrossCharactersPanelProps) {
+  const { t } = useTranslation();
+  const [fetched, setFetched] = useState<readonly CharacterContactList[] | null>(null);
+  const [fetching, setFetching] = useState(false);
+  const [disagreementsOnly, setDisagreementsOnly] = useState(false);
+
+  const effectiveLists = fetched ?? lists;
+  const rows = useMemo(() => mergeContactsAcrossCharacters(effectiveLists), [effectiveLists]);
+  const disagreementCount = useMemo(() => rows.filter((row) => row.disagrees).length, [rows]);
+
+  const text = filter.text.trim().toLowerCase();
+  const visibleRows = useMemo(
+    () =>
+      rows.filter((row) => {
+        if (disagreementsOnly && !row.disagrees) return false;
+        if (!filter.types.has(row.contactType)) return false;
+        if (text === '') return true;
+        return entityName(names, row.contactId).toLowerCase().includes(text);
+      }),
+    [rows, disagreementsOnly, filter.types, text, names]
+  );
+
+  async function fetchEveryCharacter() {
+    setFetching(true);
+    try {
+      setFetched(await loadContactsAcrossCharacters({ live: true }));
+    } finally {
+      setFetching(false);
+    }
+  }
+
+  const columns: DataTableColumn<AcrossCharactersRow>[] = [
+    {
+      id: 'name',
+      header: t('contacts.name'),
+      render: (row) => entityName(names, row.contactId),
+      sortValue: (row) => entityName(names, row.contactId),
+    },
+    {
+      id: 'type',
+      header: t('contacts.type'),
+      className: 'text-text-dim',
+      render: (row) => t(CONTACT_TYPE_KEY[row.contactType]),
+      sortValue: (row) => t(CONTACT_TYPE_KEY[row.contactType]),
+    },
+    {
+      id: 'held',
+      header: t('contacts.acrossCharacters'),
+      headerTooltip: t('contacts.acrossCharactersHeaderTooltip'),
+      align: 'center',
+      // The names go in the tooltip rather than the cell: with a dozen alts
+      // the cell would be the widest thing on the page, and the count is what
+      // a reader scans for.
+      render: (row) => (
+        <Tooltip
+          content={[
+            t('contacts.acrossHeldBy', { names: row.held.map((h) => h.name).join(', ') }),
+            row.missing.length > 0 &&
+              t('contacts.acrossMissingOn', {
+                names: row.missing.map((m) => m.name).join(', '),
+              }),
+          ]
+            .filter(Boolean)
+            .join(' · ')}
+          openOnTap
+        >
+          <span className={cx('tabular-nums', row.missing.length > 0 && 'text-warning')}>
+            {t('contacts.acrossCharactersCount', {
+              count: row.held.length,
+              total: effectiveLists.length,
+            })}
+          </span>
+        </Tooltip>
+      ),
+      sortValue: (row) => row.held.length,
+    },
+    {
+      id: 'standings',
+      header: t('contacts.acrossStandings'),
+      align: 'center',
+      // Every distinct standing, not an average: two alts at +10 and -10 have
+      // no meaningful midpoint, and seeing both is the whole point of the row.
+      render: (row) => (
+        <span className="inline-flex items-center gap-1.5">
+          {row.standings.map((standing) => (
+            <StandingIcon key={standing} value={standing} />
+          ))}
+        </span>
+      ),
+      // Worst first on a descending click, which is the direction trouble is in.
+      sortValue: (row) => row.standings[0],
+    },
+  ];
+
+  if (rows.length === 0) {
+    return (
+      <EmptyState title={t('contacts.acrossEmptyTitle')} hint={t('contacts.acrossEmptyHint')} />
+    );
+  }
+
+  return (
+    <Panel padded={false}>
+      <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2">
+        <FilterChip
+          label={t('contacts.acrossDisagreementsOnly')}
+          selected={disagreementsOnly}
+          onToggle={() => setDisagreementsOnly((previous) => !previous)}
+          count={disagreementCount}
+        />
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => void fetchEveryCharacter()}
+          disabled={fetching}
+        >
+          {t('contacts.acrossFetchAll')}
+        </Button>
+      </div>
+      {fetched === null && (
+        <p className="px-3 pt-2 text-[0.6875rem] text-text-dim">{t('contacts.acrossCachedHint')}</p>
+      )}
+      {visibleRows.length === 0 ? (
+        <EmptyState
+          title={t('contacts.acrossNoResults')}
+          hint={t('contacts.acrossNoResultsHint')}
+          className="py-8"
+        />
+      ) : (
+        <DataTable
+          label={t('contacts.acrossLabel')}
+          columns={columns}
+          rows={visibleRows}
+          rowKey={(row) => `${row.contactType}:${row.contactId}`}
+          defaultSort={{ columnId: 'held', direction: 'asc' }}
+        />
+      )}
+    </Panel>
+  );
+}
+
 /** Contacts: standings, blocked/watched state, searchable and filterable by type and standing. */
 export function Contacts() {
   const { t } = useTranslation();
@@ -278,12 +454,14 @@ export function Contacts() {
   );
 
   const [filter, setFilter] = useState<ContactsFilter>(EMPTY_CONTACTS_FILTER);
+  const [tab, setTab] = useState<'character' | 'across'>('character');
 
   const contactsResult = data?.contactsResult ?? null;
   const contactsNeedsReauth = data?.contactsNeedsReauth ?? false;
   const contactsTruncated = data?.contactsTruncated ?? false;
   const contactNames = data?.contactNames ?? NO_NAMES;
   const affiliations = data?.affiliations ?? NO_AFFILIATIONS;
+  const acrossLists = data?.acrossLists ?? NO_LISTS;
   const ownAffiliation = data?.ownAffiliation ?? NO_OWN_AFFILIATION;
 
   const contacts = useMemo(() => contactsResult?.data ?? [], [contactsResult]);
@@ -461,11 +639,31 @@ export function Contacts() {
         }
       />
 
+      {/* One character is the whole roster: there is nothing to compare it
+          against, so the second tab would only ever restate this one. */}
+      {acrossLists.length > 1 && (
+        <Tabs
+          label={t('contacts.title')}
+          value={tab}
+          onChange={(id) => setTab(id as 'character' | 'across')}
+          tabs={[
+            { id: 'character', label: t('contacts.tabThisCharacter') },
+            { id: 'across', label: t('contacts.tabAcrossCharacters') },
+          ]}
+        />
+      )}
+
+      {/* Shared with the second tab: a name typed into the box, or a type
+          switched off, means the same thing on either. The standing chips do
+          not — a row there carries several standings — so that tab ignores
+          them and says so with a chip of its own. */}
       {lastGoodCounts && (
         <ContactsFilterBar filter={filter} onChange={setFilter} counts={lastGoodCounts} />
       )}
 
-      {loading && !data ? (
+      {tab === 'across' ? (
+        <AcrossCharactersPanel lists={acrossLists} names={contactNames} filter={filter} />
+      ) : loading && !data ? (
         <div className="flex justify-center py-16">
           <Spinner label={t('common.loading')} />
         </div>

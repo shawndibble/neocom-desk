@@ -2439,6 +2439,8 @@
     "acrossDisagreementsHint": "Contacts your characters do not all hold, or hold at different standings.",
     "acrossEmptyTitle": "No contacts cached for any character",
     "acrossEmptyHint": "Reconnect to fetch contacts, or add another character.",
+    "acrossFetchAll": "Fetch every character",
+    "acrossCachedHint": "Read from what each character last cached. A character you have not opened recently may look emptier than it is.",
     "acrossNoResults": "Every character agrees on every contact",
     "acrossNoResultsHint": "Turn off \"Only disagreements\" to see the full list.",
     "reauthTitle": "Log in again to see your contacts",

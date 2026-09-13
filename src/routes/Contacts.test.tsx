@@ -234,6 +234,80 @@ describe('Contacts', () => {
     expect(types.getByRole('button', { name: /Faction/ })).toHaveTextContent('0');
   });
 
+  describe('across characters', () => {
+    /** Pilot Two's cached list: agrees on Good Friend, has never blocked Bad Alliance. */
+    async function cacheSecondCharacterContacts(contacts: unknown[]) {
+      await db.esiCache.put({
+        characterId: CHAR_ID_2,
+        key: 'contacts',
+        value: contacts,
+        fetchedAt: Date.now(),
+      });
+    }
+
+    it('offers no comparison when the device holds a single character', async () => {
+      render(<App />);
+      await screen.findByText('Good Friend');
+
+      expect(screen.queryByRole('tab', { name: 'Across characters' })).not.toBeInTheDocument();
+    });
+
+    it('counts the characters holding each contact, and flags the ones that disagree', async () => {
+      await addSecondCharacter();
+      await cacheSecondCharacterContacts([contactsPayload[0]]);
+      render(<App />);
+      await screen.findByText('Good Friend');
+
+      fireEvent.click(screen.getByRole('tab', { name: 'Across characters' }));
+
+      const table = within(await screen.findByRole('table', { name: /across/i }));
+      // Good Friend is on both; the other four are on the main alone.
+      expect(table.getAllByText('2 of 2').length).toBe(1);
+      expect(table.getAllByText('1 of 2').length).toBe(4);
+    });
+
+    it('narrows to the contacts the characters do not agree on', async () => {
+      await addSecondCharacter();
+      await cacheSecondCharacterContacts([contactsPayload[0]]);
+      render(<App />);
+      await screen.findByText('Good Friend');
+      fireEvent.click(screen.getByRole('tab', { name: 'Across characters' }));
+      await screen.findByRole('table', { name: /across/i });
+
+      fireEvent.click(screen.getByRole('button', { name: /Only disagreements/ }));
+
+      const table = within(screen.getByRole('table', { name: /across/i }));
+      expect(table.queryByText('2 of 2')).not.toBeInTheDocument();
+      expect(table.getAllByText('1 of 2').length).toBe(4);
+    });
+
+    it('shows every standing a contact was given, not one of them', async () => {
+      await addSecondCharacter();
+      // Pilot Two has Good Friend at -10; the main has them at +10.
+      await cacheSecondCharacterContacts([{ ...contactsPayload[0], standing: -10 }]);
+      render(<App />);
+      await screen.findByText('Good Friend');
+
+      fireEvent.click(screen.getByRole('tab', { name: 'Across characters' }));
+
+      const table = within(await screen.findByRole('table', { name: /across/i }));
+      expect(table.getByRole('img', { name: 'Excellent standing (10)' })).toBeInTheDocument();
+      expect(table.getAllByRole('img', { name: 'Terrible standing (-10)' }).length).toBe(2);
+    });
+
+    it('says the comparison is built from what each character last cached', async () => {
+      await addSecondCharacter();
+      await cacheSecondCharacterContacts([contactsPayload[0]]);
+      render(<App />);
+      await screen.findByText('Good Friend');
+
+      fireEvent.click(screen.getByRole('tab', { name: 'Across characters' }));
+
+      expect(await screen.findByText(/last cached/)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Fetch every character' })).toBeInTheDocument();
+    });
+  });
+
   it('falls back to cached contacts offline', async () => {
     await db.esiCache.put({
       characterId: CHAR_ID,
