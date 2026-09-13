@@ -1492,7 +1492,79 @@ describe('ContractSearchPanel — Courier reverse lane', () => {
     const dialog = await openHaul(user, OUTBOUND.contractId);
 
     expect(
+      within(dialog).getByText(
+        'No haul we can place runs the reverse lane. 1 leaves Domain for a drop-off nothing local places.'
+      )
+    ).toBeInTheDocument();
+    // One sentence, not two. "No outstanding haul runs the reverse lane."
+    // followed by "1 *more* leaves…" is more than none, and shipped green once
+    // because the test asserted only the second line.
+    expect(
+      within(dialog).queryByText('No outstanding haul runs the reverse lane.')
+    ).not.toBeInTheDocument();
+  });
+
+  it('counts the way home and the hauls it could not place as two separate lines', async () => {
+    const placeable = courierRow({
+      contractId: 602,
+      regionId: 10000043,
+      originLocationId: AMARR,
+      destinationLocationId: JITA,
+      reward: 8_000_000,
+      collateral: 1_000_000,
+    });
+    const user = await showCourierWith([OUTBOUND, placeable, AMARR_TO_STRUCTURE]);
+
+    const dialog = await openHaul(user, OUTBOUND.contractId);
+
+    expect(
+      within(dialog).getByRole('button', { name: '1 haul runs the reverse lane' })
+    ).toBeInTheDocument();
+    expect(
       within(dialog).getByText('1 more leaves Domain for a drop-off nothing local places.')
+    ).toBeInTheDocument();
+  });
+
+  /**
+   * The count and the board it opens must narrow by the same stages. The
+   * over-rate filter needs the jump counts, so it was left out of the count at
+   * first — which let the link promise a haul the board then filtered away, the
+   * exact dead link the zero case is written to avoid.
+   */
+  it('counts only the return hauls the board it opens will actually show', async () => {
+    // Twenty ordinary hauls, which is the floor a median needs, plus one paying
+    // far above them — and one ordinary haul running the lane back.
+    const ordinary = Array.from({ length: 20 }, (_, i) =>
+      courierRow({ contractId: 810 + i, reward: 15_000_000, volume: 45_000, collateral: 1_000_000 })
+    );
+    const bait = courierRow({
+      contractId: 899,
+      reward: 900_000_000,
+      volume: 45_000,
+      collateral: 1_000_000,
+    });
+    const ordinaryReturn = courierRow({
+      contractId: 898,
+      regionId: 10000043,
+      originLocationId: AMARR,
+      destinationLocationId: JITA,
+      reward: 15_000_000,
+      volume: 45_000,
+      collateral: 1_000_000,
+    });
+    const user = await showCourierWith([...ordinary, bait, ordinaryReturn]);
+
+    await user.click(screen.getByRole('button', { name: 'Filters' }));
+    await user.click(screen.getByRole('combobox', { name: 'Pay vs going rate' }));
+    await user.click(await screen.findByRole('option', { name: 'Only far above' }));
+
+    const dialog = await openHaul(user, bait.contractId);
+
+    // The way home pays the going rate, so this board is not showing it — and
+    // the count must not offer it either.
+    expect(within(dialog).queryByRole('button', { name: /reverse lane/ })).not.toBeInTheDocument();
+    expect(
+      within(dialog).getByText('No outstanding haul runs the reverse lane.')
     ).toBeInTheDocument();
   });
 
@@ -1503,7 +1575,7 @@ describe('ContractSearchPanel — Courier reverse lane', () => {
 
     expect(
       within(dialog).getByText(
-        'Nothing local places the drop-off, so there is no return lane to look up.'
+        'Nothing local places one end of this haul, so there is no return lane to look up.'
       )
     ).toBeInTheDocument();
     // Not a count of zero, which would read as an answer.

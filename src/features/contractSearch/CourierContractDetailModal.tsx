@@ -180,13 +180,11 @@ export function CourierContractDetailModal({
     ? [...endpointRisks, 'over-rate']
     : endpointRisks;
   const exposure = useRouteExposure(row, preference);
-  // Where the return hauls set out from, which is this haul's drop-off region —
-  // named only to say how many of them could not be placed, so an unnamed
-  // region falls back to its id rather than suppressing the note.
-  const returnRegionName =
-    row.destination.regionId === null
-      ? ''
-      : (regionNames.get(row.destination.regionId) ?? `#${row.destination.regionId}`);
+  // Where the return hauls set out from, which is this haul's drop-off region.
+  // Narrowed at the render site rather than defaulted to a blank here: a lane
+  // is only counted when both ends have a region, so there is no honest empty
+  // case to write — only an unnamed one, which shows its id.
+  const returnRegionId = row.destination.regionId;
   const measuring = jumps.kind === 'pending';
   const floor = measuring ? null : communityFloorReward(collateral, jumpCount);
   // Pinned to when the detail opened rather than read each render: a figure
@@ -198,6 +196,8 @@ export function CourierContractDetailModal({
   // notes with a warning-coloured "Before you accept" would contradict the
   // sentence underneath it, which says outright that it is not a warning.
   const warns = risks.some((kind) => MARKED_RISKS.includes(kind));
+
+  const regionName = (regionId: number) => regionNames.get(regionId) ?? `#${regionId}`;
 
   const place = (endpoint: CourierEndpoint) =>
     endpointPlace(
@@ -315,30 +315,42 @@ export function CourierContractDetailModal({
             necessarily near where this load is dropped. It is a prompt to go
             look, not a matched return trip.
           */}
-          <div className="flex flex-col gap-0.5 border-t border-line pt-2 text-[0.6875rem]">
+          <div className="flex flex-col gap-1 border-t border-line pt-2 text-xs">
             {reverseLane.kind === 'unresolved' ? (
               <span className="text-text-dim">{t('contractSearch.reverseLaneUnresolved')}</span>
-            ) : reverseLane.count === 0 ? (
-              // Plain text, never a button: a control that leads to an empty
-              // board is a dead link whether or not it is disabled.
-              <span className="text-text-dim">{t('contractSearch.reverseLaneNone')}</span>
-            ) : (
+            ) : reverseLane.count > 0 ? (
               <button
                 type="button"
                 onClick={onSearchReverseLane}
-                className="self-start text-accent underline"
+                className="self-start py-1 text-accent underline"
               >
                 {t('contractSearch.reverseLaneCount', { count: reverseLane.count })}
               </button>
-            )}
-            {reverseLane.kind === 'counted' && reverseLane.unplaceable > 0 && (
+            ) : (
+              // Plain text, never a button: a control that leads to an empty
+              // board is a dead link whether or not it is disabled. Said in one
+              // sentence when there are unplaceable hauls behind it, because
+              // "none" followed by "N *more*" is more than none.
               <span className="text-text-dim">
-                {t('contractSearch.reverseLaneUnplaceable', {
-                  count: reverseLane.unplaceable,
-                  region: returnRegionName,
-                })}
+                {reverseLane.unplaceable > 0 && returnRegionId !== null
+                  ? t('contractSearch.reverseLaneNoneUnplaceable', {
+                      count: reverseLane.unplaceable,
+                      region: regionName(returnRegionId),
+                    })
+                  : t('contractSearch.reverseLaneNone')}
               </span>
             )}
+            {reverseLane.kind === 'counted' &&
+              reverseLane.count > 0 &&
+              reverseLane.unplaceable > 0 &&
+              returnRegionId !== null && (
+                <span className="text-text-dim">
+                  {t('contractSearch.reverseLaneUnplaceable', {
+                    count: reverseLane.unplaceable,
+                    region: regionName(returnRegionId),
+                  })}
+                </span>
+              )}
           </div>
         </section>
 

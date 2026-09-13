@@ -54,19 +54,35 @@ export function reverseLaneMatches(
 ): ReverseLaneMatches | null {
   const from = row.destination.regionId;
   const to = row.origin.regionId;
+  // `to` cannot be null out of `resolveCourierRoutes`, which falls an unplaced
+  // pickup back to the contract's own region column. Guarded anyway because the
+  // type permits it and a caller building rows by hand would otherwise pair the
+  // lane against `undefined`.
   if (from === null || to === null) return null;
 
-  // Asked with the destination left open, so one pass answers both halves: the
-  // hauls that end where this one started, and the ones that end nowhere we can
-  // name. Filtering on `to` here would discard the second set unseen.
-  const leaving = filterCourierContracts(rows, {
-    ...filter,
-    originRegionId: from,
-    destinationRegionId: null,
-  }).filter((candidate) => candidate.contractId !== row.contractId);
+  const notThisHaul = (candidate: CourierRouteRow) => candidate.contractId !== row.contractId;
 
   return {
-    matches: leaving.filter((candidate) => candidate.destination.regionId === to),
-    unplaceable: leaving.filter((candidate) => candidate.destination.regionId === null),
+    matches: filterCourierContracts(rows, {
+      ...filter,
+      originRegionId: from,
+      destinationRegionId: to,
+    }).filter(notThisHaul),
+    // A second pass rather than a split of the first, because the two questions
+    // cannot share one filter. An end nothing local places has no region *and*
+    // no space band, and those co-vary: asked with the hauler's band filter
+    // still on, `filterCourierContracts` drops every band-less destination
+    // before we could count it, and `unplaceable` would read zero exactly when
+    // it has something to say. A band filter cannot apply to a row with no
+    // band, so it is lifted here — the question is "what leaves this region for
+    // somewhere we cannot place", and the band is the unanswerable part.
+    unplaceable: filterCourierContracts(rows, {
+      ...filter,
+      originRegionId: from,
+      destinationRegionId: null,
+      destinationSpace: null,
+    })
+      .filter(notThisHaul)
+      .filter((candidate) => candidate.destination.regionId === null),
   };
 }

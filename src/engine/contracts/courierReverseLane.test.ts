@@ -110,11 +110,44 @@ describe('reverseLaneMatches', () => {
     expect(reverseLaneMatches(subject, [subject, back], NO_FILTER)).toBeNull();
   });
 
-  it('has no lane to look up when the pickup is a structure nothing local places', () => {
-    const subject = haul(STRUCTURE, AMARR);
+  /**
+   * A pickup with no region is not the player-structure case — `courierEndpoints`
+   * hands every pickup the contract's own region column, structure or not. It is
+   * the narrower one below: a real NPC station whose *system* the local snapshot
+   * does not hold, which leaves the region unresolved with the name intact.
+   * Rare, and the reason the null guard on the pickup end is not dead code.
+   */
+  it('has no lane to look up when the pickup station sits in a system the snapshot does not hold', () => {
+    const stationOffTheMap: CourierEndpoint = {
+      ...JITA,
+      systemName: null,
+      systemId: null,
+      regionId: null,
+      space: null,
+    };
+    const subject = haul(stationOffTheMap, AMARR);
     const back = haul(AMARR, JITA);
 
     expect(reverseLaneMatches(subject, [subject, back], NO_FILTER)).toBeNull();
+  });
+
+  /**
+   * An unplaced end has no region *and* no space band — they go null together.
+   * Run through the hauler's band filter, every row this is meant to report
+   * would be dropped before it could be counted, and the figure would read zero
+   * exactly when it has something to say.
+   */
+  it('still reports the return hauls it cannot place when a space band is chosen', () => {
+    const subject = haul(JITA, AMARR);
+    const back = haul(AMARR, JITA);
+    const unplaceable = haul(AMARR, STRUCTURE);
+
+    const lane = reverseLaneMatches(subject, [subject, back, unplaceable], {
+      destinationSpace: ['highsec'],
+    });
+
+    expect(lane?.matches.map((row) => row.contractId)).toEqual([back.contractId]);
+    expect(lane?.unplaceable.map((row) => row.contractId)).toEqual([unplaceable.contractId]);
   });
 
   /**

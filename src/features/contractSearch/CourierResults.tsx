@@ -739,13 +739,24 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
     [uiFilter, spaceKinds]
   );
 
-  const matchingRows = useMemo(() => {
-    const matched = filterCourierContracts(rows, filter);
-    // Applied after the engine filter rather than inside it: what counts as
-    // "may not be able to complete" is the risk module's answer, and keeping it
-    // there stops a second definition drifting away from the flags on the row.
-    return uiFilter.hideUncompletable ? completableCourierRoutes(matched) : matched;
-  }, [rows, filter, uiFilter.hideUncompletable]);
+  /**
+   * Applied after the engine filter rather than inside it: what counts as "may
+   * not be able to complete" is the risk module's answer, and keeping it there
+   * stops a second definition drifting away from the flags on the row.
+   *
+   * Shared with the reverse-lane count below, so the way home is narrowed by
+   * the same control, on the same terms, as the board in front of it.
+   */
+  const narrowToCompletable = useCallback(
+    (candidates: readonly CourierRouteRow[]) =>
+      uiFilter.hideUncompletable ? completableCourierRoutes(candidates) : [...candidates],
+    [uiFilter.hideUncompletable]
+  );
+
+  const matchingRows = useMemo(
+    () => narrowToCompletable(filterCourierContracts(rows, filter)),
+    [rows, filter, narrowToCompletable]
+  );
   /**
    * Measured over the **whole** corpus rather than the filtered set, because
    * the going rate below is the median across every outstanding public courier
@@ -816,19 +827,24 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
    * direction: "we cannot say" is not "within the going rate", and it is not
    * "far above" it either.
    */
-  const ratedRows = useMemo(() => {
-    // Until the distances land no row has a multiple, so narrowing on one
-    // would empty the board and the empty state would report "nothing matched"
-    // — a complete answer given mid-load. The board shows everything until it
-    // can actually tell these apart.
-    if (uiFilter.overRate === 'all' || jumps.kind !== 'known') return matchingRows;
-    const wantFlagged = uiFilter.overRate === 'only';
-    return matchingRows.filter((row) => {
-      const multiple = multipleFor(row);
-      if (multiple === null) return !wantFlagged;
-      return paysFarAboveGoingRate(multiple) === wantFlagged;
-    });
-  }, [matchingRows, uiFilter.overRate, multipleFor, jumps.kind]);
+  const narrowToOverRate = useCallback(
+    (candidates: readonly CourierRouteRow[]) => {
+      // Until the distances land no row has a multiple, so narrowing on one
+      // would empty the board and the empty state would report "nothing
+      // matched" — a complete answer given mid-load. The board shows everything
+      // until it can actually tell these apart.
+      if (uiFilter.overRate === 'all' || jumps.kind !== 'known') return [...candidates];
+      const wantFlagged = uiFilter.overRate === 'only';
+      return candidates.filter((row) => {
+        const multiple = multipleFor(row);
+        if (multiple === null) return !wantFlagged;
+        return paysFarAboveGoingRate(multiple) === wantFlagged;
+      });
+    },
+    [uiFilter.overRate, multipleFor, jumps.kind]
+  );
+
+  const ratedRows = useMemo(() => narrowToOverRate(matchingRows), [matchingRows, narrowToOverRate]);
 
   const displayRows = useMemo(() => {
     const ranked = [...ratedRows];
@@ -842,23 +858,31 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
 
   /**
    * The open haul's return leg (issue #941), measured over the whole corpus
-   * with the board's own filter and its two regions swapped.
+   * with the board's own filter and its two regions swapped. `null` when no
+   * haul is open — which is not the modal's "no lane to look up", and must not
+   * borrow its tag.
    *
-   * Deliberately *not* run through `ratedRows`' over-rate narrowing. That stage
-   * needs the jump counts, so the figure would render high mid-load and then
-   * drop while the reader looked at it — the same moving target the expiry
-   * countdown in the modal is pinned to avoid. Both stages here are pure and
-   * distance-free, so this figure is settled the moment the modal opens.
+   * Every stage the board narrows by is applied here too, including the
+   * over-rate filter. That one needs the jump counts, so it is gated on them
+   * exactly as `ratedRows` is: with the distances still landing neither the
+   * board nor this count applies it, and once they land both do. Anything less
+   * than the same stages would let the count promise hauls the board it opens
+   * then filters away — the dead link the zero case below exists to prevent.
    */
-  const reverseLane = useMemo<ReverseLane>(() => {
-    if (selectedRow === null) return { kind: 'unresolved' };
+  const reverseLane = useMemo<ReverseLane | null>(() => {
+    if (selectedRow === null) return null;
     const lane = reverseLaneMatches(selectedRow, rows, filter);
     if (lane === null) return { kind: 'unresolved' };
-    const matched = uiFilter.hideUncompletable
-      ? completableCourierRoutes(lane.matches)
-      : lane.matches;
-    return { kind: 'counted', count: matched.length, unplaceable: lane.unplaceable.length };
-  }, [selectedRow, rows, filter, uiFilter.hideUncompletable]);
+    return {
+      kind: 'counted',
+      count: narrowToOverRate(narrowToCompletable(lane.matches)).length,
+      // Narrowed the same way, because these are hauls the board would hide
+      // too: a drop-off nothing local places is a `player-structure` flag, and
+      // that flag blocks completion. An end the snapshot could not read at all
+      // is not flagged, and survives — which is the honest difference.
+      unplaceable: narrowToCompletable(lane.unplaceable).length,
+    };
+  }, [selectedRow, rows, filter, narrowToCompletable, narrowToOverRate]);
 
   function changeFilter(next: CourierUiFilter) {
     setUiFilter(next);
@@ -1106,7 +1130,7 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
           )}
         </>
       )}
-      {selectedRow && (
+      {selectedRow && reverseLane && (
         <CourierContractDetailModal
           row={selectedRow}
           regionNames={regionNames}
