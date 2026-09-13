@@ -13,10 +13,8 @@ _Recorded 2026-09-13._
   that share no facility, and `normalizeReactionFacilityDefaults` already
   rejects a non-reaction pick, and `REACTION_FACILITY_PRESETS` is the one
   spelling of that restriction the Reaction Location picker already open-coded.
-  The manufacturing picker is deliberately left offering every preset,
-  refineries included: filtering it is right, but a pilot who already stored
-  one would find the control blank with no migration, so that belongs in its
-  own change rather than riding along here.
+  The manufacturing picker is left offering every preset, refineries included
+  — see the later decision on why that is correct rather than deferred.
 
 - **Shift narrows a shortcut match instead of blocking every press.**
   `useKeyboardShortcuts` dropped any key held with Shift, which made `?` — the

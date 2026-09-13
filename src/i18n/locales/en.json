@@ -3402,7 +3402,7 @@
     "tradeHubLabel": "Default trade hub",
     "tradeHubHint": "Prices shown in the Market browser, the LP store and item lookups. Moon mining tax uses each payee’s own hub instead.",
     "facilityLabel": "Default facility",
-    "facilityHint": "Where a new build plan starts. Only used for your first plan — after that, a new plan copies your most recent one.",
+    "facilityHint": "Where a new build plan starts. This holds one facility, and it counts only for plans of its own kind: pick a refinery and it is your default for reaction plans, while manufacturing plans start at an NPC station. Only your first plan uses it — after that, a new plan copies your most recent one.",
     "rigLevelLabel": "Rigs",
     "facilityTaxLabel": "Facility tax (%)",
     "facilityTaxHint": "What the structure owner charges. Leave blank to use the standard rate.",
@@ -3432,7 +3432,11 @@
     "days_other": "{{count}} days",
     "resetViewPrefs": "Reset saved view preferences",
     "resetViewPrefsHint": "Pages remember sorts, filters and expanded sections as you use them. This puts them all back to their defaults. Your characters, groups, plans and saved comparisons are untouched.",
-    "resetViewPrefsConfirm": "View preferences reset."
+    "resetViewPrefsConfirm": "View preferences reset.",
+    "facilityActivity": {
+      "manufacturing": "Manufacturing",
+      "reaction": "Reactions"
+    }
   },
   "shortcuts": {
     "title": "Keyboard shortcuts",

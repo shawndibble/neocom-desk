@@ -11,7 +11,9 @@ import {
   Panel,
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
   Spinner,
@@ -42,6 +44,7 @@ import {
   setRigSlot,
   type FacilityKind,
   type FacilityPreset,
+  type IndustryActivity,
 } from '@/engine/industry/types';
 import { rigKindLabelKey } from '@/features/industry/rigFitLabels';
 import { useMarketHub } from '@/features/market/hub';
@@ -645,6 +648,27 @@ function MobileTabsPanel() {
 }
 
 /**
+ * The presets an activity can host, in a fixed order so the two groups never
+ * swap places between renders. A single-activity list (the Reaction Location
+ * picker) still comes back as one group — its heading is what says the
+ * restriction out loud rather than leaving it to be inferred from two names.
+ */
+function presetsByActivity(
+  presets: readonly FacilityPreset[]
+): [IndustryActivity, FacilityPreset[]][] {
+  const activities: IndustryActivity[] = ['manufacturing', 'reaction'];
+  return activities
+    .map(
+      (activity) =>
+        [activity, presets.filter((preset) => preset.activity === activity)] as [
+          IndustryActivity,
+          FacilityPreset[],
+        ]
+    )
+    .filter(([, group]) => group.length > 0);
+}
+
+/**
  * One facility-defaults record's controls: which facility, its rig fit, and
  * the owner-set tax. Rendered twice in {@link DefaultsPanel} — once for where
  * a Build Plan manufactures, once for its Reaction Location — because
@@ -686,10 +710,23 @@ function FacilityDefaultsFields({
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          {presets.map((preset) => (
-            <SelectItem key={preset.kind} value={preset.kind}>
-              {preset.name}
-            </SelectItem>
+          {/*
+            Grouped by activity, because which group the pick lands in decides
+            which plans the whole record then applies to: `newBuildPlan` takes
+            it only for a plan of that facility's own activity and falls back
+            to a bare NPC station or Athanor otherwise. A flat list made
+            picking a Tatara look like it set *the* default, when it quietly
+            set the reaction one and turned the manufacturing one off.
+          */}
+          {presetsByActivity(presets).map(([activity, group]) => (
+            <SelectGroup key={activity}>
+              <SelectLabel>{t(`settings.facilityActivity.${activity}`)}</SelectLabel>
+              {group.map((preset) => (
+                <SelectItem key={preset.kind} value={preset.kind}>
+                  {preset.name}
+                </SelectItem>
+              ))}
+            </SelectGroup>
           ))}
         </SelectContent>
       </Select>
