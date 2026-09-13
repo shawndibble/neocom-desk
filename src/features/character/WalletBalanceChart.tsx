@@ -18,8 +18,8 @@ import {
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { DataTable, type DataTableColumn } from '@/components/ui';
-import { GROUPED_NUMBER_Y_AXIS_MARGIN_LEFT, GROUPED_NUMBER_Y_AXIS_WIDTH } from '@/lib/chartAxis';
-import { formatIsk } from '@/lib/isk';
+import { COMPACT_ISK_Y_AXIS_MARGIN_LEFT, COMPACT_ISK_Y_AXIS_WIDTH } from '@/lib/chartAxis';
+import { formatIsk, formatIskCompact } from '@/lib/isk';
 import { formatDateOnly, formatTimestamp } from '@/lib/timestamp';
 import type { WalletBalancePoint, WalletBalanceTrend } from '@/engine/wallet/balanceHistory';
 
@@ -85,7 +85,7 @@ export default function WalletBalanceChart({ points, trend, timeZone }: WalletBa
         <ResponsiveContainer width="100%" height="100%">
           <LineChart
             data={chartData}
-            margin={{ top: 8, right: 8, left: GROUPED_NUMBER_Y_AXIS_MARGIN_LEFT, bottom: 0 }}
+            margin={{ top: 8, right: 8, left: COMPACT_ISK_Y_AXIS_MARGIN_LEFT, bottom: 0 }}
           >
             <CartesianGrid stroke="var(--color-line)" strokeDasharray="3 3" />
             <XAxis
@@ -96,8 +96,8 @@ export default function WalletBalanceChart({ points, trend, timeZone }: WalletBa
             <YAxis
               stroke="var(--color-text-dim)"
               tick={{ fontSize: 11, fill: 'var(--color-text-dim)' }}
-              width={GROUPED_NUMBER_Y_AXIS_WIDTH}
-              tickFormatter={(value: number) => formatIsk(value, 0)}
+              width={COMPACT_ISK_Y_AXIS_WIDTH}
+              tickFormatter={(value: number) => formatIskCompact(value)}
             />
             <Tooltip content={(props) => <BalanceTooltip {...props} />} />
             <Line
