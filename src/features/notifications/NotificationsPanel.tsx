@@ -53,6 +53,7 @@ import {
 } from '@/components/ui';
 import { SelectionCheckbox } from '@/features/character/SelectionCheckbox';
 import { AllCharactersNotificationSection } from './AllCharactersNotificationSection';
+import { CHANNEL_COLUMNS, ChannelColumnHeadings } from './ChannelColumns';
 import { ScheduledPush, ICON_SIZE } from '@/components/ui/icons';
 import { PROJECTABLE_EVENT_IDS } from '@/engine/projection';
 import { db } from '@/db';
@@ -116,17 +117,6 @@ import { loadCharacterRoles, corpWideRoles } from '@/features/corp/roles';
 import { corpCapabilities, type CorpCapabilities } from '@/engine/corpRoles';
 
 const EVENT_BY_ID = new Map(NOTIFICATION_EVENTS.map((event) => [event.id, event]));
-
-/**
- * One fixed-width track per delivery channel, shared by all five grids on
- * this panel — the column captions, the per-character select-all row, the
- * event rows, the Family headers and the eve-type rows. They are independent
- * grids that only *look* like columns, so an auto track would size each to
- * its own content and the captions would drift off the checkboxes below the
- * moment a caption is wider than a checkbox. Which it now is: the columns
- * used to read "App" and "List", neither of which said what it delivered.
- */
-const CHANNEL_COLUMNS = 'grid shrink-0 grid-cols-[4.25rem_4.25rem] justify-items-center';
 
 /** Stable identity for a Character with no token row yet, so it doesn't itself break `CharacterNotificationSection`'s memo. */
 const EMPTY_SCOPES: ReadonlySet<string> = new Set();
@@ -703,37 +693,7 @@ const CharacterNotificationSection = memo(function CharacterNotificationSection(
       </div>
       {expanded && (
         <div className="bg-panel-2">
-          {/* Column captions, aligned to the same two tracks the
-              rows below use — an event can raise a browser
-              notification without joining the Overview list, or
-              the reverse. */}
-          <div className="flex items-center justify-between gap-3 border-b border-line px-3 py-1.5">
-            <span className="sr-only">{t('settings.notifications.columnEvent')}</span>
-            <span aria-hidden="true" className="flex-1" />
-            <div className={CHANNEL_COLUMNS}>
-              {NOTIFICATION_CHANNELS.map((channel) => (
-                <Tooltip
-                  key={channel}
-                  content={t(`settings.notifications.columnHint.${channel}`)}
-                  openOnTap
-                >
-                  {/* `tabIndex` because a Tooltip's trigger has to
-                      be focusable to be read without a pointer
-                      (`components/ui/Tooltip.tsx`, ADR 0008), and
-                      the dotted underline is what says there is
-                      something to read. Uppercase micro-heading
-                      per docs/DESIGN.md §2, matching the Family
-                      headers further down. */}
-                  <span
-                    tabIndex={0}
-                    className="cursor-help text-[0.6875rem] leading-tight font-semibold tracking-wide text-text-dim uppercase underline decoration-dotted decoration-text-dim/50 underline-offset-2"
-                  >
-                    {t(`settings.notifications.column.${channel}`)}
-                  </span>
-                </Tooltip>
-              ))}
-            </div>
-          </div>
+          <ChannelColumnHeadings />
           <ul className="divide-y divide-line">
             {visibleEventIds.map((eventId) => {
               const def = eventDef(eventId);

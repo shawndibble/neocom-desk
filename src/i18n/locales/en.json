@@ -3353,8 +3353,8 @@
         "feed": "Toggle all Overview notifications for {{family}}"
       },
       "columnHint": {
-        "browser": "Browser: a pop-up from your operating system, outside the app.",
-        "feed": "Overview: a row on the Overview page, inside the app."
+        "browser": "A pop-up from your browser, outside the app.",
+        "feed": "A row on the Overview page, inside the app."
       }
     },
     "dataTitle": "Data",

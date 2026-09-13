@@ -38,9 +38,7 @@ import {
   eveTypesByFamily,
 } from './eventSelection';
 import { eveTypeLabel } from './eveTypeLabel';
-
-/** Matches `NotificationsPanel.tsx`'s own per-channel grid track so the two sections visually line up. */
-const CHANNEL_COLUMNS = 'grid shrink-0 grid-cols-[4.25rem_4.25rem] justify-items-center';
+import { CHANNEL_COLUMNS, ChannelColumnHeadings } from './ChannelColumns';
 
 export function AllCharactersNotificationSection({
   characterIds,
@@ -87,6 +85,13 @@ export function AllCharactersNotificationSection({
       <p className="border-b border-line bg-panel-2 px-3 py-1.5 text-[0.6875rem] text-text-dim">
         {t('settings.notifications.allCharactersHint')}
       </p>
+      {/* The same captions a Character's own section shows. Without them this
+          section is two unlabelled columns of checkboxes — and unlike that
+          section, which is collapsed by default, this one is always open, so
+          these are the first channel checkboxes anyone sees. */}
+      <div className="bg-panel-2">
+        <ChannelColumnHeadings />
+      </div>
       <ul className="divide-y divide-line bg-panel-2">
         {NOTIFICATION_EVENT_IDS.map((eventId) => {
           const eventLabel = t(eventLabelKey(eventId));
