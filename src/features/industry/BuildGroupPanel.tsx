@@ -820,35 +820,29 @@ export function BuildGroupPanel({
               detection={detection}
               onChange={onOwnedStockScopeChange}
               action={
-                (bulkDetectedEntries.length > 0 || bulkClearTypeIds.length > 0) && (
-                  <div className="flex gap-2">
-                    {bulkDetectedEntries.length > 0 && (
-                      <Button
-                        size="sm"
-                        onClick={() =>
-                          updateOwnedStock((next) => {
-                            for (const [typeID, quantity] of bulkDetectedEntries)
-                              next[typeID] = quantity;
-                          })
-                        }
-                      >
-                        {t('industry.useAllOwned')}
-                      </Button>
-                    )}
-                    {bulkClearTypeIds.length > 0 && (
-                      <Button
-                        size="sm"
-                        onClick={() =>
-                          updateOwnedStock((next) => {
-                            for (const typeID of bulkClearTypeIds) delete next[typeID];
-                          })
-                        }
-                      >
-                        {t('industry.useNoneOwned')}
-                      </Button>
-                    )}
-                  </div>
-                )
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    onClick={() =>
+                      updateOwnedStock((next) => {
+                        for (const [typeID, quantity] of bulkDetectedEntries)
+                          next[typeID] = quantity;
+                      })
+                    }
+                  >
+                    {t('industry.useAllOwned')}
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={() =>
+                      updateOwnedStock((next) => {
+                        for (const typeID of bulkClearTypeIds) delete next[typeID];
+                      })
+                    }
+                  >
+                    {t('industry.useNoneOwned')}
+                  </Button>
+                </div>
               }
             />
           </div>
