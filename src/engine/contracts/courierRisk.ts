@@ -117,7 +117,7 @@ const RISK_ORDER: readonly CourierRiskKind[] = [
 
 /**
  * Which risks can stop a haul being delivered at all, and so are the ones a
- * "hide risky destinations" control removes.
+ * "hide risky routes" control removes.
  *
  * Nullsec is deliberately not among them. Plenty of nullsec hauling is
  * ordinary well-paid work, and hiding it behind a safety control would quietly
@@ -128,7 +128,7 @@ export function blocksCompletion(risks: readonly CourierRiskKind[]): boolean {
 }
 
 /**
- * The rows a "hide risky destinations" control leaves on screen. Kept beside the flags rather than in `filterCourierContracts`, so the
+ * The rows a "hide risky routes" control leaves on screen. Kept beside the flags rather than in `filterCourierContracts`, so the
  * one place that decides what a risk *is* also decides what hiding one means —
  * the two cannot drift into disagreeing about which rows a flag covers.
  */
