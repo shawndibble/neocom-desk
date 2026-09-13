@@ -111,7 +111,10 @@ beforeEach(async () => {
     scopes: ['esi-contracts.read_character_contracts.v1'],
   });
   await db.settings.put({ key: ACTIVE_CHARACTER_KEY, value: CHAR_ID });
-  window.history.pushState({}, '', '/contracts');
+  // Search is the page's landing tab; every describe below this one is about
+  // the character's own contract history, so they deep-link straight to it.
+  // The tab-strip describe overrides this per test.
+  window.history.pushState({}, '', '/contracts?tab=history');
 });
 
 describe('Contracts', () => {
@@ -406,38 +409,47 @@ describe('Contracts row context menu (issue #676)', () => {
 describe('Contracts tab strip (issue #908)', () => {
   const SEARCH_UNAVAILABLE = "Contract search isn't available";
 
-  it('lands on History, with the character contracts table and no tab in the URL', async () => {
+  it('lands on Search with no tab in the URL', async () => {
+    window.history.pushState({}, '', '/contracts');
     render(<App />);
-    expect(await screen.findByText('Rifter fit')).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: 'History' })).toHaveAttribute('aria-selected', 'true');
+    expect(await screen.findByText(SEARCH_UNAVAILABLE)).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Search' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.queryByRole('table', { name: 'Contracts' })).not.toBeInTheDocument();
     expect(window.location.search).toBe('');
   });
 
-  it('swaps the contracts table for the public search when Search is picked', async () => {
+  it('swaps the public search for the contracts table when History is picked', async () => {
+    const user = userEvent.setup();
+    window.history.pushState({}, '', '/contracts');
+    render(<App />);
+    await screen.findByText(SEARCH_UNAVAILABLE);
+
+    await user.click(screen.getByRole('tab', { name: 'History' }));
+
+    expect(await screen.findByText('Rifter fit')).toBeInTheDocument();
+    expect(window.location.search).toBe('?tab=history');
+  });
+
+  it('opens History from a deep link, and drops the tab again on the way back', async () => {
     const user = userEvent.setup();
     render(<App />);
-    await screen.findByText('Rifter fit');
+
+    expect(await screen.findByText('Rifter fit')).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'History' })).toHaveAttribute('aria-selected', 'true');
 
     await user.click(screen.getByRole('tab', { name: 'Search' }));
 
     expect(await screen.findByText(SEARCH_UNAVAILABLE)).toBeInTheDocument();
-    expect(screen.queryByRole('table', { name: 'Contracts' })).not.toBeInTheDocument();
-    expect(window.location.search).toBe('?tab=search');
+    // Search is the default, so it stays out of the URL entirely.
+    expect(window.location.search).toBe('');
   });
 
-  it('opens the Search tab from a deep link, and drops the tab again on the way back', async () => {
-    const user = userEvent.setup();
+  it('still honours an older `?tab=search` link', async () => {
     window.history.pushState({}, '', '/contracts?tab=search');
     render(<App />);
 
     expect(await screen.findByText(SEARCH_UNAVAILABLE)).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Search' })).toHaveAttribute('aria-selected', 'true');
-
-    await user.click(screen.getByRole('tab', { name: 'History' }));
-
-    expect(await screen.findByText('Rifter fit')).toBeInTheDocument();
-    // History is the default, so it stays out of the URL entirely.
-    expect(window.location.search).toBe('');
   });
 
   it('reaches Search even when this character has no contracts of its own', async () => {
