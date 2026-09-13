@@ -21,7 +21,7 @@ export interface DataTableColumn<T> {
   id: string;
   /** Already-translated header text. */
   header: string;
-  align?: 'left' | 'right';
+  align?: 'left' | 'right' | 'center';
   /** Static cell classes — `whitespace-nowrap`, `tabular-nums`, `text-text-dim`. */
   className?: string;
   /** Row-dependent cell classes, for per-value tones (`iskToneClass`, status tones). */
@@ -202,6 +202,7 @@ export function DataTable<T>({
       headerPadding,
       'font-semibold uppercase',
       column.align === 'right' && 'text-right',
+      column.align === 'center' && 'text-center',
       column.headerClassName
     )
   );
@@ -220,11 +221,17 @@ export function DataTable<T>({
   // right padding by that same amount brings the numbers back under the
   // label a reader's eye actually lands on, not under the icon.
   const sortIconGutter = density === 'compact' ? 'pr-6' : 'pr-7';
+  // A centered column gets no such gutter. Its sortable header is off by only
+  // half a glyph (label and icon are centred as one group), and correcting it
+  // would misalign a sortable centered column against a non-sortable one
+  // beside it — which no gutter can fix, since there is no icon to correct
+  // for. Two adjacent columns disagreeing reads worse than 8px.
   const cellClass = columns.map((column) =>
     cx(
       cellPadding,
       column.align === 'right' && 'text-right',
       column.align === 'right' && column.sortValue && sortIconGutter,
+      column.align === 'center' && 'text-center',
       column.className
     )
   );
@@ -296,7 +303,8 @@ export function DataTable<T>({
                       className={cx(
                         headerTextClass[i],
                         'inline-flex flex-1 items-center gap-1 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent',
-                        column.align === 'right' && 'justify-end'
+                        column.align === 'right' && 'justify-end',
+                        column.align === 'center' && 'justify-center'
                       )}
                     >
                       {column.header}

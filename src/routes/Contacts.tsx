@@ -179,6 +179,7 @@ export function Contacts() {
       {
         id: 'standing',
         header: t('contacts.standing'),
+        align: 'center',
         // The tag replaces the bar *and* the number: the value is in its
         // accessible name and its tooltip, and the column sorts on the raw
         // number below, so nothing is lost by not printing it.
@@ -188,6 +189,7 @@ export function Contacts() {
       {
         id: 'flags',
         header: t('contacts.flags'),
+        align: 'center',
         render: (contact) => {
           const blocked = contact.is_blocked === true;
           const watched = contact.is_watched === true;
