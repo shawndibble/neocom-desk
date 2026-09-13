@@ -9,9 +9,9 @@
  * for it again on navigation between Industry pages is cheap.
  */
 import { useEffect, useMemo, useState } from 'react';
-import { useFacilityDefaults } from './facilityDefaults';
+import { hydrateActivityFacilityDefaults, useFacilityDefaults } from './facilityDefaults';
 import { useReactionFacilityDefaults } from './reactionFacilityDefaults';
-import type { ActivityFacilityDefaults } from './newBuildPlan';
+import type { ActivityFacilityDefaults } from './facilityDefaults';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import type { SkillLevels } from '@/engine/industry/types';
 import type { CharacterBlueprint } from '@/esi/endpoints';
@@ -50,13 +50,10 @@ export interface IndustryWorkspace {
 
 export function useIndustryWorkspace(): IndustryWorkspace {
   const manufacturingDefaults = useFacilityDefaults((state) => state.value);
-  const hydrateFacilityDefaults = useFacilityDefaults((state) => state.hydrate);
   const reactionDefaults = useReactionFacilityDefaults((state) => state.value);
-  const hydrateReactionFacilityDefaults = useReactionFacilityDefaults((state) => state.hydrate);
   useEffect(() => {
-    void hydrateFacilityDefaults();
-    void hydrateReactionFacilityDefaults();
-  }, [hydrateFacilityDefaults, hydrateReactionFacilityDefaults]);
+    void hydrateActivityFacilityDefaults();
+  }, []);
   const facilityDefaults = useMemo<ActivityFacilityDefaults>(
     () => ({ manufacturing: manufacturingDefaults, reaction: reactionDefaults }),
     [manufacturingDefaults, reactionDefaults]

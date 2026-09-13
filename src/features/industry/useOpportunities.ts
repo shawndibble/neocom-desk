@@ -26,7 +26,7 @@ import type { SkillLevels } from '@/engine/industry/types';
 import type { PiData } from '@/sde/types';
 import type { TradeHub } from '@/market/hubs';
 import type { CharacterBlueprint } from '@/esi/endpoints';
-import type { ActivityFacilityDefaults } from './newBuildPlan';
+import type { ActivityFacilityDefaults } from './facilityDefaults';
 import type { BlueprintCatalog } from './blueprintCatalog';
 import { loadMarketSnapshots } from './marketData';
 import { recipeForLookup } from './recipes';

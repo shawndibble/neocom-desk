@@ -18,7 +18,7 @@ import {
   type FitToBuildPlansResult,
 } from '@/engine/import/fitToBuildPlans';
 import { parseEftFit } from '@/engine/import/eftFit';
-import type { ActivityFacilityDefaults } from './newBuildPlan';
+import type { ActivityFacilityDefaults } from './facilityDefaults';
 import { findOwnedBlueprint } from './data';
 import type { BlueprintCatalog, BlueprintCatalogEntry } from './blueprintCatalog';
 import { newBuildPlan } from './newBuildPlan';

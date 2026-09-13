@@ -46,7 +46,7 @@ import {
 } from '@/features/character/characterFilterValue';
 import type { BlueprintCatalog } from './blueprintCatalog';
 import { loadCharacterBlueprints } from './data';
-import type { ActivityFacilityDefaults } from './newBuildPlan';
+import type { ActivityFacilityDefaults } from './facilityDefaults';
 import { formatPercent } from './format';
 import type { OwnedStockSnapshot } from './ownedStockDetection';
 import { buildOpportunityCandidates, type OpportunityRow } from './opportunities';

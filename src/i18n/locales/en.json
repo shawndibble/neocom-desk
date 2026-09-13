@@ -3407,7 +3407,7 @@
     "facilityTaxLabel": "Facility tax (%)",
     "facilityTaxHint": "What the structure owner charges. Leave blank to use the standard rate.",
     "reactionLocationLabel": "Default reaction location",
-    "reactionLocationHint": "Where your reactions run: the refinery a new reaction plan starts at, and the one a manufacturing plan assumes the first time you turn on Include Reactions for it.",
+    "reactionLocationHint": "Where your reactions run: the refinery a new reaction plan starts at, and the one a manufacturing plan assumes the first time you turn on Include Reactions for it. Used only when the plan has no reaction location yet.",
     "reactionLocationRigLabel": "Reaction location rigs",
     "reactionLocationTaxLabel": "Reaction location tax (%)",
     "assumedMeLabel": "Assumed ME for blueprints you don’t own",

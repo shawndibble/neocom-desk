@@ -33,6 +33,12 @@ import {
   type RigKind,
   type RigLevel,
 } from '@/engine/industry/types';
+import {
+  DEFAULT_REACTION_FACILITY_DEFAULTS,
+  useReactionFacilityDefaults,
+  type ReactionFacilityDefaults,
+} from './reactionFacilityDefaults';
+import { adoptRefineryDefaultAsReactionLocation } from './adoptRefineryDefault';
 
 export const FACILITY_DEFAULTS_SETTING_KEY = 'sync.industryFacilityDefaults';
 
@@ -62,12 +68,18 @@ const RIG_KINDS: readonly RigKind[] = ['none', 'meT1', 'meT2', 'teT1', 'teT2'];
 const LEGACY_RIG_LEVELS: readonly RigLevel[] = ['none', 't1', 't2'];
 
 /**
- * An NPC station fits no rigs and its tax is fixed, so a stored record that
- * says otherwise is incoherent rather than merely unusual. Normalised on read
- * instead of rejected: the facility is the part the pilot chose, and dropping
- * it over a stale rig fit would be the more surprising outcome.
+ * Two incoherent records, reset differently.
  *
- * This is the same rule `BuildPlanDetail` applies when the pilot switches a
+ * A non-manufacturing facility is reset **whole**: this record seeds only
+ * manufacturing plans now, so a refinery in it would be read by nothing and
+ * the picker does not offer one to show. `adoptRefineryDefault.ts` moves a
+ * pilot's existing one to the Reaction Location default before any store
+ * reads this, so the reset lands on a value already rescued.
+ *
+ * An NPC station with rigs or a tax keeps its **facility** and loses the two
+ * fields that cannot exist: the facility is the part the pilot chose, and
+ * dropping it over a stale rig fit would be the more surprising outcome. That
+ * half is the same rule `BuildPlanDetail` applies when the pilot switches a
  * plan away from a structure — one place would be better, but that one is a
  * form handler over a plan record and this is a stored preference.
  */
@@ -84,6 +96,27 @@ export function normalizeFacilityDefaults(value: FacilityDefaults): FacilityDefa
   if (FACILITY_PRESETS[value.facility].structure) return value;
   return { facility: value.facility, rigFit: EMPTY_RIG_FIT, facilityTaxPct: null };
 }
+
+/**
+ * The pilot's Settings-level default for each activity a plan can have.
+ *
+ * Two records rather than one, because a refinery and an engineering complex
+ * are both standing facts about the same pilot and neither can host the
+ * other's jobs. The reaction half is the Reaction Location default, not a
+ * third key: the engine gives a reaction-activity plan no separate
+ * `reactionFacility`, reusing the plan's own facility for a nested reaction
+ * instead (`engine/industry/types.ts`), so "where my reactions run" is one
+ * answer.
+ */
+export interface ActivityFacilityDefaults {
+  manufacturing: FacilityDefaults;
+  reaction: ReactionFacilityDefaults;
+}
+
+export const DEFAULT_ACTIVITY_FACILITY_DEFAULTS: ActivityFacilityDefaults = {
+  manufacturing: DEFAULT_FACILITY_DEFAULTS,
+  reaction: DEFAULT_REACTION_FACILITY_DEFAULTS,
+};
 
 /**
  * The only facilities this setting may hold — what the Default facility
@@ -141,3 +174,24 @@ export const useFacilityDefaults = createSyncedSetting<FacilityDefaults>({
   defaultValue: DEFAULT_FACILITY_DEFAULTS,
   parse: parseFacilityDefaults,
 });
+
+// Started at most once per session, and awaited by every hydrate below, so no
+// reader can see the rows before the one-time adoption has had its say.
+let adoption: Promise<void> | null = null;
+
+/**
+ * Hydrates both halves of {@link ActivityFacilityDefaults}.
+ *
+ * The only supported way to hydrate either store. Hydrating one on its own
+ * would race `adoptRefineryDefaultAsReactionLocation`, which rewrites both
+ * rows — and a store that read first would hold a value the adoption has
+ * since moved, with no reason to re-read until the next sync pull.
+ */
+export async function hydrateActivityFacilityDefaults(): Promise<void> {
+  adoption ??= adoptRefineryDefaultAsReactionLocation();
+  await adoption;
+  await Promise.all([
+    useFacilityDefaults.getState().hydrate(),
+    useReactionFacilityDefaults.getState().hydrate(),
+  ]);
+}

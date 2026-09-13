@@ -2,6 +2,14 @@
 
 _Recorded 2026-09-13._
 
+> **Superseded the same day** by
+> `20260913-153943-a-facility-default-per-activity-with-reactions-served.md`.
+> Its reasoning below is sound for the code it was written against — the
+> picker offered refineries because one key served both activities — and that
+> premise no longer holds: reactions now read their own key, so filtering
+> takes nothing away and the picker is filtered. Read this for _why the
+> obvious filter was wrong before_, not for what the code does now.
+
 - **Filtering the Default facility picker to manufacturing facilities was
   proposed, verified, and rejected: it removes a capability and fixes no bug.**
   The claim it rested on — that a refinery stored there silently becomes the

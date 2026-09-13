@@ -2,15 +2,10 @@ import { describe, expect, it } from 'vitest';
 import type { BuildPlanRecord } from '@/db';
 import type { CharacterBlueprint } from '@/esi/endpoints';
 import { EMPTY_RIG_FIT, resolveRigFit } from '@/engine/industry/types';
-import { DEFAULT_FACILITY_DEFAULTS } from './facilityDefaults';
+import { DEFAULT_ACTIVITY_FACILITY_DEFAULTS, DEFAULT_FACILITY_DEFAULTS } from './facilityDefaults';
 import { DEFAULT_REACTION_FACILITY_DEFAULTS } from './reactionFacilityDefaults';
 import type { BlueprintCatalogEntry } from './blueprintCatalog';
-import {
-  DEFAULT_ACTIVITY_FACILITY_DEFAULTS,
-  fallbackFacility,
-  mostRecentlyUpdatedPlan,
-  newBuildPlan,
-} from './newBuildPlan';
+import { fallbackFacility, mostRecentlyUpdatedPlan, newBuildPlan } from './newBuildPlan';
 import { matchesPlanSeed } from './planSeed';
 
 function entry(activity: 'manufacturing' | 'reaction' = 'manufacturing'): BlueprintCatalogEntry {
@@ -257,11 +252,15 @@ describe('newBuildPlan — a default per activity', () => {
       reaction: RIGGED_TATARA,
     });
     expect(created.facility).toBe('athanor');
+    // `fallbackFacility('reaction')` is also an Athanor, so the facility alone
+    // proves nothing — the tax is what shows the plan won, not the fallback.
+    expect(created.facilityTaxPct).toBe(9);
   });
 
   it('falls back when a default names a facility its own activity cannot host', () => {
-    // A refinery stored as the manufacturing default is inert, the same as
-    // before this split — the guard, not the picker, is what enforces it.
+    // The picker cannot produce this and `normalizeFacilityDefaults` resets
+    // it, but a device on an older build can still push one through sync, so
+    // the guard stays the thing that actually enforces it.
     const created = newBuildPlan(1, entry('manufacturing'), null, null, {
       manufacturing: RIGGED_TATARA,
       reaction: DEFAULT_REACTION_FACILITY_DEFAULTS,

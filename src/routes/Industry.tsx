@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useFacilityDefaults } from '@/features/industry/facilityDefaults';
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -72,11 +71,6 @@ export function Industry() {
     assumedTe,
     facilityDefaults,
   } = workspace;
-  const hydrateFacilityDefaults = useFacilityDefaults((state) => state.hydrate);
-  useEffect(() => {
-    void hydrateFacilityDefaults();
-  }, [hydrateFacilityDefaults]);
-
   // Character-independent, loaded once — the market-wide scan's precomputed
   // input (issue #819). Not part of `useIndustryWorkspace`: only this index's
   // Opportunities tab needs it, never the plan/group detail pages.

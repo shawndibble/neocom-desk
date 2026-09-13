@@ -1119,9 +1119,14 @@ describe('Settings defaults', () => {
       await screen.findByRole('combobox', { name: /default manufacturing facility/i })
     );
     const options = within(screen.getByRole('listbox')).getAllByRole('option');
-    expect(options.map((option) => option.textContent)).not.toEqual(
-      expect.arrayContaining([expect.stringContaining('Athanor')])
-    );
+    // The whole list, not just "no Athanor" — a Tatara slipping in would pass
+    // that, and it is the same mistake in the same place.
+    expect(options.map((option) => option.textContent)).toEqual([
+      expect.stringContaining('NPC station'),
+      expect.stringContaining('Raitaru'),
+      expect.stringContaining('Azbel'),
+      expect.stringContaining('Sotiyo'),
+    ]);
   });
 
   it('only offers refineries as a reaction location', async () => {

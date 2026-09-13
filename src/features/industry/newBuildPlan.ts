@@ -12,32 +12,12 @@ import type { CharacterBlueprint } from '@/esi/endpoints';
 import { EMPTY_RIG_FIT, FACILITY_PRESETS, resolveRigFit } from '@/engine/industry/types';
 import type { FacilityKind, IndustryActivity } from '@/engine/industry/types';
 import { DEFAULT_TRADE_HUB } from '@/market/hubs';
-import { DEFAULT_FACILITY_DEFAULTS, type FacilityDefaults } from './facilityDefaults';
 import {
-  DEFAULT_REACTION_FACILITY_DEFAULTS,
-  type ReactionFacilityDefaults,
-} from './reactionFacilityDefaults';
+  DEFAULT_ACTIVITY_FACILITY_DEFAULTS,
+  type ActivityFacilityDefaults,
+  type FacilityDefaults,
+} from './facilityDefaults';
 
-/**
- * The pilot's Settings-level default for each activity a plan can have.
- *
- * Two records rather than one, because a refinery and an engineering complex
- * are both standing facts about the same pilot and neither can host the
- * other's jobs. The reaction half is the same key as the Reaction Location
- * default: the engine gives a reaction-activity plan no separate
- * `reactionFacility`, reusing the plan's own facility for a nested reaction
- * instead (`engine/industry/types.ts`), so "where my reactions run" is one
- * answer, not two.
- */
-export interface ActivityFacilityDefaults {
-  manufacturing: FacilityDefaults;
-  reaction: ReactionFacilityDefaults;
-}
-
-export const DEFAULT_ACTIVITY_FACILITY_DEFAULTS: ActivityFacilityDefaults = {
-  manufacturing: DEFAULT_FACILITY_DEFAULTS,
-  reaction: DEFAULT_REACTION_FACILITY_DEFAULTS,
-};
 import type { BlueprintCatalogEntry } from './blueprintCatalog';
 
 /**
@@ -132,10 +112,11 @@ export function newBuildPlan(
   const activity = entry.blueprint.activity;
   const defaultsMatchActivity =
     defaultsFrom != null && FACILITY_PRESETS[defaultsFrom.facility].activity === activity;
-  // The pilot's own default for *this* activity. Still guarded: the
-  // manufacturing slot accepts any preset, so a refinery left in it is inert
-  // rather than applied — a refinery cannot manufacture and an NPC station
-  // cannot run a reaction, the same rule `fallbackFacility` exists for.
+  // The pilot's own default for *this* activity, still guarded rather than
+  // trusted: each store normalises its own record, but a value pulled from a
+  // device on an older build has not been through that. A refinery cannot
+  // manufacture and an NPC station cannot run a reaction — the same rule
+  // `fallbackFacility` exists for.
   const forActivity = facilityDefaults[activity];
   const preferred =
     FACILITY_PRESETS[forActivity.facility].activity === activity ? forActivity : null;

@@ -4,7 +4,7 @@ import '@/i18n';
 import { db } from '@/db';
 import type { BlueprintCatalog } from './blueprintCatalog';
 import type { OwnedStockSnapshot } from './ownedStockDetection';
-import { DEFAULT_ACTIVITY_FACILITY_DEFAULTS } from './newBuildPlan';
+import { DEFAULT_ACTIVITY_FACILITY_DEFAULTS } from './facilityDefaults';
 import { OpportunitiesPanel } from './OpportunitiesPanel';
 
 const loadCharacterBlueprints = vi.hoisted(() => vi.fn());

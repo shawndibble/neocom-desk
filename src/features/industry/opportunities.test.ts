@@ -12,7 +12,7 @@ import {
   type UnrankedOpportunityRow,
 } from './opportunities';
 import { recipeForLookup } from './recipes';
-import { DEFAULT_ACTIVITY_FACILITY_DEFAULTS } from './newBuildPlan';
+import { DEFAULT_ACTIVITY_FACILITY_DEFAULTS } from './facilityDefaults';
 import type { MarketSnapshot } from './marketData';
 import { DEFAULT_TRADE_HUB } from '@/market/hubs';
 

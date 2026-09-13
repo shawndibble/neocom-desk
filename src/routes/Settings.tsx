@@ -51,6 +51,7 @@ import { useIncludeBlueprintCost } from '@/features/industry/includeBlueprintCos
 import {
   useFacilityDefaults,
   normalizeFacilityDefaults,
+  hydrateActivityFacilityDefaults,
   MANUFACTURING_FACILITY_PRESETS,
   type FacilityDefaults,
 } from '@/features/industry/facilityDefaults';
@@ -782,8 +783,13 @@ function DefaultsPanel() {
   const assumedMeHydrated = useHydratedStore(useAssumedMe);
   const assumedTeHydrated = useHydratedStore(useAssumedTe);
   const includeBlueprintCostHydrated = useHydratedStore(useIncludeBlueprintCost);
-  const facilityHydrated = useHydratedStore(useFacilityDefaults);
-  const reactionFacilityHydrated = useHydratedStore(useReactionFacilityDefaults);
+  // Through the pair's own gate, not `useHydratedStore`: the one-time
+  // adoption rewrites both rows, so neither store may read before it runs.
+  const facilityHydrated = useFacilityDefaults((state) => state.hydrated);
+  const reactionFacilityHydrated = useReactionFacilityDefaults((state) => state.hydrated);
+  useEffect(() => {
+    void hydrateActivityFacilityDefaults();
+  }, []);
   const expiringHydrated = useHydratedStore(useExpiringWindowHours);
   const defaultCharacterFilterHydrated = useHydratedStore(useDefaultCharacterFilter);
   const spExtractionEnabledHydrated = useHydratedStore(useSpExtractionMonitoringEnabled);

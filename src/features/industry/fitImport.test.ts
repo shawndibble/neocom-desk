@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { db, type BuildPlanRecord } from '@/db';
 import type { FitToBuildPlansResult } from '@/engine/import/fitToBuildPlans';
-import { DEFAULT_ACTIVITY_FACILITY_DEFAULTS } from './newBuildPlan';
+import { DEFAULT_ACTIVITY_FACILITY_DEFAULTS } from './facilityDefaults';
 import type { BlueprintCatalog, BlueprintCatalogEntry } from './blueprintCatalog';
 import { buildGroupsFor, type BuildGroupsValue } from './buildGroups';
 import {

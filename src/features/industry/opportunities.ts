@@ -16,7 +16,7 @@ import {
 } from './blueprintCatalog';
 import { buildPlanTypeIds } from './recipes';
 import type { MarketSnapshot, MarketSnapshotRequest } from './marketData';
-import type { ActivityFacilityDefaults } from './newBuildPlan';
+import type { ActivityFacilityDefaults } from './facilityDefaults';
 import {
   detectOwnedStock,
   bulkOwnedStockSuggestions,
