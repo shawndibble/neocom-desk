@@ -1,19 +1,63 @@
+import { useEffect, useState } from 'react';
+import { captureMessage } from '@sentry/react';
 import { useTranslation } from 'react-i18next';
-import { LogoMark, Spinner } from '@/components/ui';
+import { Button, LogoMark, Spinner } from '@/components/ui';
+import { recoverFromStalledBoot } from './bootRecovery';
+
+/**
+ * How long a boot may sit unresolved before the screen offers a way out.
+ * Generously past a cold start on a slow phone — this is not a progress
+ * hint, it is the point where "still loading" has become "stuck".
+ */
+export const BOOT_STALL_MS = 10_000;
 
 /**
  * Full-page "still working out where you are". Shared by `Root` and
  * `RequireCharacter` so neither gate is tempted to treat "not loaded yet" as
  * "logged out".
+ *
+ * Both gates wait on Dexie, and a blocked IndexedDB upgrade leaves that read
+ * pending forever rather than rejecting — so this screen, alone among the
+ * app's waits, needs its own escape hatch (`bootRecovery.ts`). Without it the
+ * only recovery is uninstalling the app.
  */
 export function BootScreen() {
   const { t } = useTranslation();
+  const [stalled, setStalled] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setStalled(true);
+      // Report the stall itself, not just the one cause we can name. A
+      // `blocked` upgrade has its own event (`db/blockedSignal.ts`), but a
+      // boot can hang with nothing firing at all — so it is the pair that
+      // diagnoses it: stall *and* blocked means the schema-version block;
+      // stall alone means something else, and without this we would see
+      // neither. Safe to call Sentry directly here where it is not in
+      // `upgradeBlockedReport.ts`: `BootScreen` is page-only (App,
+      // RequireCharacter, routes/Login) and never reaches the worker bundle.
+      captureMessage('Boot stalled on BootScreen', {
+        level: 'warning',
+        extra: { afterMs: BOOT_STALL_MS },
+      });
+    }, BOOT_STALL_MS);
+    return () => clearTimeout(timer);
+  }, []);
+
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center gap-3 bg-bg text-text">
+    <main className="flex min-h-screen flex-col items-center justify-center gap-3 bg-bg p-6 text-center text-text">
       <LogoMark className="size-10" />
       <h1 className="text-sm font-semibold tracking-widest uppercase">{t('app.name')}</h1>
       <Spinner label={t('common.loading')} />
       <p className="text-xs text-text-dim">{t('common.loadingEllipsis')}</p>
+      {stalled && (
+        <>
+          <p className="max-w-prose text-xs text-text-dim">{t('boot.stalledHint')}</p>
+          <Button size="sm" onClick={() => void recoverFromStalledBoot()}>
+            {t('boot.stalledAction')}
+          </Button>
+        </>
+      )}
     </main>
   );
 }

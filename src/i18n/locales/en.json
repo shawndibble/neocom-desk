@@ -3,6 +3,10 @@
     "name": "Neocom Desk",
     "tagline": "Skill plans, build margins, market orders, colonies and moon tax — every character you fly, in one browser tab."
   },
+  "boot": {
+    "stalledHint": "Still loading. Another copy of the app may be holding your local data open.",
+    "stalledAction": "Reload"
+  },
   "nav": {
     "characters": "Characters",
     "overview": "Overview",
