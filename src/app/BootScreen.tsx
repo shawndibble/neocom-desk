@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { captureMessage } from '@sentry/react';
 import { useTranslation } from 'react-i18next';
 import { Button, LogoMark, Spinner } from '@/components/ui';
 import { recoverFromStalledBoot } from './bootRecovery';
@@ -25,7 +26,21 @@ export function BootScreen() {
   const [stalled, setStalled] = useState(false);
 
   useEffect(() => {
-    const timer = setTimeout(() => setStalled(true), BOOT_STALL_MS);
+    const timer = setTimeout(() => {
+      setStalled(true);
+      // Report the stall itself, not just the one cause we can name. A
+      // `blocked` upgrade has its own event (`db/blockedSignal.ts`), but a
+      // boot can hang with nothing firing at all — so it is the pair that
+      // diagnoses it: stall *and* blocked means the schema-version block;
+      // stall alone means something else, and without this we would see
+      // neither. Safe to call Sentry directly here where it is not in
+      // `upgradeBlockedReport.ts`: `BootScreen` is page-only (App,
+      // RequireCharacter, routes/Login) and never reaches the worker bundle.
+      captureMessage('Boot stalled on BootScreen', {
+        level: 'warning',
+        extra: { afterMs: BOOT_STALL_MS },
+      });
+    }, BOOT_STALL_MS);
     return () => clearTimeout(timer);
   }, []);
 

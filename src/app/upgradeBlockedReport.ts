@@ -15,6 +15,9 @@ import { onUpgradeBlocked } from '@/db/blockedSignal';
  */
 export function subscribeToUpgradeBlockedReports(): () => void {
   return onUpgradeBlocked(({ oldVersion, newVersion }) => {
+    // Native IndexedDB version numbers, which are Dexie's times ten: a Dexie
+    // v10 -> v11 block reports 100 -> 110. Reported raw rather than divided so
+    // the value matches what the browser and any IndexedDB tooling show.
     captureMessage('IndexedDB upgrade blocked by another connection', {
       level: 'warning',
       extra: { oldVersion, newVersion },
