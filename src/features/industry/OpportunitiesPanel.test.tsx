@@ -4,7 +4,7 @@ import '@/i18n';
 import { db } from '@/db';
 import type { BlueprintCatalog } from './blueprintCatalog';
 import type { OwnedStockSnapshot } from './ownedStockDetection';
-import { DEFAULT_FACILITY_DEFAULTS } from './facilityDefaults';
+import { DEFAULT_ACTIVITY_FACILITY_DEFAULTS } from './facilityDefaults';
 import { OpportunitiesPanel } from './OpportunitiesPanel';
 
 const loadCharacterBlueprints = vi.hoisted(() => vi.fn());
@@ -86,7 +86,7 @@ describe('OpportunitiesPanel', () => {
         catalog={CATALOG}
         pi={null}
         skills={{}}
-        facilityDefaults={DEFAULT_FACILITY_DEFAULTS}
+        facilityDefaults={DEFAULT_ACTIVITY_FACILITY_DEFAULTS}
         activeCharacterId={CHARACTER_ID}
         ownedStockSnapshot={SNAPSHOT}
         onAddToCompare={() => {}}

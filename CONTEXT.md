@@ -626,6 +626,12 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   primary Build Location), since a pilot's manufacturing location turns over
   far more often than their one dedicated reactor. See
   `docs/context/decisions/20260910-082559-reaction-location-a-second-facility-context-lets-craft.md`.
+  Its **Settings-level default** answers one question wider than the field
+  itself: where the pilot's reactions run at all. So it also seeds the primary
+  **Build Location** of a plan whose own **Industry Activity** is `reaction` —
+  which has no Reaction Location field, because the engine reuses that plan's
+  own facility for a nested reaction instead. One refinery, one answer, two
+  places it lands.
 - **Remap**: In-game reallocation of a character's attributes. The optimizer suggests where in a Skill Plan remaps should be placed.
 - **Remap Marker**: A user-placed row in a Skill Plan marking where the character will remap attributes. Draggable like a plan entry.
 - **Remaps Available**: How many attribute remaps the character can spend: bonus remaps (new characters get several) plus the yearly remap when off cooldown. Read from the API (bonus_remaps, last_remap_date, cooldown); user may override. Optimizer must support the common single-remap case: train a leading segment on current attributes, then remap at the optimizer-chosen point.

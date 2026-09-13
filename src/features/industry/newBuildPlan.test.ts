@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import type { BuildPlanRecord } from '@/db';
 import type { CharacterBlueprint } from '@/esi/endpoints';
 import { EMPTY_RIG_FIT, resolveRigFit } from '@/engine/industry/types';
-import { DEFAULT_FACILITY_DEFAULTS } from './facilityDefaults';
+import { DEFAULT_ACTIVITY_FACILITY_DEFAULTS, DEFAULT_FACILITY_DEFAULTS } from './facilityDefaults';
+import { DEFAULT_REACTION_FACILITY_DEFAULTS } from './reactionFacilityDefaults';
 import type { BlueprintCatalogEntry } from './blueprintCatalog';
 import { fallbackFacility, mostRecentlyUpdatedPlan, newBuildPlan } from './newBuildPlan';
 import { matchesPlanSeed } from './planSeed';
@@ -85,7 +86,7 @@ describe('mostRecentlyUpdatedPlan', () => {
 
 describe('newBuildPlan — assumed ME and TE', () => {
   it('quotes a blueprint the character does not own at the assumed ME', () => {
-    const created = newBuildPlan(1, entry(), null, null, DEFAULT_FACILITY_DEFAULTS, {
+    const created = newBuildPlan(1, entry(), null, null, DEFAULT_ACTIVITY_FACILITY_DEFAULTS, {
       assumedMe: 2,
     });
     expect(created.me).toBe(2);
@@ -94,7 +95,7 @@ describe('newBuildPlan — assumed ME and TE', () => {
   it('still quotes an owned blueprint at its real research', () => {
     // The assumption fills the gap where there is nothing to read; it never
     // overrides a real value in either direction.
-    const created = newBuildPlan(1, entry(), owned(), null, DEFAULT_FACILITY_DEFAULTS, {
+    const created = newBuildPlan(1, entry(), owned(), null, DEFAULT_ACTIVITY_FACILITY_DEFAULTS, {
       assumedMe: 2,
     });
     expect(created.me).toBe(10);
@@ -102,7 +103,7 @@ describe('newBuildPlan — assumed ME and TE', () => {
   });
 
   it('defaults to unresearched when no assumption is given', () => {
-    const created = newBuildPlan(1, entry(), null, null, DEFAULT_FACILITY_DEFAULTS);
+    const created = newBuildPlan(1, entry(), null, null, DEFAULT_ACTIVITY_FACILITY_DEFAULTS);
     expect(created.me).toBe(0);
     expect(created.te).toBe(0);
   });
@@ -110,7 +111,7 @@ describe('newBuildPlan — assumed ME and TE', () => {
   it('quotes a blueprint the character does not own at the assumed TE (#634)', () => {
     // The commonest unowned case is an invented BPC with no decryptor —
     // ME2/TE4 — and quoting its time at 0 moves job time and ISK/hour.
-    const created = newBuildPlan(1, entry(), null, null, DEFAULT_FACILITY_DEFAULTS, {
+    const created = newBuildPlan(1, entry(), null, null, DEFAULT_ACTIVITY_FACILITY_DEFAULTS, {
       assumedMe: 2,
       assumedTe: 4,
     });
@@ -119,7 +120,7 @@ describe('newBuildPlan — assumed ME and TE', () => {
   });
 
   it('still quotes an owned blueprint at its real TE', () => {
-    const created = newBuildPlan(1, entry(), owned(), null, DEFAULT_FACILITY_DEFAULTS, {
+    const created = newBuildPlan(1, entry(), owned(), null, DEFAULT_ACTIVITY_FACILITY_DEFAULTS, {
       assumedMe: 2,
       assumedTe: 4,
     });
@@ -129,7 +130,7 @@ describe('newBuildPlan — assumed ME and TE', () => {
   it('assumes ME and TE independently', () => {
     // They are separate preferences: a pilot who set one and not the other
     // must not have the unset half quietly follow the set one.
-    const created = newBuildPlan(1, entry(), null, null, DEFAULT_FACILITY_DEFAULTS, {
+    const created = newBuildPlan(1, entry(), null, null, DEFAULT_ACTIVITY_FACILITY_DEFAULTS, {
       assumedTe: 4,
     });
     expect(created.me).toBe(0);
@@ -139,7 +140,7 @@ describe('newBuildPlan — assumed ME and TE', () => {
 
 describe('newBuildPlan — overrides', () => {
   it('takes runs, group and timestamp from the caller', () => {
-    const created = newBuildPlan(1, entry(), null, null, DEFAULT_FACILITY_DEFAULTS, {
+    const created = newBuildPlan(1, entry(), null, null, DEFAULT_ACTIVITY_FACILITY_DEFAULTS, {
       runs: 20,
       buildGroupId: 'g1',
       updatedAt: 12345,
@@ -152,19 +153,19 @@ describe('newBuildPlan — overrides', () => {
   it('omits buildGroupId entirely for an ungrouped plan', () => {
     // Absent rather than undefined: Firestore rejects undefined at any depth,
     // and the sync spec omits the key on absence.
-    const created = newBuildPlan(1, entry(), null, null, DEFAULT_FACILITY_DEFAULTS);
+    const created = newBuildPlan(1, entry(), null, null, DEFAULT_ACTIVITY_FACILITY_DEFAULTS);
     expect('buildGroupId' in created).toBe(false);
   });
 
   it('seeds buildHere from the caller — Opportunities carrying its auto-picked materials into a new plan', () => {
-    const created = newBuildPlan(1, entry(), null, null, DEFAULT_FACILITY_DEFAULTS, {
+    const created = newBuildPlan(1, entry(), null, null, DEFAULT_ACTIVITY_FACILITY_DEFAULTS, {
       buildHere: [502, 501],
     });
     expect(created.buildHere).toEqual([502, 501]);
   });
 
   it('omits buildHere entirely when nothing was auto-picked', () => {
-    const created = newBuildPlan(1, entry(), null, null, DEFAULT_FACILITY_DEFAULTS);
+    const created = newBuildPlan(1, entry(), null, null, DEFAULT_ACTIVITY_FACILITY_DEFAULTS);
     expect('buildHere' in created).toBe(false);
   });
 });
@@ -179,7 +180,7 @@ describe('newBuildPlan — carried defaults', () => {
       buildSystemId: 30003888,
       buildSystemName: 'Badivefi',
     });
-    const created = newBuildPlan(1, entry(), null, previous, DEFAULT_FACILITY_DEFAULTS);
+    const created = newBuildPlan(1, entry(), null, previous, DEFAULT_ACTIVITY_FACILITY_DEFAULTS);
     expect(created.facility).toBe('raitaru');
     // Through `resolveRigFit`, so a plan still in the pre-#609 `rigLevel`
     // shape carries forward as the fit it migrates to.
@@ -188,34 +189,17 @@ describe('newBuildPlan — carried defaults', () => {
     expect(created.buildSystemName).toBe('Badivefi');
   });
 
-  it('applies a refinery default to reaction plans only, leaving manufacturing at the fallback', () => {
-    // The Settings-level default holds one facility and counts only for plans
-    // of its own kind. This is why the Settings picker offers refineries at
-    // all — it is the only way to say "my reaction plans start at my rigged
-    // Tatara" — and why filtering them out would remove that, not fix a bug.
-    const stored = {
-      facility: 'tatara',
-      rigFit: ['meT2', 'teT1', 'none'],
-      facilityTaxPct: 2,
-    } as const;
-
-    const reaction = newBuildPlan(1, entry('reaction'), null, null, stored);
-    expect(reaction.facility).toBe('tatara');
-    expect(reaction.rigFit).toEqual(['meT2', 'teT1', 'none']);
-    expect(reaction.facilityTaxPct).toBe(2);
-
-    // Not corruption — the guard holds. The cost is silence: the pilot set a
-    // default and manufacturing plans carry none.
-    const manufacturing = newBuildPlan(1, entry('manufacturing'), null, null, stored);
-    expect(manufacturing.facility).toBe('npcStation');
-    expect(manufacturing.rigFit).toEqual(EMPTY_RIG_FIT);
-  });
-
   it('refuses a facility from a plan of the other activity', () => {
     // A Raitaru cannot host a reaction, so the hardcoded fallback wins over
     // the pilot's own most recent plan here.
     const previous = plan({ id: 'p', facility: 'raitaru' });
-    const created = newBuildPlan(1, entry('reaction'), null, previous, DEFAULT_FACILITY_DEFAULTS);
+    const created = newBuildPlan(
+      1,
+      entry('reaction'),
+      null,
+      previous,
+      DEFAULT_ACTIVITY_FACILITY_DEFAULTS
+    );
     expect(created.facility).toBe('athanor');
     // The fallback brings its own empty fit rather than the rejected
     // facility's rigs, which the new facility could not host anyway.
@@ -223,10 +207,73 @@ describe('newBuildPlan — carried defaults', () => {
   });
 });
 
+describe('newBuildPlan — a default per activity', () => {
+  const RIGGED_TATARA = {
+    facility: 'tatara',
+    rigFit: ['meT2', 'teT1', 'none'],
+    facilityTaxPct: 2,
+  } as const;
+  const RIGGED_AZBEL = {
+    facility: 'azbel',
+    rigFit: ['meT1', 'none', 'none'],
+    facilityTaxPct: 5,
+  } as const;
+
+  it('starts a reaction plan at the reaction default, not the manufacturing one', () => {
+    // The engine already treats a reaction-activity plan's own facility as its
+    // Reaction Location (`IndustryInputs.reactionFacility` is absent for one,
+    // reusing the plan's own facility instead), so the Settings-level Reaction
+    // Location is the same fact and seeds it here.
+    const created = newBuildPlan(1, entry('reaction'), null, null, {
+      manufacturing: RIGGED_AZBEL,
+      reaction: RIGGED_TATARA,
+    });
+    expect(created.facility).toBe('tatara');
+    expect(created.rigFit).toEqual(['meT2', 'teT1', 'none']);
+    expect(created.facilityTaxPct).toBe(2);
+  });
+
+  it('starts a manufacturing plan at the manufacturing default, untouched by the reaction one', () => {
+    const created = newBuildPlan(1, entry('manufacturing'), null, null, {
+      manufacturing: RIGGED_AZBEL,
+      reaction: RIGGED_TATARA,
+    });
+    expect(created.facility).toBe('azbel');
+    expect(created.rigFit).toEqual(['meT1', 'none', 'none']);
+    expect(created.facilityTaxPct).toBe(5);
+  });
+
+  it('still lets the most recent matching plan win over the default', () => {
+    // `defaultsMatchActivity` is checked first (#456/#460). Without this the
+    // new default would look broken to anyone who already has plans.
+    const previous = plan({ id: 'p', facility: 'athanor', rigLevel: 'none', facilityTaxPct: 9 });
+    const created = newBuildPlan(1, entry('reaction'), null, previous, {
+      manufacturing: DEFAULT_FACILITY_DEFAULTS,
+      reaction: RIGGED_TATARA,
+    });
+    expect(created.facility).toBe('athanor');
+    // `fallbackFacility('reaction')` is also an Athanor, so the facility alone
+    // proves nothing — the tax is what shows the plan won, not the fallback.
+    expect(created.facilityTaxPct).toBe(9);
+  });
+
+  it('falls back when a default names a facility its own activity cannot host', () => {
+    // The picker cannot produce this and `normalizeFacilityDefaults` resets
+    // it, but a device on an older build can still push one through sync, so
+    // the guard stays the thing that actually enforces it.
+    const created = newBuildPlan(1, entry('manufacturing'), null, null, {
+      manufacturing: RIGGED_TATARA,
+      reaction: DEFAULT_REACTION_FACILITY_DEFAULTS,
+    });
+    expect(created.facility).toBe('npcStation');
+    expect(created.rigFit).toEqual(EMPTY_RIG_FIT);
+  });
+});
+
 describe('newBuildPlan — seeded ME/TE (#637)', () => {
   it('opens at the seeded research, over an owned copy at different research', () => {
     // The pilot is quoting a copy they might buy, not the one in the hangar.
-    const created = newBuildPlan(1, entry(), owned(), null, DEFAULT_FACILITY_DEFAULTS, {
+    const created = newBuildPlan(1, entry(), owned(), null, DEFAULT_ACTIVITY_FACILITY_DEFAULTS, {
       me: 4,
       te: 12,
       runs: 5,
@@ -237,7 +284,7 @@ describe('newBuildPlan — seeded ME/TE (#637)', () => {
   });
 
   it('opens at the seeded research over the assumed-ME and assumed-TE preferences', () => {
-    const created = newBuildPlan(1, entry(), null, null, DEFAULT_FACILITY_DEFAULTS, {
+    const created = newBuildPlan(1, entry(), null, null, DEFAULT_ACTIVITY_FACILITY_DEFAULTS, {
       assumedMe: 2,
       assumedTe: 4,
       me: 0,
@@ -255,7 +302,7 @@ describe('newBuildPlan — seeded ME/TE (#637)', () => {
     // it wrote matches the seed it was given: were these ever to disagree it
     // would write a plan on every render.
     const seed = { me: 7, te: 14, runs: 3 };
-    const created = newBuildPlan(1, entry(), owned(), null, DEFAULT_FACILITY_DEFAULTS, {
+    const created = newBuildPlan(1, entry(), owned(), null, DEFAULT_ACTIVITY_FACILITY_DEFAULTS, {
       ...seed,
       assumedMe: 2,
       assumedTe: 4,
@@ -264,13 +311,15 @@ describe('newBuildPlan — seeded ME/TE (#637)', () => {
   });
 
   it('takes the name the caller supplies, so a seeded plan is tellable apart', () => {
-    const created = newBuildPlan(1, entry(), null, null, DEFAULT_FACILITY_DEFAULTS, {
+    const created = newBuildPlan(1, entry(), null, null, DEFAULT_ACTIVITY_FACILITY_DEFAULTS, {
       name: 'Rifter 10/20 ×5',
     });
     expect(created.name).toBe('Rifter 10/20 ×5');
   });
 
   it('still names a plan after its product when the caller supplies nothing', () => {
-    expect(newBuildPlan(1, entry(), null, null, DEFAULT_FACILITY_DEFAULTS).name).toBe('Rifter');
+    expect(newBuildPlan(1, entry(), null, null, DEFAULT_ACTIVITY_FACILITY_DEFAULTS).name).toBe(
+      'Rifter'
+    );
   });
 });

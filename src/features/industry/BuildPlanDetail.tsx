@@ -54,6 +54,7 @@ import {
   autoBuildDepthContext,
 } from './planFacilityContext';
 import { useReactionFacilityDefaults, REACTION_FACILITY_PRESETS } from './reactionFacilityDefaults';
+import { hydrateActivityFacilityDefaults } from './facilityDefaults';
 import { retargetPatch } from './retargetPatch';
 import { DEFAULT_TRADE_HUB, TRADE_HUBS, getTradeHub } from '@/market/hubs';
 import type { BuildPlanRecord } from '@/db';
@@ -336,7 +337,7 @@ export function BuildPlanDetail({
   // `assumedMe`, so it's in hand the moment `toggleIncludeReactions` needs it
   // rather than one render behind.
   const reactionFacilityDefaults = useReactionFacilityDefaults((state) => state.value);
-  const hydrateReactionFacilityDefaults = useReactionFacilityDefaults((state) => state.hydrate);
+  const hydrateReactionFacilityDefaults = hydrateActivityFacilityDefaults;
   useEffect(() => {
     void hydrateReactionFacilityDefaults();
   }, [hydrateReactionFacilityDefaults]);

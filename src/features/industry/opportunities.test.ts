@@ -12,7 +12,7 @@ import {
   type UnrankedOpportunityRow,
 } from './opportunities';
 import { recipeForLookup } from './recipes';
-import { DEFAULT_FACILITY_DEFAULTS } from './facilityDefaults';
+import { DEFAULT_ACTIVITY_FACILITY_DEFAULTS } from './facilityDefaults';
 import type { MarketSnapshot } from './marketData';
 import { DEFAULT_TRADE_HUB } from '@/market/hubs';
 
@@ -136,10 +136,17 @@ describe('computeOpportunityRow — auto make-or-buy depth (issue #652)', () => 
   const recipeFor = recipeForLookup({ catalog: cat, pi: null, ownedBlueprints: [] });
 
   function row(depth: number) {
-    return computeOpportunityRow(candidate, snapshot, DEFAULT_FACILITY_DEFAULTS, {}, new Map(), {
-      recipeFor,
-      depth,
-    });
+    return computeOpportunityRow(
+      candidate,
+      snapshot,
+      DEFAULT_ACTIVITY_FACILITY_DEFAULTS,
+      {},
+      new Map(),
+      {
+        recipeFor,
+        depth,
+      }
+    );
   }
 
   it('auto-builds nothing at depth 0 — matches plain (issue #642) behavior', () => {

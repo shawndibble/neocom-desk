@@ -3401,13 +3401,13 @@
     },
     "tradeHubLabel": "Default trade hub",
     "tradeHubHint": "Prices shown in the Market browser, the LP store and item lookups. Moon mining tax uses each payee’s own hub instead.",
-    "facilityLabel": "Default facility",
-    "facilityHint": "Where a new build plan starts. This holds one facility, and it counts only for plans of its own kind: pick a refinery and it is your default for reaction plans, while manufacturing plans start at an NPC station. Only your first plan uses it — after that, a new plan copies your most recent one.",
+    "facilityLabel": "Default manufacturing facility",
+    "facilityHint": "Where a new manufacturing plan starts. Only your first plan uses it — after that, a new plan copies your most recent one.",
     "rigLevelLabel": "Rigs",
     "facilityTaxLabel": "Facility tax (%)",
     "facilityTaxHint": "What the structure owner charges. Leave blank to use the standard rate.",
     "reactionLocationLabel": "Default reaction location",
-    "reactionLocationHint": "The refinery a build plan assumes the first time you turn on Include Reactions for it. Used only when the plan has no reaction location yet.",
+    "reactionLocationHint": "Where your reactions run: the refinery a new reaction plan starts at, and the one a manufacturing plan assumes the first time you turn on Include Reactions for it. Used only when the plan has no reaction location yet.",
     "reactionLocationRigLabel": "Reaction location rigs",
     "reactionLocationTaxLabel": "Reaction location tax (%)",
     "assumedMeLabel": "Assumed ME for blueprints you don’t own",
@@ -3432,11 +3432,7 @@
     "days_other": "{{count}} days",
     "resetViewPrefs": "Reset saved view preferences",
     "resetViewPrefsHint": "Pages remember sorts, filters and expanded sections as you use them. This puts them all back to their defaults. Your characters, groups, plans and saved comparisons are untouched.",
-    "resetViewPrefsConfirm": "View preferences reset.",
-    "facilityActivity": {
-      "manufacturing": "Manufacturing",
-      "reaction": "Reactions"
-    }
+    "resetViewPrefsConfirm": "View preferences reset."
   },
   "shortcuts": {
     "title": "Keyboard shortcuts",

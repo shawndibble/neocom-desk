@@ -1031,9 +1031,9 @@ describe('Settings defaults', () => {
     render(<App />);
     await screen.findByRole('heading', { level: 1, name: /settings/i });
 
-    expect(await screen.findByRole('combobox', { name: /default facility/i })).toHaveTextContent(
-      /npc/i
-    );
+    expect(
+      await screen.findByRole('combobox', { name: /default manufacturing facility/i })
+    ).toHaveTextContent(/npc/i);
     expect(screen.queryByRole('group', { name: 'Rigs' })).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/facility tax/i)).not.toBeInTheDocument();
   });
@@ -1110,17 +1110,23 @@ describe('Settings defaults', () => {
     expect(screen.getByLabelText(/reaction location tax/i)).toBeInTheDocument();
   });
 
-  it('groups the default facility options by activity, since the pick decides which plans it serves', async () => {
+  it('offers no refinery as the manufacturing default, since reactions have their own', async () => {
     const user = userEvent.setup();
     render(<App />);
     await screen.findByRole('heading', { level: 1, name: /settings/i });
 
-    await user.click(await screen.findByRole('combobox', { name: /default facility/i }));
-    const listbox = screen.getByRole('listbox');
-    // A flat list let a pilot pick a Tatara believing they had set *the*
-    // default; `newBuildPlan` then serves it to reaction plans only.
-    expect(within(listbox).getByRole('group', { name: /manufacturing/i })).toBeInTheDocument();
-    expect(within(listbox).getByRole('group', { name: /reactions/i })).toBeInTheDocument();
+    await user.click(
+      await screen.findByRole('combobox', { name: /default manufacturing facility/i })
+    );
+    const options = within(screen.getByRole('listbox')).getAllByRole('option');
+    // The whole list, not just "no Athanor" — a Tatara slipping in would pass
+    // that, and it is the same mistake in the same place.
+    expect(options.map((option) => option.textContent)).toEqual([
+      expect.stringContaining('NPC station'),
+      expect.stringContaining('Raitaru'),
+      expect.stringContaining('Azbel'),
+      expect.stringContaining('Sotiyo'),
+    ]);
   });
 
   it('only offers refineries as a reaction location', async () => {

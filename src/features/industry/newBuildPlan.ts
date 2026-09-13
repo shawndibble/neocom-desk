@@ -12,7 +12,12 @@ import type { CharacterBlueprint } from '@/esi/endpoints';
 import { EMPTY_RIG_FIT, FACILITY_PRESETS, resolveRigFit } from '@/engine/industry/types';
 import type { FacilityKind, IndustryActivity } from '@/engine/industry/types';
 import { DEFAULT_TRADE_HUB } from '@/market/hubs';
-import { DEFAULT_FACILITY_DEFAULTS, type FacilityDefaults } from './facilityDefaults';
+import {
+  DEFAULT_ACTIVITY_FACILITY_DEFAULTS,
+  type ActivityFacilityDefaults,
+  type FacilityDefaults,
+} from './facilityDefaults';
+
 import type { BlueprintCatalogEntry } from './blueprintCatalog';
 
 /**
@@ -98,7 +103,7 @@ export function newBuildPlan(
   entry: BlueprintCatalogEntry,
   owned: CharacterBlueprint | null,
   defaultsFrom?: BuildPlanRecord | null,
-  facilityDefaults: FacilityDefaults = DEFAULT_FACILITY_DEFAULTS,
+  facilityDefaults: ActivityFacilityDefaults = DEFAULT_ACTIVITY_FACILITY_DEFAULTS,
   overrides: NewBuildPlanOverrides = {}
 ): BuildPlanRecord {
   // Unlike `IndustryBlueprint.activity` (optional, for pre-#460 engine test
@@ -107,11 +112,14 @@ export function newBuildPlan(
   const activity = entry.blueprint.activity;
   const defaultsMatchActivity =
     defaultsFrom != null && FACILITY_PRESETS[defaultsFrom.facility].activity === activity;
-  // The pilot's own default, but only where it can host this activity — a
-  // refinery cannot manufacture and an NPC station cannot run a reaction, the
-  // same guard `fallbackFacility` exists for.
+  // The pilot's own default for *this* activity, still guarded rather than
+  // trusted: each store normalises its own record, but a value pulled from a
+  // device on an older build has not been through that. A refinery cannot
+  // manufacture and an NPC station cannot run a reaction — the same rule
+  // `fallbackFacility` exists for.
+  const forActivity = facilityDefaults[activity];
   const preferred =
-    FACILITY_PRESETS[facilityDefaults.facility].activity === activity ? facilityDefaults : null;
+    FACILITY_PRESETS[forActivity.facility].activity === activity ? forActivity : null;
   /**
    * Facility, rig fit and owner-set tax move together, from one source.
    *

@@ -11,9 +11,7 @@ import {
   Panel,
   Select,
   SelectContent,
-  SelectGroup,
   SelectItem,
-  SelectLabel,
   SelectTrigger,
   SelectValue,
   Spinner,
@@ -44,7 +42,6 @@ import {
   setRigSlot,
   type FacilityKind,
   type FacilityPreset,
-  type IndustryActivity,
 } from '@/engine/industry/types';
 import { rigKindLabelKey } from '@/features/industry/rigFitLabels';
 import { useMarketHub } from '@/features/market/hub';
@@ -54,6 +51,8 @@ import { useIncludeBlueprintCost } from '@/features/industry/includeBlueprintCos
 import {
   useFacilityDefaults,
   normalizeFacilityDefaults,
+  hydrateActivityFacilityDefaults,
+  MANUFACTURING_FACILITY_PRESETS,
   type FacilityDefaults,
 } from '@/features/industry/facilityDefaults';
 import {
@@ -648,27 +647,6 @@ function MobileTabsPanel() {
 }
 
 /**
- * The presets an activity can host, in a fixed order so the two groups never
- * swap places between renders. A single-activity list (the Reaction Location
- * picker) still comes back as one group — its heading is what says the
- * restriction out loud rather than leaving it to be inferred from two names.
- */
-function presetsByActivity(
-  presets: readonly FacilityPreset[]
-): [IndustryActivity, FacilityPreset[]][] {
-  const activities: IndustryActivity[] = ['manufacturing', 'reaction'];
-  return activities
-    .map(
-      (activity) =>
-        [activity, presets.filter((preset) => preset.activity === activity)] as [
-          IndustryActivity,
-          FacilityPreset[],
-        ]
-    )
-    .filter(([, group]) => group.length > 0);
-}
-
-/**
  * One facility-defaults record's controls: which facility, its rig fit, and
  * the owner-set tax. Rendered twice in {@link DefaultsPanel} — once for where
  * a Build Plan manufactures, once for its Reaction Location — because
@@ -710,23 +688,10 @@ function FacilityDefaultsFields({
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          {/*
-            Grouped by activity, because which group the pick lands in decides
-            which plans the whole record then applies to: `newBuildPlan` takes
-            it only for a plan of that facility's own activity and falls back
-            to a bare NPC station or Athanor otherwise. A flat list made
-            picking a Tatara look like it set *the* default, when it quietly
-            set the reaction one and turned the manufacturing one off.
-          */}
-          {presetsByActivity(presets).map(([activity, group]) => (
-            <SelectGroup key={activity}>
-              <SelectLabel>{t(`settings.facilityActivity.${activity}`)}</SelectLabel>
-              {group.map((preset) => (
-                <SelectItem key={preset.kind} value={preset.kind}>
-                  {preset.name}
-                </SelectItem>
-              ))}
-            </SelectGroup>
+          {presets.map((preset) => (
+            <SelectItem key={preset.kind} value={preset.kind}>
+              {preset.name}
+            </SelectItem>
           ))}
         </SelectContent>
       </Select>
@@ -818,8 +783,13 @@ function DefaultsPanel() {
   const assumedMeHydrated = useHydratedStore(useAssumedMe);
   const assumedTeHydrated = useHydratedStore(useAssumedTe);
   const includeBlueprintCostHydrated = useHydratedStore(useIncludeBlueprintCost);
-  const facilityHydrated = useHydratedStore(useFacilityDefaults);
-  const reactionFacilityHydrated = useHydratedStore(useReactionFacilityDefaults);
+  // Through the pair's own gate, not `useHydratedStore`: the one-time
+  // adoption rewrites both rows, so neither store may read before it runs.
+  const facilityHydrated = useFacilityDefaults((state) => state.hydrated);
+  const reactionFacilityHydrated = useReactionFacilityDefaults((state) => state.hydrated);
+  useEffect(() => {
+    void hydrateActivityFacilityDefaults();
+  }, []);
   const expiringHydrated = useHydratedStore(useExpiringWindowHours);
   const defaultCharacterFilterHydrated = useHydratedStore(useDefaultCharacterFilter);
   const spExtractionEnabledHydrated = useHydratedStore(useSpExtractionMonitoringEnabled);
@@ -891,7 +861,7 @@ function DefaultsPanel() {
           // combination that cannot exist. Same rule `BuildPlanDetail` applies
           // to a plan.
           onChange={(next) => void setFacilityDefaults(normalizeFacilityDefaults(next))}
-          presets={Object.values(FACILITY_PRESETS)}
+          presets={MANUFACTURING_FACILITY_PRESETS}
           // Rig and owner-set tax only exist for a player structure.
           showRigAndTax={facilityPreset.structure}
           labels={{

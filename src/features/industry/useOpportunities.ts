@@ -26,7 +26,7 @@ import type { SkillLevels } from '@/engine/industry/types';
 import type { PiData } from '@/sde/types';
 import type { TradeHub } from '@/market/hubs';
 import type { CharacterBlueprint } from '@/esi/endpoints';
-import type { FacilityDefaults } from './facilityDefaults';
+import type { ActivityFacilityDefaults } from './facilityDefaults';
 import type { BlueprintCatalog } from './blueprintCatalog';
 import { loadMarketSnapshots } from './marketData';
 import { recipeForLookup } from './recipes';
@@ -52,7 +52,7 @@ export interface UseOpportunitiesArgs {
   catalog: BlueprintCatalog | null;
   pi: PiData | null;
   hub: TradeHub;
-  facilityDefaults: FacilityDefaults;
+  facilityDefaults: ActivityFacilityDefaults;
   skills: SkillLevels;
   ownedStockSnapshot: OwnedStockSnapshot;
   /** Every owned blueprint by character, so a sub-build the recursive engine prices quotes at a researched copy's real ME where the pilot owns one. */
