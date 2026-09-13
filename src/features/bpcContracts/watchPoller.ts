@@ -29,7 +29,7 @@ import type { BpcContractRow } from '@/engine/contracts/bpcSearch';
 import type { BpcSearchWatchRecord } from '@/db';
 import { listWatches, saveWatchState, watchToFilter } from './watches';
 import { loadPublicBpcContracts } from './syncedContracts';
-import { formatIsk } from '@/lib/isk';
+import { CONTRACT_ISK_CENTS_BELOW, formatIskAuto } from '@/lib/isk';
 import i18n from '@/i18n';
 
 export interface BpcWatchPollDependencies {
@@ -91,7 +91,11 @@ export async function runBpcWatchPoll(deps: BpcWatchPollDependencies): Promise<v
         fire.reason === 'new'
           ? 'notifications.fired.bpcSearchWatchMatch.bodyNew'
           : 'notifications.fired.bpcSearchWatchMatch.bodyCheaper',
-        { watch: watch.name, item: itemName, price: formatIsk(fire.price, 2) }
+        {
+          watch: watch.name,
+          item: itemName,
+          price: formatIskAuto(fire.price, CONTRACT_ISK_CENTS_BELOW),
+        }
       ),
       firedAt: now,
     });

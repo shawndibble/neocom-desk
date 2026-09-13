@@ -26,6 +26,7 @@ import { loadContractItems } from './contractItems';
 import { loadContractLocationName } from './contractLocationName';
 import { loadTypeNames } from './typeNames';
 import { loadContractMarketValue, type ContractMarketValue } from './contractMarketValue';
+import { ContractMarketValueRow } from '@/features/contracts/ContractMarketValueRow';
 import {
   CONTRACT_AVAILABILITY_KEY,
   CONTRACT_STATUS_KEY,
@@ -36,7 +37,7 @@ import { BuildPlanContextMenu } from '@/features/industry/BuildPlanContextMenu';
 import { useMarketHub } from '@/features/market/hub';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import { IssuerLink } from './IssuerLink';
-import { formatIsk } from '@/lib/isk';
+import { CONTRACT_ISK_CENTS_BELOW, formatIskAuto } from '@/lib/isk';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
 import type { Contract, ContractItem } from '@/esi/endpoints';
@@ -293,6 +294,7 @@ export function ContractDetailModal({
                   title={t('contracts.detailItemsIncluded')}
                   columns={itemColumns}
                   items={included}
+                  typeNames={items.typeNames}
                   marketValue={
                     contract.status === 'outstanding' ? marketValue?.included : undefined
                   }
@@ -304,6 +306,7 @@ export function ContractDetailModal({
                   title={t('contracts.detailItemsRequested')}
                   columns={itemColumns}
                   items={requested}
+                  typeNames={items.typeNames}
                   marketValue={
                     contract.status === 'outstanding' ? marketValue?.requested : undefined
                   }
@@ -331,12 +334,14 @@ function ItemSection({
   title,
   columns,
   items,
+  typeNames,
   marketValue,
   hubName,
 }: {
   title: string;
   columns: DataTableColumn<ContractItem>[];
   items: ContractItem[];
+  typeNames: ReadonlyMap<number, string>;
   marketValue: ContractMarketValue | null | undefined;
   hubName: string;
 }) {
@@ -354,10 +359,16 @@ function ItemSection({
           rowKey={(item) => item.record_id}
           density="compact"
           responsive="table"
-          rowContextMenu={(item, tr) => <BuildPlanContextMenu typeId={item.type_id} trigger={tr} />}
+          rowContextMenu={(item, tr) => (
+            <BuildPlanContextMenu
+              typeId={item.type_id}
+              itemName={typeNames.get(item.type_id)}
+              trigger={tr}
+            />
+          )}
         />
       </div>
-      {marketValue && <MarketValueRow value={marketValue} hubName={hubName} />}
+      {marketValue && <ContractMarketValueRow value={marketValue} hubName={hubName} />}
     </div>
   );
 }
@@ -373,29 +384,8 @@ function IskRow({ label, value }: { label: string; value: number }) {
   return (
     <div className="flex items-baseline justify-between gap-3 py-1.5">
       <span className="text-text-dim">{label}</span>
-      <span className="tabular-nums font-semibold">{formatIsk(value, 2)}</span>
-    </div>
-  );
-}
-
-/**
- * The market-value figure (issue #717): styled like `IskRow` — same neutral
- * color, for the same reason its doc comment gives — but for a fact this app
- * computed itself (a sell-order total at a Trade Hub) rather than one ESI
- * reported, so it gets its own row rather than reusing `IskRow` verbatim.
- */
-function MarketValueRow({ value, hubName }: { value: ContractMarketValue; hubName: string }) {
-  const { t } = useTranslation();
-  return (
-    <div className="flex items-baseline justify-between gap-3 border-t border-line py-1.5">
-      <span className="text-text-dim">{t('contracts.detailMarketValue', { hub: hubName })}</span>
       <span className="tabular-nums font-semibold">
-        {formatIsk(value.total, 2)}
-        {value.unpriced > 0 && (
-          <span className="ml-1.5 font-normal text-text-dim">
-            {t('contracts.detailMarketValueUnpriced', { count: value.unpriced })}
-          </span>
-        )}
+        {formatIskAuto(value, CONTRACT_ISK_CENTS_BELOW)}
       </span>
     </div>
   );

@@ -15,7 +15,6 @@
 import { buildAppraisal, type AppraisalItem } from '@/engine/market/appraisal';
 import { getHubPrices } from '@/market/prices';
 import type { TradeHub } from '@/market/hubs';
-import type { ContractItem } from '@/esi/endpoints';
 
 export interface ContractMarketValue {
   /** Summed sell value at 100% of market, over lines that priced. */
@@ -24,9 +23,20 @@ export interface ContractMarketValue {
   unpriced: number;
 }
 
+/**
+ * The two fields the arithmetic needs, structurally — not `ContractItem`
+ * itself. A public contract's lines (`PublicContractItem`, and the merged
+ * lines a detail modal renders) carry the same two under the same names but
+ * are a different type, and a bundle is worth the same ISK either way.
+ */
+export interface PricedContractLine {
+  type_id: number;
+  quantity: number;
+}
+
 export async function loadContractMarketValue(
   hub: TradeHub,
-  items: readonly ContractItem[],
+  items: readonly PricedContractLine[],
   typeNames: ReadonlyMap<number, string>
 ): Promise<ContractMarketValue> {
   const prices = await getHubPrices(

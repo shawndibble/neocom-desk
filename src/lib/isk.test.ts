@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { formatIsk, formatIskAuto, formatIskCompact, parseIskAmount } from './isk';
+import {
+  CONTRACT_ISK_CENTS_BELOW,
+  formatIsk,
+  formatIskAuto,
+  formatIskCompact,
+  parseIskAmount,
+} from './isk';
 
 describe('formatIsk', () => {
   describe('default (0 decimals — Industry/Market Browser)', () => {
@@ -52,6 +58,12 @@ describe('formatIskAuto', () => {
   it('applies the same 100 ISK threshold to a negative amount by magnitude', () => {
     expect(formatIskAuto(-100.01)).toBe('-100');
     expect(formatIskAuto(-4.99)).toBe('-4.99');
+  });
+
+  it('takes a caller-chosen threshold, which the contract screens raise to 1,000', () => {
+    expect(formatIskAuto(5_000_000_000, CONTRACT_ISK_CENTS_BELOW)).toBe('5,000,000,000');
+    expect(formatIskAuto(1_000, CONTRACT_ISK_CENTS_BELOW)).toBe('1,000.00');
+    expect(formatIskAuto(4.99, CONTRACT_ISK_CENTS_BELOW)).toBe('4.99');
   });
 });
 

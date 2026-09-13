@@ -130,7 +130,7 @@ describe('ContractDetailModal', () => {
     expect(screen.getByRole('dialog', { name: 'Item Exchange' })).toBeInTheDocument();
     expect(screen.getByText('Finished (Contractor)')).toBeInTheDocument();
     expect(screen.getByText('Mero Otichoda')).toBeInTheDocument();
-    expect(screen.getByText('18,205,203.00')).toBeInTheDocument();
+    expect(screen.getByText('18,205,203')).toBeInTheDocument();
   });
 
   it('resolves the location name once the station lookup returns', async () => {
@@ -215,8 +215,8 @@ describe('ContractDetailModal', () => {
       issuerName: 'Mero Otichoda',
       onClose: () => {},
     });
-    expect(screen.getByText('500,000.00')).toBeInTheDocument();
-    expect(screen.getByText('1,000,000.00')).toBeInTheDocument();
+    expect(screen.getByText('500,000')).toBeInTheDocument();
+    expect(screen.getByText('1,000,000')).toBeInTheDocument();
     expect(screen.getByText('3')).toBeInTheDocument();
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
   });
@@ -300,7 +300,7 @@ describe('ContractDetailModal', () => {
       });
 
       expect(await screen.findByText('Market value at Jita (sell orders)')).toBeInTheDocument();
-      expect(screen.getByText('4,092.00')).toBeInTheDocument(); // 744 * 5.5
+      expect(screen.getByText('4,092')).toBeInTheDocument(); // 744 * 5.5
       expect(screen.queryByText(/unpriced/)).not.toBeInTheDocument();
     });
 
@@ -324,7 +324,7 @@ describe('ContractDetailModal', () => {
       });
 
       expect(await screen.findByText('Market value at Jita (sell orders)')).toBeInTheDocument();
-      expect(screen.getByText('4,092.00')).toBeInTheDocument(); // 744 * 5.5
+      expect(screen.getByText('4,092')).toBeInTheDocument(); // 744 * 5.5
     });
 
     it('flags unpriced lines instead of treating them as free, and leaves them out of the total', async () => {
