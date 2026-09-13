@@ -345,6 +345,16 @@ here — they go one per file in `docs/context/decisions/`.
   scarce thing. A haul stating no volume has no ISK/m³ at all — never an
   infinite one — since a stated `0` survives ingestion and reaches the client
   as a real row.
+- **Reverse Lane**: The way home from a public courier haul — the same region
+  pair, run backwards (issue #941). Shown on the haul detail as a count that is
+  also the link: activating it closes the detail and re-runs the Courier board
+  with the two region filters swapped, every other filter left alone. Paired
+  region to region rather than station to station, which is coarse on purpose:
+  at a corpus of a few hundred contracts for all of New Eden, station-level
+  pairing would be almost always empty, so this reads as a prompt to go look
+  rather than as a matched return trip. A haul with an end nothing local places
+  has **no lane to look up** — stated as such, never as a count of zero, which
+  would read as "nobody is hauling back" where the truth is "we cannot tell".
 - **Route Preference**: Which trip a distance describes — prefer highsec,
   shortest, or avoid highsec, the three the local jump graph supports
   (`engine/route/jumpRoute.ts`, issue #942). A reader's choice rather than a

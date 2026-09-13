@@ -47,7 +47,9 @@ import { localJumpCountsForRoutes } from '@/features/route/localRoute';
 import {
   CourierContractDetailModal,
   type CourierJumps,
+  type ReverseLane,
 } from '@/features/contractSearch/CourierContractDetailModal';
+import { reverseLaneMatches } from '@/engine/contracts/courierReverseLane';
 import { endpointSystemName } from '@/features/contractSearch/courierEndpointNames';
 import { loadCharacterRegionId } from '@/features/contractSearch/characterRegion';
 import { formatIskAuto } from '@/lib/isk';
@@ -838,9 +840,43 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
     return ranked.sort((a, b) => rate(b) - rate(a));
   }, [ratedRows, jumps, jumpsByContract]);
 
+  /**
+   * The open haul's return leg (issue #941), measured over the whole corpus
+   * with the board's own filter and its two regions swapped.
+   *
+   * Deliberately *not* run through `ratedRows`' over-rate narrowing. That stage
+   * needs the jump counts, so the figure would render high mid-load and then
+   * drop while the reader looked at it — the same moving target the expiry
+   * countdown in the modal is pinned to avoid. Both stages here are pure and
+   * distance-free, so this figure is settled the moment the modal opens.
+   */
+  const reverseLane = useMemo<ReverseLane>(() => {
+    if (selectedRow === null) return { kind: 'unresolved' };
+    const lane = reverseLaneMatches(selectedRow, rows, filter);
+    if (lane === null) return { kind: 'unresolved' };
+    const matched = uiFilter.hideUncompletable
+      ? completableCourierRoutes(lane.matches)
+      : lane.matches;
+    return { kind: 'counted', count: matched.length, unplaceable: lane.unplaceable.length };
+  }, [selectedRow, rows, filter, uiFilter.hideUncompletable]);
+
   function changeFilter(next: CourierUiFilter) {
     setUiFilter(next);
     setShowAll(false);
+  }
+
+  /**
+   * Go look at the way home: the same board, with only the two region fields
+   * swapped. Through `changeFilter` rather than `setUiFilter`, so the row cap
+   * resets the way it does for every other filter change.
+   */
+  function searchReverseLane(row: CourierRouteRow) {
+    setSelectedRow(null);
+    changeFilter({
+      ...uiFilter,
+      originRegionId: row.destination.regionId,
+      destinationRegionId: row.origin.regionId,
+    });
   }
 
   function changePreference(next: RoutePreferenceKind) {
@@ -1085,6 +1121,8 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
           }
           goingRateMultiple={multipleFor(selectedRow)}
           preference={preference}
+          reverseLane={reverseLane}
+          onSearchReverseLane={() => searchReverseLane(selectedRow)}
           onClose={() => setSelectedRow(null)}
         />
       )}

@@ -56,6 +56,22 @@ import { MARKED_RISKS, RISK_COPY } from '@/features/contractSearch/courierRiskLa
  */
 export type CourierJumps = { kind: 'pending' } | { kind: 'known'; count: number | null };
 
+/**
+ * What the board found running this haul's lane backwards (issue #941).
+ *
+ * `unresolved` is a haul with an end nothing local places, which has no region
+ * to swap and therefore no lane to look up. It is a separate state rather than
+ * a count of zero on purpose: zero reads as "nobody is hauling back", and the
+ * truth here is "we cannot tell".
+ *
+ * `unplaceable` is the return hauls leaving the right region whose own drop-off
+ * cannot be placed, so the lane cannot be measured for them either. They are
+ * missing from `count` by construction; saying how many keeps a small count
+ * from reading as a complete one.
+ */
+export type ReverseLane =
+  { kind: 'unresolved' } | { kind: 'counted'; count: number; unplaceable: number };
+
 export interface CourierContractDetailModalProps {
   row: CourierRouteRow;
   regionNames: ReadonlyMap<number, string>;
@@ -65,6 +81,10 @@ export interface CourierContractDetailModalProps {
   goingRateMultiple: number | null;
   /** Which route the board is measuring, so the exposure below counts the same one. */
   preference: RoutePreferenceKind;
+  /** The return leg, resolved by the board — it holds the corpus and the filter. */
+  reverseLane: ReverseLane;
+  /** Swap the two region filters and go look, closing this. */
+  onSearchReverseLane: () => void;
   onClose: () => void;
 }
 
@@ -139,6 +159,8 @@ export function CourierContractDetailModal({
   jumps,
   goingRateMultiple,
   preference,
+  reverseLane,
+  onSearchReverseLane,
   onClose,
 }: CourierContractDetailModalProps) {
   const { t } = useTranslation();
@@ -158,6 +180,13 @@ export function CourierContractDetailModal({
     ? [...endpointRisks, 'over-rate']
     : endpointRisks;
   const exposure = useRouteExposure(row, preference);
+  // Where the return hauls set out from, which is this haul's drop-off region —
+  // named only to say how many of them could not be placed, so an unnamed
+  // region falls back to its id rather than suppressing the note.
+  const returnRegionName =
+    row.destination.regionId === null
+      ? ''
+      : (regionNames.get(row.destination.regionId) ?? `#${row.destination.regionId}`);
   const measuring = jumps.kind === 'pending';
   const floor = measuring ? null : communityFloorReward(collateral, jumpCount);
   // Pinned to when the detail opened rather than read each render: a figure
@@ -272,6 +301,44 @@ export function CourierContractDetailModal({
             </span>
             <span className="text-sm">{endpointName(row.destination)}</span>
             <span className="text-[0.6875rem] text-text-dim">{place(row.destination)}</span>
+          </div>
+
+          {/*
+            The way home, as one line rather than a nested table. At this corpus
+            size — every public courier contract in New Eden, under 620 rows —
+            the reverse set for a given region pair is typically none or one, so
+            a table would exist to render "none" most of the time, and would owe
+            a row cap, an empty state and a second unresolved-endpoint note for
+            the privilege. A count that is also the link needs none of that.
+
+            Region to region, which is coarse: "somewhere in Domain" is not
+            necessarily near where this load is dropped. It is a prompt to go
+            look, not a matched return trip.
+          */}
+          <div className="flex flex-col gap-0.5 border-t border-line pt-2 text-[0.6875rem]">
+            {reverseLane.kind === 'unresolved' ? (
+              <span className="text-text-dim">{t('contractSearch.reverseLaneUnresolved')}</span>
+            ) : reverseLane.count === 0 ? (
+              // Plain text, never a button: a control that leads to an empty
+              // board is a dead link whether or not it is disabled.
+              <span className="text-text-dim">{t('contractSearch.reverseLaneNone')}</span>
+            ) : (
+              <button
+                type="button"
+                onClick={onSearchReverseLane}
+                className="self-start text-accent underline"
+              >
+                {t('contractSearch.reverseLaneCount', { count: reverseLane.count })}
+              </button>
+            )}
+            {reverseLane.kind === 'counted' && reverseLane.unplaceable > 0 && (
+              <span className="text-text-dim">
+                {t('contractSearch.reverseLaneUnplaceable', {
+                  count: reverseLane.unplaceable,
+                  region: returnRegionName,
+                })}
+              </span>
+            )}
           </div>
         </section>
 
