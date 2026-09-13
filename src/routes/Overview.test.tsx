@@ -626,7 +626,9 @@ describe('Overview board', () => {
     expect(nav.getByRole('link', { name: 'Alerts' })).toHaveAttribute('href', '/alerts');
 
     await seedFeed([feedEntry({ id: 'a', eventId: 'newMail', title: 'New mail' })]);
-    expect(await screen.findByRole('link', { name: /alerts, 1 waiting/i })).toBeInTheDocument();
+    // Scoped to the rail: the phone's tab bar carries the same entry, and the
+    // shell renders both on every route (one is merely `hidden`).
+    expect(await nav.findByRole('link', { name: /alerts, 1 waiting/i })).toBeInTheDocument();
   });
 });
 
