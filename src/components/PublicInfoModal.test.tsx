@@ -237,4 +237,64 @@ describe('PublicInfoModal', () => {
 
     expect(corpCalls).toBe(1);
   });
+  it("links each tab out to that entity's own zKillboard page", async () => {
+    mockCharacter(95, {
+      name: 'Killboard Pilot',
+      corporation_id: 7,
+      alliance_id: 700,
+      birthday: '2020-01-01T00:00:00Z',
+      bloodline_id: 1,
+      gender: 'male',
+      race_id: 1,
+    });
+    mockCorporation(7, {
+      name: 'Killboard Corp',
+      ticker: 'KBC',
+      alliance_id: 700,
+      ceo_id: 102,
+      creator_id: 102,
+      member_count: 3,
+      tax_rate: 0,
+    });
+    mockAlliance(700, {
+      name: 'Killboard Alliance',
+      ticker: 'KBA',
+      creator_id: 102,
+      creator_corporation_id: 7,
+      executor_corporation_id: 7,
+      date_founded: '2020-01-01T00:00:00Z',
+    });
+    mockNames([{ id: 102, name: 'Killboard CEO' }]);
+
+    render(<PublicInfoModal />);
+    act(() => usePublicInfoModalStore.getState().open('character', 95));
+
+    const dialog = await screen.findByRole('dialog');
+    expect(await within(dialog).findByRole('link', { name: 'zKillboard' })).toHaveAttribute(
+      'href',
+      'https://zkillboard.com/character/95/'
+    );
+
+    await waitFor(() =>
+      expect(within(dialog).getByRole('tab', { name: 'Corporation' })).toBeInTheDocument()
+    );
+    within(dialog).getByRole('tab', { name: 'Corporation' }).click();
+    await waitFor(() =>
+      expect(within(dialog).getByRole('link', { name: 'zKillboard' })).toHaveAttribute(
+        'href',
+        'https://zkillboard.com/corporation/7/'
+      )
+    );
+
+    await waitFor(() =>
+      expect(within(dialog).getByRole('tab', { name: 'Alliance' })).toBeInTheDocument()
+    );
+    within(dialog).getByRole('tab', { name: 'Alliance' }).click();
+    await waitFor(() =>
+      expect(within(dialog).getByRole('link', { name: 'zKillboard' })).toHaveAttribute(
+        'href',
+        'https://zkillboard.com/alliance/700/'
+      )
+    );
+  });
 });

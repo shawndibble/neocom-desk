@@ -26,6 +26,7 @@ import {
   type PublicCorporationInfo,
 } from '@/features/character/publicInfoData';
 import { allianceLogoUrl, characterPortraitUrl, corporationLogoUrl } from '@/lib/eveImages';
+import { allianceZkillUrl, characterZkillUrl, corporationZkillUrl } from '@/lib/zkillboard';
 import { usePublicInfoModalStore, type PublicInfoKind } from '@/stores/publicInfoModal';
 
 type TabState<T> =
@@ -137,6 +138,29 @@ export function PublicInfoModal() {
   );
 }
 
+/**
+ * Kills and losses are not in ESI's public-info endpoints, so each tab links
+ * out to that entity's own zKillboard page rather than showing them inline.
+ */
+function ZkillRow({ href }: { href: string }) {
+  const { t } = useTranslation();
+  return (
+    <>
+      <dt className="text-text-dim uppercase">{t('publicInfo.killboard')}</dt>
+      <dd>
+        <a
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-accent hover:underline"
+        >
+          {t('publicInfo.zkillboard')}
+        </a>
+      </dd>
+    </>
+  );
+}
+
 function TabStatus({ status }: { status: 'loading' | 'error' }) {
   const { t } = useTranslation();
   if (status === 'loading') {
@@ -211,6 +235,8 @@ function CharacterTab({
             </dd>
           </>
         )}
+
+        <ZkillRow href={characterZkillUrl(data.character_id)} />
       </dl>
     </div>
   );
@@ -263,6 +289,8 @@ function CorporationTab({
             </dd>
           </>
         )}
+
+        <ZkillRow href={corporationZkillUrl(data.corporation_id)} />
       </dl>
     </div>
   );
@@ -285,6 +313,8 @@ function AllianceTab({ state }: { state: TabState<PublicAllianceInfo> }) {
       <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
         <dt className="text-text-dim uppercase">{t('publicInfo.ticker')}</dt>
         <dd>{data.ticker}</dd>
+
+        <ZkillRow href={allianceZkillUrl(data.alliance_id)} />
       </dl>
     </div>
   );

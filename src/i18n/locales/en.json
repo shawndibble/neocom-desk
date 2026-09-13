@@ -3638,7 +3638,9 @@
     "alliance": "Alliance",
     "ticker": "Ticker",
     "memberCount": "Members",
-    "ceo": "CEO"
+    "ceo": "CEO",
+    "killboard": "Killboard",
+    "zkillboard": "zKillboard"
   },
   "filters": {
     "title": "Filters",
