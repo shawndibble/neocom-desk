@@ -69,4 +69,25 @@ describe('securityStatusColor', () => {
   it('clamps below -1.0 to the same color as -1.0', () => {
     expect(securityStatusColor(-2.0)).toBe(securityStatusColor(-1.0));
   });
+
+  /**
+   * The badge that carries this color prints `security.toFixed(1)` beside it,
+   * so a raw 0.4730616 reads "0.5" in amber — a highsec system wearing the
+   * lowsec color. Ainsan and Balle really are highsec in game; the boundary
+   * belongs to `securityBand`, which rounds the way the game does. Only the
+   * branch moves: the gradient inside each band still interpolates the raw
+   * value, so neighbouring systems stay visually distinct.
+   */
+  it('colors on the rounded boundary, matching the number rendered beside it', () => {
+    expect(securityStatusColor(0.4730616509914398)).toBe('#5fd584'); // Ainsan, shown as 0.5
+    expect(securityStatusColor(0.4608891010284424)).toBe('#5fd584'); // Balle, shown as 0.5
+    // Talidal (0.5097) already passed; it must not collapse onto the floor's
+    // color — the gradient still interpolates the raw value inside the band.
+    expect(securityStatusColor(0.509783148765564)).not.toBe(securityStatusColor(0.5));
+  });
+
+  it('leaves a system that really is lowsec on the warning side of the boundary', () => {
+    expect(securityStatusColor(0.4499)).not.toBe('#5fd584'); // shown as 0.4
+    expect(securityStatusColor(0.2825556993484497)).not.toBe('#5fd584'); // Tama 0.3
+  });
 });
