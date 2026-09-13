@@ -34,4 +34,34 @@ describe('FilterChip', () => {
     await userEvent.click(chip);
     expect(onToggle).not.toHaveBeenCalled();
   });
+
+  it('describes the chip with the tooltip on hover, leaving the label as its name', async () => {
+    render(
+      <FilterChip
+        label="Hide risky routes"
+        tooltip="Hides hauls that could strand the cargo."
+        selected={false}
+        onToggle={() => undefined}
+      />
+    );
+    const chip = screen.getByRole('button', { name: 'Hide risky routes' });
+    await userEvent.hover(chip);
+    // Described, not renamed: the visible label has to survive in the
+    // accessible name (WCAG 2.5.3), so the bubble arrives as a description.
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(
+      'Hides hauls that could strand the cargo.'
+    );
+    expect(screen.getByRole('button', { name: 'Hide risky routes' })).toHaveAccessibleDescription(
+      'Hides hauls that could strand the cargo.'
+    );
+  });
+
+  it('still toggles when it carries a tooltip', async () => {
+    const onToggle = vi.fn();
+    render(
+      <FilterChip label="Ships" tooltip="Only ship hulls." selected={false} onToggle={onToggle} />
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Ships' }));
+    expect(onToggle).toHaveBeenCalledTimes(1);
+  });
 });

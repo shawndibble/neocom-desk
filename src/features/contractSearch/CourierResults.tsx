@@ -536,7 +536,8 @@ function CourierFilterBar({
             One control, not a per-flag set: a hauler either wants the jobs they
             may not be able to deliver out of the way or they do not. What it
             hides — and what it deliberately does not — is `blocksCompletion`'s
-            to decide.
+            to decide, which is more than the label has room to say: hence the
+            tooltip, which states both halves and the nullsec exclusion.
           */}
           <FilterField label={t('contractSearch.overRateLabel')}>
             <Select
@@ -557,6 +558,7 @@ function CourierFilterBar({
           </FilterField>
           <FilterChip
             label={t('contractSearch.hideUncompletableLabel')}
+            tooltip={t('contractSearch.hideUncompletableTooltip')}
             selected={draft.hideUncompletable}
             onToggle={() => setDraft({ ...draft, hideUncompletable: !draft.hideUncompletable })}
           />

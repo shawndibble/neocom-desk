@@ -1,5 +1,6 @@
 import { cx } from '@/lib/cx';
 import { controlHeightClassName, type ControlSize } from './controlStyles';
+import { Tooltip } from './Tooltip';
 
 interface FilterChipProps {
   /** Already-translated label. */
@@ -31,10 +32,22 @@ interface FilterChipProps {
   /**
    * Inert and muted, same as a disabled `Button` — for a toggle whose
    * capability isn't available right now (e.g. Corp Assets without the
-   * Director role) rather than one that is merely off. Pair with a tooltip on
-   * the caller's side explaining why; this component only renders the state.
+   * Director role) rather than one that is merely off. Pair with `tooltip`
+   * explaining why; this component only renders the state.
    */
   disabled?: boolean;
+  /**
+   * Plain-language explanation of what the filter does, revealed on hover or
+   * focus. For a chip whose label cannot state its whole rule — which rows it
+   * removes, or which ones it deliberately leaves.
+   *
+   * A description, never a name: Radix wires it as `aria-describedby`, so the
+   * visible label still is the accessible name (WCAG 2.5.3). Rendered here
+   * rather than by the caller because the trigger Radix needs is this
+   * component's own `<button>` — `FilterChip` forwards neither ref nor props,
+   * so a caller-side `Tooltip` would have nothing to attach to.
+   */
+  tooltip?: string;
 }
 
 /**
@@ -52,9 +65,10 @@ export function FilterChip({
   className = '',
   size = 'sm',
   disabled = false,
+  tooltip,
 }: FilterChipProps) {
   const hasGloss = countLabel !== undefined;
-  return (
+  const chip = (
     <button
       type="button"
       aria-pressed={selected}
@@ -88,4 +102,9 @@ export function FilterChip({
       )}
     </button>
   );
+
+  // No `openOnTap`: the tap toggles the filter, so it belongs to that action
+  // and touch-and-hold stays the way to read the bubble (docs/DESIGN.md §
+  // `Tooltip`).
+  return tooltip ? <Tooltip content={tooltip}>{chip}</Tooltip> : chip;
 }
