@@ -146,7 +146,9 @@ describe('Skills', () => {
     expect(screen.getByRole('tooltip')).toHaveTextContent('Pilots a Frigate-class starship.');
 
     // ESI perception 22 already includes the +3 implant: base 19 + 3 = 22.
-    expect(await screen.findByText('19 + 3 = 22')).toBeInTheDocument();
+    // The chip shows the total; the terms are what its hover reveals.
+    expect(await screen.findByText('22')).toBeInTheDocument();
+    expect(screen.getByLabelText('19 base + 3 implant = 22')).toBeInTheDocument();
     // Unbonused attributes show the base value plainly.
     expect(screen.getByText('20')).toBeInTheDocument(); // intelligence, no bonus
   });
@@ -177,7 +179,7 @@ describe('Skills', () => {
 
     expect(await screen.findByText('Ocular Filter - Basic')).toBeInTheDocument();
     expect(screen.queryByText('#9899')).not.toBeInTheDocument();
-    expect(await screen.findByText('19 + 3 = 22')).toBeInTheDocument();
+    expect(await screen.findByLabelText('19 base + 3 implant = 22')).toBeInTheDocument();
   });
 
   it('counts only attribute-enhancer implants toward "N of 5 slots empty", not skill hardwirings (#405)', async () => {
@@ -231,11 +233,14 @@ describe('Skills', () => {
 
     render(<App />);
 
-    // Perception: base 20 + implant 3 + booster 4 = effective 27.
-    expect(await screen.findByText('20 + 3 implant + 4 booster = 27')).toBeInTheDocument();
-    // Intelligence, memory, willpower: no implant, only the booster — same
-    // two-term form as an implant-only bonus, applied uniformly.
-    expect(screen.getAllByText('20 + 4 = 24')).toHaveLength(3);
+    // Perception: base 20 + implant 3 + booster 4 = effective 27. The chip
+    // shows the total; the terms are the label the hover reveals.
+    expect(
+      await screen.findByLabelText('20 base + 3 implant + 4 booster = 27')
+    ).toBeInTheDocument();
+    // Intelligence, memory, willpower: no implant, so the booster is named on
+    // its own — applied uniformly.
+    expect(screen.getAllByLabelText('20 base + 4 booster = 24')).toHaveLength(3);
   });
 
   it('shows the level from a finished queue entry that /skills has not caught up to', async () => {

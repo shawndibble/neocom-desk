@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { StatChip } from '@/components/ui';
+import { StatChip, Tooltip } from '@/components/ui';
 import { cx } from '@/lib/cx';
 import type { CharacterAttributes } from '@/esi/endpoints';
 import type { Implants } from '@/engine/types';
@@ -36,8 +36,14 @@ interface AttributeChipsProps {
  * The five character attributes as chips. Shared by the trained view, the
  * plan list's side pane and the plan editor's tools pane so the base/effective
  * arithmetic lives in one place — ESI reports the *effective* value, so the
- * base is what's left once the implant bonus comes off, and only the bonus
- * case spells all three out.
+ * base is what's left once the implant bonus comes off.
+ *
+ * The chip shows the effective total and nothing else: that total is the
+ * number every training estimate is costed against, and five chips each
+ * spelling out "21 base + 4 implant + 4 booster = 29" made a strip of sums to
+ * read rather than a sheet to scan. The terms are one hover, focus or tap
+ * away instead, on the total itself — the same treatment `IskAmount` gives a
+ * rounded figure, for the same reason.
  *
  * `null` attributes render as unknown rather than as a plausible-looking
  * sheet: a character's attributes are the input every training estimate is
@@ -57,27 +63,38 @@ export function AttributeChips({
           const effective = attributes[name];
           const implant = implantBonuses[name] ?? 0;
           const base = effective - implant - boosterBonus;
-          let value: number | string = base;
+          const terms = { base, implant, booster: boosterBonus, effective };
+          let breakdown: string | null = null;
           if (implant && boosterBonus) {
-            value = t('skills.attributeEffectiveBoth', {
-              base,
-              implant,
-              booster: boosterBonus,
-              effective,
-            });
-          } else if (implant || boosterBonus) {
-            value = t('skills.attributeEffective', {
-              base,
-              bonus: implant || boosterBonus,
-              effective,
-            });
+            breakdown = t('skills.attributeBreakdownBoth', terms);
+          } else if (implant) {
+            breakdown = t('skills.attributeBreakdownImplant', terms);
+          } else if (boosterBonus) {
+            breakdown = t('skills.attributeBreakdownBooster', terms);
           }
           return (
             <StatChip
               key={name}
               label={t(`skills.attr.${name}`)}
-              value={value}
-              tone={implant || boosterBonus ? 'accent' : 'default'}
+              // No bonus means base and effective are the same number, so a
+              // bubble reading "20 base = 20" would be a hover that says
+              // nothing. The bare total stays bare.
+              value={
+                breakdown ? (
+                  <Tooltip content={breakdown} openOnTap>
+                    <span
+                      tabIndex={0}
+                      aria-label={breakdown}
+                      className="cursor-help rounded-xs underline decoration-dotted underline-offset-2 focus-visible:outline-2 focus-visible:outline-accent"
+                    >
+                      <span aria-hidden="true">{effective}</span>
+                    </span>
+                  </Tooltip>
+                ) : (
+                  effective
+                )
+              }
+              tone={breakdown ? 'accent' : 'default'}
             />
           );
         })
