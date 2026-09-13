@@ -817,26 +817,28 @@ export const db = new Dexie('neocom') as Dexie & {
 };
 
 /**
- * A blocked upgrade is the one Dexie failure with no error path at all: the
- * underlying `indexedDB.open` stays pending (dexie fires this event from
- * `req.onblocked` and never rejects), so every gate waiting on a read sits on
- * `BootScreen` indefinitely — the "stuck on the loading screen until I
- * reinstall" report.
+ * A blocked upgrade is the one Dexie failure with no error path of its own:
+ * `req.onblocked` fires this event but never rejects the open, so every read
+ * waiting on it stays pending and the app sits on a spinner with nothing
+ * thrown and nothing reported.
  *
- * Dexie's own default handler already `console.warn`s, and the *other*
- * connection's default `versionchange` handler already closes it, so this adds
- * no behaviour — nothing here should try to close or reopen anything. What is
- * missing is visibility: a console warning on a phone is unreadable, and this
- * is exactly the case that produces no Sentry event on its own. Reported via
- * `blockedSignal.ts` rather than a Sentry call here — `src/db` ships inside the
- * service-worker bundle, which must not carry the React SDK.
+ * Closing converts it into an ordinary failure. `close()` cancels an in-flight
+ * open with `DatabaseClosed`, `useLiveQuery` rethrows that during render, and
+ * `ErrorBoundary` already turns a Dexie failure into a recoverable screen with
+ * a Reload — the path every one of the 40-plus live queries is behind, rather
+ * than only the three gates that render `BootScreen`. One-way by design
+ * (`close()` latches `autoOpen: false`), which is why it is tied to this event
+ * and not to a timer: a blocked upgrade will not clear itself, but a slow cold
+ * start would recover on its own and must never be cut off.
  *
- * The usual blocker is the previous service-worker bundle: it declares an
- * older schema here, a push wakes it, and `recordFeedEntry` reopens `neocom`
- * at that version. `app/bootRecovery.ts` is the user-facing way out.
+ * The signal fires first — `DatabaseClosed` carries no version numbers, so
+ * reporting after the close would lose the diagnosis. It is a signal rather
+ * than a Sentry call because `src/db` ships inside the service-worker bundle,
+ * which must not carry the React SDK.
  */
 db.on('blocked', (event) => {
   emitUpgradeBlocked({ oldVersion: event.oldVersion, newVersion: event.newVersion });
+  db.close();
 });
 
 db.version(1).stores({

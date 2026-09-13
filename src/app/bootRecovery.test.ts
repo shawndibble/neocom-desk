@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { recoverFromStalledBoot, type BootRecoveryEnv } from './bootRecovery';
 
-function env(overrides: Partial<BootRecoveryEnv> = {}) {
+function makeEnv(overrides: Partial<BootRecoveryEnv> = {}) {
   return {
     getRegistration: vi.fn().mockResolvedValue(undefined),
     reload: vi.fn(),
@@ -11,27 +11,32 @@ function env(overrides: Partial<BootRecoveryEnv> = {}) {
 }
 
 describe('recoverFromStalledBoot', () => {
-  it('retires a waiting service worker before reloading', async () => {
+  it('promotes a waiting worker before reloading', async () => {
     const waiting = { postMessage: vi.fn() };
-    const it_ = env({ getRegistration: vi.fn().mockResolvedValue({ waiting }) });
-    await recoverFromStalledBoot(it_);
-    // The old bundle is what holds the previous schema version open; it has to
-    // go before the reload, or the next boot blocks on it again.
+    const env = makeEnv({ getRegistration: vi.fn().mockResolvedValue({ waiting }) });
+    await recoverFromStalledBoot(env);
     expect(waiting.postMessage).toHaveBeenCalledWith({ type: 'SKIP_WAITING' });
-    expect(it_.reload).toHaveBeenCalledOnce();
+    expect(env.reload).toHaveBeenCalledOnce();
   });
 
-  it('reloads when there is no waiting worker', async () => {
-    const it_ = env({ getRegistration: vi.fn().mockResolvedValue({ waiting: null }) });
-    await recoverFromStalledBoot(it_);
-    expect(it_.wait).not.toHaveBeenCalled();
-    expect(it_.reload).toHaveBeenCalledOnce();
+  it('reloads when no update is waiting', async () => {
+    const env = makeEnv({ getRegistration: vi.fn().mockResolvedValue({ waiting: null }) });
+    await recoverFromStalledBoot(env);
+    expect(env.wait).toHaveBeenCalledTimes(1); // the lookup bound only
+    expect(env.reload).toHaveBeenCalledOnce();
   });
 
   it('reloads even when the registration lookup throws', async () => {
-    const it_ = env({ getRegistration: vi.fn().mockRejectedValue(new Error('no sw')) });
-    await recoverFromStalledBoot(it_);
-    // The reload is the whole point; nothing above it may prevent it.
-    expect(it_.reload).toHaveBeenCalledOnce();
+    const env = makeEnv({ getRegistration: vi.fn().mockRejectedValue(new Error('no sw')) });
+    await recoverFromStalledBoot(env);
+    expect(env.reload).toHaveBeenCalledOnce();
+  });
+
+  it('reloads even when the registration lookup never settles', async () => {
+    // The hang bootRecovery.ts exists to escape; an unbounded await here
+    // would leave the button inert.
+    const env = makeEnv({ getRegistration: vi.fn().mockReturnValue(new Promise(() => {})) });
+    await recoverFromStalledBoot(env);
+    expect(env.reload).toHaveBeenCalledOnce();
   });
 });

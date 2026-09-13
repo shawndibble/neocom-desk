@@ -1,35 +1,40 @@
+import { getServiceWorkerRegistration } from '@/lib/serviceWorker';
+
 /**
  * Escape hatch for a boot that never finishes.
  *
- * `BootScreen`'s gates wait on local Dexie reads, and an IndexedDB `open` that
- * is *blocked* never settles: `req.onblocked` only fires an event, it does not
- * reject (dexie 4 `tryOpenDB`). So the read stays pending, nothing throws into
- * render, `ErrorBoundary` never fires, and the spinner is permanent — the
- * shape users hit as "reinstall the Android app to fix it".
+ * `db.on('blocked')` (src/db/index.ts) turns the common cause — a blocked
+ * upgrade — into a real error that `ErrorBoundary` handles. This covers what
+ * that cannot: a boot still unresolved with no `blocked` event to close on.
  *
- * The likely holder of the old schema version is the previous service-worker
- * bundle: `registerType: 'prompt'` keeps it in control until `ReloadPrompt`
- * retires it, a push wakes it, and `recordFeedEntry` reopens `neocom` at the
- * version *that* bundle declares. Messaging the waiting worker first is what
- * retires it, so the reload lands on a build whose schema matches. A plain
- * reload usually wins the race on its own, so every step here is best-effort:
- * the reload is what must always happen.
+ * Promoting a waiting worker is worth a try first. Under `registerType:
+ * 'prompt'` the *waiting* worker is the new bundle and the old one is active,
+ * so promoting it is what evicts an active worker still holding an older
+ * schema version. With no update waiting there is nothing to promote and this
+ * is a plain reload, which often suffices on its own.
+ *
+ * A reload is not a guaranteed cure — a blocker that outlives it (another tab,
+ * a push waking the worker) re-enters the same state. The guarantee is only
+ * that the user is never left with no action at all.
+ *
+ * Every await is bounded. An unbounded one would reproduce the exact failure
+ * this exists to escape, and `try`/`catch` would not catch it: a promise that
+ * never settles is not a rejection.
  */
-const SKIP_WAITING_TIMEOUT_MS = 2000;
+
+/** Bounds each step: the lookup, then the promoted worker's claim. */
+const RECOVERY_STEP_TIMEOUT_MS = 2000;
 
 export interface BootRecoveryEnv {
   getRegistration: () => Promise<ServiceWorkerRegistration | undefined>;
   reload: () => void;
-  /** Injected so the test does not wait on a real timer. */
+  /** Bounds the awaits above, and lets the test drive them without real time. */
   wait: (ms: number) => Promise<void>;
 }
 
 export function defaultBootRecoveryEnv(): BootRecoveryEnv {
   return {
-    getRegistration: () =>
-      typeof navigator === 'undefined' || !navigator.serviceWorker
-        ? Promise.resolve(undefined)
-        : navigator.serviceWorker.getRegistration(),
+    getRegistration: getServiceWorkerRegistration,
     reload: () => window.location.reload(),
     wait: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
   };
@@ -39,11 +44,14 @@ export async function recoverFromStalledBoot(
   env: BootRecoveryEnv = defaultBootRecoveryEnv()
 ): Promise<void> {
   try {
-    const registration = await env.getRegistration();
+    const registration = await Promise.race([
+      env.getRegistration(),
+      env.wait(RECOVERY_STEP_TIMEOUT_MS).then(() => undefined),
+    ]);
     if (registration?.waiting) {
       // The same message `src/sw.ts` listens for.
       registration.waiting.postMessage({ type: 'SKIP_WAITING' });
-      await env.wait(SKIP_WAITING_TIMEOUT_MS);
+      await env.wait(RECOVERY_STEP_TIMEOUT_MS);
     }
   } catch {
     // Nothing here is worth blocking the reload on.

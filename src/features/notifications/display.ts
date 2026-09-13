@@ -18,10 +18,10 @@
  * constructor kept as the fallback for a page with no worker registered yet
  * (dev server, first load before activation) where it does still work.
  *
- * `getRegistration()` rather than `serviceWorker.ready`: `ready` never
- * settles when nothing is registered, and this runs inside the poller's
- * per-fire loop, which must not hang.
+ * The registration lookup is shared (`lib/serviceWorker.ts`) — it must not
+ * hang, since this runs inside the poller's per-fire loop.
  */
+import { getServiceWorkerRegistration } from '@/lib/serviceWorker';
 import type { AppNotificationOptions } from './notificationOptions';
 
 export interface PageDisplayEnv {
@@ -31,9 +31,8 @@ export interface PageDisplayEnv {
 }
 
 export function livePageDisplayEnv(): PageDisplayEnv {
-  const container = typeof navigator === 'undefined' ? undefined : navigator.serviceWorker;
   return {
-    getRegistration: async () => (container ? container.getRegistration() : undefined),
+    getRegistration: getServiceWorkerRegistration,
     construct:
       typeof Notification === 'undefined'
         ? undefined
