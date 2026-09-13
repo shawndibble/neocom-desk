@@ -797,3 +797,23 @@ describe('Layout intent warming', () => {
     expect(mockedWarmRoute).toHaveBeenCalledWith('/wallet', null, undefined);
   });
 });
+
+describe('Layout site name', () => {
+  it('goes back to Overview when clicked', async () => {
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter initialEntries={['/market']}>
+        <Routes>
+          <Route element={<Layout />}>
+            <Route path="/overview" element={<div>overview page</div>} />
+            <Route path="/market" element={<div>market page</div>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>
+    );
+    await screen.findByText('market page');
+
+    await user.click(screen.getByRole('link', { name: 'Neocom Desk' }));
+    expect(await screen.findByText('overview page')).toBeInTheDocument();
+  });
+});

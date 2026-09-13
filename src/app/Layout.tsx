@@ -496,10 +496,19 @@ export function Layout() {
       {/* Desktop left rail */}
       <aside className="sticky top-0 hidden h-screen w-48 flex-col border-r border-line bg-panel/85 backdrop-blur-sm md:flex">
         <div className="flex items-center gap-2 border-b border-line px-3 py-3">
-          <LogoMark className="size-7 shrink-0" />
-          <span className="flex-1 text-xs font-semibold tracking-widest uppercase">
-            {t('app.name')}
-          </span>
+          {/* Logo and wordmark navigate together, as one unit: a site name
+              that goes home beside an inert logo is the odd half-measure.
+              The two status indicators stay outside the link — a sync dot
+              that navigates is nobody's expectation. */}
+          <Link
+            to="/overview"
+            className="flex min-w-0 flex-1 items-center gap-2 text-text transition-colors hover:text-accent"
+          >
+            <LogoMark className="size-7 shrink-0" />
+            <span className="min-w-0 truncate text-xs font-semibold tracking-widest uppercase">
+              {t('app.name')}
+            </span>
+          </Link>
           <PrefetchIndicator />
           {isSyncConfigured() && <SyncStatusIndicator />}
         </div>
