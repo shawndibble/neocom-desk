@@ -40,6 +40,7 @@ import {
   type MiningYieldSnapshot,
 } from './yieldSnapshot';
 import { iskPerCalendarHour } from '@/engine/miningTax/yieldRate';
+import { YieldDetailModal } from './YieldDetailModal';
 import type { DailyRatePoint, TypeComparisonPoint } from './MiningYieldCharts';
 
 const LazyMiningYieldCharts = lazy(() => import('./MiningYieldCharts'));
@@ -76,6 +77,7 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
   );
 
   const [characterFilter, setCharacterFilter] = useState<CharacterFilterValue>('all');
+  const [detailRow, setDetailRow] = useState<MiningYieldRow | null>(null);
   const resolvedCharacterFilter = useResolvedCharacterFilter(characterFilter, activeCharacterId);
 
   const characters = data?.characters ?? [];
@@ -346,12 +348,25 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
                     }
                     label={t('miningTax.overviewTab')}
                     defaultSort={{ columnId: 'date', direction: 'desc' }}
+                    onRowClick={(row) => setDetailRow(row)}
                   />
                 </div>
               </Panel>
             </>
           )}
         </>
+      )}
+
+      {detailRow && (
+        <YieldDetailModal
+          open
+          onClose={() => setDetailRow(null)}
+          row={detailRow}
+          systemName={systemName(detailRow)}
+          systemSecurity={data?.systemSecurity.get(detailRow.entry.solarSystemId) ?? null}
+          typeNames={data?.typeNames ?? new Map()}
+          typeVolumes={data?.typeVolumes ?? new Map()}
+        />
       )}
     </div>
   );

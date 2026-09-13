@@ -25,7 +25,7 @@ import { loadPriceHistory, type PriceHistoryResult } from '@/features/market/pri
 import { EsiError } from '@/esi/errors';
 import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
 import { SKILL_IDS } from '@/engine/industry/types';
-import { loadCompressedOreTypeIds, loadReprocessing } from '@/sde/loadSde';
+import { loadCompressedOreTypeIds, loadReprocessing, loadTypes } from '@/sde/loadSde';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { loadSystemNameAndSecurity } from '@/features/character/systemSecurity';
 import { DEFAULT_TRADE_HUB } from '@/market/hubs';
@@ -40,6 +40,13 @@ export interface MiningYieldRow {
   characterName: string;
   entry: MiningYieldEntry;
   valuation: EntryValuation;
+  /**
+   * Mined-date price of each material the row's ore reprocesses into, for the
+   * detail modal's refined-output list. The same prices `valuation` was built
+   * from, kept rather than recomputed so the list and the total can never
+   * disagree; a material ESI had no history for on that date is simply absent.
+   */
+  materialUnitPrices: ReadonlyMap<number, number>;
 }
 
 export interface MiningYieldSnapshot {
@@ -48,7 +55,10 @@ export interface MiningYieldSnapshot {
   reauthCharacters: TrackedCharacter[];
   systemNames: Map<number, string>;
   systemSecurity: Map<number, number>;
+  /** Ore/ice/gas types AND the materials they reprocess into — the detail modal names both. */
   typeNames: Map<number, string>;
+  /** m³ of one unit, from the SDE bake. Missing for a type the bake doesn't carry. */
+  typeVolumes: Map<number, number>;
   fetchedAt: Date | null;
   fromCache: boolean;
 }
@@ -103,6 +113,7 @@ export async function loadMiningYieldSnapshot(): Promise<MiningYieldSnapshot> {
       systemNames: new Map(),
       systemSecurity: new Map(),
       typeNames: new Map(),
+      typeVolumes: new Map(),
       fetchedAt,
       fromCache,
     };
@@ -199,13 +210,29 @@ export async function loadMiningYieldSnapshot(): Promise<MiningYieldSnapshot> {
       skills,
       materialPrices
     );
-    return { characterId, characterName, entry, valuation };
+    return {
+      characterId,
+      characterName,
+      entry,
+      valuation,
+      materialUnitPrices: new Map(
+        Object.entries(materialPrices).map(([typeId, price]) => [Number(typeId), price])
+      ),
+    };
   });
 
-  const [systemRows, typeNames] = await Promise.all([
+  const [systemRows, typeNames, sdeTypes] = await Promise.all([
     Promise.all(systemIds.map(async (id) => ({ id, ...(await loadSystemNameAndSecurity(id)) }))),
-    loadTypeNames(rawTypeIds),
+    // Materials as well as ore: the detail modal lists what each day refines
+    // into, and an unnamed "#34" there is no use to a miner.
+    loadTypeNames([...rawTypeIds, ...materialTypeIds]),
+    loadTypes(),
   ]);
+  const typeVolumes = new Map<number, number>();
+  for (const typeId of rawTypeIds) {
+    const volume = sdeTypes[String(typeId)]?.volume;
+    if (typeof volume === 'number') typeVolumes.set(typeId, volume);
+  }
   const systemNames = new Map<number, string>();
   const systemSecurity = new Map<number, number>();
   for (const { id, name, security } of systemRows) {
@@ -220,6 +247,7 @@ export async function loadMiningYieldSnapshot(): Promise<MiningYieldSnapshot> {
     systemNames,
     systemSecurity,
     typeNames,
+    typeVolumes,
     fetchedAt,
     fromCache,
   };
