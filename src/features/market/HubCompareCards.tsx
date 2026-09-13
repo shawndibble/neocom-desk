@@ -19,9 +19,8 @@ import type { HubComparisonRow } from './appraisalData';
 
 /**
  * One labelled figure inside a card. Label above value, never beside it: the
- * narrowest track this grid produces (5 across at `xl`) is ~145px of content,
- * and a side-by-side label would start wrapping there while a stacked one
- * never does.
+ * narrowest track this grid produces is ~120px of content, where a
+ * side-by-side label would leave the figure nowhere to sit.
  */
 function HubFigure({ label, value }: { label: string; value: number | null }) {
   return (
@@ -44,30 +43,26 @@ export function HubCompareCards({ rows }: { rows: readonly HubComparisonRow[] })
     // panel, so they are DESIGN.md §1's raised layer on a panel, not a second
     // panel nested in the first.
     //
-    // Three across from `sm` because that is where the paste box is still
-    // above the results rather than beside them; five only from `xl`, since
-    // below that the results share the row with the 21rem paste column and
-    // five tracks would squeeze each card under its own figures.
+    // One column on a phone, three from `sm`, all five from `lg` — which is
+    // also where the paste box becomes a 21rem sidebar, so the results track
+    // narrows at the same breakpoint the card count grows. Five tracks in
+    // that ~640px track is ~120px of content each: enough for a compact ISK
+    // figure, and a label that wraps to two lines at the very bottom of the
+    // range simply makes the row of cards taller rather than breaking.
     //
     // `min-w-0` on the grid and every card: a grid item's default `min-width`
     // is its content's intrinsic width, so without it a long figure widens
     // its track instead of being contained.
     <ul
       aria-label={t('market.appraisal.compareHubsTitle')}
-      className="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-3 xl:grid-cols-5"
+      className="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-3 lg:grid-cols-5"
     >
       {rows.map((row) => (
-        <li
-          key={row.hub.id}
-          className="min-w-0 rounded-xs border border-line bg-panel-2 p-3"
-          // The full station name, for the hub a `systemName` alone does not
-          // identify to someone new to the game.
-          title={row.hub.name}
-        >
+        <li key={row.hub.id} className="min-w-0 rounded-xs border border-line bg-panel-2 p-3">
           <p className="truncate text-sm font-semibold text-text">{row.hub.systemName}</p>
           <dl className="mt-2 flex flex-col gap-2">
-            <HubFigure label={t('market.appraisal.columnSellTotal')} value={row.sell} />
-            <HubFigure label={t('market.appraisal.columnBuyTotal')} value={row.buy} />
+            <HubFigure label={t('market.appraisal.sellTotal')} value={row.sell} />
+            <HubFigure label={t('market.appraisal.buyTotal')} value={row.buy} />
           </dl>
         </li>
       ))}
