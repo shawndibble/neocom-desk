@@ -4,6 +4,7 @@ import { EMPTY_RIG_FIT } from '@/engine/industry/types';
 import {
   DEFAULT_FACILITY_DEFAULTS,
   FACILITY_DEFAULTS_SETTING_KEY,
+  MANUFACTURING_FACILITY_PRESETS,
   normalizeFacilityDefaults,
   useFacilityDefaults,
   type FacilityDefaults,
@@ -18,6 +19,30 @@ async function hydrated(): Promise<FacilityDefaults> {
   await useFacilityDefaults.getState().hydrate();
   return useFacilityDefaults.getState().value;
 }
+
+describe('normalizeFacilityDefaults — one activity per record', () => {
+  it('resets a refinery, which this record can no longer mean anything for', () => {
+    // Reactions have their own default now, so a refinery here would be read
+    // by nothing. Reset whole rather than left inert, so the picker — which
+    // offers manufacturing facilities only — still has a value to show.
+    expect(
+      normalizeFacilityDefaults({
+        facility: 'tatara',
+        rigFit: ['meT2', 'teT1', 'none'],
+        facilityTaxPct: 2,
+      })
+    ).toEqual(DEFAULT_FACILITY_DEFAULTS);
+  });
+
+  it('offers only what it can hold', () => {
+    expect(MANUFACTURING_FACILITY_PRESETS.map((preset) => preset.kind)).toEqual([
+      'npcStation',
+      'raitaru',
+      'azbel',
+      'sotiyo',
+    ]);
+  });
+});
 
 describe('normalizeFacilityDefaults', () => {
   it('keeps rig and tax for a player structure', () => {

@@ -8,8 +8,10 @@
  * (`loadBlueprintCatalog`, `loadPi`, ...) is already cache-backed, so paying
  * for it again on navigation between Industry pages is cheap.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useFacilityDefaults } from './facilityDefaults';
+import { useReactionFacilityDefaults } from './reactionFacilityDefaults';
+import type { ActivityFacilityDefaults } from './newBuildPlan';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import type { SkillLevels } from '@/engine/industry/types';
 import type { CharacterBlueprint } from '@/esi/endpoints';
@@ -29,7 +31,8 @@ import type { OwnedStockSnapshot } from './ownedStockDetection';
 export interface IndustryWorkspace {
   hydrated: boolean;
   activeCharacterId: number | null;
-  facilityDefaults: ReturnType<typeof useFacilityDefaults.getState>['value'];
+  /** One default per activity — see `ActivityFacilityDefaults`. */
+  facilityDefaults: ActivityFacilityDefaults;
   catalog: BlueprintCatalog | null;
   pi: PiData | null;
   ownedBlueprints: CharacterBlueprint[];
@@ -46,11 +49,18 @@ export interface IndustryWorkspace {
 }
 
 export function useIndustryWorkspace(): IndustryWorkspace {
-  const facilityDefaults = useFacilityDefaults((state) => state.value);
+  const manufacturingDefaults = useFacilityDefaults((state) => state.value);
   const hydrateFacilityDefaults = useFacilityDefaults((state) => state.hydrate);
+  const reactionDefaults = useReactionFacilityDefaults((state) => state.value);
+  const hydrateReactionFacilityDefaults = useReactionFacilityDefaults((state) => state.hydrate);
   useEffect(() => {
     void hydrateFacilityDefaults();
-  }, [hydrateFacilityDefaults]);
+    void hydrateReactionFacilityDefaults();
+  }, [hydrateFacilityDefaults, hydrateReactionFacilityDefaults]);
+  const facilityDefaults = useMemo<ActivityFacilityDefaults>(
+    () => ({ manufacturing: manufacturingDefaults, reaction: reactionDefaults }),
+    [manufacturingDefaults, reactionDefaults]
+  );
 
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   const hydrated = useActiveCharacter((state) => state.hydrated);

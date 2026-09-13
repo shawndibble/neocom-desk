@@ -16,7 +16,7 @@ import {
 } from './blueprintCatalog';
 import { buildPlanTypeIds } from './recipes';
 import type { MarketSnapshot, MarketSnapshotRequest } from './marketData';
-import type { FacilityDefaults } from './facilityDefaults';
+import type { ActivityFacilityDefaults } from './newBuildPlan';
 import {
   detectOwnedStock,
   bulkOwnedStockSuggestions,
@@ -115,7 +115,7 @@ function ownedMaterialSourcing(
  */
 export function planForOpportunityCandidate(
   candidate: OpportunityCandidate,
-  facilityDefaults: FacilityDefaults,
+  facilityDefaults: ActivityFacilityDefaults,
   materialSourcing: MaterialSourcingMap,
   /** Auto-picked build-vs-buy materials (issue #652) carried onto the seeded plan verbatim. */
   buildHere?: readonly number[]
@@ -169,7 +169,7 @@ export interface OpportunityAutoBuildOptions {
 export function computeOpportunityRow(
   candidate: OpportunityCandidate,
   snapshot: MarketSnapshot,
-  facilityDefaults: FacilityDefaults,
+  facilityDefaults: ActivityFacilityDefaults,
   skills: SkillLevels,
   stock: DetectedOwnedStockMap,
   autoBuild: OpportunityAutoBuildOptions

@@ -72,9 +72,27 @@ const LEGACY_RIG_LEVELS: readonly RigLevel[] = ['none', 't1', 't2'];
  * form handler over a plan record and this is a stored preference.
  */
 export function normalizeFacilityDefaults(value: FacilityDefaults): FacilityDefaults {
+  // A refinery here is incoherent now that reactions have their own default:
+  // nothing would ever read it, since `newBuildPlan` takes this record only
+  // for a manufacturing plan. Reset whole rather than kept inert, so the
+  // picker has a value it can show. The mirror of
+  // `normalizeReactionFacilityDefaults`, and for the same reason — the whole
+  // record only means anything for its own activity.
+  if (FACILITY_PRESETS[value.facility].activity !== 'manufacturing') {
+    return DEFAULT_FACILITY_DEFAULTS;
+  }
   if (FACILITY_PRESETS[value.facility].structure) return value;
   return { facility: value.facility, rigFit: EMPTY_RIG_FIT, facilityTaxPct: null };
 }
+
+/**
+ * The only facilities this setting may hold — what the Default facility
+ * picker offers, so a pick can never be a value `normalizeFacilityDefaults`
+ * would reset. Mirrors `REACTION_FACILITY_PRESETS`.
+ */
+export const MANUFACTURING_FACILITY_PRESETS = Object.values(FACILITY_PRESETS).filter(
+  (preset) => preset.activity === 'manufacturing'
+);
 
 function parseFacilityDefaults(raw: unknown): FacilityDefaults | null {
   if (typeof raw !== 'object' || raw === null) return null;

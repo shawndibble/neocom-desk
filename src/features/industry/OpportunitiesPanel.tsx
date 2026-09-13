@@ -46,7 +46,7 @@ import {
 } from '@/features/character/characterFilterValue';
 import type { BlueprintCatalog } from './blueprintCatalog';
 import { loadCharacterBlueprints } from './data';
-import type { FacilityDefaults } from './facilityDefaults';
+import type { ActivityFacilityDefaults } from './newBuildPlan';
 import { formatPercent } from './format';
 import type { OwnedStockSnapshot } from './ownedStockDetection';
 import { buildOpportunityCandidates, type OpportunityRow } from './opportunities';
@@ -57,7 +57,7 @@ interface OpportunitiesPanelProps {
   catalog: BlueprintCatalog;
   pi: PiData | null;
   skills: SkillLevels;
-  facilityDefaults: FacilityDefaults;
+  facilityDefaults: ActivityFacilityDefaults;
   activeCharacterId: number;
   ownedStockSnapshot: OwnedStockSnapshot;
   onAddToCompare: (rows: readonly OpportunityRow[]) => void;

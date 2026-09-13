@@ -18,7 +18,7 @@ import {
   type FitToBuildPlansResult,
 } from '@/engine/import/fitToBuildPlans';
 import { parseEftFit } from '@/engine/import/eftFit';
-import type { FacilityDefaults } from './facilityDefaults';
+import type { ActivityFacilityDefaults } from './newBuildPlan';
 import { findOwnedBlueprint } from './data';
 import type { BlueprintCatalog, BlueprintCatalogEntry } from './blueprintCatalog';
 import { newBuildPlan } from './newBuildPlan';
@@ -108,7 +108,7 @@ export interface FitImportPlanContext {
   ownedBlueprints: readonly CharacterBlueprint[];
   /** The plan every created plan takes its facility/hub/system from (issue #456). */
   defaultsFrom: BuildPlanRecord | null;
-  facilityDefaults: FacilityDefaults;
+  facilityDefaults: ActivityFacilityDefaults;
   /** ME to quote a blueprint the character owns no copy of — `sync.industryAssumedMe`. */
   assumedMe: number;
   /** TE for the same blueprints, from `sync.industryAssumedTe` (issue #634). */

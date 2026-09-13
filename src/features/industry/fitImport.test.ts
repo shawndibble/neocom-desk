@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { db, type BuildPlanRecord } from '@/db';
 import type { FitToBuildPlansResult } from '@/engine/import/fitToBuildPlans';
-import { DEFAULT_FACILITY_DEFAULTS } from './facilityDefaults';
+import { DEFAULT_ACTIVITY_FACILITY_DEFAULTS } from './newBuildPlan';
 import type { BlueprintCatalog, BlueprintCatalogEntry } from './blueprintCatalog';
 import { buildGroupsFor, type BuildGroupsValue } from './buildGroups';
 import {
@@ -114,7 +114,7 @@ describe('fitImportPlans', () => {
       catalog: CATALOG,
       ownedBlueprints: [],
       defaultsFrom: null,
-      facilityDefaults: DEFAULT_FACILITY_DEFAULTS,
+      facilityDefaults: DEFAULT_ACTIVITY_FACILITY_DEFAULTS,
       assumedMe,
       assumedTe,
       buildGroupId: 'g1',
@@ -166,7 +166,7 @@ describe('fitImportPlans', () => {
         catalog: CATALOG,
         ownedBlueprints: [],
         defaultsFrom: null,
-        facilityDefaults: DEFAULT_FACILITY_DEFAULTS,
+        facilityDefaults: DEFAULT_ACTIVITY_FACILITY_DEFAULTS,
         assumedMe: 0,
         assumedTe: 0,
         buildGroupId: 'g1',
@@ -224,7 +224,7 @@ describe('applyFitImport', () => {
       catalog: CATALOG,
       ownedBlueprints: [],
       defaultsFrom: null,
-      facilityDefaults: DEFAULT_FACILITY_DEFAULTS,
+      facilityDefaults: DEFAULT_ACTIVITY_FACILITY_DEFAULTS,
       assumedMe: 2,
       assumedTe: 4,
       buildGroups: overrides.buildGroups ?? {},
