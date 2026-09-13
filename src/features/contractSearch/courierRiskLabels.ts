@@ -19,7 +19,12 @@ import type { CourierRiskKind } from '@/engine/contracts/courierRisk';
  * thing in a warning colour would turn a note into an alarm. It still gets its
  * sentence in the modal, where there is room to say why it is only a note.
  */
-export const MARKED_RISKS: readonly CourierRiskKind[] = ['player-structure', 'no-gate-route'];
+export const MARKED_RISKS: readonly CourierRiskKind[] = [
+  'player-structure',
+  'no-gate-route',
+  'over-rate',
+  'gank-chokepoint',
+];
 
 /** Both registers for one risk, read together at every call site. */
 interface RiskCopy {
@@ -41,5 +46,13 @@ export const RISK_COPY: Record<CourierRiskKind, RiskCopy> = {
   nullsec: {
     short: 'contractSearch.risk.nullsecShort',
     detail: 'contractSearch.risk.nullsecDetail',
+  },
+  'gank-chokepoint': {
+    short: 'contractSearch.risk.chokepointShort',
+    detail: 'contractSearch.risk.chokepointDetail',
+  },
+  'over-rate': {
+    short: 'contractSearch.risk.overRateShort',
+    detail: 'contractSearch.risk.overRateDetail',
   },
 };

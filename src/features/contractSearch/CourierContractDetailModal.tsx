@@ -19,6 +19,7 @@
  * is a constraint to check rather than a figure to weigh, and sits in one
  * quiet grid below.
  */
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Modal } from '@/components/ui';
 import { formatIsk, formatIskAuto, formatIskCompact } from '@/lib/isk';
@@ -30,16 +31,19 @@ import {
   type CourierRouteRow,
 } from '@/engine/contracts/courierSearch';
 import { collateralToRewardRatio, iskPerJump, iskPerVolume } from '@/engine/contracts/courierRates';
-import { courierRisks } from '@/engine/contracts/courierRisk';
+import {
+  courierRisks,
+  forcesFreighter,
+  hoursToExpiry,
+  FREIGHTER_VOLUME_M3,
+  type CourierRiskKind,
+} from '@/engine/contracts/courierRisk';
+import { communityFloorReward, paysFarAboveGoingRate } from '@/engine/contracts/courierGoingRate';
+import { routeExposure, type RouteExposure } from '@/features/contractSearch/routeExposure';
+import { formatMagnitude } from '@/lib/magnitude';
+import type { RoutePreferenceKind } from '@/engine/route/jumpRoute';
 import { endpointName, endpointSystemName } from '@/features/contractSearch/courierEndpointNames';
 import { MARKED_RISKS, RISK_COPY } from '@/features/contractSearch/courierRiskLabels';
-
-/**
- * One decimal, for a figure read as a magnitude rather than an exact amount —
- * a hold is "60,000 m³" and a collateral is "40x the reward"; further digits
- * imply a precision neither carries.
- */
-const MAGNITUDE_FORMAT = new Intl.NumberFormat('en', { maximumFractionDigits: 1 });
 
 /**
  * This haul's distance, in the states the board itself has.
@@ -57,7 +61,43 @@ export interface CourierContractDetailModalProps {
   regionNames: ReadonlyMap<number, string>;
   /** Resolved by the board, which already holds the graph read for every row. */
   jumps: CourierJumps;
+  /** How far above the corpus median it pays, or `null` where that cannot be stated. */
+  goingRateMultiple: number | null;
+  /** Which route the board is measuring, so the exposure below counts the same one. */
+  preference: RoutePreferenceKind;
   onClose: () => void;
+}
+
+/**
+ * The systems this haul is flown through at 0.5 or below, and which of them are
+ * the ones haulers are most often killed in — resolved when the detail opens.
+ * One route on demand, never one per row: a path per row is the fan-out the
+ * local snapshots exist to avoid, and this is where a hauler is deciding.
+ *
+ * `null` while it is still being worked out, which is a different thing from
+ * having no answer.
+ */
+function useRouteExposure(
+  row: CourierRouteRow,
+  preference: RoutePreferenceKind
+): RouteExposure | null {
+  const [exposure, setExposure] = useState<RouteExposure | null>(null);
+  const originSystemId = row.origin.systemId;
+  const destinationSystemId = row.destination.systemId;
+
+  useEffect(() => {
+    let cancelled = false;
+    void routeExposure(originSystemId, destinationSystemId, preference)
+      .catch((): RouteExposure => ({ kind: 'unknown' }))
+      .then((result) => {
+        if (!cancelled) setExposure(result);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [originSystemId, destinationSystemId, preference]);
+
+  return exposure;
 }
 
 /** Where this end sits, as one dim line: system, region, space band. */
@@ -97,6 +137,8 @@ export function CourierContractDetailModal({
   row,
   regionNames,
   jumps,
+  goingRateMultiple,
+  preference,
   onClose,
 }: CourierContractDetailModalProps) {
   const { t } = useTranslation();
@@ -109,7 +151,20 @@ export function CourierContractDetailModal({
   // Spelled out here, where the decision is actually made — the row only has
   // room for a marker. Every one names a condition and what it would cost;
   // none claims to know whether this player in particular has access.
-  const risks = courierRisks(row);
+  const endpointRisks = courierRisks(row);
+  // Contract-scoped rather than endpoint-scoped, so it is added here rather
+  // than derived from the two ends (issue #946).
+  const risks: CourierRiskKind[] = paysFarAboveGoingRate(goingRateMultiple)
+    ? [...endpointRisks, 'over-rate']
+    : endpointRisks;
+  const exposure = useRouteExposure(row, preference);
+  const measuring = jumps.kind === 'pending';
+  const floor = measuring ? null : communityFloorReward(collateral, jumpCount);
+  // Pinned to when the detail opened rather than read each render: a figure
+  // that ticks while the reader looks at it is a moving target, and "as of
+  // when you opened this" is the honest reading of a countdown anyway.
+  const [openedAt] = useState(() => Date.now());
+  const expiresIn = hoursToExpiry(row.dateExpired, openedAt);
   // A nullsec end is a note, not an alarm. Heading a section of nothing but
   // notes with a warning-coloured "Before you accept" would contradict the
   // sentence underneath it, which says outright that it is not a warning.
@@ -234,12 +289,82 @@ export function CourierContractDetailModal({
                 <li key={kind}>
                   <span className="text-text-dim">{t(RISK_COPY[kind].short)}</span>
                   {' — '}
-                  {t(RISK_COPY[kind].detail)}
+                  {t(RISK_COPY[kind].detail, {
+                    multiple: goingRateMultiple === null ? '' : formatMagnitude(goingRateMultiple),
+                  })}
                 </li>
               ))}
             </ul>
           </section>
         )}
+
+        {/*
+          What the rate multiple is measured against, and the conditions the
+          documented ganking shape travels with. Every line is arithmetic over
+          the snapshot: none of it says the contract is a scam, because nothing
+          here can know that — the app cannot value a courier contract's cargo,
+          which carries no item lines, or read anyone's intent.
+        */}
+        <section className="flex flex-col gap-1.5 rounded-xs border border-line bg-panel-2 p-3">
+          <h3 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+            {t('contractSearch.goingRateBenchmarkLabel')}
+          </h3>
+          <ul className="flex flex-col gap-1.5 text-sm">
+            <li>
+              {measuring
+                ? t('contractSearch.goingRateMeasuring')
+                : goingRateMultiple === null
+                  ? t('contractSearch.goingRateUnavailable')
+                  : t('contractSearch.goingRateAgainstCorpus', {
+                      multiple: formatMagnitude(goingRateMultiple),
+                    })}
+            </li>
+            {floor !== null && (
+              <li>
+                {t('contractSearch.communityFloorValue', { reward: formatIskAuto(floor) })}
+                {' · '}
+                {t('contractSearch.communityFloorActual', { reward: formatIskAuto(row.reward) })}
+              </li>
+            )}
+            {forcesFreighter(row.volume) && (
+              <li
+                // Warning-toned only where it is actually the ganking shape:
+                // the bait is an oversized load *on a lowsec route*. A 400,000
+                // m³ Jita-to-Perimeter haul is a freighter job, which is worth
+                // stating and is not a warning.
+                className={
+                  exposure?.kind === 'known' && exposure.exposedSystems > 0 ? 'text-warning' : ''
+                }
+              >
+                {t('contractSearch.freighterVolumeNote', {
+                  volume: formatMagnitude(FREIGHTER_VOLUME_M3),
+                })}
+              </li>
+            )}
+            {exposure?.kind === 'known' && exposure.chokepoints.length > 0 && (
+              <li className="text-warning">
+                {t('contractSearch.routeExposureChokepoints', {
+                  systems: exposure.chokepoints.join(', '),
+                })}
+              </li>
+            )}
+            {/*
+              Said either way: silence for a clean route reads the same as
+              silence for a route we could not work out, and the rule on this
+              surface is to state what is not in the figure.
+            */}
+            <li>
+              {exposure === null
+                ? t('contractSearch.routeExposureMeasuring')
+                : exposure.kind === 'known'
+                  ? t('contractSearch.routeExposureCrossed', { count: exposure.exposedSystems })
+                  : exposure.kind === 'no-route'
+                    ? t('contractSearch.routeExposureNoRoute')
+                    : t('contractSearch.routeExposureUnknown')}
+            </li>
+            <li>{t('contractSearch.expiresInHours', { hours: expiresIn })}</li>
+          </ul>
+        </section>
 
         {/*
          * Constraints rather than figures to weigh: whether the hold fits,
@@ -259,14 +384,14 @@ export function CourierContractDetailModal({
                 : collateralRatio === null
                   ? undefined
                   : t('contractSearch.collateralRatioNote', {
-                      ratio: MAGNITUDE_FORMAT.format(collateralRatio),
+                      ratio: formatMagnitude(collateralRatio),
                     })
             }
           />
           <Figure
             label={t('contractSearch.volumeColumn')}
             value={t('contractSearch.volumeValue', {
-              volume: MAGNITUDE_FORMAT.format(row.volume),
+              volume: formatMagnitude(row.volume),
             })}
             note={
               volumeRate === null

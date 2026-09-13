@@ -102,12 +102,16 @@ const RANCER = 60011740;
 const RANCER_SYSTEM = 30002809;
 const NULL_STATION = 60014437;
 const NULL_SYSTEM = 30001161;
+/** The single most dangerous system in highsec, and a 0.5 like hundreds of others. */
+const UEDAMA_STATION = 60011866;
+const UEDAMA_SYSTEM = 30002768;
 
 const STATIONS: NpcStationEntry[] = [
   { id: JITA, name: 'Jita IV - Moon 4 - Caldari Navy Assembly Plant', systemId: 30000142 },
   { id: AMARR, name: 'Amarr VIII (Oris) - Emperor Family Academy', systemId: 30002187 },
   { id: RANCER, name: 'Rancer III - Moon 1', systemId: RANCER_SYSTEM },
   { id: NULL_STATION, name: 'Outpost', systemId: NULL_SYSTEM },
+  { id: UEDAMA_STATION, name: 'Uedama V - Moon 3', systemId: UEDAMA_SYSTEM },
 ];
 const SYSTEMS: SolarSystemEntry[] = [
   { id: 30000142, name: 'Jita', security: 0.9, regionId: 10000002 },
@@ -123,6 +127,9 @@ const SYSTEMS: SolarSystemEntry[] = [
   // Exactly 0.0, which is a real nullsec value and a falsy one — a truthiness
   // guard anywhere on the security field would call this unknown.
   { id: NULL_SYSTEM, name: 'Vale', security: 0.0, regionId: 10000043 },
+  // Its real security, which rounds to 0.5 — the point being that the band
+  // alone says nothing and the name is what carries the warning.
+  { id: UEDAMA_SYSTEM, name: 'Uedama', security: 0.50544, regionId: 10000033 },
 ];
 
 /**
@@ -811,7 +818,10 @@ describe('ContractSearchPanel — Courier mode', () => {
     await userEvent.click(jitaToAmarr);
 
     const dialog = await screen.findByRole('dialog');
-    expect(within(dialog).getByRole('heading')).toHaveTextContent('Courier · Jita → Amarr');
+    // Named, because the body carries section headings of its own.
+    expect(
+      within(dialog).getByRole('heading', { name: 'Courier · Jita → Amarr' })
+    ).toBeInTheDocument();
     // The station itself is still in the body, said once.
     expect(within(dialog).getAllByText(/Caldari Navy Assembly Plant/)).toHaveLength(1);
   });
@@ -1245,6 +1255,137 @@ describe('ContractSearchPanel — Courier completion risk', () => {
     expect(within(dialog).queryByText(/you do not have access/i)).not.toBeInTheDocument();
     // The collateral the note is about sits in the same dialog.
     expect(within(dialog).getByText('Collateral')).toBeInTheDocument();
+  });
+});
+
+/**
+ * Over-payment is the documented bait in courier scams, so the rate comparison
+ * is the strongest signal available — and it is provable arithmetic rather than
+ * an accusation (issue #946). Nothing here may call a contract a scam.
+ */
+describe('ContractSearchPanel — Courier going rate', () => {
+  /**
+   * Twenty ordinary hauls, which is the floor a median needs before it means
+   * anything, plus one that pays far above them. All Jita→Amarr, so every row
+   * has the same distance and the rate differences are the rewards alone.
+   */
+  function corpus(count: number, reward: number, volume = 45_000) {
+    return Array.from({ length: count }, (_, i) =>
+      courierRow({ contractId: 800 + i, reward, volume })
+    );
+  }
+  const ORDINARY = corpus(20, 15_000_000);
+  const BAIT = courierRow({ contractId: 900, reward: 900_000_000, volume: 45_000 });
+
+  async function showCourierWith(rows: PublicCourierContractRow[]) {
+    loadPublicCourierContracts.mockResolvedValue(cachedCourierSnapshot(rows));
+    const user = userEvent.setup();
+    renderWithRouter();
+    await bodyRows();
+    await user.click(screen.getByRole('button', { name: 'Courier' }));
+    await screen.findByRole('table');
+    return user;
+  }
+
+  async function courierRows() {
+    const table = await screen.findByRole('table');
+    const [, ...rest] = within(table).getAllByRole('rowgroup');
+    return within(rest[0]).getAllByRole('row');
+  }
+
+  it('shows every haul as a multiple of the market going rate', async () => {
+    await showCourierWith([...ORDINARY, BAIT]);
+
+    // Ranked by ISK/jump, so the one paying 60x the others leads.
+    const first = await waitFor(async () => {
+      const found = (await courierRows())[0];
+      expect(found.textContent).toMatch(/going rate/);
+      return found;
+    });
+    expect(first.textContent).toMatch(/60x going rate/);
+    // And the ordinary hauls are the benchmark, so they sit at 1x.
+    const rest = (await courierRows()).slice(1);
+    expect(rest.every((r) => (r.textContent ?? '').includes('1x going rate'))).toBe(true);
+  });
+
+  it('flags the haul that pays far above the going rate', async () => {
+    await showCourierWith([...ORDINARY, BAIT]);
+
+    const flagged = await waitFor(async () => {
+      const found = (await courierRows())[0];
+      expect(within(found).getByText(/60x going rate/)).toBeInTheDocument();
+      return found;
+    });
+    // Marked, not merely stated: the outlier is styled as one.
+    expect(within(flagged).getByText(/60x going rate/).className).toMatch(/warning/);
+  });
+
+  it('shows no multiple at all for a corpus too small to have a median', async () => {
+    // A median over three rows is arithmetically fine and statistically
+    // meaningless, and this one decides whether a contract is called an
+    // outlier. The whole comparison degrades to silence.
+    await showCourierWith([JITA_TO_AMARR, AMARR_TO_STRUCTURE]);
+
+    const rows = await courierRows();
+    expect(rows.map((r) => r.textContent ?? '').join(' ')).not.toMatch(/going rate/);
+  });
+
+  it('states no rate for a haul with no measurable distance', async () => {
+    // An unplaced endpoint has no jump count, and a rate computed without
+    // distance is not the rate this compares.
+    await showCourierWith([...ORDINARY, AMARR_TO_STRUCTURE]);
+
+    const unmeasurable = await waitFor(async () => {
+      const found = (await courierRows()).find((r) =>
+        (r.textContent ?? '').includes(`#${UNKNOWN_STRUCTURE}`)
+      );
+      expect(found).toBeDefined();
+      return found!;
+    });
+    expect(unmeasurable.textContent).not.toMatch(/going rate/);
+  });
+
+  it('narrows to, or away from, the hauls far above the going rate', async () => {
+    const user = await showCourierWith([...ORDINARY, BAIT]);
+    await waitFor(async () => {
+      expect(await courierRows()).toHaveLength(21);
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Filters' }));
+    await user.click(screen.getByRole('combobox', { name: 'Pay vs going rate' }));
+    await user.click(await screen.findByRole('option', { name: 'Only far above' }));
+
+    expect(await courierRows()).toHaveLength(1);
+  });
+
+  it('names a delivery into a system haulers are most often killed in', async () => {
+    // Being a chokepoint is about traffic, not security: Uedama reads 0.5 like
+    // hundreds of other systems, so the band on the row says nothing and only
+    // the name carries the warning.
+    await showCourierWith([courierRow({ contractId: 950, destinationLocationId: UEDAMA_STATION })]);
+
+    const route = within((await courierRows())[0]).getAllByRole('cell')[0];
+    expect(within(route).getByText('Gank gate')).toBeInTheDocument();
+    // And the space band still reads as the ordinary highsec it is.
+    expect(route).toHaveTextContent('Highsec');
+  });
+
+  it('names the benchmark in the detail, and calls nothing a scam', async () => {
+    const user = await showCourierWith([...ORDINARY, BAIT]);
+    await waitFor(async () => {
+      expect((await courierRows())[0].textContent).toMatch(/going rate/);
+    });
+    await user.click((await courierRows())[0]);
+
+    const dialog = await screen.findByRole('dialog');
+    // The benchmark is named, not merely applied.
+    expect(within(dialog).getByText(/median reward per m³ per jump/)).toBeInTheDocument();
+    // The community floor, where collateral and distance are both known.
+    expect(within(dialog).getByText(/1M per 1B collateral per jump/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/Expires in/)).toBeInTheDocument();
+    // The bound the whole design rests on.
+    expect(within(dialog).queryByText(/scam/i)).not.toBeInTheDocument();
+    expect(within(dialog).queryByText(/fraud|bad faith|dishonest/i)).not.toBeInTheDocument();
   });
 });
 

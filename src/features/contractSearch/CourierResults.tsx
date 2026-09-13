@@ -33,7 +33,12 @@ import {
   type CourierContractFilter,
   type CourierRouteRow,
 } from '@/engine/contracts/courierSearch';
-import { iskPerJump, iskPerVolume } from '@/engine/contracts/courierRates';
+import { iskPerJump, iskPerVolume, rewardPerVolumeJump } from '@/engine/contracts/courierRates';
+import {
+  corpusGoingRate,
+  goingRateMultiple,
+  paysFarAboveGoingRate,
+} from '@/engine/contracts/courierGoingRate';
 import { SPACE_KINDS, type SpaceKind } from '@/engine/space';
 import { completableCourierRoutes } from '@/engine/contracts/courierRisk';
 import { EndpointRiskMarkers } from '@/features/contractSearch/courierRiskDisplay';
@@ -46,6 +51,7 @@ import {
 import { endpointSystemName } from '@/features/contractSearch/courierEndpointNames';
 import { loadCharacterRegionId } from '@/features/contractSearch/characterRegion';
 import { formatIskAuto } from '@/lib/isk';
+import { formatMagnitude } from '@/lib/magnitude';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
 
@@ -64,6 +70,8 @@ interface CourierUiFilter {
   destinationSpace: readonly SpaceKind[];
   /** Drop the hauls that may not be deliverable at all. Off is no restriction. */
   hideUncompletable: boolean;
+  /** What to do with the hauls paying far above the market's going rate. */
+  overRate: OverRateFilter;
   minReward: string;
   maxCollateral: string;
   maxVolume: string;
@@ -76,6 +84,7 @@ const EMPTY_UI_FILTER: CourierUiFilter = {
   destinationRegionId: null,
   destinationSpace: SPACE_KINDS,
   hideUncompletable: false,
+  overRate: 'all',
   minReward: '',
   maxCollateral: '',
   maxVolume: '',
@@ -109,6 +118,15 @@ function offeredSpaceKinds(rows: readonly CourierRouteRow[]): SpaceKind[] {
 function narrowsSpace(selected: readonly SpaceKind[], offered: readonly SpaceKind[]): boolean {
   return offered.some((kind) => !selected.includes(kind));
 }
+
+/**
+ * Both directions, because the flag reads two ways: a hauler avoiding the
+ * documented bait wants these gone, and one who has read the conditions and
+ * judged them for themselves wants only these. Neither reading is the app's to
+ * make, so it offers both and defaults to neither.
+ */
+const OVER_RATE_FILTERS = ['all', 'only', 'hide'] as const;
+type OverRateFilter = (typeof OVER_RATE_FILTERS)[number];
 
 /** A blank or unparseable field is "no restriction", never `NaN` — which would silently exclude every row. */
 function parseNumeric(value: string): number | null {
@@ -405,6 +423,7 @@ function CourierFilterBar({
     filter.destinationRegionId !== null,
     narrowsSpace(filter.destinationSpace, spaceKinds),
     filter.hideUncompletable,
+    filter.overRate !== 'all',
     filter.minReward,
     filter.maxCollateral,
     filter.maxVolume,
@@ -517,6 +536,23 @@ function CourierFilterBar({
             hides — and what it deliberately does not — is `blocksCompletion`'s
             to decide.
           */}
+          <FilterField label={t('contractSearch.overRateLabel')}>
+            <Select
+              value={draft.overRate}
+              onValueChange={(value) => setDraft({ ...draft, overRate: value as OverRateFilter })}
+            >
+              <SelectTrigger className="w-44" aria-label={t('contractSearch.overRateLabel')}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {OVER_RATE_FILTERS.map((option) => (
+                  <SelectItem key={option} value={option}>
+                    {t(`contractSearch.overRate.${option}`)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </FilterField>
           <FilterChip
             label={t('contractSearch.hideUncompletableLabel')}
             selected={draft.hideUncompletable}
@@ -708,7 +744,42 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
     // there stops a second definition drifting away from the flags on the row.
     return uiFilter.hideUncompletable ? completableCourierRoutes(matched) : matched;
   }, [rows, filter, uiFilter.hideUncompletable]);
-  const jumps = useJumpCounts(matchingRows, preference);
+  /**
+   * Measured over the **whole** corpus rather than the filtered set, because
+   * the going rate below is the median across every outstanding public courier
+   * contract (#946) — a median that moved every time a filter changed would be
+   * a comparison against the rows still on screen rather than against the
+   * market. Costs no more than the unfiltered case already did, and the counts
+   * are then looked up by contract id instead of by position.
+   */
+  const jumps = useJumpCounts(rows, preference);
+
+  /** A row's own count, found by its id — see `jumps` for why not by position. */
+  const jumpsByContract = useMemo(() => {
+    const byContract = new Map<number, number | null>();
+    if (jumps.kind !== 'known') return byContract;
+    rows.forEach((row, index) => {
+      byContract.set(row.contractId, jumps.counts[index] ?? null);
+    });
+    return byContract;
+  }, [rows, jumps]);
+
+  /**
+   * The market's own going rate: the median reward per m³ per jump across the
+   * corpus, computed from the snapshot with nothing typed in. `null` until the
+   * distances land, and for a corpus too small for a median to mean anything —
+   * in which case no row shows a multiple at all, rather than every row showing
+   * one against two samples.
+   */
+  const goingRate = useMemo(
+    () =>
+      corpusGoingRate(
+        rows.map((row) =>
+          rewardPerVolumeJump(row.reward, row.volume, jumpsByContract.get(row.contractId) ?? null)
+        )
+      ),
+    [rows, jumpsByContract]
+  );
 
   /**
    * Best rate first *before* the row cap: `DataTable` sorts only the rows it
@@ -721,29 +792,51 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
    * so the fallback order is by reward — the board stays useful mid-load
    * instead of shuffling from an order that means nothing.
    */
-  const displayRows = useMemo(() => {
-    const ranked = [...matchingRows];
-    if (jumps.kind !== 'known') return ranked.sort((a, b) => b.reward - a.reward);
-    const rateByContract = new Map<number, number | null>();
-    matchingRows.forEach((row, index) => {
-      rateByContract.set(row.contractId, iskPerJump(row.reward, jumps.counts[index] ?? null));
-    });
-    // A haul with no measurable distance has no rate, and sorts last rather
-    // than as zero — "we cannot say" is not "pays nothing".
-    return ranked.sort(
-      (a, b) => (rateByContract.get(b.contractId) ?? -1) - (rateByContract.get(a.contractId) ?? -1)
-    );
-  }, [matchingRows, jumps]);
+  /**
+   * How this haul's rate compares with the market's. `null` whenever either
+   * half is unstatable — no distance, no cargo volume, or a corpus too small
+   * for a median — so a row shows nothing rather than a figure computed
+   * without one of its terms.
+   */
+  const multipleFor = useCallback(
+    (row: CourierRouteRow) =>
+      goingRateMultiple(
+        rewardPerVolumeJump(row.reward, row.volume, jumpsByContract.get(row.contractId) ?? null),
+        goingRate
+      ),
+    [jumpsByContract, goingRate]
+  );
 
-  /** Jumps are resolved against the filtered set, so a row's count is found by its own id. */
-  const jumpsByContract = useMemo(() => {
-    const byContract = new Map<number, number | null>();
-    if (jumps.kind !== 'known') return byContract;
-    matchingRows.forEach((row, index) => {
-      byContract.set(row.contractId, jumps.counts[index] ?? null);
+  /**
+   * Applied here rather than in `matchingRows`, because a multiple needs the
+   * going rate, which needs the distances — none of which the row filter has.
+   * A haul whose multiple cannot be stated is never removed by either
+   * direction: "we cannot say" is not "within the going rate", and it is not
+   * "far above" it either.
+   */
+  const ratedRows = useMemo(() => {
+    // Until the distances land no row has a multiple, so narrowing on one
+    // would empty the board and the empty state would report "nothing matched"
+    // — a complete answer given mid-load. The board shows everything until it
+    // can actually tell these apart.
+    if (uiFilter.overRate === 'all' || jumps.kind !== 'known') return matchingRows;
+    const wantFlagged = uiFilter.overRate === 'only';
+    return matchingRows.filter((row) => {
+      const multiple = multipleFor(row);
+      if (multiple === null) return !wantFlagged;
+      return paysFarAboveGoingRate(multiple) === wantFlagged;
     });
-    return byContract;
-  }, [matchingRows, jumps]);
+  }, [matchingRows, uiFilter.overRate, multipleFor, jumps.kind]);
+
+  const displayRows = useMemo(() => {
+    const ranked = [...ratedRows];
+    if (jumps.kind !== 'known') return ranked.sort((a, b) => b.reward - a.reward);
+    const rate = (row: CourierRouteRow) =>
+      // A haul with no measurable distance has no rate, and sorts last rather
+      // than as zero — "we cannot say" is not "pays nothing".
+      iskPerJump(row.reward, jumpsByContract.get(row.contractId) ?? null) ?? -1;
+    return ranked.sort((a, b) => rate(b) - rate(a));
+  }, [ratedRows, jumps, jumpsByContract]);
 
   function changeFilter(next: CourierUiFilter) {
     setUiFilter(next);
@@ -846,7 +939,32 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
         render: (row) => {
           if (jumps.kind === 'pending') return <span className="text-text-dim">…</span>;
           const rate = iskPerJump(row.reward, jumpsByContract.get(row.contractId) ?? null);
-          return rate === null ? <span className="text-text-dim">—</span> : formatIskAuto(rate);
+          const multiple = multipleFor(row);
+          return (
+            <div className="flex flex-col items-end gap-0.5">
+              {rate === null ? <span className="text-text-dim">—</span> : formatIskAuto(rate)}
+              {/*
+                A second line in the cell rather than an eighth column: the
+                table is already seven wide and every column is a card line when
+                it stacks below `sm`. It names its own benchmark inline, because
+                it is a multiple of the corpus median per m³ per jump rather
+                than of the ISK/jump figure printed above it.
+              */}
+              {multiple !== null && (
+                <span
+                  className={
+                    paysFarAboveGoingRate(multiple)
+                      ? 'rounded-xs border border-warning/40 px-1 text-[0.6875rem] text-warning'
+                      : 'text-[0.6875rem] text-text-dim'
+                  }
+                >
+                  {t('contractSearch.goingRateMultiple', {
+                    multiple: formatMagnitude(multiple),
+                  })}
+                </span>
+              )}
+            </div>
+          );
         },
       },
       {
@@ -872,7 +990,7 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
         render: (row) => formatTimestamp(new Date(row.dateExpired), timeZone),
       },
     ];
-  }, [t, regionNames, timeZone, jumps.kind, jumpsByContract]);
+  }, [t, regionNames, timeZone, jumps.kind, jumpsByContract, multipleFor]);
 
   const visibleRows = showAll ? displayRows : displayRows.slice(0, ROW_CAP);
 
@@ -965,6 +1083,8 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
               ? PENDING_JUMPS
               : { kind: 'known', count: jumpsByContract.get(selectedRow.contractId) ?? null }
           }
+          goingRateMultiple={multipleFor(selectedRow)}
+          preference={preference}
           onClose={() => setSelectedRow(null)}
         />
       )}
