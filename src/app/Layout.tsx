@@ -170,22 +170,34 @@ function NavItem({ to, label, locked, onClick }: NavItemProps) {
  * dot, because "some alerts" and "seventy alerts" are different situations and
  * an accent tint conveys neither (DESIGN.md §7). Zero renders nothing: a badge
  * reading "0" is a badge you stop looking at.
+ *
+ * One component for both navs rather than two, so the unread read and the
+ * `nav.alertsWithCount` name stay in one place. `variant` only picks the shell:
+ * the rail/sheet row (`navClass`, badge pushed right by `ml-auto`) or the
+ * mobile tab (`mobileNavClass`, whose `justify-center` wants the badge beside
+ * the label, not flung to the edge).
  */
-function AlertsNavItem({ onClick }: { onClick?: () => void }) {
+interface AlertsNavItemProps {
+  onClick?: () => void;
+  variant?: 'rail' | 'tab';
+}
+
+function AlertsNavItem({ onClick, variant = 'rail' }: AlertsNavItemProps) {
   const { t } = useTranslation();
   const unread = useUnreadAlertCount();
+  const tab = variant === 'tab';
   return (
     <NavLink
       to="/alerts"
       onClick={onClick}
-      className={navClass}
+      className={tab ? mobileNavClass : navClass}
       aria-label={unread > 0 ? t('nav.alertsWithCount', { count: unread }) : undefined}
     >
       <span className="min-w-0 truncate">{t('nav.alerts')}</span>
       {unread > 0 && (
         <span
           aria-hidden="true"
-          className="ml-auto shrink-0 rounded-xs bg-panel-2 px-1.5 text-[0.6875rem] font-medium tabular-nums text-text-dim"
+          className={`${tab ? 'ml-1' : 'ml-auto'} shrink-0 rounded-xs bg-panel-2 px-1.5 text-[0.6875rem] font-medium tabular-nums text-text-dim`}
         >
           {unread}
         </span>
@@ -357,15 +369,21 @@ function MobileMoreSheet({ open, onClose, activeCharacter, locked }: MobileMoreS
           between two of them left almost no dead zone for a thumb to miss
           into on this phone-only sheet. */}
       <div className="space-y-2 pb-3">
-        <AlertsNavItem onClick={onClose} />
         {/* The phone's only route to /corp: the tab bar is full at 4 + More. */}
         <CorpNavItem onClick={onClose} />
         {/*
           From here down, same relative order as the desktop rail's
-          Progression/Economy/Social groups (Skills, Industry and PI lead
+          Progression/Economy/Social groups (Skills and Industry lead
           Progression there, but sit in the primary tab bar here, not this
-          sheet) — one order to learn, not two.
+          sheet) — one order to learn, not two. Alerts is a tab now, so it is
+          not repeated here.
         */}
+        <NavItem
+          to="/planetary-industry"
+          label={t('nav.pi')}
+          locked={locked.has('/planetary-industry')}
+          onClick={onClose}
+        />
         <NavItem
           to="/market"
           label={t('nav.market')}
@@ -591,14 +609,14 @@ export function Layout() {
         <NavLink to="/overview" className={mobileNavClass}>
           <span className="truncate">{t('nav.overview')}</span>
         </NavLink>
+        {/* Straight after Overview, as in the rail: an alert is what the board
+            is summarising, and the two are read in that order. */}
+        <AlertsNavItem variant="tab" />
         <NavLink to="/skills" className={mobileNavClass}>
           <span className="truncate">{t('nav.skills')}</span>
         </NavLink>
         <NavLink to="/industry" className={mobileNavClass}>
           <span className="truncate">{t('nav.industry')}</span>
-        </NavLink>
-        <NavLink to="/planetary-industry" className={mobileNavClass}>
-          <span className="truncate">{t('nav.pi')}</span>
         </NavLink>
         <button
           type="button"
