@@ -127,12 +127,21 @@ describe('AppraisalPanel', () => {
       sell: 2_000 * (index + 1),
     }));
 
-    async function compareTable() {
+    async function compareCards() {
       const toggle = await screen.findByRole('button', { name: /hub comparison/i });
       if (toggle.getAttribute('aria-label')?.startsWith('Show')) {
         await userEvent.click(toggle);
       }
-      return screen.findByRole('table', { name: 'Compare hubs' });
+      return screen.findByRole('list', { name: 'Compare hubs' });
+    }
+
+    /** The card for one hub, found by the hub name it is titled with. */
+    function hubCard(list: HTMLElement, systemName: string): HTMLElement {
+      const card = within(list)
+        .getAllByRole('listitem')
+        .find((item) => within(item).queryByText(systemName) !== null);
+      if (card === undefined) throw new Error(`No card for ${systemName}`);
+      return card;
     }
 
     it('is absent until something has been appraised', () => {
@@ -140,16 +149,19 @@ describe('AppraisalPanel', () => {
       expect(screen.queryByText('Compare hubs')).not.toBeInTheDocument();
     });
 
-    it('lists all 5 Trade Hubs, collapsed by default', async () => {
+    it('gives all 5 Trade Hubs a card, collapsed by default', async () => {
       renderPanel({ controller: controller({ result: outcome(), compare: COMPARE_ROWS }) });
       expect(screen.getByText('Compare hubs')).toBeInTheDocument();
-      expect(screen.queryByRole('table', { name: 'Compare hubs' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('list', { name: 'Compare hubs' })).not.toBeInTheDocument();
 
-      const table = await compareTable();
+      const list = await compareCards();
+      expect(within(list).getAllByRole('listitem')).toHaveLength(TRADE_HUBS.length);
       for (const hub of TRADE_HUBS) {
-        expect(
-          within(table).getByRole('row', { name: new RegExp(hub.systemName) })
-        ).toBeInTheDocument();
+        // Both sides are labelled on every card, so the buy/sell figures can
+        // never be told apart by position alone.
+        const card = hubCard(list, hub.systemName);
+        expect(within(card).getByText('Sell total')).toBeInTheDocument();
+        expect(within(card).getByText('Buy total')).toBeInTheDocument();
       }
     });
 
@@ -158,16 +170,13 @@ describe('AppraisalPanel', () => {
         controller: controller({ result: outcome(), compare: COMPARE_ROWS }),
         defaultCompareExpanded: true,
       });
-      expect(screen.getByRole('table', { name: 'Compare hubs' })).toBeInTheDocument();
+      expect(screen.getByRole('list', { name: 'Compare hubs' })).toBeInTheDocument();
     });
 
     it('shows a dash, not a zero, for a hub with no orders on a side', async () => {
       renderPanel({ controller: controller({ result: outcome(), compare: COMPARE_ROWS }) });
-      const table = await compareTable();
-      const jitaRow = within(table).getByRole('row', {
-        name: new RegExp(TRADE_HUBS[0].systemName),
-      });
-      expect(within(jitaRow).getByText('—')).toBeInTheDocument();
+      const list = await compareCards();
+      expect(within(hubCard(list, TRADE_HUBS[0].systemName)).getByText('—')).toBeInTheDocument();
     });
   });
 

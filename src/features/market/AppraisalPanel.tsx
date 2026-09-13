@@ -40,10 +40,10 @@ import { writeToClipboard } from '@/lib/clipboard';
 import { formatIskAuto } from '@/lib/isk';
 import { downloadCsv } from '@/lib/downloadCsv';
 import type { TradeHub } from '@/market/hubs';
-import type { HubComparisonRow } from './appraisalData';
 import { appraisalCsvColumns } from './appraisalCsv';
 import { buildAppraisalShareLink, MAX_SHARE_ITEMS } from './appraisalShareData';
 import { formatVolume } from './format';
+import { HubCompareCards } from './HubCompareCards';
 import { ItemContextMenu } from './ItemContextMenu';
 import { MarketItemLink } from './MarketItemLink';
 import { isValidPricePercent, MAX_PRICE_PERCENT, MIN_PRICE_PERCENT } from './pricePercent';
@@ -278,32 +278,6 @@ export function AppraisalPanel({
     );
   }
 
-  const compareColumns: DataTableColumn<HubComparisonRow>[] = [
-    {
-      id: 'hub',
-      header: t('market.appraisal.columnHub'),
-      primary: true,
-      render: (row) => row.hub.systemName,
-      sortValue: (row) => row.hub.systemName,
-    },
-    {
-      id: 'sellTotal',
-      header: t('market.appraisal.columnSellTotal'),
-      align: 'right',
-      className: 'whitespace-nowrap tabular-nums',
-      render: (row) => totalCell(row.sell, 'tap'),
-      sortValue: (row) => row.sell ?? undefined,
-    },
-    {
-      id: 'buyTotal',
-      header: t('market.appraisal.columnBuyTotal'),
-      align: 'right',
-      className: 'whitespace-nowrap tabular-nums',
-      render: (row) => totalCell(row.buy, 'tap'),
-      sortValue: (row) => row.buy ?? undefined,
-    },
-  ];
-
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-[21rem_1fr] lg:items-start">
       <Panel
@@ -518,15 +492,8 @@ export function AppraisalPanel({
               show: t('market.appraisal.compareHubsShow'),
               hide: t('market.appraisal.compareHubsHide'),
             }}
-            padded={false}
           >
-            <DataTable
-              columns={compareColumns}
-              rows={compare}
-              rowKey={(row) => row.hub.id}
-              label={t('market.appraisal.compareHubsTitle')}
-              density="compact"
-            />
+            <HubCompareCards rows={compare} />
           </CollapsiblePanel>
         )}
       </div>
