@@ -41,7 +41,10 @@ import {
   readContractsTab,
   type ContractsTab,
 } from '@/features/character/contractsTabs';
-import { ContractSearchPanel } from '@/features/contractSearch/ContractSearchPanel';
+import {
+  ContractSearchPanel,
+  type ContractSearchStatus,
+} from '@/features/contractSearch/ContractSearchPanel';
 import type { CachedResult } from '@/esi/cache';
 import { resolveNames } from '@/features/character/names';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
@@ -198,6 +201,14 @@ export function Contracts() {
   // The contract a `contractAccepted` alert pointed at, if any.
   const highlightedContractId = useHighlightParam();
 
+  /**
+   * The Search tab's own freshness and reload, reported up by the panel so the
+   * page header can draw them beside the route title — the same slot the
+   * History tab's badge and Refresh use, and the same slot every other route
+   * puts them in. Null until that panel has mounted and loaded something.
+   */
+  const [searchStatus, setSearchStatus] = useState<ContractSearchStatus | null>(null);
+
   const [searchParams, setSearchParams] = useSearchParams();
   const tab = readContractsTab(searchParams.get('tab'));
   const setTab = useCallback(
@@ -321,14 +332,20 @@ export function Contracts() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
-      {/* The badge and both actions describe this character's own contract
-          history, and mean nothing on the Search tab — which reads a shared
-          public snapshot and carries its own age badge and Refresh. */}
+      {/* Both tabs read something datable and reloadable, but not the same
+          thing: History is this character's own contract list, Search a shared
+          public snapshot the panel below owns. So the badge and the Refresh
+          are per tab — the CSV export is History-only, because it exports that
+          character's contracts and nothing on Search corresponds to it. */}
       <PageHeader
         title={t('contracts.title')}
         meta={
-          tab === 'history' && contractsResult ? (
-            <DataAgeBadge date={contractsResult.fetchedAt} />
+          tab === 'history' ? (
+            contractsResult ? (
+              <DataAgeBadge date={contractsResult.fetchedAt} />
+            ) : undefined
+          ) : searchStatus?.lastSyncedAt != null ? (
+            <DataAgeBadge date={new Date(searchStatus.lastSyncedAt)} />
           ) : undefined
         }
         actions={
@@ -355,7 +372,14 @@ export function Contracts() {
                 disabled={loading}
               />
             </>
-          ) : undefined
+          ) : (
+            <IconButton
+              icon={<Icon.Refresh />}
+              label={t('contractSearch.refresh')}
+              onClick={() => searchStatus?.refresh()}
+              disabled={searchStatus === null || searchStatus.loading}
+            />
+          )
         }
       />
 
@@ -370,7 +394,7 @@ export function Contracts() {
           neither this character's contracts nor its `contracts` scope, so a
           character with an empty history or a 403 must still reach it. */}
       {tab === 'search' ? (
-        <ContractSearchPanel />
+        <ContractSearchPanel onStatusChange={setSearchStatus} />
       ) : loading && !data ? (
         <div className="flex justify-center py-16">
           <Spinner label={t('common.loading')} />
