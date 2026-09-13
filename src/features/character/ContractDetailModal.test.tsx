@@ -265,6 +265,35 @@ describe('ContractDetailModal', () => {
     expect(screen.getByTestId('location')).toHaveTextContent('/industry?product=587');
   });
 
+  it('shows a standing tag beside the issuer when one is passed', () => {
+    renderModal({
+      characterId: CHAR_ID,
+      contract: ITEM_EXCHANGE,
+      issuerName: 'Mero Otichoda',
+      issuerStanding: {
+        standing: -10,
+        source: 'character',
+        sourceId: ITEM_EXCHANGE.issuer_id,
+        inherited: false,
+        contact: { contact_id: ITEM_EXCHANGE.issuer_id, contact_type: 'character', standing: -10 },
+      },
+      onClose: () => {},
+    });
+    expect(
+      screen.getByRole('img', { name: 'Your contact: Terrible standing (-10)' })
+    ).toBeInTheDocument();
+  });
+
+  it('shows no standing tag when none is passed (stranger, or omitted entirely)', () => {
+    renderModal({
+      characterId: CHAR_ID,
+      contract: ITEM_EXCHANGE,
+      issuerName: 'Mero Otichoda',
+      onClose: () => {},
+    });
+    expect(screen.queryByRole('img')).not.toBeInTheDocument();
+  });
+
   it('issuer name opens the shared Public Info Modal (issue #417)', () => {
     renderModal({
       characterId: CHAR_ID,

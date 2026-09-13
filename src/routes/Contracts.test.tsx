@@ -96,7 +96,11 @@ const server = setupServer(
   }),
   http.post('https://esi.evetech.net/universe/names', () =>
     HttpResponse.json([{ id: 500001, name: 'Some Trader', category: 'character' }])
-  )
+  ),
+  // No contacts and no affiliation by default — standing cross-reference
+  // tests below override these per-scenario.
+  http.get(`https://esi.evetech.net/characters/${CHAR_ID}/contacts`, () => HttpResponse.json([])),
+  http.post('https://esi.evetech.net/characters/affiliation', () => HttpResponse.json([]))
 );
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
@@ -313,6 +317,90 @@ describe('Contracts market/issuer links and filters (issue #417)', () => {
     await user.click(screen.getByRole('button', { name: 'Retry' }));
 
     await waitFor(() => expect(page2Requests).toBeGreaterThan(requestsBeforeRetry));
+  });
+});
+
+describe('Contact standing cross-reference', () => {
+  it('shows a standing tag next to a personally-blocked issuer', async () => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/contacts`, () =>
+        HttpResponse.json([
+          { contact_id: 500001, contact_type: 'character', standing: -10, is_blocked: true },
+        ])
+      )
+    );
+    render(<App />);
+    await screen.findByText('Rifter fit');
+    const table = screen.getByRole('table', { name: 'Contracts' });
+    // Both fixture contracts share issuer_id 500001 — both rows carry the tag.
+    expect(
+      within(table).getAllByRole('img', { name: 'Your contact: Terrible standing (-10)' })
+    ).toHaveLength(2);
+  });
+
+  it('shows no tag next to a stranger', async () => {
+    render(<App />);
+    await screen.findByText('Rifter fit');
+    const table = screen.getByRole('table', { name: 'Contracts' });
+    expect(within(table).queryByRole('img')).not.toBeInTheDocument();
+  });
+
+  /**
+   * The contacts scope may never have been granted at all (this route never
+   * asks for it) — a network failure on that one lookup must not take the
+   * whole page down with it, the same way an offline contracts fetch falls
+   * back to cache rather than failing the page (`loadPaginatedWithCacheStatus`
+   * catches internally; this proves the `Promise.all` alongside it inherits
+   * that, not just the contracts call on its own).
+   */
+  it('still renders contracts when the contacts lookup itself fails', async () => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/contacts`, () => HttpResponse.error())
+    );
+    render(<App />);
+    expect(await screen.findByText('Rifter fit')).toBeInTheDocument();
+    const table = screen.getByRole('table', { name: 'Contracts' });
+    expect(within(table).queryByRole('img')).not.toBeInTheDocument();
+  });
+
+  it("inherits the issuer's corp entry when the issuer has no personal contact of their own", async () => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/contacts`, () =>
+        HttpResponse.json([{ contact_id: 2, contact_type: 'corporation', standing: -10 }])
+      ),
+      http.post('https://esi.evetech.net/characters/affiliation', () =>
+        HttpResponse.json([{ character_id: 500001, corporation_id: 2 }])
+      )
+    );
+    render(<App />);
+    await screen.findByText('Rifter fit');
+    const table = screen.getByRole('table', { name: 'Contracts' });
+    // Both fixture contracts share issuer_id 500001 — both rows carry the tag.
+    expect(
+      within(table).getAllByRole('img', {
+        name: 'Terrible standing (-10) — your entry on their corp, not on them',
+      })
+    ).toHaveLength(2);
+  });
+
+  it('carries the same standing tag into the contract detail modal', async () => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/contracts/1/items`, () =>
+        HttpResponse.json([])
+      ),
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/contacts`, () =>
+        HttpResponse.json([
+          { contact_id: 500001, contact_type: 'character', standing: -10, is_blocked: true },
+        ])
+      )
+    );
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByRole('button', { name: 'Rifter fit' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Rifter fit' });
+    expect(
+      within(dialog).getByRole('img', { name: 'Your contact: Terrible standing (-10)' })
+    ).toBeInTheDocument();
   });
 });
 

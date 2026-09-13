@@ -16,6 +16,7 @@ import {
 import * as Icon from '@/components/ui/icons';
 import { beginEveLogin } from '@/app/loginFlow';
 import { IssuerLink } from '@/features/character/IssuerLink';
+import { StandingTag } from '@/features/character/StandingTag';
 import { MailRowContextMenu } from '@/features/character/MailRowContextMenu';
 import {
   loadMailHeaders,
@@ -25,6 +26,13 @@ import {
   loadMoreMailHeaders,
   markMailReadOnEsi,
 } from '@/features/character/mail';
+import { loadContacts } from '@/features/character/contacts';
+import {
+  buildContactStandingIndex,
+  type ContactStandingIndex,
+} from '@/features/character/contactStandings';
+import { resolveAffiliations } from '@/features/character/affiliations';
+import { characterStanding } from '@/features/character/entityStanding';
 import type { CachedResult } from '@/esi/cache';
 import { resolveNames } from '@/features/character/names';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
@@ -47,7 +55,14 @@ import {
   MAIL_FOLDERS,
   type MailTab,
 } from '@/engine/mail';
-import type { MailBody, MailHeader, MailLabel, MailLabels, MailingList } from '@/esi/endpoints';
+import type {
+  CharacterAffiliation,
+  MailBody,
+  MailHeader,
+  MailLabel,
+  MailLabels,
+  MailingList,
+} from '@/esi/endpoints';
 
 // Matches Market.tsx's/SkillPicker.tsx's/Assets.tsx's own search debounce.
 const SEARCH_DEBOUNCE_MS = 250;
@@ -88,12 +103,22 @@ interface Snapshot {
   headersHasMore: boolean;
   /** This character's mailing lists, for resolving a `mailing_list` recipient's real name (issue #416). */
   mailingLists: MailingList[];
+  /**
+   * This character's own contact list, indexed once per snapshot. Empty
+   * (never missing) when the contacts scope isn't granted — a stranger's tag
+   * is simply absent, not an error the page needs to surface.
+   */
+  standingIndex: ContactStandingIndex;
+  /** Each sender's corp/alliance/faction, so a sender with no personal contact entry can still match one the pilot holds on their corp. Senders only — Mail's standing tag is scoped to "who sent this", not every recipient. */
+  senderAffiliations: Map<number, CharacterAffiliation>;
 }
 
 /** Stable identity for the loading/failed fallback, so it doesn't churn every render. */
 const NO_NAMES: ReadonlyMap<number, string> = new Map();
 const NO_LABELS: readonly MailLabel[] = [];
 const NO_MAILING_LISTS: readonly MailingList[] = [];
+const NO_STANDING_INDEX: ContactStandingIndex = new Map();
+const NO_AFFILIATIONS: ReadonlyMap<number, CharacterAffiliation> = new Map();
 
 /**
  * Sender + recipient ids to look up for these headers. Mailing-list recipient
@@ -110,6 +135,11 @@ function namePartyIds(headers: readonly MailHeader[]): number[] {
   ]);
 }
 
+/** Senders only — the standing tag is scoped to "who sent this", never a recipient. */
+function senderIds(headers: readonly MailHeader[]): number[] {
+  return headers.flatMap((header) => (header.from !== undefined ? [header.from] : []));
+}
+
 async function loadMailSnapshot(
   characterId: number,
   signal: RouteSnapshotSignal
@@ -124,9 +154,15 @@ async function loadMailSnapshot(
     loadMailingLists(characterId),
   ]);
 
-  // Already superseded: skip the name lookup, its result would be discarded.
+  // Already superseded: skip the name/standing lookups, their results would be discarded.
   const ids = signal.cancelled ? [] : namePartyIds(headersResult?.data ?? []);
-  const names = await resolveNames(ids);
+  const senders = signal.cancelled ? [] : senderIds(headersResult?.data ?? []);
+  const [names, contactsStatus, senderAffiliations] = await Promise.all([
+    resolveNames(ids),
+    signal.cancelled ? Promise.resolve(null) : loadContacts(characterId),
+    resolveAffiliations(senders),
+  ]);
+  const standingIndex = buildContactStandingIndex(contactsStatus?.cached?.data ?? []);
   return {
     headersResult,
     labelsResult,
@@ -134,6 +170,8 @@ async function loadMailSnapshot(
     names,
     headersHasMore,
     mailingLists: listsResult?.data ?? [],
+    standingIndex,
+    senderAffiliations,
   };
 }
 
@@ -202,6 +240,15 @@ export function Mail() {
   // Names for those headers: the snapshot only resolved the parties in its own
   // first page, so without this every row past it would read "Unknown".
   const [loadedNames, setLoadedNames] = useState<ReadonlyMap<number, string> | null>(null);
+  // Same gap, for standing: the snapshot only resolved affiliations for its
+  // own first page of senders, so without this an inherited (corp/alliance)
+  // standing would silently never show past it — a personal contact entry
+  // would still match (the index is id-keyed), which is what makes this easy
+  // to miss in a quick look.
+  const [loadedAffiliations, setLoadedAffiliations] = useState<Map<
+    number,
+    CharacterAffiliation
+  > | null>(null);
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   // Reset for a new snapshot (character switch, manual refresh, or the
@@ -214,6 +261,7 @@ export function Mail() {
     setSnapshotForHeaders(data);
     setLoadedHeaders(null);
     setLoadedNames(null);
+    setLoadedAffiliations(null);
     setHasMore(data?.headersHasMore ?? false);
   }
   // Latest snapshot, readable from handleLoadMore's async closure after an
@@ -236,6 +284,8 @@ export function Mail() {
   const headersResult = data?.headersResult ?? null;
   const needsReauth = data?.needsReauth ?? false;
   const names = loadedNames ?? data?.names ?? NO_NAMES;
+  const standingIndex = data?.standingIndex ?? NO_STANDING_INDEX;
+  const senderAffiliations = loadedAffiliations ?? data?.senderAffiliations ?? NO_AFFILIATIONS;
   const labels = data?.labelsResult?.data.labels ?? NO_LABELS;
   const labelTabById = useMemo(() => buildLabelTabMap(labels), [labels]);
   const unreadByTab = useMemo(() => unreadCountsByTab(labels), [labels]);
@@ -310,14 +360,19 @@ export function Mail() {
     setLoadingMore(true);
     try {
       const result = await loadMoreMailHeaders(activeCharacterId, headers);
-      const names = await resolveNames(namePartyIds(result.headers));
+      const [names, affiliations] = await Promise.all([
+        resolveNames(namePartyIds(result.headers)),
+        resolveAffiliations(senderIds(result.headers)),
+      ]);
       // A character switch or refresh landed while this was in flight and
-      // already reset loadedHeaders/loadedNames for the new snapshot —
-      // applying this result now would overwrite it with stale mail.
+      // already reset loadedHeaders/loadedNames/loadedAffiliations for the
+      // new snapshot — applying this result now would overwrite it with
+      // stale mail.
       if (dataRef.current !== requestSnapshot) return;
       setLoadedHeaders(result.headers);
       setHasMore(result.hasMore);
       setLoadedNames(names);
+      setLoadedAffiliations(affiliations);
     } finally {
       setLoadingMore(false);
     }
@@ -660,10 +715,19 @@ export function Mail() {
                     {body.data.subject || t('mail.noSubject')}
                   </p>
                   <div className="space-y-0.5 border-b border-line pb-2 text-text-dim">
-                    <p>
-                      {t('mail.from')}{' '}
+                    <p className="flex flex-wrap items-center gap-1.5">
+                      {t('mail.from')}
                       {selectedHeader?.from !== undefined ? (
-                        <IssuerLink issuerId={selectedHeader.from} name={selectedSender} />
+                        <>
+                          <IssuerLink issuerId={selectedHeader.from} name={selectedSender} />
+                          <StandingTag
+                            standing={characterStanding(
+                              standingIndex,
+                              selectedHeader.from,
+                              senderAffiliations
+                            )}
+                          />
+                        </>
                       ) : (
                         <span className="text-text">{selectedSender}</span>
                       )}
