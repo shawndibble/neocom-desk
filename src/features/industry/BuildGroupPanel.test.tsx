@@ -480,3 +480,17 @@ describe('BuildGroupPanel — total volume (issue #874)', () => {
     expect(screen.getByText(/volume at least 1 m³/i)).toBeTruthy();
   });
 });
+
+describe('BuildGroupPanel — bulk owned-stock actions', () => {
+  it('shows both bulk buttons even when neither has a row to act on', () => {
+    // Nothing detected and nothing in the ledger: both suggestion lists are
+    // empty, which used to render the toolbar with no buttons at all. The
+    // pair is fixed furniture now, so the row beneath the scope select does
+    // not appear and disappear as materials change.
+    mockedUseComparedBuildResults.mockReturnValue([row('a', [material(34, 100)])]);
+    renderPanel([plan('a', 'jita')]);
+
+    expect(screen.getByRole('button', { name: 'Use all' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Use none' })).toBeTruthy();
+  });
+});
