@@ -162,6 +162,12 @@
     .dt-stack td {
       position: relative;
       padding: 0.125rem 0 0.125rem 7rem;
+      /* The label below is out of flow, so an empty cell would be only its
+         own 4px of padding tall and its label would print over the next
+         cell's. Reserves the label's own box: top offset + its pinned
+         line-height + bottom padding. Inert on any cell with content, which
+         is always taller. */
+      min-height: 1.25rem;
       /* Beats the `text-right`/`whitespace-nowrap` utilities on the cell:
          nothing may force a card wider than the screen. */
       text-align: left;
@@ -177,6 +183,9 @@
       width: 6.5rem;
       overflow: hidden;
       font-size: 0.625rem;
+      /* Pinned rather than inherited, so the `min-height` above is arithmetic
+         and not a guess at each browser's `normal`. */
+      line-height: 1rem;
       text-overflow: ellipsis;
       white-space: nowrap;
       letter-spacing: 0.1em;
