@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+  barTabs,
   DEFAULT_MOBILE_TABS,
   MOBILE_TAB_CHOICES,
   MOBILE_TAB_COUNT,
-  MOBILE_TAB_LABEL_KEYS,
+  NAV_LABEL_KEYS,
   mobileSheetPaths,
   parseMobileTabs,
   sortMobileTabs,
@@ -73,7 +74,33 @@ describe('the default bar', () => {
 describe('labels', () => {
   it('names every choice, so no tab or sheet row can render blank', () => {
     for (const path of MOBILE_TAB_CHOICES) {
-      expect(MOBILE_TAB_LABEL_KEYS[path]).toMatch(/^nav\./);
+      expect(NAV_LABEL_KEYS[path]).toMatch(/^nav\./);
     }
+  });
+});
+
+describe('barTabs', () => {
+  it('sorts a full bar into canonical order', () => {
+    expect(barTabs(['/mail', '/overview', '/wallet', '/assets'])).toEqual([
+      '/overview',
+      '/wallet',
+      '/assets',
+      '/mail',
+    ]);
+  });
+
+  it.each([
+    ['short', ['/overview', '/wallet'] as const],
+    ['empty', [] as const],
+  ])('falls back to the default rather than render a %s bar', (_case, stored) => {
+    expect(barTabs([...stored])).toEqual([...DEFAULT_MOBILE_TABS]);
+  });
+
+  it('keeps the sheet a true complement of whatever the bar ends up as', () => {
+    const bar = barTabs(['/overview', '/wallet']);
+    const sheet = mobileSheetPaths(bar);
+
+    expect(bar).toHaveLength(MOBILE_TAB_COUNT);
+    expect([...bar, ...sheet].toSorted()).toEqual([...MOBILE_TAB_CHOICES].toSorted());
   });
 });

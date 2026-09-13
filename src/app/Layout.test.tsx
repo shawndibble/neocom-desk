@@ -163,8 +163,7 @@ describe('Layout mobile "More" sheet (UX-REVIEW #4)', () => {
     await user.click(within(mobileNav).getByRole('button', { name: 'More' }));
     const sheet = screen.getByRole('dialog', { name: 'More' });
 
-    // Alerts now lives in the primary tab bar, not the sheet; PI traded places
-    // with it and leads the sheet's Progression/Economy/Social run.
+    // Alerts lives in the primary tab bar, not the sheet.
     expect(within(sheet).queryByRole('link', { name: 'Alerts' })).not.toBeInTheDocument();
 
     const labels = [
@@ -869,6 +868,40 @@ describe("Layout mobile tab bar follows the pilot's choice", () => {
     for (const chosen of ['Wallet', 'Assets', 'Mail']) {
       expect(within(sheet).queryByRole('link', { name: chosen })).not.toBeInTheDocument();
     }
+  });
+
+  it('marks a locked destination in the bar, not only in the sheet', async () => {
+    mockIsSyncConfigured.mockReturnValue(false);
+    await db.characters.put({
+      characterId: CHARACTER_ID,
+      name: 'Pilot One',
+      ownerHash: 'oh',
+      addedAt: 0,
+    });
+    // A token granting nothing: every scope-gated route is locked.
+    await db.tokens.put({
+      characterId: CHARACTER_ID,
+      accessToken: 'a',
+      refreshToken: 'r',
+      expiresAt: Date.now() + 60_000,
+      scopes: [],
+    });
+    useActiveCharacter.setState({ activeCharacterId: CHARACTER_ID, hydrated: true });
+    useMobileTabs.setState({
+      value: ['/overview', '/assets', '/skills', '/industry'],
+      hydrated: true,
+    });
+    renderLayout();
+
+    const mobileNav = screen.getByRole('navigation', { name: 'Mobile navigation' });
+    // Promoting a gated route into the bar used to hide its marker entirely:
+    // the bar did not draw one, and the sheet no longer lists what the bar holds.
+    await waitFor(() =>
+      expect(within(mobileNav).getByRole('link', { name: 'Assets' })).toHaveAttribute(
+        'title',
+        'Needs a new login'
+      )
+    );
   });
 
   it('keeps Corp, Settings and the Character in the sheet whatever the bar holds', async () => {

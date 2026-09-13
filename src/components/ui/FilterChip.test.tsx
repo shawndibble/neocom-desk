@@ -35,6 +35,32 @@ describe('FilterChip', () => {
     expect(onToggle).not.toHaveBeenCalled();
   });
 
+  it('keeps a disabled chip reachable when it has a tooltip to explain itself', async () => {
+    const onToggle = vi.fn();
+    render(
+      <FilterChip
+        label="Wallet"
+        selected={false}
+        onToggle={onToggle}
+        disabled
+        tooltip="Unpick one first — the bar holds four."
+      />
+    );
+    const chip = screen.getByRole('button', { name: /Wallet/ });
+    // Not the native attribute: that one takes no hover and no focus, so the
+    // explanation would be unreachable by either route.
+    expect(chip).not.toBeDisabled();
+    expect(chip).toHaveAttribute('aria-disabled', 'true');
+
+    await userEvent.hover(chip);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(
+      'Unpick one first — the bar holds four.'
+    );
+
+    await userEvent.click(chip);
+    expect(onToggle).not.toHaveBeenCalled();
+  });
+
   it('describes the chip with the tooltip on hover, leaving the label as its name', async () => {
     render(
       <FilterChip

@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -17,9 +17,9 @@ import { NotificationPermissionPrompt } from '@/features/notifications/Notificat
 import { ForegroundNotificationPoller } from '@/features/notifications/ForegroundNotificationPoller';
 import { useUnreadAlertCount } from '@/features/notifications/useUnreadAlertCount';
 import {
-  MOBILE_TAB_LABEL_KEYS,
+  barTabs,
   mobileSheetPaths,
-  sortMobileTabs,
+  NAV_LABEL_KEYS,
   useMobileTabs,
   type MobileTabPath,
 } from '@/lib/mobileTabs';
@@ -120,15 +120,33 @@ interface NavItemProps {
   to: AppRoutePath;
   label: string;
   locked: boolean;
+  /**
+   * What is waiting at this destination, rendered beside the label. Zero and
+   * `undefined` both render nothing: a badge reading "0" is a badge you stop
+   * looking at. It is a number, not a dot, because "some" and "seventy" are
+   * different situations and an accent tint conveys neither (DESIGN.md §7) —
+   * and it rides in the link's accessible name rather than as a bare numeral a
+   * screen reader would read out as "Alerts 12".
+   */
+  badge?: number;
+  /**
+   * `rail` (default) is the desktop rail's full-width row, which the More
+   * sheet also uses; `tab` is the phone tab bar's equal share of the viewport.
+   * One component for both so the lock marker, the badge and the accessible
+   * name cannot say different things in the two places a destination appears.
+   */
+  presentation?: 'rail' | 'tab';
   onClick?: () => void;
 }
 
 /**
- * Nav link marking a destination the active Character cannot currently use.
- * Informational only — the link still navigates and the route's `ScopeGate`
- * explains why; disabling it would leave no way to reach the explanation.
+ * A nav destination, wherever it appears.
+ *
+ * A `locked` one is marked, never disabled: the link still navigates and the
+ * route's `ScopeGate` explains why, and disabling it would leave no way to
+ * reach the explanation.
  */
-function NavItem({ to, label, locked, onClick }: NavItemProps) {
+function NavItem({ to, label, locked, badge, presentation = 'rail', onClick }: NavItemProps) {
   const { t } = useTranslation();
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   const granted = useGrantedScopes();
@@ -143,93 +161,41 @@ function NavItem({ to, label, locked, onClick }: NavItemProps) {
    * compose scope-gated reads, so `routeWarm.ts` filters on the endpoints its
    * loader actually reaches.
    *
-   * `MobileMoreSheet` renders this same component, so its links warm too; that
-   * is harmless rather than intended, since a touch device fires neither event
-   * until the tap itself. Only the bottom tab bar, which builds its own
-   * `NavLink`s, is outside this.
+   * A touch device fires neither event until the tap itself, so on the phone's
+   * two surfaces this is inert rather than wasted.
    */
   const warm = () => void warmRoute(to, activeCharacterId, granted);
-  // The marker rides on `title`, not extra text: a second string inside the
-  // link would rewrite its accessible name from "Assets" to "Assets, needs a
-  // new login", which is not what the link is called.
+  const tab = presentation === 'tab';
+  const counted = badge !== undefined && badge > 0;
+  // The lock marker rides on `title`, and the count on `aria-label`: a second
+  // string inside the link would rewrite its accessible name from "Assets" to
+  // "Assets, needs a new login", which is not what the link is called.
   return (
     <NavLink
       to={to}
       onClick={onClick}
       onMouseEnter={warm}
       onFocus={warm}
-      className={navClass}
+      className={tab ? mobileNavClass : navClass}
       title={locked ? t('reauth.navLocked') : undefined}
+      aria-label={counted ? t('nav.alertsWithCount', { count: badge }) : undefined}
     >
       <span className="min-w-0 truncate">{label}</span>
+      {counted && (
+        <span
+          aria-hidden="true"
+          className={`shrink-0 rounded-xs bg-panel-2 tabular-nums text-text-dim ${
+            tab ? 'ml-1 px-1' : 'ml-auto px-1.5 text-[0.6875rem] font-medium'
+          }`}
+        >
+          {badge}
+        </span>
+      )}
       {locked && (
-        <span aria-hidden="true" className="ml-auto size-1.5 shrink-0 rounded-full bg-warning" />
-      )}
-    </NavLink>
-  );
-}
-
-/**
- * Alerts, with what is waiting on it.
- *
- * The count rides in the link's own accessible name rather than as a bare
- * number a screen reader would read as "Alerts 12" — and it is a number, not a
- * dot, because "some alerts" and "seventy alerts" are different situations and
- * an accent tint conveys neither (DESIGN.md §7). Zero renders nothing: a badge
- * reading "0" is a badge you stop looking at.
- *
- * `unread` is a prop rather than a `useUnreadAlertCount()` call of its own:
- * the rail and the bottom tab bar are both mounted on every route (one is
- * merely `hidden`), so a hook here would open two Dexie live queries over the
- * same feed. `Layout` reads the count once and hands it to both.
- */
-function AlertsNavItem({ unread, onClick }: { unread: number; onClick?: () => void }) {
-  const { t } = useTranslation();
-  return (
-    <NavLink
-      to="/alerts"
-      onClick={onClick}
-      className={navClass}
-      aria-label={unread > 0 ? t('nav.alertsWithCount', { count: unread }) : undefined}
-    >
-      <span className="min-w-0 truncate">{t('nav.alerts')}</span>
-      {unread > 0 && (
         <span
           aria-hidden="true"
-          className="ml-auto shrink-0 rounded-xs bg-panel-2 px-1.5 text-[0.6875rem] font-medium tabular-nums text-text-dim"
-        >
-          {unread}
-        </span>
-      )}
-    </NavLink>
-  );
-}
-
-/**
- * Alerts as a bottom-tab item.
- *
- * Same count, same accessible name as the rail's — an Alerts tab that shows no
- * number is worth less than the sheet row it replaced, since the number is the
- * whole reason to look. `ml-1` rather than the rail's `ml-auto`: this tab
- * centres its label in an equal share of the bar, so the badge sits beside the
- * word instead of being pushed to an edge the tab does not really have.
- */
-function MobileAlertsTab({ unread }: { unread: number }) {
-  const { t } = useTranslation();
-  return (
-    <NavLink
-      to="/alerts"
-      className={mobileNavClass}
-      aria-label={unread > 0 ? t('nav.alertsWithCount', { count: unread }) : undefined}
-    >
-      <span className="truncate">{t('nav.alerts')}</span>
-      {unread > 0 && (
-        <span
-          aria-hidden="true"
-          className="ml-1 shrink-0 rounded-xs bg-panel-2 px-1 tabular-nums text-text-dim"
-        >
-          {unread}
-        </span>
+          className={`size-1.5 shrink-0 rounded-full bg-warning ${tab ? 'ml-1' : 'ml-auto'}`}
+        />
       )}
     </NavLink>
   );
@@ -381,13 +347,8 @@ interface MobileMoreSheetProps {
 }
 
 /**
- * Mobile-only overflow sheet: everything the bottom tab bar does not hold.
- *
- * The rows are `mobileSheetPaths(tabs)` — the complement of the bar, in the
- * desktop rail's order — rather than a list maintained here. The pilot chooses
- * the bar's four in Settings, so a hand-kept list on this side would put a
- * path in both places, or in neither, which on a phone means a route nobody
- * can reach.
+ * Mobile-only overflow sheet: `mobileSheetPaths(tabs)`, everything the bottom
+ * tab bar does not hold, in the desktop rail's order.
  *
  * Three entries sit outside that rotation, because nothing may evict them:
  * Corp (hidden rather than locked, and this is the phone's only route to it),
@@ -417,22 +378,16 @@ function MobileMoreSheet({
           into on this phone-only sheet. */}
       <div className="space-y-2 pb-3">
         <CorpNavItem onClick={onClose} />
-        {rows.map((path) =>
-          /* Alerts keeps its count wherever it lands — the number is the
-             reason to look at it, and it is the one row here that reports
-             something rather than naming a place. */
-          path === '/alerts' ? (
-            <AlertsNavItem key={path} unread={unreadAlerts} onClick={onClose} />
-          ) : (
-            <NavItem
-              key={path}
-              to={path}
-              label={t(MOBILE_TAB_LABEL_KEYS[path])}
-              locked={locked.has(path)}
-              onClick={onClose}
-            />
-          )
-        )}
+        {rows.map((path) => (
+          <NavItem
+            key={path}
+            to={path}
+            label={t(NAV_LABEL_KEYS[path])}
+            locked={locked.has(path)}
+            badge={path === '/alerts' ? unreadAlerts : undefined}
+            onClick={onClose}
+          />
+        ))}
         <FooterDivider />
         <NavItem to="/settings" label={t('nav.settings')} locked={false} onClick={onClose} />
         <CharacterFooterLink
@@ -494,21 +449,11 @@ export function Layout() {
   const locked = useLockedRoutes(NAV_PATHS);
 
   const [moreOpen, setMoreOpen] = useState(false);
-  // Read once for both renderings of the Alerts entry — see `AlertsNavItem`.
+  // Read once, not per rendering: the rail, the tab bar and the sheet are all
+  // mounted on every route, so a hook inside the nav item would open three
+  // Dexie live queries over the same feed.
   const unreadAlerts = useUnreadAlertCount();
-  /*
-   * The phone's four tabs. Hydrated in `App`, beside the other preferences the
-   * shell itself reads, so this paints the pilot's bar rather than the default
-   * one on every route they land on.
-   */
-  const chosenTabs = useMobileTabs((state) => state.value);
-  /*
-   * Sorted here rather than trusted from the row: the bar reads in the rail's
-   * order no matter who wrote the preference — a row from a later version, an
-   * import, a hand edit. `mobileSheetPaths` derives the sheet from the same
-   * canonical list, so the two stay complements.
-   */
-  const tabs = useMemo(() => sortMobileTabs(chosenTabs), [chosenTabs]);
+  const tabs = barTabs(useMobileTabs((state) => state.value));
   const moreButtonRef = useRef<HTMLButtonElement>(null);
 
   // The More sheet is mounted conditionally (`!isDesktop &&` below), not
@@ -556,14 +501,23 @@ export function Layout() {
             text scale) would push the footer off the bottom instead of
             scrolling. */}
         <nav className="flex flex-1 flex-col gap-1 overflow-y-auto p-2">
-          <NavItem to="/overview" label={t('nav.overview')} locked={locked.has('/overview')} />
+          <NavItem
+            to="/overview"
+            label={t(NAV_LABEL_KEYS['/overview'])}
+            locked={locked.has('/overview')}
+          />
           {/*
             Under Overview, not in Social: an alert is what the board is
             summarising, and the two are read in that order. Mail and calendar
             are correspondence — things other people sent you on purpose —
             which is a different errand.
           */}
-          <AlertsNavItem unread={unreadAlerts} />
+          <NavItem
+            to="/alerts"
+            label={t(NAV_LABEL_KEYS['/alerts'])}
+            locked={locked.has('/alerts')}
+            badge={unreadAlerts}
+          />
           {/*
             Beside Overview rather than inside a group: the two are the same
             kind of destination — "this pilot" and "this corporation" — and the
@@ -574,30 +528,62 @@ export function Layout() {
           */}
           <CorpNavItem />
           <NavGroupLabel>{t('nav.groups.progression')}</NavGroupLabel>
-          <NavItem to="/skills" label={t('nav.skills')} locked={locked.has('/skills')} />
-          <NavItem to="/industry" label={t('nav.industry')} locked={locked.has('/industry')} />
+          <NavItem
+            to="/skills"
+            label={t(NAV_LABEL_KEYS['/skills'])}
+            locked={locked.has('/skills')}
+          />
+          <NavItem
+            to="/industry"
+            label={t(NAV_LABEL_KEYS['/industry'])}
+            locked={locked.has('/industry')}
+          />
           <NavItem
             to="/moon-mining"
-            label={t('nav.miningTax')}
+            label={t(NAV_LABEL_KEYS['/moon-mining'])}
             locked={locked.has('/moon-mining')}
           />
           <NavItem
             to="/planetary-industry"
-            label={t('nav.pi')}
+            label={t(NAV_LABEL_KEYS['/planetary-industry'])}
             locked={locked.has('/planetary-industry')}
           />
           <NavGroupLabel>{t('nav.groups.economy')}</NavGroupLabel>
           {/* Leads the group: it is the one economy view that answers a
               question before you own anything, and the only one here that
               isn't Character-scoped. */}
-          <NavItem to="/market" label={t('nav.market')} locked={locked.has('/market')} />
-          <NavItem to="/wallet" label={t('nav.wallet')} locked={locked.has('/wallet')} />
-          <NavItem to="/assets" label={t('nav.assets')} locked={locked.has('/assets')} />
-          <NavItem to="/contracts" label={t('nav.contracts')} locked={locked.has('/contracts')} />
+          <NavItem
+            to="/market"
+            label={t(NAV_LABEL_KEYS['/market'])}
+            locked={locked.has('/market')}
+          />
+          <NavItem
+            to="/wallet"
+            label={t(NAV_LABEL_KEYS['/wallet'])}
+            locked={locked.has('/wallet')}
+          />
+          <NavItem
+            to="/assets"
+            label={t(NAV_LABEL_KEYS['/assets'])}
+            locked={locked.has('/assets')}
+          />
+          <NavItem
+            to="/contracts"
+            label={t(NAV_LABEL_KEYS['/contracts'])}
+            locked={locked.has('/contracts')}
+          />
           <NavGroupLabel>{t('nav.groups.social')}</NavGroupLabel>
-          <NavItem to="/mail" label={t('nav.mail')} locked={locked.has('/mail')} />
-          <NavItem to="/calendar" label={t('nav.calendar')} locked={locked.has('/calendar')} />
-          <NavItem to="/contacts" label={t('nav.contacts')} locked={locked.has('/contacts')} />
+          <NavItem to="/mail" label={t(NAV_LABEL_KEYS['/mail'])} locked={locked.has('/mail')} />
+          <NavItem
+            to="/calendar"
+            label={t(NAV_LABEL_KEYS['/calendar'])}
+            locked={locked.has('/calendar')}
+          />
+          <NavItem
+            to="/contacts"
+            label={t(NAV_LABEL_KEYS['/contacts'])}
+            locked={locked.has('/contacts')}
+          />
         </nav>
         {/*
           Footer: Settings then the active Character, in that reading order —
@@ -628,26 +614,25 @@ export function Layout() {
         </div>
       </main>
 
-      {/* Mobile bottom tab bar: the pilot's four destinations + More. Which
-          four is a device-local preference (`lib/mobileTabs.ts`, set in
-          Settings); the count is fixed, so the fixed-width items (see
-          MOBILE_NAV_ITEM) still never overflow the viewport.
+      {/* Mobile bottom tab bar: the pilot's four destinations (`lib/mobileTabs.ts`,
+          set in Settings) + More. The count is fixed, which is what keeps
+          MOBILE_NAV_ITEM's equal-share split honest.
           `env(safe-area-inset-bottom)` keeps the bar clear of the
           home-indicator gesture area on notched phones. */}
       <nav
         aria-label={t('nav.mobileLabel')}
         className="fixed inset-x-0 bottom-0 z-40 flex items-stretch border-t border-line bg-panel/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-sm md:hidden"
       >
-        {tabs.map((path) =>
-          /* Alerts is a count, not just a place — see `MobileAlertsTab`. */
-          path === '/alerts' ? (
-            <MobileAlertsTab key={path} unread={unreadAlerts} />
-          ) : (
-            <NavLink key={path} to={path} className={mobileNavClass}>
-              <span className="truncate">{t(MOBILE_TAB_LABEL_KEYS[path])}</span>
-            </NavLink>
-          )
-        )}
+        {tabs.map((path) => (
+          <NavItem
+            key={path}
+            to={path}
+            label={t(NAV_LABEL_KEYS[path])}
+            locked={locked.has(path)}
+            badge={path === '/alerts' ? unreadAlerts : undefined}
+            presentation="tab"
+          />
+        ))}
         <button
           type="button"
           ref={moreButtonRef}
