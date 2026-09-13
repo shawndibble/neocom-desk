@@ -8,12 +8,23 @@ export type SecurityBand = 'highsec' | 'lowsec' | 'nullsec';
  * publishes, because that is the number the game both displays and enforces.
  * Balle is 0.4608891 in ESI and a 0.5 highsec system in game; banding the raw
  * value called it lowsec, which is the wrong rig multiplier for an industry job
- * (1.9x instead of 1x) and the wrong POCO base rate in `features/pi/customsRate`
- * — the only two callers. `securityStatusColor` below interpolates the raw
- * value and is deliberately untouched.
+ * (1.9x instead of 1x) and the wrong POCO base rate in `features/pi/customsRate`.
+ * `securityStatusColor` below asks this function where the boundary is, so the
+ * color and the rig multiplier can never disagree about the same system.
  */
+/**
+ * The security status rounded to one decimal — the number the game itself
+ * displays and enforces, and the only form any banding here is done on.
+ * Exported so a caller drawing its own line (issue #946 counts systems at 0.5
+ * or below, which is a different cut from `securityBand`'s) draws it on the
+ * same number rather than re-deriving the rounding.
+ */
+export function shownSecurity(security: number): number {
+  return Math.round(security * 10) / 10;
+}
+
 export function securityBand(security: number): SecurityBand {
-  const shown = Math.round(security * 10) / 10;
+  const shown = shownSecurity(security);
   if (shown >= 0.5) return 'highsec';
   if (shown >= 0.1) return 'lowsec';
   return 'nullsec';
@@ -48,11 +59,17 @@ function lerpColor(a: { r: number; g: number; b: number }, b: typeof a, t: numbe
  * Colors a solar system's security status on the game's own scale: blue-green
  * across highsec (success at 0.5 blending to accent at 1.0), amber toward red
  * across lowsec and nullsec (warning approaching 0.5 from below, blending to
- * danger at -1.0 and beyond). The sharp jump at exactly 0.5 mirrors the
- * game client's own highsec/lowsec boundary, not an interpolation artifact.
+ * danger at -1.0 and beyond). The sharp jump mirrors the game client's own
+ * highsec/lowsec boundary, not an interpolation artifact.
+ *
+ * Which side of that jump a system falls on is `securityBand`'s call, on the
+ * rounded status — the same number the badge prints beside this color. Testing
+ * the raw float here instead painted Ainsan (0.4730616, a highsec system shown
+ * as 0.5) in the lowsec amber. Only the branch rounds: the gradient within each
+ * band still interpolates the raw value, so neighbours stay distinguishable.
  */
 export function securityStatusColor(security: number): string {
-  if (security >= HIGHSEC_FLOOR) {
+  if (securityBand(security) === 'highsec') {
     const t = clamp((security - HIGHSEC_FLOOR) / (HIGHSEC_CEIL - HIGHSEC_FLOOR), 0, 1);
     return lerpColor(SUCCESS, ACCENT, t);
   }

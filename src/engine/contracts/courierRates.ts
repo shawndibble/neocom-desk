@@ -53,3 +53,21 @@ export function collateralToRewardRatio(collateral: number, reward: number): num
   if (!(reward > 0)) return null;
   return collateral / reward;
 }
+
+/**
+ * A reward normalised by both the size of the load and the length of the trip,
+ * which is what the corpus-wide going rate is a median of (issue #946).
+ *
+ * Here rather than beside that median so it keeps the same two conventions as
+ * its siblings above by *sharing* them rather than restating them: a haul that
+ * states no cargo has no rate, and a same-system haul counts as one jump.
+ */
+export function rewardPerVolumeJump(
+  reward: number,
+  volume: number,
+  jumps: number | null
+): number | null {
+  if (!(volume > 0)) return null;
+  const perJump = iskPerJump(reward, jumps);
+  return perJump === null ? null : perJump / volume;
+}
