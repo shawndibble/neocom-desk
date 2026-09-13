@@ -1231,9 +1231,7 @@ describe('ContractSearchPanel — Courier completion risk', () => {
     expect(await courierRows()).toHaveLength(4);
 
     await user.click(screen.getByRole('button', { name: 'Filters' }));
-    await user.click(
-      screen.getByRole('button', { name: 'Hide hauls I may not be able to complete' })
-    );
+    await user.click(screen.getByRole('button', { name: 'Hide risky destinations' }));
 
     // Nullsec stays: hiding legitimate nullsec work behind a safety control
     // would quietly remove a real market rather than protect anyone.
