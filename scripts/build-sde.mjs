@@ -728,7 +728,14 @@ async function main() {
   // Material names and volumes for the refine comparison; the items
   // themselves are already referenced by whatever blueprint makes them, and
   // a market row carries its own name.
-  for (const entry of Object.values(reprocessing)) {
+  //
+  // The reprocessing KEYS ride along too — the ore, ice and scrap that
+  // refines into those materials. Nothing else references raw ore (no
+  // blueprint builds Veldspar), so without this every asteroid and ice type
+  // was absent from types.json and the Mining Yield tab could not say how
+  // many m3 a day of mining filled.
+  for (const [typeID, entry] of Object.entries(reprocessing)) {
+    referenced.add(Number(typeID));
     for (const m of entry.materials) referenced.add(m.typeID);
   }
   for (const [typeID, bp] of Object.entries(blueprints)) {
@@ -1271,6 +1278,20 @@ async function main() {
     if (compressedTypeId !== undefined) compressedOreTypeIds[rawTypeId] = compressedTypeId;
   }
 
+  // Every mineable type carries its volume in types.json, so the Mining Yield
+  // tab can report a day's m3 rather than a bare unit count. The reprocessing
+  // keys above already cover almost all of them; this catches the handful
+  // nothing else reaches — gas, which refines into nothing, and the couple of
+  // ores (Nephrite, Prismaticite) with no invTypeMaterials rows at all. Runs
+  // here rather than beside the typeMap build because the ore/ice and gas id
+  // sets are only known this far down.
+  for (const typeID of [...oreAndIceTypeIds, ...gasCloudTypeIds]) {
+    if (typeMap[typeID]) continue;
+    const t = types.get(typeID);
+    if (!t) continue;
+    typeMap[typeID] = { name: t.name, groupID: t.groupID, volume: t.volume };
+  }
+
   // --- market/variations.json: invMetaTypes + invMetaGroups -> Tech/Meta/
   // Faction variation relation (the EVE client's "Variations" tab). Every
   // classified type has an invMetaTypes row; a group's root has an empty
@@ -1568,6 +1589,21 @@ async function main() {
       '  FAIL: ore/ice type ids came out implausibly small — the ore/ice market group structure may have changed'
     );
     process.exitCode = 1;
+  }
+  // Mining Yield reports m3, so every mineable type must carry a volume.
+  // Checked rather than assumed: raw ore reaches types.json only through the
+  // reprocessing keys and the mineable pass above, and a change to either
+  // would otherwise turn the whole column into em dashes with no build error.
+  {
+    const volumeless = [...oreAndIceTypeIds, ...gasCloudTypeIds].filter(
+      (id) => !(typeMap[id]?.volume > 0)
+    );
+    if (volumeless.length > 0) {
+      console.error(
+        `  FAIL: ${volumeless.length} mineable types have no volume in types.json (e.g. ${volumeless.slice(0, 5).join(', ')})`
+      );
+      process.exitCode = 1;
+    }
   }
   console.log(`  gas cloud type ids: ${gasCloudTypeIds.length}`);
   // 50 today: 25 raw (Fullerenes + Booster Gas Clouds) and 25 compressed. The
