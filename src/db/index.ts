@@ -817,23 +817,13 @@ export const db = new Dexie('neocom') as Dexie & {
 };
 
 /**
- * A blocked upgrade is the one Dexie failure with no error path at all: the
- * underlying `indexedDB.open` stays pending (dexie fires this event from
- * `req.onblocked` and never rejects), so every gate waiting on a read sits on
- * `BootScreen` indefinitely — the "stuck on the loading screen until I
- * reinstall" report.
- *
- * Dexie's own default handler already `console.warn`s, and the *other*
- * connection's default `versionchange` handler already closes it, so this adds
- * no behaviour — nothing here should try to close or reopen anything. What is
- * missing is visibility: a console warning on a phone is unreadable, and this
- * is exactly the case that produces no Sentry event on its own. Reported via
- * `blockedSignal.ts` rather than a Sentry call here — `src/db` ships inside the
- * service-worker bundle, which must not carry the React SDK.
- *
- * The usual blocker is the previous service-worker bundle: it declares an
- * older schema here, a push wakes it, and `recordFeedEntry` reopens `neocom`
- * at that version. `app/bootRecovery.ts` is the user-facing way out.
+ * A blocked upgrade is the one Dexie failure with no error path: the open
+ * request stays pending instead of rejecting, so every gate waiting on a read
+ * sits on `BootScreen` (see `app/bootRecovery.ts`). Dexie's defaults already
+ * close the other connection and warn; what is missing is visibility, since a
+ * console warning on a phone is unreadable. Emitted as a signal rather than
+ * reported here — `src/db` ships inside the service-worker bundle, which must
+ * not carry the React SDK.
  */
 db.on('blocked', (event) => {
   emitUpgradeBlocked({ oldVersion: event.oldVersion, newVersion: event.newVersion });

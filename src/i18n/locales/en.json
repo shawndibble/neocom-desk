@@ -5,7 +5,8 @@
   },
   "boot": {
     "stalledHint": "Still loading. Another copy of the app may be holding your local data open.",
-    "stalledAction": "Reload"
+    "stalledAction": "Reload",
+    "stalledPending": "Reloading…"
   },
   "nav": {
     "characters": "Characters",

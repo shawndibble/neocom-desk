@@ -1,12 +1,8 @@
 /**
- * "The IndexedDB upgrade is blocked" as a signal, rather than a direct Sentry
- * call from `src/db`.
- *
- * `src/db` is imported by `src/sw.ts` (through the Notification Feed), so
- * anything it pulls in ships inside the service-worker bundle — `@sentry/react`
- * is a page-context, React-aware SDK and has no business there. Same shape and
- * same reason as `esi/authFailureSignal.ts`: the shell subscribes, the
- * low-level module stays unaware of who is listening.
+ * "The IndexedDB upgrade is blocked" as a signal rather than a direct Sentry
+ * call from `src/db`, which `src/sw.ts` imports through the Notification Feed
+ * — the page-context React SDK has no business in the worker bundle. Same
+ * shape and same reason as `esi/authFailureSignal.ts`.
  */
 export interface UpgradeBlockedEvent {
   oldVersion: number;

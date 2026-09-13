@@ -1,4 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+
+const { captureException } = vi.hoisted(() => ({ captureException: vi.fn() }));
+vi.mock('@sentry/react', () => ({ captureException }));
 import { db } from '@/db';
 import { useActiveCharacter, ACTIVE_CHARACTER_KEY } from './activeCharacter';
 
@@ -38,9 +41,11 @@ describe('useActiveCharacter hydrate failure', () => {
       get.mockRestore();
     }
     // A failed read must not be able to pin the app on BootScreen forever
-    // (App.tsx's Root gate waits on `hydrated`). No character is the right
-    // answer here; the Login/character gates take it from there.
+    // (the Root gate waits on `hydrated`). No character is the right answer
+    // here; the Login/character gates take it from there.
     expect(useActiveCharacter.getState().hydrated).toBe(true);
     expect(useActiveCharacter.getState().activeCharacterId).toBeNull();
+    // ...and the failure is reported rather than swallowed.
+    expect(captureException).toHaveBeenCalledOnce();
   });
 });
