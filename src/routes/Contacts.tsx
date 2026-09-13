@@ -19,6 +19,7 @@ import {
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { ICON_SIZE } from '@/components/ui/icons';
+import { cx } from '@/lib/cx';
 import { beginEveLogin } from '@/app/loginFlow';
 import { loadContacts } from '@/features/character/contacts';
 import {
@@ -35,8 +36,18 @@ import {
 } from '@/features/character/contactsFilter';
 import { ContactContextMenu } from '@/features/character/ContactContextMenu';
 import type { CachedResult } from '@/esi/cache';
-import type { CharacterContact } from '@/esi/endpoints';
+import type { CharacterAffiliation, CharacterContact } from '@/esi/endpoints';
 import { resolveNames } from '@/features/character/names';
+import { resolveAffiliations } from '@/features/character/affiliations';
+import {
+  buildContactStandingIndex,
+  type EffectiveStanding,
+} from '@/features/character/contactStandings';
+import {
+  contactAffiliationRow,
+  type ContactAffiliationRow,
+  type OwnAffiliation,
+} from '@/features/character/contactAffiliation';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 
 interface Snapshot {
@@ -46,14 +57,17 @@ interface Snapshot {
   /** Fewer pages came back than ESI advertised — the list below is partial. */
   contactsTruncated: boolean;
   contactNames: Map<number, string>;
+  /** Player contacts only, plus the signed-in character — see `loadContactsSnapshot`. */
+  affiliations: Map<number, CharacterAffiliation>;
+  /** The signed-in character's own corp and alliance, for the "yours" badges. */
+  ownAffiliation: OwnAffiliation;
 }
 
 /**
  * ESI's `contact_type` verbatim was what this column printed. "Player" is what
  * a pilot calls a character contact (a "character" is also a thing corps and
  * alliances are made of), and "Corp" is how the name is written everywhere in
- * game — both shorter than what they replace, which is what lets this table
- * keep real columns on a phone.
+ * game — both shorter than what they replace.
  */
 const CONTACT_TYPE_KEY: Record<CharacterContact['contact_type'], string> = {
   character: 'contacts.typeCharacter',
@@ -62,8 +76,15 @@ const CONTACT_TYPE_KEY: Record<CharacterContact['contact_type'], string> = {
   faction: 'contacts.typeFaction',
 };
 
-/** Stable identity, so the fallback doesn't invalidate the column memo every render. */
+/** What the table prints for an id whose name has not resolved — searchable, per `contactsFilter`. */
+function entityName(names: ReadonlyMap<number, string>, id: number): string {
+  return names.get(id) ?? `#${id}`;
+}
+
+/** Stable identities, so a fallback doesn't invalidate the column memo every render. */
 const NO_NAMES: ReadonlyMap<number, string> = new Map();
+const NO_AFFILIATIONS: ReadonlyMap<number, CharacterAffiliation> = new Map();
+const NO_OWN_AFFILIATION: OwnAffiliation = {};
 
 async function loadContactsSnapshot(
   characterId: number,
@@ -72,10 +93,38 @@ async function loadContactsSnapshot(
   const { cached: contactsResult, needsReauth: contactsNeedsReauth } =
     await loadContacts(characterId);
   const contactsTruncated = contactsResult?.truncated ?? false;
-  // Already superseded: skip the name lookup, its result would be discarded.
-  const contactIds = signal.cancelled ? [] : (contactsResult?.data ?? []).map((c) => c.contact_id);
-  const contactNames = await resolveNames(contactIds);
-  return { contactsResult, contactsNeedsReauth, contactsTruncated, contactNames };
+  // Already superseded: skip the lookups, their results would be discarded.
+  const contacts = signal.cancelled ? [] : (contactsResult?.data ?? []);
+
+  // The character's own affiliation rides along in the same request as their
+  // contacts', so "is this pilot in my corp" costs no extra round trip.
+  const playerIds = contacts.filter((c) => c.contact_type === 'character').map((c) => c.contact_id);
+  const affiliations = await resolveAffiliations(
+    playerIds.length === 0 ? [] : [...playerIds, characterId]
+  );
+  const ownAffiliation: OwnAffiliation = {
+    corporationId: affiliations.get(characterId)?.corporation_id,
+    allianceId: affiliations.get(characterId)?.alliance_id,
+  };
+
+  // Names come second because the corps and alliances to name are only known
+  // once the affiliations are back. `resolveNames` is cache-first, so on every
+  // visit after the first this costs no request at all.
+  const affiliationIds = [...affiliations.values()].flatMap((a) =>
+    a.alliance_id === undefined ? [a.corporation_id] : [a.corporation_id, a.alliance_id]
+  );
+  const contactNames = await resolveNames([
+    ...contacts.map((c) => c.contact_id),
+    ...affiliationIds,
+  ]);
+  return {
+    contactsResult,
+    contactsNeedsReauth,
+    contactsTruncated,
+    contactNames,
+    affiliations,
+    ownAffiliation,
+  };
 }
 
 /**
@@ -181,6 +230,44 @@ function ContactsFilterBar({ filter, onChange, counts }: ContactsFilterBarProps)
   );
 }
 
+/**
+ * One line of the Corp / Alliance cell: the entity's name, a "yours" badge
+ * when the contact sits inside the reader's own corp or alliance, and the
+ * standing tag of a *separate* entry of theirs that also covers this pilot.
+ *
+ * The tag is placed against the entity it comes from rather than in the
+ * Standing column, because the whole of its meaning is which entity supplied
+ * it — in the Standing column it would read as a second opinion about the
+ * pilot, which is exactly what it is not.
+ */
+function AffiliationLine({
+  name,
+  own,
+  ownLabel,
+  alsoVia,
+  dim = false,
+}: {
+  name: string;
+  own: boolean;
+  ownLabel: string;
+  alsoVia: EffectiveStanding | null;
+  dim?: boolean;
+}) {
+  return (
+    <span className={cx('flex items-center gap-1.5', dim && 'text-text-dim')}>
+      {alsoVia && <StandingIcon value={alsoVia.standing} />}
+      <span className="truncate">{name}</span>
+      {own && (
+        <Tooltip content={ownLabel} openOnTap>
+          <span role="img" aria-label={ownLabel} className="shrink-0 text-accent">
+            <Icon.Corporation size={ICON_SIZE.sm} />
+          </span>
+        </Tooltip>
+      )}
+    </span>
+  );
+}
+
 /** Contacts: standings, blocked/watched state, searchable and filterable by type and standing. */
 export function Contacts() {
   const { t } = useTranslation();
@@ -196,6 +283,8 @@ export function Contacts() {
   const contactsNeedsReauth = data?.contactsNeedsReauth ?? false;
   const contactsTruncated = data?.contactsTruncated ?? false;
   const contactNames = data?.contactNames ?? NO_NAMES;
+  const affiliations = data?.affiliations ?? NO_AFFILIATIONS;
+  const ownAffiliation = data?.ownAffiliation ?? NO_OWN_AFFILIATION;
 
   const contacts = useMemo(() => contactsResult?.data ?? [], [contactsResult]);
 
@@ -228,6 +317,19 @@ export function Contacts() {
     [contacts, filter, contactNames]
   );
 
+  // Once per load rather than per render of a cell: `alsoVia` is a lookup
+  // against an index built from the whole list, and the table re-renders on
+  // every sort click and keystroke in the search box.
+  const affiliationRows = useMemo(() => {
+    const index = buildContactStandingIndex(contacts);
+    return new Map<number, ContactAffiliationRow>(
+      contacts.map((contact) => [
+        contact.contact_id,
+        contactAffiliationRow(contact, affiliations, ownAffiliation, index),
+      ])
+    );
+  }, [contacts, affiliations, ownAffiliation]);
+
   function contactRowContextMenu(contact: CharacterContact, tr: ReactElement) {
     return (
       <ContactContextMenu
@@ -255,6 +357,43 @@ export function Contacts() {
         // Sorts on what is printed, not on ESI's word for it — otherwise
         // "Player" would sort under C and "Corp" under C too, by accident.
         sortValue: (contact) => t(CONTACT_TYPE_KEY[contact.contact_type]),
+      },
+      {
+        id: 'affiliation',
+        header: t('contacts.affiliation'),
+        headerTooltip: t('contacts.affiliationHeaderTooltip'),
+        render: (contact) => {
+          const row = affiliationRows.get(contact.contact_id);
+          if (!row || row.corporationId === null) return '—';
+          const alsoVia = row.alsoVia;
+          return (
+            <span className="flex min-w-0 flex-col">
+              <AffiliationLine
+                name={entityName(contactNames, row.corporationId)}
+                own={row.inOwnCorporation}
+                ownLabel={t('contacts.ownCorporation')}
+                alsoVia={alsoVia?.source === 'corporation' ? alsoVia : null}
+              />
+              {row.allianceId !== null && (
+                <AffiliationLine
+                  name={entityName(contactNames, row.allianceId)}
+                  own={row.inOwnAlliance}
+                  ownLabel={t('contacts.ownAlliance')}
+                  alsoVia={alsoVia?.source === 'alliance' ? alsoVia : null}
+                  dim
+                />
+              )}
+            </span>
+          );
+        },
+        // Corp first, alliance second: a reader sorting this column is
+        // gathering a corp's pilots together, not an alliance's.
+        sortValue: (contact) => {
+          const row = affiliationRows.get(contact.contact_id);
+          return row?.corporationId === null || row === undefined
+            ? undefined
+            : entityName(contactNames, row.corporationId);
+        },
       },
       {
         id: 'standing',
@@ -295,7 +434,7 @@ export function Contacts() {
         },
       },
     ],
-    [t, contactNames]
+    [t, contactNames, affiliationRows]
   );
 
   if (!hydrated) {
@@ -367,10 +506,6 @@ export function Contacts() {
               rowKey={(contact) => contact.contact_id}
               defaultSort={{ columnId: 'standing', direction: 'desc' }}
               rowContextMenu={contactRowContextMenu}
-              // Four columns, three of them a short word or a single icon —
-              // narrow enough to stay a real table on a 390px screen rather
-              // than collapsing each contact into a labelled card.
-              responsive="table"
             />
           )}
         </Panel>

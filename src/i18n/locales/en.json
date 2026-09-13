@@ -2416,13 +2416,8 @@
     "standingFilterLabel": "Standing",
     "affiliation": "Corp / Alliance",
     "affiliationHeaderTooltip": "Where each player contact is right now, from EVE's public affiliation lookup. A corp or alliance contact is its own affiliation, so it shows itself.",
-    "affiliationUnknown": "Unknown",
     "ownCorporation": "In your corporation",
     "ownAlliance": "In your alliance",
-    "alsoVia": "Also via",
-    "alsoViaHeaderTooltip": "A separate entry of yours that also covers this pilot, through the corp or alliance they are in now. EVE applies your personal entry first, so this is context, not the standing in force.",
-    "alsoViaNone": "No other entry of yours covers this pilot",
-    "entryOn": "Your {{source}} entry: {{tier}} ({{value}})",
     "source": {
       "character": "personal",
       "corporation": "corp",
