@@ -540,7 +540,10 @@ describe('Layout keyboard shortcuts (issue #25)', () => {
     renderLayoutWithRoutes();
     await screen.findByText('overview page');
 
-    await user.keyboard('?');
+    // `{Shift>}?{/Shift}`, not a bare '?': user-event's US keymap has no
+    // entry for '?', so a bare press dispatches `shiftKey: false` and would
+    // pass even with `allowsShift` deleted — testing nothing.
+    await user.keyboard('{Shift>}?{/Shift}');
     expect(await screen.findByText('settings page')).toBeInTheDocument();
   });
 
@@ -556,36 +559,30 @@ describe('Layout keyboard shortcuts (issue #25)', () => {
     expect(screen.queryByText('characters page')).not.toBeInTheDocument();
   });
 
-  it('defers to a non-modal overlay that marked itself, like the Compare drawer', async () => {
+  // Two overlays `dialog[open]` cannot match: the Compare drawer, a plain
+  // <section> that opts in (features/market/CompareDrawer.tsx), and a Radix
+  // Popover, which puts the role on a plain div.
+  it.each([
+    ['an overlay that marked itself', 'section', KEYBOARD_OVERLAY_ATTRIBUTE, ''],
+    ['a Radix popover', 'div', 'role', 'dialog'],
+  ])('defers to %s', async (_label, tag, attribute, attributeValue) => {
     const user = userEvent.setup();
     renderLayoutWithRoutes();
     await screen.findByText('overview page');
 
-    // Stands in for `features/market/CompareDrawer.tsx`: a plain <section>
-    // that owns the keyboard while open but is deliberately not a dialog.
-    const drawer = document.createElement('section');
-    drawer.setAttribute(KEYBOARD_OVERLAY_ATTRIBUTE, '');
-    document.body.append(drawer);
+    const overlay = document.createElement(tag);
+    overlay.setAttribute(attribute, attributeValue);
+    document.body.append(overlay);
 
-    await user.keyboard('c');
-    expect(screen.queryByText('characters page')).not.toBeInTheDocument();
-    drawer.remove();
-  });
-
-  it('defers to a Radix popover, which renders role="dialog" on a plain div', async () => {
-    const user = userEvent.setup();
-    renderLayoutWithRoutes();
-    await screen.findByText('overview page');
-
-    // `dialog[open]` cannot match this — that selector needs the native
-    // element — so the guard has to name the role too.
-    const popover = document.createElement('div');
-    popover.setAttribute('role', 'dialog');
-    document.body.append(popover);
-
-    await user.keyboard('c');
-    expect(screen.queryByText('characters page')).not.toBeInTheDocument();
-    popover.remove();
+    // `finally`: RTL's cleanup only unmounts React trees, and OVERLAY_SELECTOR
+    // matches anywhere in the document — a node leaked by a failed assertion
+    // would silently green every shortcut test after it.
+    try {
+      await user.keyboard('c');
+      expect(screen.queryByText('characters page')).not.toBeInTheDocument();
+    } finally {
+      overlay.remove();
+    }
   });
 
   it('defers to an open dialog rather than also navigating', async () => {

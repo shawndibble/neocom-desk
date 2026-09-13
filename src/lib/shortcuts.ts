@@ -32,7 +32,7 @@ export const OVERLAY_SELECTOR = `dialog[open], [role="menu"], [role="listbox"], 
 
 export interface ShortcutDef {
   readonly id: string;
-  /** Matches `KeyboardEvent.key` exactly; the listener only checks this with no modifier held. */
+  /** Matches `KeyboardEvent.key` exactly. Ctrl/Meta/Alt never reach a match; Shift does, via `allowsShift`. */
   readonly key: string;
   /** What the key looks like on screen — kept separate from `key` since `key` must match the DOM event verbatim ('Escape', not 'Esc'). */
   readonly displayKey: string;

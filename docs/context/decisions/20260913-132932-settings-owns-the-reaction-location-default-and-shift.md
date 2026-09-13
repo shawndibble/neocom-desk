@@ -11,10 +11,12 @@ _Recorded 2026-09-13._
   The control mirrors the manufacturing facility block beside it rather than
   folding into it: a pilot's refinery and their factory are two standing facts
   that share no facility, and `normalizeReactionFacilityDefaults` already
-  rejects a non-reaction pick. Both pickers now filter their options by
-  activity, so the build facility list stops offering refineries — the same
-  filtering the Build Location picker has done since reactions became an
-  activity.
+  rejects a non-reaction pick, and `REACTION_FACILITY_PRESETS` is the one
+  spelling of that restriction the Reaction Location picker already open-coded.
+  The manufacturing picker is deliberately left offering every preset,
+  refineries included: filtering it is right, but a pilot who already stored
+  one would find the control blank with no migration, so that belongs in its
+  own change rather than riding along here.
 
 - **Shift narrows a shortcut match instead of blocking every press.**
   `useKeyboardShortcuts` dropped any key held with Shift, which made `?` — the

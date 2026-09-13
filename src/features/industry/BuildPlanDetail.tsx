@@ -53,7 +53,7 @@ import {
   reactionPlanFacilityContextFor,
   autoBuildDepthContext,
 } from './planFacilityContext';
-import { useReactionFacilityDefaults } from './reactionFacilityDefaults';
+import { useReactionFacilityDefaults, REACTION_FACILITY_PRESETS } from './reactionFacilityDefaults';
 import { retargetPatch } from './retargetPatch';
 import { DEFAULT_TRADE_HUB, TRADE_HUBS, getTradeHub } from '@/market/hubs';
 import type { BuildPlanRecord } from '@/db';
@@ -1465,13 +1465,11 @@ export function BuildPlanDetail({
                               <SelectContent>
                                 {/* Reaction-capable structures only — an
                                   engineering complex cannot host a reaction. */}
-                                {Object.values(FACILITY_PRESETS)
-                                  .filter((f) => f.activity === 'reaction')
-                                  .map((f) => (
-                                    <SelectItem key={f.kind} value={f.kind}>
-                                      {f.name}
-                                    </SelectItem>
-                                  ))}
+                                {REACTION_FACILITY_PRESETS.map((f) => (
+                                  <SelectItem key={f.kind} value={f.kind}>
+                                    {f.name}
+                                  </SelectItem>
+                                ))}
                               </SelectContent>
                             </Select>
                           </label>

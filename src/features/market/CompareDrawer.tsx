@@ -194,12 +194,9 @@ export function CompareDrawer({
         <section
           id={DRAWER_ID}
           aria-label={t('market.compare.title')}
-          // Not a dialog and deliberately not announced as one (see the module
-          // doc), but it does own the keyboard while open: without this the
-          // global shortcut listener sees no overlay and a bare letter
-          // navigates away mid-comparison. The Escape handler just below
-          // already assumed this ownership; the attribute is what tells
-          // `app/useKeyboardShortcuts.ts` about it.
+          // Owns the keyboard while open — the Escape handler below already
+          // assumed that, while the global listener navigated away underneath
+          // it. Not a dialog, so it opts in rather than borrowing the role.
           {...{ [KEYBOARD_OVERLAY_ATTRIBUTE]: '' }}
           onKeyDown={(event) => {
             if (event.key === 'Escape') {

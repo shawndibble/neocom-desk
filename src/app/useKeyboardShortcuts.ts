@@ -19,11 +19,7 @@ export function useKeyboardShortcuts(): void {
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
-      // Shift is not in this list, unlike the other three: it is how `?` is
-      // typed on a common layout, and dropping every Shift-held press made
-      // the one key a user already reaches for to ask "what are the
-      // shortcuts" impossible to bind. A Shift-held press still has to match
-      // a shortcut that opted in (`allowsShift`), below.
+      // Shift stays out of this list: `?` is typed with it. Opt-in below.
       if (event.ctrlKey || event.metaKey || event.altKey) return;
       if (isTypingTarget(event.target)) return;
       // An open overlay owns the keyboard until it's dismissed, rather than
@@ -37,11 +33,10 @@ export function useKeyboardShortcuts(): void {
       // with `shiftKey: false`) doesn't silently defeat a letter shortcut.
       const key = event.key.toLowerCase();
       const shortcut = SHORTCUTS.find((candidate) => candidate.key.toLowerCase() === key);
+      // Shift narrows rather than widens: Shift+C stays an ordinary capital C
+      // rather than a second way to fire the character switcher.
+      if (event.shiftKey && !shortcut?.allowsShift) return;
       if (!shortcut?.run) return;
-      // Shift narrows rather than widens: `?` is reachable because it asked
-      // to be, and Shift+C stays an ordinary capital C rather than a second
-      // way to fire the character switcher.
-      if (event.shiftKey && !shortcut.allowsShift) return;
 
       event.preventDefault();
       shortcut.run(navigate);

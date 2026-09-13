@@ -1078,6 +1078,24 @@ describe('Settings defaults', () => {
     expect(screen.getByLabelText(/facility tax/i)).toHaveValue(2);
   });
 
+  it('shows the shortcut list for #shortcuts, even from another tab', async () => {
+    const user = userEvent.setup();
+    window.history.pushState({}, '', '/settings#faq');
+    render(<App />);
+    await screen.findByRole('heading', { level: 1, name: /settings/i });
+    expect(await screen.findByRole('tab', { name: /faq/i })).toHaveAttribute(
+      'aria-selected',
+      'true'
+    );
+
+    // The real `?` shortcut, pressed from a tab that is not General. Without
+    // a TAB_FOR_HASH entry the hash changes and the tab does not, so the
+    // panel this anchor names never renders.
+    await user.keyboard('{Shift>}?{/Shift}');
+
+    expect(await screen.findByRole('heading', { name: /keyboard shortcuts/i })).toBeInTheDocument();
+  });
+
   it('offers a reaction location default, which nothing could set before', async () => {
     render(<App />);
     await screen.findByRole('heading', { level: 1, name: /settings/i });
@@ -1088,11 +1106,11 @@ describe('Settings defaults', () => {
     expect(
       await screen.findByRole('combobox', { name: /default reaction location/i })
     ).toHaveTextContent(/athanor/i);
-    expect(screen.getByRole('group', { name: 'Reactor rigs' })).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Reaction location rigs' })).toBeInTheDocument();
     expect(screen.getByLabelText(/reaction location tax/i)).toBeInTheDocument();
   });
 
-  it('only offers refineries as a reaction location, and never offers one as the build facility', async () => {
+  it('only offers refineries as a reaction location', async () => {
     const user = userEvent.setup();
     render(<App />);
     await screen.findByRole('heading', { level: 1, name: /settings/i });
@@ -1105,13 +1123,6 @@ describe('Settings defaults', () => {
       expect.stringContaining('Athanor'),
       expect.stringContaining('Tatara'),
     ]);
-    await user.keyboard('{Escape}');
-
-    await user.click(await screen.findByRole('combobox', { name: /default facility/i }));
-    const buildOptions = within(screen.getByRole('listbox')).getAllByRole('option');
-    expect(buildOptions.map((option) => option.textContent)).not.toEqual(
-      expect.arrayContaining([expect.stringContaining('Athanor')])
-    );
   });
 
   it('persists a reaction location tax', async () => {
