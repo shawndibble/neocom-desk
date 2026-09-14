@@ -55,7 +55,9 @@ add-on for jobs/orders/assets/wallet), Lazy Blacksmith (blueprint
 search/analysis), EVE Orchestra (mining ledger/reprocessing/job tracking,
 corp mining tax), Alysii's PI Scheme / EVE Planetary Planner (PI chain
 calculators, one ~7yr active), Upwell Fuel Monitor (structure fuel tracker —
-already covered, `structureFuel`), **Web industry planners/calculators are an exhausted class.** eveindustry.app
+already covered, `structureFuel`).
+
+**Web industry planners/calculators are an exhausted class.** eveindustry.app
 (multi-character job tracking, slot availability, reaction planner, invention
 planning with probability, reprocessing, PI), EVE Cookbook, EveIndy,
 eveindustryplanner.com, eve-industry.org, eveonline-industry.com, EVE OS
@@ -66,6 +68,19 @@ invention planning, and both are settled out of scope (kill-test 6 / round
 27's BOM-rollup rejection; `.out-of-scope/invention-planning.md`). A new
 planner surfacing in this class is not worth re-analysing unless it does
 something outside build math.
+
+**Market/trading discovery tools are a closed class too.** theoz.space
+(Margin Finder, Material Influence, PLEX/Omega deal analysis), Adam4EVE's
+margin finder, evetools.dev, evetrade.space, EVE Workbench's Trade Tool and
+EVE OS's Screener all do one of two things. **Spread/margin finding over a
+whole region's order book** is station-trading discovery: settled against
+here (kill-test 10 killed station-trading P&L, and hub-to-hub already ships
+as `hubHaulGaps`), and a whole-region order-book fetch is not a thing a
+client-side PWA does. **"Material influence"** — which material drives a
+build's cost — is kill-test 3: the Materials Table already prints a
+`lineTotal` per material, and with a linear cost model sensitivity _is_ cost
+share, so the answer is already on screen. Don't re-analyse this class
+either unless a tool prices something the app cannot see.
 
 EVE Online Tooling / "Modular All-in-One Desktop Tool" (th-lange; Tauri+React,
 ESI+SDE, local, no telemetry: production, reprocessing, industry jobs, PI,
