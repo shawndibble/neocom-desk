@@ -55,7 +55,9 @@ add-on for jobs/orders/assets/wallet), Lazy Blacksmith (blueprint
 search/analysis), EVE Orchestra (mining ledger/reprocessing/job tracking,
 corp mining tax), Alysii's PI Scheme / EVE Planetary Planner (PI chain
 calculators, one ~7yr active), Upwell Fuel Monitor (structure fuel tracker —
-already covered, `structureFuel`), **Web industry planners/calculators are an exhausted class.** eveindustry.app
+already covered, `structureFuel`).
+
+**Web industry planners/calculators are an exhausted class.** eveindustry.app
 (multi-character job tracking, slot availability, reaction planner, invention
 planning with probability, reprocessing, PI), EVE Cookbook, EveIndy,
 eveindustryplanner.com, eve-industry.org, eveonline-industry.com, EVE OS
@@ -66,6 +68,19 @@ invention planning, and both are settled out of scope (kill-test 6 / round
 27's BOM-rollup rejection; `.out-of-scope/invention-planning.md`). A new
 planner surfacing in this class is not worth re-analysing unless it does
 something outside build math.
+
+**Market/trading discovery tools are a closed class too.** theoz.space
+(Margin Finder, Material Influence, PLEX/Omega deal analysis), Adam4EVE's
+margin finder, evetools.dev, evetrade.space, EVE Workbench's Trade Tool and
+EVE OS's Screener all do one of two things. **Spread/margin finding over a
+whole region's order book** is station-trading discovery: settled against
+here (kill-test 10 killed station-trading P&L, and hub-to-hub already ships
+as `hubHaulGaps`), and a whole-region order-book fetch is not a thing a
+client-side PWA does. **"Material influence"** — which material drives a
+build's cost — is kill-test 3: the Materials Table already prints a
+`lineTotal` per material, and with a linear cost model sensitivity _is_ cost
+share, so the answer is already on screen. Don't re-analyse this class
+either unless a tool prices something the app cannot see.
 
 EVE Online Tooling / "Modular All-in-One Desktop Tool" (th-lange; Tauri+React,
 ESI+SDE, local, no telemetry: production, reprocessing, industry jobs, PI,
@@ -142,10 +157,16 @@ sweep alone won't reach it either; the web search is what catches this shape.
 EVE Flipper (browser-based, single-character, optional-SSO: arbitrage/station/
 radius trading, multi-hop route building, contract scanning, buy-vs-produce
 compare, portfolio P&L/VaR, slippage-modeled execution plans, price alerts,
-PLEX/SP-farm calculators, war tracker) — every feature already covered here or
-killed (hubHaulGaps, kill-test 10 for station-trading P&L and portfolio VaR off
-wallet cost basis, kill-test 3/4 for slippage-modeled plans, Quickbar for price
-alerts, remit for PLEX/war tracking).
+PLEX/SP-farm calculators, war tracker), gated feature by feature: its
+hub-to-hub gap is `hubHaulGaps`, its single-station spread is the Compare tab
+(kill-test 3, already on screen), any market-wide/cross-player arbitrage or
+route-building scan hits kill-test 1; contract scanning is the Contracts
+page's market-value appraisal; buy-vs-produce is `buildVsBuy`; portfolio P&L
+and VaR both need a per-unit purchase cost basis wallet history can't give
+(kill-test 10); a slippage-modeled execution plan projects off order-book rows
+already on screen (kill-test 3); price alerts are the Quickbar. PLEX/SP-farm
+calculators and a war tracker sit outside this skill's ISK-pipeline scope —
+not something Neocom Desk's own kill-tests speak to.
 
 **A bumped thread can carry a new feature even when no new thread appears.**
 The listing's `last_posted_at`/`posts_count` move when a dev announces an
