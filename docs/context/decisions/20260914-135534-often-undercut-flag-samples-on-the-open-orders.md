@@ -34,10 +34,13 @@ quantity, filled}`. Classifying an order needs Fuzzwork station aggregates
   - `undercutRate` 0.5, strictly exceeded — an even split is not "most of
     the time".
   - `minSpacingMs` 4 minutes — just under the poller's 5, so an ordinary
-    refresh always records while a burst (route re-entry, the deep-competition
-    fetch landing, a manual refresh) records once. The guard compares against
-    the _stored_ last-sample timestamp, not a React ref, because a remount
-    would reset a ref and let a burst through.
+    refresh always records while a burst (route re-entry, a manual refresh)
+    records once. The guard compares against the _stored_ last-sample
+    timestamp, not a React ref, because a remount would reset a ref and let a
+    burst through. Readings from within one load are handled separately: they
+    share that load's timestamp, so a later, better-informed classification
+    (a deep-competition fetch landing) replaces that load's sample rather
+    than being dropped as too soon.
     None of these were validated against real order lifetimes — nobody has that
     data yet. They are the numbers to move first if the flag reads wrong.
 - **The flag is a boolean, and renders no count.** The ticket allowed either

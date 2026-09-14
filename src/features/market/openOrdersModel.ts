@@ -118,7 +118,7 @@ export interface OpenOrderRow {
   belowFloor: boolean;
   /**
    * This order reads `healthy` right now but has been undercut most of the
-   * time the page has watched it (issue #1018). Always false for an order
+   * time the page has watched it. Always false for an order
    * whose current `problem` is anything worse than `healthy` — there the
    * live status already prompts the same action, so the second read adds
    * nothing — and false whenever the sample history is too thin to judge.

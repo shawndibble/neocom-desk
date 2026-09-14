@@ -440,19 +440,18 @@ export function OpenOrdersPanel() {
   }, [snapshot, deepCompetitionByOrderId, structureByKey, stationNames]);
 
   /**
-   * Takes this load's `OrderProblem` reading for every open order (issue
-   * #1018) and drops the history of orders that have since closed. Runs
-   * AFTER `allRows` rather than inside the loader, because the reading it
-   * stores is the classification `buildOpenOrderRows` just produced —
-   * nothing earlier in the chain knows it.
+   * Takes this load's `OrderProblem` reading for every open order and drops
+   * the history of orders that have since closed. Runs off `allRows` rather
+   * than inside the loader because the reading it stores is the
+   * classification `buildOpenOrderRows` just produced — nothing earlier in
+   * the chain knows it.
    *
-   * Fire-and-forget on purpose: a failed write costs one sample from a
-   * deliberately gappy series, which is not worth an error state on a page
-   * whose actual job is elsewhere. The 4-minute spacing guard inside
-   * `appendOrderProblemSample` is what keeps a re-run of this effect (the
-   * deep-competition fetch landing, a re-render) from writing a burst of
-   * samples that would inflate the rate — it lives in the stored data, not
-   * in a ref that a remount would reset.
+   * Re-fires whenever a deeper check reclassifies a row; because every
+   * reading from one load shares `snapshot.now`, `appendOrderProblemSample`
+   * replaces that load's sample instead of appending a second one, and the
+   * spacing guard covers loads further apart. Fire-and-forget: a failed
+   * write costs one sample from a deliberately gappy series, not worth an
+   * error state on a page whose job is elsewhere.
    */
   useEffect(() => {
     if (!snapshot) return;

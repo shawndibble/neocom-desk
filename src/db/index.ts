@@ -800,7 +800,7 @@ export interface BpcSearchWatchRecord {
 
 /**
  * One open market order's rolling `OrderProblem` history — the store behind
- * the Open Orders page's `frequentlyUndercut` badge (issue #1018). Keyed by
+ * the Open Orders page's `frequentlyUndercut` badge. Keyed by
  * `orderId` with the whole series on the row, rather than one row per
  * sample: a series is only ever read and written whole, and pruning a closed
  * order is then a single delete instead of a ranged query.
@@ -1029,7 +1029,7 @@ db.version(11).stores({
 });
 
 // Additive: v11 stores unchanged, plus per-order `OrderProblem` sample
-// histories (issue #1018). Keyed by `orderId` because a series is only ever
+// histories. Keyed by `orderId` because a series is only ever
 // read and written whole; `characterId` is indexed so a prune can be scoped
 // to the characters a given load actually saw.
 db.version(12).stores({

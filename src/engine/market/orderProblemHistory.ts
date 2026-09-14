@@ -1,31 +1,18 @@
 /**
- * "Has this order actually been undercut most of the time it has been
- * listed?" — the rolling read behind the Open Orders page's
- * `frequentlyUndercut` badge (issue #1018).
+ * "Has this order been undercut most of the time it has been listed?" — the
+ * rolling read behind the Open Orders page's `frequentlyUndercut` badge.
  *
- * The page's existing `OrderProblem` classification is a snapshot: it answers
- * "is a rival beating me right now". That answer is enough for every group
- * the page already shows worst-first, because the action it prompts
- * (re-price) is obvious from the live status alone. The one case it cannot
- * see is an order reading `healthy` *this instant* that has spent most of its
- * recent life undercut — a fundamentally mispriced listing quietly running
- * out its duration, which asks for a bigger re-price than "you are undercut
- * today" ever does. This module is the only place that second read lives.
+ * `OrderProblem` is a snapshot: it answers "is a rival beating me right
+ * now". The one case it cannot see is an order reading `healthy` this
+ * instant that has spent most of its recent life undercut — a mispriced
+ * listing quietly running out its duration, which asks for a bigger
+ * re-price than "you are undercut today" ever does.
  *
- * Pure by construction (CLAUDE.md): it takes an array of samples somebody
- * else persisted and returns a verdict. The Dexie table, the pruning of
- * closed orders, and the decision of *when* to take a sample all belong to
- * `features/market/orderProblemSamples.ts` — nothing here imports Dexie.
- *
- * Deliberately coarse. The samples are taken only while the Open Orders page
- * is open (the route reloads on the Foreground Poller's own ESI cache
- * revalidation, roughly every 5 minutes), so the series is genuinely gappy:
- * a player who never leaves the tab open has hours of real listing time with
- * no sample in them at all. `wasFrequentlyUndercut` therefore returns a
- * boolean and nothing else — rendering "undercut 7 of 13 checks" would claim
- * a precision the sampling does not have. The `minSamples` floor is what
- * stops a freshly-listed order with two unlucky samples reading as
- * chronically mispriced.
+ * Who persists these samples, and when, is `features/market/
+ * orderProblemSamples.ts`. That series is gappy by construction, which is
+ * why the verdict here is a bare boolean — "undercut 7 of 13 checks" would
+ * claim a precision the sampling does not have — and why `minSamples` sits
+ * under it.
  */
 import { UNDERCUT_PROBLEMS, type OrderProblem } from './orderProblems';
 
@@ -136,9 +123,9 @@ export function wasFrequentlyUndercut(
 
 /**
  * The stored history for one order after taking a new reading: window-pruned,
- * spacing-deduplicated and capped. Returns the SAME array reference when the
- * sample was dropped for spacing, so a caller can skip the write entirely
- * rather than rewriting an unchanged row every render.
+ * spacing-deduplicated and capped. Returns the SAME array reference whenever
+ * the reading changes nothing, so a caller can skip the write rather than
+ * rewrite an unchanged row every render.
  *
  * `samples` is assumed oldest-first, which is how this function returns it.
  */

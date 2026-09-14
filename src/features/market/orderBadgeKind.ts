@@ -69,7 +69,7 @@ export function orderBadgeFor(row: OpenOrderRow): OrderBadgeChoice | null {
     }
     case 'healthy':
     default:
-      // Wins the healthy branch outright (issue #1018). An order that has
+      // Wins the healthy branch outright. An order that has
       // spent most of its watched life undercut wearing a green "best price"
       // badge is the one actively misleading row this page can produce, and
       // "we cannot work out your floor" is a lesser thing to say about an

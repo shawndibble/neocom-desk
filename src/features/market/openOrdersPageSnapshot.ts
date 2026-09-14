@@ -47,7 +47,7 @@ export interface OpenOrdersPageSnapshot {
   stationPrices: Map<string, HubAggregate>;
   costBases: Map<number, OrderCostBasis>;
   /**
-   * Rolling `OrderProblem` history per order id (issue #1018), oldest first.
+   * Rolling `OrderProblem` history per order id, oldest first.
    * Read here rather than written: the page records the *next* sample only
    * after `buildOpenOrderRows` has classified this load's rows, so a flag
    * always reflects history the page had already accumulated, and the read
@@ -95,6 +95,13 @@ export async function loadOpenOrdersSnapshot(
     };
   }
 
+  // Kicked off here and awaited far below: it depends only on `openOrders`,
+  // so leaving it on the critical path would add an IndexedDB round-trip to
+  // every load and every poller-driven reload for nothing.
+  const problemSamplesPromise = loadOrderProblemSamples(
+    openOrders.entries.map((entry) => entry.characterId)
+  );
+
   const [typeNames, npcStationsSettled, stationPrices] = await Promise.all([
     loadTypeNames([...typeIds]),
     // Caught here, not left to reject the whole `Promise.all`: this file is
@@ -129,9 +136,7 @@ export async function loadOpenOrdersSnapshot(
     })
   );
 
-  const problemSamples = await loadOrderProblemSamples(
-    openOrders.entries.map((entry) => entry.characterId)
-  );
+  const problemSamples = await problemSamplesPromise;
 
   const skillsByCharacter = new Map<number, CharacterSkills>();
   await mapWithConcurrencyLimit(openOrders.entries, ESI_FANOUT_CONCURRENCY, async (entry) => {
