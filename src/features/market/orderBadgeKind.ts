@@ -69,13 +69,9 @@ export function orderBadgeFor(row: OpenOrderRow): OrderBadgeChoice | null {
     }
     case 'healthy':
     default:
-      // Wins the healthy branch outright. An order that has
-      // spent most of its watched life undercut wearing a green "best price"
-      // badge is the one actively misleading row this page can produce, and
-      // "we cannot work out your floor" is a lesser thing to say about an
-      // order we CAN say is chronically beaten. Never fires for a row whose
-      // current problem is worse than healthy — `openOrdersModel.ts` gates
-      // `frequentlyUndercut` on that.
+      // Wins the healthy branch outright: a chronically beaten order must not
+      // wear a green "best price" badge. Only reachable for healthy rows —
+      // `openOrdersModel.ts` already gates `frequentlyUndercut` on that.
       if (row.frequentlyUndercut) return { kind: 'frequentlyUndercut' };
       if (!row.isBuyOrder && row.costBasis === null) return { kind: 'noCostBasis' };
       if (row.station.bestPrice !== null) return { kind: 'best' };

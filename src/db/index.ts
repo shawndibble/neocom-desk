@@ -798,22 +798,6 @@ export interface BpcSearchWatchRecord {
   updatedAt: number;
 }
 
-/**
- * One open market order's rolling `OrderProblem` history — the store behind
- * the Open Orders page's `frequentlyUndercut` badge. Keyed by
- * `orderId` with the whole series on the row, rather than one row per
- * sample: a series is only ever read and written whole, and pruning a closed
- * order is then a single delete instead of a ranged query.
- *
- * `characterId` is indexed so pruning can be scoped to the characters a
- * given load actually saw. Deleting every order id missing from one load
- * would wipe weeks of history for any character whose `loadOrders` happened
- * to fail or who was signed out at that moment.
- *
- * Bounded by `engine/market/orderProblemHistory.ts`'s window and
- * `MAX_SAMPLES_PER_ORDER` cap on every append, so a row cannot grow without
- * limit however long the tab stays open.
- */
 export interface OrderProblemSampleRecord {
   /** ESI's own order id. */
   orderId: number;
@@ -1031,7 +1015,8 @@ db.version(11).stores({
 // Additive: v11 stores unchanged, plus per-order `OrderProblem` sample
 // histories. Keyed by `orderId` because a series is only ever
 // read and written whole; `characterId` is indexed so a prune can be scoped
-// to the characters a given load actually saw.
+// to the characters a given load actually saw. Row growth is bounded by
+// `engine/market/orderProblemHistory.ts`'s window and per-order cap.
 db.version(12).stores({
   characters: 'characterId, corporationId',
   tokens: 'characterId',

@@ -46,23 +46,7 @@ export interface UndercutHistoryThresholds {
   minSpacingMs: number;
 }
 
-/**
- * Defaults, not laws — the same standing this repo gives
- * `DEFAULT_PROBLEM_THRESHOLDS` (see
- * `docs/context/decisions/20260906-155913-open-orders-reads-as-a-worklist.md`).
- * Picked against the observed sampling cadence rather than a study:
- *
- * - `windowMs` 7 days: long enough to outlive a weekend the tab was shut,
- *   short enough that a re-priced order stops wearing the badge within a week.
- * - `minSamples` 12: about an hour of the page being left open at the ~5
- *   minute revalidation cadence, or a dozen separate visits. Under that, the
- *   sample set is too small for a majority to mean anything.
- * - `undercutRate` 0.5, strictly exceeded: "most of the time", the plainest
- *   reading of the flag's own wording.
- * - `minSpacingMs` 4 minutes: just under the poller's 5, so an ordinary
- *   refresh always records while a burst of remounts (route re-entry,
- *   a manual refresh) records once.
- */
+/** Defaults, not laws. Each number is argued in the issue-1018 decision record. */
 export const DEFAULT_UNDERCUT_HISTORY_THRESHOLDS: UndercutHistoryThresholds = {
   windowMs: 7 * 24 * 60 * 60 * 1000,
   minSamples: 12,
