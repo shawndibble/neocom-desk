@@ -1,6 +1,7 @@
 ---
 name: improve-mobile-ux
-description: Audit Neocom Desk on a phone — touch targets, stacked tables, filter sheets, nav reach, and how hard the data is to read at 390px — kill the weak findings with a hostile reviewer, and file the survivors as ready-for-agent tickets. Fires on explicit request only: the user typing /improve-mobile-ux — a run files real GitHub issues, so an unasked-for trigger creates them.
+description: Audit the app on a phone and file the fixes as ready-for-agent tickets.
+disable-model-invocation: true
 ---
 
 # Improve Mobile UX
@@ -94,22 +95,34 @@ way to catch overflow that no grep predicts. It is optional because it needs a
 worktree; skip it rather than run a dev server or a Playwright report inside
 the main checkout.
 
-In a sibling worktree with `npm ci` already run:
+Work in a sibling worktree with `npm ci` already run. Write the throwaway
+screenshot spec into **that worktree's own `e2e/`** — `playwright.config.ts`
+sets `testDir: './e2e'` and filters positional args against it, so a spec
+anywhere else matches nothing and the run reports "no tests found". The
+worktree is disposable and goes away in step 9, so the spec goes with it.
+
+The spec sets `{ width: 390, height: 844 }`, navigates each surface, and calls
+`page.screenshot({ fullPage: true, path: '<scratchpad>/<surface>.png' })`.
 
 ```
-E2E_SKIP_BUILT=1 npx playwright test <spec> --project=chromium \
-  --output=<scratchpad>/test-results
+E2E_SKIP_BUILT=1 npx playwright test e2e/<spec> --project=chromium \
+  --reporter=list --output=<scratchpad>/test-results
 ```
 
-`E2E_SKIP_BUILT=1` is sanctioned (see `playwright.config.ts`) — without it the
-`built` project demands a local `npm run build`, which CLAUDE.md forbids.
-`--output` keeps Playwright's artifacts out of the checkout. The suite is fully
-offline: `e2e/support/testBase.ts` mocks SSO, ESI, fuzzwork and the image
-server, so a seeded character is one `Log in with EVE Online` click away.
+- `E2E_SKIP_BUILT=1` is sanctioned (see `playwright.config.ts`) — without it the
+  `built` project demands a local `npm run build`, which CLAUDE.md forbids.
+- `--reporter=list` with `--output` keeps both artifact directories out of the
+  checkout; the config's default `html` reporter writes `playwright-report/`
+  next to the config whatever `--output` says.
+- **Port 5199 is `--strictPort` with `reuseExistingServer` on locally.** A
+  concurrent worktree's e2e run already holding it means your screenshots come
+  from _its_ code. Check the port is free first (`lsof -ti:5199`); a reused
+  server is untrusted evidence.
+- `npx playwright install chromium` may be needed — check, don't assume.
 
-Write a throwaway spec in the scratchpad that sets `{ width: 390, height: 844 }`,
-navigates to each surface, and calls `page.screenshot({ fullPage: true })`.
-`npx playwright install chromium` may be needed — check, don't assume.
+The suite is fully offline: `e2e/support/testBase.ts` mocks SSO, ESI, fuzzwork
+and the image server, so a seeded character is one `Log in with EVE Online`
+click away.
 
 Read the screenshots. A finding the picture contradicts is dead.
 
@@ -289,7 +302,9 @@ gh pr list --head chore/improve-mobile-ux-ledger --state open --json number,url
   `node scripts/next-ticket/open-pr.mjs "<title>" <body-file>` (which also arms
   auto-merge). The script is generic over any PR number.
 
-`npm ci` in the worktree before committing. Before pushing, run
+`npm ci` in the worktree before committing, then `npm run verify-hooks -- --fix`
+— `prepare` is skipped under `ignore-scripts` and husky exits 0 either way, so
+without it the pre-commit hook is silently absent. Before pushing, run
 `npx prettier --check .claude/skills/improve-mobile-ux/LEDGER.md` (`--write` to
 fix) — CI's `format:check` runs repo-wide on every push, and whitespace is the
 one failure a Markdown-only change actually hits.
