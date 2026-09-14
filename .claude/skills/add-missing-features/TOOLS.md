@@ -619,6 +619,49 @@ the engine could have made sharper.
     neither of which a reader count can detect. Kill-test 33's suggestion is
     hereby retracted.
 
+36. **The industry/market CONSTANTS are verified — stop re-checking them, and
+    here is how to re-check the ones that matter in one command.** Skill rates
+    all match the shipped `skills.json` descriptions: Industry 4%/lvl, Advanced
+    Industry 3%, Reactions 4%, Reprocessing 3%, Reprocessing Efficiency 2%,
+    Scrapmetal 2%, Accounting −11%/lvl off a 7.5% base, Broker Relations −0.3%
+    off 3% **at a non-player station**, order slots 5 + 4/8/16/32. Facility and
+    rig constants are verified against **live ESI dogma attributes**, which is
+    the re-checkable artifact: structure ME/TE/job-cost = attrs **2600 / 2602 /
+    2601** (Raitaru 35825, Azbel 35826, Sotiyo 35827; Tatara 35836 carries
+    **2721** for time and correctly no 2600/2601); rig ME = **2594**, rig TE =
+    **2593** (37154/37155, 37162/37163); security multipliers = **2355 / 2356 /
+    2357**. Reactor rigs carry the SAME percentages on **different** attribute
+    ids — **2714** (material) and **2713** (time) — which is why the app's
+    "sourced identical percentages" comment is right.
+    **Three constants remain un-fixtured and un-checkable** (no ESI endpoint):
+    the **SCC surcharge 4%**, the **NPC station 0.25% facility tax**, and the
+    **100 ISK minimum broker fee**. No evidence any is wrong; they are simply
+    the app's kill-test-13 surface. The 50% reprocessing base is a fourth, but
+    a _disclosed_ one — it is exported so the UI can name the assumption.
+
+37. **Also settled, because players get it wrong: Advanced Industry does NOT
+    apply to reaction time, and the app is right to exclude it.** Its six dogma
+    effects are named for manufacturing (5903), copying (5906), invention
+    (5907), a generic industry job (5908), manufacture/research time (5909) and
+    material research (5910) — **none names reactions** — while Reactions
+    (45746) carries its own pair, 6891/6892, mirroring Industry's 425/412.
+
+38. **Mining forum REPLIES for unmet demand is not worth its own scan, but the
+    epistemics are.** Ten industry/market threads, author's own posts excluded,
+    request language matched: **5 hits, 0 gaps.** The strongest — EVE Forge's
+    users asking "how do I find what materials I'm missing for a project" — is
+    already shipped here as the Build Plan's Copy Shopping List (remaining after
+    owned stock, as multibuy text). Fold reply-reading into the existing
+    bumped-thread check, which already fetches those threads. The point worth
+    keeping: **a user asking a competitor for something this app already ships
+    is confirming evidence of coverage**, which is directly useful to a skill
+    whose named failure mode is re-proposing covered features.
+    Also checked and clean: the Adam4EVE reply arguing an ISK/hour over a
+    multi-step chain should sum parallel time does **not** reach this app's PI
+    figures — every PI rate is throughput x margin with no elapsed-duration
+    denominator (`colonyEarnings.ts`, `stopTier.ts`'s `marginPerHour`,
+    `network.ts`), and `chain.ts` provisions parallel capacity explicitly.
+
 ## Filed candidates
 
 **Verdict is the hostile review's, not the ticket's fate.** A `SHIP` row means
@@ -672,6 +715,7 @@ precedent for what this project will accept.
 | #1062 | NARROW                                                                                           | Build Opportunities computes every row with the ACTIVE character's skills while fetching owned blueprints per character. Three sibling cross-character surfaces do it right (Open Orders, Active Jobs, Mining Yield). Industry V + Adv Industry V = 0.68x base time, so an alt's rate inflates ~47%. Ordering IS corrupted because the active character is normally in the set, so honest and inflated rows interleave. Fallback is settled by the alt-colonies decision: un-reduced, never borrow the active character's                                                                                                                                   |
 | #1065 | NARROW                                                                                           | Active Jobs never says WHERE a job runs — `IndustryJob.facility_id` is typed and read nowhere. One Location cell + CSV column, resolved through the existing structure-name cache. No new scope: `getUniverseStructure` carries NO `group` in the registry, so it is in the base grant. `facility_id` is identical on the character and corporation job shapes, so widening the picked shape keeps the one-table-serves-both argument intact                                                                                                                                                                                                                |
 | #1068 | NARROW                                                                                           | **bug.** 30.3% of LP offers (867/2,859 across 10 NPC corps) demand a turn-in; `offerProfit` subtracts its cost but the detail's `<dl>` never shows it, so the breakdown does not reconcile with its own Net profit. Turn-in is a **median 85%** of ISK outlay (84% even excluding the ~1/8 with `isk_cost: 0`); 588/845 exceed half; worst shows a 0 ISK price against a 238M turn-in. Dead key `loyaltyStore.requiredItems` sits literally between the `storeCost` and `materials` labels. Second defect on the same surface: `unpriceable` blames "a material or the product" when an unpriced REQUIRED ITEM is the cause. Blocked by #1050 — same `<dl>` |
+| #1074 | NARROW                                                                                           | **bug**, and filed on a narrower justification than the feature kill-bar: the `/next-ticket` PR loop is this skill's own delivery mechanism. One Open Orders test awaits a MOCK CALL then queries the button SYNCHRONOUSLY, racing the panel's `loading && !data` spinner. The variable-latency step is `loadOrderProblemSamples` — the one collaborator the file does NOT `vi.mock`, so a real fake-IndexedDB read. Cost two CI failures on a Markdown-only PR (local: 27/27, and 508/508 across `features/market`). Exactly one instance repo-wide; fix is one line matching its own two neighbours                                                       |
 
 ## Killed / dropped candidates (never filed)
 
