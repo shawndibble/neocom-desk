@@ -10,6 +10,7 @@ import {
   DEFAULT_PRICE_HISTORY_RANGE,
   PRICE_HISTORY_RANGE_KEY,
 } from './priceHistoryRangePref';
+import { historyPoint } from '@/engine/market/__fixtures__/priceHistory';
 
 // Every fixed-date fixture below is well within 30 days of this, so the
 // panel's default range never has to change per test just to keep a point visible.
@@ -71,7 +72,7 @@ describe('PriceHistoryPanel', () => {
 
   it('renders the lazy chart once history points arrive', async () => {
     mockedLoad.mockResolvedValue({
-      points: [{ date: '2026-08-01', average: 5, volume: 50 }],
+      points: [historyPoint({ date: '2026-08-01', average: 5, volume: 50 })],
       fetchedAt: 1_000_000,
     });
     render(
@@ -97,9 +98,9 @@ describe('PriceHistoryPanel', () => {
   it('shows a hi/lo/median summary line above the chart', async () => {
     mockedLoad.mockResolvedValue({
       points: [
-        { date: '2026-08-01', average: 10, volume: 5 },
-        { date: '2026-08-02', average: 30, volume: 5 },
-        { date: '2026-08-03', average: 20, volume: 5 },
+        historyPoint({ date: '2026-08-01', average: 10, volume: 5 }),
+        historyPoint({ date: '2026-08-02', average: 30, volume: 5 }),
+        historyPoint({ date: '2026-08-03', average: 20, volume: 5 }),
       ],
       fetchedAt: 1_000_000,
     });
@@ -114,12 +115,68 @@ describe('PriceHistoryPanel', () => {
     expect(screen.getByLabelText('20.00 ISK').parentElement).toHaveTextContent('Median:');
   });
 
+  it('takes the summary high and low from the days\u2019 own extremes, not their averages', async () => {
+    mockedLoad.mockResolvedValue({
+      points: [
+        historyPoint({ date: '2026-08-01', average: 10, lowest: 4, highest: 16 }),
+        historyPoint({ date: '2026-08-02', average: 30, lowest: 25, highest: 44 }),
+      ],
+      fetchedAt: 1_000_000,
+    });
+    render(
+      <PriceHistoryPanel regionId={10000002} typeId={34} itemName="Tritanium" now={FIXED_NOW} />
+    );
+    await waitFor(() => expect(screen.getByTestId('chart')).toBeInTheDocument());
+    expect(screen.getByLabelText('44.00 ISK').parentElement).toHaveTextContent('High:');
+    expect(screen.getByLabelText('4.00 ISK').parentElement).toHaveTextContent('Low:');
+  });
+
+  it('sums traded volume and averages the daily order count across the range', async () => {
+    mockedLoad.mockResolvedValue({
+      points: [
+        historyPoint({ date: '2026-08-01', average: 10, volume: 1_200, orderCount: 40 }),
+        historyPoint({ date: '2026-08-02', average: 10, volume: 800, orderCount: 41 }),
+      ],
+      fetchedAt: 1_000_000,
+    });
+    render(
+      <PriceHistoryPanel regionId={10000002} typeId={34} itemName="Tritanium" now={FIXED_NOW} />
+    );
+    await waitFor(() => expect(screen.getByTestId('chart')).toBeInTheDocument());
+    // Matched from the figure outward, like the ISK stats above, so each
+    // number is pinned to the label it actually sits beside. The mean keeps
+    // its decimal rather than rounding — 40.5 orders a day is the fact.
+    expect(screen.getByText('2,000').parentElement).toHaveTextContent('Volume:');
+    expect(screen.getByText('40.5').parentElement).toHaveTextContent('Orders / day:');
+  });
+
+  it('keeps a thin market off a flat zero in the orders-per-day stat', async () => {
+    mockedLoad.mockResolvedValue({
+      points: [
+        historyPoint({ date: '2026-08-01', average: 10, orderCount: 1 }),
+        ...Array.from({ length: 9 }, (_, i) =>
+          historyPoint({
+            date: `2026-08-${String(i + 2).padStart(2, '0')}`,
+            average: 10,
+            orderCount: 0,
+          })
+        ),
+      ],
+      fetchedAt: 1_000_000,
+    });
+    render(
+      <PriceHistoryPanel regionId={10000002} typeId={34} itemName="Tritanium" now={FIXED_NOW} />
+    );
+    await waitFor(() => expect(screen.getByTestId('chart')).toBeInTheDocument());
+    expect(screen.getByText('0.1').parentElement).toHaveTextContent('Orders / day:');
+  });
+
   it('narrows the chart to the selected date range', async () => {
     const user = userEvent.setup();
     mockedLoad.mockResolvedValue({
       points: [
-        { date: '2026-07-20', average: 5, volume: 50 }, // within 30d (default) but outside 7d
-        { date: '2026-08-04', average: 6, volume: 50 }, // within 7d
+        historyPoint({ date: '2026-07-20', average: 5, volume: 50 }), // within 30d (default) but outside 7d
+        historyPoint({ date: '2026-08-04', average: 6, volume: 50 }), // within 7d
       ],
       fetchedAt: 1_000_000,
     });
@@ -143,8 +200,8 @@ describe('PriceHistoryPanel', () => {
     const user = userEvent.setup();
     mockedLoad.mockResolvedValue({
       points: [
-        { date: '2026-07-20', average: 5, volume: 50 }, // within 30d, outside 7d
-        { date: '2026-08-04', average: 6, volume: 50 }, // within 7d
+        historyPoint({ date: '2026-07-20', average: 5, volume: 50 }), // within 30d, outside 7d
+        historyPoint({ date: '2026-08-04', average: 6, volume: 50 }), // within 7d
       ],
       fetchedAt: 1_000_000,
     });
@@ -171,8 +228,8 @@ describe('PriceHistoryPanel', () => {
   it('passes no moving-average points when the item has fewer real days than the window', async () => {
     mockedLoad.mockResolvedValue({
       points: [
-        { date: '2026-08-03', average: 10, volume: 5 },
-        { date: '2026-08-04', average: 12, volume: 5 },
+        historyPoint({ date: '2026-08-03', average: 10, volume: 5 }),
+        historyPoint({ date: '2026-08-04', average: 12, volume: 5 }),
       ],
       fetchedAt: 1_000_000,
     });
@@ -189,11 +246,13 @@ describe('PriceHistoryPanel', () => {
     // (days 7-10). Computing after filtering would still yield 4 here since
     // 30d keeps everything — the 7d-range assertion below is what actually
     // distinguishes pre- vs post-filter computation.
-    const points = Array.from({ length: 10 }, (_, i) => ({
-      date: `2026-07-${String(20 + i).padStart(2, '0')}`,
-      average: 10 + i,
-      volume: 5,
-    }));
+    const points = Array.from({ length: 10 }, (_, i) =>
+      historyPoint({
+        date: `2026-07-${String(20 + i).padStart(2, '0')}`,
+        average: 10 + i,
+        volume: 5,
+      })
+    );
     mockedLoad.mockResolvedValue({ points, fetchedAt: 1_000_000 });
     render(
       <PriceHistoryPanel regionId={10000002} typeId={34} itemName="Tritanium" now={FIXED_NOW} />
@@ -208,13 +267,13 @@ describe('PriceHistoryPanel', () => {
     // MA point (a restatement of the summary), which is the defect the
     // ticket calls out. The 7d range must use a shorter window instead.
     const points = [
-      { date: '2026-07-30', average: 10, volume: 5 },
-      { date: '2026-07-31', average: 11, volume: 5 },
-      { date: '2026-08-01', average: 12, volume: 5 },
-      { date: '2026-08-02', average: 13, volume: 5 },
-      { date: '2026-08-03', average: 14, volume: 5 },
-      { date: '2026-08-04', average: 15, volume: 5 },
-      { date: '2026-08-05', average: 16, volume: 5 },
+      historyPoint({ date: '2026-07-30', average: 10, volume: 5 }),
+      historyPoint({ date: '2026-07-31', average: 11, volume: 5 }),
+      historyPoint({ date: '2026-08-01', average: 12, volume: 5 }),
+      historyPoint({ date: '2026-08-02', average: 13, volume: 5 }),
+      historyPoint({ date: '2026-08-03', average: 14, volume: 5 }),
+      historyPoint({ date: '2026-08-04', average: 15, volume: 5 }),
+      historyPoint({ date: '2026-08-05', average: 16, volume: 5 }),
     ];
     mockedLoad.mockResolvedValue({ points, fetchedAt: 1_000_000 });
     render(

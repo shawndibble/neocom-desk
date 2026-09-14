@@ -188,6 +188,12 @@ here — they go one per file in `docs/context/decisions/`.
 - **Cost Index**: A solar system's current manufacturing activity level
   (read live from ESI). Higher activity in a system drives its Job Fee up;
   distinct from EIV, which prices the materials rather than the system.
+- **Daily Range**: One day's lowest and highest _executed_ price for an item in
+  a Region, from ESI's market history (`lowest`/`highest`). Drawn on **Price
+  History** as a shaded band behind the average line. Distinct from the
+  **Order Book**'s spread, which is what is being asked for right now; this is
+  what was actually paid. A single mislisted order that someone took puts a
+  genuine outlier in the band — it is a fact about the day, not an artefact.
 - **Craft Scope**: Which **Industry Activity** types an **Auto Build** pass
   is allowed to mark buildable — a multi-select, not a hardcoded
   manufacturing-only filter. Only Manufacturing is functional today;
@@ -478,6 +484,11 @@ here — they go one per file in `docs/context/decisions/`.
   it has no place in a Kind Card's ordering or on the Deadline Strip, and it
   gets a surface with no clock instead.
 - **Optimize Modes**: Skill Plan optimizer actions — "optimize now" (optimizer chooses remap placement, keeps order), "optimize at remap points" (user drags **Remap Markers** into the plan; optimizer computes the best attribute spread for each marker-delimited segment), "suggest full reorder" (attribute-grouped reorder honoring prerequisites; user accepts or rejects). Reorder never applies silently.
+- **Order Count**: How many orders ticked for an item in a Region on one day
+  (ESI's `order_count`). A read on how many parties were trading, not on how
+  much moved — **Traded Volume** answers that, and the two diverge when a few
+  large fills carry a quiet day. Drawn as a line on **Price History**'s
+  activity strip.
 - **Order Book**: The live buy and sell orders for one item in one Region, read
   from ESI. Rows, not a summary — each row is one order with its price,
   quantity, location, range and expiry. Replaces the single best bid/ask that a
@@ -553,6 +564,11 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   prereq is an ordinary entry from then on — same drag handle, priority
   control and remove button — and its own upstream prerequisites stay derived,
   moving with it.
+- **Price History**: The Market Browser item tab charting one item's daily
+  history in a Region: **Daily Range**, average price and its moving average
+  above, **Traded Volume** and **Order Count** below, on one shared date axis.
+  Every figure comes from ESI's own daily rows — nothing here is derived from
+  the live **Order Book**.
 - **Price Aggregate**: One best-bid/best-ask summary per station (Fuzzwork).
   Still the source for Build Plan pricing; no longer what the Market Browser shows.
 - **Priority (Skill Plan)**: High/Normal/Low urgency a user assigns to a Skill
@@ -619,6 +635,9 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   tombstone TTL. A Pull Cursor is a statement about what this device has seen,
   never about the current time: it never advances past the newest document in
   the response.
+- **Traded Volume**: Units of an item that changed hands in a Region on one
+  day (ESI's `volume`). Not the item's cargo volume in m³ — the collision is
+  EVE's, and this glossary keeps both words only because ESI does.
 - **Quickbar**: The user's saved item shortcuts in the Market Browser's left
   column. Replaces the pin-to-compare grid; the comparison itself becomes a tab.
 - **Ratio Block**: The smallest whole-pin set that runs a chain once — one

@@ -8,14 +8,16 @@ import type { OpenOrderRow, CharacterSkills } from './openOrdersModel';
 import type { RegionCompetition } from './orderCompetition';
 import type { PriceHistoryResult } from './priceHistory';
 import { orderFloor } from '@/engine/market/orderFloor';
+import { historyPoint as buildHistoryPoint } from '@/engine/market/__fixtures__/priceHistory';
 
 /** Daily point `daysAgo` days before now, so it always lands inside a `30d` filter regardless of when the suite runs. */
+/** A day of history `daysAgo` days back — these tests only ever vary the volume. */
 function historyPoint(daysAgo: number, volume: number) {
-  return {
+  return buildHistoryPoint({
     date: new Date(Date.now() - daysAgo * 86_400_000).toISOString().slice(0, 10),
     average: 100,
     volume,
-  };
+  });
 }
 
 const SKILLS: CharacterSkills = {

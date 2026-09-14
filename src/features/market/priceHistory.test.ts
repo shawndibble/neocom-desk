@@ -27,9 +27,12 @@ describe('loadPriceHistory', () => {
     );
 
     const result = await loadPriceHistory(REGION_ID, TYPE_ID);
+    // Every field the endpoint sends, including the day's own extremes and
+    // its order count — the chart's band and activity strip are drawn from
+    // these, and dropping them here is what used to hide them.
     expect(result.points).toEqual([
-      { date: '2026-08-01', average: 5, volume: 50 },
-      { date: '2026-08-30', average: 5.5, volume: 100 },
+      { date: '2026-08-01', average: 5, highest: 5.5, lowest: 4.5, volume: 50, orderCount: 2 },
+      { date: '2026-08-30', average: 5.5, highest: 6, lowest: 5, volume: 100, orderCount: 3 },
     ]);
   });
 

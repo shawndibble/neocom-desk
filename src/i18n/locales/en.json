@@ -2912,9 +2912,11 @@
       "columnHub": "Hub"
     },
     "priceHistory": {
-      "chartLabel": "Daily average price and traded volume for {{item}}",
+      "chartLabel": "Daily price range, average, traded volume and order count for {{item}}",
       "date": "Date",
       "average": "Average Price",
+      "priceRange": "Daily range",
+      "orderCount": "Orders",
       "volume": "Volume",
       "emptyTitle": "No price history",
       "emptyHint": "ESI has no market history for this item in this region yet.",
@@ -2928,6 +2930,8 @@
       "summaryHi": "High",
       "summaryLo": "Low",
       "summaryMedian": "Median",
+      "summaryVolume": "Volume",
+      "summaryOrdersPerDay": "Orders / day",
       "summaryNone": "No data in this range",
       "movingAverage": "Moving average"
     },

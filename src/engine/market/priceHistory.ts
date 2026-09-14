@@ -7,8 +7,15 @@
 
 export interface MarketHistoryPoint {
   date: string;
+  /** Volume-weighted mean of the day's fills, as ESI reports it. */
   average: number;
+  /** The day's own extremes — the prices something actually changed hands at, which `average` alone hides. */
+  highest: number;
+  lowest: number;
+  /** Units traded that day. */
   volume: number;
+  /** Orders that ticked that day (ESI's `order_count`) — how many parties were trading, not how much moved. */
+  orderCount: number;
 }
 
 /** Sorts by date ascending, oldest first — the order the chart draws left to right. */
@@ -39,12 +46,29 @@ export function filterPriceHistoryRange<T extends { date: string }>(
 }
 
 export interface PriceHistorySummary {
+  /**
+   * The highest and lowest price anything traded at anywhere in the range,
+   * from the days' own `highest`/`lowest` — not the extremes of the daily
+   * average, which is what these were before the band existed. A day whose
+   * average sat at 9,000 while a spike filled at 14,000 now reports 14,000,
+   * because that is the number a trader is asking this column for.
+   */
   hi: number;
   lo: number;
+  /** Median of the daily *average* — the middle of a typical day, which no single day's extreme should move. */
   median: number;
+  /** Units traded across the whole range. */
+  totalVolume: number;
+  /**
+   * Mean daily order count, left unrounded — the caller formats it. Rounding
+   * here turned a real but thin market ("10 orders across 90 days") into a
+   * flat `0`, which is the fabricated figure the null return above exists to
+   * avoid.
+   */
+  meanOrderCount: number;
 }
 
-/** Hi/lo/median of the daily average price. Null for an empty range — never a fabricated 0. */
+/** Range hi/lo, median day, total volume and mean daily order count. Null for an empty range — never a fabricated 0. */
 export function summarizePriceHistory(
   points: readonly MarketHistoryPoint[]
 ): PriceHistorySummary | null {
@@ -52,7 +76,22 @@ export function summarizePriceHistory(
   const sorted = points.map((p) => p.average).sort((a, b) => a - b);
   const mid = Math.floor(sorted.length / 2);
   const median = sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
-  return { hi: sorted[sorted.length - 1], lo: sorted[0], median };
+  let totalVolume = 0;
+  let totalOrderCount = 0;
+  // `Math.min`/`Math.max` rather than a seeded comparison: a comparison seeded
+  // from `points[0]` answers differently depending on *where* a malformed day
+  // sits — `undefined > hi` is false, so a bad value at index 0 sticks and a
+  // bad value later vanishes. These two propagate NaN from any position, so a
+  // malformed response fails the same way wherever the bad day landed.
+  let hi = -Infinity;
+  let lo = Infinity;
+  for (const p of points) {
+    totalVolume += p.volume;
+    totalOrderCount += p.orderCount;
+    hi = Math.max(hi, p.highest);
+    lo = Math.min(lo, p.lowest);
+  }
+  return { hi, lo, median, totalVolume, meanOrderCount: totalOrderCount / points.length };
 }
 
 export interface MovingAveragePoint {
@@ -69,7 +108,7 @@ export interface MovingAveragePoint {
  * window, so a series shorter than `windowDays` returns empty.
  */
 export function movingAverage(
-  points: readonly MarketHistoryPoint[],
+  points: readonly MovingAveragePoint[],
   windowDays: number
 ): MovingAveragePoint[] {
   if (windowDays <= 0) return [];

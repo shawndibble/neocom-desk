@@ -7,7 +7,14 @@ export interface PriceHistoryResult {
   fetchedAt: number;
 }
 
-/** Daily average price + traded volume for typeId in regionId, sorted chronologically. */
+/**
+ * One day per entry for typeId in regionId, sorted chronologically.
+ *
+ * Every field ESI sends is kept. The endpoint has always returned the day's
+ * `highest`, `lowest` and `order_count` alongside the average and the volume;
+ * dropping them here cost a second request to get them back later, and the
+ * chart wants all five.
+ */
 export async function loadPriceHistory(
   regionId: number,
   typeId: number
@@ -17,7 +24,10 @@ export async function loadPriceHistory(
     (data ?? []).map((entry) => ({
       date: entry.date,
       average: entry.average,
+      highest: entry.highest,
+      lowest: entry.lowest,
       volume: entry.volume,
+      orderCount: entry.order_count,
     }))
   );
   return { points, fetchedAt: Date.now() };
