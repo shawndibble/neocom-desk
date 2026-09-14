@@ -110,9 +110,9 @@ describe('PriceHistoryPanel', () => {
     await waitFor(() => expect(screen.getByTestId('chart')).toBeInTheDocument());
     // Shorthand on screen (#947), so each figure is matched by its accessible
     // name and still checked against the label it sits beside.
-    expect(screen.getByLabelText('30.00 ISK').parentElement).toHaveTextContent('High:');
-    expect(screen.getByLabelText('10.00 ISK').parentElement).toHaveTextContent('Low:');
-    expect(screen.getByLabelText('20.00 ISK').parentElement).toHaveTextContent('Median:');
+    expect(screen.getByLabelText('30.00 ISK').parentElement).toHaveTextContent('High');
+    expect(screen.getByLabelText('10.00 ISK').parentElement).toHaveTextContent('Low');
+    expect(screen.getByLabelText('20.00 ISK').parentElement).toHaveTextContent('Median');
   });
 
   it('takes the summary high and low from the days\u2019 own extremes, not their averages', async () => {
@@ -127,8 +127,8 @@ describe('PriceHistoryPanel', () => {
       <PriceHistoryPanel regionId={10000002} typeId={34} itemName="Tritanium" now={FIXED_NOW} />
     );
     await waitFor(() => expect(screen.getByTestId('chart')).toBeInTheDocument());
-    expect(screen.getByLabelText('44.00 ISK').parentElement).toHaveTextContent('High:');
-    expect(screen.getByLabelText('4.00 ISK').parentElement).toHaveTextContent('Low:');
+    expect(screen.getByLabelText('44.00 ISK').parentElement).toHaveTextContent('High');
+    expect(screen.getByLabelText('4.00 ISK').parentElement).toHaveTextContent('Low');
   });
 
   it('sums traded volume and averages the daily order count across the range', async () => {
@@ -146,8 +146,8 @@ describe('PriceHistoryPanel', () => {
     // Matched from the figure outward, like the ISK stats above, so each
     // number is pinned to the label it actually sits beside. The mean keeps
     // its decimal rather than rounding — 40.5 orders a day is the fact.
-    expect(screen.getByText('2,000').parentElement).toHaveTextContent('Volume:');
-    expect(screen.getByText('40.5').parentElement).toHaveTextContent('Orders / day:');
+    expect(screen.getByText('2,000').parentElement).toHaveTextContent('Volume');
+    expect(screen.getByText('40.5').parentElement).toHaveTextContent('Orders / day');
   });
 
   it('keeps a thin market off a flat zero in the orders-per-day stat', async () => {
@@ -168,7 +168,25 @@ describe('PriceHistoryPanel', () => {
       <PriceHistoryPanel regionId={10000002} typeId={34} itemName="Tritanium" now={FIXED_NOW} />
     );
     await waitFor(() => expect(screen.getByTestId('chart')).toBeInTheDocument());
-    expect(screen.getByText('0.1').parentElement).toHaveTextContent('Orders / day:');
+    expect(screen.getByText('0.1').parentElement).toHaveTextContent('Orders / day');
+  });
+
+  it('names the summary figures without colons, so the row reads as a readout', async () => {
+    mockedLoad.mockResolvedValue({
+      points: [historyPoint({ date: '2026-08-01', average: 10, volume: 5, orderCount: 2 })],
+      fetchedAt: 1_000_000,
+    });
+    render(
+      <PriceHistoryPanel regionId={10000002} typeId={34} itemName="Tritanium" now={FIXED_NOW} />
+    );
+    await waitFor(() => expect(screen.getByTestId('chart')).toBeInTheDocument());
+    // One assertion over the whole group rather than a negative beside each
+    // label: the substring checks elsewhere in this file would all still pass
+    // if `Label:` came back, and five separate `not.toHaveTextContent` lines
+    // would say the same thing five times. Nothing in this group — labels,
+    // figures, "Orders / day" — contains a colon.
+    const stats = screen.getByText('High').parentElement?.parentElement;
+    expect(stats?.textContent).not.toContain(':');
   });
 
   it('narrows the chart to the selected date range', async () => {

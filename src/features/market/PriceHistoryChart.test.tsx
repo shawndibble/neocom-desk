@@ -96,16 +96,24 @@ describe('PriceHistoryChart', () => {
     expect(firstRow).toHaveTextContent('12');
   });
 
-  it('shows the per-day table on a phone instead of hiding it from sight', () => {
+  // A folding phone reports ~1900px unfolded, so anything that hid this table
+  // behind a max-width test made it vanish on the hinge. It is visible at
+  // every width; only its layout changes.
+  it('shows the per-day table on a phone', () => {
     withPhoneViewport(() => {
       render(<PriceHistoryChart points={POINTS} itemName="Tritanium" />);
       expect(screen.getByRole('table')).not.toHaveClass('sr-only');
     });
   });
 
-  it('keeps the per-day table screen-reader-only above phone width', () => {
+  it('still shows the per-day table above phone width', () => {
     render(<PriceHistoryChart points={POINTS} itemName="Tritanium" />);
-    expect(screen.getByRole('table')).toHaveClass('sr-only');
+    expect(screen.getByRole('table')).not.toHaveClass('sr-only');
+  });
+
+  it('pairs the day figures two to a row in its stacked cards', () => {
+    render(<PriceHistoryChart points={POINTS} itemName="Tritanium" />);
+    expect(screen.getByRole('table')).toHaveClass('dt-stack-2col');
   });
 
   it('still names every series in the legend on a phone, where an axis no longer does', () => {

@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   EmptyState,
@@ -10,6 +10,7 @@ import {
   SelectValue,
   Spinner,
 } from '@/components/ui';
+import { cx } from '@/lib/cx';
 import { formatMeanCount, formatVolume } from './format';
 import { loadPriceHistory } from './priceHistory';
 import {
@@ -133,6 +134,28 @@ export function PriceHistoryPanel({ regionId, typeId, itemName, now }: PriceHist
   );
 }
 
+/**
+ * One summary figure with its name. The label is dimmed and unpunctuated
+ * rather than a `Label:` prefix — five of these sit together, and the colons
+ * read as a list of sentences instead of a readout.
+ */
+function Stat({
+  label,
+  className,
+  children,
+}: {
+  label: string;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <span className={cx('flex items-baseline gap-1.5', className)}>
+      <span className="text-text-dim">{label}</span>
+      {children}
+    </span>
+  );
+}
+
 interface RangedHistoryProps {
   points: readonly MarketHistoryPoint[];
   range: PriceHistoryRange;
@@ -164,38 +187,48 @@ function RangedHistory({ points, range, onRangeChange, itemName, now }: RangedHi
     <div>
       {/*
        * Stacked below `sm`, one row above it. Five figures and a select no
-       * longer share a phone-width line: on that screen the summary wraps to
-       * a couple of rows and the range control takes a full-width one of its
+       * longer share a phone-width line: on that screen the summary becomes a
+       * two-column grid and the range control takes a full-width row of its
        * own, where it is also a full-height tap target rather than something
        * squeezed against the last number. CSS-only, like `DataTable`'s own
        * collapse — one markup, no duplicated branch.
+       *
+       * A grid rather than a wrapping flex row: wrapping packed four figures
+       * onto the first line and orphaned the fifth, so the labels landed at a
+       * different x on each line and the block read as ragged text instead of
+       * a readout. Fixed tracks line the labels up.
        */}
-      <div className="flex flex-col gap-2 px-1 pb-2 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
+      {/* `pt-2` only below `sm`. Above it the row is horizontal and the range
+          select is the tallest thing in it, so `items-center` already leaves
+          the figures clear of the tab bar; stacked, they are first in the
+          column with nothing setting a height and sit flush against it. */}
+      <div className="flex flex-col gap-2 px-1 pt-2 pb-2 sm:flex-row sm:items-center sm:justify-between sm:pt-0">
+        <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs sm:flex sm:flex-wrap sm:gap-x-4">
           {summary ? (
             <>
-              <span>
-                {t('market.priceHistory.summaryHi')}:{' '}
+              <Stat label={t('market.priceHistory.summaryHi')}>
                 <IskAmount value={summary.hi} revealOn="tap" />
-              </span>
-              <span>
-                {t('market.priceHistory.summaryLo')}:{' '}
+              </Stat>
+              <Stat label={t('market.priceHistory.summaryLo')}>
                 <IskAmount value={summary.lo} revealOn="tap" />
-              </span>
-              <span>
-                {t('market.priceHistory.summaryMedian')}:{' '}
+              </Stat>
+              <Stat label={t('market.priceHistory.summaryMedian')}>
                 <IskAmount value={summary.median} revealOn="tap" />
-              </span>
+              </Stat>
               {/* Units and orders, not ISK — plain figures, so no `IskAmount`
                   and nothing for its privacy blur to hide. */}
-              <span>
-                {t('market.priceHistory.summaryVolume')}:{' '}
-                <span className="tabular-nums">{formatVolume(summary.totalVolume)}</span>
-              </span>
-              <span>
-                {t('market.priceHistory.summaryOrdersPerDay')}:{' '}
+              <Stat label={t('market.priceHistory.summaryOrdersPerDay')}>
                 <span className="tabular-nums">{formatMeanCount(summary.meanOrderCount)}</span>
-              </span>
+              </Stat>
+              {/* Last, and across both columns on a phone: traded volume runs
+                  to eight or nine digits where every figure beside it is four
+                  or five, so it is the one that will not share a track. */}
+              <Stat
+                label={t('market.priceHistory.summaryVolume')}
+                className="col-span-2 sm:col-auto"
+              >
+                <span className="tabular-nums">{formatVolume(summary.totalVolume)}</span>
+              </Stat>
             </>
           ) : (
             // Distinct from emptyTitle above (ESI has no history at all) — this

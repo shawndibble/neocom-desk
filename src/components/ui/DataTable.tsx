@@ -119,6 +119,15 @@ interface DataTableProps<T> {
    * to fit a 390px screen unaided — roughly two short columns.
    */
   responsive?: 'stack' | 'table';
+  /**
+   * How many values sit side by side inside one stacked card. `1` (the
+   * default) gives each field its own line with the label in a left gutter —
+   * right whenever a value can be long (a station name, an item name).
+   * `2` pairs them up with the label above the value, for a card of short
+   * figures where one-per-line would leave half the screen empty. Ignored
+   * unless `responsive` is `'stack'`.
+   */
+  stackColumns?: 1 | 2;
 }
 
 function compareValues(a: string | number, b: string | number): number {
@@ -170,6 +179,7 @@ export function DataTable<T>({
   rowContextMenu,
   onRowClick,
   responsive = 'stack',
+  stackColumns = 1,
 }: DataTableProps<T>) {
   const { t } = useTranslation();
   const [sort, setSort] = useState<DataTableSort | null>(defaultSort ?? null);
@@ -255,7 +265,12 @@ export function DataTable<T>({
       ref={tableRef}
       role="table"
       aria-label={label}
-      className={cx('w-full text-xs', responsive === 'stack' && 'dt-stack', className)}
+      className={cx(
+        'w-full text-xs',
+        responsive === 'stack' && 'dt-stack',
+        responsive === 'stack' && stackColumns === 2 && 'dt-stack-2col',
+        className
+      )}
     >
       <thead role="rowgroup">
         <tr role="row" className="border-b border-line text-left text-text-dim">

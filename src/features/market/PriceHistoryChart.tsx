@@ -62,6 +62,22 @@ const CURVE_TYPE = 'monotone';
 const PLOT_MARGIN_RIGHT = 8;
 
 /**
+ * Decimal places for the price axis, from how much ground the axis covers.
+ *
+ * A fixed `0` is right for a battleship hull and useless for Tritanium: its
+ * whole 30-day range is 3.70 to 4.04 ISK, so every tick rounded to "4" and the
+ * axis labelled four different heights with the same number. Keyed to the
+ * *span* rather than the magnitude, because that is what decides whether two
+ * neighbouring ticks can round together.
+ */
+function priceTickDecimals(span: number): number {
+  if (span < 1) return 3;
+  if (span < 10) return 2;
+  if (span < 100) return 1;
+  return 0;
+}
+
+/**
  * `date` is a bare calendar date ("YYYY-MM-DD"), not an instant — parsing it
  * with `new Date(string)` reads it as UTC midnight, then `toLocaleDateString`
  * renders in local time, shifting the label a day back in negative-offset
@@ -222,6 +238,8 @@ export default function PriceHistoryChart({
     return [lo, hi];
   }, [chartData]);
 
+  const priceDecimals = priceTickDecimals(priceDomain[1] - priceDomain[0]);
+
   const columns = useMemo<DataTableColumn<ChartRow>[]>(
     () => [
       { id: 'date', header: t('market.priceHistory.date'), render: (p) => p.date },
@@ -286,8 +304,13 @@ export default function PriceHistoryChart({
                 // bare `['dataMin', 'dataMax']` because that pair collapses to
                 // a zero-height axis whenever every day shares one price.
                 domain={priceDomain}
+                // The phone's abbreviated ticks only apply where the axis
+                // spans whole ISK — abbreviating a 3.70-to-4.04 axis puts "4"
+                // on every tick, which is the case these decimals exist for.
                 tickFormatter={(value: number) =>
-                  isPhone ? formatIskCompact(value) : formatIsk(value, 0)
+                  isPhone && priceDecimals === 0
+                    ? formatIskCompact(value)
+                    : formatIsk(value, priceDecimals)
                 }
               />
               {/* The only `<Tooltip>` of the two charts. `syncId` activates
@@ -371,7 +394,7 @@ export default function PriceHistoryChart({
                 yAxisId="orders"
                 orientation="right"
                 hide={isPhone}
-                stroke="var(--color-text-dim)"
+                stroke="var(--color-series-order-count)"
                 tick={{ fontSize: 11, fill: 'var(--color-text-dim)' }}
                 width={ordersAxisWidth}
                 tickFormatter={(value: number) => formatCompactNumber(value)}
@@ -389,7 +412,7 @@ export default function PriceHistoryChart({
                 yAxisId="orders"
                 type={CURVE_TYPE}
                 dataKey="orderCount"
-                stroke="var(--color-text-dim)"
+                stroke="var(--color-series-order-count)"
                 strokeWidth={1.5}
                 dot={false}
                 name={t('market.priceHistory.orderCount')}
@@ -442,24 +465,33 @@ export default function PriceHistoryChart({
           <LegendItem
             label={t('market.priceHistory.orderCount')}
             shape="line"
-            color="var(--color-text-dim)"
+            color="var(--color-series-order-count)"
           />
         </li>
       </ul>
 
       {/*
-       * Visible on the phone, screen-reader-only above it. `DataTable` stacks
-       * each row into a card below `sm` (DESIGN.md §4) — the same breakpoint
-       * `useIsPhone` reads — so the figures the shrunken chart can no longer
-       * spell out are readable underneath it, and one table serves both the
-       * sighted phone reader and the accessible fallback.
+       * Shown at every width, and never `sr-only`.
+       *
+       * It was briefly hidden above `useIsPhone`'s breakpoint, which broke on
+       * a folding phone: unfolded it reports ~1900px, fails a max-width test
+       * written for a handset, and the whole day list vanished mid-session
+       * with nothing to say why. Width was answering "is this a phone" when
+       * the real question is "does anyone want these numbers", and the answer
+       * to that does not change with the hinge.
+       *
+       * So no breakpoint gates it. `DataTable` still stacks each row into a
+       * two-column card below `sm` (DESIGN.md §4) and draws a real table
+       * above, which is the same data laid out for the room available.
        */}
       <DataTable
         columns={columns}
         rows={chartData}
         rowKey={(p) => p.date}
         label={t('market.priceHistory.chartLabel', { item: itemName })}
-        className={isPhone ? undefined : 'sr-only'}
+        // Four short figures a card: one per line would run the list twice as
+        // long for no gain in legibility.
+        stackColumns={2}
       />
     </div>
   );

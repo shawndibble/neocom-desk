@@ -70,6 +70,24 @@ worth more than a better picker on one control.
 Distinct from `success`/`danger` so status badges and money never read as the same
 signal in one table. Always pair sign or +/− prefix with color (color-blind safety).
 
+### Chart series
+
+| Token                | Value     | Use                                                  |
+| -------------------- | --------- | ---------------------------------------------------- |
+| `series-order-count` | `#e9a13b` | Daily order count on the Market Price History chart. |
+
+**One token, and it should stay one.** Every other series in that figure borrows
+a colour it already owns — price is `accent`, the range band `accent-dim`, the
+volume bars `line-bright`, the moving average `text-dim` plus a dash. The order
+count had nothing honest to borrow: `warning` would make a data series read as
+an alert about the data, and a clock kind (below) names where a _deadline_ came
+from, so reusing one would give a single hue two meanings. It sits clear of
+`warning` on the orange side and of `kind-industry-job` on the saturated side.
+
+A second entry here is the start of the parallel palette this section forbids —
+so before adding one, try telling the new series apart by **form** instead:
+dashed against solid, bars against a line, its own strip.
+
 ### Clock kinds — the one nominal palette
 
 | Token                    | Value     | Use                                     |
