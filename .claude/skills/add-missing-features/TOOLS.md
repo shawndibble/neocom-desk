@@ -75,8 +75,12 @@ already covered, `structureFuel`).
 (multi-character job tracking, slot availability, reaction planner, invention
 planning with probability, reprocessing, PI), EVE Cookbook, EveIndy,
 eveindustryplanner.com, eve-industry.org, eveonline-industry.com, EVE OS
-Industry and calculator.city all sit in the same shape as Ravworks/Slipway/
-EVE Forge/EVE-HUB, already surveyed. Everything they do is covered here —
+Industry, calculator.city and Eve Nexus (eve-nexus.app — Tauri desktop app,
+distinct from the forum's like-named fitting-sim toolkit: production-graph
+BOM viz, skill-aware ME/TE solver, buy-vs-build, cross-system cost index,
+restock planner, multi-character aggregation) all sit in the same shape as
+Ravworks/Slipway/EVE Forge/EVE-HUB, already surveyed. Everything they do is
+covered here —
 _except_ their two standout features, multi-hop reaction chaining and
 invention planning, and both are settled out of scope (kill-test 6 / round
 27's BOM-rollup rejection; `.out-of-scope/invention-planning.md`). A new
