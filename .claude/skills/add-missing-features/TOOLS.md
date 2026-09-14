@@ -129,7 +129,13 @@ here), Esparto Industries (blueprint/reaction
 browser, reprocessing calc, moon-ore tax parsing — all already covered), EVE
 Motor Market (desktop build-tree viz, run planner with cross-plan material
 reservation, ESI-synced trade journal — all three dead, see Killed/dropped;
-its skills+slots-aware run planner is what surfaced #1015).
+its skills+slots-aware run planner is what surfaced #1015), Capsuleers.app /
+eHub (production planner, PI, market data, assets valuation — closed
+classes/#712; Paragon Hub SKINR marketplace — kill-test 1, cosmetics outside
+ISK-pipeline remit; Incursion ISK/h, a wallet-derived PvE combat income
+rate, is the one novel shape and drops on remit, not a kill-test — no
+blueprint/build/market leg, same exclusion already applied to EVE Flipper's
+PLEX/SP-farm calculators and war tracker).
 
 **Dead/abandoned, not gap-analysed:** EVE Panel (PI sim, iOS), EVE
 GURU/Production Ledger, EveTerminal.io, Mining Timer Tool, EVE Hauling
@@ -143,7 +149,7 @@ all three turned out to carry a full industry/market surface. A title is a
 weak classifier — "asset manager" and "companion app" both hide market,
 industry and wallet features. Treat a name here as unexamined, not cleared,
 and check any that could plausibly touch the ISK pipeline: EVE Crews, Nexum, EveWebMail, EVE-NAV,
-Capsuleers.app, Wayfinder, Atlas, MISMAPS/MISKILLZ, Fly Safe, WHMapper,
+Wayfinder, Atlas, MISMAPS/MISKILLZ, Fly Safe, WHMapper,
 Socketkill, PEARL, EVE Hacking Simulator, EVE Nexus, Eve PvP Radar, EVE-O
 Preview, EVE MCP Server, EVE Threat Checker, EVE Fit Assistant, SLH Local
 Scanner, EveBoosters.com, Dd24tool.de, ISKONOMY, EVE Market Order Assistant
@@ -310,7 +316,9 @@ what the Advisor already computes per-planet; don't re-propose.
     trap.** Formulas resting on hand-transcribed community numbers (not
     SDE-derivable, no ESI fixture) go stale silently. Killed: Moon Survey /
     Metenox Yield Estimator, Metenox ongoing fuel/yield ledger (also
-    sub-slice-of-a-sub-slice reach: moon-owning corp leadership only).
+    sub-slice-of-a-sub-slice reach: moon-owning corp leadership only); EQM
+    HyperNet Tracker (dev-confirmed HyperNet offer data has no ESI backing
+    at all — also a gambling mechanic, not manufacturing or trading).
 14. **No bulk market-history endpoint.** ESI's market history is one type ID
     at a time — kills market-wide movers/trending dashboards; a bounded
     (Quickbar-scoped) version collapses into the existing Price History
