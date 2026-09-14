@@ -1,19 +1,12 @@
 /**
- * Persistence for the Open Orders page's rolling `OrderProblem` history
- * (issue #1018) — the Dexie half of `engine/market/orderProblemHistory.ts`,
- * which owns the pure window/dedupe/cap rules and the verdict itself.
+ * Persistence for the Open Orders page's rolling `OrderProblem` history —
+ * the Dexie half of `engine/market/orderProblemHistory.ts`, which owns the
+ * pure window/dedupe/cap rules and the verdict itself.
  *
- * Why the sampling happens here, on the page, and not in
- * `features/notifications/pollDomains.ts` as the ticket's brief assumed: an
- * order's `OrderProblem` is not computable from the poller's data. The
- * classification needs Fuzzwork station aggregates and a cost basis
- * (`buildOpenOrderRows`), and the poller loads neither — `fetchAggregates`
- * has no cache layer, so having the poller classify would mean an uncached
- * third-party request per station every 5 minutes for every user, including
- * ones who never open this tab. The Open Orders route already reloads on the
- * poller's own ESI cache revalidation, so leaving the tab open samples at
- * roughly that same cadence for free, and a shut tab simply records nothing
- * — the gappy series the badge is deliberately coarse about.
+ * Sampling runs from the page rather than the Foreground Poller because an
+ * order's `OrderProblem` is not computable where the poller runs; the
+ * reasoning is in
+ * `docs/context/decisions/20260914-135534-often-undercut-flag-samples-on-the-open-orders.md`.
  */
 import { db, type OrderProblemSampleRecord } from '@/db';
 import {
@@ -21,12 +14,33 @@ import {
   type OrderProblemSample,
 } from '@/engine/market/orderProblemHistory';
 import type { OrderProblem } from '@/engine/market/orderProblems';
+import type { CharacterOpenOrders } from './openOrdersData';
 
 /** One order's classification at the moment the page computed its rows. */
 export interface OrderProblemReading {
   orderId: number;
   characterId: number;
   problem: OrderProblem;
+}
+
+/**
+ * The characters a load may prune, out of the ones it returned: those whose
+ * open orders were genuinely read.
+ *
+ * `loadAllCharactersOpenOrders` keeps two kinds of failure in `entries`
+ * rather than `skipped`, both with an empty `orders` array, so that the
+ * page can render a per-character prompt on that row instead of the row
+ * vanishing: a character needing re-auth (`needsReauth`), and one whose
+ * fetch returned no cache at all (offline or a cold first load), which shows
+ * up as `fetchedAt: 0`. Either one looks exactly like "every order closed"
+ * to a prune that only reads order ids — and would silently delete weeks of
+ * that character's samples. A character with a real, genuinely empty order
+ * list still carries a real `fetchedAt`, so actual closures prune normally.
+ */
+export function sampleableCharacterIds(entries: readonly CharacterOpenOrders[]): number[] {
+  return entries
+    .filter((entry) => !entry.needsReauth && entry.fetchedAt > 0)
+    .map((entry) => entry.characterId);
 }
 
 /**
@@ -54,11 +68,11 @@ export async function loadOrderProblemSamples(
  * Records one reading per open order and drops the history of orders that
  * are gone (filled, cancelled or expired), all in one transaction.
  *
- * The prune is scoped to `characterIds` — the characters whose orders this
- * load actually saw. A global "delete every order id not in `readings`"
- * would erase weeks of samples for any character whose own `loadOrders`
- * failed or who was signed out when the page loaded, with no error to show
- * for it.
+ * The prune is scoped to `characterIds`, which callers build with
+ * `sampleableCharacterIds` — the characters whose orders were genuinely
+ * read. A global "delete every order id not in `readings`" would erase weeks
+ * of samples for any character that was signed out, offline, or whose own
+ * `loadOrders` failed, with no error to show for it.
  *
  * Rows whose new sample is dropped for spacing are not rewritten:
  * `appendOrderProblemSample` returns the same array reference in that case,

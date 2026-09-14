@@ -43,6 +43,17 @@ quantity, filled}`. Classifying an order needs Fuzzwork station aggregates
     than being dropped as too soon.
     None of these were validated against real order lifetimes — nobody has that
     data yet. They are the numbers to move first if the flag reads wrong.
+- **The prune only ever covers characters whose orders were genuinely
+  read.** `loadAllCharactersOpenOrders` deliberately keeps two failure
+  shapes in `entries` rather than `skipped`, both with an empty `orders`
+  array, so the page can show a per-character prompt instead of the row
+  vanishing: a character needing re-auth, and one whose fetch returned no
+  cache (offline, or a cold first load, which reads as `fetchedAt: 0`).
+  Either one looks exactly like "every order closed" to a prune that reads
+  only order ids, and would silently delete weeks of samples with no error to
+  show for it. `sampleableCharacterIds` is the one place that distinction is
+  drawn, and it is tested rather than left as a condition inside an effect.
+
 - **The flag is a boolean, and renders no count.** The ticket allowed either
   a rate bucket or a boolean; boolean won because the series is genuinely
   gappy — samples exist only while this page is open — so "undercut 7 of 13

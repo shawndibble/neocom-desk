@@ -1,13 +1,55 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { db } from '@/db';
 import { DEFAULT_UNDERCUT_HISTORY_THRESHOLDS } from '@/engine/market/orderProblemHistory';
-import { loadOrderProblemSamples, recordOrderProblemSamples } from './orderProblemSamples';
+import {
+  loadOrderProblemSamples,
+  recordOrderProblemSamples,
+  sampleableCharacterIds,
+} from './orderProblemSamples';
+import type { CharacterOpenOrders } from './openOrdersData';
 
 const NOW = 1_700_000_000_000;
 const SPACING = DEFAULT_UNDERCUT_HISTORY_THRESHOLDS.minSpacingMs;
 
 beforeEach(async () => {
   await db.orderProblemSamples.clear();
+});
+
+describe('sampleableCharacterIds', () => {
+  function entry(overrides: Partial<CharacterOpenOrders> = {}): CharacterOpenOrders {
+    return {
+      characterId: 10,
+      characterName: 'Ryn Vashti',
+      orders: [],
+      fetchedAt: NOW,
+      fromCache: false,
+      needsReauth: false,
+      ...overrides,
+    };
+  }
+
+  it('includes a character whose orders were read, even when it has none open', () => {
+    expect(sampleableCharacterIds([entry()])).toEqual([10]);
+  });
+
+  it('excludes a character that needs re-auth, so its history is never pruned', () => {
+    expect(sampleableCharacterIds([entry({ needsReauth: true })])).toEqual([]);
+  });
+
+  it('excludes a character whose fetch returned no cache at all (offline, cold load)', () => {
+    expect(sampleableCharacterIds([entry({ fetchedAt: 0 })])).toEqual([]);
+  });
+
+  it('keeps only the readable characters out of a mixed load', () => {
+    expect(
+      sampleableCharacterIds([
+        entry({ characterId: 10 }),
+        entry({ characterId: 20, needsReauth: true }),
+        entry({ characterId: 30, fetchedAt: 0 }),
+        entry({ characterId: 40 }),
+      ])
+    ).toEqual([10, 40]);
+  });
 });
 
 describe('recordOrderProblemSamples', () => {

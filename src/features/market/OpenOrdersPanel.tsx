@@ -50,7 +50,7 @@ import {
   type StructureCompetition,
 } from './orderCompetition';
 import { loadPriceHistory, type PriceHistoryResult } from './priceHistory';
-import { recordOrderProblemSamples } from './orderProblemSamples';
+import { recordOrderProblemSamples, sampleableCharacterIds } from './orderProblemSamples';
 import { sampledProblem } from '@/engine/market/orderProblemHistory';
 import type { JumpsAwayResult } from '@/engine/jumpsAway';
 import {
@@ -455,7 +455,7 @@ export function OpenOrdersPanel() {
    */
   useEffect(() => {
     if (!snapshot) return;
-    const characterIds = snapshot.openOrders.entries.map((entry) => entry.characterId);
+    const characterIds = sampleableCharacterIds(snapshot.openOrders.entries);
     void recordOrderProblemSamples(
       allRows.map((row) => ({
         orderId: row.orderId,
