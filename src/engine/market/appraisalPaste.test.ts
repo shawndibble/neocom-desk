@@ -122,3 +122,107 @@ describe('parseAppraisalPaste', () => {
     expect(parseAppraisalPaste('  \n\n \t \n')).toEqual([]);
   });
 });
+
+describe('parseAppraisalPaste — EFT fits', () => {
+  const FIT = [
+    '[Rifter, Kite Fit]',
+    '',
+    'Nanofiber Internal Structure I',
+    '[Empty Low slot]',
+    '',
+    '1MN Afterburner II',
+    '',
+    '125mm Gatling AutoCannon II, Republic Fleet EMP S',
+    '125mm Gatling AutoCannon II, Republic Fleet EMP S',
+    '',
+    'Small Polycarbon Engine Housing I',
+    '',
+    'Warrior II x5',
+    '',
+    '',
+    'Nanite Repair Paste x50',
+  ].join('\n');
+
+  it('prices the hull as its own entry, from the header line', () => {
+    const entries = parseAppraisalPaste(FIT);
+    expect(entries[0]).toEqual({ name: 'Rifter', quantity: 1, lines: [1] });
+  });
+
+  it('splits a "Module, Charge" line into two entries, both on that source line', () => {
+    const entries = parseAppraisalPaste(FIT);
+    const gun = entries.find((e) => e.name === '125mm Gatling AutoCannon II');
+    const ammo = entries.find((e) => e.name === 'Republic Fleet EMP S');
+    expect(gun).toEqual({ name: '125mm Gatling AutoCannon II', quantity: 2, lines: [8, 9] });
+    expect(ammo).toEqual({ name: 'Republic Fleet EMP S', quantity: 2, lines: [8, 9] });
+  });
+
+  it('keeps drone and cargo xN counts, and skips [Empty X slot] placeholders', () => {
+    const entries = parseAppraisalPaste(FIT);
+    expect(entries.find((e) => e.name === 'Warrior II')).toEqual({
+      name: 'Warrior II',
+      quantity: 5,
+      lines: [13],
+    });
+    expect(entries.find((e) => e.name === 'Nanite Repair Paste')).toEqual({
+      name: 'Nanite Repair Paste',
+      quantity: 50,
+      lines: [16],
+    });
+    expect(entries.some((e) => e.name.startsWith('[Empty'))).toBe(false);
+  });
+
+  it('prices every line of the fit: hull, modules, rig, charges, drones, cargo', () => {
+    expect(parseAppraisalPaste(FIT)).toEqual([
+      { name: 'Rifter', quantity: 1, lines: [1] },
+      { name: 'Nanofiber Internal Structure I', quantity: 1, lines: [3] },
+      { name: '1MN Afterburner II', quantity: 1, lines: [6] },
+      { name: '125mm Gatling AutoCannon II', quantity: 2, lines: [8, 9] },
+      { name: 'Republic Fleet EMP S', quantity: 2, lines: [8, 9] },
+      { name: 'Small Polycarbon Engine Housing I', quantity: 1, lines: [11] },
+      { name: 'Warrior II', quantity: 5, lines: [13] },
+      { name: 'Nanite Repair Paste', quantity: 50, lines: [16] },
+    ]);
+  });
+
+  it('reports a malformed header as its own line, rather than dropping it', () => {
+    const entries = parseAppraisalPaste('[ , Max Hacker]\n\nDamage Control II');
+    // The header text is not an item name, so it resolves to nothing and the
+    // panel lists it as an unmatched line — the same way a typo'd item name is
+    // reported, never silently dropped.
+    expect(entries).toEqual([
+      { name: '[ , Max Hacker]', quantity: 1, lines: [1] },
+      { name: 'Damage Control II', quantity: 1, lines: [3] },
+    ]);
+  });
+
+  it('emits no hull entry when the header names no ship', () => {
+    const entries = parseAppraisalPaste('[ , Max Hacker]\n\nDamage Control II');
+    expect(entries.some((e) => e.name === '')).toBe(false);
+  });
+
+  it('reports an unparseable body line by its source line number', () => {
+    const entries = parseAppraisalPaste('[Rifter, Kite Fit]\n\n, Republic Fleet EMP S');
+    expect(entries).toEqual([
+      { name: 'Rifter', quantity: 1, lines: [1] },
+      { name: ', Republic Fleet EMP S', quantity: 1, lines: [3] },
+    ]);
+  });
+
+  it('reads an unusable xN count as one, keeping the "always >= 1" promise', () => {
+    // A zero would ride out into a share link, where decodeAppraisalShare
+    // rejects the whole payload over one non-positive count.
+    const entries = parseAppraisalPaste('[Rifter, Kite Fit]\n\nNanite Repair Paste x0');
+    expect(entries).toEqual([
+      { name: 'Rifter', quantity: 1, lines: [1] },
+      { name: 'Nanite Repair Paste', quantity: 1, lines: [3] },
+    ]);
+  });
+
+  it('leaves every non-EFT paste shape on the existing parser', () => {
+    // A bracket only counts as a fit header on the first non-blank line.
+    expect(parseAppraisalPaste('Tritanium\t100\n[Empty High slot]')).toEqual([
+      { name: 'Tritanium', quantity: 100, lines: [1] },
+      { name: '[Empty High slot]', quantity: 1, lines: [2] },
+    ]);
+  });
+});

@@ -4,7 +4,7 @@
  * data fitToSkills needs. Kept out of the dialog component so the parsing
  * logic is unit-testable without rendering anything.
  */
-import { parseEftFit } from '@/engine/import/eftFit';
+import { looksLikeEftFit, parseEftFit } from '@/engine/import/eftFit';
 import {
   fitToSkills,
   type RequiredSkill,
@@ -49,18 +49,9 @@ export interface ClipboardImportDeps {
   loadType: (typeId: number) => Promise<{ data: UniverseType } | null | undefined>;
 }
 
-function firstNonBlankLine(text: string): string {
-  return (
-    text
-      .split(/\r\n|\r|\n/)
-      .find((l) => l.trim() !== '')
-      ?.trim() ?? ''
-  );
-}
-
 /** EFT fits always start with "[Ship Name, Fit Name]" — same signal parseEftFit's own header check uses. */
 export function detectMode(text: string): ClipboardImportMode {
-  return firstNonBlankLine(text).startsWith('[') ? 'eftFit' : 'skillPlan';
+  return looksLikeEftFit(text) ? 'eftFit' : 'skillPlan';
 }
 
 async function previewEftFit(
