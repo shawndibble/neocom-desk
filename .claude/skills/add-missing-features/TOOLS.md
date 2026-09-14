@@ -55,7 +55,17 @@ add-on for jobs/orders/assets/wallet), Lazy Blacksmith (blueprint
 search/analysis), EVE Orchestra (mining ledger/reprocessing/job tracking,
 corp mining tax), Alysii's PI Scheme / EVE Planetary Planner (PI chain
 calculators, one ~7yr active), Upwell Fuel Monitor (structure fuel tracker —
-already covered, `structureFuel`), ECT EVE Assets (Electron/React desktop mirror of much of this app: assets
+already covered, `structureFuel`), EVE Online Tooling / "Modular All-in-One Desktop Tool" (th-lange; Tauri+React,
+ESI+SDE, local, no telemetry: production, reprocessing, industry jobs, PI,
+station trading and daytrading), EVE Tools Suite (15 modules in one shell —
+fitting, industry, mining, market, trading, intel), EVE Console (market
+pricing, industry planning, wealth tracking, corp oversight), Koru Desktop
+(local-first stats/history plus a live-intel map), EveTogether (fits, assets,
+skills, fleet sync, killboard). Gap-analysed together: every industry/market
+feature across the five is already covered here or already killed — station
+trading/daytrading on kill-tests 10 and 14, wealth-over-time as the shipped
+wallet chart (#690) plus assets value (#712), whose charted form is killed on
+kill-test 8. ECT EVE Assets (Electron/React desktop mirror of much of this app: assets
 priced incl. capitals/abyssals, personal+corp contracts, manufacturing/
 research/invention jobs, market orders with price trends, structure fuel
 timers, wallet history, LP by corporation, clones, mail, public contract
@@ -92,8 +102,7 @@ Scanner, EveBoosters.com, Dd24tool.de, ISKONOMY, EVE Market Order Assistant
 (write-scoped, paid), EVE NewBro, EVE Link, PATT,
 W-Space Atlas, EveHunter, ADAPT, Helm, Nicotine,
 fleet-manager/HARUSPEX/EasyEve, icon server, contract-monitoring Discord bot,
-Ministry of Pantoscopic Observance, Modular All-in-One Desktop Tool (revisit
-if it publishes specifics), EVE Market Pro (abandoned), Ascension Labs Libs,
+Ministry of Pantoscopic Observance, EVE Market Pro (abandoned), Ascension Labs Libs,
 Z-S Overview Customiser, SMT Eve Map Tool, Eve-mentor-mcp, EVEMon Lives,
 OpsCore v2, WarBeacon, Project Eden, EVE 3D MAP, @strata-eve/esi SDK, Eve
 Missile Analyst, Eve Ship Stats, Grey Zone Automation, EVE411, Eve
@@ -108,6 +117,13 @@ industry/market tool found in three more pages past 10 — re-check page 0/1
 for new threads each run instead of going deeper. A run finding no new
 threads on pages 0–1 is a valid, complete survey — it isn't evidence to go
 digging further back.
+
+**The forum category is not the whole ecosystem.** All five tools above are
+live, local-first and squarely in domain, and none was reachable from the
+category sweep — they publish on GitHub and their own sites. A sweep that only
+reads `76.json` will keep missing that shape. Run one targeted web search per
+sweep (e.g. "EVE Online desktop industry market tool open source") alongside
+the forum pages.
 
 **A bumped thread can carry a new feature even when no new thread appears.**
 The listing's `last_posted_at`/`posts_count` move when a dev announces an
