@@ -9,6 +9,7 @@ import {
   bpcPriceSummary,
   cheapestByRegion,
   effectivePrice,
+  iskPerRun,
   listedBlueprintTypeOptions,
   type BpcContractRow,
   type OwnedBlueprintInput,
@@ -363,6 +364,24 @@ describe('effectivePrice', () => {
 
   it('falls back to the starting bid for an auction with no buyout', () => {
     expect(effectivePrice(row({ isAuction: true, price: 1_000 }))).toBe(1_000);
+  });
+});
+
+describe('iskPerRun', () => {
+  it('divides the asking price by the run count', () => {
+    expect(iskPerRun(10_000_000, 10)).toBe(1_000_000);
+  });
+
+  it('has no rate for a BPO, whose runs are unlimited rather than a number', () => {
+    expect(iskPerRun(10_000_000, -1)).toBeNull();
+  });
+
+  it('has no rate for a copy stating zero runs — never an infinite one', () => {
+    expect(iskPerRun(10_000_000, 0)).toBeNull();
+  });
+
+  it('gives a real rate of zero for a copy asked to be given away', () => {
+    expect(iskPerRun(0, 10)).toBe(0);
   });
 });
 

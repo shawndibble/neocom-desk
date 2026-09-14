@@ -32,6 +32,7 @@ import {
   cheapestByRegion,
   contractRowToSearchRow,
   effectivePrice,
+  iskPerRun,
   filterBpcContracts,
   filterBpcSearchRows,
   listedBlueprintTypeOptions,
@@ -830,6 +831,29 @@ export function BpcSourcingPanel({ initialTypeId = null }: BpcSourcingPanelProps
           ) : (
             <IskAmount value={contract.price} revealOn="longPress" />
           );
+        },
+      },
+      iskPerRun: {
+        id: 'iskPerRun',
+        header: t('bpcContracts.iskPerRunColumn'),
+        align: 'right',
+        className: 'tabular-nums whitespace-nowrap',
+        // Same rule as the Courier board's ISK/jump: a row with no rate sorts
+        // last in either direction rather than reading as the cheapest offer
+        // on the board.
+        sortValue: (row) => {
+          const contract = asContract(row);
+          if (!contract) return undefined;
+          return iskPerRun(effectivePrice(contract), row.runs) ?? undefined;
+        },
+        render: (row) => {
+          const contract = asContract(row);
+          if (!contract) return t('bpcContracts.notApplicable');
+          const rate = iskPerRun(effectivePrice(contract), row.runs);
+          // A BPO's unlimited runs have no rate at all, which is why this is
+          // the unavailable marker and never a computed figure.
+          if (rate === null) return t('bpcContracts.notApplicable');
+          return formatIskAuto(rate, CONTRACT_ISK_CENTS_BELOW);
         },
       },
       region: {
