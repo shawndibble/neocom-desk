@@ -116,7 +116,10 @@ Mapped to the module/route that proves it:
   and time-to-full (#958) — out-depths every surveyed PI planner on ongoing
   colony economics, not just layout.
 - **Wallet/LP**: balance-over-time chart (#690), corp wallet division sync,
-  LP store ISK/LP ranking.
+  LP store ISK/LP ranking — `offerProfit.ts` already nets an offer's ISK cost,
+  the hub cost of its `required_items` turn-in _and_ a build cost, and returns
+  null rather than guessing when any leg is unpriceable. An "LP offers should
+  account for what you must hand in" pitch is already built.
 - **Assets**: total portfolio value across locations (#712).
 - **Open Orders**: sell-through/days-to-clear column (#713), multi-character
   aggregation.
