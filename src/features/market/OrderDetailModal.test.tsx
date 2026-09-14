@@ -351,6 +351,15 @@ describe('OrderDetailModal', () => {
     expect(screen.getByText('Where that price comes from')).toBeInTheDocument();
     expect(screen.getByText("We don't know what this cost you")).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Link a build' })).toBeInTheDocument();
+    // The hint used to offer "or type in what it cost" — a route the app has
+    // never had (issue #1020). Nothing may re-advertise it while the
+    // hand-entered cost basis stays deferred.
+    expect(screen.queryByText(/type in what it cost/i)).not.toBeInTheDocument();
+    // Linking a build is the only real route, and it needs a Build Plan that
+    // a pure trader does not have — so the hint has to name that up front
+    // rather than send them to a page that will not help.
+    const costSection = screen.getByText('Where that price comes from').closest('section')!;
+    expect(within(costSection).getByText(/build plan on the Industry page/i)).toBeInTheDocument();
     expect(screen.queryByText(/^0(\.00)? ISK$/)).not.toBeInTheDocument();
     // The headline floor stat chip reads the shared "unknown" dash, not zero.
     expect(screen.getAllByText('—').length).toBeGreaterThan(0);
