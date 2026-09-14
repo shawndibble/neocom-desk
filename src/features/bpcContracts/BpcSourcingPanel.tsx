@@ -32,9 +32,9 @@ import {
   cheapestByRegion,
   contractRowToSearchRow,
   effectivePrice,
-  iskPerRun,
   filterBpcContracts,
   filterBpcSearchRows,
+  iskPerRun,
   listedBlueprintTypeOptions,
   ownedBlueprintToSearchRow,
   blueprintSearchName,
@@ -844,12 +844,12 @@ export function BpcSourcingPanel({ initialTypeId = null }: BpcSourcingPanelProps
         sortValue: (row) => {
           const contract = asContract(row);
           if (!contract) return undefined;
-          return iskPerRun(effectivePrice(contract), row.runs) ?? undefined;
+          return iskPerRun(effectivePrice(contract), row.runs, row.quantity) ?? undefined;
         },
         render: (row) => {
           const contract = asContract(row);
           if (!contract) return t('bpcContracts.notApplicable');
-          const rate = iskPerRun(effectivePrice(contract), row.runs);
+          const rate = iskPerRun(effectivePrice(contract), row.runs, row.quantity);
           // A BPO's unlimited runs have no rate at all, which is why this is
           // the unavailable marker and never a computed figure.
           if (rate === null) return t('bpcContracts.notApplicable');

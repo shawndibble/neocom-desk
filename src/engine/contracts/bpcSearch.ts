@@ -256,9 +256,9 @@ export function effectivePrice(row: BpcContractRow): number {
 }
 
 /**
- * ISK per run — what a listed copy costs for each use it carries, so offers of
- * the same blueprint at different run counts compare on equal footing
- * (issue #1017).
+ * ISK per run — what a listed blueprint copy costs for each use it carries, so
+ * offers of the same blueprint at different run counts compare on equal
+ * footing (issue #1017).
  *
  * The same convention as `courierRates.ts`'s `iskPerJump`/`iskPerVolume`: a
  * denominator that makes the figure unknowable returns `null`, never
@@ -266,13 +266,14 @@ export function effectivePrice(row: BpcContractRow): number {
  * Here that is a BPO, whose `-1` runs are unlimited rather than a count, and a
  * copy stating `0` runs — a row the ingest keeps rather than drops.
  *
- * Divides the contract's whole ask by one copy's runs, matching what the Price
- * column itself states: both are "what this contract asks", not a per-item
- * unit price, so a multi-copy contract reads the same way in both.
+ * Divides by every copy the ask buys, not one. A listing of `quantity: 3`
+ * ten-run copies at 30M is one indivisible purchase of 30 runs, so its rate is
+ * 1M; dividing by a single copy's runs would print 3M and sort the lot as the
+ * worst offer on the board exactly when it is the best.
  */
-export function iskPerRun(price: number, runs: number): number | null {
-  if (!(runs > 0)) return null;
-  return price / runs;
+export function iskPerRun(price: number, runs: number, quantity: number): number | null {
+  if (!(runs > 0) || !(quantity > 0)) return null;
+  return price / (runs * quantity);
 }
 
 export interface BlueprintTypeOption {
