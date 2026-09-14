@@ -51,6 +51,7 @@ import {
 } from './orderCompetition';
 import { loadPriceHistory, type PriceHistoryResult } from './priceHistory';
 import { recordOrderProblemSamples } from './orderProblemSamples';
+import { sampledProblem } from '@/engine/market/orderProblemHistory';
 import type { JumpsAwayResult } from '@/engine/jumpsAway';
 import {
   buildOpenOrderRows,
@@ -460,7 +461,7 @@ export function OpenOrdersPanel() {
       allRows.map((row) => ({
         orderId: row.orderId,
         characterId: row.characterId,
-        problem: row.problem,
+        problem: sampledProblem(row.problems),
       })),
       characterIds,
       snapshot.now

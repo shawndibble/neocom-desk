@@ -1028,6 +1028,10 @@ db.version(11).stores({
   bpcSearchWatches: 'id',
 });
 
+// Additive: v11 stores unchanged, plus per-order `OrderProblem` sample
+// histories (issue #1018). Keyed by `orderId` because a series is only ever
+// read and written whole; `characterId` is indexed so a prune can be scoped
+// to the characters a given load actually saw.
 db.version(12).stores({
   characters: 'characterId, corporationId',
   tokens: 'characterId',

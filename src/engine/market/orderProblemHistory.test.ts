@@ -3,6 +3,7 @@ import {
   DEFAULT_UNDERCUT_HISTORY_THRESHOLDS,
   MAX_SAMPLES_PER_ORDER,
   appendOrderProblemSample,
+  sampledProblem,
   wasFrequentlyUndercut,
   type OrderProblemSample,
 } from './orderProblemHistory';
@@ -63,11 +64,45 @@ describe('wasFrequentlyUndercut', () => {
   });
 });
 
+describe('sampledProblem', () => {
+  it('records the undercut scope even when `belowFloor` outranks it', () => {
+    expect(sampledProblem(['belowFloor', 'undercutStation'])).toBe('undercutStation');
+  });
+
+  it('records `outbid` even when a worse-ranked problem sits beside it', () => {
+    expect(sampledProblem(['outbid', 'expiringOrStale'])).toBe('outbid');
+  });
+
+  it('keeps the worst problem when no undercut state applies', () => {
+    expect(sampledProblem(['belowFloor', 'expiringOrStale'])).toBe('belowFloor');
+  });
+
+  it('falls back to healthy for an empty set', () => {
+    expect(sampledProblem([])).toBe('healthy');
+  });
+});
+
 describe('appendOrderProblemSample', () => {
   it('appends the first sample', () => {
     expect(appendOrderProblemSample([], { at: NOW, problem: 'healthy' })).toEqual([
       { at: NOW, problem: 'healthy' },
     ]);
+  });
+
+  it('replaces the last sample when a re-read of the same load reclassifies it', () => {
+    const existing: OrderProblemSample[] = [
+      { at: NOW - HOUR, problem: 'healthy' },
+      { at: NOW, problem: 'healthy' },
+    ];
+    expect(appendOrderProblemSample(existing, { at: NOW, problem: 'undercutRegion' })).toEqual([
+      { at: NOW - HOUR, problem: 'healthy' },
+      { at: NOW, problem: 'undercutRegion' },
+    ]);
+  });
+
+  it('rewrites nothing when the same load re-reads an unchanged classification', () => {
+    const existing: OrderProblemSample[] = [{ at: NOW, problem: 'healthy' }];
+    expect(appendOrderProblemSample(existing, { at: NOW, problem: 'healthy' })).toBe(existing);
   });
 
   it('drops a sample taken sooner than the minimum spacing after the last one', () => {

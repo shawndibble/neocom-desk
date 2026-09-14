@@ -44,11 +44,7 @@ const KIND_TONE: Record<OrderBadgeKind, BadgeTone> = {
   undercutRegion: 'accent',
   expiring: 'neutral',
   outbid: 'neutral',
-  // Warning, not danger: nobody is beating this order *right now*, so it is
-  // not the same urgency as a live `undercutStation` — but it is the one
-  // healthy-group badge that says something is wrong, so it cannot be the
-  // neutral treatment either.
-  frequentlyUndercut: 'warning',
+  frequentlyUndercut: 'neutral',
   best: 'success',
   noCostBasis: 'neutral',
 };

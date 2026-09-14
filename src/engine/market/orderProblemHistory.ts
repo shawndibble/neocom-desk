@@ -101,6 +101,23 @@ function inWindow(
 }
 
 /**
+ * The `OrderProblem` to store for one reading, from an order's FULL problem
+ * set (`allProblems`), not its worst one.
+ *
+ * An order can be both under its own floor and undercut at the same time,
+ * and `ORDER_PROBLEMS` ranks `belowFloor` above all three undercut scopes —
+ * so storing `worstProblem` alone would record `belowFloor` and silently
+ * drop the undercut fact on exactly the chronically-mispriced listing this
+ * history exists to catch. Picks the undercut state whenever the order has
+ * one; otherwise the worst problem stands.
+ */
+export function sampledProblem(problems: readonly OrderProblem[]): OrderProblem {
+  return (
+    problems.find((problem) => UNDERCUT_HISTORY_PROBLEMS.has(problem)) ?? problems[0] ?? 'healthy'
+  );
+}
+
+/**
  * True when this order's recent history is majority-undercut. Callers apply
  * it ONLY to an order whose current classification is `healthy` — for
  * anything already reading worse, the live status prompts the same action
@@ -131,6 +148,13 @@ export function appendOrderProblemSample(
   thresholds: UndercutHistoryThresholds = DEFAULT_UNDERCUT_HISTORY_THRESHOLDS
 ): readonly OrderProblemSample[] {
   const last = samples[samples.length - 1];
+  // Same timestamp means the same page load re-classified this order after a
+  // deeper check landed, so the new reading is strictly better informed than
+  // the stored one — replace it rather than let the spacing guard drop it.
+  // Identical readings return the same reference, so a re-render costs no write.
+  if (last && sample.at === last.at) {
+    return last.problem === sample.problem ? samples : [...samples.slice(0, -1), sample];
+  }
   if (last && sample.at - last.at < thresholds.minSpacingMs) return samples;
 
   const kept = [...inWindow(samples, sample.at, thresholds.windowMs), sample];
