@@ -50,6 +50,7 @@ import {
   type StructureCompetition,
 } from './orderCompetition';
 import { loadPriceHistory, type PriceHistoryResult } from './priceHistory';
+import { recordOrderProblemSamples } from './orderProblemSamples';
 import type { JumpsAwayResult } from '@/engine/jumpsAway';
 import {
   buildOpenOrderRows,
@@ -431,10 +432,40 @@ export function OpenOrdersPanel() {
       deepCompetition: deepCompetitionByOrderId,
       structureCompetition: structureByKey,
       stationNames,
+      problemSamples: snapshot.problemSamples,
       skillsByCharacter: snapshot.skillsByCharacter,
       now: snapshot.now,
     });
   }, [snapshot, deepCompetitionByOrderId, structureByKey, stationNames]);
+
+  /**
+   * Takes this load's `OrderProblem` reading for every open order (issue
+   * #1018) and drops the history of orders that have since closed. Runs
+   * AFTER `allRows` rather than inside the loader, because the reading it
+   * stores is the classification `buildOpenOrderRows` just produced —
+   * nothing earlier in the chain knows it.
+   *
+   * Fire-and-forget on purpose: a failed write costs one sample from a
+   * deliberately gappy series, which is not worth an error state on a page
+   * whose actual job is elsewhere. The 4-minute spacing guard inside
+   * `appendOrderProblemSample` is what keeps a re-run of this effect (the
+   * deep-competition fetch landing, a re-render) from writing a burst of
+   * samples that would inflate the rate — it lives in the stored data, not
+   * in a ref that a remount would reset.
+   */
+  useEffect(() => {
+    if (!snapshot) return;
+    const characterIds = snapshot.openOrders.entries.map((entry) => entry.characterId);
+    void recordOrderProblemSamples(
+      allRows.map((row) => ({
+        orderId: row.orderId,
+        characterId: row.characterId,
+        problem: row.problem,
+      })),
+      characterIds,
+      snapshot.now
+    ).catch(() => {});
+  }, [snapshot, allRows]);
 
   const problemCounts = useMemo(() => openOrderProblemCounts(allRows), [allRows]);
 

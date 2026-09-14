@@ -35,6 +35,7 @@ export const ORDER_BADGE_KINDS: readonly OrderBadgeKind[] = [
   'undercutRegion',
   'expiring',
   'outbid',
+  'frequentlyUndercut',
   'best',
   'noCostBasis',
 ];
@@ -68,6 +69,14 @@ export function orderBadgeFor(row: OpenOrderRow): OrderBadgeChoice | null {
     }
     case 'healthy':
     default:
+      // Wins the healthy branch outright (issue #1018). An order that has
+      // spent most of its watched life undercut wearing a green "best price"
+      // badge is the one actively misleading row this page can produce, and
+      // "we cannot work out your floor" is a lesser thing to say about an
+      // order we CAN say is chronically beaten. Never fires for a row whose
+      // current problem is worse than healthy — `openOrdersModel.ts` gates
+      // `frequentlyUndercut` on that.
+      if (row.frequentlyUndercut) return { kind: 'frequentlyUndercut' };
       if (!row.isBuyOrder && row.costBasis === null) return { kind: 'noCostBasis' };
       if (row.station.bestPrice !== null) return { kind: 'best' };
       return null;

@@ -26,6 +26,8 @@ import type { HubAggregate } from '@/market/fuzzwork';
 import { loadAllCharactersOpenOrders, type OpenOrdersSnapshot } from './openOrdersData';
 import { loadOrderCostBases, type OrderCostBasis } from './orderCostBasis';
 import { loadStationBestPrices } from './orderCompetition';
+import { loadOrderProblemSamples } from './orderProblemSamples';
+import type { OrderProblemSample } from '@/engine/market/orderProblemHistory';
 import type { CharacterSkills } from './openOrdersModel';
 
 export interface OpenOrdersPageSnapshot {
@@ -44,6 +46,14 @@ export interface OpenOrdersPageSnapshot {
   /** Keyed `${locationId}:${typeId}`. */
   stationPrices: Map<string, HubAggregate>;
   costBases: Map<number, OrderCostBasis>;
+  /**
+   * Rolling `OrderProblem` history per order id (issue #1018), oldest first.
+   * Read here rather than written: the page records the *next* sample only
+   * after `buildOpenOrderRows` has classified this load's rows, so a flag
+   * always reflects history the page had already accumulated, and the read
+   * can never chase the write it caused.
+   */
+  problemSamples: Map<number, readonly OrderProblemSample[]>;
   skillsByCharacter: Map<number, CharacterSkills>;
   now: number;
 }
@@ -79,6 +89,7 @@ export async function loadOpenOrdersSnapshot(
       stationsLoaded: false,
       stationPrices: new Map(),
       costBases: new Map(),
+      problemSamples: new Map(),
       skillsByCharacter: new Map(),
       now,
     };
@@ -118,6 +129,10 @@ export async function loadOpenOrdersSnapshot(
     })
   );
 
+  const problemSamples = await loadOrderProblemSamples(
+    openOrders.entries.map((entry) => entry.characterId)
+  );
+
   const skillsByCharacter = new Map<number, CharacterSkills>();
   await mapWithConcurrencyLimit(openOrders.entries, ESI_FANOUT_CONCURRENCY, async (entry) => {
     const corrected = await loadCorrectedSkills(entry.characterId, now);
@@ -138,6 +153,7 @@ export async function loadOpenOrdersSnapshot(
     stationsLoaded,
     stationPrices,
     costBases,
+    problemSamples,
     skillsByCharacter,
     now,
   };

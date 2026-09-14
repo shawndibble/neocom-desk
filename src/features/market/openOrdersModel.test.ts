@@ -15,7 +15,7 @@ import type { OpenOrdersSnapshot, CharacterOpenOrders } from './openOrdersData';
 import type { OrderCostBasis } from './orderCostBasis';
 import type { MarketOrder } from '@/esi/endpoints';
 import type { CompetingOrder } from '@/engine/market/undercut';
-import { ORDER_PROBLEMS } from '@/engine/market/orderProblems';
+import { ORDER_PROBLEMS, type OrderProblem } from '@/engine/market/orderProblems';
 
 /** Every skill untrained: these fixtures test row shaping, not fee or yield maths. */
 const ZERO_SKILLS: CharacterSkills = {
@@ -540,6 +540,50 @@ describe('buildOpenOrderRows — structure market competition (issue #538)', () 
   });
 });
 
+describe('buildOpenOrderRows — frequentlyUndercut (issue #1018)', () => {
+  const MINUTE = 60 * 1000;
+
+  /** `count` samples ending 5 minutes before NOW, one every 5 minutes. */
+  function samples(count: number, problem: OrderProblem) {
+    return Array.from({ length: count }, (_, i) => ({
+      at: NOW - (count - i) * 5 * MINUTE,
+      problem,
+    }));
+  }
+
+  it('flags a currently-healthy order whose history is majority-undercut', () => {
+    const row = firstRow(
+      baseInput({ problemSamples: new Map([[1, samples(12, 'undercutStation')]]) })
+    );
+    expect(row.problem).toBe('healthy');
+    expect(row.frequentlyUndercut).toBe(true);
+  });
+
+  it('leaves an order with too short a history unflagged', () => {
+    const row = firstRow(
+      baseInput({ problemSamples: new Map([[1, samples(3, 'undercutStation')]]) })
+    );
+    expect(row.frequentlyUndercut).toBe(false);
+  });
+
+  it('never flags an order whose current problem is already worse than healthy', () => {
+    const row = firstRow(
+      baseInput({
+        stationPrices: new Map([
+          ['60003760:100', { sellMin: 900, buyMax: null, sellVolume: 5, buyVolume: 0 }],
+        ]),
+        problemSamples: new Map([[1, samples(12, 'undercutStation')]]),
+      })
+    );
+    expect(row.problem).toBe('undercutStation');
+    expect(row.frequentlyUndercut).toBe(false);
+  });
+
+  it('is false when no history has been read at all', () => {
+    expect(firstRow(baseInput()).frequentlyUndercut).toBe(false);
+  });
+});
+
 describe('buildOpenOrderRows — cost basis and floor', () => {
   const costBases = new Map<number, OrderCostBasis>([
     [1, { unitCost: 500, runId: 'run-1', runQuantity: 10, materialCost: 4000, jobFee: 1000 }],
@@ -738,6 +782,7 @@ const SUMMARY_BASE_ROW: OpenOrderRow = {
   problems: ['undercutStation'],
   iskTiedUp: 500,
   belowFloor: false,
+  frequentlyUndercut: false,
 };
 
 describe('summariseOrderGroup', () => {
