@@ -12,10 +12,12 @@ _Recorded 2026-09-14 · issue #1017._
   the rate. Rules out mirroring the Price column's "what this contract asks"
   framing in a cell labelled as a rate.
 
-- **A listing stating no copies has no rate, same as a BPO and a zero-run
-  copy.** One guard, three unknowable denominators, `null` for all of them —
-  `courierRates.ts`'s convention, which the UI sinks in either sort direction.
-  Rules out `Infinity`, a stand-in figure, and dropping the row.
+- **A listing stating no copies has no rate, same as a zero-run copy.** One
+  guard, unknowable denominators, `null` for both — `courierRates.ts`'s
+  convention, which the UI sinks in either sort direction. A BPO's `-1` runs
+  answer `null` too, but only as a signature contract: the snapshot is
+  narrowed to copies before BPC Sourcing sees it, so no original ever reaches
+  the cell. Rules out `Infinity`, a stand-in figure, and dropping the row.
 
 - **The rate lives in `engine/contracts/bpcSearch.ts` beside `effectivePrice`,
   not in a new module.** `courierRates.ts` exists because three courier
