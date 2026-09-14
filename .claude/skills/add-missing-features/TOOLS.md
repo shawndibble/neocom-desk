@@ -53,8 +53,8 @@ calculators, one ~7yr active), Upwell Fuel Monitor (structure fuel tracker —
 already covered, `structureFuel`), Esparto Industries (blueprint/reaction
 browser, reprocessing calc, moon-ore tax parsing — all already covered), EVE
 Motor Market (desktop build-tree viz, run planner with cross-plan material
-reservation, ESI-synced trade journal — both pitches dead on arrival, see
-Killed/dropped).
+reservation, ESI-synced trade journal — all three pitches dead on arrival,
+see Killed/dropped).
 
 **Dead/abandoned, not gap-analysed:** EVE Panel (PI sim, iOS), EVE
 GURU/Production Ledger, EveTerminal.io, Mining Timer Tool, EVE Hauling
@@ -178,8 +178,8 @@ what the Advisor already computes per-planet; don't re-propose.
     project-wide; kills FIFO cost reconstruction on both buy and sell sides,
     including pure station-trading P&L trackers built from wallet history.
 11. **A `ref_type` Wallet journal filter already exists**
-    (`walletJournalFilter.ts`). "A view of entries with ref*type X" is
-    usually a saved filter, not new capability — but a \_projection* computed
+    (`walletJournalFilter.ts`). "A view of entries with `ref_type X`" is
+    usually a saved filter, not new capability — but a `_projection_` computed
     from a ref_type's history (e.g. skill-training payback) is not disposed
     of by this alone; check what's actually new. Killed: LP Store redemption
     ledger off `ref_type: lp_store`.
