@@ -66,6 +66,24 @@
   --color-isk-neg: #ff8177;
 
   /*
+   * Chart series that needs a hue of its own. One token, not a palette: the
+   * Price History activity strip draws traded volume and the daily order
+   * count together, and the order count is the only series in the app with no
+   * neighbouring hue it can borrow honestly. `warning` was the obvious amber
+   * and is wrong — a data series painted in the caution tone reads as an
+   * alert about the data. A clock-kind hue is equally wrong: those name where
+   * a *deadline* came from (DESIGN.md §1), and reusing one here would give a
+   * single hue two meanings, which is the fork that section refuses.
+   *
+   * Sits clear of `warning` (#f5b94a) on the orange side and of
+   * `kind-industry-job` (#e59a55) on the saturated side. Extend this comment
+   * rather than adding a sibling: the next series that wants a colour should
+   * first try to be told apart by form — dash, bar against line — the way the
+   * moving average is.
+   */
+  --color-series-order-count: #e9a13b;
+
+  /*
    * Clock kinds — the app's one NOMINAL palette (DESIGN.md §1). Identity, not
    * magnitude and not status: these say which part of the app a deadline came
    * from. Every hue sits at least 20 ΔE from accent/success/warning/danger so
@@ -203,6 +221,46 @@
 
     .dt-stack td.dt-primary::before {
       content: none;
+    }
+
+    /*
+     * Two-value-per-row cards (`DataTable`'s `stackColumns={2}`).
+     *
+     * The default card is a single column with each label pinned into a 7rem
+     * left gutter, which reads well for four or five fields and wastes half
+     * the screen on a table of short figures — the Price History day list is
+     * four numbers, none wider than a price. Here the card becomes a
+     * two-track grid and each label moves *above* its value instead of
+     * beside it: a 6.5rem gutter inside a half-width column would leave a
+     * price barely 60px to render in.
+     *
+     * The primary cell still titles the card, now across both tracks. Grid
+     * places the rest in source order, so a table choosing this puts its
+     * widest field where a wrap costs least.
+     */
+    .dt-stack.dt-stack-2col tr {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.25rem 0.75rem;
+    }
+
+    .dt-stack.dt-stack-2col td {
+      padding-left: 0;
+      /* The label is in flow here, so the empty-cell reservation the pinned
+         version needs does not apply — the label itself gives the cell its
+         height. */
+      min-height: 0;
+    }
+
+    .dt-stack.dt-stack-2col td::before {
+      position: static;
+      display: block;
+      width: auto;
+      margin-bottom: 0.0625rem;
+    }
+
+    .dt-stack.dt-stack-2col td.dt-primary {
+      grid-column: 1 / -1;
     }
 
     /* A decorative corner cell (e.g. an edit-affordance icon): pinned out of
