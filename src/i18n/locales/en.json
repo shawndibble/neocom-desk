@@ -2896,7 +2896,7 @@
       "spread": "Spread",
       "items": "Items",
       "emptyTitle": "Nothing appraised yet",
-      "emptyHint": "Paste a stack of items to price them at your chosen trade hub. One item per line, with an optional quantity.",
+      "emptyHint": "Paste a stack of items to price them at your chosen trade hub. One item per line, with an optional quantity. A pasted ship fit prices its hull, modules and loaded charges together.",
       "noMatchesTitle": "No items recognised",
       "noMatchesHint": "None of these lines name an item that trades on the market. Check the spelling against the item's name in game.",
       "unmatched_one": "{{count}} line not matched",

@@ -1,11 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { parseEftFit } from '@/engine/import/eftFit';
+import { looksLikeEftFit, parseEftFit } from '@/engine/import/eftFit';
 
 describe('parseEftFit', () => {
   it('parses hull + fit name from the header line', () => {
     const result = parseEftFit('[Rifter, My Fit]\n\nDamage Control II');
     expect(result.shipName).toBe('Rifter');
     expect(result.fitName).toBe('My Fit');
+    expect(result.headerLine).toBe(1);
     expect(result.errors).toEqual([]);
   });
 
@@ -37,6 +38,13 @@ describe('parseEftFit', () => {
     expect(result.errors).toEqual([]);
   });
 
+  it('reports the header line number even when the paste starts with blank lines', () => {
+    const result = parseEftFit('\n\n[Rifter, My Fit]\n\nDamage Control II');
+    expect(result.shipName).toBe('Rifter');
+    expect(result.headerLine).toBe(3);
+    expect(result.items).toEqual([{ name: 'Damage Control II', quantity: 1, line: 5 }]);
+  });
+
   it('rejects a header with no ship name, rather than reading the fit name as a hull', () => {
     const result = parseEftFit('[ , Max Hacker]\n\nDamage Control II');
     expect(result.shipName).toBe('');
@@ -49,7 +57,7 @@ describe('parseEftFit', () => {
     const result = parseEftFit('[Empty high slot]\nDamage Control II');
     expect(result.shipName).toBe('');
     expect(result.errors).toHaveLength(1);
-    expect(result.items).toEqual([{ name: 'Damage Control II', quantity: 1 }]);
+    expect(result.items).toEqual([{ name: 'Damage Control II', quantity: 1, line: 2 }]);
   });
 
   it('parses module lines across blank-line-separated slot sections', () => {
@@ -66,11 +74,11 @@ describe('parseEftFit', () => {
     ].join('\n');
     const result = parseEftFit(text);
     expect(result.items).toEqual([
-      { name: 'Damage Control II', quantity: 1 },
-      { name: '1MN Afterburner II', quantity: 1 },
-      { name: 'Small Shield Extender II', quantity: 1 },
-      { name: '125mm Gatling AutoCannon II', quantity: 1 },
-      { name: '125mm Gatling AutoCannon II', quantity: 1 },
+      { name: 'Damage Control II', quantity: 1, line: 3 },
+      { name: '1MN Afterburner II', quantity: 1, line: 5 },
+      { name: 'Small Shield Extender II', quantity: 1, line: 6 },
+      { name: '125mm Gatling AutoCannon II', quantity: 1, line: 8 },
+      { name: '125mm Gatling AutoCannon II', quantity: 1, line: 9 },
     ]);
     expect(result.errors).toEqual([]);
   });
@@ -81,18 +89,19 @@ describe('parseEftFit', () => {
     );
     // Only the charge half carries `isCharge` — the flag marks ammo a module
     // was left loaded with, so Fit Import can decline to quote a launcher
-    // count as a production batch (issue #626).
+    // count as a production batch (issue #626). Both halves report the one
+    // source line they were written on.
     expect(result.items).toEqual([
-      { name: '125mm Gatling AutoCannon II', quantity: 1 },
-      { name: 'Republic Fleet EMP S', quantity: 1, isCharge: true },
+      { name: '125mm Gatling AutoCannon II', quantity: 1, line: 3 },
+      { name: 'Republic Fleet EMP S', quantity: 1, line: 3, isCharge: true },
     ]);
   });
 
   it('parses drone/cargo quantity suffix ("xN")', () => {
     const result = parseEftFit('[Rifter, My Fit]\n\n\nWarrior II x5\nNanite Repair Paste x50');
     expect(result.items).toEqual([
-      { name: 'Warrior II', quantity: 5 },
-      { name: 'Nanite Repair Paste', quantity: 50 },
+      { name: 'Warrior II', quantity: 5, line: 4 },
+      { name: 'Nanite Repair Paste', quantity: 50, line: 5 },
     ]);
   });
 
@@ -100,18 +109,18 @@ describe('parseEftFit', () => {
     const result = parseEftFit(
       '[Rifter, My Fit]\n\n[Empty Low slot]\nDamage Control II\n\n[Empty High slot]'
     );
-    expect(result.items).toEqual([{ name: 'Damage Control II', quantity: 1 }]);
+    expect(result.items).toEqual([{ name: 'Damage Control II', quantity: 1, line: 4 }]);
   });
 
   it('parses offline modules, stripping the /offline suffix from the name', () => {
     const result = parseEftFit('[Rifter, My Fit]\n\nInertial Stabilizers II /offline');
-    expect(result.items).toEqual([{ name: 'Inertial Stabilizers II', quantity: 1 }]);
+    expect(result.items).toEqual([{ name: 'Inertial Stabilizers II', quantity: 1, line: 3 }]);
   });
 
   it('tolerates Windows line endings (CRLF)', () => {
     const result = parseEftFit('[Rifter, My Fit]\r\n\r\nDamage Control II\r\n');
     expect(result.shipName).toBe('Rifter');
-    expect(result.items).toEqual([{ name: 'Damage Control II', quantity: 1 }]);
+    expect(result.items).toEqual([{ name: 'Damage Control II', quantity: 1, line: 3 }]);
   });
 
   it('handles an empty paste: no throw, header error, no items', () => {
@@ -145,7 +154,9 @@ describe('parseEftFit', () => {
 
   it('is a pure text-structure parse: unknown-looking names are not errors', () => {
     const result = parseEftFit('[Rifter, My Fit]\n\nTotally Made Up Module Name XYZ');
-    expect(result.items).toEqual([{ name: 'Totally Made Up Module Name XYZ', quantity: 1 }]);
+    expect(result.items).toEqual([
+      { name: 'Totally Made Up Module Name XYZ', quantity: 1, line: 3 },
+    ]);
     expect(result.errors).toEqual([]);
   });
 
@@ -175,16 +186,40 @@ describe('parseEftFit', () => {
     expect(result.fitName).toBe('Kite Fit');
     expect(result.errors).toEqual([]);
     expect(result.items).toEqual([
-      { name: 'Nanofiber Internal Structure I', quantity: 1 },
-      { name: 'Damage Control II', quantity: 1 },
-      { name: '1MN Afterburner II', quantity: 1 },
-      { name: '125mm Gatling AutoCannon II', quantity: 1 },
-      { name: 'Republic Fleet EMP S', quantity: 1, isCharge: true },
-      { name: '125mm Gatling AutoCannon II', quantity: 1 },
-      { name: 'Republic Fleet EMP S', quantity: 1, isCharge: true },
-      { name: 'Small Polycarbon Engine Housing I', quantity: 1 },
-      { name: 'Warrior II', quantity: 5 },
-      { name: 'Nanite Repair Paste', quantity: 50 },
+      { name: 'Nanofiber Internal Structure I', quantity: 1, line: 3 },
+      { name: 'Damage Control II', quantity: 1, line: 4 },
+      { name: '1MN Afterburner II', quantity: 1, line: 6 },
+      { name: '125mm Gatling AutoCannon II', quantity: 1, line: 9 },
+      { name: 'Republic Fleet EMP S', quantity: 1, line: 9, isCharge: true },
+      { name: '125mm Gatling AutoCannon II', quantity: 1, line: 10 },
+      { name: 'Republic Fleet EMP S', quantity: 1, line: 10, isCharge: true },
+      { name: 'Small Polycarbon Engine Housing I', quantity: 1, line: 13 },
+      { name: 'Warrior II', quantity: 5, line: 15 },
+      { name: 'Nanite Repair Paste', quantity: 50, line: 18 },
     ]);
+  });
+});
+
+describe('looksLikeEftFit', () => {
+  it('recognizes a fit by its bracketed first non-blank line', () => {
+    expect(looksLikeEftFit('[Rifter, My Fit]\n\nDamage Control II')).toBe(true);
+  });
+
+  it('ignores leading blank lines and indentation', () => {
+    expect(looksLikeEftFit('\n\n   [Rifter, My Fit]\nDamage Control II')).toBe(true);
+  });
+
+  it('still recognizes a fit whose header is malformed, so the error can be reported', () => {
+    expect(looksLikeEftFit('[Rifter, My Fit\nDamage Control II')).toBe(true);
+  });
+
+  it('rejects an inventory or multibuy paste', () => {
+    expect(looksLikeEftFit('Tritanium\t124,500\nPyerite 500')).toBe(false);
+    expect(looksLikeEftFit('Damage Control II')).toBe(false);
+  });
+
+  it('rejects empty text', () => {
+    expect(looksLikeEftFit('')).toBe(false);
+    expect(looksLikeEftFit('\n\n  \n')).toBe(false);
   });
 });

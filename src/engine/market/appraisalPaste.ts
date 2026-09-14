@@ -11,6 +11,14 @@
  *   past the second field is dropped.
  * - **Multibuy** — `Name Qty`, space-separated.
  * - **A bare name**, which counts as one.
+ * - **An EFT ship fit**, recognised by the `[Ship Name, Fit Name]` header its
+ *   first non-blank line always carries. A fit is not a list of loose items:
+ *   its hull is named only in that header, and a loaded module is written
+ *   `Module Name, Charge Name` on one line. Both are handed to
+ *   `engine/import/eftFit`'s `parseEftFit` — the same already-tested parser
+ *   Fit Import and the Skill Planner's clipboard import read — so the hull is
+ *   priced, the charge is priced separately from its module, and `[Empty ...
+ *   slot]` placeholders are dropped rather than appraised (issue #1026).
  *
  * Quantities arrive thousands-separated (`124,500`), so they are stripped
  * before parsing rather than handed to `Number`, which answers `NaN` for those.
@@ -27,6 +35,8 @@
  * two cans). Each entry carries every source line it came from, so a name that
  * resolves to nothing can be reported as the lines the reader actually sees.
  */
+
+import { looksLikeEftFit, parseEftFit } from '@/engine/import/eftFit';
 
 export interface AppraisalPasteEntry {
   /** As written, in the first spelling seen. Matching is the caller's job. */
@@ -94,25 +104,83 @@ export function countPasteLines(text: string): number {
   return text.split(LINE_BREAK).filter((line) => line.trim() !== '').length;
 }
 
+/** One name on one source line, before same-named rows are merged. */
+interface PasteRow {
+  name: string;
+  quantity: number;
+  /** 1-indexed. */
+  line: number;
+}
+
+/** One row per non-blank line, read as inventory copy, multibuy or a bare name. */
+function itemRows(text: string): PasteRow[] {
+  const rows: PasteRow[] = [];
+  const lines = text.split(LINE_BREAK);
+  for (let i = 0; i < lines.length; i++) {
+    const trimmed = lines[i].trim();
+    if (trimmed === '') continue;
+    const { name, quantity } = parseLine(trimmed);
+    rows.push({ name, quantity, line: i + 1 });
+  }
+  return rows;
+}
+
+/**
+ * One row per priceable thing in an EFT fit: the hull, then every module, rig,
+ * charge, drone and cargo line.
+ *
+ * `parseEftFit`'s own parse errors — a malformed header, an unreadable body
+ * line — become rows too, carrying the offending text. Nothing in the market
+ * catalogue is spelled like a broken header, so each one surfaces in the
+ * panel's unmatched-lines list against the line the pilot can go and fix,
+ * honouring the settled rule that an unmatched line is always reported rather
+ * than silently dropped (see
+ * docs/context/decisions/20260908-164742-appraisal-prices-at-a-trade-hub-and-shares.md).
+ * A header with no ship name in it yields an error but no hull, so the reader
+ * gets that one complaint rather than a blank-named row beside it.
+ *
+ * Rows come back in source-line order so the panel reports a header problem
+ * where the reader's eye already is — at the top — rather than after the body
+ * lines that happened to parse.
+ *
+ * A loaded charge keeps its module line's quantity, which is the only count
+ * EFT gives it: eight launchers loaded with Scourge Fury reads as eight
+ * missiles. That is a rough proxy for what refilling the fit costs, not a
+ * claim about how much ammo the pilot carries.
+ */
+function eftRows(text: string): PasteRow[] {
+  const fit = parseEftFit(text);
+  const rows: PasteRow[] = [];
+
+  if (fit.shipName) rows.push({ name: fit.shipName, quantity: 1, line: fit.headerLine });
+  for (const item of fit.items) {
+    rows.push({ name: item.name, quantity: item.quantity, line: item.line });
+  }
+  for (const error of fit.errors) {
+    rows.push({ name: error.text, quantity: 1, line: error.line });
+  }
+
+  return rows.sort((a, b) => a.line - b.line);
+}
+
 /** Parse pasted item text. Never throws — an unreadable line becomes a name. */
 export function parseAppraisalPaste(text: string): AppraisalPasteEntry[] {
   const entries: AppraisalPasteEntry[] = [];
   const byName = new Map<string, AppraisalPasteEntry>();
 
-  const lines = text.split(LINE_BREAK);
-  for (let i = 0; i < lines.length; i++) {
-    const trimmed = lines[i].trim();
-    if (trimmed === '') continue;
-
-    const { name, quantity } = parseLine(trimmed);
-    const key = name.toLowerCase();
+  for (const row of looksLikeEftFit(text) ? eftRows(text) : itemRows(text)) {
+    const key = row.name.toLowerCase();
     const existing = byName.get(key);
     if (existing) {
-      existing.quantity += quantity;
-      existing.lines.push(i + 1);
+      existing.quantity += row.quantity;
+      existing.lines.push(row.line);
       continue;
     }
-    const entry: AppraisalPasteEntry = { name, quantity, lines: [i + 1] };
+    const entry: AppraisalPasteEntry = {
+      name: row.name,
+      quantity: row.quantity,
+      lines: [row.line],
+    };
     byName.set(key, entry);
     entries.push(entry);
   }
