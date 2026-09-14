@@ -226,7 +226,7 @@ describe('schema upgrade v6 -> v7', () => {
   });
 
   it('the shipped database is at its current version with v7’s index live', () => {
-    expect(db.verno).toBe(11);
+    expect(db.verno).toBe(12);
     expect(db.characters.schema.indexes.map((i) => i.name)).toContain('corporationId');
   });
 });
@@ -269,6 +269,7 @@ describe('schema upgrade v8 -> v9 (Production Log, issue #525)', () => {
         'esiCache',
         'miningTaxAssignments',
         'notificationFeed',
+        'orderProblemSamples',
         'payees',
         'planetRichness',
         'productionOrderWatches',
@@ -297,6 +298,13 @@ describe('schema upgrade v10 -> v11 (BPC Sourcing watches, issue #926)', () => {
   it('adds bpcSearchWatches, unindexed beyond its own id — device-local and character-independent', () => {
     expect(db.bpcSearchWatches.schema.indexes.map((i) => i.name)).toEqual([]);
     expect(db.bpcSearchWatches.schema.primKey.name).toBe('id');
+  });
+});
+
+describe('schema upgrade v11 -> v12 (Open Orders problem samples, issue #1018)', () => {
+  it('adds orderProblemSamples keyed by orderId, indexed on characterId so a prune can be scoped', () => {
+    expect(db.orderProblemSamples.schema.primKey.name).toBe('orderId');
+    expect(db.orderProblemSamples.schema.indexes.map((i) => i.name)).toEqual(['characterId']);
   });
 });
 

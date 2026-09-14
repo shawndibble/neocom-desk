@@ -50,6 +50,8 @@ import {
   type StructureCompetition,
 } from './orderCompetition';
 import { loadPriceHistory, type PriceHistoryResult } from './priceHistory';
+import { recordOrderProblemSamples, sampleableCharacterIds } from './orderProblemSamples';
+import { sampledProblem } from '@/engine/market/orderProblemHistory';
 import type { JumpsAwayResult } from '@/engine/jumpsAway';
 import {
   buildOpenOrderRows,
@@ -431,10 +433,39 @@ export function OpenOrdersPanel() {
       deepCompetition: deepCompetitionByOrderId,
       structureCompetition: structureByKey,
       stationNames,
+      problemSamples: snapshot.problemSamples,
       skillsByCharacter: snapshot.skillsByCharacter,
       now: snapshot.now,
     });
   }, [snapshot, deepCompetitionByOrderId, structureByKey, stationNames]);
+
+  /**
+   * Takes this load's `OrderProblem` reading for every open order and drops
+   * the history of orders that have since closed. Runs off `allRows` rather
+   * than inside the loader because the reading it stores is the
+   * classification `buildOpenOrderRows` just produced — nothing earlier in
+   * the chain knows it.
+   *
+   * Re-fires whenever a deeper check reclassifies a row; because every
+   * reading from one load shares `snapshot.now`, `appendOrderProblemSample`
+   * replaces that load's sample instead of appending a second one, and the
+   * spacing guard covers loads further apart. Fire-and-forget: a failed
+   * write costs one sample from a deliberately gappy series, not worth an
+   * error state on a page whose job is elsewhere.
+   */
+  useEffect(() => {
+    if (!snapshot) return;
+    const characterIds = sampleableCharacterIds(snapshot.openOrders.entries);
+    void recordOrderProblemSamples(
+      allRows.map((row) => ({
+        orderId: row.orderId,
+        characterId: row.characterId,
+        problem: sampledProblem(row.problems),
+      })),
+      characterIds,
+      snapshot.now
+    ).catch(() => {});
+  }, [snapshot, allRows]);
 
   const problemCounts = useMemo(() => openOrderProblemCounts(allRows), [allRows]);
 

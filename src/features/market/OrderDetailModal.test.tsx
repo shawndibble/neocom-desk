@@ -53,6 +53,7 @@ const BASE_ROW: OpenOrderRow = {
   problems: ['healthy'],
   iskTiedUp: 5000,
   belowFloor: false,
+  frequentlyUndercut: false,
 };
 
 function renderModal(overrides: Partial<Parameters<typeof OrderDetailModal>[0]> = {}) {

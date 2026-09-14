@@ -503,6 +503,7 @@ here — they go one per file in `docs/context/decisions/`.
   deciding to leave an order alone rather than touch it. Null when nothing
   is linked to the order — never a guessed floor, since a floor of zero
   would make every rival look safe to follow.
+- **Often Undercut**: The Open Orders badge for an order that reads `healthy` right now but has been undercut most of the times this page has watched it — `wasFrequentlyUndercut` in `src/engine/market/orderProblemHistory.ts`, over samples the page stores itself in `db.orderProblemSamples`. It is an `OrderBadgeKind`, never an **Order Problem**: the row stays in the healthy group, so nothing already reading worse is affected. A boolean with no count beside it, and silent until there are enough samples to judge.
 - **Order Depth**: A **Build Opportunities** row's `deep`/`moderate`/`thin`/`unknown` read on how much sell-order ISK sits at the hub against that row's own build cost — `classifyOrderDepth` in `src/engine/industry/opportunities.ts`, a `ProblemThresholds`-style typed threshold object (see **Order Problem**) since no such convention existed before this ticket. `unknown` when the product itself has no hub sell price, never guessed as thin.
 - **Order Problem**: The one thing wrong with an open order, from
   `src/engine/market/orderProblems.ts`, and the Open Orders page's spine:

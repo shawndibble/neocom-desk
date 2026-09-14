@@ -28,6 +28,7 @@ const BASE_ROW: OpenOrderRow = {
   problems: ['healthy'],
   iskTiedUp: 5000,
   belowFloor: false,
+  frequentlyUndercut: false,
 };
 
 function buyOrder(overrides: Partial<CompetingOrder>): CompetingOrder {

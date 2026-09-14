@@ -27,6 +27,7 @@ const BASE_ROW: OpenOrderRow = {
   problems: ['healthy'],
   iskTiedUp: 5000,
   belowFloor: false,
+  frequentlyUndercut: false,
 };
 
 describe('orderVerdict', () => {

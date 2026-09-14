@@ -27,6 +27,7 @@ const BASE_ROW: OpenOrderRow = {
   problems: ['healthy'],
   iskTiedUp: 5000,
   belowFloor: false,
+  frequentlyUndercut: false,
 };
 
 describe('orderBadgeFor', () => {
@@ -171,6 +172,40 @@ describe('orderBadgeFor', () => {
       },
     };
     expect(orderBadgeFor(row)).toEqual({ kind: 'outbid', detail: '+8.0%' });
+  });
+
+  it('badges a frequently-undercut healthy row ahead of noCostBasis', () => {
+    const row: OpenOrderRow = {
+      ...BASE_ROW,
+      problem: 'healthy',
+      problems: ['healthy'],
+      costBasis: null,
+      frequentlyUndercut: true,
+    };
+    expect(orderBadgeFor(row)).toEqual({ kind: 'frequentlyUndercut' });
+  });
+
+  it('badges a frequently-undercut healthy row ahead of best, never as best', () => {
+    const row: OpenOrderRow = {
+      ...BASE_ROW,
+      problem: 'healthy',
+      problems: ['healthy'],
+      costBasis: {
+        unitCost: 400,
+        runId: 'run-1',
+        runQuantity: 10,
+        materialCost: 3000,
+        jobFee: 1000,
+      },
+      station: { bestPrice: 1000, beatsMe: false, gapIsk: 0, gapPct: 0 },
+      frequentlyUndercut: true,
+    };
+    expect(orderBadgeFor(row)).toEqual({ kind: 'frequentlyUndercut' });
+  });
+
+  it('carries no detail string, so the badge never claims a sample count', () => {
+    const row: OpenOrderRow = { ...BASE_ROW, frequentlyUndercut: true };
+    expect(orderBadgeFor(row)?.detail).toBeUndefined();
   });
 
   it('badges a healthy sell row with no linked cost basis as noCostBasis', () => {

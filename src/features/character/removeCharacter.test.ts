@@ -75,6 +75,11 @@ async function seedCharacter(characterId: number): Promise<void> {
     status: 'outstanding',
     updatedAt: 1,
   });
+  await db.orderProblemSamples.add({
+    orderId: characterId * 1000,
+    characterId,
+    samples: [{ at: 1, problem: 'healthy' }],
+  });
 }
 
 beforeEach(async () => {
@@ -92,6 +97,7 @@ beforeEach(async () => {
     db.settings.clear(),
     db.payees.clear(),
     db.miningTaxAssignments.clear(),
+    db.orderProblemSamples.clear(),
   ]);
   useActiveCharacter.setState({ activeCharacterId: null, hydrated: true });
 });
@@ -111,6 +117,7 @@ describe('removeCharacter', () => {
     expect(await db.esiCache.where('[characterId+key]').equals([1, 'wallet']).count()).toBe(0);
     expect(await db.payees.where('characterId').equals(1).count()).toBe(0);
     expect(await db.miningTaxAssignments.where('characterId').equals(1).count()).toBe(0);
+    expect(await db.orderProblemSamples.where('characterId').equals(1).count()).toBe(0);
   });
 
   it('does not touch another character’s data', async () => {
@@ -123,6 +130,7 @@ describe('removeCharacter', () => {
     expect(await db.skillPlans.where('characterId').equals(2).count()).toBe(1);
     expect(await db.payees.where('characterId').equals(2).count()).toBe(1);
     expect(await db.miningTaxAssignments.where('characterId').equals(2).count()).toBe(1);
+    expect(await db.orderProblemSamples.where('characterId').equals(2).count()).toBe(1);
   });
 
   it('attempts the remote purge and clears sync bookkeeping when configured', async () => {

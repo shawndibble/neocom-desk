@@ -11,6 +11,7 @@ import type {
   SecurityBand,
 } from '@/engine/industry/types';
 import type { TradeHub } from '@/market/hubs';
+import type { OrderProblemSample } from '@/engine/market/orderProblemHistory';
 
 export interface CharacterRecord {
   characterId: number;
@@ -797,6 +798,15 @@ export interface BpcSearchWatchRecord {
   updatedAt: number;
 }
 
+export interface OrderProblemSampleRecord {
+  /** ESI's own order id. */
+  orderId: number;
+  /** Owner of the order, so a prune can be scoped to the characters actually loaded. */
+  characterId: number;
+  /** Oldest first. */
+  samples: OrderProblemSample[];
+}
+
 export const db = new Dexie('neocom') as Dexie & {
   characters: EntityTable<CharacterRecord, 'characterId'>;
   tokens: EntityTable<TokenRecord, 'characterId'>;
@@ -814,6 +824,7 @@ export const db = new Dexie('neocom') as Dexie & {
   payees: EntityTable<PayeeRecord, 'id'>;
   miningTaxAssignments: EntityTable<MiningTaxAssignmentRecord, 'id'>;
   bpcSearchWatches: EntityTable<BpcSearchWatchRecord, 'id'>;
+  orderProblemSamples: EntityTable<OrderProblemSampleRecord, 'orderId'>;
 };
 
 /**
@@ -999,4 +1010,29 @@ db.version(11).stores({
   payees: 'id, characterId',
   miningTaxAssignments: 'id, characterId, [characterId+date+solarSystemId]',
   bpcSearchWatches: 'id',
+});
+
+// Additive: v11 stores unchanged, plus per-order `OrderProblem` sample
+// histories. Keyed by `orderId` because a series is only ever
+// read and written whole; `characterId` is indexed so a prune can be scoped
+// to the characters a given load actually saw. Row growth is bounded by
+// `engine/market/orderProblemHistory.ts`'s window and per-order cap.
+db.version(12).stores({
+  characters: 'characterId, corporationId',
+  tokens: 'characterId',
+  settings: 'key',
+  skillPlans: 'id, characterId',
+  esiCache: '[characterId+key]',
+  buildPlans: 'id, characterId',
+  quickbars: 'id, characterId',
+  stationPins: 'id, characterId, locationId',
+  planetRichness: 'id, characterId, planetId',
+  notificationFeed: 'id, characterId, firedAt',
+  productionRuns: 'id, characterId, buildPlanId',
+  productionSaleLinks: 'id, characterId, runId',
+  productionOrderWatches: 'id, characterId, runId',
+  payees: 'id, characterId',
+  miningTaxAssignments: 'id, characterId, [characterId+date+solarSystemId]',
+  bpcSearchWatches: 'id',
+  orderProblemSamples: 'orderId, characterId',
 });

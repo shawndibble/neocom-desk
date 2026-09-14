@@ -56,6 +56,7 @@ function makeRow(overrides: Partial<OpenOrderRow> = {}): OpenOrderRow {
     problems: ['healthy'],
     iskTiedUp: 5000,
     belowFloor: false,
+    frequentlyUndercut: false,
     ...overrides,
   };
 }

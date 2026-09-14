@@ -54,6 +54,10 @@ import {
 import { orderFloor, type OrderFloor } from '@/engine/market/orderFloor';
 import { orderExpiry, type OrderExpiry } from '@/engine/market/orderHealth';
 import {
+  wasFrequentlyUndercut,
+  type OrderProblemSample,
+} from '@/engine/market/orderProblemHistory';
+import {
   worstProblem,
   allProblems,
   ORDER_PROBLEMS,
@@ -112,6 +116,14 @@ export interface OpenOrderRow {
   /** price x volumeRemain. */
   iskTiedUp: number;
   belowFloor: boolean;
+  /**
+   * This order reads `healthy` right now but has been undercut most of the
+   * time the page has watched it. Always false for an order
+   * whose current `problem` is anything worse than `healthy` — there the
+   * live status already prompts the same action, so the second read adds
+   * nothing — and false whenever the sample history is too thin to judge.
+   */
+  frequentlyUndercut: boolean;
 }
 
 export interface CharacterSkills {
@@ -159,6 +171,13 @@ export interface BuildRowsInput {
   now: number;
   /** Days without a sale, keyed orderId, when known. */
   daysWithoutSale?: ReadonlyMap<number, number>;
+  /**
+   * Rolling `OrderProblem` history per order id, oldest first
+   * (`features/market/orderProblemSamples.ts`). Absent means the history has
+   * not been read — every row then reports `frequentlyUndercut: false`,
+   * never a flag the samples cannot back up.
+   */
+  problemSamples?: ReadonlyMap<number, readonly OrderProblemSample[]>;
 }
 
 /** The trap: my own order sits inside the aggregate, so a rival price EQUAL to mine is not beating me — only strictly better counts. */
@@ -319,6 +338,9 @@ function buildRow(
     problems,
     iskTiedUp: order.price * order.volume_remain,
     belowFloor,
+    frequentlyUndercut:
+      problem === 'healthy' &&
+      wasFrequentlyUndercut(input.problemSamples?.get(order.order_id) ?? [], input.now),
   };
 }
 
