@@ -52,7 +52,14 @@ add-on for jobs/orders/assets/wallet), Lazy Blacksmith (blueprint
 search/analysis), EVE Orchestra (mining ledger/reprocessing/job tracking,
 corp mining tax), Alysii's PI Scheme / EVE Planetary Planner (PI chain
 calculators, one ~7yr active), Upwell Fuel Monitor (structure fuel tracker —
-already covered, `structureFuel`), EVE Empire (multiplatform companion, successor to the old EVE Nexus: industry
+already covered, `structureFuel`), ECT EVE Assets (Electron/React desktop mirror of much of this app: assets
+priced incl. capitals/abyssals, personal+corp contracts, manufacturing/
+research/invention jobs, market orders with price trends, structure fuel
+timers, wallet history, LP by corporation, clones, mail, public contract
+search, market browser — gap-analysed, every one already covered here),
+Pod (keyboard-driven multi-character manager: wallets, skills, fitting,
+mail, assets, wallet journal, market orders, contracts, hangar search —
+all covered here), EVE Empire (multiplatform companion, successor to the old EVE Nexus: industry
 jobs across characters, PI overview with live extractor/factory timers, item
 browser with depth charts and price history, blueprint materials, wallet/
 orders/contracts/mining-ledger/LP/assets, skill queue and training plans,
@@ -67,15 +74,20 @@ its skills+slots-aware run planner is what surfaced #1015).
 GURU/Production Ledger, EveTerminal.io, Mining Timer Tool, EVE Hauling
 Advisor.
 
-**Skimmed by thread title only, confirmed out of domain** (mapping, intel,
-fitting/crew sims, DPS meters, multibox, dev-tooling, one-off Q&A threads —
-no industry or market surface): EVE Crews, Nexum, EveWebMail, EVE-NAV,
+**Skimmed by thread title only — NOT gap-analysed** (mapping, intel,
+fitting/crew sims, DPS meters, multibox, dev-tooling, one-off Q&A threads).
+This list used to read "confirmed out of domain", which claims more than a
+title skim can support: EVE Empire, Pod and ECT EVE Assets all sat here and
+all three turned out to carry a full industry/market surface. A title is a
+weak classifier — "asset manager" and "companion app" both hide market,
+industry and wallet features. Treat a name here as unexamined, not cleared,
+and check any that could plausibly touch the ISK pipeline: EVE Crews, Nexum, EveWebMail, EVE-NAV,
 Capsuleers.app, Wayfinder, Atlas, MISMAPS/MISKILLZ, Fly Safe, WHMapper,
 Socketkill, PEARL, EVE Hacking Simulator, EVE Nexus, Eve PvP Radar, EVE-O
 Preview, EVE MCP Server, EVE Threat Checker, EVE Fit Assistant, SLH Local
 Scanner, EveBoosters.com, Dd24tool.de, ISKONOMY, EVE Market Order Assistant
-(write-scoped, paid), EVE NewBro, EVE Link, ECT EVE Assets, PATT,
-W-Space Atlas, Pod, EveHunter, ADAPT, Helm, Nicotine,
+(write-scoped, paid), EVE NewBro, EVE Link, PATT,
+W-Space Atlas, EveHunter, ADAPT, Helm, Nicotine,
 fleet-manager/HARUSPEX/EasyEve, icon server, contract-monitoring Discord bot,
 Ministry of Pantoscopic Observance, Modular All-in-One Desktop Tool (revisit
 if it publishes specifics), EVE Market Pro (abandoned), Ascension Labs Libs,
