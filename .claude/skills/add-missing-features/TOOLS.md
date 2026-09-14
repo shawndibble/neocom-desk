@@ -15,7 +15,8 @@ Adam4EVE (market stats/PI profitability/industry indices), Ravworks/Slipway
 (multi-item production planning, full material tree, what/where to build &
 sell), EVE Tycoon (profit tracking, order mgmt, per-item stock),
 Janice/Iron Whales Appraiser/EVE Appraisal (bulk appraisal, reprocessing, BPC
-pricing, watchlists/alerts), EVE Blue Desk/EvE Blueprint (blueprint market
+pricing, watchlists/alerts; Iron Whales has since added abyssal-module pricing
+via MutaMarket and a 50-at-a-time BPO/BPC live-contract price lookup), EVE Blue Desk/EvE Blueprint (blueprint market
 platform), EVE Courier (routing, gatecamp check, arbitrage, contracts),
 Fuzzwork (blueprint calc, reprocessing, SDE dumps), EVE Ref (reference/market
 data), EVE Retroindustry (local BOM/make-vs-buy, multi-char asset/PI/wallet),
@@ -86,6 +87,13 @@ industry/market tool found in three more pages past 10 — re-check page 0/1
 for new threads each run instead of going deeper. A run finding no new
 threads on pages 0–1 is a valid, complete survey — it isn't evidence to go
 digging further back.
+
+**A bumped thread can carry a new feature even when no new thread appears.**
+The listing's `last_posted_at`/`posts_count` move when a dev announces an
+update, and a tool's row here records its _original_ pitch. When no thread is
+new, sort by `last_posted_at` and check what the recently-posted tools have
+added — that is how Iron Whales' abyssal and BPO-contract pricing surfaced,
+seven runs after its row was written.
 
 ## Already covered — don't re-propose
 
@@ -326,3 +334,4 @@ precedent for what this project will accept.
 | Build Opportunities: unowned-blueprint coverage ranking (#722)                                                                                              | Owner-rejected on build cost: a new panel plus a hook plus an SDE-wide scan, not worth it for the payoff. A cheaper shape that reuses an existing surface is the only way back in.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | PI Production Run / Log equivalent (#725)                                                                                                                   | Owner-rejected on a domain fact worth keeping: PI has no real cost basis to snapshot the way Industry does. Kills PI realized-profit tracking generally, not just this framing.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | Skill ROI in any framing — ranked panel (#822/#827/#925) **or** the owner's invited re-frame (annotate an existing plan with what its training order costs) | The shape objection was answered — annotating a plan the player already has does honour the re-file the owner invited on #822. It dies on the input instead: **no realized ISK/hr per job exists.** `realizedProfit.ts` carries no time basis (no seconds, no ISK/hour) and `ProductionRunRecord` stores no job duration, so it cannot be derived from the Production Log; the only ISK/hour in the app is `buildVsBuy`'s forward per-plan estimate. And an extra job slot earns nothing to a player not filling the slots they have — which `aggregateJobSlotSummary` can often prove — so the figure would be confidently wrong, the same reason #822 excluded duration skills. Unblocking needs a duration on `ProductionRunRecord` plus a slot-bottleneck signal. `suggestReorder`+`PlanPriority` already deliver the action. |
+| Abyssal (mutated) module pricing in Appraisal/Assets, à la Iron Whales' MutaMarket lookup                                                                   | Two versions, both out. Pricing them needs an external per-item valuation service (MutaMarket) — a second price source beside Fuzzwork for a population that holds no abyssals in the ordinary industry/market case, and outside this skill's ISK-pipeline remit. Merely _flagging_ them as unpriceable is already the behaviour: `appraisal.ts` counts `unpricedRows`, never treats an unpriced row as free, and surfaces the count.                                                                                                                                                                                                                                                                                                                                                                                             |
