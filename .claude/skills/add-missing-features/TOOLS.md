@@ -69,6 +69,21 @@ invention planning, and both are settled out of scope (kill-test 6 / round
 planner surfacing in this class is not worth re-analysing unless it does
 something outside build math.
 
+**Bulk appraisal tools are closed as well** — the third and last class.
+EVE Appraisal, Goonpraisal, Fuzzwork's Evaluator, EVE Workbench, EVE Tycoon
+and Iron Whales all paste-and-price against live hub orders, which is what
+Appraisal already does, with multi-hub (#689), refine-then-sell (#672),
+contract-line value (#717) and honest `unpricedRows` on top. The single
+thing they have that this app does not is **contract-derived pricing for
+items with no market price** (Adam4EVE's contract price history). That is
+already killed in the same shape as the BPC Sourcing price-trend row: it
+needs new server-side historical retention on admin-write-only infra that
+today holds only the latest sync.
+
+With planners, market/trading discovery and appraisal all closed, the
+ecosystem has no untested class left. A future sweep's job is to notice a
+tool that does not fit any of the three, not to re-analyse one that does.
+
 **Market/trading discovery tools are a closed class too.** theoz.space
 (Margin Finder, Material Influence, PLEX/Omega deal analysis), Adam4EVE's
 margin finder, evetools.dev, evetrade.space, EVE Workbench's Trade Tool and
