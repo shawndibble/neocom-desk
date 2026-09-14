@@ -17,9 +17,10 @@ sell), EVE Tycoon (profit tracking, order mgmt, per-item stock),
 Janice/Iron Whales Appraiser/EVE Appraisal (bulk appraisal, reprocessing, BPC
 pricing, watchlists/alerts; Iron Whales has since added abyssal-module pricing
 via MutaMarket and a 50-at-a-time BPO/BPC live-contract price lookup), EVE Blue Desk (blueprint market
-platform), EvE Blueprint (client-side manufacturing/reaction/PI production planner with invention and
-Fit-to-Build fit-paste — same shape as Slipway/Ravworks/EVE Forge, already covered; not a market
-platform despite the name-adjacency to EVE Blue Desk), EVE Courier (routing, gatecamp check, arbitrage, contracts),
+platform), EvE Blueprint (client-side manufacturing/reaction/PI production planner with Fit-to-Build
+fit-paste — same shape as Slipway/Ravworks/EVE Forge, already covered; its invention feature is out of
+scope per `.out-of-scope/invention-planning.md`; not a market platform despite the name-adjacency to
+EVE Blue Desk), EVE Courier (routing, gatecamp check, arbitrage, contracts),
 Fuzzwork (blueprint calc, reprocessing, SDE dumps), EVE Ref (reference/market
 data), EVE Retroindustry (local BOM/make-vs-buy, multi-char asset/PI/wallet),
 ISK.GG (multi-region price history/depth charts), EVE Miner Hub (mining
