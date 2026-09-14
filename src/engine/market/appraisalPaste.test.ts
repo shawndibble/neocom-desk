@@ -208,6 +208,16 @@ describe('parseAppraisalPaste — EFT fits', () => {
     ]);
   });
 
+  it('reads an unusable xN count as one, keeping the "always >= 1" promise', () => {
+    // A zero would ride out into a share link, where decodeAppraisalShare
+    // rejects the whole payload over one non-positive count.
+    const entries = parseAppraisalPaste('[Rifter, Kite Fit]\n\nNanite Repair Paste x0');
+    expect(entries).toEqual([
+      { name: 'Rifter', quantity: 1, lines: [1] },
+      { name: 'Nanite Repair Paste', quantity: 1, lines: [3] },
+    ]);
+  });
+
   it('leaves every non-EFT paste shape on the existing parser', () => {
     // A bracket only counts as a fit header on the first non-blank line.
     expect(parseAppraisalPaste('Tritanium\t100\n[Empty High slot]')).toEqual([

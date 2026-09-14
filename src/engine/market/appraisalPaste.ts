@@ -4,7 +4,7 @@
  * resolution and no prices here; `appraisal.ts` does the arithmetic once a
  * caller has resolved names against the market catalogue.
  *
- * Accepts the three shapes a pilot actually has on their clipboard:
+ * Accepts the four shapes a pilot actually has on their clipboard:
  *
  * - **Inventory copy** — `Name<tab>Qty`, and the wider `Name<tab>Qty<tab>Group
  *   <tab>Volume` EVE gives when the inventory is in details mode. Everything
@@ -112,6 +112,20 @@ interface PasteRow {
   line: number;
 }
 
+/**
+ * An EFT `xN` count, made safe to appraise with. `parseEftFit` hands back
+ * whatever `N` the text held, and a hand-edited "Nanite Repair Paste x0" is
+ * legal to it; this entry's quantity is promised to be >= 1, and a zero would
+ * also escape into a share link, where `decodeAppraisalShare` rejects the
+ * whole payload over one non-positive count. A count that isn't a positive
+ * whole number is read the way the loose parser reads an unusable one — as
+ * one of the thing — rather than dropping the line, which would hide it from
+ * the unmatched list too.
+ */
+function countOf(quantity: number): number {
+  return Number.isSafeInteger(quantity) && quantity > 0 ? quantity : 1;
+}
+
 /** One row per non-blank line, read as inventory copy, multibuy or a bare name. */
 function itemRows(text: string): PasteRow[] {
   const rows: PasteRow[] = [];
@@ -154,7 +168,7 @@ function eftRows(text: string): PasteRow[] {
 
   if (fit.shipName) rows.push({ name: fit.shipName, quantity: 1, line: fit.headerLine });
   for (const item of fit.items) {
-    rows.push({ name: item.name, quantity: item.quantity, line: item.line });
+    rows.push({ name: item.name, quantity: countOf(item.quantity), line: item.line });
   }
   for (const error of fit.errors) {
     rows.push({ name: error.text, quantity: 1, line: error.line });
