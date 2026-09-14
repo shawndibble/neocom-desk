@@ -80,10 +80,6 @@ already killed in the same shape as the BPC Sourcing price-trend row: it
 needs new server-side historical retention on admin-write-only infra that
 today holds only the latest sync.
 
-With planners, market/trading discovery and appraisal all closed, the
-ecosystem has no untested class left. A future sweep's job is to notice a
-tool that does not fit any of the three, not to re-analyse one that does.
-
 **Market/trading discovery tools are a closed class too.** theoz.space
 (Margin Finder, Material Influence, PLEX/Omega deal analysis), Adam4EVE's
 margin finder, evetools.dev, evetrade.space, EVE Workbench's Trade Tool and
@@ -102,6 +98,10 @@ scanners, each with a wallet-journal-matched "realized profit" tracker) gate
 the same way: the spread scan is kill-test 1 (a whole-region order-book
 fetch, not a client-side PWA thing) and the realized-profit tracker is
 kill-test 10 (FIFO reconstruction from wallet history, settled dead).
+
+With planners, market/trading discovery and appraisal all closed, the
+ecosystem has no untested class left. A future sweep's job is to notice a
+tool that does not fit any of the three, not to re-analyse one that does.
 
 EVE Online Tooling / "Modular All-in-One Desktop Tool" (th-lange; Tauri+React,
 ESI+SDE, local, no telemetry: production, reprocessing, industry jobs, PI,
