@@ -10,6 +10,7 @@ import {
   SelectValue,
   Spinner,
 } from '@/components/ui';
+import { formatVolume } from './format';
 import { loadPriceHistory } from './priceHistory';
 import {
   filterPriceHistoryRange,
@@ -161,8 +162,16 @@ function RangedHistory({ points, range, onRangeChange, itemName, now }: RangedHi
 
   return (
     <div>
-      <div className="flex items-center justify-between gap-2 px-1 pb-2">
-        <div className="flex gap-3 text-xs">
+      {/*
+       * Stacked below `sm`, one row above it. Five figures and a select no
+       * longer share a phone-width line: on that screen the summary wraps to
+       * a couple of rows and the range control takes a full-width one of its
+       * own, where it is also a full-height tap target rather than something
+       * squeezed against the last number. CSS-only, like `DataTable`'s own
+       * collapse — one markup, no duplicated branch.
+       */}
+      <div className="flex flex-col gap-2 px-1 pb-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
           {summary ? (
             <>
               <span>
@@ -177,6 +186,16 @@ function RangedHistory({ points, range, onRangeChange, itemName, now }: RangedHi
                 {t('market.priceHistory.summaryMedian')}:{' '}
                 <IskAmount value={summary.median} revealOn="tap" />
               </span>
+              {/* Units and orders, not ISK — plain figures, so no `IskAmount`
+                  and nothing for its privacy blur to hide. */}
+              <span>
+                {t('market.priceHistory.summaryVolume')}:{' '}
+                <span className="tabular-nums">{formatVolume(summary.totalVolume)}</span>
+              </span>
+              <span>
+                {t('market.priceHistory.summaryOrdersPerDay')}:{' '}
+                <span className="tabular-nums">{formatVolume(summary.meanOrderCount)}</span>
+              </span>
             </>
           ) : (
             // Distinct from emptyTitle above (ESI has no history at all) — this
@@ -185,7 +204,11 @@ function RangedHistory({ points, range, onRangeChange, itemName, now }: RangedHi
           )}
         </div>
         <Select value={range} onValueChange={(value) => onRangeChange(value as PriceHistoryRange)}>
-          <SelectTrigger size="sm" aria-label={t('market.priceHistory.range')} className="w-28">
+          <SelectTrigger
+            size="sm"
+            aria-label={t('market.priceHistory.range')}
+            className="w-full sm:w-28"
+          >
             <SelectValue />
           </SelectTrigger>
           <SelectContent>

@@ -7,8 +7,15 @@
 
 export interface MarketHistoryPoint {
   date: string;
+  /** Volume-weighted mean of the day's fills, as ESI reports it. */
   average: number;
+  /** The day's own extremes — the prices something actually changed hands at, which `average` alone hides. */
+  highest: number;
+  lowest: number;
+  /** Units traded that day. */
   volume: number;
+  /** Orders that ticked that day (ESI's `order_count`) — how many parties were trading, not how much moved. */
+  orderCount: number;
 }
 
 /** Sorts by date ascending, oldest first — the order the chart draws left to right. */
@@ -39,12 +46,24 @@ export function filterPriceHistoryRange<T extends { date: string }>(
 }
 
 export interface PriceHistorySummary {
+  /**
+   * The highest and lowest price anything traded at anywhere in the range,
+   * from the days' own `highest`/`lowest` — not the extremes of the daily
+   * average, which is what these were before the band existed. A day whose
+   * average sat at 9,000 while a spike filled at 14,000 now reports 14,000,
+   * because that is the number a trader is asking this column for.
+   */
   hi: number;
   lo: number;
+  /** Median of the daily *average* — the middle of a typical day, which no single day's extreme should move. */
   median: number;
+  /** Units traded across the whole range. */
+  totalVolume: number;
+  /** Mean daily order count, rounded to a whole order — a fractional order is not a thing. */
+  meanOrderCount: number;
 }
 
-/** Hi/lo/median of the daily average price. Null for an empty range — never a fabricated 0. */
+/** Range hi/lo, median day, total volume and mean daily order count. Null for an empty range — never a fabricated 0. */
 export function summarizePriceHistory(
   points: readonly MarketHistoryPoint[]
 ): PriceHistorySummary | null {
@@ -52,7 +71,23 @@ export function summarizePriceHistory(
   const sorted = points.map((p) => p.average).sort((a, b) => a - b);
   const mid = Math.floor(sorted.length / 2);
   const median = sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
-  return { hi: sorted[sorted.length - 1], lo: sorted[0], median };
+  let totalVolume = 0;
+  let totalOrderCount = 0;
+  let hi = points[0].highest;
+  let lo = points[0].lowest;
+  for (const p of points) {
+    totalVolume += p.volume;
+    totalOrderCount += p.orderCount;
+    if (p.highest > hi) hi = p.highest;
+    if (p.lowest < lo) lo = p.lowest;
+  }
+  return {
+    hi,
+    lo,
+    median,
+    totalVolume,
+    meanOrderCount: Math.round(totalOrderCount / points.length),
+  };
 }
 
 export interface MovingAveragePoint {
@@ -69,7 +104,7 @@ export interface MovingAveragePoint {
  * window, so a series shorter than `windowDays` returns empty.
  */
 export function movingAverage(
-  points: readonly MarketHistoryPoint[],
+  points: readonly MovingAveragePoint[],
   windowDays: number
 ): MovingAveragePoint[] {
   if (windowDays <= 0) return [];

@@ -5,13 +5,14 @@ import {
   summarizePriceHistory,
   movingAverage,
 } from './priceHistory';
+import { historyPoint as point } from './__fixtures__/priceHistory';
 
 describe('sortPriceHistory', () => {
   it('sorts points chronologically by date', () => {
     const points = [
-      { date: '2026-08-30', average: 10, volume: 5 },
-      { date: '2026-08-01', average: 9, volume: 3 },
-      { date: '2026-08-15', average: 11, volume: 7 },
+      point({ date: '2026-08-30', average: 10, volume: 5 }),
+      point({ date: '2026-08-01', average: 9, volume: 3 }),
+      point({ date: '2026-08-15', average: 11, volume: 7 }),
     ];
     expect(sortPriceHistory(points).map((p) => p.date)).toEqual([
       '2026-08-01',
@@ -22,8 +23,8 @@ describe('sortPriceHistory', () => {
 
   it('does not mutate the input array', () => {
     const points = [
-      { date: '2026-08-30', average: 10, volume: 5 },
-      { date: '2026-08-01', average: 9, volume: 3 },
+      point({ date: '2026-08-30', average: 10, volume: 5 }),
+      point({ date: '2026-08-01', average: 9, volume: 3 }),
     ];
     const original = [...points];
     sortPriceHistory(points);
@@ -37,10 +38,10 @@ describe('sortPriceHistory', () => {
 
 describe('filterPriceHistoryRange', () => {
   const points = [
-    { date: '2026-01-01', average: 1, volume: 1 },
-    { date: '2026-01-20', average: 2, volume: 2 },
-    { date: '2026-02-15', average: 3, volume: 3 },
-    { date: '2026-02-28', average: 4, volume: 4 },
+    point({ date: '2026-01-01', average: 1, volume: 1 }),
+    point({ date: '2026-01-20', average: 2, volume: 2 }),
+    point({ date: '2026-02-15', average: 3, volume: 3 }),
+    point({ date: '2026-02-28', average: 4, volume: 4 }),
   ];
   const now = new Date('2026-03-01T00:00:00Z');
 
@@ -65,23 +66,54 @@ describe('filterPriceHistoryRange', () => {
 });
 
 describe('summarizePriceHistory', () => {
-  it('reports hi, lo, and median of the average price', () => {
+  it('takes hi and lo from the days\u2019 own extremes, not from their averages', () => {
     const points = [
-      { date: '2026-01-01', average: 10, volume: 1 },
-      { date: '2026-01-02', average: 30, volume: 1 },
-      { date: '2026-01-03', average: 20, volume: 1 },
+      point({ date: '2026-01-01', average: 10, lowest: 4, highest: 16 }),
+      point({ date: '2026-01-02', average: 30, lowest: 25, highest: 44 }),
+      point({ date: '2026-01-03', average: 20, lowest: 18, highest: 23 }),
     ];
-    expect(summarizePriceHistory(points)).toEqual({ hi: 30, lo: 10, median: 20 });
+    const summary = summarizePriceHistory(points);
+    expect(summary?.hi).toBe(44);
+    expect(summary?.lo).toBe(4);
+  });
+
+  it('reports the median of the daily average price', () => {
+    const points = [
+      point({ date: '2026-01-01', average: 10 }),
+      point({ date: '2026-01-02', average: 30 }),
+      point({ date: '2026-01-03', average: 20 }),
+    ];
+    expect(summarizePriceHistory(points)?.median).toBe(20);
   });
 
   it('averages the two middle values for an even count', () => {
     const points = [
-      { date: '2026-01-01', average: 10, volume: 1 },
-      { date: '2026-01-02', average: 20, volume: 1 },
-      { date: '2026-01-03', average: 30, volume: 1 },
-      { date: '2026-01-04', average: 40, volume: 1 },
+      point({ date: '2026-01-01', average: 10 }),
+      point({ date: '2026-01-02', average: 20 }),
+      point({ date: '2026-01-03', average: 30 }),
+      point({ date: '2026-01-04', average: 40 }),
     ];
-    expect(summarizePriceHistory(points)).toEqual({ hi: 40, lo: 10, median: 25 });
+    expect(summarizePriceHistory(points)?.median).toBe(25);
+  });
+
+  it('sums traded volume across the range', () => {
+    const points = [
+      point({ date: '2026-01-01', volume: 120 }),
+      point({ date: '2026-01-02', volume: 30 }),
+      point({ date: '2026-01-03', volume: 7 }),
+    ];
+    expect(summarizePriceHistory(points)?.totalVolume).toBe(157);
+  });
+
+  it('reports the mean daily order count, rounded to a whole order', () => {
+    const points = [
+      point({ date: '2026-01-01', orderCount: 10 }),
+      point({ date: '2026-01-02', orderCount: 11 }),
+      point({ date: '2026-01-03', orderCount: 12 }),
+      point({ date: '2026-01-04', orderCount: 12 }),
+    ];
+    // 45 / 4 = 11.25
+    expect(summarizePriceHistory(points)?.meanOrderCount).toBe(11);
   });
 
   it('returns null for an empty range rather than a fabricated zero', () => {
@@ -91,11 +123,11 @@ describe('summarizePriceHistory', () => {
 
 describe('movingAverage', () => {
   const points = [
-    { date: '2026-01-01', average: 10, volume: 1 },
-    { date: '2026-01-02', average: 20, volume: 1 },
-    { date: '2026-01-03', average: 30, volume: 1 },
-    { date: '2026-01-04', average: 40, volume: 1 },
-    { date: '2026-01-05', average: 50, volume: 1 },
+    point({ date: '2026-01-01', average: 10, volume: 1 }),
+    point({ date: '2026-01-02', average: 20, volume: 1 }),
+    point({ date: '2026-01-03', average: 30, volume: 1 }),
+    point({ date: '2026-01-04', average: 40, volume: 1 }),
+    point({ date: '2026-01-05', average: 50, volume: 1 }),
   ];
 
   it('omits points until enough real history fills the window', () => {

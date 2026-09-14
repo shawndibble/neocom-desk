@@ -14,6 +14,7 @@ import { loadNpcStations } from '@/sde/loadMarketSde';
 import { loadCorrectedSkills, type CorrectedSkills } from '@/features/skills/correctedSkills';
 import { ESI_FANOUT_CONCURRENCY } from '@/lib/concurrency';
 import type { MarketOrder } from '@/esi/endpoints';
+import { historyPoint } from '@/engine/market/__fixtures__/priceHistory';
 
 vi.mock('./openOrdersData', () => ({ loadAllCharactersOpenOrders: vi.fn() }));
 vi.mock('./orderCostBasis', () => ({ loadOrderCostBases: vi.fn() }));
@@ -506,11 +507,13 @@ describe('OpenOrdersPanel', () => {
     );
     mockedCostBases.mockResolvedValue(new Map([[101, costBasis(600)]]));
     mockedPriceHistory.mockResolvedValue({
-      points: Array.from({ length: 3 }, (_, i) => ({
-        date: new Date(Date.now() - (i + 1) * 86_400_000).toISOString().slice(0, 10),
-        average: 100,
-        volume: 100,
-      })),
+      points: Array.from({ length: 3 }, (_, i) =>
+        historyPoint({
+          date: new Date(Date.now() - (i + 1) * 86_400_000).toISOString().slice(0, 10),
+          average: 100,
+          volume: 100,
+        })
+      ),
       fetchedAt: Date.now(),
     });
 
