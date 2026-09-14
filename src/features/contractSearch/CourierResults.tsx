@@ -1003,7 +1003,7 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
           const rate = iskPerJump(row.reward, jumpsByContract.get(row.contractId) ?? null);
           const multiple = multipleFor(row);
           return (
-            <div className="flex flex-col items-end gap-0.5">
+            <div className="flex flex-col items-start gap-0.5 sm:items-end">
               {rate === null ? <span className="text-text-dim">—</span> : formatIskAuto(rate)}
               {/*
                 A second line in the cell rather than an eighth column: the
