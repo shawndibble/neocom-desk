@@ -398,8 +398,12 @@ describe('OpenOrdersPanel', () => {
     );
 
     renderPanel();
-    await waitFor(() => expect(mockedLoadAll).toHaveBeenCalled());
-    await user.click(screen.getByRole('button', { name: 'Show healthy orders' }));
+    // `findBy`, not `waitFor(loadAll called)` then a synchronous `getBy`:
+    // the loader HAVING BEEN CALLED does not mean its resolved promise has
+    // flushed into state, so the old gate let the click run while the panel
+    // still showed its spinner — a race that only lost on a slow CI runner.
+    // Every other click on this control in the suite already waits this way.
+    await user.click(await screen.findByRole('button', { name: 'Show healthy orders' }));
 
     const group = await screen.findByTestId('order-group-healthy');
     const row = within(group).getByRole('row', { name: /Pyerite/ });

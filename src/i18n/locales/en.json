@@ -3024,7 +3024,7 @@
         "bestAction": "Nothing. This one is doing fine.",
         "noCostBasis": "No cost basis",
         "noCostBasisHelp": "Nothing is linked to this order, so we can't work out your lowest safe price.",
-        "noCostBasisAction": "Link the build that made this, so we can work out your lowest safe price."
+        "noCostBasisAction": "Link the build that made this. That needs a build plan on the Industry page first."
       },
       "legendTitle": "What the badges mean",
       "legendOpen": "What do these badges mean?",
@@ -3077,9 +3077,8 @@
       "floorFillLabel": "If you leave it and it sells",
       "costPerUnit": "Cost per unit",
       "noCostBasisTitle": "We don't know what this cost you",
-      "noCostBasisHint": "Link the build that made this, or type in what it cost, so we can work out your lowest safe price.",
+      "noCostBasisHint": "Without it we can't work out your lowest safe price. We only know the cost of stock you built: make a build plan on the Industry page, log the run that made these, then link it to this order.",
       "linkBuild": "Link a build",
-      "enterCost": "Type what it cost me",
       "sellsOutIn": "Sells out in",
       "sellsOutHelp": "Units left divided by the item's average daily volume in the region, shared by your place in the queue.",
       "sellsOutUnknown": "Can't tell yet",
