@@ -171,6 +171,24 @@ describe('PriceHistoryPanel', () => {
     expect(screen.getByText('0.1').parentElement).toHaveTextContent('Orders / day');
   });
 
+  it('names the summary figures without colons, so the row reads as a readout', async () => {
+    mockedLoad.mockResolvedValue({
+      points: [historyPoint({ date: '2026-08-01', average: 10, volume: 5, orderCount: 2 })],
+      fetchedAt: 1_000_000,
+    });
+    render(
+      <PriceHistoryPanel regionId={10000002} typeId={34} itemName="Tritanium" now={FIXED_NOW} />
+    );
+    await waitFor(() => expect(screen.getByTestId('chart')).toBeInTheDocument());
+    // One assertion over the whole group rather than a negative beside each
+    // label: the substring checks elsewhere in this file would all still pass
+    // if `Label:` came back, and five separate `not.toHaveTextContent` lines
+    // would say the same thing five times. Nothing in this group — labels,
+    // figures, "Orders / day" — contains a colon.
+    const stats = screen.getByText('High').parentElement?.parentElement;
+    expect(stats?.textContent).not.toContain(':');
+  });
+
   it('narrows the chart to the selected date range', async () => {
     const user = userEvent.setup();
     mockedLoad.mockResolvedValue({
