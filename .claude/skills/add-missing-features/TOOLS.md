@@ -142,10 +142,16 @@ sweep alone won't reach it either; the web search is what catches this shape.
 EVE Flipper (browser-based, single-character, optional-SSO: arbitrage/station/
 radius trading, multi-hop route building, contract scanning, buy-vs-produce
 compare, portfolio P&L/VaR, slippage-modeled execution plans, price alerts,
-PLEX/SP-farm calculators, war tracker) — every feature already covered here or
-killed (hubHaulGaps, kill-test 10 for station-trading P&L and portfolio VaR off
-wallet cost basis, kill-test 3/4 for slippage-modeled plans, Quickbar for price
-alerts, remit for PLEX/war tracking).
+PLEX/SP-farm calculators, war tracker), gated feature by feature: its
+hub-to-hub gap is `hubHaulGaps`, its single-station spread is the Compare tab
+(kill-test 3, already on screen), any market-wide/cross-player arbitrage or
+route-building scan hits kill-test 1; contract scanning is the Contracts
+page's market-value appraisal; buy-vs-produce is `buildVsBuy`; portfolio P&L
+and VaR both need a per-unit purchase cost basis wallet history can't give
+(kill-test 10); a slippage-modeled execution plan projects off order-book rows
+already on screen (kill-test 3); price alerts are the Quickbar. PLEX/SP-farm
+calculators and a war tracker sit outside this skill's ISK-pipeline scope —
+not something Neocom Desk's own kill-tests speak to.
 
 **A bumped thread can carry a new feature even when no new thread appears.**
 The listing's `last_posted_at`/`posts_count` move when a dev announces an
