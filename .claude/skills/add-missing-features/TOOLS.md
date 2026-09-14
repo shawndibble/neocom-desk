@@ -206,8 +206,15 @@ title skim can support: EVE Empire, Pod and ECT EVE Assets all sat here and
 all three turned out to carry a full industry/market surface. A title is a
 weak classifier — "asset manager" and "companion app" both hide market,
 industry and wallet features. Treat a name here as unexamined, not cleared,
-and check any that could plausibly touch the ISK pipeline: EVE Crews, Nexum, EveWebMail, EVE-NAV,
-Wayfinder, Atlas, MISMAPS/MISKILLZ, Fly Safe, WHMapper,
+and check any that could plausibly touch the ISK pipeline. **EVE Crews is now
+checked and cleared**, despite the highest post count in the category (185):
+a lore-focused crew-management roleplay layer (hiring, story events,
+station away-missions, an "After-Action Report") that reads ESI location/
+cargo/skills/killmails/standings but touches no industry, manufacturing,
+market or wallet endpoint; its own dev calls the ISK side "wonky"
+(tactical-data-recorder bounties, passive tourist-transport income) and out
+of remit either way — no blueprint/build/market leg. Still unexamined: Nexum,
+EveWebMail, EVE-NAV, Wayfinder, Atlas, MISMAPS/MISKILLZ, Fly Safe, WHMapper,
 Socketkill, PEARL, EVE Hacking Simulator, EVE Nexus, Eve PvP Radar, EVE-O
 Preview, EVE Threat Checker, EVE Fit Assistant, SLH Local
 Scanner, EveBoosters.com, EVE NewBro, EVE Link, PATT,
