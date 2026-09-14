@@ -38,11 +38,13 @@ Mobile rules proved by a component or a spec, so no run re-discovers them.
 - **Phone navigation** — `src/app/Layout.tsx` ships a `md:hidden` tab bar plus a
   More sheet (`mobileSheetPaths`) carrying every character view the bar cannot
   hold. `docs/UX-REVIEW.md` §8's "six views unreachable on mobile" is fixed.
-- **Narrow-viewport specs in CI** — `e2e/charactersToolbarNarrow.spec.ts`,
-  `corpBoardNarrow.spec.ts`, `filterSheetNarrow.spec.ts`, all at
-  `{ width: 390, height: 844 }`. Industry, Mail, Mining Tax, Market's Open
-  Orders, Overview and Skills still have none — the tickets filed each round
-  each add one (#1053/#1054/#1055/#1064/#1070/#1071).
+- **Narrow-viewport specs in CI** — `e2e/charactersToolbarNarrow.spec.ts` and
+  `filterSheetNarrow.spec.ts` at `{ width: 390, height: 844 }`;
+  `corpBoardNarrow.spec.ts` at the tighter `{ width: 320, height: 720 }`
+  (issue #419's own case, not a 390px one — don't group it with the other two).
+  Industry, Mail, Mining Tax, Market's Open Orders, Overview and Skills still
+  have none at 390 — the tickets filed each round each add one
+  (#1053/#1054/#1055/#1064/#1070/#1071).
 - **`SkillCompare`** stacks rather than scrolling sideways (#406) — the
   columns-are-the-content opt-out was reconsidered and rejected there.
 - **`useViewportBoundedHeight`'s fixed-tab-bar gap** — the hook
