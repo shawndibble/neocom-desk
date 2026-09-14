@@ -55,7 +55,19 @@ add-on for jobs/orders/assets/wallet), Lazy Blacksmith (blueprint
 search/analysis), EVE Orchestra (mining ledger/reprocessing/job tracking,
 corp mining tax), Alysii's PI Scheme / EVE Planetary Planner (PI chain
 calculators, one ~7yr active), Upwell Fuel Monitor (structure fuel tracker —
-already covered, `structureFuel`), EVE Online Tooling / "Modular All-in-One Desktop Tool" (th-lange; Tauri+React,
+already covered, `structureFuel`), **Web industry planners/calculators are an exhausted class.** eveindustry.app
+(multi-character job tracking, slot availability, reaction planner, invention
+planning with probability, reprocessing, PI), EVE Cookbook, EveIndy,
+eveindustryplanner.com, eve-industry.org, eveonline-industry.com, EVE OS
+Industry and calculator.city all sit in the same shape as Ravworks/Slipway/
+EVE Forge/EVE-HUB, already surveyed. Everything they do is covered here —
+_except_ their two standout features, multi-hop reaction chaining and
+invention planning, and both are settled out of scope (kill-test 6 / round
+27's BOM-rollup rejection; `.out-of-scope/invention-planning.md`). A new
+planner surfacing in this class is not worth re-analysing unless it does
+something outside build math.
+
+EVE Online Tooling / "Modular All-in-One Desktop Tool" (th-lange; Tauri+React,
 ESI+SDE, local, no telemetry: production, reprocessing, industry jobs, PI,
 station trading and daytrading), EVE Tools Suite (15 modules in one shell —
 fitting, industry, mining, market, trading, intel), EVE Console (market
