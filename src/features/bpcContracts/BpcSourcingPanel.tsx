@@ -34,6 +34,7 @@ import {
   effectivePrice,
   filterBpcContracts,
   filterBpcSearchRows,
+  iskPerRun,
   listedBlueprintTypeOptions,
   ownedBlueprintToSearchRow,
   blueprintSearchName,
@@ -830,6 +831,27 @@ export function BpcSourcingPanel({ initialTypeId = null }: BpcSourcingPanelProps
           ) : (
             <IskAmount value={contract.price} revealOn="longPress" />
           );
+        },
+      },
+      iskPerRun: {
+        id: 'iskPerRun',
+        header: t('bpcContracts.iskPerRunColumn'),
+        align: 'right',
+        className: 'tabular-nums whitespace-nowrap',
+        // Same rule as the Courier board's ISK/jump: no rate sinks the row in
+        // either direction, `undefined` rather than a sentinel that would lead
+        // the table on one of them. An owned row has no asking price at all.
+        sortValue: (row) => {
+          const contract = asContract(row);
+          if (!contract) return undefined;
+          return iskPerRun(effectivePrice(contract), contract.runs, contract.quantity) ?? undefined;
+        },
+        render: (row) => {
+          const contract = asContract(row);
+          if (!contract) return t('bpcContracts.notApplicable');
+          const rate = iskPerRun(effectivePrice(contract), contract.runs, contract.quantity);
+          if (rate === null) return t('bpcContracts.notApplicable');
+          return formatIskAuto(rate, CONTRACT_ISK_CENTS_BELOW);
         },
       },
       region: {

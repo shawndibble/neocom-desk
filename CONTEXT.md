@@ -345,6 +345,17 @@ here — they go one per file in `docs/context/decisions/`.
   scarce thing. A haul stating no volume has no ISK/m³ at all — never an
   infinite one — since a stated `0` survives ingestion and reaches the client
   as a real row.
+- **ISK/run**: What a listed blueprint copy costs for each use it carries —
+  the contract's asking price divided by every run that ask buys (issue #1017).
+  A **BPC Sourcing** column, and the same shape as **ISK/jump** and **ISK/m³**
+  on the Courier board: a derived per-unit rate over columns the table already
+  holds, sortable, additive. Deliberately _not_ the ranking figure — the panel
+  still sorts on price, the "cheapest listed offer" framing a buyer arrives
+  with. Quantity divides as well as runs: an **Offer** is a contract row, not a
+  copy, so a listing of three ten-run copies is one indivisible purchase of
+  thirty runs. A row with no asking price — an owned blueprint — and a copy
+  stating zero runs have no ISK/run at all; both show the unavailable marker
+  and sort last, never an infinite rate.
 - **Reverse Lane**: The way home from a public courier haul — the same region
   pair, run backwards (issue #941). Shown on the haul detail as a count that is
   also the link: activating it closes the detail and re-runs the Courier board
