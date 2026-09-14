@@ -75,8 +75,12 @@ already covered, `structureFuel`).
 (multi-character job tracking, slot availability, reaction planner, invention
 planning with probability, reprocessing, PI), EVE Cookbook, EveIndy,
 eveindustryplanner.com, eve-industry.org, eveonline-industry.com, EVE OS
-Industry and calculator.city all sit in the same shape as Ravworks/Slipway/
-EVE Forge/EVE-HUB, already surveyed. Everything they do is covered here —
+Industry, calculator.city and Eve Nexus (eve-nexus.app — Tauri desktop app,
+distinct from the forum's like-named fitting-sim toolkit: production-graph
+BOM viz, skill-aware ME/TE solver, buy-vs-build, cross-system cost index,
+restock planner, multi-character aggregation) all sit in the same shape as
+Ravworks/Slipway/EVE Forge/EVE-HUB, already surveyed. Everything they do is
+covered here —
 _except_ their two standout features, multi-hop reaction chaining and
 invention planning, and both are settled out of scope (kill-test 6 / round
 27's BOM-rollup rejection; `.out-of-scope/invention-planning.md`). A new
@@ -747,6 +751,30 @@ the engine could have made sharper.
     "read this cold and tell me what I missed" — rather than handing over a
     slate of candidates to defend.
 
+45. **`scripts/` is swept — `build-sde.mjs` is the last big producer, and it
+    is otherwise exemplary.** 1,766 lines, 21 baked files. Every derived
+    allowlist is a market-tree walk with a **tripwire carrying an argued
+    threshold** — moon ore fails below 50 or a missing parent, ore/ice unless
+    moon ore is a subset and exceeds it by 100, gas below 40 (the comment
+    explains why the bar sits above the raw count), compressed pairs below the
+    moon-ore count, every mineable type must carry a volume, gas and ore/ice
+    must be disjoint. The PI payload **throws** rather than writing a partial
+    file. Copy that pattern rather than re-auditing it. Its two real defects
+    (#1084, #1085) are both the same shape: **a field whose baked meaning is
+    narrower than every consumer assumes** — `time` is one job's, `volume` is
+    assembled. Neither is a missing guard.
+
+46. **A proxy is not a measurement — name the property, then test it.** I
+    reported 604 blueprints (15%) affected by assembled volume using
+    `volume >= 1000` as a stand-in for "is a hull". It counted 315 blueprints
+    where the printed figure is exactly right, because the most common large
+    materials are components with no packaged/assembled split at all. Tested
+    against the actual property — does this type's packaged volume differ —
+    the answer is 289 (7.16%). The honest number was also the **stronger**
+    argument: a median of 4.00x with nothing below 1.29x beats a hand-wavy
+    "10-100x". Kill-test 25 says measure; this says measure the thing itself,
+    not something correlated with it.
+
 ## Filed candidates
 
 **Verdict is the hostile review's, not the ticket's fate.** A `SHIP` row means
@@ -803,6 +831,8 @@ precedent for what this project will accept.
 | #1074 | NARROW                                                                                               | **bug**, and filed on a narrower justification than the feature kill-bar: the `/next-ticket` PR loop is this skill's own delivery mechanism. One Open Orders test awaits a MOCK CALL then queries the button SYNCHRONOUSLY, racing the panel's `loading && !data` spinner. The variable-latency step is `loadOrderProblemSamples` — the one collaborator the file does NOT `vi.mock`, so a real fake-IndexedDB read. Cost two CI failures on a Markdown-only PR (local: 27/27, and 508/508 across `features/market`). Exactly one instance repo-wide; fix is one line matching its own two neighbours                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | #1076 | NARROW — surfaced by the review while killing this run's actual candidate                            | **bug.** `compactContractOfferRow` stamps `price: contract.price` on EVERY for-sale line, so a 12-type bundle at 37M publishes 12 rows each asserting that blueprint costs 37M. No guard anywhere — `eligibleContractFrom` filters on type+expiry only. **The error is bidirectional; the SELECTION is not**: `cheapestOffer` is a bare min-reduce, so contaminated rows win by construction, and the winning tier **reseeds the plan's ME/TE**. Measured on 400 Forge contracts: 328 BPC rows, **106 (32.3%) from multi-type contracts** — quote the partner rate too, **4% of contracts**, or it reads overstated. Also silences BPC watches permanently (`minPriceSeen` is an all-time ratchet). Fixable client-side in a pass `syncedContracts` already makes — no schema change, no re-sync                                                                                                                                                                                                                                                    |
 | #1080 | OVERTURNED a null — the reviewer's cold read of `functions/` found it after I reported nothing there | **bug.** `compactContractOfferRow` drops the REQUESTED side (`is_included !== 'true'`) and records nothing about it, so a **barter** contract publishes its offered line at the contract's ISK price of **0**. Live: contract 235151477 = Aeon Blueprint **BPC ME10 TE18 at 0 ISK**, actually asking 122 PLEX; 235255057 = Erebus BPC, 499 PLEX. Nothing guards zero: `buildCandidates`' filter checks `runs`/`quantity` and **not `price`**, so 0 wins `cheapestOffer` by construction and reseeds the plan's ME/TE; Contract Search default-sorts price ASC so these top the first view; `minPriceSeen` ratchets to 0 **permanently and irrecoverably**. Forge census: 108/7,991 (1.35%) zero-price contracts, 87 publish rows, **all 87 demand items back**, 419 zero-price rows, 5 BPCs. **Reach is NOT the argument** — severity and irreversibility are; the BPC slice is below a 300-contract sample's resolution. Cannot fold into #1076: that ticket's acceptance requires single-item rows byte-identical, and 4 of the 5 are single-type |
+| #1084 | OVERTURNED a null — cold read of `build-sde.mjs` after I reported it clean                           | **bug.** `marketWideTrees.json` flattens the WHOLE material tree recursively but bakes `time: bp.time` — the TOP blueprint's job time only. `computeMarketWideRows` divides by it and the panel `defaultSort`s `iskPerHour` desc. Cost assumes build-everything; time assumes one job. Replaying the bake's own recursion: **1,754/4,012 (43.7%)** carry uncounted sub-job time, **698 (17.4%)** understate by >2x, and the bias is **systematic by tech level** — T1 exactly 1.00x, T2 1.45–1.57x, Hulk 3.05x, Ark 3.57x. NOT a disclosed approximation: the bake comment and the scope decision both name exactly three (ME/TE, owned stock, auto-make-or-buy). The sibling owned panel uses `depth: 0` so ITS cost and time agree — only this path mismatches. Blocked by #1051 (numerator half, same function)                                                                                                                                                                                                                                  |
+| #1085 | NARROW → enhancement                                                                                 | Build Plan Volume shows **assembled** volume for a hull material line, not packaged. `volumeForType` says "flagged at the call site" — **nothing flags it**. Corrected measurement (my first pass was wrong): a `volume >= 1000` proxy gives 604/15% but counts 315 blueprints where the figure is RIGHT (Capital Construction Parts etc. have no packaged/assembled split). Against real packaged volumes: 158 of 334 large materials differ → **289/4,039 (7.16%)**, median **4.00x**, p10 2.02x, max 14.27x, **min 1.29x**. Hawk consumes a Merlin: 16,500 vs 2,500 m³. The column covers **buy rows only** — exactly where a hull arrives packaged. The dump's packaged-volume table ships EMPTY; ESI is the only source, bounded to 1,446 material types                                                                                                                                                                                                                                                                                       |
 
 ## Killed / dropped candidates (never filed)
 
