@@ -135,7 +135,17 @@ live, local-first and squarely in domain, and none was reachable from the
 category sweep — they publish on GitHub and their own sites. A sweep that only
 reads `76.json` will keep missing that shape. Run one targeted web search per
 sweep (e.g. "EVE Online desktop industry market tool open source") alongside
-the forum pages.
+the forum pages. A trading tool can also sit in the forum's **Services**
+category rather than Third Party Developers (EVE Flipper did) — the category
+sweep alone won't reach it either; the web search is what catches this shape.
+
+EVE Flipper (browser-based, single-character, optional-SSO: arbitrage/station/
+radius trading, multi-hop route building, contract scanning, buy-vs-produce
+compare, portfolio P&L/VaR, slippage-modeled execution plans, price alerts,
+PLEX/SP-farm calculators, war tracker) — every feature already covered here or
+killed (hubHaulGaps, kill-test 10 for station-trading P&L and portfolio VaR off
+wallet cost basis, kill-test 3/4 for slippage-modeled plans, Quickbar for price
+alerts, remit for PLEX/war tracking).
 
 **A bumped thread can carry a new feature even when no new thread appears.**
 The listing's `last_posted_at`/`posts_count` move when a dev announces an
