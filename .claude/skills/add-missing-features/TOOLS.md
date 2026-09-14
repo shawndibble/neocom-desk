@@ -16,8 +16,8 @@ Adam4EVE (market stats/PI profitability/industry indices), Ravworks/Slipway
 sell), EVE Tycoon (profit tracking, order mgmt, per-item stock),
 Janice/Iron Whales Appraiser/EVE Appraisal (bulk appraisal, reprocessing, BPC
 pricing, watchlists/alerts; Iron Whales has since added abyssal-module pricing
-via MutaMarket and a 50-at-a-time BPO/BPC live-contract price lookup), EVE Blue Desk (blueprint market
-platform), EvE Blueprint (client-side manufacturing/reaction/PI production planner with Fit-to-Build
+via MutaMarket and a 50-at-a-time BPO/BPC live-contract price lookup), EVE Blue Desk / SolCore Dynamics (cross-player blueprint market
+platforms — kill-test 1), EvE Blueprint (client-side manufacturing/reaction/PI production planner with Fit-to-Build
 fit-paste — same shape as Slipway/Ravworks/EVE Forge, already covered; its invention feature is out of
 scope per `.out-of-scope/invention-planning.md`; not a market platform despite the name-adjacency to
 EVE Blue Desk), EVE Courier (routing, gatecamp check, arbitrage, contracts),
@@ -96,6 +96,12 @@ build's cost — is kill-test 3: the Materials Table already prints a
 `lineTotal` per material, and with a linear cost model sensitivity _is_ cost
 share, so the answer is already on screen. Don't re-analyse this class
 either unless a tool prices something the app cannot see.
+
+Oracle Market Genius and Trading Matrix (regional/station-hub spread
+scanners, each with a wallet-journal-matched "realized profit" tracker) gate
+the same way: the spread scan is kill-test 1 (a whole-region order-book
+fetch, not a client-side PWA thing) and the realized-profit tracker is
+kill-test 10 (FIFO reconstruction from wallet history, settled dead).
 
 EVE Online Tooling / "Modular All-in-One Desktop Tool" (th-lange; Tauri+React,
 ESI+SDE, local, no telemetry: production, reprocessing, industry jobs, PI,
