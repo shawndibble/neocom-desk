@@ -91,6 +91,12 @@ digging further back.
 
 Mapped to the module/route that proves it:
 
+**A closed issue is not proof.** Every claim here needs a module or route
+behind it — an issue number alone can be an owner rejection. Three rows sat
+here for rounds claiming features that were declined and never written
+(#643, #722, #725). Before adding a row, `gh issue view <n> --comments` and
+grep for the code.
+
 - **Market**: undercut detection, order competition/health, full order book
   as sortable table (Market Browser), hub-to-hub price gap for an owned sell
   order (`hubHaulGaps`), item-variation/meta comparison (EVEMissioneer's
@@ -102,14 +108,14 @@ Mapped to the module/route that proves it:
   Groups/Opportunities (owned-blueprint ranking, covers most of Ravworks'/
   Slipway's pitch), Order Depth column, open job-slot count (#679),
   owned-stock/Craft Sweep detection (materials only, not finished-product
-  inventory), unowned-blueprint coverage ranking (#722), Active Jobs sorted
+  inventory), Active Jobs sorted
   by soonest with per-category slot usage, Production Log realized-profit
   chart (#711), price history + 7-day SMA (#730), reactions modeled as a
   manufacturing `activity` (no chaining across blueprints — kill-test 6).
 - **PI**: stop-tier recommendation, fed/starved pin detection, reset-run
   batching, measured extraction rate, cross-colony coordination (ADR 0012),
   resource-richness estimate + fitted build plan for unbuilt planets
-  (out-depths every surveyed PI tool). Production Run/Log equivalent (#725).
+  (out-depths every surveyed PI tool).
   Advisor tab reworked into a ranked worklist (#954/#960) with per-colony
   ISK/hr right now (#956), restart cadence priced against the extraction
   decay curve (#959) with pilot-set restart/haul cadence preferences (#955),
@@ -127,7 +133,6 @@ Mapped to the module/route that proves it:
   no moon composition/pre-extraction data; also covers OMIP-style moon-mining
   tax tracking), ordinary ore/ice yield tracker (#671).
 - **Quickbar**: price alerts (#680), multi-hub Appraisal handoff (#726).
-- **Restock**: on-hand vs. listed vs. par-level join, multibuy refill (#643).
 - **Contracts**: item-exchange/auction market value (#717); Contract Search's
   Courier mode now ships ISK/jump ranking, ISK/m³, Reverse Lane, Endpoint
   Space filter, "From my region" shortcut, Completion Risk and Going Rate
@@ -250,7 +255,7 @@ precedent for what this project will accept.
 | #     | Verdict | Candidate                                                                                           |
 | ----- | ------- | --------------------------------------------------------------------------------------------------- |
 | #642  | NARROW  | Build Opportunity Finder — seeding tab over Build Plan Compare                                      |
-| #643  | NARROW  | Restock / reorder points                                                                            |
+| #643  | NARROW  | Restock / reorder points — **owner-rejected**, no users asking for it                               |
 | #671  | NARROW  | Mining Yield Tracker — ordinary ore/ice                                                             |
 | #672  | NARROW  | Appraisal refine-then-sell comparison                                                               |
 | #679  | NARROW  | Build Opportunities — job-slot header count                                                         |
@@ -262,8 +267,8 @@ precedent for what this project will accept.
 | #713  | NARROW  | Open Orders sell-through column                                                                     |
 | #717  | SHIP    | Contracts market-value appraisal                                                                    |
 | #718  | NARROW  | Loyalty Store cross-corp offer list                                                                 |
-| #722  | NARROW  | Build Opportunities unowned-blueprint coverage                                                      |
-| #725  | SHIP    | PI Production Run/Log                                                                               |
+| #722  | NARROW  | Build Opportunities unowned-blueprint coverage — **owner-rejected**, complexity                     |
+| #725  | SHIP    | PI Production Run/Log — **owner-rejected**, PI has no cost basis to snapshot                        |
 | #726  | NARROW  | Quickbar → Appraisal multi-hub handoff                                                              |
 | #730  | NARROW  | Price History 7-day moving average                                                                  |
 | #819  | NARROW  | Build Opportunities market-wide finder, ownership-agnostic                                          |
@@ -317,3 +322,6 @@ precedent for what this project will accept.
 | Industry Skill ROI panel, extended to job-_duration_ skills (Industry/Advanced Industry/Reactions)                               | #822 (the job-slot-skill panel that shipped) already considered and explicitly deferred this exact half: a duration cut only pays off if the player is slot-bottlenecked rather than material/capital-constrained, and the app has no signal for which regime a character is in. Re-propose only alongside that detection.                                                                                                                                                                                                                                                                                                                                          |
 | Open Orders: full per-order undercut timeline/sparkline (every row, precise sample counts)                                       | Hostile review, #1018: for an order already reading worse-than-healthy, a history readout changes no action beyond what the live status already prompts (reprice) — the buffer-headroom failure mode. Narrowed to a coarse flag on `healthy`-reading rows only, filed as #1018.                                                                                                                                                                                                                                                                                                                                                                                     |
 | Open Orders / order detail: hand-entered cost basis for an order with no linked Production Run                                   | Deferred by name in `20260906-155913-open-orders-reads-as-a-worklist.md` (needs a new stored table for a cost the app didn't compute), and killed on merit by hostile review: the typed figure feeds `belowFloor` — `ORDER_PROBLEMS[0]`, which sorts the worst-first worklist — and the `letGo` verdict, for the one population structurally locked out of Production Runs (pure traders; `saveProductionRun` requires a `buildPlanId`), off a per-unit average over fungible lots the app cannot check. Strip the directive path to make it safe and only a no-action number is left (kill-test 4 bait). Its cited precedent #858 was owner-rejected, not shipped. |
+| Restock tab / par levels / reorder points (#643)                                                                                 | Owner-rejected: "won't do. No current users are asking for this functionality." A demand signal, not a technical one — the math was never disputed. Do not re-pitch without evidence someone wants it.                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| Build Opportunities: unowned-blueprint coverage ranking (#722)                                                                   | Owner-rejected on build cost: a new panel plus a hook plus an SDE-wide scan, not worth it for the payoff. A cheaper shape that reuses an existing surface is the only way back in.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| PI Production Run / Log equivalent (#725)                                                                                        | Owner-rejected on a domain fact worth keeping: PI has no real cost basis to snapshot the way Industry does. Kills PI realized-profit tracking generally, not just this framing.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
