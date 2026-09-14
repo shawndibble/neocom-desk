@@ -144,9 +144,31 @@ describe('PriceHistoryPanel', () => {
     );
     await waitFor(() => expect(screen.getByTestId('chart')).toBeInTheDocument());
     // Matched from the figure outward, like the ISK stats above, so each
-    // number is pinned to the label it actually sits beside.
+    // number is pinned to the label it actually sits beside. The mean keeps
+    // its decimal rather than rounding — 40.5 orders a day is the fact.
     expect(screen.getByText('2,000').parentElement).toHaveTextContent('Volume:');
-    expect(screen.getByText('41').parentElement).toHaveTextContent('Orders / day:');
+    expect(screen.getByText('40.5').parentElement).toHaveTextContent('Orders / day:');
+  });
+
+  it('keeps a thin market off a flat zero in the orders-per-day stat', async () => {
+    mockedLoad.mockResolvedValue({
+      points: [
+        historyPoint({ date: '2026-08-01', average: 10, orderCount: 1 }),
+        ...Array.from({ length: 9 }, (_, i) =>
+          historyPoint({
+            date: `2026-08-${String(i + 2).padStart(2, '0')}`,
+            average: 10,
+            orderCount: 0,
+          })
+        ),
+      ],
+      fetchedAt: 1_000_000,
+    });
+    render(
+      <PriceHistoryPanel regionId={10000002} typeId={34} itemName="Tritanium" now={FIXED_NOW} />
+    );
+    await waitFor(() => expect(screen.getByTestId('chart')).toBeInTheDocument());
+    expect(screen.getByText('0.1').parentElement).toHaveTextContent('Orders / day:');
   });
 
   it('narrows the chart to the selected date range', async () => {

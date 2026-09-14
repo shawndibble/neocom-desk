@@ -20,6 +20,7 @@ import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { DataTable, type DataTableColumn } from '@/components/ui';
 import {
+  COMPACT_COUNT_Y_AXIS_WIDTH,
   COMPACT_ISK_Y_AXIS_WIDTH,
   GROUPED_NUMBER_Y_AXIS_MARGIN_LEFT,
   GROUPED_NUMBER_Y_AXIS_WIDTH,
@@ -27,7 +28,7 @@ import {
 import { formatCompactNumber } from '@/lib/compactNumber';
 import { formatIsk, formatIskCompact } from '@/lib/isk';
 import { useIsPhone } from '@/lib/useIsPhone';
-import { formatVolume } from './format';
+import { formatPriceRange, formatVolume } from './format';
 import type { MarketHistoryPoint, MovingAveragePoint } from '@/engine/market/priceHistory';
 
 interface PriceHistoryChartProps {
@@ -46,8 +47,19 @@ interface PriceHistoryChartProps {
  */
 const SYNC_ID = 'market-price-history';
 
-/** The right-hand gutter the order-count axis needs — its ticks are compact (`1.2K`), never fully grouped. */
-const ORDER_COUNT_Y_AXIS_WIDTH = 40;
+/**
+ * The band's fill strength, shared by the `<Area>` and by the legend swatch
+ * that keys it. One constant because both paint the same token over the same
+ * `panel` ground: two values drifted apart once already, and a key that
+ * misstates its own mark is worse than no key.
+ */
+const BAND_FILL_OPACITY = 0.14;
+
+/** The two price lines are `monotone`; the band's edges must match, or the average renders outside its own range between points. */
+const CURVE_TYPE = 'monotone';
+
+/** Inset both strips leave beyond their axes. Shared, because unequal horizontal insets slide one plot off the other. */
+const PLOT_MARGIN_RIGHT = 8;
 
 /**
  * `date` is a bare calendar date ("YYYY-MM-DD"), not an instant — parsing it
@@ -93,8 +105,7 @@ function HistoryTooltip({
         {t('market.priceHistory.average')}: {formatIsk(point.average, 2)}
       </p>
       <p>
-        {t('market.priceHistory.priceRange')}: {formatIsk(point.lowest, 2)} –{' '}
-        {formatIsk(point.highest, 2)}
+        {t('market.priceHistory.priceRange')}: {formatPriceRange(point.lowest, point.highest)}
       </p>
       <p>
         {t('market.priceHistory.volume')}: {formatVolume(point.volume)}
@@ -119,7 +130,20 @@ function LegendItem({ label, shape, color, opacity = 1 }: LegendItemProps) {
     <span className="flex items-center gap-1.5">
       <svg width="14" height="8" aria-hidden="true" className="shrink-0">
         {shape === 'swatch' ? (
-          <rect width="14" height="8" fill={color} fillOpacity={opacity} />
+          // Outlined in its own colour at full strength. The band's fill is
+          // faint by design — right across 200px of plot, invisible in a 14px
+          // key — and raising the swatch's opacity instead would have the key
+          // misstate the mark. The edge makes it legible without lying about
+          // it; on an already-opaque swatch the stroke is a no-op.
+          <rect
+            x="0.5"
+            y="0.5"
+            width="13"
+            height="7"
+            fill={color}
+            fillOpacity={opacity}
+            stroke={color}
+          />
         ) : (
           <line
             x1="0"
@@ -162,7 +186,10 @@ export default function PriceHistoryChart({
   // left-hand ticks.
   const isPhone = useIsPhone();
   const priceAxisWidth = isPhone ? COMPACT_ISK_Y_AXIS_WIDTH : GROUPED_NUMBER_Y_AXIS_WIDTH;
-  const orderAxisWidth = isPhone ? 0 : ORDER_COUNT_Y_AXIS_WIDTH;
+  // The one value both strips read: the lower one sizes its order-count axis
+  // from it, the upper one leaves exactly that much empty margin where the
+  // axis would be. Two separately-written widths is how the plots drift.
+  const ordersAxisWidth = isPhone ? 0 : COMPACT_COUNT_Y_AXIS_WIDTH;
 
   const chartData = useMemo<ChartRow[]>(() => {
     const maByDate = new Map(movingAverage.map((p) => [p.date, p.average]));
@@ -173,6 +200,27 @@ export default function PriceHistoryChart({
       movingAverage: maByDate.get(p.date),
     }));
   }, [points, movingAverage]);
+
+  /**
+   * Explicit rather than `['dataMin', 'dataMax']`: that pair collapses to a
+   * zero-height axis when every day shares one price — a single-day range, or
+   * an item that traded at exactly one price all week — which draws the band
+   * and both lines as one flat rule against a repeated tick.
+   */
+  const priceDomain = useMemo<[number, number]>(() => {
+    let lo = Infinity;
+    let hi = -Infinity;
+    for (const p of chartData) {
+      lo = Math.min(lo, p.lowest);
+      hi = Math.max(hi, p.highest);
+    }
+    if (!Number.isFinite(lo) || !Number.isFinite(hi)) return [0, 1];
+    if (lo === hi) {
+      const pad = Math.abs(lo) * 0.05 || 1;
+      return [lo - pad, hi + pad];
+    }
+    return [lo, hi];
+  }, [chartData]);
 
   const columns = useMemo<DataTableColumn<ChartRow>[]>(
     () => [
@@ -185,7 +233,7 @@ export default function PriceHistoryChart({
       {
         id: 'range',
         header: t('market.priceHistory.priceRange'),
-        render: (p) => `${formatIsk(p.lowest, 2)} – ${formatIsk(p.highest, 2)}`,
+        render: (p) => formatPriceRange(p.lowest, p.highest),
       },
       {
         id: 'volume',
@@ -217,7 +265,7 @@ export default function PriceHistoryChart({
               syncId={SYNC_ID}
               margin={{
                 top: 8,
-                right: 8 + orderAxisWidth,
+                right: PLOT_MARGIN_RIGHT + ordersAxisWidth,
                 left: GROUPED_NUMBER_Y_AXIS_MARGIN_LEFT,
                 bottom: 0,
               }}
@@ -234,23 +282,30 @@ export default function PriceHistoryChart({
                 width={priceAxisWidth}
                 // The band, not the average, sets the extent now; Recharts'
                 // default `[0, dataMax]` would squash a 9,000-ISK item into
-                // the top tenth of the strip.
-                domain={['dataMin', 'dataMax']}
+                // the top tenth of the strip. `priceDomain` rather than a
+                // bare `['dataMin', 'dataMax']` because that pair collapses to
+                // a zero-height axis whenever every day shares one price.
+                domain={priceDomain}
                 tickFormatter={(value: number) =>
                   isPhone ? formatIskCompact(value) : formatIsk(value, 0)
                 }
               />
+              {/* The only `<Tooltip>` of the two charts. `syncId` activates
+                  both on one hover, so a second one here pops an identical
+                  box over the lower strip; this one already reports the whole
+                  day, activity included. */}
               <Tooltip content={(props) => <HistoryTooltip {...props} />} />
               {/* First, so the two price lines draw over the band, not under it. */}
               <Area
+                type={CURVE_TYPE}
                 dataKey="range"
                 stroke="none"
                 fill="var(--color-accent-dim)"
-                fillOpacity={0.14}
+                fillOpacity={BAND_FILL_OPACITY}
                 name={t('market.priceHistory.priceRange')}
               />
               <Line
-                type="monotone"
+                type={CURVE_TYPE}
                 dataKey="average"
                 stroke="var(--color-accent)"
                 strokeWidth={2}
@@ -259,7 +314,7 @@ export default function PriceHistoryChart({
               />
               {movingAverage.length > 0 && (
                 <Line
-                  type="monotone"
+                  type={CURVE_TYPE}
                   dataKey="movingAverage"
                   stroke="var(--color-text-dim)"
                   strokeWidth={1.5}
@@ -282,7 +337,12 @@ export default function PriceHistoryChart({
               // strip above — there the order-count gutter is empty margin,
               // here it is the axis itself. The two plots misalign by exactly
               // that width the moment these drift apart.
-              margin={{ top: 4, right: 8, left: GROUPED_NUMBER_Y_AXIS_MARGIN_LEFT, bottom: 0 }}
+              margin={{
+                top: 4,
+                right: PLOT_MARGIN_RIGHT,
+                left: GROUPED_NUMBER_Y_AXIS_MARGIN_LEFT,
+                bottom: 0,
+              }}
             >
               <CartesianGrid stroke="var(--color-line)" strokeDasharray="3 3" vertical={false} />
               <XAxis
@@ -311,12 +371,11 @@ export default function PriceHistoryChart({
                 yAxisId="orders"
                 orientation="right"
                 hide={isPhone}
-                stroke="var(--color-kind-order-expiry)"
+                stroke="var(--color-text-dim)"
                 tick={{ fontSize: 11, fill: 'var(--color-text-dim)' }}
-                width={ORDER_COUNT_Y_AXIS_WIDTH}
+                width={ordersAxisWidth}
                 tickFormatter={(value: number) => formatCompactNumber(value)}
               />
-              <Tooltip content={(props) => <HistoryTooltip {...props} />} />
               <Bar
                 yAxisId="volume"
                 dataKey="volume"
@@ -328,9 +387,9 @@ export default function PriceHistoryChart({
                   names it and the tooltip carries the number at every width. */}
               <Line
                 yAxisId="orders"
-                type="monotone"
+                type={CURVE_TYPE}
                 dataKey="orderCount"
-                stroke="var(--color-kind-order-expiry)"
+                stroke="var(--color-text-dim)"
                 strokeWidth={1.5}
                 dot={false}
                 name={t('market.priceHistory.orderCount')}
@@ -353,7 +412,7 @@ export default function PriceHistoryChart({
             label={t('market.priceHistory.priceRange')}
             shape="swatch"
             color="var(--color-accent-dim)"
-            opacity={0.35}
+            opacity={BAND_FILL_OPACITY}
           />
         </li>
         <li>
@@ -383,17 +442,24 @@ export default function PriceHistoryChart({
           <LegendItem
             label={t('market.priceHistory.orderCount')}
             shape="line"
-            color="var(--color-kind-order-expiry)"
+            color="var(--color-text-dim)"
           />
         </li>
       </ul>
 
+      {/*
+       * Visible on the phone, screen-reader-only above it. `DataTable` stacks
+       * each row into a card below `sm` (DESIGN.md §4) — the same breakpoint
+       * `useIsPhone` reads — so the figures the shrunken chart can no longer
+       * spell out are readable underneath it, and one table serves both the
+       * sighted phone reader and the accessible fallback.
+       */}
       <DataTable
         columns={columns}
         rows={chartData}
         rowKey={(p) => p.date}
         label={t('market.priceHistory.chartLabel', { item: itemName })}
-        className="sr-only"
+        className={isPhone ? undefined : 'sr-only'}
       />
     </div>
   );

@@ -10,7 +10,7 @@ import {
   SelectValue,
   Spinner,
 } from '@/components/ui';
-import { formatVolume } from './format';
+import { formatMeanCount, formatVolume } from './format';
 import { loadPriceHistory } from './priceHistory';
 import {
   filterPriceHistoryRange,
@@ -194,7 +194,7 @@ function RangedHistory({ points, range, onRangeChange, itemName, now }: RangedHi
               </span>
               <span>
                 {t('market.priceHistory.summaryOrdersPerDay')}:{' '}
-                <span className="tabular-nums">{formatVolume(summary.meanOrderCount)}</span>
+                <span className="tabular-nums">{formatMeanCount(summary.meanOrderCount)}</span>
               </span>
             </>
           ) : (
@@ -204,8 +204,16 @@ function RangedHistory({ points, range, onRangeChange, itemName, now }: RangedHi
           )}
         </div>
         <Select value={range} onValueChange={(value) => onRangeChange(value as PriceHistoryRange)}>
+          {/*
+           * `md`, not the `sm` this was: DESIGN.md §3's touch tier is the
+           * reason — `sm` resolves to 36px on a phone, a mouse-pointer size,
+           * and this control now owns a full-width row there rather than
+           * sharing a dense one. `md` gives the 44px thumb target on a phone
+           * and the default 36px to a pointer. Nothing else sits in this row,
+           * so no toolbar loses its alignment to the extra 8px.
+           */}
           <SelectTrigger
-            size="sm"
+            size="md"
             aria-label={t('market.priceHistory.range')}
             className="w-full sm:w-28"
           >

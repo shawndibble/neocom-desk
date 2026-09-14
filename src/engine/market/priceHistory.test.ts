@@ -105,15 +105,34 @@ describe('summarizePriceHistory', () => {
     expect(summarizePriceHistory(points)?.totalVolume).toBe(157);
   });
 
-  it('reports the mean daily order count, rounded to a whole order', () => {
+  it('reports the mean daily order count', () => {
     const points = [
       point({ date: '2026-01-01', orderCount: 10 }),
       point({ date: '2026-01-02', orderCount: 11 }),
       point({ date: '2026-01-03', orderCount: 12 }),
       point({ date: '2026-01-04', orderCount: 12 }),
     ];
-    // 45 / 4 = 11.25
-    expect(summarizePriceHistory(points)?.meanOrderCount).toBe(11);
+    expect(summarizePriceHistory(points)?.meanOrderCount).toBe(11.25);
+  });
+
+  it('keeps a thin market\u2019s order count off zero rather than rounding it away', () => {
+    const points = Array.from({ length: 90 }, (_, i) =>
+      point({ date: `2026-01-${String(i + 1).padStart(3, '0')}`, orderCount: i < 10 ? 1 : 0 })
+    );
+    expect(summarizePriceHistory(points)?.meanOrderCount).toBeGreaterThan(0);
+  });
+
+  it('finds the range high and low wherever in the series they sit', () => {
+    const atStart = [
+      point({ date: '2026-01-01', lowest: 2, highest: 99 }),
+      point({ date: '2026-01-02', lowest: 40, highest: 50 }),
+    ];
+    const atEnd = [
+      point({ date: '2026-01-01', lowest: 40, highest: 50 }),
+      point({ date: '2026-01-02', lowest: 2, highest: 99 }),
+    ];
+    expect(summarizePriceHistory(atStart)).toMatchObject({ hi: 99, lo: 2 });
+    expect(summarizePriceHistory(atEnd)).toMatchObject({ hi: 99, lo: 2 });
   });
 
   it('returns null for an empty range rather than a fabricated zero', () => {

@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import '@/i18n';
 import PriceHistoryChart from './PriceHistoryChart';
@@ -12,7 +12,40 @@ import { historyPoint } from '@/engine/market/__fixtures__/priceHistory';
  * only signal) and the sr-only table that is the chart's accessible
  * equivalent. Those are also the parts a reader on a screen reader, or on a
  * phone with no right-hand axis, is actually left with.
+ *
+ * `vitest.setup.ts` stubs `matchMedia` to never match, so the default here is
+ * a desktop viewport and `withPhoneViewport` is what reaches the phone branch
+ * at all — without it every phone commitment in this component ships
+ * unexercised.
  */
+
+/**
+ * Runs `body` with `matchMedia` answering yes, which is how `useIsPhone`'s
+ * max-width query reads as a phone. Same override the Market route tests use.
+ */
+function withPhoneViewport(body: () => void): void {
+  const original = window.matchMedia;
+  window.matchMedia = (media: string) =>
+    ({
+      media,
+      matches: true,
+      onchange: null,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      addListener: () => {},
+      removeListener: () => {},
+      dispatchEvent: () => false,
+    }) as unknown as MediaQueryList;
+  try {
+    body();
+  } finally {
+    window.matchMedia = original;
+  }
+}
+
+afterEach(() => {
+  document.body.innerHTML = '';
+});
 
 const POINTS = [
   historyPoint({
@@ -61,6 +94,27 @@ describe('PriceHistoryChart', () => {
     const firstRow = within(table).getAllByRole('row')[1];
     expect(firstRow).toHaveTextContent('8.00 – 14.00');
     expect(firstRow).toHaveTextContent('12');
+  });
+
+  it('shows the per-day table on a phone instead of hiding it from sight', () => {
+    withPhoneViewport(() => {
+      render(<PriceHistoryChart points={POINTS} itemName="Tritanium" />);
+      expect(screen.getByRole('table')).not.toHaveClass('sr-only');
+    });
+  });
+
+  it('keeps the per-day table screen-reader-only above phone width', () => {
+    render(<PriceHistoryChart points={POINTS} itemName="Tritanium" />);
+    expect(screen.getByRole('table')).toHaveClass('sr-only');
+  });
+
+  it('still names every series in the legend on a phone, where an axis no longer does', () => {
+    withPhoneViewport(() => {
+      render(<PriceHistoryChart points={POINTS} itemName="Tritanium" />);
+      const legend = screen.getAllByRole('list')[0];
+      expect(within(legend).getByText('Orders')).toBeInTheDocument();
+      expect(within(legend).getByText('Volume')).toBeInTheDocument();
+    });
   });
 
   it('names the item in the figure label so the chart is not an unlabelled image', () => {

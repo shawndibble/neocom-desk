@@ -59,7 +59,12 @@ export interface PriceHistorySummary {
   median: number;
   /** Units traded across the whole range. */
   totalVolume: number;
-  /** Mean daily order count, rounded to a whole order — a fractional order is not a thing. */
+  /**
+   * Mean daily order count, left unrounded — the caller formats it. Rounding
+   * here turned a real but thin market ("10 orders across 90 days") into a
+   * flat `0`, which is the fabricated figure the null return above exists to
+   * avoid.
+   */
   meanOrderCount: number;
 }
 
@@ -73,21 +78,20 @@ export function summarizePriceHistory(
   const median = sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
   let totalVolume = 0;
   let totalOrderCount = 0;
-  let hi = points[0].highest;
-  let lo = points[0].lowest;
+  // `Math.min`/`Math.max` rather than a seeded comparison: a comparison seeded
+  // from `points[0]` answers differently depending on *where* a malformed day
+  // sits — `undefined > hi` is false, so a bad value at index 0 sticks and a
+  // bad value later vanishes. These two propagate NaN from any position, so a
+  // malformed response fails the same way wherever the bad day landed.
+  let hi = -Infinity;
+  let lo = Infinity;
   for (const p of points) {
     totalVolume += p.volume;
     totalOrderCount += p.orderCount;
-    if (p.highest > hi) hi = p.highest;
-    if (p.lowest < lo) lo = p.lowest;
+    hi = Math.max(hi, p.highest);
+    lo = Math.min(lo, p.lowest);
   }
-  return {
-    hi,
-    lo,
-    median,
-    totalVolume,
-    meanOrderCount: Math.round(totalOrderCount / points.length),
-  };
+  return { hi, lo, median, totalVolume, meanOrderCount: totalOrderCount / points.length };
 }
 
 export interface MovingAveragePoint {
