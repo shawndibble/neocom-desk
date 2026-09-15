@@ -17,16 +17,19 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
  * lost: the current load always finishes and calls `setSnapshot` *before*
  * the coalesced follow-up starts, so `loading` never actually gets stuck at
  * `true` (verified directly against the pre-fix code, not just inferred).
- * What isn't bounded is the *chain* of follow-ups: without a cooldown, a
+ * What isn't bounded is the *chain* of follow-ups: without a cap, a
  * follow-up's own reads can provoke another signal the same way the
  * original load's did, on and on, forever — an unbounded string of reloads
  * running back to back in the background. On a page whose renders are cheap
  * that's wasted network and battery; on BPC Search, whose `useMemo`s
  * recompute over a six-figure row array on every one of those reloads, it
  * reads as the tab hanging — the user's own report ("stuck", "spinner never
- * stops"). `MAX_EMITS` caps the mocked emitter so this test proves
- * unboundedness without actually looping forever the way the real bug does —
- * an earlier version of this test OOMed a worker doing exactly that.
+ * stops"). `MAX_EMITS` is a runaway safety valve, not a number either test
+ * approaches on purpose: with the fix's own cap in place the chain settles
+ * at a handful of calls, nowhere near it. It exists so that if the fix ever
+ * regresses back to unbounded, the mocked emitter still stops itself instead
+ * of actually looping forever — an earlier version of this test OOMed a
+ * worker doing exactly that before this cap was added.
  */
 const MAX_EMITS = 40;
 
@@ -88,40 +91,80 @@ describe('useRouteSnapshot cache-revalidation storm', () => {
 
     // Unbounded would mean callCount tracks MAX_EMITS + 1 (one run per
     // emitted signal, forever — this is what the pre-fix code did: 41 calls
-    // in this exact window). The cooldown collapses a tightly-spaced storm
-    // like this one into at most a couple of reloads.
-    expect(callCount).toBeLessThan(5);
+    // in this exact window). The cap collapses a chain like this one into a
+    // small, fixed number of reloads.
+    expect(callCount).toBeLessThan(6);
     expect(result.current.loading).toBe(false);
     expect(result.current.data).not.toBeNull();
   });
 
-  it('still reloads a genuine settle that arrives well after the storm has quieted', async () => {
-    // The discriminating case: a fix that spends a lifetime budget per mount
-    // (rather than throttling by time) would collapse the storm correctly but
-    // then silently stop picking up real revalidations for the rest of a
-    // long-lived page — this proves a later, isolated signal still lands.
-    const { useRouteSnapshot, AUTO_REVALIDATION_COOLDOWN_MS } = await import('./useRouteSnapshot');
+  it('bounds the chain even when every reload takes longer than any plausible cooldown', async () => {
+    // Regression for a real gap CodeRabbit caught in review: a first version
+    // of this fix throttled by wall-clock spacing between reloads. A single
+    // reload slow enough to outlast that window (ordinary on the slow mobile
+    // connection this bug was actually reported on) lets the throttle lapse
+    // *during* the reload, so a time-based cap fails to bound this exact
+    // case even though it bounds the fast/synchronous storm above. The fix
+    // that replaced it counts consecutive bounces instead of elapsed time,
+    // which has no window to outlast — this proves that holds regardless of
+    // how long each reload takes.
+    const { useRouteSnapshot } = await import('./useRouteSnapshot');
     const cache = (await import('@/esi/cache')) as unknown as { __emit: () => void };
     let callCount = 0;
     const load = vi.fn(async () => {
       callCount += 1;
+      cache.__emit();
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      return `snapshot-${callCount}`;
+    });
+
+    const { result } = renderHook(() => useRouteSnapshot(load));
+    act(() => useActiveCharacter.setState({ activeCharacterId: 1, hydrated: true }));
+
+    // Several small act-wrapped waits rather than one long one: a single
+    // `act(async () => await sleep(500))` only flushes React's queued work
+    // once, at the end, which collapses a real multi-round chain down to a
+    // couple of updates regardless of whether the code actually bounds it —
+    // a false negative that would hide this exact regression. Polling in
+    // small steps lets each round's reload actually commit and re-render.
+    for (let i = 0; i < 20; i += 1) {
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 30));
+      });
+    }
+
+    expect(callCount).toBeLessThan(6);
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.data).not.toBeNull();
+  });
+
+  it('still reloads a genuine settle that arrives well after a previous chain ended', async () => {
+    // The discriminating case a lifetime-per-mount cap would fail: once a
+    // chain settles cleanly (no signal arrives while that reload is
+    // running) the budget resets, so a later, unrelated signal — a
+    // different key going stale on its own, long after an earlier chain
+    // ran and ended — still triggers a reload rather than being silently
+    // dropped for the rest of a long-lived page.
+    const { useRouteSnapshot } = await import('./useRouteSnapshot');
+    const cache = (await import('@/esi/cache')) as unknown as { __emit: () => void };
+    let callCount = 0;
+    // The first two calls each emit (forming a short, real chain); every
+    // call after that settles clean.
+    const load = vi.fn(async () => {
+      callCount += 1;
+      if (callCount <= 2) cache.__emit();
       return `data-${callCount}`;
     });
 
     const { result } = renderHook(() => useRouteSnapshot(load));
     act(() => useActiveCharacter.setState({ activeCharacterId: 2, hydrated: true }));
-    await waitFor(() => expect(result.current.data).toBe('data-1'));
 
-    act(() => cache.__emit());
-    await waitFor(() => expect(result.current.data).toBe('data-2'));
-
-    // Well clear of the cooldown window that just collapsed one signal into
-    // the reload above.
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, AUTO_REVALIDATION_COOLDOWN_MS + 200));
-    });
-
-    act(() => cache.__emit());
+    // The chain: initial load emits -> reload #2 emits -> reload #3 settles
+    // clean (no more auto-emits), resetting the budget.
     await waitFor(() => expect(result.current.data).toBe('data-3'));
+
+    // Long after that chain ended, one isolated, unrelated signal arrives.
+    act(() => cache.__emit());
+    await waitFor(() => expect(result.current.data).toBe('data-4'));
   });
 });

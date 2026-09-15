@@ -94,23 +94,16 @@ export interface RouteSnapshot<T> {
 }
 
 /**
- * Minimum spacing between revalidation-triggered reloads (see
- * `lastRevalidationReloadAt` below). A tightly-spaced storm collapses into
- * one reload; a genuine settle arriving well after the previous one — a
- * different key going stale minutes later — still gets picked up, because
- * nothing about this budget is ever spent for good.
- *
- * A storm's spacing is set by `esi/cache.ts`'s `STALE_GRACE_MS` (250ms): that
- * is how close together two grace-path settles land. ~8x that is generous
- * headroom against a storm without being so long that a real back-to-back
- * settle of two *different* keys reads as one.
- *
- * Exported only so its own regression test
- * (`useRouteSnapshot.revalidationStorm.test.tsx`) can wait comfortably past
- * it rather than hardcoding a duplicate number that would silently drift
- * from this one.
+ * How many times in a row a reload's *own* reads may re-trigger another
+ * reload (see `consecutiveAutoReloads` below) before the chain is treated as
+ * noise and dropped. Deliberately not time-based: an earlier version of this
+ * fix throttled by wall-clock spacing, but a single reload that itself takes
+ * longer than that window (an entirely ordinary case on a slow mobile
+ * connection — exactly where this bug was reported) lets the cooldown lapse
+ * *during* the reload, so the chain continues anyway, just slower instead of
+ * bounded. Counting consecutive bounces has no such window to outlast.
  */
-export const AUTO_REVALIDATION_COOLDOWN_MS = 2_000;
+const MAX_CONSECUTIVE_AUTO_RELOADS = 3;
 
 export function useRouteSnapshot<T>(
   load: (characterId: number, signal: RouteSnapshotSignal) => Promise<T>,
@@ -152,29 +145,26 @@ export function useRouteSnapshot<T>(
   const loadInFlight = useRef(false);
   const revalidationPending = useRef(false);
   /**
-   * `Date.now()` of the last revalidation-triggered reload, 0 until the
-   * first one. A page that reads many keys (BPC Search: one
-   * `loadRegionName`/`loadBlueprintLocation` call per distinct
-   * region/location, easily hundreds) can have the *reload itself* provoke a
-   * fresh signal the same way the original load did — with nothing to break
-   * the cycle, that chains forever: an unbounded string of reloads running
-   * back to back in the background (each one's own coalesced signal firing
-   * the next the moment it settles). The coalescing above already keeps any
-   * single reload's commit from being lost — `loading` doesn't get stuck —
-   * but the chain itself is otherwise endless: on a page with expensive
-   * renders (BPC Search's `useMemo`s recompute over a six-figure row array
-   * on every reload) that reads as the tab hanging.
-   * `AUTO_REVALIDATION_COOLDOWN_MS` below is what breaks the chain.
+   * How many revalidation-triggered reloads have chained back to back with
+   * nothing settling cleanly in between. A page that reads many keys (BPC
+   * Search: one `loadRegionName`/`loadBlueprintLocation` call per distinct
+   * region/location, easily hundreds) can have a reload's *own* reads
+   * provoke a fresh signal the same way the original load's did — with
+   * nothing to break the cycle, that chains forever: an unbounded string of
+   * reloads running back to back in the background (each one's own
+   * coalesced signal firing the next the moment it settles). The coalescing
+   * above already keeps any single reload's commit from being lost —
+   * `loading` doesn't get stuck — but the chain itself is otherwise endless:
+   * on a page with expensive renders (BPC Search's `useMemo`s recompute over
+   * a six-figure row array on every reload) that reads as the tab hanging.
+   *
+   * Reset to 0 the moment a reload settles *without* provoking a further
+   * signal during its own run (see the `finally` block below) — a real
+   * budget that replenishes whenever things actually go quiet, not a
+   * lifetime cap that would otherwise silently stop picking up genuine
+   * revalidations for the rest of a long-lived mount.
    */
-  const lastRevalidationReloadAt = useRef(0);
-
-  /** Only revalidation-triggered reloads are throttled — an intentional one always goes through, no budget to spend. */
-  function requestRevalidationReload(): void {
-    const now = Date.now();
-    if (now - lastRevalidationReloadAt.current < AUTO_REVALIDATION_COOLDOWN_MS) return;
-    lastRevalidationReloadAt.current = now;
-    setRevalidation((n) => n + 1);
-  }
+  const consecutiveAutoReloads = useRef(0);
 
   // Adjusting state during render, React's documented way to reset on a
   // changed input: it re-renders before committing, so no effect round-trip
@@ -206,7 +196,11 @@ export function useRouteSnapshot<T>(
           revalidationPending.current = true;
           return;
         }
-        requestRevalidationReload();
+        // Nothing was loading when this signal arrived, so it cannot be a
+        // reload chaining off its own reads — an isolated, unrelated settle
+        // always gets its reload, uncapped. Whether *this* reload turns out
+        // to start its own chain is judged independently in `finally` below.
+        setRevalidation((n) => n + 1);
       }),
     []
   );
@@ -233,7 +227,18 @@ export function useRouteSnapshot<T>(
           loadInFlight.current = false;
           if (revalidationPending.current) {
             revalidationPending.current = false;
-            requestRevalidationReload();
+            if (consecutiveAutoReloads.current < MAX_CONSECUTIVE_AUTO_RELOADS) {
+              consecutiveAutoReloads.current += 1;
+              setRevalidation((n) => n + 1);
+            }
+            // else: the chain is capped — drop it. The view keeps whatever
+            // it just committed rather than chasing a self-perpetuating
+            // signal forever.
+          } else {
+            // Settled clean: nothing arrived while this reload was running,
+            // so any chain that was in progress is over. Reset so a later,
+            // unrelated storm gets its own full budget.
+            consecutiveAutoReloads.current = 0;
           }
         }
       }
