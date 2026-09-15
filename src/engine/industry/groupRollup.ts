@@ -193,6 +193,20 @@ function nettedAgainstLedger(
   return materials.map((m) => applyOwnedLedger(m, ownedStock.get(m.typeID) ?? 0));
 }
 
+/** Sum one figure across every member — null the moment any member's is null, a partial sum presented as a whole being worse than none. */
+function sumOrNull(
+  members: readonly BuildGroupMember[],
+  pick: (m: BuildGroupMember) => number | null
+): number | null {
+  let sum = 0;
+  for (const member of members) {
+    const value = pick(member);
+    if (value === null) return null;
+    sum += value;
+  }
+  return sum;
+}
+
 function mergeMaterials(
   members: readonly BuildGroupMember[],
   pick: (m: BuildGroupMember) => readonly MaterialCostLine[]
@@ -240,25 +254,8 @@ export function rollUpBuildGroup(
   const shoppingByHub = shoppingListsByHub(members);
   const hubIds = shoppingByHub.map((block) => block.hubId);
 
-  // Sum only while every member has a price: one null makes the total
-  // unknowable, and a partial sum presented as a whole is worse than none.
-  let buyCost: number | null = 0;
-  for (const member of members) {
-    if (member.result.buyCost === null) {
-      buyCost = null;
-      break;
-    }
-    buyCost += member.result.buyCost;
-  }
-
-  let summedProfit: number | null = 0;
-  for (const member of members) {
-    if (member.result.profit === null) {
-      summedProfit = null;
-      break;
-    }
-    summedProfit += member.result.profit;
-  }
+  const buyCost = sumOrNull(members, (m) => m.result.buyCost);
+  const summedProfit = sumOrNull(members, (m) => m.result.profit);
 
   // The buy list is the one cost authority the ledger ever adjusts (see
   // module doc): what it saved is the gap between each merged buy-list line

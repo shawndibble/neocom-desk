@@ -155,4 +155,24 @@ describe('computeGroupIndexStats', () => {
 
     expect(stats.verdict).toBe('unknown');
   });
+
+  it('reads "unknown" verdict when profit is null even though the member itself reads unpriceable: false', () => {
+    // A member's own material (not product) can be unpriced while the
+    // group's owned-stock ledger fully covers it — `rollup.unpriceable`
+    // clears, but that member's `profit` was computed on the owned-disabled
+    // tree, where it's still unpriced, so `rollup.profit` stays null. The
+    // verdict must not read confident next to that null.
+    const plans = [plan('p1')];
+    const rows = new Map([
+      [
+        'p1',
+        row('p1', { groupResult: result({ buyCost: 200, profit: null, unpriceable: false }) }),
+      ],
+    ]);
+
+    const stats = computeGroupIndexStats(GROUP, plans, rows);
+
+    expect(stats.profit).toBeNull();
+    expect(stats.verdict).toBe('unknown');
+  });
 });

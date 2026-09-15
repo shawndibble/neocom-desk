@@ -65,5 +65,12 @@ export function computeGroupIndexStats(
   );
   const rollup = rollUpBuildGroup(members, { ownedStock });
   const savings = profitOf(rollup.totalCost, rollup.buyCost);
-  return { profit: rollup.profit, verdict: verdictOf(savings, rollup.unpriceable) };
+  // `rollup.unpriceable` alone misses one case: a member whose own material
+  // (not product) is unpriced, but the group's owned-stock ledger happens to
+  // fully cover it — `rollup.unpriceable` clears, yet that member's own
+  // `profit` was computed on the owned-disabled tree, where it's still
+  // unpriced, so `rollup.profit` stays null. Gate on both, or the tag reads
+  // confident next to a "—" profit.
+  const unpriceable = rollup.unpriceable || rollup.profit === null;
+  return { profit: rollup.profit, verdict: verdictOf(savings, unpriceable) };
 }

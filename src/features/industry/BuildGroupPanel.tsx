@@ -297,9 +297,13 @@ export function BuildGroupPanel({
 
   // The group's own Acquisition Verdict — buyCost null means at least one
   // member is unpriced, same "unknown" rule `computeGroupIndexStats` already
-  // applies to the index row for this group.
+  // applies to the index row for this group. `rollup.unpriceable` alone
+  // misses a member whose own material is unpriced but the group's owned
+  // ledger fully covers it (see `computeGroupIndexStats`'s matching gate) —
+  // `rollup.profit === null` catches that case too, keeping this panel's
+  // verdict from disagreeing with the index row for the same group.
   const groupProfit = profitOf(rollup.totalCost, rollup.buyCost);
-  const groupVerdict = verdictOf(groupProfit);
+  const groupVerdict = verdictOf(groupProfit, rollup.unpriceable || rollup.profit === null);
 
   // Materials merge Need/Owned/Still-to-buy into one table now (issue: group
   // page redesign) — but a material fully covered by this group's own build
