@@ -13,6 +13,7 @@
  */
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
+import { FilterChip } from '@/components/ui';
 import { formatIsk } from '@/lib/isk';
 import { VerbTag, type DirectiveVerb } from './DirectiveRow';
 import { layoutLabel } from './colonyPlan';
@@ -178,20 +179,30 @@ export function WorklistToggle({
   // Nothing to include, so nothing to offer: a chip that toggles between an
   // empty list and the same empty list is a control that does nothing.
   if (rebuildCount === 0) return null;
-  const chip = (active: boolean) =>
-    `rounded-xs px-2.5 py-[3px] text-[0.625rem] font-semibold tracking-widest uppercase ${
-      active
-        ? 'border border-accent-dim bg-accent/10 text-accent'
-        : 'border border-line-bright text-text-dim hover:text-text'
-    }`;
+  /*
+   * `FilterChip` rather than two hand-styled buttons: it is the same
+   * accent-when-on pill, and it carries the two things the local template
+   * could not — `aria-pressed`, so a screen reader hears which reading is
+   * showing, and the shared control scale. `md` (`h-11 md:h-9`), not the `sm`
+   * default: `sm` tops out at 36px on touch, short of the 44px floor.
+   *
+   * Each chip sets its reading rather than flipping it, so re-pressing the one
+   * already on is a no-op and the pair stays mutually exclusive.
+   */
   return (
     <div className="flex gap-1.5">
-      <button type="button" className={chip(!includeRebuilds)} onClick={() => onChange(false)}>
-        {t('piAdvisor.worklistTuningOnly')}
-      </button>
-      <button type="button" className={chip(includeRebuilds)} onClick={() => onChange(true)}>
-        {t('piAdvisor.worklistIncludeRebuilds')}
-      </button>
+      <FilterChip
+        size="md"
+        label={t('piAdvisor.worklistTuningOnly')}
+        selected={!includeRebuilds}
+        onToggle={() => onChange(false)}
+      />
+      <FilterChip
+        size="md"
+        label={t('piAdvisor.worklistIncludeRebuilds')}
+        selected={includeRebuilds}
+        onToggle={() => onChange(true)}
+      />
     </div>
   );
 }
