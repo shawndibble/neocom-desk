@@ -28,6 +28,9 @@ One row per surface, with what the audit concluded.
 | Market (`/market?section=appraisal`, `AppraisalPanel.tsx`) + Appraisal Share (`AppraisalShared.tsx`)                        | Paste box, filter-free layout and touch targets all clean. One real bug: the result `DataTable` stacks 5-6 non-primary columns as separate full-width lines per card at the default `stackColumns={1}` — filed as #1097 (narrowed to `AppraisalPanel.tsx` only; `AppraisalShared.tsx`'s matching table left for a follow-up).                                                                                                                                                                                                                       |
 | Skill Plans (`/skills/plans`, list route only — `PlanListPane.tsx`, `PlanList.tsx`)                                         | `PlanList`'s rename/duplicate/delete `IconButton`s and filter-free layout are clean. One real bug: the list route's `PlanListPane` call defaults to `height="viewport"` and applies `useViewportBoundedHeight`'s max-height unguarded by `isDesktop`, unlike `PlanEditor.tsx`'s own correctly-gated call — filed as #1096, same bug class as #1054.                                                                                                                                                                                                 |
 | LoyaltyStore (`/wallet/loyalty/:corporationId`)                                                                             | `DataTable` stacking, self-alignment and `FilterBar` all clean; the inner materials `responsive="table"` opt-out is the already-accepted one (see Contract already enforced). One real bug, shared with Skill Plan Editor's own back link: the "← Back to Wallet" link is bare, unsized text — filed together as #1095.                                                                                                                                                                                                                             |
+| Characters (`/characters`, card + table view, groups)                                                                       | Cards, group headers, `FilterBar`'s sort row and the toolbar row are all clean (verified by screenshot at 390px, card and table view, plus the column-picker menu open). The `responsive="table"` opt-out is the already-accepted one (see Contract already enforced). One real bug: "Refresh all" explains itself only via a native `title=`, unreachable on touch — filed as #1102.                                                                                                                                                               |
+| Corp › Members (`/corp/members`, `CorpRoster.tsx`)                                                                          | Director-gated roster table: `DataTable` default stacking (no opt-out), search box alone on its own row (not a `FilterBar` case — the dark-only toggle is a lone `FilterChip`, not a second row control), CSV export via a real `IconButton`. Verified by screenshot at 390px. No findings survived.                                                                                                                                                                                                                                                |
+| Corp › Assets (`/corp/assets`)                                                                                              | A smaller, Director-gated clone of `/assets` (issue #779) reusing the exact same `assetBrowserRows.tsx` row components, virtualizer row heights and header-actions layout already vetted there — verified by screenshot at 390px (division list, drilled-in item row, bulk-select bar). No findings survived.                                                                                                                                                                                                                                       |
 
 ## Contract already enforced
 
@@ -52,7 +55,7 @@ Mobile rules proved by a component or a spec, so no run re-discovers them.
   Industry, Mail, Mining Tax, Market's Open Orders, Compare drawer and
   Appraisal, Overview, Skills, Calendar, LoyaltyStore and Skill Plans still
   have none at 390 — the tickets filed each round each add one
-  (#1053/#1054/#1055/#1064/#1070/#1071/#1077/#1086/#1095/#1096/#1097).
+  (#1053/#1054/#1055/#1064/#1070/#1071/#1077/#1086/#1095/#1096/#1097/#1102).
 - **`SkillCompare`** stacks rather than scrolling sideways (#406) — the
   columns-are-the-content opt-out was reconsidered and rejected there.
 - **`useViewportBoundedHeight`'s fixed-tab-bar gap** — the hook
@@ -86,6 +89,16 @@ Mobile rules proved by a component or a spec, so no run re-discovers them.
   the header around it having the room (#1070's Overview "Open" link, #1077's
   Calendar "Show all days"). Check any other Panel action that isn't already a
   `Button`/`IconButton` for the same gap on a future pass.
+- **A raw `title=` is only a real F-axis finding when the text is nowhere else
+  on screen.** The killed `SecurityValue`/`CharacterBadge` case (below) was a
+  redundant hover restatement of already-visible text; Characters' "Refresh
+  all" (#1102) is the other shape — a `title=` carrying information that
+  exists nowhere else on the page, so touch genuinely loses it. This
+  codebase's own fix pattern is `Tooltip` (already used the same way by
+  `GroupTargetLink.tsx`, `CorpBoardRow.tsx`, `NotificationsPanel.tsx`,
+  `CorpRoster.tsx`) — three more bare `title=` instances
+  (`AppraisalPanel.tsx:234`, `CourierResults.tsx:985`, `Mail.tsx:698`) are
+  unaudited and worth the same per-hit check on a future pass.
 
 ## Standing kill-tests
 
@@ -108,6 +121,7 @@ copy. Add a new one there only when it kills a class of finding.
 | #1095 | LoyaltyStore + Skill Plan Editor     | SHIP                                                   | Both routes' "back" `Link` is bare `inline-block` text with no controlStyles tier — ~16-18px hit height; on the Editor it's the sole mobile route back to the plan list.            |
 | #1096 | Skill Plans › list route             | SHIP (narrowed: gate the `style` object, not the hook) | `PlanListPane`'s list-route call defaults to `height="viewport"` and applies `useViewportBoundedHeight`'s max-height with no `isDesktop` gate, unlike `PlanEditor.tsx`'s own call.  |
 | #1097 | Market › Appraisal                   | NARROW (scoped to `AppraisalPanel.tsx` only)           | The result table's stacked card renders 5-6 non-primary columns as separate full lines instead of using `DataTable`'s existing `stackColumns={2}` paired layout.                    |
+| #1102 | Characters › header actions          | SHIP                                                   | "Refresh all" explains itself only via a native `title=` ("pulls live data... may take a moment for a large roster"), nowhere else on screen and unreachable on touch.              |
 
 ## Killed findings
 
