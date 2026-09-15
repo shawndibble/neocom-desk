@@ -2506,6 +2506,7 @@
     "buyPriceAt": "Buy price ({{hub}})",
     "storeCost": "LP store cost",
     "requiredItems": "Required items",
+    "requiredItemsNotPriced": "Not priced",
     "materials": "Materials",
     "netProfit": "Net profit",
     "useOwnMaterials": "Use my own materials",
@@ -2515,6 +2516,7 @@
     "materialColOwned": "Have",
     "materialColBuyCost": "Buy cost",
     "unpriceable": "Can't be priced at this hub — a material or the product has no listed sell price.",
+    "unpriceableRequiredItem": "Can't be priced at this hub — a required item has no listed sell price.",
     "viewInMarket": "View in Market",
     "planInIndustry": "Plan in Industry"
   },

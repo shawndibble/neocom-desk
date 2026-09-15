@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeLoyaltyOfferRows } from '@/features/loyalty/offerRows';
+import { collectNameableTypeIds, computeLoyaltyOfferRows } from '@/features/loyalty/offerRows';
 import type { BlueprintCatalog, BlueprintCatalogEntry } from '@/features/industry/blueprintCatalog';
 import type { LoyaltyStoreOffer } from '@/esi/endpoints';
 import { brokerFee, salesTax } from '@/engine/industry/fees';
@@ -406,5 +406,147 @@ describe('computeLoyaltyOfferRows', () => {
     expect(blueprintRow.profit.brokerFee).toBeCloseTo(itemRow.profit.brokerFee ?? 0, 6);
     expect(blueprintRow.profit.profit).toBeCloseTo(itemRow.profit.profit!, 6);
     expect(blueprintRow.profit.iskPerLp).toBeCloseTo(itemRow.profit.iskPerLp!, 9);
+  });
+
+  describe('required items (issue #1068)', () => {
+    const TAG_ID = 40_000;
+    const GOLD_TAG_ID = 40_001;
+
+    const offerWithTurnIn: LoyaltyStoreOffer = {
+      isk_cost: 0,
+      lp_cost: 18_000,
+      offer_id: 10,
+      quantity: 1,
+      required_items: [
+        { type_id: TAG_ID, quantity: 8 },
+        { type_id: GOLD_TAG_ID, quantity: 1 },
+      ],
+      type_id: PROBE_ID,
+    };
+
+    it('has no required items, and a required-items cost of 0, for an offer with none', () => {
+      const [row] = computeLoyaltyOfferRows({
+        offers: [probes],
+        catalog: makeCatalog(),
+        hubPrices: { [PROBE_ID]: 1_800 },
+        adjustedPrices: {},
+        systemCostIndex: 0,
+        skills: {},
+        liquidationBasis: 'order',
+        materialSourcing: undefined,
+        playerLp: 1_000_000,
+      });
+
+      expect(row.requiredItems).toEqual([]);
+      expect(row.requiredItemsCost).toBe(0);
+    });
+
+    it('names, quantifies and prices each required item, from `itemNames` first', () => {
+      const [row] = computeLoyaltyOfferRows({
+        offers: [offerWithTurnIn],
+        catalog: makeCatalog(),
+        hubPrices: { [PROBE_ID]: 1_800, [TAG_ID]: 200_000, [GOLD_TAG_ID]: 30_000_000 },
+        adjustedPrices: {},
+        systemCostIndex: 0,
+        skills: {},
+        liquidationBasis: 'order',
+        materialSourcing: undefined,
+        itemNames: new Map([
+          [TAG_ID, 'Serpentis Palladium Tag'],
+          [GOLD_TAG_ID, 'Shadow Serpentis Gold Tag'],
+        ]),
+        playerLp: 1_000_000,
+      });
+
+      expect(row.requiredItems).toEqual([
+        { typeId: TAG_ID, name: 'Serpentis Palladium Tag', quantity: 8, unitPrice: 200_000 },
+        {
+          typeId: GOLD_TAG_ID,
+          name: 'Shadow Serpentis Gold Tag',
+          quantity: 1,
+          unitPrice: 30_000_000,
+        },
+      ]);
+      const expectedCost = 8 * 200_000 + 1 * 30_000_000;
+      expect(row.requiredItemsCost).toBe(expectedCost);
+      // The exact figure already subtracted from profit — no independent
+      // recomputation to drift from `loyaltyOfferProfit`'s own arithmetic.
+      // offerWithTurnIn.quantity is 1, unlike the `probes` fixture.
+      const revenue = 1 * 1_800;
+      expect(row.profit.profit).toBeCloseTo(
+        revenue - salesTax(revenue, 0) - brokerFee(revenue, 0) - expectedCost,
+        6
+      );
+    });
+
+    it('falls back to `nameForType` (then `#typeId`) for a required item absent from `itemNames`', () => {
+      const [row] = computeLoyaltyOfferRows({
+        offers: [offerWithTurnIn],
+        catalog: makeCatalog(),
+        hubPrices: {},
+        adjustedPrices: {},
+        systemCostIndex: 0,
+        skills: {},
+        liquidationBasis: 'order',
+        materialSourcing: undefined,
+        itemNames: new Map(),
+        playerLp: 1_000_000,
+      });
+
+      expect(row.requiredItems[0].name).toBe(`#${TAG_ID}`);
+    });
+
+    it('lists an unpriced required item with a null unitPrice, and nulls the total, without dropping the other lines', () => {
+      const [row] = computeLoyaltyOfferRows({
+        offers: [offerWithTurnIn],
+        catalog: makeCatalog(),
+        hubPrices: { [PROBE_ID]: 1_800, [GOLD_TAG_ID]: 30_000_000 }, // TAG_ID unpriced
+        adjustedPrices: {},
+        systemCostIndex: 0,
+        skills: {},
+        liquidationBasis: 'order',
+        materialSourcing: undefined,
+        itemNames: new Map(),
+        playerLp: 1_000_000,
+      });
+
+      expect(row.requiredItems).toHaveLength(2);
+      expect(row.requiredItems.find((r) => r.typeId === TAG_ID)?.unitPrice).toBeNull();
+      expect(row.requiredItems.find((r) => r.typeId === GOLD_TAG_ID)?.unitPrice).toBe(30_000_000);
+      expect(row.requiredItemsCost).toBeNull();
+      expect(row.profit.profit).toBeNull();
+    });
+  });
+
+  describe('collectNameableTypeIds (issue #1068)', () => {
+    it('includes every offer type_id plus every required_items type_id, deduplicated', () => {
+      const a: LoyaltyStoreOffer = {
+        isk_cost: 0,
+        lp_cost: 1,
+        offer_id: 1,
+        quantity: 1,
+        required_items: [
+          { type_id: 40_000, quantity: 8 },
+          { type_id: PROBE_ID, quantity: 1 }, // also an offer's own type_id elsewhere
+        ],
+        type_id: ASTERO_BP_ID,
+      };
+      const b: LoyaltyStoreOffer = {
+        isk_cost: 0,
+        lp_cost: 1,
+        offer_id: 2,
+        quantity: 1,
+        required_items: [],
+        type_id: PROBE_ID,
+      };
+
+      expect(new Set(collectNameableTypeIds([a, b]))).toEqual(
+        new Set([ASTERO_BP_ID, 40_000, PROBE_ID])
+      );
+    });
+
+    it('returns an empty array for no offers', () => {
+      expect(collectNameableTypeIds([])).toEqual([]);
+    });
   });
 });
