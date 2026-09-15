@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest';
-import { http, HttpResponse } from 'msw';
+import { http, HttpResponse, delay } from 'msw';
 import { setupServer } from 'msw/node';
 import { buildAuthorizeUrl, exchangeCode, refreshToken, AuthError } from './sso';
 
@@ -7,9 +7,12 @@ const TOKEN_URL = 'https://login.eveonline.com/v2/oauth/token';
 
 let lastBody: URLSearchParams | null = null;
 let lastAuthHeader: string | null = null;
+/** Set by the "hangs forever" tests below to make the mock handler never respond. */
+let hang = false;
 
 const server = setupServer(
   http.post(TOKEN_URL, async ({ request }) => {
+    if (hang) await delay('infinite');
     lastBody = new URLSearchParams(await request.text());
     lastAuthHeader = request.headers.get('authorization');
     const grant = lastBody.get('grant_type');
@@ -41,6 +44,7 @@ afterEach(() => {
   server.resetHandlers();
   lastBody = null;
   lastAuthHeader = null;
+  hang = false;
 });
 afterAll(() => server.close());
 
@@ -107,6 +111,17 @@ describe('exchangeCode', () => {
     expect(authErr.description).toBe('Invalid authorization code');
     expect(authErr.status).toBe(400);
   });
+
+  // A hung token endpoint (no response, no error) previously left this
+  // `await` unsettled forever — the "Completing login…" spinner never
+  // resolved. `timeoutMs` is overridden here so the test doesn't wait out
+  // the real production default.
+  it('rejects with AuthError instead of hanging forever when the endpoint never responds', async () => {
+    hang = true;
+    await expect(
+      exchangeCode({ clientId: 'client-abc', code: 'good-code', verifier: 'ver-1', timeoutMs: 20 })
+    ).rejects.toBeInstanceOf(AuthError);
+  });
 });
 
 describe('refreshToken', () => {
@@ -122,6 +137,15 @@ describe('refreshToken', () => {
   it('throws AuthError on revoked refresh token', async () => {
     await expect(
       refreshToken({ clientId: 'client-abc', refreshToken: 'revoked' })
+    ).rejects.toBeInstanceOf(AuthError);
+  });
+
+  // Boot/`getValidAccessToken` calls this to refresh a near-expired token; a
+  // hung endpoint here previously stalled boot itself, not just login.
+  it('rejects with AuthError instead of hanging forever when the endpoint never responds', async () => {
+    hang = true;
+    await expect(
+      refreshToken({ clientId: 'client-abc', refreshToken: 'refresh-1', timeoutMs: 20 })
     ).rejects.toBeInstanceOf(AuthError);
   });
 });
