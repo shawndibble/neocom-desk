@@ -709,7 +709,9 @@ export function Mail() {
                 <div
                   ref={bodyScrollerRef}
                   className="space-y-2 overflow-y-auto text-xs"
-                  style={bodyMaxHeight !== null ? { maxHeight: bodyMaxHeight } : undefined}
+                  style={
+                    isDesktop && bodyMaxHeight !== null ? { maxHeight: bodyMaxHeight } : undefined
+                  }
                 >
                   <p className="text-base font-semibold text-text">
                     {body.data.subject || t('mail.noSubject')}
