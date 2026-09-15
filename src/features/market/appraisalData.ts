@@ -18,12 +18,13 @@
  * (`loadReprocessing`, 1.4 MB). `characterId` is null with no active
  * Character, in which case neither is fetched at all, and every row's
  * `refine` stays undefined — the page behaves exactly as it did before this
- * issue. The one skill this app has no mapping for — ore/ice's own
- * specialisation skills (Veldspar Processing and friends), as opposed to
- * Scrapmetal Processing which the existing `orderExits.ts` comparison uses
- * for modules and ships — is deliberately passed as level 0 rather than
- * guessed, the same "state the assumption, don't fold in a guess" rule
- * `reprocessing.ts` already applies to the NPC station rate.
+ * issue. Each row's specialisation skill is resolved per type via
+ * `resolveSpecialisationLevel` (issue #1058): the SDE bake's attribute-790
+ * join names the matching ore/ice/moon-ore specialisation directly, falling
+ * back to Scrapmetal Processing for a module or ship — the same resolver
+ * `orderExits.ts` and Mining Yield use, so a mixed paste of ore and modules
+ * resolves a different specialisation on each row rather than one shared
+ * guess.
  */
 import {
   buildAppraisal,
@@ -38,7 +39,12 @@ import {
   type AppraisalUnmatched,
 } from '@/engine/market/appraisalMatch';
 import { parseAppraisalPaste } from '@/engine/market/appraisalPaste';
+import {
+  resolveReprocessingSkills,
+  type GeneralReprocessingSkills,
+} from '@/engine/industry/reprocessing';
 import { SKILL_IDS } from '@/engine/industry/types';
+import type { TrainedSkill } from '@/engine/types';
 import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
 import { TRADE_HUBS, type TradeHub } from '@/market/hubs';
 import { getHubPrices, invalidateHubPrices } from '@/market/prices';
@@ -94,16 +100,23 @@ export interface AppraiseOptions {
 }
 
 /**
- * The active Character's reprocessing skills, resolved to `computeAppraisalRefine`'s
- * input shape. `specialisationLevel` is always 0 — see the module doc comment.
+ * The active Character's general reprocessing skills, plus their full
+ * trained-skill map so each row can resolve its own specialisation via
+ * `resolveReprocessingSkills` (issue #1058) — a paste mixing ore and
+ * modules resolves a different skill per row, so this cannot be reduced to
+ * one flat level here.
  */
-async function loadReprocessingSkills(characterId: number) {
+async function loadReprocessingSkills(
+  characterId: number
+): Promise<{ skills: GeneralReprocessingSkills; trained: ReadonlyMap<number, TrainedSkill> }> {
   const corrected = await loadCorrectedSkills(characterId, Date.now());
   return {
-    reprocessingLevel: corrected.trained.get(SKILL_IDS.reprocessing)?.level ?? 0,
-    reprocessingEfficiencyLevel:
-      corrected.trained.get(SKILL_IDS.reprocessingEfficiency)?.level ?? 0,
-    specialisationLevel: 0,
+    skills: {
+      reprocessingLevel: corrected.trained.get(SKILL_IDS.reprocessing)?.level ?? 0,
+      reprocessingEfficiencyLevel:
+        corrected.trained.get(SKILL_IDS.reprocessingEfficiency)?.level ?? 0,
+    },
+    trained: corrected.trained,
   };
 }
 
@@ -126,7 +139,7 @@ export async function appraisePaste(
   const catalogue = await loadAppraisalCatalogue();
   const { matched, unmatched } = matchAppraisalEntries(entries, catalogue);
 
-  const [reprocessingMap, skills] =
+  const [reprocessingMap, reprocessingSkills] =
     characterId === null
       ? [null, null]
       : await Promise.all([loadReprocessing(), loadReprocessingSkills(characterId)]);
@@ -153,7 +166,7 @@ export async function appraisePaste(
     const aggregate = prices.get(match.typeId);
     const reprocessing = reprocessingByTypeId.get(match.typeId);
     const refine =
-      reprocessing && skills
+      reprocessing && reprocessingSkills
         ? computeAppraisalRefine({
             quantity: match.quantity,
             reprocessing: {
@@ -163,7 +176,11 @@ export async function appraisePaste(
                 quantity: m.quantity,
               })),
             },
-            skills,
+            skills: resolveReprocessingSkills(
+              reprocessingSkills.skills,
+              reprocessing.specialisationSkillID,
+              reprocessingSkills.trained
+            ),
             materialPrices: Object.fromEntries(
               reprocessing.materials
                 .map((m): [number, number | undefined] => [

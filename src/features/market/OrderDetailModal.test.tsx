@@ -25,7 +25,7 @@ const SKILLS: CharacterSkills = {
   brokerRelationsLevel: 5,
   reprocessingLevel: 0,
   reprocessingEfficiencyLevel: 0,
-  scrapmetalProcessingLevel: 0,
+  trained: new Map(),
 };
 
 const BASE_ROW: OpenOrderRow = {

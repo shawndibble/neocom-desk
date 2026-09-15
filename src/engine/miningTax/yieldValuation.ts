@@ -3,14 +3,19 @@ import {
   reprocessingEfficiency,
   reprocessingValue,
   reprocessingYield,
+  resolveReprocessingSkills,
+  type GeneralReprocessingSkills,
   type ReprocessingMaterial,
-  type ReprocessingSkills,
 } from '@/engine/industry/reprocessing';
+
+export type { GeneralReprocessingSkills };
 
 /** One type's reprocessing yield, resolved from the SDE bake — same shape `appraisal.ts` uses. */
 export interface YieldReprocessingEntry {
   portionSize: number;
   materials: readonly ReprocessingMaterial[];
+  /** This type's specialisation skill; undefined falls back to Scrapmetal Processing (issue #1058). */
+  specialisationSkillId?: number;
 }
 
 /** One ore line's raw and refine-then-sell value, both priced at the entry's mined date. */
@@ -52,10 +57,14 @@ export interface EntryValuation {
   pricedAll: boolean;
   lines: OreLineValuation[];
   /**
-   * The reprocessing efficiency every `refineValue` above was computed at —
-   * the character's skills over an NPC station's 50% base rate, with no
-   * station tax deducted. `reprocessing.ts` requires a caller showing refine
-   * values to state that assumption, and it cannot be restated without this.
+   * The two general reprocessing skills over an NPC station's 50% base
+   * rate, with no station tax deducted — what `refineBasisHint` states.
+   * Deliberately excludes specialisation (issue #1058): a mixed entry can
+   * refine ore and ice under two different specialisation skills at once,
+   * so no single number could state that part honestly. Each line's own
+   * `refineValue` above is still computed at its own resolved specialisation
+   * — this field is the shared baseline the UI can name in one sentence, not
+   * the actual per-line rate.
    */
   efficiency: number;
 }
@@ -72,15 +81,23 @@ export interface EntryValuation {
  * resolves from market history; a type or material missing from either map
  * contributes zero to that side's value and flips `pricedAll` false, rather
  * than throwing or silently treating the ore as worthless in the total.
+ *
+ * `trained` resolves each line's own specialisation skill (issue #1058): an
+ * entry mining both ore and ice in one day refines each under its own
+ * skill, not one shared level, so this cannot be folded into `skills`.
  */
 export function valueMiningYield(
   oreLines: readonly OreLine[],
   rawUnitPrices: ReadonlyMap<number, number>,
   reprocessingByTypeId: ReadonlyMap<number, YieldReprocessingEntry | undefined>,
-  skills: ReprocessingSkills,
+  skills: GeneralReprocessingSkills,
+  trained: ReadonlyMap<number, { level: number }>,
   materialPrices: Readonly<Record<number, number>>
 ): EntryValuation {
-  const efficiency = reprocessingEfficiency(skills);
+  // The baseline `refineBasisHint` states — general skills only, no
+  // specialisation, since no single number can honestly speak for lines
+  // resolved against different specialisation skills.
+  const efficiency = reprocessingEfficiency({ ...skills, specialisationLevel: 0 });
   let rawValue = 0;
   let refineValue = 0;
   let pricedAll = true;
@@ -98,11 +115,14 @@ export function valueMiningYield(
     let batches = 0;
     let unitsLeftOver = 0;
     if (reprocessing) {
+      const lineEfficiency = reprocessingEfficiency(
+        resolveReprocessingSkills(skills, reprocessing.specialisationSkillId, trained)
+      );
       const yielded = reprocessingYield({
         portionSize: reprocessing.portionSize,
         materials: reprocessing.materials,
         units: line.quantity,
-        efficiency,
+        efficiency: lineEfficiency,
       });
       const value = reprocessingValue(yielded.outputs, materialPrices);
       lineRefineValue = value.total;

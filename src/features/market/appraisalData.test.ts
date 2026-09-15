@@ -232,10 +232,44 @@ describe('appraisePaste', () => {
 
       const { appraisal } = await appraisePaste('Veldspar\t1000', DEFAULT_TRADE_HUB, 100, 1);
 
-      // efficiency = 0.5 x 1.15 x 1.10 (no specialisation skill modeled), Tritanium's buyMax is 5.41
+      // efficiency = 0.5 x 1.15 x 1.10 (Veldspar carries no specialisationSkillID
+      // in this fixture, so it falls back to Scrapmetal Processing, untrained
+      // here — that term is x1). Tritanium's buyMax is 5.41.
       const efficiency = 0.5 * 1.15 * 1.1;
       const expected = Math.floor(415 * 10 * efficiency) * 5.41;
       expect(appraisal.rows[0].refineTotal).toBeCloseTo(expected, 6);
+    });
+
+    it('resolves each row against its own specialisation skill (issue #1058)', async () => {
+      // Veldspar carries the SDE's attribute-790 join to Simple Ore
+      // Processing; Damage Control II carries none, so it falls back to
+      // Scrapmetal Processing — a mixed paste resolves each independently.
+      const SIMPLE_ORE_PROCESSING = 60377;
+      server.use(aggregates(PRICED));
+      mockedLoadReprocessing.mockResolvedValue({
+        '1230': { ...VELDSPAR_ENTRY, specialisationSkillID: SIMPLE_ORE_PROCESSING },
+        '2048': { portionSize: 1, materials: [{ typeID: 34, quantity: 100 }] },
+      });
+      mockedLoadCorrectedSkills.mockResolvedValue(
+        skillsFixture([
+          [SIMPLE_ORE_PROCESSING, 5],
+          [SKILL_IDS.scrapmetalProcessing, 0],
+        ])
+      );
+
+      const { appraisal } = await appraisePaste(
+        'Veldspar\t1000\nDamage Control II\t1',
+        DEFAULT_TRADE_HUB,
+        100,
+        1
+      );
+
+      // Veldspar: 0.5 x 1.10 (Simple Ore Processing V) = 0.55 -> floor(415*10*0.55) = 2282
+      const veldsparRow = appraisal.rows.find((row) => row.typeId === 1230)!;
+      expect(veldsparRow.refineTotal).toBeCloseTo(2282 * 5.41, 6);
+      // Damage Control II: 0.5 x 1.0 (untrained Scrapmetal) -> floor(100*0.5) = 50
+      const dcuRow = appraisal.rows.find((row) => row.typeId === 2048)!;
+      expect(dcuRow.refineTotal).toBeCloseTo(50 * 5.41, 6);
     });
   });
 });
