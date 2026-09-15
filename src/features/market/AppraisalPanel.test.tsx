@@ -283,6 +283,33 @@ describe('AppraisalPanel', () => {
     });
 
     /**
+     * Regression for issue #1048: a quantity that is not whole batches left
+     * the refine side charged for units it never refined, so a row that
+     * refines for more than it sells for was highlighted as a sell. The
+     * leftover units are still there to sell, and now count.
+     */
+    it('highlights refine when the batches plus the leftover beat selling it all', () => {
+      const partBatch = refineOutcome();
+      partBatch.appraisal.rows[0] = {
+        ...partBatch.appraisal.rows[0],
+        name: 'Mercoxit III-Grade',
+        quantity: 999,
+        buyEach: 16_000,
+        buyTotal: 15_984_000,
+        sellEach: 17_000,
+        sellTotal: 16_983_000,
+        refineTotal: 15_436_890,
+        refineUnitsLeftOver: 99,
+      };
+      renderPanel({ controller: controller({ result: partBatch }) });
+      const oreRow = screen.getByRole('row', { name: /Mercoxit III-Grade/ });
+      const refineCell = within(oreRow).getByLabelText('15,436,890 ISK').parentElement;
+      const buyCell = within(oreRow).getByLabelText('15,984,000 ISK').parentElement;
+      expect(refineCell?.className).toContain('text-accent');
+      expect(buyCell?.className).not.toContain('text-accent');
+    });
+
+    /**
      * Regression: the buy-total highlight must never fire on a row with
      * nothing to compare against — a row with no refine value is not a
      * winner just because `refineBeatsSellAsIs` defaults to false for it.

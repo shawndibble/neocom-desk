@@ -3,7 +3,9 @@ import {
   buildAppraisal,
   buildHubComparison,
   computeAppraisalRefine,
+  refineBeatsSellAsIs,
   type AppraisalItem,
+  type AppraisalRow,
 } from '@/engine/market/appraisal';
 import { BASE_STATION_REPROCESSING_RATE } from '@/engine/industry/reprocessing';
 
@@ -257,5 +259,85 @@ describe('buildHubComparison', () => {
     const noBuy: AppraisalItem = { typeId: 98, name: 'A', quantity: 1, buy: null, sell: 10 };
     const { buy } = buildHubComparison([damageControl, noBuy], 100);
     expect(buy).toBe(damageControl.buy! * damageControl.quantity);
+  });
+});
+
+describe('refineBeatsSellAsIs (issue #1048)', () => {
+  /** A priced row carrying a refine comparison; overrides say what the case is. */
+  function row(overrides: Partial<AppraisalRow> = {}): AppraisalRow {
+    return {
+      typeId: 1,
+      name: 'Mercoxit III-Grade',
+      quantity: 100,
+      buyEach: 16_000,
+      sellEach: 17_000,
+      buyTotal: 1_600_000,
+      sellTotal: 1_700_000,
+      refineTotal: 1_700_000,
+      refinePricedAll: true,
+      refineUnitsLeftOver: 0,
+      ...overrides,
+    };
+  }
+
+  it('compares the two totals directly when the quantity is whole batches', () => {
+    expect(refineBeatsSellAsIs(row())).toBe(true);
+    expect(refineBeatsSellAsIs(row({ refineTotal: 1_500_000 }))).toBe(false);
+  });
+
+  it('values the leftover units the refine path still holds, at the sell-as-is price', () => {
+    // The worked example from issue #1048, at live Jita prices: 999 Mercoxit
+    // III-Grade refines 900 units for 15,436,890 and leaves 99 to sell at
+    // 16,000 each, beating 15,984,000 sold as-is by 1,036,890 ISK. Comparing
+    // the refine total alone against the full quantity would have called this
+    // for selling and cost the player that difference.
+    const paste = row({
+      quantity: 999,
+      buyTotal: 15_984_000,
+      refineTotal: 15_436_890,
+      refineUnitsLeftOver: 99,
+    });
+    expect(refineBeatsSellAsIs(paste)).toBe(true);
+  });
+
+  it('still calls a genuine loss for selling, leftover included', () => {
+    const paste = row({
+      quantity: 999,
+      buyTotal: 15_984_000,
+      refineTotal: 14_000_000,
+      refineUnitsLeftOver: 99,
+    });
+    expect(refineBeatsSellAsIs(paste)).toBe(false);
+  });
+
+  it('does not call a tie for refining: below one batch, both paths are the same goods', () => {
+    // Nothing refines, so the leftover is the whole paste and the two sides
+    // are exactly equal. A tie is not a win.
+    const partBatch = row({
+      quantity: 99,
+      buyTotal: 1_584_000,
+      refineTotal: 0,
+      refineUnitsLeftOver: 99,
+    });
+    expect(refineBeatsSellAsIs(partBatch)).toBe(false);
+  });
+
+  it('makes no claim on a row with no reprocessing data', () => {
+    expect(
+      refineBeatsSellAsIs(
+        row({ refineTotal: undefined, refinePricedAll: undefined, refineUnitsLeftOver: undefined })
+      )
+    ).toBe(false);
+  });
+
+  it('makes no claim when nobody is buying, rather than valuing the leftover at zero', () => {
+    const unpriced = row({
+      quantity: 999,
+      buyEach: null,
+      buyTotal: null,
+      refineTotal: 15_436_890,
+      refineUnitsLeftOver: 99,
+    });
+    expect(refineBeatsSellAsIs(unpriced)).toBe(false);
   });
 });

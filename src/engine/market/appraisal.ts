@@ -104,6 +104,40 @@ function scale(price: number | null, percent: number): number | null {
   return price === null ? null : (price * percent) / 100;
 }
 
+/**
+ * Does refining this row beat selling it as is?
+ *
+ * "Sell-as-is" is `buyTotal` in this engine's own vocabulary — what the list
+ * fetches sold into buy orders right now (`market.appraisal.buyTotalHelp`) —
+ * so that is what the refine-then-sell comparison is judged against, the same
+ * axis `orderExits.ts` prices its own refine exit on.
+ *
+ * The refine side is what the player actually ends up holding: the whole
+ * batches refined, **plus** the units that could not fill a batch, which are
+ * still there to sell at the same price the sell side quotes. Comparing the
+ * refine total alone against the full quantity charged the refine path for
+ * units it never consumed, and on a 999-unit paste of Mercoxit III-Grade that
+ * recommended the option worth 1,036,890 ISK less (issue #1048). Both sides
+ * are already scaled by the appraisal's Price Percent, so they stay on one
+ * axis.
+ *
+ * Strictly greater, because a tie is not a win: a quantity below one whole
+ * batch refines into nothing, leaving the leftover equal to the whole paste,
+ * and both paths come to exactly the same ISK. That case must read as sell.
+ *
+ * False whenever no comparison exists — no reprocessing data, or nobody
+ * buying. `buyEach` prices both the sell side and the leftover, so a row with
+ * no buy price cannot value either; answering false leaves the leftover
+ * unpriced rather than silently free.
+ */
+export function refineBeatsSellAsIs(row: AppraisalRow): boolean {
+  if (row.refineTotal === undefined || row.buyEach === null || row.buyTotal === null) return false;
+  // Set together with `refineTotal` in `buildAppraisal`, which the types do
+  // not say; `?? 0` reads a fit with no leftover, the same as none recorded.
+  const leftOverValue = (row.refineUnitsLeftOver ?? 0) * row.buyEach;
+  return row.refineTotal + leftOverValue > row.buyTotal;
+}
+
 /** Prices every item at `pricePercent` of market and totals both sides. */
 export function buildAppraisal(items: readonly AppraisalItem[], pricePercent: number): Appraisal {
   const rows: AppraisalRow[] = [];
