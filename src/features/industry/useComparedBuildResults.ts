@@ -160,6 +160,7 @@ function offersForRegion(
       runs: row.runs,
       quantity: row.quantity,
       price: effectivePrice(row),
+      isMultiType: row.isMultiType,
     });
     byType.set(row.typeId, list);
   }

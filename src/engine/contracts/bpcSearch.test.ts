@@ -29,6 +29,7 @@ function row(overrides: Partial<BpcContractRow> = {}): BpcContractRow {
     runs: 5,
     quantity: 1,
     dateExpired: Date.parse('2026-09-10T00:00:00Z'),
+    isMultiType: false,
     ...overrides,
   };
 }
@@ -390,6 +391,15 @@ describe('iskPerRun', () => {
 
   it('gives a real rate of zero for a copy asked to be given away', () => {
     expect(iskPerRun(0, 10, 1)).toBe(0);
+  });
+
+  it("has no rate for a multi-type row — its price is the whole contract's, not this copy's (issue #1076)", () => {
+    expect(iskPerRun(10_000_000, 10, 1, true)).toBeNull();
+  });
+
+  it('still rates a single-type row when isMultiType is omitted or false', () => {
+    expect(iskPerRun(10_000_000, 10, 1, false)).toBe(1_000_000);
+    expect(iskPerRun(10_000_000, 10, 1)).toBe(1_000_000);
   });
 });
 

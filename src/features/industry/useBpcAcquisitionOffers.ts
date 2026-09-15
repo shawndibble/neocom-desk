@@ -42,6 +42,7 @@ export function useBpcAcquisitionOffers(
         runs: row.runs,
         quantity: row.quantity,
         price: effectivePrice(row),
+        isMultiType: row.isMultiType,
       });
       map.set(row.typeId, list);
     }

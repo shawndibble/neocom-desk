@@ -141,6 +141,7 @@ function row(overrides: Partial<BpcContractRow> = {}): BpcContractRow {
     runs: 5,
     quantity: 1,
     dateExpired: Date.parse('2099-09-10T00:00:00Z'),
+    isMultiType: false,
     ...overrides,
   };
 }
@@ -200,6 +201,28 @@ describe('BpcSourcingPanel', () => {
     // The price cell shows shorthand ("5M"); its accessible name carries the
     // exact figure.
     expect(within(table).getByLabelText('5,000,000.00 ISK')).toBeInTheDocument();
+  });
+
+  it('marks a multi-type row’s price as the whole contract’s ask, and its ISK/run as unknowable (issue #1076)', async () => {
+    loadPublicBpcContracts.mockResolvedValue(
+      cachedSnapshot([row({ contractId: 1, typeId: 638, regionId: 10000002, isMultiType: true })])
+    );
+    const user = userEvent.setup();
+    render(<App />);
+
+    const table = await screen.findByRole('table', { name: 'BPC Search' });
+    await within(table).findByText('Rifter Blueprint');
+    // The real ask is still shown, just marked — not silently hidden.
+    expect(within(table).getByLabelText('5,000,000.00 ISK')).toBeInTheDocument();
+    expect(within(table).getByText('Whole contract')).toBeInTheDocument();
+
+    // ISK/run is not a default-visible column — switch it on first.
+    await user.click(await screen.findByRole('button', { name: 'Columns' }));
+    await user.click(await screen.findByRole('menuitemcheckbox', { name: 'ISK/run' }));
+    await user.keyboard('{Escape}');
+
+    const iskPerRunCell = table.querySelector('[data-label="ISK/run"]');
+    expect(iskPerRunCell).toHaveTextContent('—');
   });
 
   it('narrows the table to a typed item-name search', async () => {

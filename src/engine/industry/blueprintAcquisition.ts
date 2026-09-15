@@ -28,6 +28,12 @@ export interface BpcOffer {
   /** Copies this one listing bundles at its combined `price` — a contract can list several at once (`engine/contracts/bpcSearch.ts`'s own `BlueprintOfferStats` doc comment). 1 for an ordinary single-copy listing. */
   quantity: number;
   price: number;
+  /**
+   * True when this offer's contract carries more than one distinct for-sale
+   * type (issue #1076) — `price` is a real ask, but for the whole contract,
+   * not this blueprint. Absent/false for an ordinary single-type listing.
+   */
+  isMultiType?: boolean;
 }
 
 /** `AcquisitionResolution` minus `blueprintTypeID` — this module has no typeID of its own to report, only the caller (`recipes.ts`) knows it. */
@@ -149,9 +155,12 @@ function buildCandidates(inputs: SelectBlueprintTierInputs): Candidate[] {
   // or `quantity <= 0` is malformed, and `Math.ceil(shortfall / 0)` would
   // silently poison every cost this offer touches with Infinity/NaN rather
   // than the "no price" `null` every other bad-data path in this feature
-  // falls back to.
+  // falls back to. A multi-type offer (issue #1076) is not malformed — its
+  // price is a real ask — but it is equally unusable here: `price` covers
+  // the whole contract, not this blueprint, so it must not reseed a plan's
+  // ME/TE any more than a zeroed `runs` should.
   const bpcOffers = inputs.bpcOffers.filter(
-    (offer) => (offer.runs === -1 || offer.runs > 0) && offer.quantity > 0
+    (offer) => (offer.runs === -1 || offer.runs > 0) && offer.quantity > 0 && !offer.isMultiType
   );
 
   const candidates = ownedTierCandidates(ownedCopies);

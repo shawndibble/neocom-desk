@@ -81,22 +81,26 @@ export async function runBpcWatchPoll(deps: BpcWatchPollDependencies): Promise<v
 
     const itemName = await deps.resolveTypeName(fire.typeId);
     const now = deps.now();
+    // A "cheaper" fire never carries `isMultiType: true` — `diffBpcWatchMatches`
+    // only ever ratchets/fires cheaper off a single-type row (issue #1076) —
+    // so only "new" needs the bundle-caveat copy.
+    const bodyKey =
+      fire.reason === 'cheaper'
+        ? 'notifications.fired.bpcSearchWatchMatch.bodyCheaper'
+        : fire.isMultiType
+          ? 'notifications.fired.bpcSearchWatchMatch.bodyNewMultiType'
+          : 'notifications.fired.bpcSearchWatchMatch.bodyNew';
     await deps.recordFeedEntry({
       id: `bpcSearchWatch:${watch.id}:${fire.contractId}`,
       characterId,
       eventId: 'bpcSearchWatchMatch',
       subjectId: fire.contractId,
       title: i18n.t('notifications.fired.bpcSearchWatchMatch.title'),
-      body: i18n.t(
-        fire.reason === 'new'
-          ? 'notifications.fired.bpcSearchWatchMatch.bodyNew'
-          : 'notifications.fired.bpcSearchWatchMatch.bodyCheaper',
-        {
-          watch: watch.name,
-          item: itemName,
-          price: formatIskAuto(fire.price, CONTRACT_ISK_CENTS_BELOW),
-        }
-      ),
+      body: i18n.t(bodyKey, {
+        watch: watch.name,
+        item: itemName,
+        price: formatIskAuto(fire.price, CONTRACT_ISK_CENTS_BELOW),
+      }),
       firedAt: now,
     });
   }
