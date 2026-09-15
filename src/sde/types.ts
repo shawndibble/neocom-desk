@@ -71,6 +71,16 @@ export interface ReprocessingType {
    */
   portionSize: number;
   materials: ReprocessingMaterial[];
+  /**
+   * The reprocessing specialisation skill this type answers to (SDE
+   * attribute 790, "Reprocessing Skill"), when the SDE names one more
+   * specific than Scrapmetal Processing — every ore, ice and moon-ore type
+   * carries this; a module, ship or other item does not. Absent means
+   * Scrapmetal Processing (12196) applies, which the resolver in
+   * `engine/industry/reprocessing.ts` treats as the default rather than
+   * this bake repeating that id on every non-ore row (issue #1058).
+   */
+  specialisationSkillID?: number;
 }
 
 /**

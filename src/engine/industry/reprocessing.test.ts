@@ -3,8 +3,10 @@ import {
   reprocessingEfficiency,
   reprocessingYield,
   reprocessingValue,
+  resolveSpecialisationLevel,
   BASE_STATION_REPROCESSING_RATE,
 } from './reprocessing';
+import { SKILL_IDS } from './types';
 
 /** Tritanium, Pyerite — the two the fixtures below refine into. */
 const TRITANIUM = 34;
@@ -147,5 +149,37 @@ describe('reprocessingValue', () => {
       pricedAll: true,
       unpricedTypeIds: [],
     });
+  });
+});
+
+describe('resolveSpecialisationLevel', () => {
+  // Real SDE skill type ids (issue #1058), so this test doubles as
+  // documentation of what the bake's attribute-790 join actually resolves.
+  const SIMPLE_ORE_PROCESSING = 60377;
+  const ICE_PROCESSING = 18025;
+
+  it('resolves a known ore type to its own specialisation, not Scrapmetal', () => {
+    const trained = new Map([
+      [SIMPLE_ORE_PROCESSING, { level: 3, sp: 0 }],
+      [SKILL_IDS.scrapmetalProcessing, { level: 5, sp: 0 }],
+    ]);
+    expect(resolveSpecialisationLevel(SIMPLE_ORE_PROCESSING, trained)).toBe(3);
+  });
+
+  it('resolves a known ice type to Ice Processing, not Scrapmetal', () => {
+    const trained = new Map([
+      [ICE_PROCESSING, { level: 4, sp: 0 }],
+      [SKILL_IDS.scrapmetalProcessing, { level: 1, sp: 0 }],
+    ]);
+    expect(resolveSpecialisationLevel(ICE_PROCESSING, trained)).toBe(4);
+  });
+
+  it('falls back to Scrapmetal Processing for a known module, which carries no specialisation attribute', () => {
+    const trained = new Map([[SKILL_IDS.scrapmetalProcessing, { level: 2, sp: 0 }]]);
+    expect(resolveSpecialisationLevel(undefined, trained)).toBe(2);
+  });
+
+  it('is 0 when the resolved skill is untrained', () => {
+    expect(resolveSpecialisationLevel(undefined, new Map())).toBe(0);
   });
 });

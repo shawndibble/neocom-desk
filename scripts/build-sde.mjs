@@ -63,6 +63,13 @@ const DELVE_REGION_ID = 10000060;
 const JITA_SYSTEM_ID = 30000142;
 const MARKET_REGIONS_MIN = 78;
 const MARKET_REGIONS_MAX = 116;
+// Ore, ice and moon-ore types carrying attribute 790 (Reprocessing Skill), as
+// counted against the bake on 2026-09-14: 338. A join that silently breaks
+// (a renamed CSV column, a dropped filter) would make this 0, not slightly
+// off, so a generous band around the known count still catches that while
+// tolerating CCP adding a handful more ore variants later (issue #1058).
+const REPROCESSING_SPECIALISATION_MIN = 300;
+const REPROCESSING_SPECIALISATION_MAX = 500;
 // A region whose every solar system sits within this many meters of the
 // coordinate origin is not a place in the game universe — the nearest real
 // system (Zarzakh) sits ~5.66e15 m out, ~5.7 billion times farther than this
@@ -80,6 +87,15 @@ const SYNTHETIC_POSITION_MAX_M = 1_000_000;
 const RANK_ATTR = 275;
 const PRIMARY_ATTR = 180;
 const SECONDARY_ATTR = 181;
+// Reprocessing Skill (verified against dgmAttributeTypes.csv: id 790, unit
+// typeID) — names the specialisation skill a refinable type answers to
+// directly. Present on every ore/ice/moon-ore type probed (338 of 338),
+// absent on modules/ships/ammo, which refine under Scrapmetal Processing
+// instead (issue #1058).
+const REPROCESSING_SKILL_ATTR = 790;
+// Scrapmetal Processing (12196) — the specialisation every refinable type
+// falls back to when it carries no REPROCESSING_SKILL_ATTR of its own.
+const SCRAPMETAL_PROCESSING_SKILL_ID = 12196;
 const PREREQ_PAIRS = [
   [182, 277],
   [183, 278],
@@ -309,6 +325,11 @@ function num(s) {
   return s === '' ? null : Number(s);
 }
 
+/** Published, and carries a market group — the "reachable from an open market order" predicate `reprocessing.json` and its refinable-type-id precompute both key off. */
+function isRefinable(t) {
+  return Boolean(t && t.published && t.marketGroupID !== null);
+}
+
 /**
  * A whole number, or null for anything that isn't one.
  *
@@ -485,7 +506,21 @@ async function main() {
     if (t.published && PI_PIN_GROUPS[t.groupID]) piPinTypeIds.add(typeID);
   }
 
-  // --- dgmTypeAttributes: attrs for skill types and planetary pins ---
+  // --- Refinable type IDs: `isRefinable`, the same predicate reprocessing.json's
+  // own build uses below — computed here, ahead of the reprocessing.json pass
+  // itself, purely so the dgmTypeAttributes pass right below knows which
+  // types to keep attribute 790 for (issue #1058).
+  const refinableTypeIds = new Set();
+  {
+    const rows = raw['invTypeMaterials.csv'];
+    const h = indexHeader(rows);
+    for (let i = 1; i < rows.length; i++) {
+      const typeID = Number(rows[i][h.typeID]);
+      if (isRefinable(types.get(typeID))) refinableTypeIds.add(typeID);
+    }
+  }
+
+  // --- dgmTypeAttributes: attrs for skill types, planetary pins, and refinable types ---
   const attrsByType = new Map(); // typeID -> Map(attrID -> value)
   {
     const rows = raw['dgmTypeAttributes.csv'];
@@ -497,7 +532,12 @@ async function main() {
     for (let i = 1; i < rows.length; i++) {
       const r = rows[i];
       const typeID = Number(r[iType]);
-      if (!skillTypeIds.has(typeID) && !piPinTypeIds.has(typeID) && typeID !== PI_LINK_TYPE_ID)
+      if (
+        !skillTypeIds.has(typeID) &&
+        !piPinTypeIds.has(typeID) &&
+        typeID !== PI_LINK_TYPE_ID &&
+        !refinableTypeIds.has(typeID)
+      )
         continue;
       const value = r[iInt] !== '' ? Number(r[iInt]) : num(r[iFloat]);
       let m = attrsByType.get(typeID);
@@ -704,12 +744,20 @@ async function main() {
       const r = rows[i];
       const typeID = Number(r[h.typeID]);
       const t = types.get(typeID);
-      if (!t || !t.published || t.marketGroupID === null) continue;
+      if (!isRefinable(t)) continue;
       const quantity = Number(r[h.quantity]);
       if (!(quantity > 0)) continue;
       let entry = reprocessing[typeID];
       if (!entry) {
         entry = { portionSize: t.portionSize, materials: [] };
+        // Only stored when the SDE names one, i.e. attribute 790 is present —
+        // its absence already means Scrapmetal Processing, so a value here
+        // would just repeat SCRAPMETAL_PROCESSING_SKILL_ID on the ~1,100
+        // non-ore refinable rows for no reader that needs it (issue #1058).
+        const specialisationSkillID = attrsByType.get(typeID)?.get(REPROCESSING_SKILL_ATTR);
+        if (specialisationSkillID != null) {
+          entry.specialisationSkillID = Math.round(specialisationSkillID);
+        }
         reprocessing[typeID] = entry;
       }
       entry.materials.push({ typeID: Number(r[h.materialTypeID]), quantity });
@@ -1757,6 +1805,43 @@ async function main() {
       `  FAIL: market region count ${marketRegions.length} outside the plausible ${MARKET_REGIONS_MIN}-${MARKET_REGIONS_MAX} range`
     );
     process.exitCode = 1;
+  }
+  {
+    // Attribute 790 is the whole join this ticket rests on (issue #1058) — a
+    // silent break (renamed CSV column, a dropped filter) would make this 0,
+    // not slightly off, so a band around the known count (338 ore/ice/moon-ore
+    // types, 2026-09-14) catches that while tolerating CCP adding types later.
+    const specialised = Object.values(reprocessing).filter(
+      (e) => e.specialisationSkillID != null
+    ).length;
+    console.log(`  reprocessing types carrying a specialisation skill: ${specialised}`);
+    if (
+      specialised < REPROCESSING_SPECIALISATION_MIN ||
+      specialised > REPROCESSING_SPECIALISATION_MAX
+    ) {
+      console.error(
+        `  FAIL: ${specialised} refinable types carry attribute 790, outside the plausible ${REPROCESSING_SPECIALISATION_MIN}-${REPROCESSING_SPECIALISATION_MAX} range`
+      );
+      process.exitCode = 1;
+    }
+    // A known positive and a known negative, so a join that silently returns
+    // nothing (right count, wrong data) fails loudly too.
+    const VELDSPAR_TYPE_ID = 1230;
+    const SIMPLE_ORE_PROCESSING_SKILL_ID = 60377;
+    const RIFTER_TYPE_ID = 587;
+    if (reprocessing[VELDSPAR_TYPE_ID]?.specialisationSkillID !== SIMPLE_ORE_PROCESSING_SKILL_ID) {
+      console.error(
+        `  FAIL: Veldspar (${VELDSPAR_TYPE_ID}) does not resolve to Simple Ore Processing (${SIMPLE_ORE_PROCESSING_SKILL_ID})`
+      );
+      process.exitCode = 1;
+    }
+    if (
+      !reprocessing[RIFTER_TYPE_ID] ||
+      reprocessing[RIFTER_TYPE_ID].specialisationSkillID !== undefined
+    ) {
+      console.error(`  FAIL: Rifter (${RIFTER_TYPE_ID}) unexpectedly carries attribute 790`);
+      process.exitCode = 1;
+    }
   }
 }
 

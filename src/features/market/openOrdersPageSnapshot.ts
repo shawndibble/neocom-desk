@@ -147,7 +147,7 @@ export async function loadOpenOrdersSnapshot(
       reprocessingLevel: corrected.trained.get(SKILL_IDS.reprocessing)?.level ?? 0,
       reprocessingEfficiencyLevel:
         corrected.trained.get(SKILL_IDS.reprocessingEfficiency)?.level ?? 0,
-      scrapmetalProcessingLevel: corrected.trained.get(SKILL_IDS.scrapmetalProcessing)?.level ?? 0,
+      trained: corrected.trained,
     });
   });
 

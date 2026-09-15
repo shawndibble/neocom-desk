@@ -81,6 +81,7 @@ import { OrderBadgeLegend } from './OrderBadgeLegend';
 import { OrderRowSummaryText } from './OrderRowSummaryText';
 import { OrderDetailModal } from './OrderDetailModal';
 import type { ReprocessingInput } from './orderExits';
+import { resolveReprocessingSkills } from '@/engine/industry/reprocessing';
 
 /** Healthy orders start collapsed (CONTEXT.md redesign) — the `showHealthy` toggle is the way back, not the funnel filter. */
 const DEFAULT_FILTER: OpenOrdersFilter = { ...EMPTY_OPEN_ORDERS_FILTER, hideHealthy: true };
@@ -1167,11 +1168,11 @@ export function OpenOrdersPanel() {
             return {
               entry: loaded.entry,
               materialPrices: loaded.materialPrices,
-              skills: {
-                reprocessingLevel: skills.reprocessingLevel,
-                reprocessingEfficiencyLevel: skills.reprocessingEfficiencyLevel,
-                specialisationLevel: skills.scrapmetalProcessingLevel,
-              },
+              skills: resolveReprocessingSkills(
+                skills,
+                loaded.entry.specialisationSkillID,
+                skills.trained
+              ),
             };
           })()}
           hubs={((): readonly HubBuyPrice[] | undefined => {

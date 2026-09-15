@@ -23,7 +23,7 @@ const ZERO_SKILLS: CharacterSkills = {
   brokerRelationsLevel: 0,
   reprocessingLevel: 0,
   reprocessingEfficiencyLevel: 0,
-  scrapmetalProcessingLevel: 0,
+  trained: new Map(),
 };
 
 const NOW = new Date('2026-09-06T00:00:00Z').getTime();
