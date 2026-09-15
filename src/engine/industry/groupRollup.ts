@@ -105,6 +105,13 @@ export interface BuildGroupRollup {
   /** Cost of buying every product outright; null when any member is unpriced. */
   buyCost: number | null;
   /**
+   * Sum of member `profit` (profit after fees — materials, job cost, sales
+   * tax, broker fee, against selling every member's product). Null when any
+   * member's own `profit` is null, same "one bad member taints the total"
+   * rule `buyCost` already follows.
+   */
+  profit: number | null;
+  /**
    * Sum of member job durations — total job time, not wall-clock. Parallel job
    * slots are not modelled, so this is oven time rather than elapsed time.
    */
@@ -186,6 +193,20 @@ function nettedAgainstLedger(
   return materials.map((m) => applyOwnedLedger(m, ownedStock.get(m.typeID) ?? 0));
 }
 
+/** Sum one figure across every member — null the moment any member's is null, a partial sum presented as a whole being worse than none. */
+function sumOrNull(
+  members: readonly BuildGroupMember[],
+  pick: (m: BuildGroupMember) => number | null
+): number | null {
+  let sum = 0;
+  for (const member of members) {
+    const value = pick(member);
+    if (value === null) return null;
+    sum += value;
+  }
+  return sum;
+}
+
 function mergeMaterials(
   members: readonly BuildGroupMember[],
   pick: (m: BuildGroupMember) => readonly MaterialCostLine[]
@@ -233,16 +254,8 @@ export function rollUpBuildGroup(
   const shoppingByHub = shoppingListsByHub(members);
   const hubIds = shoppingByHub.map((block) => block.hubId);
 
-  // Sum only while every member has a price: one null makes the total
-  // unknowable, and a partial sum presented as a whole is worse than none.
-  let buyCost: number | null = 0;
-  for (const member of members) {
-    if (member.result.buyCost === null) {
-      buyCost = null;
-      break;
-    }
-    buyCost += member.result.buyCost;
-  }
+  const buyCost = sumOrNull(members, (m) => m.result.buyCost);
+  const summedProfit = sumOrNull(members, (m) => m.result.profit);
 
   // The buy list is the one cost authority the ledger ever adjusts (see
   // module doc): what it saved is the gap between each merged buy-list line
@@ -258,6 +271,14 @@ export function rollUpBuildGroup(
   );
   const materialCost = members.reduce((sum, m) => sum + m.result.materialCost, 0) - ownedSaving;
   const topLevelJobFees = members.reduce((sum, m) => sum + m.result.jobFee.total, 0);
+
+  // Each member's own `profit` was computed against *its own* totalCost,
+  // which — same as `materialCost` above — has no group-ledger deduction
+  // (owned-stock deduction is disabled per-member; see the module doc). The
+  // naive sum is short by exactly `ownedSaving`, the saving `materialCost`
+  // already has subtracted, so it's added back here to keep `profit`
+  // consistent with `totalCost` on this same rollup.
+  const profit = summedProfit === null ? null : summedProfit + ownedSaving;
 
   // `member.result.unpriceable` is computed against the owned-disabled tree,
   // before the ledger's netting — so a material the ledger now fully covers
@@ -278,6 +299,7 @@ export function rollUpBuildGroup(
     topLevelJobFees,
     totalCost: materialCost + topLevelJobFees,
     buyCost,
+    profit,
     seconds: members.reduce((sum, m) => sum + m.result.seconds, 0),
     unpriceable,
     shoppingByHub,

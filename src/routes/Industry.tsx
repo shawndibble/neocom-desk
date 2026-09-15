@@ -40,7 +40,7 @@ import { applyFitImport, fitImportGroupName } from '@/features/industry/fitImpor
 import type { FitToBuildPlansResult } from '@/engine/import/fitToBuildPlans';
 import { useComparedBuildResults } from '@/features/industry/useComparedBuildResults';
 import { useRunCountsByPlan } from '@/features/industry/useRunCountsByPlan';
-import { computeGroupIndexStats, profitOf, verdictOf } from '@/features/industry/groupIndexStats';
+import { computeGroupIndexStats } from '@/features/industry/groupIndexStats';
 import { readIndustryTab, type IndustryTab } from '@/features/industry/industryTabs';
 import { DEFAULT_TRADE_HUB } from '@/market/hubs';
 import { loadMarketWideTrees } from '@/sde/loadSde';
@@ -293,10 +293,20 @@ export function Industry() {
   const statsByPlanId = useMemo(() => {
     const map = new Map<string, PlanIndexStats>();
     for (const row of [...groupedRows, ...ungroupedRows]) {
-      const profit = row.result ? profitOf(row.result.totalCost, row.result.buyCost) : null;
+      // Displayed figure is profit after fees (matches the detail page's
+      // headline number) — but the Build/Buy verdict stays keyed off
+      // `recommendation`, the build-vs-buy question, a different one
+      // (issue: list column read as "profit" while showing buy-vs-build
+      // savings, a different number than the detail page's own "profit
+      // after fees"). `recommendation` is read straight off `result` rather
+      // than re-derived from `buyCost`/`totalCost` here, so it inherits the
+      // same `unpriceable` gating `PlanVerdictHero`'s own Acquisition
+      // Verdict pill uses — a re-derived value stayed non-null (falsely
+      // confident) whenever a material was unpriced but the product itself
+      // still had a hub price.
       map.set(row.planId, {
-        profit,
-        verdict: verdictOf(profit),
+        profit: row.result?.profit ?? null,
+        verdict: row.result?.recommendation ?? 'unknown',
         runs: runCounts.get(row.planId) ?? 0,
       });
     }
