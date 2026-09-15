@@ -808,6 +808,9 @@ export function MaterialsTable({
         label={t('industry.materials')}
         density="compact"
         rowContextMenu={rowContextMenu}
+        // Five figures broke to a 5-line stack at 390px; pair two per line,
+        // same fix as AppraisalPanel's result table.
+        stackColumns={2}
       />
     </div>
   );

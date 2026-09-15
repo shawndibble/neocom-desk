@@ -11,6 +11,7 @@ import { useTranslation } from 'react-i18next';
 import { cx } from '@/lib/cx';
 import * as Icon from './icons';
 import { InfoTooltip } from './Tooltip';
+import { nextDataTableSort, sortRows } from './dataTableSort';
 
 export interface DataTableSort {
   columnId: string;
@@ -130,31 +131,6 @@ interface DataTableProps<T> {
   stackColumns?: 1 | 2;
 }
 
-function compareValues(a: string | number, b: string | number): number {
-  if (typeof a === 'number' && typeof b === 'number') return a - b;
-  return String(a).localeCompare(String(b));
-}
-
-/** Stable: ties and rows with no sort value keep their original relative order. */
-function sortRows<T>(
-  rows: readonly T[],
-  column: DataTableColumn<T>,
-  direction: 'asc' | 'desc'
-): T[] {
-  const sortValue = column.sortValue;
-  if (!sortValue) return [...rows];
-  const withValue: { row: T; value: string | number }[] = [];
-  const withoutValue: T[] = [];
-  for (const row of rows) {
-    const value = sortValue(row);
-    if (value === undefined) withoutValue.push(row);
-    else withValue.push({ row, value });
-  }
-  const sign = direction === 'asc' ? 1 : -1;
-  withValue.sort((a, b) => compareValues(a.value, b.value) * sign);
-  return [...withValue.map((entry) => entry.row), ...withoutValue];
-}
-
 /**
  * Dense table. Headers and cell content arrive already translated — no i18n
  * here. No empty branch — callers show `EmptyState` instead (docs/DESIGN.md
@@ -253,11 +229,7 @@ export function DataTable<T>({
   }, [rows, sort, sortColumn]);
 
   function toggleSort(column: DataTableColumn<T>) {
-    setSort((previous) =>
-      previous?.columnId === column.id
-        ? { columnId: column.id, direction: previous.direction === 'asc' ? 'desc' : 'asc' }
-        : { columnId: column.id, direction: 'asc' }
-    );
+    setSort((previous) => nextDataTableSort(previous, column.id));
   }
 
   return (
