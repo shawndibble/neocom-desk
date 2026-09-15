@@ -52,4 +52,22 @@ describe('Disclosure', () => {
     await userEvent.keyboard(' ');
     expect(onToggle).toHaveBeenCalledTimes(3);
   });
+
+  it('carries the touch-tier height floor, reverting to the compact size at md (issue #1071)', () => {
+    // jsdom applies no real CSS, so this can't measure a pixel height the
+    // way `e2e/skillsTrainedNarrow.spec.ts` does for the trained-skills
+    // page's own hand-rolled header — this asserts the class tokens
+    // themselves, on every one of this shared primitive's consumers
+    // (BuildLocationPicker, ResultsSummary, AppraisalPanel, PlanToolsPane,
+    // CollapsiblePanel), not just the one page with a dedicated e2e spec.
+    render(
+      <Disclosure label="Job fee" expanded={false} onToggle={vi.fn()}>
+        <div>EIV detail</div>
+      </Disclosure>
+    );
+
+    const button = screen.getByRole('button', { name: /job fee/i });
+    expect(button.className).toContain('min-h-11');
+    expect(button.className).toContain('md:min-h-0');
+  });
 });

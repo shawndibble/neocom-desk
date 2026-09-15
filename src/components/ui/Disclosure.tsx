@@ -43,7 +43,7 @@ export function Disclosure({
         type="button"
         aria-expanded={expanded}
         onClick={onToggle}
-        className="flex min-h-8 w-full items-center justify-between gap-2 px-2.5 py-1.5 text-left hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
+        className="flex min-h-11 w-full items-center justify-between gap-2 px-2.5 py-1.5 text-left hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent md:min-h-0"
       >
         <span className="flex items-center gap-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
           <Caret expanded={expanded} />
