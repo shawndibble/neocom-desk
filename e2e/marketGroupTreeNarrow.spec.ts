@@ -4,9 +4,10 @@
  * every depth — was a hand-rolled `py-1` button with no height class, so it
  * rendered 24px tall at every viewport, well under the app's 44px touch
  * floor, on the Market page's only way to browse to an item on a phone.
- * Fixed with a phone-only `min-h-11 md:min-h-0` on both rows rather than the
- * shared `controlHeightClassName.md` tier, whose `md:h-9` would also have
- * grown the dense desktop row.
+ * Fixed with a phone-only `min-h-11 md:min-h-0` on both row shapes — on a
+ * header only while it's expandable, since a disabled one is no target —
+ * rather than the shared `controlHeightClassName.md` tier, whose `md:h-9`
+ * would also have grown the dense desktop row.
  *
  * jsdom has no layout, so a unit test could only assert the class token is
  * present, not the rendered pixel height — the same reasoning

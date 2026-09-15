@@ -237,10 +237,12 @@ function MarketGroupTree({
     const expanded = filtering ? !searchCollapsedIds.has(group.id) : expandedIds.has(group.id);
     const expandable = children.length > 0 || items.length > 0;
 
-    // Both rows below take `min-h-11 md:min-h-0` rather than the shared
-    // `controlHeightClassName.md` tier: a phone needs the 44px touch floor,
-    // but that tier's `md:h-9` would also grow these dense 24px tree rows on
-    // desktop, which this fix must not do.
+    // `min-h-11 md:min-h-0` gives a thumb the 44px floor on the leaf row and
+    // on an expandable header — a disabled header is inert, so it stays dense
+    // rather than spending 44px of the phone's scrollport on nothing (55 of
+    // the catalogue's groups are childless and itemless, five in a row under
+    // ECCM alone). Not `controlHeightClassName.md`: its `md:h-9` would grow
+    // desktop's 24px rows too, which this fix must not do.
     return (
       <li key={group.id}>
         <button
@@ -248,7 +250,9 @@ function MarketGroupTree({
           disabled={!expandable}
           onClick={() => onToggle(group.id)}
           style={{ paddingLeft: `${depth * 0.75}rem` }}
-          className="flex min-h-11 w-full items-center gap-1.5 py-1 text-left text-xs text-text hover:text-accent disabled:hover:text-text md:min-h-0"
+          className={`flex w-full items-center gap-1.5 py-1 text-left text-xs text-text hover:text-accent disabled:hover:text-text ${
+            expandable ? 'min-h-11 md:min-h-0' : ''
+          }`}
         >
           {expandable && <Caret expanded={expanded} />}
           <span className={expandable ? '' : 'pl-3'}>{group.name}</span>
