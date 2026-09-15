@@ -34,6 +34,17 @@
  * no reprocessing data carries no `refine` field at all, distinguishing "no
  * comparison exists" from "the comparison is worth nothing" (a part-portion
  * quantity, which is a real, reportable zero).
+ *
+ * LP store acquisition rides alongside the same way: a faction/navy item
+ * with no blueprint at all (the Astero, say) still often turns up in an NPC
+ * corp's LP store, which is a second acquisition path beyond the market's
+ * sell side `sellTotal` already prices. `lpOption` on `AppraisalItem` (from
+ * `features/market/appraisalLpAcquisition.ts`, which resolves which corp
+ * offers it and fetches the LP balance) is never scaled by Price Percent —
+ * it is a fixed NPC price, not a market order someone is negotiating a
+ * fraction of — and only ever competes with `sellTotal`, never `buyTotal`:
+ * redeeming an offer is how a pilot *acquires* the item, not how they
+ * dispose of one they already have.
  */
 import {
   reprocessingEfficiency,
@@ -42,6 +53,7 @@ import {
   type ReprocessingMaterial,
   type ReprocessingSkills,
 } from '@/engine/industry/reprocessing';
+import type { AppraisalLpOption } from '@/engine/market/lpAcquisition';
 
 /** Refine-then-sell value for one item's full pasted quantity, at 100% price. */
 export interface AppraisalRefine {
@@ -64,6 +76,8 @@ export interface AppraisalItem {
   sell: number | null;
   /** Undefined when this type carries no reprocessing data at all. */
   refine?: AppraisalRefine;
+  /** Undefined when nothing the character holds LP with sells this item. */
+  lpOption?: AppraisalLpOption;
 }
 
 export interface AppraisalRow {
@@ -78,6 +92,11 @@ export interface AppraisalRow {
   refineTotal?: number;
   refinePricedAll?: boolean;
   refineUnitsLeftOver?: number;
+  /** Undefined when nothing the character holds LP with sells this item. */
+  lpCorpName?: string;
+  lpCost?: number;
+  lpIskCost?: number;
+  lpAffordable?: boolean;
 }
 
 export interface AppraisalTotals {
@@ -93,6 +112,15 @@ export interface AppraisalTotals {
   refine: number;
   /** Rows with reprocessing data where at least one output material had no price. */
   refineUnpricedRows: number;
+  /**
+   * `sellTotal`, or the cheaper affordable `lpIskCost` where one exists —
+   * "the total" a pilot actually pays to acquire everything pasted, LP store
+   * included. Equal to `sell` whenever no row has a cheaper affordable LP
+   * option, so a paste with nothing LP-redeemable reads exactly as before.
+   */
+  cheapestBuy: number;
+  /** Rows whose cheapest-known acquisition path is redeeming an LP offer. */
+  cheapestBuyViaLp: number;
 }
 
 export interface Appraisal {
@@ -137,6 +165,23 @@ export function refineBeatsSellAsIs(row: AppraisalRow): boolean {
   return row.refineTotal + leftOverValue > row.buyTotal;
 }
 
+/**
+ * Does redeeming this row's LP offer beat buying it off the market?
+ *
+ * Only ever true against an *affordable* offer — a cheaper option the
+ * character lacks the LP for is real information (`row.lpIskCost` still
+ * carries it, for display), but it does not win a comparison about what the
+ * pilot can actually do today, and `cheapestBuy` must not credit a total the
+ * character cannot pay. A market row with no sell price at all (`sellTotal
+ * === null`) loses to any affordable offer, the same "an unpriced side must
+ * not silently read as free, but it also must not block a real number from
+ * winning" rule `unpricedLeafTypeIds` applies on the build side.
+ */
+export function lpBeatsMarket(row: AppraisalRow): boolean {
+  if (row.lpIskCost === undefined || row.lpAffordable !== true) return false;
+  return row.sellTotal === null || row.lpIskCost < row.sellTotal;
+}
+
 /** Prices every item at `pricePercent` of market and totals both sides. */
 export function buildAppraisal(items: readonly AppraisalItem[], pricePercent: number): Appraisal {
   const rows: AppraisalRow[] = [];
@@ -145,6 +190,8 @@ export function buildAppraisal(items: readonly AppraisalItem[], pricePercent: nu
   let unpricedRows = 0;
   let refine = 0;
   let refineUnpricedRows = 0;
+  let cheapestBuy = 0;
+  let cheapestBuyViaLp = 0;
 
   for (const item of items) {
     const buyEach = scale(item.buy, pricePercent);
@@ -167,7 +214,7 @@ export function buildAppraisal(items: readonly AppraisalItem[], pricePercent: nu
       if (!refinePricedAll) refineUnpricedRows += 1;
     }
 
-    rows.push({
+    const row: AppraisalRow = {
       typeId: item.typeId,
       name: item.name,
       quantity: item.quantity,
@@ -178,12 +225,32 @@ export function buildAppraisal(items: readonly AppraisalItem[], pricePercent: nu
       refineTotal,
       refinePricedAll,
       refineUnitsLeftOver,
-    });
+      lpCorpName: item.lpOption?.corpName,
+      lpCost: item.lpOption?.lpCost,
+      lpIskCost: item.lpOption?.iskCost,
+      lpAffordable: item.lpOption?.affordableLp,
+    };
+
+    const useLp = lpBeatsMarket(row);
+    const rowCheapest = useLp ? (row.lpIskCost ?? null) : sellTotal;
+    if (rowCheapest !== null) cheapestBuy += rowCheapest;
+    if (useLp) cheapestBuyViaLp += 1;
+
+    rows.push(row);
   }
 
   return {
     rows,
-    totals: { buy, sell, spread: sell - buy, unpricedRows, refine, refineUnpricedRows },
+    totals: {
+      buy,
+      sell,
+      spread: sell - buy,
+      unpricedRows,
+      refine,
+      refineUnpricedRows,
+      cheapestBuy,
+      cheapestBuyViaLp,
+    },
   };
 }
 

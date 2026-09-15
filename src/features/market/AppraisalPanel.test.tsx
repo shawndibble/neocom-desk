@@ -55,6 +55,8 @@ const APPRAISAL: Appraisal = {
     unpricedRows: 1,
     refine: 0,
     refineUnpricedRows: 0,
+    cheapestBuy: 0,
+    cheapestBuyViaLp: 0,
   },
 };
 
@@ -249,6 +251,8 @@ describe('AppraisalPanel', () => {
             unpricedRows: 0,
             refine: 8_000,
             refineUnpricedRows: 0,
+            cheapestBuy: 0,
+            cheapestBuyViaLp: 0,
           },
         },
         unmatched: [],
@@ -323,6 +327,77 @@ describe('AppraisalPanel', () => {
     });
   });
 
+  describe('LP store acquisition', () => {
+    function lpOutcome(overrides: Partial<AppraisalOutcome> = {}): AppraisalOutcome {
+      return {
+        appraisal: {
+          rows: [
+            {
+              typeId: 33468,
+              name: 'Astero',
+              quantity: 1,
+              buyEach: 60_000_000,
+              sellEach: 95_000_000,
+              buyTotal: 60_000_000,
+              sellTotal: 95_000_000,
+              lpCorpName: 'Sisters of EVE',
+              lpCost: 400_000,
+              lpIskCost: 850_000,
+              lpAffordable: true,
+            },
+            {
+              typeId: 2048,
+              name: 'Damage Control II',
+              quantity: 3,
+              buyEach: 448_650,
+              sellEach: 460_800,
+              buyTotal: 1_345_950,
+              sellTotal: 1_382_400,
+            },
+          ],
+          totals: {
+            buy: 60_000_000,
+            sell: 1_477_400,
+            spread: -58_522_600,
+            unpricedRows: 0,
+            refine: 0,
+            refineUnpricedRows: 0,
+            cheapestBuy: 2_232_400,
+            cheapestBuyViaLp: 1,
+          },
+        },
+        unmatched: [],
+        ...overrides,
+      };
+    }
+
+    it('adds an LP store column and cheapest-total chip when a row has an LP option', () => {
+      renderPanel({ controller: controller({ result: lpOutcome() }) });
+      const asteroRow = screen.getByRole('row', { name: /Astero/ });
+      expect(within(asteroRow).getByText(/Sisters of EVE/)).toBeInTheDocument();
+      expect(screen.getAllByText('Cheapest total').length).toBeGreaterThan(0);
+    });
+
+    it('omits the LP column entirely with no LP option on any row', () => {
+      renderPanel({ controller: controller({ result: outcome() }) });
+      expect(screen.queryAllByText('Cheapest total')).toHaveLength(0);
+    });
+
+    it('marks an unaffordable LP option rather than hiding it', () => {
+      const unaffordable = lpOutcome();
+      unaffordable.appraisal.rows[0].lpAffordable = false;
+      renderPanel({ controller: controller({ result: unaffordable }) });
+      const asteroRow = screen.getByRole('row', { name: /Astero/ });
+      expect(within(asteroRow).getByTitle(/does not hold enough LP/)).toBeInTheDocument();
+    });
+
+    it('shows a dash on a row with no LP option, when the column is present', () => {
+      renderPanel({ controller: controller({ result: lpOutcome() }) });
+      const dcuRow = screen.getByRole('row', { name: /Damage Control II/ });
+      expect(within(dcuRow).getByText('—')).toBeInTheDocument();
+    });
+  });
+
   it('reports unmatched lines beside the paste box, by line number', () => {
     renderPanel({
       controller: controller({
@@ -388,6 +463,8 @@ describe('AppraisalPanel', () => {
               unpricedRows: 0,
               refine: 0,
               refineUnpricedRows: 0,
+              cheapestBuy: 0,
+              cheapestBuyViaLp: 0,
             },
           },
           unmatched: [{ name: 'Nope', lines: [1] }],

@@ -12,7 +12,16 @@ function outcome(sell: number): AppraisalOutcome {
   return {
     appraisal: {
       rows: [],
-      totals: { buy: 0, sell, spread: sell, unpricedRows: 0, refine: 0, refineUnpricedRows: 0 },
+      totals: {
+        buy: 0,
+        sell,
+        spread: sell,
+        unpricedRows: 0,
+        refine: 0,
+        refineUnpricedRows: 0,
+        cheapestBuy: sell,
+        cheapestBuyViaLp: 0,
+      },
     },
     unmatched: [],
   };
