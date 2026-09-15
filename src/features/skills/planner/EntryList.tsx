@@ -24,6 +24,7 @@ import {
   DropdownMenuTrigger,
   EmptyState,
 } from '@/components/ui';
+import { controlHeightClassName } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
 import { PRIORITY_ORDER } from '@/engine/planPriority';
 import type { AttributeName, Attributes, Implants, PlanPriority } from '@/engine/types';
@@ -164,14 +165,32 @@ interface PriorityPillProps {
   name: string;
   priority: PlanPriority;
   onSetPriority: (skillTypeID: number, priority: PlanPriority) => void;
+  /**
+   * Pad the trigger out to the `sm` touch tier without resizing the chip
+   * (#1106). Set only from the mobile meta line; the desktop row leaves it
+   * off so the pill keeps sitting flush with the `sm` controls beside it.
+   */
+  touchTarget?: boolean;
 }
 
 /**
  * An entry's priority (#27) as a menu behind a pill the size of the attribute
  * badge beside it. Was a `NativeSelect`, whose native chrome made it the widest
  * thing in the row by a distance and pushed every column after it out of line.
+ *
+ * The chip lives in a span inside the trigger rather than on the trigger
+ * itself, so `touchTarget` can grow the *button* to the `sm` touch tier on a
+ * phone (#1106) while the chip stays the width and height of the attribute
+ * badge next to it. Hover and focus are driven off the button through `group`
+ * so both still draw on the chip, not on the padded box around it.
  */
-function PriorityPill({ skillTypeID, name, priority, onSetPriority }: PriorityPillProps) {
+function PriorityPill({
+  skillTypeID,
+  name,
+  priority,
+  onSetPriority,
+  touchTarget = false,
+}: PriorityPillProps) {
   const { t } = useTranslation();
   return (
     <DropdownMenu>
@@ -179,9 +198,13 @@ function PriorityPill({ skillTypeID, name, priority, onSetPriority }: PriorityPi
         <button
           type="button"
           aria-label={t('plans.priorityLabel', { name })}
-          className={`rounded-xs border px-1 text-[0.6875rem] tracking-wide uppercase hover:border-line-bright focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent ${PRIORITY_TONE[priority]}`}
+          className={`group inline-flex items-center ${touchTarget ? controlHeightClassName.sm : ''}`}
         >
-          {t(priorityLabelKey(priority))}
+          <span
+            className={`rounded-xs border px-1 text-[0.6875rem] tracking-wide uppercase group-hover:border-line-bright group-focus-visible:outline-2 group-focus-visible:outline-offset-1 group-focus-visible:outline-accent ${PRIORITY_TONE[priority]}`}
+          >
+            {t(priorityLabelKey(priority))}
+          </span>
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
@@ -329,6 +352,7 @@ const EntryRow = memo(function EntryRow({
       name={name}
       priority={entry.priority ?? 'normal'}
       onSetPriority={onSetPriority}
+      touchTarget={!isDesktop}
     />
   ) : null;
 
