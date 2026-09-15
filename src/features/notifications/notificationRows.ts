@@ -30,10 +30,18 @@ export interface CharacterSectionHeightInput {
   rowEnabledFor: (eventId: NotificationEventId) => boolean;
   /** Whether this Character holds `eveNotification`'s own scope (family/type rows gate on this alone, never capability). */
   hasEveNotificationScope: boolean;
+  /**
+   * True below `md`, where the header button takes the 44px touch tier
+   * (`min-h-11 md:min-h-0`, issue #1118) instead of its content height. Only
+   * the header changes across the breakpoint; every other row below is the
+   * same height on both.
+   */
+  touchViewport: boolean;
 }
 
 type InternalRowKind =
   | 'character-header'
+  | 'character-header-touch'
   | 'column-captions'
   | 'event'
   | 'extractor-hint'
@@ -55,6 +63,10 @@ type InternalRowKind =
  */
 const ROW_HEIGHT: Record<InternalRowKind, number> = {
   'character-header': 32,
+  // `min-h-11` (44px) — the touch-tier floor the header button takes below
+  // `md`. Like `character-header` above it ignores the section's 1px border,
+  // so the two tiers stay directly comparable.
+  'character-header-touch': 44,
   'column-captions': 26,
   event: 33,
   'extractor-hint': 48,
@@ -69,13 +81,14 @@ const ROW_HEIGHT: Record<InternalRowKind, number> = {
 };
 
 /**
- * One Character's estimated section height: the header row, plus — while
+ * One Character's estimated section height: the header row (at whichever
+ * tier `touchViewport` selects), plus — while
  * expanded — column captions, one row per visible event, and whatever
  * inline disclosure/threshold/eve-type rows that event carries. Same
  * conditions the old inline JSX used to decide what to render.
  */
 export function estimateCharacterSectionHeight(input: CharacterSectionHeightInput): number {
-  let height = ROW_HEIGHT['character-header'];
+  let height = ROW_HEIGHT[input.touchViewport ? 'character-header-touch' : 'character-header'];
   if (!input.expanded) return height;
 
   height += ROW_HEIGHT['column-captions'];

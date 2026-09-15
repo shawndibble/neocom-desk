@@ -339,6 +339,51 @@ describe('EntryList narrow vs desktop layout (#114)', () => {
     }
   });
 
+  /**
+   * #1106: the pill was a bare `px-1` button around 11px text — roughly a
+   * 17px tap target on the one layout where a thumb is doing the tapping.
+   * The chip keeps that size; the trigger around it grows. Asserted on the
+   * class here because jsdom has no layout; the rendered box is asserted in
+   * `e2e/skillPlanEditorNarrow.spec.ts`.
+   */
+  it('pads the priority pill out to the sm touch tier below the desktop breakpoint', () => {
+    const restore = mockDesktop(false);
+    try {
+      render(
+        <EntryList
+          rows={[entryRow(1, [5])]}
+          bandsAt={new Map()}
+          {...defaultProps}
+          columns={{ ...DEFAULT_COLUMN_VISIBILITY, priority: true }}
+        />
+      );
+      const pill = screen.getByLabelText(/priority for skill 1/i);
+      expect(pill).toHaveClass('h-9');
+      // The chip itself is untouched: same border and padding as the
+      // attribute badge it sits beside.
+      expect(pill.querySelector('span')).toHaveClass('px-1');
+    } finally {
+      restore();
+    }
+  });
+
+  it('leaves the desktop pill unpadded, so it stays flush with the sm controls in its row', () => {
+    const restore = mockDesktop(true);
+    try {
+      render(
+        <EntryList
+          rows={[entryRow(1, [5])]}
+          bandsAt={new Map()}
+          {...defaultProps}
+          columns={{ ...DEFAULT_COLUMN_VISIBILITY, priority: true }}
+        />
+      );
+      expect(screen.getByLabelText(/priority for skill 1/i)).not.toHaveClass('h-9');
+    } finally {
+      restore();
+    }
+  });
+
   it('shows a single-line row under Takes/Done by headers on desktop', () => {
     const restore = mockDesktop(true);
     try {
