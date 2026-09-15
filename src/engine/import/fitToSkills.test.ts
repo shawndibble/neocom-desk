@@ -27,8 +27,8 @@ describe('fitToSkills', () => {
       {
         shipName: 'Rifter',
         items: [
-          { name: '125mm Gatling AutoCannon II', quantity: 2 },
-          { name: 'Damage Control II', quantity: 1 },
+          { name: '125mm Gatling AutoCannon II', quantity: 2, line: 2 },
+          { name: 'Damage Control II', quantity: 1, line: 3 },
         ],
       },
       TYPE_BY_NAME,
@@ -49,7 +49,7 @@ describe('fitToSkills', () => {
 
   it('reports an error for unknown item names instead of throwing', () => {
     const result = fitToSkills(
-      { shipName: 'Rifter', items: [{ name: 'Not A Real Module', quantity: 1 }] },
+      { shipName: 'Rifter', items: [{ name: 'Not A Real Module', quantity: 1, line: 2 }] },
       TYPE_BY_NAME,
       requiredSkills
     );
@@ -85,8 +85,8 @@ describe('fitToSkills', () => {
       {
         shipName: '',
         items: [
-          { name: 'asdf', quantity: 1 },
-          { name: '####', quantity: 1 },
+          { name: 'asdf', quantity: 1, line: 2 },
+          { name: '####', quantity: 1, line: 3 },
         ],
       },
       TYPE_BY_NAME,
@@ -98,7 +98,7 @@ describe('fitToSkills', () => {
 
   it('items with no required skills contribute nothing', () => {
     const result = fitToSkills(
-      { shipName: '', items: [{ name: 'Damage Control II', quantity: 1 }] },
+      { shipName: '', items: [{ name: 'Damage Control II', quantity: 1, line: 2 }] },
       TYPE_BY_NAME,
       (typeID) => (typeID === 2048 ? [] : requiredSkills(typeID))
     );

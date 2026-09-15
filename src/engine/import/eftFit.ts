@@ -45,11 +45,28 @@ export interface EftItem {
    * rather than missiles and is a production quantity under no reading at all.
    */
   isCharge?: true;
+  /**
+   * 1-indexed source line this item was written on. Both halves of a
+   * "Module Name, Charge Name" line carry the same number — they are one line
+   * to the reader looking at their own paste.
+   *
+   * Additive, like `isCharge`: it leaves the item list's cardinality alone, so
+   * `clipboardImport`'s line-counted "Unknown item xN" warning is unchanged.
+   * Appraisal (issue #1026) needs it to report an unpriceable name by the line
+   * the pilot can actually go and fix.
+   */
+  line: number;
 }
 
 export interface EftFit {
   shipName: string;
   fitName: string;
+  /**
+   * 1-indexed line the header was found on — 1 for an empty paste. The hull is
+   * named there and nowhere else, so a caller pricing the hull has no other
+   * source line to report it against.
+   */
+  headerLine: number;
   items: EftItem[];
   errors: EftParseError[];
 }
@@ -67,6 +84,21 @@ const EMPTY_SLOT = /^\[Empty\s+.+\s+slot\]$/i;
 const OFFLINE_SUFFIX = /\s*\/offline\s*$/i;
 const QUANTITY_SUFFIX = /^(.*\S)\s+x(\d+)$/i;
 
+/**
+ * Does this paste look like an EFT fit? True when its first non-blank line
+ * opens a bracket, which is the only shape an EFT header ever takes.
+ *
+ * Deliberately loose: a *malformed* header still answers true, so `parseEftFit`
+ * gets to report it as an error instead of the paste being quietly read as a
+ * list of loose items. Exported so every caller that has to choose a parser
+ * — the Skill Planner's clipboard import, the Market page's Appraisal — asks
+ * the same question, rather than each keeping a regex that can drift.
+ */
+export function looksLikeEftFit(text: string): boolean {
+  const first = text.split(/\r\n|\r|\n/).find((line) => line.trim() !== '');
+  return first !== undefined && first.trim().startsWith('[');
+}
+
 /** Parse pasted EFT fit text. Never throws — malformed input surfaces as `errors`. */
 export function parseEftFit(text: string): EftFit {
   const lines = text.split(/\r\n|\r|\n/);
@@ -77,19 +109,20 @@ export function parseEftFit(text: string): EftFit {
   let fitName = '';
 
   const headerIndex = lines.findIndex((l) => l.trim() !== '');
-  const headerLine = headerIndex === -1 ? '' : lines[headerIndex].trim();
+  const headerLine = headerIndex === -1 ? 1 : headerIndex + 1;
+  const headerText = headerIndex === -1 ? '' : lines[headerIndex].trim();
   // A fit body pasted without its header line starts on an empty slot, which
   // — now that a bare "[Ship]" is a legal header — would otherwise be read as
   // a hull named "Empty high slot".
-  const headerMatch = EMPTY_SLOT.test(headerLine) ? null : HEADER.exec(headerLine);
+  const headerMatch = EMPTY_SLOT.test(headerText) ? null : HEADER.exec(headerText);
   if (headerMatch) {
     shipName = headerMatch[1];
     // Absent on a bare "[Ship]", empty on "[Ship, ]" — the same to callers.
     fitName = headerMatch[2] ?? '';
   } else {
     errors.push({
-      line: headerIndex === -1 ? 1 : headerIndex + 1,
-      text: headerLine,
+      line: headerLine,
+      text: headerText,
       reason: 'invalid or missing fit header, expected "[Ship Name]" or "[Ship Name, Fit Name]"',
     });
   }
@@ -109,9 +142,9 @@ export function parseEftFit(text: string): EftFit {
       errors.push({ line: i + 1, text: trimmed, reason: 'unparseable item line' });
       continue;
     }
-    items.push({ name: modulePart, quantity });
-    if (chargePart) items.push({ name: chargePart, quantity, isCharge: true });
+    items.push({ name: modulePart, quantity, line: i + 1 });
+    if (chargePart) items.push({ name: chargePart, quantity, line: i + 1, isCharge: true });
   }
 
-  return { shipName, fitName, items, errors };
+  return { shipName, fitName, headerLine, items, errors };
 }

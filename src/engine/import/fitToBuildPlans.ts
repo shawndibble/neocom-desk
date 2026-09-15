@@ -190,7 +190,7 @@ export function fitToBuildPlans(
 
   const hullResolution = headerFailed ? null : lookup(fit.shipName);
   if (!headerFailed && !hullResolution) {
-    addSkipped(skipped, { name: fit.shipName, quantity: 1 });
+    addSkipped(skipped, { name: fit.shipName, quantity: 1, line: fit.headerLine });
   }
 
   return {

@@ -21,8 +21,9 @@ here — they go one per file in `docs/context/decisions/`.
   notification the same fire may also raise: two delivery channels, one event.
 - **API-Derived Data**: Character data pulled from ESI (assets, mail, wallet, etc.). Cached locally per device for offline viewing. Never synced through the backend.
 - **Appraisal**: A Market page tab that prices a pasted pile of items — loot,
-  a haul, a shopping list — at a **Trade Hub**, on both sides of the book at
-  once: what it fetches sold into buy orders, and what it costs bought off
+  a haul, a shopping list, or a whole EFT ship fit (issue #1026), whose hull
+  and loaded charges it prices alongside the modules — at a **Trade Hub**, on
+  both sides of the book at once: what it fetches sold into buy orders, and what it costs bought off
   sell orders. Scaled by a **Price Percent**. Distinct from **Compare**, which
   puts a handful of Quickbar items side by side on their own prices: an
   Appraisal answers "what is this pile worth", Compare answers "which of these
@@ -266,7 +267,7 @@ here — they go one per file in `docs/context/decisions/`.
   read of it asks "can this set supply the product", not "how much". Carried as
   `NetworkColony.exportablePerHour`, computed by `colonyExportablePerHour`.
 - **Facility Preset**: Industry location model: NPC station or player structure type + rig level. Manufacturing structures (Raitaru/Azbel/Sotiyo, engineering complexes) and reaction structures (Athanor/Tatara, refineries — no NPC-station equivalent) each use their own **Industry Activity**'s rig bonuses and security-multiplier table (issue #460); the two never mix on one facility. Drives ME/time/cost bonuses in a Build Plan.
-- **Fit Import**: Pasting EFT fit text into Industry to get a **Build Group** holding one **Build Plan** per buildable item in the fit, named from the paste's own `[Ship, Fit]` header. Counts quantities the way a fit expresses them — one line per copy fitted _and_ the `xN` suffix, both reaching the same total — and reports what it could not build (faction, named and meta modules have no blueprint, and a fifth of a routine paste is normally one of those) rather than dropping it silently. New plans take their ME from the assumed-ME preference and their TE from the assumed-TE one rather than 0, since most of a T2 fit needs an invented BPC (ME2 / TE4 without a decryptor) and quoting it unresearched overstates the group's cost and understates its job time. Distinct from the Skill Planner's clipboard import, which reads the same text for the skills it demands; the two share `parseEftFit` and nothing else.
+- **Fit Import**: Pasting EFT fit text into Industry to get a **Build Group** holding one **Build Plan** per buildable item in the fit, named from the paste's own `[Ship, Fit]` header. Counts quantities the way a fit expresses them — one line per copy fitted _and_ the `xN` suffix, both reaching the same total — and reports what it could not build (faction, named and meta modules have no blueprint, and a fifth of a routine paste is normally one of those) rather than dropping it silently. New plans take their ME from the assumed-ME preference and their TE from the assumed-TE one rather than 0, since most of a T2 fit needs an invented BPC (ME2 / TE4 without a decryptor) and quoting it unresearched overstates the group's cost and understates its job time. Distinct from the Skill Planner's clipboard import, which reads the same text for the skills it demands, and from **Appraisal**, which reads it for what the loadout costs to buy; all three share `parseEftFit` and nothing else.
 - **Foreground Poller**: Client-side interval (5 minutes) that checks each
   enabled Notification Event's underlying ESI data while the app is open and
   the tab/window is visible; paused via the Page Visibility API when
