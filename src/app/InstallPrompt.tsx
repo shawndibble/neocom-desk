@@ -7,6 +7,7 @@ import {
   selectInstallPromptVariant,
   type BeforeInstallPromptEvent,
 } from './installPromptRules';
+import { useOnboardingBannerSlot } from './onboardingBannerSlot';
 
 /**
  * One-time install CTA: captures the native `beforeinstallprompt` event on
@@ -33,17 +34,22 @@ export function InstallPrompt() {
     return () => window.removeEventListener('beforeinstallprompt', handler);
   }, []);
 
-  if (!hydrated) return null;
+  const variant = hydrated
+    ? selectInstallPromptVariant({
+        seen,
+        isStandalone: window.matchMedia('(display-mode: standalone)').matches,
+        deferredPromptAvailable: deferredPrompt !== null,
+        isIOS: isIosSafari(navigator.userAgent),
+      })
+    : 'none';
 
-  const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
-  const variant = selectInstallPromptVariant({
-    seen,
-    isStandalone,
-    deferredPromptAvailable: deferredPrompt !== null,
-    isIOS: isIosSafari(navigator.userAgent),
-  });
-
-  if (variant === 'none') return null;
+  // Eligibility above is unchanged; this only decides whether the shared
+  // bottom slot is this banner's to use right now (issue #1124).
+  const hasSlot = useOnboardingBannerSlot('install', variant !== 'none');
+  // Both, not just the slot: registration happens in an effect, so the store
+  // still says "eligible" for the one commit after a dismissal flips
+  // `variant` back to 'none'.
+  if (variant === 'none' || !hasSlot) return null;
 
   const dismiss = () => void setValue(true);
 
@@ -57,6 +63,7 @@ export function InstallPrompt() {
   return (
     <div
       role="alert"
+      data-testid="onboarding-banner"
       className="fixed bottom-16 left-4 z-50 flex items-center gap-3 rounded-xs border border-line-bright bg-panel-2 px-3 py-2 text-sm shadow-lg md:bottom-4"
     >
       <span>{variant === 'native' ? t('pwa.installCta') : t('pwa.installIosCta')}</span>

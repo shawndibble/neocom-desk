@@ -11,6 +11,7 @@ import {
 } from './permission';
 import { webPushSupport } from '@/sync/deviceRegistration';
 import { enableWebPush } from './webPush';
+import { useOnboardingBannerSlot } from '@/app/onboardingBannerSlot';
 
 /**
  * The one-time notification explainer (issue #171). Mounted in `Layout`, so it
@@ -49,7 +50,12 @@ export function NotificationPermissionPrompt() {
     permission,
     installRequired,
   });
-  if (!visible) return null;
+  // Eligibility above is unchanged; this only decides whether the shared
+  // bottom slot is this banner's to use right now (issue #1124).
+  const hasSlot = useOnboardingBannerSlot('notifications', visible);
+  // Both, not just the slot: registration happens in an effect, so the store
+  // still says "eligible" for the one commit after `visible` goes false.
+  if (!visible || !hasSlot) return null;
 
   const dismiss = () => void setValue({ seen: true, outcome: value.outcome });
   const enable = async () => {
@@ -60,9 +66,11 @@ export function NotificationPermissionPrompt() {
   return (
     <div
       role="alert"
-      // Sits above InstallPrompt's own fixed banner rather than on top of it —
-      // a first login can plausibly surface both at once.
-      className="fixed inset-x-4 bottom-28 z-50 space-y-2 rounded-xs border border-line-bright bg-panel-2 px-3 py-2 text-sm shadow-lg md:bottom-16 md:left-auto md:max-w-sm"
+      data-testid="onboarding-banner"
+      // Shares one bottom slot with the other onboarding banners, so it can
+      // sit directly above the phone tab bar rather than stacked clear of
+      // them (issue #1124) — only one of the three is ever mounted at once.
+      className="fixed inset-x-4 bottom-16 z-50 space-y-2 rounded-xs border border-line-bright bg-panel-2 px-3 py-2 text-sm shadow-lg md:bottom-16 md:left-auto md:max-w-sm"
     >
       <p className="font-medium text-text">{t('notifications.prompt.title')}</p>
       <p className="text-xs text-text-dim">
