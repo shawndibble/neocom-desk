@@ -93,6 +93,18 @@ export interface RouteSnapshot<T> {
   refresh: () => void;
 }
 
+/**
+ * How many times in a row a reload's *own* reads may re-trigger another
+ * reload (see `consecutiveAutoReloads` below) before the chain is treated as
+ * noise and dropped. Deliberately not time-based: an earlier version of this
+ * fix throttled by wall-clock spacing, but a single reload that itself takes
+ * longer than that window (an entirely ordinary case on a slow mobile
+ * connection — exactly where this bug was reported) lets the cooldown lapse
+ * *during* the reload, so the chain continues anyway, just slower instead of
+ * bounded. Counting consecutive bounces has no such window to outlast.
+ */
+const MAX_CONSECUTIVE_AUTO_RELOADS = 3;
+
 export function useRouteSnapshot<T>(
   load: (characterId: number, signal: RouteSnapshotSignal) => Promise<T>,
   /**
@@ -132,6 +144,27 @@ export function useRouteSnapshot<T>(
   const [revalidation, setRevalidation] = useState(0);
   const loadInFlight = useRef(false);
   const revalidationPending = useRef(false);
+  /**
+   * How many revalidation-triggered reloads have chained back to back with
+   * nothing settling cleanly in between. A page that reads many keys (BPC
+   * Search: one `loadRegionName`/`loadBlueprintLocation` call per distinct
+   * region/location, easily hundreds) can have a reload's *own* reads
+   * provoke a fresh signal the same way the original load's did — with
+   * nothing to break the cycle, that chains forever: an unbounded string of
+   * reloads running back to back in the background (each one's own
+   * coalesced signal firing the next the moment it settles). The coalescing
+   * above already keeps any single reload's commit from being lost —
+   * `loading` doesn't get stuck — but the chain itself is otherwise endless:
+   * on a page with expensive renders (BPC Search's `useMemo`s recompute over
+   * a six-figure row array on every reload) that reads as the tab hanging.
+   *
+   * Reset to 0 the moment a reload settles *without* provoking a further
+   * signal during its own run (see the `finally` block below) — a real
+   * budget that replenishes whenever things actually go quiet, not a
+   * lifetime cap that would otherwise silently stop picking up genuine
+   * revalidations for the rest of a long-lived mount.
+   */
+  const consecutiveAutoReloads = useRef(0);
 
   // Adjusting state during render, React's documented way to reset on a
   // changed input: it re-renders before committing, so no effect round-trip
@@ -163,6 +196,10 @@ export function useRouteSnapshot<T>(
           revalidationPending.current = true;
           return;
         }
+        // Nothing was loading when this signal arrived, so it cannot be a
+        // reload chaining off its own reads — an isolated, unrelated settle
+        // always gets its reload, uncapped. Whether *this* reload turns out
+        // to start its own chain is judged independently in `finally` below.
         setRevalidation((n) => n + 1);
       }),
     []
@@ -190,7 +227,18 @@ export function useRouteSnapshot<T>(
           loadInFlight.current = false;
           if (revalidationPending.current) {
             revalidationPending.current = false;
-            setRevalidation((n) => n + 1);
+            if (consecutiveAutoReloads.current < MAX_CONSECUTIVE_AUTO_RELOADS) {
+              consecutiveAutoReloads.current += 1;
+              setRevalidation((n) => n + 1);
+            }
+            // else: the chain is capped — drop it. The view keeps whatever
+            // it just committed rather than chasing a self-perpetuating
+            // signal forever.
+          } else {
+            // Settled clean: nothing arrived while this reload was running,
+            // so any chain that was in progress is over. Reset so a later,
+            // unrelated storm gets its own full budget.
+            consecutiveAutoReloads.current = 0;
           }
         }
       }
