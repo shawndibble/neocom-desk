@@ -44,6 +44,16 @@ async function makeInstallPromptEligible(page: import('@playwright/test').Page):
     });
     window.dispatchEvent(event);
   });
+  // Two frames, so React has certainly processed the event, re-rendered and
+  // run the slot effect. Without this the count assertion below would run in
+  // the gap before a second banner could ever mount, and would pass against
+  // an implementation that does no arbitration at all.
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+      )
+  );
 }
 
 test('shows one onboarding banner at a time at 390px, then the next one', async ({ page }) => {
@@ -52,6 +62,10 @@ test('shows one onboarding banner at a time at 390px, then the next one', async 
   await page.setViewportSize(PHONE);
   await page.goto('./overview');
 
+  // Counted as the AC words it: every `role="alert"` on the page, so a future
+  // fixed banner that regresses the rule without opting into the shared
+  // testid still fails this. The testid only says which banner is showing.
+  const alerts = page.getByRole('alert');
   const banners = page.getByTestId('onboarding-banner');
   const notificationBanner = banners.filter({ hasText: 'Turn on notifications?' });
 
@@ -63,12 +77,12 @@ test('shows one onboarding banner at a time at 390px, then the next one', async 
 
   // Priority order — notifications outrank install, and install must not
   // appear alongside it.
-  await expect(banners).toHaveCount(1);
+  await expect(alerts).toHaveCount(1);
   await expect(notificationBanner).toBeVisible();
 
   // Dismissing the winner hands the slot to the next-highest eligible banner.
   await notificationBanner.getByRole('button', { name: 'Not now' }).click();
   await expect(notificationBanner).toBeHidden();
-  await expect(banners).toHaveCount(1);
+  await expect(alerts).toHaveCount(1);
   await expect(banners.first()).toContainText('Install Neocom Desk');
 });

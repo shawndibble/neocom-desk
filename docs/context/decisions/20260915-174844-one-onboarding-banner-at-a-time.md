@@ -28,6 +28,10 @@ _Recorded 2026-09-15 · issue #1124._
   the phone tab bar is the only position that still makes sense.
 - **`ReloadPrompt` stays out of it.** It is a service-worker update prompt,
   not onboarding: it is not one-time, not dismissible-forever, and fires on a
-  deploy rather than on a first login. The banners carry a shared
-  `data-testid="onboarding-banner"` so the e2e assertion counts the
-  onboarding set rather than every `role="alert"` in the bottom band.
+  deploy rather than on a first login. It also renders no UI of its own, so it
+  never competes for the bottom band in the first place.
+- **The e2e count assertion is on `role="alert"`, as the ticket's AC words
+  it** — the stronger invariant, since it would also catch a future fixed
+  banner that regressed the rule without opting into the shared
+  `data-testid="onboarding-banner"`. The testid exists only to say _which_
+  onboarding banner is showing.

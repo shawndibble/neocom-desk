@@ -46,7 +46,10 @@ export function InstallPrompt() {
   // Eligibility above is unchanged; this only decides whether the shared
   // bottom slot is this banner's to use right now (issue #1124).
   const hasSlot = useOnboardingBannerSlot('install', variant !== 'none');
-  if (!hasSlot) return null;
+  // Both, not just the slot: registration happens in an effect, so the store
+  // still says "eligible" for the one commit after a dismissal flips
+  // `variant` back to 'none'.
+  if (variant === 'none' || !hasSlot) return null;
 
   const dismiss = () => void setValue(true);
 

@@ -69,7 +69,10 @@ export function CorpGrantPrompt() {
   // Eligibility above is unchanged; this only decides whether the shared
   // bottom slot is this banner's to use right now (issue #1124).
   const hasSlot = useOnboardingBannerSlot('corp-grant', eligible);
-  if (!hasSlot) return null;
+  // Both, not just the slot: registration happens in an effect, so the store
+  // still says "eligible" for the one commit after a dismissal flips
+  // `eligible` false.
+  if (!eligible || !hasSlot) return null;
   // Restated rather than derived from `eligible`: a boolean carries none of
   // the narrowing the render below needs from these two.
   if (activeCharacterId === null || access.state !== 'roles-without-grant') return null;

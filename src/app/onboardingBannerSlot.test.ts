@@ -48,12 +48,16 @@ describe('useOnboardingBannerSlot', () => {
     expect(result.current).toBe(false);
   });
 
+  // No forced `rerender()` anywhere below: a losing banner re-rendering itself
+  // off its own store subscription is the whole mechanism, and a forced
+  // rerender would hide a broken subscription by re-reading the store anyway.
   it('grants the slot to the highest-priority claimant only', () => {
     const install = renderHook(() => useOnboardingBannerSlot('install', true));
+    expect(install.result.current).toBe(true);
+
     const notifications = renderHook(() => useOnboardingBannerSlot('notifications', true));
 
     expect(notifications.result.current).toBe(true);
-    install.rerender();
     expect(install.result.current).toBe(false);
   });
 
@@ -61,15 +65,12 @@ describe('useOnboardingBannerSlot', () => {
     const install = renderHook(() => useOnboardingBannerSlot('install', true));
     const notifications = renderHook(
       ({ eligible }) => useOnboardingBannerSlot('notifications', eligible),
-      {
-        initialProps: { eligible: true },
-      }
+      { initialProps: { eligible: true } }
     );
-    install.rerender();
     expect(install.result.current).toBe(false);
 
     act(() => notifications.rerender({ eligible: false }));
-    install.rerender();
+
     expect(notifications.result.current).toBe(false);
     expect(install.result.current).toBe(true);
   });
@@ -77,11 +78,10 @@ describe('useOnboardingBannerSlot', () => {
   it('releases the slot when the winning banner unmounts', () => {
     const install = renderHook(() => useOnboardingBannerSlot('install', true));
     const notifications = renderHook(() => useOnboardingBannerSlot('notifications', true));
-    install.rerender();
     expect(install.result.current).toBe(false);
 
     act(() => notifications.unmount());
-    install.rerender();
+
     expect(install.result.current).toBe(true);
   });
 });

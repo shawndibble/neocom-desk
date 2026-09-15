@@ -53,7 +53,9 @@ export function NotificationPermissionPrompt() {
   // Eligibility above is unchanged; this only decides whether the shared
   // bottom slot is this banner's to use right now (issue #1124).
   const hasSlot = useOnboardingBannerSlot('notifications', visible);
-  if (!hasSlot) return null;
+  // Both, not just the slot: registration happens in an effect, so the store
+  // still says "eligible" for the one commit after `visible` goes false.
+  if (!visible || !hasSlot) return null;
 
   const dismiss = () => void setValue({ seen: true, outcome: value.outcome });
   const enable = async () => {
