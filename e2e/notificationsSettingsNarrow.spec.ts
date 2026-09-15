@@ -55,11 +55,11 @@ test('per-Character disclosure header meets the 44px touch floor at 390px, and s
   expect(collapsedHeight).toBeGreaterThanOrEqual(44);
 
   // The padding the old button left as dead space is now inside the hit
-  // area: a click 4px below the row's vertical centre — over padding, not
-  // over the name text — must still toggle.
+  // area: a click 3px below the row's top edge — well clear of the name text
+  // that used to be the only target — must still toggle.
   const box = await toggle.boundingBox();
   if (!box) throw new Error('toggle has no bounding box');
-  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2 + 4);
+  await page.mouse.click(box.x + box.width / 2, box.y + 3);
   await expect(toggle).toHaveAttribute('aria-expanded', 'true');
 });
 

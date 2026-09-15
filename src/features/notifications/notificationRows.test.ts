@@ -19,11 +19,32 @@ function input(overrides: Partial<CharacterSectionHeightInput> = {}): CharacterS
     visibleEventIds: [],
     rowEnabledFor: () => true,
     hasEveNotificationScope: false,
+    touchViewport: false,
     ...overrides,
   };
 }
 
 describe('estimateCharacterSectionHeight', () => {
+  it('a touch viewport estimates the taller touch-tier header (issue #1118)', () => {
+    // The header button carries `min-h-11 md:min-h-0`, so the same section is
+    // 12px taller on a phone. The virtualizer has no `measureElement` to
+    // correct that later: an estimate stuck at the pointer height would stack
+    // every section 12px too high and overlap them down a long roster.
+    const pointer = estimateCharacterSectionHeight(input({ touchViewport: false }));
+    const touch = estimateCharacterSectionHeight(input({ touchViewport: true }));
+    expect(touch - pointer).toBe(12);
+  });
+
+  it('the touch-tier header is added once per section, not once per row', () => {
+    const expandedPointer = estimateCharacterSectionHeight(
+      input({ expanded: true, visibleEventIds: [ORDINARY, FUEL], touchViewport: false })
+    );
+    const expandedTouch = estimateCharacterSectionHeight(
+      input({ expanded: true, visibleEventIds: [ORDINARY, FUEL], touchViewport: true })
+    );
+    expect(expandedTouch - expandedPointer).toBe(12);
+  });
+
   it('a collapsed Character is just the header, regardless of how many events it has', () => {
     const collapsed = estimateCharacterSectionHeight(input({ expanded: false }));
     const withEvents = estimateCharacterSectionHeight(

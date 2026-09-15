@@ -121,6 +121,29 @@ const EVENT_BY_ID = new Map(NOTIFICATION_EVENTS.map((event) => [event.id, event]
 /** Stable identity for a Character with no token row yet, so it doesn't itself break `CharacterNotificationSection`'s memo. */
 const EMPTY_SCOPES: ReadonlySet<string> = new Set();
 
+/** Matches Layout.tsx's phone/desktop line (#114). */
+const DESKTOP_QUERY = '(min-width: 48rem)';
+
+/**
+ * True at or above `md`, where the section header drops back off the touch
+ * tier (issue #1118). The virtualizer sizes every section from a fixed
+ * estimate with no `measureElement` behind it, so the estimate has to know
+ * which tier the header is actually rendering at. Local rather than shared,
+ * matching `EntryList.tsx`'s own copy of this hook.
+ */
+function useIsDesktop(): boolean {
+  const [isDesktop, setIsDesktop] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia(DESKTOP_QUERY).matches
+  );
+  useEffect(() => {
+    const desktop = window.matchMedia(DESKTOP_QUERY);
+    const onChange = (e: MediaQueryListEvent) => setIsDesktop(e.matches);
+    desktop.addEventListener('change', onChange);
+    return () => desktop.removeEventListener('change', onChange);
+  }, []);
+  return isDesktop;
+}
+
 /**
  * Events whose whole row is delivered by Scheduled Push — the ones that carry
  * the badge saying so.
@@ -359,6 +382,7 @@ export function NotificationsPanel() {
    */
   const [listElement, setListElement] = useState<HTMLDivElement | null>(null);
   const [scrollMargin, setScrollMargin] = useState(0);
+  const isDesktop = useIsDesktop();
   // A callback ref, not a plain `useRef` read at render time (the eslint
   // `react-hooks/refs` rule this project enables forbids that): the list sits
   // below content whose height can change after mount (a permission banner
@@ -390,6 +414,7 @@ export function NotificationsPanel() {
       const characterCapabilities = capabilitiesByCharacterId.get(character.characterId);
       return estimateCharacterSectionHeight({
         expanded,
+        touchViewport: !isDesktop,
         visibleEventIds,
         rowEnabledFor: (eventId) =>
           characterEventRowState(eventId, grantedScopes, characterCapabilities).rowEnabled,
@@ -408,6 +433,18 @@ export function NotificationsPanel() {
     scrollMargin,
     overscan: 5,
   });
+
+  // Crossing the `md` breakpoint changes the header tier, and so every
+  // section's estimated height — `measure()` drops the sizes cached under
+  // the old tier so the new estimates are the ones laid out (TanStack
+  // Virtual's documented reset for exactly this). Without it, rotating a
+  // phone past `md` keeps positioning sections at the old heights.
+  // (`rowVirtualizer` is in the deps but never retriggers this on its own:
+  // `useWindowVirtualizer` builds the instance once in a `useState` and
+  // mutates its options, so its identity is stable across renders.)
+  useEffect(() => {
+    rowVirtualizer.measure();
+  }, [isDesktop, rowVirtualizer]);
 
   return (
     <Panel title={t('settings.notificationsTitle')}>
