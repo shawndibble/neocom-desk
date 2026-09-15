@@ -81,6 +81,7 @@ describe('findLpOfferMatches', () => {
     const matches = result.matchesByTypeId.get(33468);
     expect(matches).toHaveLength(1);
     expect(matches?.[0]).toEqual({
+      corporationId: 1000125,
       corpName: 'Sisters of EVE',
       offer: ASTERO_OFFER,
       playerLp: 500_000,
@@ -133,11 +134,19 @@ describe('findLpOfferMatches', () => {
 describe('toLpOfferInputs', () => {
   it("adapts a raw match into the engine's plain offer shape", () => {
     const inputs = toLpOfferInputs(
-      [{ corpName: 'Sisters of EVE', offer: ASTERO_OFFER, playerLp: 500_000 }],
+      [
+        {
+          corporationId: 1000125,
+          corpName: 'Sisters of EVE',
+          offer: ASTERO_OFFER,
+          playerLp: 500_000,
+        },
+      ],
       new Map()
     );
     expect(inputs).toEqual([
       {
+        corporationId: 1000125,
         corpName: 'Sisters of EVE',
         quantityPerRedemption: 1,
         lpCostPerRedemption: 400_000,
@@ -154,7 +163,7 @@ describe('toLpOfferInputs', () => {
       required_items: [{ type_id: 44992, quantity: 10 }],
     };
     const inputs = toLpOfferInputs(
-      [{ corpName: 'Sisters of EVE', offer, playerLp: 500_000 }],
+      [{ corporationId: 1000125, corpName: 'Sisters of EVE', offer, playerLp: 500_000 }],
       new Map([[44992, 100]])
     );
     expect(inputs[0].requiredItemsCostPerRedemption).toBe(1_000);
@@ -166,7 +175,7 @@ describe('toLpOfferInputs', () => {
       required_items: [{ type_id: 44992, quantity: 10 }],
     };
     const inputs = toLpOfferInputs(
-      [{ corpName: 'Sisters of EVE', offer, playerLp: 500_000 }],
+      [{ corporationId: 1000125, corpName: 'Sisters of EVE', offer, playerLp: 500_000 }],
       new Map()
     );
     expect(inputs[0].requiredItemsCostPerRedemption).toBeNull();

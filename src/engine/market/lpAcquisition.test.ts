@@ -6,6 +6,7 @@ import {
 } from '@/engine/market/lpAcquisition';
 
 const asteroOffer: LpStoreOfferInput = {
+  corporationId: 1000125,
   corpName: 'Sisters of EVE',
   quantityPerRedemption: 1,
   lpCostPerRedemption: 400_000,
@@ -18,6 +19,7 @@ describe('priceLpOffer', () => {
   it('prices one redemption when the needed quantity is exactly one bundle', () => {
     const result = priceLpOffer(asteroOffer, 1);
     expect(result).toEqual({
+      corporationId: 1000125,
       corpName: 'Sisters of EVE',
       lpCost: 400_000,
       iskCost: 850_000,
@@ -62,11 +64,13 @@ describe('cheapestLpOffer', () => {
   it('picks the cheaper of two corps selling the same item', () => {
     const cheaper: LpStoreOfferInput = {
       ...asteroOffer,
+      corporationId: 1000126,
       corpName: 'Cheaper Corp',
       iskCostPerRedemption: 100_000,
     };
     const result = cheapestLpOffer([asteroOffer, cheaper], 1);
     expect(result?.corpName).toBe('Cheaper Corp');
+    expect(result?.corporationId).toBe(1000126);
   });
 
   it('skips unpriceable offers rather than letting them win as free', () => {

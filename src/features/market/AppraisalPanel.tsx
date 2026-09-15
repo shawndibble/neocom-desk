@@ -36,6 +36,7 @@ import { lpBeatsMarket, refineBeatsSellAsIs, type AppraisalRow } from '@/engine/
 import { countPasteLines } from '@/engine/market/appraisalPaste';
 import { iskToneClass } from '@/features/character/format';
 import type { BlueprintCatalog } from '@/features/industry/blueprintCatalog';
+import { LpStoreLink } from '@/features/loyalty/LpStoreLink';
 import { writeToClipboard } from '@/lib/clipboard';
 import { formatIskAuto } from '@/lib/isk';
 import { downloadCsv } from '@/lib/downloadCsv';
@@ -251,26 +252,34 @@ export function AppraisalPanel({
       id: 'lpTotal',
       header: t('market.appraisal.columnLpTotal'),
       align: 'right',
+      // Kept to the width of an ISK figure plus one icon — never the full
+      // "X ISK + Y LP (Corp)" sentence, which would blow out the column at
+      // phone width. That sentence still exists, as the icon's tooltip and
+      // accessible name (`LpStoreLink`'s `label`).
       className: 'whitespace-nowrap tabular-nums',
-      render: (row) =>
-        row.lpCorpName === undefined
-          ? '—'
-          : comparisonCell(
-              t('market.appraisal.lpTotalCell', {
-                isk: formatIskAuto(row.lpIskCost ?? 0),
-                lp: formatVolume(row.lpCost ?? 0),
-                corp: row.lpCorpName,
-              }),
-              lpBeatsMarket(row),
-              row.lpAffordable === false && (
-                <span
-                  className="ml-0.5 text-warning"
-                  title={t('market.appraisal.lpUnaffordableHint', { corp: row.lpCorpName })}
-                >
-                  *
-                </span>
-              )
-            ),
+      render: (row) => {
+        if (row.lpCorpName === undefined || row.lpCorporationId === undefined) return '—';
+        const label = t('market.appraisal.lpTotalCell', {
+          isk: formatIskAuto(row.lpIskCost ?? 0),
+          lp: formatVolume(row.lpCost ?? 0),
+          corp: row.lpCorpName,
+        });
+        return comparisonCell(
+          <span className="inline-flex items-center gap-1">
+            {totalCell(row.lpIskCost ?? null, 'longPress')}
+            <LpStoreLink corporationId={row.lpCorporationId} label={label} />
+          </span>,
+          lpBeatsMarket(row),
+          row.lpAffordable === false && (
+            <span
+              className="ml-0.5 text-warning"
+              title={t('market.appraisal.lpUnaffordableHint', { corp: row.lpCorpName })}
+            >
+              *
+            </span>
+          )
+        );
+      },
       sortValue: (row) => row.lpIskCost ?? undefined,
     });
   }

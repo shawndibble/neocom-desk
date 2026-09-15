@@ -15,6 +15,7 @@
 
 /** One LP-store offer this item can be redeemed from, already resolved to one corp's numbers. */
 export interface LpStoreOfferInput {
+  corporationId: number;
   corpName: string;
   /** Units of the item one redemption hands over — `LoyaltyStoreOffer.quantity`. */
   quantityPerRedemption: number;
@@ -34,6 +35,7 @@ export interface LpStoreOfferInput {
 
 /** What redeeming enough of one offer to cover a pasted quantity actually costs. */
 export interface AppraisalLpOption {
+  corporationId: number;
   corpName: string;
   /** Total LP needed to cover the pasted quantity, across however many redemptions that takes. */
   lpCost: number;
@@ -64,6 +66,7 @@ export function priceLpOffer(
   const lpCost = redemptions * offer.lpCostPerRedemption;
   const iskCost = redemptions * (offer.iskCostPerRedemption + offer.requiredItemsCostPerRedemption);
   return {
+    corporationId: offer.corporationId,
     corpName: offer.corpName,
     lpCost,
     iskCost,

@@ -190,6 +190,7 @@ describe('buildAppraisal', () => {
       // whatever the last player reseller asked, here worse than LP.
       sell: 95_000_000,
       lpOption: {
+        corporationId: 1000125,
         corpName: 'Sisters of EVE',
         lpCost: 400_000,
         iskCost: 850_000,
@@ -199,6 +200,7 @@ describe('buildAppraisal', () => {
 
     it('carries the LP option through onto the row', () => {
       const { rows } = buildAppraisal([astero], 100);
+      expect(rows[0].lpCorporationId).toBe(1000125);
       expect(rows[0].lpCorpName).toBe('Sisters of EVE');
       expect(rows[0].lpCost).toBe(400_000);
       expect(rows[0].lpIskCost).toBe(850_000);

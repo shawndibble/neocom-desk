@@ -340,6 +340,7 @@ describe('AppraisalPanel', () => {
               sellEach: 95_000_000,
               buyTotal: 60_000_000,
               sellTotal: 95_000_000,
+              lpCorporationId: 1000125,
               lpCorpName: 'Sisters of EVE',
               lpCost: 400_000,
               lpIskCost: 850_000,
@@ -374,8 +375,17 @@ describe('AppraisalPanel', () => {
     it('adds an LP store column and cheapest-total chip when a row has an LP option', () => {
       renderPanel({ controller: controller({ result: lpOutcome() }) });
       const asteroRow = screen.getByRole('row', { name: /Astero/ });
-      expect(within(asteroRow).getByText(/Sisters of EVE/)).toBeInTheDocument();
+      const link = within(asteroRow).getByRole('link', { name: /Sisters of EVE/ });
+      expect(link).toHaveAttribute('href', '/wallet/loyalty/1000125');
       expect(screen.getAllByText('Cheapest total').length).toBeGreaterThan(0);
+    });
+
+    it("never spells out the corp name as plain cell text — only the icon link's accessible name", () => {
+      renderPanel({ controller: controller({ result: lpOutcome() }) });
+      const asteroRow = screen.getByRole('row', { name: /Astero/ });
+      // Keeps the column narrow at any width: the full breakdown lives on the
+      // link's label/tooltip, never as a second visible text node in the cell.
+      expect(within(asteroRow).queryByText('Sisters of EVE')).not.toBeInTheDocument();
     });
 
     it('omits the LP column entirely with no LP option on any row', () => {

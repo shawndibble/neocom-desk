@@ -1726,6 +1726,7 @@ export function BuildPlanDetail({
               {acquisitionPickerTypeId !== null && (
                 <BlueprintAcquisitionModal
                   onClose={() => setAcquisitionPickerTypeId(null)}
+                  characterId={plan.characterId}
                   blueprintTypeID={acquisitionPickerTypeId}
                   blueprintName={nameForType(catalog, acquisitionPickerTypeId)}
                   ownedCopies={acquisitionPickerOwnedCopies}

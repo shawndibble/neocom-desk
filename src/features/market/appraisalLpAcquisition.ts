@@ -19,7 +19,8 @@ import { loadCorporationName, loadLoyaltyStoreOffers } from '@/features/loyalty/
 import type { LpStoreOfferInput } from '@/engine/market/lpAcquisition';
 
 /** One corp's offer for a type the paste asked about, before required-items pricing. */
-interface LpOfferMatch {
+export interface LpOfferMatch {
+  corporationId: number;
   corpName: string;
   offer: LoyaltyStoreOffer;
   playerLp: number;
@@ -67,7 +68,12 @@ export async function findLpOfferMatches(
       if (matching.length === 0) return null;
       const corpName =
         (await loadCorporationName(corp.corporation_id)) ?? `#${corp.corporation_id}`;
-      return { corpName, playerLp: corp.loyalty_points, offers: matching };
+      return {
+        corporationId: corp.corporation_id,
+        corpName,
+        playerLp: corp.loyalty_points,
+        offers: matching,
+      };
     })
   );
 
@@ -77,7 +83,12 @@ export async function findLpOfferMatches(
     if (!entry) continue;
     for (const offer of entry.offers) {
       const existing = matchesByTypeId.get(offer.type_id) ?? [];
-      existing.push({ corpName: entry.corpName, offer, playerLp: entry.playerLp });
+      existing.push({
+        corporationId: entry.corporationId,
+        corpName: entry.corpName,
+        offer,
+        playerLp: entry.playerLp,
+      });
       matchesByTypeId.set(offer.type_id, existing);
       for (const required of offer.required_items) requiredItemTypeIds.add(required.type_id);
     }
@@ -99,7 +110,7 @@ export function toLpOfferInputs(
   matches: readonly LpOfferMatch[],
   prices: ReadonlyMap<number, number | undefined>
 ): LpStoreOfferInput[] {
-  return matches.map(({ corpName, offer, playerLp }) => {
+  return matches.map(({ corporationId, corpName, offer, playerLp }) => {
     let requiredItemsCostPerRedemption: number | null = 0;
     for (const required of offer.required_items) {
       const unitPrice = prices.get(required.type_id);
@@ -110,6 +121,7 @@ export function toLpOfferInputs(
       requiredItemsCostPerRedemption += unitPrice * required.quantity;
     }
     return {
+      corporationId,
       corpName,
       quantityPerRedemption: offer.quantity,
       lpCostPerRedemption: offer.lp_cost,

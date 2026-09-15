@@ -93,6 +93,7 @@ export interface AppraisalRow {
   refinePricedAll?: boolean;
   refineUnitsLeftOver?: number;
   /** Undefined when nothing the character holds LP with sells this item. */
+  lpCorporationId?: number;
   lpCorpName?: string;
   lpCost?: number;
   lpIskCost?: number;
@@ -225,6 +226,7 @@ export function buildAppraisal(items: readonly AppraisalItem[], pricePercent: nu
       refineTotal,
       refinePricedAll,
       refineUnitsLeftOver,
+      lpCorporationId: item.lpOption?.corporationId,
       lpCorpName: item.lpOption?.corpName,
       lpCost: item.lpOption?.lpCost,
       lpIskCost: item.lpOption?.iskCost,

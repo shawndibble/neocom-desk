@@ -297,12 +297,16 @@ describe('appraisePaste', () => {
       mockedLoadCorrectedSkills.mockResolvedValue(skillsFixture([]));
       mockedFindLpOfferMatches.mockResolvedValue({
         matchesByTypeId: new Map([
-          [2048, [{ corpName: 'Test Corp', offer: {} as never, playerLp: 0 }]],
+          [
+            2048,
+            [{ corporationId: 1000125, corpName: 'Test Corp', offer: {} as never, playerLp: 0 }],
+          ],
         ]),
         requiredItemTypeIds: [],
       });
       mockedToLpOfferInputs.mockReturnValue([
         {
+          corporationId: 1000125,
           corpName: 'Test Corp',
           quantityPerRedemption: 1,
           lpCostPerRedemption: 100_000,
