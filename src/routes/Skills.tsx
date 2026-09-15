@@ -407,7 +407,7 @@ export function Skills() {
                       aria-expanded={expanded}
                       disabled={searching}
                       onClick={() => toggleGroup(group.groupName)}
-                      className={`flex min-h-8 w-full items-center justify-between gap-2 border-line px-3 py-1 text-left hover:bg-panel-2 disabled:hover:bg-transparent ${
+                      className={`flex min-h-11 w-full items-center justify-between gap-2 border-line px-3 py-1 text-left hover:bg-panel-2 disabled:hover:bg-transparent md:min-h-0 ${
                         expanded ? 'border-b' : ''
                       }`}
                     >
