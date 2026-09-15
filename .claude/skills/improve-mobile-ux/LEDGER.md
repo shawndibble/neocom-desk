@@ -25,6 +25,9 @@ One row per surface, with what the audit concluded.
 | Calendar (`/calendar`)                                                                                                      | Extensively phone-tuned already (`useIsNarrow` swaps the month grid for a `min-h-11` Day Ticker, `CalendarKindFilterMenu` is a proper `DropdownMenu`, `ComingUpRail` rows are `min-h-11`). One real bug: the rail's "Show all days" panel-header action is a bare, unsized `<button>` — filed as #1077 (narrowed by hostile review, which found a less-convenient escape hatch via the Ticker).                                                                                                                                                     |
 | Planetary Industry (`/planetary-industry`, Colonies tab only — Plan/chain-planner tab is a non-phone workflow, not audited) | Clean: the Colonies/Plan/Advisor `Tabs` switcher and the alt-colonies `FilterChip` use the shared control scale, `ColonyRow`'s hand-rolled `<h3><button>` disclosure header is a tall multi-line tap target well above 44px, no `DataTable`/tables anywhere in this tab, empty/reauth/error states all present. No findings survived.                                                                                                                                                                                                               |
 | Market (`/market?section=browser`, item finder + Quickbar + Compare drawer; Open Orders covered separately above)           | Two-pane master/detail collapse (`isDesktop` swap), the location-mode chips + hub/region `Select` in `PageHeader` actions, and the tree/Quickbar list are all clean — confirmed the header row does _not_ overflow at 390px via a real screenshot (arithmetic alone suggested it might; it doesn't). One real bug: `CompareDrawer`'s persistent "Compare (N)" toggle handle is hardcoded `h-9` with no touch-tier variant at all — filed as #1086. The Quickbar row's own drag-handle touch target was considered and killed (see Killed findings). |
+| Market (`/market?section=appraisal`, `AppraisalPanel.tsx`) + Appraisal Share (`AppraisalShared.tsx`)                        | Paste box, filter-free layout and touch targets all clean. One real bug: the result `DataTable` stacks 5-6 non-primary columns as separate full-width lines per card at the default `stackColumns={1}` — filed as #1097 (narrowed to `AppraisalPanel.tsx` only; `AppraisalShared.tsx`'s matching table left for a follow-up).                                                                                                                                                                                                                       |
+| Skill Plans (`/skills/plans`, list route only — `PlanListPane.tsx`, `PlanList.tsx`)                                         | `PlanList`'s rename/duplicate/delete `IconButton`s and filter-free layout are clean. One real bug: the list route's `PlanListPane` call defaults to `height="viewport"` and applies `useViewportBoundedHeight`'s max-height unguarded by `isDesktop`, unlike `PlanEditor.tsx`'s own correctly-gated call — filed as #1096, same bug class as #1054.                                                                                                                                                                                                 |
+| LoyaltyStore (`/wallet/loyalty/:corporationId`)                                                                             | `DataTable` stacking, self-alignment and `FilterBar` all clean; the inner materials `responsive="table"` opt-out is the already-accepted one (see Contract already enforced). One real bug, shared with Skill Plan Editor's own back link: the "← Back to Wallet" link is bare, unsized text — filed together as #1095.                                                                                                                                                                                                                             |
 
 ## Contract already enforced
 
@@ -46,9 +49,10 @@ Mobile rules proved by a component or a spec, so no run re-discovers them.
   `filterSheetNarrow.spec.ts` at `{ width: 390, height: 844 }`;
   `corpBoardNarrow.spec.ts` at the tighter `{ width: 320, height: 720 }`
   (issue #419's own case, not a 390px one — don't group it with the other two).
-  Industry, Mail, Mining Tax, Market's Open Orders and Compare drawer,
-  Overview, Skills and Calendar still have none at 390 — the tickets filed
-  each round each add one (#1053/#1054/#1055/#1064/#1070/#1071/#1077/#1086).
+  Industry, Mail, Mining Tax, Market's Open Orders, Compare drawer and
+  Appraisal, Overview, Skills, Calendar, LoyaltyStore and Skill Plans still
+  have none at 390 — the tickets filed each round each add one
+  (#1053/#1054/#1055/#1064/#1070/#1071/#1077/#1086/#1095/#1096/#1097).
 - **`SkillCompare`** stacks rather than scrolling sideways (#406) — the
   columns-are-the-content opt-out was reconsidered and rejected there.
 - **`useViewportBoundedHeight`'s fixed-tab-bar gap** — the hook
@@ -57,9 +61,18 @@ Mobile rules proved by a component or a spec, so no run re-discovers them.
   bar. `PlanEditor.tsx` already gates its call behind `isDesktop` so phone
   falls back to normal document flow (safe, since `Layout.tsx`'s `<main>`
   already pads for the tab bar in flow) — the correct pattern for any other
-  consumer. Mail's own call was unguarded (filed #1054); `PlanListPane.tsx`
-  and `NotificationsPanel.tsx` were not checked this round and may have the
-  same gap — worth a quick look on a future SkillPlans/Notifications pass.
+  consumer. Mail's own call was unguarded (filed #1054); `PlanListPane.tsx`'s
+  list-route call was the same gap (filed #1096) — its `SkillPlanEditor.tsx`
+  call sites were already safe (`height="sidebar"`, desktop-gated).
+  `NotificationsPanel.tsx` was still not checked this round — worth a look on
+  a future pass, though it sits on `/settings`, a lower-priority phone surface.
+- **Bare, unsized `Link`/`<button>` used as a page's back-navigation control**
+  — a third instance of the same touch-target gap as the two bullets below,
+  found on LoyaltyStore and (mobile-only) SkillPlanEditor, both using the
+  identical hand-written class instead of `buttonClassName` — filed as #1095.
+  `AppraisalShared.tsx`'s own back link already does this correctly
+  (`buttonClassName({ size: 'sm' })`); worth grepping for the same bare class
+  string elsewhere on a future pass.
 - **Bare-button disclosure rows under the touch tier** — `#1064`'s fix is
   scoped to `OpenOrdersPanel`. `src/components/ui/Disclosure.tsx` itself ships
   `min-h-8` (32px, under even the pointer floor) and Skills' per-group header
@@ -81,17 +94,20 @@ copy. Add a new one there only when it kills a class of finding.
 
 ## Filed findings
 
-| Issue | Surface                              | Verdict                                               | Finding                                                                                                                                                                             |
-| ----- | ------------------------------------ | ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| #1046 | Contracts › Search › Courier         | SHIP (narrowed: needs its own Narrow spec)            | `CourierResults.tsx`'s `iskPerJump` cell self-aligns (`items-end`) with no `sm:` gate, zigzagging the board's own ranking figure once the row stacks below `sm`.                    |
-| #1053 | Industry › Records / Production Runs | SHIP                                                  | `SoldSplitButton`'s button group (`SaleLinkingControls.tsx`) self-aligns (`justify-end`) with no `sm:` gate, so the Sold/Watch/Manual/Delete actions zigzag off every stacked card. |
-| #1054 | Mail › reading pane                  | SHIP                                                  | The reading pane's body scroller (`useViewportBoundedHeight`) applies its max-height unconditionally, so a long mail's tail can be hidden behind the fixed mobile tab bar.          |
-| #1055 | Mining Tax › Balances strip          | NARROW (hit-area only, not the `sm` tier)             | The per-Payee filter button in each balance card carries no touch-target sizing at all — ~20px hit area on the app's only "check who I owe" drill-in control.                       |
-| #1064 | Market › Orders (`OpenOrdersPanel`)  | SHIP                                                  | Each problem group's expand/collapse header and the Healthy group's inline show/hide link are bare `<button>`s with no touch-target sizing — the panel's most-repeated interaction. |
-| #1070 | Overview › board cards               | SHIP                                                  | `BoardCard`'s "Open" header link is a bare, unsized `<Link>` (~16-17px hit height) — the sole full-page affordance on two of the four cards, on the app's default landing route.    |
-| #1071 | Skills › trained-list group headers  | NARROW (group header only, skill row cut)             | The per-group disclosure header hand-rolls `Disclosure.tsx`'s own undersized `min-h-8`; fix reaches the shared component too, not just this page.                                   |
-| #1077 | Calendar › Coming Up Rail            | NARROW (sizing only; "only control" framing softened) | `ComingUpRail.tsx`'s "Show all days" panel-header action is a bare, unsized `<button>` (~16-18px hit height) inside a `min-h-11` header that doesn't stretch to it.                 |
-| #1086 | Market › Compare drawer              | SHIP                                                  | `CompareDrawer.tsx`'s persistent "Compare (N)" toggle bar is fixed `h-9` (36px) at every viewport, with no touch-tier variant — the sole way to open/collapse the drawer.           |
+| Issue | Surface                              | Verdict                                                | Finding                                                                                                                                                                             |
+| ----- | ------------------------------------ | ------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| #1046 | Contracts › Search › Courier         | SHIP (narrowed: needs its own Narrow spec)             | `CourierResults.tsx`'s `iskPerJump` cell self-aligns (`items-end`) with no `sm:` gate, zigzagging the board's own ranking figure once the row stacks below `sm`.                    |
+| #1053 | Industry › Records / Production Runs | SHIP                                                   | `SoldSplitButton`'s button group (`SaleLinkingControls.tsx`) self-aligns (`justify-end`) with no `sm:` gate, so the Sold/Watch/Manual/Delete actions zigzag off every stacked card. |
+| #1054 | Mail › reading pane                  | SHIP                                                   | The reading pane's body scroller (`useViewportBoundedHeight`) applies its max-height unconditionally, so a long mail's tail can be hidden behind the fixed mobile tab bar.          |
+| #1055 | Mining Tax › Balances strip          | NARROW (hit-area only, not the `sm` tier)              | The per-Payee filter button in each balance card carries no touch-target sizing at all — ~20px hit area on the app's only "check who I owe" drill-in control.                       |
+| #1064 | Market › Orders (`OpenOrdersPanel`)  | SHIP                                                   | Each problem group's expand/collapse header and the Healthy group's inline show/hide link are bare `<button>`s with no touch-target sizing — the panel's most-repeated interaction. |
+| #1070 | Overview › board cards               | SHIP                                                   | `BoardCard`'s "Open" header link is a bare, unsized `<Link>` (~16-17px hit height) — the sole full-page affordance on two of the four cards, on the app's default landing route.    |
+| #1071 | Skills › trained-list group headers  | NARROW (group header only, skill row cut)              | The per-group disclosure header hand-rolls `Disclosure.tsx`'s own undersized `min-h-8`; fix reaches the shared component too, not just this page.                                   |
+| #1077 | Calendar › Coming Up Rail            | NARROW (sizing only; "only control" framing softened)  | `ComingUpRail.tsx`'s "Show all days" panel-header action is a bare, unsized `<button>` (~16-18px hit height) inside a `min-h-11` header that doesn't stretch to it.                 |
+| #1086 | Market › Compare drawer              | SHIP                                                   | `CompareDrawer.tsx`'s persistent "Compare (N)" toggle bar is fixed `h-9` (36px) at every viewport, with no touch-tier variant — the sole way to open/collapse the drawer.           |
+| #1095 | LoyaltyStore + Skill Plan Editor     | SHIP                                                   | Both routes' "back" `Link` is bare `inline-block` text with no controlStyles tier — ~16-18px hit height; on the Editor it's the sole mobile route back to the plan list.            |
+| #1096 | Skill Plans › list route             | SHIP (narrowed: gate the `style` object, not the hook) | `PlanListPane`'s list-route call defaults to `height="viewport"` and applies `useViewportBoundedHeight`'s max-height with no `isDesktop` gate, unlike `PlanEditor.tsx`'s own call.  |
+| #1097 | Market › Appraisal                   | NARROW (scoped to `AppraisalPanel.tsx` only)           | The result table's stacked card renders 5-6 non-primary columns as separate full lines instead of using `DataTable`'s existing `stackColumns={2}` paired layout.                    |
 
 ## Killed findings
 
