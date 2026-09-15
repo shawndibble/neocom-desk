@@ -1063,7 +1063,7 @@ export function OpenOrdersPanel() {
                         type="button"
                         aria-expanded={!folded}
                         onClick={toggle}
-                        className="flex flex-1 items-center gap-1.5 px-3 py-2 text-left text-xs font-semibold tracking-widest text-text-dim uppercase hover:bg-panel focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
+                        className="flex min-h-11 flex-1 items-center gap-1.5 px-3 py-2 text-left text-xs font-semibold tracking-widest text-text-dim uppercase hover:bg-panel focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent md:min-h-0"
                       >
                         <Caret expanded={!folded} />
                         {groupTitle} · {group.rows.length}
@@ -1072,7 +1072,7 @@ export function OpenOrdersPanel() {
                         {group.problem === 'healthy' && (
                           <button
                             type="button"
-                            className="rounded-xs text-[0.6875rem] font-semibold tracking-widest text-accent uppercase hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                            className="flex min-h-11 items-center rounded-xs text-[0.6875rem] font-semibold tracking-widest text-accent uppercase hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent md:min-h-0"
                             onClick={toggle}
                           >
                             {t(
