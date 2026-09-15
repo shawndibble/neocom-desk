@@ -25,7 +25,7 @@ import {
 } from '@/features/industry/useDetectedOwnedStock';
 import type { MaterialSourcingMap, SkillLevels } from '@/engine/industry/types';
 import type { LoyaltyStoreOffer } from '@/esi/endpoints';
-import { computeLoyaltyOfferRows, type LoyaltyOfferRow } from './offerRows';
+import { collectNameableTypeIds, computeLoyaltyOfferRows, type LoyaltyOfferRow } from './offerRows';
 
 export interface LoyaltyStoreResult {
   corpName: string | null;
@@ -136,23 +136,27 @@ export function useLoyaltyStoreOffers(corporationId: number): LoyaltyStoreResult
     return [...ids];
   }, [offers, catalog]);
 
-  // Every offer's own item name — resolved via `loadTypeNames` (SDE snapshot
-  // first, then a batched ESI call for whatever it doesn't cover) rather than
-  // `blueprintCatalog`'s `typesById`, which only carries types some blueprint
-  // or skill references. LP stores hand out plenty that neither ever does
-  // (implants, Mindlinks, SKINs) — see offerRows.ts's `itemNames`.
-  const offerTypeIds = useMemo(() => (offers ?? []).map((offer) => offer.type_id), [offers]);
+  // Every offer's own item name, plus every `required_items` turn-in —
+  // resolved via `loadTypeNames` (SDE snapshot first, then a batched ESI call
+  // for whatever it doesn't cover) rather than `blueprintCatalog`'s
+  // `typesById`, which only carries types some blueprint or skill references.
+  // LP stores hand out plenty that neither ever does (implants, Mindlinks,
+  // SKINs), and required-item turn-ins (insignia, faction tags) are the same
+  // case: prices for them already resolve via `typeIds` above, but names
+  // don't unless this id set is widened the same way — see offerRows.ts's
+  // `itemNames` and `collectNameableTypeIds`.
+  const nameableTypeIds = useMemo(() => collectNameableTypeIds(offers ?? []), [offers]);
 
   useEffect(() => {
-    if (offerTypeIds.length === 0) return;
+    if (nameableTypeIds.length === 0) return;
     let cancelled = false;
-    void loadTypeNames(offerTypeIds).then((names) => {
+    void loadTypeNames(nameableTypeIds).then((names) => {
       if (!cancelled) setItemNames(names);
     });
     return () => {
       cancelled = true;
     };
-  }, [offerTypeIds]);
+  }, [nameableTypeIds]);
 
   const ownedStockSnapshot = useOwnedStockSnapshot();
   const { stock } = useDetectedOwnedStock(ownedStockSnapshot, materialTypeIds);

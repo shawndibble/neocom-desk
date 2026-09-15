@@ -5,6 +5,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import '@/i18n';
 import { NARROW_QUERY } from '@/lib/useIsNarrow';
+import { DESKTOP_QUERY } from '@/lib/useIsDesktop';
 import { TRADE_HUBS } from '@/market/hubs';
 import type { LoyaltyOfferRow } from '@/features/loyalty/offerRows';
 import type { LoyaltyStoreOffer } from '@/esi/endpoints';
@@ -43,6 +44,26 @@ function useNarrowViewport(): void {
 }
 
 const OTHER_HUB = TRADE_HUBS.find((hub) => hub.id !== 'jita')!;
+
+/** Opposite of `useNarrowViewport`: jsdom's stub never matches, so this is
+ * what forces the desktop two-column layout in a test. */
+function useDesktopViewport(): void {
+  const real = window.matchMedia;
+  window.matchMedia = (media: string) =>
+    ({
+      media,
+      matches: media === DESKTOP_QUERY,
+      onchange: null,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      addListener: () => {},
+      removeListener: () => {},
+      dispatchEvent: () => false,
+    }) as unknown as MediaQueryList;
+  restoreMatchMedia = () => {
+    window.matchMedia = real;
+  };
+}
 
 beforeEach(() => {
   useLoyaltyStoreOffers.mockReturnValue({
@@ -129,6 +150,8 @@ const ITEM_ROW: LoyaltyOfferRow = {
   productName: null,
   build: null,
   profit: PROFIT,
+  requiredItems: [],
+  requiredItemsCost: 0,
 };
 
 const BLUEPRINT_ROW: LoyaltyOfferRow = {
@@ -139,6 +162,8 @@ const BLUEPRINT_ROW: LoyaltyOfferRow = {
   productName: 'Republic Fleet Firetail',
   build: null,
   profit: PROFIT,
+  requiredItems: [],
+  requiredItemsCost: 0,
 };
 
 const UNRESOLVED_BLUEPRINT_ROW: LoyaltyOfferRow = {
@@ -149,6 +174,8 @@ const UNRESOLVED_BLUEPRINT_ROW: LoyaltyOfferRow = {
   productName: null,
   build: null,
   profit: PROFIT,
+  requiredItems: [],
+  requiredItemsCost: 0,
 };
 
 describe('LoyaltyStore filters', () => {
@@ -280,5 +307,136 @@ describe('LoyaltyStore blueprint badge (issue #882)', () => {
     renderStore();
 
     expect(screen.getByText('BP')).toHaveClass('text-[0.6875rem]');
+  });
+});
+
+describe('LoyaltyStore required items breakdown (issue #1068)', () => {
+  const REQUIRED_ITEMS_ROW: LoyaltyOfferRow = {
+    offer: offer({ offer_id: 30, type_id: 500, isk_cost: 0, lp_cost: 18_000 }),
+    itemName: 'Vexor Navy Issue Blueprint',
+    isBlueprint: false,
+    productTypeId: null,
+    productName: null,
+    build: null,
+    profit: { ...PROFIT, profit: 30_095_516 },
+    requiredItems: [
+      { typeId: 40_000, name: 'Serpentis Palladium Tag', quantity: 8, unitPrice: 100_000 },
+      { typeId: 40_001, name: 'Shadow Serpentis Gold Tag', quantity: 1, unitPrice: 5_000_000 },
+    ],
+    requiredItemsCost: 5_800_000,
+  };
+
+  const UNPRICED_REQUIRED_ITEM_ROW: LoyaltyOfferRow = {
+    offer: offer({ offer_id: 31, type_id: 501, isk_cost: 0, lp_cost: 18_000 }),
+    itemName: 'Some Other Offer',
+    isBlueprint: false,
+    productTypeId: null,
+    productName: null,
+    build: null,
+    profit: { ...PROFIT, profit: null, iskPerLp: null },
+    requiredItems: [{ typeId: 40_002, name: 'Unpriced Faction Tag', quantity: 3, unitPrice: null }],
+    requiredItemsCost: null,
+  };
+
+  const UNPRICED_MATERIAL_ROW: LoyaltyOfferRow = {
+    offer: offer({ offer_id: 32, type_id: 502 }),
+    itemName: 'Unpriceable Item',
+    isBlueprint: false,
+    productTypeId: null,
+    productName: null,
+    build: null,
+    profit: { ...PROFIT, profit: null, iskPerLp: null },
+    requiredItems: [],
+    requiredItemsCost: 0,
+  };
+
+  function mockRows(rows: LoyaltyOfferRow[]) {
+    useLoyaltyStoreOffers.mockReturnValue({
+      corpName: 'Federal Navy Academy',
+      offersFetchedAt: null,
+      offersFromCache: false,
+      rows,
+      catalog: null,
+      playerLp: 12_000,
+      hub: TRADE_HUBS[0]!,
+      ready: true,
+      useOwnMaterialsFor: new Set<number>(),
+      toggleUseOwnMaterials: () => {},
+    });
+  }
+
+  it('shows a Required items line, and each item by name and quantity, for an offer with a turn-in', async () => {
+    mockRows([REQUIRED_ITEMS_ROW]);
+    const user = userEvent.setup();
+    renderStore();
+
+    await user.click(screen.getByText('Vexor Navy Issue Blueprint'));
+
+    expect(screen.getByText('Required items')).toBeInTheDocument();
+    expect(screen.getByText('8 × Serpentis Palladium Tag')).toBeInTheDocument();
+    expect(screen.getByText('1 × Shadow Serpentis Gold Tag')).toBeInTheDocument();
+    // The Required items total must equal what profit already subtracted —
+    // this reads it straight off `row.requiredItemsCost`, the same number
+    // fed into `loyaltyOfferProfit`, so there's nothing here to recompute or
+    // let drift.
+    expect(screen.getByText('5,800,000')).toBeInTheDocument();
+  });
+
+  it('shows no Required items line for an offer with none', async () => {
+    mockRows([ITEM_ROW]);
+    const user = userEvent.setup();
+    renderStore();
+
+    await user.click(screen.getByText('Scourge Fury Heavy Missile'));
+
+    expect(screen.queryByText('Required items')).not.toBeInTheDocument();
+  });
+
+  it('shows the same Required items lines in the mobile sheet and the desktop detail — one component', async () => {
+    mockRows([REQUIRED_ITEMS_ROW]);
+
+    // Mobile: opens in the sheet.
+    const mobileUser = userEvent.setup();
+    const mobile = renderStore();
+    await mobileUser.click(screen.getByText('Vexor Navy Issue Blueprint'));
+    expect(screen.getByText('8 × Serpentis Palladium Tag')).toBeInTheDocument();
+    mobile.unmount();
+
+    // Desktop: renders inline, no sheet.
+    useDesktopViewport();
+    const desktopUser = userEvent.setup();
+    renderStore();
+    await desktopUser.click(screen.getByText('Vexor Navy Issue Blueprint'));
+    expect(screen.getByText('Required items')).toBeInTheDocument();
+    expect(screen.getByText('8 × Serpentis Palladium Tag')).toBeInTheDocument();
+    expect(screen.getByText('1 × Shadow Serpentis Gold Tag')).toBeInTheDocument();
+  });
+
+  it('marks an unpriced required item\'s line "Not priced", and names a required item as the cannot-be-priced cause', async () => {
+    mockRows([UNPRICED_REQUIRED_ITEM_ROW]);
+    const user = userEvent.setup();
+    renderStore();
+
+    await user.click(screen.getByText('Some Other Offer'));
+
+    expect(screen.getByText('3 × Unpriced Faction Tag')).toBeInTheDocument();
+    expect(screen.getAllByText('Not priced').length).toBeGreaterThan(0);
+    expect(
+      screen.getByText("Can't be priced at this hub — a required item has no listed sell price.")
+    ).toBeInTheDocument();
+  });
+
+  it('still names a material or the product as the cause when that — not a required item — is why the offer is unpriceable', async () => {
+    mockRows([UNPRICED_MATERIAL_ROW]);
+    const user = userEvent.setup();
+    renderStore();
+
+    await user.click(screen.getByText('Unpriceable Item'));
+
+    expect(
+      screen.getByText(
+        "Can't be priced at this hub — a material or the product has no listed sell price."
+      )
+    ).toBeInTheDocument();
   });
 });
