@@ -116,11 +116,19 @@ describe('exchangeCode', () => {
   // `await` unsettled forever — the "Completing login…" spinner never
   // resolved. `timeoutMs` is overridden here so the test doesn't wait out
   // the real production default.
-  it('rejects with AuthError instead of hanging forever when the endpoint never responds', async () => {
+  it('rejects with a timeout AuthError instead of hanging forever when the endpoint never responds', async () => {
     hang = true;
-    await expect(
-      exchangeCode({ clientId: 'client-abc', code: 'good-code', verifier: 'ver-1', timeoutMs: 20 })
-    ).rejects.toBeInstanceOf(AuthError);
+    const err = await exchangeCode({
+      clientId: 'client-abc',
+      code: 'good-code',
+      verifier: 'ver-1',
+      timeoutMs: 20,
+    }).then(
+      () => null,
+      (e: unknown) => e
+    );
+    expect(err).toBeInstanceOf(AuthError);
+    expect((err as AuthError).code).toBe('timeout');
   });
 });
 
@@ -142,10 +150,17 @@ describe('refreshToken', () => {
 
   // Boot/`getValidAccessToken` calls this to refresh a near-expired token; a
   // hung endpoint here previously stalled boot itself, not just login.
-  it('rejects with AuthError instead of hanging forever when the endpoint never responds', async () => {
+  it('rejects with a timeout AuthError instead of hanging forever when the endpoint never responds', async () => {
     hang = true;
-    await expect(
-      refreshToken({ clientId: 'client-abc', refreshToken: 'refresh-1', timeoutMs: 20 })
-    ).rejects.toBeInstanceOf(AuthError);
+    const err = await refreshToken({
+      clientId: 'client-abc',
+      refreshToken: 'refresh-1',
+      timeoutMs: 20,
+    }).then(
+      () => null,
+      (e: unknown) => e
+    );
+    expect(err).toBeInstanceOf(AuthError);
+    expect((err as AuthError).code).toBe('timeout');
   });
 });
