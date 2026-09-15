@@ -217,6 +217,11 @@ export function OpportunitiesPanel({
       id: 'select',
       header: '',
       className: 'w-8',
+      // Pinned to the stacked card's top-right corner (#1096-style mobile
+      // pass): unlike a tabular value, a bare selection checkbox reads as a
+      // stray, unlabelled line when stacked normally — the same case
+      // `TaxTab.tsx`'s decorative edit affordance already uses this for.
+      cardCorner: true,
       render: (row) => {
         // Build Plan Compare only ever shows the active Character's own
         // plans (`Industry.tsx`'s `plans` query is scoped that way) — a
@@ -224,17 +229,23 @@ export function OpportunitiesPanel({
         // there, so seeding is limited to rows the active Character owns.
         const seedable = row.candidate.characterId === activeCharacterId;
         return (
-          <input
-            type="checkbox"
-            checked={selectedIds.has(row.candidate.id)}
-            onChange={() => toggleSelected(row.candidate.id)}
-            disabled={!seedable}
-            title={seedable ? undefined : t('industry.opportunitiesCompareActiveCharacterOnly')}
-            aria-label={t('industry.opportunitiesSelectFor', {
-              name: row.candidate.catalogEntry.productName,
-            })}
-            className="size-4 shrink-0 cursor-pointer accent-accent disabled:cursor-not-allowed disabled:opacity-40"
-          />
+          // `size-11 md:size-4`: the checkbox itself stays the 16px glyph
+          // it always was (desktop unaffected), but below `md` the label's
+          // own box grows to a real touch target instead of relying on the
+          // 16px input alone.
+          <label className="inline-flex size-11 shrink-0 items-center justify-center md:size-4">
+            <input
+              type="checkbox"
+              checked={selectedIds.has(row.candidate.id)}
+              onChange={() => toggleSelected(row.candidate.id)}
+              disabled={!seedable}
+              title={seedable ? undefined : t('industry.opportunitiesCompareActiveCharacterOnly')}
+              aria-label={t('industry.opportunitiesSelectFor', {
+                name: row.candidate.catalogEntry.productName,
+              })}
+              className="size-4 shrink-0 cursor-pointer accent-accent disabled:cursor-not-allowed disabled:opacity-40"
+            />
+          </label>
         );
       },
     },
