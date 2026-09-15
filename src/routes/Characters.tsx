@@ -1092,15 +1092,18 @@ export function Characters() {
         actions={
           <>
             {characters.length > 0 && (
-              <Button
-                size="md"
-                onClick={() => void handleRefreshAll()}
-                disabled={refreshingAll}
-                title={t('characters.refreshAllHint')}
-              >
-                {refreshingAll ? <Spinner size="sm" /> : <Icon.Refresh />}
-                {refreshingAll ? t('characters.refreshingAll') : t('characters.refreshAll')}
-              </Button>
+              /*
+                `Tooltip`, not a native `title=`: a touch device has no hover,
+                so the "may take a moment" warning was unreachable on a phone
+                exactly where the wait is longest (#1102). The tap belongs to
+                the refresh, so no `openOnTap` — touch-and-hold reads it.
+              */
+              <Tooltip content={t('characters.refreshAllHint')}>
+                <Button size="md" onClick={() => void handleRefreshAll()} disabled={refreshingAll}>
+                  {refreshingAll ? <Spinner size="sm" /> : <Icon.Refresh />}
+                  {refreshingAll ? t('characters.refreshingAll') : t('characters.refreshAll')}
+                </Button>
+              </Tooltip>
             )}
             {/*
               The add-a-character branch, not a re-auth: SSO decides who comes
