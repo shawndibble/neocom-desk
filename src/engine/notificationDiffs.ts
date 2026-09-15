@@ -786,57 +786,71 @@ function isPartyToContract(entry: ContractEntrySnapshot, characterId: number): b
 }
 
 /**
+ * Shared shape behind `diffContractCompleted`/`diffContractFailed` (issue
+ * #1091) — the two differ only in which status counts as the transition and
+ * which event id they report, so factored out rather than duplicated:
+ * requires the previous poll to have actually recorded this contract as
+ * outstanding or in progress (`wasLiveContractStatus`) — without that, the
+ * first poll after this field's own baseline reset (or a genuine ESI window
+ * shift) would backfill an announcement for every contract that quietly
+ * closed weeks ago — and requires `characterId` to be the issuer or acceptor
+ * (`isPartyToContract`) — the endpoint also returns contracts merely offered
+ * to the character, and without this a stranger's contract resolving for
+ * someone else would announce itself.
+ */
+function diffContractTerminalTransition(
+  characterId: number,
+  prev: ContractSnapshot | undefined,
+  next: ContractSnapshot,
+  eventId: 'contractCompleted' | 'contractFailed',
+  matchesStatus: (status: ContractStatus) => boolean
+): ContractNotificationFire[] {
+  if (!prev) return [];
+  const prevStatusById = new Map(prev.entries.map((entry) => [entry.contractId, entry.status]));
+  const fires: ContractNotificationFire[] = [];
+  for (const entry of next.entries) {
+    if (!matchesStatus(entry.status)) continue;
+    if (!wasLiveContractStatus(prevStatusById.get(entry.contractId))) continue;
+    if (!isPartyToContract(entry, characterId)) continue;
+    fires.push({ eventId, characterId, contractId: entry.contractId });
+  }
+  return fires;
+}
+
+/**
  * Fires per contract whose status is newly one of the three completed forms
  * (issue #1091) — a courier's collateral released, or an item exchange's sale
  * gone through. Deliberately silent for `rejected`/`cancelled`/`deleted`/
  * `reversed`: those are withdrawn-offer noise, not something that ran to
- * completion. Requires the previous poll to have actually recorded this
- * contract as outstanding or in progress (`wasLiveContractStatus`) — without
- * that, the first poll after this field's own baseline reset (or a genuine
- * ESI window shift) would backfill a "completed" announcement for every
- * contract that quietly closed weeks ago. Also requires `characterId` to be
- * the issuer or acceptor (`isPartyToContract`) — the endpoint also returns
- * contracts merely offered to the character, and without this a stranger's
- * contract completing for someone else would announce itself.
+ * completion. See `diffContractTerminalTransition` for the shared guards.
  */
 export function diffContractCompleted(
   characterId: number,
   prev: ContractSnapshot | undefined,
   next: ContractSnapshot
 ): ContractNotificationFire[] {
-  if (!prev) return [];
-  const prevStatusById = new Map(prev.entries.map((entry) => [entry.contractId, entry.status]));
-  const fires: ContractNotificationFire[] = [];
-  for (const entry of next.entries) {
-    if (!COMPLETED_CONTRACT_STATUSES.has(entry.status)) continue;
-    if (!wasLiveContractStatus(prevStatusById.get(entry.contractId))) continue;
-    if (!isPartyToContract(entry, characterId)) continue;
-    fires.push({ eventId: 'contractCompleted', characterId, contractId: entry.contractId });
-  }
-  return fires;
+  return diffContractTerminalTransition(characterId, prev, next, 'contractCompleted', (status) =>
+    COMPLETED_CONTRACT_STATUSES.has(status)
+  );
 }
 
 /**
  * Fires per contract whose status is newly `failed` — and only `failed`
- * (issue #1091): a courier that blew its deadline, collateral forfeited. Same
- * "was previously live" and "character is party to it" guards as
- * `diffContractCompleted` — see its doc comment for why each exists.
+ * (issue #1091): a courier that blew its deadline, collateral forfeited. See
+ * `diffContractTerminalTransition` for the shared guards.
  */
 export function diffContractFailed(
   characterId: number,
   prev: ContractSnapshot | undefined,
   next: ContractSnapshot
 ): ContractNotificationFire[] {
-  if (!prev) return [];
-  const prevStatusById = new Map(prev.entries.map((entry) => [entry.contractId, entry.status]));
-  const fires: ContractNotificationFire[] = [];
-  for (const entry of next.entries) {
-    if (entry.status !== 'failed') continue;
-    if (!wasLiveContractStatus(prevStatusById.get(entry.contractId))) continue;
-    if (!isPartyToContract(entry, characterId)) continue;
-    fires.push({ eventId: 'contractFailed', characterId, contractId: entry.contractId });
-  }
-  return fires;
+  return diffContractTerminalTransition(
+    characterId,
+    prev,
+    next,
+    'contractFailed',
+    (status) => status === 'failed'
+  );
 }
 
 export interface WalletJournalEntrySnapshot {

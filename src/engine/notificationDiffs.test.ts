@@ -1310,8 +1310,8 @@ describe('diffContractFailed', () => {
     }
   });
 
-  it('does not fire for rejected, cancelled or deleted', () => {
-    for (const status of ['rejected', 'cancelled', 'deleted'] as const) {
+  it('does not fire for rejected, cancelled, deleted or reversed', () => {
+    for (const status of ['rejected', 'cancelled', 'deleted', 'reversed'] as const) {
       const prev = contractSnapshot([contractEntry(1, 'in_progress')], T0);
       const next = contractSnapshot([contractEntry(1, status)], T0 + 2000);
       expect(diffContractFailed(7, prev, next)).toEqual([]);

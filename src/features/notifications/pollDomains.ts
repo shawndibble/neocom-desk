@@ -712,6 +712,14 @@ function isContractStatus(raw: unknown): raw is ContractStatus {
  * fields existed fails validation, so `pollerState.ts` reads it as `null` and
  * the first poll after this change fires nothing rather than replaying every
  * contract's history against a baseline that never recorded who was party to it.
+ *
+ * The invalidation is store-wide, not per-character: `isSnapshotWith`'s
+ * `entries.every(isEntry)` fails a whole character's snapshot on one bad
+ * entry, and `isPollerState` requires every character in the stored blob to
+ * pass — so one character still on a pre-#1091 baseline invalidates
+ * `notifications.pollerState.contracts` for every character on the device,
+ * not just that one. Still net-correct (no false completed/failed backfire
+ * for anyone), just a wider one-time reset than "a baseline" implies.
  */
 function isContractEntrySnapshot(raw: unknown): raw is ContractEntrySnapshot {
   if (typeof raw !== 'object' || raw === null) return false;
