@@ -57,27 +57,38 @@ interface MetaDocData {
 }
 
 /**
- * Each chunk is narrowed as it is read rather than after the whole snapshot is
- * accumulated: the shared collection holds roughly three times the rows the
- * blueprint-only one did, and only the blueprint copies are worth retaining
- * (or caching). The extra rows are then transient — one chunk at a time —
- * instead of a 3x heap and a 3x Dexie entry.
+ * Every chunk's raw rows are accumulated before narrowing, rather than each
+ * chunk being narrowed as it is read: `bpcRowsFromContractOffers` tallies
+ * distinct for-sale types per contract (issue #1076), and a contract's own
+ * lines are not guaranteed to land in one chunk — the backend sorts by
+ * contract before slicing into fixed-size chunks (`functions/src/index.ts`'s
+ * `chunkRows`), so a contract can still straddle a chunk boundary if its own
+ * line count is large enough (a real case: one archived bundle ran to 493
+ * lines). Narrowing per chunk would tally each half of such a contract as
+ * its own single-type listing — silently wrong in exactly the case this
+ * fix exists for.
+ *
+ * `getDocs` already pulls every chunk doc into memory in one round trip (this
+ * loop's `snapshot.docs` is not a network stream), so accumulating raw rows
+ * first costs one transient array for the duration of this call, not a
+ * second live copy — discarded the moment `bpcRowsFromContractOffers`
+ * returns the narrowed rows below.
  */
 async function fetchSnapshot(characterId: number): Promise<PublicBpcContractsSnapshot | null> {
   if (!isSyncConfigured()) return null;
   await ensureSignedIn(characterId);
 
   const snapshot = await getDocs(collection(getSyncFirestore(), COLLECTION));
-  const rows: BpcContractRow[] = [];
+  const offers: PublicContractOfferRow[] = [];
   let lastSyncedAt: number | null = null;
   for (const docSnap of snapshot.docs) {
     if (docSnap.id === META_DOC_ID) {
       lastSyncedAt = (docSnap.data() as MetaDocData).lastSyncedAt ?? null;
     } else {
-      rows.push(...bpcRowsFromContractOffers((docSnap.data() as ChunkDocData).rows));
+      offers.push(...(docSnap.data() as ChunkDocData).rows);
     }
   }
-  return { rows, lastSyncedAt };
+  return { rows: bpcRowsFromContractOffers(offers), lastSyncedAt };
 }
 
 /**

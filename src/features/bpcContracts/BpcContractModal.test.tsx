@@ -57,6 +57,7 @@ const ROW: BpcContractRow = {
   runs: 5,
   quantity: 1,
   dateExpired: Date.parse('2099-09-10T00:00:00Z'),
+  isMultiType: false,
 };
 
 function items(list: PublicContractItem[]) {

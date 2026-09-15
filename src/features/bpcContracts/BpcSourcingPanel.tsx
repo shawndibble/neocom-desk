@@ -818,7 +818,7 @@ export function BpcSourcingPanel({ initialTypeId = null }: BpcSourcingPanelProps
           // `bpcContracts` does not). Sorting is unaffected: `sortValue`
           // reads `effectivePrice`. Long press, not tap: a row tap opens the
           // contract.
-          return contract.isAuction ? (
+          const amount = contract.isAuction ? (
             contract.buyout !== undefined ? (
               t('bpcContracts.buyout', {
                 price: formatIskAuto(contract.buyout, CONTRACT_ISK_CENTS_BELOW),
@@ -830,6 +830,19 @@ export function BpcSourcingPanel({ initialTypeId = null }: BpcSourcingPanelProps
             )
           ) : (
             <IskAmount value={contract.price} revealOn="longPress" />
+          );
+          // A multi-type contract's ask is real but indivisible (issue
+          // #1076) — marked rather than attributed to this one blueprint;
+          // the row itself already opens the contract detail, which prices
+          // both sides of a bundle.
+          if (!contract.isMultiType) return amount;
+          return (
+            <span className="flex flex-col items-end">
+              <span>{amount}</span>
+              <span className="text-[0.625rem] text-text-dim">
+                {t('bpcContracts.wholeContractMarker')}
+              </span>
+            </span>
           );
         },
       },
@@ -844,12 +857,24 @@ export function BpcSourcingPanel({ initialTypeId = null }: BpcSourcingPanelProps
         sortValue: (row) => {
           const contract = asContract(row);
           if (!contract) return undefined;
-          return iskPerRun(effectivePrice(contract), contract.runs, contract.quantity) ?? undefined;
+          return (
+            iskPerRun(
+              effectivePrice(contract),
+              contract.runs,
+              contract.quantity,
+              contract.isMultiType
+            ) ?? undefined
+          );
         },
         render: (row) => {
           const contract = asContract(row);
           if (!contract) return t('bpcContracts.notApplicable');
-          const rate = iskPerRun(effectivePrice(contract), contract.runs, contract.quantity);
+          const rate = iskPerRun(
+            effectivePrice(contract),
+            contract.runs,
+            contract.quantity,
+            contract.isMultiType
+          );
           if (rate === null) return t('bpcContracts.notApplicable');
           return formatIskAuto(rate, CONTRACT_ISK_CENTS_BELOW);
         },

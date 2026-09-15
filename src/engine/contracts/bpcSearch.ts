@@ -21,6 +21,16 @@ export interface BpcContractRow {
   quantity: number;
   /** Epoch ms. */
   dateExpired: number;
+  /**
+   * True when this row's contract carries more than one distinct for-sale
+   * type (issue #1076) — its `price`/`buyout` is a real ask, but for the
+   * *whole contract*, not this one blueprint. A single-copy or
+   * same-type-repeated listing is `false`. Consumers that attribute a price
+   * to this one blueprint (Blueprint Acquisition's cheapest-tier selection,
+   * the ISK/run figure, a watch's all-time-cheapest baseline) must treat a
+   * `true` row's price as unknowable rather than as this blueprint's price.
+   */
+  isMultiType: boolean;
 }
 
 export interface BpcSearchFilter {
@@ -272,9 +282,20 @@ export function effectivePrice(row: BpcContractRow): number {
  * ten-run copies at 30M is one indivisible purchase of 30 runs, so its rate is
  * 1M; dividing by a single copy's runs would print 3M and sort the lot as the
  * worst offer on the board exactly when it is the best.
+ *
+ * `isMultiType` (issue #1076): a row whose contract carries more than one
+ * distinct for-sale type has no honest per-run rate — `price` is the whole
+ * contract's ask, not this blueprint's — so it returns `null` the same as
+ * every other unknowable denominator here, rather than a number that divides
+ * a bundle's price by one item's runs.
  */
-export function iskPerRun(price: number, runs: number, quantity: number): number | null {
-  if (!(runs > 0) || !(quantity > 0)) return null;
+export function iskPerRun(
+  price: number,
+  runs: number,
+  quantity: number,
+  isMultiType = false
+): number | null {
+  if (isMultiType || !(runs > 0) || !(quantity > 0)) return null;
   return price / (runs * quantity);
 }
 

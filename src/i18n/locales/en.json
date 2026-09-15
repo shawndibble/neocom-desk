@@ -2355,6 +2355,7 @@
     "expiresColumn": "Expires",
     "startingBid": "Starting bid: {{price}}",
     "buyout": "Buyout: {{price}}",
+    "wholeContractMarker": "Whole contract",
     "showAll": "Show all ({{count}} total)",
     "emptyTitle": "No public BPC listings synced yet",
     "emptyHint": "The public contract index refreshes on its own schedule — check back shortly.",
@@ -2647,6 +2648,7 @@
       "bpcSearchWatchMatch": {
         "title": "BPC Sourcing watch",
         "bodyNew": "\"{{watch}}\": new matching offer — {{item}} at {{price}} ISK.",
+        "bodyNewMultiType": "\"{{watch}}\": new matching offer — {{item}}, part of a multi-item contract asking {{price}} ISK.",
         "bodyCheaper": "\"{{watch}}\": cheaper matching offer — {{item}} now at {{price}} ISK."
       },
       "corpIndustryJobReady": {

@@ -38,6 +38,14 @@ export interface BpcWatchFire {
   price: number;
   /** A contract not in the previous poll's baseline, vs. an already-seen one whose price beat the all-time low. */
   reason: 'new' | 'cheaper';
+  /**
+   * True when `price` is this row's contract's whole ask, not this
+   * blueprint's own price (issue #1076) — always `false` on a `'cheaper'`
+   * fire (see `diffBpcWatchMatches`, which never lets a multi-type row win
+   * that comparison). A caller must caveat a `true` `'new'` fire's copy
+   * rather than state the price as this item's.
+   */
+  isMultiType: boolean;
 }
 
 export interface BpcWatchDiffResult {
@@ -55,6 +63,7 @@ function cheapestFire(rows: readonly BpcContractRow[]): Omit<BpcWatchFire, 'reas
     contractId: cheapest.contractId,
     typeId: cheapest.typeId,
     price: effectivePrice(cheapest),
+    isMultiType: cheapest.isMultiType,
   };
 }
 
@@ -70,7 +79,13 @@ export function diffBpcWatchMatches(
 ): BpcWatchDiffResult {
   const matches = filterBpcContracts(rows, filter);
   const currentIds = matches.map((row) => row.contractId);
-  const currentMin = matches.reduce<number | null>((min, row) => {
+  // The all-time-cheapest baseline (and the "cheaper" fire below) only ever
+  // considers single-type rows (issue #1076): a multi-type row's price is
+  // the whole contract's, not this blueprint's, and the baseline is a
+  // monotonic ratchet — one bundle row would permanently silence every
+  // future genuine "cheaper" fire this watch could ever raise.
+  const singleTypeMatches = matches.filter((row) => !row.isMultiType);
+  const currentMin = singleTypeMatches.reduce<number | null>((min, row) => {
     const price = effectivePrice(row);
     return min === null || price < min ? price : min;
   }, null);
@@ -84,12 +99,15 @@ export function diffBpcWatchMatches(
 
   let fire: BpcWatchFire | null = null;
   if (newMatches.length > 0) {
+    // A "new" fire may still name a multi-type row — `isMultiType` on the
+    // result lets the caller caveat the copy instead of stating the price
+    // as this item's own, rather than losing the signal entirely.
     fire = { ...cheapestFire(newMatches), reason: 'new' };
   } else if (
     currentMin !== null &&
     (prev.minPriceSeen === null || currentMin < prev.minPriceSeen)
   ) {
-    fire = { ...cheapestFire(matches), reason: 'cheaper' };
+    fire = { ...cheapestFire(singleTypeMatches), reason: 'cheaper' };
   }
 
   const minPriceSeen =

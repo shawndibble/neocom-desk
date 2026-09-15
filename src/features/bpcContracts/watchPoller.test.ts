@@ -35,6 +35,7 @@ function row(overrides: Partial<BpcContractRow>): BpcContractRow {
     runs: 1,
     quantity: 1,
     dateExpired: Date.now() + 86_400_000,
+    isMultiType: false,
     ...overrides,
   };
 }
@@ -122,6 +123,34 @@ describe('runBpcWatchPoll', () => {
     });
     await runBpcWatchPoll(deps);
     expect(deps.recordFeedEntry).not.toHaveBeenCalled();
+  });
+
+  it('caveats a "new" fire on a multi-type row as part of a bundle, rather than stating the price as this item’s own (issue #1076)', async () => {
+    const deps = makeDeps({
+      listWatches: vi.fn(async () => [watch({ seenContractIds: [1], minPriceSeen: 5_000_000 })]),
+      loadRows: vi.fn(async () => [
+        row({ contractId: 1, price: 5_000_000 }),
+        row({ contractId: 2, price: 37_000_000, isMultiType: true }),
+      ]),
+    });
+    await runBpcWatchPoll(deps);
+    expect(deps.recordFeedEntry).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'bpcSearchWatch:w1:2',
+        body: expect.stringContaining('multi-item contract'),
+      })
+    );
+  });
+
+  it('never caveats a "cheaper" fire — diffBpcWatchMatches never lets a multi-type row win it', async () => {
+    const deps = makeDeps({
+      listWatches: vi.fn(async () => [watch({ seenContractIds: [1], minPriceSeen: 5_000_000 })]),
+      loadRows: vi.fn(async () => [row({ contractId: 1, price: 4_000_000 })]),
+    });
+    await runBpcWatchPoll(deps);
+    expect(deps.recordFeedEntry).toHaveBeenCalledWith(
+      expect.objectContaining({ body: expect.not.stringContaining('multi-item contract') })
+    );
   });
 
   it('polls every watch independently in one pass', async () => {

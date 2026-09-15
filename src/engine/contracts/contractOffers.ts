@@ -41,6 +41,28 @@ export interface PublicContractOfferRow {
 }
 
 /**
+ * Distinct for-sale type IDs per contract, over every line — not only
+ * blueprint copies. A contract's whole price is one indivisible ask
+ * (issue #1076): a bundle mixing one blueprint copy with eleven plain
+ * modules is still a 12-type bundle, even though only the blueprint line
+ * ever reaches `bpcRowsFromContractOffers`'s return value, so the tally has
+ * to be built from `offers` before that filter runs, not after.
+ */
+function distinctTypeCountByContract(
+  offers: readonly PublicContractOfferRow[]
+): Map<number, number> {
+  const typesByContract = new Map<number, Set<number>>();
+  for (const offer of offers) {
+    const types = typesByContract.get(offer.contractId);
+    if (types) types.add(offer.typeId);
+    else typesByContract.set(offer.contractId, new Set([offer.typeId]));
+  }
+  const counts = new Map<number, number>();
+  for (const [contractId, types] of typesByContract) counts.set(contractId, types.size);
+  return counts;
+}
+
+/**
  * The blueprint copies among a batch of offers, as the rows BPC Search's
  * filter and columns already speak.
  *
@@ -49,10 +71,18 @@ export interface PublicContractOfferRow {
  * NaN. The two agree on every copy EVE actually issues (a copy always carries
  * all three); the fallback is what keeps a malformed row a zeroed row rather
  * than a NaN one that silently fails every numeric filter.
+ *
+ * `offers` must be every line of every contract the caller wants tallied
+ * correctly (issue #1076) — a contract split across two calls (e.g. one call
+ * per chunk of a chunked snapshot) tallies each half as its own single-type
+ * contract, which is wrong whenever a contract's lines straddle that split.
+ * Callers reading a chunked snapshot must accumulate every chunk's raw rows
+ * first and call this once over the whole thing.
  */
 export function bpcRowsFromContractOffers(
   offers: readonly PublicContractOfferRow[]
 ): BpcContractRow[] {
+  const distinctTypeCount = distinctTypeCountByContract(offers);
   const rows: BpcContractRow[] = [];
   for (const offer of offers) {
     if (!offer.isBlueprintCopy) continue;
@@ -69,6 +99,7 @@ export function bpcRowsFromContractOffers(
       runs: offer.runs ?? 0,
       quantity: offer.quantity,
       dateExpired: offer.dateExpired,
+      isMultiType: (distinctTypeCount.get(offer.contractId) ?? 1) > 1,
     });
   }
   return rows;

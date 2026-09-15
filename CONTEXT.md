@@ -457,6 +457,16 @@ here — they go one per file in `docs/context/decisions/`.
   survive to the app, so two different corps' moons rented in the same system
   on the same day cannot be told apart; the split-payee Assignment flow is the
   mitigation, not a fix (issue #523).
+- **Multi-Type Contract**: A public contract whose for-sale lines span more
+  than one distinct item type. Its price is a real, indivisible ask for the
+  whole contract — EVE exposes no per-line price to split it by, and
+  apportioning one would invent a number — so it is never attributed to any
+  single line as that item's own price (issue #1076). BPC Sourcing's price
+  cell marks it rather than hiding it; the ISK/run figure, Blueprint
+  Acquisition's cheapest-tier selection, and a BPC Watch's all-time-cheapest
+  baseline all treat it as unknowable instead. Contract Search's item mode
+  and both boards' maximum-price filters are unaffected — a bundle's whole
+  ask is exactly what those two ask about.
 - **Notification Allow-List**: The closed set of EVE Notification `type`
   strings the app delivers. A type outside it is dropped at the poller — not
   toggled off, not rendered generically, not recorded. Replaces round 34's
