@@ -24,6 +24,7 @@ import { beginEveLogin } from '@/app/loginFlow';
 import { scopesForGroup } from '@/esi/scopes';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { usePublicInfo } from '@/stores/publicInfo';
+import { useOnboardingBannerSlot } from '@/app/onboardingBannerSlot';
 import { useCorpAccess } from './useCorpAccess';
 import { corpRoleLabel } from './roles';
 import {
@@ -57,12 +58,21 @@ export function CorpGrantPrompt() {
     void hydrate();
   }, [hydrate]);
 
-  if (!hydrated || activeCharacterId === null) return null;
   // `unknown` renders as nothing, exactly as everywhere else corp state is
   // read: a banner that flickers in on a cold load is worse than one a beat
   // late, and `none`/`ready` have nothing to offer.
-  if (access.state !== 'roles-without-grant') return null;
-  if (isGrantPromptDismissed(dismissals, activeCharacterId, CORP_GROUP_SCOPES)) return null;
+  const eligible =
+    hydrated &&
+    activeCharacterId !== null &&
+    access.state === 'roles-without-grant' &&
+    !isGrantPromptDismissed(dismissals, activeCharacterId, CORP_GROUP_SCOPES);
+  // Eligibility above is unchanged; this only decides whether the shared
+  // bottom slot is this banner's to use right now (issue #1124).
+  const hasSlot = useOnboardingBannerSlot('corp-grant', eligible);
+  if (!hasSlot) return null;
+  // Restated rather than derived from `eligible`: a boolean carries none of
+  // the narrowing the render below needs from these two.
+  if (activeCharacterId === null || access.state !== 'roles-without-grant') return null;
 
   const remember = () =>
     setDismissals(withGrantPromptDismissed(dismissals, activeCharacterId, CORP_GROUP_SCOPES));
@@ -81,10 +91,12 @@ export function CorpGrantPrompt() {
     <div
       role="alert"
       aria-label={t('corp.grantPromptTitle')}
-      // Stacked above `NotificationPermissionPrompt`, which is itself above
-      // `InstallPrompt`: all three are fixed banners in the same corner, and a
-      // new Director on a fresh device can plausibly meet all three at once.
-      className="fixed inset-x-4 bottom-40 z-50 max-w-sm space-y-2 rounded-xs border border-line-bright bg-panel-2 px-3 py-2 text-sm shadow-lg md:bottom-28 md:left-auto"
+      data-testid="onboarding-banner"
+      // All three onboarding banners are fixed in this same corner and a new
+      // Director on a fresh device can plausibly meet all three at once, so
+      // they share one slot instead of stacking up the viewport (issue
+      // #1124) — hence a single offset clear of the phone tab bar.
+      className="fixed inset-x-4 bottom-16 z-50 max-w-sm space-y-2 rounded-xs border border-line-bright bg-panel-2 px-3 py-2 text-sm shadow-lg md:bottom-28 md:left-auto"
     >
       <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
         {t('corp.grantPromptTitle')}
