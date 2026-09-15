@@ -52,10 +52,10 @@ Mobile rules proved by a component or a spec, so no run re-discovers them.
   `filterSheetNarrow.spec.ts` at `{ width: 390, height: 844 }`;
   `corpBoardNarrow.spec.ts` at the tighter `{ width: 320, height: 720 }`
   (issue #419's own case, not a 390px one — don't group it with the other two).
-  Industry, Mail, Mining Tax, Market's Open Orders, Compare drawer and
-  Appraisal, Overview, Skills, Calendar, LoyaltyStore and Skill Plans still
-  have none at 390 — the tickets filed each round each add one
-  (#1053/#1054/#1055/#1064/#1070/#1071/#1077/#1086/#1095/#1096/#1097/#1102).
+  Contracts, Industry, Mail, Mining Tax, Market's Open Orders, Compare drawer
+  and Appraisal, Overview, Skills, Calendar, LoyaltyStore and Skill Plans
+  still have none at 390 — the tickets filed each round each add one
+  (#1046/#1053/#1054/#1055/#1064/#1070/#1071/#1077/#1086/#1095/#1096/#1097/#1102).
 - **`SkillCompare`** stacks rather than scrolling sideways (#406) — the
   columns-are-the-content opt-out was reconsidered and rejected there.
 - **`useViewportBoundedHeight`'s fixed-tab-bar gap** — the hook
@@ -96,9 +96,11 @@ Mobile rules proved by a component or a spec, so no run re-discovers them.
   exists nowhere else on the page, so touch genuinely loses it. This
   codebase's own fix pattern is `Tooltip` (already used the same way by
   `GroupTargetLink.tsx`, `CorpBoardRow.tsx`, `NotificationsPanel.tsx`,
-  `CorpRoster.tsx`) — three more bare `title=` instances
-  (`AppraisalPanel.tsx:234`, `CourierResults.tsx:985`, `Mail.tsx:698`) are
-  unaudited and worth the same per-hit check on a future pass.
+  `CorpRoster.tsx`) — two more bare `title=` instances (`AppraisalPanel.tsx:234`,
+  `CourierResults.tsx:985`) are unaudited and worth the same per-hit check on
+  a future pass. (`Mail.tsx:698`'s `title=` is `EmptyState`'s `title` prop,
+  rendered as visible paragraph text, not a native attribute — not this
+  shape at all.)
 
 ## Standing kill-tests
 
