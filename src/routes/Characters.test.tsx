@@ -729,6 +729,23 @@ describe('Characters table view', () => {
     }
   });
 
+  it('explains Refresh all through Tooltip, not a hover-only native title (#1102)', async () => {
+    renderCharacters();
+    const refreshAll = await screen.findByRole('button', { name: /refresh all/i });
+
+    // A native `title=` has no touch gesture to reveal it at all. `Tooltip`
+    // reveals on hover, on keyboard focus, and on touch-and-hold, so the
+    // "may take a moment" warning reaches a phone pilot too.
+    expect(refreshAll).not.toHaveAttribute('title');
+
+    fireEvent.focus(refreshAll);
+    const tooltip = await screen.findByRole('tooltip');
+    expect(tooltip).toHaveTextContent(
+      'Pulls live data for every character. This may take a moment for a large roster.'
+    );
+    expect(refreshAll).toHaveAttribute('aria-describedby', tooltip.id);
+  });
+
   it('an Open Jobs column shows free slots (max minus running), coloured red when every slot sits idle', async () => {
     // Pilot One: Mass Production II (skill_id 3387) -> 1 base + 2 = 3
     // manufacturing slots, none running -> 3 open (all of them). The old bug
