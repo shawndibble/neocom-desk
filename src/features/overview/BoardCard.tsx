@@ -48,9 +48,16 @@ export function BoardCard({ title, meta, to, openLabel, children, footer }: Boar
       title={title}
       meta={meta}
       actions={
+        // `min-h-11 md:min-h-0`: `Panel`'s own `actions` wrapper div only
+        // hugs its content's height (it doesn't stretch to the header it
+        // sits in), so the link's box was only as tall as its text — well
+        // under the touch floor even though the header around it was
+        // already sized to 44px. `md:min-h-0` resets to that original,
+        // content-hugging height at and above `md`, since desktop's box was
+        // never meant to grow (issue #1070).
         <Link
           to={to}
-          className="flex items-center gap-1 rounded-xs text-[0.6875rem] font-semibold tracking-widest text-accent uppercase hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+          className="flex min-h-11 items-center gap-1 rounded-xs text-[0.6875rem] font-semibold tracking-widest text-accent uppercase hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent md:min-h-0"
         >
           {openLabel}
           <Icon.Descend size={Icon.ICON_SIZE.sm} aria-hidden="true" />
