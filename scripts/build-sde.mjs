@@ -6,6 +6,7 @@
 import { mkdir, readFile, writeFile, stat } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { flattenMarketWideTree, MARKET_WIDE_MAX_DEPTH } from './lib/flattenMarketWideTree.mjs';
 
 const BASE_URL = 'https://www.fuzzwork.co.uk/dump/latest/csv/';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -675,7 +676,12 @@ async function main() {
   // row is turned into a Build Plan); what it buys is a scan that never
   // resolves a sub-build tree live over the whole SDE, which is the ticket's
   // explicit "precomputed, not resolved live" requirement.
-  const MARKET_WIDE_MAX_DEPTH = 10; // mirrors src/engine/industry/materialResolution.ts's MAX_SUB_BUILD_DEPTH
+  //
+  // The recursion itself, and the total-job-time accumulation alongside it
+  // (issue #1084 — `time` used to be the top blueprint's own time only,
+  // discarding every folded-in sub-job's), live in `lib/flattenMarketWideTree.mjs`
+  // so they're covered by a real fixture test without running this whole
+  // download-and-bake pipeline.
   const manufacturingByProduct = new Map(); // productTypeID -> blueprintTypeID (first-wins, mirrors blueprintCatalog.ts)
   for (const [typeID, bp] of Object.entries(blueprints)) {
     if (bp.activity !== 'manufacturing') continue;
@@ -685,44 +691,24 @@ async function main() {
       manufacturingByProduct.set(product.typeID, Number(typeID));
     }
   }
-  function flattenMaterials(blueprintTypeID, multiplier, depth, acc, visited) {
-    const bp = blueprints[blueprintTypeID];
-    for (const material of bp.materials) {
-      const subBlueprintTypeID = manufacturingByProduct.get(material.typeID);
-      const subBp = subBlueprintTypeID !== undefined ? blueprints[subBlueprintTypeID] : undefined;
-      const subOutput = subBp?.products.find((p) => p.typeID === material.typeID);
-      if (
-        subBlueprintTypeID !== undefined &&
-        subOutput &&
-        depth < MARKET_WIDE_MAX_DEPTH &&
-        !visited.has(subBlueprintTypeID)
-      ) {
-        flattenMaterials(
-          subBlueprintTypeID,
-          (multiplier * material.quantity) / subOutput.quantity,
-          depth + 1,
-          acc,
-          new Set(visited).add(subBlueprintTypeID)
-        );
-      } else {
-        acc.set(material.typeID, (acc.get(material.typeID) ?? 0) + multiplier * material.quantity);
-      }
-    }
-  }
   const marketWideTrees = {};
   for (const [productTypeID, blueprintTypeID] of manufacturingByProduct) {
     const productType = types.get(productTypeID);
     if (!productType || !productType.published || productType.marketGroupID === null) continue;
     const bp = blueprints[blueprintTypeID];
     const product = bp.products.find((p) => p.typeID === productTypeID);
-    const acc = new Map();
-    flattenMaterials(blueprintTypeID, 1, 0, acc, new Set([blueprintTypeID]));
+    const { materials, time } = flattenMarketWideTree(
+      blueprintTypeID,
+      blueprints,
+      manufacturingByProduct,
+      MARKET_WIDE_MAX_DEPTH
+    );
     marketWideTrees[productTypeID] = {
       blueprintTypeID,
-      time: bp.time,
+      time,
       outputQuantity: product.quantity,
       marketGroupID: productType.marketGroupID,
-      materials: [...acc].map(([typeID, quantity]) => ({ typeID, quantity })),
+      materials: [...materials].map(([typeID, quantity]) => ({ typeID, quantity })),
     };
   }
 

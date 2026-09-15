@@ -227,7 +227,15 @@ export default defineConfig({
         test: {
           name: 'unit',
           environment: 'node',
-          include: ['src/**/*.{test,spec}.ts'],
+          // `scripts/lib/**` is the one carve-out from the `src/`-only rule:
+          // pure logic the SDE bake script (`scripts/build-sde.mjs`, plain
+          // Node ESM, no TS/build step, deliberately outside `src/`) needs
+          // covered by a real fixture test (issue #1084) but cannot import
+          // from `src/` without pulling in a TS loader that script has never
+          // needed. Kept to `scripts/lib/`, not all of `scripts/`, so the
+          // rest of that directory's one-off tooling stays untested by
+          // design, same as before.
+          include: ['src/**/*.{test,spec}.ts', 'scripts/lib/**/*.test.mjs'],
           exclude: [...configDefaults.exclude, ...DOM_TS_TESTS],
         },
       },

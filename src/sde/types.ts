@@ -107,7 +107,15 @@ export type TypeMap = Record<string, TypeInfo>;
  */
 export interface MarketWideTreeEntry {
   blueprintTypeID: number;
-  /** base job time in seconds, one run */
+  /**
+   * Total job time in seconds for one run of the top blueprint, plus every
+   * folded-in sub-job's own time, scaled the same fractional way the
+   * material quantities are (issue #1084) — the same basis `materials`
+   * below is costed on, so `computeMarketWideRows`'s ISK/hour divides cost
+   * and time on one consistent plan rather than mixing a whole-tree cost
+   * with a top-job-only duration. Equal to the top blueprint's own time
+   * alone when the tree has no sub-builds.
+   */
   time: number;
   /** product units per run */
   outputQuantity: number;
