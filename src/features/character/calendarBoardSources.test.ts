@@ -203,6 +203,67 @@ describe('toContractExpirySources', () => {
     ]);
     expect(sources.map((source) => source.id)).toEqual(['1', '2']);
   });
+
+  const EXPIRY_MS = Date.parse('2026-09-09T15:00:00Z');
+
+  /** The under-warning case: accepted early in a long window, so the clock must shorten. */
+  it('counts an accepted courier down to acceptance plus the allowed days', () => {
+    const [source] = toContractExpirySources([
+      contract({
+        status: 'in_progress',
+        date_accepted: ISO('2026-09-01T06:00:00Z'),
+        days_to_complete: 3,
+      }),
+    ]);
+    expect(source.deadlineMs).toBe(Date.parse('2026-09-04T06:00:00Z'));
+    expect(source.deadlineMs).toBeLessThan(EXPIRY_MS);
+  });
+
+  /** The mirror case: accepted late, so delivery falls past the expiry — replaced, not capped. */
+  it('lets an accepted courier run past the offer expiry', () => {
+    const [source] = toContractExpirySources([
+      contract({
+        status: 'in_progress',
+        date_accepted: ISO('2026-09-09T12:00:00Z'),
+        days_to_complete: 3,
+      }),
+    ]);
+    expect(source.deadlineMs).toBe(Date.parse('2026-09-12T12:00:00Z'));
+    expect(source.deadlineMs).toBeGreaterThan(EXPIRY_MS);
+  });
+
+  it('uses the offer expiry for a courier nobody has accepted yet', () => {
+    const [source] = toContractExpirySources([
+      contract({ status: 'outstanding', days_to_complete: 3 }),
+    ]);
+    expect(source.deadlineMs).toBe(EXPIRY_MS);
+  });
+
+  it('uses the offer expiry for an accepted non-courier contract', () => {
+    const [source] = toContractExpirySources([
+      contract({
+        type: 'item_exchange',
+        status: 'in_progress',
+        date_accepted: ISO('2026-09-01T06:00:00Z'),
+        days_to_complete: 3,
+      }),
+    ]);
+    expect(source.deadlineMs).toBe(EXPIRY_MS);
+  });
+
+  it.each([
+    ['no acceptance time', { days_to_complete: 3 }],
+    ['no allowed days', { date_accepted: ISO('2026-09-01T06:00:00Z') }],
+    ['an unparseable acceptance time', { date_accepted: 'soon', days_to_complete: 3 }],
+    // `0` is no window at all; as a duration it would read permanently overdue.
+    ['no completion window', { date_accepted: ISO('2026-09-01T06:00:00Z'), days_to_complete: 0 }],
+  ])(
+    'falls back to the offer expiry for an accepted courier with %s',
+    (_label, overrides: Partial<Contract>) => {
+      const [source] = toContractExpirySources([contract({ status: 'in_progress', ...overrides })]);
+      expect(source.deadlineMs).toBe(EXPIRY_MS);
+    }
+  );
 });
 
 describe('toOrderExpirySources', () => {
