@@ -58,10 +58,32 @@ Survey method, all still current:
 
 - The forum category JSON paginates (`more_topics_url`) — fetch pages 0 **and**
   1 minimum; 0-15 are surveyed, 16+ is older Q&A. **A bumped thread can carry a
-  new feature**, so sort by `last_posted_at`.
+  new feature**, so sort by `last_posted_at`. Last pass: Nexum shipped a
+  capital Jump Planner (new for it, out of domain), EQM shipped a PI Production
+  Calculator (covered — `pi/chain.ts` expands a target through the recipe graph
+  and `pi/factoryBalance.ts` is the what-runs-out-first read), Iron Whales split
+  Reprocessing out of Bulk Appraisal (class 2). Nothing else new.
 - **The web-search leg is worthless — spend the budget on forum pages.** A
-  targeted sweep returned zero beyond the forum. Residual use: the **Services**
-  category and tools absent from `76.json`.
+  targeted sweep returned zero beyond the forum.
+- **The Services category (id 61, under Marketplace) is SWEPT and spent** —
+  120 topics over 4 pages yielded one flag, and that one was already killed.
+  It is structurally hostile: buyback programs, freight, wormhole real estate,
+  corp admin and escrow are cross-player commerce, dead on kill-test 1, and the
+  ~15 tool ads cross-posted there all land in closed classes 1-3. If it is ever
+  re-read, sort by **pin/age, not recency** (the one payload was the oldest
+  pinned thread) and read only two shapes: a service ad that publishes a
+  multiplier or formula, and a WTB-a-tool post. Two WTB posts there asked for
+  undercut alerts and a contract-accepted ping — both already shipped, which is
+  useful confirmation rather than a lead.
+- **Service pricing rules, checked and closed.** Buyback: Horizon Logistics is
+  the only ad publishing its rule, "90% of Jita IV-4 highest buy" — that is
+  Appraisal x 0.9, covered; every other program hides it behind a proprietary
+  appraiser. Freight: only two published numbers across 120 topics, and every
+  hauler either points at an off-site calculator or quotes on contact. Two
+  shared conventions worth knowing: collateral is the Jita **sell** value of
+  the cargo, and rate tiers gate on volume + collateral rather than route.
+  **Do not build a directory of third-party rate cards** — they go stale the
+  day a service reprices and the app then lies to the player.
 - **A title is a weak classifier** — EVE Empire, Pod and ECT EVE Assets sat in
   the skim list and all carried a full industry surface. Treat these as
   unexamined, not cleared, and check any touching the ISK pipeline: EveWebMail,
@@ -254,7 +276,12 @@ Grouped by the test that killed them; the reason is what stops a re-pitch.
   sell as personal profit; a "Corp" chip, not exclusion). **7**: asset
   staleness. **8**: Appraisal Portfolios' chart half. **9**: player-structure
   pricing incl. Iron Whales' nullsec markets; Order Floor standings in the
-  broker fee. **10**: station-trading FIFO P&L, Production Run cost from wallet
+  broker fee (re-confirmed: `fees.ts` implements the standing terms and
+  `orderFloor.ts` accepts them, but nothing populates either and
+  `read_standings` is not in the scope set, so the app always shows the
+  standing-0 fee. USIA has sold standings-raising for 17 years off exactly this
+  formula, so demand is real — the kill is the scope plus unbuilt consent UI
+  against a <=0.5pp swing, and that has not changed. Do not re-pitch it as new). **10**: station-trading FIFO P&L, Production Run cost from wallet
   purchases, EVE Motor Market's trade journal. **11**: LP redemption ledger (ESI
   has no LP transaction log). **12**: PI Advisor arbitrary-system search;
   Records tab unlink/unwatch. **13**: Moon Survey / Metenox estimator and ledger
