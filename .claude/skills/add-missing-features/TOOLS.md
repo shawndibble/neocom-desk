@@ -56,6 +56,17 @@ cheapest non-forum discovery source, and **spent**: everything on it is above.
 
 Survey method, all still current:
 
+- **GitHub is SWEPT — 520 repos, 58 keyword queries plus 6 topic pulls.** One
+  flag, and it was killed. The open-source half of the ecosystem is the same
+  three closed classes rebuilt by solo developers: ~40% industry planners, ~25%
+  market/trading screeners, ~15% ESI libraries and SDE converters, ~15%
+  killboard/intel/multibox, and a long dead tail. Do **not** re-sweep on a
+  calendar. Re-sweep on **new-expansion vocabulary**, within ~6 months of a
+  release, running the expansion's mechanic nouns as queries — an Equinox batch
+  (`skyhook`, `mercenary den`, `sovereignty hub`, `planetary resources`) came
+  back almost empty, which is the point: routes opened in 2026 need
+  `X-Compatibility-Date` or ESI 404s silently, so almost nobody has built on
+  them and this app (which always sends it) would be unusually well-placed.
 - The forum category JSON paginates (`more_topics_url`) — fetch pages 0 **and**
   1 minimum; 0-15 are surveyed, 16+ is older Q&A. **A bumped thread can carry a
   new feature**, so sort by `last_posted_at`. Last pass: Nexum shipped a
@@ -286,7 +297,22 @@ Grouped by the test that killed them; the reason is what stops a re-pitch.
   has no LP transaction log). **12**: PI Advisor arbitrary-system search;
   Records tab unlink/unwatch. **13**: Moon Survey / Metenox estimator and ledger
   in any framing (filed as #859, closed on rediscovering this — do not re-file);
-  EQM HyperNet. **14**: Market Movers. **16**: Build Plan product volume + haul
+  EQM HyperNet. **1 (reach)**: Equinox skyhook reagent-reservoir and
+  theft-window tracker in any framing (prior art `yilifaer/aa-holdfast`) —
+  needs a corp role, in a sov-holding corp, that has deployed skyhooks, and
+  skyhooks exist in neither highsec nor lowsec, so it is a sub-slice of the
+  ~5% who hold any Corp Role at all (`20260903-145528`). Narrower than the
+  Metenox kill. Second cost: `esi-structures` is missing from
+  `esi/registry.ts` as an entire scope **group**, so it is a registry entry, a
+  Corp Capability, a `corpScopes` mapping, a scopes-test assertion and consent
+  copy — kill-test 9, not a formality. Note carefully that kill-test **13 does
+  NOT apply**: the ESI ground truth is real, and the existing
+  `StructureLow/NoReagentsAlert` plumbing answers "production is stopping",
+  not "a raider can take this" — so the overlap bar does not kill it either.
+  Reach carries it alone. **This is the candidate to reopen first if the app
+  ever acquires a sov-nullsec audience.** Also note its headline number (51
+  reagent-holding skyhooks out of 413) is an alliance-wide aggregate, which
+  kill-test 1 means this app structurally cannot produce. **14**: Market Movers. **16**: Build Plan product volume + haul
   distance (+3); pricing that haul at the courier corpus' going rate (a median
   is scale-dependent — an outlier detector, not a quote). **17**: PI haul-out
   volume, misrouted-factory alert, colony staleness (+4), Advisor buffer
