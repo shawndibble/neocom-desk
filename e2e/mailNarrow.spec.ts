@@ -1,0 +1,93 @@
+/**
+ * Mail reading pane on a phone (issue #1054): `useViewportBoundedHeight`
+ * sizes the body scroller off the raw viewport height, with no knowledge of
+ * `Layout.tsx`'s fixed mobile tab bar below `md`. `Mail.tsx` applied that
+ * height unconditionally, so a mail long enough to fill the pane had its
+ * last lines sit behind the opaque tab bar with no further scroll to reach
+ * them. The fix gates the computed max-height to desktop only (the same
+ * pattern `PlanEditor.tsx` already ships for the same hook) — on phone the
+ * body falls back to normal document flow, which `Layout.tsx`'s bottom
+ * padding already clears.
+ *
+ * A long body is seeded via `page.route` overrides on the mail
+ * headers/body endpoints (mockEsi.ts's defaults are empty), then the
+ * reading pane is scrolled to its last line and checked against the fixed
+ * tab bar's own bounding box.
+ */
+import type { Page } from '@playwright/test';
+import { test, expect } from './support/testBase';
+import { loginAndSelectCharacter } from './support/login';
+import { CHARACTER_ID } from './support/fixtureData';
+
+const PHONE = { width: 390, height: 844 };
+
+const MAIL_ID = 1;
+const END_MARKER = 'END-OF-MAIL-MARKER';
+// Comfortably taller than one phone screen at 390x844.
+const LONG_BODY = Array.from({ length: 80 }, (_, i) => `Line ${i + 1} of the mail body.`).join(
+  '\n'
+);
+
+async function seedLongMail(page: Page): Promise<void> {
+  // Not covered by mockEsi.ts's `PREFETCHED_EMPTY` set (that only mocks the
+  // boot-time `/mail` headers prefetch) — `Mail.tsx` itself also fetches the
+  // mailing-lists endpoint on mount, which otherwise escapes to the network
+  // guard the moment a spec actually visits `/mail`.
+  await page.route(`**/characters/${CHARACTER_ID}/mail/lists`, (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
+  );
+  await page.route(`**/characters/${CHARACTER_ID}/mail`, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([
+        {
+          mail_id: MAIL_ID,
+          subject: 'A very long mail',
+          timestamp: '2026-01-01T00:00:00Z',
+          is_read: true,
+        },
+      ]),
+    })
+  );
+  await page.route(`**/characters/${CHARACTER_ID}/mail/${MAIL_ID}`, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        subject: 'A very long mail',
+        timestamp: '2026-01-01T00:00:00Z',
+        body: `${LONG_BODY}\n${END_MARKER}`,
+        read: true,
+      }),
+    })
+  );
+}
+
+test('reading pane: last line of a long mail is reachable above the fixed tab bar at 390px', async ({
+  page,
+}) => {
+  await seedLongMail(page);
+  await loginAndSelectCharacter(page);
+  await page.setViewportSize(PHONE);
+  await page.goto('./mail');
+
+  await page.getByText('A very long mail').click();
+
+  const marker = page.getByText(END_MARKER);
+  await expect(marker).toBeVisible();
+
+  // The whole body is one `white-space: pre-wrap` paragraph (real newlines,
+  // not separate elements), so `marker` resolves to that entire block —
+  // `scrollIntoViewIfNeeded` would bring its *top* into view with the least
+  // possible scroll, not its end. A phone reader scrolls the page itself to
+  // the end, which on the fixed page is exactly what this fix restores.
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+
+  const tabBar = page.getByRole('navigation', { name: 'Mobile navigation' });
+  const [markerBox, tabBarBox] = await Promise.all([marker.boundingBox(), tabBar.boundingBox()]);
+
+  expect(markerBox).not.toBeNull();
+  expect(tabBarBox).not.toBeNull();
+  expect(markerBox!.y + markerBox!.height).toBeLessThanOrEqual(tabBarBox!.y);
+});
