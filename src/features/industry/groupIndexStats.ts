@@ -17,9 +17,16 @@ export function profitOf(totalCost: number, buyCost: number | null): number | nu
   return buyCost === null ? null : buyCost - totalCost;
 }
 
-/** No buy price to compare against reads as "unknown" rather than silently missing. */
-export function verdictOf(profit: number | null): PlanVerdictTag {
-  if (profit === null) return 'unknown';
+/**
+ * No buy price to compare against reads as "unknown" rather than silently
+ * missing — and so does `unpriceable`: `totalCost` counts an unpriced
+ * material's own line as 0 (see `materialResolution.ts`), so a `savings`
+ * value can stay non-null and understated even when the group can't really
+ * be priced. Without this gate the verdict tag would read "confident" next
+ * to a profit figure the row itself shows as "—".
+ */
+export function verdictOf(profit: number | null, unpriceable = false): PlanVerdictTag {
+  if (profit === null || unpriceable) return 'unknown';
   return profit >= 0 ? 'build' : 'buy';
 }
 
@@ -57,6 +64,6 @@ export function computeGroupIndexStats(
     Object.entries(group.ownedStock ?? {}).map(([typeID, qty]) => [Number(typeID), qty])
   );
   const rollup = rollUpBuildGroup(members, { ownedStock });
-  const profit = profitOf(rollup.totalCost, rollup.buyCost);
-  return { profit, verdict: verdictOf(profit) };
+  const savings = profitOf(rollup.totalCost, rollup.buyCost);
+  return { profit: rollup.profit, verdict: verdictOf(savings, rollup.unpriceable) };
 }

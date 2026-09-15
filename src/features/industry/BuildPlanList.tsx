@@ -43,8 +43,14 @@ export type PlanVerdictTag = 'build' | 'buy' | 'unknown';
 
 /** Profit / Verdict — the two figures both a plan row and a group row carry. */
 export interface PlanRollupStats {
-  /** Buy price minus build cost — positive is money saved building it, negative is money lost building it. Null with no buy price to compare against. */
+  /**
+   * Profit after fees — materials + job cost + sales tax + broker fee,
+   * against selling the finished product(s). Same figure the plan's detail
+   * page headlines; for a group row, the sum of each member's own profit
+   * (`BuildGroupRollup.profit`). Null when unpriceable.
+   */
   profit: number | null;
+  /** Build/Buy verdict: buy price minus build cost, positive means cheaper to build. Independent of `profit` above. */
   verdict: PlanVerdictTag;
 }
 

@@ -213,6 +213,28 @@ describe('rollUpBuildGroup — group-owned ledger', () => {
     expect(rollup.totalCost).toBe(405);
   });
 
+  it('adds the ledger saving back into profit, keeping it consistent with totalCost', () => {
+    // Member's own `profit` is computed against its own (owned-disabled)
+    // totalCost of 1005, e.g. revenue 1500 -> profit 495. The group ledger
+    // then saves 600 off materialCost/totalCost (as in the test above), so
+    // the internally-consistent group profit is 495 + 600 = 1095 — not the
+    // naive 495, which would leave `profit` and `totalCost` disagreeing
+    // about the same saving on the same rollup.
+    const ownedStock = new Map([[34, 60]]);
+    const rollup = rollUpBuildGroup(
+      [
+        member({
+          planId: 'a',
+          result: result({ materialCost: 1000, totalCost: 1005, profit: 495 }),
+          shoppingMaterials: [line(34, 100)],
+        }),
+      ],
+      { ownedStock }
+    );
+    expect(rollup.totalCost).toBe(405);
+    expect(rollup.profit).toBe(1095);
+  });
+
   it('clamps a ledger quantity larger than what is needed', () => {
     const ownedStock = new Map([[34, 999]]);
     const rollup = rollUpBuildGroup([member({ planId: 'a', shoppingMaterials: [line(34, 100)] })], {

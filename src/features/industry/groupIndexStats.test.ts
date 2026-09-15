@@ -89,21 +89,39 @@ describe('verdictOf', () => {
   it('is "unknown" for a null profit', () => {
     expect(verdictOf(null)).toBe('unknown');
   });
+
+  it('is "unknown" when unpriceable, even with a non-null profit', () => {
+    // A `savings` figure can stay non-null (an unpriced material's line
+    // costs 0) while the group can't really be priced — `unpriceable` must
+    // override a confident-looking sign.
+    expect(verdictOf(100, true)).toBe('unknown');
+    expect(verdictOf(-1, true)).toBe('unknown');
+  });
 });
 
 describe('computeGroupIndexStats', () => {
-  it("sums every member's own rollup into one profit/verdict", () => {
+  it('sums every member’s own profit after fees, independent of the buy-vs-build verdict', () => {
     const plans = [plan('p1'), plan('p2')];
     const jobFee = { eiv: 0, grossCost: 0, sccSurcharge: 0, facilityTax: 0, total: 5 };
     const rows = new Map([
-      ['p1', row('p1', { groupResult: result({ materialCost: 100, jobFee, buyCost: 200 }) })],
-      ['p2', row('p2', { groupResult: result({ materialCost: 50, jobFee, buyCost: 100 }) })],
+      [
+        'p1',
+        row('p1', {
+          groupResult: result({ materialCost: 100, jobFee, buyCost: 200, profit: -10 }),
+        }),
+      ],
+      [
+        'p2',
+        row('p2', { groupResult: result({ materialCost: 50, jobFee, buyCost: 100, profit: -5 }) }),
+      ],
     ]);
 
     const stats = computeGroupIndexStats(GROUP, plans, rows);
 
-    // totalCost = (100+5) + (50+5) = 160; buyCost = 200 + 100 = 300 -> profit 140, build
-    expect(stats.profit).toBe(140);
+    // profit is the sum of each member's own profit after fees: -10 + -5 = -15.
+    expect(stats.profit).toBe(-15);
+    // verdict stays keyed off buy-vs-build savings (totalCost 160 vs buyCost
+    // 300), not the profit above — the two are deliberately independent.
     expect(stats.verdict).toBe('build');
   });
 
@@ -122,5 +140,19 @@ describe('computeGroupIndexStats', () => {
   it('reads "unknown" for an empty group rather than a zero total', () => {
     const stats = computeGroupIndexStats(GROUP, [], new Map());
     expect(stats).toEqual({ profit: null, verdict: 'unknown' });
+  });
+
+  it('reads "unknown" verdict when a member is unpriceable, even though buyCost/totalCost still yield a signed savings', () => {
+    // An unpriced material's own line costs 0 (see materialResolution.ts),
+    // so `totalCost`/`buyCost` can still produce a confident-looking
+    // `savings` sign here — `unpriceable: true` must still win.
+    const plans = [plan('p1')];
+    const rows = new Map([
+      ['p1', row('p1', { groupResult: result({ buyCost: 200, unpriceable: true }) })],
+    ]);
+
+    const stats = computeGroupIndexStats(GROUP, plans, rows);
+
+    expect(stats.verdict).toBe('unknown');
   });
 });

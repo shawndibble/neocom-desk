@@ -105,6 +105,13 @@ export interface BuildGroupRollup {
   /** Cost of buying every product outright; null when any member is unpriced. */
   buyCost: number | null;
   /**
+   * Sum of member `profit` (profit after fees — materials, job cost, sales
+   * tax, broker fee, against selling every member's product). Null when any
+   * member's own `profit` is null, same "one bad member taints the total"
+   * rule `buyCost` already follows.
+   */
+  profit: number | null;
+  /**
    * Sum of member job durations — total job time, not wall-clock. Parallel job
    * slots are not modelled, so this is oven time rather than elapsed time.
    */
@@ -244,6 +251,15 @@ export function rollUpBuildGroup(
     buyCost += member.result.buyCost;
   }
 
+  let summedProfit: number | null = 0;
+  for (const member of members) {
+    if (member.result.profit === null) {
+      summedProfit = null;
+      break;
+    }
+    summedProfit += member.result.profit;
+  }
+
   // The buy list is the one cost authority the ledger ever adjusts (see
   // module doc): what it saved is the gap between each merged buy-list line
   // before and after netting, and that gap — never the table's — is what
@@ -258,6 +274,14 @@ export function rollUpBuildGroup(
   );
   const materialCost = members.reduce((sum, m) => sum + m.result.materialCost, 0) - ownedSaving;
   const topLevelJobFees = members.reduce((sum, m) => sum + m.result.jobFee.total, 0);
+
+  // Each member's own `profit` was computed against *its own* totalCost,
+  // which — same as `materialCost` above — has no group-ledger deduction
+  // (owned-stock deduction is disabled per-member; see the module doc). The
+  // naive sum is short by exactly `ownedSaving`, the saving `materialCost`
+  // already has subtracted, so it's added back here to keep `profit`
+  // consistent with `totalCost` on this same rollup.
+  const profit = summedProfit === null ? null : summedProfit + ownedSaving;
 
   // `member.result.unpriceable` is computed against the owned-disabled tree,
   // before the ledger's netting — so a material the ledger now fully covers
@@ -278,6 +302,7 @@ export function rollUpBuildGroup(
     topLevelJobFees,
     totalCost: materialCost + topLevelJobFees,
     buyCost,
+    profit,
     seconds: members.reduce((sum, m) => sum + m.result.seconds, 0),
     unpriceable,
     shoppingByHub,
