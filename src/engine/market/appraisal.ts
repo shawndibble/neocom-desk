@@ -116,10 +116,9 @@ function scale(price: number | null, percent: number): number | null {
  * batches refined, **plus** the units that could not fill a batch, which are
  * still there to sell at the same price the sell side quotes. Comparing the
  * refine total alone against the full quantity charged the refine path for
- * units it never consumed, and on a 999-unit paste of Mercoxit III-Grade that
- * recommended the option worth 1,036,890 ISK less (issue #1048). Both sides
- * are already scaled by the appraisal's Price Percent, so they stay on one
- * axis.
+ * units it never consumed, and recommended the worse option across a
+ * measured band of ordinary ore (issue #1048). Both sides are already scaled
+ * by the appraisal's Price Percent, so they stay on one axis.
  *
  * Strictly greater, because a tie is not a win: a quantity below one whole
  * batch refines into nothing, leaving the leftover equal to the whole paste,
@@ -133,7 +132,7 @@ function scale(price: number | null, percent: number): number | null {
 export function refineBeatsSellAsIs(row: AppraisalRow): boolean {
   if (row.refineTotal === undefined || row.buyEach === null || row.buyTotal === null) return false;
   // Set together with `refineTotal` in `buildAppraisal`, which the types do
-  // not say; `?? 0` reads a fit with no leftover, the same as none recorded.
+  // not say; `?? 0` reads a row with no leftover, the same as none recorded.
   const leftOverValue = (row.refineUnitsLeftOver ?? 0) * row.buyEach;
   return row.refineTotal + leftOverValue > row.buyTotal;
 }
