@@ -121,6 +121,29 @@ const EVENT_BY_ID = new Map(NOTIFICATION_EVENTS.map((event) => [event.id, event]
 /** Stable identity for a Character with no token row yet, so it doesn't itself break `CharacterNotificationSection`'s memo. */
 const EMPTY_SCOPES: ReadonlySet<string> = new Set();
 
+/** Matches Layout.tsx's phone/desktop line (#114). */
+const DESKTOP_QUERY = '(min-width: 48rem)';
+
+/**
+ * True at or above `md`, where the section header drops back off the touch
+ * tier (issue #1118). The virtualizer sizes every section from a fixed
+ * estimate with no `measureElement` behind it, so the estimate has to know
+ * which tier the header is actually rendering at. Local rather than shared,
+ * matching `EntryList.tsx`'s own copy of this hook.
+ */
+function useIsDesktop(): boolean {
+  const [isDesktop, setIsDesktop] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia(DESKTOP_QUERY).matches
+  );
+  useEffect(() => {
+    const desktop = window.matchMedia(DESKTOP_QUERY);
+    const onChange = (e: MediaQueryListEvent) => setIsDesktop(e.matches);
+    desktop.addEventListener('change', onChange);
+    return () => desktop.removeEventListener('change', onChange);
+  }, []);
+  return isDesktop;
+}
+
 /**
  * Events whose whole row is delivered by Scheduled Push — the ones that carry
  * the badge saying so.
@@ -359,6 +382,7 @@ export function NotificationsPanel() {
    */
   const [listElement, setListElement] = useState<HTMLDivElement | null>(null);
   const [scrollMargin, setScrollMargin] = useState(0);
+  const isDesktop = useIsDesktop();
   // A callback ref, not a plain `useRef` read at render time (the eslint
   // `react-hooks/refs` rule this project enables forbids that): the list sits
   // below content whose height can change after mount (a permission banner
@@ -390,6 +414,7 @@ export function NotificationsPanel() {
       const characterCapabilities = capabilitiesByCharacterId.get(character.characterId);
       return estimateCharacterSectionHeight({
         expanded,
+        touchViewport: !isDesktop,
         visibleEventIds,
         rowEnabledFor: (eventId) =>
           characterEventRowState(eventId, grantedScopes, characterCapabilities).rowEnabled,
@@ -408,6 +433,18 @@ export function NotificationsPanel() {
     scrollMargin,
     overscan: 5,
   });
+
+  // Crossing the `md` breakpoint changes the header tier, and so every
+  // section's estimated height — `measure()` drops the sizes cached under
+  // the old tier so the new estimates are the ones laid out (TanStack
+  // Virtual's documented reset for exactly this). Without it, rotating a
+  // phone past `md` keeps positioning sections at the old heights.
+  // (`rowVirtualizer` is in the deps but never retriggers this on its own:
+  // `useWindowVirtualizer` builds the instance once in a `useState` and
+  // mutates its options, so its identity is stable across renders.)
+  useEffect(() => {
+    rowVirtualizer.measure();
+  }, [isDesktop, rowVirtualizer]);
 
   return (
     <Panel title={t('settings.notificationsTitle')}>
@@ -658,13 +695,25 @@ const CharacterNotificationSection = memo(function CharacterNotificationSection(
           <button> — an interactive control inside a <button> is invalid HTML
           and would fold both accessible names together for screen readers. */}
       <div
-        className={`flex min-h-8 items-center gap-2 px-2.5 py-1.5 ${expanded ? 'border-b border-line' : ''}`}
+        className={`flex min-h-8 items-center gap-2 pr-2.5 ${expanded ? 'border-b border-line' : ''}`}
       >
+        {/*
+          `min-h-11 md:min-h-0` (issue #1118): this toggle is the only way to
+          reveal a Character's ~90 event rows, and as a plain flex child it
+          collapsed to its own ~16.5px caret-plus-text height inside the 32px
+          row it appears to fill — a thumb aimed at the row's padding hit
+          nothing. The row's `px-2.5 py-1.5` moves onto the button, so that
+          padding sits inside the hit area instead of being dead space around
+          it; the row keeps `pr-2.5` for the select-all columns beside it.
+          Growing the button rather than overlaying the row is what keeps
+          those columns independently tappable. `md:min-h-0` leaves the
+          desktop button at 28.5px inside the unchanged 32px row.
+        */}
         <button
           type="button"
           aria-expanded={expanded}
           onClick={() => onToggleExpanded(character.characterId)}
-          className="flex min-w-0 flex-1 items-center gap-1.5 text-left text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase hover:text-text focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
+          className="flex min-h-11 min-w-0 flex-1 items-center gap-1.5 py-1.5 pl-2.5 text-left text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase hover:text-text focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent md:min-h-0"
         >
           <Caret expanded={expanded} />
           <span className="min-w-0 truncate normal-case">{character.name}</span>
