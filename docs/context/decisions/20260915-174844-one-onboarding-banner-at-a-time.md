@@ -18,8 +18,8 @@ _Recorded 2026-09-15 · issue #1124._
 - **Each banner keeps its own eligibility logic untouched; the slot only
   decides which eligible banner mounts.** `shouldShowPermissionExplainer`,
   `selectInstallPromptVariant` and the `roles-without-grant` + dismissal
-  check are unchanged, so nothing here can alter *whether* a banner is owed
-  to the user — only *when* they see it.
+  check are unchanged, so nothing here can alter _whether_ a banner is owed
+  to the user — only _when_ they see it.
 - **All three mobile offsets collapse to `bottom-16`; `md:` offsets are
   untouched.** The staggered `bottom-16`/`bottom-28`/`bottom-40` existed
   purely to keep the banners from overlapping each other. With one visible at

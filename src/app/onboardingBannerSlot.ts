@@ -48,9 +48,7 @@ export const useOnboardingBannerSlots = create<OnboardingBannerSlotState>((set) 
   // re-registering the answer it already gave must not wake up the other two.
   setEligible: (id, eligible) =>
     set((state) =>
-      state.eligible[id] === eligible
-        ? state
-        : { eligible: { ...state.eligible, [id]: eligible } }
+      state.eligible[id] === eligible ? state : { eligible: { ...state.eligible, [id]: eligible } }
     ),
 }));
 

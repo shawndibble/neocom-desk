@@ -27,9 +27,9 @@ describe('selectVisibleBanner', () => {
 
   it('returns the highest-priority banner when several are eligible', () => {
     expect(selectVisibleBanner({ install: true, notifications: true })).toBe('notifications');
-    expect(
-      selectVisibleBanner({ install: true, notifications: true, 'corp-grant': true })
-    ).toBe('corp-grant');
+    expect(selectVisibleBanner({ install: true, notifications: true, 'corp-grant': true })).toBe(
+      'corp-grant'
+    );
   });
 
   it('follows the declared priority order', () => {
@@ -59,9 +59,12 @@ describe('useOnboardingBannerSlot', () => {
 
   it('hands the slot to the next claimant once the winner stops being eligible', () => {
     const install = renderHook(() => useOnboardingBannerSlot('install', true));
-    const notifications = renderHook(({ eligible }) => useOnboardingBannerSlot('notifications', eligible), {
-      initialProps: { eligible: true },
-    });
+    const notifications = renderHook(
+      ({ eligible }) => useOnboardingBannerSlot('notifications', eligible),
+      {
+        initialProps: { eligible: true },
+      }
+    );
     install.rerender();
     expect(install.result.current).toBe(false);
 
