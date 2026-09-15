@@ -206,4 +206,16 @@ describe('volumeForType', () => {
     catalog.typesById['587'] = { ...catalog.typesById['587']!, volume: -1 };
     expect(volumeForType(catalog, 587)).toBeNull();
   });
+
+  it('prefers the baked packaged volume over the assembled figure for a hull material (issue #1085)', async () => {
+    const catalog = await loadBlueprintCatalog();
+    catalog.typesById['587'] = { ...catalog.typesById['587']!, packagedVolume: 2500 };
+    expect(volumeForType(catalog, 587)).toBe(2500);
+  });
+
+  it('falls back to the assembled volume when no packaged figure was baked, as for an ordinary mineral', async () => {
+    const catalog = await loadBlueprintCatalog();
+    expect(catalog.typesById['34']!.packagedVolume).toBeUndefined();
+    expect(volumeForType(catalog, 34)).toBe(0.01);
+  });
 });

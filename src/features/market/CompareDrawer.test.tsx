@@ -80,6 +80,17 @@ describe('CompareDrawer', () => {
     expect(screen.queryByRole('region')).not.toBeInTheDocument();
   });
 
+  it('sizes the handle off the shared touch-tier scale, not a hand-written height (issue #1086)', () => {
+    // jsdom has no layout, so this asserts the class token rather than a
+    // rendered pixel height — e2e/marketCompareNarrow.spec.ts proves the
+    // real 44px box at 390px against a live browser.
+    act(() => useCompareSet.setState({ items: [ITEM_A] }));
+    renderDrawer();
+    const handle = screen.getByRole('button', { name: 'Compare (1)' });
+    expect(handle.className).toContain('h-11');
+    expect(handle.className).toContain('md:h-9');
+  });
+
   it('opens the drawer and shows best sell, best buy, spread and volume for each item', async () => {
     const user = userEvent.setup();
     act(() => useCompareSet.setState({ items: [ITEM_A, ITEM_B] }));

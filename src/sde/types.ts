@@ -52,8 +52,17 @@ export type BlueprintMap = Record<string, BlueprintType>;
 export interface TypeInfo {
   name: string;
   groupID: number;
-  /** m3, unpackaged */
+  /** m3, unpackaged (assembled) */
   volume: number;
+  /**
+   * m3, packaged. Baked only for manufacturing material types where it
+   * differs from `volume` (issue #1085) — a hull or capital module bought
+   * off the market arrives packaged, while an ordinary mineral or component
+   * has no assembled/packaged distinction at all. Absent for every other
+   * type, and for a manufacturing material the packaged-volume probe
+   * couldn't resolve; callers fall back to `volume` for those.
+   */
+  packagedVolume?: number;
 }
 
 /** One material a type reprocesses into, per `portionSize` units of it. */

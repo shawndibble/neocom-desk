@@ -449,6 +449,105 @@ async function probeMarketRegions(candidates) {
   return result;
 }
 
+const PACKAGED_VOLUME_CACHE_FILE = join(CACHE_DIR, 'packaged-volume-probe.json');
+// Merlin: a manufacturing material of the Hawk Blueprint (the ticket's own
+// example), with a packaged volume CCP has held stable for years. Used to
+// catch a probe that silently stops returning sane values — a schema change
+// dropping `packaged_volume`, or ESI quietly reverting to the assembled
+// figure — rather than baking wrong numbers with no build error (issue #1085).
+const PACKAGED_VOLUME_CONTROL_TYPE_ID = 603; // Merlin
+const PACKAGED_VOLUME_CONTROL_EXPECTED = 2500;
+
+/** Fetches one type's ESI record, retrying on rate limits/errors like `fetchMarketTypesPage`. */
+async function fetchTypeInfo(typeID) {
+  const url = `${ESI_BASE}/universe/types/${typeID}/?datasource=tranquility`;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const res = await fetch(url, {
+        headers: {
+          Accept: 'application/json',
+          'X-Compatibility-Date': ESI_COMPATIBILITY_DATE,
+          'X-User-Agent': ESI_USER_AGENT,
+        },
+      });
+      if (res.status === 429 || res.status === 420) {
+        if (attempt === 3) throw new Error(`HTTP ${res.status} for ${url} (rate limited)`);
+        await new Promise((r) => setTimeout(r, probeRetryWaitMs(res)));
+        continue;
+      }
+      if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
+      const remaining = Number(res.headers.get('x-esi-error-limit-remain'));
+      if (Number.isFinite(remaining) && remaining > 0 && remaining < 20) {
+        await new Promise((r) => setTimeout(r, 1000));
+      }
+      return await res.json();
+    } catch (err) {
+      if (attempt === 3) throw err;
+      await new Promise((r) => setTimeout(r, 500 * attempt));
+    }
+  }
+}
+
+/**
+ * Packaged volume (m3) for every manufacturing material typeID, from ESI's
+ * type endpoint — the SDE's own packaged-volume table ships empty (issue
+ * #1085), so this is the only source. `invTypes.csv`'s `volume` column is
+ * always the assembled figure; ESI's `packaged_volume` matches it for an
+ * ordinary mineral/component and differs for anything assembled in space
+ * (a hull, a capital module).
+ *
+ * Cached to disk like `probeMarketRegions`, keyed by typeID, so repeated
+ * local builds don't re-probe ~1,400 types against ESI every time. A type
+ * the probe can't resolve after retries is left out of the result rather
+ * than guessed, matching `volumeForType`'s existing "no data, don't fake it"
+ * contract — the caller falls back to the assembled `volume` for it, same as
+ * today.
+ */
+async function probePackagedVolumes(typeIds) {
+  let diskCache = {};
+  try {
+    diskCache = JSON.parse(await readFile(PACKAGED_VOLUME_CACHE_FILE, 'utf8'));
+  } catch {
+    /* no cache yet */
+  }
+
+  const result = new Map();
+  let failed = 0;
+  for (const typeID of typeIds) {
+    let cached = diskCache[typeID];
+    if (!cached) {
+      try {
+        const info = await fetchTypeInfo(typeID);
+        const packagedVolume = info?.packaged_volume;
+        // Cached even when ESI returned nothing usable, same as
+        // `probeMarketRegions` caching a `false` result — otherwise every
+        // ordinary mineral/component (the common case, where there's simply
+        // no distinct figure to bake) gets re-probed against ESI on every
+        // future build instead of just once.
+        cached = { packagedVolume: typeof packagedVolume === 'number' ? packagedVolume : null };
+        diskCache[typeID] = cached;
+      } catch (err) {
+        console.warn(`  packaged volume: typeID ${typeID} failed: ${err.message}`);
+        failed++;
+        continue;
+      }
+    }
+    // >0, not >=0: a real item never has zero volume, so a 0 here is ESI
+    // returning something unusable, not a genuine figure to bake.
+    if (typeof cached.packagedVolume === 'number' && cached.packagedVolume > 0) {
+      result.set(typeID, cached.packagedVolume);
+    }
+  }
+
+  await mkdir(CACHE_DIR, { recursive: true });
+  await writeFile(PACKAGED_VOLUME_CACHE_FILE, JSON.stringify(diskCache));
+
+  console.log(
+    `  packaged volume: ${result.size} of ${typeIds.length} resolved${failed > 0 ? ` (${failed} probe failures)` : ''}`
+  );
+  return result;
+}
+
 async function main() {
   console.log('Downloading SDE CSVs...');
   const raw = {};
@@ -786,6 +885,30 @@ async function main() {
       continue;
     }
     typeMap[typeID] = { name: t.name, groupID: t.groupID, volume: t.volume };
+  }
+
+  // --- packaged volume for manufacturing material types (issue #1085) ---
+  //
+  // Restricted to types appearing as a manufacturing blueprint's material —
+  // not the whole catalogue, and not reaction formulas (a reaction consumes
+  // gas/salvage, never a hauled hull). Every such typeID is already in
+  // typeMap from the pass above.
+  const manufacturingMaterialTypeIds = new Set();
+  for (const bp of Object.values(blueprints)) {
+    if (bp.activity !== 'manufacturing') continue;
+    for (const m of bp.materials) manufacturingMaterialTypeIds.add(m.typeID);
+  }
+  console.log(
+    `Probing packaged volume for ${manufacturingMaterialTypeIds.size} manufacturing material types...`
+  );
+  const packagedVolumeByType = await probePackagedVolumes([...manufacturingMaterialTypeIds]);
+  let packagedVolumeApplied = 0;
+  for (const [typeID, packagedVolume] of packagedVolumeByType) {
+    const entry = typeMap[typeID];
+    if (entry && packagedVolume !== entry.volume) {
+      entry.packagedVolume = packagedVolume;
+      packagedVolumeApplied++;
+    }
   }
 
   // --- pi.json: planetary industry schematics, keyed by the typeID they
@@ -1605,6 +1728,25 @@ async function main() {
     );
   }
   console.log(`  types map entries: ${Object.keys(typeMap).length}`);
+  console.log(
+    `  packaged volume: baked for ${packagedVolumeApplied} of ${manufacturingMaterialTypeIds.size} manufacturing material types`
+  );
+  if (manufacturingMaterialTypeIds.size > 0 && packagedVolumeByType.size === 0) {
+    console.error(
+      '  FAIL: packaged volume probe resolved 0 types — ESI type endpoint may be unreachable or its schema changed'
+    );
+    process.exitCode = 1;
+  }
+  {
+    const control = typeMap[PACKAGED_VOLUME_CONTROL_TYPE_ID];
+    const resolved = control?.packagedVolume;
+    if (typeof resolved !== 'number' || Math.abs(resolved - PACKAGED_VOLUME_CONTROL_EXPECTED) > 1) {
+      console.error(
+        `  FAIL: packaged volume control type ${PACKAGED_VOLUME_CONTROL_TYPE_ID} (Merlin) resolved to ${resolved ?? 'missing'}, expected ~${PACKAGED_VOLUME_CONTROL_EXPECTED} — the ESI type endpoint's packaged_volume field may have changed`
+      );
+      process.exitCode = 1;
+    }
+  }
   console.log(`  market-wide trees: ${Object.keys(marketWideTrees).length}`);
   console.log(`  moon ore type ids: ${moonOreTypeIds.length}`);
   if (!moonOresParent || moonOreMarketGroupIds.size === 0 || moonOreTypeIds.length < 50) {

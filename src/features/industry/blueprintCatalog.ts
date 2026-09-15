@@ -70,13 +70,18 @@ export function nameForType(catalog: BlueprintCatalog, typeID: number): string {
 /**
  * Per-unit volume (m3) for a typeID from the baked SDE; null when unknown or
  * out of a sane range, exactly like `buyPricedLine`'s range check on a raw
- * price — this reaches past the engine into the same raw type map. Note this
- * is *assembled* volume (`scripts/build-sde.mjs`), not packaged: correct for
- * ordinary minerals/components, but can overstate a ship-hull material line
- * 10-100x (issue #874) — flagged at the call site, not corrected here.
+ * price — this reaches past the engine into the same raw type map. Prefers
+ * the *packaged* figure where the bake has one (a manufacturing material
+ * whose packaged volume differs from its assembled volume — a ship hull, a
+ * capital module) so a hauled hull line reads what actually fits in a hold,
+ * not the 10-100x larger assembled figure (issue #874, corrected in #1085).
+ * Falls back to the assembled `volume`, which is exactly right for every
+ * ordinary mineral/component and for any type the packaged-volume bake
+ * couldn't resolve.
  */
 export function volumeForType(catalog: BlueprintCatalog, typeID: number): number | null {
-  const candidate = catalog.typesById[String(typeID)]?.volume;
+  const entry = catalog.typesById[String(typeID)];
+  const candidate = entry?.packagedVolume ?? entry?.volume;
   return typeof candidate === 'number' && Number.isFinite(candidate) && candidate >= 0
     ? candidate
     : null;
