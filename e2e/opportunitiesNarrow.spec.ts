@@ -1,14 +1,13 @@
 /**
- * Build Opportunities' selection checkbox on a phone (mobile UX pass): the
- * `select` column's blank `header` gave it no context once `DataTable`
- * stacked the row into a card — it rendered as an orphaned, unlabelled 16px
- * checkbox on its own blank-labelled line between the row's title and its
- * first real field. The fix marks the column `cardCorner: true` (the same
- * corner-icon mechanism `TaxTab.tsx`'s decorative edit affordance already
- * uses), pinning it out of the label/value flow, and wraps the checkbox in a
- * `size-11 md:size-4` label so a thumb gets a real target below `md` while
- * the checkbox itself stays the exact 16px glyph — and cell position — it
- * always was at or above `md` (desktop unaffected).
+ * Build Opportunities on a phone (mobile UX pass, issues stemming from
+ * #1096's checkbox fix): `DataTable`'s stacked layout hid the sortable
+ * column headers entirely (`.dt-stack thead`, `src/styles/index.css`), so a
+ * phone pilot had no way to change sort — and its 8-line stacked card had no
+ * single number a glance could land on. `MobileOpportunityList` replaces the
+ * table below `lg` with a ranked card list: a rank badge, a "hero" metric
+ * that tracks whichever field is the active sort, and a real "Sort by" menu.
+ * Desktop (`isDesktop`, `lg` and up) keeps the exact `DataTable` it always
+ * had — this list never mounts there.
  */
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
@@ -41,57 +40,73 @@ async function seedOwnedBlueprint(page: Page): Promise<void> {
   );
 }
 
-test.describe('Opportunities selection checkbox — stacked phone card', () => {
+test.describe('Opportunities — ranked phone list', () => {
   test.beforeEach(async ({ page }) => {
     await seedOwnedBlueprint(page);
     await loginAndSelectCharacter(page);
   });
 
-  test('pins to the card corner, off the label/value flow, at 390px', async ({ page }) => {
+  test('renders a ranked card list at 390px, not the desktop table', async ({ page }) => {
+    await page.setViewportSize(PHONE);
+    await page.goto('./industry?tab=opportunities');
+
+    await expect(page.getByRole('table', { name: 'Build Opportunities' })).toHaveCount(0);
+    await expect(page.getByLabel('Rank 1')).toBeVisible();
+    await expect(page.getByText('Rifter', { exact: true })).toBeVisible();
+  });
+
+  test('the selection checkbox is pinned with a real ~44px target', async ({ page }) => {
     await page.setViewportSize(PHONE);
     await page.goto('./industry?tab=opportunities');
 
     const checkbox = page.getByRole('checkbox', { name: /Select Rifter/ });
     await expect(checkbox).toBeVisible();
 
-    // The `cardCorner` positioning lands on the cell itself, not the label.
-    const cell = checkbox.locator('xpath=ancestor::td[1]');
-    const position = await cell.evaluate((el) => getComputedStyle(el).position);
+    const wrapper = checkbox.locator('xpath=..');
+    const position = await wrapper.evaluate((el) => getComputedStyle(el).position);
     expect(position).toBe('absolute');
 
-    // A real touch target below `md`, not just the 16px glyph.
-    const label = checkbox.locator('xpath=..');
-    const box = await label.boundingBox();
+    const box = await wrapper.boundingBox();
     expect(box).not.toBeNull();
     expect(box!.width).toBeGreaterThanOrEqual(44);
     expect(box!.height).toBeGreaterThanOrEqual(44);
-
-    // No orphaned blank-labelled line above "Blueprint" any more: the
-    // checkbox sits at/above the row's title, not between it and the
-    // first real field.
-    const blueprintLabel = page.getByText('Blueprint', { exact: true });
-    const [checkboxBox, labelBox] = await Promise.all([
-      checkbox.boundingBox(),
-      blueprintLabel.boundingBox(),
-    ]);
-    expect(checkboxBox).not.toBeNull();
-    expect(labelBox).not.toBeNull();
-    expect(checkboxBox!.y).toBeLessThan(labelBox!.y);
   });
 
-  test('stays an ordinary 16px table cell at desktop width, unchanged', async ({ page }) => {
+  test('changing the sort changes which metric leads the card', async ({ page }) => {
+    await page.setViewportSize(PHONE);
+    await page.goto('./industry?tab=opportunities');
+
+    await expect(page.getByRole('button', { name: /Sort by ISK\/hour/ })).toBeVisible();
+
+    await page.getByRole('button', { name: /Sort by ISK\/hour/ }).click();
+    await page.getByRole('menuitem', { name: 'Margin', exact: true }).click();
+
+    await expect(page.getByRole('button', { name: /Sort by Margin/ })).toBeVisible();
+    // The hero number's own unit label now reads "Margin", not "ISK/hour".
+    await expect(page.getByText('ISK/hour', { exact: true })).toHaveCount(0);
+  });
+
+  test('a long product name wraps instead of truncating', async ({ page }) => {
+    await page.setViewportSize(PHONE);
+    await page.goto('./industry?tab=opportunities');
+
+    const name = page.getByText('Rifter', { exact: true });
+    const overflowWrap = await name.evaluate((el) => getComputedStyle(el).overflowWrap);
+    const textOverflow = await name.evaluate((el) => getComputedStyle(el).textOverflow);
+    expect(overflowWrap).toBe('break-word');
+    expect(textOverflow).not.toBe('ellipsis');
+  });
+
+  test('desktop keeps the ordinary table, unchanged, with no sort menu', async ({ page }) => {
     await page.setViewportSize(DESKTOP);
     await page.goto('./industry?tab=opportunities');
 
+    await expect(page.getByRole('table', { name: 'Build Opportunities' })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Sort by/ })).toHaveCount(0);
+
     const checkbox = page.getByRole('checkbox', { name: /Select Rifter/ });
     await expect(checkbox).toBeVisible();
-
-    const cell = checkbox.locator('xpath=ancestor::td[1]');
-    const position = await cell.evaluate((el) => getComputedStyle(el).position);
-    expect(position).not.toBe('absolute');
-
-    const label = checkbox.locator('xpath=..');
-    const box = await label.boundingBox();
+    const box = await checkbox.boundingBox();
     expect(box).not.toBeNull();
     expect(box!.width).toBeCloseTo(16, 0);
     expect(box!.height).toBeCloseTo(16, 0);
