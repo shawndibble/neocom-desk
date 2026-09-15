@@ -1,914 +1,283 @@
 # Survey ledger
 
-What `/add-missing-features` already knows about the third-party EVE tool
-ecosystem and Neocom Desk's own coverage. This is a **reference for the next
-run**, not a run log — it's updated in place each run, never appended to.
-Read it in step 1; update it in step 7 (curate, don't append — see the
-skill's step 7). Kept under ~150 lines — compress on sight, don't just add.
+What `/add-missing-features` knows about the third-party EVE tool ecosystem and
+Neocom Desk's own coverage. A **reference for the next run**, not a run log:
+updated in place, never appended to. Read it in step 1, curate it in step 7,
+keep it near ~150 lines. Delete run metadata on sight.
 
 ## Tools surveyed
 
-Industry/market-relevant tools, gap-analysed at least once (name: what it
-does). All confirmed live unless marked dead/abandoned.
+Gap-analysed at least once; dedup before spending a slot.
 
-Adam4EVE (market stats/PI profitability/industry indices), Ravworks/Slipway
-(multi-item production planning, full material tree, what/where to build &
-sell), EVE Tycoon (profit tracking, order mgmt, per-item stock),
-Janice/Iron Whales Appraiser/EVE Appraisal (bulk appraisal, reprocessing, BPC
-pricing, watchlists/alerts; Iron Whales has since added abyssal-module pricing
-via MutaMarket and a 50-at-a-time BPO/BPC live-contract price lookup. Its full
-surface was finally read out in one pass: nullsec staging markets beside the 5
-hubs, screenshot/OCR appraisal, saved portfolios charted over time, price
-alerts + an undercut watcher, and an EFT-fit appraisal its dev calls in
-progress — the last of which is #1026, already filed here. All five gated; see
-Killed/dropped), EVE Blue Desk / SolCore Dynamics (cross-player blueprint market
-platforms — kill-test 1), EvE Blueprint (client-side manufacturing/reaction/PI production planner with Fit-to-Build
-fit-paste — same shape as Slipway/Ravworks/EVE Forge, already covered; its invention feature is out of
-scope per `.out-of-scope/invention-planning.md`; not a market platform despite the name-adjacency to
-EVE Blue Desk), EVE Courier (routing, gatecamp check, arbitrage, contracts),
-Fuzzwork (blueprint calc, reprocessing, SDE dumps), EVE Ref (reference/market
-data), EVE Retroindustry (local BOM/make-vs-buy, multi-char asset/PI/wallet),
-ISK.GG (multi-region price history/depth charts), EVE Miner Hub (mining
-ledger aggregator), EQM (production econ, multi-hub appraisal, Corp
-Exchange, JF fuel), EveLens (EVEMon-style planning + Skill Farm ISK/hr), EVE
-Horizon (mfg+PI planning, hangar-sweep BOM netting, cross-colony
-coordination), EVE Forge (nested BOM/capital parts, reactions, invention,
-Gantt; now looks abandoned — no dev posts since Jul 2026 amid community
-speculation over pulled ESI access), EVE-Industry-Scanner-Tool (mfg/reaction/PI scoring across 5 hubs),
-EVE-HUB (PI planner, hub arbitrage, threat intel), EVE TradeLooper (cargo
-valuation, LP analysis, scanner), EVE Night Trade Tools (FIFO P&L, undercut
-alerts), IndustrialEVE (PI notifications, now shipped in full — Extractor/
-Factory/Storage alerts, a Colony Overview page, pin countdown timers — every
-piece already covered here: extraction done is a Notification Event, fed/
-starved pins are `factoryBalance`/the Advisor worklist, storage-fill reads
-are kill-test 17, and PI colony clocks already sit on the Calendar Map as a
-Character Board Item; its Colony Builder template feature is dead on
-kill-test 12), jEveAssets (multi-account asset mgr), EVEAIO
-(bug-bounty preview, unknown feature set), MONW (recursive BOM w/
-have-subtraction, corp shared plans, structure pricing), Mudoteve/Solo
-Industry App (unit BOM netting, job queue sync), ArmedATLAS V2 (route
-planner + hauling arbitrage), PlanetFlow.APP (self-hosted corp PI, shareable
-templates), Cradle of War / EVE Balance (ore reprocessing value + buy-order
-lookup — covered by `reprocessing.ts`/#672), EVE Data Site (market history
-charts, PLEX ticker), PIM/EVE PI Manager (multi-char PI forecasting),
-Web-based PI Tracker (client-side P0-P1 tracker), JitaStocks (corp build
-mgmt, material reservation, LP↔ISK), Indeve (multi-product BOM,
-wallet-imported material cost), EVE Fleet Mining & Ratting Tool (payout
-split, ore/reprocess overview), FW LP Store shopping-cart tool (LP cart + ROI
-tracker in dev), EWT Planetary Interaction Tools (PI commodity/pricing
-checker, colony builder; its announced-but-still-WIP "User Planets" module —
-colony/extractor/factory timers, Discord-webhook idle/storage-full alerts,
-ISK/h per colony and globally — gap-analysed ahead of shipping: idle pins and
-ISK/h are already covered (Advisor worklist, #956), storage-full is kill-test
-17; re-check only if it ships something beyond that pitch), EVE ONE (all-in-one: PI, market, industry suite),
-EVE Buddy (char/corp monitoring, PI overview, slot summary), Dr.MoonGoo/CLI
-Metenox Calculator (fuel-block/gas yield from scan input, no ledger), Eden
-Buyback (standalone buyback marketplace — cross-player), Evernus (desktop
-margin calc/multi-region market analysis/mfg planning), GESI (Sheets ESI
-add-on for jobs/orders/assets/wallet), Lazy Blacksmith (blueprint
-search/analysis), EVE Orchestra (mining ledger/reprocessing/job tracking,
-corp mining tax), Alysii's PI Scheme / EVE Planetary Planner (PI chain
-calculators, one ~7yr active), Upwell Fuel Monitor (structure fuel tracker —
-already covered, `structureFuel`).
+Adam4EVE, Ravworks/Slipway, EVE Tycoon, Janice, EVE Appraisal, Iron Whales
+Appraiser (every piece gated — see Killed), EVE Blue Desk, SolCore Dynamics, EvE
+Blueprint, EVE Courier, Fuzzwork, EVE Ref, EVE Retroindustry, ISK.GG, EVE Miner
+Hub, EQM, EveLens, EVE Horizon, EVE Forge, EVE-Industry-Scanner-Tool, EVE-HUB,
+EVE TradeLooper, EVE Night Trade Tools, IndustrialEVE (PI alerts fully covered —
+kill-tests 12 and 17, #956), jEveAssets, EVEAIO, MONW, Mudoteve, Solo Industry
+App, ArmedATLAS V2, PlanetFlow.APP, Cradle of War, EVE Balance, EVE Data Site,
+PIM, EVE PI Manager, Web-based PI Tracker, JitaStocks, Indeve, EVE Fleet Mining
+& Ratting Tool, FW LP Store cart tool, EWT PI Tools ("User Planets" is the
+Advisor worklist), EVE ONE, EVE Buddy, Dr.MoonGoo, CLI Metenox Calculator, Eden
+Buyback, Evernus, GESI, Lazy Blacksmith, EVE Orchestra, Alysii's PI Scheme, EVE
+Planetary Planner, Upwell Fuel Monitor, Quantum Anomaly (surfaced #1040), ETM
+v2, AllianceAuth Market Manager, EVE Tycoon MCP server, Uedama Scout (#1043),
+EVE Metro, EVE Crews (cleared: a lore roleplay crew layer, no
+industry/manufacturing/market/wallet endpoint — out of remit despite the
+category's top post count, 185), EVE-NAV (nav.ceve.cc, live: a 3D capital/JF
+jump planner; DOTLAN and Compass already cover this, so incremental).
 
-**Web industry planners/calculators are an exhausted class.** eveindustry.app
-(multi-character job tracking, slot availability, reaction planner, invention
-planning with probability, reprocessing, PI), EVE Cookbook, EveIndy,
+**Three classes are closed, and with them the ecosystem has no untested class
+left**; a sweep's job is to notice a tool fitting none of them. (1) _Web
+industry planners_ (kill-test 6): eveindustry.app, EVE Cookbook, EveIndy,
 eveindustryplanner.com, eve-industry.org, eveonline-industry.com, EVE OS
-Industry, calculator.city and Eve Nexus (eve-nexus.app — Tauri desktop app,
-distinct from the forum's like-named fitting-sim toolkit: production-graph
-BOM viz, skill-aware ME/TE solver, buy-vs-build, cross-system cost index,
-restock planner, multi-character aggregation) all sit in the same shape as
-Ravworks/Slipway/EVE Forge/EVE-HUB, already surveyed. Everything they do is
-covered here —
-_except_ their two standout features, multi-hop reaction chaining and
-invention planning, and both are settled out of scope (kill-test 6 / round
-27's BOM-rollup rejection; `.out-of-scope/invention-planning.md`). A new
-planner surfacing in this class is not worth re-analysing unless it does
-something outside build math.
+Industry, calculator.city, Eve Nexus, dev-eve.lothriell.com,
+angrytiki/eve-industry-tracker. (2) _Bulk appraisal_ (Appraisal does this and
+more): Goonpraisal, Fuzzwork's Evaluator, EVE Workbench, dd24tool.de. (3)
+_Market/trading discovery_ (kill-tests 10, 1 and 3): theoz.space, Adam4EVE's
+margin finder, evetools.dev, evetrade.space, EVE Workbench's Trade Tool, EVE
+OS's Screener, Oracle Market Genius, Trading Matrix, EveBoosters.com, ETT.
+All-in-one companion apps are the same closed set, their non-pipeline extras
+dropping on **remit**: EVE Online Tooling, EVE Tools Suite, EVE Console, Koru
+Desktop, EveTogether, ECT EVE Assets, Pod, EVE Empire, Esparto Industries, EVE
+Motor Market, Capsuleers.app/eHub, ISKONOMY, Vigilant, EVE Flipper.
 
-**Bulk appraisal tools are closed as well** — the third and last class.
-EVE Appraisal, Goonpraisal, Fuzzwork's Evaluator, EVE Workbench, EVE Tycoon
-and Iron Whales all paste-and-price against live hub orders, which is what
-Appraisal already does, with multi-hub (#689), refine-then-sell (#672),
-contract-line value (#717) and honest `unpricedRows` on top. The single
-thing they have that this app does not is **contract-derived pricing for
-items with no market price** (Adam4EVE's contract price history). That is
-already killed in the same shape as the BPC Sourcing price-trend row: it
-needs new server-side historical retention on admin-write-only infra that
-today holds only the latest sync.
+**The only open axis found is eventing/actuation, not calculation** — the three
+closed classes are all calculators. EVE Market Order Assistant (forum 505014,
+mega.nz, 300M ISK/char/mo) hotkeys the market window open on the next order
+needing a reprice and clipboards a price: liveness unverifiable, in-client
+actuation is kill-test 2, and the forum's "Grey Zone Automation" thread makes it
+contested TOS ground. EVE Contract Bot (evecontractbot.space, forum 510398, 25M
+ISK/char/mo) pushes contract accept/complete/fail to Discord — dead, TLS cert
+expired; prior art behind #1091.
 
-**Market/trading discovery tools are a closed class too.** theoz.space
-(Margin Finder, Material Influence, PLEX/Omega deal analysis), Adam4EVE's
-margin finder, evetools.dev, evetrade.space, EVE Workbench's Trade Tool and
-EVE OS's Screener all do one of two things. **Spread/margin finding over a
-whole region's order book** is station-trading discovery: settled against
-here (kill-test 10 killed station-trading P&L, and hub-to-hub already ships
-as `hubHaulGaps`), and a whole-region order-book fetch is not a thing a
-client-side PWA does. **"Material influence"** — which material drives a
-build's cost — is kill-test 3: the Materials Table already prints a
-`lineTotal` per material, and with a linear cost model sensitivity _is_ cost
-share, so the answer is already on screen. Don't re-analyse this class
-either unless a tool prices something the app cannot see.
+**CapsuleerKit (capsuleerkit.com) is a tool DIRECTORY, not a tool** — the
+cheapest non-forum discovery source, and **spent**: everything on it is above.
 
-Oracle Market Genius and Trading Matrix (regional/station-hub spread
-scanners, each with a wallet-journal-matched "realized profit" tracker) gate
-the same way: the spread scan is kill-test 1 (a whole-region order-book
-fetch, not a client-side PWA thing) and the realized-profit tracker is
-kill-test 10 (FIFO reconstruction from wallet history, settled dead).
+Survey method, all still current:
 
-With planners, market/trading discovery and appraisal all closed, the
-ecosystem has no untested class left. A future sweep's job is to notice a
-tool that does not fit any of the three, not to re-analyse one that does.
-
-EVE Online Tooling / "Modular All-in-One Desktop Tool" (th-lange; Tauri+React,
-ESI+SDE, local, no telemetry: production, reprocessing, industry jobs, PI,
-station trading and daytrading), EVE Tools Suite (15 modules in one shell —
-fitting, industry, mining, market, trading, intel), EVE Console (market
-pricing, industry planning, wealth tracking, corp oversight), Koru Desktop
-(local-first stats/history plus a live-intel map), EveTogether (fits, assets,
-skills, fleet sync, killboard). Gap-analysed together: every industry/market
-feature across the five is already covered here or already killed — station
-trading/daytrading on kill-tests 10 and 14, wealth-over-time as the shipped
-wallet chart (#690) plus assets value (#712), whose charted form is killed on
-kill-test 8. ECT EVE Assets (Electron/React desktop mirror of much of this app: assets
-priced incl. capitals/abyssals, personal+corp contracts, manufacturing/
-research/invention jobs, market orders with price trends, structure fuel
-timers, wallet history, LP by corporation, clones, mail, public contract
-search, market browser — gap-analysed, every one already covered here),
-Pod (keyboard-driven multi-character manager: wallets, skills, fitting,
-mail, assets, wallet journal, market orders, contracts, hangar search —
-all covered here), EVE Empire (multiplatform companion, successor to the old EVE Nexus: industry
-jobs across characters, PI overview with live extractor/factory timers, item
-browser with depth charts and price history, blueprint materials, wallet/
-orders/contracts/mining-ledger/LP/assets, skill queue and training plans,
-missing-skill detection for a fitting — everything but the last is covered
-here), Esparto Industries (blueprint/reaction
-browser, reprocessing calc, moon-ore tax parsing — all already covered), EVE
-Motor Market (desktop build-tree viz, run planner with cross-plan material
-reservation, ESI-synced trade journal — all three dead, see Killed/dropped;
-its skills+slots-aware run planner is what surfaced #1015), Capsuleers.app /
-eHub (production planner, PI, market data, assets valuation — closed
-classes/#712; Paragon Hub SKINR marketplace — kill-test 1, cosmetics outside
-ISK-pipeline remit; Incursion ISK/h, a wallet-derived PvE combat income
-rate, is the one novel shape and drops on remit, not a kill-test — no
-blueprint/build/market leg, same exclusion already applied to EVE Flipper's
-PLEX/SP-farm calculators and war tracker), ISKONOMY (ISK/hour tracker, primarily
-for Abyssal deadspace running — same remit exclusion, no blueprint/build/market
-leg).
-
-Compass (compass.capsuleerkit.com — capital logistics: jump-freighter route
-planning over ~5,000 cyno-able systems, cyno-alt assignment per midpoint, fuel
-and fatigue, multi-JF fleet moves — see Killed/dropped), Quantum Anomaly
-(qsna.eu — a browsable per-system industry cost-index table, an LP-store
-explorer and a market appraisal; the LP and appraisal halves are closed
-classes, the cost-index table is what surfaced #1040).
-
-**CapsuleerKit (capsuleerkit.com) is a tool DIRECTORY, not a tool** — and the
-cheapest non-forum discovery source found so far. Compass and Quantum Anomaly
-both came off it in one fetch, and neither is reachable from `76.json`. Worth
-one fetch a sweep alongside the targeted web search.
-
-Eve Space Trucker (fcostin, GitHub — sequences profitable trades into a
-cargo route maximising profit per jump), Vigilant (Thor6677, GitHub —
-self-hosted companion dashboard: multi-character wallet, skills, industry,
-intel, WebGL star map), Eve Supply Chain (jasonesteele, GitHub — "corporate
-industry planning... supply chain management and resource planning"; its
-README documents the Angular Seed Advanced boilerplate rather than the tool,
-and it makes no distinctive claim over the planner class), Uedama Scout (a
-Twitch live-feed of the game's busiest gank system — not an ESI tool at all,
-but the clearest evidence that "what is on my hauling route" is a question
-players act on; it is the prior art behind #1043), EVE Metro (a maintained
-bookmark network sold as jump-efficient shortcuts — a cross-player SERVICE,
-kill-test 1, and nothing the app could reproduce).
-
-**CapsuleerKit's full listing has now been read out**, so it is spent as a
-discovery source until it adds rows: Compass and EveLens in-house, then EVE
-Appraisal, Signal Cartel, EVE Metro, zKillboard, DOTLAN, EVE OS, pyfa,
-RavWorks, Tripwire, EVE University Wiki, EVE Who, Uedama Scout, NPSI Gateway,
-Quantum Anomaly, jEveAssets. Everything in domain is surveyed above.
-
-ETM v2 (uplink42, GitHub — profit tracker / trading and asset manager with
-order monitoring and trade simulation), AllianceAuth Market Manager (an
-Alliance Auth plugin browsing corp/alliance market orders — kill-test 1 by
-construction), EVE Tycoon MCP server (exposes EVE Tycoon's order books to
-an AI assistant; a transport for a surveyed tool, not a new tool). None
-leaves a closed class.
-
-**Dead/abandoned, not gap-analysed:** EVE Panel (PI sim, iOS), EVE
-GURU/Production Ledger, EveTerminal.io, Mining Timer Tool, EVE Hauling
-Advisor.
-
-**Skimmed by thread title only — NOT gap-analysed** (mapping, intel,
-fitting/crew sims, DPS meters, multibox, dev-tooling, one-off Q&A threads).
-This list used to read "confirmed out of domain", which claims more than a
-title skim can support: EVE Empire, Pod and ECT EVE Assets all sat here and
-all three turned out to carry a full industry/market surface. A title is a
-weak classifier — "asset manager" and "companion app" both hide market,
-industry and wallet features. Treat a name here as unexamined, not cleared,
-and check any that could plausibly touch the ISK pipeline. **EVE Crews is now
-checked and cleared**, despite the highest post count in the category (185):
-a lore-focused crew-management roleplay layer (hiring, story events,
-station away-missions, an "After-Action Report") that reads ESI location/
-cargo/skills/killmails/standings but touches no industry, manufacturing,
-market or wallet endpoint; its own dev calls the ISK side "wonky"
-(tactical-data-recorder bounties, passive tourist-transport income) and out
-of remit either way — no blueprint/build/market leg. Still unexamined: Nexum,
-EveWebMail, EVE-NAV, Wayfinder, Atlas, MISMAPS/MISKILLZ, Fly Safe, WHMapper,
-Socketkill, PEARL, EVE Hacking Simulator, EVE Nexus, Eve PvP Radar, EVE-O
-Preview, EVE Threat Checker, EVE Fit Assistant, SLH Local
-Scanner, EveBoosters.com, EVE NewBro, EVE Link, PATT,
-W-Space Atlas, EveHunter, ADAPT, Helm, Nicotine,
-fleet-manager/HARUSPEX/EasyEve, icon server, contract-monitoring Discord bot,
-Ministry of Pantoscopic Observance, EVE Market Pro (abandoned), Ascension Labs Libs,
-Z-S Overview Customiser, SMT Eve Map Tool, Eve-mentor-mcp, EVEMon Lives,
-OpsCore v2, WarBeacon, Project Eden, EVE 3D MAP, @strata-eve/esi SDK, Eve
-Missile Analyst, Eve Ship Stats, Grey Zone Automation, EVE411, Eve
-Skillsboard, EVE Intelligence Nexus, Rangefinder, Eveswitcher, Insurgency
-Tools, Battlefield.Space, EVE OQM integration, plus assorted one-off Q&A /
-request / dev-recruitment threads with no tool attached.
-
-**The forum category JSON paginates** (`more_topics_url`). Fetch page 0 _and_
-page 1 minimum each run, keep following while present. Pages 0–15 are fully
-surveyed; 16+ is 2022-and-older ESI/SSO Q&A archive with no live
-industry/market tool found in three more pages past 10 — re-check page 0/1
-for new threads each run instead of going deeper. A run finding no new
-threads on pages 0–1 is a valid, complete survey — it isn't evidence to go
-digging further back.
-
-**The forum category is not the whole ecosystem.** All five tools above are
-live, local-first and squarely in domain, and none was reachable from the
-category sweep — they publish on GitHub and their own sites. A sweep that only
-reads `76.json` will keep missing that shape. Run one targeted web search per
-sweep (e.g. "EVE Online desktop industry market tool open source") alongside
-the forum pages. A trading tool can also sit in the forum's **Services**
-category rather than Third Party Developers (EVE Flipper did) — the category
-sweep alone won't reach it either; the web search is what catches this shape.
-
-EVE Flipper (browser-based, single-character, optional-SSO: arbitrage/station/
-radius trading, multi-hop route building, contract scanning, buy-vs-produce
-compare, portfolio P&L/VaR, slippage-modeled execution plans, price alerts,
-PLEX/SP-farm calculators, war tracker), gated feature by feature: its
-hub-to-hub gap is `hubHaulGaps`, its single-station spread is the Compare tab
-(kill-test 3, already on screen), any market-wide/cross-player arbitrage or
-route-building scan hits kill-test 1; contract scanning is the Contracts
-page's market-value appraisal; buy-vs-produce is `buildVsBuy`; portfolio P&L
-and VaR both need a per-unit purchase cost basis wallet history can't give
-(kill-test 10); a slippage-modeled execution plan projects off order-book rows
-already on screen (kill-test 3); price alerts are the Quickbar. PLEX/SP-farm
-calculators and a war tracker sit outside this skill's ISK-pipeline scope —
-not something Neocom Desk's own kill-tests speak to.
-
-**A bumped thread can carry a new feature even when no new thread appears.**
-The listing's `last_posted_at`/`posts_count` move when a dev announces an
-update, and a tool's row here records its _original_ pitch. When no thread is
-new, sort by `last_posted_at` and check what the recently-posted tools have
-added — that is how Iron Whales' abyssal and BPO-contract pricing surfaced,
-seven runs after its row was written.
+- The forum category JSON paginates (`more_topics_url`) — fetch pages 0 **and**
+  1 minimum; 0-15 are surveyed, 16+ is older Q&A. **A bumped thread can carry a
+  new feature**, so sort by `last_posted_at`.
+- **The web-search leg is worthless — spend the budget on forum pages.** A
+  targeted sweep returned zero beyond the forum. Residual use: the **Services**
+  category and tools absent from `76.json`.
+- **A title is a weak classifier** — EVE Empire, Pod and ECT EVE Assets sat in
+  the skim list and all carried a full industry surface. Treat these as
+  unexamined, not cleared, and check any touching the ISK pipeline: Nexum,
+  EveWebMail, Wayfinder, Atlas, MISMAPS/MISKILLZ, Fly Safe, WHMapper,
+  Socketkill, PEARL, EVE Hacking Simulator, EVE Nexus, Eve PvP Radar, EVE-O
+  Preview, EVE Threat Checker, EVE Fit Assistant, SLH Local Scanner, EVE NewBro,
+  EVE Link, PATT, W-Space Atlas, EveHunter, ADAPT, Helm, Nicotine,
+  fleet-manager, HARUSPEX, EasyEve, icon server, contract-monitoring Discord
+  bot, Ministry of Pantoscopic Observance, Ascension Labs Libs, Z-S Overview
+  Customiser, SMT Eve Map Tool, Eve-mentor-mcp, EVEMon Lives, OpsCore v2,
+  WarBeacon, Project Eden, EVE 3D MAP, @strata-eve/esi SDK, Eve Missile Analyst,
+  Eve Ship Stats, Grey Zone Automation, EVE411, Eve Skillsboard, EVE
+  Intelligence Nexus, Rangefinder, Eveswitcher, Insurgency Tools,
+  Battlefield.Space, EVE OQM integration.
+- **Dead/unreachable, not gap-analysed:** EVE Panel, EVE GURU / Production
+  Ledger, EveTerminal.io, Mining Timer Tool, EVE Hauling Advisor, EVE Market Pro
+  (evemarketpro.org returns HTTP 530 — unclassifiable).
 
 ## Already covered — don't re-propose
 
-Mapped to the module/route that proves it:
+**A closed issue is not proof** — a number alone can be an owner rejection. Grep
+for the module or route.
 
-**A closed issue is not proof.** Every claim here needs a module or route
-behind it — an issue number alone can be an owner rejection. Three rows sat
-here for rounds claiming features that were declined and never written
-(#643, #722, #725). Before adding a row, `gh issue view <n> --comments` and
-grep for the code.
+- **Market**: undercut detection, order competition/health, full order book,
+  owned-order hub gap (`hubHaulGaps`), variation/meta compare.
+- **Appraisal**: single/multi-hub, refine-then-sell, contract-line value,
+  reprocessing off the character's REAL skills (only the facility rate is
+  assumed), shareable re-priced pile.
+- **Industry**: realized profit, build-vs-buy, Build Groups/Opportunities
+  (owned-blueprint ranking — covers Ravworks), Order Depth, job-slot count,
+  owned-stock/Craft Sweep, Active Jobs by soonest, Production Log profit chart,
+  price history + 7-day SMA, reactions as an `activity`, blueprint material
+  calc.
+- **PI**: stop-tier recommendation, fed/starved pins, reset-run batching,
+  measured extraction rate, cross-colony coordination (ADR 0012), richness
+  estimate + fitted plan for unbuilt planets; Advisor is a ranked worklist
+  (#954/#960) with per-colony ISK/hr (#956), restart cadence (#959), pilot prefs
+  (#955), time-to-full (#958), chain revenue.
+- **Wallet/LP**: balance chart, corp division sync, ISK/LP ranking nets ISK
+  cost, the `required_items` turn-in _and_ a build cost. **Assets**: portfolio
+  value.
+- **Open Orders**: sell-through, multi-char aggregation. **Quickbar**: price
+  alerts, multi-hub handoff. **Mining**: moon-ore ledger tax tracking
+  (renter-side only), ore/ice yield. **Corp Ops Board**: structure fuel clock.
+- **Contracts**: item-exchange/auction value; Courier mode ships ISK/jump,
+  ISK/m³, Reverse Lane, Endpoint Space, "From my region", Completion Risk, Going
+  Rate bait detection.
 
-- **Market**: undercut detection, order competition/health, full order book
-  as sortable table (Market Browser), hub-to-hub price gap for an owned sell
-  order (`hubHaulGaps`), item-variation/meta comparison (EVEMissioneer's
-  pitch — `VariationsTable.tsx`/`VariationsCompareModal.tsx`,
-  `engine/market/variations.ts`, `engine/market/attributeCompareMatrix.ts`).
-- **Appraisal**: single-hub, multi-hub comparison (#689), refine-then-sell
-  (#672), contract-line market value (#717), reprocessing (`reprocessing.ts`),
-  and a shareable pile — #831 SHIPPED (`/share/appraisal`,
-  `AppraisalShared.tsx`, `appraisalShare.ts`): a byte-capped typeId-qty payload
-  re-priced at view time, so "save a pile and revalue it later" is already
-  answered. `reprocessing.ts` already reads the Character's REAL Reprocessing /
-  Reprocessing Efficiency / Scrapmetal levels from ESI — the "most tools make
-  you guess your yield %" pitch (Iron Whales) does not land here; only the
-  facility rate is a labelled assumption, on purpose.
-- **Industry**: realized profit (`realizedProfit.ts`), build-vs-buy, Build
-  Groups/Opportunities (owned-blueprint ranking, covers most of Ravworks'/
-  Slipway's pitch), Order Depth column, open job-slot count (#679),
-  owned-stock/Craft Sweep detection (materials only, not finished-product
-  inventory), Active Jobs sorted
-  by soonest with per-category slot usage, Production Log realized-profit
-  chart (#711), price history + 7-day SMA (#730), reactions modeled as a
-  manufacturing `activity` (no chaining across blueprints — kill-test 6).
-- **PI**: stop-tier recommendation, fed/starved pin detection, reset-run
-  batching, measured extraction rate, cross-colony coordination (ADR 0012),
-  resource-richness estimate + fitted build plan for unbuilt planets
-  (out-depths every surveyed PI tool).
-  Advisor tab reworked into a ranked worklist (#954/#960) with per-colony
-  ISK/hr right now (#956), restart cadence priced against the extraction
-  decay curve (#959) with pilot-set restart/haul cadence preferences (#955),
-  and time-to-full (#958) — out-depths every surveyed PI planner on ongoing
-  colony economics, not just layout.
-- **Wallet/LP**: balance-over-time chart (#690), corp wallet division sync,
-  LP store ISK/LP ranking — `offerProfit.ts` already nets an offer's ISK cost,
-  the hub cost of its `required_items` turn-in _and_ a build cost, and returns
-  null rather than guessing when any leg is unpriceable. An "LP offers should
-  account for what you must hand in" pitch is already built.
-- **Assets**: total portfolio value across locations (#712).
-- **Open Orders**: sell-through/days-to-clear column (#713), multi-character
-  aggregation.
-- **Mining**: moon-ore ledger tax tracking (renter-side reconciliation only —
-  no moon composition/pre-extraction data; also covers OMIP-style moon-mining
-  tax tracking), ordinary ore/ice yield tracker (#671).
-- **Quickbar**: price alerts (#680), multi-hub Appraisal handoff (#726).
-- **Contracts**: item-exchange/auction market value (#717); Contract Search's
-  Courier mode now ships ISK/jump ranking, ISK/m³, Reverse Lane, Endpoint
-  Space filter, "From my region" shortcut, Completion Risk and Going Rate
-  bait detection (`engine/contracts/{courierRates,courierGoingRate,
-courierReverseLane,courierRisk}.ts`) — supersedes #826.
-- **Corp Ops Board**: structure fuel-expiry clock already tracked
-  (`structureFuel` kind in `engine/corp/board.ts`); Metenox reactor fuel/gas
-  tracking considered and killed — kill-test 13.
-- **Industry**: Lazy Blacksmith/EVE Orchestra-style blueprint material calc
-  already covered by the Build Plan/BOM engine
-  (`features/industry/blueprintCatalog.ts`, `BuildPlanDetail.tsx`,
-  `MaterialsTable.tsx`).
-
-Also settled: PI chain revenue/margin already prices at `revenuePrices`
-end-to-end; no market-sell PI gap. Corp Industry Jobs' missing installer
-column is real but deliberately out (narrow, corp-directors-only). A
-per-planet fitted build plan for unbuilt colonies (round 51/53/56 successor)
-already answers "what layout should I build" — a static, player-authored,
-reusable PI colony template would be a worse, non-link-cost-aware version of
-what the Advisor already computes per-planet; don't re-propose.
-
-**The "engine computes it, the UI never shows it" scan is now SPENT.** A run
-enumerated every field on every exported interface under `src/engine` and
-checked each name against all of `src/features`, `src/routes`,
-`src/components` and `src/app`. Everything it turned up is accounted for:
-`ThroughputCheck`'s `bufferM3`/`bufferNeedM3`/`flowPerHourM3` and `ColonyFit`'s
-`limitedBy` are settled-killed PI figures, `OrderFloorInputs`' standings and
-`AppraisalRow`'s `refineUnitsLeftOver` are killed below, and the rest are
-internal helpers, options-in fields or test seams. Re-running the scan finds
-the same list. A zero-caller EXPORT is especially weak evidence — it usually
-means "used inside its own file" or "exported for a test", not a gap. The
-productive variant, if any, is the reverse: a surface that draws a conclusion
-the engine could have made sharper.
+**The "engine computes it, the UI never shows it" scan is SPENT** — every
+exported `src/engine` field was checked against the whole app and accounted for.
+The productive inverse is a surface drawing a conclusion the engine could
+sharpen.
 
 ## Standing kill-tests
 
-1. **Cross-player aggregation wall.** Local-first PWA; ESI data never syncs
-   across players. Kills hub arbitrage, corp buyback/payout splitters,
-   member exchanges, buyback marketplaces.
-2. **No write-scoped ESI.** Zero write endpoints in `src/esi/registry.ts`.
-   Kills bulk relist/buy-queue/order-automation.
-3. **Picture of data already on screen.** A chart/viz re-rendering numbers
-   already visible as rows isn't new capability. Killed: order-book depth
-   chart (x2), Gantt job-scheduling timeline, working-capital-locked stat.
-4. **Engine exists but has one caller ≠ covered.** Check whether the caller
-   uses every field the engine returns. **But an unrendered field is not a
-   gap by itself** — check what the surface DOES with the underlying fact
-   first. Appraisal never renders `refineUnitsLeftOver`, and does not need
-   to: when a part batch makes `refineTotal` zero, `refineBeatsSellAsIs`
-   already highlights the buy column as the winner, so the advice on screen
-   is right without the sentence. An unrendered field is a lead, never a
-   finding; the finding is a surface that acts WRONG without it. Reprocessing, wallet balance chart,
-   and `realizedProfit.ts`'s tax/fee/margin fields (#824) were all real gaps
-   of this shape; `orderFloor`/`linkCost.greatCircleKm` came back clean.
-5. **No historical ESI series.** Kills cost-index-over-time (no ESI history,
-   63% of systems at an identical floor).
-6. **Settled scope wins.** Check `docs/context/decisions/` and
-   `.out-of-scope/` first. Named precedents: ADR 0013 (public-contract crawl
-   write-budget), invention/research/copying planning (no market price for
-   the output), round 27's BOM-rollup rejection (one blueprint per plan, no
-   cross-blueprint reaction chaining).
-7. **Assets endpoint has no timestamp.** Kills staleness/idle-inventory
-   detection.
-8. **Not in a poll domain ≠ regularly sampled.** Check
-   `pollDomains.ts`. Assets is page-visit-only — killed Total Assets Value
-   chart on sampling cadence.
-9. **A scope wired for one feature isn't free for another.** Unbuilt consent
-   UI is part of the cost, not a formality (`structureMarkets` group).
-10. **Materials are fungible — no per-unit purchase provenance.** Settled
-    project-wide; kills FIFO cost reconstruction on both buy and sell sides,
-    including pure station-trading P&L trackers built from wallet history.
-11. **A `ref_type` Wallet journal filter already exists**
-    (`walletJournalFilter.ts`). "A view of entries with `ref_type X`" is
-    usually a saved filter, not new capability — but a `_projection_` computed
-    from a ref_type's history (e.g. skill-training payback) is not disposed
-    of by this alone; check what's actually new. Killed: LP Store redemption
-    ledger off `ref_type: lp_store`.
-12. **A module's own header comment can be a settled decision.** Not every
-    scope boundary lives in `docs/context/decisions/`. Killed: PI Advisor
-    arbitrary-system search. But a comment must _argue_ a boundary to be one:
-    a descriptive parenthetical giving no reason (`(drops skills)`) is a
-    refactoring artifact, not a rejection — `git log -S` the phrase before
-    treating it as settled (#1015).
-13. **A pre-investment calculator with no ESI ground truth is a maintenance
-    trap.** Formulas resting on hand-transcribed community numbers (not
-    SDE-derivable, no ESI fixture) go stale silently. Killed: Moon Survey /
-    Metenox Yield Estimator, Metenox ongoing fuel/yield ledger (also
-    sub-slice-of-a-sub-slice reach: moon-owning corp leadership only); EQM
-    HyperNet Tracker (dev-confirmed HyperNet offer data has no ESI backing
-    at all — also a gambling mechanic, not manufacturing or trading).
-14. **No bulk market-history endpoint.** ESI's market history is one type ID
-    at a time — kills market-wide movers/trending dashboards; a bounded
-    (Quickbar-scoped) version collapses into the existing Price History
-    chart (kill-test 3).
-15. **Every real route requires a Character.** `FEATURE_ROUTES` wraps every
-    page in `RequireCharacter`/`ScopeGate` (`routeScopes.test.ts` enforces
-    it); only `/login`, `/callback`, `/styleguide` are exempt, and none
-    carry user/game data. A share-link/public-view candidate is the first
-    thing that would break this pattern — narrow it to a hand-added route
-    outside the map with its own exemption test, don't assume it's a
-    drop-in extension (#831).
-16. **SDE `invTypes.volume` is assembled volume, not packaged/cargo volume.**
-    Identical to packaged only for planetary commodities (verified in
-    `scripts/build-sde.mjs`'s own comment). For a ship/hull type the two can
-    differ 10-100x (Rifter: 27,289 m3 assembled vs. its much smaller packaged
-    volume). Kills or narrows any candidate that reports a _product_'s own
-    hauling volume (ships/structures are exactly the common product types);
-    fine for ordinary mineral/component _material_ lines, where the two
-    coincide.
-17. **A PI pin's live state is either untrustworthy or deliberately unread.**
-    `contents`/`last_cycle_start` only refresh in-client (kills any haul-out
-    volume or stock-value readout — see the ADR 0005/0011 row below).
-    `routes[]` is trustworthy configuration but reading it to model exact
-    per-pin material split was proposed and rejected on its own terms — see
-    `docs/context/decisions/20260906-100845-unfed-factories-are-a-measurement-the-advisor-prints.md`,
-    which keeps the proportional-split convention on purpose. Between the two,
-    no PI feature can honestly report live stock levels or exact per-pin
-    routing.
+Numbering is stable — later runs cite these by number. Append, never renumber.
 
-18. **A pass/fail badge is noise when most rows pass.** Compute the split over
-    the real corpus before proposing any positive marker on a ranked board, and
-    mark only the exceptions — a green "you can do this" state painting 45% of
-    a board carries no information (#1015, measured across all 4,012
-    market-wide products).
-
-19. **Shipped copy can promise a feature that does not exist.** When a
-    candidate is killed or deferred, grep `en.json` for strings that already
-    advertise it — a deferral often lands after the copy did. The string is a
-    user-visible defect in its own right and files as a `bug`, not an
-    enhancement (#1020: the order detail told players to "type in what it
-    cost" with nothing behind it, and a second key sat unreferenced).
-
-20. **A baked SDE field that looks like the answer usually is not it.**
-    "The data already ships" is the claim this skill gets wrong most often,
-    because a field's NAME reads like the fact you want. `stations.json`
-    carries a station `typeId`, which sounds like it says what a station can
-    do — it does not: 15 of 44 NPC station typeIds are mixed, the same id
-    appearing on a factory and a non-factory station, and
-    `FACILITY_KIND_BY_STRUCTURE_TYPE_ID` covers five PLAYER structure ids
-    only. Capability lives in `staStations.operationID` +
-    `staOperationServices`, which `build-sde.mjs` does not read. Before
-    writing "no new data needed", find the consumer that already answers
-    your exact question — not a field whose name sounds like it. The cost of
-    skipping this is not academic: under the naive rule, 5 of 8 hub origins
-    recommended a system where installing is impossible (#1040).
-
-21. **A settled decision resting on a premise that has since shipped is
-    stale, not binding — but prove the premise moved.** The repo states this
-    about itself: #942's decision file records round 14's "needs no local
-    pathfinding graph" as having gone "stale rather than wrong". Worked case:
-    the 2026-09-05 build-system decision refused to enumerate systems because
-    "the bundled SDE carries no solar-system table"; #942 then shipped
-    `market/systems.json` and `market/jumps.json`, and #1040 reads them. This
-    does NOT weaken kill-test 6 — a decision's premise going stale is a
-    citable fact about the repo, never a candidate's inconvenience. Cite the
-    commit/issue that moved it, keep the decision's other holdings intact
-    (the typed-name input survived untouched), and hand the call to the human
-    in "Why not delegated".
-
-22. **A prohibition's stated REASON is usually narrower than its title.**
-    `20260912-165245` is titled "courier hauls carry endpoint space, **not
-    route safety**" and reads as a flat ban — but the same sentence gives the
-    reason: "one route lookup per row against ESI's shared
-    100-errors-per-minute budget". It bars a COST at BOARD scope, and #946
-    then shipped route safety at DETAIL scope on the local graph, recording
-    the line explicitly: "An endpoint in one is a row marker... A route
-    _through_ one is a detail-modal line." #1043 is on the permitted side and
-    needed no staleness argument at all. So: read the reason before citing a
-    decision as settled scope, and check whether a LATER decision already drew
-    the line. Distinct from kill-test 21 — that is a premise going stale, this
-    is a prohibition being narrower than it looks.
-
-23. **Check what the ADJACENT cell is already computed from.** A new fact
-    derived from a route, path or scan usually has a sibling already on the
-    row, and the two may come from different sources. Open Orders' hub rows
-    take their distance from ESI `/route/` (`loadJumpsBetween`), while
-    `routeExposure` uses the local graph with different preference semantics —
-    so bolting exposure on as-is prints two answers to one route side by side,
-    which #946's own decision names as a defect ("Diverging would also give
-    one row two different distances in two adjacent cells"). The fix is
-    usually to source BOTH from the one computation, which is why #1043 ships
-    as a one-caller migration that REMOVES five ESI requests rather than as an
-    addition. Look for this before writing "just append it".
-
-24. **A decision can scope ITSELF, and then it is not a convention.** The
-    mirror of kill-test 22. `20260906-180034` states "A part batch yields
-    nothing, **and the row says so**", which reads as a project-wide
-    disclosure rule — until its last bullet: "**The only UI is the row that
-    already exists.** … No reprocessing panel, no Build Plan comparison, no
-    assets view — the ticket names those as motivation, not scope." So a
-    third surface not doing it is not an unimplemented decision, and does not
-    file as a `bug`. Read a decision's LAST bullets before citing its first
-    ones: that is where a project this careful writes down what it deliberately
-    did not do.
-
-25. **A near-tie comparison flips on a small error; "the error is small"
-    is not a kill.** The instinct that killed #1048 for one extra round was
-    "a 99-unit remainder is a rounding error against an ore haul of
-    thousands". True, and irrelevant: a flip needs the per-unit edge to be
-    smaller than one part in the batch count, which is exactly the near-tie
-    region a comparison surface exists to adjudicate. Measured, 179 of 858
-    priced types sat in that band and 799 (type, quantity) pairs flipped.
-    So when a figure feeds a VERDICT rather than a readout, bound the error
-    against the DECISION MARGIN, not against the total — and measure it
-    before concluding either way. The corpus is usually local (`public/data`)
-    and live hub prices are one Fuzzwork call.
-
-26. **A counterfactual must be an action the player could take AT THAT
-    VENUE.** Measuring a comparison defect means filling the gap with what
-    the player would really get — not with another venue's price. A sweep
-    "measured" Compare Hubs by pricing each hub's unpriced rows at JITA and
-    found 10.4% of random piles flipping; the result was a fiction that
-    inflates thin hubs by construction, because a hub with no buy order pays
-    nothing, full stop. Kill-test 25 says measure; this says check that what
-    you measured is a real alternative. A stand-in price is the commonest way
-    to manufacture a defect that is not there.
-
-27. **Fee coverage is a known fault line — check it on every new ISK
-    figure.** The app's rule is settled and correct in four places:
-    `buildVsBuy` (tax + broker on a sale), `ownedStockSale` (tax always,
-    broker only when LISTING — the 100 ISK per-order minimum is why the two
-    differ), `makeOrBuy` (a material is consumed, never listed, so neither
-    applies), and `orderExits`/`hubHaulGaps` (netted against the fee-aware
-    Order Floor; hold/dump pay tax only, matching pays broker twice). It was
-    wrong in two, both filed this round: #1050 and #1051. So when a candidate
-    touches any ISK figure, ask which of those four cases it is and whether
-    the code says so. Amplification is the reason it matters: fees land on
-    REVENUE while the headline metric is usually a MARGIN, so a ~5% revenue
-    haircut moved LP's ISK/LP by a median of 13% and flipped 61 offers from
-    profit to loss.
-
-28. **A stale code comment can send a whole run down a dead end — check the
-    game fact, not the prose.** `appraisalData.ts` says the app "has no mapping
-    for ore/ice's own specialisation skills (Veldspar Processing and friends)".
-    Veldspar Processing **does not exist** — CCP consolidated them into 15
-    tiered skills (Simple/Coherent/Variegated/Complex/Abyssal/Erratic Ore,
-    Mercoxit, Ice, five Moon tiers, Unrefined Minerals, Scrapmetal), all
-    visible in the bundled `skills.json`. A whole candidate was drafted around
-    parsing skill descriptions against type names before a reviewer read the
-    data. Kill-test 12 says a comment can BE a decision; this is the other
-    edge — a comment can be a stale fact, and the bake usually settles it in
-    one command. Check the shipped data before building on prose.
-
-29. **Before concluding "the SDE has no mapping for X", search
-    `market/attributes.json` for an attribute that IS the mapping.** The bake
-    already carries a dogma-attribute catalogue with names and units, and a
-    `unit: typeID` attribute is a pointer to another type — i.e. a join, not a
-    number. Attribute **790 "Reprocessing Skill"** names each refinable type's
-    specialisation directly (all 338 ore types carry it; absent on
-    modules/minerals/ammo, which makes absence itself the classifier).
-    `build-sde.mjs` already streams `dgmTypeAttributes.csv`, so widening its
-    filter is cheap. This is the difference between kill-test 13 (a
-    hand-transcribed table, dead) and a one-field bake (#1058).
-
-30. **Character coverage is the third fault line, after fees and skills.** The
-    app is multi-character, and any surface aggregating across characters must
-    resolve per-character inputs per ROW, not once. Correct in three places —
-    Open Orders (`skillsByCharacter.get(entry.characterId)`), Active Jobs (a
-    per-character fan-out whose missing entry reads "unknown, **never a guessed
-    0**"), Mining Yield (`loadCorrectedSkills` per character, `NO_SKILLS`
-    fallback) — and wrong in Build Opportunities (#1062). Two rules fall out:
-    (a) the fallback for an unreadable character is the UN-REDUCED value, never
-    another character's, settled in writing by
-    `20260906-145512-alt-colonies-join-the-advisors-plan-but-never.md`
-    ("Borrowing the active Character's would be an invented number; the
-    un-reduced rate understates the margin, which is the safe direction");
-    (b) fan out the CORRECTED skills loader, not the plain one, or one table
-    mixes corrected and uncorrected levels across rows.
-
-31. **When a surface lists another character's things, check the ACTION as well
-    as the number.** #1062 is a wrong figure; #1061 — found while reviewing it —
-    is the same panel's primary button silently writing unreachable data,
-    because the write stamps the row's character while every read filters to
-    the active one. The action bug was the more valuable find and nobody
-    proposed it. So for any cross-character list, trace one row's button all
-    the way to storage and back out through every read path, and check the
-    tests actually exercise more than one character (these did not).
-
-32. **"Already fetched" means the FETCH OPTIONS, not the endpoint.** The
-    killer of an otherwise strong candidate: `IndustryJob.cost` is typed, and
-    the endpoint IS called — but `loadCharacterIndustryJobs` passes
-    `{ includeCompleted: false }`, so the rows carrying the fee are never in
-    the cache. Before writing "no new endpoint, no new scope", read the CALL,
-    its options, and the cache row's other consumers — widening a shared
-    cached fetch is a change to every reader of it, not a free flag flip.
-
-33. **The ESI-boundary scan is now SPENT** (the mirror of the engine-field
-    scan). Every field on every exported interface in `esi/endpoints.ts` was
-    checked against the whole app outside that file. ~30 came back unread and
-    all are accounted for: out of remit (public-info birthdays, alliance
-    founders, corp reinforce timers, contact labels), settled (corp
-    `installer_id` — narrow reach; PI `routes[]` — kill-test 17;
-    `is_corporation` — killed below), or filed (`facility_id` → #1065). Do
-    not re-run it. If a variant is wanted, the productive direction is the
-    reverse: a field the app reads in exactly ONE place, which is how
-    `IndustryJob.cost` (CSV export only) surfaced.
-
-34. **The i18n scan works, but only for keys that RENDER — and mind the
-    dynamic-key trap.** Matching every `en.json` leaf against the source found
-    96 unreferenced keys out of 3,318. Most were **false positives**: keys
-    composed at runtime (`market.orders.badge.${kind}Help`,
-    `market.priceHistory.range${n}`, `industry.makeOrBuy.reason${Method}`)
-    look dead to a naive grep. A second trap: a key's leaf can collide with an
-    unrelated identifier (`requiredItems` vs the function `requiredItemsCost`,
-    `linkPastSale` the key vs `linkPastSale` the function) — match `t('key')`,
-    not the bare word. And a genuinely dead key is only a `bug` when something
-    it promises is **on screen**; #1020 qualified because the hint was
-    rendered. Otherwise it is a delete commit. What the scan is actually good
-    for is pointing at a gap you then argue on other grounds — #1068's case is
-    that the breakdown does not reconcile, with the dead key as corroboration.
-
+1. **Cross-player wall.** No cross-player ESI — kills arbitrage, buybacks.
+2. **No write-scoped ESI** (`esi/registry.ts`) — kills relist, automation.
+3. **Picture of data already on screen.** Killed: depth chart x2, Gantt.
+4. **One caller ≠ covered** — the finding is a surface acting WRONG (#824).
+5. **No historical ESI series** — kills cost-index-over-time.
+6. **Settled scope wins** — check `docs/context/decisions/`, `.out-of-scope/`.
+7. **Assets endpoint has no timestamp** — kills staleness/idle-inventory.
+8. **Not in `pollDomains.ts` ≠ sampled.** Assets is page-visit-only.
+9. **A scope wired for one feature isn't free for another**
+   (`structureMarkets`).
+10. **Materials are fungible** — kills FIFO cost reconstruction either side.
+11. **`walletJournalFilter.ts` exists** — a ref_type view is only a saved
+    filter.
+12. **A module header comment can be a settled decision** if it ARGUES a
+    boundary.
+13. **A pre-investment calc with no ESI ground truth is a maintenance trap.**
+14. **No bulk market-history endpoint** — kills market-wide movers/trending.
+15. **Every real route requires a Character** (`FEATURE_ROUTES`, `ScopeGate`).
+16. **`invTypes.volume` is assembled, not packaged** — narrows product volume.
+17. **A PI pin's live state is untrustworthy or deliberately unread.**
+18. **A badge is noise when most rows pass** — mark exceptions only (#1015).
+19. **Shipped copy can promise what doesn't exist** — grep `en.json` (#1020).
+20. **A baked SDE field that looks like the answer usually is not** — the claim
+    this skill gets wrong most often. `stations.json`'s `typeId` is not station
+    capability; `staStations.operationID` is, unread by `build-sde.mjs` (#1040).
+21. **A shipped premise makes a decision stale — prove it moved** (#942/#1040).
+22. **A prohibition's REASON is narrower than its title** (#946, #1043).
+23. **Check what the ADJACENT cell is computed from** — unify sources (#1043).
+24. **A decision can scope ITSELF** (mirror of 22) — read the LAST bullets.
+25. **Bound error against the DECISION MARGIN, not the total** (#1048).
+26. **A counterfactual must be an action available AT THAT VENUE.**
+27. **Fees are a fault line — check every ISK figure.** Right in `buildVsBuy`,
+    `ownedStockSale`, `orderExits`; absent in `makeOrBuy`; wrong in #1050/#1051.
+28. **A stale code comment can send a run down a dead end** — check the fact.
+29. **Before "the SDE has no mapping", search `market/attributes.json`**
+    (#1058).
+30. **Character coverage is a fault line** — resolve inputs per ROW (#1062).
+31. **Check the ACTION, not just the number, on another's row** (#1061).
+32. **"Already fetched" means the FETCH OPTIONS, not the endpoint.**
+33. **The ESI-boundary scan is SPENT** — unread fields accounted for (#1065).
+34. **The i18n scan works only for keys that RENDER** — match `t('key')`
+    (#1020).
 35. **The "read in exactly one place" scan is NOISE — do not run it.**
-    Kill-test 33 suggested it as the productive inverse of the ESI-boundary
-    scan. It was run: 147 engine interface fields have exactly one reader, and
-    nothing in it survived a second look, because **one consumer is the normal,
-    correct shape for an engine field**. The kill-test-4 signal needs the
-    caller to use the field WRONGLY or a second surface to plainly need it —
-    neither of which a reader count can detect. Kill-test 33's suggestion is
-    hereby retracted.
-
-36. **The industry/market CONSTANTS are verified — stop re-checking them, and
-    here is how to re-check the ones that matter in one command.** Skill rates
-    all match the shipped `skills.json` descriptions: Industry 4%/lvl, Advanced
-    Industry 3%, Reactions 4%, Reprocessing 3%, Reprocessing Efficiency 2%,
-    Scrapmetal 2%, Accounting −11%/lvl off a 7.5% base, Broker Relations −0.3%
-    off 3% **at a non-player station**, order slots 5 + 4/8/16/32. Facility and
-    rig constants are verified against **live ESI dogma attributes**, which is
-    the re-checkable artifact: structure ME/TE/job-cost = attrs **2600 / 2602 /
-    2601** (Raitaru 35825, Azbel 35826, Sotiyo 35827; Tatara 35836 carries
-    **2721** for time and correctly no 2600/2601); rig ME = **2594**, rig TE =
-    **2593** (37154/37155, 37162/37163); security multipliers = **2355 / 2356 /
-    2357**. Reactor rigs carry the SAME percentages on **different** attribute
-    ids — **2714** (material) and **2713** (time) — which is why the app's
-    "sourced identical percentages" comment is right.
-    **Three constants remain un-fixtured and un-checkable** (no ESI endpoint):
-    the **SCC surcharge 4%**, the **NPC station 0.25% facility tax**, and the
-    **100 ISK minimum broker fee**. No evidence any is wrong; they are simply
-    the app's kill-test-13 surface. The 50% reprocessing base is a fourth, but
-    a _disclosed_ one — it is exported so the UI can name the assumption.
-
-37. **Also settled, because players get it wrong: Advanced Industry does NOT
-    apply to reaction time, and the app is right to exclude it.** Its six dogma
-    effects are named for manufacturing (5903), copying (5906), invention
-    (5907), a generic industry job (5908), manufacture/research time (5909) and
-    material research (5910) — **none names reactions** — while Reactions
-    (45746) carries its own pair, 6891/6892, mirroring Industry's 425/412.
-
-38. **Mining forum REPLIES for unmet demand is not worth its own scan, but the
-    epistemics are.** Ten industry/market threads, author's own posts excluded,
-    request language matched: **5 hits, 0 gaps.** The strongest — EVE Forge's
-    users asking "how do I find what materials I'm missing for a project" — is
-    already shipped here as the Build Plan's Copy Shopping List (remaining after
-    owned stock, as multibuy text). Fold reply-reading into the existing
-    bumped-thread check, which already fetches those threads. The point worth
-    keeping: **a user asking a competitor for something this app already ships
-    is confirming evidence of coverage**, which is directly useful to a skill
-    whose named failure mode is re-proposing covered features.
-    Also checked and clean: the Adam4EVE reply arguing an ISK/hour over a
-    multi-step chain should sum parallel time does **not** reach this app's PI
-    figures — every PI rate is throughput x margin with no elapsed-duration
-    denominator (`colonyEarnings.ts`, `stopTier.ts`'s `marginPerHour`,
-    `network.ts`), and `chain.ts` provisions parallel capacity explicitly.
-
-39. **Mining `docs/context/decisions/` as a SOURCE (not a filter) is
-    low-yield in its broad form — keep only the narrow variant.** The scan:
-    233 decision files matched for conditional deferral language ("blocked on
-    X", "would need Y first", "re-propose when", "its own ticket") → 85 hits
-    across 57 files → each strong conditional checked against the repo to see
-    whether its blocker had shipped. Yield: **two deferrals already resolved**
-    (reprocessing comparison, #537 — the SDE bake shipped; player-structure
-    markets, #538 — `getStructureMarketOrders` is wired into
-    `orderCompetition.ts`), and **one candidate whose better half turned out
-    to be impossible**. Re-running against an unchanged corpus returns the
-    identical 85 hits — the same failure mode already marked on the
-    engine-field and ESI-boundary scans. **The part worth keeping:** re-check
-    a deferral only when its named blocker is a _specific named artifact_ (a
-    table, a file, an endpoint), and only against decisions added since the
-    last run. That incremental form is what produced both resolved hits, and
-    it is cheap.
-
-40. **Re-checking `.out-of-scope/`'s REASONS is worth one pass — and both
-    files are now done.** New method, and it half-worked: both out-of-scope
-    files rest on "the output has no market price", and that premise really
-    has moved (the contract snapshot keeps ME/TE and prices BPCs). Both
-    candidates still died — see the killed table — because each file rests on
-    a **second, independent** holding the price premise never touches, and
-    each names a precondition nothing has moved: research's "job-fee
-    calculator wearing a Build Plan's chrome", invention's "reverse round 27's
-    rollup decision first". **The transferable lesson:** when citing a
-    staleness, quote the paragraph AFTER the one that helps you, and check the
-    "If this is reconsidered" section — that is where these files put the real
-    gate. Do not re-run this scan; there are only two files and both are now
-    read out in full.
-
-41. **A shared snapshot's per-row field can mean something different from
-    what the row is about.** The crawl stamps `price: contract.price` on every
-    item line, which is correct data answering "what does this CONTRACT cost"
-    while four surfaces read it as "what does this BLUEPRINT cost" (#1076).
-    Two generalisable halves: (a) when a backend publishes a denormalised
-    parent field onto child rows, ask which question each consumer thinks it
-    is answering; (b) **a symmetric error becomes a systematic one the moment
-    something selects on `min()` or `max()`** — `cheapestOffer` turns "some
-    rows read high, some read low" into "the wrong rows always win". Look for
-    a min/max reduce downstream of any denormalised figure.
-    Corollary for writing the ticket: such a figure is **not "wrong"** — it is
-    a correct number answering a different question, and the defect is
-    attribution. Framed as "wrong price" it dies to "but that is literally
-    what you would pay."
-
-42. **`functions/` — the Firebase backend — is now swept, and it was the
-    richest ground left.** Seven files: the public-contract crawl and its
-    archive fetch, the projection dispatcher, the feed purge, device
-    registration, SSO token verification. Only the first two touch the ISK
-    pipeline. **Two of this skill's bugs came out of one file**, `publicContracts.ts`
-    (#1076, #1080), because it is the one place where a _backend_ decides what
-    a field means and _four separate clients_ then read it. Do not treat the
-    backend as out of scope just because the skill's remit is worded around
-    third-party tools. The remaining five files were read in full and hold
-    nothing — notifications and auth, outside the remit.
-
-43. **The three questions that found both crawl bugs, in order.** Worth
-    re-running against any future publisher, not just this one. (a) What does
-    the producer DROP without recording that it dropped it? The requested side
-    of a barter, which is why #1080's rows read as free. (b) Which published
-    field is the PARENT's rather than the row's? The contract price, which is
-    why #1076's bundle rows all claim the bundle's ask. (c) What SELECTS on
-    that field downstream? `cheapestOffer`'s bare min-reduce, which converts
-    both into systematically wrong answers rather than noisy ones. Question (c)
-    is what turns a data-quality note into a filed bug — without it, both are
-    "a number is sometimes odd".
-
-44. **Ask the reviewer for a COLD READ when you have just swept something
-    small yourself.** This round reported a null on `functions/` after reading
-    all seven files; the reviewer read them cold and found #1080. A package you
-    have just stared at is precisely where your own blind spot is, and a null
-    on it is the cheapest thing to have overturned. Frame the ask explicitly —
-    "read this cold and tell me what I missed" — rather than handing over a
-    slate of candidates to defend.
-
-45. **`scripts/` is swept — `build-sde.mjs` is the last big producer, and it
-    is otherwise exemplary.** 1,766 lines, 21 baked files. Every derived
-    allowlist is a market-tree walk with a **tripwire carrying an argued
-    threshold** — moon ore fails below 50 or a missing parent, ore/ice unless
-    moon ore is a subset and exceeds it by 100, gas below 40 (the comment
-    explains why the bar sits above the raw count), compressed pairs below the
-    moon-ore count, every mineable type must carry a volume, gas and ore/ice
-    must be disjoint. The PI payload **throws** rather than writing a partial
-    file. Copy that pattern rather than re-auditing it. Its two real defects
-    (#1084, #1085) are both the same shape: **a field whose baked meaning is
-    narrower than every consumer assumes** — `time` is one job's, `volume` is
-    assembled. Neither is a missing guard.
-
-46. **A proxy is not a measurement — name the property, then test it.** I
-    reported 604 blueprints (15%) affected by assembled volume using
-    `volume >= 1000` as a stand-in for "is a hull". It counted 315 blueprints
-    where the printed figure is exactly right, because the most common large
-    materials are components with no packaged/assembled split at all. Tested
-    against the actual property — does this type's packaged volume differ —
-    the answer is 289 (7.16%). The honest number was also the **stronger**
-    argument: a median of 4.00x with nothing below 1.29x beats a hand-wavy
-    "10-100x". Kill-test 25 says measure; this says measure the thing itself,
-    not something correlated with it.
+36. **Industry/market CONSTANTS are verified — stop re-checking.** Structure
+    ME/TE/cost 2600/2602/2601 (Tatara 2721), rig ME 2594, TE 2593, security
+    2355/2356/2357, reactor rigs 2714/2713. Un-checkable: SCC 4%, NPC facility
+    tax 0.25%, 100 ISK broker minimum; the 50% refine base is disclosed.
+37. **Advanced Industry does NOT apply to reaction time, rightly excluded.**
+38. **Mining forum REPLIES isn't worth its own scan** — fold into bumped
+    threads.
+39. **Mining `docs/context/decisions/` broadly is low-yield** (#537, #538).
+40. **`.out-of-scope/`'s reasons are re-checked; both files are done.**
+41. **A snapshot's per-row field can mean something other than the row** —
+    `price: contract.price` is the CONTRACT's, read as the BLUEPRINT's; a
+    symmetric error turns systematic under a min()/max() reduce (#1076).
+42. **`functions/` (Firebase) is swept** — #1076/#1080 came from it.
+43. **Ask any publisher:** what does it DROP? which field is the PARENT's?
+44. **Ask for a COLD READ after your own small sweep** (#1080, #1084).
+45. **`scripts/` is swept; `build-sde.mjs` is exemplary** — its defects
+    (#1084, #1085) share one shape: a baked field narrower than consumers
+    assume.
+46. **A proxy is not a measurement — name the property, then test it** (#1085).
 
 ## Filed candidates
 
-**Verdict is the hostile review's, not the ticket's fate.** A `SHIP` row means
-the reviewer cleared it, never that Shawn accepted it — #858 carries `SHIP`
-here and was closed "Rejected. The quickbar is small and already has enough
-as it is." Check `gh issue view <n> --comments` before citing any row as
-precedent for what this project will accept.
+**Verdict is the hostile review's, not the ticket's fate.** `SHIP` means the
+reviewer cleared it, never that Shawn accepted it — #858 carries `SHIP` and was
+closed "the quickbar already has enough". Check `gh issue view <n> --comments`.
 
-| #     | Verdict                                                                                              | Candidate                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| ----- | ---------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| #642  | NARROW                                                                                               | Build Opportunity Finder — seeding tab over Build Plan Compare                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| #643  | NARROW                                                                                               | Restock / reorder points — **owner-rejected**, no users asking for it                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| #671  | NARROW                                                                                               | Mining Yield Tracker — ordinary ore/ice                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| #672  | NARROW                                                                                               | Appraisal refine-then-sell comparison                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| #679  | NARROW                                                                                               | Build Opportunities — job-slot header count                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| #680  | SHIP                                                                                                 | Quickbar price alerts                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| #689  | SHIP                                                                                                 | Appraisal multi-hub comparison                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| #690  | SHIP                                                                                                 | Wallet balance-over-time chart                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| #711  | SHIP                                                                                                 | Production Log realized-profit-over-time chart                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| #712  | SHIP                                                                                                 | Assets total portfolio value                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| #713  | NARROW                                                                                               | Open Orders sell-through column                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| #717  | SHIP                                                                                                 | Contracts market-value appraisal                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| #718  | NARROW                                                                                               | Loyalty Store cross-corp offer list                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| #722  | NARROW                                                                                               | Build Opportunities unowned-blueprint coverage — **owner-rejected**, complexity                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| #725  | SHIP                                                                                                 | PI Production Run/Log — **owner-rejected**, PI has no cost basis to snapshot                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| #726  | NARROW                                                                                               | Quickbar → Appraisal multi-hub handoff                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| #730  | NARROW                                                                                               | Price History 7-day moving average                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| #819  | NARROW                                                                                               | Build Opportunities market-wide finder, ownership-agnostic                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| #821  | NARROW                                                                                               | Industry job-slot utilization chart over time                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| #822  | NARROW                                                                                               | Industry Skill ROI panel — **owner-rejected** (browsable panel; re-file invited, see Killed)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| #824  | NARROW                                                                                               | Production Run realized tax/fee/margin breakdown, per-run                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| #826  | NARROW                                                                                               | Contracts: courier reward-per-m3/jump/collateral ratio, detail modal only                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| #827  | SHIP                                                                                                 | Market Fee Skill ROI panel — **owner-rejected**, same reason as #822                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| #831  | NARROW                                                                                               | Appraisal shareable link — byte-capped typeId:qty payload, unauthenticated route outside ScopeGate                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| #858  | SHIP                                                                                                 | Quickbar unrealized P&L vs. a player-entered cost basis — **owner-rejected**, quickbar clutter                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| #874  | SHIP                                                                                                 | Materials Table / Group Rollup total m3 volume, hauling-trip planning                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| #880  | NARROW                                                                                               | Mining Yield Tracker: include gas cloud harvesting alongside ore/ice (needs human ESI verification)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| #925  | SHIP                                                                                                 | PI Skill ROI panel — closed completed but **no ROI code exists**; verify before citing                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| #926  | NARROW                                                                                               | BPC Sourcing: watch a search, notify on a new/cheaper matching offer (own notification source)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| #1015 | NARROW                                                                                               | Mark a build row no character on the account can install (market-wide + sub-builds, unmet only)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| #1017 | SHIP                                                                                                 | BPC Sourcing ISK/run column — mirrors ISK/jump (#943) / ISK/m³ (#938)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| #1018 | NARROW                                                                                               | Open Orders: flag a "healthy" order that has actually been frequently undercut (healthy group only)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| #1026 | NARROW                                                                                               | Appraisal: recognize a pasted EFT fit (hull + charges), price via `parseEftFit`, not just multibuy                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| #1040 | NARROW                                                                                               | Build Plan: rank nearby systems by this job's fee there (mfg only, NPC-factory systems, net of forfeited structure bonus)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| #1043 | NARROW                                                                                               | Open Orders hub rows: name the gank chokepoints and ≤0.5 count on the route, sourcing distance+exposure from one local route                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| #1048 | n/a — surfaced by a review while killing something else; filed only after meeting the bar it set     | **bug.** Appraisal's refine-vs-sell highlight compares whole-batch refine value against full-quantity sell value, so a part batch recommends selling when refining wins. Measured on live Jita prices: 179 of 858 priced portionSize-100 types sit in the flip band, 799 flipping (type, quantity) pairs, worst wrong by 1,036,890 ISK on 999 Mercoxit III-Grade. The flip needs the per-unit refine edge to be smaller than one part in the batch count — the near-tie region the column exists to adjudicate — which is why "ore hauls are thousands of units" does not dispose of it                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| #1050 | NARROW → **bug**                                                                                     | Loyalty Store 'Net profit'/ISK per LP are GROSS — no sales tax, no broker fee, while `buildVsBuy` and `ownedStockSale` both net them. Measured on 2,519 real offers from 10 NPC corps at live Jita: median overstatement 13.1% at max skills, 28.2% untrained; 78 of 218 offers above the 1500 ISK/LP benchmark fall below it; **61 offers shown profitable are losses**. Top offer stable 10/10 corps, order below it moves                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| #1051 | surfaced by the review while closing a candidate                                                     | **bug.** Market-wide Build Opportunities computes `iskPerHour = ((revenue − materialSum) / time) × 3600` — no sales tax, no broker fee, **no job fee at all** — while the owned-blueprint panel stacked above it in the same tab nets all three under the same `industry.iskPerHour` header and tooltip. Both also feed `classifyOrderDepth` with the same thresholds off different denominators, so one Deep/Thin badge means two things                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| #1058 | NARROW (two candidates fused)                                                                        | Reprocessing SPECIALISATION skill is worth 10% of yield and three refine surfaces model it three ways: open-order exit reads real Scrapmetal Processing, Appraisal and Mining Yield both pass 0. SDE attribute **790 'Reprocessing Skill' (unit typeID) names the right skill directly** — verified on live ESI (Veldspar→Simple Ore, Blue Ice→Ice, Bitumens→Ubiquitous Moon; absent on modules/minerals/ammo), and **all 338 ore types in the bake carry it**. Measured flips: ore 34/338 (10.1%) counted against each type's OWN skill — Ice 29.2%, Coherent Ore 15.0%, Common Moon 0% — plus 1.8% of non-ore. Sequence AFTER #1048                                                                                                                                                                                                                                                                                                                                                                                                               |
-| #1061 | surfaced by the review while examining #1062                                                         | **bug.** Build Opportunities' "Add to Compare" on a row owned by a NON-active character seeds a plan stamped with that character's id, while the plan list query, the compare set built from it, and the plan detail route ALL filter to `activeCharacterId`. The compare comes up empty, the plan is unreachable by list or URL, and it orphans in Dexie until the character is removed. Verified end to end; existing panel tests use one character                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| #1062 | NARROW                                                                                               | Build Opportunities computes every row with the ACTIVE character's skills while fetching owned blueprints per character. Three sibling cross-character surfaces do it right (Open Orders, Active Jobs, Mining Yield). Industry V + Adv Industry V = 0.68x base time, so an alt's rate inflates ~47%. Ordering IS corrupted because the active character is normally in the set, so honest and inflated rows interleave. Fallback is settled by the alt-colonies decision: un-reduced, never borrow the active character's                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| #1065 | NARROW                                                                                               | Active Jobs never says WHERE a job runs — `IndustryJob.facility_id` is typed and read nowhere. One Location cell + CSV column, resolved through the existing structure-name cache. No new scope: `getUniverseStructure` carries NO `group` in the registry, so it is in the base grant. `facility_id` is identical on the character and corporation job shapes, so widening the picked shape keeps the one-table-serves-both argument intact                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| #1068 | NARROW                                                                                               | **bug.** 30.3% of LP offers (867/2,859 across 10 NPC corps) demand a turn-in; `offerProfit` subtracts its cost but the detail's `<dl>` never shows it, so the breakdown does not reconcile with its own Net profit. Turn-in is a **median 85%** of ISK outlay (84% even excluding the ~1/8 with `isk_cost: 0`); 588/845 exceed half; worst shows a 0 ISK price against a 238M turn-in. Dead key `loyaltyStore.requiredItems` sits literally between the `storeCost` and `materials` labels. Second defect on the same surface: `unpriceable` blames "a material or the product" when an unpriced REQUIRED ITEM is the cause. Blocked by #1050 — same `<dl>`                                                                                                                                                                                                                                                                                                                                                                                         |
-| #1074 | NARROW                                                                                               | **bug**, and filed on a narrower justification than the feature kill-bar: the `/next-ticket` PR loop is this skill's own delivery mechanism. One Open Orders test awaits a MOCK CALL then queries the button SYNCHRONOUSLY, racing the panel's `loading && !data` spinner. The variable-latency step is `loadOrderProblemSamples` — the one collaborator the file does NOT `vi.mock`, so a real fake-IndexedDB read. Cost two CI failures on a Markdown-only PR (local: 27/27, and 508/508 across `features/market`). Exactly one instance repo-wide; fix is one line matching its own two neighbours                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| #1076 | NARROW — surfaced by the review while killing this run's actual candidate                            | **bug.** `compactContractOfferRow` stamps `price: contract.price` on EVERY for-sale line, so a 12-type bundle at 37M publishes 12 rows each asserting that blueprint costs 37M. No guard anywhere — `eligibleContractFrom` filters on type+expiry only. **The error is bidirectional; the SELECTION is not**: `cheapestOffer` is a bare min-reduce, so contaminated rows win by construction, and the winning tier **reseeds the plan's ME/TE**. Measured on 400 Forge contracts: 328 BPC rows, **106 (32.3%) from multi-type contracts** — quote the partner rate too, **4% of contracts**, or it reads overstated. Also silences BPC watches permanently (`minPriceSeen` is an all-time ratchet). Fixable client-side in a pass `syncedContracts` already makes — no schema change, no re-sync                                                                                                                                                                                                                                                    |
-| #1080 | OVERTURNED a null — the reviewer's cold read of `functions/` found it after I reported nothing there | **bug.** `compactContractOfferRow` drops the REQUESTED side (`is_included !== 'true'`) and records nothing about it, so a **barter** contract publishes its offered line at the contract's ISK price of **0**. Live: contract 235151477 = Aeon Blueprint **BPC ME10 TE18 at 0 ISK**, actually asking 122 PLEX; 235255057 = Erebus BPC, 499 PLEX. Nothing guards zero: `buildCandidates`' filter checks `runs`/`quantity` and **not `price`**, so 0 wins `cheapestOffer` by construction and reseeds the plan's ME/TE; Contract Search default-sorts price ASC so these top the first view; `minPriceSeen` ratchets to 0 **permanently and irrecoverably**. Forge census: 108/7,991 (1.35%) zero-price contracts, 87 publish rows, **all 87 demand items back**, 419 zero-price rows, 5 BPCs. **Reach is NOT the argument** — severity and irreversibility are; the BPC slice is below a 300-contract sample's resolution. Cannot fold into #1076: that ticket's acceptance requires single-item rows byte-identical, and 4 of the 5 are single-type |
-| #1084 | OVERTURNED a null — cold read of `build-sde.mjs` after I reported it clean                           | **bug.** `marketWideTrees.json` flattens the WHOLE material tree recursively but bakes `time: bp.time` — the TOP blueprint's job time only. `computeMarketWideRows` divides by it and the panel `defaultSort`s `iskPerHour` desc. Cost assumes build-everything; time assumes one job. Replaying the bake's own recursion: **1,754/4,012 (43.7%)** carry uncounted sub-job time, **698 (17.4%)** understate by >2x, and the bias is **systematic by tech level** — T1 exactly 1.00x, T2 1.45–1.57x, Hulk 3.05x, Ark 3.57x. NOT a disclosed approximation: the bake comment and the scope decision both name exactly three (ME/TE, owned stock, auto-make-or-buy). The sibling owned panel uses `depth: 0` so ITS cost and time agree — only this path mismatches. Blocked by #1051 (numerator half, same function)                                                                                                                                                                                                                                  |
-| #1085 | NARROW → enhancement                                                                                 | Build Plan Volume shows **assembled** volume for a hull material line, not packaged. `volumeForType` says "flagged at the call site" — **nothing flags it**. Corrected measurement (my first pass was wrong): a `volume >= 1000` proxy gives 604/15% but counts 315 blueprints where the figure is RIGHT (Capital Construction Parts etc. have no packaged/assembled split). Against real packaged volumes: 158 of 334 large materials differ → **289/4,039 (7.16%)**, median **4.00x**, p10 2.02x, max 14.27x, **min 1.29x**. Hawk consumes a Merlin: 16,500 vs 2,500 m³. The column covers **buy rows only** — exactly where a hull arrives packaged. The dump's packaged-volume table ships EMPTY; ESI is the only source, bounded to 1,446 material types                                                                                                                                                                                                                                                                                       |
+**Owner-rejected — do not re-pitch without new evidence:** #643 restock/reorder
+points ("no current users are asking"); #722 unowned-blueprint coverage (build
+cost); #725 PI Production Run/Log (no PI cost basis — kills PI realized-profit
+tracking generally); #822/#827/#925 Skill ROI panels; #858 Quickbar unrealized
+P&L vs. a typed cost basis.
+
+**Shipped or closed clean:** #671, #672, #679, #680, #689, #690, #711, #712,
+#713, #717, #726, #730, #831, #874 — all in "Already covered" above.
+
+**Open, unsequenced** — read each with `gh issue view`: #642, #718, #819, #821,
+#824, #826 (superseded by Courier mode), #880 (needs a human ESI check), #926,
+#1015, #1017, #1018, #1026, #1040, #1043, #1061, #1062, #1065, #1074, #1076,
+#1080.
+
+**Open, ordered.** #1048 (refine-vs-sell compares whole-batch refine against
+full-quantity sell) **before** #1058 (reprocessing specialisation modelled three
+ways; attribute 790 names the right one). #1050 (LP net profit / ISK per LP are
+GROSS; 61 offers shown profitable are losses) **blocks** #1068 (30.3% of offers
+demand a turn-in `offerProfit` subtracts and the `<dl>` never shows). #1051
+(market-wide `iskPerHour` nets no tax, broker or job fee) **blocks** #1084
+(`marketWideTrees.json` bakes the TOP blueprint's `time`). Unblocked: #1085
+(assembled volume on hull material lines).
+
+**New.** #1091 NARROW — contract notifications announce completion and failure,
+not just acceptance; every status is stored but only the edge into `in_progress`
+is diffed. Two events, silent on rejected/cancelled/deleted/reversed, gated on a
+known-live prior status and on the character being issuer or acceptor (the
+endpoint also returns contracts merely offered TO them),
+feed-on/browser-off. #1092 bug — an accepted courier's Character Board countdown
+shows the offer expiry, not `date_accepted + days_to_complete`; symptom is
+UNDER-warning.
 
 ## Killed / dropped candidates (never filed)
 
-| Candidate                                                                                                                                                                                                  | Reason                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Hub arbitrage/trade finder, corp ore buyback/payout split, EQM Corporate Exchange                                                                                                                          | Kill-test 1 (cross-player aggregation wall); arbitrage also ships as `hubHaulGaps`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| EQM HyperNet Tracker (price-per-node, break-even/target-margin calculator, manual offer tracking)                                                                                                          | Kill-test 13 — dev-confirmed HyperNet offer data has no ESI backing at all; also a gambling mechanic, not manufacturing or trading.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| System cost index watch                                                                                                                                                                                    | Kill-test 5.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| Skill Extractor ISK/hr comparison                                                                                                                                                                          | Narrow reach (multi-account SP arbitrage).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| Market/order-book depth chart, EVE Forge-style Gantt scheduling, Working Capital Locked stat                                                                                                               | Kill-test 3 (picture of data already on screen; job cost is fee-only for the last one).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| Public item-exchange contract browser; public contract sell-advisor for manufactured goods                                                                                                                 | Kill-test 6 (ADR 0013 at full scale), twice.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| Price history %-change headline stat                                                                                                                                                                       | Thin-volume days make a naive delta unreliable.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| Corp Wallet: balance chart to corp divisions                                                                                                                                                               | Narrow (Accountant-only); deferred.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| Build Plan material row → PI colony link                                                                                                                                                                   | Colony cache is Dexie-only, cold for most players.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| Bulk relist / buy-queue automation                                                                                                                                                                         | Kill-test 2.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| Asset staleness / idle-inventory detection                                                                                                                                                                 | Kill-test 7.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| Player-structure pricing for Build Plans/Appraisal                                                                                                                                                         | Kill-test 9; widens a union for a minority.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| Production Run: link material cost to wallet purchases; pure station-trading FIFO P&L tracker                                                                                                              | Kill-test 10 (buy side, then extended to pure trading).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| LP Store redemption ledger / ROI tracking                                                                                                                                                                  | Kill-test 11; needs fragile free-text parsing.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| LP transaction log / API-visible LP cashout audit                                                                                                                                                          | ESI has no LP transaction log.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| PI Advisor: arbitrary-system search                                                                                                                                                                        | Kill-test 12.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| Multi-hop reaction-chain profitability                                                                                                                                                                     | Kill-test 6 (round 27 BOM-rollup rejection).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| Moon Survey / Metenox Yield Estimator; Metenox Moon Drill ongoing fuel/yield ledger (any framing)                                                                                                          | Narrow reach (moon-owning corp leadership only) + kill-test 13 for both. The ledger framing was filed as #859 and closed on rediscovering this entry.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| Market Movers / Trending Items dashboard                                                                                                                                                                   | Kill-test 14.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| PI Colony Layout Template (save/reuse pin layout)                                                                                                                                                          | Superseded by Advisor's per-planet fitted plan.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| Upwell Fuel Monitor-style structure fuel tracker                                                                                                                                                           | Already covered — `structureFuel` in corp board.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| Hauler-capacity trip-count estimator (player-typed cargo m3, derived trip count)                                                                                                                           | Reopens the settled hauling-cost decision’s exact reasoning — an unverifiable, app-cannot-check number — just relabeled as division instead of ISK/m3.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| Build Plan product output volume + haul distance to Trade Hub (hubHaulGaps mirror for a not-yet-listed product)                                                                                            | Kill-test 16 (assembled-volume defect hits ship products hardest, the common case); also overlaps Appraisal multi-hub compare once the product is pasted in — kill-test 3.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| PI colony output material volume (total m3 awaiting haul-out); PI Factory Input Routing / misrouted-factory alert via `routes[]`                                                                           | Kill-test 17 for both — a pin's live state is either untrustworthy (`contents`) or a deliberately-kept convention over exact routing (`routes[]`).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| PI Advisor: buffer-headroom number (hours/percent) for the _winning_ stop-tier recommendation                                                                                                              | Same shape as two settled rejections (`20260906-124813-advisor-cards-say-what-to-do-not-what.md`, `...-the-advisor-drops-its-ceiling-and-colonised-chips.md`): a correct number that changes no pilot action gets cut even when the engine already computes it (kill-test 4 bait). A threshold-triggered warning folded into the existing directive text is the only shape that might survive, and even that wants its own scope write-up first.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| BPC Sourcing price-trend indicator (30-day low/typical badge on a search result)                                                                                                                           | New server-side historical retention on top of admin-write-only infra that today holds only the latest sync — real ongoing backend maintenance for a thin, easily-gamed (lumpy contract volume) payoff; reach identical to and overlapping the sibling watch/alert candidate (#926) once that ships the live listings.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| EVE Motor Market: cross-plan material reservation ("freeze allocated stock so you never buy materials twice")                                                                                              | Settled scope — `20260909-212724-group-ownership-overlay-...md` rejected a cross-plan allocation solver outright ("No allocation problem to solve") and retired `overClaimed` with it. A Build Group is the app's answer to shared ownership; extending it to ungrouped plans reopens what that decision closed.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| EVE Motor Market: interactive build-tree visualization                                                                                                                                                     | Kill-test 3 — re-renders the same nested BOM the Materials Table/`MaterialsTable.tsx` already prints as rows, just as a graph.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| EVE Motor Market: automatic ESI-synced trade journal for real-profit tracking                                                                                                                              | Kill-test 10 — FIFO cost reconstruction off wallet history is settled scope; Production Log's pilot-linked-sale model is the deliberate alternative.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| Industry Skill ROI panel, extended to job-_duration_ skills (Industry/Advanced Industry/Reactions)                                                                                                         | #822 (the job-slot-skill panel, which was **owner-rejected**, not shipped) already considered and explicitly deferred this exact half: a duration cut only pays off if the player is slot-bottlenecked rather than material/capital-constrained, and the app has no signal for which regime a character is in. Re-propose only alongside that detection.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| Open Orders: full per-order undercut timeline/sparkline (every row, precise sample counts)                                                                                                                 | Hostile review, #1018: for an order already reading worse-than-healthy, a history readout changes no action beyond what the live status already prompts (reprice) — the buffer-headroom failure mode. Narrowed to a coarse flag on `healthy`-reading rows only, filed as #1018.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| Open Orders / order detail: hand-entered cost basis for an order with no linked Production Run                                                                                                             | Deferred by name in `20260906-155913-open-orders-reads-as-a-worklist.md` (needs a new stored table for a cost the app didn't compute), and killed on merit by hostile review: the typed figure feeds `belowFloor` — `ORDER_PROBLEMS[0]`, which sorts the worst-first worklist — and the `letGo` verdict, for the one population structurally locked out of Production Runs (pure traders; `saveProductionRun` requires a `buildPlanId`), off a per-unit average over fungible lots the app cannot check. Strip the directive path to make it safe and only a no-action number is left (kill-test 4 bait). Its cited precedent #858 was owner-rejected, not shipped.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| Restock tab / par levels / reorder points (#643)                                                                                                                                                           | Owner-rejected: "won't do. No current users are asking for this functionality." A demand signal, not a technical one — the math was never disputed. Do not re-pitch without evidence someone wants it.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| Build Opportunities: unowned-blueprint coverage ranking (#722)                                                                                                                                             | Owner-rejected on build cost: a new panel plus a hook plus an SDE-wide scan, not worth it for the payoff. A cheaper shape that reuses an existing surface is the only way back in.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| PI Production Run / Log equivalent (#725)                                                                                                                                                                  | Owner-rejected on a domain fact worth keeping: PI has no real cost basis to snapshot the way Industry does. Kills PI realized-profit tracking generally, not just this framing.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| Skill ROI in any framing — ranked panel (#822/#827/#925) **or** the owner's invited re-frame (annotate an existing plan with what its training order costs)                                                | The shape objection was answered — annotating a plan the player already has does honour the re-file the owner invited on #822. It dies on the input instead: **no realized ISK/hr per job exists.** `realizedProfit.ts` carries no time basis (no seconds, no ISK/hour) and `ProductionRunRecord` stores no job duration, so it cannot be derived from the Production Log; the only ISK/hour in the app is `buildVsBuy`'s forward per-plan estimate. And an extra job slot earns nothing to a player not filling the slots they have — which `aggregateJobSlotSummary` can often prove — so the figure would be confidently wrong, the same reason #822 excluded duration skills. Unblocking needs a duration on `ProductionRunRecord` plus a slot-bottleneck signal. `suggestReorder`+`PlanPriority` already deliver the action.                                                                                                                                                                                                                                                                                                                       |
-| Abyssal (mutated) module pricing in Appraisal/Assets, à la Iron Whales' MutaMarket lookup                                                                                                                  | Two versions, both out. Pricing them needs an external per-item valuation service (MutaMarket) — a second price source beside Fuzzwork for a population that holds no abyssals in the ordinary industry/market case, and outside this skill's ISK-pipeline remit. Merely _flagging_ them as unpriceable is already the behaviour: `appraisal.ts` counts `unpricedRows`, never treats an unpriced row as free, and surfaces the count.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| EVE Miner Hub: mining-ledger-sourced build-opportunity finder (virtually reprocess mined ore into hypothetical stock, rank buildable products by margin)                                                   | Same output shape as filed #819 (market-wide, ownership-agnostic build finder) — only the candidate-stock input source differs (mining ledger vs. ownership-agnostic). Not distinct enough to re-file; a genuinely new angle would need to change what gets recommended, not just where the hypothetical stock comes from.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| EVE Horizon: PI colony staleness disclosure ("is this colony's ESI data actually current" signal, not a computed live number)                                                                              | Same shape as the settled buffer-headroom rejection two rows up and the two decisions it cites: even framed as disclosure rather than a computed stock/routing number, a correct-but-inactionable staleness flag is kill-test 4 bait, and kill-test 17 already covers why the app can't honestly read live pin state. EVE Horizon's own dev calls the equivalent feature still WIP. Would need a concrete pilot action the flag changes before it survives a hostile review.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| "Can this character fly this fit" — product-use skill check on an imported EFT fit (EVE Empire's missing-skill detection)                                                                                  | The one EVE Empire feature not covered here, and cheap: `dogma.ts` already reads requiredSkillN attributes, `SkillRequirementsList` renders trained/untrained, and the app already ingests EFT fits (`fitImport.ts`, and #1026 adds fit-shaped Appraisal pastes). Dropped on remit, not merit — flying a fit is PvP/PvE, not the ISK pipeline this skill hunts. Distinct from #1015, which is job-_install_ skills off the SDE blueprint table; product-use skills are a different dataset. Pull it forward if the owner wants breadth over pipeline depth.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| EVE Market Order Assistant: keybind + clipboard reprice helper (opens the in-game market window for the next order to edit, suggested price on the clipboard)                                              | Not a capability gap — `orderFloor.ts`/Open Orders already computes and shows the `relist` price it copies. What it adds beyond that is OS/game-client automation (driving the EVE client's own window from a keypress), which a browser PWA cannot do at all — not merely a deferred write-scoped-ESI case (kill-test 2), since there is no ESI write here to gate on either; it pastes into the client and the player still edits by hand.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| Iron Whales: nullsec staging markets (C-J6MT, UALX-3) as appraisal locations beside the 5 hubs                                                                                                             | Kill-test 9 — these are player structures; the "Player-structure pricing for Build Plans/Appraisal" row above already kills the same shape, and the unbuilt `structureMarkets` consent UI is part of the cost.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| Iron Whales: screenshot/OCR appraisal (paste a cargo-hold or contract screenshot, read the items off the image)                                                                                            | The EVE client already copies an inventory as EXACT text, which `appraisalPaste.ts` consumes today — OCR is a lossier route to a result the exact path already gives, and it adds a failure mode with no error to surface (a misread quantity yields a plausible wrong ISK total). Client-side needs a multi-MB wasm vision dependency in a PWA that deliberately keeps ~1.2 MB of SDE JSON out of the install precache; server-side means a service crawling player-uploaded images (kill-test 1).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| Iron Whales: Appraisal Portfolios (save a pasted pile under a name, re-price later, chart value over time)                                                                                                 | #831 is CLOSED and SHIPPED — `/share/appraisal`, `AppraisalShared.tsx`, `appraisalShare.ts`: a byte-capped typeId-qty payload that re-prices at view time. Saving and revaluing a pile is what that link already does. The chart half is kill-test 8 (Appraisal is not in `pollDomains.ts`, the test that killed the Total Assets Value chart). What is left is a delta figure that changes no action.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| Reprocessing: fold the character's reprocessing implant into refining yield                                                                                                                                | The decision file's stated premise IS wrong — `20260906-180034-reprocessing-v1-models-the-skills…` groups an implant with the facility rate as unreadable, and implants are readable (`getCharacterImplants`, `esi-clones.read_implants.v1`, already in the base grant; `dogma.ts` already parses implant attributes). It dies on the correct premise anyway. Verified live: Zainou 'Beancounter' Reprocessing RX-801/802/804 = dogma attr 379, +1/+2/+4%. That precision goes into a figure whose facility term is a LABELLED 50% assumption (a rigged Tatara runs past 70%) and whose station tax (0–5%, opposite sign) is unmodelled — false precision in a module whose contract is to label what it doesn't know. Flip test fails too: `reprocessExit` ranks on `price - floor.fill`, so 1–4% reorders only inside a band the unmodelled tax already spans. Reach is "owns a slot-8 reprocessing hardwiring" ∩ "has a stuck sell order".                                                                                                                                                                                                           |
-| Compass: capital jump-freighter route planning (cyno-alt assignment per midpoint, fuel/fatigue, multi-JF fleet coordination)                                                                               | Reach — a JF pilot with a cyno alt is a second account plus a multi-billion hull, the thinnest slice the kill-bar names. Fleet coordination across several pilots' JFs is kill-test 1 on top. The app's own route work (`jumpRoute.ts`, `jumpsAway.ts`) is gate routing; jump-drive range/fatigue is a different graph with no ISK-pipeline leg.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| Price the hub haul against the courier corpus' measured going rate (`corpusGoingRate` × volume × jumps)                                                                                                    | The STALENESS is sound — `20260906-215500` refused to cost a haul because "no ESI endpoint carries it", and #946 now measures the median ISK/m³/jump over every outstanding public courier contract, with nothing typed in. It dies on the arithmetic instead, twice. **Volume:** kill-test 16 — an open sell order holds a PRODUCT, and `invTypes.volume` is assembled volume; #874's `materialVolume.ts` is pure arithmetic over an injected `volumeFor` on MATERIAL lines, which is kill-test 16's own exemption, so it changed nothing here. **Estimator:** a corpus median is scale-dependent by #946's own measurement (honest small parcel ~3.6x, freighter-shaped job 0.8x — "the rate multiple cannot see the freighter shape at all"); it is an outlier detector against an 8x threshold, never a price quote for one parcel. Third, the corpus lives in Contract Search, not the Orders modal. Re-proposable only if a packaged-volume field is ever baked AND a per-route estimator replaces the median.                                                                                                                                    |
-| Open Orders: show the market order-slot ceiling (`maxMarketOrders`) beside the orders                                                                                                                      | Kill-test 3 — already rendered, on the app's landing route: `overview/cards.tsx` prints `slotsUsed {used}/{total}` in `OrdersCard`'s footer. Worse on the target page: the ceiling is PER-CHARACTER (`Overview.tsx` computes it for one pilot) while Open Orders aggregates every character and defaults to `hideHealthy`, so "used of ceiling" is not well-defined there and a naive row count would move when a filter chip is clicked. Reach is also wrong — the cap is 305 with all four Trade skills at V, so it binds on high-volume traders only. Kill-test 4 comes back CLEAN: one number, one caller, fully used.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| Eve Space Trucker / Eve-flipper multi-hop trade-route sequencing; Vigilant all-in-one dashboard                                                                                                            | Kill-test 1 — sequencing trades over a route needs order books across many stations at once, already the recorded verdict for EVE Flipper's route building. Kill-test 14 kills the supporting leg independently (market history is one type id at a time). Vigilant is the closed all-in-one dashboard class; its one novel element, a WebGL star map, has no ISK-pipeline leg — same remit exclusion as Incursion ISK/h and ISKONOMY. The sweep should not have spent a slot here; the ledger had already killed both shapes.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| Eve Supply Chain (corp supply-chain / resource planning)                                                                                                                                                   | Closed planner class, plus corp-scoped reach. Its README documents the Angular boilerplate it is built on rather than any distinctive capability, and it makes no claim the planner class does not already cover.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| Compare Hubs: disclose each hub's unpriced-row count (`buildHubComparison` discards the `unpricedRows` the primary Appraisal surfaces)                                                                     | Coverage really does vary hard — measured over a 220-type loot universe at live prices: Jita 100%, Amarr 78%, Dodixie 62%, Hek 45%, Rens 39%. It still dies: each hub's total is ARITHMETICALLY CORRECT for that hub (no buy order at Rens means Rens genuinely pays nothing), so no recommendation is wrong and the ranking does not move. A first attempt to measure a flip filled each hub's gaps at JITA prices and produced 10.4% flips — discarded as invalid, and that is the reusable lesson (kill-test 26). `buildHubComparison`'s own comment also scopes itself to "the two figures a Compare Hubs row needs" and already chose the all-null case as the one worth surfacing (kill-test 24).                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| Mining Yield: document the `specialisationLevel: 0` assumption in a comment / on screen                                                                                                                    | Folds into #1058, which deletes the zero rather than annotating it. A comment-only change nothing on screen reflects is kill-bar 7; and the governing reprocessing decision scopes ITSELF to "the row that already exists" (kill-test 24), so the omission was never an unimplemented decision to document.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| Market-wide Build Opportunities: divide ISK/hour by skill-reduced job time instead of the tree's base time                                                                                                 | Provably ranking-preserving on that panel — Industry/Advanced Industry are flat blueprint-independent multipliers and the panel has ONE skills context, so every denominator scales identically and `rankOpportunities` order is exactly preserved; `classifyOrderDepth` reads build cost, not time. The boundary is also already declared: the panel's scope decision says the precomputed tree "ignores **ME/TE**… an ME-0 approximation", and TE _is_ the time term (kill-tests 12 + 24). Not filed — added as one scope line on #1051 instead, whose own acceptance test ("both panels report the same ISK/hour") cannot pass while the denominators differ.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| Production Run: use the job's ACTUAL installed cost (`IndustryJob.cost`) instead of the Build-Plan fee estimate                                                                                            | Looked strong — ESI reports what was really charged and the app types the field — and dies on one line: `loadCharacterIndustryJobs` calls `getCharacterIndustryJobs(id, { includeCompleted: false })`, so by the time a run is logged the job is **delivered and absent** from the only cached list. Flipping that flag means changing a shared cache row `rosterAttention.ts` also reads, plus a status filter at every consumer (`isJobDone`/`summarizeJobs` branch on `end_date`, never `status`, so 90 days of delivered jobs would flood Active Jobs). Magnitude also deflated: the structure facility tax the estimate "assumes away" is an EDITABLE plan field (`BuildPlanDetail` tax input, `setupChipTax`, synced via `sync.industryFacilityDefaults`) — a not-configured error, not an unknowable one; what survives is cost-index drift, tens of thousands on a ~109k index term. And `ProductionRunRecord` carries no job id, so matching is a coin flip exactly for the heavy user it targets. Finally it lands in the residue of the killed hand-entered-cost-basis row: a bookkeeping readout with no directive path (kill-test 4 bait). |
-| Delete the rest of the dead i18n keys (`industry.saleProfitability{Profit,Loss,Unknown}`, `profitAfterFees`, `linkPastSale`, `priceSourceHub`, `market.appraisal.columnHub`, `industry.autoBuildTooltip*`) | All genuinely unreferenced, but they RENDER NOWHERE, so no player reads a false promise — which is the bar kill-test 19's precedent (#1020) actually set: that hint was on screen. Housekeeping commit, not a ticket. Same reasoning as the killed Mining Yield comment row.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| Production Log: detect/flag when `linkedQty + watchFilledQty` exceeds `run.quantity` (double-recorded sale)                                                                                                | Dies three ways. **Decision-accepted:** `20260905-181537-...` places it in the "accepted rather than mitigated" class by analogy to the wallet-window gap (whose own bullet is titled "not mitigated") and closes "it is the pilot's own attestation, **not a system that can cross-check itself**" — a detection warning IS that self-check (kill-test 24; nothing has moved, so 21 does not apply). **Already on screen:** `quantitySoldColumn` renders `"12 / 10"` on BOTH surfaces, one column from the profit. **Half of it is impossible:** `WalletTransactionCommon` has no `order_id` and `ProductionOrderWatchRecord` no transaction id, so excluding a watched order's own fill from the Link Past Sale picker has no join key; a `type_id`+price heuristic would hide real sales instead. Reach is also one of three double-count paths (manual entry carries the same risk). **Watch condition:** if ESI ever exposes an order↔transaction correlation on `WalletTransaction`, the decision's premise goes stale and the FIX (not the flag) becomes proposable.                                                                             |
-| Reopen research/copying planning because the contract corpus now prices "this blueprint at ME 10" (`.out-of-scope/blueprint-job-planning.md`)                                                              | The price premise **has** genuinely moved — the snapshot keeps a researched BPO's ME/TE by decision. It still dies. (1) **Nothing reads those rows:** `contractOffers.ts` does `if (!offer.isBlueprintCopy) continue;`. (2) **No research job time exists in the bake at all:** `build-sde.mjs`'s `ACTIVITY_TAG` is `{1:'manufacturing', 11:'reaction'}` and drops activities 3/4/5, so `blueprints.json` is 4,039 manufacturing + 119 reaction and nothing else — widening the bake, then hand-transcribed per-ME research-time multipliers (kill-test 13) on top of the job-fee base the file already names as unverified. (3) **The file rests on a SECOND independent holding** the price premise never touches: "what remains is a job-fee calculator with a duration attached… does not earn a plan type" (kill-test 24 — read the paragraph AFTER the one you are quoting). (4) Measured population is ~10 separately-priced researched BPOs region-wide against 4,039 blueprints — the surface would print "no listing" essentially always.                                                                                                     |
-| Reopen invention planning on the same moved premise (`.out-of-scope/invention-planning.md`)                                                                                                                | Its price leg moved MORE cleanly than research's — a T2 BPC is `is_blueprint_copy=true`, rides the snapshot, and is abundant (560 BPC lines per 250 contracts sampled). Irrelevant: the file gates itself on something else entirely — "whether `BuildPlanRecord` should stop being one blueprint per plan. **Reverse round 27's rollup decision first**" — and nothing reverses it. Independent kill: `build-sde.mjs` never downloads `industryActivityProbabilities.csv` and filters out activity 8, so base chance, datacores and invention products are absent from shipped data before the probability engine is even written.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| Exclude no-buyout auctions from `cheapestOffer` (the current bid is systematically below what winning costs)                                                                                               | Real and the same min()-selection shape as #1076/#1080 — `useBpcAcquisitionOffers` maps every row through `effectivePrice` with no auction filter. Dies on **reach, measured twice**: a reviewer census found **0 auctions in 8,000 live Forge contracts**; my own 5-region sample put auctions at 1.16% with 54% lacking a buyout, i.e. 0.63% of contracts — and the Forge number is the one that matters for blueprint pricing. It also cannot fold into #1076, whose Out of scope names "the auction/buyout price rules, which are orthogonal". Note `effectivePrice`'s comment ARGUES the display choice deliberately (kill-test 12) — the gap is that a display figure is reused for SELECTION.                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| Records tab: expose unlink/unwatch there, since it can CREATE allocations but only `ProductionRunsPanel`'s edit modal can remove them                                                                      | The asymmetry is real but **argued in the module's own header** — `SaleLinkingControls.tsx`: "The delete item is the only way to drop a run from the Records tab, **whose rows click through to the Build Plan rather than into an edit modal**; it says 'Delete production run' rather than inventing a second verb for the danger button already in that modal." Kill-test 12 in its qualifying form. And it is not a dead end: `ProductionLogPanel`'s `onRowClick` navigates to the run's Build Plan in one click, where the remove list lives. The genuinely unreachable subset is an ORPHANED run (plan deleted, `planExists` false, click-through disabled) that then gets a wrong allocation linked from Records — a sub-slice of a sub-slice whose two halves are each separately accepted in the same decision.                                                                                                                                                                                                                                                                                                                                |
-| LP store: flag required items the player already owns / re-price the offer against owned stock                                                                                                             | Settled scope read by its stated reason (kill-test 22): `20260909-212724-group-ownership-overlay-...md` — "No allocation problem to solve (which member 'gets' a shared unit of a material several plans need)" — applies unchanged to which offer gets a shared tag; the ledger already accepted this analogy once to kill EVE Motor Market's cross-plan reservation. Sharper kill needing no decision file: it makes ISK/LP a PER-CHARACTER figure, destroying comparison against the community benchmark the number exists for (#1050's own framing). Also not cheap — `materialTypeIds` feeding `useDetectedOwnedStock` is built from blueprint materials only, so required ids are not in it.                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| Open Orders / sale linking: distinguish corporation-placed orders (`MarketOrder.is_corporation`, typed and unread)                                                                                         | Named out of scope by the Production Log decision's own closing bullet: "corp-owned jobs / corp wallet divisions… a real gap for multi-character or corp setups, flagged but not solved" (kill-tests 6 + 24), plus the `installer_id` narrow-reach precedent. **Residue worth knowing, not worth the proposed shape:** `useSaleLinking`'s `watchCandidates` filters on buy/sell, type and already-watched but NOT `is_corporation`, so a corp sell order can be watched against a personal Production Run and book corp-wallet revenue as personal profit. Exclusion is the wrong fix — for a solo industrialist in a one-person corp (a configuration `20260903-154003-the-personal-corporation-switch.md` explicitly models) watching it is correct, and the app cannot tell the two apart. A "Corp" chip on the picker row is the honest remedy if anyone wants it. "Link Past Sale" is safe — it reads the personal wallet only.                                                                                                                                                                                                                    |
-| Appraisal: disclose the refining leftover (`refineUnitsLeftOver`) the way the order detail and Mining Yield detail both do                                                                                 | Field really is computed and rendered nowhere, and two sibling surfaces really do render it — and it still dies three ways. **Reach, measured:** of 7,760 types in `reprocessing.json`, **6,708 (86.44%) have `portionSize: 1`** and can never leave a leftover; 874 sit at 100, of which 351 of 442 ore/ice types — so a leftover is at most 99 units against hauls in the thousands. **Actionability:** when a part batch makes `refineTotal` zero, `refineBeatsSellAsIs` already highlights the buy column, so the advice on screen is already correct (kill-test 4 as sharpened). **Not a bug:** `20260906-180034` scopes itself to one row (kill-test 24), and `appraisal.ts`'s own header records a part-portion zero as "a real, reportable zero" by design. A totals-strip aggregate would also sum unlike units (50 Veldspar + 30 rockets = "80 units"). The latent defect the review surfaced beside it turned out to be REAL and is filed as #1048 — see Filed candidates; do not confuse the two, the disclosure stays dead.                                                                                                                |
-| Order Floor: pass faction/corp standings into the broker fee (`OrderFloorInputs` accepts them; `openOrdersModel` never does)                                                                               | Kill-test 4 had already cleared `orderFloor` by name. New endpoint AND new scope: `src/esi/registry.ts` has no `/standings` route and no `read_standings` anywhere in `src`. `CharacterContact.standing` is NOT substitutable — it is the player's standing TOWARD an entity, from contacts; the broker fee needs the NPC corp/faction standing toward the player. So a consent-screen line borne by every user (kill-test 9) buys at most **0.5 percentage points** (0.03×10 + 0.02×10) against a Broker Relations V fee of 1.5%, moving `belowFloor` only inside a band the unmodelled station tax already spans.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| PI: surface `ColonyFit.limitedBy` (which of CPU/Powergrid capped the block count, or the empty dead-end case)                                                                                              | The dead-end case is ALREADY SHIPPED verbatim — `en.json`'s `does-not-fit`: "No build advice: this colony's Command Center hosts no whole chain… A higher upgrade level is what changes that." Empty `limitedBy` implies `blocks === 0`, which `stopTier.ts` already maps to that status. The CPU-vs-Powergrid half is inactionable by construction, not by editorial taste: a Command Center Upgrades level raises both together, so either answer leads to the same single action — the same reasoning that already removed a chip in `20260906-180519-the-advisor-drops-its-ceiling-and-colonised-chips.md`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| Dd24tool.de instant-quote highsec item-exchange buyback; Element43 (GitHub, whole-economy order-book aggregator) and EveMarketProphet (GitHub, cross-region arbitrage finder)                              | Buyback is kill-test 1 by construction (a cross-player service). The other two are the same whole-region-order-book shape kill-test 1 already closed, and both are dead projects with no live hosted instance — not worth their own scan entry.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| EVE MCP Server (github.com/pfh59/eve-mcp-server) — exposes 52 read-only public ESI endpoints as MCP tools for AI assistants                                                                                | Out of remit, not a kill-test: it is developer infrastructure (an ESI-to-LLM adapter), never a player-facing industry/market feature this app could copy. Noted so a future sweep doesn't re-investigate it as a "tool."                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+Grouped by the test that killed them; the reason is what stops a re-pitch.
+
+- **1**: hub arbitrage/trade finder (ships as `hubHaulGaps`), corp
+  buyback/payout split, EQM Corporate Exchange, dd24tool.de, Element43 and
+  EveMarketProphet (dead), Space Trucker / EVE Flipper route sequencing (also
+  14), Vigilant, OCR appraisal (the client already copies exact text). **2**:
+  bulk relist / buy queue; the keybind-and-clipboard reprice helper
+  (`orderFloor.ts` already shows the relist price). **3**: depth chart, EVE
+  Forge Gantt, Working Capital Locked, EVE Motor Market build-tree viz, Open
+  Orders slot ceiling. **5**: cost-index watch. **6**: multi-hop reaction
+  chains; public contract browser and sell-advisor (ADR 0013, twice);
+  corp-placed order split (+24 — **residue:** `watchCandidates` books a corp
+  sell as personal profit; a "Corp" chip, not exclusion). **7**: asset
+  staleness. **8**: Appraisal Portfolios' chart half. **9**: player-structure
+  pricing incl. Iron Whales' nullsec markets; Order Floor standings in the
+  broker fee. **10**: station-trading FIFO P&L, Production Run cost from wallet
+  purchases, EVE Motor Market's trade journal. **11**: LP redemption ledger (ESI
+  has no LP transaction log). **12**: PI Advisor arbitrary-system search;
+  Records tab unlink/unwatch. **13**: Moon Survey / Metenox estimator and ledger
+  in any framing (filed as #859, closed on rediscovering this — do not re-file);
+  EQM HyperNet. **14**: Market Movers. **16**: Build Plan product volume + haul
+  distance (+3); pricing that haul at the courier corpus' going rate (a median
+  is scale-dependent — an outlier detector, not a quote). **17**: PI haul-out
+  volume, misrouted-factory alert, colony staleness (+4), Advisor buffer
+  headroom, `ColonyFit.limitedBy`. **24**: `refineUnitsLeftOver` (#1048 is the
+  real defect beside it), Compare Hubs unpriced disclosure (+26; each hub's
+  total is correct), skill-reduced job time as denominator (+12; folded
+  into #1051), Production Log double-sale detection (no join key — **watch:** an
+  ESI order↔transaction correlation makes the FIX proposable). **32**:
+  Production Run using `IndustryJob.cost` (no job id).
+- **On remit, not a kill-test:** "can this character fly this fit" (EVE Empire —
+  PvP/PvE; distinct from #1015); Compass and EVE-NAV capital jump planning (a
+  second account plus a multi-billion hull, no ISK-pipeline leg); Eve Supply
+  Chain (closed planner class); EVE MCP Server (developer infrastructure);
+  Abyssal pricing (`unpricedRows` flags them); Skill Extractor ISK/hr; Corp
+  Wallet chart by division (Accountant-only).
+- **On merit:** Skill ROI in any framing incl. the owner's invited re-frame — no
+  realized ISK/hr per job exists. Cross-plan material reservation and LP
+  required-item re-pricing — `20260909-212724-group-ownership-overlay` rejected
+  an allocation solver outright. Hand-entered cost basis with no linked run — a
+  per-unit average over fungible lots. Per-order undercut timeline — narrowed
+  to #1018. BPC price-trend badge and contract-derived pricing — need
+  server-side retention for a gameable payoff overlapping #926. Hauler
+  trip-count estimator — an unverifiable typed number relabeled. Price-history
+  %-change stat — thin-volume days. Build Plan → PI colony link — Dexie-only
+  cache. Mining-ledger opportunity finder — the shape of #819. PI Colony Layout
+  Template — superseded by the Advisor's fitted plan. Reopening research/copying
+  (~10 researched BPOs region-wide) and invention (gated on reversing
+  BOM-rollup). No-buyout auction exclusion — 0 of 8,000 live Forge contracts.
+  Reprocessing implant — false precision against a labelled 50% assumption.
+  Housekeeping only: Mining Yield's `specialisationLevel: 0`, dead i18n keys.
+- **Order-problem alerts** (undercut / below-floor; prior art Iron Whales'
+  undercut watcher, EVE Night Trade Tools) — two decisions stack: the Open
+  Orders worklist decision defers order-problem alerts to a later PR, and the
+  notification-catalog decision made `marketOrderFilled` feed-only, so an
+  undercut can only ever be a feed row duplicating the Open Orders page.
+  Detection also needs competitor prices, which the page's eager/on-demand split
+  exists to avoid. Only revival shape: `belowFloor` alone,
+  Production-Run-linked, station scope, feed-only — after the cost-basis work.
