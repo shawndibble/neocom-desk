@@ -190,6 +190,41 @@ function OfferDetail({
             {row.offer.lp_cost.toLocaleString()} LP + {formatIsk(row.offer.isk_cost)} ISK
           </dd>
         </div>
+        {row.requiredItems.length > 0 && (
+          <>
+            <div className="flex justify-between gap-4 text-text-dim">
+              <dt>{t('loyaltyStore.requiredItems')}</dt>
+              <dd className="tabular-nums text-text">
+                {row.requiredItemsCost === null ? (
+                  <span className="text-warning">{t('loyaltyStore.requiredItemsNotPriced')}</span>
+                ) : (
+                  formatIsk(row.requiredItemsCost)
+                )}
+              </dd>
+            </div>
+            <div className="flex flex-col gap-0.5 pl-3">
+              {row.requiredItems.map((item) => (
+                <div
+                  key={item.typeId}
+                  className="flex justify-between gap-4 text-[0.6875rem] text-text-dim"
+                >
+                  <dt>
+                    {item.quantity.toLocaleString()} × {item.name}
+                  </dt>
+                  <dd className="tabular-nums">
+                    {item.unitPrice === null ? (
+                      <span className="text-warning">
+                        {t('loyaltyStore.requiredItemsNotPriced')}
+                      </span>
+                    ) : (
+                      formatIsk(item.unitPrice * item.quantity)
+                    )}
+                  </dd>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
         {row.isBlueprint && row.build && (
           <div className="flex justify-between gap-4 text-text-dim">
             <dt>{t('loyaltyStore.materials')}</dt>
@@ -214,7 +249,20 @@ function OfferDetail({
         </p>
       )}
       {profit.profit === null && (
-        <p className="text-xs text-warning">{t('loyaltyStore.unpriceable')}</p>
+        <p className="text-xs text-warning">
+          {/* A required item with no hub price is a real, distinct cause from
+              a material or the product itself lacking one (row.build's
+              `unpricedMaterials` / a null `profit.revenue`) — naming the
+              wrong one would send the player looking for a Jita order that
+              was never missing. `requiredItemsCost` is the same null the
+              engine already used to null `profit.profit`, so this reads the
+              actual cause rather than re-deriving it. */}
+          {t(
+            row.requiredItemsCost === null
+              ? 'loyaltyStore.unpriceableRequiredItem'
+              : 'loyaltyStore.unpriceable'
+          )}
+        </p>
       )}
 
       {row.isBlueprint && row.build && (

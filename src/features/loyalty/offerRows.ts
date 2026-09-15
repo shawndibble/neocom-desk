@@ -33,6 +33,15 @@ import {
   type LoyaltyOfferProfit,
 } from '@/engine/loyalty/offerProfit';
 
+/** One `required_items` turn-in, named and priced for display. */
+export interface RequiredItemLine {
+  typeId: number;
+  name: string;
+  quantity: number;
+  /** Unit hub price; null when this item has no listed sell price. */
+  unitPrice: number | null;
+}
+
 export interface LoyaltyOfferRow {
   offer: LoyaltyStoreOffer;
   /** The offer's own item name (the blueprint's name, for a blueprint offer). */
@@ -44,6 +53,20 @@ export interface LoyaltyOfferRow {
   /** Manufacturing result at the default facility, for a blueprint offer only. */
   build: BuildResult | null;
   profit: LoyaltyOfferProfit;
+  /**
+   * `offer.required_items`, named/quantified/priced for display. Empty when
+   * the offer has none. The same array `requiredItemsCost` below was summed
+   * from, so the detail view's line items and its total can never drift from
+   * each other or from what `profit.profit` actually subtracted.
+   */
+  requiredItems: RequiredItemLine[];
+  /**
+   * Sum of `requiredItems`' hub cost — the exact figure `profit.profit`
+   * already subtracts (see `loyaltyOfferProfit`'s `requiredItemsCost` input).
+   * `0` for an offer with no required items, `null` when any required item
+   * has no hub price (mirrors `profit.profit`'s own null in that case).
+   */
+  requiredItemsCost: number | null;
 }
 
 export interface LoyaltyOfferComputeInputs {
@@ -95,22 +118,48 @@ export interface LoyaltyOfferComputeInputs {
   playerLp: number;
 }
 
-/** Sum of `required_items` at hub prices; null when any required item can't be priced. */
-function requiredItemsCost(offer: LoyaltyStoreOffer, hubPrices: HubPrices): number | null {
+/**
+ * Sum of `requiredItems`' hub cost; null when any line is unpriced. Sums the
+ * same `RequiredItemLine[]` the detail view lists — not a second traversal of
+ * `offer.required_items` — so the total can never disagree with the lines it
+ * is the total of.
+ */
+function sumRequiredItemsCost(requiredItems: readonly RequiredItemLine[]): number | null {
   let total = 0;
-  for (const req of offer.required_items) {
-    const price = hubPrices[req.type_id];
-    if (price === undefined) return null;
-    total += price * req.quantity;
+  for (const item of requiredItems) {
+    if (item.unitPrice === null) return null;
+    total += item.unitPrice * item.quantity;
   }
   return total;
+}
+
+/**
+ * Names, quantifies and prices each `required_items` turn-in for display.
+ * Named from `itemNames` first — `catalog.typesById` (the `nameForType`
+ * fallback) only carries types some blueprint or skill references, which the
+ * insignia and faction tags LP stores demand as turn-ins are not — then
+ * `nameForType`'s own `#typeId` fallback for anything neither resolved.
+ */
+function resolveRequiredItems(
+  offer: LoyaltyStoreOffer,
+  hubPrices: HubPrices,
+  catalog: BlueprintCatalog,
+  itemNames: ReadonlyMap<number, string> | undefined
+): RequiredItemLine[] {
+  return offer.required_items.map((req) => ({
+    typeId: req.type_id,
+    name: itemNames?.get(req.type_id) ?? nameForType(catalog, req.type_id),
+    quantity: req.quantity,
+    unitPrice: hubPrices[req.type_id] ?? null,
+  }));
 }
 
 function computeBlueprintRow(
   offer: LoyaltyStoreOffer,
   catalog: BlueprintCatalog,
   inputs: LoyaltyOfferComputeInputs,
-  itemsCost: number | null
+  itemsCost: number | null,
+  requiredItems: RequiredItemLine[]
 ): LoyaltyOfferRow {
   const entry = catalog.byBlueprintTypeID.get(offer.type_id);
   // Never called without a hit; narrows the map lookup for TypeScript.
@@ -179,6 +228,8 @@ function computeBlueprintRow(
     productName: entry.productName,
     build,
     profit,
+    requiredItems,
+    requiredItemsCost: itemsCost,
   };
 }
 
@@ -186,7 +237,8 @@ function computeItemRow(
   offer: LoyaltyStoreOffer,
   catalog: BlueprintCatalog,
   inputs: LoyaltyOfferComputeInputs,
-  itemsCost: number | null
+  itemsCost: number | null,
+  requiredItems: RequiredItemLine[]
 ): LoyaltyOfferRow {
   const revenuePrice = (inputs.revenueHubPrices ?? inputs.hubPrices)[offer.type_id];
   const revenue = revenuePrice === undefined ? null : revenuePrice * offer.quantity;
@@ -208,16 +260,44 @@ function computeItemRow(
     productName: null,
     build: null,
     profit,
+    requiredItems,
+    requiredItemsCost: itemsCost,
   };
+}
+
+/**
+ * Every type id worth resolving a display name for: an offer's own item plus
+ * every `required_items` turn-in. Required-item ids matter here because the
+ * fallback catalogue (`nameForType`'s `catalog.typesById`) only carries types
+ * some blueprint or skill references — the insignia and faction tags LP
+ * stores demand as turn-ins are not — so a caller that only asks
+ * `loadTypeNames` about offers' own `type_id`s renders every required item as
+ * a raw `#typeId`. Exported so the id set fed to name resolution (the hook)
+ * and the id set fed to price resolution (already widened) can be widened the
+ * same way.
+ */
+export function collectNameableTypeIds(offers: readonly LoyaltyStoreOffer[]): number[] {
+  const ids = new Set<number>();
+  for (const offer of offers) {
+    ids.add(offer.type_id);
+    for (const req of offer.required_items) ids.add(req.type_id);
+  }
+  return [...ids];
 }
 
 /** Ranked most- to least-profitable-per-LP; unpriceable offers sink to the end. */
 export function computeLoyaltyOfferRows(inputs: LoyaltyOfferComputeInputs): LoyaltyOfferRow[] {
   const rows = inputs.offers.map((offer) => {
-    const itemsCost = requiredItemsCost(offer, inputs.hubPrices);
+    const requiredItems = resolveRequiredItems(
+      offer,
+      inputs.hubPrices,
+      inputs.catalog,
+      inputs.itemNames
+    );
+    const itemsCost = sumRequiredItemsCost(requiredItems);
     return inputs.catalog.byBlueprintTypeID.has(offer.type_id)
-      ? computeBlueprintRow(offer, inputs.catalog, inputs, itemsCost)
-      : computeItemRow(offer, inputs.catalog, inputs, itemsCost);
+      ? computeBlueprintRow(offer, inputs.catalog, inputs, itemsCost, requiredItems)
+      : computeItemRow(offer, inputs.catalog, inputs, itemsCost, requiredItems);
   });
   return rankByIskPerLp(rows, (r) => r.profit.iskPerLp);
 }
