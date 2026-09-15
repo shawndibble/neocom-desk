@@ -93,6 +93,25 @@ export interface RouteSnapshot<T> {
   refresh: () => void;
 }
 
+/**
+ * Minimum spacing between revalidation-triggered reloads (see
+ * `lastRevalidationReloadAt` below). A tightly-spaced storm collapses into
+ * one reload; a genuine settle arriving well after the previous one — a
+ * different key going stale minutes later — still gets picked up, because
+ * nothing about this budget is ever spent for good.
+ *
+ * A storm's spacing is set by `esi/cache.ts`'s `STALE_GRACE_MS` (250ms): that
+ * is how close together two grace-path settles land. ~8x that is generous
+ * headroom against a storm without being so long that a real back-to-back
+ * settle of two *different* keys reads as one.
+ *
+ * Exported only so its own regression test
+ * (`useRouteSnapshot.revalidationStorm.test.tsx`) can wait comfortably past
+ * it rather than hardcoding a duplicate number that would silently drift
+ * from this one.
+ */
+export const AUTO_REVALIDATION_COOLDOWN_MS = 2_000;
+
 export function useRouteSnapshot<T>(
   load: (characterId: number, signal: RouteSnapshotSignal) => Promise<T>,
   /**
@@ -132,6 +151,30 @@ export function useRouteSnapshot<T>(
   const [revalidation, setRevalidation] = useState(0);
   const loadInFlight = useRef(false);
   const revalidationPending = useRef(false);
+  /**
+   * `Date.now()` of the last revalidation-triggered reload, 0 until the
+   * first one. A page that reads many keys (BPC Search: one
+   * `loadRegionName`/`loadBlueprintLocation` call per distinct
+   * region/location, easily hundreds) can have the *reload itself* provoke a
+   * fresh signal the same way the original load did — with nothing to break
+   * the cycle, that chains forever: an unbounded string of reloads running
+   * back to back in the background (each one's own coalesced signal firing
+   * the next the moment it settles). The coalescing above already keeps any
+   * single reload's commit from being lost — `loading` doesn't get stuck —
+   * but the chain itself is otherwise endless: on a page with expensive
+   * renders (BPC Search's `useMemo`s recompute over a six-figure row array
+   * on every reload) that reads as the tab hanging.
+   * `AUTO_REVALIDATION_COOLDOWN_MS` below is what breaks the chain.
+   */
+  const lastRevalidationReloadAt = useRef(0);
+
+  /** Only revalidation-triggered reloads are throttled — an intentional one always goes through, no budget to spend. */
+  function requestRevalidationReload(): void {
+    const now = Date.now();
+    if (now - lastRevalidationReloadAt.current < AUTO_REVALIDATION_COOLDOWN_MS) return;
+    lastRevalidationReloadAt.current = now;
+    setRevalidation((n) => n + 1);
+  }
 
   // Adjusting state during render, React's documented way to reset on a
   // changed input: it re-renders before committing, so no effect round-trip
@@ -163,7 +206,7 @@ export function useRouteSnapshot<T>(
           revalidationPending.current = true;
           return;
         }
-        setRevalidation((n) => n + 1);
+        requestRevalidationReload();
       }),
     []
   );
@@ -190,7 +233,7 @@ export function useRouteSnapshot<T>(
           loadInFlight.current = false;
           if (revalidationPending.current) {
             revalidationPending.current = false;
-            setRevalidation((n) => n + 1);
+            requestRevalidationReload();
           }
         }
       }
