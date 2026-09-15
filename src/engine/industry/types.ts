@@ -53,6 +53,16 @@ export interface QuantityEntry {
 /** Which industry job a blueprint/formula represents. Reactions: issue #460. */
 export type IndustryActivity = 'manufacturing' | 'reaction';
 
+/**
+ * One skill required to install a blueprint's job, at the level needed.
+ * Mirrors src/sde's `BlueprintSkill`; kept separate so the engine stays
+ * decoupled from src/sde.
+ */
+export interface BlueprintSkillRequirement {
+  typeID: number;
+  level: number;
+}
+
 /** Blueprint/reaction-formula shape the engine needs. */
 export interface IndustryBlueprint {
   name: string;
@@ -68,6 +78,12 @@ export interface IndustryBlueprint {
    * fallback at each call site.
    */
   activity?: IndustryActivity;
+  /**
+   * Skills required to install this job. Optional so pre-existing literals
+   * keep compiling; `evaluateSkillGate` treats absent and empty the same —
+   * never gated.
+   */
+  skills?: readonly BlueprintSkillRequirement[];
 }
 
 /** `blueprint.activity`, defaulting to 'manufacturing' — the one place that owns what an unset activity means. */

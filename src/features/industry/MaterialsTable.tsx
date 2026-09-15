@@ -12,6 +12,7 @@ import * as Icon from '@/components/ui/icons';
 import type { MakeMethod, MakeOrBuy } from '@/engine/industry/makeOrBuy';
 import { rowVolume } from '@/engine/industry/materialVolume';
 import type { MaterialSourcing, MaterialSourcingMap } from '@/engine/industry/types';
+import type { SkillGateVerdict } from '@/engine/industry/skillGate';
 import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
 import { maskNumber, unmaskNumber } from '@/lib/numberMask';
@@ -21,6 +22,7 @@ import { suggestedOwnedQuantity } from '@/engine/industry/ownedStock';
 import { OwnedStockHint } from './OwnedStockHint';
 import type { OwnedStockDetection } from './ownedStockDetection';
 import { buildRecipe, type MaterialTableRow } from './subBuildPlan';
+import { SkillGateMarker } from './SkillGateMarker';
 
 interface MaterialsTableProps {
   /** Engine cost lines — already resolved against the plan's sourcing overrides and hub prices. */
@@ -61,6 +63,13 @@ interface MaterialsTableProps {
    * simply drops the trigger.
    */
   onOpenAcquisitionPicker?: (typeID: number) => void;
+  /**
+   * Skill-gate verdicts by material typeID, for a sub-build row — a job the
+   * plan chose, not the pilot. Only `gated: true` renders anything; omitted
+   * entirely drops the marker. `characterNameFor` names the closest character.
+   */
+  skillGates?: ReadonlyMap<number, SkillGateVerdict>;
+  characterNameFor?: (characterId: number) => string;
 }
 
 /** Blank or garbage clears the field; anything real is kept as-is (the engine clamps). */
@@ -373,6 +382,8 @@ export function MaterialsTable({
   onToggleBuildHere,
   onShowRecipe,
   onOpenAcquisitionPicker,
+  skillGates,
+  characterNameFor,
 }: MaterialsTableProps) {
   const { t } = useTranslation();
 
@@ -385,6 +396,7 @@ export function MaterialsTable({
           const advice = makeOrBuy?.get(material.typeID);
           const name = nameFor(material.typeID);
           const building = material.subBuilds.length > 0;
+          const skillGate = building ? skillGates?.get(material.typeID) : undefined;
           // Offered on every row: a recipe input a build introduced is
           // exactly as buildable as the plan's own materials, which is what
           // lets a player keep drilling down as many levels as the recipe
@@ -481,6 +493,13 @@ export function MaterialsTable({
                 )}
               </span>
               {name}
+              {skillGate?.gated && characterNameFor && (
+                <SkillGateMarker
+                  verdict={skillGate}
+                  nameForSkill={nameFor}
+                  nameForCharacter={characterNameFor}
+                />
+              )}
               {/* Blueprint Acquisition (issue #838): opens the picker/override
                   modal for this row's tier right beside the name it governs,
                   rather than beside the ME/TE caption in the price column —
@@ -775,6 +794,8 @@ export function MaterialsTable({
       onToggleBuildHere,
       onShowRecipe,
       onOpenAcquisitionPicker,
+      skillGates,
+      characterNameFor,
     ]
   );
 

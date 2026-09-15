@@ -72,7 +72,7 @@ import {
 
 /** Matches the Roman-numeral formatting every skill-level display in the app uses. */
 const ROMAN = ['I', 'II', 'III', 'IV', 'V'] as const;
-const romanLevel = (level: number): string => ROMAN[level - 1] ?? String(level);
+export const romanLevel = (level: number): string => ROMAN[level - 1] ?? String(level);
 
 /**
  * Every Notification Event a Projection can be built for — the ones whose

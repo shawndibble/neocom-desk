@@ -115,7 +115,7 @@ export function buildPlansByMaterialTypeID(
   return map;
 }
 
-/** Adapt an SDE BlueprintType to the shape src/engine/industry consumes (drops skills). */
+/** Adapt an SDE BlueprintType to the shape src/engine/industry consumes. */
 export function toIndustryBlueprint(blueprint: BlueprintType): IndustryBlueprint {
   return {
     name: blueprint.name,
@@ -123,5 +123,6 @@ export function toIndustryBlueprint(blueprint: BlueprintType): IndustryBlueprint
     materials: blueprint.materials,
     products: blueprint.products,
     activity: blueprint.activity,
+    skills: blueprint.skills,
   };
 }
