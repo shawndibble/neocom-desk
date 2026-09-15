@@ -142,20 +142,17 @@ export function toPlanetExtractionSources(colonies: readonly ColonyPins[]): Boar
 }
 
 /**
- * When a courier's real deadline is its delivery deadline, not its offer expiry.
+ * An accepted courier's real deadline: delivery, not the offer's expiry.
  *
- * `date_expired` is the deadline to *accept* an offer, and for every other
- * contract that is also the deadline that matters. Accepting a courier
- * replaces it: the hauler then owes delivery within `days_to_complete` counted
- * from `date_accepted`, which is usually sooner than the offer window closes —
- * so using the expiry here told a hauler they had more time than they had, on
- * the one clock whose miss forfeits the collateral.
+ * `date_expired` is the deadline to *accept*, which for every other contract is
+ * also the deadline that matters. Accepting a courier replaces it — delivery is
+ * owed within `days_to_complete` of `date_accepted`, usually sooner than the
+ * offer window closes, so the expiry over-read the one clock whose miss forfeits
+ * the collateral.
  *
- * Returns `null` whenever the delivery deadline cannot be derived, and the
- * caller keeps the offer expiry rather than guessing. `days_to_complete` is
- * `0` for a courier with no completion window at all, which is not a duration:
- * treating it as one would date delivery to the moment of acceptance and leave
- * the row permanently overdue.
+ * `null` where that cannot be derived, and the caller keeps the expiry rather
+ * than guess. `days_to_complete: 0` is no completion window at all, not a
+ * zero-length one — read as a duration it would leave the row permanently overdue.
  */
 function toCourierDeliveryDeadlineMs(contract: Contract): number | null {
   if (contract.type !== 'courier' || contract.status !== 'in_progress') return null;
@@ -186,8 +183,6 @@ export function toContractExpirySources(contracts: readonly Contract[]): BoardCl
 }
 
 /**
- * The board's one genuinely derived deadline.
- *
  * ESI gives `issued` and a `duration` in whole days and never an absolute
  * expiry, so this is arithmetic rather than a field read — and getting it
  * wrong would be invisible, putting the row somewhere plausible but incorrect

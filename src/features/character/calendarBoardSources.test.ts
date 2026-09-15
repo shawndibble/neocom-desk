@@ -206,12 +206,7 @@ describe('toContractExpirySources', () => {
 
   const EXPIRY_MS = Date.parse('2026-09-09T15:00:00Z');
 
-  /**
-   * The under-warning case, and the reason this ticket exists: a courier
-   * accepted early in a long offer window is due well before that window
-   * closes, so the board's clock must shorten rather than keep the offer's
-   * expiry.
-   */
+  /** The under-warning case: accepted early in a long window, so the clock must shorten. */
   it('counts an accepted courier down to acceptance plus the allowed days', () => {
     const [source] = toContractExpirySources([
       contract({
@@ -224,11 +219,7 @@ describe('toContractExpirySources', () => {
     expect(source.deadlineMs).toBeLessThan(EXPIRY_MS);
   });
 
-  /**
-   * The mirror case, which is what proves the delivery deadline *replaces* the
-   * offer expiry rather than capping it: a courier accepted near the end of its
-   * offer window is due after that window would have closed.
-   */
+  /** The mirror case: accepted late, so delivery falls past the expiry — replaced, not capped. */
   it('lets an accepted courier run past the offer expiry', () => {
     const [source] = toContractExpirySources([
       contract({
@@ -264,9 +255,7 @@ describe('toContractExpirySources', () => {
     ['no acceptance time', { days_to_complete: 3 }],
     ['no allowed days', { date_accepted: ISO('2026-09-01T06:00:00Z') }],
     ['an unparseable acceptance time', { date_accepted: 'soon', days_to_complete: 3 }],
-    // ESI reports `0` for a courier carrying no completion window at all.
-    // Reading that as a real duration would make delivery due the instant the
-    // contract was accepted, so the row would read as permanently overdue.
+    // `0` is no window at all; as a duration it would read permanently overdue.
     ['no completion window', { date_accepted: ISO('2026-09-01T06:00:00Z'), days_to_complete: 0 }],
   ])(
     'falls back to the offer expiry for an accepted courier with %s',
