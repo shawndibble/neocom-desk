@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Link, Navigate, useParams } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
-import { PageHeader, Spinner } from '@/components/ui';
+import { buttonClassName, PageHeader, Spinner } from '@/components/ui';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { scheduleSync } from '@/sync';
 import { isSyncConfigured } from '@/app/syncStatus';
@@ -102,7 +102,7 @@ export function SkillPlanEditor() {
       {/* Below `lg` the list is not on screen at all, so this is the only way
           back to it. */}
       {!isDesktop && (
-        <Link to="/skills/plans" className="inline-block text-xs text-accent hover:underline">
+        <Link to="/skills/plans" className={buttonClassName({ size: 'sm' })}>
           {t('plans.backToList')}
         </Link>
       )}

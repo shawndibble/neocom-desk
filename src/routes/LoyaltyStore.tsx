@@ -13,6 +13,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
+  buttonClassName,
   DataAgeBadge,
   DataTable,
   EmptyState,
@@ -499,7 +500,7 @@ export function LoyaltyStore() {
 
   return (
     <div className="flex flex-col gap-3">
-      <Link to="/wallet" className="inline-block text-xs text-accent hover:underline">
+      <Link to="/wallet" className={buttonClassName({ size: 'sm' })}>
         {'←'} {t('loyaltyStore.back')}
       </Link>
 
