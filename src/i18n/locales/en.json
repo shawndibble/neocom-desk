@@ -858,9 +858,19 @@
     "marketOpportunitiesNoResultsTitle": "Nothing cleared the liquidity floor",
     "marketOpportunitiesNoResultsHint": "Nothing cleared the liquidity floor at this hub — try a busier Trade Hub.",
     "marketOpportunitiesStartPlan": "Start a plan",
+    "marketOpportunitiesSkillGateRule": "A locked row needs a skill no character on this account has trained. Every other row is one you can install today.",
     "buildCost": "Build cost",
     "bpo": "BPO",
-    "bpc": "BPC"
+    "bpc": "BPC",
+    "skillGateMarkerSingle": "{{skill}} {{level}}",
+    "skillGateMarkerMany_one": "{{count}} skill short",
+    "skillGateMarkerMany_other": "{{count}} skills short",
+    "skillGateTooltipTitle": "No character on this account can install this job",
+    "skillGateShortfallRow": "{{skill}} {{have}} → {{need}}",
+    "skillGateBestOn": "Best on {{character}}",
+    "skillGateFilterChip": "Hide skill-gated",
+    "skillGateFilterChipCount_one": "{{count}} row hidden",
+    "skillGateFilterChipCount_other": "{{count}} rows hidden"
   },
   "login": {
     "button": "Log in with EVE Online",

@@ -5,11 +5,14 @@
  * starting from nothing" answer. Opt-in: nothing runs until the pilot hits
  * "Run market scan", per the ticket.
  */
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useLiveQuery } from 'dexie-react-hooks';
 import {
   Button,
   DataTable,
   EmptyState,
+  FilterChip,
   InfoTooltip,
   IskAmount,
   Panel,
@@ -18,14 +21,18 @@ import {
   type DataTableColumn,
   type StatChipTone,
 } from '@/components/ui';
+import { db } from '@/db';
 import { iskToneClass } from '@/features/character/format';
+import { evaluateSkillGate, type SkillGateVerdict } from '@/engine/industry/skillGate';
 import type { OrderDepthLevel } from '@/engine/industry/opportunities';
 import type { SkillLevels } from '@/engine/industry/types';
 import type { MarketWideTreeMap } from '@/sde/types';
 import type { TradeHub } from '@/market/hubs';
-import type { BlueprintCatalog, BlueprintCatalogEntry } from './blueprintCatalog';
+import { useAccountSkillLevels } from '@/features/skills/useAccountSkillLevels';
+import { nameForType, type BlueprintCatalog, type BlueprintCatalogEntry } from './blueprintCatalog';
 import type { MarketWideResultRow } from './marketWideOpportunities';
 import { useMarketWideOpportunities } from './useMarketWideOpportunities';
+import { SkillGateMarker } from './SkillGateMarker';
 
 const ORDER_DEPTH_TONE: Record<OrderDepthLevel, StatChipTone> = {
   deep: 'success',
@@ -57,13 +64,57 @@ export function MarketWideOpportunitiesPanel({
     skills,
   });
 
+  // Account-wide, not active-character: every character on the account, same
+  // precedent `OpportunitiesPanel`'s own multi-character fan-out sets.
+  const allCharacters = useLiveQuery(() => db.characters.toArray(), [], []);
+  const characterNames = useMemo(
+    () => new Map((allCharacters ?? []).map((c) => [c.characterId, c.name])),
+    [allCharacters]
+  );
+  const characterIds = [...characterNames.keys()];
+  const accountSkills = useAccountSkillLevels(characterIds);
+
+  const skillGateByProductTypeID = useMemo(() => {
+    const verdicts = new Map<number, SkillGateVerdict>();
+    if (!catalog) return verdicts;
+    for (const row of rows) {
+      const requirements =
+        catalog.byBlueprintTypeID.get(row.blueprintTypeID)?.blueprint.skills ?? [];
+      verdicts.set(row.productTypeID, evaluateSkillGate(requirements, accountSkills));
+    }
+    return verdicts;
+  }, [rows, catalog, accountSkills]);
+
+  const [hideSkillGated, setHideSkillGated] = useState(false);
+  const gatedCount = useMemo(
+    () => rows.filter((row) => skillGateByProductTypeID.get(row.productTypeID)?.gated).length,
+    [rows, skillGateByProductTypeID]
+  );
+  const visibleRows = hideSkillGated
+    ? rows.filter((row) => !skillGateByProductTypeID.get(row.productTypeID)?.gated)
+    : rows;
+
   const columns: DataTableColumn<MarketWideResultRow>[] = [
     {
       id: 'product',
       header: t('industry.product'),
       primary: true,
       sortValue: (row) => row.productName,
-      render: (row) => row.productName,
+      render: (row) => {
+        const verdict = skillGateByProductTypeID.get(row.productTypeID);
+        return (
+          <span className="inline-flex items-center gap-1.5">
+            {row.productName}
+            {verdict?.gated && catalog && (
+              <SkillGateMarker
+                verdict={verdict}
+                nameForSkill={(typeID) => nameForType(catalog, typeID)}
+                nameForCharacter={(id) => characterNames.get(id) ?? t('common.unknown')}
+              />
+            )}
+          </span>
+        );
+      },
     },
     {
       id: 'iskPerHour',
@@ -151,14 +202,32 @@ export function MarketWideOpportunitiesPanel({
           className="py-8"
         />
       ) : (
-        <div className="overflow-x-auto">
-          <DataTable
-            columns={columns}
-            rows={rows}
-            rowKey={(row) => row.productTypeID}
-            label={t('industry.marketOpportunitiesTitle')}
-            defaultSort={{ columnId: 'iskPerHour', direction: 'desc' }}
-          />
+        <div className="flex flex-col gap-2">
+          {gatedCount > 0 && (
+            <div className="flex justify-end">
+              <FilterChip
+                label={t('industry.skillGateFilterChip')}
+                selected={hideSkillGated}
+                onToggle={() => setHideSkillGated((v) => !v)}
+                count={gatedCount}
+                countLabel={t('industry.skillGateFilterChipCount', { count: gatedCount })}
+              />
+            </div>
+          )}
+          <div className="overflow-x-auto">
+            <DataTable
+              columns={columns}
+              rows={visibleRows}
+              rowKey={(row) => row.productTypeID}
+              label={t('industry.marketOpportunitiesTitle')}
+              defaultSort={{ columnId: 'iskPerHour', direction: 'desc' }}
+            />
+          </div>
+          {gatedCount > 0 && (
+            <p className="text-[0.6875rem] text-text-dim">
+              {t('industry.marketOpportunitiesSkillGateRule')}
+            </p>
+          )}
         </div>
       )}
     </Panel>

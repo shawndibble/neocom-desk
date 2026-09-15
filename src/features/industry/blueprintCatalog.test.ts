@@ -8,7 +8,7 @@ const BLUEPRINTS: BlueprintMap = {
     time: 1200,
     materials: [{ typeID: 34, quantity: 4500 }],
     products: [{ typeID: 587, quantity: 1 }],
-    skills: [],
+    skills: [{ typeID: 3380, level: 1 }],
     activity: 'manufacturing',
   },
   '640': {
@@ -138,13 +138,14 @@ describe('searchByProductName', () => {
 });
 
 describe('toIndustryBlueprint', () => {
-  it('adapts an SDE blueprint to the engine shape, dropping skills', () => {
+  it('adapts an SDE blueprint to the engine shape, carrying its skill requirements through (issue #1015)', () => {
     expect(toIndustryBlueprint(BLUEPRINTS['638'])).toEqual({
       name: 'Rifter Blueprint',
       time: 1200,
       materials: [{ typeID: 34, quantity: 4500 }],
       products: [{ typeID: 587, quantity: 1 }],
       activity: 'manufacturing',
+      skills: [{ typeID: 3380, level: 1 }],
     });
   });
 });

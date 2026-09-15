@@ -60,6 +60,8 @@ import { DEFAULT_TRADE_HUB, TRADE_HUBS, getTradeHub } from '@/market/hubs';
 import type { BuildPlanRecord } from '@/db';
 import type { CharacterBlueprint } from '@/esi/endpoints';
 import type { PiData } from '@/sde/types';
+import { evaluateSkillGate, type SkillGateVerdict } from '@/engine/industry/skillGate';
+import { useAccountSkillLevels } from '@/features/skills/useAccountSkillLevels';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import {
   nameForType,
@@ -763,6 +765,21 @@ export function BuildPlanDetail({
     materialTypeIds,
     includeCorpAssets ? corpOwnedStock.source : null
   );
+
+  // Skill-gate marker for a sub-build row: account-wide, not this plan's own
+  // `skills` prop — same precedent Active Jobs' slot header and
+  // `MarketWideOpportunitiesPanel` both follow.
+  const skillGateCharacterIds = [...characterNames.keys()];
+  const accountSkills = useAccountSkillLevels(skillGateCharacterIds);
+  const skillGates = useMemo(() => {
+    const gates = new Map<number, SkillGateVerdict>();
+    for (const material of visibleMaterials) {
+      if (material.subBuilds.length === 0) continue;
+      const requirements = catalog.byProductTypeID.get(material.typeID)?.blueprint.skills ?? [];
+      gates.set(material.typeID, evaluateSkillGate(requirements, accountSkills));
+    }
+    return gates;
+  }, [visibleMaterials, catalog, accountSkills]);
 
   // Narrowed to the plan's owned-stock scope (issue #454); `detectedStock`
   // itself stays the full, galaxy-wide picture the breakdown popover shows.
@@ -1697,6 +1714,8 @@ export function BuildPlanDetail({
                 onToggleBuildHere={toggleBuildHere}
                 onShowRecipe={setRecipeTypeId}
                 onOpenAcquisitionPicker={setAcquisitionPickerTypeId}
+                skillGates={skillGates}
+                characterNameFor={detection.characterNameFor}
               />
               <BuildRecipeModal
                 recipe={openRecipe}
