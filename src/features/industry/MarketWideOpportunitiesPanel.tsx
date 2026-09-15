@@ -3,7 +3,7 @@
  * Opportunities tab, ranking manufacturable products market-wide by
  * ISK/hour, independent of ownership — a cold-start "what should I build,
  * starting from nothing" answer. Opt-in: nothing runs until the pilot hits
- * "Run market scan", per the ticket.
+ * "Scan".
  */
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
