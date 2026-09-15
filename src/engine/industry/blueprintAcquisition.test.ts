@@ -189,6 +189,32 @@ describe('selectBlueprintTier', () => {
     expect(result).toEqual({ me: 0, te: 0, line: { unitPrice: 30, owned: false } });
   });
 
+  it('discards a zero-price offer — a barter contract, not a genuinely free blueprint (issue #1080)', () => {
+    const result = selectBlueprintTier({
+      ownedCopies: [],
+      neededRuns: 5,
+      materialCostAtMe: () => 100,
+      // A supercarrier-cheap "free" offer — must not win over the real BPO price.
+      bpcOffers: [{ me: 10, te: 18, runs: 5, quantity: 1, price: 0 }],
+      bpoSellPrice: 30,
+      assumedMeForUnowned: 0,
+    });
+    expect(result).toEqual({ me: 0, te: 0, line: { unitPrice: 30, owned: false } });
+  });
+
+  it('a zero-price offer cannot extend an owned tier either, not just the new-tier candidate', () => {
+    const owned: OwnedBlueprintCopy[] = [{ me: 6, te: 12, runs: 1 }];
+    const result = selectBlueprintTier({
+      ownedCopies: owned,
+      neededRuns: 5,
+      materialCostAtMe: () => 100,
+      bpcOffers: [{ me: 6, te: 12, runs: 2, quantity: 1, price: 0 }],
+      bpoSellPrice: 30,
+      assumedMeForUnowned: 0,
+    });
+    expect(result).toEqual({ me: 0, te: 0, line: { unitPrice: 30, owned: false } });
+  });
+
   it("nets a multi-copy listing's whole bundle, not one copy, against the shortfall", () => {
     // One contract lists 3 copies of a 2-run BPC for 10 ISK total (issue
     // #838 spec: "the total is the real ISK that would leave the wallet" —

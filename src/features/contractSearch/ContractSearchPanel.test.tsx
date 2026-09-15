@@ -464,6 +464,66 @@ describe('ContractSearchPanel', () => {
   });
 });
 
+describe('ContractSearchPanel — zero-price (barter) offers (issue #1080)', () => {
+  it('sorts a zero-price row last in the default view, not first as the cheapest', async () => {
+    const barter = row({ contractId: 900, typeId: 34, price: 0, quantity: 1 });
+    const priced = row({ contractId: 901, typeId: 35, price: 500_000, quantity: 1 });
+    loadPublicContractOffers.mockResolvedValue(cachedSnapshot([barter, priced]));
+    renderWithRouter();
+
+    const rows = await bodyRows();
+    expect(rows).toHaveLength(2);
+    // Priced row first even though it costs more than the barter's literal 0.
+    expect(within(rows[0]).getAllByRole('cell')[0].textContent).toBe('Pyerite');
+    expect(within(rows[1]).getAllByRole('cell')[0].textContent).toBe('Tritanium');
+  });
+
+  it('marks a zero-price row as asking for goods rather than showing it as the cheapest thing on the page', async () => {
+    loadPublicContractOffers.mockResolvedValue(
+      cachedSnapshot([row({ contractId: 900, price: 0, quantity: 1 })])
+    );
+    renderWithRouter();
+
+    const rows = await bodyRows();
+    expect(within(rows[0]).getByText('Asking for goods')).toBeInTheDocument();
+    // The real (0) figure is still shown, not hidden.
+    expect(within(rows[0]).getByLabelText('0.00 ISK')).toBeInTheDocument();
+  });
+
+  it('does not mark an ordinary positive-price row', async () => {
+    renderWithRouter();
+
+    const rows = await bodyRows();
+    for (const r of rows) {
+      expect(within(r).queryByText('Asking for goods')).not.toBeInTheDocument();
+    }
+  });
+
+  it('keeps a zero-price row last even when the Price column is sorted descending, not first', async () => {
+    // `sortValue` must return `undefined` for an unpriced row, not a numeric
+    // sentinel like `Infinity` — a numeric sentinel sorts *first* the moment
+    // the column's own sort direction flips to descending, reintroducing the
+    // bug from the other direction.
+    const barter = row({ contractId: 900, typeId: 34, price: 0, quantity: 1 });
+    const priced = row({ contractId: 901, typeId: 35, price: 500_000, quantity: 1 });
+    loadPublicContractOffers.mockResolvedValue(cachedSnapshot([barter, priced]));
+    const user = userEvent.setup();
+    renderWithRouter();
+    await bodyRows();
+
+    // The column starts sorted ascending by default (`defaultSort`), so one
+    // click flips it straight to descending.
+    const header = screen.getByRole('columnheader', { name: 'Price' });
+    expect(header).toHaveAttribute('aria-sort', 'ascending');
+    await user.click(screen.getByRole('button', { name: 'Price' }));
+    expect(header).toHaveAttribute('aria-sort', 'descending');
+
+    const rows = await bodyRows();
+    expect(within(rows[0]).getAllByRole('cell')[0].textContent).toBe('Pyerite');
+    expect(within(rows[1]).getAllByRole('cell')[0].textContent).toBe('Tritanium');
+  });
+});
+
 describe('ContractSearchPanel — contract detail modal', () => {
   it('opens the shared contract detail modal on a row click, the same one BPC Search and Contracts History use', async () => {
     const user = userEvent.setup();

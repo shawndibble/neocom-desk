@@ -3710,6 +3710,7 @@
     "buyoutShort": "buyout",
     "startingBid": "Starting bid: {{price}}",
     "buyout": "Buyout: {{price}}",
+    "unpricedOfferMarker": "Asking for goods",
     "meTeLabel": "ME / TE",
     "runsLabel": "Runs",
     "suggestionsHeading": "Pick an item",

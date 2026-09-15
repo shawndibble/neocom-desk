@@ -46,6 +46,7 @@ import {
   contractOfferPriceSummary,
   contractOfferStats,
   filterContractOffers,
+  isUnpricedOffer,
   listedContractTypeOptions,
   offerAskingPrice,
   type ContractOfferFilter,
@@ -142,6 +143,32 @@ function parseNumeric(value: string): number | null {
   if (value.trim() === '') return null;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+/**
+ * `offerAskingPrice`, except an unpriced (barter) row sorts last rather than
+ * at its literal 0 (issue #1080) — used only for the fixed, ascending
+ * "cheapest first" default view below (`displayRows`), a plain array
+ * `.sort()` this `Infinity` sentinel is safe for. `DataTable`'s own
+ * reversible column sort must not use this: `sortValueForPriceColumn` below
+ * returns `undefined` for that instead, since `Infinity` would sort
+ * *first* the moment a pilot clicks the Price header to flip it to
+ * descending — the exact bug this fix removes, reintroduced from the
+ * other direction.
+ */
+function sortablePrice(row: PublicContractOfferRow): number {
+  return isUnpricedOffer(row) ? Infinity : offerAskingPrice(row);
+}
+
+/**
+ * The Price column's own `sortValue` — `undefined`, not `Infinity`, for an
+ * unpriced row: `DataTable.sortRows` appends every `undefined` row after
+ * the sorted, valued ones regardless of sort direction, the same
+ * "unknowable sorts last either way" rule `BpcSourcingPanel.tsx`'s ISK/run
+ * column already follows for its own `undefined`.
+ */
+function sortValueForPriceColumn(row: PublicContractOfferRow): number | undefined {
+  return isUnpricedOffer(row) ? undefined : offerAskingPrice(row);
 }
 
 interface RegionOption {
@@ -436,11 +463,16 @@ export function ContractSearchPanel({ onStatusChange }: ContractSearchPanelProps
    * arbitrary 50 — and the Cheapest chip naming a price no visible row
    * carries. Sorting first makes the capped view honestly "the 50 cheapest
    * offers"; Show all lifts it.
+   *
+   * An unpriced (barter) row sorts last regardless of its raw price (issue
+   * #1080): its 0 ISK is not a real price, and sorting on it as one would
+   * put the row asking for goods at the very top of the default view — the
+   * harm this fix exists to remove.
    */
   const displayRows = useMemo(
     () =>
       filterContractOffers(nonTypeRows, { typeIds }).sort(
-        (a, b) => offerAskingPrice(a) - offerAskingPrice(b)
+        (a, b) => sortablePrice(a) - sortablePrice(b)
       ),
     [nonTypeRows, typeIds]
   );
@@ -509,7 +541,7 @@ export function ContractSearchPanel({ onStatusChange }: ContractSearchPanelProps
         header: t('contractSearch.priceColumn'),
         align: 'right',
         className: 'tabular-nums whitespace-nowrap',
-        sortValue: (row) => offerAskingPrice(row),
+        sortValue: (row) => sortValueForPriceColumn(row),
         render: (row) => (
           <>
             {/* Long press, not tap: the row's own tap opens the offer's detail modal. */}
@@ -521,6 +553,14 @@ export function ContractSearchPanel({ onStatusChange }: ContractSearchPanelProps
                 {row.buyout
                   ? t('contractSearch.buyoutShort')
                   : t('contractSearch.startingBidShort')}
+              </span>
+            )}
+            {isUnpricedOffer(row) && (
+              // A barter's 0 ISK is real but not a price (issue #1080) — the
+              // row's own tap already opens the detail modal, which shows
+              // both sides of the exchange correctly.
+              <span className="block text-[0.625rem] text-text-dim">
+                {t('contractSearch.unpricedOfferMarker')}
               </span>
             )}
           </>
@@ -721,7 +761,12 @@ export function ContractSearchPanel({ onStatusChange }: ContractSearchPanelProps
                                 count: suggestion.stats.offerCount,
                               })}
                               {' · '}
-                              {formatIskAuto(suggestion.stats.cheapest, CONTRACT_ISK_CENTS_BELOW)}
+                              {suggestion.stats.cheapest === null
+                                ? '—'
+                                : formatIskAuto(
+                                    suggestion.stats.cheapest,
+                                    CONTRACT_ISK_CENTS_BELOW
+                                  )}
                             </span>
                           </button>
                         </li>

@@ -389,8 +389,12 @@ describe('iskPerRun', () => {
     expect(iskPerRun(10_000_000, 10, 0)).toBeNull();
   });
 
-  it('gives a real rate of zero for a copy asked to be given away', () => {
-    expect(iskPerRun(0, 10, 1)).toBe(0);
+  it('has no rate for a zero-ISK price — a barter contract, not a genuine free listing (issue #1080)', () => {
+    expect(iskPerRun(0, 10, 1)).toBeNull();
+  });
+
+  it('has no rate for a negative price either — malformed data, same as any other bad-data path', () => {
+    expect(iskPerRun(-5, 10, 1)).toBeNull();
   });
 
   it("has no rate for a multi-type row — its price is the whole contract's, not this copy's (issue #1076)", () => {
@@ -468,6 +472,28 @@ describe('bpcPriceSummary', () => {
       bestTe: null,
     });
   });
+
+  it('excludes a zero-price (barter) row from cheapest/median, but still counts it as an offer (issue #1080)', () => {
+    const summary = bpcPriceSummary([
+      row({ contractId: 1, price: 0, me: 10, te: 18 }),
+      row({ contractId: 2, price: 1_000_000, me: 5, te: 5 }),
+      row({ contractId: 3, price: 3_000_000, me: 2, te: 2 }),
+    ]);
+    expect(summary).toEqual({
+      offerCount: 3,
+      cheapest: 1_000_000,
+      median: 2_000_000,
+      bestMe: 10,
+      bestTe: 18,
+    });
+  });
+
+  it('reports cheapest/median as null when every offer is unpriced', () => {
+    const summary = bpcPriceSummary([row({ price: 0 }), row({ price: -1 })]);
+    expect(summary.cheapest).toBeNull();
+    expect(summary.median).toBeNull();
+    expect(summary.offerCount).toBe(2);
+  });
 });
 
 describe('cheapestByRegion', () => {
@@ -494,6 +520,19 @@ describe('cheapestByRegion', () => {
 
   it('is empty given no rows', () => {
     expect(cheapestByRegion([])).toEqual([]);
+  });
+
+  it('never lets a zero-price (barter) row win cheapest, though it still counts as an offer (issue #1080)', () => {
+    expect(
+      cheapestByRegion([
+        row({ contractId: 1, regionId: 10000002, price: 0 }),
+        row({ contractId: 2, regionId: 10000002, price: 4_000_000 }),
+      ])
+    ).toEqual([{ regionId: 10000002, cheapest: 4_000_000, offerCount: 2 }]);
+  });
+
+  it('omits a region whose only offers are unpriced, rather than reporting it free', () => {
+    expect(cheapestByRegion([row({ contractId: 1, regionId: 10000002, price: 0 })])).toEqual([]);
   });
 });
 

@@ -80,12 +80,14 @@ export function diffBpcWatchMatches(
   const matches = filterBpcContracts(rows, filter);
   const currentIds = matches.map((row) => row.contractId);
   // The all-time-cheapest baseline (and the "cheaper" fire below) only ever
-  // considers single-type rows (issue #1076): a multi-type row's price is
-  // the whole contract's, not this blueprint's, and the baseline is a
-  // monotonic ratchet — one bundle row would permanently silence every
-  // future genuine "cheaper" fire this watch could ever raise.
-  const singleTypeMatches = matches.filter((row) => !row.isMultiType);
-  const currentMin = singleTypeMatches.reduce<number | null>((min, row) => {
+  // considers single-type, priced rows: a multi-type row's price is the
+  // whole contract's, not this blueprint's (issue #1076), and a zero-price
+  // row is a barter, not a genuine price of zero (issue #1080) — either
+  // way the baseline is a monotonic ratchet, so one bad row would
+  // permanently silence every future genuine "cheaper" fire this watch
+  // could ever raise.
+  const priceableMatches = matches.filter((row) => !row.isMultiType && effectivePrice(row) > 0);
+  const currentMin = priceableMatches.reduce<number | null>((min, row) => {
     const price = effectivePrice(row);
     return min === null || price < min ? price : min;
   }, null);
@@ -95,19 +97,23 @@ export function diffBpcWatchMatches(
   }
 
   const prevSeen = new Set(prev.seenContractIds);
-  const newMatches = matches.filter((row) => !prevSeen.has(row.contractId));
+  // A "new" fire may still name a multi-type row (its price is real, just
+  // misattributed — `isMultiType` on the result lets the caller caveat the
+  // copy instead of losing the signal entirely). A zero-price row has no
+  // honest price to name at all, so it's excluded from "new" outright
+  // rather than fired with a caveat.
+  const newMatches = matches.filter(
+    (row) => !prevSeen.has(row.contractId) && effectivePrice(row) > 0
+  );
 
   let fire: BpcWatchFire | null = null;
   if (newMatches.length > 0) {
-    // A "new" fire may still name a multi-type row — `isMultiType` on the
-    // result lets the caller caveat the copy instead of stating the price
-    // as this item's own, rather than losing the signal entirely.
     fire = { ...cheapestFire(newMatches), reason: 'new' };
   } else if (
     currentMin !== null &&
     (prev.minPriceSeen === null || currentMin < prev.minPriceSeen)
   ) {
-    fire = { ...cheapestFire(singleTypeMatches), reason: 'cheaper' };
+    fire = { ...cheapestFire(priceableMatches), reason: 'cheaper' };
   }
 
   const minPriceSeen =

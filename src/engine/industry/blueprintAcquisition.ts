@@ -158,9 +158,15 @@ function buildCandidates(inputs: SelectBlueprintTierInputs): Candidate[] {
   // falls back to. A multi-type offer (issue #1076) is not malformed — its
   // price is a real ask — but it is equally unusable here: `price` covers
   // the whole contract, not this blueprint, so it must not reseed a plan's
-  // ME/TE any more than a zeroed `runs` should.
+  // ME/TE any more than a zeroed `runs` should. Neither is a zero/negative
+  // price (issue #1080): a barter contract's ISK side reads as 0, which
+  // must not win the cheapest-tier candidate over a genuine, priced BPO.
   const bpcOffers = inputs.bpcOffers.filter(
-    (offer) => (offer.runs === -1 || offer.runs > 0) && offer.quantity > 0 && !offer.isMultiType
+    (offer) =>
+      (offer.runs === -1 || offer.runs > 0) &&
+      offer.quantity > 0 &&
+      !offer.isMultiType &&
+      offer.price > 0
   );
 
   const candidates = ownedTierCandidates(ownedCopies);

@@ -58,6 +58,18 @@ export function offerAskingPrice(row: PublicContractOfferRow): number {
 }
 
 /**
+ * True when a row's asking price is zero or negative — a barter contract
+ * ("take this blueprint, give me 122 PLEX") has an ISK price of zero, which
+ * is not a real price of zero, it is the absence of one (issue #1080). A
+ * contract that genuinely gives an item away for nothing is indistinguishable
+ * from a barter on this data, so it is treated the same, safer way rather
+ * than as the cheapest thing on the page.
+ */
+export function isUnpricedOffer(row: PublicContractOfferRow): boolean {
+  return offerAskingPrice(row) <= 0;
+}
+
+/**
  * What a `maxPrice` ceiling judges a row on — deliberately not
  * `offerAskingPrice`, which answers a different question. This one asks
  * "could this row exceed my ceiling": an auction's starting bid says nothing
@@ -124,7 +136,8 @@ export function listedContractTypeOptions(
  */
 export interface ContractOfferStats {
   offerCount: number;
-  cheapest: number;
+  /** `null` when every offer of this type is unpriced (issue #1080) — a barter row still counts toward `offerCount`, but never wins cheapest. */
+  cheapest: number | null;
 }
 
 /**
@@ -141,14 +154,17 @@ export function contractOfferStats(
 ): Map<number, ContractOfferStats> {
   const stats = new Map<number, ContractOfferStats>();
   for (const row of rows) {
+    const unpriced = isUnpricedOffer(row);
     const price = offerAskingPrice(row);
     const existing = stats.get(row.typeId);
     if (!existing) {
-      stats.set(row.typeId, { offerCount: 1, cheapest: price });
+      stats.set(row.typeId, { offerCount: 1, cheapest: unpriced ? null : price });
       continue;
     }
     existing.offerCount += 1;
-    if (price < existing.cheapest) existing.cheapest = price;
+    if (!unpriced && (existing.cheapest === null || price < existing.cheapest)) {
+      existing.cheapest = price;
+    }
   }
   return stats;
 }
@@ -170,7 +186,15 @@ export function contractOfferPriceSummary(
   rows: readonly PublicContractOfferRow[]
 ): ContractOfferPriceSummary {
   if (rows.length === 0) return { offerCount: 0, cheapest: null, median: null };
-  const prices = rows.map(offerAskingPrice).sort((a, b) => a - b);
+  // A zero/negative-price (barter) row still counts toward `offerCount` — it
+  // is a real, buyable offer — but is excluded before cheapest/median are
+  // computed (issue #1080): its price is not a real one to average or win
+  // "cheapest" with.
+  const prices = rows
+    .filter((row) => !isUnpricedOffer(row))
+    .map(offerAskingPrice)
+    .sort((a, b) => a - b);
+  if (prices.length === 0) return { offerCount: rows.length, cheapest: null, median: null };
   const middle = prices.length >> 1;
   const median =
     prices.length % 2 === 1 ? prices[middle] : (prices[middle - 1] + prices[middle]) / 2;

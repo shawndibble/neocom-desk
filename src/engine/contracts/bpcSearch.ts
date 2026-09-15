@@ -288,6 +288,12 @@ export function effectivePrice(row: BpcContractRow): number {
  * contract's ask, not this blueprint's — so it returns `null` the same as
  * every other unknowable denominator here, rather than a number that divides
  * a bundle's price by one item's runs.
+ *
+ * `price <= 0` (issue #1080): a barter contract ("take this blueprint, give
+ * me 122 PLEX") has an ISK price of zero, which is not a real rate of zero —
+ * it is the absence of a price. Treated as unpriceable rather than free, the
+ * same as a genuine giveaway, which this data cannot tell apart from a
+ * barter and so is treated the same, safer way.
  */
 export function iskPerRun(
   price: number,
@@ -295,7 +301,7 @@ export function iskPerRun(
   quantity: number,
   isMultiType = false
 ): number | null {
-  if (isMultiType || !(runs > 0) || !(quantity > 0)) return null;
+  if (isMultiType || !(price > 0) || !(runs > 0) || !(quantity > 0)) return null;
   return price / (runs * quantity);
 }
 
@@ -364,13 +370,24 @@ export function bpcPriceSummary(rows: readonly BpcContractRow[]): BpcPriceSummar
   if (rows.length === 0) {
     return { offerCount: 0, cheapest: null, median: null, bestMe: null, bestTe: null };
   }
-  const prices = rows.map(effectivePrice).sort((a, b) => a - b);
+  // A zero/negative-price (barter) row still counts toward `offerCount` and
+  // ME/TE — it is a real, buyable offer — but is excluded before
+  // cheapest/median are computed (issue #1080): its price is not a real one
+  // to average or win "cheapest" with.
+  const prices = rows
+    .map(effectivePrice)
+    .filter((price) => price > 0)
+    .sort((a, b) => a - b);
   const middle = prices.length >> 1;
   const median =
-    prices.length % 2 === 1 ? prices[middle] : (prices[middle - 1] + prices[middle]) / 2;
+    prices.length === 0
+      ? null
+      : prices.length % 2 === 1
+        ? prices[middle]
+        : (prices[middle - 1] + prices[middle]) / 2;
   return {
     offerCount: rows.length,
-    cheapest: prices[0],
+    cheapest: prices.length === 0 ? null : prices[0],
     median,
     bestMe: rows.reduce((best, row) => Math.max(best, row.me), rows[0].me),
     bestTe: rows.reduce((best, row) => Math.max(best, row.te), rows[0].te),
@@ -392,20 +409,34 @@ export interface RegionCheapest {
  * whichever row happens to be top.
  */
 export function cheapestByRegion(rows: readonly BpcContractRow[]): RegionCheapest[] {
-  const byRegion = new Map<number, RegionCheapest>();
+  const byRegion = new Map<number, { offerCount: number; cheapest: number | null }>();
   for (const row of rows) {
     const price = effectivePrice(row);
+    // A zero/negative-price (barter) row still counts toward `offerCount`
+    // but never wins cheapest (issue #1080) — same rule `bpcPriceSummary`
+    // and `contractOfferPriceSummary` apply.
+    const unpriced = !(price > 0);
     const existing = byRegion.get(row.regionId);
     if (!existing) {
-      byRegion.set(row.regionId, { regionId: row.regionId, cheapest: price, offerCount: 1 });
+      byRegion.set(row.regionId, { offerCount: 1, cheapest: unpriced ? null : price });
       continue;
     }
     existing.offerCount += 1;
-    if (price < existing.cheapest) existing.cheapest = price;
+    if (!unpriced && (existing.cheapest === null || price < existing.cheapest)) {
+      existing.cheapest = price;
+    }
   }
+  // A region whose every offer is unpriced has no honest answer to "where is
+  // this cheapest" and is omitted rather than reported free.
+  const priced = [...byRegion.entries()]
+    .filter((entry): entry is [number, { offerCount: number; cheapest: number }] => {
+      const [, value] = entry;
+      return value.cheapest !== null;
+    })
+    .map(([regionId, { cheapest, offerCount }]) => ({ regionId, cheapest, offerCount }));
   // Ties broken by region id so the order is stable across syncs rather than
   // depending on which contract the CSV happened to list first.
-  return [...byRegion.values()].sort((a, b) => a.cheapest - b.cheapest || a.regionId - b.regionId);
+  return priced.sort((a, b) => a.cheapest - b.cheapest || a.regionId - b.regionId);
 }
 
 /**
