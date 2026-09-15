@@ -20,6 +20,7 @@ import {
 } from '@/components/ui';
 import { iskToneClass } from '@/features/character/format';
 import type { OrderDepthLevel } from '@/engine/industry/opportunities';
+import type { SkillLevels } from '@/engine/industry/types';
 import type { MarketWideTreeMap } from '@/sde/types';
 import type { TradeHub } from '@/market/hubs';
 import type { BlueprintCatalog, BlueprintCatalogEntry } from './blueprintCatalog';
@@ -37,6 +38,7 @@ interface MarketWideOpportunitiesPanelProps {
   hub: TradeHub;
   trees: MarketWideTreeMap | null;
   catalog: BlueprintCatalog | null;
+  skills: SkillLevels;
   onStartPlan: (entry: BlueprintCatalogEntry) => void;
 }
 
@@ -44,10 +46,16 @@ export function MarketWideOpportunitiesPanel({
   hub,
   trees,
   catalog,
+  skills,
   onStartPlan,
 }: MarketWideOpportunitiesPanelProps) {
   const { t } = useTranslation();
-  const { rows, loading, hasRun, run } = useMarketWideOpportunities({ hub, trees, catalog });
+  const { rows, loading, hasRun, run } = useMarketWideOpportunities({
+    hub,
+    trees,
+    catalog,
+    skills,
+  });
 
   const columns: DataTableColumn<MarketWideResultRow>[] = [
     {

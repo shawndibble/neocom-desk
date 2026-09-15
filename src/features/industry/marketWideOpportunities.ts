@@ -10,16 +10,28 @@
  * `computeMarketWideRows` prices and ranks them. `getHubPrices` chunks large
  * type-id lists internally, the same batching Build Opportunities' own
  * snapshot fetch relies on.
+ *
+ * The job-fee inputs (adjusted prices, system cost index) are fetched through
+ * `loadMarketSnapshot` with an *empty* type-id list rather than a new export
+ * off `marketData.ts`'s private cache: an empty list costs `getHubPrices` no
+ * request at all, so this reads the already-cached adjusted-price/cost-index
+ * response every other caller on this route shares. No build system of its
+ * own exists for a market-wide scan, so it reads the hub's own system's
+ * index — the same fallback `loadMarketSnapshot` already documents for a
+ * caller with no plan (LP store, planetary plans).
  */
 import { getHubPrices } from '@/market/prices';
 import type { TradeHub } from '@/market/hubs';
+import type { SkillLevels } from '@/engine/industry/types';
 import type { MarketWideTreeMap } from '@/sde/types';
 import type { BlueprintCatalog } from './blueprintCatalog';
+import { loadMarketSnapshot } from './marketData';
 import {
   computeMarketWideRows,
   selectLiquidCandidates,
   type LiquidityCandidate,
   type MarketWideCandidate,
+  type MarketWideFeeInputs,
   type MarketWideRow,
 } from '@/engine/industry/marketWideOpportunities';
 
@@ -58,6 +70,7 @@ export async function runMarketWideScan(
   hub: TradeHub,
   trees: MarketWideTreeMap,
   catalog: BlueprintCatalog,
+  skills: SkillLevels,
   options: MarketWideScanOptions = {}
 ): Promise<MarketWideResultRow[]> {
   const floorIsk = options.liquidityFloorIsk ?? DEFAULT_LIQUIDITY_FLOOR_ISK;
@@ -80,6 +93,12 @@ export async function runMarketWideScan(
   const liquid = selectLiquidCandidates(liquidityCandidates, floorIsk, topN);
   if (liquid.length === 0) return [];
 
+  // Independent of phase 2's material-price fetch below — kicked off
+  // alongside it rather than after, so the two round trips overlap. Started
+  // only once something has actually cleared liquidity, so a scan that ends
+  // here doesn't spend it for nothing.
+  const feeInputs = loadMarketSnapshot(hub, [], hub.systemId, 'manufacturing');
+
   const materialTypeIds = new Set<number>();
   for (const candidate of liquid) {
     for (const material of trees[String(candidate.productTypeID)]!.materials) {
@@ -101,7 +120,16 @@ export async function runMarketWideScan(
     sellDepthIsk: candidate.sellPrice! * candidate.sellVolume!,
   }));
 
-  const rows = computeMarketWideRows(marketWideCandidates, materialPrices);
+  // Same dead-ESI fallback as `computeOpportunityRow`: degrade the job-fee
+  // term toward 0 rather than drop every row.
+  const snapshot = await feeInputs;
+  const feeContext: MarketWideFeeInputs = {
+    adjustedPrices: snapshot.adjustedPrices ?? {},
+    systemCostIndex: snapshot.systemCostIndex ?? 0,
+    skills,
+  };
+
+  const rows = computeMarketWideRows(marketWideCandidates, materialPrices, feeContext);
   return rows.map((row) => ({
     ...row,
     productName: catalog.typesById[String(row.productTypeID)]?.name ?? `#${row.productTypeID}`,
