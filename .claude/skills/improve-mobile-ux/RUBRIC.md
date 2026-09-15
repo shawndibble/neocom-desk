@@ -179,3 +179,12 @@ class, not a case.
 - **A picture of data already on screen** is not a mobile fix.
 - **Unprovable at 390px.** If no narrow-viewport spec can assert the fix, an
   agent cannot show it worked and the next refactor undoes it.
+- **Hand-computed row height is not evidence.** `padding + font-size` arithmetic
+  routinely undercounts: an arbitrary `text-[…]` size with no paired `leading-*`
+  inherits this app's ambient 1.5 line-height rather than the tighter one a
+  `text-xs`/`text-sm` utility sets explicitly, and a multi-line grid's true
+  height is the tallest cell in each row, not the one you eyeballed. A
+  touch-target finding whose whole case is "this looks like it's under 44px on
+  paper" needs a real render (a Playwright `boundingBox()`, same bar as
+  #1160's own requirement) before it reaches the hostile reviewer — two
+  candidate findings this way turned out to measure 48-50px in practice.
