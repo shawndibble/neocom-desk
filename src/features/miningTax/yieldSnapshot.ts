@@ -18,9 +18,10 @@ import type { MiningYieldEntry } from '@/engine/miningTax/yieldGrouping';
 import {
   valueMiningYield,
   type EntryValuation,
+  type GeneralReprocessingSkills,
   type YieldReprocessingEntry,
 } from '@/engine/miningTax/yieldValuation';
-import type { ReprocessingSkills } from '@/engine/industry/reprocessing';
+import type { TrainedSkill } from '@/engine/types';
 import { loadPriceHistory, type PriceHistoryResult } from '@/features/market/priceHistory';
 import { EsiError } from '@/esi/errors';
 import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
@@ -63,20 +64,30 @@ export interface MiningYieldSnapshot {
   fromCache: boolean;
 }
 
-const NO_SKILLS: ReprocessingSkills = {
+const NO_SKILLS: GeneralReprocessingSkills = {
   reprocessingLevel: 0,
   reprocessingEfficiencyLevel: 0,
-  specialisationLevel: 0,
 };
+const NO_TRAINED: ReadonlyMap<number, TrainedSkill> = new Map();
 
-/** A character's own reprocessing skills — the same resolution `appraisalData.ts` uses for the refine comparison. */
-async function loadReprocessingSkills(characterId: number): Promise<ReprocessingSkills> {
+/**
+ * A character's general reprocessing skills, plus their full trained-skill
+ * map so `valueMiningYield` can resolve each ore line's own specialisation
+ * skill (issue #1058) — a mixed day's entry can refine ore and ice under two
+ * different specialisations, so that resolution cannot happen here, ahead of
+ * time, for the whole character.
+ */
+async function loadReprocessingSkills(
+  characterId: number
+): Promise<{ skills: GeneralReprocessingSkills; trained: ReadonlyMap<number, TrainedSkill> }> {
   const corrected = await loadCorrectedSkills(characterId, Date.now());
   return {
-    reprocessingLevel: corrected.trained.get(SKILL_IDS.reprocessing)?.level ?? 0,
-    reprocessingEfficiencyLevel:
-      corrected.trained.get(SKILL_IDS.reprocessingEfficiency)?.level ?? 0,
-    specialisationLevel: 0,
+    skills: {
+      reprocessingLevel: corrected.trained.get(SKILL_IDS.reprocessing)?.level ?? 0,
+      reprocessingEfficiencyLevel:
+        corrected.trained.get(SKILL_IDS.reprocessingEfficiency)?.level ?? 0,
+    },
+    trained: corrected.trained,
   };
 }
 
@@ -139,6 +150,7 @@ export async function loadMiningYieldSnapshot(): Promise<MiningYieldSnapshot> {
         ? {
             portionSize: entry.portionSize,
             materials: entry.materials.map((m) => ({ typeId: m.typeID, quantity: m.quantity })),
+            specialisationSkillId: entry.specialisationSkillID,
           }
         : undefined
     );
@@ -202,12 +214,16 @@ export async function loadMiningYieldSnapshot(): Promise<MiningYieldSnapshot> {
         if (materialPrice !== undefined) materialPrices[material.typeId] = materialPrice;
       }
     }
-    const skills = skillsByCharacter.get(characterId) ?? NO_SKILLS;
+    const { skills, trained } = skillsByCharacter.get(characterId) ?? {
+      skills: NO_SKILLS,
+      trained: NO_TRAINED,
+    };
     const valuation = valueMiningYield(
       entry.oreLines,
       rawUnitPrices,
       reprocessingByTypeId,
       skills,
+      trained,
       materialPrices
     );
     return {

@@ -1,3 +1,5 @@
+import { SKILL_IDS } from './types';
+
 /**
  * Reprocessing (refining): what an item breaks down into, and what that is
  * worth (issue #537).
@@ -40,6 +42,39 @@ export interface ReprocessingSkills {
   specialisationLevel: number;
   /** The facility's own rate; defaults to an NPC station's 50%. */
   stationRate?: number;
+}
+
+/** The two general reprocessing skills, ahead of resolving any type's specialisation. */
+export type GeneralReprocessingSkills = Omit<ReprocessingSkills, 'specialisationLevel'>;
+
+/**
+ * Which specialisation skill applies to a type, and what level the
+ * character has in it (issue #1058) — the one shared resolver every
+ * refining surface uses instead of each guessing or hardcoding its own.
+ *
+ * `specialisationSkillId` comes from the SDE bake's attribute-790 join
+ * (`ReprocessingType.specialisationSkillID`); its absence IS the classifier
+ * for "this type refines under Scrapmetal Processing", not a gap to guess
+ * at — every ore, ice and moon-ore type carries the attribute, nothing else
+ * does.
+ */
+export function resolveSpecialisationLevel(
+  specialisationSkillId: number | undefined,
+  trained: ReadonlyMap<number, { level: number }>
+): number {
+  return trained.get(specialisationSkillId ?? SKILL_IDS.scrapmetalProcessing)?.level ?? 0;
+}
+
+/** `resolveSpecialisationLevel`, folded into the full `ReprocessingSkills` shape `reprocessingEfficiency` takes — the assembly every per-row call site otherwise repeats by hand. */
+export function resolveReprocessingSkills(
+  general: GeneralReprocessingSkills,
+  specialisationSkillId: number | undefined,
+  trained: ReadonlyMap<number, { level: number }>
+): ReprocessingSkills {
+  return {
+    ...general,
+    specialisationLevel: resolveSpecialisationLevel(specialisationSkillId, trained),
+  };
 }
 
 /** Station rate times the three skill multipliers. Never clamped to 1: a rigged structure with maxed skills genuinely exceeds it. */

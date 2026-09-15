@@ -133,8 +133,13 @@ export interface CharacterSkills {
   reprocessingLevel: number;
   /** Reprocessing Efficiency (3389). */
   reprocessingEfficiencyLevel: number;
-  /** Scrapmetal Processing (12196) — the specialisation that applies to the items a sell order holds. */
-  scrapmetalProcessingLevel: number;
+  /**
+   * Every trained skill, so the reprocess exit can resolve each order's own
+   * item to its specialisation via `resolveSpecialisationLevel` (issue
+   * #1058) — Scrapmetal Processing for a module/ship, or the matching ore
+   * specialisation, rather than one skill hardcoded for every order.
+   */
+  trained: ReadonlyMap<number, { level: number }>;
 }
 
 export interface BuildRowsInput {
