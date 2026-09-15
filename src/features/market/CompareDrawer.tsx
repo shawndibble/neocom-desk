@@ -10,6 +10,7 @@ import { useTranslation } from 'react-i18next';
 import { Button, DataTable, IconButton, IskAmount, Spinner } from '@/components/ui';
 import type { DataTableColumn } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
+import { controlHeightClassName } from '@/components/ui/controlStyles';
 import { KEYBOARD_OVERLAY_ATTRIBUTE } from '@/lib/shortcuts';
 import { useCompareSet } from './compareSet';
 import { useCompareRows, type CompareRow } from './useCompareRows';
@@ -186,7 +187,7 @@ export function CompareDrawer({
         aria-expanded={mode !== 'closed'}
         aria-controls={DRAWER_ID}
         onClick={() => setMode((m) => (m === 'closed' ? 'open' : 'closed'))}
-        className="flex h-9 items-center justify-center border border-line bg-panel px-4 text-[0.6875rem] font-semibold tracking-widest text-text uppercase hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
+        className={`flex ${controlHeightClassName.md} items-center justify-center border border-line bg-panel px-4 text-[0.6875rem] font-semibold tracking-widest text-text uppercase hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent`}
       >
         {t('market.compare.handle', { count: items.length })}
       </button>
