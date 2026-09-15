@@ -48,7 +48,7 @@ export function useMarketWideOpportunities({
   }>({ rows: [], loading: false, hasRun: false, error: false });
 
   // Guards against a stale scan's result landing after a newer one started
-  // (e.g. the pilot hits "Run market scan" twice in a row).
+  // (e.g. the pilot hits "Scan" twice in a row).
   const runToken = useRef(0);
 
   const run = useCallback(() => {
