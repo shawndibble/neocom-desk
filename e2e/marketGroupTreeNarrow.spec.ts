@@ -20,6 +20,9 @@ import { loginAndSelectCharacter } from './support/login';
 
 const PHONE = { width: 390, height: 844 };
 const DESKTOP = { width: 1280, height: 800 };
+// Exactly `md` — the width at which `md:min-h-0` engages, so the one place a
+// breakpoint mismatch in this fix would surface.
+const MD_EDGE = { width: 768, height: 800 };
 
 /**
  * Searches the item finder for Tritanium, which lives at
@@ -59,6 +62,14 @@ test('item-finder tree rows keep their dense height at and above md (1280px)', a
   // Pinned to the exact dense height (`py-1` around a `text-xs` line box =
   // 24px), not a range — a band wide enough to admit a partial regression
   // toward the 36px `md:h-9` tier would defeat the point of this test.
+  expect(await heightOf(page, 'Minerals')).toBe(24);
+  expect(await heightOf(page, 'Tritanium')).toBe(24);
+});
+
+test('item-finder tree rows keep their dense height at exactly md (768px)', async ({ page }) => {
+  await page.setViewportSize(MD_EDGE);
+  await searchTritanium(page);
+
   expect(await heightOf(page, 'Minerals')).toBe(24);
   expect(await heightOf(page, 'Tritanium')).toBe(24);
 });
