@@ -19,6 +19,7 @@ import {
 } from '@/features/industry/blueprintCatalog';
 import { buildVsBuy } from '@/engine/industry/buildVsBuy';
 import { FACILITY_PRESETS } from '@/engine/industry/types';
+import type { LiquidationBasis } from '@/engine/industry/ownedStockSale';
 import type {
   AdjustedPrices,
   BuildResult,
@@ -75,6 +76,15 @@ export interface LoyaltyOfferComputeInputs {
    * orders) passes the hub's buy-side prices instead.
    */
   revenueHubPrices?: HubPrices;
+  /**
+   * Which side of the order book `revenueHubPrices` was priced on, as the
+   * loyalty engine's market fees need it: `order` (the "Sell (list order)"
+   * basis) pays sales tax plus a broker fee, `instant` (the "Buy (instant)"
+   * basis) pays sales tax only. The price map alone can't say which — the
+   * caller (`priceBasis.ts`) owns that choice, so it states it here rather
+   * than having this module infer it.
+   */
+  liquidationBasis: LiquidationBasis;
   /**
    * Which blueprint offers (by `offer_id`) should price their build against
    * `materialSourcing` rather than buying every material at the hub — the "use
@@ -151,8 +161,14 @@ function computeBlueprintRow(
     lpCost: offer.lp_cost,
     requiredItemsCost: itemsCost,
     revenue,
+    // Cost side only. `buildVsBuy` nets its own sales tax and broker fee
+    // into `build.profit`, which this deliberately never reads — the fees on
+    // an LP offer are charged once, by `loyaltyOfferProfit`, on the revenue
+    // priced above.
     buildCost: build.materialCost + build.jobFee.total,
     playerLp: inputs.playerLp,
+    liquidationBasis: inputs.liquidationBasis,
+    skills: inputs.skills,
   });
 
   return {
@@ -181,6 +197,8 @@ function computeItemRow(
     revenue,
     buildCost: 0,
     playerLp: inputs.playerLp,
+    liquidationBasis: inputs.liquidationBasis,
+    skills: inputs.skills,
   });
   return {
     offer,

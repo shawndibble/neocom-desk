@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { computeLoyaltyOfferRows } from '@/features/loyalty/offerRows';
 import type { BlueprintCatalog, BlueprintCatalogEntry } from '@/features/industry/blueprintCatalog';
 import type { LoyaltyStoreOffer } from '@/esi/endpoints';
+import { brokerFee, salesTax } from '@/engine/industry/fees';
 
 const ASTERO_BP_ID = 33397;
 const ASTERO_ID = 33468;
@@ -60,6 +61,7 @@ describe('computeLoyaltyOfferRows', () => {
       adjustedPrices: { [TRITANIUM_ID]: 4 },
       systemCostIndex: 0.05,
       skills: {},
+      liquidationBasis: 'order',
       materialSourcing: undefined,
       playerLp: 1_000_000,
     });
@@ -82,6 +84,7 @@ describe('computeLoyaltyOfferRows', () => {
       adjustedPrices: {},
       systemCostIndex: 0,
       skills: {},
+      liquidationBasis: 'order',
       materialSourcing: undefined,
       playerLp: 1_000_000,
     });
@@ -90,7 +93,10 @@ describe('computeLoyaltyOfferRows', () => {
     expect(row.build).toBeNull();
     expect(row.itemName).toBe('Sisters Combat Scanner Probe');
     expect(row.profit.revenue).toBe(8 * 1_800);
-    expect(row.profit.profit).toBe(8 * 1_800 - 96_000);
+    expect(row.profit.profit).toBeCloseTo(
+      8 * 1_800 - salesTax(8 * 1_800, 0) - brokerFee(8 * 1_800, 0) - 96_000,
+      6
+    );
   });
 
   it("names a plain item from `itemNames` when catalog.typesById (the trimmed, blueprint/skill-referenced SDE snapshot) doesn't cover it — LP stores hand out plenty of items no blueprint or skill ever references, e.g. implants, Mindlinks, SKINs", () => {
@@ -110,6 +116,7 @@ describe('computeLoyaltyOfferRows', () => {
       adjustedPrices: {},
       systemCostIndex: 0,
       skills: {},
+      liquidationBasis: 'order',
       materialSourcing: undefined,
       itemNames: new Map([[MINDLINK_ID, 'Skirmish Command Mindlink']]),
       playerLp: 1_000_000,
@@ -135,6 +142,7 @@ describe('computeLoyaltyOfferRows', () => {
       adjustedPrices: {},
       systemCostIndex: 0,
       skills: {},
+      liquidationBasis: 'order',
       materialSourcing: undefined,
       itemNames: new Map(),
       playerLp: 1_000_000,
@@ -146,6 +154,7 @@ describe('computeLoyaltyOfferRows', () => {
       adjustedPrices: {},
       systemCostIndex: 0,
       skills: {},
+      liquidationBasis: 'order',
       materialSourcing: undefined,
       itemNames: new Map(),
       playerLp: 1_000_000,
@@ -164,6 +173,7 @@ describe('computeLoyaltyOfferRows', () => {
       adjustedPrices: {},
       systemCostIndex: 0,
       skills: {},
+      liquidationBasis: 'order',
       materialSourcing: undefined,
       playerLp: 1_000_000,
     });
@@ -179,6 +189,7 @@ describe('computeLoyaltyOfferRows', () => {
       adjustedPrices: {},
       systemCostIndex: 0,
       skills: {},
+      liquidationBasis: 'order',
       materialSourcing: undefined,
       playerLp: 1_000_000,
     });
@@ -194,6 +205,7 @@ describe('computeLoyaltyOfferRows', () => {
       adjustedPrices: {},
       systemCostIndex: 0,
       skills: {},
+      liquidationBasis: 'order',
       materialSourcing: undefined,
       playerLp: 1_000_000,
     })[0];
@@ -205,6 +217,7 @@ describe('computeLoyaltyOfferRows', () => {
       adjustedPrices: {},
       systemCostIndex: 0,
       skills: {},
+      liquidationBasis: 'order',
       materialSourcing: undefined,
       playerLp: 1_000_000,
     })[0];
@@ -225,6 +238,7 @@ describe('computeLoyaltyOfferRows', () => {
       adjustedPrices: {},
       systemCostIndex: 0,
       skills: {},
+      liquidationBasis: 'order',
       materialSourcing: undefined,
       playerLp: 1_000_000,
     });
@@ -241,6 +255,7 @@ describe('computeLoyaltyOfferRows', () => {
       adjustedPrices: {},
       systemCostIndex: 0,
       skills: {},
+      liquidationBasis: 'order',
       materialSourcing: undefined,
       playerLp: 1_000_000,
     });
@@ -256,6 +271,7 @@ describe('computeLoyaltyOfferRows', () => {
       adjustedPrices: {},
       systemCostIndex: 0,
       skills: {},
+      liquidationBasis: 'order' as const,
       playerLp: 1_000_000,
     };
     const buyAll = computeLoyaltyOfferRows({ ...base, materialSourcing: undefined })[0];
@@ -276,6 +292,7 @@ describe('computeLoyaltyOfferRows', () => {
       adjustedPrices: {},
       systemCostIndex: 0,
       skills: {},
+      liquidationBasis: 'order',
       materialSourcing: { [TRITANIUM_ID]: { ownedQuantity: 1_000_000 } },
       useOwnMaterialsFor: new Set(), // flag not set for this offer
       playerLp: 1_000_000,
@@ -287,6 +304,7 @@ describe('computeLoyaltyOfferRows', () => {
       adjustedPrices: {},
       systemCostIndex: 0,
       skills: {},
+      liquidationBasis: 'order',
       materialSourcing: undefined,
       playerLp: 1_000_000,
     })[0];
@@ -302,6 +320,7 @@ describe('computeLoyaltyOfferRows', () => {
       adjustedPrices: {},
       systemCostIndex: 0,
       skills: {},
+      liquidationBasis: 'order',
       materialSourcing: undefined,
       playerLp: 1_000_000,
     });
@@ -319,11 +338,73 @@ describe('computeLoyaltyOfferRows', () => {
       adjustedPrices: {},
       systemCostIndex: 0,
       skills: {},
+      liquidationBasis: 'order',
       materialSourcing: undefined,
       playerLp: 1_000_000,
     });
 
     // 1 run of the fixture's blueprint needs 1,000,000 Tritanium, not 3,000,000.
     expect(row.build!.materials[0].baseQuantity).toBe(1_000_000);
+  });
+  it('charges the broker fee only on the "Sell (list order)" basis, sales tax on both', () => {
+    const base = {
+      offers: [probes],
+      catalog: makeCatalog(),
+      hubPrices: { [PROBE_ID]: 1_800 },
+      adjustedPrices: {},
+      systemCostIndex: 0,
+      skills: {},
+      materialSourcing: undefined,
+      playerLp: 1_000_000,
+    };
+    const [order] = computeLoyaltyOfferRows({ ...base, liquidationBasis: 'order' });
+    const [instant] = computeLoyaltyOfferRows({ ...base, liquidationBasis: 'instant' });
+
+    expect(order.profit.salesTax).toBeCloseTo(instant.profit.salesTax ?? 0, 6);
+    expect(instant.profit.brokerFee).toBe(0);
+    expect(order.profit.brokerFee).toBeGreaterThan(0);
+    expect(order.profit.profit).toBeLessThan(instant.profit.profit!);
+  });
+
+  it("nets a blueprint offer's fees once, agreeing with the plain-item path on an equivalent offer", () => {
+    // Regression for the double-netting trap: `buildVsBuy` nets its own sales
+    // tax and broker fee into `build.profit`, which the blueprint path must
+    // never inherit. Fold the blueprint's build cost into a plain item's ISK
+    // sticker price and the two paths must reach the same profit.
+    const [blueprintRow] = computeLoyaltyOfferRows({
+      offers: [astero],
+      catalog: makeCatalog(),
+      hubPrices: { [TRITANIUM_ID]: 5, [ASTERO_ID]: 26_000_000 },
+      adjustedPrices: { [TRITANIUM_ID]: 4 },
+      systemCostIndex: 0.05,
+      skills: {},
+      liquidationBasis: 'order',
+      materialSourcing: undefined,
+      playerLp: 1_000_000,
+    });
+    const buildCost = blueprintRow.build!.materialCost + blueprintRow.build!.jobFee.total;
+    const equivalentItem: LoyaltyStoreOffer = {
+      isk_cost: astero.isk_cost + buildCost,
+      lp_cost: astero.lp_cost,
+      offer_id: 9,
+      quantity: 1,
+      required_items: [],
+      type_id: PROBE_ID,
+    };
+    const [itemRow] = computeLoyaltyOfferRows({
+      offers: [equivalentItem],
+      catalog: makeCatalog(),
+      hubPrices: { [PROBE_ID]: 26_000_000 },
+      adjustedPrices: {},
+      systemCostIndex: 0,
+      skills: {},
+      liquidationBasis: 'order',
+      materialSourcing: undefined,
+      playerLp: 1_000_000,
+    });
+
+    expect(blueprintRow.profit.brokerFee).toBeCloseTo(itemRow.profit.brokerFee ?? 0, 6);
+    expect(blueprintRow.profit.profit).toBeCloseTo(itemRow.profit.profit!, 6);
+    expect(blueprintRow.profit.iskPerLp).toBeCloseTo(itemRow.profit.iskPerLp!, 9);
   });
 });

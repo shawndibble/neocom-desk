@@ -111,7 +111,15 @@ function offer(overrides: Partial<LoyaltyStoreOffer>): LoyaltyStoreOffer {
   };
 }
 
-const PROFIT = { revenue: 1000, profit: 500, iskPerLp: 5, affordableLp: true };
+const PROFIT = {
+  revenue: 1000,
+  salesTax: 75,
+  brokerFee: 100,
+  netRevenue: 825,
+  profit: 500,
+  iskPerLp: 5,
+  affordableLp: true,
+};
 
 const ITEM_ROW: LoyaltyOfferRow = {
   offer: offer({ offer_id: 1, type_id: 200 }),

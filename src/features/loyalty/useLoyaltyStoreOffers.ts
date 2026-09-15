@@ -182,6 +182,10 @@ export function useLoyaltyStoreOffers(corporationId: number): LoyaltyStoreResult
       catalog,
       hubPrices: snapshot.hubPrices,
       revenueHubPrices: priceBasis === 'buy' ? snapshot.hubBuyPrices : snapshot.hubPrices,
+      // The LP store's own vocabulary ('sell' / 'buy') maps onto the shared
+      // Liquidation Basis the fee engines speak: listing an order at the
+      // hub's sell price vs. dumping into its standing buy orders.
+      liquidationBasis: priceBasis === 'buy' ? 'instant' : 'order',
       adjustedPrices: snapshot.adjustedPrices,
       systemCostIndex: snapshot.systemCostIndex,
       skills,
