@@ -9,6 +9,7 @@ import {
   useViewportBoundedHeight,
   VIEWPORT_BOUNDED_BOTTOM_GAP_PX,
 } from '@/lib/useViewportBoundedHeight';
+import { useIsDesktop } from '@/lib/useIsDesktop';
 import { PlanList } from './PlanList';
 import type { RemapAvailability } from './remapAvailability';
 
@@ -57,6 +58,7 @@ export function PlanListPane({
 }: PlanListPaneProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const isDesktop = useIsDesktop();
 
   const plans = useLiveQuery(
     async () => db.skillPlans.where('characterId').equals(activeCharacterId).toArray(),
@@ -115,7 +117,14 @@ export function PlanListPane({
         // the window, not a fixed number of rows.
         className={height === 'sidebar' ? 'max-h-[40vh] overflow-y-auto' : 'overflow-y-auto'}
         style={
-          height === 'viewport' && scrollerMaxHeight !== null
+          // Desktop-only, like the editor route's own list pane
+          // (`PlanEditor.tsx`): below `lg` this cap ignores the fixed mobile
+          // tab bar (it measures `window.innerHeight`, which the bar overlays
+          // rather than shrinks), sizing the scroller past the visible area
+          // and hiding its bottom rows behind the bar (#1096). `<main>`
+          // already reserves that same space at the page level, so leaving
+          // mobile uncapped just lets the page scroll instead.
+          height === 'viewport' && isDesktop && scrollerMaxHeight !== null
             ? { maxHeight: scrollerMaxHeight }
             : undefined
         }
