@@ -70,12 +70,14 @@ Survey method, all still current:
   Preview, EVE Threat Checker, EVE Fit Assistant, SLH Local Scanner, EVE NewBro,
   EVE Link, PATT, W-Space Atlas, EveHunter, ADAPT, Helm, Nicotine,
   fleet-manager, HARUSPEX, EasyEve, icon server, contract-monitoring Discord
-  bot, Ministry of Pantoscopic Observance, Ascension Labs Libs, Z-S Overview
-  Customiser, SMT Eve Map Tool, Eve-mentor-mcp, EVEMon Lives, OpsCore v2,
-  WarBeacon, Project Eden, EVE 3D MAP, @strata-eve/esi SDK, Eve Missile Analyst,
-  Eve Ship Stats, Grey Zone Automation, EVE411, Eve Skillsboard, EVE
-  Intelligence Nexus, Rangefinder, Eveswitcher, Insurgency Tools,
-  Battlefield.Space, EVE OQM integration.
+  bot, Ascension Labs Libs, Z-S Overview Customiser, SMT Eve Map Tool,
+  Eve-mentor-mcp, EVEMon Lives, OpsCore v2, WarBeacon, Project Eden, EVE 3D
+  MAP, @strata-eve/esi SDK, Eve Missile Analyst, Eve Ship Stats, Grey Zone
+  Automation, EVE411, Eve Skillsboard, EVE Intelligence Nexus, Eveswitcher,
+  Insurgency Tools, Battlefield.Space. Cleared, non-ISK: Ministry of
+  Pantoscopic Observance (intel/killboard desk-calculator tool), Rangefinder
+  (cyno-route planning), EVE OQM integration (a dev-recruitment thread for a
+  generic inventory-mgmt plugin, no shipped feature).
 - **Dead/unreachable, not gap-analysed:** EVE Panel, EVE GURU / Production
   Ledger, EveTerminal.io, Mining Timer Tool, EVE Hauling Advisor, EVE Market Pro
   (evemarketpro.org returns HTTP 530 — unclassifiable).
