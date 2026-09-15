@@ -294,13 +294,19 @@ function PlanRow({
           `distance: 4` on the sensor and `touch-none` here are both load-
           bearing, for the reasons EntryList.tsx's copy spells out (#408). */}
       {groups.length > 0 && (
+        // `size-9 md:size-7`: the same touch-tier box `IconButton size="sm"`
+        // gives `GroupHeader`'s Caret toggle. Without it this box stayed a
+        // fixed 28px while the Caret's grew to 36px below `md` (DESIGN.md
+        // §3), so the member row's deliberate nesting indent under its group
+        // (`pl-6` vs the header's `px-2` — 16px by design) shrank to 8px on a
+        // phone instead of matching desktop's own 16px.
         <button
           type="button"
           tabIndex={-1}
           aria-hidden="true"
           {...listeners}
           title={t('industry.dragToGroup')}
-          className="shrink-0 cursor-grab touch-none px-1 text-text-faint hover:text-text"
+          className="inline-flex size-9 shrink-0 cursor-grab touch-none items-center justify-center text-text-faint hover:text-text md:size-7"
         >
           <Icon.DragHandle />
         </button>
