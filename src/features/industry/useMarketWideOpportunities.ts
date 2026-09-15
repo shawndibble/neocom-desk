@@ -5,6 +5,7 @@
  * because the tab was visited.
  */
 import { useCallback, useRef, useState } from 'react';
+import type { SkillLevels } from '@/engine/industry/types';
 import type { TradeHub } from '@/market/hubs';
 import type { MarketWideTreeMap } from '@/sde/types';
 import type { BlueprintCatalog } from './blueprintCatalog';
@@ -18,6 +19,8 @@ export interface UseMarketWideOpportunitiesArgs {
   hub: TradeHub;
   trees: MarketWideTreeMap | null;
   catalog: BlueprintCatalog | null;
+  /** For the job-fee/sales-tax/broker-fee terms — same skills the owned-blueprint panel already reads. */
+  skills: SkillLevels;
   options?: MarketWideScanOptions;
 }
 
@@ -34,6 +37,7 @@ export function useMarketWideOpportunities({
   hub,
   trees,
   catalog,
+  skills,
   options,
 }: UseMarketWideOpportunitiesArgs): UseMarketWideOpportunitiesResult {
   const [state, setState] = useState<{
@@ -51,7 +55,7 @@ export function useMarketWideOpportunities({
     if (!trees || !catalog) return;
     const token = ++runToken.current;
     setState((prev) => ({ ...prev, loading: true, error: false }));
-    void runMarketWideScan(hub, trees, catalog, options)
+    void runMarketWideScan(hub, trees, catalog, skills, options)
       .then((rows) => {
         if (runToken.current !== token) return;
         setState({ rows, loading: false, hasRun: true, error: false });
@@ -60,7 +64,7 @@ export function useMarketWideOpportunities({
         if (runToken.current !== token) return;
         setState({ rows: [], loading: false, hasRun: true, error: true });
       });
-  }, [hub, trees, catalog, options]);
+  }, [hub, trees, catalog, skills, options]);
 
   return { ...state, run };
 }

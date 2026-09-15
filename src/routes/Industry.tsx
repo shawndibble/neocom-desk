@@ -495,6 +495,7 @@ export function Industry() {
                 hub={DEFAULT_TRADE_HUB}
                 trees={marketWideTrees}
                 catalog={catalog}
+                skills={skills}
                 onStartPlan={(entry) => {
                   // Distinct from the plain search-box create: picking a
                   // scan result is an explicit "go build this" choice, same
