@@ -180,14 +180,12 @@ export function WorklistToggle({
   // empty list and the same empty list is a control that does nothing.
   if (rebuildCount === 0) return null;
   /*
-   * `FilterChip` rather than two hand-styled buttons: it is the same
-   * accent-when-on pill, and it carries the two things the local template
-   * could not — `aria-pressed`, so a screen reader hears which reading is
-   * showing, and the shared control scale. `md` (`h-11 md:h-9`), not the `sm`
-   * default: `sm` tops out at 36px on touch, short of the 44px floor.
-   *
-   * Each chip sets its reading rather than flipping it, so re-pressing the one
-   * already on is a no-op and the pair stays mutually exclusive.
+   * `FilterChip`, not a local template: same accent-when-on pill, plus the two
+   * things the template could not carry — `aria-pressed`, so a screen reader
+   * hears which reading is on, and the shared control scale. `md` (`h-11
+   * md:h-9`), not the `sm` default, which tops out at 36px on touch, short of
+   * the 44px floor. Each chip *sets* its reading rather than flipping it, so
+   * the pair stays mutually exclusive despite `onToggle`'s name.
    */
   return (
     <div className="flex gap-1.5">

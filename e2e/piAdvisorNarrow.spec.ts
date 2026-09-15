@@ -6,21 +6,24 @@
  * floor, on the tab's own lead panel. This pins the hit area at both ends of
  * the breakpoint it now sizes from.
  *
- * The colony fixture is `piAdvisor.spec.ts`'s, trimmed to what this needs: one
- * mis-built colony and one dig-and-hold colony, because the toggle renders
- * only when the worklist finds at least one rebuild candidate.
+ * The colony fixture is `piAdvisor.spec.ts`'s, copied: one mis-built colony
+ * and one dig-and-hold colony, because the toggle renders only when the
+ * worklist finds at least one rebuild candidate.
  */
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
-import { loginAndSelectCharacter } from './support/login';
+import { loginAndSelectCharacter, clearCachedEsiRows } from './support/login';
 import { CHARACTER_ID } from './support/fixtureData';
 
 const PHONE = { width: 390, height: 844 };
 /*
  * Exactly `md` — where `controlHeightClassName`'s `md:h-9` engages, so the one
  * width a breakpoint mismatch in this fix would surface at. The chip is
- * expected to *reach* 36px here, not to keep its old ~20px: 36px is the
- * `Panel` header's own `md:min-h-9`, so the header does not grow around it.
+ * expected to *reach* 36px here rather than keep its old ~20px: that chip sat
+ * below every tier on the scale, so any of them grows it. The `Panel` header
+ * grows with it — `md:min-h-9` is a floor and its own `py-1` sits outside the
+ * chip — to the 44px any `actions` slot holding an `IconButton size="md"`
+ * already stands at.
  */
 const MD_EDGE = { width: 768, height: 800 };
 
@@ -197,24 +200,14 @@ test.beforeEach(async ({ page }) => {
   // The app warms `/planets` at boot, so the shared fixture's empty answer is
   // already cached by the time the route above is registered. Drop the cached
   // rows so the colonies above are what the tab actually reads.
-  await page.evaluate(
-    async () =>
-      new Promise((resolve) => {
-        const open = indexedDB.open('neocom');
-        open.onsuccess = () => {
-          const database = open.result;
-          if (!database.objectStoreNames.contains('esiCache')) return resolve(null);
-          const tx = database.transaction('esiCache', 'readwrite');
-          tx.objectStore('esiCache').clear();
-          tx.oncomplete = () => resolve(null);
-          tx.onerror = () => resolve(null);
-        };
-        open.onerror = () => resolve(null);
-      })
-  );
+  await clearCachedEsiRows(page);
 });
 
-/** Real hit area, not the painted box — `getBoundingClientRect()`. */
+/**
+ * Measured, not asserted as a class token: jsdom has no layout, which is the
+ * whole reason this pair of assertions lives in e2e rather than beside the
+ * component.
+ */
 async function chipHeight(page: Page, name: string) {
   const chip = page.getByRole('button', { name, exact: true });
   await chip.waitFor();
@@ -225,6 +218,10 @@ async function openAdvisor(page: Page, viewport: { width: number; height: number
   await page.setViewportSize(viewport);
   await page.goto('/planetary-industry?tab=advisor');
   await page.getByText('Do this, best first').waitFor();
+  // The toggle renders only against a rebuild candidate, so gate on it here
+  // rather than inside each measurement: a timeout on this line means the
+  // fixture stopped producing one, not that the sizing regressed.
+  await page.getByRole('button', { name: 'Tuning only', exact: true }).waitFor();
 }
 
 test('worklist toggle reaches the touch floor on a phone (390px)', async ({ page }) => {
