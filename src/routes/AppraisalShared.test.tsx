@@ -67,5 +67,10 @@ describe('AppraisalShared', () => {
     expect(
       screen.getByText('Unverified, user-generated link — not an official quote.')
     ).toBeInTheDocument();
+    // The five numeric columns pair two-per-row on a phone (#1113). jsdom
+    // cannot evaluate the `@media (width < 40rem)` block the pairing lives
+    // in, so this only guards that the prop is still passed —
+    // `e2e/appraisalSharedNarrow.spec.ts` measures the reflow itself.
+    expect(screen.getByRole('table', { name: 'Shared appraisal' })).toHaveClass('dt-stack-2col');
   });
 });
