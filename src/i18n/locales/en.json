@@ -2626,6 +2626,14 @@
         "title": "Contract accepted",
         "body": "{{character}}'s contract was accepted."
       },
+      "contractCompleted": {
+        "title": "Contract completed",
+        "body": "{{character}}'s contract was completed."
+      },
+      "contractFailed": {
+        "title": "Contract failed",
+        "body": "{{character}}'s contract failed."
+      },
       "walletBalanceChanged": {
         "title": "Wallet balance changed",
         "body": "{{character}}'s wallet balance changed.",
@@ -3311,6 +3319,8 @@
         "newCalendarEvent": "New Calendar Event",
         "calendarEventStarting": "Calendar Event Starting",
         "contractAccepted": "Contract Accepted",
+        "contractCompleted": "Contract Completed",
+        "contractFailed": "Contract Failed",
         "walletBalanceChanged": "Wallet Balance Changed",
         "eveNotification": "EVE Notifications",
         "structureFuelLow": "Structure Fuel Low",

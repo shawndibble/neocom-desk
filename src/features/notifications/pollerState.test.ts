@@ -61,7 +61,7 @@ const CALENDAR_SNAPSHOT: CalendarSnapshot = {
 };
 
 const CONTRACT_SNAPSHOT: ContractSnapshot = {
-  entries: [{ contractId: 1, status: 'in_progress' }],
+  entries: [{ contractId: 1, status: 'in_progress', issuerId: 1, acceptorId: 1 }],
   nowMs: 999,
 };
 

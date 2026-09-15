@@ -71,6 +71,8 @@ import {
   diffNewCalendarEvent,
   diffCalendarEventStarting,
   diffContractAccepted,
+  diffContractCompleted,
+  diffContractFailed,
   diffWalletBalanceChanged,
   diffMarketOrderFilled,
   diffEveNotification,
@@ -704,15 +706,27 @@ function isContractStatus(raw: unknown): raw is ContractStatus {
   return typeof raw === 'string' && (CONTRACT_STATUSES as readonly string[]).includes(raw);
 }
 
+/**
+ * Strict about `issuerId`/`acceptorId` for the same reason `isWalletJournalEntrySnapshot`
+ * is strict about `dateMs` (issue #1091): a baseline written before these
+ * fields existed fails validation, so `pollerState.ts` reads it as `null` and
+ * the first poll after this change fires nothing rather than replaying every
+ * contract's history against a baseline that never recorded who was party to it.
+ */
 function isContractEntrySnapshot(raw: unknown): raw is ContractEntrySnapshot {
   if (typeof raw !== 'object' || raw === null) return false;
   const r = raw as Record<string, unknown>;
-  return typeof r.contractId === 'number' && isContractStatus(r.status);
+  return (
+    typeof r.contractId === 'number' &&
+    isContractStatus(r.status) &&
+    typeof r.issuerId === 'number' &&
+    typeof r.acceptorId === 'number'
+  );
 }
 
 export const contractDomain = defineDomain<Contract, ContractSnapshot, ContractNotificationFire>({
   id: 'contracts',
-  eventIds: ['contractAccepted'],
+  eventIds: ['contractAccepted', 'contractCompleted', 'contractFailed'],
   stateKey: 'notifications.pollerState.contracts',
   entriesKey: 'entries',
   isEntry: isContractEntrySnapshot,
@@ -730,10 +744,16 @@ export const contractDomain = defineDomain<Contract, ContractSnapshot, ContractN
     entries: contracts.map((contract) => ({
       contractId: contract.contract_id,
       status: contract.status,
+      issuerId: contract.issuer_id,
+      acceptorId: contract.acceptor_id,
     })),
     nowMs,
   }),
-  diffs: [gatedOn('contractAccepted', diffContractAccepted)],
+  diffs: [
+    gatedOn('contractAccepted', diffContractAccepted),
+    gatedOn('contractCompleted', diffContractCompleted),
+    gatedOn('contractFailed', diffContractFailed),
+  ],
 });
 
 /* -------------------------------------------------------------------------- */

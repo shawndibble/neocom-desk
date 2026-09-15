@@ -95,6 +95,10 @@ const EVENT_SEVERITY: Readonly<Partial<Record<NotificationEventId, DeadlineSever
   structureFuelLow: 'warning',
   corpWalletThreshold: 'warning',
   planetaryExtractorExpiring: 'warning',
+  // A loss already happened — the same "standing fault" reasoning as the
+  // group above, not "waiting on you": collateral is already forfeited by
+  // the time this fires (issue #1091).
+  contractFailed: 'warning',
   // Waiting on you, but nothing is burning.
   spExtractionReady: 'watch',
   industryJobComplete: 'watch',
@@ -111,6 +115,9 @@ const EVENT_SEVERITY: Readonly<Partial<Record<NotificationEventId, DeadlineSever
   marketOrderFilled: 'clear',
   walletBalanceChanged: 'clear',
   priceAlertTriggered: 'clear',
+  // The haul arrived, the sale went through (issue #1091) — same "already
+  // resolved well" shape as marketOrderFilled above.
+  contractCompleted: 'clear',
 };
 
 export function alertSeverity(target: EntryChannelTarget): DeadlineSeverity {

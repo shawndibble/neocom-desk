@@ -112,6 +112,8 @@ export function occurrenceKey(fire: OccurrenceFire, nowMs: number): string {
     case 'calendarEventStarting':
       return [characterId, fire.eventId, fire.calendarEventId].join(':');
     case 'contractAccepted':
+    case 'contractCompleted':
+    case 'contractFailed':
       return [characterId, fire.eventId, fire.contractId].join(':');
     case 'marketOrderFilled':
       return [characterId, fire.eventId, fire.orderId].join(':');
@@ -187,6 +189,8 @@ export function occurrenceFiredAt(fire: OccurrenceFire, nowMs: number): number {
     case 'newCalendarEvent':
     case 'calendarEventStarting':
     case 'contractAccepted':
+    case 'contractCompleted':
+    case 'contractFailed':
     case 'marketOrderFilled':
     case 'newMail':
     case 'structureReinforcementExit':

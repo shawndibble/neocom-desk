@@ -170,6 +170,28 @@ describe('occurrenceKey', () => {
     expect(occurrenceKey(fire, T0)).toEqual(occurrenceKey({ ...fire }, T0 + 1000));
   });
 
+  it('keys contractCompleted and contractFailed on contractId, distinctly from contractAccepted', () => {
+    const completed: ContractNotificationFire = {
+      eventId: 'contractCompleted',
+      characterId: 7,
+      contractId: 123,
+    };
+    const failed: ContractNotificationFire = {
+      eventId: 'contractFailed',
+      characterId: 7,
+      contractId: 123,
+    };
+    const accepted: ContractNotificationFire = {
+      eventId: 'contractAccepted',
+      characterId: 7,
+      contractId: 123,
+    };
+    expect(occurrenceKey(completed, T0)).toEqual(occurrenceKey({ ...completed }, T0 + 1000));
+    expect(occurrenceKey(failed, T0)).toEqual(occurrenceKey({ ...failed }, T0 + 1000));
+    expect(occurrenceKey(completed, T0)).not.toEqual(occurrenceKey(failed, T0));
+    expect(occurrenceKey(completed, T0)).not.toEqual(occurrenceKey(accepted, T0));
+  });
+
   it('keys marketOrderFilled on orderId', () => {
     const fire: MarketOrderNotificationFire = {
       eventId: 'marketOrderFilled',

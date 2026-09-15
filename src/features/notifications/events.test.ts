@@ -4,7 +4,7 @@ import { NOTIFICATION_EVENTS, NOTIFICATION_EVENT_IDS, isCorpEventId } from './ev
 import { isEventEnabledFor, isEveTypeEnabledFor } from './eventSelection';
 
 describe('NOTIFICATION_EVENTS', () => {
-  it('lists exactly the 10 synthesized events from CONTEXT.md round 20, plus eveNotification (issue #274), planetaryExtractorExpiring (issue #310), spExtractionReady (grilling session, 2026-09-09) and the five corp events (issue #299), in order', () => {
+  it('lists exactly the 10 synthesized events from CONTEXT.md round 20, plus eveNotification (issue #274), planetaryExtractorExpiring (issue #310), spExtractionReady (grilling session, 2026-09-09), the five corp events (issue #299), and contractCompleted/contractFailed (issue #1091), in order', () => {
     expect(NOTIFICATION_EVENT_IDS).toEqual([
       'skillLevelComplete',
       'characterNotTraining',
@@ -17,6 +17,8 @@ describe('NOTIFICATION_EVENTS', () => {
       'newCalendarEvent',
       'calendarEventStarting',
       'contractAccepted',
+      'contractCompleted',
+      'contractFailed',
       'walletBalanceChanged',
       'eveNotification',
       'structureFuelLow',

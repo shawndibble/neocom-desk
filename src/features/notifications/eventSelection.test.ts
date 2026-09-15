@@ -48,8 +48,13 @@ describe('isEventEnabledFor', () => {
 });
 
 describe('isEventEnabledFor — feed-only defaults', () => {
-  it('defaults marketOrderFilled and walletBalanceChanged to feed-on, browser-off — unlike the default-both-on rule above', () => {
-    for (const eventId of ['marketOrderFilled', 'walletBalanceChanged'] as const) {
+  it('defaults marketOrderFilled, walletBalanceChanged, contractCompleted and contractFailed to feed-on, browser-off — unlike the default-both-on rule above', () => {
+    for (const eventId of [
+      'marketOrderFilled',
+      'walletBalanceChanged',
+      'contractCompleted',
+      'contractFailed',
+    ] as const) {
       expect(isEventEnabledFor({}, eventId, 'browser')).toBe(false);
       expect(isEventEnabledFor({}, eventId, 'feed')).toBe(true);
     }

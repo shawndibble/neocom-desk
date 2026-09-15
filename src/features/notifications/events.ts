@@ -20,6 +20,8 @@ export type NotificationEventId =
   | 'newCalendarEvent'
   | 'calendarEventStarting'
   | 'contractAccepted'
+  | 'contractCompleted'
+  | 'contractFailed'
   | 'walletBalanceChanged'
   | 'eveNotification'
   | 'structureFuelLow'
@@ -118,6 +120,16 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventDef[] = [
   {
     id: 'contractAccepted',
     labelKey: 'settings.notifications.event.contractAccepted',
+    scope: requiredScope('getCharacterContracts'),
+  },
+  {
+    id: 'contractCompleted',
+    labelKey: 'settings.notifications.event.contractCompleted',
+    scope: requiredScope('getCharacterContracts'),
+  },
+  {
+    id: 'contractFailed',
+    labelKey: 'settings.notifications.event.contractFailed',
     scope: requiredScope('getCharacterContracts'),
   },
   {

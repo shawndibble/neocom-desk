@@ -13,6 +13,8 @@ describe('notificationSubjectId', () => {
       77
     );
     expect(notificationSubjectId({ eventId: 'contractAccepted', contractId: 5 })).toEqual(5);
+    expect(notificationSubjectId({ eventId: 'contractCompleted', contractId: 6 })).toEqual(6);
+    expect(notificationSubjectId({ eventId: 'contractFailed', contractId: 7 })).toEqual(7);
     expect(notificationSubjectId({ eventId: 'industryJobComplete', jobId: 9 })).toEqual(9);
     expect(notificationSubjectId({ eventId: 'corpMemberJoined', memberCharacterId: 12 })).toEqual(
       12
@@ -40,6 +42,12 @@ describe('notificationUrlForSubject', () => {
     );
     expect(notificationUrlForSubject('contractAccepted', 5)).toEqual(
       '/contracts?tab=history&highlight=5'
+    );
+    expect(notificationUrlForSubject('contractCompleted', 6)).toEqual(
+      '/contracts?tab=history&highlight=6'
+    );
+    expect(notificationUrlForSubject('contractFailed', 7)).toEqual(
+      '/contracts?tab=history&highlight=7'
     );
   });
 
