@@ -172,4 +172,66 @@ describe('diffBpcWatchMatches', () => {
       });
     });
   });
+
+  describe('zero-price contracts — a barter, not a genuinely free listing (issue #1080)', () => {
+    it('never lowers the all-time-cheapest baseline', () => {
+      const prev: BpcWatchState = { seenContractIds: [1], minPriceSeen: 5_000_000 };
+      const rows = [row({ contractId: 1, price: 0 })];
+      const { fire, nextState } = diffBpcWatchMatches(EMPTY_BPC_SEARCH_FILTER, prev, rows);
+      expect(fire).toBeNull();
+      expect(nextState.minPriceSeen).toBe(5_000_000);
+    });
+
+    it('never fires "cheaper" naming a zero-price row, even when it is the numerically lowest match', () => {
+      const prev: BpcWatchState = { seenContractIds: [1, 2], minPriceSeen: 5_000_000 };
+      const rows = [
+        row({ contractId: 1, price: 4_500_000 }), // genuinely cheaper, priced
+        row({ contractId: 2, price: 0 }), // numerically cheapest, but a barter
+      ];
+      const { fire, nextState } = diffBpcWatchMatches(EMPTY_BPC_SEARCH_FILTER, prev, rows);
+      expect(fire).toEqual({
+        contractId: 1,
+        typeId: 999,
+        price: 4_500_000,
+        reason: 'cheaper',
+        isMultiType: false,
+      });
+      expect(nextState.minPriceSeen).toBe(4_500_000);
+    });
+
+    it('does not fire "cheaper" at all when only a zero-price row beats the baseline', () => {
+      const prev: BpcWatchState = { seenContractIds: [1], minPriceSeen: 5_000_000 };
+      const rows = [row({ contractId: 1, price: 0 })];
+      const { fire } = diffBpcWatchMatches(EMPTY_BPC_SEARCH_FILTER, prev, rows);
+      expect(fire).toBeNull();
+    });
+
+    it('the very first baseline never seeds minPriceSeen from a zero-price row', () => {
+      const rows = [row({ contractId: 1, price: 0 })];
+      const { nextState } = diffBpcWatchMatches(EMPTY_BPC_SEARCH_FILTER, undefined, rows);
+      expect(nextState.minPriceSeen).toBeNull();
+    });
+
+    it('never fires "new" for a zero-price row either — there is no honest price to name, unlike a multi-type row', () => {
+      const prev: BpcWatchState = { seenContractIds: [], minPriceSeen: null };
+      const rows = [row({ contractId: 1, price: 0 })];
+      const { fire, nextState } = diffBpcWatchMatches(EMPTY_BPC_SEARCH_FILTER, prev, rows);
+      expect(fire).toBeNull();
+      // Still recorded as seen, so it doesn't read as "new" forever either.
+      expect(nextState.seenContractIds).toEqual([1]);
+    });
+
+    it('a genuinely new, priced contract still fires "new" even while a zero-price contract is also newly matching', () => {
+      const prev: BpcWatchState = { seenContractIds: [], minPriceSeen: null };
+      const rows = [row({ contractId: 1, price: 0 }), row({ contractId: 2, price: 6_000_000 })];
+      const { fire } = diffBpcWatchMatches(EMPTY_BPC_SEARCH_FILTER, prev, rows);
+      expect(fire).toEqual({
+        contractId: 2,
+        typeId: 999,
+        price: 6_000_000,
+        reason: 'new',
+        isMultiType: false,
+      });
+    });
+  });
 });

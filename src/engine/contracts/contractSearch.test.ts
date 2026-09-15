@@ -4,6 +4,7 @@ import {
   contractOfferPriceSummary,
   contractOfferStats,
   filterContractOffers,
+  isUnpricedOffer,
   listedContractTypeOptions,
   offerAskingPrice,
 } from '@/engine/contracts/contractSearch';
@@ -86,6 +87,22 @@ describe('offerAskingPrice', () => {
   });
 });
 
+describe('isUnpricedOffer', () => {
+  it('is true for a zero or negative asking price — a barter, not a genuinely free item (issue #1080)', () => {
+    expect(isUnpricedOffer(offer({ price: 0 }))).toBe(true);
+    expect(isUnpricedOffer(offer({ price: -1 }))).toBe(true);
+  });
+
+  it('is false for any positive asking price', () => {
+    expect(isUnpricedOffer(offer({ price: 1 }))).toBe(false);
+  });
+
+  it('judges an auction on its effective asking price, same as offerAskingPrice', () => {
+    expect(isUnpricedOffer(offer({ isAuction: true, price: 0, buyout: 100 }))).toBe(false);
+    expect(isUnpricedOffer(offer({ isAuction: true, price: 0 }))).toBe(true);
+  });
+});
+
 describe('listedContractTypeOptions', () => {
   it('is the distinct listed types, named and sorted by name', () => {
     const rows = [offer({ typeId: 35 }), offer({ typeId: 34 }), offer({ typeId: 35 })];
@@ -117,6 +134,18 @@ describe('contractOfferStats', () => {
     expect(stats.get(34)).toEqual({ offerCount: 2, cheapest: 200 });
     expect(stats.get(35)).toEqual({ offerCount: 1, cheapest: 900 });
   });
+
+  it('counts a zero-price (barter) offer but never lets it win cheapest (issue #1080)', () => {
+    const rows = [offer({ typeId: 34, price: 0 }), offer({ typeId: 34, price: 500 })];
+    const stats = contractOfferStats(rows);
+    expect(stats.get(34)).toEqual({ offerCount: 2, cheapest: 500 });
+  });
+
+  it('reports cheapest as null, not 0, when every offer of a type is unpriced', () => {
+    const rows = [offer({ typeId: 34, price: 0 }), offer({ typeId: 34, price: -1 })];
+    const stats = contractOfferStats(rows);
+    expect(stats.get(34)).toEqual({ offerCount: 2, cheapest: null });
+  });
 });
 
 describe('contractOfferPriceSummary', () => {
@@ -136,5 +165,23 @@ describe('contractOfferPriceSummary', () => {
   it('averages the middle pair for an even count', () => {
     const rows = [offer({ price: 100 }), offer({ price: 300 })];
     expect(contractOfferPriceSummary(rows).median).toBe(200);
+  });
+
+  it('excludes a zero-price (barter) offer from cheapest/median, but still counts it as an offer (issue #1080)', () => {
+    const rows = [offer({ price: 0 }), offer({ price: 300 }), offer({ price: 100 })];
+    expect(contractOfferPriceSummary(rows)).toEqual({
+      offerCount: 3,
+      cheapest: 100,
+      median: 200,
+    });
+  });
+
+  it('reports cheapest and median as null when every offer is unpriced, not as a free item', () => {
+    const rows = [offer({ price: 0 }), offer({ price: -1 })];
+    expect(contractOfferPriceSummary(rows)).toEqual({
+      offerCount: 2,
+      cheapest: null,
+      median: null,
+    });
   });
 });
