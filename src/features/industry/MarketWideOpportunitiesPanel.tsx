@@ -25,6 +25,7 @@ import { db } from '@/db';
 import { iskToneClass } from '@/features/character/format';
 import { evaluateSkillGate, type SkillGateVerdict } from '@/engine/industry/skillGate';
 import type { OrderDepthLevel } from '@/engine/industry/opportunities';
+import type { SkillLevels } from '@/engine/industry/types';
 import type { MarketWideTreeMap } from '@/sde/types';
 import type { TradeHub } from '@/market/hubs';
 import { useAccountSkillLevels } from '@/features/skills/useAccountSkillLevels';
@@ -44,6 +45,7 @@ interface MarketWideOpportunitiesPanelProps {
   hub: TradeHub;
   trees: MarketWideTreeMap | null;
   catalog: BlueprintCatalog | null;
+  skills: SkillLevels;
   onStartPlan: (entry: BlueprintCatalogEntry) => void;
 }
 
@@ -51,10 +53,16 @@ export function MarketWideOpportunitiesPanel({
   hub,
   trees,
   catalog,
+  skills,
   onStartPlan,
 }: MarketWideOpportunitiesPanelProps) {
   const { t } = useTranslation();
-  const { rows, loading, hasRun, run } = useMarketWideOpportunities({ hub, trees, catalog });
+  const { rows, loading, hasRun, run } = useMarketWideOpportunities({
+    hub,
+    trees,
+    catalog,
+    skills,
+  });
 
   // Account-wide, not active-character: every character on the account, same
   // precedent `OpportunitiesPanel`'s own multi-character fan-out sets.

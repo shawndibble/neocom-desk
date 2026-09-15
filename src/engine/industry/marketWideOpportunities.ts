@@ -9,14 +9,33 @@
  * candidate from its precomputed flattened material tree instead of a live
  * `computeBuildPlan` run (`computeMarketWideRows`).
  *
+ * `computeMarketWideRows` nets sales tax, broker fee and the job installation
+ * fee through the same `fees.ts`/`jobCost.ts` primitives the owned-blueprint
+ * panel's `buildVsBuy` uses. There is no owned facility here — this scan is
+ * ownership-agnostic by construction — so the job fee always assumes an NPC
+ * station: no job-cost bonus, the fixed 0.25% NPC tax. `MarketWideFeeInputs`
+ * is the caller's own concern (this module stays pure); the feature layer
+ * reads it off the hub's own system, the same "no build system of its own"
+ * fallback `loadMarketSnapshot` already uses for a caller with no plan.
+ *
  * Pure: no fetch/DOM/Dexie. The caller supplies prices already fetched.
  */
 import type { MarketWideTreeEntry } from '@/sde/types';
+import { brokerFee, salesTax } from './fees';
+import { jobFee } from './jobCost';
 import {
   rankOpportunities,
   type OrderDepthThresholds,
   type RankedOpportunity,
 } from './opportunities';
+import { FACILITY_PRESETS, SKILL_IDS, type AdjustedPrices, type SkillLevels } from './types';
+
+/** The pricing context `computeMarketWideRows` needs beyond hub prices — one object, not three loose same-shaped `Record<number, number>` positionals. */
+export interface MarketWideFeeInputs {
+  adjustedPrices: AdjustedPrices;
+  systemCostIndex: number;
+  skills: SkillLevels;
+}
 
 /** One product's liquidity signal — the cheap, product-only price fetch that runs before any material pricing. */
 export interface LiquidityCandidate {
@@ -89,12 +108,21 @@ export interface MarketWideRow extends RankedOpportunity {
  * "precomputed, not resolved live" requirement. A candidate with any
  * unpriced material is excluded rather than shown at a guessed cost, the
  * same "never guessed" rule `classifyOrderDepth` follows for sell depth.
+ *
+ * `iskPerHour`/`buildCost` are on the same basis `buildVsBuy` uses: cost is
+ * materials + the job fee, revenue nets sales tax and broker fee. One
+ * `jobFee` call over the whole (already base-mineral-flattened) tree slightly
+ * undercounts a multi-tier product against a real per-job build — a
+ * flattened-tree limitation, not something fixable without resolving the
+ * tree live.
  */
 export function computeMarketWideRows(
   candidates: readonly MarketWideCandidate[],
   materialPrices: ReadonlyMap<number, number>,
+  feeInputs: MarketWideFeeInputs,
   thresholds?: OrderDepthThresholds
 ): MarketWideRow[] {
+  const { adjustedPrices, systemCostIndex, skills } = feeInputs;
   const priced: {
     id: string;
     productTypeID: number;
@@ -104,7 +132,8 @@ export function computeMarketWideRows(
   }[] = [];
   for (const candidate of candidates) {
     const { tree } = candidate;
-    let buildCost = 0;
+    let materialCost = 0;
+    let eiv = 0;
     let allPriced = true;
     for (const material of tree.materials) {
       const price = materialPrices.get(material.typeID);
@@ -112,12 +141,19 @@ export function computeMarketWideRows(
         allPriced = false;
         break;
       }
-      buildCost += price * material.quantity;
+      materialCost += price * material.quantity;
+      eiv += material.quantity * (adjustedPrices[material.typeID] ?? 0);
     }
     if (!allPriced || tree.time <= 0) continue;
 
+    const fee = jobFee(eiv, systemCostIndex, FACILITY_PRESETS.npcStation);
+    const buildCost = materialCost + fee.total;
+
     const revenue = candidate.sellPrice * tree.outputQuantity;
-    const iskPerHour = ((revenue - buildCost) / tree.time) * 3600;
+    const tax = salesTax(revenue, skills[SKILL_IDS.accounting] ?? 0);
+    const broker = brokerFee(revenue, skills[SKILL_IDS.brokerRelations] ?? 0);
+    const profit = revenue - tax - broker - buildCost;
+    const iskPerHour = (profit / tree.time) * 3600;
     priced.push({
       id: String(candidate.productTypeID),
       productTypeID: candidate.productTypeID,

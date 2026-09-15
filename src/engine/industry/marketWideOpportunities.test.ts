@@ -1,4 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { buildVsBuy } from './buildVsBuy';
+import { EMPTY_RIG_FIT, FACILITY_PRESETS, SKILL_IDS } from './types';
+import type { IndustryBlueprint, IndustryInputs } from './types';
 import { computeMarketWideRows, selectLiquidCandidates } from './marketWideOpportunities';
 
 describe('selectLiquidCandidates', () => {
@@ -52,24 +55,69 @@ describe('computeMarketWideRows', () => {
     ],
   };
 
-  it('computes ISK/hour from flattened materials, sell price, and time', () => {
+  const noFee = { adjustedPrices: {}, systemCostIndex: 0, skills: {} };
+
+  it('computes ISK/hour from flattened materials, sell price, and time — net of sales tax and broker fee even at untrained skills', () => {
     const rows = computeMarketWideRows(
       [{ productTypeID: 1, tree, sellPrice: 1000, sellDepthIsk: 5_000_000 }],
       new Map([
         [50, 10], // 10 * 10 = 100
         [51, 20], // 5 * 20 = 100
-      ])
+      ]),
+      noFee // no adjusted prices -> EIV 0 -> job fee 0, isolates the tax/broker fix
     );
-    // buildCost = 200, revenue = 1000 * 1 = 1000, profit = 800, / 1 hour = 800/hr
+    // materialCost = 200, no job fee (EIV 0) -> buildCost = 200.
+    // revenue = 1000. Untrained: salesTax 7.5% -> 75; broker 3% of 1000 = 30,
+    // floored to the 100 ISK minimum -> 100. profit = 1000-75-100-200 = 625.
     expect(rows).toEqual([
-      expect.objectContaining({ id: '1', iskPerHour: 800, buildCost: 200, orderDepth: 'deep' }),
+      expect.objectContaining({ id: '1', iskPerHour: 625, buildCost: 200, orderDepth: 'deep' }),
+    ]);
+  });
+
+  it('includes the job installation fee via adjusted prices and the system cost index', () => {
+    const feeTree = {
+      blueprintTypeID: 901,
+      time: 3600,
+      outputQuantity: 1,
+      marketGroupID: 100,
+      materials: [{ typeID: 60, quantity: 10 }],
+    };
+    const rows = computeMarketWideRows(
+      [{ productTypeID: 2, tree: feeTree, sellPrice: 2000, sellDepthIsk: 5_000_000 }],
+      new Map([[60, 50]]), // materialCost = 10 * 50 = 500
+      { adjustedPrices: { 60: 10_000 }, systemCostIndex: 0.05, skills: {} } // EIV 100,000 at a 5% index
+    );
+    // jobFee(100_000, 0.05, npcStation): grossCost 5000, SCC 4000, tax 250 -> 9250.
+    // buildCost = 500 + 9250 = 9750. revenue 2000, untrained tax 150, broker
+    // floored to 100. profit = 2000-150-100-9750 = -8000.
+    expect(rows).toEqual([
+      expect.objectContaining({ id: '2', iskPerHour: -8000, buildCost: 9750 }),
+    ]);
+  });
+
+  it('nets sales tax and broker fee at the character’s Accounting/Broker Relations levels', () => {
+    const rows = computeMarketWideRows(
+      [{ productTypeID: 1, tree, sellPrice: 10_000, sellDepthIsk: 5_000_000 }],
+      new Map([
+        [50, 10],
+        [51, 20],
+      ]),
+      { ...noFee, skills: { [SKILL_IDS.accounting]: 5, [SKILL_IDS.brokerRelations]: 5 } }
+    );
+    // buildCost = 200 (no job fee). revenue = 10_000. Accounting V:
+    // 7.5%*(1-0.11*5) = 3.375% -> tax 337.5. Broker Relations V:
+    // 3%-0.3%*5 = 1.5% -> 150 (above the 100 ISK floor, so skill-driven).
+    // profit = 10_000-337.5-150-200 = 9312.5.
+    expect(rows).toEqual([
+      expect.objectContaining({ id: '1', iskPerHour: 9312.5, buildCost: 200 }),
     ]);
   });
 
   it('excludes a row when any flattened material has no known price', () => {
     const rows = computeMarketWideRows(
       [{ productTypeID: 1, tree, sellPrice: 1000, sellDepthIsk: 5_000_000 }],
-      new Map([[50, 10]]) // typeID 51 missing
+      new Map([[50, 10]]), // typeID 51 missing
+      noFee
     );
     expect(rows).toEqual([]);
   });
@@ -84,8 +132,65 @@ describe('computeMarketWideRows', () => {
       new Map([
         [50, 10],
         [51, 20],
-      ])
+      ]),
+      noFee
     );
     expect(rows.map((r) => r.id)).toEqual(['2', '1']);
+  });
+
+  it('reports the same ISK/hour as the owned-blueprint panel for an equivalent product', () => {
+    // Same product/recipe/runs(1)/ME(0)/facility(NPC)/skills/prices on both
+    // paths — the two panels' "ISK/hour" must agree at the same basis.
+    const productTypeID = 999;
+    const materialTypeID = 70;
+    const skills = { [SKILL_IDS.accounting]: 2, [SKILL_IDS.brokerRelations]: 1 };
+    const adjustedPrices = { [materialTypeID]: 2000 };
+    const systemCostIndex = 0.03;
+    const materialHubPrice = 80;
+    const productHubPrice = 1500;
+
+    const blueprint: IndustryBlueprint = {
+      name: 'Equivalence Widget',
+      time: 3600,
+      materials: [{ typeID: materialTypeID, quantity: 8 }],
+      products: [{ typeID: productTypeID, quantity: 1 }],
+    };
+    const ownedInputs: IndustryInputs = {
+      blueprint,
+      runs: 1,
+      me: 0,
+      te: 0,
+      facility: FACILITY_PRESETS.npcStation,
+      rigFit: EMPTY_RIG_FIT,
+      security: 'highsec',
+      systemCostIndex,
+      adjustedPrices,
+      hubPrices: { [materialTypeID]: materialHubPrice, [productTypeID]: productHubPrice },
+      skills,
+    };
+    const ownedResult = buildVsBuy(ownedInputs);
+
+    const equivalentTree = {
+      blueprintTypeID: 1,
+      time: blueprint.time,
+      outputQuantity: 1,
+      marketGroupID: 100,
+      materials: blueprint.materials,
+    };
+    const marketWideRows = computeMarketWideRows(
+      [
+        {
+          productTypeID,
+          tree: equivalentTree,
+          sellPrice: productHubPrice,
+          sellDepthIsk: 5_000_000,
+        },
+      ],
+      new Map([[materialTypeID, materialHubPrice]]),
+      { adjustedPrices, systemCostIndex, skills }
+    );
+
+    expect(ownedResult.iskPerHour).not.toBeNull();
+    expect(marketWideRows[0]!.iskPerHour).toBeCloseTo(ownedResult.iskPerHour!, 6);
   });
 });
