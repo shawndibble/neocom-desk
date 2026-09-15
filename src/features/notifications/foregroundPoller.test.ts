@@ -909,7 +909,10 @@ describe('runForegroundPoll', () => {
     // property the skill-queue "ESI fetch fails" case above proves for its
     // own domain.
     const initial: ContractPollerState = {
-      [CHAR.characterId]: { entries: [{ contractId: 1, status: 'outstanding' }], nowMs: 500 },
+      [CHAR.characterId]: {
+        entries: [{ contractId: 1, status: 'outstanding', issuerId: 1, acceptorId: 0 }],
+        nowMs: 500,
+      },
     };
     const saveContractState = vi.fn(async () => {});
     const notify = vi.fn<PollDependencies['notify']>(async () => {});
@@ -938,14 +941,14 @@ describe('runForegroundPoll', () => {
     expect(deps.notify).not.toHaveBeenCalled();
     expect(savedContracts).not.toBeNull();
     expect(savedContracts![CHAR.characterId].entries).toEqual([
-      { contractId: 1, status: 'outstanding' },
+      { contractId: 1, status: 'outstanding', issuerId: 1, acceptorId: 0 },
     ]);
   });
 
   it('fires contractAccepted when a contract newly transitions to in_progress', async () => {
     let savedContracts: ContractPollerState = {
       [CHAR.characterId]: {
-        entries: [{ contractId: 1, status: 'outstanding' }],
+        entries: [{ contractId: 1, status: 'outstanding', issuerId: 1, acceptorId: 0 }],
         nowMs: 1000,
       },
     };
@@ -968,6 +971,121 @@ describe('runForegroundPoll', () => {
       contractId: 1,
     });
     expect(character).toEqual(CHAR);
+  });
+
+  it('records contractCompleted to the feed but does not raise a browser notification by default (feed-only, issue #1091)', async () => {
+    let savedContracts: ContractPollerState = {
+      [CHAR.characterId]: {
+        entries: [{ contractId: 1, status: 'in_progress', issuerId: 1, acceptorId: 0 }],
+        nowMs: 1000,
+      },
+    };
+    const notify = vi.fn<PollDependencies['notify']>(async () => {});
+    const recordToFeed = vi.fn<PollDependencies['recordToFeed']>(async () => {});
+    const deps = baseDeps({
+      grantedScopes: async () => new Set([SKILLQUEUE_SCOPE, CONTRACTS_SCOPE]),
+      feedChannelEnabled: async () => true,
+      prevContractState: async () => savedContracts,
+      saveContractState: async (state) => {
+        savedContracts = state;
+      },
+      loadContracts: async () => [contract({ contract_id: 1, status: 'finished' })],
+      notify,
+      recordToFeed,
+    });
+    await runForegroundPoll(deps);
+    expect(recordToFeed).toHaveBeenCalledTimes(1);
+    expect(recordToFeed.mock.calls[0][0]).toEqual({
+      eventId: 'contractCompleted',
+      characterId: CHAR.characterId,
+      contractId: 1,
+    });
+    expect(notify).not.toHaveBeenCalled();
+  });
+
+  it('records contractFailed to the feed but does not raise a browser notification by default (feed-only, issue #1091)', async () => {
+    let savedContracts: ContractPollerState = {
+      [CHAR.characterId]: {
+        entries: [{ contractId: 1, status: 'in_progress', issuerId: 1, acceptorId: 0 }],
+        nowMs: 1000,
+      },
+    };
+    const notify = vi.fn<PollDependencies['notify']>(async () => {});
+    const recordToFeed = vi.fn<PollDependencies['recordToFeed']>(async () => {});
+    const deps = baseDeps({
+      grantedScopes: async () => new Set([SKILLQUEUE_SCOPE, CONTRACTS_SCOPE]),
+      feedChannelEnabled: async () => true,
+      prevContractState: async () => savedContracts,
+      saveContractState: async (state) => {
+        savedContracts = state;
+      },
+      loadContracts: async () => [contract({ contract_id: 1, status: 'failed' })],
+      notify,
+      recordToFeed,
+    });
+    await runForegroundPoll(deps);
+    expect(recordToFeed).toHaveBeenCalledTimes(1);
+    expect(recordToFeed.mock.calls[0][0]).toEqual({
+      eventId: 'contractFailed',
+      characterId: CHAR.characterId,
+      contractId: 1,
+    });
+    expect(notify).not.toHaveBeenCalled();
+  });
+
+  it('honours an explicit browser preference for contractFailed despite its feed-only default', async () => {
+    let savedContracts: ContractPollerState = {
+      [CHAR.characterId]: {
+        entries: [{ contractId: 1, status: 'in_progress', issuerId: 1, acceptorId: 0 }],
+        nowMs: 1000,
+      },
+    };
+    const notify = vi.fn<PollDependencies['notify']>(async () => {});
+    const deps = baseDeps({
+      grantedScopes: async () => new Set([SKILLQUEUE_SCOPE, CONTRACTS_SCOPE]),
+      eventPrefsFor: async () => ({ contractFailed: { browser: true } }),
+      prevContractState: async () => savedContracts,
+      saveContractState: async (state) => {
+        savedContracts = state;
+      },
+      loadContracts: async () => [contract({ contract_id: 1, status: 'failed' })],
+      notify,
+    });
+    await runForegroundPoll(deps);
+    expect(notify).toHaveBeenCalledTimes(1);
+    const [fire] = notify.mock.calls[0];
+    expect(fire).toEqual({
+      eventId: 'contractFailed',
+      characterId: CHAR.characterId,
+      contractId: 1,
+    });
+  });
+
+  it('fires nothing for a completed contract the character is neither issuer nor acceptor of', async () => {
+    let savedContracts: ContractPollerState = {
+      [CHAR.characterId]: {
+        entries: [{ contractId: 1, status: 'in_progress', issuerId: 999, acceptorId: 888 }],
+        nowMs: 1000,
+      },
+    };
+    const notify = vi.fn<PollDependencies['notify']>(async () => {});
+    const recordToFeed = vi.fn<PollDependencies['recordToFeed']>(async () => {});
+    const deps = baseDeps({
+      grantedScopes: async () => new Set([SKILLQUEUE_SCOPE, CONTRACTS_SCOPE]),
+      feedChannelEnabled: async () => true,
+      prevContractState: async () => savedContracts,
+      saveContractState: async (state) => {
+        savedContracts = state;
+      },
+      loadContracts: async () => [
+        contract({ contract_id: 1, status: 'finished', issuer_id: 999, acceptor_id: 888 }),
+      ],
+      notify,
+      recordToFeed,
+    });
+    await runForegroundPoll(deps);
+    expect(notify).not.toHaveBeenCalled();
+    expect(recordToFeed).not.toHaveBeenCalled();
   });
 
   it('skips the wallet journal for a character with no granted scope', async () => {

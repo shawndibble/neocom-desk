@@ -26,6 +26,7 @@ import { timeZoneFor, useTimeFormat } from '@/lib/timeFormat';
 import i18n from '@/i18n';
 import type { LocalSettingStore } from '@/lib/useLocalSetting';
 import { NOTIFICATION_EVENTS, type NotificationEventId } from './events';
+import type { ContractNotificationFire } from '@/engine/notificationDiffs';
 import { POLL_DOMAINS, type AnyNotificationFire, type PollDomain } from './pollDomains';
 import { groupIdenticalFires, type RenderedFire } from './groupFires';
 import { withCharacterSnapshot, type PollerState } from './pollerState';
@@ -501,6 +502,15 @@ function calendarStartLabel(startMs: number): string | undefined {
   return formatCalendarTimestamp(new Date(startMs), timeZoneFor(useTimeFormat.getState().value));
 }
 
+/** See `notificationText`'s doc comment on why this is a named predicate rather than an inline check. */
+function isContractLifecycleFire(fire: AnyNotificationFire): fire is ContractNotificationFire {
+  return (
+    fire.eventId === 'contractAccepted' ||
+    fire.eventId === 'contractCompleted' ||
+    fire.eventId === 'contractFailed'
+  );
+}
+
 async function notificationText(
   fire: AnyNotificationFire,
   character: CharacterRef
@@ -574,10 +584,20 @@ async function notificationText(
             }),
     };
   }
-  if (fire.eventId === 'contractAccepted') {
+  // Same shape for all three contract transitions (issue #1091 adds the
+  // latter two alongside the original acceptance event) — a template-literal
+  // key, same pattern as corpMemberJoined/corpMemberLeft below. Routed through
+  // an explicit type predicate rather than an inline `fire.eventId === ...`
+  // chain: `ContractNotificationFire`'s `eventId` is itself a 3-literal union
+  // within one interface, and TS's control-flow narrowing does not reliably
+  // eliminate that whole member from `AnyNotificationFire` via sequential
+  // equality checks the way it does for the many other members here that each
+  // carry a single-literal `eventId` — a named predicate's `is` return type
+  // narrows both branches explicitly instead of relying on that inference.
+  if (isContractLifecycleFire(fire)) {
     return {
-      title: i18n.t('notifications.fired.contractAccepted.title'),
-      body: i18n.t('notifications.fired.contractAccepted.body', { character: character.name }),
+      title: i18n.t(`notifications.fired.${fire.eventId}.title`),
+      body: i18n.t(`notifications.fired.${fire.eventId}.body`, { character: character.name }),
     };
   }
   if (fire.eventId === 'walletBalanceChanged') {
