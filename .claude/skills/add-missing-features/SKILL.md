@@ -21,6 +21,31 @@ Reference: [TOOLS.md](TOOLS.md) — the survey ledger of tools already looked at
 and candidates already killed. Read it in step 1; update it in step 7 — curate
 it in place, never append a new dated section.
 
+## 0. Freshness gate — stop here if the ecosystem was swept recently
+
+**Run this first, before reading anything else.** A full sweep spawns several
+research sub-agents and costs a great deal; the ecosystem it searches changes
+on the order of months, not hours. Seven runs in one day once produced two
+tickets and then four consecutive empty ones, each re-reading forum pages an
+earlier run had read the same afternoon.
+
+```
+git -C <main-repo> log -1 --format=%cI origin/main -- .claude/skills/add-missing-features/TOOLS.md
+```
+
+- **Ledger touched within the last 30 days, and `$ARGUMENTS` is empty** → do
+  **not** sweep. Report, in one or two lines, when the ledger was last updated
+  and that the ecosystem was swept recently, then **STOP**. Do not spawn a
+  single sub-agent. This is a successful run, not a skipped one.
+- **`$ARGUMENTS` names an area** ("industry", "hauling", …) → the caller asked
+  for something specific. Proceed, scoped to that area.
+- **Ledger older than 30 days** → proceed with the full sweep below.
+
+The ledger itself records the right cadence, and it is not a calendar:
+**re-sweep after an EVE expansion, querying that expansion's own mechanic
+nouns**, within roughly six months of release. That is a twice-a-year job. If
+something is invoking this skill on a timer, the timer is the bug.
+
 Investigation writes no application code and needs no worktree: read the main
 checkout and leave it untouched — Shawn keeps a dev server there and another
 agent may be working in it. The mutations this run makes are `gh issue create`
