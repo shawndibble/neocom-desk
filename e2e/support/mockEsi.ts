@@ -170,6 +170,14 @@ export async function installEsiMock(page: Page): Promise<void> {
     // every page of every spec. A corp spec should override this route.
     if (path === `/characters/${CHARACTER_ID}/roles`) return json({});
 
+    // The two Loyalty Store surfaces, both empty. Not in `PREFETCHED_EMPTY`:
+    // neither is warmed at boot — the Wallet and LP Store routes fetch them
+    // on demand — and the offers endpoint is public, not character-scoped.
+    // The route renders its chrome (header, back link, empty state) with no
+    // offers at all; a spec that needs real rows should override these.
+    if (path === `/characters/${CHARACTER_ID}/loyalty/points`) return json([]);
+    if (/^\/loyalty\/stores\/\d+\/offers\/$/.test(path)) return json([]);
+
     const typeMatch = /^\/universe\/types\/(\d+)$/.exec(path);
     if (typeMatch) {
       const info = UNIVERSE_TYPES[Number(typeMatch[1])];
