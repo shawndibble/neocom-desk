@@ -343,6 +343,12 @@ describe('MaterialsTable stacked card', () => {
     expect(valueOf(ownedInput('Tritanium'))).toBe('');
     expect(priceInput('Tritanium')).not.toHaveAttribute('placeholder');
   });
+
+  // Rationale is on the `stackColumns` prop itself (MaterialsTable.tsx).
+  it('pairs two figures per line below sm, same as AppraisalPanel', () => {
+    render(<Harness />);
+    expect(screen.getByRole('table', { name: 'Materials' })).toHaveClass('dt-stack-2col');
+  });
 });
 
 /**

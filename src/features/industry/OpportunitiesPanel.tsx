@@ -27,15 +27,14 @@ import {
   Spinner,
   StatChip,
   type DataTableColumn,
-  type StatChipTone,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { formatDuration } from '@/lib/duration';
 import { formatIsk } from '@/lib/isk';
 import { iskToneClass } from '@/features/character/format';
+import { useIsDesktop } from '@/lib/useIsDesktop';
 import type { CharacterBlueprint } from '@/esi/endpoints';
 import type { SkillLevels } from '@/engine/industry/types';
-import type { OrderDepthLevel } from '@/engine/industry/opportunities';
 import type { PiData } from '@/sde/types';
 import { DEFAULT_TRADE_HUB } from '@/market/hubs';
 import { PriceHistoryPanel } from '@/features/market/PriceHistoryPanel';
@@ -48,6 +47,8 @@ import type { BlueprintCatalog } from './blueprintCatalog';
 import { loadCharacterBlueprints } from './data';
 import type { ActivityFacilityDefaults } from './facilityDefaults';
 import { formatPercent } from './format';
+import { MobileOpportunityList } from './MobileOpportunityList';
+import { ORDER_DEPTH_TONE, unitMargin } from './opportunityMetrics';
 import type { OwnedStockSnapshot } from './ownedStockDetection';
 import { buildOpportunityCandidates, type OpportunityRow } from './opportunities';
 import { useOpportunities } from './useOpportunities';
@@ -61,24 +62,6 @@ interface OpportunitiesPanelProps {
   activeCharacterId: number;
   ownedStockSnapshot: OwnedStockSnapshot;
   onAddToCompare: (rows: readonly OpportunityRow[]) => void;
-}
-
-const ORDER_DEPTH_TONE: Record<OrderDepthLevel, StatChipTone> = {
-  deep: 'success',
-  moderate: 'default',
-  thin: 'warning',
-  unknown: 'default',
-};
-
-function unitCount(row: OpportunityRow): number {
-  const quantity = row.candidate.catalogEntry.blueprint.products[0]?.quantity ?? 1;
-  return quantity * row.candidate.blueprint.runs;
-}
-
-function unitMargin(row: OpportunityRow): number | null {
-  if (row.result.profit === null) return null;
-  const units = unitCount(row);
-  return units > 0 ? row.result.profit / units : null;
 }
 
 function numericCell(
@@ -100,6 +83,7 @@ export function OpportunitiesPanel({
 }: OpportunitiesPanelProps) {
   const { t } = useTranslation();
   const unknown = t('common.unknown');
+  const isDesktop = useIsDesktop();
 
   const allCharacters = useLiveQuery(() => db.characters.toArray(), [], []);
   const characterCandidates = useMemo(
@@ -214,6 +198,11 @@ export function OpportunitiesPanel({
 
   const columns: DataTableColumn<OpportunityRow>[] = [
     {
+      // Desktop-only column now (`isDesktop` gates this whole `DataTable`
+      // below — see the render branch): the `cardCorner`/enlarged-target
+      // fix this column carried for the stacked layout moved to
+      // `MobileOpportunityList`'s own corner-pinned checkbox once the phone
+      // list stopped going through `DataTable` at all.
       id: 'select',
       header: '',
       className: 'w-8',
@@ -412,7 +401,7 @@ export function OpportunitiesPanel({
           hint={t('industry.opportunitiesEmptyHint')}
           className="py-8"
         />
-      ) : (
+      ) : isDesktop ? (
         <div className="overflow-x-auto">
           <DataTable
             columns={columns}
@@ -422,6 +411,15 @@ export function OpportunitiesPanel({
             defaultSort={{ columnId: 'iskPerHour', direction: 'desc' }}
           />
         </div>
+      ) : (
+        <MobileOpportunityList
+          rows={rows}
+          activeCharacterId={activeCharacterId}
+          showCharacterColumn={showCharacterColumn}
+          selectedIds={selectedIds}
+          onToggleSelected={toggleSelected}
+          onViewHistory={(typeId, itemName) => setHistoryItem({ typeId, itemName })}
+        />
       )}
       {historyItem && (
         <Modal
