@@ -3,6 +3,7 @@ import {
   buildAppraisal,
   buildHubComparison,
   computeAppraisalRefine,
+  lpBeatsMarket,
   refineBeatsSellAsIs,
   type AppraisalItem,
   type AppraisalRow,
@@ -129,6 +130,8 @@ describe('buildAppraisal', () => {
       unpricedRows: 0,
       refine: 0,
       refineUnpricedRows: 0,
+      cheapestBuy: 0,
+      cheapestBuyViaLp: 0,
     });
   });
 
@@ -175,6 +178,133 @@ describe('buildAppraisal', () => {
       const { totals } = buildAppraisal([damageControl, ore], 100);
       expect(totals.refine).toBe(500);
     });
+  });
+
+  describe('LP store acquisition', () => {
+    const astero: AppraisalItem = {
+      typeId: 33468,
+      name: 'Astero',
+      quantity: 1,
+      buy: 60_000_000,
+      // No blueprint exists for a faction hull like this — market sell is
+      // whatever the last player reseller asked, here worse than LP.
+      sell: 95_000_000,
+      lpOption: {
+        corporationId: 1000125,
+        corpName: 'Sisters of EVE',
+        lpCost: 400_000,
+        iskCost: 850_000,
+        affordableLp: true,
+      },
+    };
+
+    it('carries the LP option through onto the row', () => {
+      const { rows } = buildAppraisal([astero], 100);
+      expect(rows[0].lpCorporationId).toBe(1000125);
+      expect(rows[0].lpCorpName).toBe('Sisters of EVE');
+      expect(rows[0].lpCost).toBe(400_000);
+      expect(rows[0].lpIskCost).toBe(850_000);
+      expect(rows[0].lpAffordable).toBe(true);
+    });
+
+    it('is undefined on a row nothing the character holds LP with sells', () => {
+      const { rows } = buildAppraisal([damageControl], 100);
+      expect(rows[0].lpCorpName).toBeUndefined();
+      expect(rows[0].lpIskCost).toBeUndefined();
+    });
+
+    it('never scales the LP ISK cost by the price percent — it is a fixed NPC price', () => {
+      const { rows } = buildAppraisal([astero], 50);
+      expect(rows[0].lpIskCost).toBe(850_000);
+    });
+
+    it('counts the cheaper affordable LP option into cheapestBuy instead of the market sell total', () => {
+      const { totals } = buildAppraisal([astero], 100);
+      expect(totals.sell).toBe(95_000_000); // market total is untouched
+      expect(totals.cheapestBuy).toBe(850_000);
+      expect(totals.cheapestBuyViaLp).toBe(1);
+    });
+
+    it('falls back to the market total when the LP offer is not affordable', () => {
+      const unaffordable: AppraisalItem = {
+        ...astero,
+        lpOption: { ...astero.lpOption!, affordableLp: false },
+      };
+      const { totals } = buildAppraisal([unaffordable], 100);
+      expect(totals.cheapestBuy).toBe(95_000_000);
+      expect(totals.cheapestBuyViaLp).toBe(0);
+    });
+
+    it('falls back to the market total when the LP offer is affordable but pricier', () => {
+      const pricier: AppraisalItem = {
+        ...astero,
+        lpOption: { ...astero.lpOption!, iskCost: 200_000_000 },
+      };
+      const { totals } = buildAppraisal([pricier], 100);
+      expect(totals.cheapestBuy).toBe(95_000_000);
+      expect(totals.cheapestBuyViaLp).toBe(0);
+    });
+
+    it('uses the LP option when nobody is selling on the market at all', () => {
+      const noMarket: AppraisalItem = { ...astero, sell: null };
+      const { rows, totals } = buildAppraisal([noMarket], 100);
+      expect(rows[0].sellTotal).toBeNull();
+      expect(totals.cheapestBuy).toBe(850_000);
+      expect(totals.cheapestBuyViaLp).toBe(1);
+    });
+
+    it('sums cheapestBuy across a mix of LP-cheaper and market-cheaper rows', () => {
+      const { totals } = buildAppraisal([astero, damageControl], 100);
+      expect(totals.cheapestBuy).toBe(850_000 + 1_536_000);
+    });
+  });
+});
+
+describe('lpBeatsMarket', () => {
+  function row(overrides: Partial<AppraisalRow> = {}): AppraisalRow {
+    return {
+      typeId: 33468,
+      name: 'Astero',
+      quantity: 1,
+      buyEach: 60_000_000,
+      sellEach: 95_000_000,
+      buyTotal: 60_000_000,
+      sellTotal: 95_000_000,
+      lpCorpName: 'Sisters of EVE',
+      lpCost: 400_000,
+      lpIskCost: 850_000,
+      lpAffordable: true,
+      ...overrides,
+    };
+  }
+
+  it('is true when the LP option is affordable and cheaper', () => {
+    expect(lpBeatsMarket(row())).toBe(true);
+  });
+
+  it('is false when the LP option is affordable but not cheaper', () => {
+    expect(lpBeatsMarket(row({ lpIskCost: 200_000_000 }))).toBe(false);
+  });
+
+  it('is false when the LP option is cheaper but unaffordable', () => {
+    expect(lpBeatsMarket(row({ lpAffordable: false }))).toBe(false);
+  });
+
+  it('is true against an unpriced market side, when affordable', () => {
+    expect(lpBeatsMarket(row({ sellTotal: null }))).toBe(true);
+  });
+
+  it('makes no claim on a row with no LP option at all', () => {
+    expect(
+      lpBeatsMarket(
+        row({
+          lpCorpName: undefined,
+          lpCost: undefined,
+          lpIskCost: undefined,
+          lpAffordable: undefined,
+        })
+      )
+    ).toBe(false);
   });
 });
 

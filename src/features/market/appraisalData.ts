@@ -25,6 +25,13 @@
  * `orderExits.ts` and Mining Yield use, so a mixed paste of ore and modules
  * resolves a different specialisation on each row rather than one shared
  * guess.
+ *
+ * LP store acquisition (`appraisalLpAcquisition.ts`) is threaded in the same
+ * way and for the same reason: only this layer may reach ESI/Dexie for the
+ * character's LP corps. It runs alongside the reprocessing fetch, both
+ * gated on `characterId` being non-null, and its `requiredItemTypeIds`
+ * widen the one `getHubPrices` batch every other price in this function
+ * already shares — a turn-in's cost is never a second network round trip.
  */
 import {
   buildAppraisal,
@@ -33,6 +40,7 @@ import {
   type Appraisal,
   type AppraisalItem,
 } from '@/engine/market/appraisal';
+import { cheapestLpOffer } from '@/engine/market/lpAcquisition';
 import {
   matchAppraisalEntries,
   type AppraisalCatalogue,
@@ -45,6 +53,7 @@ import {
 } from '@/engine/industry/reprocessing';
 import { SKILL_IDS } from '@/engine/industry/types';
 import type { TrainedSkill } from '@/engine/types';
+import { findLpOfferMatches, toLpOfferInputs } from '@/features/market/appraisalLpAcquisition';
 import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
 import { TRADE_HUBS, type TradeHub } from '@/market/hubs';
 import { getHubPrices, invalidateHubPrices } from '@/market/prices';
@@ -138,11 +147,16 @@ export async function appraisePaste(
   const entries = parseAppraisalPaste(text);
   const catalogue = await loadAppraisalCatalogue();
   const { matched, unmatched } = matchAppraisalEntries(entries, catalogue);
+  const typeIds = matched.map((match) => match.typeId);
 
-  const [reprocessingMap, reprocessingSkills] =
+  const [reprocessingMap, reprocessingSkills, lpMatches] =
     characterId === null
-      ? [null, null]
-      : await Promise.all([loadReprocessing(), loadReprocessingSkills(characterId)]);
+      ? [null, null, null]
+      : await Promise.all([
+          loadReprocessing(),
+          loadReprocessingSkills(characterId),
+          findLpOfferMatches(characterId, typeIds),
+        ]);
 
   const reprocessingByTypeId = new Map<number, ReprocessingType>();
   if (reprocessingMap) {
@@ -157,10 +171,14 @@ export async function appraisePaste(
       [...reprocessingByTypeId.values()].flatMap((entry) => entry.materials.map((m) => m.typeID))
     ),
   ];
-  const typeIds = matched.map((match) => match.typeId);
-  const allTypeIds = [...new Set([...typeIds, ...materialTypeIds])];
+  const allTypeIds = [
+    ...new Set([...typeIds, ...materialTypeIds, ...(lpMatches?.requiredItemTypeIds ?? [])]),
+  ];
   if (force) invalidateHubPrices(hub.stationId, allTypeIds);
   const prices = await getHubPrices(hub, allTypeIds);
+  const sellPrices = new Map(
+    [...prices].map(([typeId, agg]) => [typeId, agg.sellMin ?? undefined])
+  );
 
   const items: AppraisalItem[] = matched.map((match) => {
     const aggregate = prices.get(match.typeId);
@@ -191,6 +209,10 @@ export async function appraisePaste(
             ),
           })
         : undefined;
+    const lpForType = lpMatches?.matchesByTypeId.get(match.typeId);
+    const lpOption = lpForType
+      ? (cheapestLpOffer(toLpOfferInputs(lpForType, sellPrices), match.quantity) ?? undefined)
+      : undefined;
     return {
       typeId: match.typeId,
       name: match.name,
@@ -198,6 +220,7 @@ export async function appraisePaste(
       buy: aggregate?.buyMax ?? null,
       sell: aggregate?.sellMin ?? null,
       ...(refine ? { refine } : {}),
+      ...(lpOption ? { lpOption } : {}),
     };
   });
 

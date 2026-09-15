@@ -7,6 +7,7 @@ import { DEFAULT_TRADE_HUB, TRADE_HUBS } from '@/market/hubs';
 import { SKILL_IDS } from '@/engine/industry/types';
 import { loadReprocessing } from '@/sde/loadSde';
 import { loadCorrectedSkills, type CorrectedSkills } from '@/features/skills/correctedSkills';
+import { findLpOfferMatches, toLpOfferInputs } from '@/features/market/appraisalLpAcquisition';
 import { appraisePaste, clearAppraisalCatalogue, compareHubs } from './appraisalData';
 
 vi.mock('@/sde/loadMarketSde', () => ({
@@ -20,9 +21,15 @@ vi.mock('@/sde/loadMarketSde', () => ({
 
 vi.mock('@/sde/loadSde', () => ({ loadReprocessing: vi.fn() }));
 vi.mock('@/features/skills/correctedSkills', () => ({ loadCorrectedSkills: vi.fn() }));
+vi.mock('@/features/market/appraisalLpAcquisition', () => ({
+  findLpOfferMatches: vi.fn(),
+  toLpOfferInputs: vi.fn(),
+}));
 
 const mockedLoadReprocessing = vi.mocked(loadReprocessing);
 const mockedLoadCorrectedSkills = vi.mocked(loadCorrectedSkills);
+const mockedFindLpOfferMatches = vi.mocked(findLpOfferMatches);
+const mockedToLpOfferInputs = vi.mocked(toLpOfferInputs);
 
 function skillsFixture(trained: [number, number][]): CorrectedSkills {
   return {
@@ -47,6 +54,8 @@ afterEach(() => {
   clearAppraisalCatalogue();
   mockedLoadReprocessing.mockReset();
   mockedLoadCorrectedSkills.mockReset();
+  mockedFindLpOfferMatches.mockReset();
+  mockedToLpOfferInputs.mockReset();
 });
 afterAll(() => server.close());
 
@@ -270,6 +279,86 @@ describe('appraisePaste', () => {
       // Damage Control II: 0.5 x 1.0 (untrained Scrapmetal) -> floor(100*0.5) = 50
       const dcuRow = appraisal.rows.find((row) => row.typeId === 2048)!;
       expect(dcuRow.refineTotal).toBeCloseTo(50 * 5.41, 6);
+    });
+  });
+
+  describe('LP store acquisition', () => {
+    it('fetches no LP matches with no active Character', async () => {
+      server.use(aggregates(PRICED));
+
+      await appraisePaste('Tritanium\t100', DEFAULT_TRADE_HUB, 100, null);
+
+      expect(mockedFindLpOfferMatches).not.toHaveBeenCalled();
+    });
+
+    it('attaches the cheapest LP option to a matching row', async () => {
+      server.use(aggregates(PRICED));
+      mockedLoadReprocessing.mockResolvedValue({});
+      mockedLoadCorrectedSkills.mockResolvedValue(skillsFixture([]));
+      mockedFindLpOfferMatches.mockResolvedValue({
+        matchesByTypeId: new Map([
+          [
+            2048,
+            [{ corporationId: 1000125, corpName: 'Test Corp', offer: {} as never, playerLp: 0 }],
+          ],
+        ]),
+        requiredItemTypeIds: [],
+      });
+      mockedToLpOfferInputs.mockReturnValue([
+        {
+          corporationId: 1000125,
+          corpName: 'Test Corp',
+          quantityPerRedemption: 1,
+          lpCostPerRedemption: 100_000,
+          iskCostPerRedemption: 200_000,
+          requiredItemsCostPerRedemption: 0,
+          playerLp: 500_000,
+        },
+      ]);
+
+      const { appraisal } = await appraisePaste('Damage Control II\t3', DEFAULT_TRADE_HUB, 100, 1);
+
+      const row = appraisal.rows[0];
+      expect(row.lpCorpName).toBe('Test Corp');
+      // 3 units at 1-per-redemption needs 3 redemptions.
+      expect(row.lpIskCost).toBe(600_000);
+      expect(row.lpAffordable).toBe(true);
+      // The LP option (600,000) beats the market sell total (1,382,400).
+      expect(appraisal.totals.cheapestBuy).toBe(600_000);
+      expect(appraisal.totals.cheapestBuyViaLp).toBe(1);
+    });
+
+    it('widens the price fetch with required-item type ids from matched offers', async () => {
+      server.use(aggregates(PRICED));
+      mockedLoadReprocessing.mockResolvedValue({});
+      mockedLoadCorrectedSkills.mockResolvedValue(skillsFixture([]));
+      mockedFindLpOfferMatches.mockResolvedValue({
+        matchesByTypeId: new Map(),
+        requiredItemTypeIds: [1230],
+      });
+
+      await appraisePaste('Damage Control II\t3', DEFAULT_TRADE_HUB, 100, 1);
+
+      // getHubPrices is called through Fuzzwork; the widened batch is only
+      // observable via the request itself, so assert on the mocked adapter's
+      // own inputs instead of a second network round trip.
+      expect(mockedFindLpOfferMatches).toHaveBeenCalledWith(1, [2048]);
+    });
+
+    it('leaves a row untouched when nothing the character holds LP with sells it', async () => {
+      server.use(aggregates(PRICED));
+      mockedLoadReprocessing.mockResolvedValue({});
+      mockedLoadCorrectedSkills.mockResolvedValue(skillsFixture([]));
+      mockedFindLpOfferMatches.mockResolvedValue({
+        matchesByTypeId: new Map(),
+        requiredItemTypeIds: [],
+      });
+
+      const { appraisal } = await appraisePaste('Damage Control II\t3', DEFAULT_TRADE_HUB, 100, 1);
+
+      expect(appraisal.rows[0].lpCorpName).toBeUndefined();
+      expect(appraisal.totals.cheapestBuy).toBe(appraisal.totals.sell);
+      expect(appraisal.totals.cheapestBuyViaLp).toBe(0);
     });
   });
 });

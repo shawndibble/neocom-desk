@@ -55,6 +55,8 @@ function outcome(): AppraisalOutcome {
         unpricedRows: 0,
         refine: 0,
         refineUnpricedRows: 0,
+        cheapestBuy: 0,
+        cheapestBuyViaLp: 0,
       },
     },
     unmatched: [],

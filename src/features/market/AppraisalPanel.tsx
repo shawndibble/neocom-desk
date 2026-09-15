@@ -32,10 +32,11 @@ import {
 import * as Icon from '@/components/ui/icons';
 import { Caret } from '@/components/ui/Disclosure';
 import { fieldBaseClassName } from '@/components/ui/controlStyles';
-import { refineBeatsSellAsIs, type AppraisalRow } from '@/engine/market/appraisal';
+import { lpBeatsMarket, refineBeatsSellAsIs, type AppraisalRow } from '@/engine/market/appraisal';
 import { countPasteLines } from '@/engine/market/appraisalPaste';
 import { iskToneClass } from '@/features/character/format';
 import type { BlueprintCatalog } from '@/features/industry/blueprintCatalog';
+import { LpStoreLink } from '@/features/loyalty/LpStoreLink';
 import { writeToClipboard } from '@/lib/clipboard';
 import { formatIskAuto } from '@/lib/isk';
 import { downloadCsv } from '@/lib/downloadCsv';
@@ -238,6 +239,48 @@ export function AppraisalPanel({
               )
             ),
       sortValue: (row) => row.refineTotal ?? undefined,
+    });
+  }
+
+  // Undefined per row when nothing the active Character holds LP with sells
+  // this item — same "only earns its place once something has it" rule as
+  // the refine column, and also why this never shows with no active
+  // Character (`appraisalData.ts` never sets `lpOption` then).
+  const hasLpOption = rows.some((row) => row.lpCorpName !== undefined);
+  if (hasLpOption) {
+    columns.push({
+      id: 'lpTotal',
+      header: t('market.appraisal.columnLpTotal'),
+      align: 'right',
+      // Kept to the width of an ISK figure plus one icon — never the full
+      // "X ISK + Y LP (Corp)" sentence, which would blow out the column at
+      // phone width. That sentence still exists, as the icon's tooltip and
+      // accessible name (`LpStoreLink`'s `label`).
+      className: 'whitespace-nowrap tabular-nums',
+      render: (row) => {
+        if (row.lpCorpName === undefined || row.lpCorporationId === undefined) return '—';
+        const label = t('market.appraisal.lpTotalCell', {
+          isk: formatIskAuto(row.lpIskCost ?? 0),
+          lp: formatVolume(row.lpCost ?? 0),
+          corp: row.lpCorpName,
+        });
+        return comparisonCell(
+          <span className="inline-flex items-center gap-1">
+            {totalCell(row.lpIskCost ?? null, 'longPress')}
+            <LpStoreLink corporationId={row.lpCorporationId} label={label} />
+          </span>,
+          lpBeatsMarket(row),
+          row.lpAffordable === false && (
+            <span
+              className="ml-0.5 text-warning"
+              title={t('market.appraisal.lpUnaffordableHint', { corp: row.lpCorpName })}
+            >
+              *
+            </span>
+          )
+        );
+      },
+      sortValue: (row) => row.lpIskCost ?? undefined,
     });
   }
 
@@ -446,6 +489,14 @@ export function AppraisalPanel({
                     tooltip={t('market.appraisal.refineTotalHelp')}
                   />
                 )}
+                {hasLpOption && (
+                  <StatChip
+                    label={t('market.appraisal.cheapestBuy')}
+                    value={<IskAmount value={totals.cheapestBuy} revealOn="tap" decimals={0} />}
+                    tone="accent"
+                    tooltip={t('market.appraisal.cheapestBuyHelp')}
+                  />
+                )}
                 <StatChip label={t('market.appraisal.items')} value={rows.length} />
                 {loading && <Spinner label={t('common.loading')} size="sm" />}
               </div>
@@ -458,6 +509,11 @@ export function AppraisalPanel({
               {totals.refineUnpricedRows > 0 && (
                 <p className="border-b border-line px-3 py-2 text-[0.6875rem] text-warning">
                   {t('market.appraisal.refineUnpriced', { count: totals.refineUnpricedRows })}
+                </p>
+              )}
+              {totals.cheapestBuyViaLp > 0 && (
+                <p className="border-b border-line px-3 py-2 text-[0.6875rem] text-text-dim">
+                  {t('market.appraisal.cheapestBuyViaLp', { count: totals.cheapestBuyViaLp })}
                 </p>
               )}
 

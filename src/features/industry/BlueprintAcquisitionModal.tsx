@@ -12,13 +12,28 @@
  * caller's `onSourcingChange` — `acquisitionForLookup` (`recipes.ts`) then
  * honors it at every node that resolves this blueprint, not only the one the
  * modal was opened from, the same way `overridePrice` already does.
+ *
+ * The LP Store section (self-fetched on open, same pattern `ItemDetailModal`
+ * uses for its own live ESI read) answers a fourth way to get this
+ * blueprint the picker otherwise has no way to mention: an NPC corp's LP
+ * store can hand out a blueprint *copy* at a fixed ISK+LP price — no market
+ * order, no contract. It reuses `findLpOfferMatches`
+ * (`features/market/appraisalLpAcquisition.ts`), the same character-LP-corps
+ * lookup Appraisal uses, since a blueprint copy's `type_id` is the
+ * blueprint's own typeID (the same `offer.type_id` an ordinary item offer
+ * carries — `offerRows.ts`'s `computeBlueprintRow` already keys off exactly
+ * this). Informational only, not a pickable tier: the app cannot buy it for
+ * the pilot, so this is a fact plus a link, not another `onSourcingChange`.
  */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Modal, TextInput } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import type { MaterialSourcing } from '@/engine/industry/types';
+import { findLpOfferMatches, type LpOfferMatch } from '@/features/market/appraisalLpAcquisition';
+import { LpStoreLink } from '@/features/loyalty/LpStoreLink';
 import { unmaskNumber } from '@/lib/numberMask';
+import { formatIsk } from '@/lib/isk';
 
 /** One owned copy, personal or corp — same shape `ownedCopiesFor` (recipes.ts) adapts to. */
 export interface AcquisitionOwnedCopy {
@@ -53,6 +68,7 @@ function tierRows(copies: readonly AcquisitionOwnedCopy[]): TierRow[] {
 
 interface BlueprintAcquisitionModalProps {
   onClose: () => void;
+  characterId: number;
   blueprintTypeID: number;
   blueprintName: string;
   /** Every owned copy of this blueprint — personal and (when the plan's Corp Assets toggle is on) corp-owned, already merged. */
@@ -66,6 +82,7 @@ interface BlueprintAcquisitionModalProps {
 
 export function BlueprintAcquisitionModal({
   onClose,
+  characterId,
   blueprintTypeID,
   blueprintName,
   ownedCopies,
@@ -80,6 +97,21 @@ export function BlueprintAcquisitionModal({
   const [manualPrice, setManualPrice] = useState(
     sourcing?.overridePrice === undefined ? '' : String(sourcing.overridePrice)
   );
+  // Empty until the fetch resolves, same as "nothing to show yet" — no
+  // spinner: this is a secondary, optional section, and a section that
+  // appears once the lookup lands reads fine without one.
+  const [lpMatches, setLpMatches] = useState<readonly LpOfferMatch[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void findLpOfferMatches(characterId, [blueprintTypeID]).then((result) => {
+      if (cancelled) return;
+      setLpMatches(result.matchesByTypeId.get(blueprintTypeID) ?? []);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [characterId, blueprintTypeID]);
 
   function pickTier(me: number, te: number) {
     onSourcingChange(blueprintTypeID, {
@@ -164,6 +196,35 @@ export function BlueprintAcquisitionModal({
             </Button>
           )}
         </section>
+
+        {lpMatches.length > 0 && (
+          <section className="flex flex-col gap-2 border-t border-line pt-3">
+            <h3 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+              {t('industry.blueprintAcquisitionLpHeading')}
+            </h3>
+            <ul className="flex flex-col gap-1">
+              {lpMatches.map((match) => {
+                const label = t('industry.blueprintAcquisitionLpOffer', {
+                  isk: formatIsk(match.offer.isk_cost),
+                  lp: formatIsk(match.offer.lp_cost),
+                  corp: match.corpName,
+                });
+                return (
+                  <li key={match.corporationId} className="flex items-center justify-between gap-2">
+                    <span>
+                      {label}
+                      {match.offer.quantity > 1 &&
+                        ` — ${t('industry.blueprintAcquisitionLpQuantity', { count: match.offer.quantity })}`}
+                      {match.offer.required_items.length > 0 &&
+                        ` (${t('industry.blueprintAcquisitionLpRequiredItems', { count: match.offer.required_items.length })})`}
+                    </span>
+                    <LpStoreLink corporationId={match.corporationId} label={label} />
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        )}
 
         <section className="flex flex-col gap-2 border-t border-line pt-3">
           <h3 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
