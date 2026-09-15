@@ -468,6 +468,10 @@ export function AppraisalPanel({
                 label={t('market.appraisal.resultTitle')}
                 className="pb-1"
                 rowContextMenu={rowContextMenu}
+                // Five or six short figures a card: one per line runs a priced
+                // row to six, and hiding a column buys the same height at the
+                // cost of a figure.
+                stackColumns={2}
               />
             </>
           )}

@@ -121,6 +121,14 @@ describe('AppraisalPanel', () => {
     expect(screen.getByText(/1 item has no orders on one side at this hub/)).toBeInTheDocument();
   });
 
+  // The reflow itself is CSS behind a media query and is measured in
+  // `e2e/marketAppraisalNarrow.spec.ts`; this only guards the opt-in from
+  // being dropped, the same pairing `PriceHistoryChart.test.tsx` asserts.
+  it('pairs the figures two to a row in its stacked cards', () => {
+    renderPanel({ controller: controller({ result: outcome() }) });
+    expect(screen.getByRole('table', { name: 'Appraisal' })).toHaveClass('dt-stack-2col');
+  });
+
   describe('Compare hubs', () => {
     const COMPARE_ROWS: HubComparisonRow[] = TRADE_HUBS.map((hub, index) => ({
       hub,
