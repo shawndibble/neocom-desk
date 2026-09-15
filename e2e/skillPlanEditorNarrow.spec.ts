@@ -41,31 +41,40 @@ interface SeedEntry {
   targetLevel: number;
 }
 
-async function seedPlan(page: Page, entries: SeedEntry[] = []): Promise<void> {
+/** One record straight into a Dexie store — both seeds below are one `put`. */
+async function putRecord(
+  page: Page,
+  store: string,
+  record: Record<string, unknown>
+): Promise<void> {
   await page.evaluate(
-    async ({ characterId, planId, planName, entries: planEntries }) => {
+    async ({ store: storeName, record: value }) => {
       const database = await new Promise<IDBDatabase>((resolve, reject) => {
         const request = indexedDB.open('neocom');
         request.onsuccess = () => resolve(request.result);
         request.onerror = () => reject(request.error);
       });
       await new Promise<void>((resolve, reject) => {
-        const tx = database.transaction(['skillPlans'], 'readwrite');
-        tx.objectStore('skillPlans').put({
-          id: planId,
-          characterId,
-          name: planName,
-          entries: planEntries,
-          remapCount: 0,
-          updatedAt: Date.now(),
-        });
+        const tx = database.transaction([storeName], 'readwrite');
+        tx.objectStore(storeName).put(value);
         tx.oncomplete = () => resolve();
         tx.onerror = () => reject(tx.error);
       });
       database.close();
     },
-    { characterId: CHARACTER_ID, planId: PLAN_ID, planName: PLAN_NAME, entries }
+    { store, record }
   );
+}
+
+async function seedPlan(page: Page, entries: SeedEntry[] = []): Promise<void> {
+  await putRecord(page, 'skillPlans', {
+    id: PLAN_ID,
+    characterId: CHARACTER_ID,
+    name: PLAN_NAME,
+    entries,
+    remapCount: 0,
+    updatedAt: Date.now(),
+  });
 }
 
 /**
@@ -73,23 +82,10 @@ async function seedPlan(page: Page, entries: SeedEntry[] = []): Promise<void> {
  * a readout — so without this the pill never renders.
  */
 async function seedPriorityColumn(page: Page): Promise<void> {
-  await page.evaluate(async (key) => {
-    const database = await new Promise<IDBDatabase>((resolve, reject) => {
-      const request = indexedDB.open('neocom');
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
-    });
-    await new Promise<void>((resolve, reject) => {
-      const tx = database.transaction(['settings'], 'readwrite');
-      tx.objectStore('settings').put({
-        key,
-        value: { attributePair: true, priority: true, perLevelTime: true, cumulativeTime: true },
-      });
-      tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(tx.error);
-    });
-    database.close();
-  }, COLUMN_VISIBILITY_KEY);
+  await putRecord(page, 'settings', {
+    key: COLUMN_VISIBILITY_KEY,
+    value: { attributePair: true, priority: true, perLevelTime: true, cumulativeTime: true },
+  });
 }
 
 test('the back-to-plan-list link is a full sm-tier control (36px) at 390px', async ({ page }) => {
@@ -129,8 +125,12 @@ test('the entry priority pill is a full sm-tier tap target (36px) at 390px', asy
   await loginAndSelectCharacter(page);
   await seedPlan(page, [PLAN_ENTRY]);
   await seedPriorityColumn(page);
-  await page.goto(`./skills/plans/${PLAN_ID}`);
+  // Sized before the first paint, unlike the back-link tests above: the pill
+  // renders in *both* layouts, so `toBeVisible` would also pass on the desktop
+  // row this project's 1280px default viewport would draw first, and the
+  // one-shot `evaluate` below would measure that row.
   await page.setViewportSize(PHONE);
+  await page.goto(`./skills/plans/${PLAN_ID}`);
 
   const pill = page.getByRole('button', { name: /^Priority for / });
   await expect(pill).toBeVisible();
