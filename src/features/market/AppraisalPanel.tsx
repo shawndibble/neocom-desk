@@ -32,7 +32,7 @@ import {
 import * as Icon from '@/components/ui/icons';
 import { Caret } from '@/components/ui/Disclosure';
 import { fieldBaseClassName } from '@/components/ui/controlStyles';
-import type { AppraisalRow } from '@/engine/market/appraisal';
+import { refineBeatsSellAsIs, type AppraisalRow } from '@/engine/market/appraisal';
 import { countPasteLines } from '@/engine/market/appraisalPaste';
 import { iskToneClass } from '@/features/character/format';
 import type { BlueprintCatalog } from '@/features/industry/blueprintCatalog';
@@ -80,16 +80,6 @@ function eachCell(value: number | null): string {
 function totalCell(value: number | null, revealOn: IskRevealGesture): ReactNode {
   if (value === null) return '—';
   return <IskAmount value={value} revealOn={revealOn} decimals={0} />;
-}
-
-/**
- * "Sell-as-is" is `buyTotal` in this engine's own vocabulary — what the list
- * fetches sold into buy orders right now (`market.appraisal.buyTotalHelp`) —
- * so that is what the refine-then-sell comparison is judged against, the
- * same axis `orderExits.ts` prices its own refine exit on.
- */
-function refineBeatsSellAsIs(row: AppraisalRow): boolean {
-  return row.refineTotal !== undefined && row.buyTotal !== null && row.refineTotal > row.buyTotal;
 }
 
 /** Bolds a total only when it actually won a real comparison — never on a row with nothing to compare against. */
