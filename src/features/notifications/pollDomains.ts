@@ -71,6 +71,8 @@ import {
   diffNewCalendarEvent,
   diffCalendarEventStarting,
   diffContractAccepted,
+  diffContractCompleted,
+  diffContractFailed,
   diffWalletBalanceChanged,
   diffMarketOrderFilled,
   diffEveNotification,
@@ -704,15 +706,35 @@ function isContractStatus(raw: unknown): raw is ContractStatus {
   return typeof raw === 'string' && (CONTRACT_STATUSES as readonly string[]).includes(raw);
 }
 
+/**
+ * Strict about `issuerId`/`acceptorId` for the same reason `isWalletJournalEntrySnapshot`
+ * is strict about `dateMs` (issue #1091): a baseline written before these
+ * fields existed fails validation, so `pollerState.ts` reads it as `null` and
+ * the first poll after this change fires nothing rather than replaying every
+ * contract's history against a baseline that never recorded who was party to it.
+ *
+ * The invalidation is store-wide, not per-character: `isSnapshotWith`'s
+ * `entries.every(isEntry)` fails a whole character's snapshot on one bad
+ * entry, and `isPollerState` requires every character in the stored blob to
+ * pass — so one character still on a pre-#1091 baseline invalidates
+ * `notifications.pollerState.contracts` for every character on the device,
+ * not just that one. Still net-correct (no false completed/failed backfire
+ * for anyone), just a wider one-time reset than "a baseline" implies.
+ */
 function isContractEntrySnapshot(raw: unknown): raw is ContractEntrySnapshot {
   if (typeof raw !== 'object' || raw === null) return false;
   const r = raw as Record<string, unknown>;
-  return typeof r.contractId === 'number' && isContractStatus(r.status);
+  return (
+    typeof r.contractId === 'number' &&
+    isContractStatus(r.status) &&
+    typeof r.issuerId === 'number' &&
+    typeof r.acceptorId === 'number'
+  );
 }
 
 export const contractDomain = defineDomain<Contract, ContractSnapshot, ContractNotificationFire>({
   id: 'contracts',
-  eventIds: ['contractAccepted'],
+  eventIds: ['contractAccepted', 'contractCompleted', 'contractFailed'],
   stateKey: 'notifications.pollerState.contracts',
   entriesKey: 'entries',
   isEntry: isContractEntrySnapshot,
@@ -730,10 +752,16 @@ export const contractDomain = defineDomain<Contract, ContractSnapshot, ContractN
     entries: contracts.map((contract) => ({
       contractId: contract.contract_id,
       status: contract.status,
+      issuerId: contract.issuer_id,
+      acceptorId: contract.acceptor_id,
     })),
     nowMs,
   }),
-  diffs: [gatedOn('contractAccepted', diffContractAccepted)],
+  diffs: [
+    gatedOn('contractAccepted', diffContractAccepted),
+    gatedOn('contractCompleted', diffContractCompleted),
+    gatedOn('contractFailed', diffContractFailed),
+  ],
 });
 
 /* -------------------------------------------------------------------------- */

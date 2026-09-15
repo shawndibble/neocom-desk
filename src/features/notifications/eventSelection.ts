@@ -36,10 +36,19 @@ export type EventEnabledMap = Partial<Record<NotificationEventId, EventChannelSt
 /**
  * Events that default to feed-on/browser-off instead of on-for-both
  * (CONTEXT.md round 45) — worth a row, not worth an interruption.
+ *
+ * `contractCompleted`/`contractFailed` (issue #1091) join this set by an
+ * explicit decision in that ticket, deliberately including failure: a
+ * forfeited courier is irreversible by the time you hear about it, so the
+ * value is the durable feed record, not a popup — a reviewer who wants
+ * failure to interrupt should say so as a deliberate reversal, not inherit
+ * one from an unattended default.
  */
 const EVENTS_FEED_ONLY_BY_DEFAULT: ReadonlySet<NotificationEventId> = new Set([
   'marketOrderFilled',
   'walletBalanceChanged',
+  'contractCompleted',
+  'contractFailed',
 ]);
 
 function eventDefaultFor(eventId: NotificationEventId, channel: NotificationChannel): boolean {

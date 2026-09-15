@@ -50,6 +50,10 @@ export const NOTIFICATION_ROUTES: Record<NotificationEventId, string> = {
   // `?highlight=`, which `useHighlightParam` spends on arrival whether or not
   // a row matched; landing on the wrong tab would burn it for nothing.
   contractAccepted: '/contracts?tab=history',
+  // Same destination as acceptance (issue #1091) — both are about a row in
+  // History, just a later transition of the same contract.
+  contractCompleted: '/contracts?tab=history',
+  contractFailed: '/contracts?tab=history',
   // `?tab=` deep-links straight to the tab that actually shows the event,
   // not just the page — `Wallet.tsx` reads it once on mount.
   walletBalanceChanged: '/wallet?tab=journal',
@@ -175,6 +179,9 @@ const SUBJECT_ROUTES: Partial<Record<NotificationEventId, SubjectRoute>> = {
   walletBalanceChanged: { subjectOf: (fire) => fire.journalEntryId, url: highlightRow },
   // The contract someone just took. Still listed — the filter defaults to every status.
   contractAccepted: { subjectOf: (fire) => fire.contractId, url: highlightRow },
+  // Same row, a later transition of it (issue #1091).
+  contractCompleted: { subjectOf: (fire) => fire.contractId, url: highlightRow },
+  contractFailed: { subjectOf: (fire) => fire.contractId, url: highlightRow },
   // The job sits in Active Jobs until it is delivered, which is the point.
   industryJobComplete: { subjectOf: (fire) => fire.jobId, url: highlightRow },
   // The new member's roster row.

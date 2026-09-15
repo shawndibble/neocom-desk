@@ -708,6 +708,18 @@ export type ContractStatus =
 export interface ContractEntrySnapshot {
   contractId: number;
   status: ContractStatus;
+  /**
+   * Added for issue #1091's completed/failed events, which — unlike
+   * `contractAccepted` — must stay silent for a contract the character is
+   * only the `assignee` of (an offer merely made *to* them, not one they
+   * issued or accepted): `getCharacterContracts` also returns those, and
+   * without this filter a stranger's contract to someone else being
+   * withdrawn would announce itself. `diffContractCompleted`/
+   * `diffContractFailed` check these; `diffContractAccepted` deliberately
+   * does not (issue #1091's scope: that event is unchanged).
+   */
+  issuerId: number;
+  acceptorId: number;
 }
 
 export interface ContractSnapshot {
@@ -716,7 +728,7 @@ export interface ContractSnapshot {
 }
 
 export interface ContractNotificationFire {
-  eventId: 'contractAccepted';
+  eventId: 'contractAccepted' | 'contractCompleted' | 'contractFailed';
   characterId: number;
   contractId: number;
 }
@@ -746,6 +758,99 @@ export function diffContractAccepted(
     fires.push({ eventId: 'contractAccepted', characterId, contractId: entry.contractId });
   }
   return fires;
+}
+
+/** `outstanding` and `in_progress` are the two statuses a contract's terminal diffs treat as "still live" — see `wasLiveContractStatus`. */
+const COMPLETED_CONTRACT_STATUSES: ReadonlySet<ContractStatus> = new Set([
+  'finished_issuer',
+  'finished_contractor',
+  'finished',
+]);
+
+/**
+ * Whether a contract's previous status counts as "outstanding or in
+ * progress" for issue #1091's terminal-transition guard: `diffContractAccepted`
+ * only ever moves a contract's status *forward* from one of these two, so
+ * "was live" is the same condition either terminal diff needs before it
+ * announces a transition — a contract discovered already at a terminal
+ * status (`prevStatus` `undefined`) is never live, matching the
+ * discovered-already-true exclusion the ticket calls for.
+ */
+function wasLiveContractStatus(prevStatus: ContractStatus | undefined): boolean {
+  return prevStatus === 'outstanding' || prevStatus === 'in_progress';
+}
+
+/** Whether `characterId` is the issuer or the acceptor — never the mere assignee — of this snapshot entry (issue #1091). */
+function isPartyToContract(entry: ContractEntrySnapshot, characterId: number): boolean {
+  return entry.issuerId === characterId || entry.acceptorId === characterId;
+}
+
+/**
+ * Shared shape behind `diffContractCompleted`/`diffContractFailed` (issue
+ * #1091) — the two differ only in which status counts as the transition and
+ * which event id they report, so factored out rather than duplicated:
+ * requires the previous poll to have actually recorded this contract as
+ * outstanding or in progress (`wasLiveContractStatus`) — without that, the
+ * first poll after this field's own baseline reset (or a genuine ESI window
+ * shift) would backfill an announcement for every contract that quietly
+ * closed weeks ago — and requires `characterId` to be the issuer or acceptor
+ * (`isPartyToContract`) — the endpoint also returns contracts merely offered
+ * to the character, and without this a stranger's contract resolving for
+ * someone else would announce itself.
+ */
+function diffContractTerminalTransition(
+  characterId: number,
+  prev: ContractSnapshot | undefined,
+  next: ContractSnapshot,
+  eventId: 'contractCompleted' | 'contractFailed',
+  matchesStatus: (status: ContractStatus) => boolean
+): ContractNotificationFire[] {
+  if (!prev) return [];
+  const prevStatusById = new Map(prev.entries.map((entry) => [entry.contractId, entry.status]));
+  const fires: ContractNotificationFire[] = [];
+  for (const entry of next.entries) {
+    if (!matchesStatus(entry.status)) continue;
+    if (!wasLiveContractStatus(prevStatusById.get(entry.contractId))) continue;
+    if (!isPartyToContract(entry, characterId)) continue;
+    fires.push({ eventId, characterId, contractId: entry.contractId });
+  }
+  return fires;
+}
+
+/**
+ * Fires per contract whose status is newly one of the three completed forms
+ * (issue #1091) — a courier's collateral released, or an item exchange's sale
+ * gone through. Deliberately silent for `rejected`/`cancelled`/`deleted`/
+ * `reversed`: those are withdrawn-offer noise, not something that ran to
+ * completion. See `diffContractTerminalTransition` for the shared guards.
+ */
+export function diffContractCompleted(
+  characterId: number,
+  prev: ContractSnapshot | undefined,
+  next: ContractSnapshot
+): ContractNotificationFire[] {
+  return diffContractTerminalTransition(characterId, prev, next, 'contractCompleted', (status) =>
+    COMPLETED_CONTRACT_STATUSES.has(status)
+  );
+}
+
+/**
+ * Fires per contract whose status is newly `failed` — and only `failed`
+ * (issue #1091): a courier that blew its deadline, collateral forfeited. See
+ * `diffContractTerminalTransition` for the shared guards.
+ */
+export function diffContractFailed(
+  characterId: number,
+  prev: ContractSnapshot | undefined,
+  next: ContractSnapshot
+): ContractNotificationFire[] {
+  return diffContractTerminalTransition(
+    characterId,
+    prev,
+    next,
+    'contractFailed',
+    (status) => status === 'failed'
+  );
 }
 
 export interface WalletJournalEntrySnapshot {

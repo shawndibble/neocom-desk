@@ -31,6 +31,8 @@ import type { BoardCalendarEventSource, BoardClockSource } from '@/engine/charac
 
 const ROMAN = ['I', 'II', 'III', 'IV', 'V'] as const;
 
+const DAY_MS = 86_400_000;
+
 /** Resolves a type id to its SDE name; supplied by the caller, which owns the catalog. */
 export type TypeNamer = (typeId: number) => string;
 
@@ -139,11 +141,33 @@ export function toPlanetExtractionSources(colonies: readonly ColonyPins[]): Boar
   return sources;
 }
 
+/**
+ * An accepted courier's real deadline: delivery, not the offer's expiry.
+ *
+ * `date_expired` is the deadline to *accept*, which for every other contract is
+ * also the deadline that matters. Accepting a courier replaces it — delivery is
+ * owed within `days_to_complete` of `date_accepted`, usually sooner than the
+ * offer window closes, so the expiry over-read the one clock whose miss forfeits
+ * the collateral.
+ *
+ * `null` where that cannot be derived, and the caller keeps the expiry rather
+ * than guess. `days_to_complete: 0` is no completion window at all, not a
+ * zero-length one — read as a duration it would leave the row permanently overdue.
+ */
+function toCourierDeliveryDeadlineMs(contract: Contract): number | null {
+  if (contract.type !== 'courier' || contract.status !== 'in_progress') return null;
+  const days = contract.days_to_complete;
+  if (days === undefined || !Number.isFinite(days) || days <= 0) return null;
+  const acceptedMs = parseInstant(contract.date_accepted);
+  if (acceptedMs === null) return null;
+  return acceptedMs + days * DAY_MS;
+}
+
 export function toContractExpirySources(contracts: readonly Contract[]): BoardClockSource[] {
   const sources: BoardClockSource[] = [];
   for (const contract of contracts) {
     if (!isActiveContractStatus(contract.status)) continue;
-    const deadlineMs = parseInstant(contract.date_expired);
+    const deadlineMs = toCourierDeliveryDeadlineMs(contract) ?? parseInstant(contract.date_expired);
     if (deadlineMs === null) continue;
     sources.push({
       id: String(contract.contract_id),
@@ -158,11 +182,7 @@ export function toContractExpirySources(contracts: readonly Contract[]): BoardCl
   return sources;
 }
 
-const ORDER_DURATION_DAY_MS = 86_400_000;
-
 /**
- * The board's one genuinely derived deadline.
- *
  * ESI gives `issued` and a `duration` in whole days and never an absolute
  * expiry, so this is arithmetic rather than a field read — and getting it
  * wrong would be invisible, putting the row somewhere plausible but incorrect
@@ -180,7 +200,7 @@ export function toOrderExpirySources(
       id: String(order.order_id),
       subject: typeName(order.type_id),
       detail: order.is_buy_order ? 'buy' : 'sell',
-      deadlineMs: issuedMs + order.duration * ORDER_DURATION_DAY_MS,
+      deadlineMs: issuedMs + order.duration * DAY_MS,
     });
   }
   return sources;
