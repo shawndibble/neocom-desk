@@ -64,20 +64,35 @@ Survey method, all still current:
   category and tools absent from `76.json`.
 - **A title is a weak classifier** — EVE Empire, Pod and ECT EVE Assets sat in
   the skim list and all carried a full industry surface. Treat these as
-  unexamined, not cleared, and check any touching the ISK pipeline: Nexum,
-  EveWebMail, Wayfinder, Atlas, MISMAPS/MISKILLZ, Fly Safe, WHMapper,
-  Socketkill, PEARL, EVE Hacking Simulator, EVE Nexus, Eve PvP Radar, EVE-O
-  Preview, EVE Threat Checker, EVE Fit Assistant, SLH Local Scanner, EVE NewBro,
-  EVE Link, PATT, W-Space Atlas, EveHunter, ADAPT, Helm, Nicotine,
-  fleet-manager, HARUSPEX, EasyEve, icon server, contract-monitoring Discord
-  bot, Ascension Labs Libs, Z-S Overview Customiser, SMT Eve Map Tool,
-  Eve-mentor-mcp, EVEMon Lives, OpsCore v2, WarBeacon, Project Eden, EVE 3D
-  MAP, @strata-eve/esi SDK, Eve Missile Analyst, Eve Ship Stats, Grey Zone
-  Automation, EVE411, Eve Skillsboard, EVE Intelligence Nexus, Eveswitcher,
-  Insurgency Tools, Battlefield.Space. Cleared, non-ISK: Ministry of
-  Pantoscopic Observance (intel/killboard desk-calculator tool), Rangefinder
-  (cyno-route planning), EVE OQM integration (a dev-recruitment thread for a
-  generic inventory-mgmt plugin, no shipped feature).
+  unexamined, not cleared, and check any touching the ISK pipeline: EveWebMail,
+  Wayfinder, Atlas, MISMAPS/MISKILLZ, Fly Safe, WHMapper, Socketkill, PEARL,
+  EVE Hacking Simulator, Eve PvP Radar, EVE-O Preview, EVE Threat Checker, EVE
+  Fit Assistant, SLH Local Scanner, EVE NewBro, EVE Link, EveHunter, Nicotine,
+  HARUSPEX, icon server, Ascension Labs Libs, Z-S Overview Customiser, SMT Eve
+  Map Tool, Eve-mentor-mcp, WarBeacon, Project Eden, EVE 3D MAP,
+  @strata-eve/esi SDK, Eve Missile Analyst, Eve Ship Stats, Grey Zone
+  Automation, EVE Intelligence Nexus, Eveswitcher, Insurgency Tools,
+  Battlefield.Space. Cleared, non-ISK: Ministry of Pantoscopic Observance
+  (intel desk calculator), Rangefinder (cyno routing), EVE OQM integration
+  (dev-recruitment thread, nothing shipped), Nexum (wormhole chain mapper),
+  Helm (plugin-first corp platform, no industry plugin exists), fleet-manager
+  (in-fleet MOTD), EVE411 (intel + Local scan), Eve Skillsboard (skill browser
+  for character sales), EVEMon Lives (EVEMon fork), W-Space Atlas (wormhole
+  database), PATT (chat-log translator).
+- **Cleared on kill-test 1, not on domain** — each DOES carry an economic
+  surface, so the name alone will not re-clear it: ADAPT (its Internal Contract
+  Market is a member exchange, the EQM Corporate Exchange shape), OpsCore v2
+  (ore/loot buyback plus a payout ledger; assets/market/wallet are
+  roadmap-only), EasyEve (loot split; its ISK/hr is ISKONOMY's remit exclusion,
+  its trade routes are class 3).
+- **Two roster names were phantoms.** "contract-monitoring Discord bot" IS the
+  already-surveyed EVE Contract Bot. "EVE Nexus" is the _mobile app_ (dev
+  Kuastro), not `eve-nexus.app` — now examined, and an EVE Empire/Pod-shaped
+  broad ISK surface cleared item by item: watchlist price alerts are the
+  Quickbar (#680), mining ledger is EVE Miner Hub, PI and job pushes are the
+  IndustrialEVE entry, reprocessing is #672, LP is #718/#1050/#1068, injector
+  value is EveLens. Its one differentiator is a native mobile fitting sim, out
+  of domain.
 - **Dead/unreachable, not gap-analysed:** EVE Panel, EVE GURU / Production
   Ledger, EveTerminal.io, Mining Timer Tool, EVE Hauling Advisor, EVE Market Pro
   (evemarketpro.org returns HTTP 530 — unclassifiable).
