@@ -940,14 +940,15 @@ export function TaxTab({ tabBar }: TaxTabProps) {
                 {visibleBalances.map((balance) => (
                   <Panel key={balance.payee.id}>
                     <div className="flex items-center justify-between gap-2">
+                      {/* -my-3 cancels min-h-11's added height so the row (and card) doesn't grow — the 44px only exists as invisible hit area bleeding into Panel's own p-3 padding above and the tight gap below; md: reverts both so desktop is unchanged. */}
                       <button
                         type="button"
                         onClick={() => filterToPayee(balance.payee.id)}
                         aria-label={t('miningTax.filterToPayee', { payee: balance.payee.name })}
                         aria-pressed={isSolePayeeFilter(balance.payee.id)}
-                        className="min-w-0 truncate text-left text-sm font-semibold hover:text-accent focus-visible:outline-2 focus-visible:outline-accent aria-pressed:text-accent"
+                        className="-my-3 flex min-h-11 min-w-0 items-center text-left text-sm font-semibold hover:text-accent focus-visible:outline-2 focus-visible:outline-accent aria-pressed:text-accent md:my-0 md:min-h-0"
                       >
-                        {balance.payee.name}
+                        <span className="min-w-0 truncate">{balance.payee.name}</span>
                       </button>
                       <span className="shrink-0 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
                         {t('miningTax.balanceEntries', { count: balance.members.length })}
