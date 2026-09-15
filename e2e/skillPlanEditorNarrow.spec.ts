@@ -3,11 +3,10 @@
  * plan list is not on screen at all, so this link is the only way back to
  * it — and it was a bare `inline-block text-xs text-accent hover:underline`
  * anchor, a ~16px-tall tap target on exactly the viewport where it matters
- * most. It now uses `buttonClassName({ size: 'sm' })` (`h-9 md:h-7`), the
- * `Link`-as-nav-action precedent from `AppraisalShared.tsx`.
+ * most.
  *
- * Asserted on the rendered bounding box rather than the class string: the
- * class only proves what was typed, the box proves what the cascade produced.
+ * Asserted on the rendered bounding box rather than the class string; see
+ * `loyaltyStoreNarrow.spec.ts` for why.
  *
  * The plan is seeded straight into IndexedDB rather than created through the
  * "New plan" flow — same raw-`indexedDB` precedent as
@@ -23,10 +22,11 @@ const PHONE = { width: 390, height: 844 };
 const DESKTOP = { width: 1280, height: 800 };
 
 const PLAN_ID = 'e2e-skill-plan-1';
+const PLAN_NAME = 'Narrow viewport plan';
 
 async function seedPlan(page: Page): Promise<void> {
   await page.evaluate(
-    async ({ characterId, planId }) => {
+    async ({ characterId, planId, planName }) => {
       const database = await new Promise<IDBDatabase>((resolve, reject) => {
         const request = indexedDB.open('neocom');
         request.onsuccess = () => resolve(request.result);
@@ -37,7 +37,7 @@ async function seedPlan(page: Page): Promise<void> {
         tx.objectStore('skillPlans').put({
           id: planId,
           characterId,
-          name: 'Narrow viewport plan',
+          name: planName,
           entries: [],
           remapCount: 0,
           updatedAt: Date.now(),
@@ -47,7 +47,7 @@ async function seedPlan(page: Page): Promise<void> {
       });
       database.close();
     },
-    { characterId: CHARACTER_ID, planId: PLAN_ID }
+    { characterId: CHARACTER_ID, planId: PLAN_ID, planName: PLAN_NAME }
   );
 }
 
@@ -71,6 +71,12 @@ test('the back-to-plan-list link stays absent at and above lg (1280px), where th
   await seedPlan(page);
   await page.goto(`./skills/plans/${PLAN_ID}`);
   await page.setViewportSize(DESKTOP);
+
+  // Anchor on the editor having actually rendered before asserting an
+  // absence: `toHaveCount(0)` alone also passes on the loading spinner, or on
+  // the `<Navigate to="/skills/plans">` the route falls back to if the seeded
+  // plan never landed — neither of which says anything about the gate.
+  await expect(page.getByPlaceholder('Search skills…')).toBeVisible();
 
   // Gated on `!isDesktop`: the plan list itself is in the sidebar here, so
   // there is no box to size — pinned so the restyling above cannot quietly

@@ -89,7 +89,6 @@ const PREFETCHED_EMPTY = new Set(
     'contracts',
     'corporationhistory',
     'industry/jobs',
-    'loyalty/points',
     'mail',
     // Trailing slash on purpose: `getCharacterMining` fetches
     // `/characters/{id}/mining/`, and the Overview board reads it on every
@@ -171,10 +170,12 @@ export async function installEsiMock(page: Page): Promise<void> {
     // every page of every spec. A corp spec should override this route.
     if (path === `/characters/${CHARACTER_ID}/roles`) return json({});
 
-    // LP store offers are public and not character-scoped, so they can't ride
-    // in `PREFETCHED_EMPTY`. Empty for every corporation: the Loyalty Store
-    // route renders its chrome (header, back link, empty state) without any
-    // offers, and a spec that needs real offers should override this route.
+    // The two Loyalty Store surfaces, both empty. Not in `PREFETCHED_EMPTY`:
+    // neither is warmed at boot — the Wallet and LP Store routes fetch them
+    // on demand — and the offers endpoint is public, not character-scoped.
+    // The route renders its chrome (header, back link, empty state) with no
+    // offers at all; a spec that needs real rows should override these.
+    if (path === `/characters/${CHARACTER_ID}/loyalty/points`) return json([]);
     if (/^\/loyalty\/stores\/\d+\/offers\/$/.test(path)) return json([]);
 
     const typeMatch = /^\/universe\/types\/(\d+)$/.exec(path);

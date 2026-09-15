@@ -500,7 +500,11 @@ export function LoyaltyStore() {
 
   return (
     <div className="flex flex-col gap-3">
-      <Link to="/wallet" className={buttonClassName({ size: 'sm' })}>
+      {/* `self-start`, unlike `SkillPlanEditor`'s otherwise identical link:
+          this one's parent is a `flex flex-col`, whose default
+          `align-items: stretch` would blow the control's intrinsic width out
+          to the full page — a full-width bordered bar above the header. */}
+      <Link to="/wallet" className={buttonClassName({ size: 'sm', className: 'self-start' })}>
         {'←'} {t('loyaltyStore.back')}
       </Link>
 
