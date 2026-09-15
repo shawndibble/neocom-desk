@@ -19,6 +19,7 @@ import type { OwnedStockPlacement } from '@/engine/industry/ownedStock';
 import type { PiData } from '@/sde/types';
 import type { MakeOrBuy } from '@/engine/industry/makeOrBuy';
 import { FACILITY_PRESETS } from '@/engine/industry/types';
+import type { SkillGateVerdict } from '@/engine/industry/skillGate';
 import { resolveMaterial } from '@/engine/industry/materialResolution';
 import { applySourcingPatch } from './sourcingEdits';
 import { MaterialsTable } from './MaterialsTable';
@@ -44,6 +45,7 @@ const NAMES: Record<number, string> = {
   35: 'Pyerite',
   9840: 'Mechanical Parts',
   9841: 'Widget Blueprint',
+  3380: 'Industry',
 };
 const nameFor = (typeID: number) => NAMES[typeID] ?? `#${typeID}`;
 
@@ -1210,5 +1212,82 @@ describe('MaterialsTable Blueprint Acquisition picker trigger (issue #839)', () 
 
     expect(screen.getByText('ME 8% / TE 16%')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Choose blueprint tier' })).toBeNull();
+  });
+});
+
+describe('MaterialsTable skill-gate marker (issue #1015)', () => {
+  const GATED: SkillGateVerdict = {
+    gated: true,
+    shortfall: [{ typeID: 3380, haveLevel: 2, needLevel: 5 }],
+    bestCharacterId: 7,
+  };
+  const characterNameFor = (id: number) => (id === 7 ? 'Vex Kado' : `#${id}`);
+
+  /** A real resolved sub-build row for Mechanical Parts (9840) — mirrors the "build-here control" describe block's own `buildParts` fixture, self-contained since that one is scoped to its own describe. */
+  function building(): MaterialTableRow[] {
+    const partsBlueprint = {
+      name: 'Mechanical Parts Blueprint',
+      time: 1800,
+      materials: [{ typeID: 35, quantity: 5 }],
+      products: [{ typeID: 9840, quantity: 4 }],
+    };
+    return MENU_LINES.map((line) => {
+      if (line.typeID !== 9840) return line;
+      const { subBuild, ...resolved } = resolveMaterial(
+        { typeID: line.typeID, baseQuantity: line.baseQuantity, quantity: line.quantity },
+        {
+          buildHere: new Set([9840]),
+          recipeFor: (typeID) =>
+            typeID === 9840 ? { method: 'manufacturing', blueprint: partsBlueprint, me: 0 } : null,
+          materialPrices: { 35: 10 },
+          sourcing: undefined,
+          ctx: {
+            facility: FACILITY_PRESETS.npcStation,
+            rigFit: ['none', 'none', 'none'] as const,
+            security: 'highsec' as const,
+            systemCostIndex: 0.05,
+            adjustedPrices: {},
+            skills: {},
+          },
+        }
+      );
+      return { ...resolved, subBuilds: subBuild ? [subBuild] : [] };
+    });
+  }
+
+  it('marks a sub-build row no character on the account can install', () => {
+    renderTable({
+      materials: building(),
+      skillGates: new Map([[9840, GATED]]),
+      characterNameFor,
+    });
+
+    expect(within(row('Mechanical Parts')).getByText('Industry V')).toBeInTheDocument();
+  });
+
+  it('never marks a row bought, not built, even with a gated verdict on the books', () => {
+    renderTable({
+      materials: MENU_LINES,
+      skillGates: new Map([[9840, GATED]]),
+      characterNameFor,
+    });
+
+    expect(within(row('Mechanical Parts')).queryByText('Industry V')).toBeNull();
+  });
+
+  it('shows no marker at all when the caller passed no skill-gate data', () => {
+    renderTable({ materials: building() });
+
+    expect(within(row('Mechanical Parts')).queryByText('Industry V')).toBeNull();
+  });
+
+  it('shows no marker for a not-gated verdict — no positive state to draw', () => {
+    renderTable({
+      materials: building(),
+      skillGates: new Map([[9840, { gated: false }]]),
+      characterNameFor,
+    });
+
+    expect(within(row('Mechanical Parts')).queryByRole('img')).toBeNull();
   });
 });

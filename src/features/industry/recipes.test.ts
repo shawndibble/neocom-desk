@@ -130,6 +130,7 @@ describe('materialRecipe', () => {
         materials: [{ typeID: 34, quantity: 20 }],
         products: [{ typeID: 9840, quantity: 5 }],
         activity: 'manufacturing',
+        skills: [],
       },
       me: 0,
     });
@@ -206,6 +207,7 @@ describe('materialRecipe', () => {
         materials: [{ typeID: 16650, quantity: 200 }],
         products: [{ typeID: 16667, quantity: 100 }],
         activity: 'reaction',
+        skills: [],
       },
     });
   });

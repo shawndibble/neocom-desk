@@ -50,6 +50,7 @@ const DOM_TS_TESTS = [
   'src/features/industry/useRunCountsByPlan.test.ts',
   'src/features/market/useAppraisal.test.ts',
   'src/features/market/useCompareRows.test.ts',
+  'src/features/skills/useAccountSkillLevels.test.ts',
   // sessionStorage / localStorage
   'src/app/loginFlow.test.ts',
   'src/auth/session.test.ts',

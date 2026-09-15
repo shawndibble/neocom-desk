@@ -316,6 +316,8 @@ export const Orders = withWeight(Receipt);
 export const ReadOnly = withWeight(ShieldCheck);
 /** Credentials that stay on the device. */
 export const TokenPrivacy = withWeight(LockKey);
+/** A build row no character on the account has the skills to install. */
+export const SkillLocked = withWeight(LockKey);
 /** The project's source being public. */
 export const OpenSource = withWeight(Code);
 /** Start the EVE SSO round trip. Replaces the `▶` dingbat the login button used to draw (DESIGN.md §5). */

@@ -41,6 +41,8 @@ export interface MarketWideScanOptions {
 
 export interface MarketWideResultRow extends MarketWideRow {
   productName: string;
+  /** The blueprint that builds this product, for skill-gate lookups against the catalog. */
+  blueprintTypeID: number;
 }
 
 /** Every product typeID `marketWideTrees.json` carries a tree for. */
@@ -105,5 +107,6 @@ export async function runMarketWideScan(
   return rows.map((row) => ({
     ...row,
     productName: catalog.typesById[String(row.productTypeID)]?.name ?? `#${row.productTypeID}`,
+    blueprintTypeID: trees[String(row.productTypeID)]!.blueprintTypeID,
   }));
 }

@@ -9,6 +9,7 @@ import type { CharacterAttributes, CharacterSkill } from '@/esi/endpoints';
 import { buildUnlockIndex } from '@/engine/skillUnlocks';
 import { deriveAttributeBaseline, type AttributeBaseline } from '@/engine/attributeBaseline';
 import type { Attributes, EngineSkill, Implants, SkillUnlock, TrainedSkill } from '@/engine/types';
+import type { SkillLevels } from '@/engine/industry/types';
 
 export interface SkillCatalog {
   /** All skills, keyed by typeID, in the shape src/engine consumes. */
@@ -48,6 +49,17 @@ export function toTrainedSkillsMap(skills: readonly CharacterSkill[]): Map<numbe
     map.set(skill.skill_id, { level: skill.trained_skill_level, sp: skill.skillpoints_in_skill });
   }
   return map;
+}
+
+/**
+ * ESI trained-skills rows -> plain typeID->level record, for a job-eligibility
+ * check (active_skill_level, not trained_skill_level — level in effect, which
+ * can read lower than trained under an alpha clone or a lapsed skill).
+ */
+export function toAccountSkillLevels(skills: readonly CharacterSkill[]): SkillLevels {
+  const levels: SkillLevels = {};
+  for (const skill of skills) levels[skill.skill_id] = skill.active_skill_level;
+  return levels;
 }
 
 /**
