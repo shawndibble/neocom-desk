@@ -904,6 +904,9 @@ export function Characters() {
    * rather than a new pattern for this page.
    */
   async function handleRefreshAll() {
+    // `aria-disabled` keeps the button hoverable so its Tooltip stays readable
+    // mid-refresh, but it still takes the click — so the guard lives here.
+    if (refreshingAll) return;
     setRefreshingAll(true);
     try {
       const now = Date.now();
@@ -1091,15 +1094,24 @@ export function Characters() {
         title={t('characters.title')}
         actions={
           <>
+            {/*
+              `Tooltip`, not a native `title=`: a touch device has no hover, so
+              the "may take a moment" warning was unreachable on a phone exactly
+              where the wait is longest (#1102). The tap belongs to the refresh,
+              so no `openOnTap` — touch-and-hold reads it. And `aria-disabled`
+              rather than the native attribute while refreshing, per DESIGN.md's
+              `FilterChip` rule: a natively disabled button takes no hover and no
+              focus, which would make the bubble unreadable by either route just
+              as the wait it explains is actually happening.
+            */}
             {characters.length > 0 && (
-              /*
-                `Tooltip`, not a native `title=`: a touch device has no hover,
-                so the "may take a moment" warning was unreachable on a phone
-                exactly where the wait is longest (#1102). The tap belongs to
-                the refresh, so no `openOnTap` — touch-and-hold reads it.
-              */
               <Tooltip content={t('characters.refreshAllHint')}>
-                <Button size="md" onClick={() => void handleRefreshAll()} disabled={refreshingAll}>
+                <Button
+                  size="md"
+                  onClick={() => void handleRefreshAll()}
+                  aria-disabled={refreshingAll || undefined}
+                  className="aria-disabled:cursor-default aria-disabled:opacity-40"
+                >
                   {refreshingAll ? <Spinner size="sm" /> : <Icon.Refresh />}
                   {refreshingAll ? t('characters.refreshingAll') : t('characters.refreshAll')}
                 </Button>

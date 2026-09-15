@@ -6,18 +6,27 @@
  * `filterSheetNarrow.spec.ts` and `corpBoardNarrow.spec.ts` give for running
  * this one against a real browser instead.
  */
+import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
 import { CHARACTER_NAME } from './support/fixtureData';
 
 const PHONE = { width: 390, height: 844 };
 
-test('New Group, density, and view-mode controls share one row at 390px', async ({ page }) => {
+/**
+ * Both tests here start the same way. `support/login.ts`'s helper lands on
+ * /overview, and this file is about the Characters toolbar specifically.
+ */
+async function landOnCharactersAtPhoneWidth(page: Page) {
   await page.setViewportSize(PHONE);
   await page.goto('./');
   await page.getByRole('button', { name: 'Log in with EVE Online' }).first().click();
   await page.waitForLoadState('load');
   await expect(page).toHaveURL(/\/characters$/);
   await expect(page.getByRole('button', { name: `Select ${CHARACTER_NAME}` })).toBeVisible();
+}
+
+test('New Group, density, and view-mode controls share one row at 390px', async ({ page }) => {
+  await landOnCharactersAtPhoneWidth(page);
 
   const newGroup = page.getByRole('button', { name: 'New group' });
   const density = page.getByRole('combobox', { name: 'Density' });
@@ -64,12 +73,7 @@ test.describe('Refresh all on a touch device', () => {
     'Pulls live data for every character. This may take a moment for a large roster.';
 
   test('touch-and-hold reveals the Refresh all hint at 390px', async ({ page }) => {
-    await page.setViewportSize(PHONE);
-    await page.goto('./');
-    await page.getByRole('button', { name: 'Log in with EVE Online' }).first().click();
-    await page.waitForLoadState('load');
-    await expect(page).toHaveURL(/\/characters$/);
-    await expect(page.getByRole('button', { name: `Select ${CHARACTER_NAME}` })).toBeVisible();
+    await landOnCharactersAtPhoneWidth(page);
 
     const refreshAll = page.getByRole('button', { name: 'Refresh all' });
     await expect(refreshAll).toBeVisible();
@@ -91,8 +95,10 @@ test.describe('Refresh all on a touch device', () => {
       touchPoints: [touchPoint],
     });
     try {
-      // `toHaveText` waits out the long-press delay on its own.
+      // `toHaveText` waits out the long-press delay on its own; `toBeVisible`
+      // is what makes it "reachable" rather than merely present.
       await expect(page.getByRole('tooltip')).toHaveText(REFRESH_ALL_HINT);
+      await expect(page.getByRole('tooltip')).toBeVisible();
     } finally {
       await cdp.send('Input.dispatchTouchEvent', { type: 'touchCancel', touchPoints: [] });
     }
