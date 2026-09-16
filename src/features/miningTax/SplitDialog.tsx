@@ -277,8 +277,7 @@ export function SplitDialog({
               {t('miningTax.splitKeepsLabel', { payee: originalPayeeName })}
             </p>
             <p className="tabular-nums">
-              {formatIsk(keptValue.estimatedValue)} ISK ·{' '}
-              <span className="text-isk-neg">{formatIsk(keptValue.taxOwed)} ISK</span>{' '}
+              {formatIsk(keptValue.estimatedValue)} ISK · {formatIsk(keptValue.taxOwed)} ISK{' '}
               {t('miningTax.splitAtPct', { pct: assignment.taxPct })}
             </p>
           </div>
@@ -294,8 +293,7 @@ export function SplitDialog({
               })}
             </p>
             <p className="tabular-nums">
-              {formatIsk(newValue.estimatedValue)} ISK ·{' '}
-              <span className="text-isk-neg">{formatIsk(newValue.taxOwed)} ISK</span>{' '}
+              {formatIsk(newValue.estimatedValue)} ISK · {formatIsk(newValue.taxOwed)} ISK{' '}
               {t('miningTax.splitAtPct', { pct: safePct })}
             </p>
           </div>
