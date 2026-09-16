@@ -10,13 +10,23 @@
  * so a variation price that finishes loading after the modal opens (the
  * Variations table fetches those independently) still lands in the matrix
  * without a refetch.
+ *
+ * One `DataTable` per attribute category (issue #1128), so the matrix
+ * inherits the default below-`sm` stack — a card per attribute, one labelled
+ * line per item — rather than showing two of up to `VARIATIONS_LIMIT` (20)
+ * 96px columns at a time. Same trade DESIGN.md §4a records for
+ * `SkillCompare` in #406. §4a's one-DOM rule forbids a `sm:hidden` pair, so
+ * the header loses its 32px `TypeIcon`: `DataTableColumn.header` is a string,
+ * and the stacked label is CSS `content: attr(data-label)`.
  */
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { EmptyState, IskAmount, Modal, Spinner, TypeIcon } from '@/components/ui';
+import { DataTable, EmptyState, IskAmount, Modal, Spinner } from '@/components/ui';
+import type { DataTableColumn } from '@/components/ui';
 import {
   buildCompareMatrix,
   type CompareAttributeGroup,
+  type CompareAttributeRow,
   type CompareCell,
 } from '@/engine/market/attributeCompareMatrix';
 import type {
@@ -138,6 +148,40 @@ export function VariationsCompareModal({ items, prices, onClose }: VariationsCom
     );
   }, [data, items, prices, t]);
 
+  const columns = useMemo<DataTableColumn<CompareAttributeRow>[]>(
+    () => [
+      {
+        id: 'attribute',
+        header: t('market.variationsCompare.attributeColumn'),
+        primary: true,
+        // The `sm:` half is the desktop matrix, and `sm` is where `.dt-stack`
+        // stops (`width < 40rem`): pinned, so the attribute still says which
+        // row you are on 19 columns to the right, and dim, as a row label
+        // beside its values. Once it titles a card instead, dim would make
+        // the one line naming the card the quietest thing on it.
+        className: 'whitespace-nowrap sm:sticky sm:left-0 sm:z-10 sm:bg-panel sm:text-text-dim',
+        // A floor, so the pinned gutter is the same width in every category —
+        // each table sizes its own columns off its own longest name.
+        headerClassName: 'sm:sticky sm:left-0 sm:z-10 sm:bg-panel sm:min-w-40',
+        render: (row) => row.name,
+      },
+      ...items.map((item): DataTableColumn<CompareAttributeRow> => ({
+        id: `item-${item.typeId}`,
+        header: item.name,
+        align: 'right',
+        className: 'tabular-nums',
+        // 20 items in a `max-w-5xl` modal compress to ~50px each without a
+        // floor — narrower than the figures they hold.
+        headerClassName: 'sm:min-w-24',
+        render: (row) => {
+          const cell = row.cells.get(item.typeId);
+          return cell ? formatCell(row.kind, cell) : emptyCell(row.kind, item, prices);
+        },
+      })),
+    ],
+    [items, prices, t]
+  );
+
   return (
     <Modal open onClose={onClose} title={t('market.variationsCompare.title')} placement="wide">
       {loading ? (
@@ -151,66 +195,32 @@ export function VariationsCompareModal({ items, prices, onClose }: VariationsCom
           className="py-8"
         />
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-max border-collapse text-xs">
-            <thead>
-              <tr>
-                <th scope="col" className="sticky left-0 z-10 bg-panel"></th>
-                {items.map((item) => (
-                  <th
-                    key={item.typeId}
-                    scope="col"
-                    className="min-w-24 border-b border-line px-2 py-1 text-center font-medium text-text"
-                  >
-                    <TypeIcon
-                      typeId={item.typeId}
-                      size={32}
-                      width={32}
-                      height={32}
-                      className="mx-auto rounded-xs border border-line"
-                    />
-                    <div className="mt-1 truncate">{item.name}</div>
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            {groups.map((group) => (
-              <tbody key={group.category}>
-                <tr>
-                  <th
-                    scope="rowgroup"
-                    colSpan={items.length + 1}
-                    className="border-b border-line pt-2 pb-1 text-left"
-                  >
-                    {/* The cell spans the full (scrolling) table width, so the
-                        label is pinned by a sticky child rather than a sticky
-                        cell — otherwise it scrolls away with the columns. */}
-                    <div className="sticky left-0 inline-block bg-panel pr-3 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                      {group.category}
-                    </div>
-                  </th>
-                </tr>
-                {group.rows.map((row) => (
-                  <tr key={row.key}>
-                    <th
-                      scope="row"
-                      className="sticky left-0 z-10 bg-panel py-0.5 pr-3 text-left font-normal whitespace-nowrap text-text-dim"
-                    >
-                      {row.name}
-                    </th>
-                    {items.map((item) => {
-                      const cell = row.cells.get(item.typeId);
-                      return (
-                        <td key={item.typeId} className="py-0.5 text-right tabular-nums text-text">
-                          {cell ? formatCell(row.kind, cell) : emptyCell(row.kind, item, prices)}
-                        </td>
-                      );
-                    })}
-                  </tr>
-                ))}
-              </tbody>
-            ))}
-          </table>
+        // One scroller for every category, not one each: the categories are
+        // still a single matrix of the same items, so scrolling Fitting to
+        // column 12 has to take Capacitor with it. Inert below `sm`, where
+        // `.dt-stack` makes each table a column of full-width cards.
+        <div className="space-y-3 overflow-x-auto">
+          {groups.map((group) => (
+            <section key={group.category}>
+              {/* Pinned left: the heading sits above the full scrolling width,
+                  so it would otherwise slide away with the columns. Ungated,
+                  unlike the cells below — nothing scrolls sideways under
+                  `sm`, so it is already inert there. */}
+              <h3 className="sticky left-0 mb-1 inline-block bg-panel pr-3 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                {group.category}
+              </h3>
+              <DataTable
+                columns={columns}
+                rows={group.rows}
+                rowKey={(row) => row.key}
+                label={group.category}
+                density="compact"
+                // Scroll rather than squeeze: the floors above only hold if
+                // the table may outgrow the modal.
+                className="sm:min-w-max"
+              />
+            </section>
+          ))}
         </div>
       )}
     </Modal>

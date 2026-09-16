@@ -3017,6 +3017,7 @@
     },
     "variationsCompare": {
       "title": "Compare Variations",
+      "attributeColumn": "Attribute",
       "worth": "Worth",
       "estimatedPrice": "Estimated Price",
       "errorTitle": "Couldn't load comparison",
