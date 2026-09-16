@@ -419,7 +419,13 @@ interface PlanSensitivityProps {
  *
  * A row per floor rather than per rate, so the footprint sits beside the
  * margins it buys — and because that is the orientation `DataTable`'s stacking
- * survives: each card is titled by its floor, with one labelled line per rate.
+ * survives: each card is titled by its floor, with the footprint and every
+ * rate's margin below it.
+ *
+ * The margins below that title are short figures, so the card pairs them
+ * two per row rather than spending a whole phone line on each — the same
+ * `stackColumns={2}` treatment the Price History day list and the Appraisal
+ * tables already use.
  */
 export function PlanSensitivity({ grid, rates }: PlanSensitivityProps) {
   const { t } = useTranslation();
@@ -484,6 +490,7 @@ export function PlanSensitivity({ grid, rates }: PlanSensitivityProps) {
         rows={grid}
         rowKey={(row: SensitivityRow) => row.floor as SourcingFloor}
         density="compact"
+        stackColumns={2}
       />
     </Panel>
   );
