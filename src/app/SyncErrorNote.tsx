@@ -8,17 +8,22 @@ interface SyncErrorNoteProps {
 }
 
 /**
- * Visible (not tooltip-only) "Sync error" text, mounted once at the shell
- * level by `Layout.tsx`'s `SyncErrorBanner` so it speaks from every route
- * (#1132) rather than from `/skills/plans` alone, as it did when UX-REVIEW
- * #1/#10 first added it. Local edits keep working even when sync can't reach
- * Firebase, so a silent failure otherwise looks like data loss; the nav's
- * `SyncStatusDot` is hover-only, which reads as "red = broken" with no
- * visible words, and is desktop-only besides. Renders nothing outside the
- * error state.
+ * Visible (not tooltip-only) "Sync error" text. Local edits keep working even
+ * when sync can't reach Firebase, so a silent failure looks like data loss,
+ * and the nav's `SyncStatusDot` is hover-only — "red = broken" with no words
+ * (UX-REVIEW #1/#10). Renders nothing outside the error state; `Layout.tsx`'s
+ * `SyncErrorBanner` owns where it is mounted.
+ *
+ * `role="status"`: it surfaces mid-session off a background event, so without
+ * a live region a screen reader is never told — the form the planner's and
+ * Settings' confirmations already use.
  */
 export function SyncErrorNote({ status, online }: SyncErrorNoteProps) {
   const { t } = useTranslation();
   if (syncDisplayState(status, online) !== 'error') return null;
-  return <p className="text-[0.6875rem] text-danger uppercase">{t('sync.errorNote')}</p>;
+  return (
+    <p role="status" aria-live="polite" className="text-[0.6875rem] text-danger uppercase">
+      {t('sync.errorNote')}
+    </p>
+  );
 }

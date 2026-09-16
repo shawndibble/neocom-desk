@@ -11,6 +11,13 @@ describe('SyncErrorNote', () => {
     expect(screen.getByText('Sync error — changes saved locally')).toBeInTheDocument();
   });
 
+  it('is a live region, so it is announced and not just drawn', () => {
+    render(
+      <SyncErrorNote status={{ state: 'error', lastSyncedAt: null, error: 'boom' }} online={true} />
+    );
+    expect(screen.getByRole('status')).toHaveTextContent('Sync error — changes saved locally');
+  });
+
   it('renders nothing when idle', () => {
     render(
       <SyncErrorNote status={{ state: 'idle', lastSyncedAt: null, error: null }} online={true} />

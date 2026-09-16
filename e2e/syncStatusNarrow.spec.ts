@@ -1,10 +1,6 @@
 /**
- * Sync failure has to be visible on a phone (issue #1132). The only signal the
- * app had was `SyncStatusDot`, whose state lives in a `title=` tooltip and
- * which is mounted inside the desktop-only left rail — so below `md` nothing
- * reported a failing sync at all, except on `/skills/plans`, the single route
- * that mounted `SyncErrorNote` for itself. The fix moves that note to the
- * shell (`Layout.tsx`), where it speaks from every route.
+ * A failing sync has to be visible on a phone (issue #1132) — see
+ * `Layout.tsx`'s `SyncErrorBanner` for why the note lives in the shell.
  *
  * Forcing the state: `sync/planSync.ts` is the only writer of an `error`
  * status, and it never runs here — E2E deliberately blanks the Firebase env
@@ -19,28 +15,50 @@ import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
 import { loginAndSelectCharacter } from './support/login';
 import { CHARACTER_ID } from './support/fixtureData';
+import type { SyncStatus } from '../src/sync/status';
 
-const PHONE = { width: 390, height: 844 };
-const DESKTOP = { width: 1280, height: 800 };
+type Viewport = { width: number; height: number };
+
+const PHONE: Viewport = { width: 390, height: 844 };
+const DESKTOP: Viewport = { width: 1280, height: 800 };
 const ERROR_NOTE = 'Sync error — changes saved locally';
 
-/** Must run after the app has mounted: a navigation resets the module state. */
+test.beforeEach(async ({ page }) => {
+  await loginAndSelectCharacter(page);
+});
+
+/**
+ * Waits on the route's own `<h1>`: `page.goto` resolves on `load`, which in
+ * this SPA lands before React paints, so a count assertion made any earlier
+ * would pass against an empty shell.
+ */
+async function openRoute(
+  page: Page,
+  path: string,
+  heading: string,
+  viewport: Viewport = PHONE
+): Promise<void> {
+  await page.setViewportSize(viewport);
+  await page.goto(path);
+  await expect(page.getByRole('heading', { name: heading, level: 1 })).toBeVisible();
+}
+
 async function forceSyncError(page: Page): Promise<void> {
   await page.evaluate(async (characterId) => {
     // Indirected through a variable so `tsc` leaves it alone: this is a dev
-    // server URL, not a path this spec's own module graph can resolve.
+    // server URL, not a path this spec's own module graph can resolve. The
+    // cast is still checked against the real `SyncStatus`, so a signature
+    // change here fails typecheck rather than at runtime in CI.
     const specifier = '/src/sync/status.ts';
     const status = (await import(specifier)) as {
-      setStatus: (characterId: number, patch: { state: string; error: string }) => void;
+      setStatus: (characterId: number, patch: Partial<SyncStatus>) => void;
     };
     status.setStatus(characterId, { state: 'error', error: 'forced by e2e' });
   }, CHARACTER_ID);
 }
 
 test('a sync error is visible at 390px from a route outside /skills/plans', async ({ page }) => {
-  await loginAndSelectCharacter(page);
-  await page.setViewportSize(PHONE);
-  await page.goto('./settings');
+  await openRoute(page, './settings', 'Settings');
 
   // The note is absent while sync is healthy — otherwise the assertion below
   // would pass on a note that was always there.
@@ -51,31 +69,26 @@ test('a sync error is visible at 390px from a route outside /skills/plans', asyn
 });
 
 test('the shell note follows the pilot across routes at 390px', async ({ page }) => {
-  await loginAndSelectCharacter(page);
-  await page.setViewportSize(PHONE);
-  await page.goto('./settings');
+  await openRoute(page, './settings', 'Settings');
   await forceSyncError(page);
   await expect(page.getByText(ERROR_NOTE)).toBeVisible();
 
   // A client-side route change keeps the module state, so the note should
-  // simply still be there — the point of mounting it in the shell.
+  // simply still be there — the point of mounting it in the shell. `/overview`
+  // is in `DEFAULT_MOBILE_TABS`, so the link is in the phone's tab bar.
   await page.getByRole('link', { name: 'Overview' }).first().click();
-  await page.waitForURL(/\/$|\/overview/);
+  await page.waitForURL(/\/overview$/);
   await expect(page.getByText(ERROR_NOTE)).toBeVisible();
 });
 
 test('/skills/plans shows exactly one note, not the shell note plus its own', async ({ page }) => {
-  await loginAndSelectCharacter(page);
-  await page.setViewportSize(PHONE);
-  await page.goto('./skills/plans');
+  await openRoute(page, './skills/plans', 'Skills');
   await forceSyncError(page);
   await expect(page.getByText(ERROR_NOTE)).toHaveCount(1);
 });
 
 test('the note is kept at desktop width, where /skills/plans already had it', async ({ page }) => {
-  await loginAndSelectCharacter(page);
-  await page.setViewportSize(DESKTOP);
-  await page.goto('./settings');
+  await openRoute(page, './settings', 'Settings', DESKTOP);
   await forceSyncError(page);
   await expect(page.getByText(ERROR_NOTE)).toBeVisible();
 });
