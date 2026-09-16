@@ -114,8 +114,10 @@ describe('VariationsCompareModal', () => {
     );
 
     expect(await screen.findByText('Structure Hitpoints')).toBeInTheDocument();
+    // One table per attribute category (#1128), so each item's column header
+    // repeats once per category rather than appearing once for the matrix.
     expect(screen.getAllByText('Rifter').length).toBeGreaterThan(0);
-    expect(screen.getByText('Republic Fleet Rifter')).toBeInTheDocument();
+    expect(screen.getAllByText('Republic Fleet Rifter').length).toBeGreaterThan(0);
     expect(screen.getByText('Maximum Velocity')).toBeInTheDocument();
     expect(screen.getByText('1,200 HP')).toBeInTheDocument();
     expect(screen.getByText('250 m/sec')).toBeInTheDocument();
@@ -194,6 +196,62 @@ describe('VariationsCompareModal', () => {
     await user.keyboard('{Escape}');
     expect(onClose).toHaveBeenCalled();
   });
+  it('renders one stacking DataTable per attribute category, labelled per item for the stacked view', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/universe/types/587`, () =>
+        HttpResponse.json({
+          type_id: 587,
+          name: 'Rifter',
+          description: '',
+          group_id: 25,
+          published: true,
+          dogma_attributes: [{ attribute_id: 9, value: 1200 }],
+        })
+      ),
+      http.get(`${ESI_BASE_URL}/universe/types/588`, () =>
+        HttpResponse.json({
+          type_id: 588,
+          name: 'Republic Fleet Rifter',
+          description: '',
+          group_id: 25,
+          published: true,
+          dogma_attributes: [{ attribute_id: 37, value: 250 }],
+        })
+      )
+    );
+    mockedLoadDictionary.mockResolvedValue({
+      9: { name: 'Structure Hitpoints', unit: 'HP', category: 'Structure' },
+      37: { name: 'Maximum Velocity', unit: 'm/sec', category: 'Speed and Travel' },
+    });
+    mockedLoadSkills.mockResolvedValue([]);
+
+    render(
+      <VariationsCompareModal
+        items={ITEMS}
+        prices={new Map([[587, summary(100)]])}
+        onClose={() => {}}
+      />
+    );
+
+    // Worth + the two attribute categories, each its own table rather than a
+    // `tbody` of one hand-rolled matrix.
+    const tables = await screen.findAllByRole('table');
+    expect(tables.map((table) => table.getAttribute('aria-label'))).toEqual([
+      'Worth',
+      'Speed and Travel',
+      'Structure',
+    ]);
+    // Every table stacks below `sm` — the whole point of #1128; none opts out
+    // with `responsive="table"`.
+    for (const table of tables) expect(table).toHaveClass('dt-stack');
+
+    // Stacked cards label each value with its item's name, from `data-label`
+    // (CSS `content: attr(data-label)`), and title the card with the attribute.
+    const hpCell = screen.getByText('1,200 HP');
+    expect(hpCell).toHaveAttribute('data-label', 'Rifter');
+    expect(screen.getByText('Structure Hitpoints')).toHaveClass('dt-primary');
+  });
+
   it('resolves an id-reference row once for the whole matrix, not once per column', async () => {
     let groupCalls = 0;
     const rifter = (typeId: number, name: string) =>
