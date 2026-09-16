@@ -1,0 +1,327 @@
+/**
+ * The PI Plan tab's Sensitivity table at 390px (issue #1134).
+ *
+ * That table is one row per sourcing floor and one short figure per customs
+ * rate in the sweep — five fixed rates plus the pilot's own when it differs,
+ * beside a footprint. At `DataTable`'s default `stackColumns={1}` each of
+ * those six or seven figures took a full phone line, so comparing one floor
+ * across rates (the table's whole reason to exist) was a scroll. Fixed the
+ * same way `PriceHistoryChart.tsx`, `AppraisalPanel.tsx` and Mining Tax's
+ * Yield Detail already are: `stackColumns={2}`.
+ *
+ * Playwright rather than jsdom because the pairing lives in `.dt-stack-2col`'s
+ * `@media (width < 40rem)` grid (`src/styles/index.css`), which jsdom cannot
+ * evaluate. The class token itself is already guarded beside the component in
+ * `src/features/pi/PlanPanel.test.tsx`; what only a real engine can tell is a
+ * paired card from the one-line-per-rate card that shipped, so the assertions
+ * here are on bounding boxes — which cells share a line, and how wide each is.
+ *
+ * Both parities are driven, because unlike #1130's fixed four columns this
+ * card's cell count moves with the pilot's own rate:
+ *   - a 10% rate is already one of the fixed five, so the sweep stays five
+ *     rates: footprint + 5 = 6 cells, an exact 2+2+2.
+ *   - a 3% rate is not, so it folds in as a sixth column: 7 cells, and the
+ *     last margin is the odd trailing cell #1113 had to prove lands cleanly.
+ *
+ * And both floor counts the issue names, from the product's own tier
+ * (`floorsBelow` in `planModel.ts` — every tier under the target): a P3
+ * product has three floors, a P2 product two.
+ *
+ * No colony fixture. The Plan tab costs a hypothetical chain from `pi.json`
+ * and hub prices alone — it never reads the character's colonies — so the
+ * product is chosen straight off the URL (`?tab=plan&type=`) and the only
+ * network this spec has to answer is Fuzzwork.
+ */
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import type { Page } from '@playwright/test';
+import { test, expect } from './support/testBase';
+import { loginAndSelectCharacter } from './support/login';
+
+const PHONE = { width: 390, height: 844 };
+const DESKTOP = { width: 1280, height: 800 };
+
+/** Camera Drones: a P3, so the grid has three floors — P0, P1, P2. */
+const P3_PRODUCT = 2345;
+/** Oxides: a P2, so the grid has two — P0 and P1. */
+const P2_PRODUCT = 2317;
+
+const SENSITIVITY_TABLE = 'Margin per unit for each sourcing floor across customs rates';
+
+interface PiJson {
+  raw: { typeID: number }[];
+  schematics: Record<string, { inputs: { typeID: number }[] }>;
+}
+
+const pi = JSON.parse(
+  readFileSync(resolve(process.cwd(), 'public/data/pi.json'), 'utf8')
+) as PiJson;
+const rawTypeIds = new Set(pi.raw.map((resource) => resource.typeID));
+
+/**
+ * `engine/pi/chain.ts`'s `piTier` rule — one above the deepest input — read
+ * off the same `pi.json` the app loads, so the mocked book below can price a
+ * made product above the tier it is made from. A flat price per type would
+ * leave every floor's margin negative, which every geometry assertion here
+ * would happily pass while showing the pilot a card of losses.
+ */
+function piTier(typeId: number): number {
+  if (rawTypeIds.has(typeId)) return 0;
+  const schematic = pi.schematics[String(typeId)];
+  if (!schematic) return 0;
+  return 1 + Math.max(...schematic.inputs.map((input) => piTier(input.typeID)));
+}
+
+/** Flat per tier, as in `PlanPanel.test.tsx`: enough to keep a made tier worth making. */
+const UNIT_PRICE = [5, 760, 14_000, 100_000, 1_900_000];
+
+/**
+ * Quotes every type asked about, at its tier's price. The shared fixture
+ * prices one type only, which would leave the whole chain unpriceable and
+ * every cell reading "not priceable" — short strings that would satisfy the
+ * layout checks below without proving a single margin rendered.
+ * A later `page.route` wins over an earlier one — see `support/testBase.ts`.
+ */
+async function mockHubPrices(page: Page): Promise<void> {
+  await page.route('https://market.fuzzwork.co.uk/**', async (route) => {
+    const types = new URL(route.request().url()).searchParams.get('types') ?? '';
+    const body: Record<string, unknown> = {};
+    for (const raw of types.split(',').filter(Boolean)) {
+      const sell = UNIT_PRICE[piTier(Number(raw))] ?? 5;
+      body[raw] = {
+        buy: { max: sell * 0.95, volume: 500_000, orderCount: 40 },
+        sell: { min: sell, volume: 500_000, orderCount: 40 },
+      };
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(body),
+    });
+  });
+}
+
+/**
+ * Opens the Plan tab on one product and pins the customs rate, which is what
+ * decides the sweep's width. Gated on the Sensitivity table itself, so a
+ * timeout here means the tab stopped costing the chain rather than that the
+ * layout regressed.
+ */
+async function openSensitivity(page: Page, typeId: number, ratePercent: string): Promise<void> {
+  await page.goto(`./planetary-industry?tab=plan&type=${typeId}`);
+  const table = page.getByRole('table', { name: SENSITIVITY_TABLE });
+  // Well past the 5s default: the tab awaits the SDE bake plus a hub read for
+  // every type in the chain, cold on a CI runner.
+  await expect(table).toBeVisible({ timeout: 20_000 });
+
+  const rate = page.getByLabel('Customs rate (%)');
+  await rate.fill(ratePercent);
+  // The column only exists once the control has actually moved the sweep.
+  await expect(
+    page.getByRole('table', { name: SENSITIVITY_TABLE }).getByRole('columnheader', {
+      name: `${ratePercent}%`,
+      exact: true,
+    })
+  ).toBeVisible();
+}
+
+interface CellBox {
+  label: string;
+  text: string;
+  top: number;
+  left: number;
+  width: number;
+  /** `::before`'s `position` — `static` is the paired card's label-above-value, `absolute` the default card's pinned gutter. */
+  labelPosition: string;
+}
+
+interface RowGeometry {
+  display: string;
+  /** The `tr`'s own content box — what the card's cells have to share. */
+  contentWidth: number;
+  rowHeight: number;
+  cells: CellBox[];
+}
+
+/** One floor's cells, measured. Addressed by `data-row-key`, which is the floor itself. */
+async function readRow(page: Page, floor: string): Promise<RowGeometry> {
+  const row = page.locator(`table[aria-label="${SENSITIVITY_TABLE}"] tr[data-row-key="${floor}"]`);
+  await expect(row).toBeVisible();
+  return page.evaluate(
+    ({ key, table: label }) => {
+      const table = document.querySelector(`table[aria-label="${label}"]`)!;
+      const row = table.querySelector(`tbody tr[data-row-key="${key}"]`) as HTMLElement;
+      const style = getComputedStyle(row);
+      const box = row.getBoundingClientRect();
+      const cells = [...row.querySelectorAll(':scope > td')].map((td) => {
+        const cellBox = td.getBoundingClientRect();
+        return {
+          label: td.getAttribute('data-label') ?? '',
+          text: (td.textContent ?? '').trim(),
+          top: cellBox.top,
+          left: cellBox.left,
+          width: cellBox.width,
+          labelPosition: getComputedStyle(td, '::before').position,
+        };
+      });
+      return {
+        display: style.display,
+        contentWidth: box.width - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight),
+        rowHeight: box.height,
+        cells,
+      };
+    },
+    { key: floor, table: SENSITIVITY_TABLE }
+  );
+}
+
+/**
+ * Cells clustered into the lines they actually render on, top-to-bottom then
+ * left-to-right. A 1px tolerance rather than an exact match: grid stretches
+ * the cells of one track row to a shared top, but a tolerance costs nothing
+ * and will not split a line on a subpixel.
+ */
+function lines(cells: CellBox[]): CellBox[][] {
+  const grouped: CellBox[][] = [];
+  for (const cell of [...cells].sort((a, b) => a.top - b.top || a.left - b.left)) {
+    const last = grouped.at(-1);
+    if (last && Math.abs(last[0].top - cell.top) <= 1) last.push(cell);
+    else grouped.push([cell]);
+  }
+  return grouped;
+}
+
+function labelLines(cells: CellBox[]): string[][] {
+  return lines(cells).map((line) => line.map((cell) => cell.label));
+}
+
+/** The pairs under the card's title, and the trailing cell when the count is odd. */
+function assertPairing(
+  valueLines: CellBox[][],
+  contentWidth: number,
+  { trailing }: { trailing: boolean }
+): void {
+  const pairs = trailing ? valueLines.slice(0, -1) : valueLines;
+  for (const [first, second] of pairs) {
+    // Side by side, each roughly half the card: same width, same line, and the
+    // second starting past the end of the first (the 0.75rem gap).
+    expect(second.left).toBeGreaterThan(first.left + first.width);
+    expect(first.width).toBeCloseTo(second.width, 0);
+    expect(first.width).toBeLessThan(contentWidth * 0.55);
+    expect(first.width).toBeGreaterThan(contentWidth * 0.4);
+    // The other half of "no misaligned label": each label sits above its value
+    // in flow, not pinned into the default card's gutter — which inside a
+    // ~165px cell would leave the margin nowhere to render. Track geometry
+    // alone cannot see this, so without it the whole `td::before` rule could
+    // be deleted and this spec stay green.
+    for (const cell of [first, second]) expect(cell.labelPosition).toBe('static');
+  }
+  if (!trailing) return;
+
+  const [odd] = valueLines.at(-1)!;
+  const [firstOfPair] = pairs.at(-1)!;
+  // The dangling half-row the issue asks about: it stays in the first track at
+  // the same width as a paired cell, rather than stretching the card's width
+  // and reading as a second title.
+  expect(odd.left).toBeCloseTo(firstOfPair.left, 0);
+  expect(odd.width).toBeCloseTo(firstOfPair.width, 0);
+  expect(odd.labelPosition).toBe('static');
+}
+
+/** No sideways scroll, measured on the table's own wrapper rather than the document. */
+async function assertNoOverflow(page: Page): Promise<void> {
+  const wrapper = await page.evaluate((label) => {
+    const element = document.querySelector(`table[aria-label="${label}"]`)!.parentElement!;
+    return { scrollWidth: element.scrollWidth, clientWidth: element.clientWidth };
+  }, SENSITIVITY_TABLE);
+  expect(wrapper.scrollWidth).toBeLessThanOrEqual(wrapper.clientWidth);
+}
+
+test.describe('PI Plan — stacked Sensitivity card', () => {
+  test.beforeEach(async ({ page }) => {
+    await mockHubPrices(page);
+    await loginAndSelectCharacter(page);
+  });
+
+  test('pairs an even sweep two per row on all three of a P3 product’s floors', async ({
+    page,
+  }) => {
+    await page.setViewportSize(PHONE);
+    await openSensitivity(page, P3_PRODUCT, '10');
+
+    for (const floor of ['P0', 'P1', 'P2']) {
+      const { display, contentWidth, cells } = await readRow(page, floor);
+      expect(display).toBe('grid');
+
+      // 10% is already one of the fixed five rates, so the sweep stays five
+      // wide: footprint plus five margins under the floor's own title, an
+      // exact 2+2+2. Asserted as the whole card at once — a per-pair check
+      // would pass just as happily on a card that had dropped a column.
+      expect(labelLines(cells)).toEqual([
+        ['Floor'],
+        ['Footprint', '0%'],
+        ['5%', '10%'],
+        ['15%', '20%'],
+      ]);
+
+      const [[title], ...valueLines] = lines(cells);
+      // The floor still titles the card across both tracks (`grid-column: 1 / -1`).
+      expect(title.width).toBeCloseTo(contentWidth, 0);
+      assertPairing(valueLines, contentWidth, { trailing: false });
+    }
+
+    // The prices actually landed: a bought floor costs to a real ISK margin
+    // rather than the em dash an unpriced chain would show in every cell.
+    // (P0 is excluded on purpose — with no extractor yield given it reads
+    // "needs rate", which is a legitimate short value, not a missing one.)
+    const bought = await readRow(page, 'P1');
+    for (const cell of bought.cells.slice(2)) expect(cell.text).toMatch(/\d/);
+
+    await assertNoOverflow(page);
+  });
+
+  test('lands the odd trailing margin cleanly on both of a P2 product’s floors', async ({
+    page,
+  }) => {
+    await page.setViewportSize(PHONE);
+    // 3% is not one of the fixed columns, so it folds in as a sixth rate and
+    // the card carries seven cells — an odd count, which the even sweep above
+    // can never produce.
+    await openSensitivity(page, P2_PRODUCT, '3');
+
+    for (const floor of ['P0', 'P1']) {
+      const { display, contentWidth, cells } = await readRow(page, floor);
+      expect(display).toBe('grid');
+      expect(labelLines(cells)).toEqual([
+        ['Floor'],
+        ['Footprint', '0%'],
+        ['3%', '5%'],
+        ['10%', '15%'],
+        ['20%'],
+      ]);
+
+      const [[title], ...valueLines] = lines(cells);
+      expect(title.width).toBeCloseTo(contentWidth, 0);
+      assertPairing(valueLines, contentWidth, { trailing: true });
+    }
+
+    await assertNoOverflow(page);
+  });
+
+  test('keeps one real table row per floor at 1280px', async ({ page }) => {
+    await page.setViewportSize(DESKTOP);
+    await openSensitivity(page, P3_PRODUCT, '10');
+
+    const { display, contentWidth, rowHeight, cells } = await readRow(page, 'P1');
+    // `stackColumns` may only ever affect the card below `sm` — above it the
+    // row is still a table row, footprint and all five margins on one line.
+    expect(display).toBe('table-row');
+    expect(labelLines(cells)).toEqual([['Floor', 'Footprint', '0%', '5%', '10%', '15%', '20%']]);
+    // Not just "one line group": a single dense row, so a cell that started
+    // wrapping would fail here rather than pass by sharing a top with its
+    // neighbours.
+    expect(rowHeight).toBeLessThan(40);
+    // And no cell hoisted to title width — that is the stacked card's shape.
+    for (const cell of cells) expect(cell.width).toBeLessThan(contentWidth * 0.9);
+  });
+});

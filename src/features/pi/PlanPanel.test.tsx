@@ -231,6 +231,22 @@ describe('PlanPanel', () => {
     expect(best(p1)[4]).toBe(true); // 10%
   });
 
+  // Rationale is on the `stackColumns` prop itself (PlanResults.tsx). The
+  // geometry it buys — which cells share a line, and the odd trailing margin
+  // — is in `e2e/planetaryIndustryNarrow.spec.ts`, because the pairing lives
+  // in a `@media (width < 40rem)` grid that jsdom cannot evaluate. This half
+  // is the token itself, so deleting the prop fails here rather than only in
+  // Playwright.
+  it('pairs two figures per line below sm, same as the Appraisal tables', async () => {
+    renderPanel();
+    await verdict();
+
+    const table = await screen.findByRole('table', {
+      name: /Margin per unit for each sourcing floor/,
+    });
+    expect(table).toHaveClass('dt-stack-2col');
+  });
+
   it("folds the user's own rate into the sweep, so the control moves the answer", async () => {
     const user = userEvent.setup();
     renderPanel();
