@@ -633,10 +633,12 @@ describe('Variations table (issue #145, formerly the Related Items strip of issu
 
     const dialog = await screen.findByRole('dialog', { name: 'Compare Variations' });
     // A column per row the table is showing, and the selected item is not
-    // one of them — it isn't a row in that table either.
-    expect(await within(dialog).findByText('Kestrel')).toBeInTheDocument();
-    expect(within(dialog).getByText('Corax')).toBeInTheDocument();
-    expect(within(dialog).queryByText('Merlin')).not.toBeInTheDocument();
+    // one of them — it isn't a row in that table either. Each name repeats
+    // once per attribute category, since the matrix is one DataTable per
+    // category (#1128).
+    expect(await within(dialog).findAllByText('Kestrel')).not.toHaveLength(0);
+    expect(within(dialog).getAllByText('Corax')).not.toHaveLength(0);
+    expect(within(dialog).queryAllByText('Merlin')).toHaveLength(0);
     // Estimated Price leads, then the dogma rows fetched for the modal.
     expect(within(dialog).getByText('Estimated Price')).toBeInTheDocument();
     expect(within(dialog).getByText('1,200 HP')).toBeInTheDocument();
@@ -698,9 +700,9 @@ describe('Variations table (issue #145, formerly the Related Items strip of issu
     await user.click(screen.getByRole('menuitem', { name: 'Compare Variations' }));
 
     const dialog = await screen.findByRole('dialog', { name: 'Compare Variations' });
-    expect(within(dialog).getByText('Kestrel')).toBeInTheDocument();
-    expect(within(dialog).getByText('Corax')).toBeInTheDocument();
-    expect(within(dialog).queryByText('Merlin')).not.toBeInTheDocument();
+    expect(within(dialog).getAllByText('Kestrel')).not.toHaveLength(0);
+    expect(within(dialog).getAllByText('Corax')).not.toHaveLength(0);
+    expect(within(dialog).queryAllByText('Merlin')).toHaveLength(0);
 
     await user.keyboard('{Escape}');
   });
