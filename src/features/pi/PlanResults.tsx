@@ -422,13 +422,10 @@ interface PlanSensitivityProps {
  * survives: each card is titled by its floor, with the footprint and every
  * rate's margin below it.
  *
- * Those below-the-title cells are all short figures, so the card pairs them
+ * The margins below that title are short figures, so the card pairs them
  * two per row rather than spending a whole phone line on each — the same
  * `stackColumns={2}` treatment the Price History day list and the Appraisal
- * tables already use. The sweep is five fixed rates plus the pilot's own when
- * it differs, so a card carries six or seven cells: an even count pairs
- * exactly, an odd one leaves the last margin alone in the first track, which
- * is where the `.dt-stack-2col` grid puts it and reads fine.
+ * tables already use.
  */
 export function PlanSensitivity({ grid, rates }: PlanSensitivityProps) {
   const { t } = useTranslation();

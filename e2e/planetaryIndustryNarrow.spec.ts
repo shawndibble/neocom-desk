@@ -24,7 +24,7 @@
  *     last margin is the odd trailing cell #1113 had to prove lands cleanly.
  *
  * And both floor counts the issue names, from the product's own tier
- * (`floorsBelow` in `planModel.ts` — every tier under the target): a P3
+ * (`validFloors` in `planModel.ts` — every tier under the target): a P3
  * product has three floors, a P2 product two.
  *
  * No colony fixture. The Plan tab costs a hypothetical chain from `pi.json`
@@ -37,6 +37,8 @@ import { resolve } from 'node:path';
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
 import { loginAndSelectCharacter } from './support/login';
+import { piTier } from '../src/engine/pi/chain';
+import type { PiData } from '../src/sde/types';
 
 const PHONE = { width: 390, height: 844 };
 const DESKTOP = { width: 1280, height: 800 };
@@ -47,32 +49,20 @@ const P3_PRODUCT = 2345;
 const P2_PRODUCT = 2317;
 
 const SENSITIVITY_TABLE = 'Margin per unit for each sourcing floor across customs rates';
+/** The winning floor's decorative star plus the words a screen reader gets. */
+const BEST_MARKER = /★\s*Best at this rate/;
 
-interface PiJson {
-  raw: { typeID: number }[];
-  schematics: Record<string, { inputs: { typeID: number }[] }>;
-}
-
+/** The graph the app itself bakes, so the engine's own `piTier` can read it. */
 const pi = JSON.parse(
   readFileSync(resolve(process.cwd(), 'public/data/pi.json'), 'utf8')
-) as PiJson;
-const rawTypeIds = new Set(pi.raw.map((resource) => resource.typeID));
+) as PiData;
 
 /**
- * `engine/pi/chain.ts`'s `piTier` rule — one above the deepest input — read
- * off the same `pi.json` the app loads, so the mocked book below can price a
- * made product above the tier it is made from. A flat price per type would
- * leave every floor's margin negative, which every geometry assertion here
- * would happily pass while showing the pilot a card of losses.
+ * Flat per tier, as in `PlanPanel.test.tsx`: enough to keep a made tier worth
+ * making. One price for every type would leave every floor's margin negative,
+ * which every geometry assertion here would happily pass while showing the
+ * pilot a card of losses.
  */
-function piTier(typeId: number): number {
-  if (rawTypeIds.has(typeId)) return 0;
-  const schematic = pi.schematics[String(typeId)];
-  if (!schematic) return 0;
-  return 1 + Math.max(...schematic.inputs.map((input) => piTier(input.typeID)));
-}
-
-/** Flat per tier, as in `PlanPanel.test.tsx`: enough to keep a made tier worth making. */
 const UNIT_PRICE = [5, 760, 14_000, 100_000, 1_900_000];
 
 /**
@@ -87,7 +77,7 @@ async function mockHubPrices(page: Page): Promise<void> {
     const types = new URL(route.request().url()).searchParams.get('types') ?? '';
     const body: Record<string, unknown> = {};
     for (const raw of types.split(',').filter(Boolean)) {
-      const sell = UNIT_PRICE[piTier(Number(raw))] ?? 5;
+      const sell = UNIT_PRICE[piTier(Number(raw), pi)];
       body[raw] = {
         buy: { max: sell * 0.95, volume: 500_000, orderCount: 40 },
         sell: { min: sell, volume: 500_000, orderCount: 40 },
@@ -116,13 +106,14 @@ async function openSensitivity(page: Page, typeId: number, ratePercent: string):
 
   const rate = page.getByLabel('Customs rate (%)');
   await rate.fill(ratePercent);
-  // The column only exists once the control has actually moved the sweep.
+  // A real gate only for a rate outside the fixed five: there the column
+  // appears once the fill has moved the sweep. At 10% — the highsec untrained
+  // default, and already one of the five — nothing moves and this just says
+  // the sweep is up. Attached, not visible: `.dt-stack thead` is clipped to
+  // 1px on a phone, so the header is deliberately invisible there.
   await expect(
-    page.getByRole('table', { name: SENSITIVITY_TABLE }).getByRole('columnheader', {
-      name: `${ratePercent}%`,
-      exact: true,
-    })
-  ).toBeVisible();
+    table.getByRole('columnheader', { name: `${ratePercent}%`, exact: true })
+  ).toBeAttached();
 }
 
 interface CellBox {
@@ -202,6 +193,9 @@ function assertPairing(
   { trailing }: { trailing: boolean }
 ): void {
   const pairs = trailing ? valueLines.slice(0, -1) : valueLines;
+  // Destructured below, so a short line has to fail as a length rather than as
+  // a TypeError on an undefined second cell.
+  for (const line of pairs) expect(line).toHaveLength(2);
   for (const [first, second] of pairs) {
     // Side by side, each roughly half the card: same width, same line, and the
     // second starting past the end of the first (the 0.75rem gap).
@@ -228,13 +222,19 @@ function assertPairing(
   expect(odd.labelPosition).toBe('static');
 }
 
-/** No sideways scroll, measured on the table's own wrapper rather than the document. */
+/**
+ * The halved card still costs the page no sideways scroll, which is the risk a
+ * two-track grid runs at 390px. Measured on the document, as
+ * `appraisalSharedNarrow.spec.ts` does: `DataTable` renders a bare `<table>`
+ * and `Panel padded={false}` a plain block div, so there is no scrolling
+ * wrapper of its own to ask.
+ */
 async function assertNoOverflow(page: Page): Promise<void> {
-  const wrapper = await page.evaluate((label) => {
-    const element = document.querySelector(`table[aria-label="${label}"]`)!.parentElement!;
-    return { scrollWidth: element.scrollWidth, clientWidth: element.clientWidth };
-  }, SENSITIVITY_TABLE);
-  expect(wrapper.scrollWidth).toBeLessThanOrEqual(wrapper.clientWidth);
+  const doc = await page.evaluate(() => ({
+    scrollWidth: document.documentElement.scrollWidth,
+    clientWidth: document.documentElement.clientWidth,
+  }));
+  expect(doc.scrollWidth).toBeLessThanOrEqual(doc.clientWidth);
 }
 
 test.describe('PI Plan — stacked Sensitivity card', () => {
@@ -249,9 +249,18 @@ test.describe('PI Plan — stacked Sensitivity card', () => {
     await page.setViewportSize(PHONE);
     await openSensitivity(page, P3_PRODUCT, '10');
 
+    const markedRates: Record<string, number> = {};
     for (const floor of ['P0', 'P1', 'P2']) {
       const { display, contentWidth, cells } = await readRow(page, floor);
       expect(display).toBe('grid');
+
+      for (const cell of cells) {
+        if (!BEST_MARKER.test(cell.text)) continue;
+        markedRates[cell.label] = (markedRates[cell.label] ?? 0) + 1;
+        // The marker rides inside the cell, so it must not widen it out of its
+        // track — the half-width check the paired cells get below.
+        expect(cell.width).toBeLessThan(contentWidth * 0.55);
+      }
 
       // 10% is already one of the fixed five rates, so the sweep stays five
       // wide: footprint plus five margins under the floor's own title, an
@@ -269,6 +278,10 @@ test.describe('PI Plan — stacked Sensitivity card', () => {
       expect(title.width).toBeCloseTo(contentWidth, 0);
       assertPairing(valueLines, contentWidth, { trailing: false });
     }
+
+    // Every rate still marks exactly one winning floor: the star survived the
+    // reflow, and it did not multiply or vanish along the way.
+    expect(markedRates).toEqual({ '0%': 1, '5%': 1, '10%': 1, '15%': 1, '20%': 1 });
 
     // The prices actually landed: a bought floor costs to a real ISK margin
     // rather than the em dash an unpriced chain would show in every cell.

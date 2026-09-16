@@ -231,12 +231,10 @@ describe('PlanPanel', () => {
     expect(best(p1)[4]).toBe(true); // 10%
   });
 
-  // Rationale is on the `stackColumns` prop itself (PlanResults.tsx). The
-  // geometry it buys — which cells share a line, and the odd trailing margin
-  // — is in `e2e/planetaryIndustryNarrow.spec.ts`, because the pairing lives
-  // in a `@media (width < 40rem)` grid that jsdom cannot evaluate. This half
-  // is the token itself, so deleting the prop fails here rather than only in
-  // Playwright.
+  // Rationale is on the `stackColumns` prop itself (PlanResults.tsx), the
+  // geometry it buys in `e2e/planetaryIndustryNarrow.spec.ts` — jsdom cannot
+  // evaluate the media query. This half is the token, so deleting the prop
+  // fails here too.
   it('pairs two figures per line below sm, same as the Appraisal tables', async () => {
     renderPanel();
     await verdict();
