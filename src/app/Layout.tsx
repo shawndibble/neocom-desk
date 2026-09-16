@@ -7,6 +7,7 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 import { usePrefetch, isPrefetching } from '@/stores/prefetch';
 import { isSyncConfigured } from './syncStatus';
 import { SyncStatusDot } from './SyncStatusDot';
+import { SyncErrorNote } from './SyncErrorNote';
 import { useSyncStatus } from './useSyncStatus';
 import { CharacterAvatar, characterAvatarBoxClassName, LogoMark, Modal } from '@/components/ui';
 import { AuthFailureNotice } from './AuthFailureNotice';
@@ -35,6 +36,31 @@ import type { AppRoutePath } from './routeScopes';
 function SyncStatusIndicator() {
   const { status, online } = useSyncStatus();
   return <SyncStatusDot status={status} online={online} />;
+}
+
+/**
+ * The visible half of the sync signal, shell-wide (#1132). `SyncStatusDot`
+ * carries its state in a `title=`/`aria-label` only and lives inside the
+ * desktop-only rail, so below `md` a failing sync said nothing at all except
+ * on `/skills/plans`, the one route that mounted this note for itself.
+ *
+ * Mounted at every width, not `md:hidden`: that route rendered the note on
+ * desktop too, and hiding it above `md` would take away a signal desktop
+ * already has. A desktop user seeing both this and the rail's red dot is the
+ * intended overlap.
+ *
+ * No `isSyncConfigured()` gate, unlike the dot: `SyncErrorNote` renders
+ * nothing outside the `error` state, and only `sync/planSync.ts` writes that
+ * state — which never runs when sync isn't configured. `empty:hidden` keeps
+ * the spacer from reserving a margin in the (normal) case where it does.
+ */
+function SyncErrorBanner() {
+  const { status, online } = useSyncStatus();
+  return (
+    <div className="mb-4 empty:hidden">
+      <SyncErrorNote status={status} online={online} />
+    </div>
+  );
 }
 
 /**
@@ -600,6 +626,7 @@ export function Layout() {
 
       <main className="min-w-0 flex-1 px-2 py-4 pb-[calc(5rem+env(safe-area-inset-bottom))] md:px-4 md:pb-4">
         <AuthFailureNotice />
+        <SyncErrorBanner />
         {/*
           Deliberately not `key={location.pathname}`, which would replay a CSS
           animation by remounting. Six entries in App.tsx's `ROUTE_ELEMENTS`

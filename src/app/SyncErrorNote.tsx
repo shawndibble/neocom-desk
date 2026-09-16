@@ -8,11 +8,14 @@ interface SyncErrorNoteProps {
 }
 
 /**
- * Visible (not tooltip-only) "Sync error" text for pages where a silent
- * failure risks looking like data loss — e.g. /skills/plans, where local
- * edits keep working even when sync can't reach Firebase (UX-REVIEW #1/#10:
- * the nav's SyncStatusDot is hover-only, which reads as "red = broken" with
- * no visible words). Renders nothing outside the error state.
+ * Visible (not tooltip-only) "Sync error" text, mounted once at the shell
+ * level by `Layout.tsx`'s `SyncErrorBanner` so it speaks from every route
+ * (#1132) rather than from `/skills/plans` alone, as it did when UX-REVIEW
+ * #1/#10 first added it. Local edits keep working even when sync can't reach
+ * Firebase, so a silent failure otherwise looks like data loss; the nav's
+ * `SyncStatusDot` is hover-only, which reads as "red = broken" with no
+ * visible words, and is desktop-only besides. Renders nothing outside the
+ * error state.
  */
 export function SyncErrorNote({ status, online }: SyncErrorNoteProps) {
   const { t } = useTranslation();
