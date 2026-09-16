@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Modal, TextInput } from '@/components/ui';
+import { tappableRowClassName } from '@/components/ui/controlStyles';
 import type { PayeeRecord } from '@/db';
 import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
@@ -183,7 +184,12 @@ export function LinkPaymentDialog({
                   const on = !excluded.has(m.assignment.id);
                   return (
                     <li key={m.assignment.id}>
-                      <label className="flex cursor-pointer items-center gap-2 px-2 py-1.5 text-xs">
+                      <label
+                        className={cx(
+                          'flex cursor-pointer items-center gap-2 px-2 py-1.5 text-xs',
+                          tappableRowClassName
+                        )}
+                      >
                         <input
                           type="checkbox"
                           checked={on}

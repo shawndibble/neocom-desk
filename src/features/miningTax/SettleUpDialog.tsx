@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, FilterChip, Modal, TextInput } from '@/components/ui';
+import { tappableRowClassName } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
 import type { MiningTaxAssignmentRecord, MiningTaxPaymentMethod } from '@/db';
 import { writeToClipboard } from '@/lib/clipboard';
@@ -173,7 +174,12 @@ export function SettleUpDialog({ open, onClose, rows, systemNames, onPaid }: Set
                 const on = !excluded.has(r.assignment.id);
                 return (
                   <li key={r.assignment.id}>
-                    <label className="flex cursor-pointer items-center gap-2 px-2 py-1.5 text-xs">
+                    <label
+                      className={cx(
+                        'flex cursor-pointer items-center gap-2 px-2 py-1.5 text-xs',
+                        tappableRowClassName
+                      )}
+                    >
                       <input
                         type="checkbox"
                         checked={on}
