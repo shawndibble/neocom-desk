@@ -51,16 +51,14 @@ function SyncStatusIndicator() {
  *
  * No `isSyncConfigured()` gate, unlike the dot: `SyncErrorNote` renders
  * nothing outside the `error` state, and only `sync/planSync.ts` writes that
- * state — which never runs when sync isn't configured. `empty:hidden` keeps
- * the spacer from reserving a margin in the (normal) case where it does.
+ * state — which never runs when sync isn't configured.
+ *
+ * Its own component, like `SyncStatusIndicator`, so a status tick re-renders
+ * the note rather than the whole shell.
  */
 function SyncErrorBanner() {
   const { status, online } = useSyncStatus();
-  return (
-    <div className="mb-4 empty:hidden">
-      <SyncErrorNote status={status} online={online} />
-    </div>
-  );
+  return <SyncErrorNote status={status} online={online} />;
 }
 
 /**
