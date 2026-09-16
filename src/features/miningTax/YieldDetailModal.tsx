@@ -293,6 +293,11 @@ export function YieldDetailModal({
                 rowKey={(line) => line.typeId}
                 label={t('miningTax.overview.detail.oreMinedTitle')}
                 defaultSort={{ columnId: 'raw', direction: 'desc' }}
+                // Four short figures a card, same shape as the Price History
+                // day list: one per line would run a multi-ore day twice as
+                // long for no gain in legibility. The neighbouring "refines
+                // into" table has only two and stays at the default.
+                stackColumns={2}
               />
             </div>
           </div>
