@@ -21,6 +21,12 @@ interface ReauthBannerProps {
    * component's call sites are in-page secondary banners that never pass
    * `variant` at all and so inherit `primary` too. Keying off it would resize
    * all of them.
+   *
+   * It moves the pointer-width height too, 28px to 36px (plus that tier's
+   * padding and type scale), because the scale has no `h-11 md:h-7` rung and
+   * DESIGN.md §3 forbids hand-writing one. 36px is what every other primary
+   * button in the app already renders at on a pointer, so the sole CTA of a
+   * locked route matching them is the outcome to want.
    */
   soleAction?: boolean;
 }
