@@ -25,7 +25,7 @@ import { loginAndSelectCharacter } from './support/login';
 const PHONE = { width: 390, height: 844 };
 const DESKTOP = { width: 1280, height: 800 };
 
-/** The fixture item's own name, and the variation group it roots. */
+/** Roots the variation group; excluded from the compared set itself. */
 const ITEM = '1MN Afterburner I';
 
 /**
@@ -84,14 +84,12 @@ test('Variations compare stacks into labelled cards at 390px', async ({ page }) 
   await page.setViewportSize(PHONE);
   const dialog = await openCompareModal(page);
 
-  // Every category table stacks — none opts out with `responsive="table"`.
-  // Both stubbed categories plus the synthetic "Worth" group are present, so
-  // this is the real multi-table shape and not one table passing for all.
+  // Both stubbed categories plus the synthetic "Worth" group, so what follows
+  // measures the real multi-table shape and not one table passing for all.
+  // That each carries `.dt-stack` is `VariationsCompareModal.test.tsx`'s job;
+  // this spec exists for what the class does once a browser lays it out.
   const tables = dialog.getByRole('table');
   expect(await tables.count()).toBeGreaterThanOrEqual(3);
-  for (const table of await tables.all()) {
-    await expect(table).toHaveClass(/dt-stack/);
-  }
   await expect(dialog.getByRole('table', { name: 'Capacitor' })).toBeAttached();
 
   // An attribute table, named rather than positional: `buildCompareMatrix`
@@ -111,8 +109,8 @@ test('Variations compare stacks into labelled cards at 390px', async ({ page }) 
     })
   ).toBeLessThanOrEqual(1);
 
-  // More than the 2-3 items the precedent exercised: this variation group
-  // contributes 18 compared items, each a labelled line in the card.
+  // Every compared item is a labelled line in the card. A floor rather than
+  // the exact 18, so an SDE update that adds a variation doesn't fail this.
   const labels = await fitting
     .locator('td[data-label]')
     .evaluateAll((cells) => [...new Set(cells.map((cell) => cell.getAttribute('data-label')))]);
@@ -128,7 +126,7 @@ test('Variations compare stacks into labelled cards at 390px', async ({ page }) 
   }
 });
 
-test('Variations compare keeps real item columns at and above md (1280px)', async ({ page }) => {
+test('Variations compare keeps real item columns above sm (1280px)', async ({ page }) => {
   await page.setViewportSize(DESKTOP);
   const dialog = await openCompareModal(page);
 
@@ -140,7 +138,6 @@ test('Variations compare keeps real item columns at and above md (1280px)', asyn
   const attribute = dialog.getByRole('columnheader', { name: 'Attribute', exact: true }).first();
   await expect(attribute).toBeVisible();
 
-  // Real columns: the table lays out as a table, not as the stack's blocks.
   expect(
     await dialog
       .getByRole('table')
@@ -148,8 +145,7 @@ test('Variations compare keeps real item columns at and above md (1280px)', asyn
       .evaluate((table) => getComputedStyle(table).display)
   ).toBe('table');
 
-  // The attribute stays pinned while the items scroll, as it did when it was
-  // a `sticky left-0` row header.
+  // The attribute stays pinned while the items scroll past it.
   expect(await attribute.evaluate((cell) => getComputedStyle(cell).position)).toBe('sticky');
 
   // Every category scrolls together: one scroll container for the whole

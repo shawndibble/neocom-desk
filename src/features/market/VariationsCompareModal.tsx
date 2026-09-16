@@ -153,15 +153,16 @@ export function VariationsCompareModal({ items, prices, onClose }: VariationsCom
       {
         id: 'attribute',
         header: t('market.variationsCompare.attributeColumn'),
-        // Titles the stacked card: the attribute is what a phone reader is
-        // comparing across, and every other cell is one item's value for it.
         primary: true,
-        // Everything past `whitespace-nowrap` is desktop-only. Pinned, the
-        // attribute still says which row you are on 19 columns to the right;
-        // dim, it is a row label beside its values. Below `sm` the same cell
-        // titles the card, where dim is the quietest thing on it.
+        // The `sm:` half is the desktop matrix, and `sm` is where `.dt-stack`
+        // stops (`width < 40rem`): pinned, so the attribute still says which
+        // row you are on 19 columns to the right, and dim, as a row label
+        // beside its values. Once it titles a card instead, dim would make
+        // the one line naming the card the quietest thing on it.
         className: 'whitespace-nowrap sm:sticky sm:left-0 sm:z-10 sm:bg-panel sm:text-text-dim',
-        headerClassName: 'sm:sticky sm:left-0 sm:z-10 sm:bg-panel',
+        // A floor, so the pinned gutter is the same width in every category —
+        // each table sizes its own columns off its own longest name.
+        headerClassName: 'sm:sticky sm:left-0 sm:z-10 sm:bg-panel sm:min-w-40',
         render: (row) => row.name,
       },
       ...items.map((item): DataTableColumn<CompareAttributeRow> => ({
@@ -169,8 +170,8 @@ export function VariationsCompareModal({ items, prices, onClose }: VariationsCom
         header: item.name,
         align: 'right',
         className: 'tabular-nums',
-        // The width floor the old `min-w-24` header carried: 20 items in a
-        // `max-w-5xl` modal otherwise compress to ~50px each.
+        // 20 items in a `max-w-5xl` modal compress to ~50px each without a
+        // floor — narrower than the figures they hold.
         headerClassName: 'sm:min-w-24',
         render: (row) => {
           const cell = row.cells.get(item.typeId);
@@ -202,7 +203,9 @@ export function VariationsCompareModal({ items, prices, onClose }: VariationsCom
           {groups.map((group) => (
             <section key={group.category}>
               {/* Pinned left: the heading sits above the full scrolling width,
-                  so it would otherwise slide away with the columns. */}
+                  so it would otherwise slide away with the columns. Ungated,
+                  unlike the cells below — nothing scrolls sideways under
+                  `sm`, so it is already inert there. */}
               <h3 className="sticky left-0 mb-1 inline-block bg-panel pr-3 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
                 {group.category}
               </h3>
@@ -212,8 +215,8 @@ export function VariationsCompareModal({ items, prices, onClose }: VariationsCom
                 rowKey={(row) => row.key}
                 label={group.category}
                 density="compact"
-                // Lets the item columns keep their own width and scroll above
-                // `sm` instead of compressing into the modal.
+                // Scroll rather than squeeze: the floors above only hold if
+                // the table may outgrow the modal.
                 className="sm:min-w-max"
               />
             </section>

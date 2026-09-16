@@ -233,16 +233,13 @@ describe('VariationsCompareModal', () => {
       />
     );
 
-    // Worth + the two attribute categories, each its own table rather than a
-    // `tbody` of one hand-rolled matrix.
     const tables = await screen.findAllByRole('table');
     expect(tables.map((table) => table.getAttribute('aria-label'))).toEqual([
       'Worth',
       'Speed and Travel',
       'Structure',
     ]);
-    // Every table stacks below `sm` — the whole point of #1128; none opts out
-    // with `responsive="table"`.
+    // None opts out with `responsive="table"`.
     for (const table of tables) expect(table).toHaveClass('dt-stack');
 
     // Stacked cards label each value with its item's name, from `data-label`
