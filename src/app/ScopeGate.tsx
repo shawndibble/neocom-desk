@@ -27,6 +27,11 @@ interface ScopeGateProps {
  * response codes: ESI answers 403 both for a missing scope and for a structure
  * ACL the character isn't on, and re-authing cannot fix the latter.
  *
+ * `soleAction` because the banner is the entire page here: its button is the
+ * only thing left to tap, so it takes the touch tier the app's other primary
+ * actions get rather than the compact one a banner beside a view's own
+ * controls uses.
+ *
  * Passes `children` through while the Dexie read is in flight — a spinner would
  * flash for every user on every gated route, and delay the view's fetch behind
  * an IndexedDB lookup, to smooth over an already-broken grant.
@@ -46,6 +51,7 @@ export function ScopeGate({ path, children }: ScopeGateProps) {
       hint={t(`${namespace}.reauthHint`)}
       actionLabel={t(`${namespace}.reauthAction`)}
       onLogin={() => void beginEveLogin()}
+      soleAction
     />
   );
 }

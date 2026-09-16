@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { db } from '@/db';
 import { SCOPES } from '@/esi/scopes';
+import { controlHeightClassName } from '@/components/ui/controlStyles';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { ScopeGate } from './ScopeGate';
 import { useGrantedScopes } from './useGrantedScopes';
@@ -80,6 +81,17 @@ describe('ScopeGate', () => {
     // The point of gating before the fetch: no spinner-then-empty-table to
     // misread.
     expect(screen.queryByText('Mail from Aura')).not.toBeInTheDocument();
+  });
+
+  it('sizes the banner’s button at the touch tier — it is the locked route’s only control', async () => {
+    await seedGrant(['esi-assets.read_assets.v1']);
+    renderGate();
+
+    const login = await screen.findByRole('button', { name: /log in again with eve online/i });
+    // The gate replaces the whole view, so this button is the only thing on the
+    // page to tap: DESIGN.md §3's 44px tier, not the 36px one a banner sitting
+    // beside a view's own controls gets.
+    expect(login).toHaveClass(...controlHeightClassName.md.split(' '));
   });
 
   it('treats a character with no stored token as granting nothing', async () => {
