@@ -2,9 +2,6 @@ import { useTranslation } from 'react-i18next';
 import { Navigate } from 'react-router-dom';
 import { PageHeader, Spinner } from '@/components/ui';
 import { useActiveCharacter } from '@/stores/activeCharacter';
-import { isSyncConfigured } from '@/app/syncStatus';
-import { useSyncStatus } from '@/app/useSyncStatus';
-import { SyncErrorNote } from '@/app/SyncErrorNote';
 import { SkillsSubNav } from '@/features/skills/SkillsSubNav';
 import { AttributesPane } from '@/features/skills/planner/AttributesPane';
 import { CurrentQueuePanel } from '@/features/skills/planner/CurrentQueuePanel';
@@ -22,7 +19,6 @@ export function SkillPlans() {
   const { t } = useTranslation();
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   const hydrated = useActiveCharacter((state) => state.hydrated);
-  const syncStatus = useSyncStatus();
   const { catalog, attributesResult, implants, attributeBaseline, remapInfo } =
     usePlanEditorData(activeCharacterId);
   const isDesktop = useIsDesktop();
@@ -40,7 +36,6 @@ export function SkillPlans() {
     <div className="mx-auto max-w-6xl space-y-4">
       <PageHeader title={t('nav.skills')} />
       <SkillsSubNav />
-      {isSyncConfigured() && <SyncErrorNote {...syncStatus} />}
 
       {/* `lg:items-start`: grid items stretch to the row's height by
           default, so without this a short right column gets pulled down to
