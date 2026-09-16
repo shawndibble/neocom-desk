@@ -11,16 +11,13 @@
  * Variations table fetches those independently) still lands in the matrix
  * without a refetch.
  *
- * The matrix renders as one `DataTable` per attribute category rather than a
- * hand-rolled `<table>` (issue #1128), so it inherits `DataTable`'s default
- * below-`sm` stack: on a phone each attribute becomes a card listing every
- * compared item's labelled value, instead of a sideways scroll that showed
- * about two of up to `VARIATIONS_LIMIT` (20) 96px columns at a time. Same
- * trade DESIGN.md §4a records for `SkillCompare`'s matrix in #406. One DOM at
- * every width (§4a) rules out keeping the old markup behind a `sm:hidden`
- * pair, so the columns-as-items header gives up its 32px `TypeIcon`:
- * `DataTableColumn.header` is a string, and the stacked label is CSS
- * `content: attr(data-label)`.
+ * One `DataTable` per attribute category (issue #1128), so the matrix
+ * inherits the default below-`sm` stack — a card per attribute, one labelled
+ * line per item — rather than showing two of up to `VARIATIONS_LIMIT` (20)
+ * 96px columns at a time. Same trade DESIGN.md §4a records for
+ * `SkillCompare` in #406. §4a's one-DOM rule forbids a `sm:hidden` pair, so
+ * the header loses its 32px `TypeIcon`: `DataTableColumn.header` is a string,
+ * and the stacked label is CSS `content: attr(data-label)`.
  */
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -159,7 +156,12 @@ export function VariationsCompareModal({ items, prices, onClose }: VariationsCom
         // Titles the stacked card: the attribute is what a phone reader is
         // comparing across, and every other cell is one item's value for it.
         primary: true,
-        className: 'whitespace-nowrap text-text-dim',
+        // Everything past `whitespace-nowrap` is desktop-only. Pinned, the
+        // attribute still says which row you are on 19 columns to the right;
+        // dim, it is a row label beside its values. Below `sm` the same cell
+        // titles the card, where dim is the quietest thing on it.
+        className: 'whitespace-nowrap sm:sticky sm:left-0 sm:z-10 sm:bg-panel sm:text-text-dim',
+        headerClassName: 'sm:sticky sm:left-0 sm:z-10 sm:bg-panel',
         render: (row) => row.name,
       },
       ...items.map((item): DataTableColumn<CompareAttributeRow> => ({
@@ -167,6 +169,9 @@ export function VariationsCompareModal({ items, prices, onClose }: VariationsCom
         header: item.name,
         align: 'right',
         className: 'tabular-nums',
+        // The width floor the old `min-w-24` header carried: 20 items in a
+        // `max-w-5xl` modal otherwise compress to ~50px each.
+        headerClassName: 'sm:min-w-24',
         render: (row) => {
           const cell = row.cells.get(item.typeId);
           return cell ? formatCell(row.kind, cell) : emptyCell(row.kind, item, prices);
@@ -189,27 +194,28 @@ export function VariationsCompareModal({ items, prices, onClose }: VariationsCom
           className="py-8"
         />
       ) : (
-        <div className="space-y-3">
+        // One scroller for every category, not one each: the categories are
+        // still a single matrix of the same items, so scrolling Fitting to
+        // column 12 has to take Capacitor with it. Inert below `sm`, where
+        // `.dt-stack` makes each table a column of full-width cards.
+        <div className="space-y-3 overflow-x-auto">
           {groups.map((group) => (
             <section key={group.category}>
-              {/* `label` names the table for assistive tech; the category also
-                  stays visible, as it was as a `<th scope="rowgroup">`. */}
-              <h3 className="mb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+              {/* Pinned left: the heading sits above the full scrolling width,
+                  so it would otherwise slide away with the columns. */}
+              <h3 className="sticky left-0 mb-1 inline-block bg-panel pr-3 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
                 {group.category}
               </h3>
-              {/* Above `sm` the items are real columns again, and up to 20 of
-                  them outgrow even a wide modal — same wrapper SkillCompare
-                  puts around its own matrix. */}
-              <div className="overflow-x-auto">
-                <DataTable
-                  columns={columns}
-                  rows={group.rows}
-                  rowKey={(row) => row.key}
-                  label={group.category}
-                  density="compact"
-                  className="text-xs"
-                />
-              </div>
+              <DataTable
+                columns={columns}
+                rows={group.rows}
+                rowKey={(row) => row.key}
+                label={group.category}
+                density="compact"
+                // Lets the item columns keep their own width and scroll above
+                // `sm` instead of compressing into the modal.
+                className="sm:min-w-max"
+              />
             </section>
           ))}
         </div>

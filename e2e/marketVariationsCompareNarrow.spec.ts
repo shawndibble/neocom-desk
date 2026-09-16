@@ -85,18 +85,24 @@ test('Variations compare stacks into labelled cards at 390px', async ({ page }) 
   const dialog = await openCompareModal(page);
 
   // Every category table stacks — none opts out with `responsive="table"`.
+  // Both stubbed categories plus the synthetic "Worth" group are present, so
+  // this is the real multi-table shape and not one table passing for all.
   const tables = dialog.getByRole('table');
-  await expect(tables.first()).toBeVisible();
-  expect(await tables.count()).toBeGreaterThan(1);
+  expect(await tables.count()).toBeGreaterThanOrEqual(3);
   for (const table of await tables.all()) {
     await expect(table).toHaveClass(/dt-stack/);
   }
+  await expect(dialog.getByRole('table', { name: 'Capacitor' })).toBeAttached();
+
+  // An attribute table, named rather than positional: `buildCompareMatrix`
+  // returns "Worth" first, so `.first()` would measure the one-row price
+  // group and never touch an attribute card.
+  const fitting = dialog.getByRole('table', { name: 'Fitting' });
 
   // The stack is what's rendering, not columns. `.dt-stack` makes the table
   // itself a block and clips the header row off-screen, so read the computed
   // layout rather than visibility — a clipped 1px `thead` still counts as
   // "visible" to a bounding-box check.
-  const fitting = tables.first();
   expect(await fitting.evaluate((table) => getComputedStyle(table).display)).toBe('block');
   expect(
     await fitting.evaluate((table) => {
@@ -105,18 +111,21 @@ test('Variations compare stacks into labelled cards at 390px', async ({ page }) 
     })
   ).toBeLessThanOrEqual(1);
 
-  // More than the 2-3 items the precedent exercised: this variation group runs
-  // to 18, and every one of them is a labelled line in the card.
+  // More than the 2-3 items the precedent exercised: this variation group
+  // contributes 18 compared items, each a labelled line in the card.
   const labels = await fitting
     .locator('td[data-label]')
     .evaluateAll((cells) => [...new Set(cells.map((cell) => cell.getAttribute('data-label')))]);
   expect(labels.length).toBeGreaterThanOrEqual(10);
 
-  // No sideways scroll of the page itself — the failure the ticket describes.
-  const overflow = await page.evaluate(
-    () => document.documentElement.scrollWidth - document.documentElement.clientWidth
-  );
-  expect(overflow).toBeLessThanOrEqual(1);
+  // Nothing forces a sideways scroll — the failure the ticket describes.
+  // Measured on the tables themselves: the modal is a `fixed inset-0
+  // overflow-hidden` dialog, so an overflowing matrix inside it is clipped
+  // and never widens `documentElement`.
+  for (const table of await tables.all()) {
+    const overflow = await table.evaluate((el) => el.scrollWidth - el.clientWidth);
+    expect(overflow).toBeLessThanOrEqual(1);
+  }
 });
 
 test('Variations compare keeps real item columns at and above md (1280px)', async ({ page }) => {
@@ -124,9 +133,12 @@ test('Variations compare keeps real item columns at and above md (1280px)', asyn
   const dialog = await openCompareModal(page);
 
   // Items are columns again, with a visible header row per category table.
-  const header = dialog.getByRole('columnheader', { name: ITEM }).first();
-  await expect(header).toBeVisible();
-  await expect(dialog.getByRole('columnheader', { name: 'Attribute' }).first()).toBeVisible();
+  // The compared set excludes the searched item itself, so a variation of it
+  // names the column — `ITEM` would only match one as a substring.
+  const header = dialog.getByRole('columnheader', { name: '1MN Afterburner II', exact: true });
+  await expect(header.first()).toBeVisible();
+  const attribute = dialog.getByRole('columnheader', { name: 'Attribute', exact: true }).first();
+  await expect(attribute).toBeVisible();
 
   // Real columns: the table lays out as a table, not as the stack's blocks.
   expect(
@@ -135,4 +147,24 @@ test('Variations compare keeps real item columns at and above md (1280px)', asyn
       .first()
       .evaluate((table) => getComputedStyle(table).display)
   ).toBe('table');
+
+  // The attribute stays pinned while the items scroll, as it did when it was
+  // a `sticky left-0` row header.
+  expect(await attribute.evaluate((cell) => getComputedStyle(cell).position)).toBe('sticky');
+
+  // Every category scrolls together: one scroll container for the whole
+  // matrix, not one per table, or scrolling Fitting to column 12 would leave
+  // Capacitor on column 1.
+  const scrollers = await dialog.getByRole('table').evaluateAll((tables) => {
+    const found = new Set<Element>();
+    for (const table of tables) {
+      let node = table.parentElement;
+      while (node && !['auto', 'scroll'].includes(getComputedStyle(node).overflowX)) {
+        node = node.parentElement;
+      }
+      if (node) found.add(node);
+    }
+    return found.size;
+  });
+  expect(scrollers).toBe(1);
 });
