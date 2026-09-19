@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Modal } from '@/components/ui';
+import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
 import { dismissEntries } from './assignments';
@@ -84,7 +85,12 @@ export function BulkDismissDialog({
             const on = !excluded.has(dr.key);
             return (
               <li key={dr.key}>
-                <label className="flex cursor-pointer items-center gap-2 px-2 py-1.5 text-xs">
+                <label
+                  className={cx(
+                    'flex cursor-pointer items-center gap-2 px-2 py-1.5 text-xs',
+                    tappableRowClassName
+                  )}
+                >
                   <input
                     type="checkbox"
                     checked={on}
