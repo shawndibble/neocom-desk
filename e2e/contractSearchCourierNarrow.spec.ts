@@ -72,6 +72,10 @@ const ALIGNMENT_TOLERANCE_PX = 1;
 const JITA_4_4 = 60003760;
 const AMARR_VIII = 60008494;
 const THE_FORGE = 10000002;
+const DOMAIN = 10000043;
+
+/** The touch tier `controlHeightClassName.md` sets aside for a phone thumb. */
+const TOUCH_TARGET_PX = 44;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -115,6 +119,28 @@ function courierSnapshotRows() {
     dateExpired: Date.now() + 7 * DAY_MS,
   });
   return rows;
+}
+
+/**
+ * The corpus above plus one haul running the lane backwards — Amarr to Jita
+ * rather than Jita to Amarr — so `reverseLaneMatches` (issue #941) finds a
+ * real, placeable return leg for the top card's detail modal to count.
+ */
+function courierSnapshotRowsWithReverseLane() {
+  return [
+    ...courierSnapshotRows(),
+    {
+      contractId: 4_999_998,
+      regionId: DOMAIN,
+      originLocationId: AMARR_VIII,
+      destinationLocationId: JITA_4_4,
+      reward: 6_000_000,
+      volume: 10_000,
+      collateral: 100_000_000,
+      daysToComplete: 5,
+      dateExpired: Date.now() + 7 * DAY_MS,
+    },
+  ];
 }
 
 /**
@@ -267,5 +293,32 @@ test.describe('courier board — 390px width', () => {
       Math.abs(edges.badge - edges.jumpsValue),
       `Going-rate badge does not start at the card's label gutter — ${measured}`
     ).toBeLessThanOrEqual(ALIGNMENT_TOLERANCE_PX);
+  });
+
+  test('the reverse-lane link meets the touch tier (issue #1150)', async ({ page }) => {
+    await stubSyncConfigured(page);
+    await refuseSyncBackend(page);
+
+    await loginAndSelectCharacter(page);
+    await seedCourierSnapshot(page, courierSnapshotRowsWithReverseLane());
+
+    await page.goto('./contracts');
+    await page.getByRole('button', { name: 'Courier' }).click();
+
+    const table = page.getByRole('table', { name: 'Courier Contract Search' });
+    // Matched by its own reward rather than board position — the reverse-leg
+    // row above was built to answer for this exact haul, not "whichever one
+    // sorts first".
+    await table.getByRole('row', { name: /30,000,000\.00 ISK/ }).click();
+
+    const reverseLaneLink = page.getByRole('button', { name: /reverse lane/ });
+    await expect(reverseLaneLink).toBeVisible();
+
+    const box = await reverseLaneLink.boundingBox();
+    expect(box, 'reverse-lane link has no layout box').not.toBeNull();
+    expect(
+      box!.height,
+      `reverse-lane link is only ${box!.height}px tall at 390px width`
+    ).toBeGreaterThanOrEqual(TOUCH_TARGET_PX);
   });
 });
