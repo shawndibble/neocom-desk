@@ -208,7 +208,7 @@ test.describe('Balances strip Payee filter button — touch target', () => {
       rowHeight: el.parentElement!.getBoundingClientRect().height,
     }));
 
-    expect(buttonHeight).toBe(-1);
+    expect(buttonHeight).toBeGreaterThanOrEqual(44);
     // Proves the extra height comes from the button's own box/negative-margin
     // trick, not from the row (and thus the card) genuinely growing to fit
     // it: pinned near text-sm's own 20px line-height, not just "under 44".
@@ -311,7 +311,7 @@ test.describe('Mining Tax dialog entry rows — touch target', () => {
     await page.goto('./moon-mining');
 
     const dialog = await openSettleUp(page);
-    expect(await rowHeight(dialog, ENTRY_DATE)).toBe(-1);
+    expect(await rowHeight(dialog, ENTRY_DATE)).toBeGreaterThanOrEqual(44);
   });
 
   test('Link Payment: covered-entry row reaches 44px on phone', async ({ page }) => {
@@ -321,7 +321,7 @@ test.describe('Mining Tax dialog entry rows — touch target', () => {
     await page.goto('./moon-mining');
 
     const dialog = await openLinkPayment(page);
-    expect(await rowHeight(dialog, ENTRY_DATE)).toBe(-1);
+    expect(await rowHeight(dialog, ENTRY_DATE)).toBeGreaterThanOrEqual(44);
   });
 
   test('Bulk Dismiss: itemized entry row reaches 44px on phone', async ({ page }) => {
@@ -331,7 +331,7 @@ test.describe('Mining Tax dialog entry rows — touch target', () => {
     await page.goto('./moon-mining');
 
     const dialog = await openBulkDismiss(page);
-    expect(await rowHeight(dialog, UNASSIGNED_DATE)).toBe(-1);
+    expect(await rowHeight(dialog, UNASSIGNED_DATE)).toBeGreaterThanOrEqual(44);
   });
 
   test('all three stay at their old height above md — desktop is unchanged', async ({ page }) => {
@@ -344,7 +344,7 @@ test.describe('Mining Tax dialog entry rows — touch target', () => {
     // `md:min-h-7` reverts to exactly. Pinned as a range rather than asserted
     // "under 44" so a row that quietly grew for some other reason still fails.
     const expectUnchanged = (height: number) => {
-      expect(height).toBe(-1);
+      expect(height).toBeGreaterThan(24);
       expect(height).toBeLessThan(32);
     };
 
