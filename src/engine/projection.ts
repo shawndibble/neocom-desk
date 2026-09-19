@@ -508,6 +508,7 @@ export function projectCalendar(
 ): ProjectionRow[] {
   const rows: ProjectionRow[] = [];
   for (const entry of entries) {
+    if (entry.response === 'declined') continue;
     if (!inHorizon(entry.startMs, nowMs, horizonMs)) continue;
     const fire: CalendarEventStartingFire = {
       eventId: 'calendarEventStarting',

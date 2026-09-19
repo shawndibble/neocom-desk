@@ -99,6 +99,7 @@ import {
   type MailHeaderSnapshot,
   type MailSnapshot,
   type MailNotificationFire,
+  CALENDAR_EVENT_RESPONSES,
   type CalendarEventEntrySnapshot,
   type CalendarSnapshot,
   type NewCalendarEventFire,
@@ -637,15 +638,21 @@ export const mailDomain = defineDomain<MailHeader, MailSnapshot, MailNotificatio
 /* -------------------------------------------------------------------------- */
 
 /**
- * `title` is deliberately **not** required: this validates persisted baselines,
- * and a snapshot written before the title was recorded is still a usable
- * baseline. Rejecting it would discard the high-water mark and re-announce
- * every event on the calendar as new.
+ * `title` and `response` are deliberately **not** required: this validates
+ * persisted baselines, and a snapshot written before either field existed is
+ * still a usable baseline. Rejecting it would discard the high-water mark and
+ * re-announce every event on the calendar as new.
  */
 function isCalendarEventEntrySnapshot(raw: unknown): raw is CalendarEventEntrySnapshot {
   if (typeof raw !== 'object' || raw === null) return false;
   const r = raw as Record<string, unknown>;
   if (r.title !== undefined && typeof r.title !== 'string') return false;
+  if (
+    r.response !== undefined &&
+    !(CALENDAR_EVENT_RESPONSES as readonly unknown[]).includes(r.response)
+  ) {
+    return false;
+  }
   return typeof r.calendarEventId === 'number' && typeof r.startMs === 'number';
 }
 
@@ -669,6 +676,7 @@ export const calendarDomain = defineDomain<
       calendarEventId: event.event_id,
       startMs: Date.parse(event.event_date),
       title: event.title,
+      response: event.event_response,
     })),
     nowMs,
   }),
