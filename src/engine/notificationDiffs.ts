@@ -595,6 +595,19 @@ export function diffNewMail(
   return fires;
 }
 
+/**
+ * ESI's `event_response` values. Exported as a runtime array (rather than a
+ * bare union type) so `pollDomains.ts`'s persisted-baseline validator can
+ * check against the same literals instead of retyping them — a second typed
+ * copy is exactly the drift a 5th ESI value would silently break.
+ */
+export const CALENDAR_EVENT_RESPONSES = [
+  'declined',
+  'not_responded',
+  'accepted',
+  'tentative',
+] as const;
+
 export interface CalendarEventEntrySnapshot {
   calendarEventId: number;
   /** Epoch ms this event starts (ESI's `event_date`). */
@@ -614,7 +627,7 @@ export interface CalendarEventEntrySnapshot {
    * source. Absence must default to notifying, not to silence: only a
    * confirmed `'declined'` suppresses the starting reminder.
    */
-  response?: 'declined' | 'not_responded' | 'accepted' | 'tentative';
+  response?: (typeof CALENDAR_EVENT_RESPONSES)[number];
 }
 
 export interface CalendarSnapshot {
