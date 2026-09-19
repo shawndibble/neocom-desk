@@ -636,16 +636,21 @@ export const mailDomain = defineDomain<MailHeader, MailSnapshot, MailNotificatio
 /* Calendar                                                                    */
 /* -------------------------------------------------------------------------- */
 
+const CALENDAR_RESPONSES = ['declined', 'not_responded', 'accepted', 'tentative'];
+
 /**
- * `title` is deliberately **not** required: this validates persisted baselines,
- * and a snapshot written before the title was recorded is still a usable
- * baseline. Rejecting it would discard the high-water mark and re-announce
- * every event on the calendar as new.
+ * `title` and `response` are deliberately **not** required: this validates
+ * persisted baselines, and a snapshot written before either field existed is
+ * still a usable baseline. Rejecting it would discard the high-water mark and
+ * re-announce every event on the calendar as new.
  */
 function isCalendarEventEntrySnapshot(raw: unknown): raw is CalendarEventEntrySnapshot {
   if (typeof raw !== 'object' || raw === null) return false;
   const r = raw as Record<string, unknown>;
   if (r.title !== undefined && typeof r.title !== 'string') return false;
+  if (r.response !== undefined && !CALENDAR_RESPONSES.includes(r.response as string)) {
+    return false;
+  }
   return typeof r.calendarEventId === 'number' && typeof r.startMs === 'number';
 }
 
@@ -669,6 +674,7 @@ export const calendarDomain = defineDomain<
       calendarEventId: event.event_id,
       startMs: Date.parse(event.event_date),
       title: event.title,
+      response: event.event_response,
     })),
     nowMs,
   }),

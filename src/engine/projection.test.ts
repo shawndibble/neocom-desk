@@ -266,6 +266,20 @@ describe('projectCalendar', () => {
     const entries = [{ calendarEventId: 99, startMs: T0 + PROJECTION_HORIZON_MS + 1 }];
     expect(projectCalendar(7, 'Kestrel', entries, T0)).toEqual([]);
   });
+
+  it('produces no row for an event the character declined', () => {
+    const entries = [
+      { calendarEventId: 99, startMs: T0 + 5 * HOUR_MS, response: 'declined' as const },
+    ];
+    expect(projectCalendar(7, 'Kestrel', entries, T0)).toEqual([]);
+  });
+
+  it('still projects an accepted event (regression guard)', () => {
+    const entries = [
+      { calendarEventId: 99, startMs: T0 + 5 * HOUR_MS, response: 'accepted' as const },
+    ];
+    expect(projectCalendar(7, 'Kestrel', entries, T0)).toHaveLength(1);
+  });
 });
 
 describe('projectStructureFuel', () => {

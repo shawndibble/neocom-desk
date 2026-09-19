@@ -608,6 +608,13 @@ export interface CalendarEventEntrySnapshot {
    * carries it.
    */
   title?: string;
+  /**
+   * ESI's `event_response`. Optional for the same reason `title` is — a
+   * baseline persisted before this field existed must still work as a diff
+   * source. Absence must default to notifying, not to silence: only a
+   * confirmed `'declined'` suppresses the starting reminder.
+   */
+  response?: 'declined' | 'not_responded' | 'accepted' | 'tentative';
 }
 
 export interface CalendarSnapshot {
@@ -680,6 +687,7 @@ export function diffCalendarEventStarting(
   if (!prev) return [];
   const fires: CalendarEventStartingFire[] = [];
   for (const entry of next.entries) {
+    if (entry.response === 'declined') continue;
     if (entry.startMs > next.nowMs) continue;
     if (entry.startMs <= prev.nowMs) continue;
     fires.push({

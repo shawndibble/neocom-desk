@@ -1051,9 +1051,15 @@ describe('diffNewMail', () => {
 function calendarEntry(
   calendarEventId: number,
   startMs: number,
-  title?: string
+  title?: string,
+  response?: CalendarEventEntrySnapshot['response']
 ): CalendarEventEntrySnapshot {
-  return { calendarEventId, startMs, ...(title === undefined ? {} : { title }) };
+  return {
+    calendarEventId,
+    startMs,
+    ...(title === undefined ? {} : { title }),
+    ...(response === undefined ? {} : { response }),
+  };
 }
 
 function calendarSnapshot(
@@ -1154,6 +1160,39 @@ describe('diffCalendarEventStarting', () => {
     const next = calendarSnapshot([calendarEntry(1, T0 + 1000)], T0 + 2000);
     expect(diffCalendarEventStarting(7, prev, next)).toEqual([
       { eventId: 'calendarEventStarting', characterId: 7, calendarEventId: 1 },
+    ]);
+  });
+
+  it('does not fire for an event the character declined', () => {
+    const prev = calendarSnapshot([calendarEntry(1, T0 + 1000, 'Fleet Op', 'declined')], T0);
+    const next = calendarSnapshot([calendarEntry(1, T0 + 1000, 'Fleet Op', 'declined')], T0 + 2000);
+    expect(diffCalendarEventStarting(7, prev, next)).toEqual([]);
+  });
+
+  it('still fires for an accepted event (regression guard)', () => {
+    const prev = calendarSnapshot([calendarEntry(1, T0 + 1000, 'Fleet Op', 'accepted')], T0);
+    const next = calendarSnapshot([calendarEntry(1, T0 + 1000, 'Fleet Op', 'accepted')], T0 + 2000);
+    expect(diffCalendarEventStarting(7, prev, next)).toEqual([
+      { eventId: 'calendarEventStarting', characterId: 7, calendarEventId: 1, title: 'Fleet Op' },
+    ]);
+  });
+
+  it('still fires for an event with no response recorded', () => {
+    const prev = calendarSnapshot([calendarEntry(1, T0 + 1000, 'Fleet Op', 'not_responded')], T0);
+    const next = calendarSnapshot(
+      [calendarEntry(1, T0 + 1000, 'Fleet Op', 'not_responded')],
+      T0 + 2000
+    );
+    expect(diffCalendarEventStarting(7, prev, next)).toEqual([
+      { eventId: 'calendarEventStarting', characterId: 7, calendarEventId: 1, title: 'Fleet Op' },
+    ]);
+  });
+
+  it('still fires for a snapshot written before response was recorded (undefined defaults to notifying)', () => {
+    const prev = calendarSnapshot([calendarEntry(1, T0 + 1000, 'Fleet Op')], T0);
+    const next = calendarSnapshot([calendarEntry(1, T0 + 1000, 'Fleet Op')], T0 + 2000);
+    expect(diffCalendarEventStarting(7, prev, next)).toEqual([
+      { eventId: 'calendarEventStarting', characterId: 7, calendarEventId: 1, title: 'Fleet Op' },
     ]);
   });
 });
