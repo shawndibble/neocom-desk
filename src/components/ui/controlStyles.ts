@@ -38,3 +38,17 @@ export const fieldSizeClassName: Record<ControlSize, string> = {
   sm: `${controlHeightClassName.sm} px-2 text-xs`,
   md: `${controlHeightClassName.md} px-3 text-sm`,
 };
+
+/**
+ * A full-width list row that is itself the tap target — the `<label>` wrapping
+ * a checkbox in Mining Tax's Settle Up / Link Payment / Bulk Dismiss dialogs.
+ *
+ * Not a `ControlSize`: those rows keep their own `px-2 py-1.5 text-xs`
+ * density, and a single line of that lands at 28px — exactly `sm`'s pointer
+ * value, and exactly the "reusing a pointer size on a phone" mistake DESIGN.md
+ * §3 calls out. So this pins the touch tier's 44px on a phone and reverts to
+ * that same 28px above `md`, leaving pointer rendering pixel-identical (the
+ * `min-h-11` / `md:min-h-7` shape #1055's Balances-strip fix established).
+ * `min-h-*`, not `h-*`, so a row whose text wraps grows instead of clipping.
+ */
+export const tappableRowClassName = 'min-h-11 md:min-h-7';

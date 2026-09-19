@@ -18,7 +18,7 @@
  * the stores. `esiCache` rows are written with a fresh `fetchedAt` so
  * `esi/cache.ts` serves them without ever attempting a live ESI call.
  */
-import type { Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
 import { loginAndSelectCharacter } from './support/login';
 import { CHARACTER_ID } from './support/fixtureData';
@@ -37,10 +37,23 @@ const ASSIGNMENT_ID = 'e2e-assignment-1';
 const ORE_QUANTITY = 1000;
 const TAX_OWED = 100_000;
 
+/** A second Mining Ledger Entry, deliberately left with no Assignment so it reads as Unassigned — the only status `dismissableRows` will bulk-dismiss. Same system, a different date, so `groupMiningLedger` keeps it a row of its own. */
+const UNASSIGNED_DATE = '2026-01-02';
+/** Four days after the entry it settles: inside `withinLinkWindow`'s asymmetric `[-1, +14]` day window, and after the mining, which is the direction a pilot actually pays in. */
+const PAYMENT_DATE = '2026-01-05T12:00:00Z';
+const JOURNAL_REF_ID = 7_000_001;
+
+interface SeedOptions {
+  /** Also seed `UNASSIGNED_DATE`'s entry — what Bulk Dismiss needs something to dismiss. */
+  withUnassignedEntry?: boolean;
+  /** Also seed a wallet-journal payment `suggestLink` will offer — what Link Payment needs a suggestion to show. */
+  withMadePayment?: boolean;
+}
+
 /** `esi/cache.ts`'s character-independent public-lookup sentinel (`GLOBAL_CACHE_CHARACTER_ID`). */
 const GLOBAL_CACHE_CHARACTER_ID = 0;
 
-async function seedPayeeBalance(page: Page): Promise<void> {
+async function seedPayeeBalance(page: Page, options: SeedOptions = {}): Promise<void> {
   await page.evaluate(
     async ({
       characterId,
@@ -53,6 +66,11 @@ async function seedPayeeBalance(page: Page): Promise<void> {
       assignmentId,
       oreQuantity,
       taxOwed,
+      unassignedDate,
+      paymentDate,
+      journalRefId,
+      withUnassignedEntry,
+      withMadePayment,
     }) => {
       const database = await new Promise<IDBDatabase>((resolve, reject) => {
         const request = indexedDB.open('neocom');
@@ -65,23 +83,57 @@ async function seedPayeeBalance(page: Page): Promise<void> {
           ['esiCache', 'payees', 'miningTaxAssignments'],
           'readwrite'
         );
+        const ledgerRows = [
+          {
+            date: entryDate,
+            quantity: oreQuantity,
+            solar_system_id: solarSystemId,
+            type_id: oreTypeId,
+          },
+          ...(withUnassignedEntry
+            ? [
+                {
+                  date: unassignedDate,
+                  quantity: oreQuantity,
+                  solar_system_id: solarSystemId,
+                  type_id: oreTypeId,
+                },
+              ]
+            : []),
+        ];
         // Raw ESI mining-ledger row (`getCharacterMining`'s shape), grouped by
         // `groupMiningLedger` into one Mining Ledger Entry for this (date,
         // system) pair.
         tx.objectStore('esiCache').put({
           characterId,
           key: 'miningTax:ledger',
-          value: [
-            {
-              date: entryDate,
-              quantity: oreQuantity,
-              solar_system_id: solarSystemId,
-              type_id: oreTypeId,
-            },
-          ],
+          value: ledgerRows,
           fetchedAt: now,
           truncated: false,
         });
+        // One outgoing wallet-journal payment for exactly the balance below,
+        // which is all `suggestLink` needs to offer a link at its weakest
+        // `amount` tier. `second_party_id` is deliberately omitted: with no
+        // counterparty there is no `resolveNames` lookup (and so nothing for
+        // `testBase`'s escaped-network guard to catch), and `identityKind`
+        // returns null, so the suggestion rests on the figure alone.
+        if (withMadePayment) {
+          tx.objectStore('esiCache').put({
+            characterId,
+            key: 'wallet:journal',
+            value: [
+              {
+                id: journalRefId,
+                ref_type: 'player_donation',
+                // Negative: `fromJournal` only counts ISK *leaving* the wallet.
+                amount: -taxOwed,
+                date: paymentDate,
+              },
+            ],
+            fetchedAt: now,
+            truncated: false,
+          });
+        }
         // Solar-system name/security, cached under the shared public-lookup
         // sentinel so `resolveRowNames` never calls `/universe/systems/{id}`.
         tx.objectStore('esiCache').put({
@@ -129,6 +181,11 @@ async function seedPayeeBalance(page: Page): Promise<void> {
       assignmentId: ASSIGNMENT_ID,
       oreQuantity: ORE_QUANTITY,
       taxOwed: TAX_OWED,
+      unassignedDate: UNASSIGNED_DATE,
+      paymentDate: PAYMENT_DATE,
+      journalRefId: JOURNAL_REF_ID,
+      withUnassignedEntry: options.withUnassignedEntry ?? false,
+      withMadePayment: options.withMadePayment ?? false,
     }
   );
 }
@@ -171,5 +228,137 @@ test.describe('Balances strip Payee filter button — touch target', () => {
     // slack — not just "small", pinned to what `md:my-0 md:min-h-0` reverts to.
     expect(buttonHeight).toBeGreaterThan(15);
     expect(buttonHeight).toBeLessThan(25);
+  });
+});
+
+/**
+ * Mining Tax dialog entry rows — touch target (issue #1144): the `<label>`
+ * wrapping each include/exclude checkbox in Settle Up, Link Payment and Bulk
+ * Dismiss is the row's whole tap target, and at `px-2 py-1.5 text-xs` it
+ * measured 28px — a pointer-sized row reused verbatim on a phone, which
+ * docs/DESIGN.md §3 rules out. The fix applies `tappableRowClassName`
+ * (`min-h-11 md:min-h-7`, `controlStyles.ts`), so the row grows to the 44px
+ * floor on a phone and reverts to exactly its old 28px above `md`. jsdom has
+ * no layout engine, so only a real browser can tell 44 from 28 — hence a
+ * Playwright spec rather than a unit test.
+ *
+ * Each dialog needs different state, so `seedPayeeBalance` grew two opt-in
+ * extras rather than a second seeding pattern:
+ *
+ * - **Settle Up** needs only the Payee balance the block above already seeds.
+ * - **Link Payment**'s "covered entries" sub-list renders only once a
+ *   suggestion is selected — and `LinkPaymentDialog` pre-selects the first
+ *   one, so seeding a single outgoing wallet-journal payment for exactly the
+ *   balance owed is enough; no radio click is involved.
+ * - **Bulk Dismiss** acts on Unassigned rows only, so a second ledger entry
+ *   is seeded with no Assignment against it.
+ *
+ * Rows are ticked through the table's real checkbox column and the real
+ * selection toolbar rather than by poking state, because "can this even be
+ * opened at 390px?" is half of what the fix has to survive.
+ */
+test.describe('Mining Tax dialog entry rows — touch target', () => {
+  const INCLUDE_LABEL = (date: string) => `Include ${date}`;
+
+  /** The tap target is the `<label>`, not the checkbox the accessible name hangs off — so anchor on the input and measure its wrapper. */
+  function rowHeight(dialog: Locator, date: string): Promise<number> {
+    return dialog
+      .getByLabel(INCLUDE_LABEL(date))
+      .evaluate((el) => el.closest('label')!.getBoundingClientRect().height);
+  }
+
+  async function openSettleUp(page: Page): Promise<Locator> {
+    // Exact: the selection toolbar's own action is "Settle up {{count}}".
+    await page.getByRole('button', { name: 'Settle up', exact: true }).click();
+    const dialog = page.getByRole('dialog', { name: `Settle up — ${PAYEE_NAME}` });
+    await expect(dialog).toBeVisible();
+    return dialog;
+  }
+
+  async function openLinkPayment(page: Page): Promise<Locator> {
+    // The card appears only once `loadMadePayments` resolves — it is loaded
+    // after the ledger on purpose, so this waits rather than clicking blind.
+    const review = page.getByRole('button', { name: 'Review' });
+    await expect(review).toBeVisible();
+    await review.click();
+    const dialog = page.getByRole('dialog', { name: 'Link a payment you already made' });
+    await expect(dialog).toBeVisible();
+    return dialog;
+  }
+
+  async function openBulkDismiss(page: Page): Promise<Locator> {
+    // Ticking both selectable rows is deliberate: only the Unassigned one is
+    // dismissable, so the count in the button is itself the check that
+    // `dismissableRows` narrowed the selection the way the toolbar claims.
+    // `.all()` resolves against whatever is in the DOM right now and never
+    // waits, so the count — one Outstanding row plus one Unassigned — is what
+    // holds until the table has actually rendered.
+    const boxes = page.getByLabel('Select this row');
+    await expect(boxes).toHaveCount(2);
+    for (const box of await boxes.all()) await box.check();
+    const dismiss = page.getByRole('button', { name: 'Dismiss 1' });
+    await expect(dismiss).toBeEnabled();
+    await dismiss.click();
+    const dialog = page.getByRole('dialog', { name: 'Dismiss entries' });
+    await expect(dialog).toBeVisible();
+    return dialog;
+  }
+
+  test('Settle Up: itemized entry row reaches 44px on phone', async ({ page }) => {
+    await page.setViewportSize(PHONE);
+    await loginAndSelectCharacter(page);
+    await seedPayeeBalance(page);
+    await page.goto('./moon-mining');
+
+    const dialog = await openSettleUp(page);
+    expect(await rowHeight(dialog, ENTRY_DATE)).toBeGreaterThanOrEqual(44);
+  });
+
+  test('Link Payment: covered-entry row reaches 44px on phone', async ({ page }) => {
+    await page.setViewportSize(PHONE);
+    await loginAndSelectCharacter(page);
+    await seedPayeeBalance(page, { withMadePayment: true });
+    await page.goto('./moon-mining');
+
+    const dialog = await openLinkPayment(page);
+    expect(await rowHeight(dialog, ENTRY_DATE)).toBeGreaterThanOrEqual(44);
+  });
+
+  test('Bulk Dismiss: itemized entry row reaches 44px on phone', async ({ page }) => {
+    await page.setViewportSize(PHONE);
+    await loginAndSelectCharacter(page);
+    await seedPayeeBalance(page, { withUnassignedEntry: true });
+    await page.goto('./moon-mining');
+
+    const dialog = await openBulkDismiss(page);
+    expect(await rowHeight(dialog, UNASSIGNED_DATE)).toBeGreaterThanOrEqual(44);
+  });
+
+  test('all three stay at their old height above md — desktop is unchanged', async ({ page }) => {
+    await page.setViewportSize(DESKTOP);
+    await loginAndSelectCharacter(page);
+    await seedPayeeBalance(page, { withUnassignedEntry: true, withMadePayment: true });
+    await page.goto('./moon-mining');
+
+    // One line of `text-xs` (16px) inside `py-1.5` (2 x 6px) is 28px — what
+    // `md:min-h-7` reverts to exactly. Pinned as a range rather than asserted
+    // "under 44" so a row that quietly grew for some other reason still fails.
+    const expectUnchanged = (height: number) => {
+      expect(height).toBeGreaterThan(24);
+      expect(height).toBeLessThan(32);
+    };
+
+    const settleUp = await openSettleUp(page);
+    expectUnchanged(await rowHeight(settleUp, ENTRY_DATE));
+    await page.keyboard.press('Escape');
+    await expect(settleUp).toBeHidden();
+
+    const linkPayment = await openLinkPayment(page);
+    expectUnchanged(await rowHeight(linkPayment, ENTRY_DATE));
+    await page.keyboard.press('Escape');
+    await expect(linkPayment).toBeHidden();
+
+    const bulkDismiss = await openBulkDismiss(page);
+    expectUnchanged(await rowHeight(bulkDismiss, UNASSIGNED_DATE));
   });
 });
