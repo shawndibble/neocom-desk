@@ -769,7 +769,12 @@ describe('runForegroundPoll', () => {
     expect(deps.notify).not.toHaveBeenCalled();
     expect(savedCalendar).not.toBeNull();
     expect(savedCalendar![CHAR.characterId].entries).toEqual([
-      { calendarEventId: 9, startMs: Date.parse('2026-01-01T02:00:00Z'), title: 'Ops' },
+      {
+        calendarEventId: 9,
+        startMs: Date.parse('2026-01-01T02:00:00Z'),
+        title: 'Ops',
+        response: 'not_responded',
+      },
     ]);
   });
 
