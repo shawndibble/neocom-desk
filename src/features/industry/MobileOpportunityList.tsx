@@ -185,21 +185,28 @@ export function MobileOpportunityList({
           const original = row.candidate.blueprint.runs === -1;
 
           const checkboxWrapper = (
-            <div className="absolute top-1 right-2 flex size-11 items-center justify-center md:size-4">
+            <div
+              className="absolute top-1 right-2 flex size-11 items-center justify-center md:size-4"
+              // Never the native `disabled` attribute here: it takes the
+              // element out of the tab order and off the hover/touch event
+              // path a `Tooltip` trigger needs to explain itself (same
+              // reasoning `FilterChip` documents). `preventDefault` on click
+              // is what actually blocks the toggle — it cancels the
+              // checkbox's native activation before `onChange` ever fires.
+              // On this div, not the `<input>`: this is `Tooltip`'s real
+              // trigger (the whole ~44px zone, not the visual glyph inside
+              // it), and Radix's own click-to-close only sees
+              // `defaultPrevented` if the trigger element's own click
+              // handler set it — a tap outside the 16px input never reaches
+              // the input's handler.
+              onClick={(event) => {
+                if (!seedable) event.preventDefault();
+              }}
+            >
               <input
                 type="checkbox"
                 checked={selectedIds.has(row.candidate.id)}
                 onChange={() => onToggleSelected(row.candidate.id)}
-                // Never the native `disabled` attribute here: it takes the
-                // element out of the tab order and off the hover/touch event
-                // path a `Tooltip` trigger needs to explain itself (same
-                // reasoning `FilterChip` documents). `preventDefault` on
-                // click is what actually blocks the toggle — it cancels a
-                // checkbox's native activation before `onChange` ever fires,
-                // so the visible check state never flashes and back.
-                onClick={(event) => {
-                  if (!seedable) event.preventDefault();
-                }}
                 aria-disabled={seedable ? undefined : true}
                 aria-label={t('industry.opportunitiesSelectFor', {
                   name: row.candidate.catalogEntry.productName,

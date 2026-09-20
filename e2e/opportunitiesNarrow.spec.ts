@@ -192,7 +192,7 @@ test.describe('Opportunities — ranked phone list', () => {
 
     const COMPARE_REASON = "Only the active character's own blueprints can be added to Compare";
 
-    test("touch-and-hold reveals why another character's row cannot be compared, at 390px", async ({
+    test("a tap reveals why another character's row cannot be compared, at 390px", async ({
       page,
     }) => {
       await seedSecondCharacterBlueprint(page);
@@ -230,29 +230,19 @@ test.describe('Opportunities — ranked phone list', () => {
       // The wrapper div, not the checkbox itself: this app's real ~44px tap
       // target for this control (see the sibling test above), and touching
       // its corner rather than its center lands well outside the checkbox's
-      // own 16px box — proof the long-press zone actually grew with it,
-      // not just that the tiny input alone still works.
+      // own 16px box — proof the tap zone actually grew with it, not just
+      // that the tiny input alone still works.
+      // The wrapper div's own corner, not its center and not the checkbox:
+      // this app's real ~44px tap target for this control (see the sibling
+      // test above) extends well past the checkbox's own 16px box, and a tap
+      // there never reaches the checkbox's own click handler — proof the
+      // reveal works off the tap zone as a whole, not just the glyph inside it.
       const wrapper = checkbox.locator('xpath=..');
-      const box = await wrapper.boundingBox();
-      expect(box).not.toBeNull();
-      const touchPoint = { x: box!.x + 4, y: box!.y + 4 };
+      await wrapper.tap({ position: { x: 4, y: 4 } });
+      await expect(page.getByRole('tooltip')).toHaveText(COMPARE_REASON);
+      await expect(page.getByRole('tooltip')).toBeVisible();
 
-      // A touch-and-hold, not a tap: CDP drives the raw touch sequence and
-      // cancels rather than ends it, since a `touchend` synthesizes the
-      // click this test is only trying to read the tooltip around.
-      const cdp = await page.context().newCDPSession(page);
-      await cdp.send('Input.dispatchTouchEvent', {
-        type: 'touchStart',
-        touchPoints: [touchPoint],
-      });
-      try {
-        await expect(page.getByRole('tooltip')).toHaveText(COMPARE_REASON);
-        await expect(page.getByRole('tooltip')).toBeVisible();
-      } finally {
-        await cdp.send('Input.dispatchTouchEvent', { type: 'touchCancel', touchPoints: [] });
-      }
-
-      // The touch-and-hold must never have toggled the checkbox itself.
+      // The tap must never have toggled the checkbox itself.
       expect(await checkbox.isChecked()).toBe(false);
     });
   });
