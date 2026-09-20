@@ -362,3 +362,65 @@ test.describe('Mining Tax dialog entry rows — touch target', () => {
     expectUnchanged(await rowHeight(bulkDismiss, UNASSIGNED_DATE));
   });
 });
+
+/**
+ * `SelectionToolbar`'s bulk "Settle Up" touch target (issue #1175): the
+ * bar's one primary, decision-committing action for the whole checked
+ * selection rendered at `size="sm"` (36px) like its four ordinary secondary
+ * siblings (Select All, Clear, Combine, Dismiss) — under this app's `md`
+ * touch tier (44px), the accepted size for a page's sole primary control
+ * (`FilterBar`'s sheet Apply/Cancel precedent). Only Settle Up moves; the
+ * other four stay `sm` at every width, since widening them too would grow
+ * four already-conventional secondary actions on desktop pointer for no
+ * phone-specific reason (RUBRIC.md's "the desktop layout is the control").
+ *
+ * A row is ticked through the table's real checkbox column, not by poking
+ * state — the toolbar itself only renders once something is checked, so
+ * "does the bar even reach 44px once it's actually showing on a phone?" is
+ * the property under test, the same reasoning the dialog-row spec above
+ * gives for driving its own checkboxes for real.
+ */
+test.describe('Mining Tax bulk Settle Up — touch target', () => {
+  /** Lands on the Tax tab with exactly one row checked, so the toolbar is showing and its Settle Up/Clear heights are ready to measure. */
+  async function openToolbarWithOneRowChecked(
+    page: Page,
+    viewport: { width: number; height: number }
+  ) {
+    await page.setViewportSize(viewport);
+    await loginAndSelectCharacter(page);
+    await seedPayeeBalance(page);
+    await page.goto('./moon-mining');
+
+    const boxes = page.getByLabel('Select this row');
+    await expect(boxes).toHaveCount(1);
+    await boxes.first().check();
+
+    const settleUp = page.getByRole('button', { name: /^Settle up \d+$/ });
+    await expect(settleUp).toBeVisible();
+    return {
+      settleUpHeight: async () => (await settleUp.boundingBox())?.height,
+      clearHeight: async () =>
+        (await page.getByRole('button', { name: 'Clear' }).boundingBox())?.height,
+    };
+  }
+
+  test('Settle Up reaches 44px on phone once the bar is showing', async ({ page }) => {
+    const heights = await openToolbarWithOneRowChecked(page, PHONE);
+    expect(await heights.settleUpHeight()).toBeGreaterThanOrEqual(44);
+
+    // Select All/Clear stay at the ordinary `sm` size — widening them too
+    // isn't this ticket's fix.
+    expect(await heights.clearHeight()).toBeLessThan(40);
+  });
+
+  test('desktop changes only Settle Up, to 36px — a deliberate, narrow exception', async ({
+    page,
+  }) => {
+    const heights = await openToolbarWithOneRowChecked(page, DESKTOP);
+    // `md` tier's own pointer-width value (`h-9`), not the 44px touch value —
+    // this is the one accepted pointer-size change the ticket calls for.
+    expect(await heights.settleUpHeight()).toBeCloseTo(36, 0);
+    // Clear's own `sm` pointer value is untouched.
+    expect(await heights.clearHeight()).toBeCloseTo(28, 0);
+  });
+});
