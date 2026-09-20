@@ -837,7 +837,7 @@ export function BpcSourcingPanel({ initialTypeId = null }: BpcSourcingPanelProps
           // both sides of a bundle.
           if (!contract.isMultiType) return amount;
           return (
-            <span className="flex flex-col items-end">
+            <span className="flex flex-col items-start sm:items-end">
               <span>{amount}</span>
               <span className="text-[0.625rem] text-text-dim">
                 {t('bpcContracts.wholeContractMarker')}
