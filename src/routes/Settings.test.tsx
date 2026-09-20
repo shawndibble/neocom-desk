@@ -515,9 +515,11 @@ describe('Settings — Notifications (issue #170)', () => {
     expect(screen.getByRole('checkbox', { name: 'Overview notifications' })).toBeEnabled();
 
     expect(await screen.findByRole('checkbox', { name: 'New Mail, Overview list' })).toBeEnabled();
+    // aria-disabled, not native disabled — the row's Tooltip explaining why
+    // needs the control to stay in the hover/touch/focus path.
     expect(
       screen.getByRole('checkbox', { name: 'New Mail, browser notifications' })
-    ).toBeDisabled();
+    ).toHaveAttribute('aria-disabled', 'true');
   });
 
   it('offers an Enable button that makes the browser request, and no request without it', async () => {
@@ -582,9 +584,7 @@ describe('Settings — Notifications (issue #170)', () => {
     const mailCheckbox = pilotTwoSection.getByRole('checkbox', {
       name: 'New Mail, browser notifications',
     });
-    expect(mailCheckbox).toBeDisabled();
-    // A disabled control can't take focus, so the tooltip only reveals on
-    // hover — a real pointermove, not the click above.
+    expect(mailCheckbox).toHaveAttribute('aria-disabled', 'true');
     fireEvent.pointerMove(mailCheckbox);
     expect(await screen.findByText(/re-authorize the character/i)).toBeInTheDocument();
 

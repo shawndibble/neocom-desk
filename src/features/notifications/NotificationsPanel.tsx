@@ -1155,10 +1155,16 @@ function ChannelCheckbox({
     <input
       type="checkbox"
       checked={enabled && checked}
-      disabled={!enabled}
       onChange={onToggle}
+      // Not `disabled` — same reasoning as MobileOpportunityList (keeps the
+      // Tooltip trigger in the hover/touch path). `preventDefault` on click
+      // blocks the toggle instead, before `onChange` fires.
+      onClick={(event) => {
+        if (!enabled) event.preventDefault();
+      }}
+      aria-disabled={enabled ? undefined : true}
       aria-label={label}
-      className="size-4 shrink-0 cursor-pointer accent-accent disabled:cursor-not-allowed disabled:opacity-50"
+      className={`size-4 shrink-0 accent-accent ${enabled ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}`}
     />
   );
   if (enabled) return checkbox;
@@ -1166,7 +1172,11 @@ function ChannelCheckbox({
     disabledReason === 'capability'
       ? 'settings.notifications.corpCapabilityHint'
       : 'settings.notifications.reauthHint';
-  return <Tooltip content={t(hintKey)}>{checkbox}</Tooltip>;
+  return (
+    <Tooltip content={t(hintKey)} openOnTap>
+      {checkbox}
+    </Tooltip>
+  );
 }
 
 /**
