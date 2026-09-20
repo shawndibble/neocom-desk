@@ -18,7 +18,8 @@ import {
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { DataTable, type DataTableColumn } from '@/components/ui';
-import { formatIsk } from '@/lib/isk';
+import { COMPACT_ISK_Y_AXIS_MARGIN_LEFT, COMPACT_ISK_Y_AXIS_WIDTH } from '@/lib/chartAxis';
+import { formatIsk, formatIskCompact } from '@/lib/isk';
 import type { ProductionProfitPoint, ProductionProfitTrend } from './productionProfitHistory';
 
 interface ProductionProfitChartProps {
@@ -83,7 +84,10 @@ export default function ProductionProfitChart({ points, trend }: ProductionProfi
     <div>
       <div role="img" aria-label={t('industry.profitHistoryChartLabel')} className="h-64 w-full">
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={points} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+          <LineChart
+            data={points}
+            margin={{ top: 8, right: 8, left: COMPACT_ISK_Y_AXIS_MARGIN_LEFT, bottom: 0 }}
+          >
             <CartesianGrid stroke="var(--color-line)" strokeDasharray="3 3" />
             <XAxis
               dataKey="date"
@@ -94,8 +98,8 @@ export default function ProductionProfitChart({ points, trend }: ProductionProfi
             <YAxis
               stroke="var(--color-text-dim)"
               tick={{ fontSize: 11, fill: 'var(--color-text-dim)' }}
-              width={70}
-              tickFormatter={(value: number) => formatIsk(value, 0)}
+              width={COMPACT_ISK_Y_AXIS_WIDTH}
+              tickFormatter={(value: number) => formatIskCompact(value)}
             />
             <Tooltip content={(props) => <ProfitTooltip {...props} />} />
             <Line
