@@ -26,6 +26,7 @@ import {
   InfoTooltip,
   IskAmount,
   StatChip,
+  Tooltip,
   nextDataTableSort,
   sortRows,
   type DataTableSort,
@@ -150,7 +151,6 @@ export function MobileOpportunityList({
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button
-            size="sm"
             variant="ghost"
             className="mb-3 self-start"
             aria-label={t('industry.opportunitiesSortByField', {
@@ -184,26 +184,49 @@ export function MobileOpportunityList({
           const productTypeID = row.candidate.catalogEntry.productTypeID;
           const original = row.candidate.blueprint.runs === -1;
 
+          const checkboxWrapper = (
+            <div className="absolute top-1 right-2 flex size-11 items-center justify-center md:size-4">
+              <input
+                type="checkbox"
+                checked={selectedIds.has(row.candidate.id)}
+                onChange={() => onToggleSelected(row.candidate.id)}
+                // Never the native `disabled` attribute here: it takes the
+                // element out of the tab order and off the hover/touch event
+                // path a `Tooltip` trigger needs to explain itself (same
+                // reasoning `FilterChip` documents). `preventDefault` on
+                // click is what actually blocks the toggle — it cancels a
+                // checkbox's native activation before `onChange` ever fires,
+                // so the visible check state never flashes and back.
+                onClick={(event) => {
+                  if (!seedable) event.preventDefault();
+                }}
+                aria-disabled={seedable ? undefined : true}
+                aria-label={t('industry.opportunitiesSelectFor', {
+                  name: row.candidate.catalogEntry.productName,
+                })}
+                className={`size-4 shrink-0 accent-accent ${
+                  seedable ? 'cursor-pointer' : 'cursor-not-allowed opacity-40'
+                }`}
+              />
+            </div>
+          );
+
           return (
             <li
               key={row.candidate.id}
               className="relative flex flex-col gap-1.5 border-b border-line py-2.5 last:border-b-0"
             >
-              <div className="absolute top-1 right-2 flex size-11 items-center justify-center md:size-4">
-                <input
-                  type="checkbox"
-                  checked={selectedIds.has(row.candidate.id)}
-                  onChange={() => onToggleSelected(row.candidate.id)}
-                  disabled={!seedable}
-                  title={
-                    seedable ? undefined : t('industry.opportunitiesCompareActiveCharacterOnly')
-                  }
-                  aria-label={t('industry.opportunitiesSelectFor', {
-                    name: row.candidate.catalogEntry.productName,
-                  })}
-                  className="size-4 shrink-0 cursor-pointer accent-accent disabled:cursor-not-allowed disabled:opacity-40"
-                />
-              </div>
+              {seedable ? (
+                checkboxWrapper
+              ) : (
+                // Wraps the same `size-11` box the checkbox's own touch
+                // target is measured against elsewhere in this file, not the
+                // bare `size-4` input — the long-press-to-reveal zone has to
+                // match the tap zone, not the visual glyph inside it.
+                <Tooltip content={t('industry.opportunitiesCompareActiveCharacterOnly')}>
+                  {checkboxWrapper}
+                </Tooltip>
+              )}
 
               <div className="flex items-start gap-2 pr-12">
                 <span
