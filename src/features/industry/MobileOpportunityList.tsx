@@ -223,7 +223,7 @@ export function MobileOpportunityList({
                 // target is measured against elsewhere in this file, not the
                 // bare `size-4` input — the long-press-to-reveal zone has to
                 // match the tap zone, not the visual glyph inside it.
-                <Tooltip content={t('industry.opportunitiesCompareActiveCharacterOnly')}>
+                <Tooltip content={t('industry.opportunitiesCompareActiveCharacterOnly')} openOnTap>
                   {checkboxWrapper}
                 </Tooltip>
               )}
