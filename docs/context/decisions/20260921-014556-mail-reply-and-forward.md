@@ -1,4 +1,4 @@
-# Scope decisions — mail reply and forward
+# Scope decisions — Mail reply and forward
 
 _Recorded 2026-09-21._
 
@@ -19,11 +19,24 @@ _Recorded 2026-09-21._
   login** once this ships — `revokedScopes` in `scopes.ts` already treats a
   widened grant as a no-op, not a revocation, so no cache purge follows, but
   the SSO screen itself changes for everyone, whether or not they ever reply.
+  **This is a real, weighed cost, not just friction avoided**: a character
+  who never opens Reply still holds send-mail capability from that point on,
+  and a compromised session or leaked refresh token can now send mail as
+  that character, app-wide — not scoped to the subset who'd ever use it,
+  same shape of risk the `corp` group's opt-in gate exists to avoid. Accepted
+  anyway because the two aren't equivalent: `corp`'s gate is sized to ~95% of
+  users who _cannot_ exercise those scopes at all (CCP role-gates them
+  server-side, so holding them unused is pure downside with zero eventual
+  benefit); send-mail is a capability every character can use, so the
+  "unused grant" population shrinks over time rather than staying near-total,
+  and the blast radius (one character's mail) matches what `organize_mail`
+  already carries today.
 
 - **No CSPA (contact-charge) support.** A stranger who prices contact from
   non-contacts can reject a send unless `approved_cost` is attached. This app
-  does not read, display, or pay that charge — a rejected send surfaces ESI's
-  error as-is with a hint to use the in-game client instead. Reply-all is the
+  does not read, display, or pay that charge — a rejected send surfaces only
+  ESI's error message text (never a raw response dump) with a hint to use
+  the in-game client instead. Reply-all is the
   one path likely to hit this (a third party on the original mail who isn't a
   contact); replying to the original sender alone effectively never does,
   since they already messaged this character. Handling the charge would mean
@@ -61,17 +74,31 @@ _Recorded 2026-09-21._
   Contacts-only was rejected as too narrow — forwarding to someone not yet a
   contact is a normal use of the feature, not an edge case.
 
-- **Drafts persist to Dexie, device-only**, surviving a refresh or character
-  switch, cleared on send. Same tier as this app's refresh tokens (CLAUDE.md:
-  "Refresh tokens live in Dexie only") — local, never synced through the
-  backend, never sent anywhere but ESI. A pilot who starts a reply, picks
-  another mail, and comes back should find their draft rather than an empty
-  box; the alternative (drop it on navigation) was rejected as the one thing
-  most likely to lose real work mid-feature.
+- **Reply-all's chips are editable except the sender's.** A pilot can remove
+  any CC'd recipient before sending; the sender's own chip is pinned. Removing
+  every CC is still a reply; removing the sender turns "reply" into "forward
+  to the CC list", a different action this decision already gives its own
+  entry point.
+
+- **Drafts persist to Dexie, device-only, keyed one-per-mail**, surviving a
+  refresh or character switch, overwritten on retry, cleared on send. Same
+  tier as this app's refresh tokens (CLAUDE.md: "Refresh tokens live in Dexie
+  only") — local, never synced through the backend, never sent anywhere but
+  ESI. A pilot who starts a reply, picks another mail, and comes back should
+  find their draft rather than an empty box; the alternative (drop it on
+  navigation) was rejected as the one thing most likely to lose real work
+  mid-feature. A lingering draft necessarily holds someone else's quoted mail
+  text, same as the mail body it quotes — but that body is already sitting in
+  this same Dexie cache, unencrypted, for as long as `mail:{mailId}`'s
+  `STALE_AFTER.static` window keeps it (`features/character/mail.ts`). A
+  draft adds no exposure beyond what the app already keeps on-device; no
+  separate expiry is added here for that reason.
 
 - **No toast component exists in this app** (checked before deciding) —
-  a failed send surfaces inline, near the Send button, the same place
-  `ReauthBanner` already puts an actionable error elsewhere. Rate limiting
+  a failed send surfaces inline, near the Send button: same spot and tier
+  `ReauthBanner` already uses for an actionable error, not the component
+  itself — its props (`title`/`hint`/`actionLabel`/`onLogin`) are
+  login-specific and don't fit a rate-limit or CSPA rejection. Rate limiting
   and auth failure on the send call follow the existing pattern every other
   ESI write already uses (`esi/client.ts`'s `X-Ratelimit-*`/`Retry-After`
   handling, `emitEsiAuthFailure` on a 401/403) — nothing new to design there.
