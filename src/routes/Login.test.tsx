@@ -44,6 +44,7 @@ const READ_ONLY_PHRASES: Record<string, string> = {
 const WRITE_SCOPE_PHRASES: Record<string, string> = {
   'esi-mail.organize_mail.v1': 'marks it read in EVE',
   'esi-calendar.respond_calendar_events.v1': 'sends that response to EVE',
+  'esi-mail.send_mail.v1': 'sends it through your EVE account',
 };
 
 const BASE_GRANT_PHRASES: Record<string, string> = {
@@ -217,7 +218,7 @@ describe('Login', () => {
     }
   });
 
-  it('discloses the one write scope in its own fine-print line, not the read-only sentence', async () => {
+  it('discloses each write scope in its own fine-print line, not the read-only sentence', async () => {
     renderLogin();
     await screen.findByRole('heading', { name: /read-only, and it stays that way/i });
 
