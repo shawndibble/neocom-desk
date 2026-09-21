@@ -80,6 +80,16 @@ async function seedCharacter(characterId: number): Promise<void> {
     characterId,
     samples: [{ at: 1, problem: 'healthy' }],
   });
+  await db.mailDrafts.add({
+    id: `${characterId}:1`,
+    characterId,
+    mailId: 1,
+    kind: 'reply',
+    recipients: [{ recipient_id: 2, recipient_type: 'character' }],
+    subject: 'RE: Ratting fleet up',
+    body: 'On my way',
+    updatedAt: 1,
+  });
 }
 
 beforeEach(async () => {
@@ -98,6 +108,7 @@ beforeEach(async () => {
     db.payees.clear(),
     db.miningTaxAssignments.clear(),
     db.orderProblemSamples.clear(),
+    db.mailDrafts.clear(),
   ]);
   useActiveCharacter.setState({ activeCharacterId: null, hydrated: true });
 });
@@ -118,6 +129,7 @@ describe('removeCharacter', () => {
     expect(await db.payees.where('characterId').equals(1).count()).toBe(0);
     expect(await db.miningTaxAssignments.where('characterId').equals(1).count()).toBe(0);
     expect(await db.orderProblemSamples.where('characterId').equals(1).count()).toBe(0);
+    expect(await db.mailDrafts.where('characterId').equals(1).count()).toBe(0);
   });
 
   it('does not touch another character’s data', async () => {
@@ -131,6 +143,7 @@ describe('removeCharacter', () => {
     expect(await db.payees.where('characterId').equals(2).count()).toBe(1);
     expect(await db.miningTaxAssignments.where('characterId').equals(2).count()).toBe(1);
     expect(await db.orderProblemSamples.where('characterId').equals(2).count()).toBe(1);
+    expect(await db.mailDrafts.where('characterId').equals(2).count()).toBe(1);
   });
 
   it('attempts the remote purge and clears sync bookkeeping when configured', async () => {

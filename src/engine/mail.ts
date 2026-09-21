@@ -171,3 +171,87 @@ export function parseMailFolders(raw: unknown): MailTab[] | null {
     typeof value === 'string' && (MAIL_FOLDERS as readonly string[]).includes(value);
   return raw.every(isTab) ? (raw as MailTab[]) : null;
 }
+
+interface RecipientLike {
+  recipient_id: number;
+  recipient_type: 'alliance' | 'character' | 'corporation' | 'mailing_list';
+}
+
+interface ReplyAllSource {
+  from?: number;
+  recipients?: readonly RecipientLike[];
+}
+
+/** A reply-all candidate: the sender's own chip is pinned (`removable: false`), every other one isn't. */
+export type ReplyRecipient = RecipientLike & { removable: boolean };
+
+/**
+ * Reply defaults to reply-all (mail-reply-and-forward decision): the sender
+ * plus every original recipient except the reading character. The sender's
+ * chip is not removable — dropping it would turn "reply" into "forward to
+ * the CC list", a different action with its own entry point. Replying to a
+ * Sent mail (`from === ownCharacterId`) has no sender to pin, so every
+ * recipient stays removable.
+ */
+export function buildReplyAllRecipients(
+  header: ReplyAllSource,
+  ownCharacterId: number
+): ReplyRecipient[] {
+  const out: ReplyRecipient[] = [];
+  const seen = new Set<string>();
+  const add = (recipient: RecipientLike, removable: boolean) => {
+    const key = `${recipient.recipient_type}:${recipient.recipient_id}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push({ ...recipient, removable });
+  };
+
+  if (header.from !== undefined && header.from !== ownCharacterId) {
+    add({ recipient_id: header.from, recipient_type: 'character' }, false);
+  }
+  for (const recipient of header.recipients ?? []) {
+    if (recipient.recipient_type === 'character' && recipient.recipient_id === ownCharacterId) {
+      continue;
+    }
+    add(recipient, true);
+  }
+  return out;
+}
+
+export type ComposeKind = 'reply' | 'forward';
+
+const SUBJECT_PREFIX: Readonly<Record<ComposeKind, string>> = {
+  reply: 'RE:',
+  forward: 'FWD:',
+};
+
+/**
+ * `RE: <subject>` / `FWD: <subject>`, without doubling a prefix the subject
+ * already carries (case-insensitive — mail clients vary the case). Crossing
+ * the two (`FWD: RE: ...`) is left alone rather than de-duplicated: a
+ * forwarded reply genuinely is both, and collapsing it would lose that a
+ * pilot already replied once.
+ */
+export function prefixSubject(kind: ComposeKind, subject: string): string {
+  const prefix = SUBJECT_PREFIX[kind];
+  const trimmed = subject.trim();
+  if (trimmed.toLowerCase().startsWith(prefix.toLowerCase())) return trimmed;
+  return trimmed === '' ? prefix : `${prefix} ${trimmed}`;
+}
+
+/**
+ * The original message, quoted line-by-line with `> ` (a blank line quotes as
+ * a bare `>`, never `> ` with a trailing space nobody can see they typed
+ * over), under a one-line attribution. `senderName` and `formattedTimestamp`
+ * are supplied already-resolved: this stays a pure string join, with no name
+ * lookup or timezone formatting of its own to keep in sync with the
+ * reading pane's.
+ */
+export function quoteMailBody(
+  senderName: string,
+  formattedTimestamp: string,
+  body: string
+): string {
+  const quotedLines = body.split('\n').map((line) => (line === '' ? '>' : `> ${line}`));
+  return `\n\nOn ${formattedTimestamp}, ${senderName} wrote:\n${quotedLines.join('\n')}`;
+}

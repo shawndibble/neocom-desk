@@ -638,7 +638,7 @@ export function getCharacterMailingLists(
 
 // --- PUT /characters/{character_id}/mail/{mail_id}/ (esi-mail.organize_mail.v1) ---
 
-/** The app's one ESI write: marks a mail read (or unread). Answers 204 No Content on success. */
+/** Marks a mail read (or unread). Answers 204 No Content on success. */
 export function putCharacterMail(
   characterId: number,
   mailId: number,
@@ -651,6 +651,36 @@ export function putCharacterMail(
     method: 'PUT',
     body: update,
     endpointId: 'putCharacterMail',
+  });
+}
+
+// --- POST /characters/{character_id}/mail/ (esi-mail.send_mail.v1) ---
+
+/** What a Reply/Forward send actually posts. */
+export interface MailSendBody {
+  recipients: MailRecipient[];
+  subject: string;
+  body: string;
+  /**
+   * ISK the pilot approved to pay a recipient's contact charge (CSPA) — not
+   * offered by this app (mail-reply-and-forward decision: no CSPA support).
+   * Always omitted; kept on the type for fidelity to ESI's own request shape.
+   */
+  approved_cost?: number;
+}
+
+/** Answers the new mail's id on success. */
+export function postCharacterMail(
+  characterId: number,
+  mail: MailSendBody,
+  options: { signal?: AbortSignal } = {}
+): Promise<EsiResult<number>> {
+  return esiFetch<number>(`/characters/${characterId}/mail/`, {
+    ...options,
+    characterId,
+    method: 'POST',
+    body: mail,
+    endpointId: 'postCharacterMail',
   });
 }
 
@@ -891,14 +921,15 @@ export async function postCharactersAffiliation(
 
 // --- GET /characters/{character_id}/search (esi-search.search_structures.v1) ---
 
-/** Only the categories the Build Plan's location search asks for. */
+/** The categories this app's two callers ask for: Build Plan locations, and Forward's recipient picker. */
 export interface CharacterSearchResult {
   station?: number[];
   structure?: number[];
   solar_system?: number[];
+  character?: number[];
 }
 
-export type SearchCategory = 'station' | 'structure' | 'solar_system';
+export type SearchCategory = 'station' | 'structure' | 'solar_system' | 'character';
 
 /**
  * Name search across the categories asked for, returning ids only.

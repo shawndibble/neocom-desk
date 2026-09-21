@@ -1,14 +1,17 @@
 /** Fetch + cache layer for the Mail view: headers list + one body on demand. */
+import { db } from '@/db';
 import {
   getCharacterMailHeaders,
   getCharacterMail,
   getCharacterMailLabels,
   getCharacterMailingLists,
   putCharacterMail,
+  postCharacterMail,
   type MailHeader,
   type MailBody,
   type MailLabels,
   type MailingList,
+  type MailRecipient,
 } from '@/esi/endpoints';
 import {
   loadWithCache,
@@ -152,4 +155,37 @@ export async function markMailReadOnEsi(characterId: number, mailId: number): Pr
     headers.map((header) => (header.mail_id === mailId ? { ...header, is_read: true } : header)),
     Date.now()
   );
+}
+
+/**
+ * Sends a Reply or Forward (`MailSendBody.approved_cost` — see there for why
+ * it's never set). Auth failure signals the app-wide reauth banner like
+ * every other write in this file; every other failure is left for the
+ * caller to display inline (no toast component in this app).
+ *
+ * On success, deletes the cached headers row rather than patching it: unlike
+ * `markMailReadOnEsi`, the new mail's shape (timestamp, `mail_id`) is not
+ * known locally, so the next Mail load simply refetches instead of guessing.
+ */
+export async function sendMail(
+  characterId: number,
+  recipients: readonly MailRecipient[],
+  subject: string,
+  body: string
+): Promise<number> {
+  let mailId: number;
+  try {
+    const result = await postCharacterMail(characterId, {
+      recipients: [...recipients],
+      subject,
+      body,
+    });
+    if (result.data === null) throw new Error('ESI did not answer with a mail id.');
+    mailId = result.data;
+  } catch (err) {
+    if (isAuthFailure(err)) emitEsiAuthFailure(characterId);
+    throw err;
+  }
+  await db.esiCache.delete([characterId, KEYS.headers]);
+  return mailId;
 }

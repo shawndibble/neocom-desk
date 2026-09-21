@@ -17,6 +17,8 @@
 import {
   Broadcast,
   CalendarBlank,
+  ArrowBendUpLeft,
+  ArrowBendUpRight,
   ArrowClockwise,
   ArrowCounterClockwise,
   ArrowDown,
@@ -280,6 +282,9 @@ export const Social = withWeight(EnvelopeSimple);
 export const MailInbox = withWeight(Tray);
 export const MailSent = withWeight(PaperPlaneRight);
 export const MailAlliance = withWeight(UsersFour);
+/** Reply and Forward, on the reading pane's compose actions. */
+export const MailReply = withWeight(ArrowBendUpLeft);
+export const MailForward = withWeight(ArrowBendUpRight);
 /** Jump clones and implants. */
 export const Clones = withWeight(Stack);
 /** A calendar event — the Coming Up rail's own kind. */

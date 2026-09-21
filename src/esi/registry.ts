@@ -141,6 +141,13 @@ export const ESI_REGISTRY = {
     route: '/characters/{character_id}/mail/{mail_id}/',
     scope: 'esi-mail.organize_mail.v1',
   },
+
+  // Base grant, deliberately (mail-reply-and-forward decision): every
+  // Character can send mail, unlike the gated `corp` scopes below.
+  postCharacterMail: {
+    route: '/characters/{character_id}/mail/',
+    scope: 'esi-mail.send_mail.v1',
+  },
   getCharacterNotifications: {
     route: '/characters/{character_id}/notifications',
     scope: 'esi-characters.read_notifications.v1',

@@ -206,6 +206,13 @@ here — they go one per file in `docs/context/decisions/`.
   `docs/context/decisions/20260909-212715-craft-sweep-bulk-build-depth-strategy-control-for.md`.
   Reactions' own path to becoming a real, selectable option is decided —
   see **Include Reactions** and **Reaction Location**.
+- **CSPA**: CONCORD Spam Prevention Act — a per-character charge (in ISK) a
+  pilot can set to require from anyone outside their contact list who mails
+  them. ESI exposes it as `approved_cost` on a mail send; a send that omits
+  it against a recipient who charges one is rejected. This app does not read,
+  display, or pay it — see `docs/context/decisions/` (mail reply and
+  forward): a rejected send surfaces ESI's own error text and points the
+  pilot at the in-game client instead.
 - **Dark**: A member with no login for the corp's inactivity span or more —
   the pilot's own setting (14/30/60/90 days), defaulting to
   `DARK_AFTER_DAYS` (30). `engine/corp/members.ts` still owns the default and

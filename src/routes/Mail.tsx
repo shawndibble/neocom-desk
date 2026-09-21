@@ -27,6 +27,7 @@ import {
   markMailReadOnEsi,
 } from '@/features/character/mail';
 import { loadContacts } from '@/features/character/contacts';
+import { MailComposeBox } from '@/features/character/MailComposeBox';
 import {
   buildContactStandingIndex,
   type ContactStandingIndex,
@@ -53,6 +54,7 @@ import {
   resolveMailTab,
   unreadCountsByTab,
   MAIL_FOLDERS,
+  type ComposeKind,
   type MailTab,
 } from '@/engine/mail';
 import type {
@@ -207,6 +209,14 @@ export function Mail() {
   }
 
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  // Which compose box is open, if any (mail-reply-and-forward decision) —
+  // reset below whenever the selected mail changes, so switching mails never
+  // leaves a stale Reply/Forward box open against the wrong header.
+  const [composeKind, setComposeKind] = useState<ComposeKind | null>(null);
+  function selectMail(mailId: number | null) {
+    setSelectedId(mailId);
+    setComposeKind(null);
+  }
   // Local "mark read" state, applied instantly on selection so the dim never
   // waits on the network — independent of `markMailReadOnEsi`'s own write
   // below. Set on selection, not toggled — no manual mark-unread control.
@@ -334,16 +344,19 @@ export function Mail() {
   const selectedHeader = headers.find((h) => h.mail_id === selectedId) ?? null;
 
   /**
-   * A header's recipients as display names. A mailing list resolves through
-   * this character's own lists rather than `/universe/names`, which cannot
+   * A recipient's display name. A mailing list resolves through this
+   * character's own lists rather than `/universe/names`, which cannot
    * resolve a list id at all (see `namePartyIds`).
    */
+  function resolveRecipientName(r: { recipient_id: number; recipient_type: string }): string {
+    return r.recipient_type === 'mailing_list'
+      ? (mailingListNames.get(r.recipient_id) ?? t('mail.mailingList'))
+      : (names.get(r.recipient_id) ?? t('mail.unknownRecipient'));
+  }
+
+  /** A header's recipients as display names. */
   function recipientNames(header: MailHeader): string[] {
-    return (header.recipients ?? []).map((r) =>
-      r.recipient_type === 'mailing_list'
-        ? (mailingListNames.get(r.recipient_id) ?? t('mail.mailingList'))
-        : (names.get(r.recipient_id) ?? t('mail.unknownRecipient'))
-    );
+    return (header.recipients ?? []).map(resolveRecipientName);
   }
 
   /** The same recipients, cut to one name plus a count — a list row has one line for them. */
@@ -354,28 +367,55 @@ export function Mail() {
     return t('mail.recipientMore', { name: all[0], count: all.length - 1 });
   }
 
+  /**
+   * Shared by `handleLoadMore` and `handleSent`: resolve names/affiliations
+   * for a fresh header list and apply it, unless a character switch or
+   * refresh already superseded `requestSnapshot` while this was in flight
+   * (`dataRef` tracks the latest one).
+   */
+  async function applyFreshHeaders(
+    requestSnapshot: Snapshot | null,
+    freshHeaders: MailHeader[],
+    hasMoreNext: boolean
+  ) {
+    const [freshNames, freshAffiliations] = await Promise.all([
+      resolveNames(namePartyIds(freshHeaders)),
+      resolveAffiliations(senderIds(freshHeaders)),
+    ]);
+    if (dataRef.current !== requestSnapshot) return;
+    setLoadedHeaders(freshHeaders);
+    setHasMore(hasMoreNext);
+    setLoadedNames(freshNames);
+    setLoadedAffiliations(freshAffiliations);
+  }
+
   async function handleLoadMore() {
     if (activeCharacterId === null || loadingMore) return;
     const requestSnapshot = data;
     setLoadingMore(true);
     try {
       const result = await loadMoreMailHeaders(activeCharacterId, headers);
-      const [names, affiliations] = await Promise.all([
-        resolveNames(namePartyIds(result.headers)),
-        resolveAffiliations(senderIds(result.headers)),
-      ]);
-      // A character switch or refresh landed while this was in flight and
-      // already reset loadedHeaders/loadedNames/loadedAffiliations for the
-      // new snapshot — applying this result now would overwrite it with
-      // stale mail.
-      if (dataRef.current !== requestSnapshot) return;
-      setLoadedHeaders(result.headers);
-      setHasMore(result.hasMore);
-      setLoadedNames(names);
-      setLoadedAffiliations(affiliations);
+      await applyFreshHeaders(requestSnapshot, result.headers, result.hasMore);
     } finally {
       setLoadingMore(false);
     }
+  }
+
+  /**
+   * After a successful Reply/Forward send. `sendMail` already deleted the
+   * cached headers row (mail-reply-and-forward decision: "a targeted
+   * invalidation of one key, not a broader reload") — refetching just the
+   * headers here is what shows the new Sent mail without a manual refresh
+   * while keeping that promise. Not `refresh()`: it calls the cache's global
+   * `invalidateFreshness()`, forcing every other default-tier row (labels,
+   * mailing lists, contacts, affiliations) to refetch too.
+   */
+  async function handleSent() {
+    setComposeKind(null);
+    if (activeCharacterId === null) return;
+    const requestSnapshot = data;
+    const result = await loadMailHeaders(activeCharacterId);
+    await applyFreshHeaders(requestSnapshot, result.cached?.data ?? [], result.hasMore);
   }
 
   useEffect(() => {
@@ -390,6 +430,9 @@ export function Mail() {
   }, [activeCharacterId, selectedId]);
 
   const body = bodySnapshot?.selectedId === selectedId ? bodySnapshot.result : undefined;
+  // Stripped once, shared by the reading pane's own paragraph and the
+  // compose box's auto-quote — both must quote exactly what the pilot reads.
+  const bodyText = body?.data.body ? stripEveMarkup(body.data.body) : '';
 
   if (!hydrated) {
     return (
@@ -558,7 +601,7 @@ export function Mail() {
                           <button
                             type="button"
                             onClick={() => {
-                              setSelectedId(header.mail_id);
+                              selectMail(header.mail_id);
                               markLocalRead(header.mail_id);
                               // Gated on ESI's flag, not `isRead` (which also covers
                               // local state) — a failed write must get another
@@ -686,11 +729,29 @@ export function Mail() {
                 ) : undefined
               }
               actions={
-                showBackControl && (
-                  <Button size="sm" onClick={() => setSelectedId(null)}>
-                    {t('mail.backToList')}
-                  </Button>
-                )
+                <div className="flex items-center gap-2">
+                  {selectedHeader !== null && composeKind === null && (
+                    <>
+                      <IconButton
+                        icon={<Icon.MailReply size={Icon.ICON_SIZE.sm} />}
+                        label={t('mail.reply')}
+                        size="sm"
+                        onClick={() => setComposeKind('reply')}
+                      />
+                      <IconButton
+                        icon={<Icon.MailForward size={Icon.ICON_SIZE.sm} />}
+                        label={t('mail.forward')}
+                        size="sm"
+                        onClick={() => setComposeKind('forward')}
+                      />
+                    </>
+                  )}
+                  {showBackControl && (
+                    <Button size="sm" onClick={() => selectMail(null)}>
+                      {t('mail.backToList')}
+                    </Button>
+                  )}
+                </div>
               }
             >
               {selectedId === null ? (
@@ -745,9 +806,26 @@ export function Mail() {
                       shipped at the smallest size in the dimmest readable
                       tier. `break-words` so an unbroken URL cannot push the
                       pane sideways. */}
-                  <p className="text-sm whitespace-pre-wrap text-text break-words">
-                    {body.data.body ? stripEveMarkup(body.data.body) : ''}
-                  </p>
+                  <p className="text-sm whitespace-pre-wrap text-text break-words">{bodyText}</p>
+
+                  {composeKind !== null && selectedHeader !== null && (
+                    <MailComposeBox
+                      key={`${selectedHeader.mail_id}:${composeKind}`}
+                      characterId={activeCharacterId}
+                      kind={composeKind}
+                      header={selectedHeader}
+                      bodyText={bodyText}
+                      senderName={selectedSender}
+                      formattedTimestamp={
+                        selectedHeader.timestamp
+                          ? formatTimestamp(new Date(selectedHeader.timestamp), timeZone)
+                          : ''
+                      }
+                      resolveRecipientName={resolveRecipientName}
+                      onClose={() => setComposeKind(null)}
+                      onSent={() => void handleSent()}
+                    />
+                  )}
                 </div>
               )}
             </Panel>

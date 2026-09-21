@@ -52,6 +52,7 @@ export async function removeCharacter(
   await db.payees.where('characterId').equals(characterId).delete();
   await db.miningTaxAssignments.where('characterId').equals(characterId).delete();
   await db.orderProblemSamples.where('characterId').equals(characterId).delete();
+  await db.mailDrafts.where('characterId').equals(characterId).delete();
   // Orphaned feed rows are invisible in the UI (both the Overview list and the
   // other-character counts skip ids with no Character) but `refreshAppBadge`
   // counts the whole table — leaving an app-icon count nothing can dismiss.

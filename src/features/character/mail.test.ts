@@ -10,6 +10,7 @@ import {
   loadMailLabels,
   loadMoreMailHeaders,
   markMailReadOnEsi,
+  sendMail,
 } from './mail';
 
 const CHAR_ID = 91;
@@ -285,5 +286,89 @@ describe('markMailReadOnEsi', () => {
 
     const cached = (await db.esiCache.get([CHAR_ID, 'mail:headers']))?.value;
     expect(cached).toEqual(headers);
+  });
+});
+
+describe('sendMail', () => {
+  const RECIPIENTS = [{ recipient_id: 90000001, recipient_type: 'character' as const }];
+
+  it('POSTs recipients/subject/body with no approved_cost, and returns the new mail id', async () => {
+    let capturedBody: unknown;
+    server.use(
+      http.post(`${ESI_BASE_URL}/characters/${CHAR_ID}/mail/`, async ({ request }) => {
+        capturedBody = await request.json();
+        return HttpResponse.json(123456);
+      })
+    );
+
+    const mailId = await sendMail(CHAR_ID, RECIPIENTS, 'RE: Hi', 'On my way');
+
+    expect(mailId).toBe(123456);
+    expect(capturedBody).toEqual({
+      recipients: RECIPIENTS,
+      subject: 'RE: Hi',
+      body: 'On my way',
+    });
+  });
+
+  it('deletes the cached headers row on success, so the next load refetches', async () => {
+    await db.esiCache.put({
+      characterId: CHAR_ID,
+      key: 'mail:headers',
+      value: [{ mail_id: 1 }],
+      fetchedAt: Date.now(),
+    });
+    server.use(
+      http.post(`${ESI_BASE_URL}/characters/${CHAR_ID}/mail/`, () => HttpResponse.json(123456))
+    );
+
+    await sendMail(CHAR_ID, RECIPIENTS, 'RE: Hi', 'On my way');
+
+    expect(await db.esiCache.get([CHAR_ID, 'mail:headers'])).toBeUndefined();
+  });
+
+  it('throws with only ESI’s own error message on a rejected send (e.g. a CSPA charge)', async () => {
+    server.use(
+      http.post(`${ESI_BASE_URL}/characters/${CHAR_ID}/mail/`, () =>
+        HttpResponse.json({ error: 'Contact 90000001 requires 1000000.0 ISK' }, { status: 400 })
+      )
+    );
+
+    await expect(sendMail(CHAR_ID, RECIPIENTS, 'RE: Hi', 'On my way')).rejects.toThrow(
+      'Contact 90000001 requires 1000000.0 ISK'
+    );
+  });
+
+  it('signals the app-wide reauth banner on a 401/403', async () => {
+    server.use(
+      http.post(`${ESI_BASE_URL}/characters/${CHAR_ID}/mail/`, () =>
+        HttpResponse.json({ error: 'missing scope' }, { status: 403 })
+      )
+    );
+    const reported = vi.fn();
+    const unsubscribe = onEsiAuthFailure(reported);
+
+    try {
+      await expect(sendMail(CHAR_ID, RECIPIENTS, 'RE: Hi', 'On my way')).rejects.toThrow();
+      expect(reported).toHaveBeenCalledWith(CHAR_ID);
+    } finally {
+      unsubscribe();
+    }
+  });
+
+  it('leaves the cached headers row alone when the send fails', async () => {
+    await db.esiCache.put({
+      characterId: CHAR_ID,
+      key: 'mail:headers',
+      value: [{ mail_id: 1 }],
+      fetchedAt: Date.now(),
+    });
+    server.use(
+      http.post(`${ESI_BASE_URL}/characters/${CHAR_ID}/mail/`, () => HttpResponse.error())
+    );
+
+    await expect(sendMail(CHAR_ID, RECIPIENTS, 'RE: Hi', 'On my way')).rejects.toThrow();
+
+    expect((await db.esiCache.get([CHAR_ID, 'mail:headers']))?.value).toEqual([{ mail_id: 1 }]);
   });
 });

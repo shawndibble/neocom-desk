@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildLabelTabMap,
+  buildReplyAllRecipients,
   capHeadersForDisplay,
   mailSearchMatches,
   mergeMailHeaderPage,
   parseMailFolders,
+  prefixSubject,
+  quoteMailBody,
   resolveMailTab,
   unreadCountsByTab,
   MAIL_FOLDERS,
@@ -203,5 +206,113 @@ describe('parseMailFolders', () => {
     expect(parseMailFolders('inbox')).toBeNull();
     expect(parseMailFolders([])).toBeNull();
     expect(parseMailFolders(['inbox', 'drafts'])).toBeNull();
+  });
+});
+
+describe('buildReplyAllRecipients', () => {
+  const OWN_ID = 100;
+
+  it('includes the sender plus every original recipient except self, sender not removable', () => {
+    const result = buildReplyAllRecipients(
+      {
+        from: 200,
+        recipients: [
+          { recipient_id: OWN_ID, recipient_type: 'character' },
+          { recipient_id: 300, recipient_type: 'character' },
+        ],
+      },
+      OWN_ID
+    );
+    expect(result).toEqual([
+      { recipient_id: 200, recipient_type: 'character', removable: false },
+      { recipient_id: 300, recipient_type: 'character', removable: true },
+    ]);
+  });
+
+  it('includes a mailing_list recipient, same as any other type', () => {
+    const result = buildReplyAllRecipients(
+      {
+        from: 200,
+        recipients: [{ recipient_id: 900, recipient_type: 'mailing_list' }],
+      },
+      OWN_ID
+    );
+    expect(result).toEqual([
+      { recipient_id: 200, recipient_type: 'character', removable: false },
+      { recipient_id: 900, recipient_type: 'mailing_list', removable: true },
+    ]);
+  });
+
+  it('replying to your own Sent mail has no sender to pin — every original recipient is removable', () => {
+    const result = buildReplyAllRecipients(
+      {
+        from: OWN_ID,
+        recipients: [{ recipient_id: 300, recipient_type: 'character' }],
+      },
+      OWN_ID
+    );
+    expect(result).toEqual([{ recipient_id: 300, recipient_type: 'character', removable: true }]);
+  });
+
+  it('dedupes a recipient who is also the sender (rare, but ESI does not forbid it)', () => {
+    const result = buildReplyAllRecipients(
+      {
+        from: 200,
+        recipients: [{ recipient_id: 200, recipient_type: 'character' }],
+      },
+      OWN_ID
+    );
+    expect(result).toEqual([{ recipient_id: 200, recipient_type: 'character', removable: false }]);
+  });
+
+  it('drops a header with no sender and no recipients to an empty list', () => {
+    expect(buildReplyAllRecipients({}, OWN_ID)).toEqual([]);
+  });
+});
+
+describe('prefixSubject', () => {
+  it('prepends "RE:" for a reply', () => {
+    expect(prefixSubject('reply', 'Ratting fleet up')).toBe('RE: Ratting fleet up');
+  });
+
+  it('prepends "FWD:" for a forward', () => {
+    expect(prefixSubject('forward', 'Ratting fleet up')).toBe('FWD: Ratting fleet up');
+  });
+
+  it('does not double-prefix a reply that already reads RE:, case-insensitively', () => {
+    expect(prefixSubject('reply', 'RE: Ratting fleet up')).toBe('RE: Ratting fleet up');
+    expect(prefixSubject('reply', 're: Ratting fleet up')).toBe('re: Ratting fleet up');
+  });
+
+  it('does not double-prefix a forward that already reads FWD:', () => {
+    expect(prefixSubject('forward', 'FWD: Ratting fleet up')).toBe('FWD: Ratting fleet up');
+  });
+
+  it('still prefixes FWD: onto an existing RE: (crossing the two is allowed)', () => {
+    expect(prefixSubject('forward', 'RE: Ratting fleet up')).toBe('FWD: RE: Ratting fleet up');
+  });
+
+  it('prefixes a blank subject rather than producing a bare prefix with trailing space', () => {
+    expect(prefixSubject('reply', '')).toBe('RE:');
+  });
+});
+
+describe('quoteMailBody', () => {
+  it('quotes every line of the body with "> ", headed by sender and timestamp', () => {
+    expect(quoteMailBody('Aura', 'Sep 21, 2026 03:14', 'line one\nline two')).toBe(
+      '\n\nOn Sep 21, 2026 03:14, Aura wrote:\n> line one\n> line two'
+    );
+  });
+
+  it('quotes a blank line as a bare ">", not "> " with a trailing space', () => {
+    expect(quoteMailBody('Aura', 'Sep 21, 2026 03:14', 'line one\n\nline two')).toBe(
+      '\n\nOn Sep 21, 2026 03:14, Aura wrote:\n> line one\n>\n> line two'
+    );
+  });
+
+  it('quotes an empty body as just the attribution line', () => {
+    expect(quoteMailBody('Aura', 'Sep 21, 2026 03:14', '')).toBe(
+      '\n\nOn Sep 21, 2026 03:14, Aura wrote:\n>'
+    );
   });
 });
