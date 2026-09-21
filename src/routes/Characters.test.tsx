@@ -826,6 +826,82 @@ describe('Characters table view', () => {
     expect(screen.queryByText('overview page')).not.toBeInTheDocument();
   });
 
+  it('reveals the Open Jobs tooltip on a plain tap, without navigating the row', async () => {
+    const roster: RosterEntry[] = [
+      {
+        characterId: 91,
+        name: 'Pilot One',
+        wallet: null,
+        queue: null,
+        correctedTotalSp: 1_000_000,
+        skills: {
+          data: {
+            total_sp: 1_000_000,
+            skills: [
+              {
+                skill_id: 3387,
+                trained_skill_level: 2,
+                active_skill_level: 2,
+                skillpoints_in_skill: 0,
+              },
+            ],
+          },
+          fetchedAt: new Date(),
+          fromCache: true,
+          truncated: false,
+        },
+      },
+    ];
+    const attention: AttentionEntry[] = [
+      {
+        characterId: 91,
+        jobCounts: { manufacturing: 0, science: 0, reaction: 0 },
+        jobCountsFetchedAt: new Date(),
+        piAttention: undefined,
+        piSoonestExpiryMs: undefined,
+        piFetchedAt: null,
+      },
+    ];
+    const snapshotSpy = vi.spyOn(rosterModule, 'loadRosterSnapshot').mockResolvedValue(roster);
+    const attentionSpy = vi
+      .spyOn(rosterAttentionModule, 'loadRosterAttention')
+      .mockResolvedValue(attention);
+
+    try {
+      const user = userEvent.setup();
+      renderCharacters();
+      await user.click(await screen.findByRole('button', { name: 'Table' }));
+
+      const table = await screen.findByRole('table');
+      const mfgHeader = within(table).getByRole('columnheader', { name: 'Mfg' });
+      const mfgIndex = within(table).getAllByRole('columnheader').indexOf(mfgHeader);
+      const pilotRow = within(table).getByText('Pilot One').closest('tr');
+      if (!pilotRow) throw new Error('expected a Pilot One row');
+      const mfgCell = within(pilotRow).getAllByRole('cell')[mfgIndex];
+      const trigger = within(mfgCell).getByText('3');
+
+      fireEvent.touchStart(trigger);
+      fireEvent.touchEnd(trigger);
+      // Not `findByRole('tooltip')` — the "Table" toggle button leaves its
+      // own hover tooltip open from the click above, so more than one
+      // tooltip-role element exists; match this one by its content instead.
+      expect(await screen.findByText('0/3 slots used')).toBeInTheDocument();
+
+      // The click a real tap produces (jsdom doesn't synthesize it itself —
+      // see Tooltip.test.tsx) — this is what would otherwise bubble to the
+      // row's own onRowClick. `userEvent.click`, not `fireEvent.click`: the
+      // row's select-and-navigate is fire-and-forget async, so only an
+      // interaction that awaits pending effects gives it a chance to run
+      // before the assertion below checks whether it did.
+      await user.click(trigger);
+
+      expect(screen.queryByText('overview page')).not.toBeInTheDocument();
+    } finally {
+      snapshotSpy.mockRestore();
+      attentionSpy.mockRestore();
+    }
+  });
+
   describe('row context menu', () => {
     it('offers Overview, Skill training, Industry, PI, and Alerts for the row under the pointer', async () => {
       renderCharacters();

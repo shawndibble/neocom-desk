@@ -116,8 +116,15 @@ export function FilterChip({
     </button>
   );
 
-  // No `openOnTap`: the tap toggles the filter, so it belongs to that action
-  // and touch-and-hold stays the way to read the bubble (docs/DESIGN.md §
-  // `Tooltip`).
-  return tooltip ? <Tooltip content={tooltip}>{chip}</Tooltip> : chip;
+  // Toggleable chip: the tap belongs to `onToggle`, so touch-and-hold stays
+  // the way to read the bubble (docs/DESIGN.md § `Tooltip`). `explained`
+  // takes the tap away, so it gets `openOnTap` instead — the same swap
+  // `InfoTooltip` makes for `onClick`.
+  return tooltip ? (
+    <Tooltip content={tooltip} openOnTap={explained}>
+      {chip}
+    </Tooltip>
+  ) : (
+    chip
+  );
 }
