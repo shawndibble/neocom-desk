@@ -1,12 +1,7 @@
 /**
- * Name search for Forward's recipient picker (mail-reply-and-forward
- * decision, docs/context/decisions/): search-plus-contacts, not
- * contacts-only. `GET /characters/{id}/search` is the same base-grant
- * endpoint `BuildLocationPicker` already uses for stations/structures
- * (`esi-search.search_structures.v1`, in the base grant) — this just asks it
- * for the `character` category instead, and resolves each hit's name the
- * same way the rest of Mail already does (`resolveNames`), rather than a
- * second lookup mechanism.
+ * Name search for Forward's recipient picker. Reuses `BuildLocationPicker`'s
+ * own `GET /characters/{id}/search` endpoint with the `character` category
+ * instead of stations/structures — same base-grant scope, no new lookup.
  */
 import { getCharacterSearch } from '@/esi/endpoints';
 import { resolveNames } from './names';

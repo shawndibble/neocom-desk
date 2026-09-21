@@ -98,13 +98,10 @@ export function MailComposeBox({
   // already started and silently overwriting it.
   const touchedRef = useRef(false);
 
-  // Hydrates from a saved draft (same kind, same source mail) or builds the
-  // defaults this decision settled: reply-all with the sender pinned, both
-  // kinds auto-quoted. Runs once per (mail, kind) — a pilot who closes and
-  // reopens the same Reply mid-edit should see the draft, not the defaults.
-  // Mail.tsx keys this component by `${mail_id}:${kind}`, so a change to
-  // either fully remounts it — `ready` starting `false` on mount is already
-  // the reset this effect needs, with no synchronous setState of its own.
+  // Hydrates from a saved draft, or builds this decision's reply/forward
+  // defaults (`engine/mail.ts`) otherwise. Mail.tsx keys this component by
+  // `${mail_id}:${kind}`, so either changing fully remounts it — `ready`
+  // starting `false` is already the reset this effect needs.
   useEffect(() => {
     let cancelled = false;
     void (async () => {
@@ -243,16 +240,10 @@ export function MailComposeBox({
       query === ''
         ? contacts.slice(0, MAX_QUICK_PICKS)
         : contacts.filter((c) => c.name.toLowerCase().includes(query));
-    // Below the search floor, `searchResults` is stale from a longer query
-    // that has since been shortened — the debounce effect no longer clears
-    // it (that setState-in-effect is what this gate replaces), so this is
-    // where a short query stops showing it.
+    // Stale `searchResults` below the floor (see the search effect above) is dropped here.
     const liveResults = trimmed.length < MIN_RECIPIENT_SEARCH_LENGTH ? [] : searchResults;
     const merged = [...quickPicks, ...liveResults].filter((c) => !addedIds.has(c.characterId));
-    const seen = new Set<number>();
-    return merged.filter((c) =>
-      seen.has(c.characterId) ? false : (seen.add(c.characterId), true)
-    );
+    return Array.from(new Map(merged.map((c) => [c.characterId, c])).values());
   }, [contacts, searchResults, recipientQuery, addedIds]);
 
   function addRecipient(candidate: RecipientCandidate) {

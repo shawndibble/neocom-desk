@@ -344,23 +344,19 @@ export function Mail() {
   const selectedHeader = headers.find((h) => h.mail_id === selectedId) ?? null;
 
   /**
-   * A header's recipients as display names. A mailing list resolves through
-   * this character's own lists rather than `/universe/names`, which cannot
+   * A recipient's display name. A mailing list resolves through this
+   * character's own lists rather than `/universe/names`, which cannot
    * resolve a list id at all (see `namePartyIds`).
    */
-  function recipientNames(header: MailHeader): string[] {
-    return (header.recipients ?? []).map((r) =>
-      r.recipient_type === 'mailing_list'
-        ? (mailingListNames.get(r.recipient_id) ?? t('mail.mailingList'))
-        : (names.get(r.recipient_id) ?? t('mail.unknownRecipient'))
-    );
-  }
-
-  /** Same resolution as `recipientNames`, for one recipient at a time — the compose box's reply-all chips. */
   function resolveRecipientName(r: { recipient_id: number; recipient_type: string }): string {
     return r.recipient_type === 'mailing_list'
       ? (mailingListNames.get(r.recipient_id) ?? t('mail.mailingList'))
       : (names.get(r.recipient_id) ?? t('mail.unknownRecipient'));
+  }
+
+  /** A header's recipients as display names. */
+  function recipientNames(header: MailHeader): string[] {
+    return (header.recipients ?? []).map(resolveRecipientName);
   }
 
   /** The same recipients, cut to one name plus a count — a list row has one line for them. */
@@ -371,25 +367,35 @@ export function Mail() {
     return t('mail.recipientMore', { name: all[0], count: all.length - 1 });
   }
 
+  /**
+   * Shared by `handleLoadMore` and `handleSent`: resolve names/affiliations
+   * for a fresh header list and apply it, unless a character switch or
+   * refresh already superseded `requestSnapshot` while this was in flight
+   * (`dataRef` tracks the latest one).
+   */
+  async function applyFreshHeaders(
+    requestSnapshot: Snapshot | null,
+    freshHeaders: MailHeader[],
+    hasMoreNext: boolean
+  ) {
+    const [freshNames, freshAffiliations] = await Promise.all([
+      resolveNames(namePartyIds(freshHeaders)),
+      resolveAffiliations(senderIds(freshHeaders)),
+    ]);
+    if (dataRef.current !== requestSnapshot) return;
+    setLoadedHeaders(freshHeaders);
+    setHasMore(hasMoreNext);
+    setLoadedNames(freshNames);
+    setLoadedAffiliations(freshAffiliations);
+  }
+
   async function handleLoadMore() {
     if (activeCharacterId === null || loadingMore) return;
     const requestSnapshot = data;
     setLoadingMore(true);
     try {
       const result = await loadMoreMailHeaders(activeCharacterId, headers);
-      const [names, affiliations] = await Promise.all([
-        resolveNames(namePartyIds(result.headers)),
-        resolveAffiliations(senderIds(result.headers)),
-      ]);
-      // A character switch or refresh landed while this was in flight and
-      // already reset loadedHeaders/loadedNames/loadedAffiliations for the
-      // new snapshot — applying this result now would overwrite it with
-      // stale mail.
-      if (dataRef.current !== requestSnapshot) return;
-      setLoadedHeaders(result.headers);
-      setHasMore(result.hasMore);
-      setLoadedNames(names);
-      setLoadedAffiliations(affiliations);
+      await applyFreshHeaders(requestSnapshot, result.headers, result.hasMore);
     } finally {
       setLoadingMore(false);
     }
@@ -399,31 +405,17 @@ export function Mail() {
    * After a successful Reply/Forward send. `sendMail` already deleted the
    * cached headers row (mail-reply-and-forward decision: "a targeted
    * invalidation of one key, not a broader reload") — refetching just the
-   * headers here, the same way `handleLoadMore` patches them in, is what
-   * shows the new Sent mail without a manual refresh while keeping that
-   * promise. `refresh()` was tried first and reverted: `useRouteSnapshot`'s
-   * `refresh` calls the cache's global `invalidateFreshness()`, which forces
-   * every other default-tier row (labels, mailing lists, contacts, sender
-   * affiliations) to refetch too — exactly the broader reload the decision
-   * rules out.
+   * headers here is what shows the new Sent mail without a manual refresh
+   * while keeping that promise. Not `refresh()`: it calls the cache's global
+   * `invalidateFreshness()`, forcing every other default-tier row (labels,
+   * mailing lists, contacts, affiliations) to refetch too.
    */
   async function handleSent() {
     setComposeKind(null);
     if (activeCharacterId === null) return;
     const requestSnapshot = data;
     const result = await loadMailHeaders(activeCharacterId);
-    const freshHeaders = result.cached?.data ?? [];
-    const [freshNames, freshAffiliations] = await Promise.all([
-      resolveNames(namePartyIds(freshHeaders)),
-      resolveAffiliations(senderIds(freshHeaders)),
-    ]);
-    // A character switch or refresh landed while this was in flight —
-    // same guard `handleLoadMore` uses, for the same reason.
-    if (dataRef.current !== requestSnapshot) return;
-    setLoadedHeaders(freshHeaders);
-    setHasMore(result.hasMore);
-    setLoadedNames(freshNames);
-    setLoadedAffiliations(freshAffiliations);
+    await applyFreshHeaders(requestSnapshot, result.cached?.data ?? [], result.hasMore);
   }
 
   useEffect(() => {

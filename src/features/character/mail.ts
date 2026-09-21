@@ -158,20 +158,14 @@ export async function markMailReadOnEsi(characterId: number, mailId: number): Pr
 }
 
 /**
- * Sends a Reply or Forward (mail-reply-and-forward decision,
- * docs/context/decisions/). No `approved_cost` is ever sent — this app does
- * not support paying a recipient's contact charge (CSPA); a send ESI rejects
- * for that reason throws the same as any other failure, `err.message`
- * already holding only ESI's own error text (`esi/client.ts`'s `EsiError`),
- * never a raw response dump. Auth failure signals the app-wide reauth
- * banner, same as every other write in this file; every other failure
- * (rate limit, CSPA rejection, validation) is left for the caller to display
- * inline, near the Send button — this app has no toast component.
+ * Sends a Reply or Forward (`MailSendBody.approved_cost` — see there for why
+ * it's never set). Auth failure signals the app-wide reauth banner like
+ * every other write in this file; every other failure is left for the
+ * caller to display inline (no toast component in this app).
  *
  * On success, deletes the cached headers row rather than patching it: unlike
  * `markMailReadOnEsi`, the new mail's shape (timestamp, `mail_id`) is not
  * known locally, so the next Mail load simply refetches instead of guessing.
- * Targeted to this one key — nothing else in the cache changes.
  */
 export async function sendMail(
   characterId: number,

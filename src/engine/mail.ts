@@ -187,13 +187,11 @@ export type ReplyRecipient = RecipientLike & { removable: boolean };
 
 /**
  * Reply defaults to reply-all (mail-reply-and-forward decision): the sender
- * plus every original recipient except the reading character, mailing lists
- * included — ESI accepts a `mailing_list` recipient on a send the same as any
- * other type. The sender's chip is not removable: dropping it turns "reply"
- * into "forward to the CC list", a different action with its own entry
- * point, so that distinction is drawn here rather than left to the UI to
- * enforce. Replying to a Sent mail (`from === ownCharacterId`) has no sender
- * to pin — every original recipient is removable, since none of them is you.
+ * plus every original recipient except the reading character. The sender's
+ * chip is not removable — dropping it would turn "reply" into "forward to
+ * the CC list", a different action with its own entry point. Replying to a
+ * Sent mail (`from === ownCharacterId`) has no sender to pin, so every
+ * recipient stays removable.
  */
 export function buildReplyAllRecipients(
   header: ReplyAllSource,
