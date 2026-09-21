@@ -807,6 +807,35 @@ export interface OrderProblemSampleRecord {
   samples: OrderProblemSample[];
 }
 
+/** Local widening of `MailRecipient` (`esi/endpoints.ts`) — `src/db` carries no dependency on the esi layer, same rule `NotificationFeedRecord.eventId` follows for `src/features`. */
+export interface MailDraftRecipient {
+  recipient_id: number;
+  recipient_type: 'alliance' | 'character' | 'corporation' | 'mailing_list';
+}
+
+/**
+ * A Reply/Forward draft (mail-reply-and-forward decision, docs/context/
+ * decisions/): device-local like `TokenRecord`, one per source mail. Cleared
+ * on send, overwritten on every edit while composing — no history is kept
+ * once a newer edit lands. Holds no more exposure than the mail body it
+ * quotes, which is already sitting in `esiCache` unencrypted for as long as
+ * that row's freshness window keeps it — see the decision doc for why no
+ * separate expiry is added here.
+ */
+export interface MailDraftRecord {
+  /** `${characterId}:${mailId}` — one draft per source mail per Character. */
+  id: string;
+  characterId: number;
+  /** The mail this is a reply/forward of. */
+  mailId: number;
+  kind: 'reply' | 'forward';
+  recipients: MailDraftRecipient[];
+  subject: string;
+  body: string;
+  /** Epoch ms of the last edit. */
+  updatedAt: number;
+}
+
 export const db = new Dexie('neocom') as Dexie & {
   characters: EntityTable<CharacterRecord, 'characterId'>;
   tokens: EntityTable<TokenRecord, 'characterId'>;
@@ -825,6 +854,7 @@ export const db = new Dexie('neocom') as Dexie & {
   miningTaxAssignments: EntityTable<MiningTaxAssignmentRecord, 'id'>;
   bpcSearchWatches: EntityTable<BpcSearchWatchRecord, 'id'>;
   orderProblemSamples: EntityTable<OrderProblemSampleRecord, 'orderId'>;
+  mailDrafts: EntityTable<MailDraftRecord, 'id'>;
 };
 
 /**
@@ -1035,4 +1065,28 @@ db.version(12).stores({
   miningTaxAssignments: 'id, characterId, [characterId+date+solarSystemId]',
   bpcSearchWatches: 'id',
   orderProblemSamples: 'orderId, characterId',
+});
+
+// Additive: v12 stores unchanged, plus Mail Reply/Forward drafts
+// (mail-reply-and-forward decision). `characterId` is indexed so
+// `removeCharacter` can purge a dropped Character's drafts in one query.
+db.version(13).stores({
+  characters: 'characterId, corporationId',
+  tokens: 'characterId',
+  settings: 'key',
+  skillPlans: 'id, characterId',
+  esiCache: '[characterId+key]',
+  buildPlans: 'id, characterId',
+  quickbars: 'id, characterId',
+  stationPins: 'id, characterId, locationId',
+  planetRichness: 'id, characterId, planetId',
+  notificationFeed: 'id, characterId, firedAt',
+  productionRuns: 'id, characterId, buildPlanId',
+  productionSaleLinks: 'id, characterId, runId',
+  productionOrderWatches: 'id, characterId, runId',
+  payees: 'id, characterId',
+  miningTaxAssignments: 'id, characterId, [characterId+date+solarSystemId]',
+  bpcSearchWatches: 'id',
+  orderProblemSamples: 'orderId, characterId',
+  mailDrafts: 'id, characterId',
 });

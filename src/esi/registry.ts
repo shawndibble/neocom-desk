@@ -141,6 +141,17 @@ export const ESI_REGISTRY = {
     route: '/characters/{character_id}/mail/{mail_id}/',
     scope: 'esi-mail.organize_mail.v1',
   },
+
+  // Base grant, deliberately (mail-reply-and-forward decision,
+  // docs/context/decisions/): every Character can send mail, unlike the
+  // `corp` group's scopes below, which ~95% can never exercise — gating this
+  // behind a feature-triggered consent screen would just delay the same
+  // prompt for nearly everyone who'd use Reply/Forward. This is the app's
+  // second write scope after `organize_mail`.
+  postCharacterMail: {
+    route: '/characters/{character_id}/mail/',
+    scope: 'esi-mail.send_mail.v1',
+  },
   getCharacterNotifications: {
     route: '/characters/{character_id}/notifications',
     scope: 'esi-characters.read_notifications.v1',

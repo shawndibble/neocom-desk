@@ -27,6 +27,7 @@ import {
   markMailReadOnEsi,
 } from '@/features/character/mail';
 import { loadContacts } from '@/features/character/contacts';
+import { MailComposeBox } from '@/features/character/MailComposeBox';
 import {
   buildContactStandingIndex,
   type ContactStandingIndex,
@@ -53,6 +54,7 @@ import {
   resolveMailTab,
   unreadCountsByTab,
   MAIL_FOLDERS,
+  type ComposeKind,
   type MailTab,
 } from '@/engine/mail';
 import type {
@@ -207,6 +209,14 @@ export function Mail() {
   }
 
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  // Which compose box is open, if any (mail-reply-and-forward decision) —
+  // reset below whenever the selected mail changes, so switching mails never
+  // leaves a stale Reply/Forward box open against the wrong header.
+  const [composeKind, setComposeKind] = useState<ComposeKind | null>(null);
+  function selectMail(mailId: number | null) {
+    setSelectedId(mailId);
+    setComposeKind(null);
+  }
   // Local "mark read" state, applied instantly on selection so the dim never
   // waits on the network — independent of `markMailReadOnEsi`'s own write
   // below. Set on selection, not toggled — no manual mark-unread control.
@@ -346,6 +356,13 @@ export function Mail() {
     );
   }
 
+  /** Same resolution as `recipientNames`, for one recipient at a time — the compose box's reply-all chips. */
+  function resolveRecipientName(r: { recipient_id: number; recipient_type: string }): string {
+    return r.recipient_type === 'mailing_list'
+      ? (mailingListNames.get(r.recipient_id) ?? t('mail.mailingList'))
+      : (names.get(r.recipient_id) ?? t('mail.unknownRecipient'));
+  }
+
   /** The same recipients, cut to one name plus a count — a list row has one line for them. */
   function recipientSummary(header: MailHeader): string {
     const all = recipientNames(header);
@@ -390,6 +407,9 @@ export function Mail() {
   }, [activeCharacterId, selectedId]);
 
   const body = bodySnapshot?.selectedId === selectedId ? bodySnapshot.result : undefined;
+  // Stripped once, shared by the reading pane's own paragraph and the
+  // compose box's auto-quote — both must quote exactly what the pilot reads.
+  const bodyText = body?.data.body ? stripEveMarkup(body.data.body) : '';
 
   if (!hydrated) {
     return (
@@ -558,7 +578,7 @@ export function Mail() {
                           <button
                             type="button"
                             onClick={() => {
-                              setSelectedId(header.mail_id);
+                              selectMail(header.mail_id);
                               markLocalRead(header.mail_id);
                               // Gated on ESI's flag, not `isRead` (which also covers
                               // local state) — a failed write must get another
@@ -686,11 +706,29 @@ export function Mail() {
                 ) : undefined
               }
               actions={
-                showBackControl && (
-                  <Button size="sm" onClick={() => setSelectedId(null)}>
-                    {t('mail.backToList')}
-                  </Button>
-                )
+                <div className="flex items-center gap-2">
+                  {selectedHeader !== null && composeKind === null && (
+                    <>
+                      <IconButton
+                        icon={<Icon.MailReply size={Icon.ICON_SIZE.sm} />}
+                        label={t('mail.reply')}
+                        size="sm"
+                        onClick={() => setComposeKind('reply')}
+                      />
+                      <IconButton
+                        icon={<Icon.MailForward size={Icon.ICON_SIZE.sm} />}
+                        label={t('mail.forward')}
+                        size="sm"
+                        onClick={() => setComposeKind('forward')}
+                      />
+                    </>
+                  )}
+                  {showBackControl && (
+                    <Button size="sm" onClick={() => selectMail(null)}>
+                      {t('mail.backToList')}
+                    </Button>
+                  )}
+                </div>
               }
             >
               {selectedId === null ? (
@@ -745,9 +783,29 @@ export function Mail() {
                       shipped at the smallest size in the dimmest readable
                       tier. `break-words` so an unbroken URL cannot push the
                       pane sideways. */}
-                  <p className="text-sm whitespace-pre-wrap text-text break-words">
-                    {body.data.body ? stripEveMarkup(body.data.body) : ''}
-                  </p>
+                  <p className="text-sm whitespace-pre-wrap text-text break-words">{bodyText}</p>
+
+                  {composeKind !== null && selectedHeader !== null && (
+                    <MailComposeBox
+                      key={`${selectedHeader.mail_id}:${composeKind}`}
+                      characterId={activeCharacterId}
+                      kind={composeKind}
+                      header={selectedHeader}
+                      bodyText={bodyText}
+                      senderName={selectedSender}
+                      formattedTimestamp={
+                        selectedHeader.timestamp
+                          ? formatTimestamp(new Date(selectedHeader.timestamp), timeZone)
+                          : ''
+                      }
+                      resolveRecipientName={resolveRecipientName}
+                      onClose={() => setComposeKind(null)}
+                      onSent={() => {
+                        setComposeKind(null);
+                        void refresh();
+                      }}
+                    />
+                  )}
                 </div>
               )}
             </Panel>
