@@ -16,6 +16,7 @@ import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
 import type { NotificationFeedRecord } from '@/db';
 import type { DisplayAlertGroup } from './alertsFilter';
+import { dedupeCharacterName } from './notificationBody';
 import { notificationUrlForSubject } from './notificationOptions';
 
 export interface AlertGroupRowProps {
@@ -53,47 +54,28 @@ export function AlertGroupRow({
 
   return (
     <li className={group.muted ? 'text-text-dim' : undefined}>
-      {/*
-        `items-start` below `sm`, because the row is two lines there and the
-        two controls belong beside the first of them, not floating between the
-        pair. From `sm` up there is only one line and centring is the same
-        thing.
-      */}
-      <div className="flex min-h-11 items-start gap-1 px-3 sm:items-center sm:gap-2 md:min-h-9">
+      <div className="flex min-h-11 items-center gap-1 px-3 sm:gap-2 md:min-h-9">
         {/*
-          The disclosure button owns the whole label, so the row's big target
-          is the one that expands it. `Disclosure` is not reused here: it puts
-          its content inside the button's own container, and these rows need
-          the fires to escape the row's padding and sit flush in the panel.
-
-          It WRAPS below `sm` rather than stacking with `flex-col`, and the
-          three children carry `order` so the wrap lands where it should: the
-          count cluster and the age share the first line, and the type name —
-          the one thing here of unpredictable length — takes the whole of the
-          second. Written this way the age exists once, inside the button, at
-          both widths; the obvious alternative (a phone copy and a pointer
-          copy, each hidden at the other width) would put the same fact in the
-          DOM twice and let the two drift.
-
-          The name still cannot reach under the two controls to its right —
-          they are siblings of the button, and nothing can be a flex item and
-          a button's child at once — but it goes from sharing a line with
-          everything to owning one, which is most of the room back.
+          One line, always — the label truncates instead of reflowing.
+          Wrapping the label onto its own row used to be unconditional (a
+          `w-full` on the third flex child), which meant even "New Mail"
+          dropped to a second line it never needed. Real `alerts.byType`
+          labels ("New Calendar Event", "Sell Order Filled", …) fit this row
+          at 390px with room to spare; the rare one that doesn't just
+          ellipsizes, the same as every other truncated label in the app.
         */}
         <button
           type="button"
           aria-expanded={expanded}
           onClick={onToggle}
-          className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 rounded-xs py-1.5 text-left focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent sm:flex-nowrap"
+          className="flex min-w-0 flex-1 items-center gap-3 rounded-xs py-1.5 text-left focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
         >
-          <span className="order-1 flex shrink-0 items-center gap-3">
-            <Caret expanded={expanded} />
-            <span className="flex items-center gap-1.5 text-sm font-semibold tabular-nums sm:w-14">
-              <SeverityIcon severity={group.severity} />
-              {group.count}
-            </span>
+          <Caret expanded={expanded} />
+          <span className="flex shrink-0 items-center gap-1.5 text-sm font-semibold tabular-nums">
+            <SeverityIcon severity={group.severity} />
+            {group.count}
           </span>
-          <span className="order-3 w-full min-w-0 truncate text-sm sm:order-2 sm:w-auto sm:flex-1">
+          <span className="min-w-0 flex-1 truncate text-sm">
             {group.label}
             {group.muted && (
               <span className="ml-2 text-[0.6875rem] tracking-widest text-text-dim uppercase">
@@ -101,7 +83,7 @@ export function AlertGroupRow({
               </span>
             )}
           </span>
-          <span className="order-2 ml-auto shrink-0 text-[0.6875rem] tabular-nums text-text-dim sm:order-3 sm:ml-0">
+          <span className="shrink-0 text-[0.6875rem] tabular-nums text-text-dim">
             {t('alerts.newest', {
               // eslint-disable-next-line react-hooks/purity -- relative age reads the wall clock; it only affects this label
               age: formatAge(Math.max(0, Date.now() - group.newestFiredAt), t),
@@ -170,6 +152,7 @@ function AlertFireRow({
   const { t } = useTranslation();
   const timeZone = useTimeZone();
   const firedAt = new Date(entry.firedAt);
+  const body = dedupeCharacterName(entry.body, name);
 
   return (
     /*
@@ -177,53 +160,52 @@ function AlertFireRow({
       indent bought a visual hierarchy the panel's own fill and the disclosure
       state already carry, and it cost the body copy — the one thing on this
       row that is worth reading — nine characters of a phone's width.
-    */
-    <li className="flex min-h-11 items-center gap-3 border-b border-line px-3 last:border-b-0 md:min-h-9">
-      {/* Same destination a tap on the OS notification would reach — the feed
-          and the browser channel deliver the same fires, so they must land in
-          the same place (`notificationOptions.ts`). */}
-      {/*
-        Two lines on a phone, one from `sm` up.
 
-        Removing the indent and the portrait bought this row about sixty
-        pixels, and on a 390px screen that still only reaches twenty-odd
-        characters of "Mero Otichoda's extractor on Efa I expires in under 12
-        hours." — the body is the whole reason to expand a type, and a body cut
-        off at "Mero Otichoda's extr…" says nothing the collapsed row did not.
-        A second line is the room it actually needs. Clamped at two rather than
-        left to run, so a long body cannot turn one fire into a paragraph and
-        push the rest of the list off the screen.
-      */}
+      Name + age share their own line above the body on a phone, where the
+      name is a pill (not plain text) since the body already says the rest of
+      the sentence — `dedupeCharacterName` strips only the name itself. From
+      `sm` up there's room for all of it on one line, so the pill rejoins the
+      body's row and the phone-only meta line disappears.
+
+      The body is never clamped: `line-clamp-2` used to share an element with
+      this row's own vertical padding, and `overflow: hidden` clips at the
+      *padding* box — a sliver of a clipped third line rendered inside that
+      padding, under the row's border, on anything long enough to need it.
+      Letting the body wrap to full height removes the clamp and the clip
+      both; `sm:truncate` still keeps it to one line from `sm` up, where the
+      row has the width to spare instead.
+    */
+    <li className="flex flex-col gap-1 border-b border-line px-3 py-1.5 last:border-b-0 sm:flex-row sm:items-center sm:gap-3">
+      <div className="flex items-center justify-between gap-2 sm:hidden">
+        {name !== null && (
+          <span className="min-w-0 truncate rounded-full bg-panel px-2 py-0.5 text-[0.625rem] font-medium text-text-dim">
+            {name}
+          </span>
+        )}
+        <time
+          dateTime={firedAt.toISOString()}
+          title={formatTimestamp(firedAt, timeZone)}
+          className="shrink-0 text-[0.6875rem] tabular-nums text-text-dim"
+        >
+          {/* eslint-disable-next-line react-hooks/purity -- relative age reads the wall clock; it only affects this label */}
+          {formatAge(Math.max(0, Date.now() - entry.firedAt), t)}
+        </time>
+      </div>
       <Link
         to={notificationUrlForSubject(entry.eventId, entry.subjectId ?? entry.typeId)}
-        className="line-clamp-2 min-w-0 flex-1 rounded-xs py-1.5 text-xs text-text-dim hover:text-text focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent sm:line-clamp-none sm:truncate"
+        className="min-w-0 flex-1 rounded-xs text-xs text-text-dim hover:text-text focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent sm:truncate"
       >
-        {entry.body}
+        {body}
       </Link>
-      {/*
-        The name, at every width and on its own — no portrait.
-
-        The two used to be a pair with the name hidden below `sm`, which made
-        the portrait the sole identification on a phone and earned it the alt
-        text. With the portrait gone the name has to be visible everywhere, or
-        the phone would say nothing at all about whose alert this is — which is
-        the fact this page exists to surface (an alt's alerts used to be
-        invisible until you switched to it).
-
-        `min-w-0 truncate` without `shrink-0`: when the row is tight the name
-        gives way before the body does, because the body is what the reader
-        came for.
-      */}
       {name !== null && (
-        <span className="min-w-0 truncate text-[0.6875rem] text-text-dim">{name}</span>
+        <span className="hidden shrink-0 truncate rounded-full bg-panel px-2 py-0.5 text-[0.625rem] font-medium text-text-dim sm:inline">
+          {name}
+        </span>
       )}
       <time
         dateTime={firedAt.toISOString()}
         title={formatTimestamp(firedAt, timeZone)}
-        // Auto-width on a phone, where "2h ago" paying for "just now" is
-        // room the body could have had; the tidy aligned column returns at
-        // `sm`, where there is width to spend on it.
-        className="shrink-0 text-right text-[0.6875rem] tabular-nums text-text-dim sm:w-16"
+        className="hidden shrink-0 text-right text-[0.6875rem] tabular-nums text-text-dim sm:inline sm:w-16"
       >
         {/* eslint-disable-next-line react-hooks/purity -- relative age reads the wall clock; it only affects this label */}
         {formatAge(Math.max(0, Date.now() - entry.firedAt), t)}
@@ -234,6 +216,7 @@ function AlertFireRow({
         variant="plain"
         size="sm"
         onClick={onDismiss}
+        className="self-end sm:self-auto"
       />
     </li>
   );
