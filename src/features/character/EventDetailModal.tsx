@@ -7,9 +7,11 @@
  */
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, EmptyState, Modal, Spinner } from '@/components/ui';
+import { Button, EmptyState, Modal, Spinner, type ButtonVariant } from '@/components/ui';
+import * as Icon from '@/components/ui/icons';
+import { KIND_FILL, KIND_TEXT } from '@/components/ui/kindTone';
 import { loadCalendarEvent, respondToCalendarEvent } from '@/features/character/calendar';
-import { RESPONSE_KEY, RESPONSE_TEXT_TONE } from './calendarResponseTone';
+import { RESPONSE_BADGE_TONE, RESPONSE_ICON, RESPONSE_KEY } from './calendarResponseTone';
 import { stripEveMarkup } from '@/features/skills/typeDisplay';
 import { buildIcsFile, googleCalendarUrl, type CalendarExportEvent } from '@/lib/calendarExport';
 import { downloadTextFile } from '@/lib/download';
@@ -27,10 +29,12 @@ const RSVP_OPTIONS: { response: CalendarRsvpResponse; labelKey: string }[] = [
   { response: 'tentative', labelKey: 'calendar.rsvpTentative' },
 ];
 
-/** `CalendarEventDetail.response` is a loose `string` (ESI's detail shape isn't as tightly typed as the list's), so guard the lookup rather than casting blindly. */
-function isKnownResponse(value: string): value is CalendarEventSummary['event_response'] {
-  return value in RESPONSE_KEY;
-}
+/** The active button already turns this tone (DESIGN.md §7's other signal is its own icon + label, not a second, redundant telling). */
+const RSVP_ACTIVE_VARIANT: Record<CalendarRsvpResponse, ButtonVariant> = {
+  accepted: 'success',
+  declined: 'danger',
+  tentative: 'warning',
+};
 
 /** `detail.text` is markup, but the export formats want plain text — the same strip already used for the on-screen body. */
 function exportEventOf(detail: CalendarEventDetail): CalendarExportEvent {
@@ -108,66 +112,97 @@ export function EventDetailModal({
       ) : detail === null ? (
         <EmptyState title={t('calendar.emptyTitle')} className="py-8" />
       ) : (
-        <div className="space-y-2 text-xs">
-          <p className="text-text-dim">
+        <div className="space-y-3 text-xs">
+          {/* Kind-colour bar, bled to the modal's edges: the same hue the Coming Up Rail and Calendar Map use for `calendarEvent`, so the popup carries the identity a plain dialog otherwise loses. */}
+          <div className={`-mx-3 -mt-3 h-1 ${KIND_FILL.calendarEvent}`} />
+          <p className="flex items-center gap-1.5 text-text-dim">
+            <Icon.CalendarEvent
+              className={`size-4 shrink-0 ${KIND_TEXT.calendarEvent}`}
+              aria-hidden="true"
+            />
             {formatCalendarTimestamp(new Date(detail.data.date))} ·{' '}
             {t('calendar.importance', { value: detail.data.importance })}
           </p>
-          <p className="whitespace-pre-wrap text-text-dim">{stripEveMarkup(detail.data.text)}</p>
-          <div className="border-t border-line pt-2">
-            {/*
-              Selection state is never color-only (DESIGN.md §7): `aria-pressed`
-              carries it for assistive tech, and this status line carries it
-              for a sighted reader who can't rely on primary-vs-ghost alone —
-              the same tone/label `CharacterBoardRow` uses for the rail.
-            */}
-            {isKnownResponse(detail.data.response) && (
-              <p
-                className={`mb-2 text-[0.6875rem] font-semibold tracking-widest uppercase ${RESPONSE_TEXT_TONE[detail.data.response]}`}
-              >
-                {t(RESPONSE_KEY[detail.data.response])}
+          <p className="rounded-xs border border-line bg-panel-2 p-2 whitespace-pre-wrap text-text-dim">
+            {stripEveMarkup(detail.data.text)}
+          </p>
+          <div className="space-y-2 border-t border-line pt-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                {t('calendar.yourResponse')}
               </p>
-            )}
+              {/*
+                Only for "no answer yet" — once a response is picked, the
+                button it picked already turns that tone (DESIGN.md §7's
+                other signal is `aria-pressed` plus the button's own icon and
+                label), so a second badge repeating the same word/color here
+                would just double it.
+              */}
+              {detail.data.response === 'not_responded' &&
+                (() => {
+                  const ResponseIcon = RESPONSE_ICON[detail.data.response];
+                  return (
+                    <p
+                      className={`inline-flex items-center gap-1 rounded-xs border px-1.5 py-0.5 text-[0.6875rem] font-semibold tracking-widest uppercase ${RESPONSE_BADGE_TONE[detail.data.response]}`}
+                    >
+                      <ResponseIcon size={Icon.ICON_SIZE.sm} aria-hidden="true" />
+                      {t(RESPONSE_KEY[detail.data.response])}
+                    </p>
+                  );
+                })()}
+            </div>
             <div className="flex flex-wrap gap-2">
-              {RSVP_OPTIONS.map(({ response, labelKey }) => (
-                <Button
-                  key={response}
-                  size="sm"
-                  variant={detail.data.response === response ? 'primary' : 'ghost'}
-                  aria-pressed={detail.data.response === response}
-                  disabled={saving}
-                  onClick={() => void respond(response)}
-                >
-                  {t(labelKey)}
-                </Button>
-              ))}
+              {RSVP_OPTIONS.map(({ response, labelKey }) => {
+                const OptionIcon = RESPONSE_ICON[response];
+                const active = detail.data.response === response;
+                return (
+                  <Button
+                    key={response}
+                    size="sm"
+                    variant={active ? RSVP_ACTIVE_VARIANT[response] : 'ghost'}
+                    aria-pressed={active}
+                    disabled={saving}
+                    onClick={() => void respond(response)}
+                  >
+                    <OptionIcon size={Icon.ICON_SIZE.sm} aria-hidden="true" />
+                    {t(labelKey)}
+                  </Button>
+                );
+              })}
             </div>
             {rsvpFailed && (
               <p className="mt-2 text-[0.6875rem] text-danger">{t('calendar.rsvpFailed')}</p>
             )}
           </div>
-          <div className="flex flex-wrap gap-2 border-t border-line pt-2">
-            <Button
-              size="sm"
-              onClick={() => {
-                const exportEvent = exportEventOf(detail.data);
-                downloadTextFile(
-                  `${exportEvent.eventId}.ics`,
-                  buildIcsFile(exportEvent),
-                  'text/calendar;charset=utf-8'
-                );
-              }}
-            >
-              {t('calendar.downloadIcs')}
-            </Button>
-            <Button
-              size="sm"
-              onClick={() =>
-                window.open(googleCalendarUrl(exportEventOf(detail.data)), '_blank', 'noopener')
-              }
-            >
-              {t('calendar.addToGoogleCalendar')}
-            </Button>
+          <div className="space-y-2 border-t border-line pt-2">
+            <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+              {t('calendar.export')}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                size="sm"
+                onClick={() => {
+                  const exportEvent = exportEventOf(detail.data);
+                  downloadTextFile(
+                    `${exportEvent.eventId}.ics`,
+                    buildIcsFile(exportEvent),
+                    'text/calendar;charset=utf-8'
+                  );
+                }}
+              >
+                <Icon.Download size={Icon.ICON_SIZE.sm} aria-hidden="true" />
+                {t('calendar.downloadIcs')}
+              </Button>
+              <Button
+                size="sm"
+                onClick={() =>
+                  window.open(googleCalendarUrl(exportEventOf(detail.data)), '_blank', 'noopener')
+                }
+              >
+                <Icon.CalendarEvent size={Icon.ICON_SIZE.sm} aria-hidden="true" />
+                {t('calendar.addToGoogleCalendar')}
+              </Button>
+            </div>
           </div>
         </div>
       )}

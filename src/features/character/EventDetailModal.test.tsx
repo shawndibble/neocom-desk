@@ -132,7 +132,7 @@ describe('EventDetailModal', () => {
       expect(await screen.findByText(/couldn't save your response/i)).toBeInTheDocument();
     });
 
-    it('marks the current response with aria-pressed and a text status, not color alone', async () => {
+    it('marks the current response with aria-pressed, not color alone', async () => {
       serveDetail('tentative');
       render(<EventDetailModal characterId={CHAR_ID} event={EVENT} onClose={() => {}} />);
 
@@ -142,7 +142,17 @@ describe('EventDetailModal', () => {
         'aria-pressed',
         'false'
       );
-      expect(screen.getByText('Tentative', { selector: 'p' })).toBeInTheDocument();
+      // Once a response is picked, the button it picked already carries the
+      // status — a second "Tentative" badge next to it would double the same
+      // fact, so it renders only for "no answer yet" (below).
+      expect(screen.queryByText('Tentative', { selector: 'p' })).not.toBeInTheDocument();
+    });
+
+    it('shows a status badge only while no response has been picked yet', async () => {
+      serveDetail('not_responded');
+      render(<EventDetailModal characterId={CHAR_ID} event={EVENT} onClose={() => {}} />);
+
+      expect(await screen.findByText('Not responded', { selector: 'p' })).toBeInTheDocument();
     });
   });
 });
