@@ -136,7 +136,11 @@ export async function loadCalendarEvents(
   const result = await loadWithCacheStatus(
     characterId,
     KEYS.events,
-    async () => (await getCharacterCalendar(characterId)).data
+    async () => (await getCharacterCalendar(characterId)).data,
+    // Shorter than STALE_AFTER.default (10 min): an RSVP made outside this
+    // app (in-client, or another device) must reach the alert poller fast
+    // enough that a declined event doesn't still fire calendarEventStarting.
+    { staleAfterMs: 2 * 60_000 }
   );
   // Nothing read and nothing cached: a revoked scope or a cold offline start.
   // Retention has no read to add to, and must not invent one from a stale
