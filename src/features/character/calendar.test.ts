@@ -3,7 +3,8 @@ import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { configureEsi, ESI_BASE_URL } from '@/esi/client';
 import { db } from '@/db';
-import { loadCalendarEvents, loadCalendarEvent } from './calendar';
+import { loadCalendarEvents, loadCalendarEvent, respondToCalendarEvent } from './calendar';
+import { onEsiAuthFailure } from '@/esi/authFailureSignal';
 import { calendarDomain } from '@/features/notifications/pollDomains';
 import type { CalendarSnapshot } from '@/engine/notificationDiffs';
 
@@ -323,5 +324,179 @@ describe('loadCalendarEvent', () => {
     const result = await loadCalendarEvent(CHAR_ID, 1);
     expect(result?.data).toEqual(detail);
     expect((await db.esiCache.get([CHAR_ID, 'calendar:1']))?.value).toEqual(detail);
+  });
+});
+
+describe('respondToCalendarEvent', () => {
+  it('PUTs {response} to the calendar endpoint', async () => {
+    let capturedBody: unknown;
+    server.use(
+      http.put(`${ESI_BASE_URL}/characters/${CHAR_ID}/calendar/1/`, async ({ request }) => {
+        capturedBody = await request.json();
+        return new HttpResponse(null, { status: 204 });
+      })
+    );
+
+    await respondToCalendarEvent(CHAR_ID, 1, 'accepted');
+
+    expect(capturedBody).toEqual({ response: 'accepted' });
+  });
+
+  it('resolves true rather than throwing on success', async () => {
+    server.use(
+      http.put(
+        `${ESI_BASE_URL}/characters/${CHAR_ID}/calendar/1/`,
+        () => new HttpResponse(null, { status: 204 })
+      )
+    );
+
+    await expect(respondToCalendarEvent(CHAR_ID, 1, 'accepted')).resolves.toBe(true);
+  });
+
+  it('resolves false rather than throwing when the write fails', async () => {
+    server.use(
+      http.put(`${ESI_BASE_URL}/characters/${CHAR_ID}/calendar/1/`, () =>
+        HttpResponse.json({ error: 'missing scope' }, { status: 403 })
+      )
+    );
+
+    await expect(respondToCalendarEvent(CHAR_ID, 1, 'declined')).resolves.toBe(false);
+  });
+
+  it('signals the app-wide reauth banner on a 401/403 — a stale grant (a token that predates respond_calendar_events) must not fail silently', async () => {
+    server.use(
+      http.put(`${ESI_BASE_URL}/characters/${CHAR_ID}/calendar/1/`, () =>
+        HttpResponse.json({ error: 'missing scope' }, { status: 403 })
+      )
+    );
+    const reported = vi.fn();
+    const unsubscribe = onEsiAuthFailure(reported);
+
+    try {
+      await respondToCalendarEvent(CHAR_ID, 1, 'tentative');
+      expect(reported).toHaveBeenCalledWith(CHAR_ID);
+    } finally {
+      unsubscribe();
+    }
+  });
+
+  it('does not signal the reauth banner for a non-auth failure (network error)', async () => {
+    server.use(
+      http.put(`${ESI_BASE_URL}/characters/${CHAR_ID}/calendar/1/`, () => HttpResponse.error())
+    );
+    const reported = vi.fn();
+    const unsubscribe = onEsiAuthFailure(reported);
+
+    try {
+      await respondToCalendarEvent(CHAR_ID, 1, 'accepted');
+      expect(reported).not.toHaveBeenCalled();
+    } finally {
+      unsubscribe();
+    }
+  });
+
+  it('patches event_response in both the list cache and the seen-events carryover', async () => {
+    const events = [
+      {
+        event_id: 1,
+        event_date: '2026-09-01T18:00:00Z',
+        title: 'Fleet Op',
+        importance: 1,
+        event_response: 'not_responded' as const,
+      },
+      {
+        event_id: 2,
+        event_date: '2026-09-02T18:00:00Z',
+        title: 'Other',
+        importance: 0,
+        event_response: 'not_responded' as const,
+      },
+    ];
+    await db.esiCache.put({
+      characterId: CHAR_ID,
+      key: 'calendar',
+      value: events,
+      fetchedAt: Date.now(),
+    });
+    await db.esiCache.put({
+      characterId: CHAR_ID,
+      key: 'calendar:seen',
+      value: events,
+      fetchedAt: Date.now(),
+    });
+    server.use(
+      http.put(
+        `${ESI_BASE_URL}/characters/${CHAR_ID}/calendar/1/`,
+        () => new HttpResponse(null, { status: 204 })
+      )
+    );
+
+    await respondToCalendarEvent(CHAR_ID, 1, 'accepted');
+
+    const list = (await db.esiCache.get([CHAR_ID, 'calendar']))?.value as typeof events;
+    const seen = (await db.esiCache.get([CHAR_ID, 'calendar:seen']))?.value as typeof events;
+    expect(list.find((e) => e.event_id === 1)?.event_response).toBe('accepted');
+    expect(list.find((e) => e.event_id === 2)?.event_response).toBe('not_responded');
+    expect(seen.find((e) => e.event_id === 1)?.event_response).toBe('accepted');
+  });
+
+  it('patches response in the per-event detail cache', async () => {
+    const detail = {
+      event_id: 1,
+      title: 'Fleet Op',
+      date: '2026-09-01T18:00:00Z',
+      duration: 60,
+      importance: 1,
+      owner_id: 1,
+      owner_name: 'FC',
+      owner_type: 'character' as const,
+      response: 'not_responded',
+      text: 'Bring your ship',
+    };
+    await db.esiCache.put({
+      characterId: CHAR_ID,
+      key: 'calendar:1',
+      value: detail,
+      fetchedAt: Date.now(),
+    });
+    server.use(
+      http.put(
+        `${ESI_BASE_URL}/characters/${CHAR_ID}/calendar/1/`,
+        () => new HttpResponse(null, { status: 204 })
+      )
+    );
+
+    await respondToCalendarEvent(CHAR_ID, 1, 'tentative');
+
+    const cached = (await db.esiCache.get([CHAR_ID, 'calendar:1']))?.value as typeof detail;
+    expect(cached.response).toBe('tentative');
+  });
+
+  it('leaves cached rows alone when the write fails', async () => {
+    const events = [
+      {
+        event_id: 1,
+        event_date: '2026-09-01T18:00:00Z',
+        title: 'Fleet Op',
+        importance: 1,
+        event_response: 'not_responded' as const,
+      },
+    ];
+    await db.esiCache.put({
+      characterId: CHAR_ID,
+      key: 'calendar',
+      value: events,
+      fetchedAt: Date.now(),
+    });
+    server.use(
+      http.put(`${ESI_BASE_URL}/characters/${CHAR_ID}/calendar/1/`, () =>
+        HttpResponse.json({ error: 'missing scope' }, { status: 403 })
+      )
+    );
+
+    await respondToCalendarEvent(CHAR_ID, 1, 'accepted');
+
+    const cached = (await db.esiCache.get([CHAR_ID, 'calendar']))?.value;
+    expect(cached).toEqual(events);
   });
 });

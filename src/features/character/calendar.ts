@@ -2,8 +2,10 @@
 import {
   getCharacterCalendar,
   getCharacterCalendarEvent,
+  putCharacterCalendarResponse,
   type CalendarEventSummary,
   type CalendarEventDetail,
+  type CalendarRsvpResponse,
 } from '@/esi/endpoints';
 import {
   loadWithCache,
@@ -13,6 +15,8 @@ import {
   type CachedResult,
   type StatusResult,
 } from '@/esi/cache';
+import { isAuthFailure } from '@/esi/client';
+import { emitEsiAuthFailure } from '@/esi/authFailureSignal';
 import { parseInstant } from '@/engine/esiInstant';
 import { stillRunning, type CalendarRetentionEntry } from '@/engine/character/calendarRetention';
 
@@ -152,4 +156,65 @@ export function loadCalendarEvent(
     KEYS.event(eventId),
     async () => (await getCharacterCalendarEvent(characterId, eventId)).data
   );
+}
+
+/**
+ * Pushes an RSVP write to ESI. Errors are otherwise swallowed — same
+ * contract as `mail.ts`'s `markMailReadOnEsi` — but an auth failure still
+ * signals the app-wide reauth banner (`emitEsiAuthFailure`): a token that
+ * predates this scope's addition (same shape as `organize_mail`, issue
+ * #741) would otherwise fail silently on every click with no way for the
+ * user to learn a re-login would fix it.
+ *
+ * Returns whether the write actually reached ESI — unlike
+ * `markMailReadOnEsi`'s `void`, a caller here (`EventDetailModal`) shows the
+ * new response optimistically in its own local state, and must not do that
+ * for a call this function silently swallowed.
+ *
+ * On success, patches every cache row that carries response state rather
+ * than refetching: the list (`event_response`), the started-event carryover
+ * (`calendar:seen`, same field — an already-started event must not show a
+ * stale response after a successful write), and the per-event detail
+ * (`response`, a different field name on a different shape).
+ *
+ * The patch itself is best-effort: ESI has already accepted the write by
+ * this point, so a Dexie failure here (quota, IO) is a local display
+ * inconsistency the next natural reload corrects on its own — not a reason
+ * to report the RSVP itself as failed, and not something the caller should
+ * see as an unhandled rejection.
+ */
+export async function respondToCalendarEvent(
+  characterId: number,
+  eventId: number,
+  response: CalendarRsvpResponse
+): Promise<boolean> {
+  try {
+    await putCharacterCalendarResponse(characterId, eventId, response);
+  } catch (err) {
+    if (isAuthFailure(err)) emitEsiAuthFailure(characterId);
+    return false;
+  }
+
+  try {
+    const now = Date.now();
+    for (const key of [KEYS.events, KEYS.seenEvents]) {
+      const events = await readCached<CalendarEventSummary[]>(characterId, key);
+      if (!events) continue;
+      await writeCached(
+        characterId,
+        key,
+        events.map((event) =>
+          event.event_id === eventId ? { ...event, event_response: response } : event
+        ),
+        now
+      );
+    }
+
+    const detail = await readCached<CalendarEventDetail>(characterId, KEYS.event(eventId));
+    if (detail) await writeCached(characterId, KEYS.event(eventId), { ...detail, response }, now);
+  } catch {
+    // See doc comment above: the write already succeeded, this patch didn't.
+  }
+
+  return true;
 }

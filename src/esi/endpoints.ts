@@ -996,6 +996,27 @@ export function getCharacterCalendarEvent(
   });
 }
 
+// --- PUT /characters/{character_id}/calendar/{event_id}/ (esi-calendar.respond_calendar_events.v1) ---
+
+/** Narrower than `CalendarEventSummary['event_response']` — ESI's write only accepts these three, not `not_responded`. */
+export type CalendarRsvpResponse = 'accepted' | 'declined' | 'tentative';
+
+/** The app's second ESI write (the first is `putCharacterMail`): sets a character's RSVP on a calendar event. Answers 204 No Content on success. */
+export function putCharacterCalendarResponse(
+  characterId: number,
+  eventId: number,
+  response: CalendarRsvpResponse,
+  options: { signal?: AbortSignal } = {}
+): Promise<EsiResult<void>> {
+  return esiFetch<void>(`/characters/${characterId}/calendar/${eventId}/`, {
+    ...options,
+    characterId,
+    method: 'PUT',
+    body: { response },
+    endpointId: 'putCharacterCalendarResponse',
+  });
+}
+
 // --- GET /characters/{character_id}/contracts (esi-contracts.read_character_contracts.v1) ---
 
 export interface Contract {

@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import '@/i18n';
@@ -67,5 +68,81 @@ describe('EventDetailModal', () => {
     );
     render(<EventDetailModal characterId={CHAR_ID} event={EVENT} onClose={() => {}} />);
     expect(await screen.findByText('No event detail cached')).toBeInTheDocument();
+  });
+
+  describe('RSVP', () => {
+    function serveDetail(response: string) {
+      server.use(
+        http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/calendar/1`, () =>
+          HttpResponse.json({
+            event_id: 1,
+            title: 'Fleet Op',
+            date: '2026-09-01T18:00:00Z',
+            duration: 60,
+            importance: 1,
+            owner_id: 1,
+            owner_name: 'FC',
+            owner_type: 'character',
+            response,
+            text: 'Bring your ship',
+          })
+        )
+      );
+    }
+
+    it('PUTs the response and disables the buttons while saving', async () => {
+      serveDetail('not_responded');
+      let resolvePut!: () => void;
+      server.use(
+        http.put(
+          `${ESI_BASE_URL}/characters/${CHAR_ID}/calendar/1/`,
+          () =>
+            new Promise((resolve) => {
+              resolvePut = () => resolve(new HttpResponse(null, { status: 204 }));
+            })
+        )
+      );
+      render(<EventDetailModal characterId={CHAR_ID} event={EVENT} onClose={() => {}} />);
+
+      const acceptButton = await screen.findByRole('button', { name: 'Accept' });
+      const user = userEvent.setup();
+      await user.click(acceptButton);
+
+      expect(acceptButton).toBeDisabled();
+      expect(screen.getByRole('button', { name: 'Decline' })).toBeDisabled();
+      expect(screen.getByRole('button', { name: 'Tentative' })).toBeDisabled();
+
+      resolvePut();
+      await vi.waitFor(() => expect(acceptButton).not.toBeDisabled());
+    });
+
+    it('does not throw when the write fails, and shows a failure message', async () => {
+      serveDetail('not_responded');
+      server.use(
+        http.put(`${ESI_BASE_URL}/characters/${CHAR_ID}/calendar/1/`, () =>
+          HttpResponse.json({ error: 'missing scope' }, { status: 403 })
+        )
+      );
+      render(<EventDetailModal characterId={CHAR_ID} event={EVENT} onClose={() => {}} />);
+
+      const declineButton = await screen.findByRole('button', { name: 'Decline' });
+      await userEvent.setup().click(declineButton);
+
+      await vi.waitFor(() => expect(declineButton).not.toBeDisabled());
+      expect(await screen.findByText(/couldn't save your response/i)).toBeInTheDocument();
+    });
+
+    it('marks the current response with aria-pressed and a text status, not color alone', async () => {
+      serveDetail('tentative');
+      render(<EventDetailModal characterId={CHAR_ID} event={EVENT} onClose={() => {}} />);
+
+      const tentativeButton = await screen.findByRole('button', { name: 'Tentative' });
+      expect(tentativeButton).toHaveAttribute('aria-pressed', 'true');
+      expect(screen.getByRole('button', { name: 'Accept' })).toHaveAttribute(
+        'aria-pressed',
+        'false'
+      );
+      expect(screen.getByText('Tentative', { selector: 'p' })).toBeInTheDocument();
+    });
   });
 });
