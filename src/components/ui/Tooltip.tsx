@@ -4,6 +4,7 @@ import {
   useEffect,
   useRef,
   useState,
+  type MouseEvent,
   type PointerEvent,
   type ReactElement,
   type ReactNode,
@@ -17,6 +18,8 @@ import { usePortalContainer } from './portalContainer';
 const TOUCH_LONG_PRESS_MS = 500;
 /** Finger roll during a tap: iOS fires `touchmove` for sub-pixel drift, so only real dragging should cancel. */
 const TOUCH_MOVE_TOLERANCE_PX = 10;
+/** Generous bound on a device's touchend→click echo delay; the tests confirm a later, real click still closes the tooltip normally once this expires. */
+const TOUCH_CLICK_ECHO_MS = 700;
 
 interface TooltipProps {
   /**
@@ -51,10 +54,18 @@ interface TooltipProps {
  * so the bubble never renders partially off-screen, and it portals to
  * `document.body` so a clipping scroll container can't cut it off either.
  *
- * Radix's own pointer handling ignores touch (no hover on touch devices), so
- * touch reveals the tooltip via our own state, OR'd into Radix's controlled
- * `open`: a touch-and-hold by default, a plain tap under `openOnTap`. Neither
- * path ever calls `preventDefault`, so a trigger that acts on tap still acts.
+ * Radix's own pointer handling ignores touch, so touch reveals the tooltip
+ * via our own state, OR'd into Radix's controlled `open`: a touch-and-hold by
+ * default, a plain tap under `openOnTap`. Revealing never calls
+ * `preventDefault`, so a trigger's own tap action, or an ancestor's click
+ * handler (a table row, say), still fires.
+ *
+ * Radix's `Trigger` closes on *any* click, and a real device echoes a
+ * compatibility `click` a moment after `touchend` — so an `openOnTap` bubble
+ * would open and immediately flash shut. `suppressEchoedClose` intercepts
+ * that echo through `composeEventHandlers`'s own extension point (it skips
+ * Radix's close when `event.preventDefault()` was already called), so only
+ * Radix's close is swallowed — the click itself still bubbles normally.
  * A touch-revealed tooltip has no timeout — it stays up to be read, until
  * something dismisses it: a tap outside, a scroll, Escape, or another tap on
  * an `openOnTap` trigger.
@@ -73,6 +84,8 @@ export function Tooltip({ content, children, openOnTap = false, className = '' }
   const touchDragged = useRef(false);
   /** `undefined` between touch sequences, so the first handler of a sequence wins the capture. */
   const openAtTouchStart = useRef<boolean | undefined>(undefined);
+  /** `null` until a tap opens the tooltip; then the echoed click has a deadline to beat. */
+  const touchOpenedAt = useRef<number | null>(null);
 
   function cancelLongPress() {
     clearTimeout(longPressTimer.current);
@@ -128,7 +141,21 @@ export function Tooltip({ content, children, openOnTap = false, className = '' }
     const wasOpen = openAtTouchStart.current;
     const lastFingerUp = event.touches.length === 0;
     endTouchSequence();
-    if (openOnTap && lastFingerUp && !touchDragged.current) setTouchOpen(!wasOpen);
+    if (openOnTap && lastFingerUp && !touchDragged.current) {
+      const opening = !wasOpen;
+      if (opening) touchOpenedAt.current = Date.now();
+      setTouchOpen(opening);
+    }
+  }
+
+  function suppressEchoedClose(event: MouseEvent) {
+    if (
+      openOnTap &&
+      touchOpenedAt.current !== null &&
+      Date.now() - touchOpenedAt.current < TOUCH_CLICK_ECHO_MS
+    ) {
+      event.preventDefault();
+    }
   }
 
   /** The browser took the gesture over (a scroll, usually) — no touchend is coming. */
@@ -166,6 +193,7 @@ export function Tooltip({ content, children, openOnTap = false, className = '' }
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
           onTouchCancel={handleTouchCancel}
+          onClick={suppressEchoedClose}
         >
           {trigger}
         </TooltipPrimitive.Trigger>

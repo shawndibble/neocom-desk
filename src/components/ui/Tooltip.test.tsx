@@ -324,6 +324,45 @@ describe('Tooltip tap-to-open', () => {
 
     expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
   });
+
+  it('stays open through the compatibility click a real device echoes after the tap', () => {
+    // jsdom doesn't auto-synthesize a click after touchend the way a device
+    // does, so this fires one explicitly — the assertion is on our own click
+    // handler's reaction, not on jsdom modeling the touch/mouse linkage itself.
+    render(
+      <Tooltip content="One-line explanation." openOnTap>
+        <button type="button">Trigger</button>
+      </Tooltip>
+    );
+    const trigger = screen.getByRole('button', { name: 'Trigger' });
+
+    fireEvent.touchStart(trigger);
+    fireEvent.touchEnd(trigger);
+    fireEvent.click(trigger);
+
+    expect(screen.getByRole('tooltip')).toHaveTextContent('One-line explanation.');
+  });
+
+  it('lets a click land normally once the echo window has passed', () => {
+    vi.useFakeTimers();
+    render(
+      <Tooltip content="One-line explanation." openOnTap>
+        <button type="button">Trigger</button>
+      </Tooltip>
+    );
+    const trigger = screen.getByRole('button', { name: 'Trigger' });
+
+    fireEvent.touchStart(trigger);
+    fireEvent.touchEnd(trigger);
+    expect(screen.getByRole('tooltip')).toBeInTheDocument();
+
+    act(() => {
+      vi.advanceTimersByTime(1000);
+    });
+    fireEvent.click(trigger);
+
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+  });
 });
 
 describe('Tooltip multi-touch', () => {
