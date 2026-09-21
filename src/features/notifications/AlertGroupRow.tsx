@@ -161,36 +161,25 @@ function AlertFireRow({
       state already carry, and it cost the body copy — the one thing on this
       row that is worth reading — nine characters of a phone's width.
 
-      Name + age share their own line above the body on a phone, where the
-      name is a pill (not plain text) since the body already says the rest of
-      the sentence — `dedupeCharacterName` strips only the name itself. From
-      `sm` up there's room for all of it on one line, so the pill rejoins the
-      body's row and the phone-only meta line disappears.
+      One name node, one time node, at every width — never a phone copy and a
+      pointer copy of either, each hidden at the other width by a responsive
+      class. That pair used to exist for the portrait/name switch this row no
+      longer makes, and a screen reader (or a query in a test) has no width to
+      go by: it would find both, which is exactly how a name ends up
+      announced twice, or a device with a single Character silently ends up
+      wrong for want of the copy that should have been removed. The name is a
+      pill (not plain text) since the body already says the rest of the
+      sentence via `dedupeCharacterName`, which strips the name itself.
 
       The body is never clamped: `line-clamp-2` used to share an element with
       this row's own vertical padding, and `overflow: hidden` clips at the
       *padding* box — a sliver of a clipped third line rendered inside that
       padding, under the row's border, on anything long enough to need it.
-      Letting the body wrap to full height removes the clamp and the clip
-      both; `sm:truncate` still keeps it to one line from `sm` up, where the
+      Letting it wrap to full height on a phone removes the clamp and the
+      clip both; `sm:truncate` keeps it to one line from `sm` up, where the
       row has the width to spare instead.
     */
-    <li className="flex flex-col gap-1 border-b border-line px-3 py-1.5 last:border-b-0 sm:flex-row sm:items-center sm:gap-3">
-      <div className="flex items-center justify-between gap-2 sm:hidden">
-        {name !== null && (
-          <span className="min-w-0 truncate rounded-full bg-panel px-2 py-0.5 text-[0.625rem] font-medium text-text-dim">
-            {name}
-          </span>
-        )}
-        <time
-          dateTime={firedAt.toISOString()}
-          title={formatTimestamp(firedAt, timeZone)}
-          className="shrink-0 text-[0.6875rem] tabular-nums text-text-dim"
-        >
-          {/* eslint-disable-next-line react-hooks/purity -- relative age reads the wall clock; it only affects this label */}
-          {formatAge(Math.max(0, Date.now() - entry.firedAt), t)}
-        </time>
-      </div>
+    <li className="flex items-start gap-3 border-b border-line px-3 py-1.5 last:border-b-0">
       <Link
         to={notificationUrlForSubject(entry.eventId, entry.subjectId ?? entry.typeId)}
         className="min-w-0 flex-1 rounded-xs text-xs text-text-dim hover:text-text focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent sm:truncate"
@@ -198,14 +187,14 @@ function AlertFireRow({
         {body}
       </Link>
       {name !== null && (
-        <span className="hidden shrink-0 truncate rounded-full bg-panel px-2 py-0.5 text-[0.625rem] font-medium text-text-dim sm:inline">
+        <span className="max-w-24 shrink-0 truncate rounded-full bg-panel px-2 py-0.5 text-[0.625rem] font-medium text-text-dim sm:max-w-none">
           {name}
         </span>
       )}
       <time
         dateTime={firedAt.toISOString()}
         title={formatTimestamp(firedAt, timeZone)}
-        className="hidden shrink-0 text-right text-[0.6875rem] tabular-nums text-text-dim sm:inline sm:w-16"
+        className="shrink-0 text-right text-[0.6875rem] tabular-nums text-text-dim sm:w-16"
       >
         {/* eslint-disable-next-line react-hooks/purity -- relative age reads the wall clock; it only affects this label */}
         {formatAge(Math.max(0, Date.now() - entry.firedAt), t)}
@@ -216,7 +205,6 @@ function AlertFireRow({
         variant="plain"
         size="sm"
         onClick={onDismiss}
-        className="self-end sm:self-auto"
       />
     </li>
   );
