@@ -13,8 +13,8 @@ const specs: readonly EsiEndpointSpec[] = Object.values(ESI_REGISTRY);
 describe('SCOPES', () => {
   // Hand-written, not derived: SCOPES is computed from registry.ts, so a
   // derived expectation would assert nothing. This is the spelling backstop.
-  // Almost every scope here is a read — `organize_mail` is the one
-  // deliberate exception, the app's single write.
+  // Most scopes here are reads — `organize_mail` and
+  // `respond_calendar_events` are the deliberate write exceptions.
   it('lists exactly the v1 Base Grant scopes', () => {
     expect([...SCOPES].sort()).toEqual(
       [
@@ -26,6 +26,7 @@ describe('SCOPES', () => {
         'esi-mail.read_mail.v1',
         'esi-mail.organize_mail.v1',
         'esi-calendar.read_calendar_events.v1',
+        'esi-calendar.respond_calendar_events.v1',
         'esi-contracts.read_character_contracts.v1',
         'esi-markets.read_character_orders.v1',
         'esi-characters.read_blueprints.v1',

@@ -153,6 +153,10 @@ export const ESI_REGISTRY = {
     route: '/characters/{character_id}/calendar/{event_id}',
     scope: 'esi-calendar.read_calendar_events.v1',
   },
+  putCharacterCalendarResponse: {
+    route: '/characters/{character_id}/calendar/{event_id}/',
+    scope: 'esi-calendar.respond_calendar_events.v1',
+  },
   getCharacterContracts: {
     route: '/characters/{character_id}/contracts',
     scope: 'esi-contracts.read_character_contracts.v1',

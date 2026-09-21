@@ -8,13 +8,27 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, EmptyState, Modal, Spinner } from '@/components/ui';
-import { loadCalendarEvent } from '@/features/character/calendar';
+import { loadCalendarEvent, respondToCalendarEvent } from '@/features/character/calendar';
 import { stripEveMarkup } from '@/features/skills/typeDisplay';
 import { buildIcsFile, googleCalendarUrl, type CalendarExportEvent } from '@/lib/calendarExport';
 import { downloadTextFile } from '@/lib/download';
 import { formatCalendarTimestamp } from '@/lib/timestamp';
 import type { CachedResult } from '@/esi/cache';
-import type { CalendarEventDetail, CalendarEventSummary } from '@/esi/endpoints';
+import type {
+  CalendarEventDetail,
+  CalendarEventSummary,
+  CalendarRsvpResponse,
+} from '@/esi/endpoints';
+
+const RSVP_OPTIONS: {
+  response: CalendarRsvpResponse;
+  labelKey: string;
+  variant: 'primary' | 'danger';
+}[] = [
+  { response: 'accepted', labelKey: 'calendar.rsvpAccept', variant: 'primary' },
+  { response: 'declined', labelKey: 'calendar.rsvpDecline', variant: 'danger' },
+  { response: 'tentative', labelKey: 'calendar.rsvpTentative', variant: 'primary' },
+];
 
 /** `detail.text` is markup, but the export formats want plain text — the same strip already used for the on-screen body. */
 function exportEventOf(detail: CalendarEventDetail): CalendarExportEvent {
@@ -31,13 +45,40 @@ export interface EventDetailModalProps {
   characterId: number;
   event: CalendarEventSummary;
   onClose: () => void;
+  /**
+   * Fired after a successful RSVP write, alongside the cache patch inside
+   * `respondToCalendarEvent`. The route's own event list/board (loaded via
+   * `useRouteSnapshot`, not a live query) never sees a Dexie write on its
+   * own, so it needs this to repaint the Coming Up Rail / Calendar Map
+   * without forcing a live ESI refetch — which could reapply ESI's own
+   * still-propagating pre-RSVP response over the optimistic update.
+   */
+  onResponded?: (eventId: number, response: CalendarRsvpResponse) => void;
 }
 
-export function EventDetailModal({ characterId, event, onClose }: EventDetailModalProps) {
+export function EventDetailModal({
+  characterId,
+  event,
+  onClose,
+  onResponded,
+}: EventDetailModalProps) {
   const { t } = useTranslation();
   const [detail, setDetail] = useState<CachedResult<CalendarEventDetail> | null | undefined>(
     undefined
   );
+  const [saving, setSaving] = useState(false);
+
+  async function respond(response: CalendarRsvpResponse) {
+    setSaving(true);
+    try {
+      const ok = await respondToCalendarEvent(characterId, event.event_id, response);
+      if (!ok) return;
+      setDetail((prev) => (prev ? { ...prev, data: { ...prev.data, response } } : prev));
+      onResponded?.(event.event_id, response);
+    } finally {
+      setSaving(false);
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -66,6 +107,19 @@ export function EventDetailModal({ characterId, event, onClose }: EventDetailMod
             {t('calendar.importance', { value: detail.data.importance })}
           </p>
           <p className="whitespace-pre-wrap text-text-dim">{stripEveMarkup(detail.data.text)}</p>
+          <div className="flex flex-wrap gap-2 border-t border-line pt-2">
+            {RSVP_OPTIONS.map(({ response, labelKey, variant }) => (
+              <Button
+                key={response}
+                size="sm"
+                variant={detail.data.response === response ? variant : 'ghost'}
+                disabled={saving}
+                onClick={() => void respond(response)}
+              >
+                {t(labelKey)}
+              </Button>
+            ))}
+          </div>
           <div className="flex flex-wrap gap-2 border-t border-line pt-2">
             <Button
               size="sm"

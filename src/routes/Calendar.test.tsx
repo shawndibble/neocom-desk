@@ -288,6 +288,28 @@ describe('Calendar', () => {
     expect(await screen.findByText('Bring your ship')).toBeInTheDocument();
   });
 
+  /**
+   * `respondToCalendarEvent` patches Dexie, but this route reads through
+   * `useRouteSnapshot` (a plain loader snapshot, not a live query) — so the
+   * rail only repaints if the route applies the RSVP locally, ahead of the
+   * next natural reload. `CharacterBoardRow` only tags a response other than
+   * `accepted`, so the fixture's starting `accepted` shows no badge, and a
+   * successful Decline must make one appear with no further
+   * `GET /calendar` round trip in between.
+   */
+  it('reflects an RSVP in the rail without waiting for a refetch', async () => {
+    server.use(http.put(`${ESI}/calendar/1/`, () => new HttpResponse(null, { status: 204 })));
+    render(<App />);
+    await userEvent.click(await screen.findByText('Fleet Op'));
+
+    expect(screen.queryByText('Declined')).not.toBeInTheDocument();
+    await userEvent.click(await screen.findByRole('button', { name: 'Decline' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Decline' })).not.toBeDisabled());
+
+    await userEvent.click(screen.getByRole('button', { name: /close/i }));
+    expect(await screen.findByText('Declined')).toBeInTheDocument();
+  });
+
   it('hides a kind from the filter menu and remembers it', async () => {
     server.use(http.get(`${ESI}/industry/jobs`, () => HttpResponse.json(jobs)));
     render(<App />);

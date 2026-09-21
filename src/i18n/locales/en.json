@@ -1723,6 +1723,9 @@
     "csvResponse": "Response",
     "downloadIcs": "Download .ics",
     "addToGoogleCalendar": "Add to Google Calendar",
+    "rsvpAccept": "Accept",
+    "rsvpDecline": "Decline",
+    "rsvpTentative": "Tentative",
     "contextMenu": {
       "copyEventId": "Copy event ID"
     },
