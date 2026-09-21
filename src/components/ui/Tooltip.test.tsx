@@ -324,6 +324,49 @@ describe('Tooltip tap-to-open', () => {
 
     expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
   });
+
+  it('stays open through the compatibility click a real device echoes after the tap', () => {
+    // A real touch device fires a `click` a moment after `touchend`, and
+    // Radix's own Trigger closes on any click — without swallowing that
+    // echoed one, a tap-to-open bubble would open and immediately close.
+    // jsdom doesn't auto-synthesize that click the way a device does, so this
+    // fires it explicitly to stand in for the device's — the assertion is on
+    // our own click handler's reaction, not on jsdom modeling the touch/mouse
+    // event linkage itself.
+    render(
+      <Tooltip content="One-line explanation." openOnTap>
+        <span role="img" aria-label="Trigger" />
+      </Tooltip>
+    );
+    const trigger = screen.getByRole('img', { name: 'Trigger' });
+
+    fireEvent.touchStart(trigger);
+    fireEvent.touchEnd(trigger);
+    fireEvent.click(trigger);
+
+    expect(screen.getByRole('tooltip')).toHaveTextContent('One-line explanation.');
+  });
+
+  it('lets a click land normally once the echo window has passed', () => {
+    vi.useFakeTimers();
+    render(
+      <Tooltip content="One-line explanation." openOnTap>
+        <span role="img" aria-label="Trigger" />
+      </Tooltip>
+    );
+    const trigger = screen.getByRole('img', { name: 'Trigger' });
+
+    fireEvent.touchStart(trigger);
+    fireEvent.touchEnd(trigger);
+    expect(screen.getByRole('tooltip')).toBeInTheDocument();
+
+    act(() => {
+      vi.advanceTimersByTime(1000);
+    });
+    fireEvent.click(trigger);
+
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+  });
 });
 
 describe('Tooltip multi-touch', () => {
