@@ -5,7 +5,14 @@
  * while a pilot has Reply or Forward open; `Mail.tsx` unmounts it on Cancel,
  * on send, or when the selected mail changes.
  */
-import { useEffect, useMemo, useState, type KeyboardEvent } from 'react';
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type MouseEvent as ReactMouseEvent,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, IconButton, Spinner, TextInput } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
@@ -85,6 +92,12 @@ export function MailComposeBox({
   const [pickerOpen, setPickerOpen] = useState(false);
   const listboxId = `mail-compose-recipient-listbox-${header.mail_id}`;
 
+  // Flips true the moment a pilot makes their own edit (subject, body, a
+  // chip). Guards the hydration effect below: `loadDraft` is async, and
+  // nothing else stops a slow resolution from landing after typing has
+  // already started and silently overwriting it.
+  const touchedRef = useRef(false);
+
   // Hydrates from a saved draft (same kind, same source mail) or builds the
   // defaults this decision settled: reply-all with the sender pinned, both
   // kinds auto-quoted. Runs once per (mail, kind) — a pilot who closes and
@@ -96,7 +109,14 @@ export function MailComposeBox({
     let cancelled = false;
     void (async () => {
       const draft = await loadDraft(characterId, header.mail_id);
-      if (cancelled) return;
+      // A pilot who started typing before this resolved keeps what they
+      // typed — their edit is authoritative over a draft/default that would
+      // otherwise clobber it. `ready` still flips below, so autosave picks
+      // up their in-progress edit rather than staying gated forever.
+      if (cancelled || touchedRef.current) {
+        if (!cancelled) setReady(true);
+        return;
+      }
       if (draft && draft.kind === kind) {
         setRecipients(
           draft.recipients.map((r) => ({
@@ -172,6 +192,14 @@ export function MailComposeBox({
     };
   }, [kind, characterId]);
 
+  // Only the newest query may write results (ESI can answer out of order) —
+  // same `latest`-ticket guard `BuildLocationPicker` uses against its own
+  // search. The `.catch()` also matters on its own: `esi/client.ts` throws
+  // on an aborted request, and every keystroke that supersedes an in-flight
+  // search aborts the previous one — with no catch here, that was an
+  // unhandled rejection on nearly every character typed.
+  const latestSearch = useRef(0);
+
   // Debounced live search (decision: same ESI search pattern as
   // BuildLocationPicker). Below the floor there is nothing to fetch — no
   // setState here either; `candidates` below gates on the same floor, so a
@@ -181,11 +209,18 @@ export function MailComposeBox({
     if (kind !== 'forward') return;
     const trimmed = recipientQuery.trim();
     if (trimmed.length < MIN_RECIPIENT_SEARCH_LENGTH) return;
+    const ticket = ++latestSearch.current;
     const controller = new AbortController();
     const id = setTimeout(() => {
-      void searchMailRecipients(characterId, trimmed, controller.signal).then((hits) => {
-        setSearchResults(hits.map((h) => ({ characterId: h.characterId, name: h.name })));
-      });
+      void searchMailRecipients(characterId, trimmed, controller.signal)
+        .then((hits) => {
+          if (ticket !== latestSearch.current) return;
+          setSearchResults(hits.map((h) => ({ characterId: h.characterId, name: h.name })));
+        })
+        .catch(() => {
+          if (ticket !== latestSearch.current || controller.signal.aborted) return;
+          setSearchResults([]);
+        });
     }, RECIPIENT_SEARCH_DEBOUNCE_MS);
     return () => {
       clearTimeout(id);
@@ -221,6 +256,7 @@ export function MailComposeBox({
   }, [contacts, searchResults, recipientQuery, addedIds]);
 
   function addRecipient(candidate: RecipientCandidate) {
+    touchedRef.current = true;
     setRecipients((prev) => [
       ...prev,
       {
@@ -236,7 +272,19 @@ export function MailComposeBox({
     setPickerOpen(false);
   }
 
+  // Named rather than inlined at its `onMouseDown` call site: a block-body
+  // arrow directly in JSX (needed for `preventDefault()` before the call)
+  // is what the `react-hooks/refs` lint rule flags as an unproven-safe call
+  // to a ref-touching function — a single-expression arrow calling a named
+  // function, the same shape every other handler below already uses, reads
+  // as a plain event handler to it.
+  function pickCandidateOnMouseDown(e: ReactMouseEvent, candidate: RecipientCandidate) {
+    e.preventDefault();
+    addRecipient(candidate);
+  }
+
   function removeRecipient(target: RecipientChip) {
+    touchedRef.current = true;
     setRecipients((prev) => prev.filter((r) => chipKey(r) !== chipKey(target)));
   }
 
@@ -305,7 +353,6 @@ export function MailComposeBox({
                 size="sm"
                 variant="plain"
                 onClick={() => removeRecipient(r)}
-                className="size-5 md:size-5"
               />
             ) : (
               <span className="sr-only">{t('mail.senderNotRemovable')}</span>
@@ -319,6 +366,7 @@ export function MailComposeBox({
           <TextInput
             size="sm"
             role="combobox"
+            aria-autocomplete="list"
             aria-expanded={pickerOpen}
             aria-controls={listboxId}
             aria-activedescendant={
@@ -336,6 +384,16 @@ export function MailComposeBox({
             onKeyDown={handlePickerKeyDown}
             className="w-full"
           />
+          <span role="status" aria-live="polite" className="sr-only">
+            {pickerOpen &&
+              recipientQuery.trim().length >= MIN_RECIPIENT_SEARCH_LENGTH &&
+              (highlight !== null && candidates[highlight]
+                ? t('mail.recipientHighlighted', {
+                    count: candidates.length,
+                    name: candidates[highlight].name,
+                  })
+                : t('mail.recipientResultsCount', { count: candidates.length }))}
+          </span>
           {pickerOpen && (
             <ul
               id={listboxId}
@@ -361,11 +419,8 @@ export function MailComposeBox({
                       highlight === i ? 'bg-panel-2' : 'hover:bg-panel-2/60'
                     )}
                     onMouseEnter={() => setHighlight(i)}
-                    onMouseDown={(e) => {
-                      // Keeps the input focused — a plain click would blur it first and close the list.
-                      e.preventDefault();
-                      addRecipient(c);
-                    }}
+                    // Keeps the input focused — a plain click would blur it first and close the list.
+                    onMouseDown={(e) => pickCandidateOnMouseDown(e, c)}
                   >
                     {c.name}
                   </li>
@@ -381,14 +436,20 @@ export function MailComposeBox({
         aria-label={t('mail.subjectLabel')}
         placeholder={t('mail.subjectLabel')}
         value={subject}
-        onChange={(e) => setSubject(e.target.value)}
+        onChange={(e) => {
+          touchedRef.current = true;
+          setSubject(e.target.value);
+        }}
         className="w-full"
       />
 
       <textarea
         aria-label={t('mail.bodyLabel')}
         value={body}
-        onChange={(e) => setBody(e.target.value)}
+        onChange={(e) => {
+          touchedRef.current = true;
+          setBody(e.target.value);
+        }}
         rows={8}
         className="w-full rounded-xs border border-line bg-panel-2 p-2 text-sm text-text placeholder:text-text-faint focus-visible:outline-2 focus-visible:outline-accent"
       />

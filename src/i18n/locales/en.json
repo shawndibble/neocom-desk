@@ -1719,12 +1719,16 @@
     "noRecipientResults": "No characters found.",
     "contactsHeading": "Contacts",
     "searchResultsHeading": "Search results",
+    "recipientResultsCount_one": "{{count}} result",
+    "recipientResultsCount_other": "{{count}} results",
+    "recipientHighlighted_one": "{{count}} result. {{name}} highlighted.",
+    "recipientHighlighted_other": "{{count}} results. {{name}} highlighted.",
     "subjectLabel": "Subject",
     "bodyLabel": "Message",
     "send": "Send",
     "sending": "Sending…",
     "cancel": "Cancel",
-    "sendErrorPrefix": "Couldn't send: {{message}}",
+    "sendErrorPrefix": "Couldn't send: {{message}} Try sending from the EVE client instead.",
     "sendNoRecipients": "Add at least one recipient before sending."
   },
   "calendar": {

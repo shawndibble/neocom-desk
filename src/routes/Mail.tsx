@@ -395,6 +395,37 @@ export function Mail() {
     }
   }
 
+  /**
+   * After a successful Reply/Forward send. `sendMail` already deleted the
+   * cached headers row (mail-reply-and-forward decision: "a targeted
+   * invalidation of one key, not a broader reload") — refetching just the
+   * headers here, the same way `handleLoadMore` patches them in, is what
+   * shows the new Sent mail without a manual refresh while keeping that
+   * promise. `refresh()` was tried first and reverted: `useRouteSnapshot`'s
+   * `refresh` calls the cache's global `invalidateFreshness()`, which forces
+   * every other default-tier row (labels, mailing lists, contacts, sender
+   * affiliations) to refetch too — exactly the broader reload the decision
+   * rules out.
+   */
+  async function handleSent() {
+    setComposeKind(null);
+    if (activeCharacterId === null) return;
+    const requestSnapshot = data;
+    const result = await loadMailHeaders(activeCharacterId);
+    const freshHeaders = result.cached?.data ?? [];
+    const [freshNames, freshAffiliations] = await Promise.all([
+      resolveNames(namePartyIds(freshHeaders)),
+      resolveAffiliations(senderIds(freshHeaders)),
+    ]);
+    // A character switch or refresh landed while this was in flight —
+    // same guard `handleLoadMore` uses, for the same reason.
+    if (dataRef.current !== requestSnapshot) return;
+    setLoadedHeaders(freshHeaders);
+    setHasMore(result.hasMore);
+    setLoadedNames(freshNames);
+    setLoadedAffiliations(freshAffiliations);
+  }
+
   useEffect(() => {
     if (activeCharacterId === null || selectedId === null) return;
     let cancelled = false;
@@ -800,10 +831,7 @@ export function Mail() {
                       }
                       resolveRecipientName={resolveRecipientName}
                       onClose={() => setComposeKind(null)}
-                      onSent={() => {
-                        setComposeKind(null);
-                        void refresh();
-                      }}
+                      onSent={() => void handleSent()}
                     />
                   )}
                 </div>

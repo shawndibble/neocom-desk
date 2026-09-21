@@ -158,6 +158,23 @@ describe('a saved draft', () => {
     expect(screen.queryByText('Sender Sal')).not.toBeInTheDocument();
     expect(screen.getByText('CC Cara')).toBeInTheDocument();
   });
+
+  it('never clobbers a subject the pilot already typed while loadDraft was still resolving', async () => {
+    let resolveLoad: (value: undefined) => void = () => {};
+    drafts.loadDraft.mockReturnValue(new Promise((resolve) => (resolveLoad = resolve)));
+    const user = userEvent.setup();
+    renderBox('reply');
+
+    // Reply-all defaults haven't landed yet — loadDraft is still pending.
+    expect(screen.getByLabelText('Subject')).toHaveValue('');
+    await user.type(screen.getByLabelText('Subject'), 'My own subject');
+
+    resolveLoad(undefined);
+    await waitFor(() => expect(drafts.saveDraft).toHaveBeenCalled());
+
+    expect(screen.getByLabelText('Subject')).toHaveValue('My own subject');
+    expect(screen.getByLabelText('Message')).toHaveValue('');
+  });
 });
 
 describe('sending', () => {
@@ -194,7 +211,9 @@ describe('sending', () => {
     await user.click(screen.getByRole('button', { name: 'Send' }));
 
     expect(
-      await screen.findByText("Couldn't send: Contact 200 requires 1000000.0 ISK")
+      await screen.findByText(
+        "Couldn't send: Contact 200 requires 1000000.0 ISK Try sending from the EVE client instead."
+      )
     ).toBeInTheDocument();
     expect(drafts.clearDraft).not.toHaveBeenCalled();
     expect(onSent).not.toHaveBeenCalled();
