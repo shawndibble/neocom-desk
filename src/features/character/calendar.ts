@@ -176,6 +176,12 @@ export function loadCalendarEvent(
  * (`calendar:seen`, same field — an already-started event must not show a
  * stale response after a successful write), and the per-event detail
  * (`response`, a different field name on a different shape).
+ *
+ * The patch itself is best-effort: ESI has already accepted the write by
+ * this point, so a Dexie failure here (quota, IO) is a local display
+ * inconsistency the next natural reload corrects on its own — not a reason
+ * to report the RSVP itself as failed, and not something the caller should
+ * see as an unhandled rejection.
  */
 export async function respondToCalendarEvent(
   characterId: number,
@@ -189,22 +195,26 @@ export async function respondToCalendarEvent(
     return false;
   }
 
-  const now = Date.now();
-  for (const key of [KEYS.events, KEYS.seenEvents]) {
-    const events = await readCached<CalendarEventSummary[]>(characterId, key);
-    if (!events) continue;
-    await writeCached(
-      characterId,
-      key,
-      events.map((event) =>
-        event.event_id === eventId ? { ...event, event_response: response } : event
-      ),
-      now
-    );
-  }
+  try {
+    const now = Date.now();
+    for (const key of [KEYS.events, KEYS.seenEvents]) {
+      const events = await readCached<CalendarEventSummary[]>(characterId, key);
+      if (!events) continue;
+      await writeCached(
+        characterId,
+        key,
+        events.map((event) =>
+          event.event_id === eventId ? { ...event, event_response: response } : event
+        ),
+        now
+      );
+    }
 
-  const detail = await readCached<CalendarEventDetail>(characterId, KEYS.event(eventId));
-  if (detail) await writeCached(characterId, KEYS.event(eventId), { ...detail, response }, now);
+    const detail = await readCached<CalendarEventDetail>(characterId, KEYS.event(eventId));
+    if (detail) await writeCached(characterId, KEYS.event(eventId), { ...detail, response }, now);
+  } catch {
+    // See doc comment above: the write already succeeded, this patch didn't.
+  }
 
   return true;
 }

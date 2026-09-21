@@ -1726,6 +1726,7 @@
     "rsvpAccept": "Accept",
     "rsvpDecline": "Decline",
     "rsvpTentative": "Tentative",
+    "rsvpFailed": "Couldn't save your response. Try again.",
     "contextMenu": {
       "copyEventId": "Copy event ID"
     },

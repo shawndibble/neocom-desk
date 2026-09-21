@@ -67,6 +67,20 @@ import type { CalendarRsvpResponse } from '@/esi/endpoints';
 /** How many days the phone's Day Ticker scrolls through at a time. */
 const TICKER_DAYS = 14;
 
+/** Shared shape behind both `eventsWithOverrides` and `boardSources` below — same override lookup, two different id/response fields. */
+function applyResponseOverrides<T>(
+  items: readonly T[],
+  overrides: Map<number, CalendarRsvpResponse> | undefined,
+  idOf: (item: T) => number,
+  withResponse: (item: T, response: CalendarRsvpResponse) => T
+): T[] {
+  if (!overrides || overrides.size === 0) return [...items];
+  return items.map((item) => {
+    const response = overrides.get(idOf(item));
+    return response === undefined ? item : withResponse(item, response);
+  });
+}
+
 export function Calendar() {
   const { t } = useTranslation();
   const { data, error, loading, hydrated, activeCharacterId, refresh } = useRouteSnapshot(
@@ -102,14 +116,19 @@ export function Calendar() {
    * response over what the pilot just clicked, so the override stands in
    * for that source.
    *
-   * Not pruned once `data` agrees with it — a route-local Map that only grows
-   * by one entry per event the pilot RSVPs to in this session is not worth an
-   * effect to shrink, and every derived read below already ignores an entry
-   * that no longer changes what `data` would show anyway.
+   * Scoped to the snapshot (`asOfMs`, `data.loadedAtMs`) it was set against
+   * rather than kept forever: the moment a *newer* snapshot loads (manual
+   * refresh, background poll, remount), that snapshot's own data is trusted
+   * over a possibly-stale local guess — an override must not go on masking
+   * what ESI, another device, or another session says once fresher
+   * information actually arrives.
    */
-  const [responseOverrides, setResponseOverrides] = useState<Map<number, CalendarRsvpResponse>>(
-    new Map()
-  );
+  const [responseOverrides, setResponseOverrides] = useState<{
+    asOfMs: number;
+    values: Map<number, CalendarRsvpResponse>;
+  } | null>(null);
+  const activeOverrides =
+    data && responseOverrides?.asOfMs === data.loadedAtMs ? responseOverrides.values : undefined;
 
   /**
    * The instant the snapshot was assembled, threaded into everything below.
@@ -132,14 +151,18 @@ export function Calendar() {
    * contracts and orders are all small), and the rail's day grouping is what
    * makes a long list readable.
    */
-  const eventsWithOverrides = useMemo(() => {
-    if (!data) return undefined;
-    if (responseOverrides.size === 0) return data.events;
-    return data.events.map((event) => {
-      const override = responseOverrides.get(event.event_id);
-      return override === undefined ? event : { ...event, event_response: override };
-    });
-  }, [data, responseOverrides]);
+  const eventsWithOverrides = useMemo(
+    () =>
+      data
+        ? applyResponseOverrides(
+            data.events,
+            activeOverrides,
+            (event) => event.event_id,
+            (event, response) => ({ ...event, event_response: response })
+          )
+        : undefined,
+    [data, activeOverrides]
+  );
 
   /**
    * `buildCharacterBoard` reads `calendarEvents` (each keyed by `id`, a
@@ -149,13 +172,16 @@ export function Calendar() {
    */
   const boardSources = useMemo(() => {
     if (!data) return undefined;
-    if (responseOverrides.size === 0) return data;
-    const calendarEvents = data.calendarEvents?.map((source) => {
-      const override = responseOverrides.get(Number(source.id));
-      return override === undefined ? source : { ...source, response: override };
-    });
+    const calendarEvents = data.calendarEvents
+      ? applyResponseOverrides(
+          data.calendarEvents,
+          activeOverrides,
+          (source) => Number(source.id),
+          (source, response) => ({ ...source, response })
+        )
+      : undefined;
     return { ...data, calendarEvents };
-  }, [data, responseOverrides]);
+  }, [data, activeOverrides]);
 
   const board = useMemo(
     () => (boardSources ? buildCharacterBoard({ nowMs, ...boardSources }) : []),
@@ -365,7 +391,12 @@ export function Calendar() {
           event={selectedEvent}
           onClose={() => setSelectedEventId(null)}
           onResponded={(eventId, response) =>
-            setResponseOverrides((prev) => new Map(prev).set(eventId, response))
+            setResponseOverrides((prev) => {
+              const asOfMs = data?.loadedAtMs ?? 0;
+              const values = prev?.asOfMs === asOfMs ? new Map(prev.values) : new Map();
+              values.set(eventId, response);
+              return { asOfMs, values };
+            })
           }
         />
       )}

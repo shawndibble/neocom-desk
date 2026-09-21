@@ -116,7 +116,7 @@ describe('EventDetailModal', () => {
       await vi.waitFor(() => expect(acceptButton).not.toBeDisabled());
     });
 
-    it('does not throw when the write fails', async () => {
+    it('does not throw when the write fails, and shows a failure message', async () => {
       serveDetail('not_responded');
       server.use(
         http.put(`${ESI_BASE_URL}/characters/${CHAR_ID}/calendar/1/`, () =>
@@ -129,6 +129,20 @@ describe('EventDetailModal', () => {
       await userEvent.setup().click(declineButton);
 
       await vi.waitFor(() => expect(declineButton).not.toBeDisabled());
+      expect(await screen.findByText(/couldn't save your response/i)).toBeInTheDocument();
+    });
+
+    it('marks the current response with aria-pressed and a text status, not color alone', async () => {
+      serveDetail('tentative');
+      render(<EventDetailModal characterId={CHAR_ID} event={EVENT} onClose={() => {}} />);
+
+      const tentativeButton = await screen.findByRole('button', { name: 'Tentative' });
+      expect(tentativeButton).toHaveAttribute('aria-pressed', 'true');
+      expect(screen.getByRole('button', { name: 'Accept' })).toHaveAttribute(
+        'aria-pressed',
+        'false'
+      );
+      expect(screen.getByText('Tentative', { selector: 'p' })).toBeInTheDocument();
     });
   });
 });

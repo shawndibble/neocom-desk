@@ -9,6 +9,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, EmptyState, Modal, Spinner } from '@/components/ui';
 import { loadCalendarEvent, respondToCalendarEvent } from '@/features/character/calendar';
+import { RESPONSE_KEY, RESPONSE_TEXT_TONE } from './calendarResponseTone';
 import { stripEveMarkup } from '@/features/skills/typeDisplay';
 import { buildIcsFile, googleCalendarUrl, type CalendarExportEvent } from '@/lib/calendarExport';
 import { downloadTextFile } from '@/lib/download';
@@ -20,15 +21,16 @@ import type {
   CalendarRsvpResponse,
 } from '@/esi/endpoints';
 
-const RSVP_OPTIONS: {
-  response: CalendarRsvpResponse;
-  labelKey: string;
-  variant: 'primary' | 'danger';
-}[] = [
-  { response: 'accepted', labelKey: 'calendar.rsvpAccept', variant: 'primary' },
-  { response: 'declined', labelKey: 'calendar.rsvpDecline', variant: 'danger' },
-  { response: 'tentative', labelKey: 'calendar.rsvpTentative', variant: 'primary' },
+const RSVP_OPTIONS: { response: CalendarRsvpResponse; labelKey: string }[] = [
+  { response: 'accepted', labelKey: 'calendar.rsvpAccept' },
+  { response: 'declined', labelKey: 'calendar.rsvpDecline' },
+  { response: 'tentative', labelKey: 'calendar.rsvpTentative' },
 ];
+
+/** `CalendarEventDetail.response` is a loose `string` (ESI's detail shape isn't as tightly typed as the list's), so guard the lookup rather than casting blindly. */
+function isKnownResponse(value: string): value is CalendarEventSummary['event_response'] {
+  return value in RESPONSE_KEY;
+}
 
 /** `detail.text` is markup, but the export formats want plain text — the same strip already used for the on-screen body. */
 function exportEventOf(detail: CalendarEventDetail): CalendarExportEvent {
@@ -67,12 +69,17 @@ export function EventDetailModal({
     undefined
   );
   const [saving, setSaving] = useState(false);
+  const [rsvpFailed, setRsvpFailed] = useState(false);
 
   async function respond(response: CalendarRsvpResponse) {
     setSaving(true);
+    setRsvpFailed(false);
     try {
       const ok = await respondToCalendarEvent(characterId, event.event_id, response);
-      if (!ok) return;
+      if (!ok) {
+        setRsvpFailed(true);
+        return;
+      }
       setDetail((prev) => (prev ? { ...prev, data: { ...prev.data, response } } : prev));
       onResponded?.(event.event_id, response);
     } finally {
@@ -107,18 +114,37 @@ export function EventDetailModal({
             {t('calendar.importance', { value: detail.data.importance })}
           </p>
           <p className="whitespace-pre-wrap text-text-dim">{stripEveMarkup(detail.data.text)}</p>
-          <div className="flex flex-wrap gap-2 border-t border-line pt-2">
-            {RSVP_OPTIONS.map(({ response, labelKey, variant }) => (
-              <Button
-                key={response}
-                size="sm"
-                variant={detail.data.response === response ? variant : 'ghost'}
-                disabled={saving}
-                onClick={() => void respond(response)}
+          <div className="border-t border-line pt-2">
+            {/*
+              Selection state is never color-only (DESIGN.md §7): `aria-pressed`
+              carries it for assistive tech, and this status line carries it
+              for a sighted reader who can't rely on primary-vs-ghost alone —
+              the same tone/label `CharacterBoardRow` uses for the rail.
+            */}
+            {isKnownResponse(detail.data.response) && (
+              <p
+                className={`mb-2 text-[0.6875rem] font-semibold tracking-widest uppercase ${RESPONSE_TEXT_TONE[detail.data.response]}`}
               >
-                {t(labelKey)}
-              </Button>
-            ))}
+                {t(RESPONSE_KEY[detail.data.response])}
+              </p>
+            )}
+            <div className="flex flex-wrap gap-2">
+              {RSVP_OPTIONS.map(({ response, labelKey }) => (
+                <Button
+                  key={response}
+                  size="sm"
+                  variant={detail.data.response === response ? 'primary' : 'ghost'}
+                  aria-pressed={detail.data.response === response}
+                  disabled={saving}
+                  onClick={() => void respond(response)}
+                >
+                  {t(labelKey)}
+                </Button>
+              ))}
+            </div>
+            {rsvpFailed && (
+              <p className="mt-2 text-[0.6875rem] text-danger">{t('calendar.rsvpFailed')}</p>
+            )}
           </div>
           <div className="flex flex-wrap gap-2 border-t border-line pt-2">
             <Button

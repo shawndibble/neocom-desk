@@ -310,6 +310,28 @@ describe('Calendar', () => {
     expect(await screen.findByText('Declined')).toBeInTheDocument();
   });
 
+  /**
+   * The override is scoped to the snapshot it was set against (`asOfMs`)
+   * rather than kept forever — once a *newer* snapshot loads (here, a manual
+   * refresh), that snapshot's own data wins even though, in this fixture, it
+   * happens to still read `accepted` (an ESI-propagation-lag stand-in). A
+   * stale override winning indefinitely was the bug; trusting fresh data,
+   * even imperfect fresh data, over an old local guess is the fix.
+   */
+  it('lets a fresh reload override the earlier local RSVP once one arrives', async () => {
+    server.use(http.put(`${ESI}/calendar/1/`, () => new HttpResponse(null, { status: 204 })));
+    render(<App />);
+    await userEvent.click(await screen.findByText('Fleet Op'));
+    await userEvent.click(await screen.findByRole('button', { name: 'Decline' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Decline' })).not.toBeDisabled());
+    await userEvent.click(screen.getByRole('button', { name: /close/i }));
+    expect(await screen.findByText('Declined')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: /refresh/i }));
+
+    await waitFor(() => expect(screen.queryByText('Declined')).not.toBeInTheDocument());
+  });
+
   it('hides a kind from the filter menu and remembers it', async () => {
     server.use(http.get(`${ESI}/industry/jobs`, () => HttpResponse.json(jobs)));
     render(<App />);
