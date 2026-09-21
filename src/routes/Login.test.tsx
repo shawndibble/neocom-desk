@@ -40,9 +40,10 @@ const READ_ONLY_PHRASES: Record<string, string> = {
   'esi-location.read_location.v1': 'current location',
 };
 
-/** The one Base Grant scope that's a write, not a read — its disclosure goes in its own fine-print line, not the "read-only access" sentence, which it would otherwise contradict. */
+/** The Base Grant scopes that are writes, not reads — their disclosure goes in its own fine-print line, not the "read-only access" sentence, which it would otherwise contradict. */
 const WRITE_SCOPE_PHRASES: Record<string, string> = {
   'esi-mail.organize_mail.v1': 'marks it read in EVE',
+  'esi-calendar.respond_calendar_events.v1': 'sends that response to EVE',
 };
 
 const BASE_GRANT_PHRASES: Record<string, string> = {
