@@ -495,9 +495,11 @@ function openJobsColumn(
       // urgent, not less.
       const tone = open === max ? 'text-danger' : open / max >= 0.5 ? 'text-warning' : 'text-text';
       return (
-        <Tooltip content={t('characters.openJobsTooltip', { used: running, max })}>
+        // Row click navigates to Overview — this tag must not also fire that on tap.
+        <Tooltip openOnTap content={t('characters.openJobsTooltip', { used: running, max })}>
           <span
             tabIndex={0}
+            onClick={(event) => event.stopPropagation()}
             className={`cursor-help underline decoration-dotted decoration-current/50 underline-offset-2 ${tone}`}
           >
             {open}
@@ -591,9 +593,14 @@ function buildColumns(
           return <span className={tone}>{t(`characters.queueStates.${row.queue.state}`)}</span>;
         }
         return (
-          <Tooltip content={formatTimestamp(new Date(row.queue.trainingFinishMs), timeZone)}>
+          // Row click navigates to Overview — this tag must not also fire that on tap.
+          <Tooltip
+            openOnTap
+            content={formatTimestamp(new Date(row.queue.trainingFinishMs), timeZone)}
+          >
             <span
               tabIndex={0}
+              onClick={(event) => event.stopPropagation()}
               className={`cursor-help underline decoration-dotted decoration-current/50 underline-offset-2 ${tone}`}
             >
               {formatDuration((row.queue.trainingFinishMs - Date.now()) / 1000)}
@@ -627,9 +634,11 @@ function buildColumns(
         const label =
           expiryMs <= Date.now() ? t('pi.expired') : formatDuration((expiryMs - Date.now()) / 1000);
         return (
-          <Tooltip content={formatTimestamp(new Date(expiryMs), timeZone)}>
+          // Row click navigates to Overview — this tag must not also fire that on tap.
+          <Tooltip openOnTap content={formatTimestamp(new Date(expiryMs), timeZone)}>
             <span
               tabIndex={0}
+              onClick={(event) => event.stopPropagation()}
               className={`cursor-help underline decoration-dotted decoration-current/50 underline-offset-2 ${tone}`}
             >
               {label}

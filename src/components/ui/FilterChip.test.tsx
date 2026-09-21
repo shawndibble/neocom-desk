@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { FilterChip } from './FilterChip';
@@ -59,6 +59,24 @@ describe('FilterChip', () => {
 
     await userEvent.click(chip);
     expect(onToggle).not.toHaveBeenCalled();
+  });
+
+  it('reveals the disabled-and-explained tooltip on a plain tap, since the tap does nothing else', () => {
+    render(
+      <FilterChip
+        label="Wallet"
+        selected={false}
+        onToggle={() => undefined}
+        disabled
+        tooltip="Unpick one first — the bar holds four."
+      />
+    );
+    const chip = screen.getByRole('button', { name: /Wallet/ });
+
+    fireEvent.touchStart(chip);
+    fireEvent.touchEnd(chip);
+
+    expect(screen.getByRole('tooltip')).toHaveTextContent('Unpick one first — the bar holds four.');
   });
 
   it('describes the chip with the tooltip on hover, leaving the label as its name', async () => {
