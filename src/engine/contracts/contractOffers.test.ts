@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   bpcRowsFromContractOffers,
+  bpoRowsFromContractOffers,
   type PublicContractOfferRow,
 } from '@/engine/contracts/contractOffers';
 
@@ -95,5 +96,40 @@ describe('bpcRowsFromContractOffers', () => {
         expect.objectContaining({ contractId: 2, isMultiType: false }),
       ]);
     });
+  });
+});
+
+describe('bpoRowsFromContractOffers', () => {
+  const original: PublicContractOfferRow = { ...base, contractId: 2, me: 10, te: 20 };
+
+  it('keeps only blueprint originals — unflagged lines that carry ME/TE', () => {
+    const plainItem: PublicContractOfferRow = { ...base, typeId: 34, quantity: 250 };
+    expect(
+      bpoRowsFromContractOffers([plainItem, copy, original]).map((row) => row.contractId)
+    ).toEqual([2]);
+  });
+
+  it('reports an original with the -1 unlimited-runs sentinel and its research', () => {
+    expect(bpoRowsFromContractOffers([original])).toEqual([
+      {
+        contractId: 2,
+        regionId: 10000002,
+        locationId: 60003760,
+        typeId: 32858,
+        price: 5000000,
+        isAuction: false,
+        me: 10,
+        te: 20,
+        runs: -1,
+        quantity: 1,
+        dateExpired: Date.parse('2026-09-09T18:00:00Z'),
+        isMultiType: false,
+      },
+    ]);
+  });
+
+  it('flags an original bundled with another for-sale type as multi-type', () => {
+    const bundledItem: PublicContractOfferRow = { ...base, contractId: 2, typeId: 34 };
+    expect(bpoRowsFromContractOffers([original, bundledItem])[0].isMultiType).toBe(true);
   });
 });
