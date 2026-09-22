@@ -31,7 +31,6 @@ import {
   toggleEveTypeChannelPref,
 } from './preferences';
 import type { NotificationChannel } from './eventSelection';
-import { rebuildProjectionAfterChannelWrite } from './projectionRebuildScheduler';
 
 export interface NotificationContextMenuProps {
   entry: NotificationFeedRecord;
@@ -57,21 +56,18 @@ export function NotificationContextMenu({ entry, children }: NotificationContext
           'browser'
         );
 
-  /** Effectful, unlike `isEventEnabledFor`/`isEveTypeEnabledFor` above — writes the toggle. */
+  /** Effectful, unlike `isEventEnabledFor`/`isEveTypeEnabledFor` above — writes the toggle and returns its promise. */
   function applyToggle(channel: NotificationChannel) {
-    rebuildProjectionAfterChannelWrite(
-      channel,
-      target.kind === 'eveType'
-        ? toggleEveTypeChannelPref(entry.characterId, prefsValue, target.type, channel)
-        : toggleEventChannelPref(entry.characterId, prefsValue, target.eventId, channel)
-    );
+    return target.kind === 'eveType'
+      ? toggleEveTypeChannelPref(entry.characterId, prefsValue, target.type, channel)
+      : toggleEventChannelPref(entry.characterId, prefsValue, target.eventId, channel);
   }
 
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
       <ContextMenuContent>
-        <ContextMenuItem onSelect={() => applyToggle('browser')}>
+        <ContextMenuItem onSelect={() => void applyToggle('browser')}>
           {browserEnabled ? (
             <BrowserNotifyOn size={ICON_SIZE.sm} />
           ) : (
@@ -81,7 +77,7 @@ export function NotificationContextMenu({ entry, children }: NotificationContext
             ? t('notifications.contextMenu.browserOn')
             : t('notifications.contextMenu.browserOff')}
         </ContextMenuItem>
-        <ContextMenuItem onSelect={() => applyToggle('feed')}>
+        <ContextMenuItem onSelect={() => void applyToggle('feed')}>
           <HideInFeed size={ICON_SIZE.sm} />
           {t('notifications.contextMenu.hideInFeed')}
         </ContextMenuItem>
