@@ -1006,7 +1006,8 @@
     "bottomCtaBody": "One EVE SSO login to start. Add as many characters as you fly — they all sit side by side.",
     "footerMultiChar": "Multi-character from day one",
     "footerOffline": "Offline-capable PWA",
-    "footerOpenSource": "Free & open source"
+    "footerOpenSource": "Free & open source",
+    "footerPrivacy": "Privacy policy"
   },
   "callback": {
     "completing": "Completing login…",

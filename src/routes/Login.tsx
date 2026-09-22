@@ -445,6 +445,9 @@ export function Login() {
         >
           {t('login.footerOpenSource')}
         </a>
+        <a href="/privacy.html" className="hover:text-text hover:underline">
+          {t('login.footerPrivacy')}
+        </a>
       </footer>
     </main>
   );
