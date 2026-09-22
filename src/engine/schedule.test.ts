@@ -236,3 +236,110 @@ describe('computeSchedule partial-SP credit', () => {
     expect(step.seconds).toBeCloseTo(1800 / 7, 6);
   });
 });
+
+describe('computeSchedule with attribute segments (Remap Markers)', () => {
+  const steps: PlanStep[] = [
+    { skillTypeID: 100, level: 1 },
+    { skillTypeID: 100, level: 2 },
+    { skillTypeID: 100, level: 3 },
+  ];
+
+  it('ignores `segments` entirely when omitted, unchanged from the flat-attributes behaviour', () => {
+    const flat = computeSchedule(steps, { attributes: attrs(20, 20) }, skills);
+    const withEmptySegments = computeSchedule(
+      steps,
+      { attributes: attrs(20, 20), segments: [] },
+      skills
+    );
+    expect(withEmptySegments).toEqual(flat);
+  });
+
+  it('a single segment starting at index 0 behaves exactly like the flat attributes it replaces', () => {
+    const flat = computeSchedule(steps, { attributes: attrs(20, 20) }, skills);
+    const segmented = computeSchedule(
+      steps,
+      {
+        attributes: attrs(1, 1), // must be ignored: fully overridden from step 0
+        segments: [{ startIndex: 0, attributes: attrs(20, 20) }],
+      },
+      skills
+    );
+    expect(segmented).toEqual(flat);
+  });
+
+  it('a segment starting mid-plan applies its own attributes only from that step onward', () => {
+    // Step 0 (L1, 250 SP) trains at 30 SP/min on attrs(20,20) -> 500 s.
+    // Steps 1-2 (L2 1165 SP, L3 6585 SP) remap to attrs(27,21) -> 37.5 SP/min.
+    const result = computeSchedule(
+      steps,
+      {
+        attributes: attrs(20, 20),
+        segments: [{ startIndex: 1, attributes: attrs(27, 21) }],
+      },
+      skills
+    );
+    expect(result[0].seconds).toBeCloseTo(500, 6);
+    expect(result[1].seconds).toBeCloseTo((1165 / 37.5) * 60, 6);
+    expect(result[2].seconds).toBeCloseTo((6585 / 37.5) * 60, 6);
+  });
+
+  it('two segments each apply to their own step range', () => {
+    const result = computeSchedule(
+      steps,
+      {
+        attributes: attrs(20, 20),
+        segments: [
+          { startIndex: 0, attributes: attrs(30, 30) },
+          { startIndex: 2, attributes: attrs(10, 10) },
+        ],
+      },
+      skills
+    );
+    // rate 45 SP/min for steps 0-1, rate 15 SP/min for step 2.
+    expect(result[0].seconds).toBeCloseTo((250 / 45) * 60, 6);
+    expect(result[1].seconds).toBeCloseTo((1165 / 45) * 60, 6);
+    expect(result[2].seconds).toBeCloseTo((6585 / 15) * 60, 6);
+  });
+
+  it('sorts unordered segments before applying them', () => {
+    const sorted = computeSchedule(
+      steps,
+      {
+        attributes: attrs(20, 20),
+        segments: [
+          { startIndex: 2, attributes: attrs(10, 10) },
+          { startIndex: 0, attributes: attrs(30, 30) },
+        ],
+      },
+      skills
+    );
+    const reference = computeSchedule(
+      steps,
+      {
+        attributes: attrs(20, 20),
+        segments: [
+          { startIndex: 0, attributes: attrs(30, 30) },
+          { startIndex: 2, attributes: attrs(10, 10) },
+        ],
+      },
+      skills
+    );
+    expect(sorted).toEqual(reference);
+  });
+
+  it('combines with a live Booster on top of the segment attributes', () => {
+    // Step 1 segment attrs(27,21) + booster +10 int -> rate (37+21/2)=47.5 for
+    // the whole step (booster expires well after the plan finishes).
+    const result = computeSchedule(
+      steps,
+      {
+        attributes: attrs(20, 20),
+        segments: [{ startIndex: 1, attributes: attrs(27, 21) }],
+        boosters: [{ bonus: { intelligence: 10 }, expiresAt: new Date(10_000_000) }],
+        startDate: new Date(0),
+      },
+      skills
+    );
+    expect(result[1].seconds).toBeCloseTo((1165 / 47.5) * 60, 6);
+  });
+});

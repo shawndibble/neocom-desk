@@ -437,6 +437,29 @@ describe('PlanEditor tools pane', () => {
     ).toBeInTheDocument();
   });
 
+  it("costs the plan's total training time and finish date per marker segment, not just the savings badge (#1232)", async () => {
+    // Skill A (intelligence/memory) trains on the flat attributes either way.
+    // Skill B (perception/willpower) sits after a marker with a manual
+    // override favouring perception, so it must train faster than a flat
+    // read of ATTRIBUTES would give it — and the header total must show that.
+    const override: Attributes = {
+      intelligence: 19,
+      memory: 19,
+      perception: 27,
+      willpower: 21,
+      charisma: 17,
+    };
+    renderEditor(vi.fn(), {
+      plan: { ...PLAN, markers: [1], markerAttributes: [override] },
+    });
+    // A: 250 SP at 20 + 20/2 = 30 SP/min -> 500s. B: 250 SP at 27 + 21/2 =
+    // 37.5 SP/min -> 400s. Total 900s = 15m, not the flat-attributes 1000s = 16m40s.
+    const summary = sectionFor('Plan summary');
+    expect(within(summary).getByText('15m')).toBeInTheDocument();
+    expect(within(summary).queryByText('16m')).not.toBeInTheDocument();
+    expect(within(summary).queryByText('17m')).not.toBeInTheDocument();
+  });
+
   it("opens Optimize at my markers' preview in a Modal when it finds savings; Accept re-applies the segments as markers and closes it", async () => {
     const user = userEvent.setup();
     const { onUpdate } = renderEditor(vi.fn(), { plan: { ...PLAN, markers: [1] } });
