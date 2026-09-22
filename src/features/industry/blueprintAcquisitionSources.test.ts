@@ -5,12 +5,16 @@ import type { LpOfferMatch } from '@/features/market/appraisalLpAcquisition';
 import {
   cheapestRow,
   contractOfferRows,
+  groupContractOffers,
+  groupMarketSells,
   isCurrentPick,
   lpOfferRows,
   lpPickPrice,
   marketSellRows,
   overridePatchFor,
   ownedTierRows,
+  SECTION_ROW_LIMIT,
+  sectionRows,
 } from './blueprintAcquisitionSources';
 
 const ASTERO_BP = 33468;
@@ -109,6 +113,118 @@ describe('contractOfferRows', () => {
   });
 });
 
+describe('groupContractOffers', () => {
+  const rowsOf = (copies: BpcContractRow[], originals: BpcContractRow[] = []) =>
+    contractOfferRows({ copies, originals, blueprintTypeID: ASTERO_BP, regionId: null });
+
+  it('merges listings that show and pick identically into one group with a count', () => {
+    const groups = groupContractOffers(
+      rowsOf([
+        contract({ contractId: 1, runs: 50, price: 2_000_000 }),
+        contract({ contractId: 2, runs: 50, price: 2_000_000 }),
+        contract({ contractId: 3, runs: 50, price: 2_000_000 }),
+      ])
+    );
+    expect(groups).toHaveLength(1);
+    expect(groups[0].count).toBe(3);
+    expect(groups[0].row.contractId).toBe(1);
+    expect(overridePatchFor(groups[0].row)).toEqual({
+      acquisitionTierOverride: { me: 10, te: 20 },
+      overridePrice: 2_000_000,
+    });
+  });
+
+  it('keeps apart listings that differ in runs, tier, price, station, kind, quantity or bid', () => {
+    const groups = groupContractOffers(
+      rowsOf(
+        [
+          contract({ contractId: 1 }),
+          contract({ contractId: 2, runs: 20 }),
+          contract({ contractId: 3, me: 9 }),
+          contract({ contractId: 4, te: 18 }),
+          contract({ contractId: 5, price: 31_000_000 }),
+          contract({ contractId: 6, locationId: 60008494 }),
+          contract({ contractId: 7, quantity: 2 }),
+          contract({ contractId: 8, isAuction: true }),
+        ],
+        [contract({ contractId: 9, runs: -1 })]
+      )
+    );
+    expect(groups).toHaveLength(9);
+    expect(groups.every((g) => g.count === 1)).toBe(true);
+  });
+
+  it('never merges a bundle with a plain listing, but merges identical bundles', () => {
+    const groups = groupContractOffers(
+      rowsOf([
+        contract({ contractId: 1 }),
+        contract({ contractId: 2, isMultiType: true }),
+        contract({ contractId: 3, isMultiType: true }),
+      ])
+    );
+    expect(groups.map((g) => [g.row.contractId, g.count])).toEqual([
+      [1, 1],
+      [2, 2],
+    ]);
+  });
+
+  it('keeps sort order, each group at its first member, so cheapest stays first', () => {
+    const groups = groupContractOffers(
+      rowsOf([
+        contract({ contractId: 1, price: 30_000_000 }),
+        contract({ contractId: 2, price: 10_000_000 }),
+        contract({ contractId: 3, price: 30_000_000 }),
+        contract({ contractId: 4, price: 20_000_000 }),
+      ])
+    );
+    expect(groups.map((g) => [g.row.contractId, g.count])).toEqual([
+      [2, 1],
+      [4, 1],
+      [1, 2],
+    ]);
+    expect(cheapestRow(groups.map((g) => g.row))?.contractId).toBe(2);
+  });
+});
+
+describe('sectionRows', () => {
+  const pickable = (id: number) => ({ id, pickable: true });
+  const unpickable = (id: number) => ({ id, pickable: false });
+  const isPickable = (r: { pickable: boolean }) => r.pickable;
+
+  it('drops unpickable rows when anything in the section can be picked', () => {
+    const { shown, total } = sectionRows([pickable(1), unpickable(2), pickable(3)], isPickable);
+    expect(shown.map((r) => r.id)).toEqual([1, 3]);
+    expect(total).toBe(2);
+  });
+
+  it('keeps unpickable rows when they are all the section has', () => {
+    const { shown, total } = sectionRows([unpickable(1), unpickable(2)], isPickable);
+    expect(shown.map((r) => r.id)).toEqual([1, 2]);
+    expect(total).toBe(2);
+  });
+
+  it(`caps at ${SECTION_ROW_LIMIT} rows in order, reporting how many there were`, () => {
+    const rows = Array.from({ length: 13 }, (_, i) => pickable(i));
+    const { shown, total } = sectionRows([unpickable(99), ...rows], isPickable);
+    expect(SECTION_ROW_LIMIT).toBe(10);
+    expect(shown.map((r) => r.id)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    expect(total).toBe(13);
+  });
+
+  it('caps after grouping: duplicates fold first, then the cap counts groups', () => {
+    const copies = Array.from({ length: 12 }, (_, i) =>
+      contract({ contractId: i, price: i < 3 ? 1_000_000 : 1_000_000 + i })
+    );
+    const groups = groupContractOffers(
+      contractOfferRows({ copies, originals: [], blueprintTypeID: ASTERO_BP, regionId: null })
+    );
+    const { shown, total } = sectionRows(groups, (g) => g.row.pickable);
+    expect(total).toBe(10);
+    expect(shown).toHaveLength(10);
+    expect(shown[0].count).toBe(3);
+  });
+});
+
 describe('cheapestRow', () => {
   it('is the first pickable row', () => {
     const rows = contractOfferRows({
@@ -170,6 +286,31 @@ describe('marketSellRows', () => {
       expect.objectContaining({ orderId: 1, atHub: true, me: 0, te: 0, pickable: true }),
       expect.objectContaining({ orderId: 2, atHub: false }),
     ]);
+  });
+});
+
+describe('groupMarketSells', () => {
+  it('merges orders at one price and station, counting orders and summing volume', () => {
+    const groups = groupMarketSells(
+      marketSellRows(
+        [
+          order({ order_id: 1, price: 5_000_000, volume_remain: 3 }),
+          order({ order_id: 2, price: 4_000_000, location_id: 60008494 }),
+          order({ order_id: 3, price: 5_000_000, volume_remain: 2 }),
+          order({ order_id: 4, price: 4_000_000, volume_remain: 1 }),
+        ],
+        JITA_44
+      )
+    );
+    expect(groups.map((g) => [g.row.orderId, g.count, g.row.volumeRemain])).toEqual([
+      [2, 1, 3],
+      [4, 1, 1],
+      [1, 2, 5],
+    ]);
+    expect(overridePatchFor(groups[2].row)).toEqual({
+      acquisitionTierOverride: { me: 0, te: 0 },
+      overridePrice: 5_000_000,
+    });
   });
 });
 
