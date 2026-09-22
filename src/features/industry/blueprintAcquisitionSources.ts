@@ -147,6 +147,85 @@ export function marketSellRows(
 }
 
 /**
+ * Identical rows folded into one: `row` is the first member (so a builder's
+ * cheapest-first order holds), `count` how many rows it stands for. Picking
+ * the group is picking `row` — every member writes the same patch.
+ */
+export interface OfferGroup<T> {
+  row: T;
+  count: number;
+}
+
+/** Folds rows sharing `keyOf` into their first member, order kept; `merge` folds a later member in. */
+function groupBy<T>(
+  rows: readonly T[],
+  keyOf: (row: T) => string,
+  merge: (into: T, next: T) => T = (into) => into
+): OfferGroup<T>[] {
+  const groups = new Map<string, OfferGroup<T>>();
+  for (const row of rows) {
+    const key = keyOf(row);
+    const group = groups.get(key);
+    if (group) {
+      group.row = merge(group.row, row);
+      group.count += 1;
+    } else groups.set(key, { row, count: 1 });
+  }
+  return [...groups.values()];
+}
+
+/**
+ * Contract listings that display and pick identically, one group each:
+ * same kind and runs, tier, price, region and station, copies per listing, bid
+ * state and bundle flag. A bundle never merges with a plain listing.
+ */
+export function groupContractOffers(
+  rows: readonly ContractOfferRow[]
+): OfferGroup<ContractOfferRow>[] {
+  return groupBy(rows, (r) =>
+    [
+      r.runs ?? 'bpo',
+      r.me,
+      r.te,
+      r.price,
+      r.regionId,
+      r.locationId,
+      r.quantity,
+      r.isStartingBid,
+      r.isMultiType,
+    ].join(':')
+  );
+}
+
+/** Sell orders at one price and station, one group each; `volumeRemain` summed across them. */
+export function groupMarketSells(rows: readonly MarketSellRow[]): OfferGroup<MarketSellRow>[] {
+  return groupBy(
+    rows,
+    (r) => `${r.price}:${r.locationId}`,
+    (into, next) => ({ ...into, volumeRemain: into.volumeRemain + next.volumeRemain })
+  );
+}
+
+/** Most rows one modal section lists; BPC Sourcing (the Contracts link) shows the rest. */
+export const SECTION_ROW_LIMIT = 10;
+
+/**
+ * What one modal section lists: unpickable rows (a bundle, a barter) are
+ * dropped unless nothing in the section can be picked — then they are its
+ * only rows. Then the first `limit`, so pass rows already grouped and sorted.
+ * `total` is the count before the cap, for a "Showing 10 of N" note.
+ */
+export function sectionRows<T>(
+  rows: readonly T[],
+  isPickable: (row: T) => boolean,
+  limit: number = SECTION_ROW_LIMIT
+): { shown: T[]; total: number } {
+  const pickable = rows.filter(isPickable);
+  const listed = pickable.length > 0 ? pickable : [...rows];
+  return { shown: listed.slice(0, limit), total: listed.length };
+}
+
+/**
  * What one LP Store redemption costs in ISK: its ISK cost plus its LP cost at
  * the pilot's own **LP Value** (ISK per LP). A zero rate — the default —
  * prices the ISK side alone. A negative or non-finite rate is treated as zero

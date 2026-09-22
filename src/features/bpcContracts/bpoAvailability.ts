@@ -9,7 +9,11 @@
  * multi-type bundles and zero-price barters via `cheapestRow`, and
  * `marketSellRows` reads sell orders only.
  */
-import { effectivePrice, type BpcContractRow } from '@/engine/contracts/bpcSearch';
+import {
+  effectivePrice,
+  type BpcContractRow,
+  type BpcSearchRow,
+} from '@/engine/contracts/bpcSearch';
 import type { RegionOrder } from '@/esi/endpoints';
 import {
   cheapestRow,
@@ -53,16 +57,21 @@ export function marketBpoOffers(
   return marketSellRows(orders, hubStationId).map((row) => ({ ...row, regionId }));
 }
 
+/** One type's cheapest original from each source; at least one is non-null. */
+export interface BpoSources {
+  market: MarketBpoOffer | null;
+  contract: ContractOfferRow | null;
+}
+
 /**
- * The cheapest pickable original per type in `typeIds`, from contracts in
- * `contractRegionId` and market orders in each type's own book. A tie goes to
- * the contract: it may be researched, a market original never is. Types with
- * no BPO at all are left out.
+ * The cheapest pickable original per type in `typeIds`, kept per source:
+ * contracts in `contractRegionId`, market orders in each type's own book.
+ * Types with no BPO at all are left out.
  */
-export function cheapestBpoByType(
+export function cheapestBpoSourcesByType(
   typeIds: Iterable<number>,
   input: BpoAvailabilityInput
-): Map<number, BpoOffer> {
+): Map<number, BpoSources> {
   const wanted = new Set(typeIds);
   const originalsByType = new Map<number, BpcContractRow[]>();
   for (const row of input.originals) {
@@ -72,7 +81,7 @@ export function cheapestBpoByType(
     else originalsByType.set(row.typeId, [row]);
   }
 
-  const result = new Map<number, BpoOffer>();
+  const result = new Map<number, BpoSources>();
   for (const typeId of wanted) {
     const originals = originalsByType.get(typeId);
     const contract = originals
@@ -89,10 +98,70 @@ export function cheapestBpoByType(
     const market = book
       ? cheapestRow(marketBpoOffers(book.sell, book.regionId, input.hubStationId))
       : null;
-    const best = market && (!contract || market.price < contract.price) ? market : contract;
+    if (market || contract) result.set(typeId, { market, contract });
+  }
+  return result;
+}
+
+/** The cheaper of a type's two sources; a tie goes to the contract (it may be researched, a market original never is). */
+export function cheaperBpo({ market, contract }: BpoSources): BpoOffer | null {
+  return market && (!contract || market.price < contract.price) ? market : contract;
+}
+
+/**
+ * The cheapest pickable original per type in `typeIds`, from contracts in
+ * `contractRegionId` and market orders in each type's own book. A tie goes to
+ * the contract: it may be researched, a market original never is. Types with
+ * no BPO at all are left out.
+ */
+export function cheapestBpoByType(
+  typeIds: Iterable<number>,
+  input: BpoAvailabilityInput
+): Map<number, BpoOffer> {
+  const result = new Map<number, BpoOffer>();
+  for (const [typeId, sources] of cheapestBpoSourcesByType(typeIds, input)) {
+    const best = cheaperBpo(sources);
     if (best) result.set(typeId, best);
   }
   return result;
+}
+
+/**
+ * The cheapest copy a BPO price can honestly be compared with: not a
+ * multi-type bundle, not a zero-price barter. `null` when none qualifies.
+ */
+export function cheapestComparableCopy(rows: readonly BpcContractRow[]): BpcContractRow | null {
+  let best: BpcContractRow | null = null;
+  for (const row of rows) {
+    if (row.isMultiType || !(effectivePrice(row) > 0)) continue;
+    if (!best || effectivePrice(row) < effectivePrice(best)) best = row;
+  }
+  return best;
+}
+
+/**
+ * The one copy row per type that carries the "BPO too" badge when results
+ * span several blueprints — once per type, never on every offer. Its cheapest
+ * comparable contract copy, so "may be cheaper" is judged where it means
+ * most; else its first copy row. Originals are never badged: they are the BPO.
+ */
+export function bpoBadgeRows(rows: readonly BpcSearchRow[]): Set<BpcSearchRow> {
+  const byType = new Map<number, BpcSearchRow>();
+  const price = (row: BpcSearchRow) =>
+    row.source === 'contract' && !row.contract.isMultiType ? effectivePrice(row.contract) : 0;
+  for (const row of rows) {
+    if (row.runs === -1) continue;
+    const current = byType.get(row.typeId);
+    if (!current) {
+      byType.set(row.typeId, row);
+      continue;
+    }
+    const candidate = price(row);
+    if (candidate > 0 && (!(price(current) > 0) || candidate < price(current))) {
+      byType.set(row.typeId, row);
+    }
+  }
+  return new Set(byType.values());
 }
 
 /**
