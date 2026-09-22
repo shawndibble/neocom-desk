@@ -31,6 +31,7 @@ import {
 import { normalizePlanWithBoundaries } from '@/engine/plan';
 import { effectivePriority } from '@/engine/planPriority';
 import { computeSchedule } from '@/engine/schedule';
+import type { AttributeSegment } from '@/engine/schedule';
 import { parseSkillQueue } from '@/engine/queueImport';
 import { exportPlanToClipboard } from '@/engine/clipboardExport';
 import {
@@ -200,6 +201,14 @@ interface ComputeResult {
    * timeline (#20), so the two can never disagree.
    */
   startDate: Date;
+  /**
+   * What "Optimize at my markers" resolves to for this plan's current
+   * markers, `null` when there are none. The queue's own segment-aware
+   * `scheduled` above is built from these same segments (`s.attributes` from
+   * `s.startIndex` onward), so the plan total/finish date and the savings
+   * badge can never disagree about what each marker segment trains on (#1232).
+   */
+  markersResult: PlaceRemapsResult | null;
 }
 
 function computeQueue(
@@ -208,7 +217,9 @@ function computeQueue(
   trainedSkills: ReadonlyMap<number, TrainedSkill>,
   attributes: Attributes,
   implants: Implants,
-  boosters: Booster[]
+  boosters: Booster[],
+  markers: readonly number[] | undefined,
+  markerAttributes: readonly (Attributes | null)[]
 ): ComputeResult {
   // Guard against unknown typeIDs (stale plan, imported skill not in the current SDE snapshot).
   const validEntries = entries.filter((e) => catalog.engineSkills.has(e.skillTypeID));
@@ -219,6 +230,21 @@ function computeQueue(
       catalog.engineSkills,
       trainedSkills
     );
+    const markerStepIdx = markerStepIndices(entries, markers, catalog.engineSkills, trainedSkills);
+    const markersResult =
+      markerStepIdx.length > 0
+        ? optimizeAtMarkers(steps, catalog.engineSkills, {
+            markers: markerStepIdx,
+            currentAttributes: attributes,
+            implants,
+            booster: boosters.length > 0 ? { boosters, startDate } : undefined,
+            manualAttributes: markerAttributes,
+          })
+        : null;
+    const segments: AttributeSegment[] | undefined = markersResult?.segments.map((s) => ({
+      startIndex: s.startIndex,
+      attributes: s.attributes,
+    }));
     const scheduled = computeSchedule(
       steps,
       // `trainedSkills` is read twice, for two different things:
@@ -227,16 +253,17 @@ function computeQueue(
       // already paid for). Without the second, a plan that opens on the skill
       // the character is currently training re-charges the whole level and
       // reads hours longer than the in-game queue for it.
-      { attributes, implants, boosters, startDate, trainedSkills },
+      { attributes, implants, boosters, startDate, trainedSkills, segments },
       catalog.engineSkills
     );
-    return { scheduled, entryBoundaries, error: null, startDate };
+    return { scheduled, entryBoundaries, error: null, startDate, markersResult };
   } catch (err) {
     return {
       scheduled: [],
       entryBoundaries: [],
       error: err instanceof Error ? err.message : String(err),
       startDate,
+      markersResult: null,
     };
   }
 }
@@ -473,7 +500,22 @@ export function PlanEditor({
     [catalog]
   );
 
-  const { scheduled, entryBoundaries, error, startDate } = useMemo(
+  // Manual overrides (RemapMarkerModal), aligned to the current markers —
+  // recomputed here rather than trusted as-is, since `plan.markerAttributes`
+  // can be stale relative to `plan.markers` (a drag or removal touches one
+  // without necessarily touching the other in the same write).
+  const normalizedMarkerAttributes = useMemo(
+    () => normalizeMarkerAttributes(plan.markers, plan.markerAttributes, plan.entries.length),
+    [plan.markers, plan.markerAttributes, plan.entries.length]
+  );
+
+  const {
+    scheduled,
+    entryBoundaries,
+    error,
+    startDate,
+    markersResult: markersAtCurrentPositions,
+  } = useMemo(
     () =>
       computeQueue(
         plan.entries,
@@ -481,9 +523,20 @@ export function PlanEditor({
         trainedSkills,
         attributes,
         effectiveImplants,
-        activeBoosters
+        activeBoosters,
+        plan.markers,
+        normalizedMarkerAttributes
       ),
-    [plan.entries, catalog, trainedSkills, attributes, effectiveImplants, activeBoosters]
+    [
+      plan.entries,
+      catalog,
+      trainedSkills,
+      attributes,
+      effectiveImplants,
+      activeBoosters,
+      plan.markers,
+      normalizedMarkerAttributes,
+    ]
   );
 
   // One row per skill level (reorder.ts). Plans written before that rule —
@@ -626,15 +679,15 @@ export function PlanEditor({
     [scheduled]
   );
 
-  // What each marker resolves to right now — kept in sync with `plan.markers`
-  // itself (a plain derivation, not state, and cheap: unlike `placeRemaps`,
-  // the cut points are fixed by the markers rather than searched, so this is
-  // one bounded per-segment allocation search per marker, not a DP over where
-  // to cut), so a marker row shows its target attributes immediately: after
-  // Accept on either preview Modal, after a drag, and on a fresh page load or
-  // another device, without a separate "Optimize at my markers" click first.
-  // Lives up here, with its verdict, so headerBadge below can read both.
-  const markersAtCurrentPositions = useMemo(() => {
+  // `markersAtCurrentPositions` (from computeQueue, above) already carries a
+  // manual override's real attributes when one is set — exactly what the
+  // savings badge and Accept must cost against (#1232). But RemapMarkerModal
+  // needs the OTHER half for a marker that already has an override: what the
+  // optimizer would pick absent that override, to seed a fresh edit without
+  // it being mistaken for the existing one. This is a second, override-blind
+  // (and Booster-blind) run of the same bounded per-segment search — cheap,
+  // unlike `placeRemaps`'s DP — kept only for that seeding purpose.
+  const markersOptimizerSpread = useMemo(() => {
     if (!plan.markers || plan.markers.length === 0) return null;
     return optimizeAtMarkers(scheduled, catalog.engineSkills, {
       markers: markerStepIndices(plan.entries, plan.markers, catalog.engineSkills, trainedSkills),
@@ -846,29 +899,20 @@ export function PlanEditor({
    * share.
    */
   const markerAttributesByStepIndex = useMemo(() => {
-    if (!markersAtCurrentPositions) return null;
+    if (!markersOptimizerSpread) return null;
     return new Map(
-      markersAtCurrentPositions.segments
+      markersOptimizerSpread.segments
         .filter((s) => s.remap)
         .map((s) => [s.startIndex, s.attributes])
     );
-  }, [markersAtCurrentPositions]);
+  }, [markersOptimizerSpread]);
   const markerStepIndicesForResult = useMemo(
     () =>
-      markersAtCurrentPositions
+      markersOptimizerSpread
         ? markerStepIndices(plan.entries, plan.markers, catalog.engineSkills, trainedSkills)
         : null,
-    [markersAtCurrentPositions, plan.entries, plan.markers, catalog.engineSkills, trainedSkills]
+    [markersOptimizerSpread, plan.entries, plan.markers, catalog.engineSkills, trainedSkills]
   );
-  // Manual overrides (RemapMarkerModal), aligned to the current markers —
-  // recomputed here rather than trusted as-is, since `plan.markerAttributes`
-  // can be stale relative to `plan.markers` (a drag or removal touches one
-  // without necessarily touching the other in the same write).
-  const normalizedMarkerAttributes = useMemo(
-    () => normalizeMarkerAttributes(plan.markers, plan.markerAttributes, plan.entries.length),
-    [plan.markers, plan.markerAttributes, plan.entries.length]
-  );
-
   /** What "Optimize at my markers" computes for this marker, ignoring any manual override — RemapMarkerModal needs this half on its own so it can seed a fresh edit from the optimizer's spread without that spread being mistaken for an existing override. */
   function computedMarkerAttributesFor(markerIndex: number): Attributes | undefined {
     const stepIndex = markerStepIndicesForResult?.[markerIndex];

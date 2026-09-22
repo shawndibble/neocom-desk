@@ -151,4 +151,136 @@ describe('optimizeAtMarkers', () => {
     // Baseline: (20+3) + (20+3)/2 = 34.5 SP/min.
     expect(result.currentSeconds).toBeCloseTo((8000 / 34.5) * 60, 6);
   });
+
+  describe('manual marker attributes', () => {
+    it('a manual override replaces the computed spread for that segment', () => {
+      const override: Attributes = {
+        intelligence: 19,
+        memory: 19,
+        perception: 30,
+        willpower: 18,
+        charisma: 19,
+      };
+      const result = optimizeAtMarkers(TWO_PHASE_STEPS, TWO_PHASE_SKILLS, {
+        markers: [3],
+        currentAttributes: CURRENT,
+        manualAttributes: [override],
+      });
+      expect(result.segments[1].attributes).toEqual(override);
+      // 8000 SP at 30 + 18/2 = 39 SP/min.
+      expect(result.segments[1].seconds).toBeCloseTo((8000 / 39) * 60, 6);
+    });
+
+    it('falls back to the computed spread when the override is null', () => {
+      const withNull = optimizeAtMarkers(TWO_PHASE_STEPS, TWO_PHASE_SKILLS, {
+        markers: [3],
+        currentAttributes: CURRENT,
+        manualAttributes: [null],
+      });
+      const withoutOption = optimizeAtMarkers(TWO_PHASE_STEPS, TWO_PHASE_SKILLS, {
+        markers: [3],
+        currentAttributes: CURRENT,
+      });
+      expect(withNull.segments[1].attributes).toEqual(withoutOption.segments[1].attributes);
+    });
+
+    it('aligns overrides to markers by ordinal, not by sorted cut order', () => {
+      const skills = skillMap(
+        skill(1, 'intelligence', 'memory'),
+        skill(2, 'perception', 'willpower'),
+        skill(3, 'charisma', 'willpower')
+      );
+      const steps = [...levels(1, 3), ...levels(2, 3), ...levels(3, 3)];
+      const overrideForSecondMarker: Attributes = {
+        intelligence: 19,
+        memory: 19,
+        perception: 19,
+        willpower: 19,
+        charisma: 30,
+      };
+      // markers given out of order ([6, 3]); manualAttributes stays aligned to
+      // the input array, not to the sorted cut points ([3, 6]).
+      const result = optimizeAtMarkers(steps, skills, {
+        markers: [6, 3],
+        currentAttributes: CURRENT,
+        manualAttributes: [overrideForSecondMarker, null],
+      });
+      expect(result.segments[1]).toMatchObject({ startIndex: 3, remap: true });
+      expect(result.segments[1].attributes.perception).toBe(27); // computed, not overridden
+      expect(result.segments[2]).toMatchObject({ startIndex: 6, remap: true });
+      expect(result.segments[2].attributes).toEqual(overrideForSecondMarker);
+    });
+  });
+
+  describe('with a live Booster', () => {
+    const START = new Date('2026-08-30T00:00:00Z');
+    const after = (seconds: number) => new Date(START.getTime() + seconds * 1000);
+    const bonus = { intelligence: 10, memory: 10, perception: 10, willpower: 10, charisma: 10 };
+
+    it('leaves the Booster-blind result untouched when no booster context is passed', () => {
+      const blind = optimizeAtMarkers(TWO_PHASE_STEPS, TWO_PHASE_SKILLS, {
+        markers: [3],
+        currentAttributes: CURRENT,
+      });
+      const empty = optimizeAtMarkers(TWO_PHASE_STEPS, TWO_PHASE_SKILLS, {
+        markers: [3],
+        currentAttributes: CURRENT,
+        booster: { boosters: [], startDate: START },
+      });
+      expect(empty.totalSeconds).toBeCloseTo(blind.totalSeconds, 9);
+      expect(empty.currentSeconds).toBeCloseTo(blind.currentSeconds, 9);
+    });
+
+    it('speeds up both the baseline and the remapped segments while the Booster is live', () => {
+      const blind = optimizeAtMarkers(TWO_PHASE_STEPS, TWO_PHASE_SKILLS, {
+        markers: [3],
+        currentAttributes: CURRENT,
+      });
+      const boosted = optimizeAtMarkers(TWO_PHASE_STEPS, TWO_PHASE_SKILLS, {
+        markers: [3],
+        currentAttributes: CURRENT,
+        booster: { boosters: [{ bonus, expiresAt: after(1e9) }], startDate: START },
+      });
+      expect(boosted.currentSeconds).toBeLessThan(blind.currentSeconds);
+      expect(boosted.totalSeconds).toBeLessThan(blind.totalSeconds);
+    });
+
+    it('ignores a Booster that expired before the plan starts', () => {
+      const blind = optimizeAtMarkers(TWO_PHASE_STEPS, TWO_PHASE_SKILLS, {
+        markers: [3],
+        currentAttributes: CURRENT,
+      });
+      const expired = optimizeAtMarkers(TWO_PHASE_STEPS, TWO_PHASE_SKILLS, {
+        markers: [3],
+        currentAttributes: CURRENT,
+        booster: { boosters: [{ bonus, expiresAt: after(-1) }], startDate: START },
+      });
+      expect(expired.totalSeconds).toBeCloseTo(blind.totalSeconds, 9);
+    });
+
+    it('costs a later segment from where the earlier one left off, not from the plan start', () => {
+      // The Booster only covers the leading segment's actual (boosted)
+      // training time, so the remapped tail must not still get boosted once
+      // it expires at the real handoff point.
+      const withLongBooster = optimizeAtMarkers(TWO_PHASE_STEPS, TWO_PHASE_SKILLS, {
+        markers: [3],
+        currentAttributes: CURRENT,
+        booster: { boosters: [{ bonus, expiresAt: after(1e9) }], startDate: START },
+      });
+      const leadingBoostedSeconds = withLongBooster.segments[0].seconds;
+      const expiringAtHandoff = optimizeAtMarkers(TWO_PHASE_STEPS, TWO_PHASE_SKILLS, {
+        markers: [3],
+        currentAttributes: CURRENT,
+        booster: {
+          boosters: [{ bonus, expiresAt: after(leadingBoostedSeconds) }],
+          startDate: START,
+        },
+      });
+      const blindTail = optimizeAtMarkers(TWO_PHASE_STEPS, TWO_PHASE_SKILLS, {
+        markers: [3],
+        currentAttributes: CURRENT,
+      }).segments[1].seconds;
+      expect(expiringAtHandoff.segments[1].seconds).toBeCloseTo(blindTail, 6);
+    });
+  });
 });
