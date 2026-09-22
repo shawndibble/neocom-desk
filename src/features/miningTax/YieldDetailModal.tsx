@@ -314,15 +314,25 @@ export function YieldDetailModal({
           </div>
           <div className={cx(CARD, 'border-line')}>
             <p className={cx(CARD_LABEL, 'text-text-dim')}>
-              {totals.delta > 0
-                ? t('miningTax.overview.detail.refineGainCard')
-                : totals.delta < 0
-                  ? t('miningTax.overview.detail.refineLossCard')
-                  : t('miningTax.overview.detail.refineEvenCard')}
+              {!anyValue
+                ? t('miningTax.overview.detail.refineUnknownCard')
+                : totals.delta > 0
+                  ? t('miningTax.overview.detail.refineGainCard')
+                  : totals.delta < 0
+                    ? t('miningTax.overview.detail.refineLossCard')
+                    : t('miningTax.overview.detail.refineEvenCard')}
             </p>
             <p className={cx('mt-1 text-lg font-semibold tabular-nums', deltaTone)}>
-              {anyValue && totals.delta !== 0 && (totals.delta > 0 ? '+' : '-')}
-              <IskAmount value={Math.abs(totals.delta)} revealOn="tap" decimals={0} />
+              {/* Nothing priced is unknown, not break-even: an em dash says so,
+                  "0 ISK" would claim the two exits were measured and tied. */}
+              {!anyValue ? (
+                '—'
+              ) : (
+                <>
+                  {totals.delta !== 0 && (totals.delta > 0 ? '+' : '-')}
+                  <IskAmount value={Math.abs(totals.delta)} revealOn="tap" decimals={0} />
+                </>
+              )}
             </p>
             {totals.deltaPercent !== null && totals.deltaPercent !== 0 && (
               <p className={cx(CARD_HINT, 'tabular-nums')}>

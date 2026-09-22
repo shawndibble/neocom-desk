@@ -158,7 +158,8 @@ describe('YieldDetailModal', () => {
     renderModal(unpriced);
     expect(screen.getByText('Sell raw')).not.toHaveClass('text-accent');
     expect(screen.getByText('Refine, then sell')).not.toHaveClass('text-accent');
-    expect(screen.getByText('Refining breaks even')).toBeInTheDocument();
+    expect(screen.getByText('Refining vs. raw')).toBeInTheDocument();
+    expect(screen.queryByText('Refining breaks even')).not.toBeInTheDocument();
   });
 
   it('states the mined-date price basis and the refining assumption', () => {

@@ -1542,6 +1542,7 @@
         "refineGainCard": "Refining gains",
         "refineLossCard": "Refining loses",
         "refineEvenCard": "Refining breaks even",
+        "refineUnknownCard": "Refining vs. raw",
         "deltaPercentGain": "+{{percent}}% over selling raw",
         "deltaPercentLoss": "-{{percent}}% against selling raw",
         "oreMinedTitle": "Ore mined",
