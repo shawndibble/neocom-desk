@@ -118,6 +118,7 @@ const baseArgs: Omit<UseComparedBuildResultsArgs, 'plans' | 'catalog'> = {
   pi: null,
   ownedBlueprints: [],
   skills: {},
+  implantBonusPct: 0,
 };
 
 beforeEach(() => {

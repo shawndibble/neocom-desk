@@ -43,6 +43,7 @@ export function IndustryGroupPage() {
     ownedBlueprints,
     corpOwnedBlueprints,
     skills,
+    implantBonusPct,
     ownedStockSnapshot,
     blueprintsNeedsReauth,
   } = workspace;
@@ -166,6 +167,7 @@ export function IndustryGroupPage() {
           ownedBlueprints={ownedBlueprints}
           corpOwnedBlueprints={corpOwnedBlueprints}
           skills={skills}
+          implantBonusPct={implantBonusPct}
           ownedStockSnapshot={ownedStockSnapshot}
           onOpenPlan={(planId) => navigate(`/industry/plans/${planId}`)}
           onRetarget={(target, planIds) => void handleRetargetGroup(target, planIds)}

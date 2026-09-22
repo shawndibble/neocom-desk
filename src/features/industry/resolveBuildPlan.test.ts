@@ -87,6 +87,7 @@ function sources(catalog: BlueprintCatalog, overrides: Partial<BuildPlanSources>
     ownedBlueprints: [],
     assumedMe: 0,
     skills: {},
+    implantBonusPct: 0,
     bpcOffersFor: () => [],
     includeBlueprintCost: true,
     ...overrides,

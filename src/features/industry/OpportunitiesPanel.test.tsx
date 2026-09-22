@@ -86,6 +86,7 @@ describe('OpportunitiesPanel', () => {
         catalog={CATALOG}
         pi={null}
         skills={{}}
+        implantBonusPct={0}
         facilityDefaults={DEFAULT_ACTIVITY_FACILITY_DEFAULTS}
         activeCharacterId={CHARACTER_ID}
         ownedStockSnapshot={SNAPSHOT}

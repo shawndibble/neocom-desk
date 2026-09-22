@@ -192,6 +192,7 @@ function renderPanel(
       pi={null}
       ownedBlueprints={[]}
       skills={{} as never}
+      implantBonusPct={0}
       ownedStockSnapshot={SNAPSHOT}
       onAutoBuild={overrides.onAutoBuild ?? (() => Promise.resolve())}
       onOpenPlan={() => {}}

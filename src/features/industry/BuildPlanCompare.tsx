@@ -29,6 +29,8 @@ interface BuildPlanCompareProps {
   /** Folded into each plan on its own `includeCorpAssets` — see `resolveBuildPlan`. */
   corpOwnedBlueprints?: CorpOwnedBlueprintsState;
   skills: SkillLevels;
+  /** The plan owner's active-clone BX-80x manufacturing-time implant bonus, if any (issue #1229). */
+  implantBonusPct: number;
   /** Exits compare mode, restoring the previously open single-plan detail. */
   onDone: () => void;
 }
@@ -80,6 +82,7 @@ export function BuildPlanCompare({
   ownedBlueprints,
   corpOwnedBlueprints,
   skills,
+  implantBonusPct,
   onDone,
 }: BuildPlanCompareProps) {
   const { t } = useTranslation();
@@ -90,6 +93,7 @@ export function BuildPlanCompare({
     ownedBlueprints,
     corpOwnedBlueprints,
     skills,
+    implantBonusPct,
   });
   const unknown = t('common.unknown');
 

@@ -75,6 +75,8 @@ export interface UseComparedBuildResultsArgs {
    */
   corpOwnedBlueprints?: CorpOwnedBlueprintsState;
   skills: SkillLevels;
+  /** The plan owner's active-clone BX-80x manufacturing-time implant bonus, if any (issue #1229). */
+  implantBonusPct: number;
   /** @see ComparedBuildRow.groupResult */
   computeGroupResult?: boolean;
 }
@@ -154,6 +156,7 @@ export function useComparedBuildResults({
   ownedBlueprints,
   corpOwnedBlueprints,
   skills,
+  implantBonusPct,
   computeGroupResult = false,
 }: UseComparedBuildResultsArgs): ComparedBuildRow[] {
   const [rows, setRows] = useState<ComparedBuildRow[]>([]);
@@ -244,6 +247,7 @@ export function useComparedBuildResults({
           corpBlueprints: corpForPlans,
           assumedMe,
           skills,
+          implantBonusPct,
           includeBlueprintCost,
         },
         bpcRows,
@@ -269,6 +273,7 @@ export function useComparedBuildResults({
     includeBlueprintCostHydrated,
     bpcRows,
     skills,
+    implantBonusPct,
     computeGroupResult,
   ]);
 

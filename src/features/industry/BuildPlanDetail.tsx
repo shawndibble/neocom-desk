@@ -175,6 +175,8 @@ interface BuildPlanDetailProps {
   pi: PiData | null;
   ownedBlueprints: readonly CharacterBlueprint[];
   skills: SkillLevels;
+  /** The plan owner's active-clone BX-80x manufacturing-time implant bonus, if any (issue #1229). */
+  implantBonusPct: number;
   /**
    * Whole-account asset snapshot for owned-stock detection (issue #181),
    * loaded once by `useOwnedStockSnapshot` above this component's own
@@ -241,6 +243,7 @@ export function BuildPlanDetail({
   pi,
   ownedBlueprints,
   skills,
+  implantBonusPct,
   ownedStockSnapshot,
   corpOwnedStock,
   corpOwnedBlueprints,
@@ -517,6 +520,7 @@ export function BuildPlanDetail({
           corpBlueprints: corpOwnedBlueprints,
           assumedMe,
           skills,
+          implantBonusPct,
           bpcOffersFor,
           includeBlueprintCost,
         },
@@ -530,6 +534,7 @@ export function BuildPlanDetail({
       corpOwnedBlueprints,
       assumedMe,
       skills,
+      implantBonusPct,
       bpcOffersFor,
       includeBlueprintCost,
       snapshot,

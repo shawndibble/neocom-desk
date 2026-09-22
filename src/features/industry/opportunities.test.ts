@@ -182,6 +182,7 @@ describe('computeOpportunityRow — auto make-or-buy depth (issue #652)', () => 
       snapshot,
       DEFAULT_ACTIVITY_FACILITY_DEFAULTS,
       {},
+      0,
       new Map(),
       {
         recipeFor,
