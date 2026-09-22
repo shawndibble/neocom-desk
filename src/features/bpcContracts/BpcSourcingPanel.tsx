@@ -66,9 +66,14 @@ import {
 import { useSpaceFilter } from '@/features/bpcContracts/bpcSpaceFilterPref';
 import { BpcContractModal } from '@/features/bpcContracts/BpcContractModal';
 import { BpoBadge } from '@/features/bpcContracts/BpoBadge';
+import { BpoCard } from '@/features/bpcContracts/BpoCard';
 import {
+  bpoBadgeRows,
   bpoMayBeCheaper,
-  cheapestBpoByType,
+  cheaperBpo,
+  cheapestBpoSourcesByType,
+  cheapestComparableCopy,
+  type BpoOffer,
   marketBpoOffers,
 } from '@/features/bpcContracts/bpoAvailability';
 import {
@@ -897,11 +902,11 @@ export function BpcSourcingPanel({ initialTypeId = null }: BpcSourcingPanelProps
    * contract originals in the Region filter's scope, market orders for the
    * looked-up types only.
    */
-  const bpoByType = useMemo(() => {
+  const bpoSourcesByType = useMemo(() => {
     const typeIds = new Set(marketLookup.typeIds);
     for (const row of filteredRows) typeIds.add(row.typeId);
     for (const row of filteredOwnedRows) typeIds.add(row.typeId);
-    return cheapestBpoByType(typeIds, {
+    return cheapestBpoSourcesByType(typeIds, {
       originals,
       contractRegionId: uiFilter.regionId,
       marketBooks: market.booksByType,
@@ -916,6 +921,14 @@ export function BpcSourcingPanel({ initialTypeId = null }: BpcSourcingPanelProps
     market.booksByType,
     marketHubStationId,
   ]);
+  const bpoByType = useMemo(() => {
+    const result = new Map<number, BpoOffer>();
+    for (const [typeId, sources] of bpoSourcesByType) {
+      const best = cheaperBpo(sources);
+      if (best) result.set(typeId, best);
+    }
+    return result;
+  }, [bpoSourcesByType]);
 
   /**
    * Built from whichever source(s) are toggled on. Owned rows lead, then the
@@ -930,7 +943,16 @@ export function BpcSourcingPanel({ initialTypeId = null }: BpcSourcingPanelProps
     const contractBpoRows = sources.has('contractBpo') ? contractBpoSearchRows : [];
     return [...ownedRows, ...marketRows, ...contractBpoRows, ...contractRows];
   }, [sources, contractSearchRows, filteredOwnedRows, marketSearchRows, contractBpoSearchRows]);
-  const visibleRows = showAll ? displayRows : displayRows.slice(0, ROW_CAP);
+  const visibleRows = useMemo(
+    () => (showAll ? displayRows : displayRows.slice(0, ROW_CAP)),
+    [showAll, displayRows]
+  );
+  // With several blueprints listed, one on-screen copy row per type carries the BPO
+  // badge; with one picked, the callout cards say it instead (issue #1241).
+  const badgedRows = useMemo(
+    () => (selectedTypeId === null ? bpoBadgeRows(visibleRows) : new Set<BpcSearchRow>()),
+    [selectedTypeId, visibleRows]
+  );
 
   // Both summarise `filteredRows`, not every row of the chosen blueprint, so
   // they describe what is actually on screen: narrowing to ME ≥ 10 should move
@@ -940,7 +962,27 @@ export function BpcSourcingPanel({ initialTypeId = null }: BpcSourcingPanelProps
     () => (selectedTypeId === null ? null : bpcPriceSummary(filteredRows)),
     [selectedTypeId, filteredRows]
   );
-  const selectedBpo = selectedTypeId === null ? undefined : bpoByType.get(selectedTypeId);
+  const selectedBpoSources =
+    selectedTypeId === null ? undefined : bpoSourcesByType.get(selectedTypeId);
+  const selectedBpoCards = selectedBpoSources
+    ? [selectedBpoSources.market, selectedBpoSources.contract]
+        .filter((bpo): bpo is BpoOffer => bpo !== null)
+        .sort((a, b) => a.price - b.price)
+    : [];
+  // The copy the CHEAPEST chip would quote, if it has an honest price to
+  // compare a BPO with — so a card never claims "may be cheaper" against a
+  // bundle's or barter's price.
+  const cheapestCopy = useMemo(
+    () => (selectedTypeId === null ? null : cheapestComparableCopy(filteredRows)),
+    [selectedTypeId, filteredRows]
+  );
+  const bpoLocationName = useCallback(
+    (bpo: BpoOffer) =>
+      (bpo.kind === 'market'
+        ? market.locations.get(bpo.locationId)?.name
+        : contractLocations.get(bpo.locationId)?.name) ?? null,
+    [market.locations, contractLocations]
+  );
   const regionPrices = useMemo(
     () => (selectedTypeId === null ? [] : cheapestByRegion(filteredRows)),
     [selectedTypeId, filteredRows]
@@ -1155,8 +1197,9 @@ export function BpcSourcingPanel({ initialTypeId = null }: BpcSourcingPanelProps
         sortValue: (row) => blueprintNames.get(row.typeId) ?? `#${row.typeId}`,
         render: (row) => {
           const name = blueprintNames.get(row.typeId) ?? `#${row.typeId}`;
-          // A BPO row is the BPO itself; only a copy gets the "BPO too" badge.
-          const bpo = row.runs === -1 ? undefined : bpoByType.get(row.typeId);
+          // A BPO row is the BPO itself; only a copy gets the "BPO too" badge,
+          // and only one copy per type (`bpoBadgeRows`).
+          const bpo = badgedRows.has(row) ? bpoByType.get(row.typeId) : undefined;
           if (!bpo) return name;
           return (
             <span className="flex min-w-0 flex-col items-start gap-1">
@@ -1164,11 +1207,7 @@ export function BpcSourcingPanel({ initialTypeId = null }: BpcSourcingPanelProps
               <BpoBadge
                 bpo={bpo}
                 mayBeCheaper={row.source === 'contract' && bpoMayBeCheaper(bpo, row.contract)}
-                locationName={
-                  (bpo.kind === 'market'
-                    ? market.locations.get(bpo.locationId)?.name
-                    : contractLocations.get(bpo.locationId)?.name) ?? null
-                }
+                locationName={bpoLocationName(bpo)}
                 regionName={regionLabel(bpo.regionId)}
               />
             </span>
@@ -1186,8 +1225,8 @@ export function BpcSourcingPanel({ initialTypeId = null }: BpcSourcingPanelProps
     visibleColumns,
     bpcColumnsById,
     bpoByType,
-    market.locations,
-    contractLocations,
+    badgedRows,
+    bpoLocationName,
     regionLabel,
   ]);
 
@@ -1412,12 +1451,6 @@ export function BpcSourcingPanel({ initialTypeId = null }: BpcSourcingPanelProps
                     value={<IskAmount value={summary.median} revealOn="tap" />}
                   />
                 )}
-                {selectedBpo && (
-                  <StatChip
-                    label={t('bpcContracts.cheapestBpoLabel')}
-                    value={<IskAmount value={selectedBpo.price} revealOn="tap" />}
-                  />
-                )}
                 {summary.bestMe !== null && summary.bestTe !== null && (
                   <StatChip
                     label={t('bpcContracts.bestMeTeLabel')}
@@ -1435,42 +1468,62 @@ export function BpcSourcingPanel({ initialTypeId = null }: BpcSourcingPanelProps
             </div>
           )}
 
-          {regionPrices.length > 1 && (
-            <div className="border-b border-line px-3 py-2">
-              {/* Says so when it is showing a subset: the cheapest region always
-                  survives the slice, but a blueprint listed in twenty regions
-                  would otherwise show six with nothing admitting it. */}
-              <p className="pb-2 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                {regionPrices.length > REGION_CELL_LIMIT
-                  ? t('bpcContracts.cheapestByRegionCapped', {
-                      shown: REGION_CELL_LIMIT,
-                      total: regionPrices.length,
-                    })
-                  : t('bpcContracts.cheapestByRegion')}
-              </p>
-              {/* Cheapest first, so the ordering carries the answer and the
-                  accent on the leading cell is only reinforcement (DESIGN.md §7). */}
-              <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
-                {regionPrices.slice(0, REGION_CELL_LIMIT).map((region, index) => (
-                  <li
-                    key={region.regionId}
-                    className={cx(
-                      'flex flex-col gap-0.5 rounded-xs border bg-panel-2 px-2.5 py-2',
-                      index === 0 ? 'border-accent-dim' : 'border-line'
-                    )}
-                  >
-                    <span className="truncate text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                      {regionNames.get(region.regionId) ?? `#${region.regionId}`}
-                    </span>
-                    <span className={cx('text-sm tabular-nums', index === 0 && 'text-accent')}>
-                      <IskAmount value={region.cheapest} revealOn="tap" />
-                    </span>
-                    <span className="text-[0.6875rem] tabular-nums text-text-dim">
-                      {t('bpcContracts.regionOffers', { count: region.offerCount })}
-                    </span>
-                  </li>
-                ))}
-              </ul>
+          {(regionPrices.length > 1 || selectedBpoCards.length > 0) && (
+            <div className="flex flex-col gap-3 border-b border-line px-3 py-2">
+              {selectedBpoCards.length > 0 && (
+                <ul
+                  aria-label={t('bpcContracts.bpoCardsLabel')}
+                  className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3"
+                >
+                  {selectedBpoCards.map((bpo) => (
+                    <BpoCard
+                      key={bpo.kind}
+                      bpo={bpo}
+                      mayBeCheaper={cheapestCopy !== null && bpoMayBeCheaper(bpo, cheapestCopy)}
+                      locationName={bpoLocationName(bpo)}
+                      regionName={regionLabel(bpo.regionId)}
+                    />
+                  ))}
+                </ul>
+              )}
+              {regionPrices.length > 1 && (
+                <div>
+                  {/* Says so when it is showing a subset: the cheapest region always
+                    survives the slice, but a blueprint listed in twenty regions
+                    would otherwise show six with nothing admitting it. */}
+                  <p className="pb-2 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                    {regionPrices.length > REGION_CELL_LIMIT
+                      ? t('bpcContracts.cheapestByRegionCapped', {
+                          shown: REGION_CELL_LIMIT,
+                          total: regionPrices.length,
+                        })
+                      : t('bpcContracts.cheapestByRegion')}
+                  </p>
+                  {/* Cheapest first, so the ordering carries the answer and the
+                    accent on the leading cell is only reinforcement (DESIGN.md §7). */}
+                  <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+                    {regionPrices.slice(0, REGION_CELL_LIMIT).map((region, index) => (
+                      <li
+                        key={region.regionId}
+                        className={cx(
+                          'flex flex-col gap-0.5 rounded-xs border bg-panel-2 px-2.5 py-2',
+                          index === 0 ? 'border-accent-dim' : 'border-line'
+                        )}
+                      >
+                        <span className="truncate text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                          {regionNames.get(region.regionId) ?? `#${region.regionId}`}
+                        </span>
+                        <span className={cx('text-sm tabular-nums', index === 0 && 'text-accent')}>
+                          <IskAmount value={region.cheapest} revealOn="tap" />
+                        </span>
+                        <span className="text-[0.6875rem] tabular-nums text-text-dim">
+                          {t('bpcContracts.regionOffers', { count: region.offerCount })}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
           )}
 
