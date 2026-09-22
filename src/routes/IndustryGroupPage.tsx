@@ -14,6 +14,7 @@ import {
   withGroupOwnedStockScope,
 } from '@/features/industry/buildGroups';
 import { retargetBuildGroup } from '@/features/industry/buildGroupActions';
+import { patchBuildPlans } from '@/features/industry/buildPlanStore';
 import { BuildGroupPanel } from '@/features/industry/BuildGroupPanel';
 import { applyGroupAutoBuild } from '@/features/industry/autoBuildGroup';
 import { loadPublicBpcContracts } from '@/features/bpcContracts/syncedContracts';
@@ -100,15 +101,9 @@ export function IndustryGroupPage() {
       bpcRows
     );
     if (picks.size === 0) return;
-    await db.transaction('rw', db.buildPlans, async () => {
-      const stored = await db.buildPlans.bulkGet([...picks.keys()]);
-      const now = Date.now();
-      const updated = stored.flatMap((p) => {
-        if (!p) return [];
-        const picked = picks.get(p.id);
-        return picked ? [{ ...p, buildHere: [...picked], updatedAt: now }] : [];
-      });
-      await db.buildPlans.bulkPut(updated);
+    await patchBuildPlans([...picks.keys()], (p) => {
+      const picked = picks.get(p.id);
+      return picked ? { buildHere: [...picked] } : null;
     });
   }
 

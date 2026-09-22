@@ -19,8 +19,9 @@ import type { BpcContractRow } from '@/engine/contracts/bpcSearch';
 import type { SpaceKind } from '@/engine/space';
 import type { PublicBpcContractsSnapshot } from '@/features/bpcContracts/syncedContracts';
 import type { CachedResult, StatusResult } from '@/esi/cache';
-import type { CharacterBlueprint } from '@/esi/endpoints';
+import type { CharacterBlueprint, RegionOrder } from '@/esi/endpoints';
 import type { BlueprintMap } from '@/sde/types';
+import type { GlobalMarketEntry } from '@/sde/marketTypes';
 
 vi.mock('virtual:pwa-register/react', () => ({
   useRegisterSW: () => ({
@@ -82,6 +83,47 @@ vi.mock('@/features/bpcContracts/blueprintLocation', () => ({
   loadBlueprintLocation: (...args: [number, number]) => loadBlueprintLocation(...args),
   loadContractLocationInfo: (...args: [number]) => loadContractLocationInfo(...args),
 }));
+
+// Market BPO lookups (issue #1241). Empty books unless a test says otherwise.
+const getOrderBook =
+  vi.fn<
+    (
+      regionId: number,
+      typeId: number
+    ) => Promise<{ orders: RegionOrder[]; truncated: boolean; fetchedAt: number }>
+  >();
+vi.mock('@/features/market/orderBook', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/features/market/orderBook')>();
+  return {
+    ...actual,
+    getOrderBook: (...args: [number, number]) => getOrderBook(...args),
+  };
+});
+
+// No item trades in a Global Market Region unless a test says otherwise.
+const loadGlobalMarkets = vi.fn<() => Promise<GlobalMarketEntry[]>>();
+vi.mock('@/sde/loadMarketSde', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/sde/loadMarketSde')>();
+  return { ...actual, loadGlobalMarkets: () => loadGlobalMarkets() };
+});
+
+function sellOrder(overrides: Partial<RegionOrder> = {}): RegionOrder {
+  return {
+    duration: 365,
+    is_buy_order: false,
+    issued: '2026-09-01T00:00:00Z',
+    location_id: 60003760,
+    min_volume: 1,
+    order_id: 77,
+    price: 2_000_000,
+    range: 'region',
+    system_id: 30000142,
+    type_id: 638,
+    volume_remain: 4,
+    volume_total: 4,
+    ...overrides,
+  };
+}
 
 function ownedResult(
   blueprints: CharacterBlueprint[],
@@ -146,9 +188,12 @@ function row(overrides: Partial<BpcContractRow> = {}): BpcContractRow {
   };
 }
 
-function cachedSnapshot(rows: BpcContractRow[]): CachedResult<PublicBpcContractsSnapshot> {
+function cachedSnapshot(
+  rows: BpcContractRow[],
+  originals?: BpcContractRow[]
+): CachedResult<PublicBpcContractsSnapshot> {
   return {
-    data: { rows, lastSyncedAt: Date.parse('2026-09-08T18:30:00Z') },
+    data: { rows, originals, lastSyncedAt: Date.parse('2026-09-08T18:30:00Z') },
     fetchedAt: new Date(),
     fromCache: false,
     truncated: false,
@@ -182,6 +227,10 @@ beforeEach(async () => {
   loadContractLocationInfo.mockReset();
   loadContractLocationInfo.mockResolvedValue({ name: null, space: null });
   vi.mocked(isSyncConfigured).mockReturnValue(true);
+  getOrderBook.mockReset();
+  getOrderBook.mockResolvedValue({ orders: [], truncated: false, fetchedAt: 0 });
+  loadGlobalMarkets.mockReset();
+  loadGlobalMarkets.mockResolvedValue([]);
 
   await db.characters.put({ characterId: CHAR_ID, name: 'Pilot One', ownerHash: 'oh', addedAt: 1 });
   await db.settings.put({ key: ACTIVE_CHARACTER_KEY, value: CHAR_ID });
@@ -612,7 +661,7 @@ describe('BpcSourcingPanel source multiselect', () => {
     await user.click(screen.getByRole('button', { name: 'Contracts' }));
     await user.click(screen.getByRole('button', { name: 'Owned' }));
 
-    expect(screen.getByText('Select Contracts, Owned, or both to search.')).toBeInTheDocument();
+    expect(screen.getByText('Select at least one source to search.')).toBeInTheDocument();
   });
 
   it('a region filter narrows out an owned row whose location has not resolved', async () => {
@@ -860,5 +909,123 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
     } finally {
       restore();
     }
+  });
+
+  describe('BPO availability (issue #1241)', () => {
+    it('checks no market Order Book while the search is empty', async () => {
+      loadPublicBpcContracts.mockResolvedValue(cachedSnapshot([row({ contractId: 1 })]));
+      render(<App />);
+      await screen.findByRole('table', { name: 'BPC Search' });
+      // Past the lookup debounce, so a pending fan-out would have started.
+      await new Promise((resolve) => setTimeout(resolve, 400));
+      expect(getOrderBook).not.toHaveBeenCalled();
+    });
+
+    it('highlights a copy whose price is at or above a contract BPO in the same region', async () => {
+      loadPublicBpcContracts.mockResolvedValue(
+        cachedSnapshot(
+          [row({ contractId: 1, price: 5_000_000 })],
+          [row({ contractId: 2, runs: -1, price: 4_000_000, me: 8, te: 16 })]
+        )
+      );
+      render(<App />);
+      const table = await screen.findByRole('table', { name: 'BPC Search' });
+      const badge = await within(table).findByRole('button', { name: /BPO on contract: 4M/ });
+      expect(badge).toHaveTextContent('BPO may be cheaper');
+    });
+
+    it('shows a BPO costing more than the copy without the highlight', async () => {
+      loadPublicBpcContracts.mockResolvedValue(
+        cachedSnapshot(
+          [row({ contractId: 1, price: 5_000_000 })],
+          [row({ contractId: 2, runs: -1, price: 40_000_000 })]
+        )
+      );
+      render(<App />);
+      const table = await screen.findByRole('table', { name: 'BPC Search' });
+      const badge = await within(table).findByRole('button', { name: /BPO on contract: 40M/ });
+      expect(badge).not.toHaveTextContent('BPO may be cheaper');
+    });
+
+    it('checks the market for a typed search in the market hub region, badges it, and lists it under Market BPOs', async () => {
+      loadPublicBpcContracts.mockResolvedValue(
+        cachedSnapshot([row({ contractId: 1, typeId: 638, price: 5_000_000 })])
+      );
+      getOrderBook.mockImplementation(async (_regionId, typeId) => ({
+        orders: typeId === 638 ? [sellOrder({ price: 2_000_000 })] : [],
+        truncated: false,
+        fetchedAt: 0,
+      }));
+      loadContractLocationInfo.mockResolvedValue({ name: 'Jita IV - Moon 4', space: 'highsec' });
+      const user = userEvent.setup();
+      render(<App />);
+      const table = await screen.findByRole('table', { name: 'BPC Search' });
+
+      await user.type(screen.getByPlaceholderText('Search blueprint name…'), 'Rifter');
+
+      const badge = await within(table).findByRole('button', { name: /BPO on market: 2M/ });
+      expect(badge).toHaveTextContent('BPO may be cheaper');
+      // "All regions" reads the pilot's market hub (Jita by default) region.
+      expect(getOrderBook).toHaveBeenCalledWith(10000002, 638);
+      expect(getOrderBook.mock.calls.every(([regionId]) => regionId === 10000002)).toBe(true);
+      expect(screen.getByText(/Market BPOs checked in the Jita region/)).toBeInTheDocument();
+
+      expect(within(table).queryByLabelText('2,000,000.00 ISK')).not.toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: 'Market BPOs' }));
+      // The market row itself: its order price, and its station.
+      expect(await within(table).findByLabelText('2,000,000.00 ISK')).toBeInTheDocument();
+      expect(within(table).getAllByText('Jita IV - Moon 4').length).toBeGreaterThan(0);
+      // The hub's own station is marked (location 60003760 is the Jita hub).
+      expect(within(table).getByText('Trade hub')).toBeInTheDocument();
+    });
+
+    it("says which market books couldn't be checked, rather than reading a failure as no BPO", async () => {
+      loadPublicBpcContracts.mockResolvedValue(
+        cachedSnapshot([row({ contractId: 1, typeId: 638, price: 5_000_000 })])
+      );
+      getOrderBook.mockRejectedValue(new Error('420'));
+      const user = userEvent.setup();
+      render(<App />);
+      await screen.findByRole('table', { name: 'BPC Search' });
+
+      await user.type(screen.getByPlaceholderText('Search blueprint name…'), 'Rifter');
+
+      expect(
+        await screen.findByText(/Couldn't check the market for 1 blueprint/)
+      ).toBeInTheDocument();
+    });
+
+    it('reads a Global Market Region blueprint from its own region', async () => {
+      const GPMR = 19000001;
+      loadGlobalMarkets.mockResolvedValue([{ typeId: 638, regionId: GPMR, regionName: 'GPMR-01' }]);
+      loadPublicBpcContracts.mockResolvedValue(
+        cachedSnapshot([row({ contractId: 1, typeId: 638, price: 5_000_000 })])
+      );
+      const user = userEvent.setup();
+      render(<App />);
+      await screen.findByRole('table', { name: 'BPC Search' });
+
+      await user.type(screen.getByPlaceholderText('Search blueprint name…'), 'Rifter');
+
+      await waitFor(() => expect(getOrderBook).toHaveBeenCalledWith(GPMR, 638));
+      expect(getOrderBook).not.toHaveBeenCalledWith(10000002, 638);
+    });
+
+    it('lists contract originals under the Contract BPOs source', async () => {
+      loadPublicBpcContracts.mockResolvedValue(
+        cachedSnapshot([], [row({ contractId: 2, typeId: 870, runs: -1, price: 40_000_000 })])
+      );
+      loadCharacterBlueprints.mockResolvedValue(
+        ownedResult([ownedBlueprint({ item_id: 1, type_id: 638 })])
+      );
+      const user = userEvent.setup();
+      render(<App />);
+      const table = await screen.findByRole('table', { name: 'BPC Search' });
+      expect(within(table).queryByText('Caracal Blueprint')).not.toBeInTheDocument();
+
+      await user.click(screen.getByRole('button', { name: 'Contract BPOs' }));
+
+      expect(await within(table).findByText('Caracal Blueprint')).toBeInTheDocument();
+    });
   });
 });

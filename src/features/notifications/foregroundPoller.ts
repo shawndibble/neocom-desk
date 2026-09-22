@@ -18,7 +18,7 @@ import type { ProjectionRow } from '@/engine/projection';
 import { mapWithConcurrencyLimit, ESI_FANOUT_CONCURRENCY } from '@/lib/concurrency';
 import i18n from '@/i18n';
 import type { LocalSettingStore } from '@/lib/useLocalSetting';
-import { NOTIFICATION_EVENTS, type NotificationEventId } from './events';
+import { hasEventScope, type NotificationEventId } from './events';
 import {
   POLL_DOMAINS,
   renderNotification,
@@ -50,12 +50,11 @@ import { readNotificationPermission } from './permission';
 import { displayPageNotification, livePageDisplayEnv } from './display';
 import { notificationOptionsFor } from './notificationOptions';
 import { uploadProjectionRows } from './projectionUpload';
+import { rebuildProjection } from './projectionRebuild';
 
 export type { AnyNotificationFire } from './pollDomains';
 
 export const POLL_INTERVAL_MS = 5 * 60 * 1000;
-
-const SCOPE_BY_EVENT = new Map(NOTIFICATION_EVENTS.map((event) => [event.id, event.scope]));
 
 export interface CharacterRef {
   characterId: number;
@@ -134,11 +133,12 @@ export interface PollDependencies {
     occurrenceKeys: readonly string[]
   ) => Promise<void>;
   /**
-   * This poll's Scheduled Push upload (issue #358, ADR 0010, CONTEXT.md round
-   * 45): every Character updated this poll, mapped to its whole 72-hour
-   * Projection window. Called once per poll — "every app open and every
-   * foreground poll" collapses to this one call site, since
-   * `ForegroundNotificationPoller` already runs a poll immediately on mount.
+   * The Scheduled Push upload (issue #358, ADR 0010, CONTEXT.md round 45):
+   * every Character mapped to its whole 72-hour Projection window, built by
+   * `projectionRebuild.ts` from the saved baselines — once per poll that
+   * updated anything ("every app open and every foreground poll", since
+   * `ForegroundNotificationPoller` polls on mount), and directly from
+   * Settings (issue #1248).
    */
   uploadProjection: (rowsByCharacter: ReadonlyMap<number, ProjectionRow[]>) => Promise<void>;
 }
@@ -179,9 +179,7 @@ function enabledEventsFor(
 ): ReadonlySet<NotificationEventId> {
   const enabled = new Set<NotificationEventId>();
   for (const eventId of eventIds) {
-    const scope = SCOPE_BY_EVENT.get(eventId);
-    const hasScope = scope === undefined || scopes.has(scope);
-    if (hasScope && reachesAnyChannel(eventPrefs, eventId, channels)) {
+    if (hasEventScope(eventId, scopes) && reachesAnyChannel(eventPrefs, eventId, channels)) {
       enabled.add(eventId);
     }
   }
@@ -207,8 +205,6 @@ interface CharacterUpdate {
   fires: AnyNotificationFire[];
   /** Occurrence Keys this poll disproved — see `PollDependencies.retractFromFeed`. */
   retractedKeys: string[];
-  /** This poll's contribution to the Scheduled Push upload (issue #358) — see `PollDependencies.uploadProjection`. */
-  projectionRows: ProjectionRow[];
 }
 
 /**
@@ -294,7 +290,6 @@ async function runForegroundPollOnce(deps: PollDependencies): Promise<void> {
     const fires: AnyNotificationFire[] = [];
     const retractedKeys: string[] = [];
     const snapshots = new Map<DomainRun, unknown>();
-    const projectionRows: ProjectionRow[] = [];
 
     for (const run of runs) {
       const enabledEvents = enabledEventsFor(run.domain.eventIds, scopes, eventPrefs, channels);
@@ -328,31 +323,6 @@ async function runForegroundPollOnce(deps: PollDependencies): Promise<void> {
             .map((fire) => occurrenceKey(fire, deps.now()))
         );
       }
-      // Scheduled Push upload (issue #358): a Scheduled Push is the
-      // closed-app analog of the *browser* channel specifically (it shows an
-      // OS notification, same as `notify` below) — never gated on `feed`,
-      // which shows nothing. Filtering to `enabledEvents` alone (browser OR
-      // feed) would upload — and later push — a feed-only event the user
-      // switched browser notifications off for. `projectColonies` in
-      // particular emits both colony events off one snapshot regardless of
-      // which is individually toggled, so this filter is load-bearing there,
-      // not redundant.
-      if (run.domain.projection) {
-        const domainProjectionRows = await run.domain.projection(
-          character.characterId,
-          character.name,
-          next,
-          deps.now()
-        );
-        projectionRows.push(
-          ...domainProjectionRows.filter(
-            (row) =>
-              enabledEvents.has(row.eventId) &&
-              browserEnabled &&
-              isEventEnabledFor(eventPrefs, row.eventId, 'browser')
-          )
-        );
-      }
     }
 
     if (snapshots.size > 0) {
@@ -363,7 +333,6 @@ async function runForegroundPollOnce(deps: PollDependencies): Promise<void> {
         snapshots,
         fires,
         retractedKeys,
-        projectionRows,
       });
     }
   });
@@ -467,9 +436,10 @@ async function runForegroundPollOnce(deps: PollDependencies): Promise<void> {
     );
   }
 
-  await deps.uploadProjection(
-    new Map(updates.map((update) => [update.characterId, update.projectionRows]))
-  );
+  // Scheduled Push upload (issue #358), from every domain's baseline as just
+  // saved — including one this poll skipped or failed to load, whose last
+  // good snapshot still stands (issue #1248).
+  await rebuildProjection(deps, new Map(runs.map((run) => [run.domain, run.next])));
 }
 
 /** `"{{title}} x{{count}}"` — the suffix a grouped browser-toast title carries (`groupFires.ts`). */

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { db, type BuildPlanRecord } from '@/db';
 import type { BuildGroupSnapshot, BuildGroupsValue } from './buildGroups';
-import { deleteBuildGroup, moveBuildPlanToGroup, retargetBuildGroup } from './buildGroupActions';
+import { deleteBuildGroup, retargetBuildGroup } from './buildGroupActions';
 
 function plan(overrides: Partial<BuildPlanRecord> & { id: string }): BuildPlanRecord {
   return {
@@ -92,40 +92,6 @@ describe('deleteBuildGroup', () => {
 
     const [value] = ctx.setBuildGroups.mock.calls[0];
     expect(value[1] ?? []).toEqual([]);
-  });
-});
-
-describe('moveBuildPlanToGroup', () => {
-  it('sets the plan onto the given group', async () => {
-    await db.buildPlans.add(plan({ id: 'p1' }));
-
-    await moveBuildPlanToGroup('p1', 'g2', 1);
-
-    const stored = await db.buildPlans.get('p1');
-    expect(stored?.buildGroupId).toBe('g2');
-  });
-
-  it('clears the group when moving out to null', async () => {
-    await db.buildPlans.add(plan({ id: 'p1', buildGroupId: 'g1' }));
-
-    await moveBuildPlanToGroup('p1', null, 1);
-
-    const stored = await db.buildPlans.get('p1');
-    expect(stored && 'buildGroupId' in stored).toBe(false);
-  });
-
-  it('bumps updatedAt on the moved plan', async () => {
-    await db.buildPlans.add(plan({ id: 'p1', updatedAt: 0 }));
-
-    await moveBuildPlanToGroup('p1', 'g2', 1);
-
-    const stored = await db.buildPlans.get('p1');
-    expect(stored?.updatedAt).toBeGreaterThan(0);
-  });
-
-  it('does nothing when the plan no longer exists', async () => {
-    await expect(moveBuildPlanToGroup('missing', 'g2', 1)).resolves.toBeUndefined();
-    expect(await db.buildPlans.get('missing')).toBeUndefined();
   });
 });
 

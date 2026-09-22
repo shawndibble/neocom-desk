@@ -237,16 +237,11 @@ function Harness({
         ownedStockSnapshot={EMPTY_OWNED_STOCK_SNAPSHOT}
         corpOwnedStock={{ ...CORP_OWNED_STOCK_UNAVAILABLE, ...corpOwnedStock }}
         corpOwnedBlueprints={{ ...CORP_OWNED_BLUEPRINTS_UNAVAILABLE, ...corpOwnedBlueprints }}
-        onUpdate={(patch) => {
-          onUpdate?.(patch);
-          setPlan((p) => ({ ...p, ...patch }));
+        onChange={(change) => {
+          if (change.kind === 'sourcing') return;
+          (change.kind === 'edit' ? onUpdate : onDerivedFix)?.(change.patch);
+          setPlan((p) => ({ ...p, ...change.patch }));
         }}
-        onDerivedFix={(patch) => {
-          onDerivedFix?.(patch);
-          setPlan((p) => ({ ...p, ...patch }));
-        }}
-        onSourcingChange={vi.fn()}
-        onSourcingChangeMany={vi.fn()}
         onAddToQuickbar={vi.fn()}
         quickbarAvailable
         onShowInfo={vi.fn()}
