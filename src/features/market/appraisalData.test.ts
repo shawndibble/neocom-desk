@@ -7,6 +7,7 @@ import { DEFAULT_TRADE_HUB, TRADE_HUBS } from '@/market/hubs';
 import { SKILL_IDS } from '@/engine/industry/types';
 import { loadReprocessing } from '@/sde/loadSde';
 import { loadCorrectedSkills, type CorrectedSkills } from '@/features/skills/correctedSkills';
+import { loadCharacterImplants } from '@/features/skills/data';
 import { findLpOfferMatches, toLpOfferInputs } from '@/features/market/appraisalLpAcquisition';
 import { appraisePaste, clearAppraisalCatalogue, compareHubs } from './appraisalData';
 
@@ -21,6 +22,7 @@ vi.mock('@/sde/loadMarketSde', () => ({
 
 vi.mock('@/sde/loadSde', () => ({ loadReprocessing: vi.fn() }));
 vi.mock('@/features/skills/correctedSkills', () => ({ loadCorrectedSkills: vi.fn() }));
+vi.mock('@/features/skills/data', () => ({ loadCharacterImplants: vi.fn(async () => null) }));
 vi.mock('@/features/market/appraisalLpAcquisition', () => ({
   findLpOfferMatches: vi.fn(),
   toLpOfferInputs: vi.fn(),
@@ -28,6 +30,7 @@ vi.mock('@/features/market/appraisalLpAcquisition', () => ({
 
 const mockedLoadReprocessing = vi.mocked(loadReprocessing);
 const mockedLoadCorrectedSkills = vi.mocked(loadCorrectedSkills);
+const mockedLoadCharacterImplants = vi.mocked(loadCharacterImplants);
 const mockedFindLpOfferMatches = vi.mocked(findLpOfferMatches);
 const mockedToLpOfferInputs = vi.mocked(toLpOfferInputs);
 
@@ -54,6 +57,7 @@ afterEach(() => {
   clearAppraisalCatalogue();
   mockedLoadReprocessing.mockReset();
   mockedLoadCorrectedSkills.mockReset();
+  mockedLoadCharacterImplants.mockReset();
   mockedFindLpOfferMatches.mockReset();
   mockedToLpOfferInputs.mockReset();
 });
@@ -305,6 +309,68 @@ describe('appraisePaste', () => {
       // 0.5 x 1.10 -> floor(100*0.55) = 55
       const dcuRow = appraisal.rows[0];
       expect(dcuRow.refineTotal).toBeCloseTo(55 * 5.41, 6);
+    });
+
+    it("applies the active clone's refining implant to an ore row, and reports the pct (issue #1227)", async () => {
+      const RX_804 = 27174; // Zainou 'Beancounter' Reprocessing RX-804, +4%.
+      const SIMPLE_ORE_PROCESSING = 60377;
+      server.use(
+        aggregates({
+          ...PRICED,
+          1230: {
+            buy: { min: '4', max: '5', volume: '1000', orderCount: '2' },
+            sell: { min: '6', max: '7', volume: '1000', orderCount: '2' },
+          },
+        })
+      );
+      mockedLoadReprocessing.mockResolvedValue({
+        '1230': { ...VELDSPAR_ENTRY, specialisationSkillID: SIMPLE_ORE_PROCESSING },
+      });
+      mockedLoadCorrectedSkills.mockResolvedValue(skillsFixture([]));
+      mockedLoadCharacterImplants.mockResolvedValue({
+        data: [RX_804],
+        fetchedAt: new Date(),
+        fromCache: false,
+        truncated: false,
+      });
+
+      const { appraisal, implantBonusPct } = await appraisePaste(
+        'Veldspar\t1000',
+        DEFAULT_TRADE_HUB,
+        100,
+        1
+      );
+
+      // 0.5 x 1.04 -> floor(415 * 10 * 0.52) Tritanium x 5.41 ISK.
+      const expected = Math.floor(415 * 10 * 0.52) * 5.41;
+      expect(appraisal.rows[0].refineTotal).toBeCloseTo(expected, 6);
+      expect(implantBonusPct).toBe(4);
+    });
+
+    it("does not apply the refining implant to scrap, and reports 0 rather than the character's raw bonus (issue #1227)", async () => {
+      const RX_804 = 27174;
+      server.use(aggregates(PRICED));
+      mockedLoadReprocessing.mockResolvedValue({
+        '2048': { portionSize: 1, materials: [{ typeID: 34, quantity: 100 }] },
+      });
+      mockedLoadCorrectedSkills.mockResolvedValue(skillsFixture([]));
+      mockedLoadCharacterImplants.mockResolvedValue({
+        data: [RX_804],
+        fetchedAt: new Date(),
+        fromCache: false,
+        truncated: false,
+      });
+
+      const { appraisal, implantBonusPct } = await appraisePaste(
+        'Damage Control II\t1',
+        DEFAULT_TRADE_HUB,
+        100,
+        1
+      );
+
+      // Untrained Scrapmetal Processing, no implant: 0.5 x 1.0 -> floor(100*0.5) = 50.
+      expect(appraisal.rows[0].refineTotal).toBeCloseTo(50 * 5.41, 6);
+      expect(implantBonusPct).toBe(0);
     });
   });
 

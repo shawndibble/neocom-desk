@@ -5,7 +5,9 @@ import {
   reprocessingValue,
   resolveSpecialisationLevel,
   resolveReprocessingSkills,
+  resolveImplantBonusPct,
   BASE_STATION_REPROCESSING_RATE,
+  REFINING_IMPLANT_TYPE_IDS,
 } from './reprocessing';
 import { SKILL_IDS } from './types';
 
@@ -81,6 +83,59 @@ describe('reprocessingEfficiency', () => {
         isScrap: true,
       })
     ).toBeCloseTo(0.5, 10);
+  });
+
+  it('applies a refining implant bonus on top of the skill multipliers (issue #1227)', () => {
+    expect(
+      reprocessingEfficiency({
+        reprocessingLevel: 0,
+        reprocessingEfficiencyLevel: 0,
+        specialisationLevel: 0,
+        implantBonusPct: 4,
+      })
+    ).toBeCloseTo(0.5 * 1.04, 10);
+  });
+
+  it("does not apply a refining implant to scrap — the RX-80x line's own description covers ore and ice only (issue #1227)", () => {
+    expect(
+      reprocessingEfficiency({
+        reprocessingLevel: 0,
+        reprocessingEfficiencyLevel: 0,
+        specialisationLevel: 0,
+        isScrap: true,
+        implantBonusPct: 4,
+      })
+    ).toBeCloseTo(0.5, 10);
+  });
+});
+
+describe('resolveImplantBonusPct', () => {
+  // Real ESI type IDs for the Zainou 'Beancounter' Reprocessing line
+  // (issue #1227): "+N% bonus to ore and ice reprocessing yield".
+  const RX_801 = 27175;
+  const RX_802 = 27169;
+  const RX_804 = 27174;
+
+  it('is 0 with no implants fitted', () => {
+    expect(resolveImplantBonusPct([])).toBe(0);
+  });
+
+  it.each([
+    [RX_801, 1],
+    [RX_802, 2],
+    [RX_804, 4],
+  ])('resolves implant %i to a %i%% bonus', (typeId, pct) => {
+    expect(resolveImplantBonusPct([typeId])).toBe(pct);
+  });
+
+  it('ignores implants that are not the refining line', () => {
+    expect(resolveImplantBonusPct([1, 2, 3])).toBe(0);
+  });
+
+  it('mirrors the known typeIDs in REFINING_IMPLANT_TYPE_IDS', () => {
+    expect(REFINING_IMPLANT_TYPE_IDS[RX_801]).toBe(1);
+    expect(REFINING_IMPLANT_TYPE_IDS[RX_802]).toBe(2);
+    expect(REFINING_IMPLANT_TYPE_IDS[RX_804]).toBe(4);
   });
 });
 

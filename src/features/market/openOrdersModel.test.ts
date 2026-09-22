@@ -24,6 +24,7 @@ const ZERO_SKILLS: CharacterSkills = {
   advancedBrokerRelationsLevel: 0,
   reprocessingLevel: 0,
   reprocessingEfficiencyLevel: 0,
+  implantBonusPct: 0,
   trained: new Map(),
 };
 

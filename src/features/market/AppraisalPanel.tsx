@@ -212,6 +212,7 @@ export function AppraisalPanel({
   const rows = result?.appraisal.rows ?? [];
   const totals = result?.appraisal.totals;
   const unmatched = result?.unmatched ?? [];
+  const implantBonusPct = result?.implantBonusPct ?? 0;
   // Undefined per row when the type has no reprocessing data at all — the
   // column only earns its place on screen when at least one row has
   // something to show, which is also exactly when there is nothing to show
@@ -486,7 +487,11 @@ export function AppraisalPanel({
                   <StatChip
                     label={t('market.appraisal.refineTotal')}
                     value={<IskAmount value={totals.refine} revealOn="tap" decimals={0} />}
-                    tooltip={t('market.appraisal.refineTotalHelp')}
+                    tooltip={
+                      implantBonusPct > 0
+                        ? `${t('market.appraisal.refineTotalHelp')} ${t('market.appraisal.refineImplantHint', { pct: implantBonusPct })}`
+                        : t('market.appraisal.refineTotalHelp')
+                    }
                   />
                 )}
                 {hasLpOption && (

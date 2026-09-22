@@ -37,6 +37,7 @@ function row(overrides: Partial<MiningYieldRow> = {}): MiningYieldRow {
       refineValue: 1200,
       pricedAll: false,
       efficiency: 0.5,
+      implantBonusPct: 0,
       lines: [
         {
           typeId: VELDSPAR,
@@ -121,6 +122,20 @@ describe('YieldDetailModal', () => {
   it('says how many units fall short of a whole batch', () => {
     renderModal();
     expect(screen.getByText(/50 units fall short of a whole batch/)).toBeInTheDocument();
+  });
+
+  it('says nothing about an implant when none is fitted', () => {
+    renderModal();
+    expect(screen.queryByText(/fitted refining implant/)).not.toBeInTheDocument();
+  });
+
+  it("names the fitted refining implant's bonus (issue #1227)", () => {
+    renderModal(row({ valuation: { ...row().valuation, implantBonusPct: 2 } }));
+    expect(
+      screen.getByText(
+        "Includes the active clone's fitted refining implant, +2% to ore and ice yield."
+      )
+    ).toBeInTheDocument();
   });
 
   it('marks the exit worth more as the suggested one, and signs the gain', () => {

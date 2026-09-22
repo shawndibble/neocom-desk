@@ -108,6 +108,7 @@ describe('valueMiningYield', () => {
       pricedAll: true,
       lines: [],
       efficiency: 0.5,
+      implantBonusPct: 0,
     });
   });
 });
@@ -178,6 +179,19 @@ describe('valueMiningYield line detail (issue: Mining Yield row detail)', () => 
     // single number could state that part honestly. `refineBasisHint` only
     // ever names the two general skills, never a specialisation.
     expect(result.efficiency).toBe(0.5);
+  });
+
+  it('folds the refining implant bonus into the reported efficiency and reports the pct (issue #1227)', () => {
+    const result = valueMiningYield(
+      [],
+      new Map(),
+      new Map(),
+      { ...NO_SKILLS, implantBonusPct: 4 },
+      NO_TRAINED,
+      {}
+    );
+    expect(result.efficiency).toBeCloseTo(0.5 * 1.04, 10);
+    expect(result.implantBonusPct).toBe(4);
   });
 });
 

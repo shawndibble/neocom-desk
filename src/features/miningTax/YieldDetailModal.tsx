@@ -414,6 +414,13 @@ export function YieldDetailModal({
                     efficiency: (valuation.efficiency * 100).toFixed(1),
                   })}
                 </p>
+                {valuation.implantBonusPct > 0 && (
+                  <p>
+                    {t('miningTax.overview.detail.refineImplantHint', {
+                      pct: valuation.implantBonusPct,
+                    })}
+                  </p>
+                )}
                 {!valuation.pricedAll && (
                   <p className="text-warning">
                     {t('miningTax.overview.detail.partialPricingHint')}

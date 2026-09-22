@@ -49,6 +49,40 @@ export interface ReprocessingSkills {
    * Reprocessing Efficiency do not apply to it.
    */
   isScrap?: boolean;
+  /**
+   * The active clone's refining implant bonus, if any (issue #1227) —
+   * `resolveImplantBonusPct`'s result. Ignored when `isScrap`: the RX-80x
+   * line's own ESI description names ore and ice only, not scrap.
+   */
+  implantBonusPct?: number;
+}
+
+/**
+ * Zainou 'Beancounter' Reprocessing implant type IDs -> the % bonus their
+ * own ESI/SDE description gives to ore and ice reprocessing yield (issue
+ * #1227). Only three exist and none supersede another positionally (same
+ * implant slot — a character can only ever have one fitted), so a flat
+ * lookup is simpler than a general dogma-attribute read for this.
+ */
+export const REFINING_IMPLANT_TYPE_IDS: Readonly<Record<number, number>> = {
+  27175: 1, // RX-801
+  27169: 2, // RX-802
+  27174: 4, // RX-804
+};
+
+/**
+ * The active clone's refining implant bonus, or 0 with none fitted. Takes
+ * the character's full implant typeID list (as already read for skill
+ * training) rather than a single value, so the caller need not know which
+ * slot the implant lives in.
+ */
+export function resolveImplantBonusPct(implantTypeIds: readonly number[]): number {
+  let best = 0;
+  for (const typeId of implantTypeIds) {
+    const pct = REFINING_IMPLANT_TYPE_IDS[typeId];
+    if (pct !== undefined && pct > best) best = pct;
+  }
+  return best;
 }
 
 /** The two general reprocessing skills, ahead of resolving any type's specialisation. */
@@ -99,6 +133,7 @@ export function reprocessingEfficiency({
   specialisationLevel,
   stationRate = BASE_STATION_REPROCESSING_RATE,
   isScrap = false,
+  implantBonusPct = 0,
 }: ReprocessingSkills): number {
   if (isScrap) {
     return stationRate * (1 + 0.02 * specialisationLevel);
@@ -107,7 +142,8 @@ export function reprocessingEfficiency({
     stationRate *
     (1 + 0.03 * reprocessingLevel) *
     (1 + 0.02 * reprocessingEfficiencyLevel) *
-    (1 + 0.02 * specialisationLevel)
+    (1 + 0.02 * specialisationLevel) *
+    (1 + implantBonusPct / 100)
   );
 }
 
