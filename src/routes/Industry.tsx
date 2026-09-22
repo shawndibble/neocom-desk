@@ -448,7 +448,8 @@ export function Industry() {
         row.candidate,
         facilityDefaults,
         row.materialSourcing,
-        row.buildHere
+        row.buildHere,
+        activeCharacterId
       )
     );
     await db.buildPlans.bulkAdd(newPlans);

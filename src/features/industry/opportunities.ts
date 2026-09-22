@@ -112,13 +112,23 @@ function ownedMaterialSourcing(
  * what "Add to Compare" persists for a row the pilot picks: the plan's own
  * economics then match what justified picking it, rather than reverting to
  * an unclaimed-materials cost the instant it lands in Compare.
+ *
+ * `ownerCharacterId` is the plan's owner, separate from `candidate.characterId`
+ * whose owned blueprint and materials justified the row (issue #1061: a Build
+ * Plan belongs to whoever is going to build it, not to whichever alt held the
+ * blueprint it was seeded from — the plan list, compare set and detail route
+ * all filter to one active character, so a plan stamped with any other id is
+ * unreachable). Required, not defaulted to the candidate's id: `characterId`
+ * plays no part in the pricing this also seeds for, so there is no correct
+ * default and a caller must say who the plan is for.
  */
 export function planForOpportunityCandidate(
   candidate: OpportunityCandidate,
   facilityDefaults: ActivityFacilityDefaults,
   materialSourcing: MaterialSourcingMap,
   /** Auto-picked build-vs-buy materials (issue #652) carried onto the seeded plan verbatim. */
-  buildHere?: readonly number[]
+  buildHere: readonly number[] | undefined,
+  ownerCharacterId: number
 ) {
   const { blueprint } = candidate;
   // A BPC prices at its own remaining runs; a BPO (runs === -1, unlimited)
@@ -128,17 +138,10 @@ export function planForOpportunityCandidate(
   // run-count normalization beyond that).
   const runs = blueprint.runs > 0 ? blueprint.runs : 1;
   return {
-    ...newBuildPlan(
-      candidate.characterId,
-      candidate.catalogEntry,
-      blueprint,
-      null,
-      facilityDefaults,
-      {
-        runs,
-        ...(buildHere !== undefined && buildHere.length > 0 ? { buildHere: [...buildHere] } : {}),
-      }
-    ),
+    ...newBuildPlan(ownerCharacterId, candidate.catalogEntry, blueprint, null, facilityDefaults, {
+      runs,
+      ...(buildHere !== undefined && buildHere.length > 0 ? { buildHere: [...buildHere] } : {}),
+    }),
     materialSourcing,
   };
 }
@@ -176,7 +179,13 @@ export function computeOpportunityRow(
 ): UnrankedOpportunityRow | null {
   const blueprint = toIndustryBlueprint(candidate.catalogEntry.blueprint);
   const materialSourcing = ownedMaterialSourcing(candidate.catalogEntry.blueprint.materials, stock);
-  const basePlan = planForOpportunityCandidate(candidate, facilityDefaults, materialSourcing);
+  const basePlan = planForOpportunityCandidate(
+    candidate,
+    facilityDefaults,
+    materialSourcing,
+    undefined,
+    candidate.characterId
+  );
 
   const systemCostIndex = snapshot.systemCostIndex ?? 0;
   const adjustedPrices = snapshot.adjustedPrices ?? {};

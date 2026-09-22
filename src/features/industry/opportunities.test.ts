@@ -7,6 +7,7 @@ import {
   buildOpportunityCandidates,
   computeOpportunityRow,
   opportunitiesCacheKey,
+  planForOpportunityCandidate,
   rankOpportunityRows,
   type OpportunityCandidate,
   type UnrankedOpportunityRow,
@@ -96,6 +97,46 @@ describe('buildOpportunityCandidates', () => {
       cat
     );
     expect(new Set(candidates.map((c) => c.id)).size).toBe(2);
+  });
+});
+
+describe('planForOpportunityCandidate — plan ownership (issue #1061)', () => {
+  it('stamps the candidate owner for an unsaved pricing preview', () => {
+    const cat = catalog([catalogEntry(1)]);
+    const candidate: OpportunityCandidate = {
+      id: '200:10',
+      characterId: 200,
+      characterName: 'Alt',
+      blueprint: owned(1),
+      catalogEntry: cat.byBlueprintTypeID.get(1)!,
+    };
+    const plan = planForOpportunityCandidate(
+      candidate,
+      DEFAULT_ACTIVITY_FACILITY_DEFAULTS,
+      {},
+      undefined,
+      candidate.characterId
+    );
+    expect(plan.characterId).toBe(200);
+  });
+
+  it('stamps an explicit owner onto the plan, for Add to Compare seeding the active character', () => {
+    const cat = catalog([catalogEntry(1)]);
+    const candidate: OpportunityCandidate = {
+      id: '200:10',
+      characterId: 200,
+      characterName: 'Alt',
+      blueprint: owned(1),
+      catalogEntry: cat.byBlueprintTypeID.get(1)!,
+    };
+    const plan = planForOpportunityCandidate(
+      candidate,
+      DEFAULT_ACTIVITY_FACILITY_DEFAULTS,
+      {},
+      undefined,
+      100
+    );
+    expect(plan.characterId).toBe(100);
   });
 });
 

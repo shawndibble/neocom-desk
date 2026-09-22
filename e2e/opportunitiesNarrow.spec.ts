@@ -186,15 +186,18 @@ test.describe('Opportunities — ranked phone list', () => {
   /**
    * `hasTouch` scoped to this block, not the file — same reasoning
    * `charactersToolbarNarrow.spec.ts`'s own touch-and-hold block gives.
+   *
+   * Previously (issue #1174) this row's checkbox was disabled with a
+   * tooltip explaining that only the active character's own blueprints
+   * could be added to Compare — because the seeded plan used to be stamped
+   * with the alt's own id, which no surface reading Build Plans could ever
+   * find. Issue #1061 fixed the stamping (seeded plans now belong to the
+   * active character), so the row is selectable like any other.
    */
-  test.describe('a non-comparable row explains itself on touch (issue #1174)', () => {
+  test.describe("another character's row is selectable on touch (issue #1061)", () => {
     test.use({ hasTouch: true });
 
-    const COMPARE_REASON = "Only the active character's own blueprints can be added to Compare";
-
-    test("a tap reveals why another character's row cannot be compared, at 390px", async ({
-      page,
-    }) => {
+    test('a tap toggles the checkbox, with no disabled state or tooltip', async ({ page }) => {
       await seedSecondCharacterBlueprint(page);
       await page.setViewportSize(PHONE);
       await page.goto('./industry?tab=opportunities');
@@ -207,7 +210,7 @@ test.describe('Opportunities — ranked phone list', () => {
       await expect(page.getByRole('button', { name: /Sort by/ })).toBeVisible();
 
       // The Character filter defaults to "This character" — switch to "All
-      // characters" so the alt's non-comparable row joins the list.
+      // characters" so the alt's row joins the list.
       await page.getByText('This character').last().click();
       await page.getByRole('button', { name: 'All characters' }).click();
 
@@ -215,35 +218,14 @@ test.describe('Opportunities — ranked phone list', () => {
       await expect(altRow).toBeVisible();
       const checkbox = altRow.getByRole('checkbox');
       await expect(checkbox).toBeVisible();
-      // The reason used to live only in a native `title=`, which touch can
-      // never reveal, and a native `disabled` checkbox is off the hover/
-      // touch event path a `Tooltip` trigger needs entirely. Checked via the
-      // DOM property directly, not Playwright's `isDisabled()` — that helper
-      // treats `aria-disabled="true"` (which this checkbox correctly carries)
-      // as disabled too, which is exactly the state this test needs to tell
-      // apart from the native attribute.
       await expect(checkbox).not.toHaveAttribute('title');
-      await expect(checkbox).toHaveAttribute('aria-disabled', 'true');
+      await expect(checkbox).not.toHaveAttribute('aria-disabled');
       expect(await checkbox.evaluate((el) => (el as HTMLInputElement).disabled)).toBe(false);
       await expect(page.getByRole('tooltip')).toHaveCount(0);
 
-      // The wrapper div, not the checkbox itself: this app's real ~44px tap
-      // target for this control (see the sibling test above), and touching
-      // its corner rather than its center lands well outside the checkbox's
-      // own 16px box — proof the tap zone actually grew with it, not just
-      // that the tiny input alone still works.
-      // The wrapper div's own corner, not its center and not the checkbox:
-      // this app's real ~44px tap target for this control (see the sibling
-      // test above) extends well past the checkbox's own 16px box, and a tap
-      // there never reaches the checkbox's own click handler — proof the
-      // reveal works off the tap zone as a whole, not just the glyph inside it.
-      const wrapper = checkbox.locator('xpath=..');
-      await wrapper.tap({ position: { x: 4, y: 4 } });
-      await expect(page.getByRole('tooltip')).toHaveText(COMPARE_REASON);
-      await expect(page.getByRole('tooltip')).toBeVisible();
-
-      // The tap must never have toggled the checkbox itself.
-      expect(await checkbox.isChecked()).toBe(false);
+      await checkbox.tap();
+      await expect(page.getByRole('tooltip')).toHaveCount(0);
+      expect(await checkbox.isChecked()).toBe(true);
     });
   });
 });

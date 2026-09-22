@@ -26,7 +26,6 @@ import {
   InfoTooltip,
   IskAmount,
   StatChip,
-  Tooltip,
   nextDataTableSort,
   sortRows,
   type DataTableSort,
@@ -41,7 +40,6 @@ import type { OpportunityRow } from './opportunities';
 
 interface MobileOpportunityListProps {
   rows: readonly OpportunityRow[];
-  activeCharacterId: number;
   showCharacterColumn: boolean;
   selectedIds: ReadonlySet<string>;
   onToggleSelected: (id: string) => void;
@@ -129,7 +127,6 @@ const SORT_FIELD_ORDER: readonly SortFieldId[] = ['iskPerHour', 'unitMargin', 'm
 
 export function MobileOpportunityList({
   rows,
-  activeCharacterId,
   showCharacterColumn,
   selectedIds,
   onToggleSelected,
@@ -179,61 +176,26 @@ export function MobileOpportunityList({
 
       <ul className="flex flex-col" aria-label={t('industry.opportunitiesTitle')}>
         {sortedRows.map((row, index) => {
-          const seedable = row.candidate.characterId === activeCharacterId;
           const hero = fields[activeFieldId].hero(row);
           const productTypeID = row.candidate.catalogEntry.productTypeID;
           const original = row.candidate.blueprint.runs === -1;
-
-          const checkboxWrapper = (
-            <div
-              className="absolute top-1 right-2 flex size-11 items-center justify-center md:size-4"
-              // Never the native `disabled` attribute here: it takes the
-              // element out of the tab order and off the hover/touch event
-              // path a `Tooltip` trigger needs to explain itself (same
-              // reasoning `FilterChip` documents). `preventDefault` on click
-              // is what actually blocks the toggle — it cancels the
-              // checkbox's native activation before `onChange` ever fires.
-              // On this div, not the `<input>`: this is `Tooltip`'s real
-              // trigger (the whole ~44px zone, not the visual glyph inside
-              // it), and Radix's own click-to-close only sees
-              // `defaultPrevented` if the trigger element's own click
-              // handler set it — a tap outside the 16px input never reaches
-              // the input's handler.
-              onClick={(event) => {
-                if (!seedable) event.preventDefault();
-              }}
-            >
-              <input
-                type="checkbox"
-                checked={selectedIds.has(row.candidate.id)}
-                onChange={() => onToggleSelected(row.candidate.id)}
-                aria-disabled={seedable ? undefined : true}
-                aria-label={t('industry.opportunitiesSelectFor', {
-                  name: row.candidate.catalogEntry.productName,
-                })}
-                className={`size-4 shrink-0 accent-accent ${
-                  seedable ? 'cursor-pointer' : 'cursor-not-allowed opacity-40'
-                }`}
-              />
-            </div>
-          );
 
           return (
             <li
               key={row.candidate.id}
               className="relative flex flex-col gap-1.5 border-b border-line py-2.5 last:border-b-0"
             >
-              {seedable ? (
-                checkboxWrapper
-              ) : (
-                // Wraps the same `size-11` box the checkbox's own touch
-                // target is measured against elsewhere in this file, not the
-                // bare `size-4` input — the long-press-to-reveal zone has to
-                // match the tap zone, not the visual glyph inside it.
-                <Tooltip content={t('industry.opportunitiesCompareActiveCharacterOnly')} openOnTap>
-                  {checkboxWrapper}
-                </Tooltip>
-              )}
+              <div className="absolute top-1 right-2 flex size-11 items-center justify-center md:size-4">
+                <input
+                  type="checkbox"
+                  checked={selectedIds.has(row.candidate.id)}
+                  onChange={() => onToggleSelected(row.candidate.id)}
+                  aria-label={t('industry.opportunitiesSelectFor', {
+                    name: row.candidate.catalogEntry.productName,
+                  })}
+                  className="size-4 shrink-0 cursor-pointer accent-accent"
+                />
+              </div>
 
               <div className="flex items-start gap-2 pr-12">
                 <span

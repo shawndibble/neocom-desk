@@ -478,3 +478,105 @@ describe('Industry: owned-blueprint reauth', () => {
     expect(screen.getByText('Active jobs')).toBeInTheDocument();
   });
 });
+
+describe('Industry: Opportunities "Add to Compare" for an alt-owned row (issue #1061)', () => {
+  const ALT_ID = 92;
+
+  beforeEach(async () => {
+    await db.characters.put({
+      characterId: ALT_ID,
+      name: 'Alt Pilot',
+      ownerHash: 'oh-alt',
+      addedAt: 1,
+    });
+    await db.tokens.put({
+      characterId: ALT_ID,
+      accessToken: 'access-token',
+      refreshToken: 'refresh',
+      expiresAt: Date.now() + 3_600_000,
+      scopes: ['esi-skills.read_skillqueue.v1'],
+    });
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${ALT_ID}/skills`, () =>
+        HttpResponse.json(emptySkillsPayload)
+      ),
+      http.get(`https://esi.evetech.net/characters/${ALT_ID}/skillqueue`, () =>
+        HttpResponse.json([])
+      ),
+      // The sidebar's character switcher now has two characters to show and
+      // fetches public/corp info for each — not exercised by any single-
+      // character test in this file.
+      http.get('https://esi.evetech.net/characters/:id', ({ params }) =>
+        HttpResponse.json({
+          name: params.id === String(ALT_ID) ? 'Alt Pilot' : 'Pilot One',
+          corporation_id: 1000001,
+          birthday: '2020-01-01T00:00:00Z',
+          bloodline_id: 1,
+          gender: 'male',
+          race_id: 1,
+        })
+      ),
+      http.get('https://esi.evetech.net/characters/:id/corporationhistory', () =>
+        HttpResponse.json([])
+      ),
+      http.get('https://esi.evetech.net/corporations/:id', () =>
+        HttpResponse.json({ name: 'Corp', ticker: 'CORP' })
+      ),
+      http.get(`https://esi.evetech.net/characters/${ALT_ID}/blueprints`, () =>
+        HttpResponse.json([
+          {
+            item_id: 501,
+            type_id: 638,
+            runs: -1,
+            material_efficiency: 10,
+            time_efficiency: 20,
+            quantity: 1,
+            location_id: 60003760,
+            location_flag: 'Hangar',
+          },
+          {
+            item_id: 502,
+            type_id: 9841,
+            runs: -1,
+            material_efficiency: 10,
+            time_efficiency: 20,
+            quantity: 1,
+            location_id: 60003760,
+            location_flag: 'Hangar',
+          },
+        ])
+      )
+    );
+  });
+
+  it('seeds both rows onto the active character and shows a real comparison, not the empty state', async () => {
+    window.history.pushState({}, '', '/industry?tab=opportunities');
+    render(<App />);
+    const user = userEvent.setup();
+
+    // The panel defaults to "This character" (91, no blueprints); switch to
+    // "All characters" to see the alt's two Rifter/Mechanical Parts BPOs.
+    // Scoped to this panel's own section: Active Jobs renders its own
+    // (unrelated) character filter with the same trigger label.
+    const oppSection = (
+      await screen.findByRole('heading', { name: 'Build Opportunities' })
+    ).closest('section')!;
+    await user.click(await within(oppSection).findByRole('button', { name: 'This character' }));
+    await user.click(await screen.findByRole('button', { name: 'All characters' }));
+
+    await user.click(
+      await screen.findByRole('checkbox', { name: 'Select Rifter to add to Compare' })
+    );
+    await user.click(
+      screen.getByRole('checkbox', { name: 'Select Mechanical Parts to add to Compare' })
+    );
+    await user.click(screen.getByRole('button', { name: 'Add 2 to Compare' }));
+
+    expect(await screen.findByRole('table', { name: 'Build plan comparison' })).toBeInTheDocument();
+    expect(screen.queryByText('Select at least 2 plans')).not.toBeInTheDocument();
+
+    const seeded = await db.buildPlans.toArray();
+    expect(seeded).toHaveLength(2);
+    for (const plan of seeded) expect(plan.characterId).toBe(CHAR_ID);
+  });
+});
