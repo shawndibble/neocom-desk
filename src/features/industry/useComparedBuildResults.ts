@@ -30,7 +30,6 @@
 import { useEffect, useRef, useState } from 'react';
 import i18n from '@/i18n';
 import type { BuildPlanRecord } from '@/db';
-import { industryActivityOf } from '@/engine/industry/types';
 import type { BuildResult, SkillLevels } from '@/engine/industry/types';
 import type { BpcOffer } from '@/engine/industry/blueprintAcquisition';
 import { effectivePrice, type BpcContractRow } from '@/engine/contracts/bpcSearch';
@@ -39,9 +38,7 @@ import type { PiData } from '@/sde/types';
 import { DEFAULT_TRADE_HUB, getTradeHub, type TradeHub } from '@/market/hubs';
 import { loadPublicBpcContracts } from '@/features/bpcContracts/syncedContracts';
 import { toIndustryBlueprint, type BlueprintCatalog } from './blueprintCatalog';
-import { loadMarketSnapshots, type MarketSnapshot, type MarketSnapshotRequest } from './marketData';
-import { buildPlanTypeIds } from './recipes';
-import { reactionPlanFacilityContextFor } from './planFacilityContext';
+import { loadPlanSnapshots, type PlanSnapshots } from './planSnapshots';
 import { resolveBuildPlan, type BuildPlanSources } from './resolveBuildPlan';
 import type { CorpOwnedBlueprintsState } from './corpOwnedBlueprints';
 import { useAssumedMe } from './assumedMe';
@@ -82,19 +79,6 @@ export interface UseComparedBuildResultsArgs {
   computeGroupResult?: boolean;
 }
 
-/** A plan resolved far enough to ask for prices — what a snapshot request needs. */
-interface PriceablePlan {
-  request: MarketSnapshotRequest;
-  /** Its Reaction Location's own cost-index request — null when none is configured (issue #698). */
-  reactionRequest: MarketSnapshotRequest | null;
-}
-
-/** A priceable plan paired with the in-flight snapshots that price it. */
-interface PricedPlan {
-  snapshot: Promise<MarketSnapshot>;
-  reactionSnapshot: Promise<MarketSnapshot> | null;
-}
-
 function productNameFor(plan: BuildPlanRecord, catalog: BlueprintCatalog): string {
   return catalog.byBlueprintTypeID.get(plan.blueprintTypeID)?.productName ?? plan.name;
 }
@@ -109,38 +93,6 @@ function placeholderRow(plan: BuildPlanRecord, catalog: BlueprintCatalog): Compa
     result: null,
     groupResult: null,
     error: null,
-  };
-}
-
-/**
- * Resolves what a plan needs priced, before any fetch — the type ids have to
- * be known up front for `loadMarketSnapshots` to union them across a hub.
- */
-function priceablePlan(
-  plan: BuildPlanRecord,
-  catalog: BlueprintCatalog,
-  pi: PiData | null
-): PriceablePlan | null {
-  const entry = catalog.byBlueprintTypeID.get(plan.blueprintTypeID);
-  if (!entry) return null;
-
-  const blueprint = toIndustryBlueprint(entry.blueprint);
-  const hub = getTradeHub(plan.hubId) ?? DEFAULT_TRADE_HUB;
-  const typeIds = buildPlanTypeIds(blueprint, { catalog, pi });
-  return {
-    request: {
-      hub,
-      typeIds,
-      costIndexSystemId: plan.buildSystemId,
-      activity: industryActivityOf(blueprint),
-    },
-    // The Reaction Location's own cost index (issue #698) — a reaction-activity
-    // request in the same `loadMarketSnapshots` call as `request`, which
-    // unions its hub prices and sequences the two cost-index lookups.
-    reactionRequest:
-      reactionPlanFacilityContextFor(plan) !== null
-        ? { hub, typeIds, costIndexSystemId: plan.reactionBuildSystemId, activity: 'reaction' }
-        : null,
   };
 }
 
@@ -175,7 +127,7 @@ function offersForRegion(
 async function computeRow(
   plan: BuildPlanRecord,
   catalog: BlueprintCatalog,
-  priced: PricedPlan | null,
+  priced: PlanSnapshots | null,
   sources: Omit<BuildPlanSources, 'catalog' | 'bpcOffersFor'>,
   bpcRows: readonly BpcContractRow[],
   computeGroupResult: boolean
@@ -293,30 +245,17 @@ export function useComparedBuildResults({
     if (!assumedMeHydrated || !includeBlueprintCostHydrated) return;
     let cancelled = false;
 
-    // Every plan's request goes in together, so plans sharing a hub share a
-    // fetch. Plans with no blueprint contribute none; the returned promises
-    // are zipped back onto the requests that produced them, so no plan can
-    // pick up a sibling's snapshot.
-    // A plan's Reaction Location request (issue #698) rides in the same call:
-    // a second call the same tick would race the first on a cold cache and
-    // fetch hub prices, adjusted prices and cost indices twice.
-    const priceable = currentPlans.map((plan) => priceablePlan(plan, catalog, pi));
-    const requests = priceable.flatMap((p) =>
-      p ? (p.reactionRequest ? [p.request, p.reactionRequest] : [p.request]) : []
-    );
-    const snapshots = loadMarketSnapshots(requests);
-    const snapshotByRequest = new Map(requests.map((request, i) => [request, snapshots[i]!]));
+    // Every plan's requests go in one call, so plans sharing a hub share a
+    // fetch. Plans with no blueprint contribute none.
+    const priceable = currentPlans.flatMap((plan) => {
+      const entry = catalog.byBlueprintTypeID.get(plan.blueprintTypeID);
+      return entry ? [{ plan, blueprint: toIndustryBlueprint(entry.blueprint) }] : [];
+    });
+    const snapshots = loadPlanSnapshots(priceable, { catalog, pi });
+    const pricedByPlanId = new Map(priceable.map(({ plan }, i) => [plan.id, snapshots[i]!]));
 
-    for (const [index, plan] of currentPlans.entries()) {
-      const entry = priceable[index];
-      const priced = entry
-        ? {
-            snapshot: snapshotByRequest.get(entry.request)!,
-            reactionSnapshot: entry.reactionRequest
-              ? snapshotByRequest.get(entry.reactionRequest)!
-              : null,
-          }
-        : null;
+    for (const plan of currentPlans) {
+      const priced = pricedByPlanId.get(plan.id) ?? null;
       void computeRow(
         plan,
         catalog,

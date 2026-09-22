@@ -14,7 +14,7 @@ import {
   bulkUseNone,
   groupMaterialTypeIdKey,
   materialTypeIdKey,
-  ownedStockDetection,
+  ownedStockView,
   typeIdsFromKey,
 } from './planMaterialsView';
 
@@ -183,14 +183,18 @@ describe('groupMaterialTypeIdKey', () => {
   });
 });
 
-describe('ownedStockDetection', () => {
-  const t = ((key: string) => key) as Parameters<typeof ownedStockDetection>[1];
+describe('ownedStockView', () => {
+  const t = ((key: string) => key) as Parameters<typeof ownedStockView>[1];
 
-  it('reads galaxy-wide stock and the scoped quantity separately', () => {
-    const detection = ownedStockDetection(
+  it('narrows to the owned-stock scope for "use detected", keeping galaxy-wide stock for the breakdown', () => {
+    const elsewhere: OwnedStockPlacement = { ...placement(60), locationId: 60008494 };
+    const { detection, scopedStock } = ownedStockView(
       {
-        stock: stockOf([[34, 100]]),
-        scopedStock: stockOf([[34, 40]]),
+        stock: new Map([[34, { quantity: 100, placements: [placement(40), elsewhere] }]]),
+        scope: {
+          mode: 'selected',
+          locations: [{ characterId: 7, locationId: 60003760, locationType: 'station' }],
+        },
         characterNames: new Map([[7, 'Pilot']]),
         locationNames: new Map(),
         incompleteCharacters: [],
@@ -199,6 +203,7 @@ describe('ownedStockDetection', () => {
     );
     expect(detection.stockFor(34)?.quantity).toBe(100);
     expect(detection.scopedQuantityFor(34)).toBe(40);
+    expect(scopedStock.get(34)?.quantity).toBe(40);
     expect(detection.scopedQuantityFor(35)).toBe(0);
     expect(detection.characterNameFor(7)).toBe('Pilot');
     expect(detection.characterNameFor(8)).toBe('common.unknown');
@@ -215,10 +220,10 @@ describe('ownedStockDetection', () => {
       expected: ['Alt', 'Corp'],
     },
   ])('lower bound: $name', ({ incomplete, corp, expected }) => {
-    const detection = ownedStockDetection(
+    const { detection } = ownedStockView(
       {
         stock: new Map(),
-        scopedStock: new Map(),
+        scope: undefined,
         characterNames: new Map(),
         locationNames: new Map(),
         incompleteCharacters: incomplete,

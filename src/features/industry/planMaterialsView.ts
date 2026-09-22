@@ -1,6 +1,6 @@
 /**
- * The Plan Materials view's shared, pure half: which material types owned-stock
- * detection scans, the `OwnedStockDetection` object every materials row reads,
+ * The pure half of a materials table's owned-stock handling: which material
+ * types detection scans, the `OwnedStockDetection` object every row reads,
  * and the "use all" / "use none" bulk rules. `BuildPlanDetail.tsx` (one plan)
  * and `BuildGroupPanel.tsx` (a Build Group's merged table) both call these, so
  * a group and its members can never hold two opinions about what the hangar
@@ -10,10 +10,11 @@ import type { BuildPlanRecord } from '@/db';
 import {
   bulkOwnedStockSuggestions,
   clearOwnedStockSuggestions,
+  filterStockByScope,
   type DetectedOwnedStockMap,
   type OwnedStockSuggestion,
 } from '@/engine/industry/ownedStock';
-import type { MaterialSourcingMap } from '@/engine/industry/types';
+import type { MaterialSourcingMap, OwnedStockScope } from '@/engine/industry/types';
 import { toIndustryBlueprint } from './blueprintCatalog';
 import { buildPlanTypeIds, type RecipeCatalog } from './recipes';
 import { stockLocationLabel, type OwnedStockDetection } from './ownedStockDetection';
@@ -65,11 +66,11 @@ export function groupMaterialTypeIdKey(
   return materialTypeIdKey(ids);
 }
 
-export interface OwnedStockDetectionInput {
+export interface OwnedStockViewInput {
   /** Galaxy-wide detection — the breakdown popover always shows all of it. */
   stock: DetectedOwnedStockMap;
-  /** `stock` narrowed to the owned-stock scope — what "use detected" offers. */
-  scopedStock: DetectedOwnedStockMap;
+  /** The owned-stock scope (issue #454) "use detected" is narrowed to. */
+  scope: OwnedStockScope | undefined;
   characterNames: ReadonlyMap<number, string>;
   locationNames: ReadonlyMap<number, string>;
   incompleteCharacters: readonly string[];
@@ -82,22 +83,27 @@ export interface OwnedStockDetectionInput {
   corporationName?: string | null;
 }
 
-export function ownedStockDetection(
-  input: OwnedStockDetectionInput,
-  t: Translate
-): OwnedStockDetection {
+export interface OwnedStockView {
+  detection: OwnedStockDetection;
+  /** `stock` narrowed to the scope — what the bulk "use all" fills from. */
+  scopedStock: DetectedOwnedStockMap;
+}
+
+export function ownedStockView(input: OwnedStockViewInput, t: Translate): OwnedStockView {
+  const scopedStock = filterStockByScope(input.stock, input.scope);
   const incompleteCharacters = input.incompleteCorporation
     ? [...input.incompleteCharacters, input.incompleteCorporation]
     : input.incompleteCharacters;
-  return {
+  const detection: OwnedStockDetection = {
     stockFor: (typeID) => input.stock.get(typeID),
-    scopedQuantityFor: (typeID) => input.scopedStock.get(typeID)?.quantity ?? 0,
+    scopedQuantityFor: (typeID) => scopedStock.get(typeID)?.quantity ?? 0,
     lowerBound: incompleteCharacters.length > 0,
     incompleteCharacters,
     characterNameFor: (characterId) => input.characterNames.get(characterId) ?? t('common.unknown'),
     corporationNameFor: () => input.corporationName ?? t('common.unknown'),
     locationLabelFor: (placement) => stockLocationLabel(placement, input.locationNames, t),
   };
+  return { detection, scopedStock };
 }
 
 /** Adapts either owned-quantity store (a plan's sourcing, a group's ledger) to the engine's shape. */

@@ -30,11 +30,7 @@ import type { BuildPlanRecord } from '@/db';
 import type { BuildStrategy } from '@/engine/industry/autoMakeOrBuy';
 import { rollUpBuildGroup, type BuildGroupMember } from '@/engine/industry/groupRollup';
 import { rowVolume, totalVolume } from '@/engine/industry/materialVolume';
-import {
-  filterStockByScope,
-  suggestedOwnedQuantity,
-  type OwnedStockScope,
-} from '@/engine/industry/ownedStock';
+import { suggestedOwnedQuantity, type OwnedStockScope } from '@/engine/industry/ownedStock';
 import type { MaterialCostLine, SkillLevels } from '@/engine/industry/types';
 import type { CharacterBlueprint } from '@/esi/endpoints';
 import { iskToneClass } from '@/features/character/format';
@@ -56,12 +52,12 @@ import { profitOf, verdictOf } from './groupIndexStats';
 import { SourcingInput } from './MaterialsTable';
 import { OwnedStockHint } from './OwnedStockHint';
 import { OwnedStockScopeControl } from './OwnedStockScopeControl';
-import type { OwnedStockDetection, OwnedStockSnapshot } from './ownedStockDetection';
+import type { OwnedStockSnapshot } from './ownedStockDetection';
 import {
   bulkUseDetected,
   bulkUseNone,
   groupMaterialTypeIdKey,
-  ownedStockDetection,
+  ownedStockView,
   typeIdsFromKey,
 } from './planMaterialsView';
 import { flattenBuildResult } from './resultFlattenCache';
@@ -276,16 +272,12 @@ export function BuildGroupPanel({
   // rollup directly — `rollUpBuildGroup` only ever sees the ledger the pilot
   // has committed to, in `ownedStockMap`.
   const detected = useDetectedOwnedStock(ownedStockSnapshot, materialTypeIds);
-  const scopedStock = useMemo(
-    () => filterStockByScope(detected.stock, group.ownedStockScope),
-    [detected.stock, group.ownedStockScope]
-  );
   // Corp Assets (issue #798) is a per-plan toggle, not a group-level one —
   // the group rollup never merges a corp source in, so no corp name or corp
   // incompleteness is passed.
-  const detection = useMemo<OwnedStockDetection>(
-    () => ownedStockDetection({ ...detected, scopedStock }, t),
-    [detected, scopedStock, t]
+  const { detection, scopedStock } = useMemo(
+    () => ownedStockView({ ...detected, scope: group.ownedStockScope }, t),
+    [detected, group.ownedStockScope, t]
   );
 
   const ownedStockMap = useMemo(

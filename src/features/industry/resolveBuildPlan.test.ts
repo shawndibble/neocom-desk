@@ -130,14 +130,14 @@ describe('resolveBuildPlan', () => {
     const first = resolveBuildPlan(plan(), src, market);
     const second = resolveBuildPlan(plan(), src, market);
 
-    expect(first.topLevelAcquisition).toEqual({
-      me: 10,
-      te: 20,
-      blueprintTypeID: 100,
-      line: { unitPrice: 0, owned: true },
-    });
-    expect(second.topLevelAcquisition).toEqual(first.topLevelAcquisition);
-    expect(second.resolvedMe).toBe(10);
+    // The owned BPC covers the run: an acquisition row with nothing to buy.
+    for (const resolved of [first, second]) {
+      expect(resolved.resolvedMe).toBe(10);
+      expect(resolved.resolvedTe).toBe(20);
+      expect(acquisitionRows(resolved.result, 100)).toEqual([
+        expect.objectContaining({ remainingQuantity: 0 }),
+      ]);
+    }
     expect(second.result?.totalCost).toBe(first.result?.totalCost);
   });
 
@@ -173,7 +173,7 @@ describe('resolveBuildPlan', () => {
   it('folds corp blueprints in only when the plan itself has includeCorpAssets on', () => {
     const catalog = catalogOf([entry(100, 1, [{ typeID: 34, quantity: 10 }])]);
     const src = sources(catalog, {
-      corpBlueprints: { available: true, incomplete: false, blueprints: [owned(100, -1, 8)] },
+      corpBlueprints: { available: true, blueprints: [owned(100, -1, 8)] },
     });
     const market = { snapshot: snapshot({ 1: 1000, 34: 5, 100: 10_000 }) };
 
@@ -181,12 +181,11 @@ describe('resolveBuildPlan', () => {
     const withoutCorp = resolveBuildPlan(plan({ includeCorpAssets: false }), src, market);
 
     // An owned BPO: nothing to acquire, at the corp copy's own ME.
-    expect(withCorp.topLevelAcquisition).toEqual(
-      expect.objectContaining({ me: 8, blueprintTypeID: 100, line: null })
-    );
-    expect(withCorp.ownedBlueprints).toHaveLength(1);
-    expect(withoutCorp.topLevelAcquisition?.line).toEqual({ unitPrice: 10_000, owned: false });
-    expect(withoutCorp.ownedBlueprints).toHaveLength(0);
+    expect(withCorp.resolvedMe).toBe(8);
+    expect(acquisitionRows(withCorp.result, 100)).toEqual([]);
+    expect(acquisitionRows(withoutCorp.result, 100)).toEqual([
+      expect.objectContaining({ unitPrice: 10_000, remainingQuantity: 1 }),
+    ]);
   });
 
   it('ignores corp blueprints the active Character cannot read, even with includeCorpAssets on', () => {
@@ -194,11 +193,14 @@ describe('resolveBuildPlan', () => {
     const resolved = resolveBuildPlan(
       plan({ includeCorpAssets: true }),
       sources(catalog, {
-        corpBlueprints: { available: false, incomplete: false, blueprints: [owned(100, -1)] },
+        corpBlueprints: { available: false, blueprints: [owned(100, -1)] },
       }),
       { snapshot: snapshot({ 1: 1000, 34: 5, 100: 10_000 }) }
     );
-    expect(resolved.ownedBlueprints).toHaveLength(0);
+    expect(resolved.resolvedMe).toBe(0);
+    expect(acquisitionRows(resolved.result, 100)).toEqual([
+      expect.objectContaining({ unitPrice: 10_000 }),
+    ]);
   });
 
   describe('Reaction Location (issue #698)', () => {
@@ -232,8 +234,7 @@ describe('resolveBuildPlan', () => {
       const cheap = resolveAt(0.01);
       const dear = resolveAt(0.5);
 
-      expect(dear.reactionFacility?.systemCostIndex).toBe(0.5);
-      expect(dear.makeOrBuyContext?.reactionFacility).toEqual(dear.reactionFacility);
+      expect(dear.makeOrBuyContext?.reactionFacility?.systemCostIndex).toBe(0.5);
       expect(dear.result!.totalCost).toBeGreaterThan(cheap.result!.totalCost);
       // Nothing owned, so the group pass must price exactly like the normal one.
       expect(dear.groupResult!.totalCost).toBe(dear.result!.totalCost);
@@ -241,12 +242,12 @@ describe('resolveBuildPlan', () => {
     });
 
     it('leaves the Reaction Location unresolved until its cost index lands', () => {
-      expect(resolveAt(null).reactionFacility).toBeUndefined();
+      expect(resolveAt(null).makeOrBuyContext?.reactionFacility).toBeUndefined();
       expect(
         resolveBuildPlan({ ...reactionPlan, reactionFacility: undefined }, sources(catalog), {
           snapshot: prices,
           reactionSystemCostIndex: 0.5,
-        }).reactionFacility
+        }).makeOrBuyContext?.reactionFacility
       ).toBeUndefined();
     });
   });
@@ -259,7 +260,7 @@ describe('resolveBuildPlan', () => {
     );
     expect(resolved.result).not.toBeNull();
     expect(resolved.makeOrBuyContext).toBeNull();
-    expect(resolved.topLevelAcquisition).toBeNull();
+    expect(acquisitionRows(resolved.result, 100)).toEqual([]);
     expect(resolved.resolvedMe).toBe(0);
   });
 
@@ -279,6 +280,8 @@ describe('resolveBuildPlan', () => {
     const resolved = resolveBuildPlan(plan({ runs: 0 }), src, {
       snapshot: snapshot({ 1: 1000, 34: 5, 100: 10_000 }),
     });
-    expect(resolved.topLevelAcquisition?.line).toEqual({ unitPrice: 0, owned: true });
+    expect(acquisitionRows(resolved.result, 100)).toEqual([
+      expect.objectContaining({ remainingQuantity: 0 }),
+    ]);
   });
 });

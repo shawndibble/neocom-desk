@@ -92,13 +92,12 @@ import {
 } from './subBuildPlan';
 import { formatIsk } from '@/lib/isk';
 import { cx } from '@/lib/cx';
-import { filterStockByScope } from '@/engine/industry/ownedStock';
-import type { OwnedStockDetection, OwnedStockSnapshot } from './ownedStockDetection';
+import type { OwnedStockSnapshot } from './ownedStockDetection';
 import {
   bulkUseDetected,
   bulkUseNone,
   materialTypeIdKey,
-  ownedStockDetection,
+  ownedStockView,
   typeIdsFromKey,
 } from './planMaterialsView';
 import { useDetectedOwnedStock } from './useDetectedOwnedStock';
@@ -519,8 +518,8 @@ export function BuildPlanDetail({
    * - `result`/`error`: the Results panel and materials table.
    * - `makeOrBuyContext`: every make-or-buy verdict; null until live prices
    *   land (a fee-free quote would call almost everything worth building).
-   * - `topLevelAcquisition`/`resolvedMe`/`resolvedTe`: Blueprint Acquisition
-   *   for the plan's own product. `plan.me`/`plan.te` stay whatever they
+   * - `resolvedMe`/`resolvedTe`: the tier Blueprint Acquisition resolved for
+   *   the plan's own product. `plan.me`/`plan.te` stay whatever they
    *   last were (Setup no longer edits them); every reader below uses the
    *   resolved pair, so there is exactly one number in play.
    * - `materialPrices`: the plan's price basis — both sides come from the
@@ -587,7 +586,7 @@ export function BuildPlanDetail({
    * never prices anything, so gating it on `makeOrBuyContext` (null until
    * `pricesReady`) would leave Apply disabled during a slow price
    * fetch for no reason. Built from `reactionPlanFacilityContext`, not the
-   * price-resolved `resolved.reactionFacility` above: the latter stays
+   * price-resolved Reaction Location in `makeOrBuyContext`: that one stays
    * `undefined` until its own market snapshot lands, which would understate
    * this plan's depth for as long as that fetch is in flight whenever a
    * Reaction Location is configured. `autoBuildDepthContext` is the same seam
@@ -674,19 +673,14 @@ export function BuildPlanDetail({
     return gates;
   }, [visibleMaterials, catalog, accountSkills]);
 
-  // Narrowed to the plan's owned-stock scope (issue #454); `detectedStock`
-  // itself stays the full, galaxy-wide picture the breakdown popover shows.
-  const scopedStock = useMemo(
-    () => filterStockByScope(detectedStock, plan.ownedStockScope),
-    [detectedStock, plan.ownedStockScope]
-  );
-
-  const detection = useMemo<OwnedStockDetection>(
+  // `scopedStock` is narrowed to the plan's owned-stock scope (issue #454);
+  // `detectedStock` stays the galaxy-wide picture the breakdown popover shows.
+  const { detection, scopedStock } = useMemo(
     () =>
-      ownedStockDetection(
+      ownedStockView(
         {
           stock: detectedStock,
-          scopedStock,
+          scope: plan.ownedStockScope,
           characterNames,
           locationNames,
           incompleteCharacters,
@@ -702,7 +696,7 @@ export function BuildPlanDetail({
       ),
     [
       detectedStock,
-      scopedStock,
+      plan.ownedStockScope,
       characterNames,
       locationNames,
       incompleteCharacters,

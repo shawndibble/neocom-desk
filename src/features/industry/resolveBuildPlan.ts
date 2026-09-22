@@ -5,8 +5,8 @@
  *
  * Every view that prices a plan — its own page (`BuildPlanDetail.tsx`),
  * Compare, the Industry index and every Group Rollup
- * (`useComparedBuildResults.ts`) — calls this, so the wiring they used to
- * each do by hand can no longer drift between them:
+ * (`useComparedBuildResults.ts`) — calls this, so the wiring can't drift
+ * between them:
  *
  * - Corp blueprints fold in per plan, exactly when that plan's own
  *   `includeCorpAssets` is on (issue #839) — never one list for every plan.
@@ -28,14 +28,12 @@ import i18n from '@/i18n';
 import type { BuildPlanRecord } from '@/db';
 import { MAX_JOB_RUNS } from '@/engine/industry/types';
 import type {
-  AcquisitionResolution,
   BuildResult,
   HubPrices,
-  IndustryBlueprint,
   ReactionFacilityContext,
   SkillLevels,
 } from '@/engine/industry/types';
-import type { MakeOrBuyContext, MaterialRecipe } from '@/engine/industry/makeOrBuy';
+import type { MakeOrBuyContext } from '@/engine/industry/makeOrBuy';
 import type { BpcOffer } from '@/engine/industry/blueprintAcquisition';
 import type { CharacterBlueprint } from '@/esi/endpoints';
 import type { PiData } from '@/sde/types';
@@ -55,6 +53,9 @@ import {
   type RecipeSources,
 } from './recipes';
 
+/** The parts of `CorpOwnedBlueprintsState` resolution reads. */
+export type CorpBlueprintSource = Pick<CorpOwnedBlueprintsState, 'available' | 'blueprints'>;
+
 /** Everything a plan resolves against that is not the plan itself or its prices. */
 export interface BuildPlanSources {
   catalog: BlueprintCatalog;
@@ -63,7 +64,7 @@ export interface BuildPlanSources {
   /** The active Character's own blueprints. */
   ownedBlueprints: readonly CharacterBlueprint[];
   /** Folded in per plan — see `planOwnedBlueprints`. Absent reads as unavailable. */
-  corpBlueprints?: CorpOwnedBlueprintsState;
+  corpBlueprints?: CorpBlueprintSource;
   /** ME to quote an unowned sub-build at (`useAssumedMe`). */
   assumedMe: number;
   skills: SkillLevels;
@@ -90,7 +91,6 @@ export interface ResolveBuildPlanOptions {
 }
 
 export interface ResolvedBuildPlan {
-  blueprint: IndustryBlueprint | null;
   result: BuildResult | null;
   error: string | null;
   /** Null unless `withGroupResult` was requested and succeeded. */
@@ -99,19 +99,13 @@ export interface ResolvedBuildPlan {
   /** The ME/TE actually priced — the top-level acquisition's tier, else the plan's own. */
   resolvedMe: number;
   resolvedTe: number;
-  /** Null until live prices land (same gate as `makeOrBuyContext`). */
-  topLevelAcquisition: AcquisitionResolution | null;
   /**
    * Every make-or-buy verdict's pricing context. Null until adjusted prices
    * and a system cost index land: a fee-free quote would call almost
    * everything worth building.
    */
   makeOrBuyContext: MakeOrBuyContext | null;
-  reactionFacility: ReactionFacilityContext | undefined;
   materialPrices: HubPrices;
-  /** Personal plus, when this plan opts in, corp blueprints. */
-  ownedBlueprints: readonly CharacterBlueprint[];
-  recipeFor: (typeID: number) => MaterialRecipe | null;
 }
 
 /**
@@ -123,7 +117,7 @@ export interface ResolvedBuildPlan {
 export function planOwnedBlueprints(
   plan: Pick<BuildPlanRecord, 'includeCorpAssets'>,
   ownedBlueprints: readonly CharacterBlueprint[],
-  corpBlueprints: CorpOwnedBlueprintsState | undefined
+  corpBlueprints: CorpBlueprintSource | undefined
 ): readonly CharacterBlueprint[] {
   return (plan.includeCorpAssets ?? false) &&
     corpBlueprints?.available &&
@@ -188,22 +182,17 @@ export function resolveBuildPlan(
     groupResult: null,
     groupError: null,
     makeOrBuyContext,
-    reactionFacility,
     materialPrices,
-    ownedBlueprints,
-    recipeFor,
   };
 
   const catalogEntry = sources.catalog.byBlueprintTypeID.get(plan.blueprintTypeID);
   if (!catalogEntry) {
     return {
       ...base,
-      blueprint: null,
       result: null,
       error: i18n.t('industry.blueprintMissing'),
       resolvedMe: plan.me,
       resolvedTe: plan.te,
-      topLevelAcquisition: null,
     };
   }
   const blueprint = toIndustryBlueprint(catalogEntry.blueprint);
@@ -264,13 +253,11 @@ export function resolveBuildPlan(
 
   return {
     ...base,
-    blueprint,
     result,
     error,
     groupResult,
     groupError,
     resolvedMe,
     resolvedTe,
-    topLevelAcquisition,
   };
 }

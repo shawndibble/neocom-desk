@@ -64,7 +64,7 @@ export function reactionPlanFacilityContextFor(
  * with every pricing field zeroed, since `maxAutoBuildDepth` never prices
  * anything — only walks the tree. Built from the plan-level
  * `reactionPlanFacilityContextFor` result, never the price-resolved
- * `reactionFacilityContext` a rendered plan also carries: that one stays
+ * `reactionFacilityFor` one a rendered plan also carries: that one stays
  * `undefined` until its own market snapshot lands, which would gate depth
  * discovery on a fetch it does not need for any plan with a Reaction
  * Location configured. The single seam `BuildPlanDetail.tsx`'s solo control
