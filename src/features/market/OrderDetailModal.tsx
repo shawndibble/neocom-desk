@@ -26,7 +26,7 @@ import { cx } from '@/lib/cx';
 import { buttonClassName } from '@/components/ui/buttonClassName';
 import { Link } from 'react-router-dom';
 import { formatIsk } from '@/lib/isk';
-import { salesTax, brokerFee } from '@/engine/industry/fees';
+import { salesTax } from '@/engine/industry/fees';
 import type { JumpsAwayResult } from '@/engine/jumpsAway';
 import { JumpsAwayText } from '@/features/character/assetBrowserRows';
 import type { UndercutRival, UndercutScope } from '@/engine/market/undercut';
@@ -700,7 +700,7 @@ export function OrderDetailModal({
                     {/*
                       Rendered as ISK off `floor.relist`, not as a bare
                       percentage: `unitCost + salesTax(relist) +
-                      brokerFee(relist) === relist` by construction
+                      brokerFeePerUnit === relist` by construction
                       (`breakEvenPrice` solves for exactly that revenue),
                       including its 100 ISK minimum-broker-fee floor — which a
                       percentage-of-unitCost readout would silently miss. This
@@ -708,6 +708,14 @@ export function OrderDetailModal({
                       floor shown below, so gated on `row.floor` (not `skills`
                       alone): there is no relist price to read the fee off
                       without it.
+
+                      Broker fee is read as the ledger's remainder
+                      (`relist - unitCost - salesTax`), not
+                      `brokerFee(relist, ...)`: `relist` is already a
+                      PER-UNIT price, and `brokerFee()` would re-apply its own
+                      100 ISK minimum to that single unit, silently
+                      reintroducing the per-unit minimum this floor fix
+                      removes for large remaining-quantity stacks.
                     */}
                     {skills && row.floor && (
                       <>
@@ -717,7 +725,7 @@ export function OrderDetailModal({
                         />
                         <LedgerRow
                           label={t('industry.brokerFee')}
-                          value={`${formatIsk(brokerFee(row.floor.relist, skills.brokerRelationsLevel), 2)} ISK`}
+                          value={`${formatIsk(row.floor.relist - row.costBasis.unitCost - salesTax(row.floor.relist, skills.accountingLevel), 2)} ISK`}
                         />
                       </>
                     )}
