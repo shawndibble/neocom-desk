@@ -3,10 +3,10 @@ import {
   getCharacterWallet,
   getCharacterWalletJournal,
   getCharacterWalletTransactions,
-  uniqueTransactions,
   type WalletJournalEntry,
   type WalletTransaction,
 } from '@/esi/endpoints';
+import { uniqueTransactions } from '@/esi/uniqueTransactions';
 import {
   loadWithCache,
   loadWithCacheStatus,

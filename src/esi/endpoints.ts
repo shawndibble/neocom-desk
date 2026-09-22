@@ -9,6 +9,7 @@
  * registry, and `endpointId` being typed `EsiEndpointId` makes a typo a
  * compile error.
  */
+import { uniqueTransactions } from './uniqueTransactions';
 import { esiFetch, recordEsiActivity, outcomeForError } from './client';
 import type { EsiResult } from './client';
 import { fetchAllPagesStatus } from './paginated';
@@ -357,23 +358,6 @@ export interface WalletTransaction extends WalletTransactionCommon {
  * full history is unbounded and this view needs only recent activity.
  */
 const MAX_TRANSACTION_PAGES = 5;
-
-/**
- * First occurrence of each `transaction_id`, order kept. The cursor walk
- * below applies it as it goes; the loaders apply it again on the way out,
- * because lists cached before that fix still carry repeats and a fresh
- * cached row is served without a fetch.
- */
-export function uniqueTransactions<T extends Pick<WalletTransactionCommon, 'transaction_id'>>(
-  rows: readonly T[]
-): T[] {
-  const seen = new Set<number>();
-  return rows.filter((row) => {
-    if (seen.has(row.transaction_id)) return false;
-    seen.add(row.transaction_id);
-    return true;
-  });
-}
 
 /**
  * Walks a `from_id` transaction cursor to the page cap.

@@ -22,13 +22,13 @@ import {
   getCorporationDivisions,
   getCorporationWalletJournal,
   getCorporationWalletTransactions,
-  uniqueTransactions,
   getCorporationWallets,
   type CorporationDivisions,
   type CorporationWalletDivision,
   type CorporationWalletTransaction,
   type WalletJournalEntry,
 } from '@/esi/endpoints';
+import { uniqueTransactions } from '@/esi/uniqueTransactions';
 import type { StatusResult } from '@/esi/cache';
 import { loadCorpPaginatedWithCacheStatus, loadCorpWithCacheStatus } from './corpRead';
 
