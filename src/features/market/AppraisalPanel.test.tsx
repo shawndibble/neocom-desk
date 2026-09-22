@@ -61,7 +61,7 @@ const APPRAISAL: Appraisal = {
 };
 
 function outcome(overrides: Partial<AppraisalOutcome> = {}): AppraisalOutcome {
-  return { appraisal: APPRAISAL, unmatched: [], ...overrides };
+  return { appraisal: APPRAISAL, unmatched: [], implantBonusPct: 0, ...overrides };
 }
 
 /**
@@ -264,6 +264,7 @@ describe('AppraisalPanel', () => {
           },
         },
         unmatched: [],
+        implantBonusPct: 0,
         ...overrides,
       };
     }
@@ -376,6 +377,7 @@ describe('AppraisalPanel', () => {
           },
         },
         unmatched: [],
+        implantBonusPct: 0,
         ...overrides,
       };
     }

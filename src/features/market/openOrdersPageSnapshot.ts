@@ -17,6 +17,8 @@
  */
 import { loadTypeNames } from '@/features/character/typeNames';
 import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
+import { loadCharacterImplants } from '@/features/skills/data';
+import { resolveImplantBonusPct } from '@/engine/industry/reprocessing';
 import { SKILL_IDS } from '@/engine/industry/types';
 import { loadNpcStations } from '@/sde/loadMarketSde';
 import type { NpcStationEntry } from '@/sde/marketTypes';
@@ -140,7 +142,10 @@ export async function loadOpenOrdersSnapshot(
 
   const skillsByCharacter = new Map<number, CharacterSkills>();
   await mapWithConcurrencyLimit(openOrders.entries, ESI_FANOUT_CONCURRENCY, async (entry) => {
-    const corrected = await loadCorrectedSkills(entry.characterId, now);
+    const [corrected, implants] = await Promise.all([
+      loadCorrectedSkills(entry.characterId, now),
+      loadCharacterImplants(entry.characterId),
+    ]);
     skillsByCharacter.set(entry.characterId, {
       accountingLevel: corrected.trained.get(SKILL_IDS.accounting)?.level ?? 0,
       brokerRelationsLevel: corrected.trained.get(SKILL_IDS.brokerRelations)?.level ?? 0,
@@ -149,6 +154,7 @@ export async function loadOpenOrdersSnapshot(
       reprocessingLevel: corrected.trained.get(SKILL_IDS.reprocessing)?.level ?? 0,
       reprocessingEfficiencyLevel:
         corrected.trained.get(SKILL_IDS.reprocessingEfficiency)?.level ?? 0,
+      implantBonusPct: resolveImplantBonusPct(implants?.data ?? []),
       trained: corrected.trained,
     });
   });

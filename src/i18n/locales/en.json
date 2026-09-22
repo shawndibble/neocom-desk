@@ -1564,6 +1564,7 @@
         "pricingTitle": "How this is priced",
         "priceBasisHint": "Jita average on {{date}}, not today's price. Raw ore is priced as its compressed form.",
         "refineBasisHint": "Refining uses {{character}}'s Reprocessing and Reprocessing Efficiency skills at an NPC station's 50% base rate ({{efficiency}}% yield), with no station tax deducted.",
+        "refineImplantHint": "Includes the active clone's fitted refining implant, +{{pct}}% to ore and ice yield.",
         "partialPricingHint": "Some types had no market history on this date. Their value is left out of both totals rather than guessed."
       }
     }
@@ -2977,6 +2978,7 @@
       "buyTotalHelp": "What the list fetches if you sell into buy orders at this hub right now.",
       "refineTotal": "Refine total",
       "refineTotalHelp": "What refining the list with the active Character's own reprocessing skills would fetch, sold into buy orders at this hub. Assumes an NPC station's 50% base rate and no ore-specialisation skill — neither is modelled — so a trained miner's real yield runs higher than shown.",
+      "refineImplantHint": "Includes the active clone's fitted refining implant, +{{pct}}% to ore and ice yield.",
       "refinePartialHint": "At least one material has no price at this hub, so this total is a floor rather than the full value.",
       "refineUnpriced_one": "{{count}} refine value has an unpriced material, so it is a floor rather than the full total.",
       "refineUnpriced_other": "{{count}} refine values have an unpriced material, so they are floors rather than the full total.",
@@ -3236,6 +3238,7 @@
       "exitReprocessNotBuilt": "Reprocess and sell the minerals",
       "exitReprocess": "Reprocess and sell the materials, {{price}} a unit",
       "exitReprocessAssumption": "Assumes a {{rate}}% station and no station tax, valued against the buy orders here.",
+      "exitReprocessImplant": "Includes the active clone's fitted refining implant, +{{pct}}% to ore and ice yield.",
       "exitReprocessPartial": "At least one material has no buy order here, so this total is a floor.",
       "exitReprocessLeftOver_one": "{{count}} unit is short of a full refining batch and returns nothing.",
       "exitReprocessLeftOver_other": "{{count}} units are short of a full refining batch and return nothing.",

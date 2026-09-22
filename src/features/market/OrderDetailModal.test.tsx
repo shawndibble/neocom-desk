@@ -26,6 +26,7 @@ const SKILLS: CharacterSkills = {
   advancedBrokerRelationsLevel: 5,
   reprocessingLevel: 0,
   reprocessingEfficiencyLevel: 0,
+  implantBonusPct: 0,
   trained: new Map(),
 };
 
@@ -851,6 +852,23 @@ describe('OrderDetailModal', () => {
         )
       ).toBeInTheDocument();
       expect(screen.queryByText('Reprocess and sell the minerals')).not.toBeInTheDocument();
+    });
+
+    it('says nothing about an implant when none is fitted', () => {
+      renderModal({ row: FLOORED_ROW, reprocessing: REPROCESSING });
+      expect(screen.queryByText(/fitted refining implant/)).not.toBeInTheDocument();
+    });
+
+    it("names the fitted refining implant's bonus (issue #1227)", () => {
+      renderModal({
+        row: FLOORED_ROW,
+        reprocessing: { ...REPROCESSING, skills: { ...REPROCESSING.skills, implantBonusPct: 4 } },
+      });
+      expect(
+        screen.getByText(
+          "Includes the active clone's fitted refining implant, +4% to ore and ice yield."
+        )
+      ).toBeInTheDocument();
     });
 
     it('says how much stock is short of a whole refining batch', () => {

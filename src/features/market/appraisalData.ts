@@ -49,11 +49,13 @@ import {
 import { parseAppraisalPaste } from '@/engine/market/appraisalPaste';
 import {
   resolveReprocessingSkills,
+  resolveImplantBonusPct,
   type GeneralReprocessingSkills,
 } from '@/engine/industry/reprocessing';
 import { SKILL_IDS } from '@/engine/industry/types';
 import type { TrainedSkill } from '@/engine/types';
 import { findLpOfferMatches, toLpOfferInputs } from '@/features/market/appraisalLpAcquisition';
+import { loadCharacterImplants } from '@/features/skills/data';
 import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
 import { TRADE_HUBS, type TradeHub } from '@/market/hubs';
 import { getHubPrices, invalidateHubPrices } from '@/market/prices';
@@ -64,6 +66,8 @@ import type { ReprocessingType } from '@/sde/types';
 export interface AppraisalOutcome {
   appraisal: Appraisal;
   unmatched: AppraisalUnmatched[];
+  /** The active clone's refining implant bonus folded into every row's `refine`, 0 with none fitted or no active Character (issue #1227). */
+  implantBonusPct: number;
 }
 
 /**
@@ -118,12 +122,16 @@ export interface AppraiseOptions {
 async function loadReprocessingSkills(
   characterId: number
 ): Promise<{ skills: GeneralReprocessingSkills; trained: ReadonlyMap<number, TrainedSkill> }> {
-  const corrected = await loadCorrectedSkills(characterId, Date.now());
+  const [corrected, implants] = await Promise.all([
+    loadCorrectedSkills(characterId, Date.now()),
+    loadCharacterImplants(characterId),
+  ]);
   return {
     skills: {
       reprocessingLevel: corrected.trained.get(SKILL_IDS.reprocessing)?.level ?? 0,
       reprocessingEfficiencyLevel:
         corrected.trained.get(SKILL_IDS.reprocessingEfficiency)?.level ?? 0,
+      implantBonusPct: resolveImplantBonusPct(implants?.data ?? []),
     },
     trained: corrected.trained,
   };
@@ -227,6 +235,7 @@ export async function appraisePaste(
   return {
     appraisal: buildAppraisal(items, pricePercent),
     unmatched,
+    implantBonusPct: reprocessingSkills?.skills.implantBonusPct ?? 0,
   };
 }
 

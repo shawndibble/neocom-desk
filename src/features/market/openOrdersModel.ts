@@ -135,6 +135,8 @@ export interface CharacterSkills {
   reprocessingLevel: number;
   /** Reprocessing Efficiency (3389). */
   reprocessingEfficiencyLevel: number;
+  /** The active clone's refining implant bonus, if any (issue #1227) — `resolveImplantBonusPct`'s result. */
+  implantBonusPct: number;
   /**
    * Every trained skill, so the reprocess exit can resolve each order's own
    * item to its specialisation via `resolveSpecialisationLevel` (issue
