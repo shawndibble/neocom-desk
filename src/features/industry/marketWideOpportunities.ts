@@ -115,12 +115,16 @@ export async function runMarketWideScan(
 
   // Every candidate here already passed the liquidity filter, so `sellPrice`
   // and `sellVolume` are non-null by construction.
-  const marketWideCandidates: MarketWideCandidate[] = liquid.map((candidate) => ({
-    productTypeID: candidate.productTypeID,
-    tree: trees[String(candidate.productTypeID)]!,
-    sellPrice: candidate.sellPrice!,
-    sellDepthIsk: candidate.sellPrice! * candidate.sellVolume!,
-  }));
+  const marketWideCandidates: MarketWideCandidate[] = liquid.map((candidate) => {
+    const tree = trees[String(candidate.productTypeID)]!;
+    return {
+      productTypeID: candidate.productTypeID,
+      tree,
+      sellPrice: candidate.sellPrice!,
+      sellDepthIsk: candidate.sellPrice! * candidate.sellVolume!,
+      blueprintSkills: catalog.byBlueprintTypeID.get(tree.blueprintTypeID)?.blueprint.skills,
+    };
+  });
 
   // Same dead-ESI fallback as `computeOpportunityRow`: degrade the job-fee
   // term toward 0 rather than drop every row.
