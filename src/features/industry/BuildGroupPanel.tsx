@@ -30,11 +30,7 @@ import type { BuildPlanRecord } from '@/db';
 import type { BuildStrategy } from '@/engine/industry/autoMakeOrBuy';
 import { rollUpBuildGroup, type BuildGroupMember } from '@/engine/industry/groupRollup';
 import { rowVolume, totalVolume } from '@/engine/industry/materialVolume';
-import {
-  filterStockByScope,
-  suggestedOwnedQuantity,
-  type OwnedStockScope,
-} from '@/engine/industry/ownedStock';
+import { suggestedOwnedQuantity, type OwnedStockScope } from '@/engine/industry/ownedStock';
 import type { MaterialCostLine, SkillLevels } from '@/engine/industry/types';
 import type { CharacterBlueprint } from '@/esi/endpoints';
 import { iskToneClass } from '@/features/character/format';
@@ -46,13 +42,9 @@ import { unmaskNumber } from '@/lib/numberMask';
 import { getTradeHub } from '@/market/hubs';
 import type { PiData } from '@/sde/types';
 import { useAssumedMe } from './assumedMe';
-import {
-  nameForType,
-  toIndustryBlueprint,
-  volumeForType,
-  type BlueprintCatalog,
-} from './blueprintCatalog';
+import { nameForType, volumeForType, type BlueprintCatalog } from './blueprintCatalog';
 import type { BuildGroup } from './buildGroups';
+import type { CorpOwnedBlueprintsState } from './corpOwnedBlueprints';
 import { AutoBuildControl } from './AutoBuildControl';
 import { groupCraftScope, groupAutoBuildMaxDepth } from './autoBuildGroup';
 import { formatPercent, formatVolume } from './format';
@@ -60,9 +52,14 @@ import { profitOf, verdictOf } from './groupIndexStats';
 import { SourcingInput } from './MaterialsTable';
 import { OwnedStockHint } from './OwnedStockHint';
 import { OwnedStockScopeControl } from './OwnedStockScopeControl';
-import { stockLocationLabel, type OwnedStockSnapshot } from './ownedStockDetection';
-import type { OwnedStockDetection } from './ownedStockDetection';
-import { recipeForLookup } from './recipes';
+import type { OwnedStockSnapshot } from './ownedStockDetection';
+import {
+  bulkUseDetected,
+  bulkUseNone,
+  groupMaterialTypeIdKey,
+  ownedStockView,
+  typeIdsFromKey,
+} from './planMaterialsView';
 import { flattenBuildResult } from './resultFlattenCache';
 import { hasShoppingList, shoppingListText } from './shoppingList';
 import { useComparedBuildResults } from './useComparedBuildResults';
@@ -99,6 +96,8 @@ interface BuildGroupPanelProps {
   catalog: BlueprintCatalog;
   pi: PiData | null;
   ownedBlueprints: readonly CharacterBlueprint[];
+  /** Folded into each member on its own `includeCorpAssets` — see `resolveBuildPlan`. */
+  corpOwnedBlueprints?: CorpOwnedBlueprintsState;
   skills: SkillLevels;
   ownedStockSnapshot: OwnedStockSnapshot;
   /** Opens one member on its own, the way clicking it in the list would. */
@@ -129,6 +128,7 @@ export function BuildGroupPanel({
   catalog,
   pi,
   ownedBlueprints,
+  corpOwnedBlueprints,
   skills,
   ownedStockSnapshot,
   onOpenPlan,
@@ -153,6 +153,7 @@ export function BuildGroupPanel({
     catalog,
     pi,
     ownedBlueprints,
+    corpOwnedBlueprints,
     skills,
     computeGroupResult: true,
   });
@@ -161,10 +162,6 @@ export function BuildGroupPanel({
   // pricing — sub-builds unowned anywhere in the group must assume the same
   // ME that hook already quotes them at.
   const assumedMe = useAssumedMe((state) => state.value);
-  const recipeFor = useMemo(
-    () => recipeForLookup({ catalog, pi, ownedBlueprints, assumedMeForUnowned: assumedMe }),
-    [catalog, pi, ownedBlueprints, assumedMe]
-  );
 
   // Depth is structural — which typeIDs have a recipe — and never
   // moves with a member's runs/ME/hub/sourcing edit, so this keys on the
@@ -175,9 +172,22 @@ export function BuildGroupPanel({
   // avoid for the rollup's own flattening.
   const autoBuildBlueprintSignature = plans.map((p) => `${p.blueprintTypeID}`).join(',');
   const autoBuildMaxDepth = useMemo(
-    () => groupAutoBuildMaxDepth(plans, catalog, recipeFor, skills),
+    () =>
+      groupAutoBuildMaxDepth(
+        plans,
+        { catalog, pi, ownedBlueprints, corpOwnedBlueprints, assumedMe },
+        skills
+      ),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- autoBuildBlueprintSignature is the stable proxy for `plans`' structural identity; see comment above.
-    [autoBuildBlueprintSignature, catalog, recipeFor, skills]
+    [
+      autoBuildBlueprintSignature,
+      catalog,
+      pi,
+      ownedBlueprints,
+      corpOwnedBlueprints,
+      assumedMe,
+      skills,
+    ]
   );
   // Craft Scope's Reactions chip (issue #698): lit whenever any single member
   // is eligible, keyed on each member's own flag too, unlike the signature
@@ -240,21 +250,20 @@ export function BuildGroupPanel({
     return { members, builtQuantityByType };
   }, [rows, plans]);
 
-  // The members' *blueprint* material types, never the computed cost lines:
-  // those get a fresh array identity on every runs/ME keystroke, and an asset
-  // list runs to tens of thousands of rows per Character. Sorted, so the array
-  // identity the detection hook memoizes on survives a reordering of `plans`.
-  const materialTypeIds = useMemo(() => {
-    const ids = new Set<number>();
-    for (const plan of plans) {
-      const entry = catalog.byBlueprintTypeID.get(plan.blueprintTypeID);
-      if (!entry) continue;
-      for (const material of toIndustryBlueprint(entry.blueprint).materials) {
-        ids.add(material.typeID);
-      }
-    }
-    return [...ids].sort((a, b) => a - b);
-  }, [plans, catalog]);
+  // Every type any member's whole tree can show, not only each blueprint's
+  // own materials: the buy table below lists sub-build leaves
+  // (`rollup.tableMaterials`), and a mineral only a component's recipe
+  // introduces is as ownable here as on that member's own page — the same
+  // Tritanium bug `BuildPlanDetail.tsx` fixed for one plan. Keyed on the
+  // blueprints in play, like `autoBuildMaxDepth` above: `plans` gets a fresh
+  // identity on every keystroke in any member, and an asset list runs to
+  // tens of thousands of rows per Character.
+  const materialTypeIdsKey = useMemo(
+    () => groupMaterialTypeIdKey(plans, { catalog, pi }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- autoBuildBlueprintSignature is the stable proxy for `plans`' structural identity; see autoBuildMaxDepth.
+    [autoBuildBlueprintSignature, catalog, pi]
+  );
+  const materialTypeIds = useMemo(() => typeIdsFromKey(materialTypeIdsKey), [materialTypeIdsKey]);
 
   // The very detection a single plan's own page runs, over the union of the
   // group's materials — reused rather than re-derived, so a group and its
@@ -263,25 +272,12 @@ export function BuildGroupPanel({
   // rollup directly — `rollUpBuildGroup` only ever sees the ledger the pilot
   // has committed to, in `ownedStockMap`.
   const detected = useDetectedOwnedStock(ownedStockSnapshot, materialTypeIds);
-  const scopedStock = useMemo(
-    () => filterStockByScope(detected.stock, group.ownedStockScope),
-    [detected.stock, group.ownedStockScope]
-  );
-  const detection = useMemo<OwnedStockDetection>(
-    () => ({
-      stockFor: (typeID) => detected.stock.get(typeID),
-      scopedQuantityFor: (typeID) => scopedStock.get(typeID)?.quantity ?? 0,
-      lowerBound: detected.incompleteCharacters.length > 0,
-      incompleteCharacters: detected.incompleteCharacters,
-      characterNameFor: (characterId) =>
-        detected.characterNames.get(characterId) ?? t('common.unknown'),
-      // Corp Assets (issue #798) is a per-plan toggle, not a group-level one —
-      // the group rollup never merges a corp source in, so this is never
-      // actually reached, only required by the shared `OwnedStockDetection` shape.
-      corporationNameFor: () => t('common.unknown'),
-      locationLabelFor: (placement) => stockLocationLabel(placement, detected.locationNames, t),
-    }),
-    [detected, scopedStock, t]
+  // Corp Assets (issue #798) is a per-plan toggle, not a group-level one —
+  // the group rollup never merges a corp source in, so no corp name or corp
+  // incompleteness is passed.
+  const { detection, scopedStock } = useMemo(
+    () => ownedStockView({ ...detected, scope: group.ownedStockScope }, t),
+    [detected, group.ownedStockScope, t]
   );
 
   const ownedStockMap = useMemo(
@@ -405,21 +401,14 @@ export function BuildGroupPanel({
   );
 
   // Same "never clobber a hand-typed value" rule the plan-level bulk fill
-  // keeps: only rows with nothing in the ledger yet are offered. Scoped to
-  // `buyRows`, not every merged material — a fully-crafted row (see above)
-  // is never bought, so it has no owned quantity for "Use all"/"Use none" to
-  // touch.
+  // keeps (`planMaterialsView.ts`). Scoped to `buyRows`, not every merged
+  // material — a fully-crafted row (see above) is never bought, so it has no
+  // owned quantity for "Use all" to fill.
   const bulkDetectedEntries = useMemo(
     () =>
-      buyRows
-        .filter((m) => ownedStockMap.get(m.typeID) === undefined && scopedStock.has(m.typeID))
-        .map(
-          (m) =>
-            [
-              m.typeID,
-              suggestedOwnedQuantity(scopedStock.get(m.typeID)!.quantity, m.quantity),
-            ] as const
-        ),
+      bulkUseDetected(buyRows, (typeID) => ownedStockMap.get(typeID), scopedStock).map(
+        ({ typeID, ownedQuantity }) => [typeID, ownedQuantity] as const
+      ),
     [buyRows, ownedStockMap, scopedStock]
   );
   // Unlike `bulkDetectedEntries`, this scans every merged material, not just
@@ -430,9 +419,9 @@ export function BuildGroupPanel({
   // to be able to reach it, or a stray entry becomes permanently stuck.
   const bulkClearTypeIds = useMemo(
     () =>
-      rollup.tableMaterials
-        .filter((m) => (ownedStockMap.get(m.typeID) ?? 0) > 0)
-        .map((m) => m.typeID),
+      bulkUseNone(rollup.tableMaterials, (typeID) => ownedStockMap.get(typeID)).map(
+        ({ typeID }) => typeID
+      ),
     [rollup.tableMaterials, ownedStockMap]
   );
 

@@ -12,7 +12,13 @@ import { useMarketHub } from '@/features/market/hub';
 import { useLocationMode, DEFAULT_LOCATION_MODE } from '@/features/market/locationMode';
 import { clearOrderBookCache, ORDER_BOOK_FANOUT_CONCURRENCY } from '@/features/market/orderBook';
 import { resetEsiBudget } from '@/esi/budget';
-import { loadMarketGroups, loadMarketTypes, loadVariations } from '@/sde/loadMarketSde';
+import {
+  loadGlobalMarkets,
+  loadMarketGroups,
+  loadMarketTypes,
+  loadNpcStations,
+  loadVariations,
+} from '@/sde/loadMarketSde';
 import { useCompareSet } from '@/features/market/compareSet';
 import { ESI_BASE_URL } from '@/esi/client';
 import { configureClipboard } from '@/lib/clipboard';
@@ -436,11 +442,11 @@ describe('Market Browser', () => {
     expect(within(buyTable).getByText('500,000.00')).toBeInTheDocument();
   });
 
-  it('an ESI failure clears the spinner instead of hanging on it', async () => {
-    // `getOrderBook` throws on any ESI failure, and the fetch effect used to
-    // let that reject into nothing: `setOrderBookLoading(false)` sat after the
-    // await, so a rate-limited market page spun forever and the rejection
-    // escaped as an unhandled one (which is how CI first caught this).
+  it('an ESI failure shows a failed state, not an empty book and not a spinner', async () => {
+    // `getOrderBook` throws on any ESI failure. The fetch effect once let
+    // that reject into nothing and spun forever; the fix after that read the
+    // failure as an empty book, telling the pilot nobody trades the item when
+    // the truth is the request never came back.
     server.use(
       http.get(`${ESI_BASE_URL}/markets/${RIFTER_REGION_ID}/orders`, () =>
         HttpResponse.json({ error: 'Rate limit exceeded' }, { status: 420 })
@@ -452,11 +458,73 @@ describe('Market Browser', () => {
     await user.type(await screen.findByRole('searchbox'), 'rift');
     await user.click(await screen.findByText('Rifter'));
 
-    // The empty book, not the spinner: `orderBookResult: null` is the state
-    // the rest of this page already reads as "loaded, nothing to show".
-    // Reaching this text at all means the loading branch was left behind.
-    expect(await screen.findByText('No sell orders')).toBeInTheDocument();
-    expect(screen.getByText('No buy orders')).toBeInTheDocument();
+    expect(await screen.findByText("Couldn't load the order book")).toBeInTheDocument();
+    expect(screen.queryByText('No sell orders')).not.toBeInTheDocument();
+    expect(screen.queryByText('No buy orders')).not.toBeInTheDocument();
+  });
+
+  it('a deep-linked item still loads its order book when the market catalogue fails', async () => {
+    // The book waits only on globalMarkets.json, never on the whole catalogue:
+    // a failed stations.json once left a selected item spinning forever.
+    vi.mocked(loadNpcStations).mockRejectedValueOnce(new Error('network error'));
+    server.use(ordersHandler({ count: 0 }));
+    window.history.pushState({}, '', '/market?type=587');
+
+    render(<App />);
+
+    expect(await screen.findByRole('table', { name: 'Sell Orders' })).toBeInTheDocument();
+  });
+
+  it('a failed globalMarkets.json load reads the chosen region instead of hanging', async () => {
+    vi.mocked(loadGlobalMarkets).mockRejectedValueOnce(new Error('network error'));
+    server.use(ordersHandler({ count: 0 }));
+    window.history.pushState({}, '', '/market?type=587');
+
+    render(<App />);
+
+    expect(await screen.findByRole('table', { name: 'Sell Orders' })).toBeInTheDocument();
+  });
+
+  it('Try again after a failed order book refetches and shows the rows', async () => {
+    let fail = true;
+    server.use(
+      http.get(`${ESI_BASE_URL}/markets/${RIFTER_REGION_ID}/orders`, () =>
+        fail
+          ? HttpResponse.json({ error: 'Internal error' }, { status: 500 })
+          : HttpResponse.json(
+              [
+                {
+                  order_id: 1,
+                  type_id: 587,
+                  is_buy_order: false,
+                  price: 450_000,
+                  location_id: 60003760,
+                  system_id: 30000142,
+                  volume_remain: 3,
+                  volume_total: 3,
+                  min_volume: 1,
+                  duration: 90,
+                  issued: '2026-08-01T00:00:00Z',
+                  range: 'region',
+                },
+              ],
+              { headers: { 'X-Pages': '1' } }
+            )
+      )
+    );
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.type(await screen.findByRole('searchbox'), 'rift');
+    await user.click(await screen.findByText('Rifter'));
+    await screen.findByText("Couldn't load the order book");
+
+    fail = false;
+    await user.click(screen.getByRole('button', { name: 'Try again' }));
+
+    const sellTable = await screen.findByRole('table', { name: 'Sell Orders' });
+    expect(within(sellTable).getByText('450,000.00')).toBeInTheDocument();
+    expect(screen.queryByText("Couldn't load the order book")).not.toBeInTheDocument();
   });
 
   it('Refresh bypasses the 300s order-book cache and refetches immediately', async () => {
@@ -1568,6 +1636,27 @@ describe('Market search focus (issue #25 "jump to search" shortcut)', () => {
       'href',
       '/industry?tab=sourcing&bpcSearch=638'
     );
+  });
+
+  it('does not point a blueprint at the BPC search when its order book failed to load', async () => {
+    vi.mocked(loadMarketTypes).mockResolvedValueOnce([
+      ...TYPES,
+      { typeId: 638, name: 'Rifter Blueprint', marketGroupId: 2 },
+    ]);
+    server.use(
+      http.get(`${ESI_BASE_URL}/markets/:regionId/orders`, () =>
+        HttpResponse.json({ error: 'Internal error' }, { status: 500 })
+      )
+    );
+    window.history.pushState({}, '', '/market?type=638');
+
+    render(<App />);
+
+    expect(await screen.findByText("Couldn't load the order book")).toBeInTheDocument();
+    expect(
+      screen.queryByText('Copies of this blueprint are traded on contract, not on the market.')
+    ).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Search BPC contracts' })).not.toBeInTheDocument();
   });
 
   it('leaves a non-blueprint empty order book alone', async () => {

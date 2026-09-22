@@ -20,22 +20,32 @@ import { useTranslation } from 'react-i18next';
 import { EmptyState, IskAmount, Modal, Spinner, TypeIcon } from '@/components/ui';
 import { groupItemAttributes, type AttributeGroup } from '@/engine/market/itemAttributes';
 import { parseItemDescription, type DescriptionRun } from '@/engine/market/itemDescription';
-import { summarizeOrderBook, type OrderBookSummary } from '@/engine/market/orderBook';
+import type { OrderBookSummary } from '@/engine/market/orderBook';
 import { getUniverseType, type UniverseType } from '@/esi/endpoints';
 import { loadAttributeDictionary } from '@/sde/loadMarketSde';
 import { loadPi } from '@/sde/loadSde';
 import type { PiData } from '@/sde/types';
 import { formatDuration } from '@/lib/duration';
-import { getTradeHub } from '@/market/hubs';
 import { loadAttributeReferenceNames } from './attributeReferenceNames';
 import { formatAttributeValue, formatVolume } from './format';
-import { useMarketHub } from './hub';
-import { getOrderBook } from './orderBook';
+import {
+  loadOrderBookView,
+  useSavedOrderBookLocation,
+  type OrderBookLocation,
+} from './orderBookView';
 
 export interface ItemDetailModalProps {
   typeId: number;
   itemName: string;
   onClose: () => void;
+  /**
+   * The location to price at. The Market Browser passes its own effective
+   * one (a shared link's hub/region can differ from the saved preference);
+   * every other page leaves it out and gets the saved Location Mode and
+   * Trade Hub — the same answer the Market Browser and its Compare Drawer
+   * give for the item there.
+   */
+  location?: OrderBookLocation;
 }
 
 interface DetailData {
@@ -55,42 +65,33 @@ type PriceState =
   { status: 'loading' } | { status: 'ready'; summary: OrderBookSummary } | { status: 'error' };
 
 /** Mounted only while open (ImportClipboardDialog's pattern) — mounting is the open signal. */
-export function ItemDetailModal({ typeId, itemName, onClose }: ItemDetailModalProps) {
+export function ItemDetailModal({ typeId, itemName, onClose, location }: ItemDetailModalProps) {
   const { t } = useTranslation();
   const [data, setData] = useState<DetailData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
-  const hubId = useMarketHub((state) => state.value);
-  const hubHydrated = useMarketHub((state) => state.hydrated);
-  const hydrateHub = useMarketHub((state) => state.hydrate);
+  const savedLocation = useSavedOrderBookLocation(location === undefined);
+  const priceLocation = location ?? savedLocation;
   const [priceState, setPriceState] = useState<PriceState>({ status: 'loading' });
 
   useEffect(() => {
-    void hydrateHub();
-  }, [hydrateHub]);
-
-  useEffect(() => {
-    if (!hubHydrated) return;
+    if (!priceLocation) return;
     let cancelled = false;
-    const regionId = getTradeHub(hubId)?.regionId;
     void (async () => {
       setPriceState({ status: 'loading' });
-      try {
-        if (regionId === undefined) throw new Error(`Unknown hub ${hubId}`);
-        const { orders } = await getOrderBook(regionId, typeId);
-        if (cancelled) return;
-        setPriceState({ status: 'ready', summary: summarizeOrderBook(orders) });
-      } catch {
-        // A nice-to-have fetch, same as the PI schematic below: its failure
-        // costs the price row, never the whole modal.
-        if (!cancelled) setPriceState({ status: 'error' });
-      }
+      // Never rejects: a failure is its own status. A nice-to-have fetch, same
+      // as the PI schematic below — it costs the price row, never the modal.
+      const view = await loadOrderBookView(typeId, priceLocation);
+      if (cancelled) return;
+      setPriceState(
+        view.status === 'failed' ? { status: 'error' } : { status: 'ready', summary: view.summary }
+      );
     })();
     return () => {
       cancelled = true;
     };
-  }, [typeId, hubId, hubHydrated]);
+  }, [typeId, priceLocation]);
 
   useEffect(() => {
     let cancelled = false;

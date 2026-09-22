@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
 import { useCompareRows, type CompareRow, type UseCompareRowsArgs } from './useCompareRows';
 import { getOrderBook, ORDER_BOOK_FANOUT_CONCURRENCY, type OrderBookResult } from './orderBook';
+import type { OrderBookLocation } from './orderBookView';
 import type { RegionOrder } from '@/esi/endpoints';
 
 vi.mock('./orderBook', async (importOriginal) => ({
@@ -14,11 +15,16 @@ const mockedGetOrderBook = vi.mocked(getOrderBook);
 const ITEM_A = { typeId: 34, itemName: 'Tritanium' };
 const ITEM_B = { typeId: 35, itemName: 'Pyerite' };
 
-const baseArgs: Omit<UseCompareRowsArgs, 'items' | 'enabled'> = {
-  chosenRegionId: 10000002,
-  globalMarkets: new Map(),
-  locationMode: 'region',
+const REGION_LOCATION: OrderBookLocation = {
+  mode: 'region',
+  regionId: 10000002,
   hubStationId: 60003760,
+  globalMarkets: new Map(),
+};
+const HUB_LOCATION: OrderBookLocation = { ...REGION_LOCATION, mode: 'hub' };
+
+const baseArgs: Omit<UseCompareRowsArgs, 'items' | 'enabled'> = {
+  location: REGION_LOCATION,
   refreshTick: 0,
 };
 
@@ -137,7 +143,7 @@ describe('useCompareRows', () => {
         items: [ITEM_A],
         enabled: true,
         ...baseArgs,
-        locationMode: 'hub',
+        location: HUB_LOCATION,
       })
     );
 
@@ -164,7 +170,7 @@ describe('useCompareRows', () => {
           order_id: 1,
           price: 7,
           volume_remain: 1,
-          location_id: baseArgs.hubStationId,
+          location_id: HUB_LOCATION.hubStationId,
         }),
       ])
     );
@@ -174,7 +180,7 @@ describe('useCompareRows', () => {
       { initialProps: { items: [ITEM_A], enabled: true, ...baseArgs } }
     );
 
-    rerender({ items: [ITEM_A], enabled: true, ...baseArgs, locationMode: 'hub' });
+    rerender({ items: [ITEM_A], enabled: true, ...baseArgs, location: HUB_LOCATION });
 
     await waitFor(() => expect(result.current[0]?.loading).toBe(false));
     expect(result.current[0]?.summary).toEqual({
