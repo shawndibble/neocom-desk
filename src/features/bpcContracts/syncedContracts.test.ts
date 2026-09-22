@@ -76,6 +76,22 @@ describe('loadPublicBpcContracts', () => {
     expect(result?.data.lastSyncedAt).toBe(1_700_000_000_000);
   });
 
+  it('carries blueprint originals separately from the copies (issue #1240)', async () => {
+    const original: PublicContractOfferRow = {
+      ...copyLine({ contractId: 2 }),
+      isBlueprintCopy: undefined,
+      runs: undefined,
+    };
+    getDocs.mockResolvedValue(snapshotDocs(1_700_000_000_000, [[copyLine(), original]]));
+
+    const result = await loadPublicBpcContracts(CHARACTER_ID);
+
+    expect(result?.data.rows.map((row) => row.contractId)).toEqual([1]);
+    expect(result?.data.originals).toEqual([
+      expect.objectContaining({ contractId: 2, me: 10, te: 20, runs: -1 }),
+    ]);
+  });
+
   it('tallies a contract as multi-type even when its lines straddle a chunk boundary (issue #1076)', async () => {
     // One contract's two lines land in two different chunk docs — exactly
     // the case fixed-size chunking over a contract-then-type sorted array

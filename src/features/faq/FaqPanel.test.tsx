@@ -56,6 +56,7 @@ const SETTING_KEY_TO_PHRASE: Readonly<Record<string, RegExp>> = {
   'sync.spExtractionMonitoringEnabled': /SP Extraction monitoring is on/i,
   'sync.spExtractionThresholdSp': /SP threshold you set/i,
   'sync.industryIncludeBlueprintCost': /blueprint cost counts toward Industry profit/i,
+  'sync.loyaltyLpValue': /ISK-per-LP value/i,
 };
 
 function syncedItemIds(): Set<string> {
