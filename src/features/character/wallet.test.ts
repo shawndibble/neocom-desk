@@ -265,6 +265,32 @@ describe('loadWalletTransactions', () => {
     const result = await loadWalletTransactions(CHAR_ID);
     expect(result?.data).toEqual(txns);
   });
+
+  it('drops a fill repeated in an already-cached list', async () => {
+    // Rows cached before the cursor learned to skip repeats carry the
+    // oldest fill several times; a still-fresh row is served without a fetch.
+    const txn = (transaction_id: number) => ({
+      transaction_id,
+      date: '2026-08-01T00:00:00Z',
+      location_id: 1,
+      type_id: 34,
+      unit_price: 5,
+      quantity: 1,
+      client_id: 1,
+      is_buy: true,
+      is_personal: true,
+      journal_ref_id: transaction_id,
+    });
+    await db.esiCache.put({
+      characterId: CHAR_ID,
+      key: 'wallet:transactions',
+      value: [txn(3), txn(2), txn(2), txn(1), txn(1), txn(1)],
+      fetchedAt: Date.now(),
+      truncated: true,
+    });
+    const result = await loadWalletTransactions(CHAR_ID);
+    expect(result?.data.map((t) => t.transaction_id)).toEqual([3, 2, 1]);
+  });
 });
 
 const CHAR_A = 1;

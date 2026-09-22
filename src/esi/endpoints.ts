@@ -9,6 +9,7 @@
  * registry, and `endpointId` being typed `EsiEndpointId` makes a typo a
  * compile error.
  */
+import { uniqueTransactions } from './uniqueTransactions';
 import { esiFetch, recordEsiActivity, outcomeForError } from './client';
 import type { EsiResult } from './client';
 import { fetchAllPagesStatus } from './paginated';
@@ -378,6 +379,7 @@ async function fetchTransactionCursor<T extends WalletTransactionCommon>(
   options: Omit<EndpointOptions, 'etag'>
 ): Promise<TruncatableResult<T>> {
   const items: T[] = [];
+  const seen = new Set<number>();
   let fromId: number | undefined;
   // The cap is a deliberate product limit, but the user still has to be told
   // when it bit. Using every call *and* getting data on the last one is the
@@ -391,13 +393,21 @@ async function fetchTransactionCursor<T extends WalletTransactionCommon>(
         characterId,
         query: fromId === undefined ? undefined : { from_id: fromId },
       });
-      const page_ = result.data ?? [];
-      if (page_.length === 0) break;
-      items.push(...page_);
+      // Live ESI answers `from_id` inclusively: each page repeats the fill it
+      // was asked from, and the oldest page is that one fill alone. Keeping
+      // only unseen ids stops the repeat from doubling a row (and every total
+      // over it), and a page with nothing new is where history ends — without
+      // this the walk re-fetched that last fill until the cap, then reported
+      // truncation that wasn't there. Not `fromId - 1` instead: an exclusive
+      // cursor would then skip the transaction `minId - 1`.
+      const fresh = uniqueTransactions(result.data ?? []).filter(
+        (t) => !seen.has(t.transaction_id)
+      );
+      if (fresh.length === 0) break;
+      for (const t of fresh) seen.add(t.transaction_id);
+      items.push(...fresh);
       truncated = page === MAX_TRANSACTION_PAGES - 1;
-      // from_id is exclusive, so the lowest id seen is already excluded from
-      // the next page; subtracting 1 would skip the transaction `minId - 1`.
-      fromId = Math.min(...page_.map((t) => t.transaction_id));
+      fromId = Math.min(...fresh.map((t) => t.transaction_id));
     }
   } catch (err) {
     if (err instanceof Error && err.name === 'AbortError') throw err;

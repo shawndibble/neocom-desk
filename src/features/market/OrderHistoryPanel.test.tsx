@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { useActiveCharacter } from '@/stores/activeCharacter';
@@ -99,5 +99,84 @@ describe('OrderHistoryPanel — the row as an item', () => {
 
     fireEvent.contextMenu(await screen.findByRole('row', { name: /Damage Control II/ }));
     expect(onRequestBlueprintCatalog).toHaveBeenCalled();
+  });
+});
+
+describe('OrderHistoryPanel — phone', () => {
+  const original = window.matchMedia;
+  beforeEach(() => {
+    // `useIsPhone` reads a max-width query; answering yes is how a phone looks under test.
+    window.matchMedia = (media: string) =>
+      ({
+        media,
+        matches: true,
+        onchange: null,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        addListener: () => {},
+        removeListener: () => {},
+        dispatchEvent: () => false,
+      }) as unknown as MediaQueryList;
+  });
+  afterEach(() => {
+    window.matchMedia = original;
+  });
+
+  function load(data: MarketOrderHistory[]) {
+    mockedLoadHistory.mockResolvedValue({
+      cached: { data, fetchedAt: new Date(), fromCache: false, truncated: false },
+      needsReauth: false,
+    });
+  }
+
+  it('shows item, filled and shorthand price per row, and opens the rest on tap', async () => {
+    load([historyOrder({ volume_remain: 1, volume_total: 3 })]);
+    renderPanel();
+
+    const toggle = await screen.findByRole('button', { name: /Damage Control II/ });
+    expect(screen.queryByRole('table')).toBeNull();
+    expect(within(toggle).getByText('2/3')).toBeInTheDocument();
+    expect(within(toggle).getByText('460.8K')).toBeInTheDocument();
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByText('1 / 3')).toBeInTheDocument();
+    expect(screen.getByText('460,800.00')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'View in market' })).toHaveAttribute(
+      'href',
+      expect.stringContaining('2048')
+    );
+  });
+
+  it('sorts by price from the column header', async () => {
+    mockedTypeNames.mockResolvedValue(
+      new Map([
+        [1, 'Cheap Thing'],
+        [2, 'Pricey Thing'],
+      ])
+    );
+    load([
+      historyOrder({ order_id: 1, type_id: 1, price: 10 }),
+      historyOrder({ order_id: 2, type_id: 2, price: 1_000 }),
+    ]);
+    renderPanel();
+    await screen.findByRole('button', { name: /Cheap Thing/ });
+
+    const names = () =>
+      screen
+        .getAllByRole('button', { name: /Thing/ })
+        .map((b) => b.textContent?.match(/(Cheap|Pricey) Thing/)?.[0]);
+    fireEvent.click(screen.getByRole('button', { name: 'Sort by Price' }));
+    expect(names()).toEqual(['Cheap Thing', 'Pricey Thing']);
+    fireEvent.click(screen.getByRole('button', { name: 'Price, sorted ascending' }));
+    expect(names()).toEqual(['Pricey Thing', 'Cheap Thing']);
+  });
+
+  it('carries the item context menu on every row', async () => {
+    load([historyOrder()]);
+    renderPanel();
+    fireEvent.contextMenu(await screen.findByRole('button', { name: /Damage Control II/ }));
+    expect(await screen.findByRole('menuitem', { name: 'Show info' })).toBeInTheDocument();
   });
 });

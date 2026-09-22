@@ -28,6 +28,7 @@ import {
   type CorporationWalletTransaction,
   type WalletJournalEntry,
 } from '@/esi/endpoints';
+import { uniqueTransactions } from '@/esi/uniqueTransactions';
 import type { StatusResult } from '@/esi/cache';
 import { loadCorpPaginatedWithCacheStatus, loadCorpWithCacheStatus } from './corpRead';
 
@@ -81,15 +82,21 @@ export function loadCorporationWalletJournal(
  * One division's market fills. `truncated` on the result means the cursor walk
  * stopped at its page cap, so older history is missing.
  */
-export function loadCorporationWalletTransactions(
+export async function loadCorporationWalletTransactions(
   characterId: number,
   corporationId: number,
   division: number
 ): Promise<StatusResult<CorporationWalletTransaction[]>> {
-  return loadCorpPaginatedWithCacheStatus(
+  const result = await loadCorpPaginatedWithCacheStatus(
     characterId,
     corporationId,
     KEYS.transactions(division),
     () => getCorporationWalletTransactions(characterId, corporationId, division)
   );
+  // Same repeat-in-cache cleanup as the character read (`uniqueTransactions`).
+  const cached = result.cached && {
+    ...result.cached,
+    data: uniqueTransactions(result.cached.data),
+  };
+  return { ...result, cached };
 }

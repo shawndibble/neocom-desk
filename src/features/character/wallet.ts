@@ -6,6 +6,7 @@ import {
   type WalletJournalEntry,
   type WalletTransaction,
 } from '@/esi/endpoints';
+import { uniqueTransactions } from '@/esi/uniqueTransactions';
 import {
   loadWithCache,
   loadWithCacheStatus,
@@ -141,10 +142,11 @@ export function loadWalletJournalWithStatus(
 }
 
 /** Transactions. `truncated` means the fetch stopped at the page cap. */
-export function loadWalletTransactions(
+export async function loadWalletTransactions(
   characterId: number
 ): Promise<CachedResult<WalletTransaction[]> | null> {
-  return loadPaginatedWithCache(characterId, KEYS.transactions, () =>
+  const result = await loadPaginatedWithCache(characterId, KEYS.transactions, () =>
     getCharacterWalletTransactions(characterId)
   );
+  return result && { ...result, data: uniqueTransactions(result.data) };
 }

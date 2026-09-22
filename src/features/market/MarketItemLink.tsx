@@ -5,6 +5,8 @@ import { marketLinkParams } from '@/engine/market/urlState';
 interface MarketItemLinkProps {
   typeId: number;
   children: ReactNode;
+  /** Replaces the default inline-link look, e.g. to draw it as a button. */
+  className?: string;
 }
 
 /**
@@ -13,13 +15,16 @@ interface MarketItemLinkProps {
  * `marketLinkParams` precedence as `ImplantChip` (#405) and the item context
  * menu's "View in Market".
  */
-export function MarketItemLink({ typeId, children }: MarketItemLinkProps) {
+export function MarketItemLink({ typeId, children, className }: MarketItemLinkProps) {
   const location = useLocation();
   const params = marketLinkParams(typeId, location.search);
   return (
     <Link
       to={`/market?${new URLSearchParams(params).toString()}`}
-      className="hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+      className={
+        className ??
+        'hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent'
+      }
     >
       {children}
     </Link>

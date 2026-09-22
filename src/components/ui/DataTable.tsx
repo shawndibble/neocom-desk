@@ -1,14 +1,7 @@
-import {
-  Fragment,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type ReactElement,
-  type ReactNode,
-} from 'react';
+import { Fragment, useMemo, useRef, useState, type ReactElement, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { cx } from '@/lib/cx';
+import { useScrollToRowKey } from '@/lib/useScrollToRowKey';
 import * as Icon from './icons';
 import { InfoTooltip } from './Tooltip';
 import { nextDataTableSort, sortRows } from './dataTableSort';
@@ -161,19 +154,7 @@ export function DataTable<T>({
   const [sort, setSort] = useState<DataTableSort | null>(defaultSort ?? null);
   const tableRef = useRef<HTMLTableElement>(null);
 
-  // Once, when the row first exists. Rows arrive a render or more after the
-  // key does (the fetch resolves later), so this depends on the row set as
-  // well as the key — and `scrollIntoView` on the same element twice is
-  // harmless, where missing it entirely leaves the reader where they landed.
-  useEffect(() => {
-    if (highlightRowKey === null) return;
-    const row = tableRef.current?.querySelector(
-      `[data-row-key="${CSS.escape(String(highlightRowKey))}"]`
-    );
-    if (!row) return;
-    const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
-    row.scrollIntoView({ block: 'center', behavior: reduced ? 'auto' : 'smooth' });
-  }, [highlightRowKey, rows]);
+  useScrollToRowKey(tableRef, highlightRowKey, rows);
 
   const headerPadding = density === 'compact' ? 'px-2 py-1' : 'px-3 py-2';
   const cellPadding = density === 'compact' ? 'px-2 py-1' : 'px-3 py-1.5';
