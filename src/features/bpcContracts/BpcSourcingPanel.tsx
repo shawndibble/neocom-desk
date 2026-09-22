@@ -67,6 +67,7 @@ import { useSpaceFilter } from '@/features/bpcContracts/bpcSpaceFilterPref';
 import { BpcContractModal } from '@/features/bpcContracts/BpcContractModal';
 import { BpoBadge } from '@/features/bpcContracts/BpoBadge';
 import { BpoCard } from '@/features/bpcContracts/BpoCard';
+import { useOfferLocations } from '@/features/contractSearch/offerLocations';
 import {
   bpoBadgeRows,
   bpoMayBeCheaper,
@@ -222,8 +223,15 @@ const TYPE_SEARCH_LIMIT = 50;
  */
 const SUGGESTION_LIMIT = 8;
 
-/** Region cells shown in the cheapest-by-region strip, in cheapest-first order — six fills the row at `lg` without wrapping into a second one that would outsize the table below it. */
+/** Region cells shown in the cheapest-by-region strip, in cheapest-first order — six keeps the strip (plus the BPO cards beside it) from wrapping into rows that would outsize the table below it. */
 const REGION_CELL_LIMIT = 6;
+
+/** Section header over each group in the sourcing strip: Cheapest by region, Market BPOs, Contract BPOs. */
+const SOURCING_GROUP_HEADER =
+  'pb-2 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase';
+
+/** One card width for region and BPO cards alike: two across on a phone, fixed from `sm` so the groups share a row. */
+const SOURCING_CARD_WIDTH = 'w-[calc(50%-0.25rem)] sm:w-36';
 
 /** One row of the search's autocomplete: a candidate blueprint plus what its listings look like, so a dead blueprint is visible before it is chosen. */
 type BlueprintSuggestion = BlueprintTypeOption & BlueprintOfferStats;
@@ -964,11 +972,14 @@ export function BpcSourcingPanel({ initialTypeId = null }: BpcSourcingPanelProps
   );
   const selectedBpoSources =
     selectedTypeId === null ? undefined : bpoSourcesByType.get(selectedTypeId);
-  const selectedBpoCards = selectedBpoSources
-    ? [selectedBpoSources.market, selectedBpoSources.contract]
-        .filter((bpo): bpo is BpoOffer => bpo !== null)
-        .sort((a, b) => a.price - b.price)
-    : [];
+  const selectedMarketBpo = selectedBpoSources?.market ?? null;
+  const selectedContractBpo = selectedBpoSources?.contract ?? null;
+  const selectedBpoCards = useMemo(
+    () => [selectedMarketBpo, selectedContractBpo].filter((bpo): bpo is BpoOffer => bpo !== null),
+    [selectedMarketBpo, selectedContractBpo]
+  );
+  // System + security for each card, the same local SDE lookup Item Offers uses.
+  const bpoCardLocations = useOfferLocations(selectedBpoCards);
   // The copy the CHEAPEST chip would quote, if it has an honest price to
   // compare a BPO with — so a card never claims "may be cheaper" against a
   // bundle's or barter's price.
@@ -1469,29 +1480,16 @@ export function BpcSourcingPanel({ initialTypeId = null }: BpcSourcingPanelProps
           )}
 
           {(regionPrices.length > 1 || selectedBpoCards.length > 0) && (
-            <div className="flex flex-col gap-3 border-b border-line px-3 py-2">
-              {selectedBpoCards.length > 0 && (
-                <ul
-                  aria-label={t('bpcContracts.bpoCardsLabel')}
-                  className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3"
-                >
-                  {selectedBpoCards.map((bpo) => (
-                    <BpoCard
-                      key={bpo.kind}
-                      bpo={bpo}
-                      mayBeCheaper={cheapestCopy !== null && bpoMayBeCheaper(bpo, cheapestCopy)}
-                      locationName={bpoLocationName(bpo)}
-                      regionName={regionLabel(bpo.regionId)}
-                    />
-                  ))}
-                </ul>
-              )}
+            // One wrapping row: [Cheapest by region] [Market BPOs] [Contract BPOs],
+            // every card the same width; groups stack on a phone. A group with
+            // no card is left out.
+            <div className="flex flex-col gap-3 border-b border-line px-3 py-2 sm:flex-row sm:flex-wrap sm:gap-x-4">
               {regionPrices.length > 1 && (
-                <div>
+                <div className="min-w-0 max-w-full">
                   {/* Says so when it is showing a subset: the cheapest region always
                     survives the slice, but a blueprint listed in twenty regions
                     would otherwise show six with nothing admitting it. */}
-                  <p className="pb-2 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                  <p className={SOURCING_GROUP_HEADER}>
                     {regionPrices.length > REGION_CELL_LIMIT
                       ? t('bpcContracts.cheapestByRegionCapped', {
                           shown: REGION_CELL_LIMIT,
@@ -1501,12 +1499,13 @@ export function BpcSourcingPanel({ initialTypeId = null }: BpcSourcingPanelProps
                   </p>
                   {/* Cheapest first, so the ordering carries the answer and the
                     accent on the leading cell is only reinforcement (DESIGN.md §7). */}
-                  <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+                  <ul className="flex flex-wrap gap-2">
                     {regionPrices.slice(0, REGION_CELL_LIMIT).map((region, index) => (
                       <li
                         key={region.regionId}
                         className={cx(
                           'flex flex-col gap-0.5 rounded-xs border bg-panel-2 px-2.5 py-2',
+                          SOURCING_CARD_WIDTH,
                           index === 0 ? 'border-accent-dim' : 'border-line'
                         )}
                       >
@@ -1524,6 +1523,26 @@ export function BpcSourcingPanel({ initialTypeId = null }: BpcSourcingPanelProps
                   </ul>
                 </div>
               )}
+              {selectedBpoCards.map((bpo) => {
+                const header = t(
+                  bpo.kind === 'market'
+                    ? 'bpcContracts.sourceMarketBpos'
+                    : 'bpcContracts.sourceContractBpos'
+                );
+                return (
+                  <div key={bpo.kind} className="min-w-0 max-w-full">
+                    <p className={SOURCING_GROUP_HEADER}>{header}</p>
+                    <ul aria-label={header} className="flex flex-wrap gap-2">
+                      <BpoCard
+                        bpo={bpo}
+                        mayBeCheaper={cheapestCopy !== null && bpoMayBeCheaper(bpo, cheapestCopy)}
+                        location={bpoCardLocations.get(bpo.locationId)}
+                        className={SOURCING_CARD_WIDTH}
+                      />
+                    </ul>
+                  </div>
+                );
+              })}
             </div>
           )}
 

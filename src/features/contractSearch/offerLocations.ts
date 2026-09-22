@@ -55,7 +55,9 @@ async function resolveLocations(
 }
 
 /**
- * One entry per distinct locationId; missing key = still resolving.
+ * One entry per distinct locationId; missing key = still resolving. Takes
+ * anything with a `locationId`, so BPC Search's BPO cards (issue #1241) place
+ * a station through the same lookup.
  *
  * Batches every distinct id in the rows into one `Promise.all` pass — a
  * location that is ten rows' worth of stock costs one lookup, the same
@@ -64,7 +66,7 @@ async function resolveLocations(
  * a fresher one that lands first.
  */
 export function useOfferLocations(
-  rows: readonly PublicContractOfferRow[]
+  rows: readonly Pick<PublicContractOfferRow, 'locationId'>[]
 ): ReadonlyMap<number, OfferLocation> {
   // Sorted and joined so the effect keys on *which* locations are listed, not
   // on the array reference a fresh snapshot read hands in on every
