@@ -79,7 +79,6 @@ import {
 import { setStatus } from './status';
 import { ensureSignedIn } from './syncAuth';
 import {
-  feedTransportStamp,
   mergeFeed,
   mergeRecords,
   mergeSettings,
@@ -488,6 +487,17 @@ async function handleOwnerHashChange(character: CharacterRecord): Promise<void> 
     // The new owner's docs can carry an `updatedAt` below the previous owner's
     // high-water mark, so a surviving cursor would hide them entirely.
     await clearPullCursors(character.characterId);
+    // Feed rows themselves survive a transfer (they are this device's archive
+    // of what it saw, and carry no tombstones), but the new owner's remote
+    // collection has never held any of them — so the claim `syncedAt` makes
+    // is now false for every one of them, and leaving it set would keep them
+    // off the new uid forever.
+    await db.notificationFeed
+      .where('characterId')
+      .equals(character.characterId)
+      .modify((row) => {
+        delete row.syncedAt;
+      });
     // Cached wallet/mail/assets belong to the previous owner just as much as
     // the plans do. `auth/session` purges on the same signal at login; this
     // covers a transfer noticed between logins. Degrades rather than throws
@@ -1266,7 +1276,11 @@ interface RemoteNotificationFeedDoc extends RemoteFeedDoc {
   typeId?: number;
 }
 
-function toRemoteFeedDoc(row: NotificationFeedRecord, ownerHash: string): Record<string, unknown> {
+function toRemoteFeedDoc(
+  row: NotificationFeedRecord,
+  ownerHash: string,
+  writeNow: number
+): Record<string, unknown> {
   return {
     id: row.id,
     characterId: row.characterId,
@@ -1279,9 +1293,16 @@ function toRemoteFeedDoc(row: NotificationFeedRecord, ownerHash: string): Record
     ...(row.dismissedAt !== undefined ? { dismissedAt: row.dismissedAt } : {}),
     ownerHash,
     // Transport only — what an incremental pull cursors on (issue #581).
-    // `mergeFeed` still keys on firedAt/dismissedAt and never reads this; a
-    // dismissal moves it, which a `firedAt` cursor could not have seen.
-    updatedAt: feedTransportStamp(row),
+    // `mergeFeed` still keys on firedAt/dismissedAt and never reads this.
+    //
+    // A wall clock, not the row's own `max(firedAt, dismissedAt)` — see
+    // `LocalFeedRow` for why the derived stamp hid rows from other devices.
+    // `writeNow`, never `ctx.now`: a pass stamps `ctx.now` before ten other
+    // collections' round trips, and a doc written a minute later under a
+    // stamp a minute old can land below a cursor another device has already
+    // moved past. Nothing here re-dates the row itself — `firedAt` and
+    // `dismissedAt` go up untouched, and stay the only fields `mergeFeed` reads.
+    updatedAt: writeNow,
   };
 }
 
@@ -1293,9 +1314,13 @@ function toRemoteFeedDoc(row: NotificationFeedRecord, ownerHash: string): Record
  */
 function toLocalFeedRecord(
   remote: RemoteNotificationFeedDoc,
+  writeNow: number,
   local?: NotificationFeedRecord
 ): NotificationFeedRecord {
   return mergeFeedRecord(local, {
+    // Seen in the remote collection, so the remote side demonstrably holds it
+    // — the same fact a successful push records, learned a step later.
+    syncedAt: writeNow,
     id: remote.id,
     characterId: remote.characterId,
     eventId: remote.eventId,
@@ -1328,20 +1353,36 @@ async function syncFeed(ctx: SyncContext): Promise<void> {
     pushEligible,
     remote,
     ctx.now,
-    FEED_SYNC_WINDOW_MS,
-    pull.since
+    FEED_SYNC_WINDOW_MS
   );
 
+  const pushed = [...plan.pushCreate, ...plan.pushDismiss];
+  const writeNow = Date.now();
   await Promise.all([
-    ...[...plan.pushCreate, ...plan.pushDismiss].map((row) =>
-      setDoc(doc(col, row.id), toRemoteFeedDoc(row, ctx.ownerHash))
-    ),
+    ...pushed.map((row) => setDoc(doc(col, row.id), toRemoteFeedDoc(row, ctx.ownerHash, writeNow))),
     ...plan.purgeRemote.map((id) => deleteDoc(doc(col, id))),
   ]);
 
   const localById = new Map(local.map((row) => [row.id, row]));
+  // What this pass now knows the remote side holds: what it just wrote, and
+  // what it read back unchanged. Without the second half a row both sides
+  // already had — one the Scheduled Push handler wrote here and the other
+  // device uploaded — would stay unmarked and re-push on every pass.
+  //
+  // Marked only after the writes land: a `syncedAt` on a row that never
+  // reached Firestore is a row this device has silently agreed never to
+  // upload again. A throw here leaves it unmarked and the next pass
+  // re-pushes, which is the harmless direction to fail in.
+  const knownRemote = [
+    ...pushed.map((row) => row.id),
+    ...remote.map((row) => row.id).filter((id) => localById.has(id)),
+  ];
+  if (knownRemote.length > 0) {
+    await db.notificationFeed.where('id').anyOf(knownRemote).modify({ syncedAt: writeNow });
+  }
+
   const pulled = [...plan.pullCreate, ...plan.pullDismiss].map((row) =>
-    toLocalFeedRecord(row, localById.get(row.id))
+    toLocalFeedRecord(row, writeNow, localById.get(row.id))
   );
   if (pulled.length > 0) {
     await db.notificationFeed.bulkPut(pulled);

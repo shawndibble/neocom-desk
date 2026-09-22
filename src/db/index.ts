@@ -464,6 +464,13 @@ export interface NotificationFeedRecord {
    */
   dismissedAt?: number;
   /**
+   * Epoch ms the remote side is known to hold this row, absent until it does.
+   * Local bookkeeping: `sync/planSync`'s `toRemoteFeedDoc` never uploads it,
+   * and `sync/merge.mergeFeed` is the only reader. See `sync/merge.LocalFeedRow`
+   * for why a row's own timestamps cannot answer the same question.
+   */
+  syncedAt?: number;
+  /**
    * The row this fire was *about*, where its event lands on a table that can
    * show it (`features/notifications/notificationOptions`'s `SUBJECT_ROUTES`).
    * A journal entry id, a contract id, a job id, a member's character id — the

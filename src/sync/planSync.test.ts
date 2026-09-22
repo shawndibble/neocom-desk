@@ -286,8 +286,9 @@ function feedRow(overrides: Partial<NotificationFeedRecord> = {}): NotificationF
 
 function remoteFeedDoc(overrides: DocData = {}): DocData {
   const merged = { ...feedRow(), ownerHash: HASH, ...overrides };
-  // The transport stamp toRemoteFeedDoc writes (issue #581); an explicit
-  // override still wins.
+  // A seeded doc needs *some* transport stamp for the cursor to read. It is no
+  // longer derivable from the row — `toRemoteFeedDoc` stamps the wall clock of
+  // the write — so a test about pull ordering passes `updatedAt` explicitly.
   const firedAt = merged.firedAt as number;
   const dismissedAt = merged.dismissedAt as number | undefined;
   return { updatedAt: Math.max(firedAt, dismissedAt ?? 0), ...merged };
@@ -1347,7 +1348,104 @@ describe('triggerSync: notification feed', () => {
   it('pushes a local-only row within the sync window', async () => {
     await db.notificationFeed.put(feedRow());
     await triggerSync(1);
-    expect(remoteStore.get(NOTIFICATION_FEED_PATH)?.get('occ-1')).toEqual(remoteFeedDoc());
+    expect(remoteStore.get(NOTIFICATION_FEED_PATH)?.get('occ-1')).toEqual(
+      // `updatedAt` is stamped at upload now (#1207), so it is the one field
+      // the seeded fixture cannot predict.
+      remoteFeedDoc({ updatedAt: expect.any(Number) })
+    );
+  });
+
+  it('records that it uploaded the row, so the next pass does not re-push it', async () => {
+    await db.notificationFeed.put(feedRow());
+    await triggerSync(1);
+    expect((await db.notificationFeed.get('occ-1'))?.syncedAt).toEqual(expect.any(Number));
+
+    vi.mocked(setDoc).mockClear();
+    await triggerSync(1);
+    expect(vi.mocked(setDoc)).not.toHaveBeenCalled();
+  });
+
+  it('pushes a back-dated row on an incremental pass (#1207)', async () => {
+    // The reported bug. A skill completion is dated by its `finish_date` and a
+    // wallet change by the journal entry's `date`
+    // (`engine/occurrenceKey.occurrenceFiredAt`), so a row written now can sit
+    // days below this device's own pull cursor. It had never been uploaded;
+    // being old is not evidence that it had.
+    // A pull that carries this device's cursor up to now — what the other
+    // device's ordinary recent activity does in the field.
+    const now = Date.now();
+    seedRemote(NOTIFICATION_FEED_PATH, [
+      remoteFeedDoc({ id: 'from-other-device', firedAt: now, updatedAt: now }),
+    ]);
+    await triggerSync(1);
+
+    await db.notificationFeed.put(
+      feedRow({ id: 'backdated', firedAt: Date.now() - 10 * 24 * 60 * 60 * 1000 })
+    );
+    await triggerSync(1);
+
+    expect(remoteStore.get(NOTIFICATION_FEED_PATH)?.has('backdated')).toBe(true);
+  });
+
+  it('pulls a back-dated row the other device wrote just now (#1207)', async () => {
+    const now = Date.now();
+    // Cursor first, from ordinary recent activity.
+    seedRemote(NOTIFICATION_FEED_PATH, [
+      remoteFeedDoc({ id: 'earlier', firedAt: now, updatedAt: now }),
+    ]);
+    await triggerSync(1);
+
+    // The other device uploads a ten-day-old skill completion. Written now, so
+    // its transport stamp is now, whatever the occurrence is dated.
+    seedRemote(NOTIFICATION_FEED_PATH, [
+      remoteFeedDoc({ id: 'earlier', firedAt: now, updatedAt: now }),
+      remoteFeedDoc({
+        id: 'backdated',
+        firedAt: now - 10 * 24 * 60 * 60 * 1000,
+        updatedAt: now + 1,
+      }),
+    ]);
+    await triggerSync(1);
+
+    expect(await db.notificationFeed.get('backdated')).toBeDefined();
+  });
+
+  it('does not re-push a row it read back unchanged from the remote side', async () => {
+    // Both sides already hold it — the Scheduled Push handler wrote it here
+    // while the other device uploaded it. Nothing to introduce.
+    await db.notificationFeed.put(feedRow());
+    seedRemote(NOTIFICATION_FEED_PATH, [remoteFeedDoc()]);
+    await triggerSync(1);
+    expect((await db.notificationFeed.get('occ-1'))?.syncedAt).toEqual(expect.any(Number));
+
+    vi.mocked(setDoc).mockClear();
+    await triggerSync(1);
+    expect(vi.mocked(setDoc)).not.toHaveBeenCalled();
+  });
+
+  it('clears syncedAt for the Character’s rows when the ownerHash changes', async () => {
+    await db.notificationFeed.put(feedRow());
+    await triggerSync(1);
+    expect((await db.notificationFeed.get('occ-1'))?.syncedAt).toEqual(expect.any(Number));
+
+    // A transfer. The rows survive as this device's archive, but the new
+    // owner's collection has never held them.
+    await db.settings.put({ key: 'sync.__ownerHash.1', value: 'previous-owner-hash' });
+    remoteStore.clear();
+    await triggerSync(1);
+
+    expect(remoteStore.get(NOTIFICATION_FEED_PATH)?.has('occ-1')).toBe(true);
+  });
+
+  it('re-pushes a row dismissed after it was uploaded', async () => {
+    await db.notificationFeed.put(feedRow());
+    await triggerSync(1);
+
+    const dismissedAt = Date.now();
+    await db.notificationFeed.update('occ-1', { dismissedAt });
+    await triggerSync(1);
+
+    expect(remoteStore.get(NOTIFICATION_FEED_PATH)?.get('occ-1')?.dismissedAt).toBe(dismissedAt);
   });
 
   it('does not push a row older than the 30-day/100-row sync window', async () => {
@@ -1359,7 +1457,10 @@ describe('triggerSync: notification feed', () => {
   it('pulls a remote-only row into Dexie without the ownerHash field', async () => {
     seedRemote(NOTIFICATION_FEED_PATH, [remoteFeedDoc()]);
     await triggerSync(1);
-    expect(await db.notificationFeed.get('occ-1')).toEqual(feedRow());
+    expect(await db.notificationFeed.get('occ-1')).toEqual(
+      // Seeing it in the remote collection is the same fact a push records.
+      feedRow({ syncedAt: expect.any(Number) })
+    );
   });
 
   it('never syncs another Character’s feed rows onto this uid', async () => {
@@ -1811,13 +1912,19 @@ describe('triggerSync: incremental pull', () => {
     ]);
   });
 
-  it('writes the feed transport stamp on push, derived not wall-clocked', async () => {
+  it('writes the feed transport stamp on push as a wall clock, not the row’s own dates (#1207)', async () => {
+    // Inverted from #581's original rule. A cursor orders *writes*; a feed
+    // row's own timestamps order *occurrences*, and back-dating one below
+    // every other device's cursor is what hid it from their pulls.
     const dismissedAt = Date.now() - 500;
+    const before = Date.now();
     await db.notificationFeed.put(feedRow({ dismissedAt }));
 
     await triggerSync(1);
 
-    expect(remoteStore.get(NOTIFICATION_FEED_PATH)?.get('occ-1')?.updatedAt).toBe(dismissedAt);
+    const updatedAt = remoteStore.get(NOTIFICATION_FEED_PATH)?.get('occ-1')?.updatedAt as number;
+    expect(updatedAt).toBeGreaterThanOrEqual(before);
+    expect(updatedAt).toBeGreaterThan(dismissedAt);
   });
 
   it('purges an expired remote tombstone on the full-read path (AC5)', async () => {

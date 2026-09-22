@@ -260,6 +260,24 @@ export interface RemoteFeedDoc extends FeedRow {
   ownerHash: string;
 }
 
+/**
+ * A feed row as this device holds it, with the one field the remote copy never
+ * carries: whether the remote side holds this row, and as of when.
+ *
+ * It exists because a feed row's timestamps date the *occurrence*, not the
+ * write — `engine/occurrenceKey.occurrenceFiredAt` stamps a skill completion
+ * with its `finish_date`, a wallet change with the journal entry's `date` — so
+ * a row written seconds ago can sort days below this device's own pull cursor.
+ * Read as "reconciled last pass", that cost a user every back-dated alert on
+ * their second device. The remote `updatedAt` is now a wall clock, which a
+ * device cannot recompute from the row, so `syncedAt` records the fact here
+ * instead of inferring it.
+ */
+export interface LocalFeedRow extends FeedRow {
+  /** Epoch ms this device last uploaded the row. Absent = the remote side has never held it. */
+  syncedAt?: number;
+}
+
 export interface FeedMergeResult<L extends FeedRow, R extends RemoteFeedDoc> {
   /** Local rows to create remotely — never seen there yet, and within the sync window. */
   pushCreate: L[];
@@ -275,20 +293,6 @@ export interface FeedMergeResult<L extends FeedRow, R extends RemoteFeedDoc> {
    * archive.
    */
   purgeRemote: string[];
-}
-
-/**
- * The feed's **transport** timestamp (issue #581) — what an incremental pull
- * cursors on, written to the remote doc as a plain `updatedAt` by
- * `toRemoteFeedDoc`. Deliberately NOT a merge input: {@link mergeFeed} keys on
- * `firedAt`/`dismissedAt` and nothing here changes that. Derived from those two
- * rather than stamped with `Date.now()` so the value a device compares locally
- * and the value it wrote remotely are the same number — a `dismissedAt`-only
- * change moves it (which is the whole reason the feed cannot cursor on
- * `firedAt`), and a re-push never re-dates a row.
- */
-export function feedTransportStamp(row: FeedRow): number {
-  return Math.max(row.firedAt, row.dismissedAt ?? 0);
 }
 
 /**
@@ -314,6 +318,14 @@ export function feedTransportStamp(row: FeedRow): number {
  * passed in, never just the windowed subset, and never regresses an
  * already-recorded dismissal.
  *
+ * What decides push-CREATE on an *incremental* pass is {@link LocalFeedRow}'s
+ * `syncedAt`, not the pull cursor. Every other collection reads "local row,
+ * absent from the remote window, at or below the cursor" as "reconciled last
+ * pass"; a feed row cannot, because its timestamps date the occurrence rather
+ * than the write. A dismissal recorded after that write puts the row back in
+ * play, which is what keeps the read amplification the cursor gate prevented
+ * from coming back.
+ *
  * `purgeRemote` (issue #582) bounds the remote collection on that same
  * window, which until now gated only what a device started uploading, never
  * what stayed up there: a remote row fired more than `windowMs` ago is
@@ -336,13 +348,12 @@ export function feedTransportStamp(row: FeedRow): number {
  * reconciled in a pass, never both — a row old enough to purge is old enough
  * that its dismissal no longer matters.
  */
-export function mergeFeed<L extends FeedRow, R extends RemoteFeedDoc>(
+export function mergeFeed<L extends LocalFeedRow, R extends RemoteFeedDoc>(
   local: readonly L[],
   pushEligible: ReadonlySet<string>,
   remote: readonly R[],
   now: number,
-  windowMs: number,
-  since?: number
+  windowMs: number
 ): FeedMergeResult<L, R> {
   const result: FeedMergeResult<L, R> = {
     pushCreate: [],
@@ -374,9 +385,12 @@ export function mergeFeed<L extends FeedRow, R extends RemoteFeedDoc>(
     }
 
     if (l && !r) {
-      // Incremental pull: a row at or below the cursor was already reconciled,
-      // so its absence here is "in sync", not "never seen" — see mergeRecords.
-      if (since !== undefined && feedTransportStamp(l) <= since) continue;
+      // Absent from an incremental window means "not changed since the
+      // cursor", never "not there" — so absence alone can't say whether this
+      // row has been uploaded. `syncedAt` says it outright. A dismissal made
+      // after that upload still needs writing out, and the remote doc is
+      // replaced wholesale, so it goes back through push-CREATE.
+      if (l.syncedAt !== undefined && (l.dismissedAt ?? 0) <= l.syncedAt) continue;
       if (pushEligible.has(id)) result.pushCreate.push(l);
       continue;
     }
