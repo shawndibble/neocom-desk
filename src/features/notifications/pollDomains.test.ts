@@ -442,6 +442,30 @@ describe('projection wiring', () => {
     expect(extractionDone?.body).toContain('Amarr III');
   });
 
+  it("projects extractor warnings at the Character's current lead time, not the one baked into the baseline (issue #1248)", async () => {
+    // A Settings lead-time change rebuilds the Projection from the saved
+    // baseline, whose `thresholdMs` is whatever was in force at load time.
+    useNotificationPreferences.setState({
+      value: withCharacterEventThreshold(
+        DEFAULT_NOTIFICATION_PREFERENCES,
+        7,
+        'extractorExpiringLeadHours',
+        12
+      ),
+      hydrated: true,
+    });
+    const expiryTimeMs = T0 + 20 * HOUR_MS;
+    const snapshot = {
+      colonies: [
+        { planetId: 40000001, extractors: [{ pinId: 1, expiryTimeMs, thresholdMs: 6 * HOUR_MS }] },
+      ],
+      nowMs: T0,
+    };
+    const rows = await colonyDomain.projection!(7, 'Kestrel', snapshot, T0);
+    const expiring = rows.filter((r) => r.eventId === 'planetaryExtractorExpiring');
+    expect(expiring.map((r) => r.fireAt)).toEqual([expiryTimeMs - 12 * HOUR_MS]);
+  });
+
   it('projects calendarEventStarting without any name resolution', async () => {
     const snapshot = { entries: [{ calendarEventId: 99, startMs: T0 + 5 * HOUR_MS }], nowMs: T0 };
     const rows = await calendarDomain.projection!(7, 'Kestrel', snapshot, T0);

@@ -44,6 +44,7 @@ import type {
   SkillLevels,
 } from '@/engine/industry/types';
 import { rigKindLabelKey, rigFitSummaryLabel } from './rigFitLabels';
+import type { BuildPlanChange, SourcingPatchEntry } from './buildPlanStore';
 import type { BuildGroupSnapshot } from './buildGroups';
 import { GroupTargetLink } from './GroupTargetLink';
 import {
@@ -117,7 +118,7 @@ import { buildLocationLabel } from './buildLocationLabel';
 import { buildLocationPatch, reactionBuildLocationPatch } from './buildLocationPatch';
 import { useDerivedSecurityBand } from './useDerivedSecurityBand';
 
-/** The Build Plan fields this panel edits; `Industry.tsx` persists exactly these. */
+/** The Build Plan fields this panel edits, sent as an `edit` `BuildPlanChange`. */
 export type PlanPatch = Partial<
   Pick<
     BuildPlanRecord,
@@ -167,12 +168,6 @@ const clearedReactionBuildLocation = {
   reactionBuildLocationName: undefined,
 } satisfies PlanPatch;
 
-/** One material's sourcing edit, for the bulk "use all" action. */
-export interface SourcingPatchEntry {
-  typeID: number;
-  patch: MaterialSourcing;
-}
-
 interface BuildPlanDetailProps {
   plan: BuildPlanRecord;
   catalog: BlueprintCatalog;
@@ -203,28 +198,13 @@ interface BuildPlanDetailProps {
    * `corpOwnedStock` already answers to, not a second one.
    */
   corpOwnedBlueprints: CorpOwnedBlueprintsState;
-  onUpdate: (patch: PlanPatch) => void;
   /**
-   * A correction the panel derived rather than the pilot made — persisted
-   * without counting as an edit, so opening a plan never bumps its
-   * `updatedAt`. Today: a security band brought back into line with the
-   * plan's build system.
+   * Every write this panel makes to its plan, as one `BuildPlanChange` — a
+   * pilot edit, a derived fix, or sourcing edits. The caller hands it to
+   * `buildPlanStore.applyBuildPlanChange`, which owns the merge, `updatedAt`
+   * and sync rules for each kind.
    */
-  onDerivedFix: (patch: PlanPatch) => void;
-  /**
-   * One material row’s sourcing edit. Separate from `onUpdate` because it is a
-   * read-modify-write of a nested map rather than a whole field, so it has to
-   * merge against the stored record, not against this render’s `plan`.
-   */
-  onSourcingChange: (typeID: number, patch: MaterialSourcing) => void;
-  /**
-   * Several rows' sourcing edits at once, for "use all detected". Separate from
-   * `onSourcingChange` because the caller has to serialise the writes: each one
-   * is a read-modify-write of the same nested map, so firing them concurrently
-   * would have later ones merging into a record read before the earlier ones
-   * landed.
-   */
-  onSourcingChangeMany: (patches: readonly SourcingPatchEntry[]) => void;
+  onChange: (change: BuildPlanChange) => void;
   /** Materials-row context menu (CONTEXT.md round 26) — the same actions the Market and Assets rows offer. */
   onAddToQuickbar: (typeId: number, itemName: string) => void;
   /** False with no active character — the Quickbar has nobody to save the material under. */
@@ -264,10 +244,7 @@ export function BuildPlanDetail({
   ownedStockSnapshot,
   corpOwnedStock,
   corpOwnedBlueprints,
-  onUpdate,
-  onDerivedFix,
-  onSourcingChange,
-  onSourcingChangeMany,
+  onChange,
   onAddToQuickbar,
   quickbarAvailable,
   onShowInfo,
@@ -389,7 +366,7 @@ export function BuildPlanDetail({
   // on edit — otherwise a plan saved before the Security field went away keeps
   // a band nothing can correct, and still drives the rig multiplier.
   useDerivedSecurityBand(buildSystem?.id, hub.security, plan.security, (security) =>
-    onDerivedFix({ security })
+    onChange({ kind: 'derived', patch: { security } })
   );
   // Same reconciliation for the Reaction Location. There is no hub fallback
   // for a place with no hub of its own — highsec is the same "nothing chosen
@@ -398,7 +375,7 @@ export function BuildPlanDetail({
     reactionBuildSystem?.id,
     'highsec',
     plan.reactionSecurity ?? 'highsec',
-    (security) => onDerivedFix({ reactionSecurity: security })
+    (security) => onChange({ kind: 'derived', patch: { reactionSecurity: security } })
   );
 
   // Distinct from `pricesReady` below: that one collapses "still fetching"
@@ -862,7 +839,15 @@ export function BuildPlanDetail({
   const productQuantity = blueprint.products[0] ? blueprint.products[0].quantity * plan.runs : null;
 
   function update(patch: PlanPatch) {
-    onUpdate(patch);
+    onChange({ kind: 'edit', patch });
+  }
+
+  function changeSourcing(edits: readonly SourcingPatchEntry[]) {
+    onChange({ kind: 'sourcing', edits });
+  }
+
+  function changeOneSourcing(typeID: number, patch: MaterialSourcing) {
+    changeSourcing([{ typeID, patch }]);
   }
 
   /**
@@ -870,8 +855,8 @@ export function BuildPlanDetail({
    *
    * The whole list is rewritten rather than the single entry toggled in place,
    * because it is a plain field on the record — unlike `materialSourcing`,
-   * which is a nested map and so needs the read-modify-write path
-   * `onSourcingChange` takes.
+   * which is a nested map and so needs the read-modify-write path a
+   * `sourcing` change takes.
    */
   function toggleBuildHere(typeID: number) {
     const current = plan.buildHere ?? [];
@@ -1565,10 +1550,10 @@ export function BuildPlanDetail({
                   }
                   action={
                     <div className="flex gap-2">
-                      <Button size="sm" onClick={() => onSourcingChangeMany(bulkDetectedPatches)}>
+                      <Button size="sm" onClick={() => changeSourcing(bulkDetectedPatches)}>
                         {t('industry.useAllOwned')}
                       </Button>
-                      <Button size="sm" onClick={() => onSourcingChangeMany(bulkClearPatches)}>
+                      <Button size="sm" onClick={() => changeSourcing(bulkClearPatches)}>
                         {t('industry.useNoneOwned')}
                       </Button>
                     </div>
@@ -1581,7 +1566,7 @@ export function BuildPlanDetail({
                 volumeFor={(typeID) => volumeForType(catalog, typeID)}
                 sourcing={plan.materialSourcing}
                 pricesReady={pricesReady}
-                onSourcingChange={onSourcingChange}
+                onSourcingChange={changeOneSourcing}
                 detection={detection}
                 rowContextMenu={materialContextMenu}
                 makeOrBuy={materialAdvice}
@@ -1606,8 +1591,9 @@ export function BuildPlanDetail({
                   blueprintName={nameForType(catalog, acquisitionPickerTypeId)}
                   ownedCopies={acquisitionPickerOwnedCopies}
                   sourcing={plan.materialSourcing?.[acquisitionPickerTypeId]}
-                  onSourcingChange={onSourcingChange}
+                  onSourcingChange={changeOneSourcing}
                   onSearchBpcSourcing={onSearchBpcSourcing}
+                  planHubId={plan.hubId}
                 />
               )}
               {/*

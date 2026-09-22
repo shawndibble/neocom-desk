@@ -23,6 +23,7 @@ import { loadWithCache, GLOBAL_CACHE_CHARACTER_ID, type CachedResult } from '@/e
 import type { BpcContractRow } from '@/engine/contracts/bpcSearch';
 import {
   bpcRowsFromContractOffers,
+  bpoRowsFromContractOffers,
   type PublicContractOfferRow,
 } from '@/engine/contracts/contractOffers';
 
@@ -44,6 +45,13 @@ const SNAPSHOT_PUBLISH_INTERVAL_MS = 30 * 60_000;
 
 export interface PublicBpcContractsSnapshot {
   rows: BpcContractRow[];
+  /**
+   * Blueprint originals on public contract (issue #1240), `runs: -1`. Kept out
+   * of `rows` so BPC Sourcing's copy-only search is unchanged. Optional: a
+   * snapshot cached before this field existed has none, which reads as "no
+   * listed originals" until the next refetch.
+   */
+  originals?: BpcContractRow[];
   /** When the backend last pulled EVE Ref's archive — the freshness that actually matters here, distinct from when this browser last read Firestore. Null when nothing has synced yet. */
   lastSyncedAt: number | null;
 }
@@ -88,7 +96,11 @@ async function fetchSnapshot(characterId: number): Promise<PublicBpcContractsSna
       offers.push(...(docSnap.data() as ChunkDocData).rows);
     }
   }
-  return { rows: bpcRowsFromContractOffers(offers), lastSyncedAt };
+  return {
+    rows: bpcRowsFromContractOffers(offers),
+    originals: bpoRowsFromContractOffers(offers),
+    lastSyncedAt,
+  };
 }
 
 /**

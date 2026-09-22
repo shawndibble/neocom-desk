@@ -596,12 +596,21 @@ export const colonyDomain = defineDomain<
     gatedOn('planetaryExtractorExpiring', diffPlanetaryExtractorExpiring),
   ],
   disproven: disprovenExtractorOccurrences,
+  // The baseline's baked-in `thresholdMs` stays as the diff needs it (the
+  // setting in force at load time); the Projection instead uses the current
+  // lead time, so a Settings change rebuilt from that baseline (issue #1248,
+  // `projectionRebuild.ts`) projects the new warning time, not the old one.
   projection: async (characterId, characterName, snapshot, nowMs) => {
+    const thresholdMs = (await currentThresholds(characterId)).extractorExpiringLeadHours * HOUR_MS;
+    const colonies = snapshot.colonies.map((colony) => ({
+      ...colony,
+      extractors: colony.extractors.map((extractor) => ({ ...extractor, thresholdMs })),
+    }));
     const planetNames = await resolveProjectionNames(
-      snapshot.colonies.map((colony) => colony.planetId),
+      colonies.map((colony) => colony.planetId),
       loadPlanetName
     );
-    return projectColonies(characterId, characterName, snapshot.colonies, planetNames, nowMs);
+    return projectColonies(characterId, characterName, colonies, planetNames, nowMs);
   },
 });
 

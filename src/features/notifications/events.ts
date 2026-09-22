@@ -193,6 +193,14 @@ export const NOTIFICATION_EVENT_IDS: readonly NotificationEventId[] = NOTIFICATI
 const EVENT_BY_ID = new Map(NOTIFICATION_EVENTS.map((event) => [event.id, event]));
 
 /** One event's i18n label key — a shared lookup so callers don't each build their own copy of this catalog map. */
+const SCOPE_BY_EVENT = new Map(NOTIFICATION_EVENTS.map((event) => [event.id, event.scope]));
+
+/** Whether `scopes` covers this event; a scope-less event (`priceAlertTriggered`) always passes. */
+export function hasEventScope(eventId: NotificationEventId, scopes: ReadonlySet<string>): boolean {
+  const scope = SCOPE_BY_EVENT.get(eventId);
+  return scope === undefined || scopes.has(scope);
+}
+
 export function eventLabelKey(eventId: NotificationEventId): string {
   const def = EVENT_BY_ID.get(eventId);
   if (!def) throw new Error(`Unknown Notification Event id: ${eventId}`);

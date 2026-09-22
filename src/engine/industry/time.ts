@@ -3,13 +3,23 @@
  * duration = baseTime * runs * (1 - TE/100) * skill modifiers * facility modifiers
  * Which skills apply depends on the activity (issue #513; sources cited on
  * `SKILL_IDS` in ./types.ts):
- *   manufacturing: Industry -4%/level, Advanced Industry -3%/level
- *   reaction:      Reactions -4%/level; the two manufacturing skills do not
- *                  apply at all
+ *   manufacturing: Industry -4%/level, Advanced Industry -3%/level, plus
+ *                  1-2%/level per blueprint-required science/engineering
+ *                  skill that carries the bonus (issue #1228)
+ *   reaction:      Reactions -4%/level; the two manufacturing skills and the
+ *                  science-skill table do not apply at all
  * All factors stack multiplicatively. Rig TE bonus scales with security band.
  */
-import type { FacilityContext, SkillLevels } from '@/engine/industry/types';
-import { SKILL_IDS, rigBonusPct } from '@/engine/industry/types';
+import type {
+  BlueprintSkillRequirement,
+  FacilityContext,
+  SkillLevels,
+} from '@/engine/industry/types';
+import {
+  MANUFACTURING_TIME_SCIENCE_SKILL_PCT,
+  SKILL_IDS,
+  rigBonusPct,
+} from '@/engine/industry/types';
 
 const INDUSTRY_PCT_PER_LEVEL = 4;
 const ADVANCED_INDUSTRY_PCT_PER_LEVEL = 3;
@@ -24,7 +34,12 @@ function skillLevel(skills: SkillLevels, typeID: number): number {
 }
 
 /** Combined time multiplier for TE level + skills + facility + rig. */
-export function timeModifier(te: number, skills: SkillLevels, ctx: FacilityContext): number {
+export function timeModifier(
+  te: number,
+  skills: SkillLevels,
+  ctx: FacilityContext,
+  blueprintSkills?: readonly BlueprintSkillRequirement[]
+): number {
   if (!Number.isInteger(te) || te < 0 || te > 20) {
     throw new RangeError(`TE must be an integer 0..20, got ${te}`);
   }
@@ -39,6 +54,14 @@ export function timeModifier(te: number, skills: SkillLevels, ctx: FacilityConte
       : ([
           [SKILL_IDS.industry, INDUSTRY_PCT_PER_LEVEL],
           [SKILL_IDS.advancedIndustry, ADVANCED_INDUSTRY_PCT_PER_LEVEL],
+          // Per-blueprint science/engineering skills (issue #1228): filtered
+          // to the ones that actually carry the bonus, since a blueprint's
+          // own `skills` list also names Industry/Advanced Industry, which
+          // are already applied above and must not be double counted. This
+          // branch is manufacturing-only already, via the outer ternary.
+          ...(blueprintSkills ?? [])
+            .filter((req) => req.typeID in MANUFACTURING_TIME_SCIENCE_SKILL_PCT)
+            .map((req) => [req.typeID, MANUFACTURING_TIME_SCIENCE_SKILL_PCT[req.typeID]] as const),
         ] as const);
   const rigPct = ctx.facility.structure
     ? rigBonusPct(ctx.rigFit, 'te', ctx.facility.activity, ctx.security)
@@ -56,10 +79,11 @@ export function jobDurationSeconds(
   runs: number,
   te: number,
   skills: SkillLevels,
-  ctx: FacilityContext
+  ctx: FacilityContext,
+  blueprintSkills?: readonly BlueprintSkillRequirement[]
 ): number {
   if (!Number.isInteger(runs) || runs < 1) {
     throw new RangeError(`runs must be an integer >= 1, got ${runs}`);
   }
-  return baseTimePerRun * runs * timeModifier(te, skills, ctx);
+  return baseTimePerRun * runs * timeModifier(te, skills, ctx, blueprintSkills);
 }

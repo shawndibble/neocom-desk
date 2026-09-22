@@ -3,19 +3,13 @@ import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
-import { scheduleSync } from '@/sync';
 import { Spinner } from '@/components/ui';
 import { useIndustryWorkspace } from '@/features/industry/useIndustryWorkspace';
 import { IndustryHeader } from '@/features/industry/IndustryHeader';
 import { buildGroupsFor } from '@/features/industry/buildGroups';
 import { industryTabHref, type IndustryTab } from '@/features/industry/industryTabs';
-import {
-  BuildPlanDetail,
-  type PlanPatch,
-  type SourcingPatchEntry,
-} from '@/features/industry/BuildPlanDetail';
-import { saveSourcingEdit } from '@/features/industry/sourcingEdits';
-import type { MaterialSourcing } from '@/engine/industry/types';
+import { BuildPlanDetail } from '@/features/industry/BuildPlanDetail';
+import { applyBuildPlanChange } from '@/features/industry/buildPlanStore';
 import { useQuickbar } from '@/features/market/useQuickbar';
 import { ItemDetailModal } from '@/features/market/ItemDetailModal';
 
@@ -58,30 +52,6 @@ export function IndustryPlanPage() {
     if (planId === undefined) return undefined;
     return { plan: await db.buildPlans.get(planId) };
   }, [planId]);
-
-  async function writePlanPatch(patch: PlanPatch, touch: boolean) {
-    if (planId === undefined) return;
-    await db.transaction('rw', db.buildPlans, async () => {
-      const stored = await db.buildPlans.get(planId);
-      if (!stored) return;
-      await db.buildPlans.put({ ...stored, ...patch, ...(touch ? { updatedAt: Date.now() } : {}) });
-    });
-    if (activeCharacterId !== null) scheduleSync(activeCharacterId);
-  }
-
-  async function handleSourcingChangeMany(patches: readonly SourcingPatchEntry[]) {
-    if (planId === undefined) return;
-    for (const { typeID, patch } of patches) {
-      await saveSourcingEdit(planId, typeID, patch);
-    }
-    if (activeCharacterId !== null) scheduleSync(activeCharacterId);
-  }
-
-  async function handleSourcingChange(typeID: number, patch: MaterialSourcing) {
-    if (planId === undefined) return;
-    await saveSourcingEdit(planId, typeID, patch);
-    if (activeCharacterId !== null) scheduleSync(activeCharacterId);
-  }
 
   if (!workspace.hydrated || planQuery === undefined) {
     return (
@@ -136,10 +106,7 @@ export function IndustryPlanPage() {
           ownedStockSnapshot={ownedStockSnapshot}
           corpOwnedStock={corpOwnedStock}
           corpOwnedBlueprints={corpOwnedBlueprints}
-          onUpdate={(patch) => void writePlanPatch(patch, true)}
-          onDerivedFix={(patch) => void writePlanPatch(patch, false)}
-          onSourcingChange={(typeID, patch) => void handleSourcingChange(typeID, patch)}
-          onSourcingChangeMany={(patches) => void handleSourcingChangeMany(patches)}
+          onChange={(change) => void applyBuildPlanChange(plan.id, change)}
           onAddToQuickbar={quickbar.add}
           quickbarAvailable={quickbar.available}
           onShowInfo={(typeId, itemName) => setInfoModalItem({ typeId, itemName })}

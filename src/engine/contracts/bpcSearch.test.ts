@@ -11,7 +11,9 @@ import {
   effectivePrice,
   iskPerRun,
   listedBlueprintTypeOptions,
+  marketBpoToSearchRow,
   type BpcContractRow,
+  type MarketBpoInput,
   type OwnedBlueprintInput,
   blueprintSearchName,
 } from './bpcSearch';
@@ -103,6 +105,12 @@ describe('filterBpcContracts', () => {
   it('an auction with no buyout at all always passes maxPrice — its final price is unknown, not disqualifying', () => {
     const rows = [row({ contractId: 1, isAuction: true, price: 100 })];
     const filtered = filterBpcContracts(rows, { ...EMPTY_BPC_SEARCH_FILTER, maxPrice: 1 });
+    expect(filtered.map((r) => r.contractId)).toEqual([1]);
+  });
+
+  it('a contract original (runs -1) passes minRuns — unlimited runs, not too few (issue #1241)', () => {
+    const rows = [row({ contractId: 1, runs: -1 }), row({ contractId: 2, runs: 5 })];
+    const filtered = filterBpcContracts(rows, { ...EMPTY_BPC_SEARCH_FILTER, minRuns: 10 });
     expect(filtered.map((r) => r.contractId)).toEqual([1]);
   });
 
@@ -206,7 +214,63 @@ describe('ownedBlueprintToSearchRow', () => {
   });
 });
 
+function marketInput(overrides: Partial<MarketBpoInput> = {}): MarketBpoInput {
+  return {
+    orderId: 9001,
+    typeId: 32858,
+    regionId: 10000002,
+    locationId: 60003760,
+    price: 12_500_000,
+    volumeRemain: 3,
+    atHub: true,
+    locationName: 'Jita IV - Moon 4 - Caldari Navy Assembly Plant',
+    space: 'highsec',
+    ...overrides,
+  };
+}
+
+describe('marketBpoToSearchRow (issue #1241)', () => {
+  it('is an unresearched original: ME0/TE0, unlimited runs, the order volume as quantity', () => {
+    expect(marketBpoToSearchRow(marketInput())).toEqual({
+      source: 'market',
+      typeId: 32858,
+      me: 0,
+      te: 0,
+      runs: -1,
+      quantity: 3,
+      orderId: 9001,
+      price: 12_500_000,
+      regionId: 10000002,
+      locationId: 60003760,
+      atHub: true,
+      locationName: 'Jita IV - Moon 4 - Caldari Navy Assembly Plant',
+      space: 'highsec',
+    });
+  });
+});
+
 describe('filterBpcSearchRows', () => {
+  it('judges a market BPO row on its order price against maxPrice (issue #1241)', () => {
+    const rows = [
+      marketBpoToSearchRow(marketInput({ orderId: 1, price: 10 })),
+      marketBpoToSearchRow(marketInput({ orderId: 2, price: 100 })),
+    ];
+    const filtered = filterBpcSearchRows(rows, { ...EMPTY_BPC_SEARCH_FILTER, maxPrice: 50 });
+    expect(filtered.map((r) => (r.source === 'market' ? r.orderId : null))).toEqual([1]);
+  });
+
+  it('matches a market BPO row on its own region, fails minMe, passes minRuns (issue #1241)', () => {
+    const rows = [marketBpoToSearchRow(marketInput({ regionId: 10000043 }))];
+    expect(filterBpcSearchRows(rows, { ...EMPTY_BPC_SEARCH_FILTER, regionId: 10000043 })).toEqual(
+      rows
+    );
+    expect(filterBpcSearchRows(rows, { ...EMPTY_BPC_SEARCH_FILTER, regionId: 10000002 })).toEqual(
+      []
+    );
+    expect(filterBpcSearchRows(rows, { ...EMPTY_BPC_SEARCH_FILTER, minMe: 1 })).toEqual([]);
+    expect(filterBpcSearchRows(rows, { ...EMPTY_BPC_SEARCH_FILTER, minRuns: 500 })).toEqual(rows);
+  });
+
   it('narrows to the given type ids across both sources', () => {
     const rows = [
       contractRowToSearchRow(row({ contractId: 1, typeId: 100 })),
