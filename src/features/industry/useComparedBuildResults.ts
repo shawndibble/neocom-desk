@@ -31,8 +31,7 @@ import { useEffect, useRef, useState } from 'react';
 import i18n from '@/i18n';
 import type { BuildPlanRecord } from '@/db';
 import type { BuildResult, SkillLevels } from '@/engine/industry/types';
-import type { BpcOffer } from '@/engine/industry/blueprintAcquisition';
-import { effectivePrice, type BpcContractRow } from '@/engine/contracts/bpcSearch';
+import type { BpcContractRow } from '@/engine/contracts/bpcSearch';
 import type { CharacterBlueprint } from '@/esi/endpoints';
 import type { PiData } from '@/sde/types';
 import { DEFAULT_TRADE_HUB, getTradeHub, type TradeHub } from '@/market/hubs';
@@ -43,6 +42,7 @@ import { resolveBuildPlan, type BuildPlanSources } from './resolveBuildPlan';
 import type { CorpOwnedBlueprintsState } from './corpOwnedBlueprints';
 import { useAssumedMe } from './assumedMe';
 import { useIncludeBlueprintCost } from './includeBlueprintCost';
+import { offersForRegion } from './useBpcAcquisitionOffers';
 
 export interface ComparedBuildRow {
   planId: string;
@@ -94,28 +94,6 @@ function placeholderRow(plan: BuildPlanRecord, catalog: BlueprintCatalog): Compa
     groupResult: null,
     error: null,
   };
-}
-
-/** BPC Sourcing offers for one blueprint type, in one region — `bpcRows` narrowed the same way `useBpcAcquisitionOffers` narrows for a single plan's own page. */
-function offersForRegion(
-  bpcRows: readonly BpcContractRow[],
-  regionId: number
-): (blueprintTypeID: number) => readonly BpcOffer[] {
-  const byType = new Map<number, BpcOffer[]>();
-  for (const row of bpcRows) {
-    if (row.regionId !== regionId) continue;
-    const list = byType.get(row.typeId) ?? [];
-    list.push({
-      me: row.me,
-      te: row.te,
-      runs: row.runs,
-      quantity: row.quantity,
-      price: effectivePrice(row),
-      isMultiType: row.isMultiType,
-    });
-    byType.set(row.typeId, list);
-  }
-  return (blueprintTypeID) => byType.get(blueprintTypeID) ?? [];
 }
 
 /**

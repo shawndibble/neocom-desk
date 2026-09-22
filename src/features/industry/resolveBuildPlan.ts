@@ -28,8 +28,10 @@ import i18n from '@/i18n';
 import type { BuildPlanRecord } from '@/db';
 import { MAX_JOB_RUNS } from '@/engine/industry/types';
 import type {
+  AcquisitionResolution,
   BuildResult,
   HubPrices,
+  IndustryBlueprint,
   ReactionFacilityContext,
   SkillLevels,
 } from '@/engine/industry/types';
@@ -140,6 +142,31 @@ export function reactionFacilityFor(
     : undefined;
 }
 
+/**
+ * The ME/TE a plan is actually priced at: its top-level Blueprint
+ * Acquisition tier (owned copy, forced tier, BPC offer, BPO), else the
+ * stored `plan.me`/`plan.te`. Gated on real prices (`ctx` non-null), same as
+ * `makeOrBuyContext`: a tier resolved against a zeroed snapshot would change
+ * once prices actually arrive. Takes `acquisitionFor`, not a pool, so a
+ * caller that goes on to resolve nested sub-builds claims from the same pool
+ * as this top-level claim (issue #860). Auto Build on a Build Group
+ * (`autoBuildGroup.ts`) walks each member at this same ME.
+ */
+export function resolveTopLevelTier(
+  plan: Pick<BuildPlanRecord, 'me' | 'te' | 'runs'>,
+  blueprint: IndustryBlueprint,
+  acquisitionFor: ReturnType<typeof acquisitionForLookup>,
+  ctx: MakeOrBuyContext | null,
+  materialPrices: HubPrices
+): { me: number; te: number; acquisition: AcquisitionResolution | null } {
+  const product = blueprint.products[0];
+  const acquisition =
+    product && ctx
+      ? acquisitionFor(product.typeID, clampInt(plan.runs, 1, MAX_JOB_RUNS), ctx, materialPrices)
+      : null;
+  return { me: acquisition?.me ?? plan.me, te: acquisition?.te ?? plan.te, acquisition };
+}
+
 export function resolveBuildPlan(
   plan: BuildPlanRecord,
   sources: BuildPlanSources,
@@ -205,20 +232,11 @@ export function resolveBuildPlan(
   };
   const acquisitionFor = acquisitionForPool(blueprintPools);
 
-  // Gated on real prices, same as `makeOrBuyContext`: a tier resolved
-  // against a zeroed snapshot would change once prices actually arrive.
-  const product = blueprint.products[0];
-  const topLevelAcquisition =
-    product && makeOrBuyContext
-      ? acquisitionFor(
-          product.typeID,
-          clampInt(plan.runs, 1, MAX_JOB_RUNS),
-          makeOrBuyContext,
-          materialPrices
-        )
-      : null;
-  const resolvedMe = topLevelAcquisition?.me ?? plan.me;
-  const resolvedTe = topLevelAcquisition?.te ?? plan.te;
+  const {
+    me: resolvedMe,
+    te: resolvedTe,
+    acquisition: topLevelAcquisition,
+  } = resolveTopLevelTier(plan, blueprint, acquisitionFor, makeOrBuyContext, materialPrices);
   const blueprintAcquisition = topLevelAcquisition
     ? { blueprintTypeID: topLevelAcquisition.blueprintTypeID, line: topLevelAcquisition.line }
     : undefined;
