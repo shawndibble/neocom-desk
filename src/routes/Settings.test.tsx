@@ -953,7 +953,8 @@ describe('Settings — Notifications (issue #170)', () => {
       const user = await renderPanelWithFakeTimers();
       // Read from Dexie, not the store: the rebuild must wait for the write.
       let seenAtRebuild: boolean | undefined;
-      vi.mocked(rebuildProjection).mockImplementation(async () => {
+      // Once only: a later test's leftover rebuild must not run this against a cleared Dexie.
+      vi.mocked(rebuildProjection).mockImplementationOnce(async () => {
         const stored = (await db.settings.get(NOTIFICATION_PREFS_SETTING_KEY))
           ?.value as typeof DEFAULT_NOTIFICATION_PREFERENCES;
         seenAtRebuild = isEventEnabledFor(stored.perCharacter[CHAR_ID] ?? {}, 'newMail', 'browser');
