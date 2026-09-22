@@ -387,6 +387,8 @@ export const SKILL_IDS = {
   reactions: 45746,
   accounting: 16622,
   brokerRelations: 3446,
+  /** Relist Discount: +6 points/level on top of the 50% base (issue #1225). */
+  advancedBrokerRelations: 16597,
   /** Reprocessing: +3% refining yield a level (issue #537). */
   reprocessing: 3385,
   /** Reprocessing Efficiency: +2% a level. */

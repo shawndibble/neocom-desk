@@ -1,9 +1,31 @@
 import { describe, it, expect } from 'vitest';
 import { orderFloor } from './orderFloor';
-import { breakEvenPrice, salesTaxPct } from '@/engine/industry/fees';
+import { relistBreakEvenPrice, breakEvenPrice, salesTaxPct } from '@/engine/industry/fees';
 
 describe('orderFloor', () => {
-  it('relist matches breakEvenPrice at quantity 1 with the same fee inputs', () => {
+  it('relist matches relistBreakEvenPrice at quantity 1 with the same fee inputs', () => {
+    const unitCost = 2_154_300;
+    const accountingLevel = 5;
+    const brokerRelationsLevel = 5;
+    const advancedBrokerRelationsLevel = 5;
+    const result = orderFloor({
+      unitCost,
+      remainingQuantity: 1,
+      accountingLevel,
+      brokerRelationsLevel,
+      advancedBrokerRelationsLevel,
+    });
+    const expectedRelist = relistBreakEvenPrice(
+      unitCost,
+      1,
+      accountingLevel,
+      brokerRelationsLevel,
+      advancedBrokerRelationsLevel
+    );
+    expect(result?.relist).toBeCloseTo(expectedRelist as number, 6);
+  });
+
+  it('relist is lower than a fresh-listing break-even, since relisting is Relist-Discounted', () => {
     const unitCost = 2_154_300;
     const accountingLevel = 5;
     const brokerRelationsLevel = 5;
@@ -12,9 +34,33 @@ describe('orderFloor', () => {
       remainingQuantity: 1,
       accountingLevel,
       brokerRelationsLevel,
+      advancedBrokerRelationsLevel: 0,
     });
-    const expectedRelist = breakEvenPrice(unitCost, 1, accountingLevel, brokerRelationsLevel);
-    expect(result?.relist).toBeCloseTo(expectedRelist as number, 6);
+    const freshListing = breakEvenPrice(unitCost, 1, accountingLevel, brokerRelationsLevel);
+    expect(result).not.toBeNull();
+    expect(result!.relist).toBeLessThan(freshListing as number);
+  });
+
+  it('a character without Advanced Broker Relations still gets the 50% base Relist Discount', () => {
+    const withoutSkill = orderFloor({
+      unitCost: 1_000_000,
+      remainingQuantity: 1,
+      accountingLevel: 0,
+      brokerRelationsLevel: 0,
+      advancedBrokerRelationsLevel: 0,
+    });
+    const withSkill = orderFloor({
+      unitCost: 1_000_000,
+      remainingQuantity: 1,
+      accountingLevel: 0,
+      brokerRelationsLevel: 0,
+      advancedBrokerRelationsLevel: 5,
+    });
+    expect(withoutSkill).not.toBeNull();
+    expect(withSkill).not.toBeNull();
+    // Both get the base discount; higher skill level narrows the gap further.
+    expect(withSkill!.relist).toBeLessThan(withoutSkill!.relist);
+    expect(withoutSkill!.relist).toBeLessThan(breakEvenPrice(1_000_000, 1, 0, 0) as number);
   });
 
   it('fill is sales-tax-only: revenue such that revenue * (1 - tax/100) === unitCost', () => {
@@ -26,6 +72,7 @@ describe('orderFloor', () => {
       remainingQuantity: 1,
       accountingLevel,
       brokerRelationsLevel,
+      advancedBrokerRelationsLevel: 5,
     });
     const tax = salesTaxPct(accountingLevel);
     const expectedFill = unitCost / (1 - tax / 100);
@@ -40,10 +87,11 @@ describe('orderFloor', () => {
       remainingQuantity: 1,
       accountingLevel: 5,
       brokerRelationsLevel: 5,
+      advancedBrokerRelationsLevel: 5,
     });
     expect(result).not.toBeNull();
     expect(result!.relist).toBeGreaterThan(2_200_000);
-    expect(result!.relist).toBeLessThan(2_300_000);
+    expect(result!.relist).toBeLessThan(2_260_000);
     expect(result!.fill).toBeGreaterThan(2_200_000);
     expect(result!.fill).toBeLessThan(2_260_000);
   });
@@ -54,6 +102,7 @@ describe('orderFloor', () => {
       remainingQuantity: 1,
       accountingLevel: 5,
       brokerRelationsLevel: 5,
+      advancedBrokerRelationsLevel: 5,
     });
     expect(result).not.toBeNull();
     expect(result!.fill).toBeLessThanOrEqual(result!.relist);
@@ -65,12 +114,14 @@ describe('orderFloor', () => {
       remainingQuantity: 1,
       accountingLevel: 0,
       brokerRelationsLevel: 0,
+      advancedBrokerRelationsLevel: 0,
     });
     const withStandings = orderFloor({
       unitCost: 1_000_000,
       remainingQuantity: 1,
       accountingLevel: 0,
       brokerRelationsLevel: 0,
+      advancedBrokerRelationsLevel: 0,
       factionStanding: 10,
       corpStanding: 10,
     });
@@ -87,6 +138,7 @@ describe('orderFloor', () => {
       remainingQuantity: 1,
       accountingLevel: 0,
       brokerRelationsLevel: 0,
+      advancedBrokerRelationsLevel: 0,
     });
     expect(result).not.toBeNull();
     expect(Number.isFinite(result!.relist)).toBe(true);
@@ -95,7 +147,13 @@ describe('orderFloor', () => {
 
   it('returns null for a zero unitCost', () => {
     expect(
-      orderFloor({ unitCost: 0, remainingQuantity: 1, accountingLevel: 5, brokerRelationsLevel: 5 })
+      orderFloor({
+        unitCost: 0,
+        remainingQuantity: 1,
+        accountingLevel: 5,
+        brokerRelationsLevel: 5,
+        advancedBrokerRelationsLevel: 5,
+      })
     ).toBeNull();
   });
 
@@ -106,6 +164,7 @@ describe('orderFloor', () => {
         remainingQuantity: 1,
         accountingLevel: 5,
         brokerRelationsLevel: 5,
+        advancedBrokerRelationsLevel: 5,
       })
     ).toBeNull();
   });
@@ -117,6 +176,7 @@ describe('orderFloor', () => {
         remainingQuantity: 1,
         accountingLevel: 5,
         brokerRelationsLevel: 5,
+        advancedBrokerRelationsLevel: 5,
       })
     ).toBeNull();
     expect(
@@ -125,6 +185,7 @@ describe('orderFloor', () => {
         remainingQuantity: 1,
         accountingLevel: 5,
         brokerRelationsLevel: 5,
+        advancedBrokerRelationsLevel: 5,
       })
     ).toBeNull();
   });
@@ -136,6 +197,7 @@ describe('orderFloor', () => {
         remainingQuantity: 0,
         accountingLevel: 5,
         brokerRelationsLevel: 5,
+        advancedBrokerRelationsLevel: 5,
       })
     ).toBeNull();
     expect(
@@ -144,6 +206,7 @@ describe('orderFloor', () => {
         remainingQuantity: -5,
         accountingLevel: 5,
         brokerRelationsLevel: 5,
+        advancedBrokerRelationsLevel: 5,
       })
     ).toBeNull();
   });
@@ -155,17 +218,20 @@ describe('orderFloor', () => {
     const remainingQuantity = 10_000;
     const accountingLevel = 5;
     const brokerRelationsLevel = 5;
+    const advancedBrokerRelationsLevel = 0;
     const result = orderFloor({
       unitCost,
       remainingQuantity,
       accountingLevel,
       brokerRelationsLevel,
+      advancedBrokerRelationsLevel,
     });
-    const expectedRelist = breakEvenPrice(
+    const expectedRelist = relistBreakEvenPrice(
       unitCost * remainingQuantity,
       remainingQuantity,
       accountingLevel,
-      brokerRelationsLevel
+      brokerRelationsLevel,
+      advancedBrokerRelationsLevel
     );
     expect(result?.relist).toBeCloseTo(expectedRelist as number, 6);
     // The bug this pins: charging the 100 ISK minimum per unit would inflate
@@ -175,25 +241,31 @@ describe('orderFloor', () => {
   });
 
   it('spreads the 100 ISK minimum across a stack whose percentage fee alone would still fall short of it', () => {
-    // Percentage fee on the whole 100-unit stack (~15.77 ISK) is still under
-    // the 100 ISK minimum, so the minimum applies once and is spread across
-    // all 100 units — not the qty-1 case, and not a stack large enough to
-    // clear the minimum on percentage fee alone.
+    // Percentage fee on the whole 100-unit stack is still under the 100 ISK
+    // minimum even after the Relist Discount, so the minimum applies once and
+    // is spread across all 100 units — not the qty-1 case, and not a stack
+    // large enough to clear the minimum on percentage fee alone. The minimum
+    // re-solve (totalCost + 100) / (1 - taxPct/100) does not depend on the
+    // broker rate at all, so this lands at the same figure with or without
+    // the Relist Discount.
     const unitCost = 10;
     const remainingQuantity = 100;
     const accountingLevel = 5;
     const brokerRelationsLevel = 5;
+    const advancedBrokerRelationsLevel = 0;
     const result = orderFloor({
       unitCost,
       remainingQuantity,
       accountingLevel,
       brokerRelationsLevel,
+      advancedBrokerRelationsLevel,
     });
-    const expectedRelist = breakEvenPrice(
+    const expectedRelist = relistBreakEvenPrice(
       unitCost * remainingQuantity,
       remainingQuantity,
       accountingLevel,
-      brokerRelationsLevel
+      brokerRelationsLevel,
+      advancedBrokerRelationsLevel
     );
     expect(result?.relist).toBeCloseTo(expectedRelist as number, 6);
     expect(result!.relist).toBeCloseTo(11.3842, 3);
@@ -203,17 +275,20 @@ describe('orderFloor', () => {
     const unitCost = 10;
     const accountingLevel = 5;
     const brokerRelationsLevel = 5;
+    const advancedBrokerRelationsLevel = 0;
     const singleUnit = orderFloor({
       unitCost,
       remainingQuantity: 1,
       accountingLevel,
       brokerRelationsLevel,
+      advancedBrokerRelationsLevel,
     });
     const bigStack = orderFloor({
       unitCost,
       remainingQuantity: 10_000,
       accountingLevel,
       brokerRelationsLevel,
+      advancedBrokerRelationsLevel,
     });
     expect(singleUnit).not.toBeNull();
     expect(bigStack).not.toBeNull();

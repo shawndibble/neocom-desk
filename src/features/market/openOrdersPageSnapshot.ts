@@ -144,6 +144,8 @@ export async function loadOpenOrdersSnapshot(
     skillsByCharacter.set(entry.characterId, {
       accountingLevel: corrected.trained.get(SKILL_IDS.accounting)?.level ?? 0,
       brokerRelationsLevel: corrected.trained.get(SKILL_IDS.brokerRelations)?.level ?? 0,
+      advancedBrokerRelationsLevel:
+        corrected.trained.get(SKILL_IDS.advancedBrokerRelations)?.level ?? 0,
       reprocessingLevel: corrected.trained.get(SKILL_IDS.reprocessing)?.level ?? 0,
       reprocessingEfficiencyLevel:
         corrected.trained.get(SKILL_IDS.reprocessingEfficiency)?.level ?? 0,

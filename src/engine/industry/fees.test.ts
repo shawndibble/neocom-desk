@@ -5,6 +5,10 @@ import {
   salesTax,
   brokerFee,
   breakEvenPrice,
+  relistDiscountPct,
+  relistBrokerFeePct,
+  relistFee,
+  relistBreakEvenPrice,
 } from '@/engine/industry/fees';
 
 describe('salesTaxPct', () => {
@@ -72,5 +76,73 @@ describe('breakEvenPrice', () => {
   it('returns null for a non-positive quantity', () => {
     expect(breakEvenPrice(1_000, 0, 0, 0)).toBeNull();
     expect(breakEvenPrice(1_000, -1, 0, 0)).toBeNull();
+  });
+});
+
+describe('relistDiscountPct', () => {
+  it('is 50% base, +6 points per Advanced Broker Relations level, 80% at V', () => {
+    expect(relistDiscountPct(0)).toBeCloseTo(50, 12);
+    expect(relistDiscountPct(3)).toBeCloseTo(68, 12);
+    expect(relistDiscountPct(5)).toBeCloseTo(80, 12);
+  });
+
+  it('rejects levels outside 0..5', () => {
+    expect(() => relistDiscountPct(-1)).toThrow(RangeError);
+    expect(() => relistDiscountPct(6)).toThrow(RangeError);
+  });
+});
+
+describe('relistBrokerFeePct', () => {
+  it('applies the 50% base discount to the broker rate even without the skill', () => {
+    expect(relistBrokerFeePct(0, 0)).toBeCloseTo(3 * 0.5, 12);
+  });
+
+  it('applies the deeper discount per Advanced Broker Relations level', () => {
+    // Broker Relations V -> 1.5% base rate; ABR V -> 80% discount -> 0.3%
+    expect(relistBrokerFeePct(5, 5)).toBeCloseTo(1.5 * 0.2, 12);
+  });
+});
+
+describe('relistFee', () => {
+  it('charges only the discounted rate on the full new total for a price decrease', () => {
+    // Broker Relations V (1.5%), ABR V (80% discount) -> 0.3% of new total
+    expect(relistFee(200, 100, 1_000, 5, 5)).toBeCloseTo(100 * 1_000 * 0.003, 6);
+  });
+
+  it('adds the full undiscounted rate on the increase increment for a price increase', () => {
+    const quantity = 1_000;
+    const oldPrice = 100;
+    const newPrice = 120;
+    const increaseFee = (newPrice - oldPrice) * quantity * (1.5 / 100);
+    const discountedFee = newPrice * quantity * (0.3 / 100);
+    expect(relistFee(oldPrice, newPrice, quantity, 5, 5)).toBeCloseTo(
+      increaseFee + discountedFee,
+      6
+    );
+  });
+
+  it('a character without the skill still gets the 50% base discount', () => {
+    expect(relistFee(200, 100, 1_000, 0, 0)).toBeCloseTo((100 * 1_000 * (3 * 0.5)) / 100, 6);
+  });
+
+  it('applies the 100 ISK minimum for a nonzero order', () => {
+    expect(relistFee(20, 10, 1, 5, 5)).toBe(100);
+    expect(relistFee(0, 0, 1, 5, 5)).toBe(0);
+  });
+});
+
+describe('relistBreakEvenPrice', () => {
+  it('matches breakEvenPrice when Advanced Broker Relations is at level 0 but discounts the rate', () => {
+    // Same fee/tax rates as breakEvenPrice's own equivalent test, but at half
+    // the broker rate (50% base discount), so revenue clears at a lower price.
+    const full = breakEvenPrice(8_950, 100, 0, 0);
+    const relist = relistBreakEvenPrice(8_950, 100, 0, 0, 0);
+    expect(relist).not.toBeNull();
+    expect(full).not.toBeNull();
+    expect(relist as number).toBeLessThan(full as number);
+  });
+
+  it('returns null for a non-positive quantity', () => {
+    expect(relistBreakEvenPrice(1_000, 0, 0, 0, 0)).toBeNull();
   });
 });

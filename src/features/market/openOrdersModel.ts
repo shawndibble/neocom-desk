@@ -129,6 +129,8 @@ export interface OpenOrderRow {
 export interface CharacterSkills {
   accountingLevel: number;
   brokerRelationsLevel: number;
+  /** Advanced Broker Relations (typeID 16597): +6 points/level to the 50% base Relist Discount. */
+  advancedBrokerRelationsLevel: number;
   /** Reprocessing (3385), for the "refine and sell the materials" comparison. */
   reprocessingLevel: number;
   /** Reprocessing Efficiency (3389). */
@@ -300,6 +302,7 @@ function buildRow(
           remainingQuantity: order.volume_remain,
           accountingLevel: skills.accountingLevel,
           brokerRelationsLevel: skills.brokerRelationsLevel,
+          advancedBrokerRelationsLevel: skills.advancedBrokerRelationsLevel,
         })
       : null;
 
