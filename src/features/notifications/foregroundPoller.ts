@@ -54,6 +54,7 @@ import { notificationOptionsFor, notificationSubjectId } from './notificationOpt
 import { eveNotificationText } from './eveNotificationText';
 import { resolveEveNotificationNames } from './eveNotificationNames';
 import { uploadProjectionRows } from './projectionUpload';
+import { rebuildProjection } from './projectionRebuild';
 
 export type { AnyNotificationFire } from './pollDomains';
 
@@ -141,11 +142,12 @@ export interface PollDependencies {
     occurrenceKeys: readonly string[]
   ) => Promise<void>;
   /**
-   * This poll's Scheduled Push upload (issue #358, ADR 0010, CONTEXT.md round
-   * 45): every Character updated this poll, mapped to its whole 72-hour
-   * Projection window. Called once per poll — "every app open and every
-   * foreground poll" collapses to this one call site, since
-   * `ForegroundNotificationPoller` already runs a poll immediately on mount.
+   * The Scheduled Push upload (issue #358, ADR 0010, CONTEXT.md round 45):
+   * every Character mapped to its whole 72-hour Projection window, built by
+   * `projectionRebuild.ts` from the saved baselines — once per poll that
+   * updated anything ("every app open and every foreground poll", since
+   * `ForegroundNotificationPoller` polls on mount), and directly from
+   * Settings (issue #1248).
    */
   uploadProjection: (rowsByCharacter: ReadonlyMap<number, ProjectionRow[]>) => Promise<void>;
 }
@@ -214,8 +216,6 @@ interface CharacterUpdate {
   fires: AnyNotificationFire[];
   /** Occurrence Keys this poll disproved — see `PollDependencies.retractFromFeed`. */
   retractedKeys: string[];
-  /** This poll's contribution to the Scheduled Push upload (issue #358) — see `PollDependencies.uploadProjection`. */
-  projectionRows: ProjectionRow[];
 }
 
 /**
@@ -301,7 +301,6 @@ async function runForegroundPollOnce(deps: PollDependencies): Promise<void> {
     const fires: AnyNotificationFire[] = [];
     const retractedKeys: string[] = [];
     const snapshots = new Map<DomainRun, unknown>();
-    const projectionRows: ProjectionRow[] = [];
 
     for (const run of runs) {
       const enabledEvents = enabledEventsFor(run.domain.eventIds, scopes, eventPrefs, channels);
@@ -335,31 +334,6 @@ async function runForegroundPollOnce(deps: PollDependencies): Promise<void> {
             .map((fire) => occurrenceKey(fire, deps.now()))
         );
       }
-      // Scheduled Push upload (issue #358): a Scheduled Push is the
-      // closed-app analog of the *browser* channel specifically (it shows an
-      // OS notification, same as `notify` below) — never gated on `feed`,
-      // which shows nothing. Filtering to `enabledEvents` alone (browser OR
-      // feed) would upload — and later push — a feed-only event the user
-      // switched browser notifications off for. `projectColonies` in
-      // particular emits both colony events off one snapshot regardless of
-      // which is individually toggled, so this filter is load-bearing there,
-      // not redundant.
-      if (run.domain.projection) {
-        const domainProjectionRows = await run.domain.projection(
-          character.characterId,
-          character.name,
-          next,
-          deps.now()
-        );
-        projectionRows.push(
-          ...domainProjectionRows.filter(
-            (row) =>
-              enabledEvents.has(row.eventId) &&
-              browserEnabled &&
-              isEventEnabledFor(eventPrefs, row.eventId, 'browser')
-          )
-        );
-      }
     }
 
     if (snapshots.size > 0) {
@@ -370,7 +344,6 @@ async function runForegroundPollOnce(deps: PollDependencies): Promise<void> {
         snapshots,
         fires,
         retractedKeys,
-        projectionRows,
       });
     }
   });
@@ -474,9 +447,10 @@ async function runForegroundPollOnce(deps: PollDependencies): Promise<void> {
     );
   }
 
-  await deps.uploadProjection(
-    new Map(updates.map((update) => [update.characterId, update.projectionRows]))
-  );
+  // Scheduled Push upload (issue #358), from every domain's baseline as just
+  // saved — including one this poll skipped or failed to load, whose last
+  // good snapshot still stands (issue #1248).
+  await rebuildProjection(deps, new Map(runs.map((run) => [run.domain, run.next])));
 }
 
 /** `"{{title}} x{{count}}"` — the suffix a grouped browser-toast title carries (`groupFires.ts`). */

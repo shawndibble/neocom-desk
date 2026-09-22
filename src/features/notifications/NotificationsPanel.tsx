@@ -86,7 +86,8 @@ import {
   EXTRACTOR_EXPIRING_LEAD_HOUR_OPTIONS,
   type CharacterEventThresholds,
 } from './preferences';
-import { runForegroundPoll, liveDependencies } from './foregroundPoller';
+import { liveDependencies } from './foregroundPoller';
+import { rebuildProjection } from './projectionRebuild';
 import {
   isEventEnabledFor,
   isEveTypeEnabledFor,
@@ -671,22 +672,16 @@ const CharacterNotificationSection = memo(function CharacterNotificationSection(
 
   /**
    * `registerDeviceForWebPush` replaces the backend's whole stored
-   * Projection for a Character on every poll tick (issue #358), so a
-   * lead-time change or an off-toggle otherwise leaves a stale Scheduled
-   * Push live until the next ~5-minute tick catches up (issue #750). This
-   * re-runs the full Foreground Poller — the only thing in the codebase
-   * that assembles one Character's whole Projection correctly — rather
-   * than uploading just this domain's rows, which would silently wipe
-   * every other domain's pending push for every other Character too.
-   * `runForegroundPoll`'s in-flight guard coalesces rather than queues: a
-   * click landing while a poll is already running joins that in-flight
-   * poll instead of starting a fresh one, so it can compute under the
-   * *previous* threshold/toggle state — a narrow, self-healing race (the
-   * next ~5-minute tick still picks up the new value) that also happens to
-   * be what stops rapid Select changes from firing one ESI poll apiece.
+   * Projection for a Character on every upload (issue #358), so a lead-time
+   * change or an off-toggle otherwise leaves a stale Scheduled Push live
+   * until the next ~5-minute poll catches up (issue #750). This rebuilds
+   * every Character's whole Projection from the saved baselines
+   * (`projectionRebuild.ts`, issue #1248) — no ESI calls — once `write` has
+   * landed: a rebuild reading preferences before then could project the old
+   * value, or re-hydrate the synced threshold over the new one.
    */
-  const triggerExtractorReupload = () => {
-    void runForegroundPoll(liveDependencies());
+  const reuploadProjectionAfter = (write: Promise<void>) => {
+    void write.then(() => rebuildProjection(liveDependencies()));
   };
 
   return (
@@ -774,14 +769,16 @@ const CharacterNotificationSection = memo(function CharacterNotificationSection(
                           checked={isEventEnabledFor(prefs, eventId, channel)}
                           onToggle={() => {
                             const wasEnabled = isEventEnabledFor(prefs, eventId, channel);
-                            void toggleEventChannelPref(
+                            const write = toggleEventChannelPref(
                               character.characterId,
                               currentValue(),
                               eventId,
                               channel
                             );
                             if (eventId === 'planetaryExtractorExpiring' && wasEnabled) {
-                              triggerExtractorReupload();
+                              reuploadProjectionAfter(write);
+                            } else {
+                              void write;
                             }
                           }}
                         />
@@ -815,16 +812,17 @@ const CharacterNotificationSection = memo(function CharacterNotificationSection(
                         <Select
                           value={String(thresholds.extractorExpiringLeadHours)}
                           onValueChange={(value) => {
-                            void updatePrefs(
-                              character.characterId,
-                              withCharacterEventThreshold(
-                                currentValue(),
+                            reuploadProjectionAfter(
+                              updatePrefs(
                                 character.characterId,
-                                'extractorExpiringLeadHours',
-                                Number(value)
+                                withCharacterEventThreshold(
+                                  currentValue(),
+                                  character.characterId,
+                                  'extractorExpiringLeadHours',
+                                  Number(value)
+                                )
                               )
                             );
-                            triggerExtractorReupload();
                           }}
                         >
                           <SelectTrigger
