@@ -505,4 +505,83 @@ describe('useComparedBuildResults', () => {
     await waitFor(() => expect(result.current.every((row) => !row.loading)).toBe(true));
     expect(mockedSnapshots).toHaveBeenCalledTimes(1);
   });
+
+  it('prices Include Reactions sub-builds at the Reaction Location, like the plan page, not at the main facility (issue #698)', async () => {
+    mockedSnapshots.mockImplementation((requests) =>
+      requests.map((request) =>
+        Promise.resolve({
+          ...SNAPSHOT,
+          systemCostIndex: request.activity === 'reaction' ? 0.25 : 0.01,
+        })
+      )
+    );
+    const catalog = catalogWith([entry({ blueprintTypeID: 100 })]);
+    const plans = [
+      plan({
+        id: 'a',
+        includeReactions: true,
+        reactionFacility: 'athanor',
+        reactionSecurity: 'lowsec',
+        reactionBuildSystemId: 30002053,
+      }),
+      plan({ id: 'b' }),
+    ];
+
+    const { result } = renderHook(() => useComparedBuildResults({ plans, catalog, ...baseArgs }));
+    await waitFor(() => expect(result.current.every((row) => !row.loading)).toBe(true));
+
+    // One extra batch, for the one plan with a Reaction Location.
+    const reactionBatch = mockedSnapshots.mock.calls.find(([reqs]) =>
+      reqs.some((r) => r.activity === 'reaction')
+    )?.[0];
+    expect(reactionBatch).toEqual([
+      expect.objectContaining({ activity: 'reaction', costIndexSystemId: 30002053 }),
+    ]);
+    const reactionCall = mockedCompute.mock.calls.find(([args]) => args.reactionFacility);
+    expect(reactionCall?.[0].reactionFacility).toEqual(
+      expect.objectContaining({ systemCostIndex: 0.25, security: 'lowsec' })
+    );
+    expect(mockedCompute.mock.calls.filter(([args]) => args.reactionFacility)).toHaveLength(1);
+  });
+
+  it("folds corp blueprints into a plan only when that plan's own includeCorpAssets is on", async () => {
+    const producedEntry = entry({
+      blueprintTypeID: 200,
+      productTypeID: 300,
+      productName: 'Component',
+    });
+    const catalog: BlueprintCatalog = {
+      ...catalogWith([entry({ blueprintTypeID: 100 }), producedEntry]),
+      byProductTypeID: new Map([[300, producedEntry]]),
+    };
+    const corpCopy: CharacterBlueprint = {
+      item_id: 9,
+      type_id: 200,
+      runs: -1,
+      material_efficiency: 9,
+      time_efficiency: 18,
+      quantity: 1,
+      location_id: 60003760,
+      location_flag: 'Hangar',
+    };
+    const plans = [
+      plan({ id: 'corp', name: 'corp', includeCorpAssets: true }),
+      plan({ id: 'solo', name: 'solo' }),
+    ];
+    const corpOwnedBlueprints = { available: true, incomplete: false, blueprints: [corpCopy] };
+
+    const { result } = renderHook(() =>
+      useComparedBuildResults({ ...baseArgs, plans, catalog, corpOwnedBlueprints })
+    );
+    await waitFor(() => expect(result.current.every((row) => !row.loading)).toBe(true));
+
+    const meFor = (name: string) => {
+      const call = mockedCompute.mock.calls.find(
+        ([args]) => (args.plan as BuildPlanRecord).name === name
+      );
+      return call?.[0].recipeFor?.(300);
+    };
+    expect(meFor('corp')).toEqual(expect.objectContaining({ me: 9 }));
+    expect(meFor('solo')).toEqual(expect.objectContaining({ me: 0 }));
+  });
 });

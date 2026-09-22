@@ -39,6 +39,7 @@ export function IndustryGroupPage() {
     catalog,
     pi,
     ownedBlueprints,
+    corpOwnedBlueprints,
     skills,
     ownedStockSnapshot,
     blueprintsNeedsReauth,
@@ -86,7 +87,8 @@ export function IndustryGroupPage() {
       ownedBlueprints,
       skills,
       workspace.assumedMe,
-      options
+      options,
+      corpOwnedBlueprints
     );
     if (picks.size === 0) return;
     await db.transaction('rw', db.buildPlans, async () => {
@@ -158,6 +160,7 @@ export function IndustryGroupPage() {
           catalog={catalog}
           pi={pi}
           ownedBlueprints={ownedBlueprints}
+          corpOwnedBlueprints={corpOwnedBlueprints}
           skills={skills}
           ownedStockSnapshot={ownedStockSnapshot}
           onOpenPlan={(planId) => navigate(`/industry/plans/${planId}`)}

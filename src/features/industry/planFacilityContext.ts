@@ -1,7 +1,7 @@
 /**
  * The "where and how this plan's job runs" half of a make-or-buy context —
  * facility, rig fit, security, structure tax — independent of pricing, which
- * each caller layers its own fields on top of (`BuildPlanDetail.tsx`'s own
+ * each caller layers its own fields on top of (`resolveBuildPlan.ts`'s
  * `makeOrBuyContext`, `autoBuildGroup.ts`'s per-member `ctx`). Pulled out
  * once both needed the exact same four-field shape.
  */

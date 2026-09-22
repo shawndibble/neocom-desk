@@ -33,6 +33,8 @@ import {
 } from './planFacilityContext';
 import { materialPricesFor } from './priceBasis';
 import { buildPlanTypeIds, recipeForLookup } from './recipes';
+import { planOwnedBlueprints, reactionFacilityFor } from './resolveBuildPlan';
+import type { CorpOwnedBlueprintsState } from './corpOwnedBlueprints';
 
 interface ResolvedMember {
   plan: BuildPlanRecord;
@@ -119,6 +121,11 @@ export function groupAutoBuildMaxDepth(
  * whether) to patch each plan. A member whose blueprint no longer resolves
  * is left out of the returned map entirely, contributing nothing rather than
  * an empty set.
+ *
+ * Owned blueprints and the Reaction Location resolve per member through
+ * `resolveBuildPlan.ts`'s own helpers — corp copies count only for a member
+ * whose own `includeCorpAssets` is on, the same rule its page and the Group
+ * Rollup price with.
  */
 export async function applyGroupAutoBuild(
   plans: readonly BuildPlanRecord[],
@@ -127,7 +134,8 @@ export async function applyGroupAutoBuild(
   ownedBlueprints: readonly CharacterBlueprint[],
   skills: SkillLevels,
   assumedMe: number,
-  options: { strategy: BuildStrategy; depth: number }
+  options: { strategy: BuildStrategy; depth: number },
+  corpOwnedBlueprints?: CorpOwnedBlueprintsState
 ): Promise<Map<string, Set<number>>> {
   const members = plans.flatMap((plan) => {
     const member = resolveMember(plan, catalog);
@@ -142,13 +150,6 @@ export async function applyGroupAutoBuild(
       activity: industryActivityOf(member.blueprint),
     }))
   );
-
-  const recipeFor = recipeForLookup({
-    catalog,
-    pi,
-    ownedBlueprints,
-    assumedMeForUnowned: assumedMe,
-  });
 
   // A second, independent batch for only the members with a Reaction
   // Location configured (issue #698) — most groups have none, so this is
@@ -174,13 +175,13 @@ export async function applyGroupAutoBuild(
     members.map(async (member, index) => {
       const snapshot = await snapshots[index]!;
       const reactionSnapshot = await reactionSnapshotByPlanId.get(member.plan.id);
-      const reactionFacility =
-        member.reactionPlanFacilityContext && reactionSnapshot?.systemCostIndex != null
-          ? {
-              ...member.reactionPlanFacilityContext,
-              systemCostIndex: reactionSnapshot.systemCostIndex,
-            }
-          : undefined;
+      const reactionFacility = reactionFacilityFor(member.plan, reactionSnapshot?.systemCostIndex);
+      const recipeFor = recipeForLookup({
+        catalog,
+        pi,
+        ownedBlueprints: planOwnedBlueprints(member.plan, ownedBlueprints, corpOwnedBlueprints),
+        assumedMeForUnowned: assumedMe,
+      });
       const ctx: MakeOrBuyContext = {
         ...member.facilityContext,
         systemCostIndex: snapshot.systemCostIndex ?? 0,

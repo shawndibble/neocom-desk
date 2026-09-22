@@ -20,22 +20,18 @@
  * Plans sharing a hub do share that fetch's outcome, so they fail together
  * when it fails; each still reports its own row.
  *
- * Blueprint Acquisition (issue #838/#839) mirrors `BuildPlanDetail.tsx`'s own
- * wiring: a top-level acquisition resolution overrides the ME/TE this plan is
- * priced at (same as the detail page's `resolvedMe`/`resolvedTe`), and the
- * same `acquisitionFor` closure is forwarded into `computeBuildPlan` so a
- * nested buildable node's own blueprint cost is resolved too — otherwise this
- * hook's totals (the Industry index's Profit column, and every Build Group
- * rollup, both price through this hook) would silently disagree with the
- * plan's own page. `useIncludeBlueprintCost` degrades that cost to zero
- * everywhere at once (tier still resolves, so material quantities never
- * change) rather than reverting to the pre-#838 ME-only heuristic.
+ * Resolution itself is `resolveBuildPlan`, the same call `BuildPlanDetail.tsx`
+ * makes for the open plan — Blueprint Acquisition (issue #838/#839), the
+ * per-plan Corp Assets blueprint merge and the Reaction Location (issue #698)
+ * are all wired there, once, so this hook's totals (the Industry index's
+ * Profit column, Compare, and every Build Group rollup) cannot drift from the
+ * plan's own page. This hook only batches the fetches that feed it.
  */
 import { useEffect, useRef, useState } from 'react';
 import i18n from '@/i18n';
 import type { BuildPlanRecord } from '@/db';
-import { MAX_JOB_RUNS, industryActivityOf } from '@/engine/industry/types';
-import type { BuildResult, IndustryBlueprint, SkillLevels } from '@/engine/industry/types';
+import { industryActivityOf } from '@/engine/industry/types';
+import type { BuildResult, SkillLevels } from '@/engine/industry/types';
 import type { BpcOffer } from '@/engine/industry/blueprintAcquisition';
 import { effectivePrice, type BpcContractRow } from '@/engine/contracts/bpcSearch';
 import type { CharacterBlueprint } from '@/esi/endpoints';
@@ -43,18 +39,11 @@ import type { PiData } from '@/sde/types';
 import { DEFAULT_TRADE_HUB, getTradeHub, type TradeHub } from '@/market/hubs';
 import { loadPublicBpcContracts } from '@/features/bpcContracts/syncedContracts';
 import { toIndustryBlueprint, type BlueprintCatalog } from './blueprintCatalog';
-import { computeBuildPlan } from './computeBuildPlan';
 import { loadMarketSnapshots, type MarketSnapshot, type MarketSnapshotRequest } from './marketData';
-import { materialPricesFor } from './priceBasis';
-import {
-  acquisitionForLookup,
-  buildPlanTypeIds,
-  cloneBlueprintPools,
-  recipeForLookup,
-  withoutAcquisitionCost,
-  type BlueprintTierPools,
-} from './recipes';
-import { facilityContextFor } from './planFacilityContext';
+import { buildPlanTypeIds } from './recipes';
+import { reactionPlanFacilityContextFor } from './planFacilityContext';
+import { resolveBuildPlan, type BuildPlanSources } from './resolveBuildPlan';
+import type { CorpOwnedBlueprintsState } from './corpOwnedBlueprints';
 import { useAssumedMe } from './assumedMe';
 import { useIncludeBlueprintCost } from './includeBlueprintCost';
 
@@ -82,6 +71,12 @@ export interface UseComparedBuildResultsArgs {
   catalog: BlueprintCatalog | null;
   pi: PiData | null;
   ownedBlueprints: readonly CharacterBlueprint[];
+  /**
+   * The active Character's corp blueprints (issue #839), folded into each
+   * plan on its own `includeCorpAssets` — never into every plan at once.
+   * Omitted reads as unavailable.
+   */
+  corpOwnedBlueprints?: CorpOwnedBlueprintsState;
   skills: SkillLevels;
   /** @see ComparedBuildRow.groupResult */
   computeGroupResult?: boolean;
@@ -89,15 +84,18 @@ export interface UseComparedBuildResultsArgs {
 
 /** A plan resolved far enough to ask for prices — what a snapshot request needs. */
 interface PriceablePlan {
-  blueprint: IndustryBlueprint;
   request: MarketSnapshotRequest;
+  /** Its Reaction Location's own cost-index request — null when none is configured (issue #698). */
+  reactionRequest: MarketSnapshotRequest | null;
 }
 
-/** A priceable plan paired with the in-flight snapshot that prices it. */
+/** A priceable plan paired with the in-flight snapshots that price it. */
 interface PricedPlan {
-  blueprint: IndustryBlueprint;
   snapshot: Promise<MarketSnapshot>;
+  reactionSnapshot: Promise<MarketSnapshot> | null;
 }
+
+const NO_BLUEPRINTS: readonly CharacterBlueprint[] = [];
 
 function productNameFor(plan: BuildPlanRecord, catalog: BlueprintCatalog): string {
   return catalog.byBlueprintTypeID.get(plan.blueprintTypeID)?.productName ?? plan.name;
@@ -129,20 +127,23 @@ function priceablePlan(
   if (!entry) return null;
 
   const blueprint = toIndustryBlueprint(entry.blueprint);
+  const hub = getTradeHub(plan.hubId) ?? DEFAULT_TRADE_HUB;
+  const typeIds = buildPlanTypeIds(blueprint, { catalog, pi });
   return {
-    blueprint,
     request: {
-      hub: getTradeHub(plan.hubId) ?? DEFAULT_TRADE_HUB,
-      typeIds: buildPlanTypeIds(blueprint, { catalog, pi }),
+      hub,
+      typeIds,
       costIndexSystemId: plan.buildSystemId,
       activity: industryActivityOf(blueprint),
     },
+    // Same second fetch `BuildPlanDetail.tsx` makes for its Reaction
+    // Location: hub prices are already cached by the primary request, so
+    // this only really costs the reaction cost-index lookup.
+    reactionRequest:
+      reactionPlanFacilityContextFor(plan) !== null
+        ? { hub, typeIds, costIndexSystemId: plan.reactionBuildSystemId, activity: 'reaction' }
+        : null,
   };
-}
-
-function clampInt(value: number, min: number, max: number): number {
-  const n = Math.round(value);
-  return Math.min(max, Math.max(min, Number.isFinite(n) ? n : min));
 }
 
 /** BPC Sourcing offers for one blueprint type, in one region — `bpcRows` narrowed the same way `useBpcAcquisitionOffers` narrows for a single plan's own page. */
@@ -170,18 +171,15 @@ function offersForRegion(
 /**
  * Prices one plan against the snapshot already requested for it. Batching
  * happens a level up, so this only ever awaits — a plan with no blueprint has
- * no snapshot to await, and reports that instead.
+ * no snapshot to await, and reports that instead. Everything past the await
+ * is `resolveBuildPlan`, the same resolution the plan's own page runs.
  */
 async function computeRow(
   plan: BuildPlanRecord,
   catalog: BlueprintCatalog,
-  pi: PiData | null,
   priced: PricedPlan | null,
-  ownedBlueprints: readonly CharacterBlueprint[],
-  skills: SkillLevels,
-  assumedMe: number,
+  sources: Omit<BuildPlanSources, 'catalog' | 'bpcOffersFor'>,
   bpcRows: readonly BpcContractRow[],
-  includeBlueprintCost: boolean,
   computeGroupResult: boolean
 ): Promise<ComparedBuildRow> {
   const base = {
@@ -197,109 +195,21 @@ async function computeRow(
   }
 
   try {
-    const snap = await priced.snapshot;
-    const materialPrices = materialPricesFor(snap, plan.materialPriceBasis);
+    const snapshot = await priced.snapshot;
+    // A failed Reaction Location fetch degrades to "not resolved yet", the
+    // same way the plan's own page treats it — never an error on the row.
+    const reactionSnapshot = await priced.reactionSnapshot?.catch(() => null);
     const hub: TradeHub = getTradeHub(plan.hubId) ?? DEFAULT_TRADE_HUB;
-
-    // Shared by both computeBuildPlan calls below, matching BuildPlanDetail.tsx's
-    // own recipeFor/acquisitionFor, so a buildHere choice and a Blueprint
-    // Acquisition tier roll up the same way here as they do on the plan's own
-    // page.
-    const recipeSources = {
-      catalog,
-      pi,
-      ownedBlueprints,
-      assumedMeForUnowned: assumedMe,
-      blueprintAcquisition: {
-        offersFor: offersForRegion(bpcRows, hub.regionId),
-        hubPrices: snap.hubPrices,
-        sourcing: plan.materialSourcing,
-      },
-    };
-    const recipeFor = recipeForLookup(recipeSources);
-    // Shared by `topLevelAcquisition` below and `result`'s own nested
-    // resolution (issue #860) — both need to see the same blueprint copies
-    // claimed once, not once each. The Group Owned Overlay pass further
-    // down gets its own independent pool instead of this one, the same way
-    // `buildVsBuy.ts` gives material `ownedPool` a fresh map per call rather
-    // than sharing one across unrelated resolutions.
-    const blueprintPools: BlueprintTierPools = new Map();
-    const rawAcquisitionFor = acquisitionForLookup(recipeSources, blueprintPools);
-    const acquisitionFor = includeBlueprintCost
-      ? rawAcquisitionFor
-      : withoutAcquisitionCost(rawAcquisitionFor);
-
-    const common = {
-      blueprint: priced.blueprint,
-      systemCostIndex: snap.systemCostIndex ?? 0,
-      adjustedPrices: snap.adjustedPrices ?? {},
-      hubPrices: snap.hubPrices,
-      materialPrices,
-      skills,
-      recipeFor,
-    };
-
-    // Top-level Blueprint Acquisition (issue #838), mirroring
-    // `BuildPlanDetail.tsx`'s `topLevelAcquisition`/`resolvedMe`/`resolvedTe`:
-    // gated on real prices having landed, same as that page's
-    // `makeOrBuyContext` — resolving a tier against a zeroed snapshot would
-    // disagree with the detail page once prices actually arrive.
-    const adjustedPrices = snap.adjustedPrices;
-    const systemCostIndex = snap.systemCostIndex;
-    const product = priced.blueprint.products[0];
-    const topLevelAcquisition =
-      product && adjustedPrices !== null && systemCostIndex !== null
-        ? acquisitionFor(
-            product.typeID,
-            clampInt(plan.runs, 1, MAX_JOB_RUNS),
-            { ...facilityContextFor(plan), systemCostIndex, adjustedPrices, skills },
-            materialPrices
-          )
-        : null;
-    const resolvedMe = topLevelAcquisition?.me ?? plan.me;
-    const resolvedTe = topLevelAcquisition?.te ?? plan.te;
-    const blueprintAcquisition = topLevelAcquisition
-      ? { blueprintTypeID: topLevelAcquisition.blueprintTypeID, line: topLevelAcquisition.line }
-      : undefined;
-    // Snapshot right after the top-level's own claim, before `result`'s
-    // nested resolution below claims anything further — the Group Owned
-    // Overlay pass starts from here, not from `blueprintPools`'s final state,
-    // so the two passes' nested resolutions never claim from each other.
-    const blueprintPoolsAfterTopLevel = cloneBlueprintPools(blueprintPools);
-
-    const planForCompute = { ...plan, me: resolvedMe, te: resolvedTe };
-    const { result, error } = computeBuildPlan({
-      plan: planForCompute,
-      ...common,
-      acquisitionFor,
-      blueprintAcquisition,
-    });
-    // Same snapshot, priced a second time with owned-stock deduction
-    // disabled — the Group Owned Overlay (issue #697) needs each member's
-    // tree re-resolved this way; a member's own row above is untouched. Its
-    // own error surfaces on the row too (only reachable when the primary
-    // call above succeeded, since `error` already wins otherwise) — a member
-    // whose group computation alone failed must not silently vanish from the
-    // rollup with no explanation, the same "report your own row" contract
-    // every other failure mode here keeps.
-    let groupResult: BuildResult | null = null;
-    let groupError: string | null = null;
-    if (computeGroupResult) {
-      const groupAcquisitionForRaw = acquisitionForLookup(
-        recipeSources,
-        blueprintPoolsAfterTopLevel
-      );
-      const groupAcquisitionFor = includeBlueprintCost
-        ? groupAcquisitionForRaw
-        : withoutAcquisitionCost(groupAcquisitionForRaw);
-      ({ result: groupResult, error: groupError } = computeBuildPlan({
-        plan: planForCompute,
-        ...common,
-        acquisitionFor: groupAcquisitionFor,
-        blueprintAcquisition,
-        ignoreOwnedStock: true,
-      }));
-    }
+    const { result, error, groupResult, groupError } = resolveBuildPlan(
+      plan,
+      { ...sources, catalog, bpcOffersFor: offersForRegion(bpcRows, hub.regionId) },
+      { snapshot, reactionSystemCostIndex: reactionSnapshot?.systemCostIndex },
+      { withGroupResult: computeGroupResult }
+    );
+    // The group pass's own error surfaces on the row too (only reachable
+    // when the primary pass succeeded, since `error` already wins otherwise)
+    // — a member whose group computation alone failed must not silently
+    // vanish from the rollup with no explanation.
     return { ...base, result, groupResult, error: error ?? groupError };
   } catch (err) {
     return {
@@ -316,10 +226,20 @@ export function useComparedBuildResults({
   catalog,
   pi,
   ownedBlueprints,
+  corpOwnedBlueprints,
   skills,
   computeGroupResult = false,
 }: UseComparedBuildResultsArgs): ComparedBuildRow[] {
   const [rows, setRows] = useState<ComparedBuildRow[]>([]);
+
+  // `useCorpOwnedBlueprints` hands back a fresh wrapper (and, while loading,
+  // a fresh empty list) every render, so the fetch effect keys on these two
+  // value-stable parts instead of the wrapper.
+  const corpAvailable = corpOwnedBlueprints?.available ?? false;
+  const corpBlueprintList =
+    corpAvailable && corpOwnedBlueprints!.blueprints.length > 0
+      ? corpOwnedBlueprints!.blueprints
+      : NO_BLUEPRINTS;
 
   // Latest-ref pattern (useCompareRows.ts): a fresh `plans` array reference
   // lands on nearly every render, so the fetch effect below keys on a
@@ -388,22 +308,46 @@ export function useComparedBuildResults({
     const requests = priceable.flatMap((p) => (p ? [p.request] : []));
     const snapshots = loadMarketSnapshots(requests);
     const snapshotByRequest = new Map(requests.map((request, i) => [request, snapshots[i]!]));
+    // A second, independent batch for only the plans with a Reaction
+    // Location configured (issue #698) — most have none, so this is usually
+    // skipped rather than doubling every comparison's price fetch.
+    const reactionRequests = priceable.flatMap((p) =>
+      p?.reactionRequest ? [p.reactionRequest] : []
+    );
+    const reactionSnapshots =
+      reactionRequests.length > 0 ? loadMarketSnapshots(reactionRequests) : [];
+    const reactionSnapshotByRequest = new Map(
+      reactionRequests.map((request, i) => [request, reactionSnapshots[i]!])
+    );
+    const corpBlueprints: CorpOwnedBlueprintsState = {
+      available: corpAvailable,
+      incomplete: false,
+      blueprints: corpBlueprintList,
+    };
 
     for (const [index, plan] of currentPlans.entries()) {
       const entry = priceable[index];
       const priced = entry
-        ? { blueprint: entry.blueprint, snapshot: snapshotByRequest.get(entry.request)! }
+        ? {
+            snapshot: snapshotByRequest.get(entry.request)!,
+            reactionSnapshot: entry.reactionRequest
+              ? reactionSnapshotByRequest.get(entry.reactionRequest)!
+              : null,
+          }
         : null;
       void computeRow(
         plan,
         catalog,
-        pi,
         priced,
-        ownedBlueprints,
-        skills,
-        assumedMe,
+        {
+          pi,
+          ownedBlueprints,
+          corpBlueprints,
+          assumedMe,
+          skills,
+          includeBlueprintCost,
+        },
         bpcRows,
-        includeBlueprintCost,
         computeGroupResult
       ).then((row) => {
         if (cancelled) return;
@@ -419,6 +363,8 @@ export function useComparedBuildResults({
     catalog,
     pi,
     ownedBlueprints,
+    corpAvailable,
+    corpBlueprintList,
     assumedMe,
     assumedMeHydrated,
     includeBlueprintCost,

@@ -53,6 +53,7 @@ import {
   type BlueprintCatalog,
 } from './blueprintCatalog';
 import type { BuildGroup } from './buildGroups';
+import type { CorpOwnedBlueprintsState } from './corpOwnedBlueprints';
 import { AutoBuildControl } from './AutoBuildControl';
 import { groupCraftScope, groupAutoBuildMaxDepth } from './autoBuildGroup';
 import { formatPercent, formatVolume } from './format';
@@ -99,6 +100,8 @@ interface BuildGroupPanelProps {
   catalog: BlueprintCatalog;
   pi: PiData | null;
   ownedBlueprints: readonly CharacterBlueprint[];
+  /** Folded into each member on its own `includeCorpAssets` — see `resolveBuildPlan`. */
+  corpOwnedBlueprints?: CorpOwnedBlueprintsState;
   skills: SkillLevels;
   ownedStockSnapshot: OwnedStockSnapshot;
   /** Opens one member on its own, the way clicking it in the list would. */
@@ -129,6 +132,7 @@ export function BuildGroupPanel({
   catalog,
   pi,
   ownedBlueprints,
+  corpOwnedBlueprints,
   skills,
   ownedStockSnapshot,
   onOpenPlan,
@@ -153,6 +157,7 @@ export function BuildGroupPanel({
     catalog,
     pi,
     ownedBlueprints,
+    corpOwnedBlueprints,
     skills,
     computeGroupResult: true,
   });

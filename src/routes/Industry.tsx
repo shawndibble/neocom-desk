@@ -62,6 +62,7 @@ export function Industry() {
     catalog,
     pi,
     ownedBlueprints,
+    corpOwnedBlueprints,
     blueprintsNeedsReauth,
     skills,
     buildGroups,
@@ -278,6 +279,7 @@ export function Industry() {
     catalog,
     pi,
     ownedBlueprints,
+    corpOwnedBlueprints,
     skills,
     computeGroupResult: true,
   });
@@ -286,6 +288,7 @@ export function Industry() {
     catalog,
     pi,
     ownedBlueprints,
+    corpOwnedBlueprints,
     skills,
   });
   const runCounts = useRunCountsByPlan(activeCharacterId);
@@ -534,6 +537,7 @@ export function Industry() {
                 catalog={catalog}
                 pi={pi}
                 ownedBlueprints={ownedBlueprints}
+                corpOwnedBlueprints={corpOwnedBlueprints}
                 skills={skills}
                 onDone={exitCompare}
               />
