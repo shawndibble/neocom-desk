@@ -231,7 +231,7 @@ describe('resolveEveNotificationNames — the second render of a fire costs no s
       type: 'CorpAppNewMsg',
       text: 'applicationText: hi\ncharID: 1011\ncorpID: 2001\n',
     });
-    // `notificationText` renders twice per fire: once for the browser
+    // `renderNotification` renders twice per fire: once for the browser
     // notification, once for the Notification Feed entry.
     const [browser, feed] = await Promise.all([
       resolveEveNotificationNames(applicant),

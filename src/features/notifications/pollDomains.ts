@@ -10,6 +10,11 @@
  * merge loop). Now `foregroundPoller.ts` is one generic loop over
  * `POLL_DOMAINS`, and **adding a domain is one entry in this file**.
  *
+ * Each entry also says how its events read (issue #1249): its `copy` (live
+ * and push wording, subject route — `domainCopy.ts`) and the `names` lookups
+ * that copy needs. The poller renders every fire through
+ * `renderNotification` without knowing which domain it came from.
+ *
  * The engine's diffs stay pure and untouched; only their registration lives
  * here. `defineDomain` is where each entry's types are erased to `unknown`, so
  * the entry literal is fully type-checked while the loop that drives all of
@@ -148,8 +153,39 @@ import {
 } from '@/engine/projection';
 import { loadUniverseType } from '@/features/skills/data';
 import { loadPlanetName } from '@/features/pi/names';
+import { resolveNames } from '@/features/character/names';
+import { loadTypeNames } from '@/features/character/typeNames';
+import type { NotificationCopy } from '@/engine/notificationWording';
 import { mapWithConcurrencyLimit, ESI_FANOUT_CONCURRENCY } from '@/lib/concurrency';
+import { formatCalendarTimestamp } from '@/lib/timestamp';
+import { timeZoneFor, useTimeFormat } from '@/lib/timeFormat';
 import type { NotificationEventId } from './events';
+import { resolveEveNotificationNames } from './eveNotificationNames';
+import {
+  skillQueueCopy,
+  spExtractionCopy,
+  industryJobCopy,
+  industryItemTypeId,
+  colonyCopy,
+  mailCopy,
+  calendarCopy,
+  contractCopy,
+  walletCopy,
+  marketOrderCopy,
+  eveNotificationCopy,
+  structureFuelCopy,
+  corpIndustryJobCopy,
+  corpRosterCopy,
+  corpWalletCopy,
+  priceAlertCopy,
+  type DomainCopy,
+  type SkillNames,
+  type ItemNames,
+  type PlanetNames,
+  type CalendarNames,
+  type MemberNames,
+} from './domainCopy';
+import type { EveNotificationNames } from './eveNotificationText';
 import {
   useNotificationPreferences,
   hydrateNotificationPreferences,
@@ -182,6 +218,29 @@ async function resolveProjectionNames(
 async function universeTypeName(typeId: number): Promise<string | null> {
   const result = await loadUniverseType(typeId);
   return result?.data.name ?? null;
+}
+
+/** `universeTypeName` as a copy lookup: absent rather than null when unresolved. */
+async function typeNameOrAbsent(typeId: number): Promise<string | undefined> {
+  return (await universeTypeName(typeId)) ?? undefined;
+}
+
+/**
+ * When a newly-added calendar event starts, in the pilot's chosen clock
+ * (`lib/timeFormat.ts` — local, or EVE/UTC).
+ *
+ * Read through the store's `getState` rather than the `useTimeZone` hook: this
+ * runs in the poll loop, not in a component. The preference is hydrated by the
+ * time any poll runs (`ForegroundNotificationPoller` mounts inside the app),
+ * and its default is the same 'local' every other surface used before the
+ * preference existed, so a cold read is never wrong in a way a pilot notices.
+ *
+ * `undefined` when the snapshot carries no usable instant — the copy drops
+ * the clause rather than printing "Invalid Date".
+ */
+function calendarStartLabel(startMs: number): string | undefined {
+  if (!Number.isFinite(startMs)) return undefined;
+  return formatCalendarTimestamp(new Date(startMs), timeZoneFor(useTimeFormat.getState().value));
 }
 
 /** Every fire any registered diff can produce. */
@@ -232,7 +291,7 @@ export function gatedOn<TSnapshot, TFire>(
 }
 
 /** One registry entry, as written. Fully typed; `defineDomain` erases it. */
-interface PollDomainSpec<TRaw, TSnapshot, TFire extends AnyNotificationFire> {
+interface PollDomainSpec<TRaw, TSnapshot, TFire extends AnyNotificationFire, TNames> {
   /** Stable identifier, used for the state key and by tests to address a domain. */
   readonly id: string;
   /** Every Notification Event this domain's snapshot can fire. */
@@ -285,6 +344,14 @@ interface PollDomainSpec<TRaw, TSnapshot, TFire extends AnyNotificationFire> {
     snapshot: TSnapshot,
     nowMs: number
   ) => Promise<ProjectionRow[]>;
+  /** How this domain's fires read, and which row each is about (`domainCopy.ts`). */
+  readonly copy: DomainCopy<TFire, TNames>;
+  /**
+   * The display names `copy.poll` needs, looked up per fire. Best-effort: a
+   * name it cannot resolve is left absent and the copy falls back to `#id`.
+   * Omitted by a domain whose copy names nothing it has to look up.
+   */
+  readonly names?: (fire: TFire) => Promise<TNames>;
 }
 
 /**
@@ -312,6 +379,10 @@ export interface PollDomain {
     snapshot: unknown,
     nowMs: number
   ) => Promise<ProjectionRow[]>;
+  /** Looks up this fire's names, then renders its live copy. */
+  readonly render: (fire: AnyNotificationFire, characterName: string) => Promise<NotificationCopy>;
+  /** The row this fire was about, where its event routes to one. */
+  readonly subjectOf: (fire: AnyNotificationFire) => number | undefined;
 }
 
 /**
@@ -319,9 +390,12 @@ export interface PollDomain {
  * known and every cast is checked against the spec above; outside it, nothing
  * needs to know which domain it is holding.
  */
-function defineDomain<TRaw, TSnapshot, TFire extends AnyNotificationFire>(
-  spec: PollDomainSpec<TRaw, TSnapshot, TFire>
-): PollDomain {
+function defineDomain<
+  TRaw,
+  TSnapshot,
+  TFire extends AnyNotificationFire,
+  TNames = Record<string, never>,
+>(spec: PollDomainSpec<TRaw, TSnapshot, TFire, TNames>): PollDomain {
   const store = createPollerStateStore<TSnapshot>(
     spec.stateKey,
     isSnapshotWith<TSnapshot>(spec.entriesKey, spec.isEntry)
@@ -350,6 +424,14 @@ function defineDomain<TRaw, TSnapshot, TFire extends AnyNotificationFire>(
       ? (characterId, characterName, snapshot, nowMs) =>
           spec.projection!(characterId, characterName, snapshot as TSnapshot, nowMs)
       : undefined,
+    // Only ever handed a fire whose eventId is in `spec.eventIds` —
+    // `domainForEvent` is the one caller that picks the domain.
+    render: async (fire, characterName) => {
+      const typed = fire as TFire;
+      const names = spec.names ? await spec.names(typed) : ({} as TNames);
+      return spec.copy.poll(typed, characterName, names);
+    },
+    subjectOf: (fire) => spec.copy.subjectOf?.(fire as TFire),
   };
 }
 
@@ -383,40 +465,54 @@ function toSkillQueueEntrySnapshot(entry: SkillQueueEntry): SkillQueueEntrySnaps
   };
 }
 
-export const skillQueueDomain = defineDomain<SkillQueueEntry, SkillQueueSnapshot, NotificationFire>(
-  {
-    id: 'skillQueue',
-    eventIds: SKILL_QUEUE_EVENT_IDS,
-    stateKey: 'notifications.pollerState.skillQueue',
-    entriesKey: 'entries',
-    isEntry: isSkillQueueEntrySnapshot,
-    load: async (characterId) => {
-      const result = await loadCharacterSkillQueueWithStatus(characterId);
-      if (result.needsReauth || result.cached === null) return null;
-      return result.cached.data;
-    },
-    toSnapshot: (entries, nowMs) => ({ entries: entries.map(toSkillQueueEntrySnapshot), nowMs }),
-    // The engine already runs this domain's diffs off an enabled set, so it is
-    // the one that needs no `gatedOn` adapter — only the narrowing back to the
-    // ids it knows about.
-    diffs: [
-      (characterId, prev, next, enabledEvents) =>
-        runSkillQueueNotificationDiffs(
-          characterId,
-          prev,
-          next,
-          new Set(SKILL_QUEUE_EVENT_IDS.filter((eventId) => enabledEvents.has(eventId)))
-        ),
-    ],
-    projection: async (characterId, characterName, snapshot, nowMs) => {
-      const skillNames = await resolveProjectionNames(
-        snapshot.entries.map((entry) => entry.skillId),
-        universeTypeName
-      );
-      return projectSkillQueue(characterId, characterName, snapshot.entries, skillNames, nowMs);
-    },
-  }
-);
+export const skillQueueDomain = defineDomain<
+  SkillQueueEntry,
+  SkillQueueSnapshot,
+  NotificationFire,
+  SkillNames
+>({
+  id: 'skillQueue',
+  eventIds: SKILL_QUEUE_EVENT_IDS,
+  stateKey: 'notifications.pollerState.skillQueue',
+  entriesKey: 'entries',
+  isEntry: isSkillQueueEntrySnapshot,
+  load: async (characterId) => {
+    const result = await loadCharacterSkillQueueWithStatus(characterId);
+    if (result.needsReauth || result.cached === null) return null;
+    return result.cached.data;
+  },
+  toSnapshot: (entries, nowMs) => ({ entries: entries.map(toSkillQueueEntrySnapshot), nowMs }),
+  // The engine already runs this domain's diffs off an enabled set, so it is
+  // the one that needs no `gatedOn` adapter — only the narrowing back to the
+  // ids it knows about.
+  diffs: [
+    (characterId, prev, next, enabledEvents) =>
+      runSkillQueueNotificationDiffs(
+        characterId,
+        prev,
+        next,
+        new Set(SKILL_QUEUE_EVENT_IDS.filter((eventId) => enabledEvents.has(eventId)))
+      ),
+  ],
+  projection: async (characterId, characterName, snapshot, nowMs) => {
+    const skillNames = await resolveProjectionNames(
+      snapshot.entries.map((entry) => entry.skillId),
+      universeTypeName
+    );
+    return projectSkillQueue(
+      characterId,
+      characterName,
+      snapshot.entries,
+      skillNames,
+      skillQueueCopy.push,
+      nowMs
+    );
+  },
+  copy: skillQueueCopy,
+  names: async (fire) => ({
+    skill: fire.skillId === null ? undefined : await typeNameOrAbsent(fire.skillId),
+  }),
+});
 
 /* -------------------------------------------------------------------------- */
 /* SP extraction (grilling session, 2026-09-09)                               */
@@ -463,6 +559,7 @@ export const spExtractionDomain = defineDomain<
   },
   toSnapshot: (entries, nowMs) => ({ entries: [...entries], nowMs }),
   diffs: [gatedOn('spExtractionReady', diffSpExtractionReady)],
+  copy: spExtractionCopy,
 });
 
 /* -------------------------------------------------------------------------- */
@@ -494,7 +591,8 @@ function toIndustryJobEntrySnapshot(job: IndustryJob): IndustryJobEntrySnapshot 
 export const industryJobDomain = defineDomain<
   IndustryJob,
   IndustryJobSnapshot,
-  IndustryJobNotificationFire
+  IndustryJobNotificationFire,
+  ItemNames
 >({
   id: 'industryJobs',
   eventIds: ['industryJobComplete'],
@@ -513,8 +611,17 @@ export const industryJobDomain = defineDomain<
       snapshot.entries.map((entry) => entry.productTypeId ?? entry.blueprintTypeId),
       universeTypeName
     );
-    return projectIndustryJobs(characterId, characterName, snapshot.entries, itemNames, nowMs);
+    return projectIndustryJobs(
+      characterId,
+      characterName,
+      snapshot.entries,
+      itemNames,
+      industryJobCopy.push,
+      nowMs
+    );
   },
+  copy: industryJobCopy,
+  names: async (fire) => ({ item: await typeNameOrAbsent(industryItemTypeId(fire)) }),
 });
 
 /* -------------------------------------------------------------------------- */
@@ -551,7 +658,8 @@ function isColonySnapshotEntry(raw: unknown): raw is ColonySnapshotEntry {
 export const colonyDomain = defineDomain<
   ColonySnapshotEntry,
   PlanetarySnapshot,
-  PlanetaryNotificationFire | ExtractorExpiringFire
+  PlanetaryNotificationFire | ExtractorExpiringFire,
+  PlanetNames
 >({
   id: 'colonies',
   eventIds: ['planetaryExtractionDone', 'planetaryExtractorExpiring'],
@@ -601,8 +709,17 @@ export const colonyDomain = defineDomain<
       snapshot.colonies.map((colony) => colony.planetId),
       loadPlanetName
     );
-    return projectColonies(characterId, characterName, snapshot.colonies, planetNames, nowMs);
+    return projectColonies(
+      characterId,
+      characterName,
+      snapshot.colonies,
+      planetNames,
+      colonyCopy.push,
+      nowMs
+    );
   },
+  copy: colonyCopy,
+  names: async (fire) => ({ planet: (await loadPlanetName(fire.planetId)) ?? undefined }),
 });
 
 /* -------------------------------------------------------------------------- */
@@ -631,6 +748,7 @@ export const mailDomain = defineDomain<MailHeader, MailSnapshot, MailNotificatio
     nowMs,
   }),
   diffs: [gatedOn('newMail', diffNewMail)],
+  copy: mailCopy,
 });
 
 /* -------------------------------------------------------------------------- */
@@ -659,7 +777,8 @@ function isCalendarEventEntrySnapshot(raw: unknown): raw is CalendarEventEntrySn
 export const calendarDomain = defineDomain<
   CalendarEventSummary,
   CalendarSnapshot,
-  NewCalendarEventFire | CalendarEventStartingFire
+  NewCalendarEventFire | CalendarEventStartingFire,
+  CalendarNames
 >({
   id: 'calendar',
   eventIds: ['newCalendarEvent', 'calendarEventStarting'],
@@ -690,7 +809,10 @@ export const calendarDomain = defineDomain<
   // `calendarEventStarting`'s `startMs` is; the pure `projectCalendar`
   // already emits `calendarEventStarting` rows exclusively.
   projection: async (characterId, characterName, snapshot, nowMs) =>
-    projectCalendar(characterId, characterName, snapshot.entries, nowMs),
+    projectCalendar(characterId, characterName, snapshot.entries, calendarCopy.push, nowMs),
+  copy: calendarCopy,
+  names: async (fire) =>
+    fire.eventId === 'newCalendarEvent' ? { when: calendarStartLabel(fire.startMs) } : {},
 });
 
 /* -------------------------------------------------------------------------- */
@@ -770,6 +892,7 @@ export const contractDomain = defineDomain<Contract, ContractSnapshot, ContractN
     gatedOn('contractCompleted', diffContractCompleted),
     gatedOn('contractFailed', diffContractFailed),
   ],
+  copy: contractCopy,
 });
 
 /* -------------------------------------------------------------------------- */
@@ -835,6 +958,7 @@ export const walletDomain = defineDomain<
   },
   toSnapshot: (entries, nowMs) => ({ entries: [...entries], nowMs }),
   diffs: [gatedOn('walletBalanceChanged', diffWalletBalanceChanged)],
+  copy: walletCopy,
 });
 
 /* -------------------------------------------------------------------------- */
@@ -898,7 +1022,8 @@ export function deriveMarketOrderEntries(
 export const marketOrderDomain = defineDomain<
   MarketOrderEntrySnapshot,
   MarketOrderSnapshot,
-  MarketOrderNotificationFire
+  MarketOrderNotificationFire,
+  ItemNames
 >({
   id: 'marketOrders',
   eventIds: ['marketOrderFilled'],
@@ -920,6 +1045,14 @@ export const marketOrderDomain = defineDomain<
   },
   toSnapshot: (entries, nowMs) => ({ entries: [...entries], nowMs }),
   diffs: [gatedOn('marketOrderFilled', diffMarketOrderFilled)],
+  copy: marketOrderCopy,
+  // Best-effort: `loadTypeNames` reads the local SDE snapshot first, falls
+  // back to one batched ESI call, and yields "Type #id" rather than throwing.
+  // A name we cannot resolve is no reason to hold the notification back.
+  names: async (fire) => {
+    const names = await loadTypeNames([fire.typeId]).catch(() => new Map<number, string>());
+    return { item: names.get(fire.typeId) };
+  },
 });
 
 /* -------------------------------------------------------------------------- */
@@ -952,7 +1085,8 @@ function isEveNotificationEntrySnapshot(raw: unknown): raw is EveNotificationEnt
 export const eveNotificationDomain = defineDomain<
   CharacterNotification,
   EveNotificationSnapshot,
-  EveNotificationFire
+  EveNotificationFire,
+  EveNotificationNames
 >({
   id: 'eveNotification',
   eventIds: ['eveNotification'],
@@ -1004,9 +1138,15 @@ export const eveNotificationDomain = defineDomain<
       characterName,
       eligible,
       structureNames,
+      eveNotificationCopy.push,
       nowMs
     );
   },
+  copy: eveNotificationCopy,
+  // Best-effort, time-boxed and never rejects (issue #300): whatever it could
+  // not look up in its budget renders as an id or a neutral phrase rather
+  // than holding the notification back.
+  names: resolveEveNotificationNames,
 });
 
 /* -------------------------------------------------------------------------- */
@@ -1096,7 +1236,14 @@ export const structureFuelDomain = defineDomain<
   // `entry.thresholdMs` is already baked in per entry above (this poll's
   // fuel lead time), so no preference read is needed here.
   projection: async (characterId, characterName, snapshot, nowMs) =>
-    projectStructureFuel(characterId, characterName, snapshot.entries, nowMs),
+    projectStructureFuel(
+      characterId,
+      characterName,
+      snapshot.entries,
+      structureFuelCopy.push,
+      nowMs
+    ),
+  copy: structureFuelCopy,
 });
 
 /* Corp industry jobs --------------------------------------------------------- */
@@ -1126,7 +1273,8 @@ function toCorpIndustryJobEntrySnapshot(job: CorporationIndustryJob): CorpIndust
 export const corpIndustryJobDomain = defineDomain<
   CorporationIndustryJob,
   CorpIndustryJobSnapshot,
-  CorpIndustryJobNotificationFire
+  CorpIndustryJobNotificationFire,
+  ItemNames
 >({
   id: 'corpIndustryJobs',
   eventIds: ['corpIndustryJobReady'],
@@ -1142,6 +1290,8 @@ export const corpIndustryJobDomain = defineDomain<
   },
   toSnapshot: (jobs, nowMs) => ({ entries: jobs.map(toCorpIndustryJobEntrySnapshot), nowMs }),
   diffs: [gatedOn('corpIndustryJobReady', diffCorpIndustryJobReady)],
+  copy: corpIndustryJobCopy,
+  names: async (fire) => ({ item: await typeNameOrAbsent(industryItemTypeId(fire)) }),
 });
 
 /* Corp roster ----------------------------------------------------------------- */
@@ -1161,7 +1311,8 @@ function isCorpRosterMemberSnapshot(raw: unknown): raw is CorpRosterMemberSnapsh
 export const corpRosterDomain = defineDomain<
   number,
   CorpRosterSnapshot,
-  CorpMemberJoinedFire | CorpMemberLeftFire
+  CorpMemberJoinedFire | CorpMemberLeftFire,
+  MemberNames
 >({
   id: 'corpRoster',
   eventIds: ['corpMemberJoined', 'corpMemberLeft'],
@@ -1185,6 +1336,10 @@ export const corpRosterDomain = defineDomain<
     gatedOn('corpMemberJoined', diffCorpMemberJoined),
     gatedOn('corpMemberLeft', diffCorpMemberLeft),
   ],
+  copy: corpRosterCopy,
+  names: async (fire) => ({
+    member: (await resolveNames([fire.memberCharacterId])).get(fire.memberCharacterId),
+  }),
 });
 
 /* Corp wallet threshold --------------------------------------------------- */
@@ -1259,6 +1414,7 @@ export const corpWalletDomain = defineDomain<
   },
   toSnapshot: (divisions, nowMs) => ({ divisions: [...divisions], nowMs }),
   diffs: [gatedOn('corpWalletThreshold', diffCorpWalletThreshold)],
+  copy: corpWalletCopy,
 });
 
 /* Quickbar: price alerts ----------------------------------------------------- */
@@ -1320,6 +1476,7 @@ export const priceAlertDomain = defineDomain<
   },
   toSnapshot: (entries, nowMs) => ({ entries: [...entries], nowMs }),
   diffs: [gatedOn('priceAlertTriggered', diffPriceAlertTriggered)],
+  copy: priceAlertCopy,
 });
 
 /**
@@ -1343,3 +1500,27 @@ export const POLL_DOMAINS: readonly PollDomain[] = [
   corpWalletDomain,
   priceAlertDomain,
 ];
+
+const DOMAIN_BY_EVENT: ReadonlyMap<NotificationEventId, PollDomain> = new Map(
+  POLL_DOMAINS.flatMap((domain) => domain.eventIds.map((eventId) => [eventId, domain] as const))
+);
+
+/** The one domain whose diffs can fire this event. */
+export function domainForEvent(eventId: NotificationEventId): PollDomain {
+  const domain = DOMAIN_BY_EVENT.get(eventId);
+  if (domain === undefined) throw new Error(`pollDomains: no domain fires ${eventId}`);
+  return domain;
+}
+
+/** A fire's live copy, names looked up by its own domain. */
+export function renderNotification(
+  fire: AnyNotificationFire,
+  characterName: string
+): Promise<NotificationCopy> {
+  return domainForEvent(fire.eventId).render(fire, characterName);
+}
+
+/** The row a fire was about, where its event has a use for one — see `NotificationFeedRecord.subjectId`. */
+export function notificationSubjectId(fire: AnyNotificationFire): number | undefined {
+  return domainForEvent(fire.eventId).subjectOf(fire);
+}

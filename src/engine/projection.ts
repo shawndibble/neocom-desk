@@ -26,17 +26,14 @@
  * — `src/engine` stays free of Dexie/fetch/DOM (and, since Cloud Functions
  * import this module directly per ADR 0010, free of `src/i18n`'s React
  * coupling too) — the caller resolves names at the feature-layer boundary
- * (ARCHITECTURE.md) and hands them in. For the same reason the events that
- * word a push exactly as the live path words it read their English copy
- * from `notificationWording.ts`'s `SHARED_NOTIFICATION_WORDING` rather than
- * writing it out here a second time — `src/i18n/index.ts` splices the same
- * templates into `notifications.fired.*` for `foregroundPoller.ts`'s
- * `notificationText` to render on the *live* path, so the two read from one
- * place instead of being kept in sync by hand.
+ * (ARCHITECTURE.md) and hands them in.
  *
- * The events `projectionWording` hedges are the exception, and necessarily
- * so: their push copy makes a weaker claim than the live path's, so there
- * is nothing to share, and their text is written inline below.
+ * The wording itself is not written here either: each `project*` takes the
+ * owning domain's push renderer (`PushCopy`, declared beside that domain's
+ * live wording in `features/notifications/domainCopy.ts`, issue #1249), so an
+ * event's poll and push copy sit side by side. Those renderers are plain
+ * functions of their arguments — no i18next, no lookups — which keeps this
+ * module as pure as before.
  *
  * 8 of the 17 Notification Events carry a timestamp fixed far enough in
  * advance to be worth projecting; the rest are inherently "as it happens"
@@ -63,12 +60,7 @@ import {
 } from './notificationDiffs';
 import { reinforcementExitMs, parseEveNotificationPayload } from './eveNotificationPayload';
 import { occurrenceKey, type OccurrenceFire } from './occurrenceKey';
-import {
-  SHARED_NOTIFICATION_WORDING,
-  renderWording,
-  type NotificationWordingTemplate,
-  type SharedWordingEventId,
-} from './notificationWording';
+import type { NotificationCopy } from './notificationWording';
 
 /** Matches the Roman-numeral formatting every skill-level display in the app uses. */
 const ROMAN = ['I', 'II', 'III', 'IV', 'V'] as const;
@@ -120,9 +112,8 @@ export type ProjectionWording = 'assert' | 'hedge';
  * observed what it reports, so its copy stays assertive
  * (`notificationWording.ts`'s `SHARED_NOTIFICATION_WORDING`, spliced into
  * `notifications.fired.*` by `src/i18n/index.ts`). That split is why the
- * hedged text below is written inline here rather than through
- * `renderShared` — `structureFuelLowText`'s precedent, now followed by
- * three events instead of one.
+ * hedged push text (`features/notifications/domainCopy.ts`) is written out
+ * inline rather than rendered from a shared template.
  */
 export function projectionWording(eventId: ProjectableEventId): ProjectionWording {
   switch (eventId) {
@@ -174,14 +165,28 @@ function inHorizon(fireAt: number, nowMs: number, horizonMs: number): boolean {
 }
 
 /**
- * Builds a row's `{ title, body }` from `projectionWording(eventId)` — never
- * from a template picked independently of it. `assertWording` turns a future
- * change to `projectionWording`'s mapping that a template wasn't updated to
- * match into an immediate thrown error under test, rather than two
- * independently-maintained switches that can silently drift apart (AC4:
- * wording must actually be *applied*, not just computed and unused).
+ * A domain's push renderer: the rendered text for one projected fire. `names`
+ * carries whatever display names the text needs, already resolved by the
+ * caller (this module never looks anything up); a name that failed to resolve
+ * is simply absent, and the renderer owns the fallback.
  */
-function assertWording(eventId: ProjectableEventId, expected: ProjectionWording): void {
+export type PushCopy<TFire, TNames> = (
+  fire: TFire,
+  characterName: string,
+  names: TNames
+) => NotificationCopy;
+
+/**
+ * Every push renderer calls this with the wording its template actually
+ * makes, so a future change to `projectionWording`'s mapping that a template
+ * wasn't updated to match throws under test, rather than two
+ * independently-maintained switches silently drifting apart (AC4: wording
+ * must actually be *applied*, not just computed and unused).
+ */
+export function assertProjectionWording(
+  eventId: ProjectableEventId,
+  expected: ProjectionWording
+): void {
   const actual = projectionWording(eventId);
   if (actual !== expected) {
     throw new Error(
@@ -195,7 +200,7 @@ function buildRow(
   eventId: ProjectableEventId,
   fire: OccurrenceFire,
   fireAt: number,
-  text: { title: string; body: string },
+  text: NotificationCopy,
   eveType?: string
 ): ProjectionRow {
   return {
@@ -206,132 +211,6 @@ function buildRow(
     title: text.title,
     body: text.body,
     ...(eveType !== undefined ? { eveType } : {}),
-  };
-}
-
-/**
- * `variant` picks the template's degraded body where it has one
- * (`NotificationWordingTemplate.bodyUnnamed`), falling back to the ordinary
- * body for a template that declares none — so a caller asking for a variant an
- * event does not define renders a complete sentence rather than nothing.
- */
-function renderShared(
-  eventId: SharedWordingEventId,
-  vars: Readonly<Record<string, string | number>>,
-  variant: 'body' | 'bodyUnnamed' = 'body'
-): { title: string; body: string } {
-  // Widened to the interface: the constant is `as const`, so its inferred
-  // union only carries `bodyUnnamed` on the members that declare one.
-  const template: NotificationWordingTemplate = SHARED_NOTIFICATION_WORDING[eventId];
-  const body = (variant === 'bodyUnnamed' ? template.bodyUnnamed : undefined) ?? template.body;
-  return { title: template.title, body: renderWording(body, vars) };
-}
-
-function skillLevelCompleteText(characterName: string, skillName: string, level: number) {
-  assertWording('skillLevelComplete', 'assert');
-  return renderShared('skillLevelComplete', {
-    character: characterName,
-    skill: skillName,
-    level: romanLevel(level),
-  });
-}
-
-function characterNotTrainingText(characterName: string) {
-  assertWording('characterNotTraining', 'assert');
-  return renderShared('characterNotTraining', { character: characterName });
-}
-
-function industryJobCompleteText(characterName: string, itemName: string) {
-  assertWording('industryJobComplete', 'assert');
-  return renderShared('industryJobComplete', { character: characterName, item: itemName });
-}
-
-/**
- * Hedged, unlike the live path's "has stopped": a pilot who restarted the
- * programs in game before this fired never had an extraction stop at all.
- *
- * The **title** hedges too, which `structureFuelLowText` below does not. A
- * push is often read as a single line on a lock screen, so the title is the
- * whole claim there — "Extraction done" over a colony still running is the
- * exact sentence this was reported for, and softening only the body leaves
- * the wrong half showing.
- */
-function planetaryExtractionDoneText(characterName: string, planetName: string) {
-  assertWording('planetaryExtractionDone', 'hedge');
-  return {
-    title: 'Extraction due to stop',
-    body: `${characterName}'s extraction on ${planetName} was due to stop.`,
-  };
-}
-
-/** Hedged for `planetaryExtractionDoneText`'s reason, title included. */
-function planetaryExtractorExpiringText(
-  characterName: string,
-  planetName: string,
-  thresholdMs: number
-) {
-  assertWording('planetaryExtractorExpiring', 'hedge');
-  const hours = Math.round(thresholdMs / 3_600_000);
-  return {
-    title: 'Extractor due to expire',
-    body: `${characterName}'s extractor on ${planetName} was due to expire in under ${hours} hours.`,
-  };
-}
-
-/**
- * Names the event where the snapshot knows it. A baseline persisted before the
- * title was recorded falls back to the unnamed copy rather than pushing a
- * sentence with a hole in it.
- */
-function calendarEventStartingText(characterName: string, title: string | undefined) {
-  assertWording('calendarEventStarting', 'assert');
-  return title === undefined
-    ? renderShared('calendarEventStarting', { character: characterName }, 'bodyUnnamed')
-    : renderShared('calendarEventStarting', { character: characterName, event: title });
-}
-
-/**
- * Hedged for the same reason as the two planetary events above: "was due to
- * run out" rather than "is low", because a refuel performed in game while
- * the app is closed makes the assertive phrasing plainly wrong and nothing
- * re-checks before the push goes out.
- *
- * Its title stays assertive where theirs do not — "Structure fuel low" is a
- * standing condition a refuel resolves, not a moment this push claims to
- * have witnessed, so it reads as stale rather than false. Changing it is a
- * separate call about structure copy, not a consequence of this one.
- */
-function structureFuelLowText(characterName: string, structureName: string) {
-  assertWording('structureFuelLow', 'hedge');
-  return {
-    title: 'Structure fuel low',
-    body: `${characterName}: ${structureName} was due to run out of fuel.`,
-  };
-}
-
-/**
- * Best structure label available, in the same preference order as
- * `eveNotificationText.ts`'s `structureLabel` (never nothing, since "exits
- * reinforcement soon" with no subject is worse than the generic body it
- * would otherwise fall back to) — duplicated by hand rather than imported
- * because that module lives above `src/engine` and pulls in `src/i18n`.
- */
-function structureReinforcementExitLabel(
-  payloadStructureName: string | undefined,
-  resolvedName: string | undefined,
-  structureId: number | undefined
-): string {
-  if (payloadStructureName !== undefined) return payloadStructureName;
-  if (resolvedName !== undefined) return resolvedName;
-  if (structureId !== undefined) return `structure #${structureId}`;
-  return 'a structure';
-}
-
-function eveNotificationReinforcementExitText(characterName: string, structureLabel: string) {
-  assertWording('eveNotification', 'assert');
-  return {
-    title: 'Structure coming out of reinforcement',
-    body: `${characterName}: ${structureLabel} exits reinforcement soon.`,
   };
 }
 
@@ -354,6 +233,7 @@ export function projectSkillQueue(
   characterName: string,
   entries: readonly SkillQueueEntrySnapshot[],
   skillNames: ReadonlyMap<number, string>,
+  copy: PushCopy<NotificationFire, { skill?: string }>,
   nowMs: number,
   horizonMs: number = PROJECTION_HORIZON_MS
 ): ProjectionRow[] {
@@ -369,14 +249,13 @@ export function projectSkillQueue(
       level: entry.finishedLevel,
       finishMs: entry.finishMs,
     };
-    const skillName = skillNames.get(entry.skillId) ?? `#${entry.skillId}`;
     rows.push(
       buildRow(
         characterId,
         'skillLevelComplete',
         fire,
         entry.finishMs,
-        skillLevelCompleteText(characterName, skillName, entry.finishedLevel)
+        copy(fire, characterName, { skill: skillNames.get(entry.skillId) })
       )
     );
   }
@@ -395,7 +274,7 @@ export function projectSkillQueue(
         'characterNotTraining',
         fire,
         last.finishMs,
-        characterNotTrainingText(characterName)
+        copy(fire, characterName, {})
       )
     );
   }
@@ -407,6 +286,7 @@ export function projectIndustryJobs(
   characterName: string,
   entries: readonly IndustryJobEntrySnapshot[],
   itemNames: ReadonlyMap<number, string>,
+  copy: PushCopy<IndustryJobNotificationFire, { item?: string }>,
   nowMs: number,
   horizonMs: number = PROJECTION_HORIZON_MS
 ): ProjectionRow[] {
@@ -422,14 +302,13 @@ export function projectIndustryJobs(
       productTypeId: entry.productTypeId,
       activityId: entry.activityId,
     };
-    const itemName = itemNames.get(itemTypeId) ?? `#${itemTypeId}`;
     rows.push(
       buildRow(
         characterId,
         'industryJobComplete',
         fire,
         entry.endMs,
-        industryJobCompleteText(characterName, itemName)
+        copy(fire, characterName, { item: itemNames.get(itemTypeId) })
       )
     );
   }
@@ -449,13 +328,14 @@ export function projectColonies(
   characterName: string,
   colonies: readonly ColonySnapshotEntry[],
   planetNames: ReadonlyMap<number, string>,
+  copy: PushCopy<PlanetaryNotificationFire | ExtractorExpiringFire, { planet?: string }>,
   nowMs: number,
   horizonMs: number = PROJECTION_HORIZON_MS
 ): ProjectionRow[] {
   const rows: ProjectionRow[] = [];
   for (const colony of colonies) {
     if (colony.extractors.length === 0) continue;
-    const planetName = planetNames.get(colony.planetId) ?? `#${colony.planetId}`;
+    const names = { planet: planetNames.get(colony.planetId) };
     const expiryTimeMs = Math.min(...colony.extractors.map((e) => e.expiryTimeMs));
     if (inHorizon(expiryTimeMs, nowMs, horizonMs)) {
       const fire: PlanetaryNotificationFire = {
@@ -470,7 +350,7 @@ export function projectColonies(
           'planetaryExtractionDone',
           fire,
           expiryTimeMs,
-          planetaryExtractionDoneText(characterName, planetName)
+          copy(fire, characterName, names)
         )
       );
     }
@@ -491,7 +371,7 @@ export function projectColonies(
           'planetaryExtractorExpiring',
           fire,
           fireAt,
-          planetaryExtractorExpiringText(characterName, planetName, extractor.thresholdMs)
+          copy(fire, characterName, names)
         )
       );
     }
@@ -503,6 +383,7 @@ export function projectCalendar(
   characterId: number,
   characterName: string,
   entries: readonly CalendarEventEntrySnapshot[],
+  copy: PushCopy<CalendarEventStartingFire, Record<string, never>>,
   nowMs: number,
   horizonMs: number = PROJECTION_HORIZON_MS
 ): ProjectionRow[] {
@@ -522,7 +403,7 @@ export function projectCalendar(
         'calendarEventStarting',
         fire,
         entry.startMs,
-        calendarEventStartingText(characterName, entry.title)
+        copy(fire, characterName, {})
       )
     );
   }
@@ -538,6 +419,7 @@ export function projectStructureFuel(
   characterId: number,
   characterName: string,
   entries: readonly StructureFuelEntrySnapshot[],
+  copy: PushCopy<StructureFuelLowFire, Record<string, never>>,
   nowMs: number,
   horizonMs: number = PROJECTION_HORIZON_MS
 ): ProjectionRow[] {
@@ -555,13 +437,7 @@ export function projectStructureFuel(
       fuelExpiresMs: entry.fuelExpiresMs,
     };
     rows.push(
-      buildRow(
-        characterId,
-        'structureFuelLow',
-        fire,
-        fireAt,
-        structureFuelLowText(characterName, entry.name)
-      )
+      buildRow(characterId, 'structureFuelLow', fire, fireAt, copy(fire, characterName, {}))
     );
   }
   return rows;
@@ -614,11 +490,19 @@ export function reinforcementExitStructureIds(
   return ids;
 }
 
+/** What a reinforcement-exit push can name its structure by, best first. */
+export interface ReinforcementExitNames {
+  readonly payloadStructureName?: string;
+  readonly resolvedStructureName?: string;
+  readonly structureId?: number;
+}
+
 export function projectEveNotificationReinforcementExit(
   characterId: number,
   characterName: string,
   entries: readonly EveNotificationEntrySnapshot[],
   structureNames: ReadonlyMap<number, string>,
+  copy: PushCopy<StructureReinforcementExitFire, ReinforcementExitNames>,
   nowMs: number,
   horizonMs: number = PROJECTION_HORIZON_MS
 ): ProjectionRow[] {
@@ -628,11 +512,12 @@ export function projectEveNotificationReinforcementExit(
     const exitMs = reinforcementExitMs(entry.timestamp, payload);
     if (exitMs === undefined) continue;
     if (!inHorizon(exitMs, nowMs, horizonMs)) continue;
-    const label = structureReinforcementExitLabel(
-      payload.structureName,
-      payload.structureId === undefined ? undefined : structureNames.get(payload.structureId),
-      payload.structureId
-    );
+    const names: ReinforcementExitNames = {
+      payloadStructureName: payload.structureName,
+      resolvedStructureName:
+        payload.structureId === undefined ? undefined : structureNames.get(payload.structureId),
+      structureId: payload.structureId,
+    };
     const fire: StructureReinforcementExitFire = {
       eventId: 'structureReinforcementExit',
       characterId,
@@ -644,7 +529,7 @@ export function projectEveNotificationReinforcementExit(
         'eveNotification',
         fire,
         exitMs,
-        eveNotificationReinforcementExitText(characterName, label),
+        copy(fire, characterName, names),
         entry.type
       )
     );

@@ -93,7 +93,7 @@ async function withinBudget<T>(work: Promise<T>, fallback: T): Promise<T> {
 }
 
 /**
- * In-flight and recent resolutions, keyed by notification id. `notificationText`
+ * In-flight and recent resolutions, keyed by notification id. `renderNotification`
  * is rendered twice per fire — once for the browser notification and once for
  * the Notification Feed entry — and `resolveNames` asks ESI live before it
  * consults its cache, so without this the two renders would cost two
