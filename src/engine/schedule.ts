@@ -10,9 +10,23 @@ import type {
   TrainedSkill,
 } from '@/engine/types';
 
-export interface ScheduleOptions {
-  /** Base + remap attribute values. */
+/** A Remap Marker's segment: `attributes` apply from `steps[startIndex]` onward. */
+export interface AttributeSegment {
+  startIndex: number;
   attributes: Attributes;
+}
+
+export interface ScheduleOptions {
+  /** Base + remap attribute values; also covers any steps before the earliest `segments` entry. */
+  attributes: Attributes;
+  /**
+   * Per-segment attribute overrides for Remap Markers, keyed by step index
+   * ("apply `attributes` from `steps[startIndex]` onward"). Need not be
+   * sorted or start at 0 — steps before the earliest segment use `attributes`
+   * above. Omit (the default) for the plan's original flat-attributes
+   * behaviour.
+   */
+  segments?: readonly AttributeSegment[];
   implants?: Implants;
   /** Active cerebral accelerators; bonuses apply until their expiry. */
   boosters?: Booster[];
@@ -46,7 +60,14 @@ export function computeSchedule(
   options: ScheduleOptions,
   skills: ReadonlyMap<number, EngineSkill>
 ): ScheduledStep[] {
-  const { attributes, implants = {}, boosters = [], startDate, trainedSkills } = options;
+  const {
+    attributes,
+    segments = [],
+    implants = {},
+    boosters = [],
+    startDate,
+    trainedSkills,
+  } = options;
   if (boosters.length > 0 && !startDate) {
     throw new Error('startDate is required when boosters are provided');
   }
@@ -58,8 +79,23 @@ export function computeSchedule(
     .filter((offset) => offset > 0)
     .sort((a, b) => a - b);
 
-  const attributeAt = (name: AttributeName, elapsedSeconds: number): number => {
-    let value = attributes[name] + (implants[name] ?? 0);
+  const sortedSegments = [...segments].sort((a, b) => a.startIndex - b.startIndex);
+
+  const baseAttributesForStep = (stepIndex: number): Attributes => {
+    let result = attributes;
+    for (const segment of sortedSegments) {
+      if (segment.startIndex <= stepIndex) result = segment.attributes;
+      else break;
+    }
+    return result;
+  };
+
+  const attributeAt = (
+    baseAttributes: Attributes,
+    name: AttributeName,
+    elapsedSeconds: number
+  ): number => {
+    let value = baseAttributes[name] + (implants[name] ?? 0);
     for (const booster of boosters) {
       const offset = (booster.expiresAt.getTime() - startMs) / 1000;
       if (elapsedSeconds < offset) value += booster.bonus[name] ?? 0;
@@ -77,9 +113,10 @@ export function computeSchedule(
   const result: ScheduledStep[] = [];
   let elapsed = 0;
 
-  for (const step of steps) {
+  for (const [stepIndex, step] of steps.entries()) {
     const skill = skills.get(step.skillTypeID);
     if (!skill) throw new Error(`Unknown skill typeID ${step.skillTypeID}`);
+    const baseAttributes = baseAttributesForStep(stepIndex);
 
     // Only the level actually in progress can carry banked SP:
     // `remainingSpForLevel` clamps `currentSp` into this level's own band, so
@@ -94,7 +131,10 @@ export function computeSchedule(
 
     while (remaining > EPSILON_SP) {
       const now = elapsed + seconds;
-      const rate = trainingRate(attributeAt(skill.primary, now), attributeAt(skill.secondary, now));
+      const rate = trainingRate(
+        attributeAt(baseAttributes, skill.primary, now),
+        attributeAt(baseAttributes, skill.secondary, now)
+      );
       const spPerSecond = rate / 60;
       const segmentEnd = nextBreakpointAfter(now);
       const secondsNeeded = remaining / spPerSecond;
