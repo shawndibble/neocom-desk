@@ -96,7 +96,7 @@ export function planSubBuild(
       needed,
       spare,
       me,
-      seconds: jobDurationSeconds(blueprint.time, runs, 0, ctx.skills, ctx),
+      seconds: jobDurationSeconds(blueprint.time, runs, 0, ctx.skills, ctx, blueprint.skills),
       inputs,
       jobFee: jobFee(
         estimatedItemValue(blueprint, runs, ctx.adjustedPrices),

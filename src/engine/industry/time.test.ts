@@ -114,6 +114,44 @@ describe('timeModifier', () => {
   it('still range-checks the skill it reads under a reaction facility', () => {
     expect(() => timeModifier(0, { [SKILL_IDS.reactions]: 6 }, athanor)).toThrow(RangeError);
   });
+
+  it('applies each qualifying science skill in blueprintSkills at 1%/level (issue #1228)', () => {
+    // Mechanical Engineering (11452) and Electronic Engineering (11453) both
+    // carry the 1%-per-level manufacturing-time bonus.
+    const skills: SkillLevels = { 11452: 4, 11453: 3 };
+    const blueprintSkills = [
+      { typeID: 11452, level: 1 },
+      { typeID: 11453, level: 1 },
+    ];
+    // 0.96 (Mech Eng IV) * 0.97 (Elec Eng III)
+    expect(timeModifier(0, skills, npc, blueprintSkills)).toBeCloseTo(0.96 * 0.97, 12);
+  });
+
+  it('does not double count Industry/Advanced Industry/Reactions even if listed in blueprintSkills', () => {
+    const skills: SkillLevels = { [SKILL_IDS.industry]: 5, [SKILL_IDS.advancedIndustry]: 4 };
+    const blueprintSkills = [
+      { typeID: SKILL_IDS.industry, level: 1 },
+      { typeID: SKILL_IDS.advancedIndustry, level: 1 },
+    ];
+    expect(timeModifier(0, skills, npc, blueprintSkills)).toBeCloseTo(0.8 * 0.88, 12);
+  });
+
+  it('ignores a blueprint skill with no manufacturing-time bonus (e.g. Mass Production)', () => {
+    const skills: SkillLevels = { 3387: 5 };
+    const blueprintSkills = [{ typeID: 3387, level: 1 }];
+    expect(timeModifier(0, skills, npc, blueprintSkills)).toBe(1);
+  });
+
+  it('ignores blueprintSkills entirely under a reaction facility', () => {
+    const skills: SkillLevels = { 11452: 5 };
+    const blueprintSkills = [{ typeID: 11452, level: 1 }];
+    expect(timeModifier(0, skills, athanor, blueprintSkills)).toBe(1);
+  });
+
+  it('is unaffected when blueprintSkills is omitted (T1/reaction blueprints with no science skills)', () => {
+    const skills: SkillLevels = { [SKILL_IDS.industry]: 5, [SKILL_IDS.advancedIndustry]: 4 };
+    expect(timeModifier(0, skills, npc)).toBeCloseTo(0.8 * 0.88, 12);
+  });
 });
 
 describe('jobDurationSeconds', () => {
@@ -130,5 +168,12 @@ describe('jobDurationSeconds', () => {
 
   it('rejects invalid runs', () => {
     expect(() => jobDurationSeconds(600, 0, 0, noSkills, npc)).toThrow(RangeError);
+  });
+
+  it('applies qualifying blueprint science skills (issue #1228)', () => {
+    const skills: SkillLevels = { 11452: 4 };
+    const blueprintSkills = [{ typeID: 11452, level: 1 }];
+    // 600 * 10 * 0.96 (Mech Eng IV)
+    expect(jobDurationSeconds(600, 10, 0, skills, npc, blueprintSkills)).toBeCloseTo(5760, 6);
   });
 });

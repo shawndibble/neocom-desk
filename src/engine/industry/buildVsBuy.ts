@@ -78,7 +78,7 @@ export function buildVsBuy(inputs: IndustryInputs): BuildResult {
     ? [acquisitionMaterial, ...resolvedMaterials]
     : resolvedMaterials;
 
-  const seconds = jobDurationSeconds(blueprint.time, runs, te, skills, ctx);
+  const seconds = jobDurationSeconds(blueprint.time, runs, te, skills, ctx, blueprint.skills);
   const fee = jobFee(
     estimatedItemValue(blueprint, runs, adjustedPrices),
     systemCostIndex,

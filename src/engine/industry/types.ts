@@ -39,6 +39,18 @@
  *   time/level), Mass Reactions and Advanced Mass Reactions (job slots,
  *   `reactionSlotBonus` 2661) and Remote Reactions (range) — Industry and
  *   Advanced Industry are not among them.
+ *
+ * Per-blueprint science/engineering skill time bonuses (verified 2026-09,
+ * issue #1228) — everef.net ref-data skills.json type descriptions, read for
+ * every skill whose description matches
+ * `/(\d+)% reduction in manufacturing time for all items requiring/i`. This
+ * phrasing (not the looser "reduction in manufacturing time", which also
+ * matches Industry's own description) is what distinguishes a per-blueprint
+ * science skill from Industry/Advanced Industry, which reduce every
+ * manufacturing job's time unconditionally rather than gating on the
+ * blueprint's own required-skill list — so they're excluded from this table
+ * and applied separately, above, to avoid double counting when a blueprint's
+ * `skills` list also names them (it does, for every T2 item).
  */
 
 import type { EngineAsset } from '../assetTree';
@@ -396,6 +408,43 @@ export const SKILL_IDS = {
   /** Scrapmetal Processing: +2% a level, on items rather than ore. */
   scrapmetalProcessing: 12196,
 } as const;
+
+/**
+ * Per-blueprint science/engineering skills that cut manufacturing time for
+ * items requiring them, keyed by typeID, valued at percent-per-level
+ * (issue #1228; sources cited on `SKILL_IDS` above). Every entry is 1%
+ * except Mutagenic Stabilization at 2%. Only applies when the skill is named
+ * in the blueprint's own `skills` list — unlike Industry/Advanced Industry,
+ * which apply unconditionally and are deliberately absent from this table.
+ */
+export const MANUFACTURING_TIME_SCIENCE_SKILL_PCT: Readonly<Record<number, number>> = {
+  3395: 1, // Advanced Small Ship Construction
+  3396: 1, // Advanced Industrial Ship Construction
+  3397: 1, // Advanced Medium Ship Construction
+  3398: 1, // Advanced Large Ship Construction
+  3400: 1, // Outpost Construction
+  11433: 1, // High Energy Physics
+  11441: 1, // Plasma Physics
+  11442: 1, // Nanite Engineering
+  11443: 1, // Hydromagnetic Physics
+  11444: 1, // Amarr Starship Engineering
+  11445: 1, // Minmatar Starship Engineering
+  11446: 1, // Graviton Physics
+  11447: 1, // Laser Physics
+  11448: 1, // Electromagnetic Physics
+  11449: 1, // Rocket Science
+  11450: 1, // Gallente Starship Engineering
+  11451: 1, // Nuclear Physics
+  11452: 1, // Mechanical Engineering
+  11453: 1, // Electronic Engineering
+  11454: 1, // Caldari Starship Engineering
+  11455: 1, // Quantum Physics
+  11529: 1, // Molecular Engineering
+  52307: 1, // Triglavian Quantum Engineering
+  77725: 1, // Advanced Capital Ship Construction
+  81050: 1, // Upwell Starship Engineering
+  81896: 2, // Mutagenic Stabilization
+};
 
 /** Trained skill levels: skill typeID -> level (0..5). Missing = untrained. */
 export type SkillLevels = Record<number, number>;
