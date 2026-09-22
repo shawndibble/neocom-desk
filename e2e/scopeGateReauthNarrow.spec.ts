@@ -14,6 +14,12 @@
  * endpoint with the usual fixture token minus `/clones`' one scope. `/clones`
  * is the narrowest gated route and needs no ESI fixture of its own: the gate
  * decides before any request goes out.
+ *
+ * One of the two specs still driving the real SSO round trip rather than
+ * `signInAndGoto`'s seeded session (`auth.spec.ts` is the other). It has to:
+ * the whole setup is a re-mocked token endpoint, and a seeded token row would
+ * be written with the full fixture grant, never passing through the code
+ * exchange this spec bends.
  */
 import { test, expect } from './support/testBase';
 import { loginAndSelectCharacter } from './support/login';

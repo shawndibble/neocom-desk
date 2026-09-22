@@ -35,7 +35,7 @@
  */
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
-import { loginAndSelectCharacter } from './support/login';
+import { signInAndGoto } from './support/authSeed';
 
 const PHONE = { width: 390, height: 844 };
 const DESKTOP = { width: 1280, height: 800 };
@@ -172,7 +172,7 @@ function labelLines(cells: CellBox[]): string[][] {
 test.describe('Market Appraisal — stacked result card', () => {
   test.beforeEach(async ({ page }) => {
     await mockHubPrices(page);
-    await loginAndSelectCharacter(page);
+    await signInAndGoto(page);
   });
 
   test('pairs its six value columns two-per-row at 390px', async ({ page }) => {

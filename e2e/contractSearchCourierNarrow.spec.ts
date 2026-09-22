@@ -50,7 +50,7 @@
  * `expect` rather than quietly asserting nothing.
  */
 import { test, expect } from './support/testBase';
-import { loginAndSelectCharacter } from './support/login';
+import { signInAndGoto } from './support/authSeed';
 import type { Page } from '@playwright/test';
 
 const PHONE = { width: 390, height: 844 };
@@ -230,7 +230,7 @@ test.describe('courier board — 390px width', () => {
     await stubSyncConfigured(page);
     await refuseSyncBackend(page);
 
-    await loginAndSelectCharacter(page);
+    await signInAndGoto(page);
     await seedCourierSnapshot(page, courierSnapshotRows());
 
     // Search is the tab this page opens on, so it needs no `?tab=`.
@@ -299,7 +299,7 @@ test.describe('courier board — 390px width', () => {
     await stubSyncConfigured(page);
     await refuseSyncBackend(page);
 
-    await loginAndSelectCharacter(page);
+    await signInAndGoto(page);
     await seedCourierSnapshot(page, courierSnapshotRowsWithReverseLane());
 
     await page.goto('./contracts');

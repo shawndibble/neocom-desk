@@ -15,7 +15,7 @@
  */
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
-import { loginAndSelectCharacter } from './support/login';
+import { signInAndGoto } from './support/authSeed';
 import { CHARACTER_ID } from './support/fixtureData';
 
 const PHONE = { width: 390, height: 844 };
@@ -135,7 +135,7 @@ test.describe('production profit chart — 390px width', () => {
   test.use({ viewport: PHONE });
 
   test('Y-axis ticks stay inside the chart, not clipped, at a 1B+ ISK value', async ({ page }) => {
-    await loginAndSelectCharacter(page);
+    await signInAndGoto(page);
     await seedProfitHistory(page);
 
     await page.goto('./industry?tab=records');

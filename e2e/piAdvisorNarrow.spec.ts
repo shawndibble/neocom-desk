@@ -12,7 +12,8 @@
  */
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
-import { loginAndSelectCharacter, clearCachedEsiRows } from './support/login';
+import { signInAndGoto } from './support/authSeed';
+import { clearCachedEsiRows } from './support/login';
 import { CHARACTER_ID } from './support/fixtureData';
 
 const PHONE = { width: 390, height: 844 };
@@ -146,7 +147,7 @@ const PLANETS: Record<number, { name: string; type_id: number }> = {
 };
 
 test.beforeEach(async ({ page }) => {
-  await loginAndSelectCharacter(page);
+  await signInAndGoto(page);
 
   // Registered after the shared fixture so these win: Playwright matches the
   // most recently added route first.

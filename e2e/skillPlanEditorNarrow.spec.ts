@@ -23,7 +23,7 @@
  */
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
-import { loginAndSelectCharacter } from './support/login';
+import { signInAndGoto } from './support/authSeed';
 import { CHARACTER_ID, SKILL } from './support/fixtureData';
 
 const PHONE = { width: 390, height: 844 };
@@ -89,7 +89,7 @@ async function seedPriorityColumn(page: Page): Promise<void> {
 }
 
 test('the back-to-plan-list link is a full sm-tier control (36px) at 390px', async ({ page }) => {
-  await loginAndSelectCharacter(page);
+  await signInAndGoto(page);
   await seedPlan(page);
   await page.goto(`./skills/plans/${PLAN_ID}`);
   await page.setViewportSize(PHONE);
@@ -104,7 +104,7 @@ test('the back-to-plan-list link is a full sm-tier control (36px) at 390px', asy
 test('the back-to-plan-list link stays absent at and above lg (1280px), where the list is on screen', async ({
   page,
 }) => {
-  await loginAndSelectCharacter(page);
+  await signInAndGoto(page);
   await seedPlan(page);
   await page.goto(`./skills/plans/${PLAN_ID}`);
   await page.setViewportSize(DESKTOP);
@@ -122,7 +122,7 @@ test('the back-to-plan-list link stays absent at and above lg (1280px), where th
 });
 
 test('the entry priority pill is a full sm-tier tap target (36px) at 390px', async ({ page }) => {
-  await loginAndSelectCharacter(page);
+  await signInAndGoto(page);
   await seedPlan(page, [PLAN_ENTRY]);
   await seedPriorityColumn(page);
   // Sized before the first paint, unlike the back-link tests above: the pill
@@ -151,7 +151,7 @@ test('the entry priority pill is a full sm-tier tap target (36px) at 390px', asy
 test('the entry priority pill keeps its pointer-sized box at and above md (1280px)', async ({
   page,
 }) => {
-  await loginAndSelectCharacter(page);
+  await signInAndGoto(page);
   await seedPlan(page, [PLAN_ENTRY]);
   await seedPriorityColumn(page);
   await page.goto(`./skills/plans/${PLAN_ID}`);
