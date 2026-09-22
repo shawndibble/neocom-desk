@@ -1,29 +1,23 @@
 /**
- * The Courier board's ISK/jump cell at 390px (issue #1046).
+ * The Courier board's dense phone card at 390px (issues #1046, #1150).
  *
- * Below `sm` a `DataTable` row stops being a row: `.dt-stack` in
- * `src/styles/index.css` turns each one into a card whose every cell prints
- * its column header into a 7rem left gutter and starts its value at that
- * gutter's inner edge. The ISK/jump cell is the one cell that renders a flex
- * container rather than a value, because it carries a second line — the
- * "Nx going rate" badge — and that container carried `items-end`
- * unconditionally. Right-aligned is correct in the table at pointer width and
- * wrong in the card, where it left one line hugging the card's right edge
- * while every sibling line began at the gutter. Nothing in the suite could see
- * that: `productionCss.built.spec.ts` checks that the stack collapses at all,
- * and no spec had ever rendered this board.
+ * Below `sm` the board is a `DataTable` with `stackLayout="dense"`: each haul
+ * is a two-line card, the route on line one with the ISK/jump cell
+ * (`cardCorner`) in flow at its right, and every other figure on a dim meta
+ * line under it. Hauls between the same two systems fold behind one lane
+ * header (`groupBy`), collapsed until tapped.
  *
- * The alignment assertion is that file's, reused rather than reinvented: take
- * the left edges of two values on the same card and require them to agree. The
- * reference is the Jumps cell one line above — a plain value in an ordinary
- * stacked cell — so "the ISK/jump figure starts where the Jumps figure starts"
- * is exactly the property the fix restores. Both lines of the cell are
- * measured, the figure and the badge, because `items-end` moved both.
+ * The first test pins the headline figure where a thumb scans for it: the
+ * ISK/jump cell hugs the card's right padding edge and sits on the route's
+ * line, not on a line of its own, with the going-rate badge under it. It
+ * replaces #1046's check that the figure started at the labelled card's
+ * gutter — that card is gone, and the right-aligned corner is the design.
+ * Nothing in the unit suite can see this: jsdom lays nothing out, and
+ * `productionCss.built.spec.ts` only checks that the stack collapses at all.
  *
- * Text, not boxes: the ISK/jump figure and the Jumps count are bare strings
- * inside their cells, and the flex container is full width under either
- * alignment — so its own box says nothing. A `Range` over the text reports
- * where the glyphs actually sit, which is what a reader sees.
+ * Every haul the fixture seeds runs one lane, Jita → Amarr, so the first
+ * thing in the table is that lane's collapsed header; both tests open it
+ * before touching a haul.
  *
  * ## Why this spec stubs one module
  *
@@ -56,12 +50,21 @@ import type { Page } from '@playwright/test';
 const PHONE = { width: 390, height: 844 };
 
 /**
- * Layout coordinates are fractional, and the two states this separates are most
- * of a card's width apart (~250px at this viewport) — so a pixel of slack costs
- * nothing and absorbs sub-pixel drift between two boxes that genuinely share an
- * edge.
+ * Layout coordinates are fractional, so a pixel of slack absorbs sub-pixel
+ * drift between two edges that genuinely coincide. The failures it separates
+ * are far larger: a left-aligned corner leaves the figure and its badge a text
+ * width apart (the badge is several characters longer), and a stray padding
+ * utility pulls the figure a whole gutter (28px) off the card's edge.
  */
 const ALIGNMENT_TOLERANCE_PX = 1;
+
+/**
+ * Two cells on one flex line with `align-items: baseline` start a few pixels
+ * apart when their fonts differ (a bold figure beside a semibold name). A
+ * wrap onto the next line moves the corner a full line (~16px) or more, so
+ * half a line separates the two cleanly.
+ */
+const LINE_TOLERANCE_PX = 8;
 
 /**
  * Real ids out of `public/data/market/stations.json`, so both ends resolve and
@@ -217,16 +220,28 @@ async function refuseSyncBackend(page: Page): Promise<void> {
 }
 
 interface CardEdges {
-  jumpsValue: number;
-  rateValue: number;
-  badge: number;
-  cardRight: number;
+  cornerRight: number;
+  badgeRight: number;
+  cardContentRight: number;
+  cornerTop: number;
+  primaryTop: number;
+  cornerBottom: number;
+  metaTop: number;
+}
+
+/** Open the seeded lane: every Jita → Amarr haul is folded behind this one header. */
+async function expandLane(page: Page): Promise<void> {
+  const table = page.getByRole('table', { name: 'Courier Contract Search' });
+  const toggle = table.locator('tr.dt-group-header button').first();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
 }
 
 test.describe('courier board — 390px width', () => {
   test.use({ viewport: PHONE });
 
-  test('the ISK/jump cell starts at the card gutter, not the card edge', async ({ page }) => {
+  test('the ISK/jump figure heads the dense card at its right edge', async ({ page }) => {
     await stubSyncConfigured(page);
     await refuseSyncBackend(page);
 
@@ -238,61 +253,79 @@ test.describe('courier board — 390px width', () => {
     await page.getByRole('button', { name: 'Courier' }).click();
 
     const table = page.getByRole('table', { name: 'Courier Contract Search' });
-    const card = table.locator('tbody tr').first();
-    // The badge is the whole wait: it needs the jump counts, and through them
-    // the corpus median. Until the distances land the cell renders a bare "…"
-    // and there is nothing on the card worth measuring.
-    await expect(card.locator('td[data-label="ISK/jump"] span')).toHaveText(/going rate/);
+    // The collapsed lane must still carry its bait haul's warning — a folded
+    // group that hid the over-rate marker would hide the one thing it is for.
+    const header = table.locator('tr.dt-group-header').first();
+    await expect(header).toContainText('25 hauls');
+    await expect(header).toContainText('Over rate');
+
+    await expandLane(page);
+    // The top member is the bait haul: it sorts first under the default
+    // ISK/jump descending sort. The badge is the whole wait: it needs the
+    // jump counts, and through them the corpus median.
+    const card = table.locator('tr.dt-group-member').first();
+    const corner = card.locator('td.dt-corner');
+    await expect(corner).toContainText(/going rate/);
+    await expect(corner.getByText(/going rate/)).toBeVisible();
 
     const edges = await card.evaluate((row): CardEdges => {
-      /** Where the glyphs start: a text node has no box of its own, and the flex container is full width whichever way it aligns its children. */
-      const leftOf = (node: Node): number => {
-        if (node.nodeType === Node.TEXT_NODE) {
-          const range = document.createRange();
-          range.selectNodeContents(node);
-          return range.getBoundingClientRect().left;
-        }
-        return (node as Element).getBoundingClientRect().left;
+      const cell = (selector: string): Element => {
+        const found = row.querySelector(selector);
+        if (!found) throw new Error(`No ${selector} on the dense card`);
+        return found;
       };
-      const cellFor = (label: string): Element => {
-        const cell = row.querySelector(`td[data-label="${label}"]`);
-        if (!cell) throw new Error(`No "${label}" cell on the stacked card`);
-        return cell;
-      };
-      const firstChildOf = (node: Node, what: string): Node => {
-        const child = node.firstChild;
-        if (!child) throw new Error(`${what} rendered nothing to measure`);
-        return child;
-      };
-
-      const jumpsCell = cellFor('Jumps');
-      const stack = cellFor('ISK/jump').querySelector('div');
+      const cornerCell = cell('td.dt-corner');
+      const stack = cornerCell.querySelector('div');
       if (!stack) throw new Error('ISK/jump cell is not the two-line flex cell');
       const badge = stack.querySelector('span');
       if (!badge) throw new Error('ISK/jump cell shows no going-rate badge');
-
+      // Where the glyphs end, not the cell's box: a stray padding utility
+      // would leave the box at the edge and the figure well short of it. A
+      // `Range` over the figure's text reports what a reader sees.
+      const figure = stack.firstChild;
+      if (!figure) throw new Error('ISK/jump cell rendered no figure');
+      const range = document.createRange();
+      range.selectNodeContents(figure);
+      const rowBox = row.getBoundingClientRect();
+      const cornerBox = cornerCell.getBoundingClientRect();
       return {
-        jumpsValue: leftOf(firstChildOf(jumpsCell, 'Jumps cell')),
-        rateValue: leftOf(firstChildOf(stack, 'ISK/jump figure')),
-        badge: leftOf(badge),
-        cardRight: row.getBoundingClientRect().right,
+        cornerRight: range.getBoundingClientRect().right,
+        badgeRight: badge.getBoundingClientRect().right,
+        // The card's content edge, read from its own style rather than a
+        // hardcoded inset, so a padding change moves the target with it.
+        cardContentRight: rowBox.right - parseFloat(getComputedStyle(row).paddingRight),
+        cornerTop: cornerBox.top,
+        primaryTop: cell('td.dt-primary').getBoundingClientRect().top,
+        cornerBottom: cornerBox.bottom,
+        metaTop: cell('td.dt-meta').getBoundingClientRect().top,
       };
     });
 
     const measured =
-      `ISK/jump figure at ${Math.round(edges.rateValue)}px, ` +
-      `badge at ${Math.round(edges.badge)}px, ` +
-      `Jumps value at ${Math.round(edges.jumpsValue)}px, ` +
-      `card right edge ${Math.round(edges.cardRight)}px`;
+      `figure right ${Math.round(edges.cornerRight)}px, ` +
+      `badge right ${Math.round(edges.badgeRight)}px, ` +
+      `card content right ${Math.round(edges.cardContentRight)}px, ` +
+      `corner top ${Math.round(edges.cornerTop)}px vs route top ${Math.round(edges.primaryTop)}px`;
 
     expect(
-      Math.abs(edges.rateValue - edges.jumpsValue),
-      `ISK/jump figure does not start at the card's label gutter — ${measured}`
+      Math.abs(edges.cornerRight - edges.cardContentRight),
+      `ISK/jump figure does not reach the card's right padding edge — ${measured}`
     ).toBeLessThanOrEqual(ALIGNMENT_TOLERANCE_PX);
     expect(
-      Math.abs(edges.badge - edges.jumpsValue),
-      `Going-rate badge does not start at the card's label gutter — ${measured}`
+      Math.abs(edges.badgeRight - edges.cornerRight),
+      `Going-rate badge is not right-aligned under the figure — ${measured}`
     ).toBeLessThanOrEqual(ALIGNMENT_TOLERANCE_PX);
+    // On the route's line, not wrapped onto one of its own. Tops can differ by
+    // the baseline alignment between a bold figure and the route's first line,
+    // which is a few pixels — far less than a line height.
+    expect(
+      Math.abs(edges.cornerTop - edges.primaryTop),
+      `ISK/jump cell is not on the route's line — ${measured}`
+    ).toBeLessThanOrEqual(LINE_TOLERANCE_PX);
+    expect(
+      edges.cornerBottom,
+      `ISK/jump cell runs into the meta line below it — ${measured}`
+    ).toBeLessThanOrEqual(edges.metaTop + ALIGNMENT_TOLERANCE_PX);
   });
 
   test('the reverse-lane link meets the touch tier (issue #1150)', async ({ page }) => {
@@ -306,6 +339,9 @@ test.describe('courier board — 390px width', () => {
     await page.getByRole('button', { name: 'Courier' }).click();
 
     const table = page.getByRole('table', { name: 'Courier Contract Search' });
+    // The haul is folded behind its lane's header until that is opened; the
+    // reverse haul (Amarr → Jita) is a lane of one, which never folds.
+    await expandLane(page);
     // Matched by its own reward rather than board position — the reverse-leg
     // row above was built to answer for this exact haul, not "whichever one
     // sorts first".

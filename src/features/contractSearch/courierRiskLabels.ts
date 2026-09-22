@@ -13,9 +13,10 @@ import type { CourierRiskKind } from '@/engine/contracts/courierRisk';
 /**
  * Which risks earn a marker on the row.
  *
- * `nullsec` is deliberately absent: the route cell already names each end's
- * space band (#939), which is informational text rather than a warning — which
- * is exactly what a nullsec end should be. A second marker saying the same
+ * `nullsec` is deliberately absent: the route cell already prints each end's
+ * security status beside its system name — a `0.0` or `-0.4` says nullsec as
+ * plainly as the band word it replaced (#939) — and that is informational text
+ * rather than a warning, which is exactly what a nullsec end should be. A second marker saying the same
  * thing in a warning colour would turn a note into an alarm. It still gets its
  * sentence in the modal, where there is room to say why it is only a note.
  */

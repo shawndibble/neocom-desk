@@ -145,6 +145,15 @@
    * `sm:hidden`/`hidden sm:flex` pair, nothing rendered twice — which is the
    * same rule the Assets rework follows. `display: block` drops the implicit
    * table roles in real browsers, so `DataTable` sets them explicitly.
+   *
+   * Two opt-in phone features are the deliberate exceptions to that rule,
+   * and only for the tables that ask for them: `mobileSort` renders an
+   * `sm:hidden` sort picker (the stack hides the header row and every sort
+   * button in it, and CSS cannot turn a hidden `<th>` into a picker), and
+   * `groupBy` changes the rows themselves via `useIsPhone` (a collapsed
+   * group's members are not rendered at all, which no stylesheet can do
+   * without also hiding them from desktop). The dense card below is pure
+   * CSS again.
    */
   @media (width < 40rem) {
     .dt-stack,
@@ -275,6 +284,148 @@
 
     .dt-stack td.dt-corner::before {
       content: none;
+    }
+
+    /*
+     * The dense card (`stackLayout="dense"`): two lines instead of one field
+     * per line, for a long list a reader scans rather than reads — a courier
+     * search returns hundreds of offers, and the labelled card fits four on
+     * a screen.
+     *
+     * Line one is the title (`dt-primary`) with the headline figure
+     * (`dt-corner`) in flow at its right; line two is every other cell
+     * inline, small and dim, `·`-separated, with no column labels —
+     * `stackAffix` (`data-stack-before`/`-after`) says what a bare number is.
+     *
+     * A wrapping row flexbox. `tr::before` is a flex item too: a zero-height,
+     * full-basis one ordered between the two lines forces the break, so the
+     * meta cells can never ride up beside the title however short they are.
+     */
+    .dt-stack.dt-stack-dense tr {
+      flex-direction: row;
+      flex-wrap: wrap;
+      align-items: baseline;
+      /* About one no-break space wide, so the gap before each `·` matches
+         the one the separator prints after it. */
+      column-gap: 0.1875rem;
+      row-gap: 0.125rem;
+      /* A thumb target even for a card whose two lines are short. */
+      min-height: 44px;
+      padding: 0.5rem 0.75rem;
+    }
+
+    .dt-stack.dt-stack-dense tr::before {
+      content: '';
+      order: 0;
+      flex-basis: 100%;
+      height: 0;
+    }
+
+    .dt-stack.dt-stack-dense td.dt-primary {
+      order: -2;
+      flex: 1 1 0;
+      min-width: 0;
+      padding: 0;
+    }
+
+    /* Undoes the decorative corner's absolute pin: here it is content, and
+       an absolute cell would overlap a title long enough to reach it. */
+    .dt-stack.dt-stack-dense td.dt-corner {
+      position: static;
+      order: -1;
+      flex: none;
+      margin-left: auto;
+      padding: 0 0 0 0.5rem;
+      text-align: right;
+      white-space: nowrap;
+      font-weight: 700;
+    }
+
+    .dt-stack.dt-stack-dense td.dt-meta {
+      order: 1;
+      display: inline;
+      padding: 0;
+      min-height: 0;
+      font-size: 0.6875rem;
+      line-height: 1rem;
+      color: var(--color-text-dim);
+    }
+
+    /* The separator and the affix share the one pseudo-element a cell has
+       before its value. The space after `·` is a no-break space: an ordinary
+       one at the start of the cell's line would be collapsed away. Every
+       gutter-label property of the base rule is reset, not just `content`. */
+    .dt-stack.dt-stack-dense td.dt-meta::before {
+      content: '\00b7\00a0' attr(data-stack-before);
+      position: static;
+      width: auto;
+      overflow: visible;
+      font-size: inherit;
+      line-height: inherit;
+      text-overflow: clip;
+      white-space: pre;
+      letter-spacing: normal;
+      text-transform: none;
+      /* Pinned, not inherited: a sorted cell bolds its value, and a bold
+         separator would read as part of it. */
+      font-weight: 400;
+      color: var(--color-text-dim);
+    }
+
+    .dt-stack.dt-stack-dense td.dt-meta.dt-meta-first::before {
+      content: attr(data-stack-before);
+    }
+
+    .dt-stack.dt-stack-dense td.dt-meta::after {
+      content: attr(data-stack-after);
+      white-space: pre;
+    }
+
+    /* No header row to show the sort on, so the sorted value itself says it
+       — its trailing affix too, which inherits; the leading separator and
+       affix stay dim (pinned above). The corner never
+       changes: it is already the bold figure. */
+    .dt-stack.dt-stack-dense td.dt-meta.dt-sorted {
+      color: var(--color-text);
+      font-weight: 700;
+    }
+
+    /*
+     * Phone grouping (`groupBy`): a toggle row whose one full-width cell is
+     * the button, in either card. It is not a field, so it gets neither the
+     * labelled card's gutter and `data-label` slot nor the dense card's
+     * line-break pseudo — the button carries its own padding and 48px height.
+     */
+    .dt-stack tr.dt-group-header {
+      padding: 0;
+    }
+
+    .dt-stack.dt-stack-dense tr.dt-group-header::before {
+      content: none;
+    }
+
+    .dt-stack tr.dt-group-header > td {
+      flex: 1 1 100%;
+      padding: 0;
+      min-height: 0;
+    }
+
+    .dt-stack tr.dt-group-header > td::before {
+      content: none;
+    }
+
+    /* An expanded group's members: indented and on the panel fill, so where
+       the group ends is visible without a closing row. */
+    tr.dt-group-member {
+      background-color: var(--color-panel);
+    }
+
+    .dt-stack tr.dt-group-member {
+      padding-left: 2rem;
+    }
+
+    table:not(.dt-stack) tr.dt-group-member > td:first-child {
+      padding-left: 2rem;
     }
 
     /*

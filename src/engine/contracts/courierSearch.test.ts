@@ -39,6 +39,7 @@ const ENDPOINTS = new Map<number, CourierEndpoint>([
       systemName: 'Jita',
       systemId: JITA_SYSTEM,
       regionId: THE_FORGE,
+      security: 0.9459,
       space: 'highsec',
       resolution: 'station',
       hasStargates: true,
@@ -52,6 +53,7 @@ const ENDPOINTS = new Map<number, CourierEndpoint>([
       systemName: 'Amarr',
       systemId: AMARR_SYSTEM,
       regionId: DOMAIN,
+      security: 0.9515,
       space: 'highsec',
       resolution: 'station',
       hasStargates: true,
@@ -65,6 +67,7 @@ const ENDPOINTS = new Map<number, CourierEndpoint>([
       systemName: 'Rancer',
       systemId: RANCER_SYSTEM,
       regionId: SINQ_LAISON,
+      security: 0.4,
       space: 'lowsec',
       resolution: 'station',
       hasStargates: true,
@@ -78,6 +81,7 @@ const ENDPOINTS = new Map<number, CourierEndpoint>([
       systemName: 'J105443',
       systemId: WORMHOLE_SYSTEM,
       regionId: WORMHOLE_REGION,
+      security: -1.0,
       space: 'wormhole',
       resolution: 'station',
       hasStargates: true,
@@ -114,6 +118,7 @@ describe('resolveCourierRoutes', () => {
       systemName: 'Jita',
       systemId: JITA_SYSTEM,
       regionId: THE_FORGE,
+      security: 0.9459,
       space: 'highsec',
       resolution: 'station',
       hasStargates: true,
@@ -136,6 +141,9 @@ describe('resolveCourierRoutes', () => {
       // the jumps column renders as unavailable.
       systemId: null,
       regionId: null,
+      // No system, so no security status either — the same "cannot place it"
+      // reasoning the band below states out loud.
+      security: null,
       // And no band: nothing local places it, so there is no security status
       // to classify. A space filter excludes it rather than guessing highsec.
       space: null,

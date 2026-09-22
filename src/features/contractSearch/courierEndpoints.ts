@@ -38,6 +38,7 @@ function unplaced(
     systemName: null,
     systemId: null,
     regionId,
+    security: null,
     space: null,
     resolution,
     hasStargates: null,
@@ -69,6 +70,9 @@ async function resolveOne(
     // between systems, so this is what makes a jump count possible at all.
     systemId: station.systemId,
     regionId: system?.regionId ?? null,
+    // Raw, unrounded — the same float `classifySpace` below is fed, and the
+    // same one `security` band displays get rounded from at render time.
+    security: system?.security ?? null,
     // The same entry that names the system carries its security status, so the
     // band is free (issue #939) — one call to the classifier BPC Search's own
     // Space filter uses, never a second implementation of the cutoffs. No

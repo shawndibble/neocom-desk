@@ -21,6 +21,7 @@
  * trigger (#931), and so is each line of the detail modal's contents.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -62,6 +63,8 @@ import {
 import { loadPublicContractOffers } from '@/features/contractSearch/publicContractOffers';
 import { loadPublicCourierContracts } from '@/features/contractSearch/publicCourierContracts';
 import { CourierResults } from '@/features/contractSearch/CourierResults';
+import { useOfferLocations } from '@/features/contractSearch/offerLocations';
+import { SecurityStatus } from '@/components/SecurityStatus';
 import {
   useCourierEndpoints,
   useListedTypeNames,
@@ -79,6 +82,8 @@ import { rankedSearch } from '@/lib/rankedSearch';
 import { CONTRACT_ISK_CENTS_BELOW, formatIskAuto } from '@/lib/isk';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
+import { useIsPhone } from '@/lib/useIsPhone';
+import { cx } from '@/lib/cx';
 
 /** Rows shown before "show all" — the same cap the character-contracts table and BPC Search use. */
 const ROW_CAP = 50;
@@ -311,12 +316,65 @@ interface ContractSearchPanelProps {
    * the badge and the Refresh button; this panel owns the data behind them.
    */
   onStatusChange?: (status: ContractSearchStatus) => void;
+  /**
+   * Phone only: an element in the route's tab row the Items/Courier switch is
+   * portalled into, so the Search/History tabs and the corpus switch share
+   * one line instead of stacking a tab bar over a panel header holding two
+   * chips — two rows of chrome above a list that is the whole point of the
+   * page. Portalled rather than lifted because the mode is this panel's state
+   * and nothing on the route reads it. Ignored at `sm` and up, and when absent
+   * the switch falls back to the panel header, so the panel still works alone.
+   */
+  modeSwitchSlot?: HTMLElement | null;
+}
+
+interface ContractModeSegmentsProps {
+  mode: ContractMode;
+  onChange: (mode: ContractMode) => void;
+}
+
+/**
+ * The phone's Items/Courier switch: the same two pressed/unpressed toggles as
+ * the desktop chips (`aria-pressed`, exactly one on, same accessible names),
+ * drawn as one joined control. Beside a tab bar, two free-standing chips read
+ * as two more filters; a shared border reads as one either/or choice. Each
+ * segment is `min-h-11` — the touch tier — since it sits where a thumb lands.
+ */
+function ContractModeSegments({ mode, onChange }: ContractModeSegmentsProps) {
+  const { t } = useTranslation();
+  return (
+    <div
+      role="group"
+      aria-label={t('contractSearch.modeLabel')}
+      className="inline-flex overflow-hidden rounded-xs border border-line"
+    >
+      {CONTRACT_MODES.map((candidate, index) => {
+        const selected = mode === candidate;
+        return (
+          <button
+            key={candidate}
+            type="button"
+            aria-pressed={selected}
+            onClick={() => onChange(candidate)}
+            className={cx(
+              'inline-flex min-h-11 items-center px-3 text-[0.6875rem] font-semibold tracking-widest whitespace-nowrap uppercase transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent',
+              index > 0 && 'border-l border-line',
+              selected ? 'bg-accent/15 text-accent' : 'text-text-dim hover:text-text'
+            )}
+          >
+            {t(`contractSearch.mode.${candidate}`)}
+          </button>
+        );
+      })}
+    </div>
+  );
 }
 
 /** Search every public item_exchange/auction contract line, any item type. Read-only, cached for offline. */
-export function ContractSearchPanel({ onStatusChange }: ContractSearchPanelProps) {
+export function ContractSearchPanel({ onStatusChange, modeSwitchSlot }: ContractSearchPanelProps) {
   const { t } = useTranslation();
   const timeZone = useTimeZone();
+  const isPhone = useIsPhone();
   /**
    * One hook per corpus, so neither board waits on the other's snapshot. The
    * two used to arrive together out of a single loader, on the argument that
@@ -369,6 +427,10 @@ export function ContractSearchPanel({ onStatusChange }: ContractSearchPanelProps
     return [...ids];
   }, [rows, courierRoutes]);
   const { value: regionNames } = useRegionNames(regionIds);
+  // Over the whole snapshot, not the filtered rows: keyed on the distinct
+  // location ids, so narrowing the filter never changes the key and never
+  // flashes the newly shown rows back to "resolving".
+  const offerLocations = useOfferLocations(rows);
 
   const [uiFilter, setUiFilter] = useState<UiFilter>(EMPTY_UI_FILTER);
   /** The type the user picked out of the suggestion list, pinning the search to exactly one item. */
@@ -535,11 +597,16 @@ export function ContractSearchPanel({ onStatusChange }: ContractSearchPanelProps
         className: 'tabular-nums',
         sortValue: (row) => row.quantity,
         render: (row) => row.quantity.toLocaleString(),
+        // The dense phone card has no header row, and a bare "12" beside a
+        // system name says nothing about what it counts.
+        stackAffix: { before: t('contractSearch.mobile.qtyAffix') },
       },
       {
         id: 'price',
         header: t('contractSearch.priceColumn'),
         align: 'right',
+        // The headline figure of the dense phone card, on the title line.
+        cardCorner: true,
         className: 'tabular-nums whitespace-nowrap',
         sortValue: (row) => sortValueForPriceColumn(row),
         render: (row) => (
@@ -567,6 +634,37 @@ export function ContractSearchPanel({ onStatusChange }: ContractSearchPanelProps
         ),
       },
       {
+        // The system, with its security, is what a buyer actually weighs —
+        // whether the pickup is a hop from home or a trip into lowsec — and a
+        // region alone cannot say either. After Price so the phone card's
+        // meta line reads "Qty · System · Region · Exp", narrowest place last.
+        id: 'system',
+        header: t('contractSearch.systemColumn'),
+        className: 'whitespace-nowrap',
+        // Unplaced or still resolving sinks in either direction, rather than
+        // sorting as a name — the Price column's "unknowable sorts last" rule.
+        sortValue: (row) => offerLocations.get(row.locationId)?.systemName ?? undefined,
+        render: (row) => {
+          const location = offerLocations.get(row.locationId);
+          // Missing key: the local lookup has not answered yet. Distinct from
+          // a null name, which is a finished answer — a player structure, or
+          // a table that could not be read — and must not read as pending.
+          if (location === undefined) return <span className="text-text-dim">…</span>;
+          if (location.systemName === null) return <span className="text-text-dim">—</span>;
+          return (
+            <>
+              {location.systemName}
+              {location.security !== null && (
+                <>
+                  {' '}
+                  <SecurityStatus security={location.security} />
+                </>
+              )}
+            </>
+          );
+        },
+      },
+      {
         id: 'region',
         header: t('contractSearch.regionColumn'),
         sortValue: (row) => regionNames.get(row.regionId) ?? `#${row.regionId}`,
@@ -578,9 +676,10 @@ export function ContractSearchPanel({ onStatusChange }: ContractSearchPanelProps
         className: 'whitespace-nowrap text-text-dim',
         sortValue: (row) => row.dateExpired,
         render: (row) => formatTimestamp(new Date(row.dateExpired), timeZone),
+        stackAffix: { before: t('contractSearch.mobile.expiresAffix') },
       },
     ],
-    [t, typeNames, regionNames, timeZone]
+    [t, typeNames, regionNames, offerLocations, timeZone]
   );
 
   const visibleRows = showAll ? displayRows : displayRows.slice(0, ROW_CAP);
@@ -620,10 +719,24 @@ export function ContractSearchPanel({ onStatusChange }: ContractSearchPanelProps
     );
   }
 
+  // Exactly one switch per render, chosen here rather than by CSS: two copies
+  // with one hidden would still be two buttons named "Courier". The panel
+  // mounts a render before the route's slot ref lands, so the header copy
+  // shows first and the portal takes over on the next pass.
+  const portalSwitch = syncConfigured && isPhone && modeSwitchSlot != null;
+
   return (
     <>
+      {portalSwitch &&
+        createPortal(<ContractModeSegments mode={mode} onChange={setMode} />, modeSwitchSlot)}
       <Panel
         padded={false}
+        // Frameless on a phone, bleeding through `<main>`'s `px-2`: the dense
+        // list is the page there, and a border plus gutter on each side costs
+        // a 390px screen the width the card's two lines need. The switch that
+        // held the header strip has moved up into the tab row (see
+        // `modeSwitchSlot`), so the strip goes with it.
+        className="max-sm:-mx-2 max-sm:rounded-none max-sm:border-0"
         // No title of its own: the tab immediately above already reads
         // "Search", and repeating it in the panel header beneath reads as a
         // stutter. The table keeps its own accessible name from
@@ -643,7 +756,8 @@ export function ContractSearchPanel({ onStatusChange }: ContractSearchPanelProps
         // build has no sync backend: there is nothing to switch between, and
         // dropping it takes the empty header with it.
         meta={
-          syncConfigured && (
+          syncConfigured &&
+          !portalSwitch && (
             <div
               role="group"
               aria-label={t('contractSearch.modeLabel')}
@@ -834,6 +948,16 @@ export function ContractSearchPanel({ onStatusChange }: ContractSearchPanelProps
                       // the duplicate React keys left stale rows in the table.
                       rowKey={(row, index) => `${row.contractId}:${row.typeId}:${index}`}
                       defaultSort={{ columnId: 'price', direction: 'asc' }}
+                      // Two-line cards on a phone: a buyer scans hundreds of
+                      // offers for a price and a place, not reads each one.
+                      stackLayout="dense"
+                      mobileSort
+                      // Counted over every matching offer, not the capped 50
+                      // on screen — the Show all button below says the same
+                      // total, and the two must not disagree.
+                      stackSummary={t('contractSearch.mobile.offerCount', {
+                        count: displayRows.length,
+                      })}
                       onRowClick={setSelectedRow}
                       // The shortcut past the detail modal, which offers the
                       // same action per line since #933 — hence the shared

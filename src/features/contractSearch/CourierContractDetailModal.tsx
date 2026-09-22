@@ -19,9 +19,10 @@
  * is a constraint to check rather than a figure to weigh, and sits in one
  * quiet grid below.
  */
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Modal } from '@/components/ui';
+import { SecurityStatus } from '@/components/SecurityStatus';
 import { formatIsk, formatIskAuto, formatIskCompact } from '@/lib/isk';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
@@ -120,24 +121,51 @@ function useRouteExposure(
   return exposure;
 }
 
-/** Where this end sits, as one dim line: system, region, space band. */
-function endpointPlace(
-  endpoint: CourierEndpoint,
-  regionNames: ReadonlyMap<number, string>,
-  unknownSpace: string,
-  spaceLabel: (space: string) => string,
-  structureLabel: string
-): string {
-  const parts: string[] = [];
+/**
+ * Where this end sits, as one dim line: system and its security status, then
+ * region — "Jita 0.9 · The Forge".
+ *
+ * The number rather than the space band word, the same as the board's route
+ * cell: "Highsec" tells a 0.5 gank system and a 1.0 core system apart not at
+ * all, and the number carries the band anyway. An end with no security (a
+ * system nothing local places) prints none rather than an "unknown" — the
+ * structure label and the bare id above already say why it is unplaced.
+ */
+function EndpointPlace({
+  endpoint,
+  regionNames,
+  structureLabel,
+}: {
+  endpoint: CourierEndpoint;
+  regionNames: ReadonlyMap<number, string>;
+  structureLabel: string;
+}) {
+  const parts: ReactNode[] = [];
   // A structure names itself before anything else: its bare id is the line
   // above, and "#1039…" alone does not say *why* there is no name.
   if (endpoint.resolution === 'structure') parts.push(structureLabel);
-  if (endpoint.systemName !== null) parts.push(endpoint.systemName);
+  if (endpoint.systemName !== null || endpoint.security !== null) {
+    parts.push(
+      <>
+        {endpoint.systemName}
+        {endpoint.systemName !== null && endpoint.security !== null && ' '}
+        {endpoint.security !== null && <SecurityStatus security={endpoint.security} />}
+      </>
+    );
+  }
   if (endpoint.regionId !== null) {
     parts.push(regionNames.get(endpoint.regionId) ?? `#${endpoint.regionId}`);
   }
-  parts.push(endpoint.space === null ? unknownSpace : spaceLabel(endpoint.space));
-  return parts.join(' · ');
+  return (
+    <span className="text-[0.6875rem] text-text-dim">
+      {parts.map((part, index) => (
+        <Fragment key={index}>
+          {index > 0 && ' · '}
+          {part}
+        </Fragment>
+      ))}
+    </span>
+  );
 }
 
 /** Label over value, the shape every figure below the hero takes. */
@@ -199,14 +227,13 @@ export function CourierContractDetailModal({
 
   const regionName = (regionId: number) => regionNames.get(regionId) ?? `#${regionId}`;
 
-  const place = (endpoint: CourierEndpoint) =>
-    endpointPlace(
-      endpoint,
-      regionNames,
-      t('contractSearch.spaceUnknown'),
-      (space) => t(`common.spaceOption.${space}`),
-      t('contractSearch.playerStructureShort')
-    );
+  const place = (endpoint: CourierEndpoint) => (
+    <EndpointPlace
+      endpoint={endpoint}
+      regionNames={regionNames}
+      structureLabel={t('contractSearch.playerStructureShort')}
+    />
+  );
 
   /**
    * The exact rate and what it is quoted over, under the compact figure —
@@ -281,7 +308,7 @@ export function CourierContractDetailModal({
                 are the whole reason this row exists, and the old `truncate`
                 clipped the region off both ends. */}
             <span className="text-sm">{endpointName(row.origin)}</span>
-            <span className="text-[0.6875rem] text-text-dim">{place(row.origin)}</span>
+            {place(row.origin)}
           </div>
 
           <div className="flex items-center gap-2 text-[0.6875rem] text-text-dim">
@@ -300,7 +327,7 @@ export function CourierContractDetailModal({
               {t('contractSearch.dropOffLabel')}
             </span>
             <span className="text-sm">{endpointName(row.destination)}</span>
-            <span className="text-[0.6875rem] text-text-dim">{place(row.destination)}</span>
+            {place(row.destination)}
           </div>
 
           {/*

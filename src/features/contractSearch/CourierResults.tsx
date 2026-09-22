@@ -26,6 +26,7 @@ import {
   TextInput,
   IskAmount,
   type DataTableColumn,
+  type DataTableGroupBy,
 } from '@/components/ui';
 import {
   courierCollateral,
@@ -40,8 +41,14 @@ import {
   paysFarAboveGoingRate,
 } from '@/engine/contracts/courierGoingRate';
 import { SPACE_KINDS, type SpaceKind } from '@/engine/space';
-import { completableCourierRoutes } from '@/engine/contracts/courierRisk';
-import { EndpointRiskMarkers } from '@/features/contractSearch/courierRiskDisplay';
+import { SecurityStatus } from '@/components/SecurityStatus';
+import {
+  completableCourierRoutes,
+  endpointRisks,
+  type CourierRiskKind,
+} from '@/engine/contracts/courierRisk';
+import { EndpointRiskMarkers, RiskMarker } from '@/features/contractSearch/courierRiskDisplay';
+import { MARKED_RISKS } from '@/features/contractSearch/courierRiskLabels';
 import type { RoutePreferenceKind } from '@/engine/route/jumpRoute';
 import { localJumpCountsForRoutes } from '@/features/route/localRoute';
 import {
@@ -52,7 +59,7 @@ import {
 import { reverseLaneMatches } from '@/engine/contracts/courierReverseLane';
 import { endpointSystemName } from '@/features/contractSearch/courierEndpointNames';
 import { loadCharacterRegionId } from '@/features/contractSearch/characterRegion';
-import { formatIskAuto } from '@/lib/isk';
+import { formatIskAuto, formatIskCompact } from '@/lib/isk';
 import { formatMagnitude } from '@/lib/magnitude';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
@@ -138,21 +145,48 @@ function parseNumeric(value: string): number | null {
 }
 
 /**
- * Where this end sits, in the same four bands BPC Search's Space filter uses.
+ * This end's system security status, printed right after the system name
+ * ("Jita 0.9"). The number rather than the Space filter's band word: a 0.5
+ * gank system and a 1.0 core system are both "Highsec", and a hauler reads the
+ * difference — the number carries the band anyway, so nothing is lost.
  *
  * Endpoint security, never route security: a highsec pickup and a highsec
  * delivery can still route through lowsec, and this app cannot know — a
  * per-row route lookup is the ESI fan-out all three courier scope decisions
- * refuse. So the band describes the end it sits beside and claims nothing
+ * refuse. So the number describes the end it sits beside and claims nothing
  * about the trip between them.
+ *
+ * Nothing at all for an end nothing local places, rather than an "unknown":
+ * the bare id in the name slot, and the Structure marker where it applies,
+ * already say it is unplaced — a third word for it only crowds a phone card.
  */
-function EndpointSpace({ space }: { space: SpaceKind | null }) {
-  const { t } = useTranslation();
-  return (
-    <span className="ml-1.5 text-[0.6875rem] text-text-dim">
-      {space === null ? t('contractSearch.spaceUnknown') : t(`common.spaceOption.${space}`)}
-    </span>
-  );
+function EndpointSecurity({ security }: { security: number | null }) {
+  if (security === null) return null;
+  return <SecurityStatus security={security} className="ml-1" />;
+}
+
+/**
+ * The phone's lane key (`DataTable`'s `groupBy`): hauls between the same two
+ * systems fold into one row. Systems, not stations or regions — "Jita →
+ * Amarr" is how a hauler names a lane, and ten contracts on it are one
+ * decision about which to take. An end with no system never groups: two
+ * unplaced ends are not known to be the same place.
+ */
+function laneKey(row: CourierRouteRow): string | null {
+  if (row.origin.systemId === null || row.destination.systemId === null) return null;
+  return `${row.origin.systemId}>${row.destination.systemId}`;
+}
+
+/** Distinct lanes across these hauls, counting every unplaced haul as its own. */
+function laneCount(rows: readonly CourierRouteRow[]): number {
+  const keys = new Set<string>();
+  let ungrouped = 0;
+  for (const row of rows) {
+    const key = laneKey(row);
+    if (key === null) ungrouped += 1;
+    else keys.add(key);
+  }
+  return keys.size + ungrouped;
 }
 
 function regionLabel(
@@ -649,6 +683,107 @@ function useJumpCounts(
     : PENDING;
 }
 
+/**
+ * A folded lane's toggle on a phone: the lane itself, how many hauls run it,
+ * the best ISK/jump among them, and every warning any of them carries.
+ *
+ * The warnings are the load-bearing part. A group is collapsed by default, so
+ * a bait contract sitting third in a lane of ten would otherwise be invisible
+ * until someone tapped — and the whole point of the over-rate and structure
+ * markers is that nobody has to go looking for them. So the header shows the
+ * union of its members' markers, once each.
+ *
+ * The best rate is the group's maximum, not its first member's: the sort
+ * picker can order the members by anything, and "what is this lane worth at
+ * best" must not change when the reader sorts by expiry.
+ *
+ * Rendered inside the toggle `<button>`, so everything here is plain text —
+ * no `IskAmount` long-press reveal, which would be a control inside a control.
+ */
+function LaneGroupHeader({
+  rows,
+  regionNames,
+  pending,
+  rateFor,
+  multipleFor,
+}: {
+  rows: readonly CourierRouteRow[];
+  regionNames: ReadonlyMap<number, string>;
+  pending: boolean;
+  rateFor: (row: CourierRouteRow) => number | null;
+  multipleFor: (row: CourierRouteRow) => number | null;
+}) {
+  const { t } = useTranslation();
+  const first = rows[0];
+  if (!first) return null;
+
+  const rates = rows.map(rateFor).filter((rate): rate is number => rate !== null);
+  const best = rates.length > 0 ? Math.max(...rates) : null;
+
+  const multiples = rows.map(multipleFor).filter((multiple): multiple is number => {
+    return multiple !== null && paysFarAboveGoingRate(multiple);
+  });
+  const present = new Set<CourierRiskKind>();
+  for (const row of rows) {
+    for (const kind of endpointRisks(row.origin, 'origin')) present.add(kind);
+    for (const kind of endpointRisks(row.destination, 'destination')) present.add(kind);
+  }
+  if (multiples.length > 0) present.add('over-rate');
+  // `MARKED_RISKS`' own order, so every lane lists its markers the same way.
+  const marked = MARKED_RISKS.filter((kind) => present.has(kind));
+
+  const originRegion = regionLabel(first.origin.regionId, regionNames);
+  const destinationRegion = regionLabel(first.destination.regionId, regionNames);
+
+  return (
+    <span className="flex items-start justify-between gap-3">
+      <span className="flex min-w-0 flex-col gap-0.5">
+        <span className="font-semibold">
+          {endpointSystemName(first.origin)}
+          <EndpointSecurity security={first.origin.security} />
+          {' → '}
+          {endpointSystemName(first.destination)}
+          <EndpointSecurity security={first.destination.security} />
+        </span>
+        <span className="text-[0.6875rem] text-text-dim">
+          {t('contractSearch.courierMobile.laneHauls', { count: rows.length })}
+          {originRegion &&
+            destinationRegion &&
+            ` · ${t('contractSearch.courierMobile.laneRegions', {
+              origin: originRegion,
+              destination: destinationRegion,
+            })}`}
+        </span>
+      </span>
+      <span className="flex shrink-0 flex-col items-end gap-0.5 text-right">
+        <span className="whitespace-nowrap tabular-nums">
+          <span className="font-bold">
+            {pending ? '…' : best === null ? '—' : formatIskCompact(best)}
+          </span>
+          <span className="text-[0.6875rem] text-text-dim">
+            {t('contractSearch.courierMobile.bestIskPerJump')}
+          </span>
+        </span>
+        {marked.length > 0 && (
+          <span className="flex flex-wrap justify-end gap-1">
+            {marked.map((kind) => (
+              <RiskMarker
+                key={kind}
+                kind={kind}
+                detailOptions={
+                  kind === 'over-rate'
+                    ? { multiple: formatMagnitude(Math.max(...multiples)) }
+                    : undefined
+                }
+              />
+            ))}
+          </span>
+        )}
+      </span>
+    </span>
+  );
+}
+
 interface CourierResultsProps {
   rows: readonly CourierRouteRow[];
   regionNames: ReadonlyMap<number, string>;
@@ -925,19 +1060,19 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
           <div className="flex flex-col gap-0.5">
             <span>
               {endpointSystemName(row.origin)}
+              <EndpointSecurity security={row.origin.security} />
               {originRegion(row) && (
                 <span className="ml-1.5 text-[0.6875rem] text-text-dim">{originRegion(row)}</span>
               )}
-              <EndpointSpace space={row.origin.space} />
               <EndpointRiskMarkers endpoint={row.origin} end="origin" />
             </span>
             <span className="text-text-dim">
               {'→ '}
               {endpointSystemName(row.destination)}
+              <EndpointSecurity security={row.destination.security} />
               {destinationRegion(row) && (
                 <span className="ml-1.5 text-[0.6875rem]">{destinationRegion(row)}</span>
               )}
-              <EndpointSpace space={row.destination.space} />
               <EndpointRiskMarkers endpoint={row.destination} end="destination" />
             </span>
           </div>
@@ -949,6 +1084,7 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
         align: 'right',
         className: 'tabular-nums whitespace-nowrap',
         sortValue: (row) => row.reward,
+        stackAffix: { after: t('contractSearch.courierMobile.rewardAffix') },
         // Long press, not tap: the row's own tap opens the haul's detail modal.
         render: (row) => <IskAmount value={row.reward} revealOn="longPress" />,
       },
@@ -958,6 +1094,9 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
         align: 'right',
         className: 'tabular-nums whitespace-nowrap',
         sortValue: (row) => courierCollateral(row),
+        // A no-collateral haul reads "— collat" on the phone card, which says
+        // "none asked" as plainly as the em dash does in the table.
+        stackAffix: { after: t('contractSearch.courierMobile.collateralAffix') },
         // A haul that asks for no collateral is a real, distinct offer — an em
         // dash says "none asked", where "0.00 ISK" reads as a figure the issuer
         // actually typed.
@@ -977,6 +1116,7 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
         // row to the end in *either* direction, where a large or small
         // sentinel would lead the table on one of them.
         sortValue: (row) => jumpsByContract.get(row.contractId) ?? undefined,
+        stackAffix: { after: t('contractSearch.courierMobile.jumpsAffix') },
         render: (row) => {
           if (jumps.kind === 'pending') return <span className="text-text-dim">…</span>;
           const count = jumpsByContract.get(row.contractId) ?? null;
@@ -995,6 +1135,11 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
         header: t('contractSearch.iskPerJumpColumn'),
         align: 'right',
         className: 'tabular-nums whitespace-nowrap',
+        // The phone card's headline figure, top right beside the route: the
+        // number the board ranks by is the one a thumb scans down. A flag,
+        // not a position — the dense card hoists it by CSS `order`, so the
+        // desktop column order is untouched.
+        cardCorner: true,
         /** Same rule as Jumps above: no rate sinks the row, in either direction. */
         sortValue: (row) =>
           iskPerJump(row.reward, jumpsByContract.get(row.contractId) ?? null) ?? undefined,
@@ -1003,21 +1148,38 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
           const rate = iskPerJump(row.reward, jumpsByContract.get(row.contractId) ?? null);
           const multiple = multipleFor(row);
           return (
-            <div className="flex flex-col items-start gap-0.5 sm:items-end">
-              {rate === null ? <span className="text-text-dim">—</span> : formatIskAuto(rate)}
+            <div className="flex flex-col items-end gap-0.5">
+              {rate === null ? (
+                <span className="text-text-dim">—</span>
+              ) : (
+                // Compact like Reward beside it, exact on long press (a row
+                // tap opens the modal). The " /J" only shows on the phone
+                // card, which has no column header to name the figure.
+                <span className="whitespace-nowrap">
+                  <IskAmount value={rate} revealOn="longPress" />
+                  <span className="text-[0.625rem] font-semibold text-text-dim sm:hidden">
+                    {t('contractSearch.courierMobile.perJumpSuffix')}
+                  </span>
+                </span>
+              )}
               {/*
                 A second line in the cell rather than an eighth column: the
-                table is already seven wide and every column is a card line when
-                it stacks below `sm`. It names its own benchmark inline, because
-                it is a multiple of the corpus median per m³ per jump rather
-                than of the ISK/jump figure printed above it.
+                table is already seven wide. It names its own benchmark inline,
+                because it is a multiple of the corpus median per m³ per jump
+                rather than of the ISK/jump figure printed above it.
+
+                Right-aligned at every width: in the table it sits under a
+                right-aligned header, and on the phone's dense card this cell is
+                the top-right corner, where both lines hug the card's edge.
+                `font-normal` because the corner is bold, and only the figure
+                should be.
               */}
               {multiple !== null && (
                 <span
                   className={
                     paysFarAboveGoingRate(multiple)
-                      ? 'rounded-xs border border-warning/40 px-1 text-[0.6875rem] text-warning'
-                      : 'text-[0.6875rem] text-text-dim'
+                      ? 'rounded-xs border border-warning/40 px-1 text-[0.6875rem] font-normal text-warning'
+                      : 'text-[0.6875rem] font-normal text-text-dim'
                   }
                 >
                   {t('contractSearch.goingRateMultiple', {
@@ -1035,6 +1197,7 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
         align: 'right',
         className: 'tabular-nums whitespace-nowrap',
         sortValue: (row) => iskPerVolume(row.reward, row.volume) ?? undefined,
+        stackAffix: { after: t('contractSearch.courierMobile.iskPerVolumeAffix') },
         // `formatIskAuto`, not whole ISK: this rate spans orders of magnitude
         // the ISK/jump column never sees, and whole-ISK formatting clamps
         // anything under half an ISK to "0" — which would print a low-paying
@@ -1049,12 +1212,50 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
         header: t('contractSearch.expiresColumn'),
         className: 'whitespace-nowrap text-text-dim',
         sortValue: (row) => row.dateExpired,
+        stackAffix: { before: t('contractSearch.courierMobile.expiresAffix') },
         render: (row) => formatTimestamp(new Date(row.dateExpired), timeZone),
       },
     ];
   }, [t, regionNames, timeZone, jumps.kind, jumpsByContract, multipleFor]);
 
   const visibleRows = showAll ? displayRows : displayRows.slice(0, ROW_CAP);
+
+  /**
+   * Phone-only lane folding. Memoised because `DataTable` regroups whenever
+   * this object's identity changes, and the jump counts it reads land after
+   * the first render. Collapsed by default: the header already says what the
+   * lane is worth and what it warns of, and a phone shows one line per lane
+   * instead of ten near-identical cards.
+   */
+  const groupBy = useMemo<DataTableGroupBy<CourierRouteRow>>(
+    () => ({
+      key: laneKey,
+      renderHeader: (members) => (
+        <LaneGroupHeader
+          rows={members}
+          regionNames={regionNames}
+          pending={jumps.kind === 'pending'}
+          rateFor={(row) => iskPerJump(row.reward, jumpsByContract.get(row.contractId) ?? null)}
+          multipleFor={multipleFor}
+        />
+      ),
+      defaultExpanded: () => false,
+    }),
+    [regionNames, jumps.kind, jumpsByContract, multipleFor]
+  );
+
+  /**
+   * Counted over every haul the filters kept, not the capped page on screen:
+   * "50 hauls" when there are 214 would be the cap talking, not the board.
+   */
+  const stackSummary = useMemo(
+    () =>
+      t('contractSearch.courierMobile.summary', {
+        hauls: t('contractSearch.courierMobile.laneHauls', { count: displayRows.length }),
+        lanes: t('contractSearch.courierMobile.summaryLanes', { count: laneCount(displayRows) }),
+      }),
+    [t, displayRows]
+  );
 
   /**
    * A narrowed space filter drops every haul whose destination nothing local
@@ -1122,6 +1323,12 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
             rowKey={(row) => String(row.contractId)}
             defaultSort={{ columnId: 'iskPerJump', direction: 'desc' }}
             onRowClick={setSelectedRow}
+            // Hundreds of hauls are scanned, not read: the dense two-line card
+            // fits three times the labelled one on a phone.
+            stackLayout="dense"
+            mobileSort
+            stackSummary={stackSummary}
+            groupBy={groupBy}
           />
           {!showAll && displayRows.length > ROW_CAP && (
             <div className="px-3 py-2">

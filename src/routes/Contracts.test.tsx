@@ -13,6 +13,7 @@ import { DEFAULT_TIME_FORMAT, TIME_FORMAT_SETTING_KEY, useTimeFormat } from '@/l
 import { formatTimestamp } from '@/lib/timestamp';
 import { isSyncConfigured } from '@/app/syncStatus';
 import { App } from '@/app/App';
+import { PHONE_QUERY } from '@/lib/useIsPhone';
 
 vi.mock('virtual:pwa-register/react', () => ({
   useRegisterSW: () => ({
@@ -640,5 +641,55 @@ describe('Contracts Search tab page header', () => {
     const modes = await screen.findByRole('group', { name: 'Contract kind' });
     expect(within(modes).getByRole('button', { name: 'Items' })).toBeInTheDocument();
     expect(within(modes).getByRole('button', { name: 'Courier' })).toBeInTheDocument();
+    // Desktop keeps it in the panel's own header strip — Panel is the only
+    // `<section>` on the page.
+    expect(modes.closest('section')).not.toBeNull();
+  });
+
+  describe('on a phone', () => {
+    let restore: () => void;
+    beforeEach(() => {
+      const real = window.matchMedia;
+      window.matchMedia = ((media: string) =>
+        ({
+          media,
+          matches: media === PHONE_QUERY,
+          onchange: null,
+          addEventListener: () => {},
+          removeEventListener: () => {},
+          addListener: () => {},
+          removeListener: () => {},
+          dispatchEvent: () => false,
+        }) as unknown as MediaQueryList) as typeof window.matchMedia;
+      restore = () => {
+        window.matchMedia = real;
+      };
+    });
+    afterEach(() => restore());
+
+    it('moves the Items/Courier switch up into the tab row, out of the panel', async () => {
+      const user = userEvent.setup();
+      window.history.pushState({}, '', '/contracts?tab=search');
+      render(<App />);
+
+      const modes = await screen.findByRole('group', { name: 'Contract kind' });
+      await waitFor(() => expect(modes.closest('section')).toBeNull());
+      // The tablist's scroller sits in the same row wrapper as the switch.
+      const tabRow = screen.getByRole('tablist', { name: 'Contracts sections' }).parentElement
+        ?.parentElement;
+      expect(tabRow).toContainElement(modes);
+      // One switch, not a portalled copy beside a hidden header one.
+      expect(screen.getAllByRole('button', { name: 'Courier' })).toHaveLength(1);
+
+      await user.click(within(modes).getByRole('button', { name: 'Courier' }));
+      expect(within(modes).getByRole('button', { name: 'Courier' })).toHaveAttribute(
+        'aria-pressed',
+        'true'
+      );
+      expect(within(modes).getByRole('button', { name: 'Items' })).toHaveAttribute(
+        'aria-pressed',
+        'false'
+      );
+    });
   });
 });

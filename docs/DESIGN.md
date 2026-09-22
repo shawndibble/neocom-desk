@@ -321,6 +321,45 @@ count down to what's actually worth scanning — and a sideways-scrolling
 matrix couldn't show more than about two characters on a 390px screen
 anyway, so the opt-out was buying less than it looked like.
 
+### Dense cards, phone sort and phone grouping (opt-in)
+
+Three further props exist for a long list a reader _scans_ on a phone rather
+than reads — Courier Search, with hundreds of offers, is the case that
+motivated them. Each is strictly opt-in: a table passing none of them renders
+exactly the markup above.
+
+- **`stackLayout="dense"`** replaces the labelled card with a two-line one.
+  Line one is the primary cell with the `cardCorner` cell _in flow_ at its
+  right (bold, unwrapped — the headline figure, not a decorative icon as in
+  the labelled card). Line two is every other cell inline at 11px in
+  `text-dim`, `·`-separated, with no column labels; a column's `stackAffix`
+  (`{ before: 'Qty ' }`, `{ after: ' reward' }`) supplies the word a bare
+  number needs. The active sort column's meta value turns `text` and bold
+  (`dt-sorted`, set on every sorted cell and inert everywhere else), since
+  there is no header row to show the sort on. Still pure CSS
+  (`.dt-stack-dense`); `stackColumns` is ignored.
+- **`mobileSort`** (+ optional `stackSummary`, e.g. "214 offers") renders an
+  `sm:hidden` bar above the table with a native `<select>` ("Sort: Price ↑")
+  driving the same sort state as the header buttons. The stacked card hides
+  the header row and every sort button with it, so without this a sortable
+  table is unsortable on a phone. A real `<select>` rather than `Select`
+  because the phone should get the OS picker, laid invisibly over its own
+  label because the closed control's text differs from its options'.
+- **`groupBy`** folds rows sharing a non-null key behind one full-width
+  toggle row (collapsed by default, `defaultExpanded` to seed), with expanded
+  members indented on the `panel` fill. Groups keep the table's sort: each
+  sits where its best-ranked member did (`groupSortedRows`). Phone only —
+  desktop has the width to compare those rows side by side.
+
+The sort bar and grouping are **deliberate exceptions to "one DOM at every
+width"**, for the same kind of reason `FilterBar` is (§4b): the bar replaces
+controls CSS has hidden and cannot re-present, and a collapsed group's
+members are _not rendered_ — CSS could hide them on a phone only by also
+deciding their fate on desktop, where they must always show. Grouping reads
+`useIsPhone`, so it tracks the same `sm` line as the stack. One consequence:
+a `highlightRowKey` pointing inside a collapsed group has no row to scroll
+to.
+
 ## 4b. Filters on a phone
 
 A filter row is fine at 1280px and is most of the screen at 390px. Wallet's
