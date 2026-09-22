@@ -42,6 +42,7 @@ import {
 } from '@/engine/industry/makeOrBuy';
 import { MAX_SUB_BUILD_DEPTH } from '@/engine/industry/materialResolution';
 import { sizeRuns } from '@/engine/industry/runSizing';
+import type { SkillGateVerdict } from '@/engine/industry/skillGate';
 
 /**
  * Which rule decides build-or-buy for a material within Craft Scope: `buy`
@@ -74,6 +75,15 @@ export interface AutoBuildHereOptions {
   scope?: readonly MakeMethod[];
   /** Defaults to `'cost-effective'` — Build Opportunities' own heuristic. */
   strategy?: BuildStrategy;
+  /**
+   * Called for each material this pass forced to buy specifically because no
+   * account character can build it (issue #1231's "and says why"), rather
+   * than on cost — lets a caller keep the skill-gate marker on that row even
+   * though it is no longer a sub-build. Never called for an ordinary
+   * cost-based buy, a Craft-Scope exclusion, or under `ctx.accountSkills`
+   * being absent (`makeOrBuy` never sets `skillGate` in that case).
+   */
+  onSkillGated?: (typeID: number, verdict: Extract<SkillGateVerdict, { gated: true }>) => void;
 }
 
 interface WalkContext {
@@ -220,6 +230,7 @@ export function autoBuildHere(
       recipe,
       opts.ctx
     );
+    if (verdict?.skillGate) opts.onSkillGated?.(material.typeID, verdict.skillGate);
     return verdict?.verdict === 'build' ? 'build' : 'buy';
   }
 }

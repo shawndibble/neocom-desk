@@ -4,11 +4,13 @@ import { Button, IskAmount, Panel, Spinner } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import type { BuildResult } from '@/engine/industry/types';
 import { compareUseOrSell, type OwnedStockSale } from '@/engine/industry/ownedStockSale';
+import type { SkillGateVerdict } from '@/engine/industry/skillGate';
 import { formatDuration } from '@/lib/duration';
 import { formatIsk } from '@/lib/isk';
 import { iskToneClass } from '@/features/character/format';
 import { formatPercent } from './format';
 import { CalculationBreakdown, type BreakdownContext } from './CalculationBreakdown';
+import { SkillGateMarker } from './SkillGateMarker';
 
 type PillTone = 'success' | 'warning' | 'muted';
 
@@ -58,6 +60,10 @@ interface PlanVerdictHeroProps {
   onBreakdownOpenChange: (open: boolean) => void;
   onLogProduction: () => void;
   logProductionDisabled?: boolean;
+  /** Account-wide skill gate on this plan's own product (issue #1231). */
+  skillGate?: SkillGateVerdict;
+  nameForSkill?: (typeID: number) => string;
+  nameForCharacter?: (characterId: number) => string;
 }
 
 /**
@@ -79,6 +85,9 @@ export function PlanVerdictHero({
   onBreakdownOpenChange,
   onLogProduction,
   logProductionDisabled = false,
+  skillGate,
+  nameForSkill,
+  nameForCharacter,
 }: PlanVerdictHeroProps) {
   const { t } = useTranslation();
 
@@ -114,6 +123,13 @@ export function PlanVerdictHero({
             <p className="flex flex-wrap items-baseline gap-x-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
               {/* A real heading, not decoration: it is what names the open plan to a screen reader. */}
               <h2 className="text-text">{productName}</h2>
+              {skillGate?.gated && nameForSkill && nameForCharacter && (
+                <SkillGateMarker
+                  verdict={skillGate}
+                  nameForSkill={nameForSkill}
+                  nameForCharacter={nameForCharacter}
+                />
+              )}
               <span>· {t('industry.heroTitle', { count: runs })}</span>
             </p>
             {pricesLoading ? (

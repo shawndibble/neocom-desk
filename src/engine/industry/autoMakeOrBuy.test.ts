@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   autoBuildHere,
   facilityContextForNode,
@@ -265,6 +265,58 @@ describe('autoBuildHere', () => {
     expect(() =>
       autoBuildHere(root, 0, { recipeFor: cyclic, ctx: cyclicCtx, depth: 3, runs: 1 })
     ).not.toThrow();
+  });
+
+  it('excludes a material nobody on the account can build (issue #1231), even though building is cheaper — ending the branch the same way an ordinary cost-based buy verdict does', () => {
+    const gatedGearABlueprint: IndustryBlueprint = {
+      ...gearABlueprint,
+      skills: [{ typeID: 3380, level: 5 }],
+    };
+    const gatedRecipes: Record<number, MaterialRecipe> = {
+      ...recipes,
+      502: { method: 'manufacturing', blueprint: gatedGearABlueprint, me: 0 },
+    };
+    const noAccountSkills = new Map([[1, {}]]);
+    const result = autoBuildHere(productBlueprint, 0, {
+      recipeFor: (id) => gatedRecipes[id] ?? null,
+      ctx: { ...ctx, accountSkills: noAccountSkills },
+      depth: 2,
+      runs: 1,
+    });
+    expect(result.size).toBe(0);
+  });
+
+  it('calls onSkillGated for a material it forced to buy, and says why (issue #1231)', () => {
+    const gatedGearABlueprint: IndustryBlueprint = {
+      ...gearABlueprint,
+      skills: [{ typeID: 3380, level: 5 }],
+    };
+    const gatedRecipes: Record<number, MaterialRecipe> = {
+      ...recipes,
+      502: { method: 'manufacturing', blueprint: gatedGearABlueprint, me: 0 },
+    };
+    const noAccountSkills = new Map([[1, {}]]);
+    const onSkillGated = vi.fn();
+    autoBuildHere(productBlueprint, 0, {
+      recipeFor: (id) => gatedRecipes[id] ?? null,
+      ctx: { ...ctx, accountSkills: noAccountSkills },
+      depth: 2,
+      runs: 1,
+      onSkillGated,
+    });
+    expect(onSkillGated).toHaveBeenCalledTimes(1);
+    expect(onSkillGated).toHaveBeenCalledWith(502, {
+      gated: true,
+      shortfall: [{ typeID: 3380, haveLevel: 0, needLevel: 5 }],
+      bestCharacterId: 1,
+    });
+  });
+
+  it('never calls onSkillGated for an ordinary cost-based buy', () => {
+    const dear: MakeOrBuyContext = { ...ctx, materialPrices: { ...ctx.materialPrices, 502: 1 } };
+    const onSkillGated = vi.fn();
+    autoBuildHere(productBlueprint, 0, { recipeFor, ctx: dear, depth: 3, runs: 1, onSkillGated });
+    expect(onSkillGated).not.toHaveBeenCalled();
   });
 
   it("sizes the root job to the plan's real runs, not always 1 — a verdict decided at the wrong scale would disagree with what the recursive engine later bills", () => {
