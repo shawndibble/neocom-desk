@@ -697,7 +697,7 @@ function FacilityDefaultsFields({
       </Select>
 
       {showRigAndTax && (
-        <div className="space-y-3 border-l-2 border-line pt-2 pl-3">
+        <div className="space-y-3 border-l border-line pt-2 pl-3">
           <div role="group" aria-label={labels.rigGroup} className="space-y-3">
             <p className="text-xs font-semibold">{labels.rigGroup}</p>
             {value.rigFit.map((kind, slot) => (

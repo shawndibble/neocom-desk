@@ -245,7 +245,6 @@ export function MobileOpportunityList({
                       : row.candidate.blueprint.runs
                   }
                   tone={original ? 'accent' : 'default'}
-                  className="h-6"
                 />
                 {SORT_FIELD_ORDER.filter((id) => id !== activeFieldId).map((id) => {
                   const secondary = fields[id].hero(row);
@@ -259,7 +258,6 @@ export function MobileOpportunityList({
                   label={t('industry.opportunitiesOrderDepthLabel')}
                   value={t(`industry.opportunitiesOrderDepth.${row.orderDepth}`)}
                   tone={ORDER_DEPTH_TONE[row.orderDepth]}
-                  className="h-6"
                 />
                 {row.result.profit !== null && row.result.profit < 0 && (
                   <InfoTooltip
