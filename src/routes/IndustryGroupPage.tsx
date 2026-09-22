@@ -16,6 +16,7 @@ import {
 import { retargetBuildGroup } from '@/features/industry/buildGroupActions';
 import { BuildGroupPanel } from '@/features/industry/BuildGroupPanel';
 import { applyGroupAutoBuild } from '@/features/industry/autoBuildGroup';
+import { loadPublicBpcContracts } from '@/features/bpcContracts/syncedContracts';
 import type { BuildStrategy } from '@/engine/industry/autoMakeOrBuy';
 import type { OwnedStockScope } from '@/engine/industry/types';
 import { useQuickbar } from '@/features/market/useQuickbar';
@@ -80,6 +81,13 @@ export function IndustryGroupPage() {
         strategy: options.strategy,
       })
     );
+    // Same BPC Sourcing snapshot each member's own page resolves its
+    // top-level tier against; no offers (not synced / fetch failed) degrades
+    // to owned, forced and BPO tiers, exactly as on the plan page.
+    const bpcRows = await loadPublicBpcContracts(activeCharacterId).then(
+      (cached) => cached?.data.rows ?? [],
+      () => []
+    );
     const picks = await applyGroupAutoBuild(
       plans,
       catalog,
@@ -88,7 +96,8 @@ export function IndustryGroupPage() {
       skills,
       workspace.assumedMe,
       options,
-      corpOwnedBlueprints
+      corpOwnedBlueprints,
+      bpcRows
     );
     if (picks.size === 0) return;
     await db.transaction('rw', db.buildPlans, async () => {

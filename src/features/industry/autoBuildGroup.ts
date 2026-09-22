@@ -12,6 +12,8 @@
  */
 import type { BuildPlanRecord } from '@/db';
 import type { CharacterBlueprint } from '@/esi/endpoints';
+import type { BpcContractRow } from '@/engine/contracts/bpcSearch';
+import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import {
   autoBuildHere,
   maxAutoBuildDepth,
@@ -31,8 +33,9 @@ import {
   type PlanFacilityContext,
 } from './planFacilityContext';
 import { materialPricesFor } from './priceBasis';
-import { recipeForLookup, type RecipeCatalog } from './recipes';
-import { planOwnedBlueprints, reactionFacilityFor } from './resolveBuildPlan';
+import { acquisitionForLookup, recipeForLookup, type RecipeCatalog } from './recipes';
+import { planOwnedBlueprints, reactionFacilityFor, resolveTopLevelTier } from './resolveBuildPlan';
+import { offersForRegion } from './useBpcAcquisitionOffers';
 import type { CorpOwnedBlueprintsState } from './corpOwnedBlueprints';
 
 interface ResolvedMember {
@@ -117,6 +120,12 @@ export function memberRecipeFor(
  * A member whose blueprint no longer resolves contributes nothing, the same
  * "skip, don't zero" policy `groupRollup.ts` applies to an unresolvable
  * member.
+ *
+ * Walks at the stored `plan.me`, not the member's resolved ME
+ * (`resolveTopLevelTier`) that `applyGroupAutoBuild` uses: resolving it
+ * needs live prices, and ME can't change depth anyway — every effective
+ * quantity floors at `runs` (never zero), so the same recipes are reached at
+ * any ME.
  */
 export function groupAutoBuildMaxDepth(
   plans: readonly BuildPlanRecord[],
@@ -149,7 +158,9 @@ export function groupAutoBuildMaxDepth(
  * per member — never writes to Dexie itself, so the caller decides how (and
  * whether) to patch each plan. A member whose blueprint no longer resolves
  * is left out of the returned map entirely, contributing nothing rather than
- * an empty set.
+ * an empty set — as is one whose prices never landed, the same way its own
+ * page's Auto Build waits on prices. Each member is walked at its resolved
+ * ME (`resolveTopLevelTier`), the same ME its own page walks at.
  *
  * Owned blueprints and the Reaction Location resolve per member through
  * `resolveBuildPlan.ts`'s own helpers — corp copies count only for a member
@@ -164,7 +175,9 @@ export async function applyGroupAutoBuild(
   skills: SkillLevels,
   assumedMe: number,
   options: { strategy: BuildStrategy; depth: number },
-  corpOwnedBlueprints?: CorpOwnedBlueprintsState
+  corpOwnedBlueprints?: CorpOwnedBlueprintsState,
+  /** BPC Sourcing rows (all regions) — narrowed to each member's own Trade Hub region. */
+  bpcRows: readonly BpcContractRow[] = []
 ): Promise<Map<string, Set<number>>> {
   const members = plans.flatMap((plan) => {
     const member = resolveMember(plan, catalog);
@@ -185,19 +198,45 @@ export async function applyGroupAutoBuild(
     members.map(async (member, index) => {
       const snapshot = await snapshots[index]!.snapshot;
       const reactionSnapshot = await snapshots[index]!.reactionSnapshot;
+      // Same gate as the member's own page (`resolveBuildPlan`'s
+      // `makeOrBuyContext`): without real fees every verdict would read
+      // "build", so a member whose prices never landed is left untouched.
+      if (snapshot.adjustedPrices === null || snapshot.systemCostIndex === null) return;
       const reactionFacility = reactionFacilityFor(member.plan, reactionSnapshot?.systemCostIndex);
       const recipeFor = memberRecipeFor(member.plan, recipeSources);
+      const materialPrices = materialPricesFor(snapshot, member.plan.materialPriceBasis);
       const ctx: MakeOrBuyContext = {
         ...member.facilityContext,
-        systemCostIndex: snapshot.systemCostIndex ?? 0,
-        adjustedPrices: snapshot.adjustedPrices ?? {},
-        materialPrices: materialPricesFor(snapshot, member.plan.materialPriceBasis),
+        systemCostIndex: snapshot.systemCostIndex,
+        adjustedPrices: snapshot.adjustedPrices,
+        materialPrices,
         skills,
         reactionFacility,
       };
+      // The ME the member's own page walks at: its top-level Blueprint
+      // Acquisition tier, resolved against a fresh pool per member.
+      const hub = getTradeHub(member.plan.hubId) ?? DEFAULT_TRADE_HUB;
+      const acquisitionFor = acquisitionForLookup({
+        catalog,
+        pi,
+        ownedBlueprints: planOwnedBlueprints(member.plan, ownedBlueprints, corpOwnedBlueprints),
+        assumedMeForUnowned: assumedMe,
+        blueprintAcquisition: {
+          offersFor: offersForRegion(bpcRows, hub.regionId),
+          hubPrices: snapshot.hubPrices,
+          sourcing: member.plan.materialSourcing,
+        },
+      });
+      const { me } = resolveTopLevelTier(
+        member.plan,
+        member.blueprint,
+        acquisitionFor,
+        ctx,
+        materialPrices
+      );
       picks.set(
         member.plan.id,
-        autoBuildHere(member.blueprint, member.plan.me, {
+        autoBuildHere(member.blueprint, me, {
           recipeFor,
           ctx,
           depth: options.depth,

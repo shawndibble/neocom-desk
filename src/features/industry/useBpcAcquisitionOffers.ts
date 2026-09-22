@@ -14,6 +14,28 @@ import { loadPublicBpcContracts } from '@/features/bpcContracts/syncedContracts'
 import { effectivePrice, type BpcContractRow } from '@/engine/contracts/bpcSearch';
 import type { BpcOffer } from '@/engine/industry/blueprintAcquisition';
 
+/** BPC Sourcing offers for one blueprint type, in one region — the per-node lookup `acquisitionForLookup` reads. */
+export function offersForRegion(
+  bpcRows: readonly BpcContractRow[],
+  regionId: number
+): (blueprintTypeID: number) => readonly BpcOffer[] {
+  const byType = new Map<number, BpcOffer[]>();
+  for (const row of bpcRows) {
+    if (row.regionId !== regionId) continue;
+    const list = byType.get(row.typeId) ?? [];
+    list.push({
+      me: row.me,
+      te: row.te,
+      runs: row.runs,
+      quantity: row.quantity,
+      price: effectivePrice(row),
+      isMultiType: row.isMultiType,
+    });
+    byType.set(row.typeId, list);
+  }
+  return (blueprintTypeID) => byType.get(blueprintTypeID) ?? [];
+}
+
 export function useBpcAcquisitionOffers(
   characterId: number,
   regionId: number
@@ -31,23 +53,7 @@ export function useBpcAcquisitionOffers(
     };
   }, [characterId]);
 
-  const byType = useMemo(() => {
-    const map = new Map<number, BpcOffer[]>();
-    for (const row of rows) {
-      if (row.regionId !== regionId) continue;
-      const list = map.get(row.typeId) ?? [];
-      list.push({
-        me: row.me,
-        te: row.te,
-        runs: row.runs,
-        quantity: row.quantity,
-        price: effectivePrice(row),
-        isMultiType: row.isMultiType,
-      });
-      map.set(row.typeId, list);
-    }
-    return map;
-  }, [rows, regionId]);
+  const offersFor = useMemo(() => offersForRegion(rows, regionId), [rows, regionId]);
 
-  return useMemo(() => (blueprintTypeID: number) => byType.get(blueprintTypeID) ?? [], [byType]);
+  return offersFor;
 }

@@ -4,13 +4,20 @@ import { loadMarketSnapshots, type MarketSnapshot } from './marketData';
 import type { CharacterBlueprint } from '@/esi/endpoints';
 import type { BuildPlanRecord } from '@/db';
 import type { BlueprintCatalog, BlueprintCatalogEntry } from './blueprintCatalog';
+import { autoBuildHere } from '@/engine/industry/autoMakeOrBuy';
 
 vi.mock('./marketData', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./marketData')>();
   return { ...actual, loadMarketSnapshots: vi.fn() };
 });
 
+vi.mock('@/engine/industry/autoMakeOrBuy', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/engine/industry/autoMakeOrBuy')>();
+  return { ...actual, autoBuildHere: vi.fn(actual.autoBuildHere) };
+});
+
 const mockedSnapshots = vi.mocked(loadMarketSnapshots);
+const autoBuildHereSpy = vi.mocked(autoBuildHere);
 
 function plan(overrides: Partial<BuildPlanRecord> & { id: string }): BuildPlanRecord {
   return {
@@ -114,6 +121,7 @@ const CORP_BPO_101: CharacterBlueprint = {
 const CORP = { available: true, incomplete: false, blueprints: [CORP_BPO_101] };
 
 beforeEach(() => {
+  autoBuildHereSpy.mockClear();
   mockedSnapshots.mockReset();
   mockedSnapshots.mockImplementation((requests) => requests.map(() => Promise.resolve(SNAPSHOT)));
 });
@@ -281,6 +289,61 @@ describe('applyGroupAutoBuild', () => {
       expect(requests.filter((r) => r.activity === 'reaction')).toEqual([
         expect.objectContaining({ costIndexSystemId: 30002053 }),
       ]);
+    });
+  });
+
+  describe("each member's resolved ME (top-level Blueprint Acquisition)", () => {
+    /** A personal BPO of the plan's own top-level blueprint (100) at ME 10. */
+    const OWN_BPO_100: CharacterBlueprint = { ...CORP_BPO_101, item_id: 7, type_id: 100 };
+    const catalog = catalogWith(CHAIN_CATALOG_ENTRIES);
+
+    function meFor(planId: string, plans: BuildPlanRecord[]): number | undefined {
+      const index = plans.findIndex((p) => p.id === planId);
+      return autoBuildHereSpy.mock.calls[index]?.[1];
+    }
+
+    it('walks a member at its owned top-level blueprint ME, not the stored plan.me — same as its own page', async () => {
+      const plans = [plan({ id: 'owned', blueprintTypeID: 100, me: 0 })];
+
+      await applyGroupAutoBuild(plans, catalog, null, [OWN_BPO_100], {}, 0, {
+        strategy: 'build',
+        depth: 1,
+      });
+
+      expect(autoBuildHereSpy).toHaveBeenCalledTimes(1);
+      expect(meFor('owned', plans)).toBe(10);
+    });
+
+    it("honours the member's own forced acquisition tier", async () => {
+      const plans = [
+        plan({
+          id: 'forced',
+          blueprintTypeID: 100,
+          me: 0,
+          materialSourcing: { 100: { acquisitionTierOverride: { me: 4, te: 8 } } },
+        }),
+      ];
+
+      await applyGroupAutoBuild(plans, catalog, null, [], {}, 0, {
+        strategy: 'build',
+        depth: 1,
+      });
+
+      expect(meFor('forced', plans)).toBe(4);
+    });
+
+    it('skips a member whose prices never landed, leaving its buildHere untouched like the plan page', async () => {
+      mockedSnapshots.mockImplementation((requests) =>
+        requests.map(() => Promise.resolve({ ...SNAPSHOT, adjustedPrices: null }))
+      );
+      const plans = [plan({ id: 'unpriced', blueprintTypeID: 100 })];
+
+      const picks = await applyGroupAutoBuild(plans, catalog, null, [], {}, 0, {
+        strategy: 'build',
+        depth: 1,
+      });
+
+      expect(picks.has('unpriced')).toBe(false);
     });
   });
 });
