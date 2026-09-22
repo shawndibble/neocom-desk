@@ -958,6 +958,14 @@ describe('copy wiring', () => {
     }
   });
 
+  it('refuses an event no domain fires rather than rendering nothing', () => {
+    // Every fire the poller renders came from a domain's own diff, so an
+    // unowned id is a programmer error, not a stale feed row.
+    expect(() => domainForEvent('somethingNewer' as NotificationEventId)).toThrow(
+      'no domain fires somethingNewer'
+    );
+  });
+
   it('routes a subject for exactly the events whose URL table can use one', () => {
     // A fire of every event, carrying every subject field a diff could set.
     const routed = NOTIFICATION_EVENT_IDS.filter(

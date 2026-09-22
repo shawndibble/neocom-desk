@@ -1,7 +1,7 @@
 /**
- * Renderer for EVE's own notifications (issue #274), kept separate from
- * `foregroundPoller.ts`'s `notificationText` if-chain because this one is
- * keyed by ESI's raw `type` string rather than a `NotificationEventId`.
+ * Renderer for EVE's own notifications (issue #274), called by
+ * `domainCopy.ts`'s `eveNotificationCopy` but kept in its own module because
+ * it is keyed by ESI's raw `type` string rather than a `NotificationEventId`.
  * Every `type` reaching this module is already a member of the closed
  * Notification Allow-List (`EVE_ALLOWED_TYPES`, `eventSelection.ts`) —
  * `foregroundPoller.ts` drops anything else before it gets here, so

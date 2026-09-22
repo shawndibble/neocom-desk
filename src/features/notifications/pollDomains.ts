@@ -179,6 +179,7 @@ import {
   corpWalletCopy,
   priceAlertCopy,
   type DomainCopy,
+  type NoNames,
   type SkillNames,
   type ItemNames,
   type PlanetNames,
@@ -390,12 +391,9 @@ export interface PollDomain {
  * known and every cast is checked against the spec above; outside it, nothing
  * needs to know which domain it is holding.
  */
-function defineDomain<
-  TRaw,
-  TSnapshot,
-  TFire extends AnyNotificationFire,
-  TNames = Record<string, never>,
->(spec: PollDomainSpec<TRaw, TSnapshot, TFire, TNames>): PollDomain {
+function defineDomain<TRaw, TSnapshot, TFire extends AnyNotificationFire, TNames = NoNames>(
+  spec: PollDomainSpec<TRaw, TSnapshot, TFire, TNames>
+): PollDomain {
   const store = createPollerStateStore<TSnapshot>(
     spec.stateKey,
     isSnapshotWith<TSnapshot>(spec.entriesKey, spec.isEntry)
