@@ -72,12 +72,14 @@ async function rebuildOnce(
   deps: ProjectionRebuildDependencies,
   baselines: ReadonlyMap<PollDomain, PollerState<unknown>> | undefined
 ): Promise<void> {
-  if (!(await deps.masterEnabled())) return;
-  const [browserAllowed, characters] = await Promise.all([
+  // Master off still uploads (empty rows): an early return would leave the
+  // last upload's Scheduled Pushes live on the backend.
+  const [masterEnabled, browserAllowed, characters] = await Promise.all([
+    deps.masterEnabled(),
     deps.browserChannelEnabled(),
     deps.characters(),
   ]);
-  const browserEnabled = browserAllowed && deps.permission() === 'granted';
+  const browserEnabled = masterEnabled && browserAllowed && deps.permission() === 'granted';
 
   const domainBaselines = await Promise.all(
     PROJECTING_DOMAINS.map(

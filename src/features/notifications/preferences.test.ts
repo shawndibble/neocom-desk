@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { db } from '@/db';
 import type { NotificationEventId } from './events';
 import {
@@ -35,8 +35,13 @@ import {
   broadcastAllEventsChannelPref,
   broadcastEveTypeChannelPref,
   broadcastAllEveTypesChannelPref,
+  setDeviceNotificationPrefs,
+  withCharacterEventThreshold as withThreshold,
 } from './preferences';
+import { scheduleProjectionRebuild } from './projectionRebuildScheduler';
 import { SYNCED_NOTIFICATION_FEED_PREFS_KEY } from './syncedPreferences';
+
+vi.mock('./projectionRebuildScheduler', () => ({ scheduleProjectionRebuild: vi.fn() }));
 
 const EVENT_A = 'skillLevelComplete' satisfies NotificationEventId;
 const EVENT_B = 'newMail' satisfies NotificationEventId;
@@ -46,6 +51,7 @@ const TYPE_B = 'AllWarDeclaredMsg';
 beforeEach(async () => {
   await db.settings.clear();
   useNotificationPreferences.setState({ value: DEFAULT_NOTIFICATION_PREFERENCES, hydrated: false });
+  vi.mocked(scheduleProjectionRebuild).mockClear();
 });
 
 describe('useNotificationPreferences', () => {
@@ -629,5 +635,114 @@ describe('hydrateNotificationPreferences', () => {
 
     await hydrateNotificationPreferences();
     expect(useNotificationPreferences.getState().value).toBe(afterFirstCall);
+  });
+});
+
+describe('Projection rebuild scheduling (issue #1259 follow-up)', () => {
+  const DEFAULTS = DEFAULT_NOTIFICATION_PREFERENCES;
+
+  it('turning the master switch off, then on, schedules a rebuild each time', async () => {
+    await setDeviceNotificationPrefs(withMasterEnabled(DEFAULTS, false));
+    expect(scheduleProjectionRebuild).toHaveBeenCalledTimes(1);
+    await setDeviceNotificationPrefs(withMasterEnabled(DEFAULTS, true));
+    expect(scheduleProjectionRebuild).toHaveBeenCalledTimes(2);
+  });
+
+  it('turning the browser channel gate off, then on, schedules a rebuild each time', async () => {
+    await setDeviceNotificationPrefs(withBrowserEnabled(DEFAULTS, false));
+    expect(scheduleProjectionRebuild).toHaveBeenCalledTimes(1);
+    await setDeviceNotificationPrefs(withBrowserEnabled(DEFAULTS, true));
+    expect(scheduleProjectionRebuild).toHaveBeenCalledTimes(2);
+  });
+
+  it('the feed channel gate does not schedule a rebuild', async () => {
+    await setDeviceNotificationPrefs(withFeedEnabled(DEFAULTS, false));
+    expect(scheduleProjectionRebuild).not.toHaveBeenCalled();
+  });
+
+  it('hands the scheduler the write itself, so the rebuild waits for it', async () => {
+    await setDeviceNotificationPrefs(withMasterEnabled(DEFAULTS, false));
+    const [write] = vi.mocked(scheduleProjectionRebuild).mock.calls[0];
+    await write;
+    expect((await db.settings.get(NOTIFICATION_PREFS_SETTING_KEY))?.value).toMatchObject({
+      masterEnabled: false,
+    });
+  });
+
+  it('a browser event toggle schedules one rebuild; a feed toggle does not', async () => {
+    await toggleEventChannelPref(1, DEFAULTS, EVENT_A, 'feed');
+    expect(scheduleProjectionRebuild).not.toHaveBeenCalled();
+    await toggleEventChannelPref(
+      1,
+      useNotificationPreferences.getState().value,
+      EVENT_A,
+      'browser'
+    );
+    expect(scheduleProjectionRebuild).toHaveBeenCalledTimes(1);
+  });
+
+  it('turning on a browser-off-by-default event schedules a rebuild', async () => {
+    await toggleEventChannelPref(1, DEFAULTS, 'walletBalanceChanged', 'browser');
+    expect(scheduleProjectionRebuild).toHaveBeenCalledTimes(1);
+  });
+
+  it('browser select-all, EVE-type and broadcast writes each schedule one rebuild', async () => {
+    await toggleAllEventsChannelPref(1, DEFAULTS, [EVENT_A, EVENT_B], 'browser');
+    await toggleEveTypeChannelPref(
+      1,
+      useNotificationPreferences.getState().value,
+      TYPE_A,
+      'browser'
+    );
+    await toggleAllEveTypesChannelPref(
+      1,
+      useNotificationPreferences.getState().value,
+      [TYPE_A, TYPE_B],
+      'browser'
+    );
+    await broadcastEventChannelPref(
+      [1, 2],
+      useNotificationPreferences.getState().value,
+      EVENT_B,
+      'browser'
+    );
+    expect(scheduleProjectionRebuild).toHaveBeenCalledTimes(4);
+  });
+
+  it('feed-only EVE-type and broadcast writes do not schedule a rebuild', async () => {
+    await toggleEveTypeChannelPref(1, DEFAULTS, TYPE_A, 'feed');
+    await broadcastAllEventsChannelPref(
+      [1, 2],
+      useNotificationPreferences.getState().value,
+      [EVENT_A],
+      'feed'
+    );
+    await broadcastAllEveTypesChannelPref(
+      [1, 2],
+      useNotificationPreferences.getState().value,
+      [TYPE_B],
+      'feed'
+    );
+    expect(scheduleProjectionRebuild).not.toHaveBeenCalled();
+  });
+
+  it('fuel and extractor thresholds schedule a rebuild; wallet thresholds do not', async () => {
+    await updateNotificationPrefs(1, withThreshold(DEFAULTS, 1, 'corpWalletBalanceFloorIsk', 5));
+    expect(scheduleProjectionRebuild).not.toHaveBeenCalled();
+    await updateNotificationPrefs(
+      1,
+      withThreshold(useNotificationPreferences.getState().value, 1, 'structureFuelLowDays', 3)
+    );
+    await updateNotificationPrefs(
+      1,
+      withThreshold(useNotificationPreferences.getState().value, 1, 'extractorExpiringLeadHours', 1)
+    );
+    expect(scheduleProjectionRebuild).toHaveBeenCalledTimes(2);
+  });
+
+  it('a write that changes nothing uploaded does not schedule a rebuild', async () => {
+    await setDeviceNotificationPrefs(withMasterEnabled(DEFAULTS, true));
+    await setDeviceNotificationPrefs(withBrowserEnabled(DEFAULTS, true));
+    expect(scheduleProjectionRebuild).not.toHaveBeenCalled();
   });
 });

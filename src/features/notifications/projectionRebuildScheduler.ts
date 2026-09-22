@@ -8,10 +8,11 @@
  * it settles — an earlier read could project the old value, or re-hydrate the
  * synced threshold over the new one. A failed synced half still rebuilds: the
  * local value is already set.
+ *
+ * `preferences.ts` calls this on every write that changes the upload, so the
+ * rebuild's own modules load lazily: a static import would close a
+ * preferences → scheduler → foregroundPoller → preferences cycle.
  */
-import type { NotificationChannel } from './eventSelection';
-import { liveDependencies } from './foregroundPoller';
-import { rebuildProjection } from './projectionRebuild';
 
 /** Long enough to span a burst of checkbox clicks, short next to the poll. */
 export const PROJECTION_REBUILD_DELAY_MS = 1000;
@@ -53,16 +54,10 @@ export function createCoalescedRebuild(
 }
 
 /** The app-wide instance; `rebuildProjection` itself serializes overlapping runs. */
-export const scheduleProjectionRebuild = createCoalescedRebuild(
-  () => rebuildProjection(liveDependencies()),
-  PROJECTION_REBUILD_DELAY_MS
-);
-
-/** Only the browser channel feeds the upload (`mayProject`); a feed write just logs failures. */
-export function rebuildProjectionAfterChannelWrite(
-  channel: NotificationChannel,
-  write: Promise<unknown>
-): void {
-  if (channel === 'browser') scheduleProjectionRebuild(write);
-  else void logWriteFailure(write);
-}
+export const scheduleProjectionRebuild = createCoalescedRebuild(async () => {
+  const [{ rebuildProjection }, { liveDependencies }] = await Promise.all([
+    import('./projectionRebuild'),
+    import('./foregroundPoller'),
+  ]);
+  await rebuildProjection(liveDependencies());
+}, PROJECTION_REBUILD_DELAY_MS);

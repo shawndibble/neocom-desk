@@ -949,6 +949,22 @@ describe('Settings — Notifications (issue #170)', () => {
       await waitFor(() => expect(rebuildProjection).toHaveBeenCalledTimes(1));
     });
 
+    it('the master switch and browser gate each rebuild once; the Overview gate does not', async () => {
+      const user = await renderPanelWithFakeTimers();
+
+      await user.click(screen.getByRole('checkbox', { name: 'Overview notifications' }));
+      await afterQuietPeriod();
+      expect(rebuildProjection).not.toHaveBeenCalled();
+
+      await user.click(screen.getByRole('checkbox', { name: 'Browser notifications' }));
+      await afterQuietPeriod();
+      await waitFor(() => expect(rebuildProjection).toHaveBeenCalledTimes(1));
+
+      await user.click(screen.getByRole('checkbox', { name: 'Enable notifications' }));
+      await afterQuietPeriod();
+      await waitFor(() => expect(rebuildProjection).toHaveBeenCalledTimes(2));
+    });
+
     it('several quick browser toggles share one rebuild, which sees the final preferences', async () => {
       const user = await renderPanelWithFakeTimers();
       // Read from Dexie, not the store: the rebuild must wait for the write.

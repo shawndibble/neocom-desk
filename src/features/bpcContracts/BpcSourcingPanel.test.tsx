@@ -84,6 +84,27 @@ vi.mock('@/features/bpcContracts/blueprintLocation', () => ({
   loadContractLocationInfo: (...args: [number]) => loadContractLocationInfo(...args),
 }));
 
+// BPO cards place a station by its system (issue #1241), through the same
+// local SDE lookups Item Offers uses. Only the Jita hub station is known.
+vi.mock('@/sde/npcStations', () => ({
+  lookupNpcStation: vi.fn(async (stationId: number) =>
+    stationId === 60003760
+      ? { id: 60003760, name: 'Jita IV - Moon 4', systemId: 30000142, typeId: 1 }
+      : null
+  ),
+}));
+vi.mock('@/sde/solarSystems', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/sde/solarSystems')>();
+  return {
+    ...actual,
+    lookupSolarSystem: vi.fn(async (systemId: number) =>
+      systemId === 30000142
+        ? { id: 30000142, name: 'Jita', security: 0.9459, regionId: 10000002 }
+        : undefined
+    ),
+  };
+});
+
 // Market BPO lookups (issue #1241). Empty books unless a test says otherwise.
 const getOrderBook =
   vi.fn<
@@ -992,20 +1013,30 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
         within(screen.getByRole('list', { name: 'Matching blueprints' })).getByRole('button')
       );
 
-      const cards = await screen.findByRole('list', { name: 'Blueprint originals for sale' });
+      // Inline beside Cheapest by region, one headed group per BPO source.
+      expect(await screen.findByText('Market BPOs', { selector: 'p' })).toBeInTheDocument();
+      expect(screen.getByText('Contract BPOs', { selector: 'p' })).toBeInTheDocument();
+      expect(screen.getByText('Cheapest by region', { selector: 'p' })).toBeInTheDocument();
       // The market book lands after the contract snapshot (debounced lookup).
-      await waitFor(() => expect(within(cards).getAllByRole('listitem')).toHaveLength(2));
-      const [marketCard, contractCard] = within(cards).getAllByRole('listitem');
-      // Cheapest first: the 2M market original, then the 40M contract one.
-      expect(marketCard).toHaveTextContent('BPO · Market');
+      const marketList = await screen.findByRole('list', { name: 'Market BPOs' });
+      const marketCard = within(marketList).getByRole('listitem');
+      const contractCard = within(screen.getByRole('list', { name: 'Contract BPOs' })).getByRole(
+        'listitem'
+      );
       expect(within(marketCard).getByLabelText('2,000,000.00 ISK')).toBeInTheDocument();
-      expect(marketCard).toHaveTextContent('Market (incl. NPC-seeded)');
-      expect(marketCard).toHaveTextContent('Jita IV - Moon 4 (trade hub) · The Forge');
+      expect(marketCard).toHaveTextContent('incl. NPC-seeded');
+      // System plus its security, never the station or region name.
+      await waitFor(() => expect(marketCard).toHaveTextContent('Jita 0.9'));
+      expect(marketCard).not.toHaveTextContent('Jita IV - Moon 4');
+      expect(marketCard).not.toHaveTextContent('The Forge');
       // 2M is at or below the cheapest copy (3M); 40M is not.
       expect(marketCard).toHaveTextContent('BPO may be cheaper');
-      expect(contractCard).toHaveTextContent('BPO · Contract');
       expect(within(contractCard).getByLabelText('40,000,000.00 ISK')).toBeInTheDocument();
+      expect(contractCard).toHaveTextContent('BPO');
       expect(contractCard).toHaveTextContent('ME 8 / TE 16');
+      await waitFor(() => expect(contractCard).toHaveTextContent('Jita 0.9'));
+      expect(contractCard).not.toHaveTextContent('Jita IV - Moon 4');
+      expect(contractCard).not.toHaveTextContent('The Forge');
       expect(contractCard).not.toHaveTextContent('BPO may be cheaper');
 
       // Said once, in the cards: no row badge, and no duplicate chip.
