@@ -59,16 +59,20 @@ import { formatIsk } from '@/lib/isk';
 import {
   cheapestRow,
   contractOfferRows,
+  groupContractOffers,
+  groupMarketSells,
   isCurrentPick,
   lpOfferRows,
   marketSellRows,
   overridePatchFor,
   ownedTierRows,
+  sectionRows,
   type AcquisitionOwnedCopy,
   type AcquisitionSourceRow,
   type ContractOfferRow,
   type LpOfferRow,
   type MarketSellRow,
+  type OfferGroup,
 } from './blueprintAcquisitionSources';
 
 export type { AcquisitionOwnedCopy } from './blueprintAcquisitionSources';
@@ -219,29 +223,38 @@ export function BlueprintAcquisitionModal({
     `${characterId}:${blueprintTypeID}`
   );
 
-  const ownedRows = ownedTierRows(ownedCopies);
-  const contractRows = useMemo(
+  // Each section: identical rows folded (contracts, market), unpickable rows
+  // dropped unless they are all there is, then capped — cheapest first throughout.
+  const owned = sectionRows(ownedTierRows(ownedCopies), () => true);
+  const contractGroups = useMemo(
     () =>
       contracts.status === 'ready'
-        ? contractOfferRows({
-            ...contracts.data,
-            blueprintTypeID,
-            regionId: contractScope === ALL_REGIONS ? null : hub.regionId,
-          })
+        ? groupContractOffers(
+            contractOfferRows({
+              ...contracts.data,
+              blueprintTypeID,
+              regionId: contractScope === ALL_REGIONS ? null : hub.regionId,
+            })
+          )
         : [],
     [contracts, blueprintTypeID, contractScope, hub.regionId]
   );
-  const marketRows = useMemo(
+  const contractSection = sectionRows(contractGroups, (g) => g.row.pickable);
+  const marketGroups = useMemo(
     () =>
       marketView && marketView.status !== 'failed'
-        ? marketSellRows(marketView.sell, hub.stationId)
+        ? groupMarketSells(marketSellRows(marketView.sell, hub.stationId))
         : [],
     [marketView, hub.stationId]
   );
+  const marketSection = sectionRows(marketGroups, (g) => g.row.pickable);
   const lpRows = useMemo(
     () => (lp.status === 'ready' ? lpOfferRows(lp.data, lpValue) : []),
     [lp, lpValue]
   );
+  const lpSection = sectionRows(lpRows, (r) => r.pickable);
+  const contractRows = contractSection.shown.map((g) => g.row);
+  const marketRows = marketSection.shown.map((g) => g.row);
 
   const stationNames = useNames(
     [...contractRows.map((r) => r.locationId), ...marketRows.map((r) => r.locationId)],
@@ -397,7 +410,20 @@ export function BlueprintAcquisitionModal({
 
   const cheapestContract = cheapestRow(contractRows);
   const cheapestMarket = cheapestRow(marketRows);
-  const cheapestLp = cheapestRow(lpRows);
+  const cheapestLp = cheapestRow(lpSection.shown);
+
+  const groupCount = (group: OfferGroup<unknown>, key: string) =>
+    group.count > 1 ? [t(key, { count: group.count })] : [];
+
+  /** The dim "Showing 10 of N" note, only when the cap cut rows. */
+  function capNote(section: { shown: readonly unknown[]; total: number }) {
+    if (section.total <= section.shown.length) return null;
+    return (
+      <p className="text-text-dim">
+        {t('industry.bpAcqShowingOf', { shown: section.shown.length, count: section.total })}
+      </p>
+    );
+  }
 
   return (
     <Modal
@@ -425,11 +451,11 @@ export function BlueprintAcquisitionModal({
 
         <section className="flex flex-col gap-2">
           <h3 className={HEADING_CLASS}>{t('industry.blueprintAcquisitionOwnedTiers')}</h3>
-          {ownedRows.length === 0 ? (
+          {owned.total === 0 ? (
             <p className="text-text-dim">{t('industry.blueprintAcquisitionNoOwnedTiers')}</p>
           ) : (
             <ul className="flex flex-col gap-1">
-              {ownedRows.map((row) =>
+              {owned.shown.map((row) =>
                 renderRow(
                   `${row.me}:${row.te}`,
                   row,
@@ -442,6 +468,7 @@ export function BlueprintAcquisitionModal({
               )}
             </ul>
           )}
+          {capNote(owned)}
           {override && (
             <Button size="sm" variant="ghost" onClick={useAutomatic}>
               {t('industry.blueprintAcquisitionUseAutomatic')}
@@ -469,7 +496,7 @@ export function BlueprintAcquisitionModal({
             <p className="text-text-dim">{t('industry.bpAcqContractsLoading')}</p>
           ) : contracts.status === 'unavailable' ? (
             <p className="text-text-dim">{t('industry.bpAcqContractsUnavailable')}</p>
-          ) : contractRows.length === 0 ? (
+          ) : contractSection.total === 0 ? (
             <p className="text-text-dim">
               {contractScope === ALL_REGIONS
                 ? t('industry.bpAcqNoContractsAnywhere')
@@ -477,8 +504,9 @@ export function BlueprintAcquisitionModal({
             </p>
           ) : (
             <ul className="flex flex-col gap-1">
-              {contractRows.map((row, index) =>
-                renderRow(
+              {contractSection.shown.map((group, index) => {
+                const { row } = group;
+                return renderRow(
                   // A contract can repeat an identical line; the index keeps keys unique.
                   `${row.contractId}:${row.runs ?? 'bpo'}:${row.me}:${row.te}:${index}`,
                   row,
@@ -486,15 +514,17 @@ export function BlueprintAcquisitionModal({
                   {
                     cheapest: row === cheapestContract,
                     tags: [
+                      ...groupCount(group, 'industry.bpAcqOfferCount'),
                       ...(row.isStartingBid ? [t('industry.bpAcqStartingBid')] : []),
                       ...(row.isMultiType ? [t('industry.bpAcqBundle')] : []),
                       ...(!row.isMultiType && row.price <= 0 ? [t('industry.bpAcqBarter')] : []),
                     ],
                   }
-                )
-              )}
+                );
+              })}
             </ul>
           )}
+          {capNote(contractSection)}
           <Button size="sm" variant="ghost" onClick={() => onSearchBpcSourcing(blueprintTypeID)}>
             <Icon.Search /> {t('industry.bpAcqSeeAll')}
           </Button>
@@ -512,7 +542,7 @@ export function BlueprintAcquisitionModal({
             <p className="text-text-dim">{t('industry.bpAcqMarketLoading')}</p>
           ) : market.status === 'unavailable' || marketView?.status === 'failed' ? (
             <p className="text-text-dim">{t('industry.bpAcqMarketUnavailable')}</p>
-          ) : marketRows.length === 0 ? (
+          ) : marketSection.total === 0 ? (
             <p className="text-text-dim">
               {t('industry.bpAcqNoSellOrders', {
                 region: marketView?.region.override?.regionName ?? hubRegionName,
@@ -520,14 +550,19 @@ export function BlueprintAcquisitionModal({
             </p>
           ) : (
             <ul className="flex flex-col gap-1">
-              {marketRows.map((row) =>
-                renderRow(row.orderId, row, marketSummary(row), {
+              {marketSection.shown.map((group) => {
+                const { row } = group;
+                return renderRow(row.orderId, row, marketSummary(row), {
                   cheapest: row === cheapestMarket,
-                  tags: row.atHub ? [t('industry.bpAcqAtHub', { hub: hub.systemName })] : [],
-                })
-              )}
+                  tags: [
+                    ...groupCount(group, 'industry.bpAcqOrderCount'),
+                    ...(row.atHub ? [t('industry.bpAcqAtHub', { hub: hub.systemName })] : []),
+                  ],
+                });
+              })}
             </ul>
           )}
+          {capNote(marketSection)}
         </section>
 
         <section className={SECTION_CLASS}>
@@ -552,11 +587,11 @@ export function BlueprintAcquisitionModal({
             <p className="text-text-dim">{t('industry.bpAcqLpLoading')}</p>
           ) : lp.status === 'unavailable' ? (
             <p className="text-text-dim">{t('industry.bpAcqLpUnavailable')}</p>
-          ) : lpRows.length === 0 ? (
+          ) : lpSection.total === 0 ? (
             <p className="text-text-dim">{t('industry.bpAcqNoLpOffers')}</p>
           ) : (
             <ul className="flex flex-col gap-1">
-              {lpRows.map((row) =>
+              {lpSection.shown.map((row) =>
                 renderRow(`${row.corporationId}:${row.offerId}`, row, lpSummary(row), {
                   cheapest: row === cheapestLp,
                   extra: <LpStoreLink corporationId={row.corporationId} label={row.corpName} />,
@@ -564,6 +599,7 @@ export function BlueprintAcquisitionModal({
               )}
             </ul>
           )}
+          {capNote(lpSection)}
         </section>
 
         <section className={SECTION_CLASS}>
