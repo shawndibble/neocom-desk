@@ -837,10 +837,9 @@ const CharacterNotificationSection = memo(function CharacterNotificationSection(
                     (issue #299, AC4) — the first Notification
                     Event with a setting of its own rather than
                     a plain on/off. Persisted per Character and
-                    per device (`preferences.ts`), and re-read
-                    by the poller every 5-minute tick, which is
-                    what "takes effect without a reload" means
-                    here (CONTEXT.md round 43).
+                    per device (`preferences.ts`); the poller
+                    re-reads it each tick and a change rebuilds
+                    the Projection at once (issue #1259).
                   */}
                   {eventId === 'structureFuelLow' && rowEnabled && (
                     <div className="border-t border-line bg-panel/60 px-6 py-1.5">

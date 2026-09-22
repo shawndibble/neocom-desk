@@ -1,15 +1,13 @@
 /**
- * Coalesced Projection rebuilds after Settings writes (issue #1259).
+ * Coalesced Projection rebuilds after preference writes (issue #1259).
  *
- * `registerDeviceForWebPush` replaces the backend's whole stored Projection
- * for a Character on every upload (issue #358), so a toggle or threshold
- * change otherwise leaves a stale Scheduled Push live — or a wanted one
- * missing — until the next ~5-minute poll. A rebuild makes no ESI data
- * fetches but does upload, so rapid clicks share one: each write restarts a
- * quiet period, and the rebuild runs once it ends *and* every write made in
- * it has settled. A rebuild reading preferences before then could project
- * the old value, or re-hydrate the synced threshold over the new one. It
- * still runs if a write's synced half failed: the local value is set by then.
+ * Each upload replaces a Character's whole stored Projection (issue #358), so
+ * without a rebuild a toggle or threshold change leaves a stale or missing
+ * Scheduled Push until the next poll. Uploads cost, so a burst of writes
+ * shares one rebuild: it runs after a quiet period *and* once every write in
+ * it settles — an earlier read could project the old value, or re-hydrate the
+ * synced threshold over the new one. A failed synced half still rebuilds: the
+ * local value is already set.
  */
 import type { NotificationChannel } from './eventSelection';
 import { liveDependencies } from './foregroundPoller';
@@ -34,7 +32,6 @@ export function createCoalescedRebuild(
   let draining = false;
 
   const flush = async () => {
-    timer = undefined;
     draining = true;
     while (pending.length > 0) {
       const writes = pending;
@@ -61,10 +58,7 @@ export const scheduleProjectionRebuild = createCoalescedRebuild(
   PROJECTION_REBUILD_DELAY_MS
 );
 
-/**
- * A Scheduled Push is the closed-app analog of the *browser* channel only
- * (`projectionRebuild.ts`), so a feed-channel write can't change the upload.
- */
+/** Only the browser channel feeds the upload (`mayProject`); a feed write just logs failures. */
 export function rebuildProjectionAfterChannelWrite(
   channel: NotificationChannel,
   write: Promise<unknown>
