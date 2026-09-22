@@ -292,9 +292,8 @@ describe('Calendar', () => {
    * `respondToCalendarEvent` patches Dexie, but this route reads through
    * `useRouteSnapshot` (a plain loader snapshot, not a live query) — so the
    * rail only repaints if the route applies the RSVP locally, ahead of the
-   * next natural reload. `CharacterBoardRow` only tags a response other than
-   * `accepted`, so the fixture's starting `accepted` shows no badge, and a
-   * successful Decline must make one appear with no further
+   * next natural reload. The fixture starts `accepted` (its own badge), and a
+   * successful Decline must swap it for `Declined` with no further
    * `GET /calendar` round trip in between.
    */
   it('reflects an RSVP in the rail without waiting for a refetch', async () => {

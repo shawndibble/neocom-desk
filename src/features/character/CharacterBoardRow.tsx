@@ -84,7 +84,7 @@ export function CharacterBoardRow({ item, onSelectEvent }: CharacterBoardRowProp
               {t('calendar.important')}
             </span>
           )}
-          {item.response && item.response !== 'accepted' && (
+          {item.response && (
             <span
               className={`ml-auto shrink-0 text-[0.6875rem] font-semibold tracking-widest uppercase ${RESPONSE_TEXT_TONE[item.response]}`}
             >
