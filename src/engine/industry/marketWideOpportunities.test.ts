@@ -113,6 +113,56 @@ describe('computeMarketWideRows', () => {
     ]);
   });
 
+  it('shortens time — and raises ISK/hour — with trained Industry/Advanced Industry skills', () => {
+    const untrained = computeMarketWideRows(
+      [{ productTypeID: 1, tree, sellPrice: 1000, sellDepthIsk: 5_000_000 }],
+      new Map([
+        [50, 10],
+        [51, 20],
+      ]),
+      noFee
+    );
+    const trained = computeMarketWideRows(
+      [{ productTypeID: 1, tree, sellPrice: 1000, sellDepthIsk: 5_000_000 }],
+      new Map([
+        [50, 10],
+        [51, 20],
+      ]),
+      {
+        ...noFee,
+        skills: { [SKILL_IDS.industry]: 5, [SKILL_IDS.advancedIndustry]: 5 },
+      }
+    );
+    // Same profit (625) either way — skills here don't touch tax/broker —
+    // but the trained run's 3600s baked time shrinks to 3600 * (1-0.2) *
+    // (1-0.15) = 2448s, so ISK/hour rises accordingly.
+    expect(untrained[0]!.iskPerHour).toBeCloseTo(625, 6);
+    expect(trained[0]!.iskPerHour).toBeCloseTo((625 / 2448) * 3600, 6);
+    expect(trained[0]!.iskPerHour!).toBeGreaterThan(untrained[0]!.iskPerHour!);
+  });
+
+  it("shortens time further using the candidate's own blueprint science skills (issue #1228/#1230)", () => {
+    const rows = computeMarketWideRows(
+      [
+        {
+          productTypeID: 1,
+          tree,
+          sellPrice: 1000,
+          sellDepthIsk: 5_000_000,
+          blueprintSkills: [{ typeID: 3395, level: 3 }], // blueprint requires ASSC III to build
+        },
+      ],
+      new Map([
+        [50, 10],
+        [51, 20],
+      ]),
+      { ...noFee, skills: { 3395: 3 } } // character trained ASSC III
+    );
+    // Same profit (625) as the untrained baseline — only time changes.
+    // 3600s * (1 - 0.01*3) = 3492s.
+    expect(rows[0]!.iskPerHour).toBeCloseTo((625 / 3492) * 3600, 6);
+  });
+
   it('excludes a row when any flattened material has no known price', () => {
     const rows = computeMarketWideRows(
       [{ productTypeID: 1, tree, sellPrice: 1000, sellDepthIsk: 5_000_000 }],
@@ -138,12 +188,22 @@ describe('computeMarketWideRows', () => {
     expect(rows.map((r) => r.id)).toEqual(['2', '1']);
   });
 
-  it('reports the same ISK/hour as the owned-blueprint panel for an equivalent product', () => {
+  it('reports the same ISK/hour as the owned-blueprint panel for an equivalent product, including time skills (issue #1230 AC2)', () => {
     // Same product/recipe/runs(1)/ME(0)/facility(NPC)/skills/prices on both
-    // paths — the two panels' "ISK/hour" must agree at the same basis.
+    // paths — the two panels' "ISK/hour" must agree at the same basis,
+    // including Industry/Advanced Industry and a blueprint science skill —
+    // not just the tax/broker skills the pre-#1230 version of this test
+    // covered, which passed even while the market-wide side ignored time
+    // skills entirely.
     const productTypeID = 999;
     const materialTypeID = 70;
-    const skills = { [SKILL_IDS.accounting]: 2, [SKILL_IDS.brokerRelations]: 1 };
+    const skills = {
+      [SKILL_IDS.accounting]: 2,
+      [SKILL_IDS.brokerRelations]: 1,
+      [SKILL_IDS.industry]: 4,
+      [SKILL_IDS.advancedIndustry]: 3,
+      3395: 2, // Advanced Small Ship Construction II
+    };
     const adjustedPrices = { [materialTypeID]: 2000 };
     const systemCostIndex = 0.03;
     const materialHubPrice = 80;
@@ -154,6 +214,7 @@ describe('computeMarketWideRows', () => {
       time: 3600,
       materials: [{ typeID: materialTypeID, quantity: 8 }],
       products: [{ typeID: productTypeID, quantity: 1 }],
+      skills: [{ typeID: 3395, level: 2 }],
     };
     const ownedInputs: IndustryInputs = {
       blueprint,
@@ -184,6 +245,7 @@ describe('computeMarketWideRows', () => {
           tree: equivalentTree,
           sellPrice: productHubPrice,
           sellDepthIsk: 5_000_000,
+          blueprintSkills: blueprint.skills,
         },
       ],
       new Map([[materialTypeID, materialHubPrice]]),
