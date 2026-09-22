@@ -123,6 +123,44 @@ describe('YieldDetailModal', () => {
     expect(screen.getByText(/50 units fall short of a whole batch/)).toBeInTheDocument();
   });
 
+  it('marks the exit worth more as the suggested one, and signs the gain', () => {
+    renderModal();
+    expect(screen.getByText('Refine, then sell')).toHaveClass('text-accent');
+    expect(screen.getByText('Sell raw')).not.toHaveClass('text-accent');
+    expect(screen.getByText(/\+20\.0% over selling raw/)).toBeInTheDocument();
+  });
+
+  it('suggests selling raw, and reddens the shortfall, when refining loses', () => {
+    const losing = row();
+    losing.valuation = { ...losing.valuation, rawValue: 1200, refineValue: 1000 };
+    renderModal(losing);
+    expect(screen.getByText('Sell raw')).toHaveClass('text-accent');
+    expect(screen.getByText('Refining loses')).toBeInTheDocument();
+    expect(screen.getByText(/-16\.7% against selling raw/)).toBeInTheDocument();
+  });
+
+  it('greens the higher of a line’s raw and refined value', () => {
+    renderModal();
+    const ore = screen.getByRole('table', { name: 'Ore mined' });
+    const veldspar = within(ore).getByRole('row', { name: /Veldspar/ });
+    expect(within(veldspar).getByLabelText('1,200 ISK')).toHaveClass('text-isk-pos');
+    expect(within(veldspar).getByLabelText('1,000 ISK')).not.toHaveClass('text-isk-pos');
+  });
+
+  it('suggests nothing on a day where nothing priced', () => {
+    const unpriced = row();
+    unpriced.valuation = {
+      ...unpriced.valuation,
+      rawValue: 0,
+      refineValue: 0,
+      lines: unpriced.valuation.lines.map((line) => ({ ...line, rawValue: 0, refineValue: 0 })),
+    };
+    renderModal(unpriced);
+    expect(screen.getByText('Sell raw')).not.toHaveClass('text-accent');
+    expect(screen.getByText('Refine, then sell')).not.toHaveClass('text-accent');
+    expect(screen.getByText('Refining breaks even')).toBeInTheDocument();
+  });
+
   it('states the mined-date price basis and the refining assumption', () => {
     renderModal();
     expect(screen.getByText(/Jita average on 2026-09-08/)).toBeInTheDocument();

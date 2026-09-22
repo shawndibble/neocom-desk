@@ -15,6 +15,7 @@
  */
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { cx } from '@/lib/cx';
 import {
   DataTable,
   InfoTooltip,
@@ -46,6 +47,24 @@ interface RefinedRow {
   quantity: number;
   /** Null when ESI had no mined-date history for this material — never a zero standing in for "free". */
   value: number | null;
+}
+
+const CARD = 'rounded-xs border bg-panel-2 p-2.5';
+/** Marks the exit worth more — a recommendation, not decoration, so accent is
+ *  in bounds per DESIGN.md §6. Same treatment as `BuildGroupPanel`'s best row. */
+const CARD_SUGGESTED = 'border-accent-dim bg-accent/5';
+const CARD_LABEL = 'text-[0.6875rem] font-semibold tracking-widest uppercase';
+const CARD_HINT = 'mt-0.5 text-[0.6875rem] text-text-dim';
+
+/**
+ * Which exit this line was worth more through, or null when the two tie or
+ * neither priced — a day with no market history must not green an em dash.
+ */
+function lineWinner(line: OreLineValuation): 'raw' | 'refined' | null {
+  if (line.rawValue <= 0 && line.refineValue <= 0) return null;
+  if (line.refineValue > line.rawValue) return 'refined';
+  if (line.rawValue > line.refineValue) return 'raw';
+  return null;
 }
 
 export function YieldDetailModal({
@@ -145,7 +164,16 @@ export function YieldDetailModal({
       // A line with no mined-date price has a zero `rawValue` that means
       // "unpriced", not "worthless" — an em dash says so, "0 ISK" would not.
       render: (line) =>
-        line.rawValue > 0 ? <IskAmount value={line.rawValue} revealOn="tap" decimals={0} /> : '—',
+        line.rawValue > 0 ? (
+          <IskAmount
+            value={line.rawValue}
+            revealOn="tap"
+            decimals={0}
+            className={lineWinner(line) === 'raw' ? 'text-isk-pos' : undefined}
+          />
+        ) : (
+          '—'
+        ),
       sortValue: (line) => line.rawValue,
     },
     {
@@ -155,7 +183,12 @@ export function YieldDetailModal({
       className: 'whitespace-nowrap',
       render: (line) =>
         line.refineValue > 0 ? (
-          <IskAmount value={line.refineValue} revealOn="tap" decimals={0} />
+          <IskAmount
+            value={line.refineValue}
+            revealOn="tap"
+            decimals={0}
+            className={lineWinner(line) === 'refined' ? 'text-isk-pos' : undefined}
+          />
         ) : (
           '—'
         ),
@@ -199,7 +232,22 @@ export function YieldDetailModal({
     },
   ];
 
-  const refineWins = totals.delta > 0;
+  // A day where nothing priced has a zero delta that means "unknown", not
+  // "break even" — it gets neither a suggestion nor a tone.
+  const anyValue = valuation.rawValue > 0 || valuation.refineValue > 0;
+  const suggested: 'raw' | 'refined' | null = !anyValue
+    ? null
+    : totals.delta > 0
+      ? 'refined'
+      : totals.delta < 0
+        ? 'raw'
+        : null;
+  const deltaTone =
+    !anyValue || totals.delta === 0
+      ? 'text-text'
+      : totals.delta > 0
+        ? 'text-isk-pos'
+        : 'text-isk-neg';
 
   return (
     <Modal
@@ -240,38 +288,50 @@ export function YieldDetailModal({
             much. Raw and refined sit side by side so neither reads as the
             headline number on its own. */}
         <div className="grid gap-3 sm:grid-cols-3">
-          <div className="rounded-xs border border-line bg-panel-2 p-2.5">
-            <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+          <div className={cx(CARD, suggested === 'raw' ? CARD_SUGGESTED : 'border-line')}>
+            <p className={cx(CARD_LABEL, suggested === 'raw' ? 'text-accent' : 'text-text-dim')}>
               {t('miningTax.overview.detail.sellRawCard')}
             </p>
             <p className="mt-1 text-lg font-semibold tabular-nums">
               <IskAmount value={valuation.rawValue} revealOn="tap" decimals={0} />
             </p>
+            <p className={CARD_HINT}>{t('miningTax.overview.detail.sellRawCardHint')}</p>
           </div>
-          <div className="rounded-xs border border-line bg-panel-2 p-2.5">
-            <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+          <div className={cx(CARD, suggested === 'refined' ? CARD_SUGGESTED : 'border-line')}>
+            <p
+              className={cx(CARD_LABEL, suggested === 'refined' ? 'text-accent' : 'text-text-dim')}
+            >
               {t('miningTax.overview.detail.refineCard')}
             </p>
             <p className="mt-1 text-lg font-semibold tabular-nums">
               <IskAmount value={valuation.refineValue} revealOn="tap" decimals={0} />
             </p>
-          </div>
-          <div className="rounded-xs border border-line bg-panel-2 p-2.5">
-            <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-              {refineWins
-                ? t('miningTax.overview.detail.refineGainCard')
-                : t('miningTax.overview.detail.refineLossCard')}
+            <p className={CARD_HINT}>
+              {t('miningTax.overview.detail.refineCardHint', {
+                efficiency: (valuation.efficiency * 100).toFixed(1),
+              })}
             </p>
-            <p
-              className={`mt-1 text-lg font-semibold tabular-nums ${refineWins ? 'text-isk-pos' : 'text-text'}`}
-            >
+          </div>
+          <div className={cx(CARD, 'border-line')}>
+            <p className={cx(CARD_LABEL, 'text-text-dim')}>
+              {totals.delta > 0
+                ? t('miningTax.overview.detail.refineGainCard')
+                : totals.delta < 0
+                  ? t('miningTax.overview.detail.refineLossCard')
+                  : t('miningTax.overview.detail.refineEvenCard')}
+            </p>
+            <p className={cx('mt-1 text-lg font-semibold tabular-nums', deltaTone)}>
+              {anyValue && totals.delta !== 0 && (totals.delta > 0 ? '+' : '-')}
               <IskAmount value={Math.abs(totals.delta)} revealOn="tap" decimals={0} />
             </p>
-            {totals.deltaPercent !== null && (
-              <p className="text-[0.6875rem] text-text-dim tabular-nums">
-                {t('miningTax.overview.detail.deltaPercent', {
-                  percent: Math.abs(totals.deltaPercent).toFixed(1),
-                })}
+            {totals.deltaPercent !== null && totals.deltaPercent !== 0 && (
+              <p className={cx(CARD_HINT, 'tabular-nums')}>
+                {t(
+                  totals.deltaPercent > 0
+                    ? 'miningTax.overview.detail.deltaPercentGain'
+                    : 'miningTax.overview.detail.deltaPercentLoss',
+                  { percent: Math.abs(totals.deltaPercent).toFixed(1) }
+                )}
               </p>
             )}
           </div>
