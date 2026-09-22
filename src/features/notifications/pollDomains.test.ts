@@ -30,6 +30,7 @@ import { getTradeHub } from '@/market/hubs';
 import {
   useNotificationPreferences,
   DEFAULT_NOTIFICATION_PREFERENCES,
+  DEFAULT_STRUCTURE_FUEL_LOW_DAYS,
   withCharacterEventThreshold,
   withEveNotificationTypeToggled,
   DEFAULT_WALLET_BALANCE_CHANGED_THRESHOLD_ISK,
@@ -509,7 +510,7 @@ describe('projection wiring', () => {
           structureId: 111,
           name: 'Keepstar',
           // Two hours past the default fuel threshold's warning point.
-          fuelExpiresMs: T0 + (7 * 24 + 2) * HOUR_MS,
+          fuelExpiresMs: T0 + (DEFAULT_STRUCTURE_FUEL_LOW_DAYS * 24 + 2) * HOUR_MS,
           thresholdMs: 24 * HOUR_MS,
         },
       ],

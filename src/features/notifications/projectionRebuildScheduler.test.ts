@@ -104,7 +104,25 @@ describe('createCoalescedRebuild', () => {
     );
   });
 
-  it('a write made while a rebuild is in flight gets one trailing rebuild of its own', async () => {
+  it('a write made while earlier writes are still settling joins that rebuild', async () => {
+    const rebuild = vi.fn(async () => {});
+    const schedule = createCoalescedRebuild(rebuild, DELAY);
+    const slow = deferred();
+
+    schedule(slow.promise);
+    await vi.advanceTimersByTimeAsync(DELAY);
+    const late = deferred();
+    schedule(late.promise);
+    slow.resolve();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(rebuild).not.toHaveBeenCalled();
+
+    late.resolve();
+    await vi.advanceTimersByTimeAsync(DELAY * 2);
+    expect(rebuild).toHaveBeenCalledTimes(1);
+  });
+
+  it('a write made once a rebuild has started schedules one more', async () => {
     const inFlight = deferred();
     const rebuild = vi.fn().mockReturnValueOnce(inFlight.promise).mockResolvedValue(undefined);
     const schedule = createCoalescedRebuild(rebuild, DELAY);
