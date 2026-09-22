@@ -11,6 +11,7 @@ import { usePublicInfo } from '@/stores/publicInfo';
 import { useMarketHub } from '@/features/market/hub';
 import { useLocationMode, DEFAULT_LOCATION_MODE } from '@/features/market/locationMode';
 import { clearOrderBookCache } from '@/features/market/orderBook';
+import { resetEsiBudget } from '@/esi/budget';
 import { loadMarketGroups, loadMarketTypes, loadVariations } from '@/sde/loadMarketSde';
 import { useCompareSet } from '@/features/market/compareSet';
 import { ESI_BASE_URL } from '@/esi/client';
@@ -333,6 +334,12 @@ beforeEach(async () => {
   useLocationMode.setState({ value: DEFAULT_LOCATION_MODE, hydrated: false });
   useCompareSet.setState({ items: [] });
   clearOrderBookCache();
+  // Module state, and it latches. One test provoking an ESI error (the 420 in
+  // "an ESI failure clears the spinner" below) trips the error-limit gate, and
+  // without this every later test in the file has its fetches declined before
+  // they are sent — eleven of them failed that way on a "Sell Orders" table
+  // that never arrived, with nothing in the message to say why.
+  resetEsiBudget();
   window.history.pushState({}, '', '/market');
 });
 
@@ -427,6 +434,29 @@ describe('Market Browser', () => {
 
     const buyTable = await screen.findByRole('table', { name: 'Buy Orders' });
     expect(within(buyTable).getByText('500,000.00')).toBeInTheDocument();
+  });
+
+  it('an ESI failure clears the spinner instead of hanging on it', async () => {
+    // `getOrderBook` throws on any ESI failure, and the fetch effect used to
+    // let that reject into nothing: `setOrderBookLoading(false)` sat after the
+    // await, so a rate-limited market page spun forever and the rejection
+    // escaped as an unhandled one (which is how CI first caught this).
+    server.use(
+      http.get(`${ESI_BASE_URL}/markets/${RIFTER_REGION_ID}/orders`, () =>
+        HttpResponse.json({ error: 'Rate limit exceeded' }, { status: 420 })
+      )
+    );
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.type(await screen.findByRole('searchbox'), 'rift');
+    await user.click(await screen.findByText('Rifter'));
+
+    // The empty book, not the spinner: `orderBookResult: null` is the state
+    // the rest of this page already reads as "loaded, nothing to show".
+    // Reaching this text at all means the loading branch was left behind.
+    expect(await screen.findByText('No sell orders')).toBeInTheDocument();
+    expect(screen.getByText('No buy orders')).toBeInTheDocument();
   });
 
   it('Refresh bypasses the 300s order-book cache and refetches immediately', async () => {

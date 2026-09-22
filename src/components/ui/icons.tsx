@@ -14,88 +14,98 @@
  * glyph the app doesn't have yet.
  */
 
-import {
-  Broadcast,
-  CalendarBlank,
-  ArrowBendUpLeft,
-  ArrowBendUpRight,
-  ArrowClockwise,
-  ArrowCounterClockwise,
-  ArrowDown,
-  ArrowUp,
-  ArrowsDownUp,
-  ArrowsLeftRight,
-  Bell,
-  BellSlash,
-  BlueprintIcon,
-  Buildings,
-  CaretDoubleDown,
-  CaretDoubleUp,
-  CaretDown,
-  CaretLeft,
-  CaretRight,
-  CaretUpDown,
-  Checks,
-  CloudSlash,
-  ChartLineUp,
-  Check,
-  CheckCircle,
-  Clipboard,
-  Columns as ColumnsGlyph,
-  Copy,
-  DotsSixVertical,
-  DotsThreeVertical,
-  DownloadSimple,
-  EnvelopeSimple,
-  Eye,
-  EyeSlash,
-  Export as ExportIcon,
-  Factory,
-  FileText,
-  Flag,
-  Flask,
-  FolderSimple,
-  Funnel,
-  Gear,
-  Gauge,
-  GraduationCap,
-  Hammer,
-  Code,
-  Info as InfoGlyph,
-  ListBullets,
-  LockKey,
-  MagnifyingGlass,
-  Moon,
-  PaperPlaneRight,
-  Package,
-  PencilSimple,
-  Planet,
-  Play,
-  Plus,
-  Prohibit,
-  Queue,
-  Receipt,
-  Scales,
-  ShareNetwork,
-  ShieldCheck,
-  ShoppingCart,
-  SignIn as SignInGlyph,
-  Sliders,
-  SquaresFour,
-  Stack,
-  Star,
-  Table as TableGlyph,
-  Target,
-  Tray,
-  UsersFour,
-  UsersThree,
-  Wallet as WalletGlyph,
-  Warning,
-  WarningOctagon,
-  X,
-  type Icon as PhosphorIcon,
-  type IconProps,
-} from '@phosphor-icons/react';
+/*
+ * Imported one module deep (`dist/csr/<Name>`) rather than as 80 specifiers
+ * off `@phosphor-icons/react`. That barrel re-exports 3045 icons, and a bare
+ * import of it costs ~1.4s — a price Vitest pays *per test file*, because
+ * every module graph reaching this one drags the whole barrel in. It was
+ * 33% of the unit-test job: the 126 jsdom test files that reach this module
+ * had a median collect time of 1128ms against 25ms for the 56 that don't.
+ * Deep imports took the dom project's import bucket from 182.0s to 34.3s.
+ *
+ * Each per-icon module exports both `Foo` and the newer `FooIcon`, so the
+ * specifiers below are unchanged; only where they come from is. `eslint`'s
+ * `no-restricted-imports` rule keeps the barrel from creeping back.
+ */
+import { ArrowBendUpLeft } from '@phosphor-icons/react/dist/csr/ArrowBendUpLeft';
+import { ArrowBendUpRight } from '@phosphor-icons/react/dist/csr/ArrowBendUpRight';
+import { ArrowClockwise } from '@phosphor-icons/react/dist/csr/ArrowClockwise';
+import { ArrowCounterClockwise } from '@phosphor-icons/react/dist/csr/ArrowCounterClockwise';
+import { ArrowDown } from '@phosphor-icons/react/dist/csr/ArrowDown';
+import { ArrowUp } from '@phosphor-icons/react/dist/csr/ArrowUp';
+import { ArrowsDownUp } from '@phosphor-icons/react/dist/csr/ArrowsDownUp';
+import { ArrowsLeftRight } from '@phosphor-icons/react/dist/csr/ArrowsLeftRight';
+import { Bell } from '@phosphor-icons/react/dist/csr/Bell';
+import { BellSlash } from '@phosphor-icons/react/dist/csr/BellSlash';
+import { BlueprintIcon } from '@phosphor-icons/react/dist/csr/Blueprint';
+import { Broadcast } from '@phosphor-icons/react/dist/csr/Broadcast';
+import { Buildings } from '@phosphor-icons/react/dist/csr/Buildings';
+import { CalendarBlank } from '@phosphor-icons/react/dist/csr/CalendarBlank';
+import { CaretDoubleDown } from '@phosphor-icons/react/dist/csr/CaretDoubleDown';
+import { CaretDoubleUp } from '@phosphor-icons/react/dist/csr/CaretDoubleUp';
+import { CaretDown } from '@phosphor-icons/react/dist/csr/CaretDown';
+import { CaretLeft } from '@phosphor-icons/react/dist/csr/CaretLeft';
+import { CaretRight } from '@phosphor-icons/react/dist/csr/CaretRight';
+import { CaretUpDown } from '@phosphor-icons/react/dist/csr/CaretUpDown';
+import { ChartLineUp } from '@phosphor-icons/react/dist/csr/ChartLineUp';
+import { Check } from '@phosphor-icons/react/dist/csr/Check';
+import { CheckCircle } from '@phosphor-icons/react/dist/csr/CheckCircle';
+import { Checks } from '@phosphor-icons/react/dist/csr/Checks';
+import { Clipboard } from '@phosphor-icons/react/dist/csr/Clipboard';
+import { CloudSlash } from '@phosphor-icons/react/dist/csr/CloudSlash';
+import { Code } from '@phosphor-icons/react/dist/csr/Code';
+import { Columns as ColumnsGlyph } from '@phosphor-icons/react/dist/csr/Columns';
+import { Copy } from '@phosphor-icons/react/dist/csr/Copy';
+import { DotsSixVertical } from '@phosphor-icons/react/dist/csr/DotsSixVertical';
+import { DotsThreeVertical } from '@phosphor-icons/react/dist/csr/DotsThreeVertical';
+import { DownloadSimple } from '@phosphor-icons/react/dist/csr/DownloadSimple';
+import { EnvelopeSimple } from '@phosphor-icons/react/dist/csr/EnvelopeSimple';
+import { Export as ExportIcon } from '@phosphor-icons/react/dist/csr/Export';
+import { Eye } from '@phosphor-icons/react/dist/csr/Eye';
+import { EyeSlash } from '@phosphor-icons/react/dist/csr/EyeSlash';
+import { Factory } from '@phosphor-icons/react/dist/csr/Factory';
+import { FileText } from '@phosphor-icons/react/dist/csr/FileText';
+import { Flag } from '@phosphor-icons/react/dist/csr/Flag';
+import { Flask } from '@phosphor-icons/react/dist/csr/Flask';
+import { FolderSimple } from '@phosphor-icons/react/dist/csr/FolderSimple';
+import { Funnel } from '@phosphor-icons/react/dist/csr/Funnel';
+import { Gauge } from '@phosphor-icons/react/dist/csr/Gauge';
+import { Gear } from '@phosphor-icons/react/dist/csr/Gear';
+import { GraduationCap } from '@phosphor-icons/react/dist/csr/GraduationCap';
+import { Hammer } from '@phosphor-icons/react/dist/csr/Hammer';
+import { Info as InfoGlyph } from '@phosphor-icons/react/dist/csr/Info';
+import { ListBullets } from '@phosphor-icons/react/dist/csr/ListBullets';
+import { LockKey } from '@phosphor-icons/react/dist/csr/LockKey';
+import { MagnifyingGlass } from '@phosphor-icons/react/dist/csr/MagnifyingGlass';
+import { Moon } from '@phosphor-icons/react/dist/csr/Moon';
+import { Package } from '@phosphor-icons/react/dist/csr/Package';
+import { PaperPlaneRight } from '@phosphor-icons/react/dist/csr/PaperPlaneRight';
+import { PencilSimple } from '@phosphor-icons/react/dist/csr/PencilSimple';
+import { Planet } from '@phosphor-icons/react/dist/csr/Planet';
+import { Play } from '@phosphor-icons/react/dist/csr/Play';
+import { Plus } from '@phosphor-icons/react/dist/csr/Plus';
+import { Prohibit } from '@phosphor-icons/react/dist/csr/Prohibit';
+import { Queue } from '@phosphor-icons/react/dist/csr/Queue';
+import { Receipt } from '@phosphor-icons/react/dist/csr/Receipt';
+import { Scales } from '@phosphor-icons/react/dist/csr/Scales';
+import { ShareNetwork } from '@phosphor-icons/react/dist/csr/ShareNetwork';
+import { ShieldCheck } from '@phosphor-icons/react/dist/csr/ShieldCheck';
+import { ShoppingCart } from '@phosphor-icons/react/dist/csr/ShoppingCart';
+import { SignIn as SignInGlyph } from '@phosphor-icons/react/dist/csr/SignIn';
+import { Sliders } from '@phosphor-icons/react/dist/csr/Sliders';
+import { SquaresFour } from '@phosphor-icons/react/dist/csr/SquaresFour';
+import { Stack } from '@phosphor-icons/react/dist/csr/Stack';
+import { Star } from '@phosphor-icons/react/dist/csr/Star';
+import { Table as TableGlyph } from '@phosphor-icons/react/dist/csr/Table';
+import { Target } from '@phosphor-icons/react/dist/csr/Target';
+import { Tray } from '@phosphor-icons/react/dist/csr/Tray';
+import { UsersFour } from '@phosphor-icons/react/dist/csr/UsersFour';
+import { UsersThree } from '@phosphor-icons/react/dist/csr/UsersThree';
+import { Wallet as WalletGlyph } from '@phosphor-icons/react/dist/csr/Wallet';
+import { Warning } from '@phosphor-icons/react/dist/csr/Warning';
+import { WarningOctagon } from '@phosphor-icons/react/dist/csr/WarningOctagon';
+import { X } from '@phosphor-icons/react/dist/csr/X';
+import type { Icon as PhosphorIcon, IconProps } from '@phosphor-icons/react/dist/lib/types';
 import type { ComponentType } from 'react';
 
 export type { IconProps };

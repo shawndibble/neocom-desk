@@ -36,9 +36,28 @@ jobs:
       - run: npm run typecheck --prefix functions
       - run: npm test --prefix functions
 
-  test:
+  test-shard:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    # Sharded for the same reason `e2e-shard` is, and with the same shape.
+    # Vitest's own summary says where the time goes: of 1250s of worker time,
+    # only 40% is test callbacks — the rest is `import` (33%), `environment`
+    # (13%) and `setup` (12%), all paid once per file across 644 files. That
+    # is work you divide, not work you speed up, and vitest defaults to
+    # `cores - 1` = 3 workers on a 4-vCPU runner at 93% utilisation, so there
+    # is nothing left to reclaim on one machine.
+    #
+    # Four, not more: vitest shards by a stable hash of the file path, and
+    # replaying that split over measured per-file costs puts the worst shard
+    # at 27.7% against an ideal 25%. Six splits worse (20.9% worst) for four
+    # more runners. The four heavy route tests land in different shards.
+    #
+    # Unlike the e2e worker experiment, this adds no concurrency per machine:
+    # each shard still runs vitest's default 3 workers on its own runner.
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -46,7 +65,21 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - run: npm run test:run
+      - run: npm run test:run -- --shard=${{ matrix.shard }}/4
+
+  # The name the `main` ruleset requires. See the `e2e` job below for the full
+  # reasoning — a matrix reports as `test-shard (1)`…`(4)`, none of which is
+  # the required context, so this turns the four results back into it.
+  test:
+    if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+    needs: [test-shard]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail unless every shard passed
+        if: needs.test-shard.result != 'success'
+        run: |
+          echo "::error::test shards did not all pass (result: ${{ needs.test-shard.result }})"
+          exit 1
 
   deploy:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'

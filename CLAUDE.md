@@ -45,9 +45,11 @@ dev`) — Shawn frequently has another agent working there at the same
   iterating, use narrower checks: `npm run typecheck`
   and `npx vitest run <path>` for the file(s) you're touching. **Never run
   the full suite (`npm run test:run`) or `npm run build` locally** — CI's
-  `validate` job runs `lint`, `format:check`, `typecheck`, `test:run`, and
-  `build` on every push, and the `e2e` job runs Playwright; that's the gate,
-  not a local pre-PR run. In ticket-loop work (`/next-ticket`, `/implement`),
+  `validate` job runs `lint`, `format:check`, `typecheck` and `build` on
+  every push, the `test` job runs `test:run` across four shards, and the
+  `e2e` job runs Playwright across four more; that's the gate, not a local
+  pre-PR run. Both sharded jobs report through a single aggregate check
+  (`test`, `e2e`) because the `main` ruleset requires those exact names. In ticket-loop work (`/next-ticket`, `/implement`),
   see `.claude/commands/next-ticket.md`'s "Pre-commit hook, then CI" for the
   exact cadence. `node scripts/next-ticket/gate.mjs [--build]` still exists
   as an optional, manual full-CI-mirror for ad-hoc branches — nothing in the

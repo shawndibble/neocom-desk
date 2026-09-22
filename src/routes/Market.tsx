@@ -765,10 +765,26 @@ export function Market() {
     let cancelled = false;
     void (async () => {
       setOrderBookLoading(true);
-      const result = await getOrderBook(resolvedRegion.regionId, selectedTypeId);
-      if (cancelled) return;
-      setOrderBookResult(result);
-      setOrderBookLoading(false);
+      try {
+        const result = await getOrderBook(resolvedRegion.regionId, selectedTypeId);
+        if (cancelled) return;
+        setOrderBookResult(result);
+      } catch {
+        // `getOrderBook` throws on any ESI failure — a 420, or the budget gate
+        // declining to send at all. Uncaught, this async IIFE rejected into
+        // nothing (`void` discards the value, not the rejection) and the
+        // spinner below never cleared, because `setOrderBookLoading(false)`
+        // sat after the await. A rate-limited market page span forever.
+        //
+        // A null book is the state the rest of this component already reads as
+        // "loaded, nothing to show" (see `resetKey` above and the table at the
+        // bottom), so failure degrades to the empty book rather than to a
+        // permanent spinner.
+        if (cancelled) return;
+        setOrderBookResult(null);
+      } finally {
+        if (!cancelled) setOrderBookLoading(false);
+      }
     })();
     return () => {
       cancelled = true;
