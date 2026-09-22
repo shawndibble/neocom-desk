@@ -1608,6 +1608,7 @@ export function BuildPlanDetail({
                   sourcing={plan.materialSourcing?.[acquisitionPickerTypeId]}
                   onSourcingChange={onSourcingChange}
                   onSearchBpcSourcing={onSearchBpcSourcing}
+                  planHubId={plan.hubId}
                 />
               )}
               {/*
