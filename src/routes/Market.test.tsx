@@ -11,6 +11,7 @@ import { usePublicInfo } from '@/stores/publicInfo';
 import { useMarketHub } from '@/features/market/hub';
 import { useLocationMode, DEFAULT_LOCATION_MODE } from '@/features/market/locationMode';
 import { clearOrderBookCache } from '@/features/market/orderBook';
+import { resetEsiBudget } from '@/esi/budget';
 import { loadMarketGroups, loadMarketTypes, loadVariations } from '@/sde/loadMarketSde';
 import { useCompareSet } from '@/features/market/compareSet';
 import { ESI_BASE_URL } from '@/esi/client';
@@ -333,6 +334,12 @@ beforeEach(async () => {
   useLocationMode.setState({ value: DEFAULT_LOCATION_MODE, hydrated: false });
   useCompareSet.setState({ items: [] });
   clearOrderBookCache();
+  // Module state, and it latches. One test provoking an ESI error (the 420 in
+  // "an ESI failure clears the spinner" below) trips the error-limit gate, and
+  // without this every later test in the file has its fetches declined before
+  // they are sent — eleven of them failed that way on a "Sell Orders" table
+  // that never arrived, with nothing in the message to say why.
+  resetEsiBudget();
   window.history.pushState({}, '', '/market');
 });
 
