@@ -406,6 +406,7 @@ describe('OrderDetailModal', () => {
     const unitCost = 437.5;
     const floor = orderFloor({
       unitCost,
+      remainingQuantity: 1,
       accountingLevel: skills.accountingLevel,
       brokerRelationsLevel: skills.brokerRelationsLevel,
     });
@@ -430,6 +431,52 @@ describe('OrderDetailModal', () => {
     const relist = rowValue('Never sell below');
 
     expect(costPerUnit).toBeCloseTo(unitCost, 2);
+    expect(costPerUnit + salesTax + brokerFeeValue).toBeCloseTo(relist, 1);
+    expect(relist).toBeCloseTo(floor.relist, 2);
+  });
+
+  it('spreads the broker fee minimum across a large remaining quantity, not re-applied per unit', () => {
+    // Regression pin for #1224: the ledger used to re-derive broker fee via
+    // brokerFee(relist, ...), which re-clamped the per-unit relist price to
+    // its own 100 ISK minimum — silently reintroducing the per-unit bug in
+    // the fee ledger even after orderFloor() itself was fixed.
+    const skills: CharacterSkills = { ...SKILLS, accountingLevel: 5, brokerRelationsLevel: 5 };
+    const unitCost = 10;
+    const floor = orderFloor({
+      unitCost,
+      remainingQuantity: 10_000,
+      accountingLevel: skills.accountingLevel,
+      brokerRelationsLevel: skills.brokerRelationsLevel,
+    });
+    if (!floor) throw new Error('expected a floor for this fixture');
+
+    const row: OpenOrderRow = {
+      ...BASE_ROW,
+      floor,
+      volumeRemain: 10_000,
+      costBasis: {
+        unitCost,
+        runId: 'run-3',
+        runQuantity: 10_000,
+        materialCost: 90_000,
+        jobFee: 10_000,
+      },
+    };
+    renderModal({ row, skills });
+
+    const ledger = screen.getByText('Where that price comes from').closest('section')!;
+    const rowValue = (label: string) => {
+      const text = within(ledger).getByText(label).nextElementSibling?.textContent ?? '';
+      return Number(text.replace(/[^0-9.-]/g, ''));
+    };
+
+    const costPerUnit = rowValue('Cost per unit');
+    const salesTax = rowValue('Sales tax');
+    const brokerFeeValue = rowValue('Broker fee');
+    const relist = rowValue('Never sell below');
+
+    // The whole point of the fix: the fee ledger must not show ~100 ISK.
+    expect(brokerFeeValue).toBeLessThan(5);
     expect(costPerUnit + salesTax + brokerFeeValue).toBeCloseTo(relist, 1);
     expect(relist).toBeCloseTo(floor.relist, 2);
   });

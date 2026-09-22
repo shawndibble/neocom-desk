@@ -24,6 +24,8 @@ import { breakEvenPrice, salesTaxPct } from '@/engine/industry/fees';
 export interface OrderFloorInputs {
   /** What one unit cost the player, from a linked Production Run or a hand-entered cost. */
   unitCost: number;
+  /** Units left on the order (or about to be listed). The 100 ISK broker-fee minimum is re-solved once against this whole stack, not per unit. */
+  remainingQuantity: number;
   accountingLevel: number;
   brokerRelationsLevel: number;
   factionStanding?: number;
@@ -37,21 +39,29 @@ export interface OrderFloor {
   fill: number;
 }
 
-/** Null when there is no usable cost basis (unitCost <= 0 or not finite). */
+/** Null when there is no usable cost basis (unitCost <= 0 or not finite) or a non-positive remainingQuantity. */
 export function orderFloor(inputs: OrderFloorInputs): OrderFloor | null {
-  const { unitCost, accountingLevel, brokerRelationsLevel, factionStanding, corpStanding } = inputs;
+  const {
+    unitCost,
+    remainingQuantity,
+    accountingLevel,
+    brokerRelationsLevel,
+    factionStanding,
+    corpStanding,
+  } = inputs;
 
   if (!Number.isFinite(unitCost) || unitCost <= 0) return null;
+  if (!Number.isFinite(remainingQuantity) || remainingQuantity <= 0) return null;
 
   const relist = breakEvenPrice(
-    unitCost,
-    1,
+    unitCost * remainingQuantity,
+    remainingQuantity,
     accountingLevel,
     brokerRelationsLevel,
     factionStanding,
     corpStanding
   );
-  // quantity 1 > 0, so breakEvenPrice never returns null here.
+  // remainingQuantity > 0, so breakEvenPrice never returns null here.
   const tax = salesTaxPct(accountingLevel);
   const fill = unitCost / (1 - tax / 100);
 
