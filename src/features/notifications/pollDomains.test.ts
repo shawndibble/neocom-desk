@@ -30,6 +30,7 @@ import { getTradeHub } from '@/market/hubs';
 import {
   useNotificationPreferences,
   DEFAULT_NOTIFICATION_PREFERENCES,
+  DEFAULT_STRUCTURE_FUEL_LOW_DAYS,
   withCharacterEventThreshold,
   withEveNotificationTypeToggled,
   DEFAULT_WALLET_BALANCE_CHANGED_THRESHOLD_ISK,
@@ -481,13 +482,35 @@ describe('projection wiring', () => {
     expect(loadUniverseType).not.toHaveBeenCalled();
   });
 
-  it('hedges the structure fuel projection using the entry-level threshold, without a preference read', async () => {
+  it("projects structure fuel warnings at the Character's current fuel threshold, not the one baked into the baseline (issue #1259)", async () => {
+    // Same reasoning as the extractor lead time above: a Settings change
+    // rebuilds from the saved baseline, whose `thresholdMs` is stale.
+    useNotificationPreferences.setState({
+      value: withCharacterEventThreshold(
+        DEFAULT_NOTIFICATION_PREFERENCES,
+        7,
+        'structureFuelLowDays',
+        2
+      ),
+      hydrated: true,
+    });
+    const fuelExpiresMs = T0 + 60 * HOUR_MS;
+    const snapshot = {
+      entries: [{ structureId: 111, name: 'Keepstar', fuelExpiresMs, thresholdMs: 24 * HOUR_MS }],
+      nowMs: T0,
+    };
+    const rows = await structureFuelDomain.projection!(7, 'Kestrel', snapshot, T0);
+    expect(rows.map((r) => r.fireAt)).toEqual([fuelExpiresMs - 48 * HOUR_MS]);
+  });
+
+  it('hedges the structure fuel projection copy', async () => {
     const snapshot = {
       entries: [
         {
           structureId: 111,
           name: 'Keepstar',
-          fuelExpiresMs: T0 + 50 * HOUR_MS,
+          // Two hours past the default fuel threshold's warning point.
+          fuelExpiresMs: T0 + (DEFAULT_STRUCTURE_FUEL_LOW_DAYS * 24 + 2) * HOUR_MS,
           thresholdMs: 24 * HOUR_MS,
         },
       ],

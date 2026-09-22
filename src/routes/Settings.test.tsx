@@ -17,6 +17,9 @@ import {
   DEFAULT_NOTIFICATION_PROMPT_STATE,
   NOTIFICATION_PERMISSION_PROMPT_KEY,
 } from '@/features/notifications/permission';
+import { isEventEnabledFor } from '@/features/notifications/eventSelection';
+import { rebuildProjection } from '@/features/notifications/projectionRebuild';
+import { PROJECTION_REBUILD_DELAY_MS } from '@/features/notifications/projectionRebuildScheduler';
 import { App } from '@/app/App';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeFormat, DEFAULT_TIME_FORMAT, TIME_FORMAT_SETTING_KEY } from '@/lib/timeFormat';
@@ -52,6 +55,10 @@ vi.mock('@/sde/loadSde', () => ({
   loadTypes: vi.fn(async () => ({})),
   loadBlueprints: vi.fn(async () => ({})),
   loadMarketWideTrees: vi.fn(async () => ({})),
+}));
+
+vi.mock('@/features/notifications/projectionRebuild', () => ({
+  rebuildProjection: vi.fn(async () => {}),
 }));
 
 const CHAR_ID = 91;
@@ -875,6 +882,95 @@ describe('Settings — Notifications (issue #170)', () => {
       });
       await user.click(selectAllCharacters);
       expect(confirmSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Scheduled Push re-upload after a preference write (issue #1259)', () => {
+    /**
+     * Fake only the scheduler's timers, and only once the panel is up —
+     * `shouldAdvanceTime` keeps Dexie and user-event's own waits moving.
+     */
+    async function renderPanelWithFakeTimers() {
+      render(<App />);
+      await notificationsPanel();
+      await screen.findByRole('checkbox', { name: 'Skill Level Complete, browser notifications' });
+      // The scheduler is module state: let a rebuild an earlier test's
+      // browser click queued (on real timers) land before counting.
+      await act(
+        () => new Promise((resolve) => setTimeout(resolve, PROJECTION_REBUILD_DELAY_MS + 50))
+      );
+      vi.mocked(rebuildProjection).mockClear();
+      vi.useFakeTimers({ shouldAdvanceTime: true, toFake: ['setTimeout', 'clearTimeout'] });
+      return userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    }
+
+    async function afterQuietPeriod() {
+      await act(() => vi.advanceTimersByTimeAsync(PROJECTION_REBUILD_DELAY_MS));
+    }
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('turning a browser event on rebuilds once; an Overview-only toggle does not', async () => {
+      const user = await renderPanelWithFakeTimers();
+
+      await user.click(screen.getByRole('checkbox', { name: 'New Mail, Overview list' }));
+      await afterQuietPeriod();
+      expect(rebuildProjection).not.toHaveBeenCalled();
+
+      // Wallet Balance Changed defaults browser-off (CONTEXT.md round 45).
+      await user.click(
+        screen.getByRole('checkbox', { name: 'Wallet Balance Changed, browser notifications' })
+      );
+      await afterQuietPeriod();
+      await waitFor(() => expect(rebuildProjection).toHaveBeenCalledTimes(1));
+    });
+
+    it("a Character's browser select-all rebuilds once", async () => {
+      const user = await renderPanelWithFakeTimers();
+
+      await user.click(
+        screen.getByRole('checkbox', { name: /toggle all browser notifications for pilot one/i })
+      );
+      await afterQuietPeriod();
+      await waitFor(() => expect(rebuildProjection).toHaveBeenCalledTimes(1));
+    });
+
+    it('an All Characters browser broadcast rebuilds once', async () => {
+      const user = await renderPanelWithFakeTimers();
+
+      await user.click(
+        screen.getByRole('checkbox', {
+          name: 'New Mail for every character, browser notifications',
+        })
+      );
+      await afterQuietPeriod();
+      await waitFor(() => expect(rebuildProjection).toHaveBeenCalledTimes(1));
+    });
+
+    it('several quick browser toggles share one rebuild, which sees the final preferences', async () => {
+      const user = await renderPanelWithFakeTimers();
+      // Read from Dexie, not the store: the rebuild must wait for the write.
+      let seenAtRebuild: boolean | undefined;
+      // Once only: a later test's leftover rebuild must not run this against a cleared Dexie.
+      vi.mocked(rebuildProjection).mockImplementationOnce(async () => {
+        const stored = (await db.settings.get(NOTIFICATION_PREFS_SETTING_KEY))
+          ?.value as typeof DEFAULT_NOTIFICATION_PREFERENCES;
+        seenAtRebuild = isEventEnabledFor(stored.perCharacter[CHAR_ID] ?? {}, 'newMail', 'browser');
+      });
+
+      const newMail = screen.getByRole('checkbox', { name: 'New Mail, browser notifications' });
+      await user.click(newMail);
+      await user.click(newMail);
+      await user.click(newMail);
+      await user.click(
+        screen.getByRole('checkbox', { name: 'Skill Level Complete, browser notifications' })
+      );
+      await afterQuietPeriod();
+
+      await waitFor(() => expect(rebuildProjection).toHaveBeenCalledTimes(1));
+      expect(seenAtRebuild).toBe(false);
     });
   });
 });

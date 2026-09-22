@@ -17,6 +17,11 @@ vi.mock('@/sync', () => ({
   scheduleSync: (characterId: number) => scheduleSyncMock(characterId),
 }));
 
+const rebuildAfterWriteMock = vi.fn();
+vi.mock('./projectionRebuildScheduler', () => ({
+  rebuildProjectionAfterChannelWrite: (...args: unknown[]) => rebuildAfterWriteMock(...args),
+}));
+
 const CHARACTER_ID = 1;
 
 function entry(overrides: Partial<NotificationFeedRecord> = {}): NotificationFeedRecord {
@@ -74,6 +79,8 @@ describe('NotificationContextMenu', () => {
     );
     expect(setSyncedSettingMock).not.toHaveBeenCalled();
     expect(scheduleSyncMock).not.toHaveBeenCalled();
+    // Browser writes re-upload the Scheduled Push Projection (issue #1259).
+    expect(rebuildAfterWriteMock).toHaveBeenCalledWith('browser', expect.any(Promise));
   });
 
   it("hides the row's event type in the feed and syncs the change", async () => {
@@ -86,6 +93,7 @@ describe('NotificationContextMenu', () => {
     expect(useNotificationPreferences.getState().value.perCharacter[CHARACTER_ID]).toEqual({
       newMail: { browser: true, feed: false },
     });
+    expect(rebuildAfterWriteMock).toHaveBeenCalledWith('feed', expect.any(Promise));
   });
 
   it('reads the eveType-scoped toggle for an eveNotification row, not the parent event', async () => {
