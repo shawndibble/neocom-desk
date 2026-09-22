@@ -2,8 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db, type BuildPlanRecord } from '@/db';
-import { markBuildPlanDeleted, scheduleSync } from '@/sync';
+import { db } from '@/db';
 import { Button, EmptyState, Modal, Panel, Spinner } from '@/components/ui';
 import { useIndustryWorkspace } from '@/features/industry/useIndustryWorkspace';
 import { IndustryHeader } from '@/features/industry/IndustryHeader';
@@ -33,7 +32,14 @@ import {
   type BuildPlanSeed,
 } from '@/features/industry/planSeed';
 import { addBuildGroup, buildGroupsFor, renameBuildGroup } from '@/features/industry/buildGroups';
-import { deleteBuildGroup, moveBuildPlanToGroup } from '@/features/industry/buildGroupActions';
+import { deleteBuildGroup } from '@/features/industry/buildGroupActions';
+import {
+  applyBuildPlanChange,
+  createBuildPlans,
+  duplicateBuildPlan,
+  moveBuildPlan,
+  removeBuildPlan,
+} from '@/features/industry/buildPlanStore';
 import { useExpandedGroups, withGroupExpanded } from '@/features/industry/expandedGroups';
 import { FitImportDialog } from '@/features/industry/FitImportDialog';
 import { applyFitImport, fitImportGroupName } from '@/features/industry/fitImport';
@@ -62,8 +68,10 @@ export function Industry() {
     catalog,
     pi,
     ownedBlueprints,
+    corpOwnedBlueprints,
     blueprintsNeedsReauth,
     skills,
+    implantBonusPct,
     buildGroups,
     buildGroupsHydrated,
     setBuildGroups,
@@ -168,8 +176,7 @@ export function Industry() {
             : {}),
         }
       );
-      await db.buildPlans.add(plan);
-      scheduleSync(activeCharacterId);
+      await createBuildPlans([plan]);
       return plan.id;
     },
     [activeCharacterId, ownedBlueprints, plans, facilityDefaults, assumedMe, assumedTe, t]
@@ -278,7 +285,9 @@ export function Industry() {
     catalog,
     pi,
     ownedBlueprints,
+    corpOwnedBlueprints,
     skills,
+    implantBonusPct,
     computeGroupResult: true,
   });
   const ungroupedRows = useComparedBuildResults({
@@ -286,7 +295,9 @@ export function Industry() {
     catalog,
     pi,
     ownedBlueprints,
+    corpOwnedBlueprints,
     skills,
+    implantBonusPct,
   });
   const runCounts = useRunCountsByPlan(activeCharacterId);
 
@@ -334,15 +345,8 @@ export function Industry() {
 
   async function handleDuplicate(id: string) {
     const source = plans?.find((p) => p.id === id);
-    if (!source || activeCharacterId === null) return;
-    const copy: BuildPlanRecord = {
-      ...source,
-      id: crypto.randomUUID(),
-      name: t('industry.copySuffix', { name: source.name }),
-      updatedAt: Date.now(),
-    };
-    await db.buildPlans.add(copy);
-    scheduleSync(activeCharacterId);
+    if (!source) return;
+    await duplicateBuildPlan(source, t('industry.copySuffix', { name: source.name }));
     // Stays on the index, like rename/delete — duplicate is a list-management
     // action here, not "go start editing this". Only a deep link
     // (`?product=`/`?material=`) or an explicit row click opens a plan's own
@@ -351,13 +355,11 @@ export function Industry() {
 
   async function handleDelete(id: string) {
     if (activeCharacterId === null) return;
-    await markBuildPlanDeleted(activeCharacterId, id);
-    scheduleSync(activeCharacterId);
+    await removeBuildPlan(activeCharacterId, id);
   }
 
   async function handleRename(id: string, name: string) {
-    await db.buildPlans.update(id, { name, updatedAt: Date.now() });
-    if (activeCharacterId !== null) scheduleSync(activeCharacterId);
+    await applyBuildPlanChange(id, { kind: 'edit', patch: { name } });
   }
 
   function toggleCompareMode() {
@@ -413,8 +415,7 @@ export function Industry() {
   }
 
   async function handleMovePlan(planId: string, groupId: string | null) {
-    if (activeCharacterId === null) return;
-    await moveBuildPlanToGroup(planId, groupId, activeCharacterId);
+    await moveBuildPlan(planId, groupId);
     if (groupId !== null) await setGroupExpanded(groupId, true);
   }
 
@@ -452,8 +453,7 @@ export function Industry() {
         activeCharacterId
       )
     );
-    await db.buildPlans.bulkAdd(newPlans);
-    scheduleSync(activeCharacterId);
+    await createBuildPlans(newPlans);
     setCompareSelectedIds(new Set(newPlans.map((p) => p.id)));
     setComparing(true);
     setTab('plans');
@@ -497,6 +497,7 @@ export function Industry() {
                 catalog={catalog}
                 pi={pi}
                 skills={skills}
+                implantBonusPct={implantBonusPct}
                 facilityDefaults={facilityDefaults}
                 activeCharacterId={activeCharacterId}
                 ownedStockSnapshot={workspace.ownedStockSnapshot}
@@ -534,7 +535,9 @@ export function Industry() {
                 catalog={catalog}
                 pi={pi}
                 ownedBlueprints={ownedBlueprints}
+                corpOwnedBlueprints={corpOwnedBlueprints}
                 skills={skills}
+                implantBonusPct={implantBonusPct}
                 onDone={exitCompare}
               />
             ) : (

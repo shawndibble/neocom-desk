@@ -14,8 +14,10 @@ import {
   withGroupOwnedStockScope,
 } from '@/features/industry/buildGroups';
 import { retargetBuildGroup } from '@/features/industry/buildGroupActions';
+import { patchBuildPlans } from '@/features/industry/buildPlanStore';
 import { BuildGroupPanel } from '@/features/industry/BuildGroupPanel';
 import { applyGroupAutoBuild } from '@/features/industry/autoBuildGroup';
+import { loadPublicBpcContracts } from '@/features/bpcContracts/syncedContracts';
 import type { BuildStrategy } from '@/engine/industry/autoMakeOrBuy';
 import type { OwnedStockScope } from '@/engine/industry/types';
 import { useQuickbar } from '@/features/market/useQuickbar';
@@ -39,7 +41,9 @@ export function IndustryGroupPage() {
     catalog,
     pi,
     ownedBlueprints,
+    corpOwnedBlueprints,
     skills,
+    implantBonusPct,
     ownedStockSnapshot,
     blueprintsNeedsReauth,
   } = workspace;
@@ -79,6 +83,13 @@ export function IndustryGroupPage() {
         strategy: options.strategy,
       })
     );
+    // Same BPC Sourcing snapshot each member's own page resolves its
+    // top-level tier against; no offers (not synced / fetch failed) degrades
+    // to owned, forced and BPO tiers, exactly as on the plan page.
+    const bpcRows = await loadPublicBpcContracts(activeCharacterId).then(
+      (cached) => cached?.data.rows ?? [],
+      () => []
+    );
     const picks = await applyGroupAutoBuild(
       plans,
       catalog,
@@ -86,18 +97,14 @@ export function IndustryGroupPage() {
       ownedBlueprints,
       skills,
       workspace.assumedMe,
-      options
+      options,
+      corpOwnedBlueprints,
+      bpcRows
     );
     if (picks.size === 0) return;
-    await db.transaction('rw', db.buildPlans, async () => {
-      const stored = await db.buildPlans.bulkGet([...picks.keys()]);
-      const now = Date.now();
-      const updated = stored.flatMap((p) => {
-        if (!p) return [];
-        const picked = picks.get(p.id);
-        return picked ? [{ ...p, buildHere: [...picked], updatedAt: now }] : [];
-      });
-      await db.buildPlans.bulkPut(updated);
+    await patchBuildPlans([...picks.keys()], (p) => {
+      const picked = picks.get(p.id);
+      return picked ? { buildHere: [...picked] } : null;
     });
   }
 
@@ -158,7 +165,9 @@ export function IndustryGroupPage() {
           catalog={catalog}
           pi={pi}
           ownedBlueprints={ownedBlueprints}
+          corpOwnedBlueprints={corpOwnedBlueprints}
           skills={skills}
+          implantBonusPct={implantBonusPct}
           ownedStockSnapshot={ownedStockSnapshot}
           onOpenPlan={(planId) => navigate(`/industry/plans/${planId}`)}
           onRetarget={(target, planIds) => void handleRetargetGroup(target, planIds)}

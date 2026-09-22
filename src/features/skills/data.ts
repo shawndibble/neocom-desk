@@ -180,7 +180,7 @@ function loadUniverseTypeOnce(typeId: number): Promise<CachedResult<UniverseType
  * retry (up to 10s) is a real rate-limit window, not a blip. Roughly doubles
  * the worst case on a persistent failure — accepted here, but two of
  * `foregroundPoller.ts`'s callers feed the notification poll's text
- * resolution (`notificationText`), which has its own execution-time limits
+ * resolution (`renderNotification`), which has its own execution-time limits
  * and isn't currently budget-aware the way `eveNotification`'s name
  * resolution is (issue #300); worth revisiting there if notifications start
  * missing their window.

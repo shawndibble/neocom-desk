@@ -1,5 +1,7 @@
 /**
- * Wires a Build Plan record + blueprint + market data into a call to
+ * The engine-adapter step under `resolveBuildPlan.ts` (which every Build Plan
+ * view calls — reach for that, not this, to price a saved plan). Wires a
+ * Build Plan record + blueprint + market data into a call to
  * src/engine/industry's buildVsBuy: clamps user-entered runs/ME/TE into the
  * engine's valid ranges (a cleared/invalid input field must never blank the
  * results panel), drops facilityTaxPct for NPC stations (their tax is fixed;
@@ -20,6 +22,7 @@ import type {
 import type { SubBuildContext } from '@/engine/industry/subBuild';
 import type { MaterialRecipe } from '@/engine/industry/makeOrBuy';
 import type { BuildPlanRecord } from '@/db';
+import { clampInt } from './clampInt';
 
 export interface ComputeBuildPlanInput {
   plan: Pick<
@@ -43,6 +46,8 @@ export interface ComputeBuildPlanInput {
   /** The plan's material price basis, already resolved by `priceBasis.ts`. */
   materialPrices?: HubPrices;
   skills: SkillLevels;
+  /** The plan owner's active-clone BX-80x manufacturing-time implant bonus, if any (issue #1229). */
+  implantBonusPct?: number;
   /** What produces a material, for anything `plan.buildHere` might name at any depth. */
   recipeFor?: (typeID: number) => MaterialRecipe | null;
   /** Blueprint Acquisition (issue #838) for any buildable node reached during recursion. */
@@ -73,11 +78,6 @@ export interface ComputeBuildPlanResult {
   error: string | null;
 }
 
-function clampInt(value: number, min: number, max: number): number {
-  const n = Math.round(value);
-  return Math.min(max, Math.max(min, Number.isFinite(n) ? n : min));
-}
-
 export function computeBuildPlan({
   plan,
   blueprint,
@@ -86,6 +86,7 @@ export function computeBuildPlan({
   hubPrices,
   materialPrices,
   skills,
+  implantBonusPct,
   recipeFor,
   acquisitionFor,
   blueprintAcquisition,
@@ -122,6 +123,7 @@ export function computeBuildPlan({
         ? withoutOwnedQuantities(plan.materialSourcing)
         : plan.materialSourcing,
       skills,
+      implantBonusPct,
       buildHere: plan.buildHere,
       recipeFor,
       acquisitionFor,

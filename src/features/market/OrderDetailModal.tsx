@@ -26,7 +26,7 @@ import { cx } from '@/lib/cx';
 import { buttonClassName } from '@/components/ui/buttonClassName';
 import { Link } from 'react-router-dom';
 import { formatIsk } from '@/lib/isk';
-import { salesTax, brokerFee } from '@/engine/industry/fees';
+import { salesTax } from '@/engine/industry/fees';
 import type { JumpsAwayResult } from '@/engine/jumpsAway';
 import { JumpsAwayText } from '@/features/character/assetBrowserRows';
 import type { UndercutRival, UndercutScope } from '@/engine/market/undercut';
@@ -700,14 +700,26 @@ export function OrderDetailModal({
                     {/*
                       Rendered as ISK off `floor.relist`, not as a bare
                       percentage: `unitCost + salesTax(relist) +
-                      brokerFee(relist) === relist` by construction
-                      (`breakEvenPrice` solves for exactly that revenue),
-                      including its 100 ISK minimum-broker-fee floor — which a
-                      percentage-of-unitCost readout would silently miss. This
-                      is what makes the ledger's lines actually sum to the
-                      floor shown below, so gated on `row.floor` (not `skills`
-                      alone): there is no relist price to read the fee off
-                      without it.
+                      brokerFeePerUnit === relist` by construction
+                      (`relistBreakEvenPrice` solves for exactly that
+                      revenue), including its 100 ISK minimum-broker-fee
+                      floor — which a percentage-of-unitCost readout would
+                      silently miss. This is what makes the ledger's lines
+                      actually sum to the floor shown below, so gated on
+                      `row.floor` (not `skills` alone): there is no relist
+                      price to read the fee off without it.
+
+                      Broker fee is read as the ledger's remainder
+                      (`relist - unitCost - salesTax`), not a re-derived
+                      `relistFee(relist, relist, 1, ...)`: `relist` is
+                      already a PER-UNIT price, and re-solving the fee at
+                      quantity 1 would re-apply its own 100 ISK minimum to
+                      that single unit, silently reintroducing the per-unit
+                      minimum this floor removes for large remaining-quantity
+                      stacks. The remainder already carries whatever discount
+                      `relistBreakEvenPrice` applied when it solved `relist`
+                      (Advanced Broker Relations' Relist Discount), so this
+                      readout is correct with no separate fee call needed.
                     */}
                     {skills && row.floor && (
                       <>
@@ -716,8 +728,8 @@ export function OrderDetailModal({
                           value={`${formatIsk(salesTax(row.floor.relist, skills.accountingLevel), 2)} ISK`}
                         />
                         <LedgerRow
-                          label={t('industry.brokerFee')}
-                          value={`${formatIsk(brokerFee(row.floor.relist, skills.brokerRelationsLevel), 2)} ISK`}
+                          label={t('market.orders.relistBrokerFee')}
+                          value={`${formatIsk(row.floor.relist - row.costBasis.unitCost - salesTax(row.floor.relist, skills.accountingLevel), 2)} ISK`}
                         />
                       </>
                     )}
@@ -871,6 +883,13 @@ export function OrderDetailModal({
                       rate: Math.round(BASE_STATION_REPROCESSING_RATE * 100),
                     })}
                   </p>
+                  {!reprocessing?.skills.isScrap && !!reprocessing?.skills.implantBonusPct && (
+                    <p className="text-text-dim">
+                      {t('market.orders.exitReprocessImplant', {
+                        pct: reprocessing.skills.implantBonusPct,
+                      })}
+                    </p>
+                  )}
                   {refine.partial && (
                     <p className="text-warning">{t('market.orders.exitReprocessPartial')}</p>
                   )}

@@ -88,6 +88,7 @@ function renderCompare(rows: ComparedBuildRow[], onDone = vi.fn()) {
         pi={null}
         ownedBlueprints={[]}
         skills={{}}
+        implantBonusPct={0}
         onDone={onDone}
       />
     ),

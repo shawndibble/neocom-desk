@@ -6,6 +6,12 @@ import {
   projectColonies,
   projectCalendar,
 } from '@/engine/projection';
+import {
+  calendarCopy,
+  colonyCopy,
+  industryJobCopy,
+  skillQueueCopy,
+} from '@/features/notifications/domainCopy';
 
 const T0 = 1_700_000_000_000;
 const HOUR_MS = 3_600_000;
@@ -26,7 +32,14 @@ describe('notifications.fired.* — live i18next path agrees with projection.ts'
       { skillId: 1, finishedLevel: 3, queuePosition: 0, finishMs: T0 + 5 * HOUR_MS },
       { skillId: 2, finishedLevel: 1, queuePosition: 1, finishMs: T0 + 10 * HOUR_MS },
     ];
-    const [row] = projectSkillQueue(1, 'Kestrel', entries, new Map([[1, 'Gunnery']]), T0);
+    const [row] = projectSkillQueue(
+      1,
+      'Kestrel',
+      entries,
+      new Map([[1, 'Gunnery']]),
+      skillQueueCopy.push,
+      T0
+    );
     const live = i18n.t('notifications.fired.skillLevelComplete.body', {
       character: 'Kestrel',
       skill: 'Gunnery',
@@ -40,7 +53,14 @@ describe('notifications.fired.* — live i18next path agrees with projection.ts'
     const entries = [
       { skillId: 1, finishedLevel: 5, queuePosition: 0, finishMs: T0 + 5 * HOUR_MS },
     ];
-    const rows = projectSkillQueue(1, 'Kestrel', entries, new Map([[1, 'Gunnery']]), T0);
+    const rows = projectSkillQueue(
+      1,
+      'Kestrel',
+      entries,
+      new Map([[1, 'Gunnery']]),
+      skillQueueCopy.push,
+      T0
+    );
     const row = rows[rows.length - 1];
     const live = i18n.t('notifications.fired.characterNotTraining.body', { character: 'Kestrel' });
     expect(live).toEqual(row.body);
@@ -57,7 +77,14 @@ describe('notifications.fired.* — live i18next path agrees with projection.ts'
         endMs: T0 + 5 * HOUR_MS,
       },
     ];
-    const [row] = projectIndustryJobs(1, 'Kestrel', entries, new Map([[200, 'Rifter']]), T0);
+    const [row] = projectIndustryJobs(
+      1,
+      'Kestrel',
+      entries,
+      new Map([[200, 'Rifter']]),
+      industryJobCopy.push,
+      T0
+    );
     const live = i18n.t('notifications.fired.industryJobComplete.body', {
       character: 'Kestrel',
       item: 'Rifter',
@@ -82,7 +109,14 @@ describe('notifications.fired.* — live i18next path agrees with projection.ts'
         extractors: [{ pinId: 1, expiryTimeMs, thresholdMs: 6 * HOUR_MS }],
       },
     ];
-    const rows = projectColonies(1, 'Kestrel', colonies, new Map([[1, 'Amarr Prime III']]), T0);
+    const rows = projectColonies(
+      1,
+      'Kestrel',
+      colonies,
+      new Map([[1, 'Amarr Prime III']]),
+      colonyCopy.push,
+      T0
+    );
     const doneRow = rows.find((r) => r.eventId === 'planetaryExtractionDone');
     const expiringRow = rows.find((r) => r.eventId === 'planetaryExtractorExpiring');
     expect(doneRow).toBeDefined();
@@ -112,7 +146,7 @@ describe('notifications.fired.* — live i18next path agrees with projection.ts'
 
   it('calendarEventStarting: same character and event name produce the same string on both paths', () => {
     const entries = [{ calendarEventId: 1, startMs: T0 + 5 * HOUR_MS, title: 'Fleet Op' }];
-    const [row] = projectCalendar(1, 'Kestrel', entries, T0);
+    const [row] = projectCalendar(1, 'Kestrel', entries, calendarCopy.push, T0);
     const live = i18n.t('notifications.fired.calendarEventStarting.body', {
       character: 'Kestrel',
       event: 'Fleet Op',
@@ -130,7 +164,7 @@ describe('notifications.fired.* — live i18next path agrees with projection.ts'
    */
   it('calendarEventStarting: the unnamed fallback is the same sentence on both paths', () => {
     const entries = [{ calendarEventId: 1, startMs: T0 + 5 * HOUR_MS }];
-    const [row] = projectCalendar(1, 'Kestrel', entries, T0);
+    const [row] = projectCalendar(1, 'Kestrel', entries, calendarCopy.push, T0);
     const live = i18n.t('notifications.fired.calendarEventStarting.bodyUnnamed', {
       character: 'Kestrel',
     });

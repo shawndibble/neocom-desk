@@ -28,7 +28,28 @@ import {
   type OrderDepthThresholds,
   type RankedOpportunity,
 } from './opportunities';
-import { FACILITY_PRESETS, SKILL_IDS, type AdjustedPrices, type SkillLevels } from './types';
+import { jobDurationSeconds } from './time';
+import {
+  EMPTY_RIG_FIT,
+  FACILITY_PRESETS,
+  SKILL_IDS,
+  type AdjustedPrices,
+  type BlueprintSkillRequirement,
+  type SkillLevels,
+} from './types';
+
+/**
+ * NPC station, no rig, no security-band dependence — matches the ownership-
+ * agnostic assumption `jobFee`'s `FACILITY_PRESETS.npcStation` call already
+ * makes here. `security` only feeds a structure's rig TE bonus
+ * (`rigBonusPct`), and an NPC station never has one (`structure: false`), so
+ * the band picked is inert; `highsec` is chosen for readability only.
+ */
+const NPC_STATION_CONTEXT = {
+  facility: FACILITY_PRESETS.npcStation,
+  rigFit: EMPTY_RIG_FIT,
+  security: 'highsec' as const,
+};
 
 /** The pricing context `computeMarketWideRows` needs beyond hub prices — one object, not three loose same-shaped `Record<number, number>` positionals. */
 export interface MarketWideFeeInputs {
@@ -96,6 +117,16 @@ export interface MarketWideCandidate {
   sellPrice: number;
   /** ISK value of sell orders for the product at the hub, from the same liquidity pass — reused for `orderDepth`, never re-fetched. */
   sellDepthIsk: number;
+  /**
+   * The top blueprint's own required-skills list (issue #1230), for the
+   * per-blueprint science/engineering time bonus (issue #1228) — looked up
+   * by the caller from the blueprint catalog via `tree.blueprintTypeID`,
+   * since the precomputed tree itself carries no skills. Applied to the
+   * whole flattened `tree.time`, the same "one lookup over the whole tree"
+   * approximation `jobFee`'s single EIV call above already makes for a
+   * multi-tier product's sub-jobs.
+   */
+  blueprintSkills?: readonly BlueprintSkillRequirement[];
 }
 
 export interface MarketWideRow extends RankedOpportunity {
@@ -153,7 +184,18 @@ export function computeMarketWideRows(
     const tax = salesTax(revenue, skills[SKILL_IDS.accounting] ?? 0);
     const broker = brokerFee(revenue, skills[SKILL_IDS.brokerRelations] ?? 0);
     const profit = revenue - tax - broker - buildCost;
-    const iskPerHour = (profit / tree.time) * 3600;
+    // TE0, 1 run: tree.time is already the per-candidate total (not per-run),
+    // and this scan has no owned plan to seed a non-zero TE assumption from
+    // (docs/context/decisions/20260909-090113-assumed-te-seeds-a-plan-not-its-sub.md).
+    const seconds = jobDurationSeconds(
+      tree.time,
+      1,
+      0,
+      skills,
+      NPC_STATION_CONTEXT,
+      candidate.blueprintSkills
+    );
+    const iskPerHour = (profit / seconds) * 3600;
     priced.push({
       id: String(candidate.productTypeID),
       productTypeID: candidate.productTypeID,

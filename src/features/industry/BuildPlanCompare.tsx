@@ -17,6 +17,7 @@ import type { PiData } from '@/sde/types';
 import { formatDuration } from '@/lib/duration';
 import { iskToneClass } from '@/features/character/format';
 import type { BlueprintCatalog } from './blueprintCatalog';
+import type { CorpOwnedBlueprintsState } from './corpOwnedBlueprints';
 import { formatPercent } from './format';
 import { useComparedBuildResults, type ComparedBuildRow } from './useComparedBuildResults';
 
@@ -25,7 +26,11 @@ interface BuildPlanCompareProps {
   catalog: BlueprintCatalog;
   pi: PiData | null;
   ownedBlueprints: readonly CharacterBlueprint[];
+  /** Folded into each plan on its own `includeCorpAssets` — see `resolveBuildPlan`. */
+  corpOwnedBlueprints?: CorpOwnedBlueprintsState;
   skills: SkillLevels;
+  /** The plan owner's active-clone BX-80x manufacturing-time implant bonus, if any (issue #1229). */
+  implantBonusPct: number;
   /** Exits compare mode, restoring the previously open single-plan detail. */
   onDone: () => void;
 }
@@ -75,11 +80,21 @@ export function BuildPlanCompare({
   catalog,
   pi,
   ownedBlueprints,
+  corpOwnedBlueprints,
   skills,
+  implantBonusPct,
   onDone,
 }: BuildPlanCompareProps) {
   const { t } = useTranslation();
-  const rows = useComparedBuildResults({ plans, catalog, pi, ownedBlueprints, skills });
+  const rows = useComparedBuildResults({
+    plans,
+    catalog,
+    pi,
+    ownedBlueprints,
+    corpOwnedBlueprints,
+    skills,
+    implantBonusPct,
+  });
   const unknown = t('common.unknown');
 
   const columns: DataTableColumn<ComparedBuildRow>[] = [

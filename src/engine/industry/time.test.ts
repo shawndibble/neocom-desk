@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { timeModifier, jobDurationSeconds } from '@/engine/industry/time';
+import {
+  timeModifier,
+  jobDurationSeconds,
+  resolveManufacturingTimeImplantBonusPct,
+} from '@/engine/industry/time';
 import { FACILITY_PRESETS, SKILL_IDS } from '@/engine/industry/types';
 import type { FacilityContext, SkillLevels } from '@/engine/industry/types';
 
@@ -114,6 +118,85 @@ describe('timeModifier', () => {
   it('still range-checks the skill it reads under a reaction facility', () => {
     expect(() => timeModifier(0, { [SKILL_IDS.reactions]: 6 }, athanor)).toThrow(RangeError);
   });
+
+  it('applies each qualifying science skill in blueprintSkills at 1%/level (issue #1228)', () => {
+    // Mechanical Engineering (11452) and Electronic Engineering (11453) both
+    // carry the 1%-per-level manufacturing-time bonus.
+    const skills: SkillLevels = { 11452: 4, 11453: 3 };
+    const blueprintSkills = [
+      { typeID: 11452, level: 1 },
+      { typeID: 11453, level: 1 },
+    ];
+    // 0.96 (Mech Eng IV) * 0.97 (Elec Eng III)
+    expect(timeModifier(0, skills, npc, blueprintSkills)).toBeCloseTo(0.96 * 0.97, 12);
+  });
+
+  it('does not double count Industry/Advanced Industry/Reactions even if listed in blueprintSkills', () => {
+    const skills: SkillLevels = { [SKILL_IDS.industry]: 5, [SKILL_IDS.advancedIndustry]: 4 };
+    const blueprintSkills = [
+      { typeID: SKILL_IDS.industry, level: 1 },
+      { typeID: SKILL_IDS.advancedIndustry, level: 1 },
+    ];
+    expect(timeModifier(0, skills, npc, blueprintSkills)).toBeCloseTo(0.8 * 0.88, 12);
+  });
+
+  it('ignores a blueprint skill with no manufacturing-time bonus (e.g. Mass Production)', () => {
+    const skills: SkillLevels = { 3387: 5 };
+    const blueprintSkills = [{ typeID: 3387, level: 1 }];
+    expect(timeModifier(0, skills, npc, blueprintSkills)).toBe(1);
+  });
+
+  it('ignores blueprintSkills entirely under a reaction facility', () => {
+    const skills: SkillLevels = { 11452: 5 };
+    const blueprintSkills = [{ typeID: 11452, level: 1 }];
+    expect(timeModifier(0, skills, athanor, blueprintSkills)).toBe(1);
+  });
+
+  it('is unaffected when blueprintSkills is omitted (T1/reaction blueprints with no science skills)', () => {
+    const skills: SkillLevels = { [SKILL_IDS.industry]: 5, [SKILL_IDS.advancedIndustry]: 4 };
+    expect(timeModifier(0, skills, npc)).toBeCloseTo(0.8 * 0.88, 12);
+  });
+
+  it('applies a BX-80x manufacturing implant bonus (issue #1229)', () => {
+    expect(timeModifier(0, noSkills, npc, undefined, 4)).toBeCloseTo(0.96, 12);
+  });
+
+  it('stacks the implant bonus with skills and facility/rig terms', () => {
+    const skills: SkillLevels = { [SKILL_IDS.industry]: 5, [SKILL_IDS.advancedIndustry]: 4 };
+    expect(timeModifier(20, skills, raitaruT1Hi, undefined, 4)).toBeCloseTo(
+      0.8 * 0.8 * 0.88 * 0.85 * 0.8 * 0.96,
+      12
+    );
+  });
+
+  it('is unaffected when implantBonusPct is omitted or zero', () => {
+    expect(timeModifier(0, noSkills, npc)).toBe(1);
+    expect(timeModifier(0, noSkills, npc, undefined, 0)).toBe(1);
+  });
+
+  it('ignores the manufacturing implant bonus under a reaction facility', () => {
+    expect(timeModifier(0, noSkills, athanor, undefined, 4)).toBe(1);
+  });
+});
+
+describe('resolveManufacturingTimeImplantBonusPct', () => {
+  it('returns 0 with no implants fitted', () => {
+    expect(resolveManufacturingTimeImplantBonusPct([])).toBe(0);
+  });
+
+  it('resolves each BX-80x tier', () => {
+    expect(resolveManufacturingTimeImplantBonusPct([27170])).toBe(1); // BX-801
+    expect(resolveManufacturingTimeImplantBonusPct([27167])).toBe(2); // BX-802
+    expect(resolveManufacturingTimeImplantBonusPct([27171])).toBe(4); // BX-804
+  });
+
+  it('ignores unrelated implants and type IDs', () => {
+    expect(resolveManufacturingTimeImplantBonusPct([27175])).toBe(0); // RX-801 (reprocessing)
+  });
+
+  it('picks the best fitted one, though only one can ever be fitted at once', () => {
+    expect(resolveManufacturingTimeImplantBonusPct([27170, 27171])).toBe(4);
+  });
 });
 
 describe('jobDurationSeconds', () => {
@@ -130,5 +213,17 @@ describe('jobDurationSeconds', () => {
 
   it('rejects invalid runs', () => {
     expect(() => jobDurationSeconds(600, 0, 0, noSkills, npc)).toThrow(RangeError);
+  });
+
+  it('applies qualifying blueprint science skills (issue #1228)', () => {
+    const skills: SkillLevels = { 11452: 4 };
+    const blueprintSkills = [{ typeID: 11452, level: 1 }];
+    // 600 * 10 * 0.96 (Mech Eng IV)
+    expect(jobDurationSeconds(600, 10, 0, skills, npc, blueprintSkills)).toBeCloseTo(5760, 6);
+  });
+
+  it('applies a BX-80x manufacturing implant bonus (issue #1229)', () => {
+    // 600 * 10 * 0.96 (BX-804)
+    expect(jobDurationSeconds(600, 10, 0, noSkills, npc, undefined, 4)).toBeCloseTo(5760, 6);
   });
 });

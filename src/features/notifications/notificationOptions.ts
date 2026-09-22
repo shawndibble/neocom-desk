@@ -125,39 +125,21 @@ function withParam(url: string, key: string, value: string): string {
   return `${path}?${params}`;
 }
 
-/**
- * What a fire was *about*, structurally — deliberately not `AnyNotificationFire`,
- * so this module stays free of a cycle back through the poller. Each event
- * reads whichever of these fields its own diff sets.
- */
-export interface NotificationSubject {
-  eventId: string;
-  typeId?: number;
-  journalEntryId?: number;
-  contractId?: number;
-  jobId?: number;
-  memberCharacterId?: number;
-}
+/** How a subject id reaches the destination page. */
+type SubjectUrl = (base: string, subjectId: number) => string;
 
-interface SubjectRoute {
-  /** The id of the row this fire was about, if its diff carries one. */
-  readonly subjectOf: (fire: NotificationSubject) => number | undefined;
-  /** How that id reaches the destination page. */
-  readonly url: (base: string, subjectId: number) => string;
-}
-
-/** Every subject-routed event lands on a table that pulses the row (`lib/useHighlightParam`). */
-const highlightRow = (base: string, subjectId: number) =>
+/** Every highlight-routed event lands on a table that pulses the row (`lib/useHighlightParam`). */
+const highlightRow: SubjectUrl = (base, subjectId) =>
   withParam(base, HIGHLIGHT_PARAM, String(subjectId));
 
 /**
  * The events whose destination depends on *what the fire was about*, not only
- * on which event it was.
+ * on which event it was — and how the id reaches that page.
  *
  * An alert that opens the right page still leaves the pilot scanning a table
  * for the thing they were just told about. Every entry here names a
- * destination that is a table, keyed by an id the fire already carries, so
- * arriving means arriving *on the row*.
+ * destination keyed by an id the fire already carries, so arriving means
+ * arriving *on the row*.
  *
  * The bar for an entry is that the row is **actually there on arrival**. That
  * rules out `corpMemberLeft` — the roster no longer lists them — and it rules
@@ -166,33 +148,27 @@ const highlightRow = (base: string, subjectId: number) =>
  * is harmless, but an entry that can *never* match is a promise this cannot
  * keep.
  *
- * A table rather than an `if` per event: the URL builder and the "has this
- * fire a subject worth storing" check both answer to one entry, so a new event
- * is one line here instead of two edits that can disagree.
+ * Which field of the fire is the subject lives on the event's poll domain
+ * (`domainCopy.ts`'s `subjectOf`, issue #1249); only the URL shape is here,
+ * because the Service Worker (`pushHandler.ts`) and the Alerts page build
+ * URLs from a stored event id and must not import the poll registry.
+ * `pollDomains.test.ts` pins the two to the same set of events.
  */
-const SUBJECT_ROUTES: Partial<Record<NotificationEventId, SubjectRoute>> = {
-  // The fill itself — what sold, how many, to whom. ESI's transactions carry
-  // no order id, so the panel resolves the item to its newest sell; every
-  // other entry here is an exact row id.
-  marketOrderFilled: { subjectOf: (fire) => fire.typeId, url: highlightRow },
-  // The journal line that moved the balance.
-  walletBalanceChanged: { subjectOf: (fire) => fire.journalEntryId, url: highlightRow },
-  // The contract someone just took. Still listed — the filter defaults to every status.
-  contractAccepted: { subjectOf: (fire) => fire.contractId, url: highlightRow },
-  // Same row, a later transition of it (issue #1091).
-  contractCompleted: { subjectOf: (fire) => fire.contractId, url: highlightRow },
-  contractFailed: { subjectOf: (fire) => fire.contractId, url: highlightRow },
-  // The job sits in Active Jobs until it is delivered, which is the point.
-  industryJobComplete: { subjectOf: (fire) => fire.jobId, url: highlightRow },
-  // The new member's roster row.
-  corpMemberJoined: { subjectOf: (fire) => fire.memberCharacterId, url: highlightRow },
+const SUBJECT_URLS: Partial<Record<NotificationEventId, SubjectUrl>> = {
+  marketOrderFilled: highlightRow,
+  walletBalanceChanged: highlightRow,
+  contractAccepted: highlightRow,
+  contractCompleted: highlightRow,
+  contractFailed: highlightRow,
+  industryJobComplete: highlightRow,
+  corpMemberJoined: highlightRow,
   // The item itself, selected via Market Browser's own `?type=` param rather
   // than a pulsed table row — there is no table on arrival to pulse.
-  priceAlertTriggered: {
-    subjectOf: (fire) => fire.typeId,
-    url: (base, subjectId) => withParam(base, 'type', String(subjectId)),
-  },
+  priceAlertTriggered: (base, subjectId) => withParam(base, 'type', String(subjectId)),
 };
+
+/** The events a subject id routes for — see `SUBJECT_URLS`. */
+export const SUBJECT_ROUTED_EVENT_IDS = Object.keys(SUBJECT_URLS) as NotificationEventId[];
 
 /**
  * Where a fire lands, narrowed by what it was about where that changes the
@@ -203,13 +179,8 @@ const SUBJECT_ROUTES: Partial<Record<NotificationEventId, SubjectRoute>> = {
  */
 export function notificationUrlForSubject(eventId: string, subjectId: number | undefined): string {
   const base = notificationUrlFor(eventId);
-  const route = SUBJECT_ROUTES[eventId as NotificationEventId];
-  return route === undefined || subjectId === undefined ? base : route.url(base, subjectId);
-}
-
-/** The row a fire was about, where its event has a use for one — see `NotificationFeedRecord.subjectId`. */
-export function notificationSubjectId(fire: NotificationSubject): number | undefined {
-  return SUBJECT_ROUTES[fire.eventId as NotificationEventId]?.subjectOf(fire);
+  const url = SUBJECT_URLS[eventId as NotificationEventId];
+  return url === undefined || subjectId === undefined ? base : url(base, subjectId);
 }
 
 export function notificationTagFor(target: NotificationTarget): string {

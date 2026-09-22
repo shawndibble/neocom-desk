@@ -54,6 +54,8 @@ export interface UseOpportunitiesArgs {
   hub: TradeHub;
   facilityDefaults: ActivityFacilityDefaults;
   skills: SkillLevels;
+  /** The active Character's active-clone BX-80x manufacturing-time implant bonus, if any (issue #1229). */
+  implantBonusPct: number;
   ownedStockSnapshot: OwnedStockSnapshot;
   /** Every owned blueprint by character, so a sub-build the recursive engine prices quotes at a researched copy's real ME where the pilot owns one. */
   ownedByCharacter: ReadonlyMap<number, readonly CharacterBlueprint[]>;
@@ -89,6 +91,7 @@ export function useOpportunities({
   hub,
   facilityDefaults,
   skills,
+  implantBonusPct,
   ownedStockSnapshot,
   ownedByCharacter,
   assumedMe,
@@ -150,14 +153,22 @@ export function useOpportunities({
             ownedBlueprints: ownedByCharacter.get(candidate.characterId) ?? [],
             assumedMeForUnowned: assumedMe,
           });
-          const row = computeOpportunityRow(candidate, snapshot, facilityDefaults, skills, stock, {
-            recipeFor,
-            // Build Opportunities' own auto-build depth control was removed
-            // as unused (issue #652 superseded) — every row now prices with
-            // nothing auto-built, `computeOpportunityRow`'s own pre-#652
-            // plain behavior.
-            depth: 0,
-          });
+          const row = computeOpportunityRow(
+            candidate,
+            snapshot,
+            facilityDefaults,
+            skills,
+            implantBonusPct,
+            stock,
+            {
+              recipeFor,
+              // Build Opportunities' own auto-build depth control was
+              // removed as unused (issue #652 superseded) — every row now
+              // prices with nothing auto-built, `computeOpportunityRow`'s
+              // own pre-#652 plain behavior.
+              depth: 0,
+            }
+          );
           if (row) unranked.push(row);
         }
         const done = Math.min(i + CHUNK_SIZE, currentCandidates.length);
@@ -190,6 +201,7 @@ export function useOpportunities({
     hub,
     facilityDefaults,
     skills,
+    implantBonusPct,
     ownedStockSnapshot,
     ownedByCharacter,
     assumedMe,

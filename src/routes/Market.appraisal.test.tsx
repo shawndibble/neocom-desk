@@ -37,6 +37,7 @@ vi.mock('@/features/market/appraisalData', () => ({
   appraisePaste: vi.fn(async () => ({
     appraisal: { rows: [], totals: { buy: 0, sell: 0, spread: 0, unpricedRows: 0 } },
     unmatched: [],
+    implantBonusPct: 0,
   })),
   compareHubs: vi.fn(async () => []),
   loadAppraisalCatalogue: vi.fn(async () => new Map()),
@@ -157,6 +158,7 @@ describe('Market Appraisal tab navigation', () => {
         },
       },
       unmatched: [],
+      implantBonusPct: 0,
     });
     renderAt('/market?section=appraisal');
 

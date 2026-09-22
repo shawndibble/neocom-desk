@@ -69,6 +69,7 @@ import {
   useNotificationPreferences,
   hydrateNotificationPreferences,
   updateNotificationPrefs as updatePrefs,
+  setDeviceNotificationPrefs,
   characterEventPrefs,
   characterEveTypePrefs,
   withMasterEnabled,
@@ -86,7 +87,6 @@ import {
   EXTRACTOR_EXPIRING_LEAD_HOUR_OPTIONS,
   type CharacterEventThresholds,
 } from './preferences';
-import { runForegroundPoll, liveDependencies } from './foregroundPoller';
 import {
   isEventEnabledFor,
   isEveTypeEnabledFor,
@@ -197,7 +197,6 @@ export function NotificationsPanel() {
   const tokens = useLiveQuery(() => db.tokens.toArray());
 
   const prefsValue = useNotificationPreferences((state) => state.value);
-  const setPrefsValue = useNotificationPreferences((state) => state.setValue);
 
   useEffect(() => {
     void hydrateNotificationPreferences();
@@ -207,8 +206,8 @@ export function NotificationsPanel() {
   // `updatePrefs` (preferences.ts) — it also pushes the feed-only slice to
   // the synced setting and schedules a sync (issue #363). The
   // device-local-only writes below (master switch, browser/feed channel
-  // gates) go straight through `setPrefsValue` instead, since none of that
-  // belongs on the wire.
+  // gates) go through `setDeviceNotificationPrefs` instead, since none of
+  // that belongs on the wire. Both schedule the Projection rebuild themselves.
 
   // The Overview panel refreshes the app-icon badge when preferences change,
   // but it is unmounted while the user is on Settings — which is the only
@@ -487,7 +486,9 @@ export function NotificationsPanel() {
             type="checkbox"
             checked={prefsValue.masterEnabled}
             onChange={() =>
-              void setPrefsValue(withMasterEnabled(prefsValue, !prefsValue.masterEnabled))
+              void setDeviceNotificationPrefs(
+                withMasterEnabled(prefsValue, !prefsValue.masterEnabled)
+              )
             }
             className="size-4 shrink-0 cursor-pointer accent-accent"
           />
@@ -510,7 +511,7 @@ export function NotificationsPanel() {
               checked={isBrowserChannelEnabled(prefsValue) && !browserBlocked}
               disabled={browserBlocked}
               onChange={() =>
-                void setPrefsValue(
+                void setDeviceNotificationPrefs(
                   withBrowserEnabled(prefsValue, !isBrowserChannelEnabled(prefsValue))
                 )
               }
@@ -526,7 +527,9 @@ export function NotificationsPanel() {
               type="checkbox"
               checked={isFeedChannelEnabled(prefsValue)}
               onChange={() =>
-                void setPrefsValue(withFeedEnabled(prefsValue, !isFeedChannelEnabled(prefsValue)))
+                void setDeviceNotificationPrefs(
+                  withFeedEnabled(prefsValue, !isFeedChannelEnabled(prefsValue))
+                )
               }
               className="size-4 shrink-0 cursor-pointer accent-accent disabled:cursor-not-allowed"
             />
@@ -669,26 +672,6 @@ const CharacterNotificationSection = memo(function CharacterNotificationSection(
   // over a `prefsValue` prop — see this component's props doc for why.
   const currentValue = () => useNotificationPreferences.getState().value;
 
-  /**
-   * `registerDeviceForWebPush` replaces the backend's whole stored
-   * Projection for a Character on every poll tick (issue #358), so a
-   * lead-time change or an off-toggle otherwise leaves a stale Scheduled
-   * Push live until the next ~5-minute tick catches up (issue #750). This
-   * re-runs the full Foreground Poller — the only thing in the codebase
-   * that assembles one Character's whole Projection correctly — rather
-   * than uploading just this domain's rows, which would silently wipe
-   * every other domain's pending push for every other Character too.
-   * `runForegroundPoll`'s in-flight guard coalesces rather than queues: a
-   * click landing while a poll is already running joins that in-flight
-   * poll instead of starting a fresh one, so it can compute under the
-   * *previous* threshold/toggle state — a narrow, self-healing race (the
-   * next ~5-minute tick still picks up the new value) that also happens to
-   * be what stops rapid Select changes from firing one ESI poll apiece.
-   */
-  const triggerExtractorReupload = () => {
-    void runForegroundPoll(liveDependencies());
-  };
-
   return (
     <div className="rounded-xs border border-line bg-panel/85 backdrop-blur-sm">
       {/* Select-all is a sibling of the expand toggle, not nested inside its
@@ -772,18 +755,14 @@ const CharacterNotificationSection = memo(function CharacterNotificationSection(
                             !hasScope ? 'scope' : capabilityMissing ? 'capability' : null
                           }
                           checked={isEventEnabledFor(prefs, eventId, channel)}
-                          onToggle={() => {
-                            const wasEnabled = isEventEnabledFor(prefs, eventId, channel);
+                          onToggle={() =>
                             void toggleEventChannelPref(
                               character.characterId,
                               currentValue(),
                               eventId,
                               channel
-                            );
-                            if (eventId === 'planetaryExtractorExpiring' && wasEnabled) {
-                              triggerExtractorReupload();
-                            }
-                          }}
+                            )
+                          }
                         />
                       ))}
                     </div>
@@ -824,7 +803,6 @@ const CharacterNotificationSection = memo(function CharacterNotificationSection(
                                 Number(value)
                               )
                             );
-                            triggerExtractorReupload();
                           }}
                         >
                           <SelectTrigger
@@ -851,10 +829,9 @@ const CharacterNotificationSection = memo(function CharacterNotificationSection(
                     (issue #299, AC4) — the first Notification
                     Event with a setting of its own rather than
                     a plain on/off. Persisted per Character and
-                    per device (`preferences.ts`), and re-read
-                    by the poller every 5-minute tick, which is
-                    what "takes effect without a reload" means
-                    here (CONTEXT.md round 43).
+                    per device (`preferences.ts`); the poller
+                    re-reads it each tick and a change rebuilds
+                    the Projection at once (issue #1259).
                   */}
                   {eventId === 'structureFuelLow' && rowEnabled && (
                     <div className="border-t border-line bg-panel/60 px-6 py-1.5">

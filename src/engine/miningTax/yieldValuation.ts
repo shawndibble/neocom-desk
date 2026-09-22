@@ -67,6 +67,8 @@ export interface EntryValuation {
    * the actual per-line rate.
    */
   efficiency: number;
+  /** The active clone's refining implant bonus folded into `efficiency`, 0 with none fitted (issue #1227). */
+  implantBonusPct: number;
 }
 
 /**
@@ -146,5 +148,12 @@ export function valueMiningYield(
     });
   }
 
-  return { rawValue, refineValue, pricedAll, lines, efficiency };
+  return {
+    rawValue,
+    refineValue,
+    pricedAll,
+    lines,
+    efficiency,
+    implantBonusPct: skills.implantBonusPct ?? 0,
+  };
 }

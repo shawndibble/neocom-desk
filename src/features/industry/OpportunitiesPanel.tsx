@@ -61,6 +61,8 @@ interface OpportunitiesPanelProps {
   catalog: BlueprintCatalog;
   pi: PiData | null;
   skills: SkillLevels;
+  /** The active Character's active-clone BX-80x manufacturing-time implant bonus, if any (issue #1229). */
+  implantBonusPct: number;
   facilityDefaults: ActivityFacilityDefaults;
   activeCharacterId: number;
   ownedStockSnapshot: OwnedStockSnapshot;
@@ -79,6 +81,7 @@ export function OpportunitiesPanel({
   catalog,
   pi,
   skills,
+  implantBonusPct,
   facilityDefaults,
   activeCharacterId,
   ownedStockSnapshot,
@@ -174,6 +177,7 @@ export function OpportunitiesPanel({
     hub: DEFAULT_TRADE_HUB,
     facilityDefaults,
     skills,
+    implantBonusPct,
     ownedStockSnapshot,
     ownedByCharacter,
     assumedMe,

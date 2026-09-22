@@ -116,4 +116,20 @@ describe('useCorpOwnedBlueprints', () => {
     resolveNext({ cached: { data: [BLUEPRINT], truncated: false } });
     await waitFor(() => expect(result.current.blueprints).toEqual([BLUEPRINT]));
   });
+
+  it('keeps the same state object across re-renders while nothing changed, so memos keyed on it hold', async () => {
+    const { result, rerender } = renderHook(() => useCorpOwnedBlueprints());
+    await waitFor(() => expect(result.current.blueprints).toEqual([BLUEPRINT]));
+    const settled = result.current;
+    rerender();
+    expect(result.current).toBe(settled);
+  });
+
+  it('keeps the same loading state object across re-renders before the fetch lands', () => {
+    loadCorporationBlueprints.mockReturnValue(new Promise(() => {}));
+    const { result, rerender } = renderHook(() => useCorpOwnedBlueprints());
+    const loading = result.current;
+    rerender();
+    expect(result.current).toBe(loading);
+  });
 });

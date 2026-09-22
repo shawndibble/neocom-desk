@@ -25,6 +25,8 @@ import type { TrainedSkill } from '@/engine/types';
 import { loadPriceHistory, type PriceHistoryResult } from '@/features/market/priceHistory';
 import { EsiError } from '@/esi/errors';
 import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
+import { loadCharacterImplants } from '@/features/skills/data';
+import { resolveImplantBonusPct } from '@/engine/industry/reprocessing';
 import { SKILL_IDS } from '@/engine/industry/types';
 import { loadCompressedOreTypeIds, loadReprocessing, loadTypes } from '@/sde/loadSde';
 import { loadTypeNames } from '@/features/character/typeNames';
@@ -80,12 +82,16 @@ const NO_TRAINED: ReadonlyMap<number, TrainedSkill> = new Map();
 async function loadReprocessingSkills(
   characterId: number
 ): Promise<{ skills: GeneralReprocessingSkills; trained: ReadonlyMap<number, TrainedSkill> }> {
-  const corrected = await loadCorrectedSkills(characterId, Date.now());
+  const [corrected, implants] = await Promise.all([
+    loadCorrectedSkills(characterId, Date.now()),
+    loadCharacterImplants(characterId),
+  ]);
   return {
     skills: {
       reprocessingLevel: corrected.trained.get(SKILL_IDS.reprocessing)?.level ?? 0,
       reprocessingEfficiencyLevel:
         corrected.trained.get(SKILL_IDS.reprocessingEfficiency)?.level ?? 0,
+      implantBonusPct: resolveImplantBonusPct(implants?.data ?? []),
     },
     trained: corrected.trained,
   };

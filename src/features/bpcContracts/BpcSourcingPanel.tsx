@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -36,6 +36,7 @@ import {
   filterBpcSearchRows,
   iskPerRun,
   listedBlueprintTypeOptions,
+  marketBpoToSearchRow,
   ownedBlueprintToSearchRow,
   blueprintSearchName,
   type BlueprintOfferStats,
@@ -64,6 +65,24 @@ import {
 } from '@/features/bpcContracts/bpcSearchColumns';
 import { useSpaceFilter } from '@/features/bpcContracts/bpcSpaceFilterPref';
 import { BpcContractModal } from '@/features/bpcContracts/BpcContractModal';
+import { BpoBadge } from '@/features/bpcContracts/BpoBadge';
+import { BpoCard } from '@/features/bpcContracts/BpoCard';
+import { useOfferLocations } from '@/features/contractSearch/offerLocations';
+import {
+  bpoBadgeRows,
+  bpoMayBeCheaper,
+  cheaperBpo,
+  cheapestBpoSourcesByType,
+  cheapestComparableCopy,
+  type BpoOffer,
+  marketBpoOffers,
+} from '@/features/bpcContracts/bpoAvailability';
+import {
+  MARKET_BPO_LOOKUP_LIMIT,
+  useMarketBpoOrders,
+} from '@/features/bpcContracts/useMarketBpoOrders';
+import { useMarketHub } from '@/features/market/hub';
+import { DEFAULT_TRADE_HUB, getTradeHub, TRADE_HUBS } from '@/market/hubs';
 import {
   createWatch,
   deleteWatch,
@@ -127,7 +146,12 @@ async function loadBpcContractsSnapshot(
   );
 
   // Already superseded: skip the region-name fan-out, its result would be discarded.
-  const rows = contractsResult?.data?.rows ?? [];
+  // Originals ride along (issue #1241): the Contract BPOs source and the BPO
+  // badge name their region and station too.
+  const rows = [
+    ...(contractsResult?.data?.rows ?? []),
+    ...(contractsResult?.data?.originals ?? []),
+  ];
   const regionIds = signal.cancelled ? [] : [...new Set(rows.map((r) => r.regionId))];
   const regionEntries = await Promise.all(
     regionIds.map(async (id): Promise<[number, string] | null> => {
@@ -199,8 +223,15 @@ const TYPE_SEARCH_LIMIT = 50;
  */
 const SUGGESTION_LIMIT = 8;
 
-/** Region cells shown in the cheapest-by-region strip, in cheapest-first order — six fills the row at `lg` without wrapping into a second one that would outsize the table below it. */
+/** Region cells shown in the cheapest-by-region strip, in cheapest-first order — six keeps the strip (plus the BPO cards beside it) from wrapping into rows that would outsize the table below it. */
 const REGION_CELL_LIMIT = 6;
+
+/** Section header over each group in the sourcing strip: Cheapest by region, Market BPOs, Contract BPOs. */
+const SOURCING_GROUP_HEADER =
+  'pb-2 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase';
+
+/** One card width for region and BPO cards alike: two across on a phone, fixed from `sm` so the groups share a row. */
+const SOURCING_CARD_WIDTH = 'w-[calc(50%-0.25rem)] sm:w-36';
 
 /** One row of the search's autocomplete: a candidate blueprint plus what its listings look like, so a dead blueprint is visible before it is chosen. */
 type BlueprintSuggestion = BlueprintTypeOption & BlueprintOfferStats;
@@ -212,11 +243,63 @@ function parsePositiveNumber(value: string): number | null {
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
 }
 
+/** Space narrows contract rows up front — see `spaceFilteredRows`' comment. */
+function narrowBySpace(
+  rows: BpcContractRow[],
+  kinds: ReadonlySet<SpaceKind> | null,
+  locations: ReadonlyMap<number, ContractLocationInfo>
+): BpcContractRow[] {
+  if (!kinds) return rows;
+  return rows.filter((row) => {
+    const space = locations.get(row.locationId)?.space ?? null;
+    return space != null && kinds.has(space);
+  });
+}
+
+/** The market lookup's region: the Region filter's, else the pilot's market hub's once known. */
+function marketLookupRegion(
+  regionId: number | null,
+  hubHydrated: boolean,
+  hubRegionId: number
+): number | null {
+  if (regionId !== null) return regionId;
+  return hubHydrated ? hubRegionId : null;
+}
+
+/** The Trade Hub station in `regionId`, or 0 when the region holds none — nothing gets marked. */
+function hubStationIn(regionId: number | null): number {
+  return TRADE_HUBS.find((hub) => hub.regionId === regionId)?.stationId ?? 0;
+}
+
 /** Rows shown before "show all" (same precedent as Contracts/the market order book). */
 const ROW_CAP = 50;
 
+/**
+ * The Source toggles. `contract` is copies; `contractBpo` is contract
+ * originals and `market` market BPO sell orders (issue #1241) — both off by
+ * default, so the tab stays a copy search unless asked.
+ */
+type SourceToggle = BpcSearchSource | 'contractBpo';
+const SOURCE_TOGGLES: readonly SourceToggle[] = ['contract', 'contractBpo', 'market', 'owned'];
+
 /** Both on by default: an existing user must keep seeing today's contract results, plus their owned blueprints, not a narrower default. */
-const DEFAULT_SOURCES: ReadonlySet<BpcSearchSource> = new Set(['contract', 'owned']);
+const DEFAULT_SOURCES: ReadonlySet<SourceToggle> = new Set(['contract', 'owned']);
+
+function isDefaultSources(sources: ReadonlySet<SourceToggle>): boolean {
+  return sources.size === DEFAULT_SOURCES.size && [...DEFAULT_SOURCES].every((s) => sources.has(s));
+}
+
+const SOURCE_LABEL_KEYS: Record<SourceToggle, string> = {
+  contract: 'bpcContracts.sourceContracts',
+  contractBpo: 'bpcContracts.sourceContractBpos',
+  market: 'bpcContracts.sourceMarketBpos',
+  owned: 'bpcContracts.sourceOwned',
+};
+
+const SOURCE_TOOLTIP_KEYS: Partial<Record<SourceToggle, string>> = {
+  contractBpo: 'bpcContracts.sourceContractBposTooltip',
+  market: 'bpcContracts.sourceMarketBposTooltip',
+};
 
 /** `engineFilter`'s `Set`-shaped fields, flattened to the arrays a watch persists (`db.BpcSearchWatchRecord`). */
 function bpcWatchFilterInput(filter: BpcSearchFilter): BpcWatchFilterInput {
@@ -235,8 +318,8 @@ interface BpcFilterBarProps {
   filter: UiFilter;
   onChange: (filter: UiFilter) => void;
   regionOptions: { id: number; name: string }[];
-  sources: ReadonlySet<BpcSearchSource>;
-  onSourcesChange: (next: ReadonlySet<BpcSearchSource>) => void;
+  sources: ReadonlySet<SourceToggle>;
+  onSourcesChange: (next: ReadonlySet<SourceToggle>) => void;
   spaceKinds: readonly SpaceKind[];
   onSpaceKindsChange: (next: readonly SpaceKind[]) => void;
 }
@@ -258,7 +341,7 @@ function BpcFilterBar({
     filter.minTe,
     filter.minRuns,
     filter.maxPrice,
-    sources.size !== DEFAULT_SOURCES.size,
+    !isDefaultSources(sources),
     spaceKinds.length !== SPACE_KINDS.length,
   ].filter(Boolean).length;
 
@@ -365,14 +448,11 @@ function BpcFilterBar({
             className="flex flex-wrap items-center gap-2"
           >
             <span className="text-text-dim">{t('bpcContracts.sourceLabel')}</span>
-            {(['contract', 'owned'] as const).map((source) => (
+            {SOURCE_TOGGLES.map((source) => (
               <FilterChip
                 key={source}
-                label={t(
-                  source === 'contract'
-                    ? 'bpcContracts.sourceContracts'
-                    : 'bpcContracts.sourceOwned'
-                )}
+                label={t(SOURCE_LABEL_KEYS[source])}
+                tooltip={SOURCE_TOOLTIP_KEYS[source] && t(SOURCE_TOOLTIP_KEYS[source])}
                 selected={draft.sources.has(source)}
                 onToggle={() => {
                   const next = new Set(draft.sources);
@@ -471,7 +551,7 @@ export function BpcSourcingPanel({ initialTypeId = null }: BpcSourcingPanelProps
 
   const [uiFilter, setUiFilter] = useState<UiFilter>(EMPTY_UI_FILTER);
   const [showAll, setShowAll] = useState(false);
-  const [sources, setSources] = useState<ReadonlySet<BpcSearchSource>>(DEFAULT_SOURCES);
+  const [sources, setSources] = useState<ReadonlySet<SourceToggle>>(DEFAULT_SOURCES);
   /**
    * The one blueprint the search has been narrowed to, or `null` while the
    * query is still free text. Distinct from `uiFilter.typeQuery`: typing
@@ -497,6 +577,20 @@ export function BpcSourcingPanel({ initialTypeId = null }: BpcSourcingPanelProps
   const [openRow, setOpenRow] = useState<BpcContractRow | null>(null);
 
   const rows = useMemo(() => contractsResult?.data?.rows ?? [], [contractsResult]);
+  /** Contract originals (issue #1241). Absent on a snapshot cached before #1240. */
+  const originals = useMemo(() => contractsResult?.data?.originals ?? [], [contractsResult]);
+
+  // The market BPO lookup's region when the Region filter is "All regions":
+  // an Order Book is one region's, so it falls back to the pilot's own market
+  // hub rather than guessing (issue #1241).
+  const marketHubId = useMarketHub((state) => state.value);
+  const marketHubHydrated = useMarketHub((state) => state.hydrated);
+  const hydrateMarketHub = useMarketHub((state) => state.hydrate);
+  useEffect(() => {
+    void hydrateMarketHub();
+  }, [hydrateMarketHub]);
+  const marketHub = getTradeHub(marketHubId) ?? DEFAULT_TRADE_HUB;
+  const [marketRefreshTick, setMarketRefreshTick] = useState(0);
 
   /** `null` when every kind is checked — the filter's own default, a no-op. */
   const activeSpaceKinds = useMemo(
@@ -512,13 +606,14 @@ export function BpcSourcingPanel({ initialTypeId = null }: BpcSourcingPanelProps
   // it here instead keeps the suggestion counts and the displayed table
   // agreeing on what "40 offers" means, the same property `nonTypeFilter`
   // below already protects for the other criteria.
-  const spaceFilteredRows = useMemo(() => {
-    if (!activeSpaceKinds) return rows;
-    return rows.filter((row) => {
-      const space = contractLocations.get(row.locationId)?.space ?? null;
-      return space != null && activeSpaceKinds.has(space);
-    });
-  }, [rows, activeSpaceKinds, contractLocations]);
+  const spaceFilteredRows = useMemo(
+    () => narrowBySpace(rows, activeSpaceKinds, contractLocations),
+    [rows, activeSpaceKinds, contractLocations]
+  );
+  const spaceFilteredOriginals = useMemo(
+    () => narrowBySpace(originals, activeSpaceKinds, contractLocations),
+    [originals, activeSpaceKinds, contractLocations]
+  );
 
   // Merges in owned typeIds, gated on the Owned toggle, so free-text search
   // narrows an Owned-only result even without a contract listing — but never
@@ -528,8 +623,25 @@ export function BpcSourcingPanel({ initialTypeId = null }: BpcSourcingPanelProps
     const ownedTypeIds = sources.has('owned')
       ? ownedBlueprints.map((bp) => ({ typeId: bp.type_id }))
       : [];
-    return listedBlueprintTypeOptions([...spaceFilteredRows, ...ownedTypeIds], blueprintNames);
-  }, [spaceFilteredRows, ownedBlueprints, sources, blueprintNames]);
+    const listedOriginals = sources.has('contractBpo') ? spaceFilteredOriginals : [];
+    return listedBlueprintTypeOptions(
+      [...spaceFilteredRows, ...listedOriginals, ...ownedTypeIds],
+      blueprintNames
+    );
+  }, [spaceFilteredRows, spaceFilteredOriginals, ownedBlueprints, sources, blueprintNames]);
+
+  /**
+   * Every blueprint in the SDE, for the market lookup only: an NPC-seeded BPO
+   * nobody has contracted is exactly what it must find, and `typeOptions`
+   * only holds listed or owned types.
+   */
+  const allBlueprintOptions = useMemo(
+    () =>
+      [...blueprintNames.entries()]
+        .map(([typeId, name]) => ({ typeId, name }))
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    [blueprintNames]
+  );
 
   /**
    * Every filter *except* the blueprint itself. Suggestions are counted
@@ -607,10 +719,10 @@ export function BpcSourcingPanel({ initialTypeId = null }: BpcSourcingPanelProps
   }
   const regionOptions = useMemo(
     () =>
-      [...new Set(rows.map((r) => r.regionId))]
+      [...new Set([...rows, ...originals].map((r) => r.regionId))]
         .map((id) => ({ id, name: regionNames.get(id) ?? `#${id}` }))
         .sort((a, b) => a.name.localeCompare(b.name)),
-    [rows, regionNames]
+    [rows, originals, regionNames]
   );
 
   const engineFilter: BpcSearchFilter = useMemo(() => {
@@ -630,6 +742,53 @@ export function BpcSourcingPanel({ initialTypeId = null }: BpcSourcingPanelProps
     // the table would answer different questions.
     return { ...nonTypeFilter, typeIds };
   }, [nonTypeFilter, uiFilter.typeQuery, typeOptions, selectedTypeId]);
+
+  /**
+   * The blueprint types the market is checked for BPOs (issue #1241): the
+   * chosen blueprint, else the closest typed matches across the whole SDE,
+   * else none — never every type in the results (`useMarketBpoOrders`).
+   */
+  const marketLookup = useMemo(() => {
+    if (selectedTypeId !== null) return { typeIds: [selectedTypeId], capped: false };
+    if (uiFilter.typeQuery.trim() === '') return { typeIds: [], capped: false };
+    const matches = rankedSearch(allBlueprintOptions, blueprintSearchName(uiFilter.typeQuery), {
+      primary: (o) => blueprintSearchName(o.name),
+      limit: MARKET_BPO_LOOKUP_LIMIT + 1,
+    }).map((o) => o.typeId);
+    return {
+      typeIds: matches.slice(0, MARKET_BPO_LOOKUP_LIMIT),
+      capped: matches.length > MARKET_BPO_LOOKUP_LIMIT,
+    };
+  }, [selectedTypeId, uiFilter.typeQuery, allBlueprintOptions]);
+  const marketRegionId = useMemo(
+    () => marketLookupRegion(uiFilter.regionId, marketHubHydrated, marketHub.regionId),
+    [uiFilter.regionId, marketHubHydrated, marketHub.regionId]
+  );
+  const marketHubStationId = useMemo(() => hubStationIn(marketRegionId), [marketRegionId]);
+  const market = useMarketBpoOrders(marketRegionId, marketLookup.typeIds, marketRefreshTick);
+
+  // The market region may hold no contract listing, so `regionNames` may not name it.
+  const [marketRegionName, setMarketRegionName] = useState<{ id: number; name: string } | null>(
+    null
+  );
+  useEffect(() => {
+    if (marketRegionId === null || regionNames.has(marketRegionId)) return;
+    let cancelled = false;
+    void loadRegionName(marketRegionId)
+      .then((name) => {
+        if (!cancelled && name) setMarketRegionName({ id: marketRegionId, name });
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [marketRegionId, regionNames]);
+  const regionLabel = useCallback(
+    (id: number) =>
+      regionNames.get(id) ?? (marketRegionName?.id === id ? marketRegionName.name : `#${id}`),
+    [regionNames, marketRegionName]
+  );
+  const marketRegionLabel = marketRegionId === null ? null : regionLabel(marketRegionId);
 
   // BPC Sourcing watches (issue #926): a pilot's saved searches, notified on
   // a genuinely new or cheaper matching offer by the standalone
@@ -712,18 +871,96 @@ export function BpcSourcingPanel({ initialTypeId = null }: BpcSourcingPanelProps
     [ownedSearchRows, engineFilter]
   );
 
+  const contractBpoSearchRows = useMemo(
+    () =>
+      filterBpcContracts(spaceFilteredOriginals, engineFilter).map((row) =>
+        contractRowToSearchRow(row, contractLocations.get(row.locationId))
+      ),
+    [spaceFilteredOriginals, engineFilter, contractLocations]
+  );
+
+  // Already limited to the looked-up types, so filtered on everything but the
+  // listed-type search (`engineFilter.typeIds` only knows listed types).
+  const marketSearchRows = useMemo(() => {
+    if (marketRegionId === null) return [];
+    const searchRows: BpcSearchRow[] = [];
+    for (const [typeId, book] of market.booksByType) {
+      for (const offer of marketBpoOffers(book.sell, book.regionId, marketHubStationId)) {
+        const location = market.locations.get(offer.locationId);
+        searchRows.push(
+          marketBpoToSearchRow({
+            orderId: offer.orderId,
+            typeId,
+            regionId: offer.regionId,
+            locationId: offer.locationId,
+            price: offer.price,
+            volumeRemain: offer.volumeRemain,
+            atHub: offer.atHub,
+            locationName: location?.name ?? null,
+            space: location?.space ?? null,
+          })
+        );
+      }
+    }
+    return filterBpcSearchRows(searchRows, nonTypeFilter);
+  }, [market.booksByType, market.locations, marketRegionId, marketHubStationId, nonTypeFilter]);
+
   /**
-   * Built from whichever source(s) are toggled on. Owned rows lead: the
-   * synced contract snapshot can run to six figures while owned blueprints
-   * number in the dozens, so contracts-first would let them fill `ROW_CAP`
-   * and push every owned row out of the default (not-`showAll`) view.
+   * The cheapest BPO per blueprint type in the results (issue #1241):
+   * contract originals in the Region filter's scope, market orders for the
+   * looked-up types only.
+   */
+  const bpoSourcesByType = useMemo(() => {
+    const typeIds = new Set(marketLookup.typeIds);
+    for (const row of filteredRows) typeIds.add(row.typeId);
+    for (const row of filteredOwnedRows) typeIds.add(row.typeId);
+    return cheapestBpoSourcesByType(typeIds, {
+      originals,
+      contractRegionId: uiFilter.regionId,
+      marketBooks: market.booksByType,
+      hubStationId: marketHubStationId,
+    });
+  }, [
+    marketLookup.typeIds,
+    filteredRows,
+    filteredOwnedRows,
+    originals,
+    uiFilter.regionId,
+    market.booksByType,
+    marketHubStationId,
+  ]);
+  const bpoByType = useMemo(() => {
+    const result = new Map<number, BpoOffer>();
+    for (const [typeId, sources] of bpoSourcesByType) {
+      const best = cheaperBpo(sources);
+      if (best) result.set(typeId, best);
+    }
+    return result;
+  }, [bpoSourcesByType]);
+
+  /**
+   * Built from whichever source(s) are toggled on. Owned rows lead, then the
+   * BPO sources: the synced contract snapshot can run to six figures while
+   * the others number in the dozens, so copies-first would let them fill
+   * `ROW_CAP` and push every other row out of the default (not-`showAll`) view.
    */
   const displayRows = useMemo<BpcSearchRow[]>(() => {
     const contractRows = sources.has('contract') ? contractSearchRows : [];
     const ownedRows = sources.has('owned') ? filteredOwnedRows : [];
-    return [...ownedRows, ...contractRows];
-  }, [sources, contractSearchRows, filteredOwnedRows]);
-  const visibleRows = showAll ? displayRows : displayRows.slice(0, ROW_CAP);
+    const marketRows = sources.has('market') ? marketSearchRows : [];
+    const contractBpoRows = sources.has('contractBpo') ? contractBpoSearchRows : [];
+    return [...ownedRows, ...marketRows, ...contractBpoRows, ...contractRows];
+  }, [sources, contractSearchRows, filteredOwnedRows, marketSearchRows, contractBpoSearchRows]);
+  const visibleRows = useMemo(
+    () => (showAll ? displayRows : displayRows.slice(0, ROW_CAP)),
+    [showAll, displayRows]
+  );
+  // With several blueprints listed, one on-screen copy row per type carries the BPO
+  // badge; with one picked, the callout cards say it instead (issue #1241).
+  const badgedRows = useMemo(
+    () => (selectedTypeId === null ? bpoBadgeRows(visibleRows) : new Set<BpcSearchRow>()),
+    [selectedTypeId, visibleRows]
+  );
 
   // Both summarise `filteredRows`, not every row of the chosen blueprint, so
   // they describe what is actually on screen: narrowing to ME ≥ 10 should move
@@ -732,6 +969,30 @@ export function BpcSourcingPanel({ initialTypeId = null }: BpcSourcingPanelProps
   const summary = useMemo(
     () => (selectedTypeId === null ? null : bpcPriceSummary(filteredRows)),
     [selectedTypeId, filteredRows]
+  );
+  const selectedBpoSources =
+    selectedTypeId === null ? undefined : bpoSourcesByType.get(selectedTypeId);
+  const selectedMarketBpo = selectedBpoSources?.market ?? null;
+  const selectedContractBpo = selectedBpoSources?.contract ?? null;
+  const selectedBpoCards = useMemo(
+    () => [selectedMarketBpo, selectedContractBpo].filter((bpo): bpo is BpoOffer => bpo !== null),
+    [selectedMarketBpo, selectedContractBpo]
+  );
+  // System + security for each card, the same local SDE lookup Item Offers uses.
+  const bpoCardLocations = useOfferLocations(selectedBpoCards);
+  // The copy the CHEAPEST chip would quote, if it has an honest price to
+  // compare a BPO with — so a card never claims "may be cheaper" against a
+  // bundle's or barter's price.
+  const cheapestCopy = useMemo(
+    () => (selectedTypeId === null ? null : cheapestComparableCopy(filteredRows)),
+    [selectedTypeId, filteredRows]
+  );
+  const bpoLocationName = useCallback(
+    (bpo: BpoOffer) =>
+      (bpo.kind === 'market'
+        ? market.locations.get(bpo.locationId)?.name
+        : contractLocations.get(bpo.locationId)?.name) ?? null,
+    [market.locations, contractLocations]
   );
   const regionPrices = useMemo(
     () => (selectedTypeId === null ? [] : cheapestByRegion(filteredRows)),
@@ -748,7 +1009,9 @@ export function BpcSourcingPanel({ initialTypeId = null }: BpcSourcingPanelProps
           <span className="inline-flex items-center rounded-xs border border-line bg-panel-2 px-1.5 py-0.5 text-[0.625rem] font-semibold tracking-widest text-text-dim uppercase">
             {row.source === 'contract'
               ? t('bpcContracts.sourceContractSingular')
-              : t('bpcContracts.sourceOwned')}
+              : row.source === 'market'
+                ? t('bpcContracts.sourceMarketSingular')
+                : t('bpcContracts.sourceOwned')}
           </span>
         ),
       },
@@ -756,7 +1019,19 @@ export function BpcSourcingPanel({ initialTypeId = null }: BpcSourcingPanelProps
         id: 'location',
         header: t('bpcContracts.locationColumn'),
         sortValue: (row) => row.locationName ?? '',
-        render: (row) => row.locationName ?? t('bpcContracts.notApplicable'),
+        render: (row) => {
+          const name = row.locationName ?? t('bpcContracts.notApplicable');
+          // The owner's #1240 rule for market BPOs: the whole region, the hub's own station marked.
+          if (row.source !== 'market' || !row.atHub) return name;
+          return (
+            <span className="inline-flex flex-wrap items-center gap-x-1.5">
+              <span>{name}</span>
+              <span className="text-[0.625rem] tracking-widest text-accent uppercase">
+                {t('bpcContracts.atTradeHub')}
+              </span>
+            </span>
+          );
+        },
       },
       me: {
         id: 'me',
@@ -802,10 +1077,12 @@ export function BpcSourcingPanel({ initialTypeId = null }: BpcSourcingPanelProps
         // top of the table while rendering — and now summarising — at its real
         // price. Owned rows sort last (Infinity) rather than reading as cheapest.
         sortValue: (row) => {
+          if (row.source === 'market') return row.price;
           const contract = asContract(row);
           return contract ? effectivePrice(contract) : Infinity;
         },
         render: (row) => {
+          if (row.source === 'market') return <IskAmount value={row.price} revealOn="longPress" />;
           const contract = asContract(row);
           if (!contract) return t('bpcContracts.notApplicable');
           // Only the plain ask becomes shorthand, so this column mixes
@@ -929,14 +1206,40 @@ export function BpcSourcingPanel({ initialTypeId = null }: BpcSourcingPanelProps
         header: t('bpcContracts.itemColumn'),
         primary: true,
         sortValue: (row) => blueprintNames.get(row.typeId) ?? `#${row.typeId}`,
-        render: (row) => blueprintNames.get(row.typeId) ?? `#${row.typeId}`,
+        render: (row) => {
+          const name = blueprintNames.get(row.typeId) ?? `#${row.typeId}`;
+          // A BPO row is the BPO itself; only a copy gets the "BPO too" badge,
+          // and only one copy per type (`bpoBadgeRows`).
+          const bpo = badgedRows.has(row) ? bpoByType.get(row.typeId) : undefined;
+          if (!bpo) return name;
+          return (
+            <span className="flex min-w-0 flex-col items-start gap-1">
+              <span>{name}</span>
+              <BpoBadge
+                bpo={bpo}
+                mayBeCheaper={row.source === 'contract' && bpoMayBeCheaper(bpo, row.contract)}
+                locationName={bpoLocationName(bpo)}
+                regionName={regionLabel(bpo.regionId)}
+              />
+            </span>
+          );
+        },
       },
     ];
     for (const id of BPC_SEARCH_COLUMN_IDS) {
       if (visibleColumns.includes(id)) cols.push(bpcColumnsById[id]);
     }
     return cols;
-  }, [t, blueprintNames, visibleColumns, bpcColumnsById]);
+  }, [
+    t,
+    blueprintNames,
+    visibleColumns,
+    bpcColumnsById,
+    bpoByType,
+    badgedRows,
+    bpoLocationName,
+    regionLabel,
+  ]);
 
   if (!hydrated || activeCharacterId === null) {
     // No redirect of its own: the Industry route this sits in already sends a
@@ -975,7 +1278,10 @@ export function BpcSourcingPanel({ initialTypeId = null }: BpcSourcingPanelProps
           <IconButton
             icon={<Icon.Refresh />}
             label={t('bpcContracts.refresh')}
-            onClick={refresh}
+            onClick={() => {
+              refresh();
+              setMarketRefreshTick((tick) => tick + 1);
+            }}
             disabled={loading}
           />
         </>
@@ -992,7 +1298,7 @@ export function BpcSourcingPanel({ initialTypeId = null }: BpcSourcingPanelProps
           title={t('bpcContracts.notConfiguredTitle')}
           hint={t('bpcContracts.notConfiguredHint')}
         />
-      ) : rows.length === 0 && ownedBlueprints.length === 0 ? (
+      ) : rows.length === 0 && originals.length === 0 && ownedBlueprints.length === 0 ? (
         // Nothing to search from either source — distinct from
         // `noFilterMatches` below, which is "some data exists, the filter
         // just excludes it all."
@@ -1173,43 +1479,93 @@ export function BpcSourcingPanel({ initialTypeId = null }: BpcSourcingPanelProps
             </div>
           )}
 
-          {regionPrices.length > 1 && (
-            <div className="border-b border-line px-3 py-2">
-              {/* Says so when it is showing a subset: the cheapest region always
-                  survives the slice, but a blueprint listed in twenty regions
-                  would otherwise show six with nothing admitting it. */}
-              <p className="pb-2 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                {regionPrices.length > REGION_CELL_LIMIT
-                  ? t('bpcContracts.cheapestByRegionCapped', {
-                      shown: REGION_CELL_LIMIT,
-                      total: regionPrices.length,
-                    })
-                  : t('bpcContracts.cheapestByRegion')}
-              </p>
-              {/* Cheapest first, so the ordering carries the answer and the
-                  accent on the leading cell is only reinforcement (DESIGN.md §7). */}
-              <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
-                {regionPrices.slice(0, REGION_CELL_LIMIT).map((region, index) => (
-                  <li
-                    key={region.regionId}
-                    className={cx(
-                      'flex flex-col gap-0.5 rounded-xs border bg-panel-2 px-2.5 py-2',
-                      index === 0 ? 'border-accent-dim' : 'border-line'
-                    )}
-                  >
-                    <span className="truncate text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                      {regionNames.get(region.regionId) ?? `#${region.regionId}`}
-                    </span>
-                    <span className={cx('text-sm tabular-nums', index === 0 && 'text-accent')}>
-                      <IskAmount value={region.cheapest} revealOn="tap" />
-                    </span>
-                    <span className="text-[0.6875rem] tabular-nums text-text-dim">
-                      {t('bpcContracts.regionOffers', { count: region.offerCount })}
-                    </span>
-                  </li>
-                ))}
-              </ul>
+          {(regionPrices.length > 1 || selectedBpoCards.length > 0) && (
+            // One wrapping row: [Cheapest by region] [Market BPOs] [Contract BPOs],
+            // every card the same width; groups stack on a phone. A group with
+            // no card is left out.
+            <div className="flex flex-col gap-3 border-b border-line px-3 py-2 sm:flex-row sm:flex-wrap sm:gap-x-4">
+              {regionPrices.length > 1 && (
+                <div className="min-w-0 max-w-full">
+                  {/* Says so when it is showing a subset: the cheapest region always
+                    survives the slice, but a blueprint listed in twenty regions
+                    would otherwise show six with nothing admitting it. */}
+                  <p className={SOURCING_GROUP_HEADER}>
+                    {regionPrices.length > REGION_CELL_LIMIT
+                      ? t('bpcContracts.cheapestByRegionCapped', {
+                          shown: REGION_CELL_LIMIT,
+                          total: regionPrices.length,
+                        })
+                      : t('bpcContracts.cheapestByRegion')}
+                  </p>
+                  {/* Cheapest first, so the ordering carries the answer and the
+                    accent on the leading cell is only reinforcement (DESIGN.md §7). */}
+                  <ul className="flex flex-wrap gap-2">
+                    {regionPrices.slice(0, REGION_CELL_LIMIT).map((region, index) => (
+                      <li
+                        key={region.regionId}
+                        className={cx(
+                          'flex flex-col gap-0.5 rounded-xs border bg-panel-2 px-2.5 py-2',
+                          SOURCING_CARD_WIDTH,
+                          index === 0 ? 'border-accent-dim' : 'border-line'
+                        )}
+                      >
+                        <span className="truncate text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                          {regionNames.get(region.regionId) ?? `#${region.regionId}`}
+                        </span>
+                        <span className={cx('text-sm tabular-nums', index === 0 && 'text-accent')}>
+                          <IskAmount value={region.cheapest} revealOn="tap" />
+                        </span>
+                        <span className="text-[0.6875rem] tabular-nums text-text-dim">
+                          {t('bpcContracts.regionOffers', { count: region.offerCount })}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {selectedBpoCards.map((bpo) => {
+                const header = t(
+                  bpo.kind === 'market'
+                    ? 'bpcContracts.sourceMarketBpos'
+                    : 'bpcContracts.sourceContractBpos'
+                );
+                return (
+                  <div key={bpo.kind} className="min-w-0 max-w-full">
+                    <p className={SOURCING_GROUP_HEADER}>{header}</p>
+                    <ul aria-label={header} className="flex flex-wrap gap-2">
+                      <BpoCard
+                        bpo={bpo}
+                        mayBeCheaper={cheapestCopy !== null && bpoMayBeCheaper(bpo, cheapestCopy)}
+                        location={bpoCardLocations.get(bpo.locationId)}
+                        className={SOURCING_CARD_WIDTH}
+                      />
+                    </ul>
+                  </div>
+                );
+              })}
             </div>
+          )}
+
+          {(marketLookup.typeIds.length > 0 || sources.has('market')) && (
+            <p className="border-b border-line px-3 py-2 text-[0.6875rem] text-text-dim">
+              {marketLookup.typeIds.length === 0 || marketRegionId === null
+                ? t('bpcContracts.marketScopeNeedsSearch')
+                : [
+                    market.loading
+                      ? t('bpcContracts.marketScopeChecking')
+                      : uiFilter.regionId === null
+                        ? t('bpcContracts.marketScopeHub', { hub: marketHub.systemName })
+                        : t('bpcContracts.marketScopeRegion', { region: marketRegionLabel }),
+                    market.failedTypeIds.size > 0
+                      ? t('bpcContracts.marketScopeFailed', { count: market.failedTypeIds.size })
+                      : null,
+                    marketLookup.capped
+                      ? t('bpcContracts.marketScopeCapped', { count: MARKET_BPO_LOOKUP_LIMIT })
+                      : null,
+                  ]
+                    .filter(Boolean)
+                    .join(' ')}
+            </p>
           )}
 
           {sources.size === 0 ? (
@@ -1231,7 +1587,9 @@ export function BpcSourcingPanel({ initialTypeId = null }: BpcSourcingPanelProps
                 rowKey={(row, index) =>
                   row.source === 'contract'
                     ? `${row.contract.contractId}:${row.typeId}:${index}`
-                    : `owned:${row.itemId}`
+                    : row.source === 'market'
+                      ? `market:${row.orderId}`
+                      : `owned:${row.itemId}`
                 }
                 defaultSort={{ columnId: 'price', direction: 'asc' }}
                 // No contract exists for an owned row — nothing to open.

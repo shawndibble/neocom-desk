@@ -1,17 +1,15 @@
 /**
  * Fetches and summarizes the order book for every item in the Compare Set,
- * under the same region/Location Mode resolution `Market.tsx` uses for the
- * order book beside it (`resolveOrderBookRegion`, `filterOrdersByLocation`).
+ * through the same Order Book view (`orderBookView.ts`) `Market.tsx` reads
+ * the order book beside it from, so a row can't disagree with the tables.
  * Only runs while `enabled` — the drawer's handle shows a count, not prices,
  * so a closed drawer must not fire N ESI reads.
  */
 import { useEffect, useRef, useState } from 'react';
-import { getOrderBook, ORDER_BOOK_FANOUT_CONCURRENCY } from './orderBook';
+import { ORDER_BOOK_FANOUT_CONCURRENCY } from './orderBook';
+import { loadOrderBookView, type OrderBookLocation } from './orderBookView';
 import { mapWithConcurrencyLimit } from '@/lib/concurrency';
 import type { CompareSetItem } from './compareSet';
-import type { LocationMode } from './locationMode';
-import { resolveOrderBookRegion, type GlobalMarketOverride } from '@/engine/market/locationMode';
-import { filterOrdersByLocation, summarizeOrderBook } from '@/engine/market/orderBook';
 import type { OrderBookSummary } from '@/engine/market/orderBook';
 
 export interface CompareRow {
@@ -26,10 +24,8 @@ export interface UseCompareRowsArgs {
   items: readonly CompareSetItem[];
   /** Fetch only while the drawer is actually open. */
   enabled: boolean;
-  chosenRegionId: number;
-  globalMarkets: ReadonlyMap<number, GlobalMarketOverride>;
-  locationMode: LocationMode;
-  hubStationId: number;
+  /** The Market Browser's own Order Book location, so rows match its tables. */
+  location: OrderBookLocation;
   /** Bump to force a refetch past the order-book cache's TTL. */
   refreshTick: number;
 }
@@ -37,10 +33,7 @@ export interface UseCompareRowsArgs {
 export function useCompareRows({
   items,
   enabled,
-  chosenRegionId,
-  globalMarkets,
-  locationMode,
-  hubStationId,
+  location,
   refreshTick,
 }: UseCompareRowsArgs): CompareRow[] {
   const [rows, setRows] = useState<CompareRow[]>([]);
@@ -73,22 +66,13 @@ export function useCompareRows({
       }))
     );
     async function loadRow(item: CompareSetItem): Promise<CompareRow> {
-      try {
-        const resolved = resolveOrderBookRegion(item.typeId, chosenRegionId, globalMarkets);
-        const result = await getOrderBook(resolved.regionId, item.typeId);
-        const orders =
-          locationMode === 'hub'
-            ? filterOrdersByLocation(result.orders, hubStationId)
-            : result.orders;
-        return {
-          typeId: item.typeId,
-          itemName: item.itemName,
-          loading: false,
-          summary: summarizeOrderBook(orders),
-        };
-      } catch {
-        return { typeId: item.typeId, itemName: item.itemName, loading: false, summary: null };
-      }
+      const view = await loadOrderBookView(item.typeId, location);
+      return {
+        typeId: item.typeId,
+        itemName: item.itemName,
+        loading: false,
+        summary: view.status === 'failed' ? null : view.summary,
+      };
     }
     const resolvedRows: CompareRow[] = new Array<CompareRow>(currentItems.length);
     void mapWithConcurrencyLimit(
@@ -105,7 +89,7 @@ export function useCompareRows({
     return () => {
       cancelled = true;
     };
-  }, [enabled, itemsKey, chosenRegionId, globalMarkets, locationMode, hubStationId, refreshTick]);
+  }, [enabled, itemsKey, location, refreshTick]);
 
   return rows;
 }

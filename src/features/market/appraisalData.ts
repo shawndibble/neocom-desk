@@ -49,11 +49,13 @@ import {
 import { parseAppraisalPaste } from '@/engine/market/appraisalPaste';
 import {
   resolveReprocessingSkills,
+  resolveImplantBonusPct,
   type GeneralReprocessingSkills,
 } from '@/engine/industry/reprocessing';
 import { SKILL_IDS } from '@/engine/industry/types';
 import type { TrainedSkill } from '@/engine/types';
 import { findLpOfferMatches, toLpOfferInputs } from '@/features/market/appraisalLpAcquisition';
+import { loadCharacterImplants } from '@/features/skills/data';
 import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
 import { TRADE_HUBS, type TradeHub } from '@/market/hubs';
 import { getHubPrices, invalidateHubPrices } from '@/market/prices';
@@ -64,6 +66,13 @@ import type { ReprocessingType } from '@/sde/types';
 export interface AppraisalOutcome {
   appraisal: Appraisal;
   unmatched: AppraisalUnmatched[];
+  /**
+   * The active clone's refining implant bonus, 0 with none fitted, no active
+   * Character, or the whole paste is scrap — the implant's own ESI
+   * description covers ore and ice only, so a scrap-only paste never
+   * actually saw the bonus even though the character has it (issue #1227).
+   */
+  implantBonusPct: number;
 }
 
 /**
@@ -118,12 +127,16 @@ export interface AppraiseOptions {
 async function loadReprocessingSkills(
   characterId: number
 ): Promise<{ skills: GeneralReprocessingSkills; trained: ReadonlyMap<number, TrainedSkill> }> {
-  const corrected = await loadCorrectedSkills(characterId, Date.now());
+  const [corrected, implants] = await Promise.all([
+    loadCorrectedSkills(characterId, Date.now()),
+    loadCharacterImplants(characterId),
+  ]);
   return {
     skills: {
       reprocessingLevel: corrected.trained.get(SKILL_IDS.reprocessing)?.level ?? 0,
       reprocessingEfficiencyLevel:
         corrected.trained.get(SKILL_IDS.reprocessingEfficiency)?.level ?? 0,
+      implantBonusPct: resolveImplantBonusPct(implants?.data ?? []),
     },
     trained: corrected.trained,
   };
@@ -180,11 +193,20 @@ export async function appraisePaste(
     [...prices].map(([typeId, agg]) => [typeId, agg.sellMin ?? undefined])
   );
 
+  let implantApplied = false;
   const items: AppraisalItem[] = matched.map((match) => {
     const aggregate = prices.get(match.typeId);
     const reprocessing = reprocessingByTypeId.get(match.typeId);
-    const refine =
+    const resolvedSkills =
       reprocessing && reprocessingSkills
+        ? resolveReprocessingSkills(
+            reprocessingSkills.skills,
+            reprocessing.specialisationSkillID,
+            reprocessingSkills.trained
+          )
+        : undefined;
+    const refine =
+      reprocessing && resolvedSkills
         ? computeAppraisalRefine({
             quantity: match.quantity,
             reprocessing: {
@@ -194,11 +216,7 @@ export async function appraisePaste(
                 quantity: m.quantity,
               })),
             },
-            skills: resolveReprocessingSkills(
-              reprocessingSkills.skills,
-              reprocessing.specialisationSkillID,
-              reprocessingSkills.trained
-            ),
+            skills: resolvedSkills,
             materialPrices: Object.fromEntries(
               reprocessing.materials
                 .map((m): [number, number | undefined] => [
@@ -209,6 +227,9 @@ export async function appraisePaste(
             ),
           })
         : undefined;
+    if (refine && !resolvedSkills?.isScrap && resolvedSkills?.implantBonusPct) {
+      implantApplied = true;
+    }
     const lpForType = lpMatches?.matchesByTypeId.get(match.typeId);
     const lpOption = lpForType
       ? (cheapestLpOffer(toLpOfferInputs(lpForType, sellPrices), match.quantity) ?? undefined)
@@ -227,6 +248,7 @@ export async function appraisePaste(
   return {
     appraisal: buildAppraisal(items, pricePercent),
     unmatched,
+    implantBonusPct: implantApplied ? (reprocessingSkills?.skills.implantBonusPct ?? 0) : 0,
   };
 }
 

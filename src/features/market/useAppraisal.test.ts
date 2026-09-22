@@ -24,6 +24,7 @@ function outcome(sell: number): AppraisalOutcome {
       },
     },
     unmatched: [],
+    implantBonusPct: 0,
   };
 }
 

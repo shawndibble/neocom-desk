@@ -8,8 +8,7 @@
  * `clipboardImport` already use.
  */
 
-import { db, type BuildPlanRecord } from '@/db';
-import { scheduleSync } from '@/sync';
+import type { BuildPlanRecord } from '@/db';
 import type { CharacterBlueprint } from '@/esi/endpoints';
 import {
   fitToBuildPlans,
@@ -23,6 +22,7 @@ import { findOwnedBlueprint } from './data';
 import type { BlueprintCatalog, BlueprintCatalogEntry } from './blueprintCatalog';
 import { newBuildPlan } from './newBuildPlan';
 import { addBuildGroup, type BuildGroupsValue } from './buildGroups';
+import { createBuildPlans } from './buildPlanStore';
 
 /**
  * Lower-cased item name to typeID, built once per catalog.
@@ -181,10 +181,10 @@ export interface FitImportApplyContext extends Omit<FitImportPlanContext, 'build
  *
  * Write order matters and is owned here, not by the caller: the group's
  * record goes down *before* the plans that point at it, the same rule
- * `buildGroups.ts` documents for the delete path in reverse. A single
- * `bulkAdd` and one `scheduleSync` cover every plan, not one of each per plan
- * — see `fitImportPlans`. Returns `null`, having written nothing, when the
- * preview resolves to no buildable plans at all (an all-skipped paste).
+ * `buildGroups.ts` documents for the delete path in reverse. One
+ * `createBuildPlans` call (one bulk add, one sync) covers every plan — see
+ * `fitImportPlans`. Returns `null`, having written nothing, when the preview
+ * resolves to no buildable plans at all (an all-skipped paste).
  */
 export async function applyFitImport(
   preview: FitToBuildPlansResult,
@@ -199,7 +199,6 @@ export async function applyFitImport(
       name: context.groupName,
     })
   );
-  await db.buildPlans.bulkAdd(newPlans);
-  scheduleSync(context.characterId);
+  await createBuildPlans(newPlans);
   return { groupId: buildGroupId };
 }

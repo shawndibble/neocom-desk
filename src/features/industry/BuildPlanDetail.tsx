@@ -20,7 +20,6 @@ import {
 import * as Icon from '@/components/ui/icons';
 import {
   FACILITY_PRESETS,
-  MAX_JOB_RUNS,
   RIG_KIND_OPTIONS,
   SKILL_IDS,
   EMPTY_RIG_FIT,
@@ -41,11 +40,11 @@ import type {
   FacilityKind,
   MaterialPriceBasis,
   MaterialSourcing,
-  ReactionFacilityContext,
   RigKind,
   SkillLevels,
 } from '@/engine/industry/types';
 import { rigKindLabelKey, rigFitSummaryLabel } from './rigFitLabels';
+import type { BuildPlanChange, SourcingPatchEntry } from './buildPlanStore';
 import type { BuildGroupSnapshot } from './buildGroups';
 import { GroupTargetLink } from './GroupTargetLink';
 import {
@@ -69,15 +68,10 @@ import {
   volumeForType,
   type BlueprintCatalog,
 } from './blueprintCatalog';
-import { computeBuildPlan } from './computeBuildPlan';
-import {
-  acquisitionForLookup,
-  buildPlanTypeIds,
-  recipeForLookup,
-  withoutAcquisitionCost,
-} from './recipes';
+import { planOwnedBlueprints, resolveBuildPlan } from './resolveBuildPlan';
+import { buildPlanTypeIds, recipeForLookup } from './recipes';
 import { useBpcAcquisitionOffers } from './useBpcAcquisitionOffers';
-import { materialPriceBasisOf, materialPricesFor } from './priceBasis';
+import { materialPriceBasisOf } from './priceBasis';
 import { useMarketSnapshot } from './useMarketSnapshot';
 import { formatDuration } from '@/lib/duration';
 import { downloadCsv } from '@/lib/downloadCsv';
@@ -99,16 +93,14 @@ import {
 } from './subBuildPlan';
 import { formatIsk } from '@/lib/isk';
 import { cx } from '@/lib/cx';
+import type { OwnedStockSnapshot } from './ownedStockDetection';
 import {
-  bulkOwnedStockSuggestions,
-  clearOwnedStockSuggestions,
-  filterStockByScope,
-} from '@/engine/industry/ownedStock';
-import {
-  stockLocationLabel,
-  type OwnedStockDetection,
-  type OwnedStockSnapshot,
-} from './ownedStockDetection';
+  bulkUseDetected,
+  bulkUseNone,
+  materialTypeIdKey,
+  ownedStockView,
+  typeIdsFromKey,
+} from './planMaterialsView';
 import { useDetectedOwnedStock } from './useDetectedOwnedStock';
 import type { CorpOwnedStockState } from './corpOwnedStock';
 import type { CorpOwnedBlueprintsState } from './corpOwnedBlueprints';
@@ -126,7 +118,7 @@ import { buildLocationLabel } from './buildLocationLabel';
 import { buildLocationPatch, reactionBuildLocationPatch } from './buildLocationPatch';
 import { useDerivedSecurityBand } from './useDerivedSecurityBand';
 
-/** The Build Plan fields this panel edits; `Industry.tsx` persists exactly these. */
+/** The Build Plan fields this panel edits, sent as an `edit` `BuildPlanChange`. */
 export type PlanPatch = Partial<
   Pick<
     BuildPlanRecord,
@@ -176,12 +168,6 @@ const clearedReactionBuildLocation = {
   reactionBuildLocationName: undefined,
 } satisfies PlanPatch;
 
-/** One material's sourcing edit, for the bulk "use all" action. */
-export interface SourcingPatchEntry {
-  typeID: number;
-  patch: MaterialSourcing;
-}
-
 interface BuildPlanDetailProps {
   plan: BuildPlanRecord;
   catalog: BlueprintCatalog;
@@ -189,6 +175,8 @@ interface BuildPlanDetailProps {
   pi: PiData | null;
   ownedBlueprints: readonly CharacterBlueprint[];
   skills: SkillLevels;
+  /** The plan owner's active-clone BX-80x manufacturing-time implant bonus, if any (issue #1229). */
+  implantBonusPct: number;
   /**
    * Whole-account asset snapshot for owned-stock detection (issue #181),
    * loaded once by `useOwnedStockSnapshot` above this component's own
@@ -212,28 +200,13 @@ interface BuildPlanDetailProps {
    * `corpOwnedStock` already answers to, not a second one.
    */
   corpOwnedBlueprints: CorpOwnedBlueprintsState;
-  onUpdate: (patch: PlanPatch) => void;
   /**
-   * A correction the panel derived rather than the pilot made — persisted
-   * without counting as an edit, so opening a plan never bumps its
-   * `updatedAt`. Today: a security band brought back into line with the
-   * plan's build system.
+   * Every write this panel makes to its plan, as one `BuildPlanChange` — a
+   * pilot edit, a derived fix, or sourcing edits. The caller hands it to
+   * `buildPlanStore.applyBuildPlanChange`, which owns the merge, `updatedAt`
+   * and sync rules for each kind.
    */
-  onDerivedFix: (patch: PlanPatch) => void;
-  /**
-   * One material row’s sourcing edit. Separate from `onUpdate` because it is a
-   * read-modify-write of a nested map rather than a whole field, so it has to
-   * merge against the stored record, not against this render’s `plan`.
-   */
-  onSourcingChange: (typeID: number, patch: MaterialSourcing) => void;
-  /**
-   * Several rows' sourcing edits at once, for "use all detected". Separate from
-   * `onSourcingChange` because the caller has to serialise the writes: each one
-   * is a read-modify-write of the same nested map, so firing them concurrently
-   * would have later ones merging into a record read before the earlier ones
-   * landed.
-   */
-  onSourcingChangeMany: (patches: readonly SourcingPatchEntry[]) => void;
+  onChange: (change: BuildPlanChange) => void;
   /** Materials-row context menu (CONTEXT.md round 26) — the same actions the Market and Assets rows offer. */
   onAddToQuickbar: (typeId: number, itemName: string) => void;
   /** False with no active character — the Quickbar has nobody to save the material under. */
@@ -248,11 +221,6 @@ interface BuildPlanDetailProps {
    * route-agnostic; `IndustryPlanPage.tsx` supplies it.
    */
   onSearchBpcSourcing: (blueprintTypeID: number) => void;
-}
-
-function clampInt(value: number, min: number, max: number): number {
-  const n = Math.round(Number(value));
-  return Math.min(max, Math.max(min, Number.isFinite(n) ? n : min));
 }
 
 /**
@@ -275,13 +243,11 @@ export function BuildPlanDetail({
   pi,
   ownedBlueprints,
   skills,
+  implantBonusPct,
   ownedStockSnapshot,
   corpOwnedStock,
   corpOwnedBlueprints,
-  onUpdate,
-  onDerivedFix,
-  onSourcingChange,
-  onSourcingChangeMany,
+  onChange,
   onAddToQuickbar,
   quickbarAvailable,
   onShowInfo,
@@ -403,7 +369,7 @@ export function BuildPlanDetail({
   // on edit — otherwise a plan saved before the Security field went away keeps
   // a band nothing can correct, and still drives the rig multiplier.
   useDerivedSecurityBand(buildSystem?.id, hub.security, plan.security, (security) =>
-    onDerivedFix({ security })
+    onChange({ kind: 'derived', patch: { security } })
   );
   // Same reconciliation for the Reaction Location. There is no hub fallback
   // for a place with no hub of its own — highsec is the same "nothing chosen
@@ -412,7 +378,7 @@ export function BuildPlanDetail({
     reactionBuildSystem?.id,
     'highsec',
     plan.reactionSecurity ?? 'highsec',
-    (security) => onDerivedFix({ reactionSecurity: security })
+    (security) => onChange({ kind: 'derived', patch: { reactionSecurity: security } })
   );
 
   // Distinct from `pricesReady` below: that one collapses "still fetching"
@@ -439,29 +405,17 @@ export function BuildPlanDetail({
     refreshTick
   );
 
-  /**
-   * The one map every "what does this material cost to buy" on the plan reads
-   * — its own cost lines, its sub-build inputs and its make-or-buy verdicts,
-   * so a single plan never mixes the two sides of the book. Both sides come
-   * from the snapshot already in hand, which is why the basis is deliberately
-   * absent from `snapshotKey` above: toggling it must re-compute, not refetch.
-   */
-  const materialPrices = useMemo(
-    () => materialPricesFor(snapshot, plan.materialPriceBasis),
-    [snapshot, plan.materialPriceBasis]
-  );
-
   // Corp-owned blueprints (issue #839) fold in only when this plan's own
-  // Corp Assets toggle is on — the same `plan.includeCorpAssets` toggle
-  // `corpOwnedStock` above already answers to, not a second one.
-  // `CorporationBlueprint` mirrors `CharacterBlueprint` field-for-field, so
-  // the corp source needs no further adaptation before it can sit alongside
-  // the personal list.
+  // Corp Assets toggle is on — the same rule `resolveBuildPlan` applies
+  // below, through the same helper, so the picker's owned copies and the
+  // recipe lookup can never disagree with what the result was priced from.
   const effectiveOwnedBlueprints = useMemo(
     () =>
-      (plan.includeCorpAssets ?? false) && corpOwnedBlueprints.available
-        ? [...ownedBlueprints, ...corpOwnedBlueprints.blueprints]
-        : ownedBlueprints,
+      planOwnedBlueprints(
+        { includeCorpAssets: plan.includeCorpAssets },
+        ownedBlueprints,
+        corpOwnedBlueprints
+      ),
     [ownedBlueprints, plan.includeCorpAssets, corpOwnedBlueprints]
   );
 
@@ -470,7 +424,9 @@ export function BuildPlanDetail({
    * might reach, at any depth, not only the blueprint's own materials. Recipe
    * lookup needs no live prices, so this is available even while the market
    * snapshot is still loading, which is what keeps the build control present
-   * during a slow or unreachable price fetch.
+   * during a slow or unreachable price fetch. Kept apart from `resolved`
+   * below so its identity survives a runs/ME keystroke — `canBuildHere` and
+   * `autoBuildMaxDepth` key on it.
    */
   const recipeFor = useMemo(
     () =>
@@ -489,30 +445,6 @@ export function BuildPlanDetail({
   // the price cascade then falls straight through to the BPO's own hub sell
   // price, same as if no contract offer were listed.
   const bpcOffersFor = useBpcAcquisitionOffers(plan.characterId, hub.regionId);
-
-  const acquisitionFor = useMemo(() => {
-    const raw = acquisitionForLookup({
-      catalog,
-      pi,
-      ownedBlueprints: effectiveOwnedBlueprints,
-      assumedMeForUnowned: assumedMe,
-      blueprintAcquisition: {
-        offersFor: bpcOffersFor,
-        hubPrices: snapshot?.hubPrices ?? {},
-        sourcing: plan.materialSourcing,
-      },
-    });
-    return includeBlueprintCost ? raw : withoutAcquisitionCost(raw);
-  }, [
-    catalog,
-    pi,
-    effectiveOwnedBlueprints,
-    assumedMe,
-    bpcOffersFor,
-    snapshot,
-    plan.materialSourcing,
-    includeBlueprintCost,
-  ]);
 
   // The one place "can this be built here" is decided — `craftScopeList`
   // (issue #698) is the same answer Auto Build's own Craft Scope and the
@@ -542,30 +474,9 @@ export function BuildPlanDetail({
   );
 
   /**
-   * The Reaction Location, fully resolved with a live cost index — `undefined`
-   * until both a facility is configured and `reactionSnapshot` has landed.
-   * Fed to every engine context on this plan that needs it (`makeOrBuyContext`
-   * below, `computeBuildPlan`'s own `reactionFacility`), so the manual toggle,
-   * the recursive engine and the advisory marker all quote the same place.
-   * Memoized so its identity is stable across renders where nothing it reads
-   * changed — several `useMemo`s downstream (`makeOrBuyContext`,
-   * `autoBuildMaxDepth`, the `result` computation) list it as a dependency.
-   */
-  const reactionFacilityContext: ReactionFacilityContext | undefined = useMemo(
-    () =>
-      reactionPlanFacilityContext && reactionSnapshot?.systemCostIndex != null
-        ? { ...reactionPlanFacilityContext, systemCostIndex: reactionSnapshot.systemCostIndex }
-        : undefined,
-    [reactionPlanFacilityContext, reactionSnapshot]
-  );
-
-  /**
-   * The facility/rig/security/tax inputs every engine context on this plan
-   * needs — the "where and how a job runs" half, which doesn't depend on
-   * whether prices have loaded yet. Shared by `makeOrBuyContext` below and
-   * `expanded`'s own `ctx`, which each then add their own pricing fields with
-   * their own fallback policy (one waits for real prices, the other tolerates
-   * their absence so a plan still renders while they load).
+   * The facility/rig/security/tax inputs Auto Build's depth walk needs — the
+   * "where and how a job runs" half, which doesn't depend on whether prices
+   * have loaded yet.
    */
   const facilityContext = useMemo(
     () =>
@@ -580,79 +491,57 @@ export function BuildPlanDetail({
   );
 
   /**
-   * The pricing context every make-or-buy verdict on this plan needs. Null
-   * until live prices land, for the same reason the results panel waits:
-   * without adjusted prices and a system cost index there is no job fee, and
-   * a fee-free quote would call almost everything worth building.
+   * The whole plan, resolved in one pass by `resolveBuildPlan` — the same
+   * call Compare and every Group Rollup make, so this page cannot price a
+   * plan differently from them. Everything the page reads off it:
+   *
+   * - `result`/`error`: the Results panel and materials table.
+   * - `makeOrBuyContext`: every make-or-buy verdict; null until live prices
+   *   land (a fee-free quote would call almost everything worth building).
+   * - `resolvedMe`/`resolvedTe`: the tier Blueprint Acquisition resolved for
+   *   the plan's own product. `plan.me`/`plan.te` stay whatever they
+   *   last were (Setup no longer edits them); every reader below uses the
+   *   resolved pair, so there is exactly one number in play.
+   * - `materialPrices`: the plan's price basis — both sides come from the
+   *   snapshot already in hand, so toggling it re-computes, never refetches.
+   *
+   * One memo, one fresh tier pool: the top-level claim and the tree's nested
+   * claims share it, and a re-run of this memo starts from nothing rather
+   * than re-claiming against copies a previous run already took.
    */
-  const makeOrBuyContext = useMemo(() => {
-    if (!snapshot || snapshot.adjustedPrices === null || snapshot.systemCostIndex === null) {
-      return null;
-    }
-    return {
-      ...facilityContext,
-      systemCostIndex: snapshot.systemCostIndex,
-      adjustedPrices: snapshot.adjustedPrices,
-      materialPrices,
+  const resolved = useMemo(
+    () =>
+      resolveBuildPlan(
+        plan,
+        {
+          catalog,
+          pi,
+          ownedBlueprints,
+          corpBlueprints: corpOwnedBlueprints,
+          assumedMe,
+          skills,
+          implantBonusPct,
+          bpcOffersFor,
+          includeBlueprintCost,
+        },
+        { snapshot, reactionSystemCostIndex: reactionSnapshot?.systemCostIndex }
+      ),
+    [
+      plan,
+      catalog,
+      pi,
+      ownedBlueprints,
+      corpOwnedBlueprints,
+      assumedMe,
       skills,
-      reactionFacility: reactionFacilityContext,
-    };
-  }, [facilityContext, snapshot, materialPrices, skills, reactionFacilityContext]);
-
-  /**
-   * Blueprint Acquisition (issue #838) for the plan's own top-level product —
-   * the resolved ME/TE tier and, unless it is an owned BPO, a material row.
-   * Computed here rather than persisted: `plan.me`/`plan.te` stay whatever
-   * they last were (Setup no longer edits them — the resolved tier is now
-   * the only source of truth), and every reader below — the results
-   * computation, the breakdown modal, the setup chips — uses `resolvedMe`/
-   * `resolvedTe` instead, so there is exactly one number in play, never two
-   * disagreeing.
-   */
-  const topLevelAcquisition = useMemo(() => {
-    const product = blueprint?.products[0];
-    if (!product || !makeOrBuyContext) return null;
-    return acquisitionFor(
-      product.typeID,
-      clampInt(plan.runs, 1, MAX_JOB_RUNS),
-      makeOrBuyContext,
-      materialPrices
-    );
-  }, [blueprint, makeOrBuyContext, plan.runs, acquisitionFor, materialPrices]);
-  const resolvedMe = topLevelAcquisition?.me ?? plan.me;
-  const resolvedTe = topLevelAcquisition?.te ?? plan.te;
-
-  const { result, error } = useMemo(() => {
-    if (!blueprint) return { result: null, error: t('industry.blueprintMissing') };
-    return computeBuildPlan({
-      plan: { ...plan, me: resolvedMe, te: resolvedTe },
-      blueprint,
-      systemCostIndex: snapshot?.systemCostIndex ?? 0,
-      adjustedPrices: snapshot?.adjustedPrices ?? {},
-      hubPrices: snapshot?.hubPrices ?? {},
-      materialPrices,
-      skills,
-      recipeFor,
-      acquisitionFor,
-      blueprintAcquisition: topLevelAcquisition
-        ? { blueprintTypeID: topLevelAcquisition.blueprintTypeID, line: topLevelAcquisition.line }
-        : undefined,
-      reactionFacility: reactionFacilityContext,
-    });
-  }, [
-    plan,
-    resolvedMe,
-    resolvedTe,
-    blueprint,
-    snapshot,
-    materialPrices,
-    skills,
-    recipeFor,
-    acquisitionFor,
-    topLevelAcquisition,
-    reactionFacilityContext,
-    t,
-  ]);
+      implantBonusPct,
+      bpcOffersFor,
+      includeBlueprintCost,
+      snapshot,
+      reactionSnapshot?.systemCostIndex,
+    ]
+  );
+  const { result, error, makeOrBuyContext, resolvedMe, resolvedTe, materialPrices } = resolved;
 
   /**
    * Both liquidation bases at once, so the Use-or-sell toggle switches between
@@ -679,7 +568,7 @@ export function BuildPlanDetail({
    * never prices anything, so gating it on `makeOrBuyContext` (null until
    * `pricesReady`) would leave Apply disabled during a slow price
    * fetch for no reason. Built from `reactionPlanFacilityContext`, not the
-   * price-resolved `reactionFacilityContext` below: the latter stays
+   * price-resolved Reaction Location in `makeOrBuyContext`: that one stays
    * `undefined` until its own market snapshot lands, which would understate
    * this plan's depth for as long as that fetch is in flight whenever a
    * Reaction Location is configured. `autoBuildDepthContext` is the same seam
@@ -732,25 +621,10 @@ export function BuildPlanDetail({
   // sub-build introduced is as ownable as anything else, and while this was
   // the blueprint's material list a player with 10,714,573 Tritanium in the
   // hangar was told they owned none of it the moment the Tritanium row came
-  // from a component's recipe rather than the ship's.
-  //
-  // Still keyed off content, not array identity. `detectOwnedStock` scans
-  // every Character's whole asset list — tens of thousands of rows — so it
-  // must not re-run on a runs/ME/TE keystroke, and `visibleMaterials` is a
-  // fresh array on each of those. The joined id list is the real dependency:
-  // it changes when a build is toggled (which does add and remove rows) and
-  // not when a number beside one is edited.
-  const materialTypeIdKey = useMemo(
-    () =>
-      [...new Set(visibleMaterials.map((material) => material.typeID))]
-        .sort((a, b) => a - b)
-        .join(','),
-    [visibleMaterials]
-  );
-  const materialTypeIds = useMemo(
-    () => (materialTypeIdKey === '' ? [] : materialTypeIdKey.split(',').map(Number)),
-    [materialTypeIdKey]
-  );
+  // from a component's recipe rather than the ship's. Content-keyed, not
+  // array-keyed — see `materialTypeIdKey` for why that matters.
+  const materialTypeIdsKey = useMemo(() => materialTypeIdKey(visibleMaterials), [visibleMaterials]);
+  const materialTypeIds = useMemo(() => typeIdsFromKey(materialTypeIdsKey), [materialTypeIdsKey]);
   // Folded in only when this plan's own toggle is on — Corp Assets is a
   // per-plan choice (issue #798), not something every plan inherits merely
   // because the active Character happens to hold Director on some corp.
@@ -799,74 +673,57 @@ export function BuildPlanDetail({
     [entry, accountSkills]
   );
 
-  // Narrowed to the plan's owned-stock scope (issue #454); `detectedStock`
-  // itself stays the full, galaxy-wide picture the breakdown popover shows.
-  const scopedStock = useMemo(
-    () => filterStockByScope(detectedStock, plan.ownedStockScope),
-    [detectedStock, plan.ownedStockScope]
-  );
-
-  // The corp source's own incompleteness (a capped/missing asset page) folds
-  // in only while it's actually contributing — an untoggled or unavailable
-  // corp source has nothing to be incomplete about.
-  const allIncompleteCharacters = useMemo(
+  // `scopedStock` is narrowed to the plan's owned-stock scope (issue #454);
+  // `detectedStock` stays the galaxy-wide picture the breakdown popover shows.
+  const { detection, scopedStock } = useMemo(
     () =>
-      includeCorpAssets && corpOwnedStock.incomplete && corpOwnedStock.corporationName
-        ? [...incompleteCharacters, corpOwnedStock.corporationName]
-        : incompleteCharacters,
+      ownedStockView(
+        {
+          stock: detectedStock,
+          scope: plan.ownedStockScope,
+          characterNames,
+          locationNames,
+          incompleteCharacters,
+          // The corp source's own incompleteness (a capped/missing asset
+          // page) folds in only while it's actually contributing — an
+          // untoggled or unavailable corp source has nothing to be
+          // incomplete about.
+          incompleteCorporation:
+            includeCorpAssets && corpOwnedStock.incomplete ? corpOwnedStock.corporationName : null,
+          corporationName: corpOwnedStock.corporationName,
+        },
+        t
+      ),
     [
+      detectedStock,
+      plan.ownedStockScope,
+      characterNames,
+      locationNames,
       incompleteCharacters,
       includeCorpAssets,
       corpOwnedStock.incomplete,
-      corpOwnedStock.corporationName,
-    ]
-  );
-
-  const detection = useMemo<OwnedStockDetection>(
-    () => ({
-      stockFor: (typeID) => detectedStock.get(typeID),
-      scopedQuantityFor: (typeID) => scopedStock.get(typeID)?.quantity ?? 0,
-      lowerBound: allIncompleteCharacters.length > 0,
-      incompleteCharacters: allIncompleteCharacters,
-      characterNameFor: (characterId) => characterNames.get(characterId) ?? t('common.unknown'),
-      corporationNameFor: () => corpOwnedStock.corporationName ?? t('common.unknown'),
-      locationLabelFor: (placement) => stockLocationLabel(placement, locationNames, t),
-    }),
-    [
-      detectedStock,
-      scopedStock,
-      characterNames,
-      locationNames,
-      allIncompleteCharacters,
       corpOwnedStock.corporationName,
       t,
     ]
   );
 
-  // "Use all" fills only rows with nothing typed in them: a
-  // hand-entered value, including a deliberate 0, is never clobbered by a bulk
-  // action. The per-row action is the one that overwrites — clicking it on that
-  // row means it.
-  //
   // Over every row on the table, not the blueprint's own materials: the bulk
   // action has to reach exactly what the per-row offers reach, or "use all"
   // silently skips every mineral a sub-build introduced while the row beside
-  // it is still offering to apply one.
+  // it is still offering to apply one. The fill/clear rules themselves live
+  // in `planMaterialsView.ts`, shared with the Build Group's ledger.
   const bulkDetectedPatches = useMemo<SourcingPatchEntry[]>(
     () =>
-      bulkOwnedStockSuggestions(visibleMaterials, plan.materialSourcing, scopedStock).map(
-        ({ typeID, ownedQuantity }) => ({ typeID, patch: { ownedQuantity } })
-      ),
+      bulkUseDetected(
+        visibleMaterials,
+        (typeID) => plan.materialSourcing?.[typeID]?.ownedQuantity,
+        scopedStock
+      ).map(({ typeID, ownedQuantity }) => ({ typeID, patch: { ownedQuantity } })),
     [visibleMaterials, plan.materialSourcing, scopedStock]
   );
-
-  // "Use none" is the reverse of "use all": it zeroes every row currently
-  // carrying a non-zero owned quantity, hand-typed or bulk-filled alike
-  // (issue #612) — a deliberate clobber, not the "only untouched rows" rule
-  // above.
   const bulkClearPatches = useMemo<SourcingPatchEntry[]>(
     () =>
-      clearOwnedStockSuggestions(visibleMaterials, plan.materialSourcing).map(
+      bulkUseNone(visibleMaterials, (typeID) => plan.materialSourcing?.[typeID]?.ownedQuantity).map(
         ({ typeID, ownedQuantity }) => ({ typeID, patch: { ownedQuantity } })
       ),
     [visibleMaterials, plan.materialSourcing]
@@ -1005,7 +862,15 @@ export function BuildPlanDetail({
   const productQuantity = blueprint.products[0] ? blueprint.products[0].quantity * plan.runs : null;
 
   function update(patch: PlanPatch) {
-    onUpdate(patch);
+    onChange({ kind: 'edit', patch });
+  }
+
+  function changeSourcing(edits: readonly SourcingPatchEntry[]) {
+    onChange({ kind: 'sourcing', edits });
+  }
+
+  function changeOneSourcing(typeID: number, patch: MaterialSourcing) {
+    changeSourcing([{ typeID, patch }]);
   }
 
   /**
@@ -1013,8 +878,8 @@ export function BuildPlanDetail({
    *
    * The whole list is rewritten rather than the single entry toggled in place,
    * because it is a plain field on the record — unlike `materialSourcing`,
-   * which is a nested map and so needs the read-modify-write path
-   * `onSourcingChange` takes.
+   * which is a nested map and so needs the read-modify-write path a
+   * `sourcing` change takes.
    */
   function toggleBuildHere(typeID: number) {
     const current = plan.buildHere ?? [];
@@ -1717,10 +1582,10 @@ export function BuildPlanDetail({
                   }
                   action={
                     <div className="flex gap-2">
-                      <Button size="sm" onClick={() => onSourcingChangeMany(bulkDetectedPatches)}>
+                      <Button size="sm" onClick={() => changeSourcing(bulkDetectedPatches)}>
                         {t('industry.useAllOwned')}
                       </Button>
-                      <Button size="sm" onClick={() => onSourcingChangeMany(bulkClearPatches)}>
+                      <Button size="sm" onClick={() => changeSourcing(bulkClearPatches)}>
                         {t('industry.useNoneOwned')}
                       </Button>
                     </div>
@@ -1733,7 +1598,7 @@ export function BuildPlanDetail({
                 volumeFor={(typeID) => volumeForType(catalog, typeID)}
                 sourcing={plan.materialSourcing}
                 pricesReady={pricesReady}
-                onSourcingChange={onSourcingChange}
+                onSourcingChange={changeOneSourcing}
                 detection={detection}
                 rowContextMenu={materialContextMenu}
                 makeOrBuy={materialAdvice}
@@ -1758,8 +1623,9 @@ export function BuildPlanDetail({
                   blueprintName={nameForType(catalog, acquisitionPickerTypeId)}
                   ownedCopies={acquisitionPickerOwnedCopies}
                   sourcing={plan.materialSourcing?.[acquisitionPickerTypeId]}
-                  onSourcingChange={onSourcingChange}
+                  onSourcingChange={changeOneSourcing}
                   onSearchBpcSourcing={onSearchBpcSourcing}
+                  planHubId={plan.hubId}
                 />
               )}
               {/*

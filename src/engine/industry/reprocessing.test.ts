@@ -4,7 +4,10 @@ import {
   reprocessingYield,
   reprocessingValue,
   resolveSpecialisationLevel,
+  resolveReprocessingSkills,
+  resolveImplantBonusPct,
   BASE_STATION_REPROCESSING_RATE,
+  REFINING_IMPLANT_TYPE_IDS,
 } from './reprocessing';
 import { SKILL_IDS } from './types';
 
@@ -56,6 +59,83 @@ describe('reprocessingEfficiency', () => {
 
   it('exports the assumed station rate rather than hiding it in the maths', () => {
     expect(BASE_STATION_REPROCESSING_RATE).toBe(0.5);
+  });
+
+  it('ignores Reprocessing and Reprocessing Efficiency for scrap, applying only the specialisation (Scrapmetal Processing) bonus (issue #1226)', () => {
+    // 0.5 x 1.10 (Scrapmetal V only) — Reprocessing V and Reprocessing
+    // Efficiency V are trained but must not apply to scrap.
+    expect(
+      reprocessingEfficiency({
+        reprocessingLevel: 5,
+        reprocessingEfficiencyLevel: 5,
+        specialisationLevel: 5,
+        isScrap: true,
+      })
+    ).toBeCloseTo(0.5 * 1.1, 10);
+  });
+
+  it('is the bare station rate for untrained scrap, same as untrained ore', () => {
+    expect(
+      reprocessingEfficiency({
+        reprocessingLevel: 0,
+        reprocessingEfficiencyLevel: 0,
+        specialisationLevel: 0,
+        isScrap: true,
+      })
+    ).toBeCloseTo(0.5, 10);
+  });
+
+  it('applies a refining implant bonus on top of the skill multipliers (issue #1227)', () => {
+    expect(
+      reprocessingEfficiency({
+        reprocessingLevel: 0,
+        reprocessingEfficiencyLevel: 0,
+        specialisationLevel: 0,
+        implantBonusPct: 4,
+      })
+    ).toBeCloseTo(0.5 * 1.04, 10);
+  });
+
+  it("does not apply a refining implant to scrap — the RX-80x line's own description covers ore and ice only (issue #1227)", () => {
+    expect(
+      reprocessingEfficiency({
+        reprocessingLevel: 0,
+        reprocessingEfficiencyLevel: 0,
+        specialisationLevel: 0,
+        isScrap: true,
+        implantBonusPct: 4,
+      })
+    ).toBeCloseTo(0.5, 10);
+  });
+});
+
+describe('resolveImplantBonusPct', () => {
+  // Real ESI type IDs for the Zainou 'Beancounter' Reprocessing line
+  // (issue #1227): "+N% bonus to ore and ice reprocessing yield".
+  const RX_801 = 27175;
+  const RX_802 = 27169;
+  const RX_804 = 27174;
+
+  it('is 0 with no implants fitted', () => {
+    expect(resolveImplantBonusPct([])).toBe(0);
+  });
+
+  it.each([
+    [RX_801, 1],
+    [RX_802, 2],
+    [RX_804, 4],
+  ])('resolves implant %i to a %i%% bonus', (typeId, pct) => {
+    expect(resolveImplantBonusPct([typeId])).toBe(pct);
+  });
+
+  it('ignores implants that are not the refining line', () => {
+    expect(resolveImplantBonusPct([1, 2, 3])).toBe(0);
+  });
+
+  it('mirrors the known typeIDs in REFINING_IMPLANT_TYPE_IDS', () => {
+    expect(REFINING_IMPLANT_TYPE_IDS[RX_801]).toBe(1);
+    expect(REFINING_IMPLANT_TYPE_IDS[RX_802]).toBe(2);
+    expect(REFINING_IMPLANT_TYPE_IDS[RX_804]).toBe(4);
   });
 });
 
@@ -181,5 +261,30 @@ describe('resolveSpecialisationLevel', () => {
 
   it('is 0 when the resolved skill is untrained', () => {
     expect(resolveSpecialisationLevel(undefined, new Map())).toBe(0);
+  });
+});
+
+describe('resolveReprocessingSkills', () => {
+  it('marks a type with no specialisation attribute as scrap (issue #1226)', () => {
+    const trained = new Map([[SKILL_IDS.scrapmetalProcessing, { level: 2, sp: 0 }]]);
+    const skills = resolveReprocessingSkills(
+      { reprocessingLevel: 5, reprocessingEfficiencyLevel: 5 },
+      undefined,
+      trained
+    );
+    expect(skills.isScrap).toBe(true);
+    expect(skills.specialisationLevel).toBe(2);
+  });
+
+  it('does not mark an ore/ice/moon-ore type as scrap', () => {
+    const SIMPLE_ORE_PROCESSING = 60377;
+    const trained = new Map([[SIMPLE_ORE_PROCESSING, { level: 3, sp: 0 }]]);
+    const skills = resolveReprocessingSkills(
+      { reprocessingLevel: 5, reprocessingEfficiencyLevel: 5 },
+      SIMPLE_ORE_PROCESSING,
+      trained
+    );
+    expect(skills.isScrap).toBe(false);
+    expect(skills.specialisationLevel).toBe(3);
   });
 });

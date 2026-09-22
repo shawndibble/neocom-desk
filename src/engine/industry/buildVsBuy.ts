@@ -36,6 +36,7 @@ export function buildVsBuy(inputs: IndustryInputs): BuildResult {
     systemCostIndex,
     adjustedPrices,
     skills,
+    implantBonusPct: inputs.implantBonusPct,
   };
   // The Reaction Location (issue #698): `inputs.reactionFacility` carries no
   // pricing of its own, so it's projected onto the same `adjustedPrices`/
@@ -78,7 +79,15 @@ export function buildVsBuy(inputs: IndustryInputs): BuildResult {
     ? [acquisitionMaterial, ...resolvedMaterials]
     : resolvedMaterials;
 
-  const seconds = jobDurationSeconds(blueprint.time, runs, te, skills, ctx);
+  const seconds = jobDurationSeconds(
+    blueprint.time,
+    runs,
+    te,
+    skills,
+    ctx,
+    blueprint.skills,
+    inputs.implantBonusPct
+  );
   const fee = jobFee(
     estimatedItemValue(blueprint, runs, adjustedPrices),
     systemCostIndex,

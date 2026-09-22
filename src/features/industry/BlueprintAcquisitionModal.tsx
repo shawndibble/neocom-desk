@@ -1,70 +1,91 @@
 /**
- * The Blueprint Acquisition picker/override modal (issue #839): opened from
- * an icon on any Blueprint Acquisition row (the top-level plan or any nested
- * sub-build), it lets a pilot deliberately pick a different owned ME/TE tier
- * than `selectBlueprintTier`'s automatic cheapest one, or force a tier for a
- * copy the app cannot see at all (a private contract, in-person trade) — the
- * escape hatch that used to be the Setup page's own ME/TE fields before #838
- * removed them.
+ * The Blueprint Acquisition modal (issues #839, #1240): opened from an icon on
+ * any Blueprint Acquisition row (the top-level plan or any nested sub-build),
+ * it lays every way to get this blueprint side by side — Owned tiers, public
+ * Contracts (copies and originals), Market sell orders, LP Store offers and a
+ * Manual entry — each row with a "Use this blueprint" button.
  *
- * Picking anything here writes `MaterialSourcing.acquisitionTierOverride`
- * (keyed by the blueprint's own typeID, same as `overridePrice`) via the
- * caller's `onSourcingChange` — `acquisitionForLookup` (`recipes.ts`) then
- * honors it at every node that resolves this blueprint, not only the one the
- * modal was opened from, the same way `overridePrice` already does.
+ * Picking writes `MaterialSourcing.acquisitionTierOverride` (+ `overridePrice`
+ * for anything but an owned tier), keyed by the blueprint's own typeID, via
+ * the caller's `onSourcingChange` — `acquisitionForLookup` (`recipes.ts`)
+ * then honors it at every node that resolves this blueprint. What each row
+ * writes, and why a picked price is one purchase of that row, lives in
+ * `blueprintAcquisitionSources.ts`'s `overridePatchFor`.
  *
- * The LP Store section (self-fetched on open, same pattern `ItemDetailModal`
- * uses for its own live ESI read) answers a fourth way to get this
- * blueprint the picker otherwise has no way to mention: an NPC corp's LP
- * store can hand out a blueprint *copy* at a fixed ISK+LP price — no market
- * order, no contract. It reuses `findLpOfferMatches`
- * (`features/market/appraisalLpAcquisition.ts`), the same character-LP-corps
- * lookup Appraisal uses, since a blueprint copy's `type_id` is the
- * blueprint's own typeID (the same `offer.type_id` an ordinary item offer
- * carries — `offerRows.ts`'s `computeBlueprintRow` already keys off exactly
- * this). Informational only, not a pickable tier: the app cannot buy it for
- * the pilot, so this is a fact plus a link, not another `onSourcingChange`.
+ * Contracts and Market read one Trade Hub's region — the Build Plan's own by
+ * default; Market reads the whole region (not just the hub station), unless
+ * the blueprint trades in a Global Market Region. The hub picker here only
+ * changes what this modal shows, never the plan. Contracts can widen to every
+ * region.
+ *
+ * Data is self-fetched on open, the same pattern `ItemDetailModal` uses: the
+ * Public Contract Offers snapshot (`loadPublicBpcContracts`, cached), the
+ * hub region's Order Book view (`loadOrderBookView` — cached underneath,
+ * failed kept distinct from empty), and the
+ * character's LP corps' offers (`findLpOfferMatches`). Station names come
+ * from the local SDE snapshot only (`loadContractLocationInfo`) — no ESI
+ * call per row; a player structure stays unnamed.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Modal, TextInput } from '@/components/ui';
+import {
+  Button,
+  IconButton,
+  Modal,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  TextInput,
+} from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import type { MaterialSourcing } from '@/engine/industry/types';
-import { findLpOfferMatches, type LpOfferMatch } from '@/features/market/appraisalLpAcquisition';
+import { loadPublicBpcContracts } from '@/features/bpcContracts/syncedContracts';
+import { loadContractLocationInfo } from '@/features/bpcContracts/blueprintLocation';
+import { loadRegionName } from '@/features/bpcContracts/regionNames';
+import { useLpValue } from '@/features/loyalty/lpValue';
 import { LpStoreLink } from '@/features/loyalty/LpStoreLink';
+import { findLpOfferMatches, type LpOfferMatch } from '@/features/market/appraisalLpAcquisition';
+import {
+  loadGlobalMarketOverrides,
+  loadOrderBookView,
+  orderBookLocationFor,
+  type OrderBookView,
+} from '@/features/market/orderBookView';
+import { DEFAULT_TRADE_HUB, getTradeHub, TRADE_HUBS, type TradeHub } from '@/market/hubs';
 import { unmaskNumber } from '@/lib/numberMask';
 import { formatIsk } from '@/lib/isk';
+import {
+  cheapestRow,
+  contractOfferRows,
+  groupContractOffers,
+  groupMarketSells,
+  isCurrentPick,
+  lpOfferRows,
+  marketSellRows,
+  overridePatchFor,
+  ownedTierRows,
+  sectionRows,
+  type AcquisitionOwnedCopy,
+  type AcquisitionSourceRow,
+  type ContractOfferRow,
+  type LpOfferRow,
+  type MarketSellRow,
+  type OfferGroup,
+} from './blueprintAcquisitionSources';
 
-/** One owned copy, personal or corp — same shape `ownedCopiesFor` (recipes.ts) adapts to. */
-export interface AcquisitionOwnedCopy {
-  me: number;
-  te: number;
-  /** -1 = an original (BPO): unlimited runs. */
-  runs: number;
-}
+export type { AcquisitionOwnedCopy } from './blueprintAcquisitionSources';
 
-interface TierRow {
-  me: number;
-  te: number;
-  /** Summed runs across every owned copy at this tier; `null` for a BPO (unlimited). */
-  runs: number | null;
-}
+/** `loading` until the fetch lands; `unavailable` = nothing to read (sync off, fetch failed). */
+type Load<T> = { status: 'loading' } | { status: 'unavailable' } | { status: 'ready'; data: T };
 
-/** Groups owned copies into one row per distinct ME/TE tier, for display only — no cost math (that stays in the engine). */
-function tierRows(copies: readonly AcquisitionOwnedCopy[]): TierRow[] {
-  const byTier = new Map<string, TierRow>();
-  for (const copy of copies) {
-    const key = `${copy.me}:${copy.te}`;
-    const existing = byTier.get(key);
-    if (!existing) {
-      byTier.set(key, { me: copy.me, te: copy.te, runs: copy.runs === -1 ? null : copy.runs });
-      continue;
-    }
-    if (existing.runs !== null && copy.runs !== -1) existing.runs += copy.runs;
-    else existing.runs = null;
-  }
-  return [...byTier.values()].sort((a, b) => b.me - a.me || b.te - a.te);
-}
+const ALL_REGIONS = 'all';
+const HUB_REGION = 'hub';
+type ContractScope = typeof HUB_REGION | typeof ALL_REGIONS;
+
+const HEADING_CLASS = 'text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase';
+const SECTION_CLASS = 'flex flex-col gap-2 border-t border-line pt-3';
 
 interface BlueprintAcquisitionModalProps {
   onClose: () => void;
@@ -78,6 +99,71 @@ interface BlueprintAcquisitionModalProps {
   onSourcingChange: (typeID: number, patch: MaterialSourcing) => void;
   /** Navigates to BPC Sourcing pre-filtered to this blueprint. */
   onSearchBpcSourcing: (blueprintTypeID: number) => void;
+  /** The Build Plan's own Trade Hub — the modal's starting hub. */
+  planHubId: TradeHub['id'];
+}
+
+/** Names for `ids`, resolved one by one as they land; a missing entry means not resolved yet. */
+function useNames(
+  ids: readonly number[],
+  load: (id: number) => Promise<string | null>
+): ReadonlyMap<number, string | null> {
+  const [names, setNames] = useState<ReadonlyMap<number, string | null>>(new Map());
+  // Ids already asked for: a changed id list (new hub, All regions) loads only
+  // the new ones, and an in-flight lookup is never cancelled and re-sent.
+  const requested = useRef(new Set<number>());
+  const mounted = useRef(true);
+  // Reset on (re)mount: StrictMode's mount → cleanup → mount would otherwise
+  // leave this false and drop every name lookup.
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+  const key = [...new Set(ids)].sort((a, b) => a - b).join(',');
+  useEffect(() => {
+    for (const id of key === '' ? [] : key.split(',').map(Number)) {
+      if (requested.current.has(id)) continue;
+      requested.current.add(id);
+      void load(id)
+        .catch(() => null)
+        .then((name) => {
+          if (mounted.current) setNames((prev) => new Map(prev).set(id, name));
+        });
+    }
+  }, [key, load]);
+  return names;
+}
+
+const loadStationName = async (id: number) => (await loadContractLocationInfo(id)).name;
+
+/**
+ * Runs `load` whenever `key` changes, into a `Load` state. The result is
+ * stored against the key it was fetched for, so a changed key (a new hub)
+ * reads as loading until its own result lands, and a stale one is dropped.
+ */
+function useLoad<T>(load: () => Promise<T | null>, key: string): Load<T> {
+  const [state, setState] = useState<{ key: string; result: Load<T> } | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    load()
+      .then((data) => {
+        if (cancelled) return;
+        setState({
+          key,
+          result: data === null ? { status: 'unavailable' } : { status: 'ready', data },
+        });
+      })
+      .catch(() => {
+        if (!cancelled) setState({ key, result: { status: 'unavailable' } });
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `key` encodes everything `load` reads
+  }, [key]);
+  return state?.key === key ? state.result : { status: 'loading' };
 }
 
 export function BlueprintAcquisitionModal({
@@ -89,6 +175,7 @@ export function BlueprintAcquisitionModal({
   sourcing,
   onSourcingChange,
   onSearchBpcSourcing,
+  planHubId,
 }: BlueprintAcquisitionModalProps) {
   const { t } = useTranslation();
   const override = sourcing?.acquisitionTierOverride;
@@ -97,27 +184,92 @@ export function BlueprintAcquisitionModal({
   const [manualPrice, setManualPrice] = useState(
     sourcing?.overridePrice === undefined ? '' : String(sourcing.overridePrice)
   );
-  // Empty until the fetch resolves, same as "nothing to show yet" — no
-  // spinner: this is a secondary, optional section, and a section that
-  // appears once the lookup lands reads fine without one.
-  const [lpMatches, setLpMatches] = useState<readonly LpOfferMatch[]>([]);
 
+  const [hubId, setHubId] = useState<TradeHub['id']>(
+    getTradeHub(planHubId)?.id ?? DEFAULT_TRADE_HUB.id
+  );
+  const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
+  const [contractScope, setContractScope] = useState<ContractScope>(HUB_REGION);
+
+  const lpValue = useLpValue((state) => state.value);
+  const lpValueHydrated = useLpValue((state) => state.hydrated);
+  const hydrateLpValue = useLpValue((state) => state.hydrate);
+  const setLpValue = useLpValue((state) => state.setValue);
+  const [lpValueDraft, setLpValueDraft] = useState<string | null>(null);
   useEffect(() => {
-    let cancelled = false;
-    void findLpOfferMatches(characterId, [blueprintTypeID]).then((result) => {
-      if (cancelled) return;
-      setLpMatches(result.matchesByTypeId.get(blueprintTypeID) ?? []);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [characterId, blueprintTypeID]);
+    void hydrateLpValue();
+  }, [hydrateLpValue]);
 
-  function pickTier(me: number, te: number) {
-    onSourcingChange(blueprintTypeID, {
-      acquisitionTierOverride: { me, te },
-      overridePrice: undefined,
-    });
+  const contracts = useLoad(async () => {
+    const cached = await loadPublicBpcContracts(characterId);
+    return cached ? { copies: cached.data.rows, originals: cached.data.originals ?? [] } : null;
+  }, String(characterId));
+  // Region mode, not Trade Hub mode: every sell order in the hub's region is
+  // a real option, and the hub station's own are tagged below.
+  const market = useLoad<OrderBookView>(
+    async () =>
+      loadOrderBookView(
+        blueprintTypeID,
+        orderBookLocationFor('region', null, hub, await loadGlobalMarketOverrides())
+      ),
+    `${hub.id}:${blueprintTypeID}`
+  );
+  const marketView = market.status === 'ready' ? market.data : null;
+  const lp = useLoad<readonly LpOfferMatch[]>(
+    async () =>
+      (await findLpOfferMatches(characterId, [blueprintTypeID])).matchesByTypeId.get(
+        blueprintTypeID
+      ) ?? [],
+    `${characterId}:${blueprintTypeID}`
+  );
+
+  // Each section: identical rows folded (contracts, market), unpickable rows
+  // dropped unless they are all there is, then capped — cheapest first throughout.
+  const owned = sectionRows(ownedTierRows(ownedCopies), () => true);
+  const contractGroups = useMemo(
+    () =>
+      contracts.status === 'ready'
+        ? groupContractOffers(
+            contractOfferRows({
+              ...contracts.data,
+              blueprintTypeID,
+              regionId: contractScope === ALL_REGIONS ? null : hub.regionId,
+            })
+          )
+        : [],
+    [contracts, blueprintTypeID, contractScope, hub.regionId]
+  );
+  const contractSection = sectionRows(contractGroups, (g) => g.row.pickable);
+  const marketGroups = useMemo(
+    () =>
+      marketView && marketView.status !== 'failed'
+        ? groupMarketSells(marketSellRows(marketView.sell, hub.stationId))
+        : [],
+    [marketView, hub.stationId]
+  );
+  const marketSection = sectionRows(marketGroups, (g) => g.row.pickable);
+  const lpRows = useMemo(
+    () => (lp.status === 'ready' ? lpOfferRows(lp.data, lpValue) : []),
+    [lp, lpValue]
+  );
+  const lpSection = sectionRows(lpRows, (r) => r.pickable);
+  const contractRows = contractSection.shown.map((g) => g.row);
+  const marketRows = marketSection.shown.map((g) => g.row);
+
+  const stationNames = useNames(
+    [...contractRows.map((r) => r.locationId), ...marketRows.map((r) => r.locationId)],
+    loadStationName
+  );
+  const regionNames = useNames(
+    [hub.regionId, ...contractRows.map((r) => r.regionId)],
+    loadRegionName
+  );
+  const hubRegionName =
+    regionNames.get(hub.regionId) ?? t('industry.bpAcqHubRegion', { hub: hub.systemName });
+  const stationName = (id: number) => stationNames.get(id) ?? t('market.unknownStructure');
+
+  function pick(row: AcquisitionSourceRow) {
+    onSourcingChange(blueprintTypeID, overridePatchFor(row));
     onClose();
   }
 
@@ -144,7 +296,134 @@ export function BlueprintAcquisitionModal({
     onClose();
   }
 
-  const rows = tierRows(ownedCopies);
+  function commitLpValue() {
+    if (lpValueDraft === null) return;
+    const parsed = unmaskNumber(lpValueDraft);
+    setLpValueDraft(null);
+    if (parsed === undefined || !Number.isFinite(parsed) || parsed < 0) return;
+    void setLpValue(parsed);
+  }
+
+  const tier = (row: { me: number; te: number }) =>
+    t('industry.blueprintAcquisitionTier', { me: row.me, te: row.te });
+  const isk = (value: number) => t('industry.bpAcqIsk', { isk: formatIsk(value) });
+
+  function contractSummary(row: ContractOfferRow): string {
+    const parts = [
+      row.runs === null
+        ? t('industry.bpAcqOriginal')
+        : t('industry.bpAcqCopyRuns', { count: row.runs }),
+      tier(row),
+    ];
+    if (row.quantity > 1) parts.push(t('industry.bpAcqQuantity', { count: row.quantity }));
+    parts.push(row.price > 0 ? isk(row.price) : t('industry.bpAcqNoPrice'));
+    if (row.iskPerRun !== null)
+      parts.push(t('industry.bpAcqIskPerRun', { isk: formatIsk(row.iskPerRun) }));
+    parts.push(stationName(row.locationId));
+    if (contractScope === ALL_REGIONS)
+      parts.push(regionNames.get(row.regionId) ?? `#${row.regionId}`);
+    return parts.join(' · ');
+  }
+
+  function marketSummary(row: MarketSellRow): string {
+    return [
+      tier(row),
+      isk(row.price),
+      t('industry.bpAcqOnSale', { count: row.volumeRemain }),
+      stationName(row.locationId),
+    ].join(' · ');
+  }
+
+  function lpSummary(row: LpOfferRow): string {
+    const parts = [
+      t('industry.blueprintAcquisitionLpOffer', {
+        corp: row.corpName,
+        isk: formatIsk(row.iskCost),
+        lp: formatIsk(row.lpCost),
+      }),
+      tier(row),
+      row.lpPriced
+        ? t('industry.bpAcqLpPriced', { isk: formatIsk(row.price) })
+        : t('industry.bpAcqLpIskOnly'),
+    ];
+    if (row.quantity > 1)
+      parts.push(t('industry.blueprintAcquisitionLpQuantity', { count: row.quantity }));
+    if (row.requiredItemCount > 0)
+      parts.push(
+        t('industry.blueprintAcquisitionLpRequiredItems', { count: row.requiredItemCount })
+      );
+    return parts.join(' · ');
+  }
+
+  /**
+   * One row: its facts, any tags, and the pick button. A plain render
+   * function, not a nested component — a component defined in render would
+   * remount every row on every render.
+   */
+  const selectedTag = t('industry.blueprintAcquisitionSelected');
+
+  function renderRow(
+    key: string | number,
+    row: AcquisitionSourceRow,
+    summary: string,
+    options: { cheapest?: boolean; tags?: readonly string[]; extra?: ReactNode } = {}
+  ) {
+    const { cheapest = false, tags = [], extra } = options;
+    const current = isCurrentPick(row, sourcing);
+    const pickable = row.kind === 'owned' || row.pickable;
+    const allTags = [
+      ...(cheapest ? [t('industry.bpAcqCheapest')] : []),
+      ...(current ? [selectedTag] : []),
+      ...tags,
+    ];
+    return (
+      <li
+        key={key}
+        className={`flex items-start justify-between gap-2 rounded-xs px-1 py-0.5 ${cheapest ? 'bg-panel-2' : ''}`}
+      >
+        <span className="min-w-0 flex-1 break-words">
+          {summary}
+          {allTags.map((tag) => (
+            <span
+              key={tag}
+              // Accent is for the selected state only (DESIGN.md); static facts stay dim.
+              className={`ml-1.5 inline-block text-[0.625rem] font-semibold tracking-wider uppercase ${tag === selectedTag ? 'text-accent' : 'text-text-dim'}`}
+            >
+              {tag}
+            </span>
+          ))}
+        </span>
+        <span className="flex shrink-0 items-center gap-1">
+          {extra}
+          <IconButton
+            size="sm"
+            icon={<Icon.Select />}
+            label={t('industry.bpAcqUseRow', { row: summary })}
+            tooltip={t('industry.bpAcqUse')}
+            disabled={current || !pickable}
+            onClick={() => pick(row)}
+          />
+        </span>
+      </li>
+    );
+  }
+
+  const cheapestContract = cheapestRow(contractRows);
+  const cheapestMarket = cheapestRow(marketRows);
+  const cheapestLp = cheapestRow(lpSection.shown);
+
+  const groupCount = (group: OfferGroup<unknown>, key: string) =>
+    group.count > 1 ? [t(key, { count: group.count })] : [];
+
+  /** The dim "Showing 10 of N" note, only when the cap cut rows. */
+  function capNote(section: { shown: readonly unknown[]; total: number }) {
+    if (section.total <= section.shown.length) return null;
+    return (
+      <p className="text-text-dim">
+        {t('industry.bpAcqShowingOf', { shown: section.shown.length, count: section.total })}
+      </p>
+    );
+  }
 
   return (
     <Modal
@@ -153,43 +432,43 @@ export function BlueprintAcquisitionModal({
       title={t('industry.blueprintAcquisitionModalTitle', { name: blueprintName })}
     >
       <div className="flex flex-col gap-4 text-xs">
+        <div className="flex flex-col gap-1">
+          <span>{t('industry.bpAcqHubLabel')}</span>
+          <Select value={hubId} onValueChange={(value) => setHubId(value as TradeHub['id'])}>
+            <SelectTrigger size="sm" aria-label={t('industry.bpAcqHubLabel')}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {TRADE_HUBS.map((h) => (
+                <SelectItem key={h.id} value={h.id}>
+                  {h.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <span className="text-text-dim">{t('industry.bpAcqHubHint')}</span>
+        </div>
+
         <section className="flex flex-col gap-2">
-          <h3 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-            {t('industry.blueprintAcquisitionOwnedTiers')}
-          </h3>
-          {rows.length === 0 ? (
+          <h3 className={HEADING_CLASS}>{t('industry.blueprintAcquisitionOwnedTiers')}</h3>
+          {owned.total === 0 ? (
             <p className="text-text-dim">{t('industry.blueprintAcquisitionNoOwnedTiers')}</p>
           ) : (
             <ul className="flex flex-col gap-1">
-              {rows.map((row) => {
-                const isCurrent = override?.me === row.me && override?.te === row.te;
-                return (
-                  <li
-                    key={`${row.me}:${row.te}`}
-                    className="flex items-center justify-between gap-2"
-                  >
-                    <span>
-                      {t('industry.blueprintAcquisitionTier', { me: row.me, te: row.te })}
-                      {' — '}
-                      {row.runs === null
-                        ? t('industry.blueprintAcquisitionUnlimitedRuns')
-                        : t('industry.blueprintAcquisitionRunsOwned', { count: row.runs })}
-                    </span>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      disabled={isCurrent}
-                      onClick={() => pickTier(row.me, row.te)}
-                    >
-                      {isCurrent
-                        ? t('industry.blueprintAcquisitionSelected')
-                        : t('industry.blueprintAcquisitionUseThis')}
-                    </Button>
-                  </li>
-                );
-              })}
+              {owned.shown.map((row) =>
+                renderRow(
+                  `${row.me}:${row.te}`,
+                  row,
+                  `${tier(row)} · ${
+                    row.runs === null
+                      ? t('industry.blueprintAcquisitionUnlimitedRuns')
+                      : t('industry.blueprintAcquisitionRunsOwned', { count: row.runs })
+                  }`
+                )
+              )}
             </ul>
           )}
+          {capNote(owned)}
           {override && (
             <Button size="sm" variant="ghost" onClick={useAutomatic}>
               {t('industry.blueprintAcquisitionUseAutomatic')}
@@ -197,51 +476,136 @@ export function BlueprintAcquisitionModal({
           )}
         </section>
 
-        {lpMatches.length > 0 && (
-          <section className="flex flex-col gap-2 border-t border-line pt-3">
-            <h3 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-              {t('industry.blueprintAcquisitionLpHeading')}
-            </h3>
+        <section className={SECTION_CLASS}>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h3 className={HEADING_CLASS}>{t('industry.bpAcqContractsHeading')}</h3>
+            <Select
+              value={contractScope}
+              onValueChange={(value) => setContractScope(value as ContractScope)}
+            >
+              <SelectTrigger size="sm" aria-label={t('industry.bpAcqContractRegion')}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={HUB_REGION}>{hubRegionName}</SelectItem>
+                <SelectItem value={ALL_REGIONS}>{t('industry.bpAcqAllRegions')}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {contracts.status === 'loading' ? (
+            <p className="text-text-dim">{t('industry.bpAcqContractsLoading')}</p>
+          ) : contracts.status === 'unavailable' ? (
+            <p className="text-text-dim">{t('industry.bpAcqContractsUnavailable')}</p>
+          ) : contractSection.total === 0 ? (
+            <p className="text-text-dim">
+              {contractScope === ALL_REGIONS
+                ? t('industry.bpAcqNoContractsAnywhere')
+                : t('industry.bpAcqNoContracts', { region: hubRegionName })}
+            </p>
+          ) : (
             <ul className="flex flex-col gap-1">
-              {lpMatches.map((match) => {
-                const label = t('industry.blueprintAcquisitionLpOffer', {
-                  isk: formatIsk(match.offer.isk_cost),
-                  lp: formatIsk(match.offer.lp_cost),
-                  corp: match.corpName,
-                });
-                return (
-                  <li key={match.corporationId} className="flex items-center justify-between gap-2">
-                    <span>
-                      {label}
-                      {match.offer.quantity > 1 &&
-                        ` — ${t('industry.blueprintAcquisitionLpQuantity', { count: match.offer.quantity })}`}
-                      {match.offer.required_items.length > 0 &&
-                        ` (${t('industry.blueprintAcquisitionLpRequiredItems', { count: match.offer.required_items.length })})`}
-                    </span>
-                    <LpStoreLink corporationId={match.corporationId} label={label} />
-                  </li>
+              {contractSection.shown.map((group, index) => {
+                const { row } = group;
+                return renderRow(
+                  // A contract can repeat an identical line; the index keeps keys unique.
+                  `${row.contractId}:${row.runs ?? 'bpo'}:${row.me}:${row.te}:${index}`,
+                  row,
+                  contractSummary(row),
+                  {
+                    cheapest: row === cheapestContract,
+                    tags: [
+                      ...groupCount(group, 'industry.bpAcqOfferCount'),
+                      ...(row.isStartingBid ? [t('industry.bpAcqStartingBid')] : []),
+                      ...(row.isMultiType ? [t('industry.bpAcqBundle')] : []),
+                      ...(!row.isMultiType && row.price <= 0 ? [t('industry.bpAcqBarter')] : []),
+                    ],
+                  }
                 );
               })}
             </ul>
-          </section>
-        )}
-
-        <section className="flex flex-col gap-2 border-t border-line pt-3">
-          <h3 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-            {t('industry.blueprintAcquisitionSearchHeading')}
-          </h3>
-          <p className="text-text-dim">{t('industry.blueprintAcquisitionSearchHint')}</p>
+          )}
+          {capNote(contractSection)}
           <Button size="sm" variant="ghost" onClick={() => onSearchBpcSourcing(blueprintTypeID)}>
-            <Icon.Search /> {t('industry.blueprintAcquisitionSearchAction')}
+            <Icon.Search /> {t('industry.bpAcqSeeAll')}
           </Button>
         </section>
 
-        <section className="flex flex-col gap-2 border-t border-line pt-3">
-          <h3 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-            {t('industry.blueprintAcquisitionManualHeading')}
-          </h3>
+        <section className={SECTION_CLASS}>
+          <h3 className={HEADING_CLASS}>{t('industry.bpAcqMarketHeading')}</h3>
+          <p className="text-text-dim">{t('industry.bpAcqMarketHint')}</p>
+          {marketView?.region.override && (
+            <p className="text-text-dim">
+              {t('market.globalMarketNote', { regionName: marketView.region.override.regionName })}
+            </p>
+          )}
+          {market.status === 'loading' ? (
+            <p className="text-text-dim">{t('industry.bpAcqMarketLoading')}</p>
+          ) : market.status === 'unavailable' || marketView?.status === 'failed' ? (
+            <p className="text-text-dim">{t('industry.bpAcqMarketUnavailable')}</p>
+          ) : marketSection.total === 0 ? (
+            <p className="text-text-dim">
+              {t('industry.bpAcqNoSellOrders', {
+                region: marketView?.region.override?.regionName ?? hubRegionName,
+              })}
+            </p>
+          ) : (
+            <ul className="flex flex-col gap-1">
+              {marketSection.shown.map((group) => {
+                const { row } = group;
+                return renderRow(row.orderId, row, marketSummary(row), {
+                  cheapest: row === cheapestMarket,
+                  tags: [
+                    ...groupCount(group, 'industry.bpAcqOrderCount'),
+                    ...(row.atHub ? [t('industry.bpAcqAtHub', { hub: hub.systemName })] : []),
+                  ],
+                });
+              })}
+            </ul>
+          )}
+          {capNote(marketSection)}
+        </section>
+
+        <section className={SECTION_CLASS}>
+          <h3 className={HEADING_CLASS}>{t('industry.blueprintAcquisitionLpHeading')}</h3>
+          <label className="flex flex-wrap items-center gap-2">
+            {t('industry.bpAcqLpValueLabel')}
+            <TextInput
+              size="sm"
+              className="w-28"
+              inputMode="decimal"
+              disabled={!lpValueHydrated}
+              value={lpValueDraft ?? String(lpValue)}
+              onChange={(e) => setLpValueDraft(e.target.value)}
+              onBlur={commitLpValue}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') commitLpValue();
+              }}
+            />
+          </label>
+          <p className="text-text-dim">{t('industry.bpAcqLpValueHint')}</p>
+          {lp.status === 'loading' ? (
+            <p className="text-text-dim">{t('industry.bpAcqLpLoading')}</p>
+          ) : lp.status === 'unavailable' ? (
+            <p className="text-text-dim">{t('industry.bpAcqLpUnavailable')}</p>
+          ) : lpSection.total === 0 ? (
+            <p className="text-text-dim">{t('industry.bpAcqNoLpOffers')}</p>
+          ) : (
+            <ul className="flex flex-col gap-1">
+              {lpSection.shown.map((row) =>
+                renderRow(`${row.corporationId}:${row.offerId}`, row, lpSummary(row), {
+                  cheapest: row === cheapestLp,
+                  extra: <LpStoreLink corporationId={row.corporationId} label={row.corpName} />,
+                })
+              )}
+            </ul>
+          )}
+          {capNote(lpSection)}
+        </section>
+
+        <section className={SECTION_CLASS}>
+          <h3 className={HEADING_CLASS}>{t('industry.blueprintAcquisitionManualHeading')}</h3>
           <p className="text-text-dim">{t('industry.blueprintAcquisitionManualHint')}</p>
-          <div className="flex items-end gap-2">
+          <div className="flex flex-wrap items-end gap-2">
             <label className="flex flex-col gap-1">
               {t('industry.blueprintAcquisitionManualMe')}
               <TextInput
@@ -272,9 +636,14 @@ export function BlueprintAcquisitionModal({
                 onChange={(e) => setManualPrice(e.target.value)}
               />
             </label>
-            <Button size="sm" variant="primary" onClick={applyManual}>
-              {t('industry.blueprintAcquisitionApply')}
-            </Button>
+            <IconButton
+              icon={<Icon.Select />}
+              label={t('industry.bpAcqUseRow', {
+                row: t('industry.blueprintAcquisitionManualHeading'),
+              })}
+              tooltip={t('industry.bpAcqUse')}
+              onClick={applyManual}
+            />
           </div>
         </section>
       </div>

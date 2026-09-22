@@ -60,6 +60,7 @@ function outcome(): AppraisalOutcome {
       },
     },
     unmatched: [],
+    implantBonusPct: 0,
   };
 }
 

@@ -96,6 +96,13 @@ describe('planSubBuild', () => {
     expect(sub?.jobFee.total).toBeGreaterThan(0);
   });
 
+  it('applies the context manufacturing-time implant bonus to the sub-job seconds (issue #1229)', () => {
+    const sub = planSubBuild(parent(57478, 3), recipe(), 0, { ...CTX, implantBonusPct: 4 });
+
+    // 1800 * 1 run * 0.96 (BX-804)
+    expect(sub?.seconds).toBeCloseTo(1728, 6);
+  });
+
   it('has nothing to plan for a material that is already fully owned', () => {
     expect(planSubBuild(parent(57478, 150, 150), recipe(), 0, CTX)).toBeNull();
   });

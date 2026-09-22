@@ -79,7 +79,8 @@ function priceForMaxFilter(row: BpcContractRow): number | null {
   return row.buyout ?? null;
 }
 
-export type BpcSearchSource = 'contract' | 'owned';
+/** Where a unified row came from. `market` = a region's BPO sell order (issue #1241). */
+export type BpcSearchSource = 'contract' | 'owned' | 'market';
 
 /** The fields `filterBpcSearchRows`/`ownedBlueprintToSearchRow` need out of a character's owned blueprint (ESI's `CharacterBlueprint`) — kept local to this module rather than importing the ESI type, so `src/engine` stays decoupled from `src/esi`. */
 export interface OwnedBlueprintInput {
@@ -135,7 +136,60 @@ export type BpcSearchRow =
       locationName: string | null;
       regionId: number | null;
       space: SpaceKind | null;
+    }
+  | {
+      /** A market sell order for the blueprint original (issue #1241). */
+      source: 'market';
+      typeId: number;
+      me: 0;
+      te: 0;
+      runs: -1;
+      quantity: number;
+      orderId: number;
+      price: number;
+      regionId: number;
+      locationId: number;
+      /** At the region's Trade Hub station, rather than elsewhere in the region. */
+      atHub: boolean;
+      locationName: string | null;
+      space: SpaceKind | null;
     };
+
+/**
+ * One market sell order for a blueprint original, as BPC Sourcing's Market
+ * BPOs source lists it (issue #1241). ESI names no seller, so an NPC-seeded
+ * order is not told apart from a player's.
+ */
+export interface MarketBpoInput {
+  orderId: number;
+  typeId: number;
+  regionId: number;
+  locationId: number;
+  price: number;
+  volumeRemain: number;
+  atHub: boolean;
+  locationName?: string | null;
+  space?: SpaceKind | null;
+}
+
+/** Only an original is ever a market item, and it always sells unresearched: ME0/TE0, unlimited runs. */
+export function marketBpoToSearchRow(order: MarketBpoInput): BpcSearchRow {
+  return {
+    source: 'market',
+    typeId: order.typeId,
+    me: 0,
+    te: 0,
+    runs: -1,
+    quantity: order.volumeRemain,
+    orderId: order.orderId,
+    price: order.price,
+    regionId: order.regionId,
+    locationId: order.locationId,
+    atHub: order.atHub,
+    locationName: order.locationName ?? null,
+    space: order.space ?? null,
+  };
+}
 
 /**
  * `location` is optional: most callers resolve it separately (an ESI/SDE
@@ -193,7 +247,8 @@ export function ownedBlueprintToSearchRow(bp: OwnedBlueprintInput): BpcSearchRow
  * a restriction is active and the row's location has not resolved to a
  * matching value — resolving that location is issue #796's whole point, but
  * an unresolved one (offline, no ACL) still cannot honestly match a specific
- * region or space the player picked.
+ * region or space the player picked. A market BPO row's order price is a
+ * real ask, so maxPrice judges it like a plain contract.
  */
 export function filterBpcSearchRows(
   rows: readonly BpcSearchRow[],
@@ -214,6 +269,9 @@ export function filterBpcSearchRows(
     if (row.source === 'contract' && filter.maxPrice != null) {
       const price = priceForMaxFilter(row.contract);
       if (price != null && price > filter.maxPrice) return false;
+    }
+    if (row.source === 'market' && filter.maxPrice != null && row.price > filter.maxPrice) {
+      return false;
     }
     return true;
   });
@@ -238,7 +296,8 @@ export function filterBpcContracts(
     if (filter.regionId != null && row.regionId !== filter.regionId) return false;
     if (filter.minMe != null && row.me < filter.minMe) return false;
     if (filter.minTe != null && row.te < filter.minTe) return false;
-    if (filter.minRuns != null && row.runs < filter.minRuns) return false;
+    // An original's -1 is unlimited runs, never too few (issue #1241 lists contract originals).
+    if (filter.minRuns != null && row.runs !== -1 && row.runs < filter.minRuns) return false;
     if (filter.maxPrice != null) {
       const price = priceForMaxFilter(row);
       if (price != null && price > filter.maxPrice) return false;

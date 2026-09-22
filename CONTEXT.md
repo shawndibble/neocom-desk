@@ -419,6 +419,7 @@ here — they go one per file in `docs/context/decisions/`.
   SDE-build time (`public/data/marketWideTrees.json`,
   `scripts/build-sde.mjs`) rather than resolved live — an ME-0 approximation;
   selecting a row still opens a real Build Plan for exact numbers.
+- **LP Value**: What the pilot counts one loyalty point as worth, in ISK per LP — typed in the Blueprint Acquisition modal's LP Store section and synced (`sync.loyaltyLpValue`). Prices an LP Store pick as ISK cost + LP cost × LP Value. Default 0, meaning the pick is priced on its ISK cost alone and says so; the app never guesses a rate. Distinct from an LP Store offer's ISK/LP profit figure, which is what an offer _earns_ per LP spent, not what the pilot values LP at.
 - **Liquidity Floor**: The minimum sell-order ISK a product must carry at the
   hub to be considered at all in **Market-Wide Build Opportunities** — the
   same `sellPrice * sellVolume` depth `classifyOrderDepth` (**Order Depth**)
@@ -534,8 +535,11 @@ here — they go one per file in `docs/context/decisions/`.
   are per portion size, not per unit, so a part portion refines into
   nothing at all — the portion size rides inside each entry so the quantities
   cannot be read without it. `src/engine/industry/reprocessing.ts` turns a
-  yield plus the character's Reprocessing, Reprocessing Efficiency and
-  Scrapmetal Processing levels into an expected output. What it deliberately
+  yield plus the character's skills into an expected output — ore, ice and
+  moon ore get Reprocessing, Reprocessing Efficiency and their own
+  specialisation skill; scrap (anything else) gets Scrapmetal Processing's
+  bonus only, never Reprocessing or Reprocessing Efficiency (issue #1226).
+  What it deliberately
   does NOT model: a structure's own refining rate, its rigs, and the
   standings-based station tax — none is readable from ESI for an arbitrary
   location, so the base 50% station rate is stated on screen as an assumption

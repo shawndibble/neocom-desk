@@ -212,7 +212,7 @@ export type BlueprintTierPools = Map<number, OwnedBlueprintPool>;
  * Deep-clones `pools` — a snapshot a caller can hand to a second, independent
  * `acquisitionForLookup` closure so it starts from today's claimed-so-far
  * state without sharing its own further claims back onto `pools` (issue
- * #860's Group Owned Overlay case: `useComparedBuildResults.ts` re-resolves
+ * #860's Group Owned Overlay case: `resolveBuildPlan.ts` re-resolves
  * the same tree twice, once for real, once with owned *material* stock
  * ignored, and those two nested resolutions must not claim from each other's
  * blueprint stock even though both should see the top-level product's own
@@ -227,15 +227,15 @@ export function cloneBlueprintPools(pools: BlueprintTierPools): BlueprintTierPoo
 /**
  * `blueprintPools` is shared by every call this closure resolves — the
  * top-level product and every nested sub-build all call the same closure
- * instance (see `BuildPlanDetail.tsx`) — so two branches needing the same
- * blueprint type see each other's claims instead of both counting the same
- * owned copies as free (issue #860). Defaults to a closure-private pool
- * nothing else can reach, for a caller with only one resolution pass to run
- * (`BuildPlanDetail.tsx`); a caller running more than one independent pass
- * over the same plan (`useComparedBuildResults.ts`'s Group Owned Overlay)
- * must pass its own pool per pass — never one pool shared across passes,
- * the same way `buildVsBuy.ts` creates its own fresh `ownedPool` every call
- * rather than sharing one across unrelated resolutions.
+ * instance — so two branches needing the same blueprint type see each
+ * other's claims instead of both counting the same owned copies as free
+ * (issue #860). The pool is mutated by every call, so it belongs to exactly
+ * one resolution pass: a closure kept alive across passes (e.g. held in a
+ * React memo while the result memo re-runs) would re-claim against copies an
+ * earlier pass already took. `resolveBuildPlan.ts` owns this — it builds a
+ * fresh pool per resolution, and a separate one per independent pass (the
+ * Group Owned Overlay), the same way `buildVsBuy.ts` creates its own fresh
+ * `ownedPool` every call.
  */
 export function acquisitionForLookup(
   sources: RecipeSources,
@@ -305,9 +305,8 @@ export function acquisitionForLookup(
  * blueprint cost line does) but reports nothing to buy: the same `line: null`
  * contract an owned BPO already reports. This is what the
  * `useIncludeBlueprintCost` setting being off means, applied once here rather
- * than duplicated at both of this closure's callers (`BuildPlanDetail.tsx`'s
- * `acquisitionFor`, `useComparedBuildResults.ts`'s `computeRow`) — both wrap
- * the same top-level and nested resolutions this closure produces.
+ * than at each resolution pass `resolveBuildPlan.ts` runs — it wraps the
+ * same top-level and nested resolutions this closure produces.
  */
 export function withoutAcquisitionCost(
   acquisitionFor: ReturnType<typeof acquisitionForLookup>
