@@ -99,6 +99,9 @@ jobs:
         with:
           path: dist
           name: github-pages-${{ github.run_attempt }}
+          # Default excludes dotfiles/dotdirs, silently dropping
+          # dist/.well-known/assetlinks.json (Play Store TWA verification).
+          include-hidden-files: true
       - uses: actions/deploy-pages@v4
         id: deployment
         with:
