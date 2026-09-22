@@ -225,6 +225,14 @@ describe('mergeFeedRecord', () => {
     expect(mergeFeedRecord(undefined, incoming)).toEqual(incoming);
   });
 
+  it('keeps a stored syncedAt that the incoming write knows nothing about', () => {
+    // The poller re-diffing an occurrence, or a push arriving for one already
+    // uploaded, must not make the row look un-uploaded (#1207) — that would
+    // re-push it on every pass for as long as it lives.
+    const stored = { ...incoming, title: 'Stored copy', syncedAt: 4000 };
+    expect(mergeFeedRecord(stored, incoming).syncedAt).toBe(4000);
+  });
+
   /**
    * The fields that say *what an occurrence was about* are facts fixed when it
    * fired, and not every writer knows them: a remote doc written by a build
