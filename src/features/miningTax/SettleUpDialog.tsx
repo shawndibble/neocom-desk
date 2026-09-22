@@ -8,7 +8,7 @@ import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
 import { formatLocalDate } from '@/lib/localDate';
 import { markAssignmentsPaid } from './assignments';
-import { formatDateRange } from './groupRows';
+import { buildSettleUpReason, formatDateRange } from './groupRows';
 
 export interface SettleUpRow {
   assignment: MiningTaxAssignmentRecord;
@@ -70,14 +70,12 @@ export function SettleUpDialog({ open, onClose, rows, systemNames, onPaid }: Set
     payeeNames.length === 1
       ? payeeNames[0]
       : t('miningTax.settleUpSeveralPayees', { count: payeeNames.length });
-  const dateRange = formatDateRange(included.map((r) => r.assignment.date).sort());
+  const sortedDates = included.map((r) => r.assignment.date).sort();
+  const dateRange = formatDateRange(sortedDates);
   const systemName = (solarSystemId: number) =>
     systemNames.get(solarSystemId) ?? `#${String(solarSystemId)}`;
   const systems = [...new Set(included.map((r) => systemName(r.assignment.solarSystemId)))];
-  const reason = t('miningTax.settleUpReasonText', {
-    systems: systems.join('/'),
-    range: dateRange,
-  });
+  const reason = buildSettleUpReason(t('miningTax.settleUpReasonPrefix'), systems, sortedDates);
 
   function toggle(id: string) {
     setExcluded((previous) => {
