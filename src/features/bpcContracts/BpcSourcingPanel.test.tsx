@@ -934,6 +934,85 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
       expect(badge).toHaveTextContent('BPO may be cheaper');
     });
 
+    it('badges one copy per blueprint, not every offer row, when several are listed', async () => {
+      loadPublicBpcContracts.mockResolvedValue(
+        cachedSnapshot(
+          [
+            row({ contractId: 1, price: 9_000_000 }),
+            row({ contractId: 3, price: 6_000_000 }),
+            row({ contractId: 4, typeId: 870, price: 5_000_000 }),
+          ],
+          [row({ contractId: 2, runs: -1, price: 4_000_000 })]
+        )
+      );
+      render(<App />);
+      const table = await screen.findByRole('table', { name: 'BPC Search' });
+      await within(table).findByRole('button', { name: /BPO on contract: 4M/ });
+      expect(within(table).getAllByRole('button', { name: /BPO on contract/ })).toHaveLength(1);
+    });
+
+    it('badges a copy that is on screen even when the cheapest one is past the row cap', async () => {
+      loadPublicBpcContracts.mockResolvedValue(
+        cachedSnapshot(
+          // Cheapest last, so it falls past the default 50-row cap.
+          Array.from({ length: 60 }, (_, i) =>
+            row({ contractId: i + 1, price: (60 - i) * 1_000_000 })
+          ),
+          [row({ contractId: 999, runs: -1, price: 4_000_000 })]
+        )
+      );
+      render(<App />);
+      const table = await screen.findByRole('table', { name: 'BPC Search' });
+      await within(table).findByRole('button', { name: /BPO on contract: 4M/ });
+      expect(within(table).getAllByRole('button', { name: /BPO on contract/ })).toHaveLength(1);
+    });
+
+    it('with one blueprint picked, says BPO once in callout cards rather than on every row', async () => {
+      loadPublicBpcContracts.mockResolvedValue(
+        cachedSnapshot(
+          [
+            row({ contractId: 1, price: 5_000_000 }),
+            row({ contractId: 3, price: 3_000_000, regionId: 10000043 }),
+          ],
+          [row({ contractId: 2, runs: -1, price: 40_000_000, me: 8, te: 16 })]
+        )
+      );
+      getOrderBook.mockImplementation(async (_regionId, typeId) => ({
+        orders: typeId === 638 ? [sellOrder({ price: 2_000_000 })] : [],
+        truncated: false,
+        fetchedAt: 0,
+      }));
+      loadContractLocationInfo.mockResolvedValue({ name: 'Jita IV - Moon 4', space: 'highsec' });
+      const user = userEvent.setup();
+      render(<App />);
+      const table = await screen.findByRole('table', { name: 'BPC Search' });
+
+      await user.type(screen.getByPlaceholderText('Search blueprint name…'), 'Rifter');
+      await user.click(
+        within(screen.getByRole('list', { name: 'Matching blueprints' })).getByRole('button')
+      );
+
+      const cards = await screen.findByRole('list', { name: 'Blueprint originals for sale' });
+      // The market book lands after the contract snapshot (debounced lookup).
+      await waitFor(() => expect(within(cards).getAllByRole('listitem')).toHaveLength(2));
+      const [marketCard, contractCard] = within(cards).getAllByRole('listitem');
+      // Cheapest first: the 2M market original, then the 40M contract one.
+      expect(marketCard).toHaveTextContent('BPO · Market');
+      expect(within(marketCard).getByLabelText('2,000,000.00 ISK')).toBeInTheDocument();
+      expect(marketCard).toHaveTextContent('Market (incl. NPC-seeded)');
+      expect(marketCard).toHaveTextContent('Jita IV - Moon 4 (trade hub) · The Forge');
+      // 2M is at or below the cheapest copy (3M); 40M is not.
+      expect(marketCard).toHaveTextContent('BPO may be cheaper');
+      expect(contractCard).toHaveTextContent('BPO · Contract');
+      expect(within(contractCard).getByLabelText('40,000,000.00 ISK')).toBeInTheDocument();
+      expect(contractCard).toHaveTextContent('ME 8 / TE 16');
+      expect(contractCard).not.toHaveTextContent('BPO may be cheaper');
+
+      // Said once, in the cards: no row badge, and no duplicate chip.
+      expect(within(table).queryByRole('button', { name: /BPO on/ })).not.toBeInTheDocument();
+      expect(screen.queryByText('Cheapest BPO')).not.toBeInTheDocument();
+    });
+
     it('shows a BPO costing more than the copy without the highlight', async () => {
       loadPublicBpcContracts.mockResolvedValue(
         cachedSnapshot(
