@@ -101,6 +101,12 @@ describe('buildVsBuy', () => {
     expect(r.recommendation).toBe('build');
   });
 
+  it('applies a manufacturing-time implant bonus to seconds (issue #1229)', () => {
+    const r = buildVsBuy({ ...baseInputs, implantBonusPct: 4 });
+    // 13_787.136 (baseline) * 0.96 (BX-804)
+    expect(r.seconds).toBeCloseTo(13_235.65056, 6);
+  });
+
   it('recommends buy when building costs more than the hub sell price', () => {
     const r = buildVsBuy({ ...baseInputs, hubPrices: { ...baseInputs.hubPrices, 999: 8_000 } });
     // buyCost 80_000 < totalCost 86_589

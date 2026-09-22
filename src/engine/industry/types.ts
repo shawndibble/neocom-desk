@@ -510,6 +510,13 @@ export interface IndustryInputs {
   materialSourcing?: MaterialSourcingMap;
   skills: SkillLevels;
   /**
+   * The active clone's BX-80x manufacturing-time implant bonus, if any
+   * (issue #1229) — `resolveManufacturingTimeImplantBonusPct`'s result.
+   * Absent/0 = no implant fitted. Ignored for a reaction-activity plan; see
+   * `timeModifier`.
+   */
+  implantBonusPct?: number;
+  /**
    * Material typeIDs the player chose to build rather than buy, at any depth
    * — not only the blueprint's own materials. Absent = build nothing, the
    * plan priced exactly as its own recipe lists it.

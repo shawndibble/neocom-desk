@@ -70,6 +70,8 @@ export interface BuildPlanSources {
   /** ME to quote an unowned sub-build at (`useAssumedMe`). */
   assumedMe: number;
   skills: SkillLevels;
+  /** The plan owner's active-clone BX-80x manufacturing-time implant bonus, if any (issue #1229). */
+  implantBonusPct: number;
   /** BPC Sourcing offers already narrowed to the plan's own Trade Hub region. */
   bpcOffersFor: (blueprintTypeID: number) => readonly BpcOffer[];
   /** `useIncludeBlueprintCost`: off still resolves each tier, but prices no acquisition line. */
@@ -253,6 +255,7 @@ export function resolveBuildPlan(
     hubPrices: snapshot?.hubPrices ?? {},
     materialPrices,
     skills: sources.skills,
+    implantBonusPct: sources.implantBonusPct,
     recipeFor,
     blueprintAcquisition,
     reactionFacility,

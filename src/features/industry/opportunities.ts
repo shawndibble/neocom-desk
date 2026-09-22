@@ -174,6 +174,8 @@ export function computeOpportunityRow(
   snapshot: MarketSnapshot,
   facilityDefaults: ActivityFacilityDefaults,
   skills: SkillLevels,
+  /** The candidate's owning character's active-clone BX-80x manufacturing-time implant bonus, if any (issue #1229). */
+  implantBonusPct: number,
   stock: DetectedOwnedStockMap,
   autoBuild: OpportunityAutoBuildOptions
 ): UnrankedOpportunityRow | null {
@@ -218,6 +220,7 @@ export function computeOpportunityRow(
     adjustedPrices,
     hubPrices: snapshot.hubPrices,
     skills,
+    implantBonusPct,
     recipeFor: autoBuild.recipeFor,
   });
   if (!result) return null;

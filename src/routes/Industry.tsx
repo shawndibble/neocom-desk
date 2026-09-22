@@ -71,6 +71,7 @@ export function Industry() {
     corpOwnedBlueprints,
     blueprintsNeedsReauth,
     skills,
+    implantBonusPct,
     buildGroups,
     buildGroupsHydrated,
     setBuildGroups,
@@ -286,6 +287,7 @@ export function Industry() {
     ownedBlueprints,
     corpOwnedBlueprints,
     skills,
+    implantBonusPct,
     computeGroupResult: true,
   });
   const ungroupedRows = useComparedBuildResults({
@@ -295,6 +297,7 @@ export function Industry() {
     ownedBlueprints,
     corpOwnedBlueprints,
     skills,
+    implantBonusPct,
   });
   const runCounts = useRunCountsByPlan(activeCharacterId);
 
@@ -494,6 +497,7 @@ export function Industry() {
                 catalog={catalog}
                 pi={pi}
                 skills={skills}
+                implantBonusPct={implantBonusPct}
                 facilityDefaults={facilityDefaults}
                 activeCharacterId={activeCharacterId}
                 ownedStockSnapshot={workspace.ownedStockSnapshot}
@@ -533,6 +537,7 @@ export function Industry() {
                 ownedBlueprints={ownedBlueprints}
                 corpOwnedBlueprints={corpOwnedBlueprints}
                 skills={skills}
+                implantBonusPct={implantBonusPct}
                 onDone={exitCompare}
               />
             ) : (

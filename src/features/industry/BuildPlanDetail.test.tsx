@@ -234,6 +234,7 @@ function Harness({
         pi={null}
         ownedBlueprints={[]}
         skills={{}}
+        implantBonusPct={0}
         ownedStockSnapshot={EMPTY_OWNED_STOCK_SNAPSHOT}
         corpOwnedStock={{ ...CORP_OWNED_STOCK_UNAVAILABLE, ...corpOwnedStock }}
         corpOwnedBlueprints={{ ...CORP_OWNED_BLUEPRINTS_UNAVAILABLE, ...corpOwnedBlueprints }}

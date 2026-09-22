@@ -18,6 +18,8 @@ import type { CharacterBlueprint } from '@/esi/endpoints';
 import { loadPi } from '@/sde/loadSde';
 import type { PiData } from '@/sde/types';
 import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
+import { loadCharacterImplants } from '@/features/skills/data';
+import { resolveManufacturingTimeImplantBonusPct } from '@/engine/industry/time';
 import { loadBlueprintCatalog, type BlueprintCatalog } from './blueprintCatalog';
 import { loadCharacterBlueprints } from './data';
 import { useOwnedStockSnapshot } from './useDetectedOwnedStock';
@@ -38,6 +40,8 @@ export interface IndustryWorkspace {
   ownedBlueprints: CharacterBlueprint[];
   blueprintsNeedsReauth: boolean;
   skills: SkillLevels;
+  /** The active Character's active-clone BX-80x manufacturing-time implant bonus, if any (issue #1229). */
+  implantBonusPct: number;
   ownedStockSnapshot: OwnedStockSnapshot;
   corpOwnedStock: CorpOwnedStockState;
   corpOwnedBlueprints: CorpOwnedBlueprintsState;
@@ -85,18 +89,20 @@ export function useIndustryWorkspace(): IndustryWorkspace {
   const [ownedBlueprints, setOwnedBlueprints] = useState<CharacterBlueprint[]>([]);
   const [blueprintsNeedsReauth, setBlueprintsNeedsReauth] = useState(false);
   const [skills, setSkills] = useState<SkillLevels>({});
+  const [implantBonusPct, setImplantBonusPct] = useState(0);
 
   useEffect(() => {
     if (activeCharacterId === null) return;
     let cancelled = false;
     void (async () => {
-      const [cat, planetary, owned, corrected] = await Promise.all([
+      const [cat, planetary, owned, corrected, implants] = await Promise.all([
         loadBlueprintCatalog(),
         // Only the make-or-buy marker needs this one, so its failure costs a
         // handful of verdicts rather than the whole page.
         loadPi().catch(() => null),
         loadCharacterBlueprints(activeCharacterId),
         loadCorrectedSkills(activeCharacterId, Date.now(), { skipQueueWithoutScope: true }),
+        loadCharacterImplants(activeCharacterId),
       ]);
       if (cancelled) return;
       setCatalog(cat);
@@ -108,6 +114,7 @@ export function useIndustryWorkspace(): IndustryWorkspace {
       const map: SkillLevels = {};
       for (const [skillId, trained] of corrected.trained) map[skillId] = trained.level;
       setSkills(map);
+      setImplantBonusPct(resolveManufacturingTimeImplantBonusPct(implants?.data ?? []));
     })();
     return () => {
       cancelled = true;
@@ -123,6 +130,7 @@ export function useIndustryWorkspace(): IndustryWorkspace {
     ownedBlueprints,
     blueprintsNeedsReauth,
     skills,
+    implantBonusPct,
     ownedStockSnapshot,
     corpOwnedStock,
     corpOwnedBlueprints,

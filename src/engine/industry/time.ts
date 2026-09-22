@@ -25,6 +25,35 @@ const INDUSTRY_PCT_PER_LEVEL = 4;
 const ADVANCED_INDUSTRY_PCT_PER_LEVEL = 3;
 const REACTIONS_PCT_PER_LEVEL = 4;
 
+/**
+ * Zainou 'Beancounter' Industry BX-80x implant type IDs -> the % bonus their
+ * own ESI/SDE description gives to manufacturing job time (issue #1229).
+ * Manufacturing only — reactions have their own skill line and no dogma
+ * attribute on this implant touches them. Same one-fitted-at-a-time slot as
+ * the RX-80x refining line (`reprocessing.ts`'s `REFINING_IMPLANT_TYPE_IDS`),
+ * so a flat lookup is simpler than a general dogma-attribute read here too.
+ */
+export const MANUFACTURING_TIME_IMPLANT_TYPE_IDS: Readonly<Record<number, number>> = {
+  27170: 1, // BX-801
+  27167: 2, // BX-802
+  27171: 4, // BX-804
+};
+
+/**
+ * The active clone's manufacturing-time implant bonus, or 0 with none
+ * fitted. Takes the character's full implant typeID list (as already read
+ * for skill training) rather than a single value, so the caller need not
+ * know which slot the implant lives in.
+ */
+export function resolveManufacturingTimeImplantBonusPct(implantTypeIds: readonly number[]): number {
+  let best = 0;
+  for (const typeId of implantTypeIds) {
+    const pct = MANUFACTURING_TIME_IMPLANT_TYPE_IDS[typeId];
+    if (pct !== undefined && pct > best) best = pct;
+  }
+  return best;
+}
+
 function skillLevel(skills: SkillLevels, typeID: number): number {
   const level = skills[typeID] ?? 0;
   if (!Number.isInteger(level) || level < 0 || level > 5) {
@@ -38,7 +67,8 @@ export function timeModifier(
   te: number,
   skills: SkillLevels,
   ctx: FacilityContext,
-  blueprintSkills?: readonly BlueprintSkillRequirement[]
+  blueprintSkills?: readonly BlueprintSkillRequirement[],
+  implantBonusPct = 0
 ): number {
   if (!Number.isInteger(te) || te < 0 || te > 20) {
     throw new RangeError(`TE must be an integer 0..20, got ${te}`);
@@ -70,6 +100,11 @@ export function timeModifier(
   for (const [typeID, pctPerLevel] of skillTerms) {
     modifier *= 1 - (pctPerLevel * skillLevel(skills, typeID)) / 100;
   }
+  // BX-80x implants (issue #1229) reduce manufacturing time only, same
+  // reaction-branch guard as the science-skill table above.
+  if (ctx.facility.activity !== 'reaction') {
+    modifier *= 1 - implantBonusPct / 100;
+  }
   return modifier;
 }
 
@@ -80,10 +115,11 @@ export function jobDurationSeconds(
   te: number,
   skills: SkillLevels,
   ctx: FacilityContext,
-  blueprintSkills?: readonly BlueprintSkillRequirement[]
+  blueprintSkills?: readonly BlueprintSkillRequirement[],
+  implantBonusPct = 0
 ): number {
   if (!Number.isInteger(runs) || runs < 1) {
     throw new RangeError(`runs must be an integer >= 1, got ${runs}`);
   }
-  return baseTimePerRun * runs * timeModifier(te, skills, ctx, blueprintSkills);
+  return baseTimePerRun * runs * timeModifier(te, skills, ctx, blueprintSkills, implantBonusPct);
 }

@@ -85,6 +85,7 @@ function tableFor(p: BuildPlanRecord) {
       ownedBlueprints: [],
       assumedMe: 0,
       skills: {},
+      implantBonusPct: 0,
       bpcOffersFor: () => [],
       includeBlueprintCost: false,
     },

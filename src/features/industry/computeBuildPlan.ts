@@ -46,6 +46,8 @@ export interface ComputeBuildPlanInput {
   /** The plan's material price basis, already resolved by `priceBasis.ts`. */
   materialPrices?: HubPrices;
   skills: SkillLevels;
+  /** The plan owner's active-clone BX-80x manufacturing-time implant bonus, if any (issue #1229). */
+  implantBonusPct?: number;
   /** What produces a material, for anything `plan.buildHere` might name at any depth. */
   recipeFor?: (typeID: number) => MaterialRecipe | null;
   /** Blueprint Acquisition (issue #838) for any buildable node reached during recursion. */
@@ -84,6 +86,7 @@ export function computeBuildPlan({
   hubPrices,
   materialPrices,
   skills,
+  implantBonusPct,
   recipeFor,
   acquisitionFor,
   blueprintAcquisition,
@@ -120,6 +123,7 @@ export function computeBuildPlan({
         ? withoutOwnedQuantities(plan.materialSourcing)
         : plan.materialSourcing,
       skills,
+      implantBonusPct,
       buildHere: plan.buildHere,
       recipeFor,
       acquisitionFor,

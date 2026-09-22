@@ -99,6 +99,8 @@ interface BuildGroupPanelProps {
   /** Folded into each member on its own `includeCorpAssets` — see `resolveBuildPlan`. */
   corpOwnedBlueprints?: CorpOwnedBlueprintsState;
   skills: SkillLevels;
+  /** The plan owner's active-clone BX-80x manufacturing-time implant bonus, if any (issue #1229). */
+  implantBonusPct: number;
   ownedStockSnapshot: OwnedStockSnapshot;
   /** Opens one member on its own, the way clicking it in the list would. */
   onOpenPlan: (planId: string) => void;
@@ -130,6 +132,7 @@ export function BuildGroupPanel({
   ownedBlueprints,
   corpOwnedBlueprints,
   skills,
+  implantBonusPct,
   ownedStockSnapshot,
   onOpenPlan,
   onRetarget,
@@ -155,6 +158,7 @@ export function BuildGroupPanel({
     ownedBlueprints,
     corpOwnedBlueprints,
     skills,
+    implantBonusPct,
     computeGroupResult: true,
   });
 
