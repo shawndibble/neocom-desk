@@ -24,6 +24,12 @@ interface PanelProps {
    */
   meta?: ReactNode;
   children: ReactNode;
+  /**
+   * Lets `actions` take the header's free width instead of hugging the right
+   * edge — for a header whose actions *are* the toolbar, like the History
+   * tab's phone view toggle, which needs the row to be tappable at all.
+   */
+  actionsFill?: boolean;
   /** Set false for flush content like tables. */
   padded?: boolean;
   /**
@@ -59,7 +65,18 @@ interface PanelProps {
  * own, defeats it).
  */
 export const Panel = forwardRef<HTMLElement, PanelProps>(function Panel(
-  { title, actions, leading, meta, children, padded = true, fill = false, className = '', style },
+  {
+    title,
+    actions,
+    actionsFill = false,
+    leading,
+    meta,
+    children,
+    padded = true,
+    fill = false,
+    className = '',
+    style,
+  },
   ref
 ) {
   const contentClassName = [padded ? 'p-3' : '', fill ? 'flex min-h-0 flex-1 flex-col' : '']
@@ -78,16 +95,23 @@ export const Panel = forwardRef<HTMLElement, PanelProps>(function Panel(
         <header
           className={`flex min-h-11 items-center justify-between gap-2 border-b border-line bg-panel-2 py-1 pr-3 md:min-h-9 ${leading ? 'pl-1' : 'pl-3'}`}
         >
-          <div className="flex min-w-0 items-center gap-2">
-            {leading}
-            {title && (
-              <h2 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                {title}
-              </h2>
-            )}
-            {meta}
-          </div>
-          {actions && <div className="flex items-center gap-1">{actions}</div>}
+          {/* An empty left group would still cost the header's gap before filling actions. */}
+          {(!actionsFill || leading || title || meta) && (
+            <div className="flex min-w-0 items-center gap-2">
+              {leading}
+              {title && (
+                <h2 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                  {title}
+                </h2>
+              )}
+              {meta}
+            </div>
+          )}
+          {actions && (
+            <div className={`flex items-center gap-1 ${actionsFill ? 'min-w-0 flex-1' : ''}`}>
+              {actions}
+            </div>
+          )}
         </header>
       )}
       <div className={contentClassName}>{children}</div>

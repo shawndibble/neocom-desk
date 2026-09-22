@@ -482,6 +482,42 @@ describe('wallet journal + transactions', () => {
     // Stopped because a page came back empty, not because the cap bit.
     expect(transactions.truncated).toBe(false);
   });
+
+  it('getCharacterWalletTransactions drops a fill repeated across pages and stops when a page adds nothing new', async () => {
+    // Live ESI answers `from_id` inclusively: each page leads with the id it
+    // was asked from, and the oldest page is that one fill on its own.
+    const txn = (transaction_id: number) => ({
+      transaction_id,
+      date: '2026-08-01T00:00:00Z',
+      location_id: 1,
+      type_id: 34,
+      unit_price: 1,
+      quantity: 1,
+      client_id: 1,
+      is_buy: false,
+      is_personal: true,
+      journal_ref_id: transaction_id,
+    });
+    const fromIds: (string | null)[] = [];
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${CHARACTER_ID}/wallet/transactions`, ({ request }) => {
+        const bad = rejectBadEsiHeaders(request);
+        if (bad) return bad;
+        const fromId = new URL(request.url).searchParams.get('from_id');
+        fromIds.push(fromId);
+        if (fromId === null) return HttpResponse.json([txn(30), txn(20)]);
+        if (fromId === '20') return HttpResponse.json([txn(20), txn(10)]);
+        return HttpResponse.json([txn(10)]);
+      })
+    );
+
+    const transactions = await getCharacterWalletTransactions(CHARACTER_ID);
+
+    expect(transactions.items.map((t) => t.transaction_id)).toEqual([30, 20, 10]);
+    expect(fromIds).toEqual([null, '20', '10']);
+    // History ran out; the cap never bit.
+    expect(transactions.truncated).toBe(false);
+  });
 });
 
 describe('assets', () => {

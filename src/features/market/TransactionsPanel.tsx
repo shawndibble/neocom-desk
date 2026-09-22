@@ -1,4 +1,4 @@
-import { useMemo, type ReactElement } from 'react';
+import { useCallback, useMemo, type ReactElement } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -13,6 +13,8 @@ import {
 import * as Icon from '@/components/ui/icons';
 import { loadWalletTransactions } from '@/features/character/wallet';
 import { ItemContextMenu } from './ItemContextMenu';
+import { TransactionsDayList } from './TransactionsDayList';
+import { useIsPhone } from '@/lib/useIsPhone';
 import { MarketItemLink } from './MarketItemLink';
 import type { CachedResult } from '@/esi/cache';
 import { loadTypeNames } from '@/features/character/typeNames';
@@ -83,6 +85,7 @@ export function TransactionsPanel({
   onShowInfo,
 }: TransactionsPanelProps) {
   const { t } = useTranslation();
+  const isPhone = useIsPhone();
   const timeZone = useTimeZone();
   const { data, error, loading, hydrated, activeCharacterId, refreshCount, refresh } =
     useRouteSnapshot(loadTransactionsSnapshot, undefined, { cacheKey: 'market:transactions' });
@@ -94,6 +97,10 @@ export function TransactionsPanel({
   const transactionsResult = data?.transactionsResult ?? null;
   const transactionsTruncated = data?.transactionsTruncated ?? false;
   const typeNames = data?.typeNames ?? NO_TYPE_NAMES;
+  const nameFor = useCallback(
+    (typeId: number) => typeNames.get(typeId) ?? `Type #${typeId}`,
+    [typeNames]
+  );
 
   const transactions = useMemo(
     () => [...(transactionsResult?.data ?? [])].sort((a, b) => b.date.localeCompare(a.date)),
@@ -207,12 +214,13 @@ export function TransactionsPanel({
   return (
     <Panel
       padded={false}
+      actionsFill={isPhone}
       actions={
         <span className="flex w-full items-center justify-between gap-2">
           <HistoryViewSelect value="transactions" onChange={onViewChange} />
           <span className="flex items-center gap-2">
             <IconButton
-              size="sm"
+              size={isPhone ? 'md' : 'sm'}
               icon={<Icon.Refresh />}
               label={t('wallet.refresh')}
               onClick={refresh}
@@ -220,7 +228,7 @@ export function TransactionsPanel({
             {transactionsResult && (
               <>
                 <IconButton
-                  size="sm"
+                  size={isPhone ? 'md' : 'sm'}
                   icon={<Icon.Download />}
                   label={t('wallet.exportCsvTransactions')}
                   disabled={transactions.length === 0}
@@ -254,14 +262,24 @@ export function TransactionsPanel({
               {t(offlineTitleKey)}
             </p>
           )}
-          <DataTable
-            label={t('wallet.transactionsTab')}
-            columns={columns}
-            rows={transactions}
-            rowKey={(txn) => txn.transaction_id}
-            highlightRowKey={highlightId}
-            rowContextMenu={rowContextMenu}
-          />
+          {isPhone ? (
+            <TransactionsDayList
+              transactions={transactions}
+              nameFor={nameFor}
+              label={t('wallet.transactionsTab')}
+              highlightId={highlightId}
+              rowContextMenu={rowContextMenu}
+            />
+          ) : (
+            <DataTable
+              label={t('wallet.transactionsTab')}
+              columns={columns}
+              rows={transactions}
+              rowKey={(txn) => txn.transaction_id}
+              highlightRowKey={highlightId}
+              rowContextMenu={rowContextMenu}
+            />
+          )}
         </>
       )}
     </Panel>

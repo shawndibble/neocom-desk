@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactElement } from 'react';
+import { useCallback, useMemo, useState, type ReactElement } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -19,6 +19,8 @@ import * as Icon from '@/components/ui/icons';
 import { beginEveLogin } from '@/app/loginFlow';
 import { loadOrderHistory } from '@/features/character/orders';
 import { ItemContextMenu } from './ItemContextMenu';
+import { OrderHistoryList } from './OrderHistoryList';
+import { useIsPhone } from '@/lib/useIsPhone';
 import { MarketItemLink } from './MarketItemLink';
 import type { CachedResult } from '@/esi/cache';
 import { loadTypeNames } from '@/features/character/typeNames';
@@ -139,6 +141,7 @@ export function OrderHistoryPanel({
   onShowInfo,
 }: OrderHistoryPanelProps) {
   const { t } = useTranslation();
+  const isPhone = useIsPhone();
   const { data, error, loading, hydrated, activeCharacterId, refresh } = useRouteSnapshot(
     loadOrderHistorySnapshot,
     undefined,
@@ -149,7 +152,10 @@ export function OrderHistoryPanel({
   const historyNeedsReauth = data?.historyNeedsReauth ?? false;
   const historyTruncated = data?.historyTruncated ?? false;
   const typeNames = data?.typeNames ?? NO_TYPE_NAMES;
-  const nameFor = (typeId: number) => typeNames.get(typeId) ?? `Type #${typeId}`;
+  const nameFor = useCallback(
+    (typeId: number) => typeNames.get(typeId) ?? `Type #${typeId}`,
+    [typeNames]
+  );
   const [filter, setFilter] = useState<HistoryFilter>(EMPTY_HISTORY_FILTER);
 
   const history = useMemo(
@@ -262,12 +268,13 @@ export function OrderHistoryPanel({
   return (
     <Panel
       padded={false}
+      actionsFill={isPhone}
       actions={
         <span className="flex w-full items-center justify-between gap-2">
           <HistoryViewSelect value="history" onChange={onViewChange} />
           <span className="flex items-center gap-2">
             <IconButton
-              size="sm"
+              size={isPhone ? 'md' : 'sm'}
               icon={<Icon.Refresh />}
               label={t('orders.refresh')}
               onClick={refresh}
@@ -275,7 +282,7 @@ export function OrderHistoryPanel({
             {historyResult && (
               <>
                 <IconButton
-                  size="sm"
+                  size={isPhone ? 'md' : 'sm'}
                   icon={<Icon.Download />}
                   label={t('orders.exportCsvHistory')}
                   disabled={filteredHistory.length === 0}
@@ -326,6 +333,13 @@ export function OrderHistoryPanel({
           <HistoryFilterBar filter={filter} onChange={setFilter} />
           {filteredHistory.length === 0 ? (
             <EmptyState title={t('orders.noResults')} className="py-8" />
+          ) : isPhone ? (
+            <OrderHistoryList
+              orders={filteredHistory}
+              nameFor={nameFor}
+              label={t('orders.historyTab')}
+              rowContextMenu={rowContextMenu}
+            />
           ) : (
             <DataTable
               columns={columns}

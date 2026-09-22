@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { useActiveCharacter } from '@/stores/activeCharacter';
@@ -89,5 +89,91 @@ describe('TransactionsPanel — the row as an item', () => {
 
     fireEvent.contextMenu(await screen.findByRole('row', { name: /Damage Control II/ }));
     expect(onRequestBlueprintCatalog).toHaveBeenCalled();
+  });
+});
+
+describe('TransactionsPanel — phone', () => {
+  const original = window.matchMedia;
+  const originalScroll = Element.prototype.scrollIntoView;
+  beforeEach(() => {
+    // `useIsPhone` reads a max-width query; answering yes is how a phone looks under test.
+    window.matchMedia = (media: string) =>
+      ({
+        media,
+        matches: true,
+        onchange: null,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        addListener: () => {},
+        removeListener: () => {},
+        dispatchEvent: () => false,
+      }) as unknown as MediaQueryList;
+    Element.prototype.scrollIntoView = vi.fn();
+  });
+  afterEach(() => {
+    window.matchMedia = original;
+    Element.prototype.scrollIntoView = originalScroll;
+  });
+
+  function load(data: WalletTransaction[], truncated = false) {
+    mockedLoadTransactions.mockResolvedValue({
+      data,
+      fetchedAt: new Date(),
+      fromCache: false,
+      truncated,
+    });
+  }
+
+  it('groups fills by day with a signed net per day and a Sold / Bought / Net strip', async () => {
+    load([
+      transaction({ transaction_id: 1, date: '2026-09-20T13:27:00Z' }),
+      transaction({
+        transaction_id: 2,
+        date: '2026-09-20T12:00:00Z',
+        is_buy: true,
+        quantity: 1,
+        unit_price: 100_000,
+      }),
+    ]);
+    renderPanel();
+
+    expect(await screen.findAllByRole('link', { name: 'Damage Control II' })).toHaveLength(2);
+    expect(screen.queryByRole('table')).toBeNull();
+    const summary = screen.getByRole('region', { name: 'Totals for the transactions shown' });
+    expect(within(summary).getByText('+1,382,400')).toBeInTheDocument();
+    expect(within(summary).getByText('-100,000')).toBeInTheDocument();
+    expect(within(summary).getByText('+1,282,400')).toBeInTheDocument();
+    // Day net and a row total both carry their sign, not colour alone.
+    expect(screen.getByText('+1,282,400.00')).toBeInTheDocument();
+    expect(screen.getByText('+1,382,400.00')).toBeInTheDocument();
+    expect(screen.getByText('-100,000.00')).toBeInTheDocument();
+  });
+
+  it('pulses the fill a notification pointed at', async () => {
+    load([transaction({ transaction_id: 7 })]);
+    render(
+      <MemoryRouter initialEntries={['/market?section=transactions&highlight=2048']}>
+        <TransactionsPanel
+          onViewChange={vi.fn()}
+          blueprintCatalog={null}
+          onRequestBlueprintCatalog={vi.fn()}
+          onAddToQuickbar={vi.fn()}
+          quickbarAvailable
+          onShowInfo={vi.fn()}
+        />
+      </MemoryRouter>
+    );
+    const link = await screen.findByRole('link', { name: 'Damage Control II' });
+    const row = link.closest('[data-row-key]');
+    expect(row).toHaveAttribute('data-row-key', '7');
+    expect(row).toHaveClass('row-pulse');
+    expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
+  });
+
+  it('switches to Orders from the header toggle', async () => {
+    load([transaction()]);
+    const { onViewChange } = renderPanel();
+    fireEvent.click(await screen.findByRole('button', { name: 'Orders' }));
+    expect(onViewChange).toHaveBeenCalledWith('history');
   });
 });

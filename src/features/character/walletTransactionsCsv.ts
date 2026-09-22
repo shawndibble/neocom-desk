@@ -2,7 +2,9 @@ import type { CsvColumn, CsvTranslate } from '@/lib/csv';
 import type { WalletTransactionCommon } from '@/esi/endpoints';
 
 /** Buys are money out, so the signed total is what carries the ISK tone. */
-export function transactionTotal(txn: WalletTransactionCommon): number {
+export function transactionTotal(
+  txn: Pick<WalletTransactionCommon, 'unit_price' | 'quantity' | 'is_buy'>
+): number {
   return txn.unit_price * txn.quantity * (txn.is_buy ? -1 : 1);
 }
 
