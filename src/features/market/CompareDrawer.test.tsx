@@ -63,10 +63,12 @@ beforeEach(() => {
 function renderDrawer() {
   return render(
     <CompareDrawer
-      chosenRegionId={REGION_ID}
-      globalMarkets={new Map()}
-      locationMode="region"
-      hubStationId={60003760}
+      location={{
+        mode: 'region',
+        regionId: REGION_ID,
+        hubStationId: 60003760,
+        globalMarkets: new Map(),
+      }}
       refreshTick={0}
     />
   );

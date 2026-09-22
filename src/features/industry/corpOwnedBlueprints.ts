@@ -12,7 +12,7 @@
  * adapted list can be concatenated straight onto `ownedBlueprints` with no
  * further translation.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { CharacterBlueprint } from '@/esi/endpoints';
 import { loadCorporationBlueprints } from '@/features/corp/blueprints';
 import { useActiveCorporationId } from '@/features/corp/owner';
@@ -31,6 +31,8 @@ export interface CorpOwnedBlueprintsState {
   /** The corp's blueprint list was capped or missing pages. */
   incomplete: boolean;
 }
+
+const NO_BLUEPRINTS: readonly CharacterBlueprint[] = [];
 
 const UNAVAILABLE: CorpOwnedBlueprintsState = {
   blueprints: [],
@@ -89,8 +91,6 @@ export function useCorpOwnedBlueprints(): CorpOwnedBlueprintsState {
     };
   }, [available, activeCharacterId, corporationId]);
 
-  if (!available) return UNAVAILABLE;
-
   // Guards against a stale result from the previous Character/corporation
   // still being in state the instant the new one becomes available — the
   // effect above has already been re-fired and its result isn't in yet.
@@ -101,9 +101,18 @@ export function useCorpOwnedBlueprints(): CorpOwnedBlueprintsState {
       ? tagged
       : null;
 
-  return {
-    blueprints: result?.blueprints ?? [],
-    available: true,
-    incomplete: result?.incomplete ?? false,
-  };
+  // One object per distinct state, not per render: `BuildPlanDetail.tsx`'s
+  // whole-plan resolution and `useComparedBuildResults`'s batched fetch both
+  // key on it, and a fresh wrapper every render re-ran them every render.
+  return useMemo(
+    () =>
+      available
+        ? {
+            blueprints: result?.blueprints ?? NO_BLUEPRINTS,
+            available: true,
+            incomplete: result?.incomplete ?? false,
+          }
+        : UNAVAILABLE,
+    [available, result]
+  );
 }

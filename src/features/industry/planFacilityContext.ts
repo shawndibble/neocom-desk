@@ -1,7 +1,7 @@
 /**
  * The "where and how this plan's job runs" half of a make-or-buy context —
  * facility, rig fit, security, structure tax — independent of pricing, which
- * each caller layers its own fields on top of (`BuildPlanDetail.tsx`'s own
+ * each caller layers its own fields on top of (`resolveBuildPlan.ts`'s
  * `makeOrBuyContext`, `autoBuildGroup.ts`'s per-member `ctx`). Pulled out
  * once both needed the exact same four-field shape.
  */
@@ -64,7 +64,7 @@ export function reactionPlanFacilityContextFor(
  * with every pricing field zeroed, since `maxAutoBuildDepth` never prices
  * anything — only walks the tree. Built from the plan-level
  * `reactionPlanFacilityContextFor` result, never the price-resolved
- * `reactionFacilityContext` a rendered plan also carries: that one stays
+ * `reactionFacilityFor` one a rendered plan also carries: that one stays
  * `undefined` until its own market snapshot lands, which would gate depth
  * discovery on a fetch it does not need for any plan with a Reaction
  * Location configured. The single seam `BuildPlanDetail.tsx`'s solo control

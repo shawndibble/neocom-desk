@@ -299,6 +299,7 @@ function buildRow(
     costBasis && skills
       ? orderFloor({
           unitCost: costBasis.unitCost,
+          remainingQuantity: order.volume_remain,
           accountingLevel: skills.accountingLevel,
           brokerRelationsLevel: skills.brokerRelationsLevel,
           advancedBrokerRelationsLevel: skills.advancedBrokerRelationsLevel,

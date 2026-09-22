@@ -14,8 +14,7 @@ import { controlHeightClassName } from '@/components/ui/controlStyles';
 import { KEYBOARD_OVERLAY_ATTRIBUTE } from '@/lib/shortcuts';
 import { useCompareSet } from './compareSet';
 import { useCompareRows, type CompareRow } from './useCompareRows';
-import type { LocationMode } from './locationMode';
-import type { GlobalMarketOverride } from '@/engine/market/locationMode';
+import type { OrderBookLocation } from './orderBookView';
 import { compareCsvColumns } from './compareCsv';
 import { formatVolume } from './format';
 import { downloadCsv } from '@/lib/downloadCsv';
@@ -32,21 +31,12 @@ function clampHeight(value: number): number {
 }
 
 export interface CompareDrawerProps {
-  chosenRegionId: number;
-  globalMarkets: ReadonlyMap<number, GlobalMarketOverride>;
-  locationMode: LocationMode;
-  hubStationId: number;
+  location: OrderBookLocation;
   refreshTick: number;
 }
 
 /** Mounted only while the Compare Set is non-empty — see Market.tsx. Unmounting on empty resets the drawer's own open/height state for free. */
-export function CompareDrawer({
-  chosenRegionId,
-  globalMarkets,
-  locationMode,
-  hubStationId,
-  refreshTick,
-}: CompareDrawerProps) {
+export function CompareDrawer({ location, refreshTick }: CompareDrawerProps) {
   const { t } = useTranslation();
   const items = useCompareSet((state) => state.items);
   const removeItem = useCompareSet((state) => state.remove);
@@ -60,10 +50,7 @@ export function CompareDrawer({
   const rows = useCompareRows({
     items,
     enabled: mode !== 'closed',
-    chosenRegionId,
-    globalMarkets,
-    locationMode,
-    hubStationId,
+    location,
     refreshTick,
   });
 

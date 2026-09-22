@@ -21,10 +21,9 @@ import { craftScope, reactionCraftEligible } from '@/engine/industry/craftScope'
 import type { MakeMethod, MakeOrBuyContext, MaterialRecipe } from '@/engine/industry/makeOrBuy';
 import type { IndustryBlueprint, SkillLevels } from '@/engine/industry/types';
 import { industryActivityOf } from '@/engine/industry/types';
-import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import type { PiData } from '@/sde/types';
 import { toIndustryBlueprint, type BlueprintCatalog } from './blueprintCatalog';
-import { loadMarketSnapshots, type MarketSnapshot } from './marketData';
+import { loadPlanSnapshots } from './planSnapshots';
 import {
   facilityContextFor,
   reactionPlanFacilityContextFor,
@@ -32,7 +31,9 @@ import {
   type PlanFacilityContext,
 } from './planFacilityContext';
 import { materialPricesFor } from './priceBasis';
-import { buildPlanTypeIds, recipeForLookup } from './recipes';
+import { recipeForLookup, type RecipeCatalog } from './recipes';
+import { planOwnedBlueprints, reactionFacilityFor } from './resolveBuildPlan';
+import type { CorpOwnedBlueprintsState } from './corpOwnedBlueprints';
 
 interface ResolvedMember {
   plan: BuildPlanRecord;
@@ -77,6 +78,36 @@ export function groupCraftScope(
   return ['manufacturing'];
 }
 
+/** What a member's recipe lookup reads — the group-wide half; the member supplies its own corp toggle. */
+export interface GroupRecipeSources extends RecipeCatalog {
+  ownedBlueprints: readonly CharacterBlueprint[];
+  corpOwnedBlueprints?: CorpOwnedBlueprintsState;
+  assumedMe: number;
+}
+
+/**
+ * One member's recipe lookup: personal blueprints plus, only when that
+ * member's own `includeCorpAssets` is on, the corp's — the same
+ * `planOwnedBlueprints` rule the member's page and the Group Rollup price
+ * with, so Auto Build and its depth control see each member at the ME it is
+ * priced at.
+ */
+export function memberRecipeFor(
+  plan: Pick<BuildPlanRecord, 'includeCorpAssets'>,
+  sources: GroupRecipeSources
+): (typeID: number) => MaterialRecipe | null {
+  return recipeForLookup({
+    catalog: sources.catalog,
+    pi: sources.pi,
+    ownedBlueprints: planOwnedBlueprints(
+      plan,
+      sources.ownedBlueprints,
+      sources.corpOwnedBlueprints
+    ),
+    assumedMeForUnowned: sources.assumedMe,
+  });
+}
+
 /**
  * The group's depth ceiling: the deepest level any single member's own
  * tree reaches, the same way a solo plan sizes its own control
@@ -89,14 +120,14 @@ export function groupCraftScope(
  */
 export function groupAutoBuildMaxDepth(
   plans: readonly BuildPlanRecord[],
-  catalog: BlueprintCatalog,
-  recipeFor: (typeID: number) => MaterialRecipe | null,
+  sources: GroupRecipeSources,
   skills: SkillLevels
 ): number {
   let deepest = 0;
   for (const plan of plans) {
-    const member = resolveMember(plan, catalog);
+    const member = resolveMember(plan, sources.catalog);
     if (!member) continue;
+    const recipeFor = memberRecipeFor(plan, sources);
     const ctx = autoBuildDepthContext(
       member.facilityContext,
       member.reactionPlanFacilityContext,
@@ -113,12 +144,17 @@ export function groupAutoBuildMaxDepth(
 /**
  * Applies one Build Strategy, at the group's own depth ceiling, to every member independently:
  * each member is priced at its own hub/build-system (batched by hub, the
- * same `loadMarketSnapshots` union `useComparedBuildResults.ts` uses), then
+ * same `loadPlanSnapshots` batch `useComparedBuildResults.ts` uses), then
  * walked with its own facility/ME/runs. Returns the picked `buildHere` set
  * per member — never writes to Dexie itself, so the caller decides how (and
  * whether) to patch each plan. A member whose blueprint no longer resolves
  * is left out of the returned map entirely, contributing nothing rather than
  * an empty set.
+ *
+ * Owned blueprints and the Reaction Location resolve per member through
+ * `resolveBuildPlan.ts`'s own helpers — corp copies count only for a member
+ * whose own `includeCorpAssets` is on, the same rule its page and the Group
+ * Rollup price with.
  */
 export async function applyGroupAutoBuild(
   plans: readonly BuildPlanRecord[],
@@ -127,60 +163,30 @@ export async function applyGroupAutoBuild(
   ownedBlueprints: readonly CharacterBlueprint[],
   skills: SkillLevels,
   assumedMe: number,
-  options: { strategy: BuildStrategy; depth: number }
+  options: { strategy: BuildStrategy; depth: number },
+  corpOwnedBlueprints?: CorpOwnedBlueprintsState
 ): Promise<Map<string, Set<number>>> {
   const members = plans.flatMap((plan) => {
     const member = resolveMember(plan, catalog);
     return member ? [member] : [];
   });
 
-  const snapshots = loadMarketSnapshots(
-    members.map((member) => ({
-      hub: getTradeHub(member.plan.hubId) ?? DEFAULT_TRADE_HUB,
-      typeIds: buildPlanTypeIds(member.blueprint, { catalog, pi }),
-      costIndexSystemId: member.plan.buildSystemId,
-      activity: industryActivityOf(member.blueprint),
-    }))
-  );
-
-  const recipeFor = recipeForLookup({
+  const snapshots = loadPlanSnapshots(members, { catalog, pi });
+  const recipeSources: GroupRecipeSources = {
     catalog,
     pi,
     ownedBlueprints,
-    assumedMeForUnowned: assumedMe,
-  });
-
-  // A second, independent batch for only the members with a Reaction
-  // Location configured (issue #698) — most groups have none, so this is
-  // usually a no-op rather than doubling every group Auto Build's price fetch.
-  const reactionMembers = members.filter((m) => m.reactionPlanFacilityContext !== null);
-  const reactionSnapshots =
-    reactionMembers.length > 0
-      ? loadMarketSnapshots(
-          reactionMembers.map((member) => ({
-            hub: getTradeHub(member.plan.hubId) ?? DEFAULT_TRADE_HUB,
-            typeIds: buildPlanTypeIds(member.blueprint, { catalog, pi }),
-            costIndexSystemId: member.plan.reactionBuildSystemId,
-            activity: 'reaction',
-          }))
-        )
-      : [];
-  const reactionSnapshotByPlanId = new Map<string, Promise<MarketSnapshot>>(
-    reactionMembers.map((member, i) => [member.plan.id, reactionSnapshots[i]!])
-  );
+    corpOwnedBlueprints,
+    assumedMe,
+  };
 
   const picks = new Map<string, Set<number>>();
   await Promise.all(
     members.map(async (member, index) => {
-      const snapshot = await snapshots[index]!;
-      const reactionSnapshot = await reactionSnapshotByPlanId.get(member.plan.id);
-      const reactionFacility =
-        member.reactionPlanFacilityContext && reactionSnapshot?.systemCostIndex != null
-          ? {
-              ...member.reactionPlanFacilityContext,
-              systemCostIndex: reactionSnapshot.systemCostIndex,
-            }
-          : undefined;
+      const snapshot = await snapshots[index]!.snapshot;
+      const reactionSnapshot = await snapshots[index]!.reactionSnapshot;
+      const reactionFacility = reactionFacilityFor(member.plan, reactionSnapshot?.systemCostIndex);
+      const recipeFor = memberRecipeFor(member.plan, recipeSources);
       const ctx: MakeOrBuyContext = {
         ...member.facilityContext,
         systemCostIndex: snapshot.systemCostIndex ?? 0,

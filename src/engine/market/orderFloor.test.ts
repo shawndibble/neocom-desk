@@ -10,6 +10,7 @@ describe('orderFloor', () => {
     const advancedBrokerRelationsLevel = 5;
     const result = orderFloor({
       unitCost,
+      remainingQuantity: 1,
       accountingLevel,
       brokerRelationsLevel,
       advancedBrokerRelationsLevel,
@@ -30,6 +31,7 @@ describe('orderFloor', () => {
     const brokerRelationsLevel = 5;
     const result = orderFloor({
       unitCost,
+      remainingQuantity: 1,
       accountingLevel,
       brokerRelationsLevel,
       advancedBrokerRelationsLevel: 0,
@@ -42,12 +44,14 @@ describe('orderFloor', () => {
   it('a character without Advanced Broker Relations still gets the 50% base Relist Discount', () => {
     const withoutSkill = orderFloor({
       unitCost: 1_000_000,
+      remainingQuantity: 1,
       accountingLevel: 0,
       brokerRelationsLevel: 0,
       advancedBrokerRelationsLevel: 0,
     });
     const withSkill = orderFloor({
       unitCost: 1_000_000,
+      remainingQuantity: 1,
       accountingLevel: 0,
       brokerRelationsLevel: 0,
       advancedBrokerRelationsLevel: 5,
@@ -65,6 +69,7 @@ describe('orderFloor', () => {
     const brokerRelationsLevel = 5;
     const result = orderFloor({
       unitCost,
+      remainingQuantity: 1,
       accountingLevel,
       brokerRelationsLevel,
       advancedBrokerRelationsLevel: 5,
@@ -79,6 +84,7 @@ describe('orderFloor', () => {
   it('produces the documented approximate figures for Accounting V / Broker Relations V', () => {
     const result = orderFloor({
       unitCost: 2_154_300,
+      remainingQuantity: 1,
       accountingLevel: 5,
       brokerRelationsLevel: 5,
       advancedBrokerRelationsLevel: 5,
@@ -93,6 +99,7 @@ describe('orderFloor', () => {
   it('fill is always <= relist (broker fee makes relist strictly pricier)', () => {
     const result = orderFloor({
       unitCost: 2_154_300,
+      remainingQuantity: 1,
       accountingLevel: 5,
       brokerRelationsLevel: 5,
       advancedBrokerRelationsLevel: 5,
@@ -104,12 +111,14 @@ describe('orderFloor', () => {
   it('applies faction and corp standing reductions to relist via fees.ts, not re-derived here', () => {
     const base = orderFloor({
       unitCost: 1_000_000,
+      remainingQuantity: 1,
       accountingLevel: 0,
       brokerRelationsLevel: 0,
       advancedBrokerRelationsLevel: 0,
     });
     const withStandings = orderFloor({
       unitCost: 1_000_000,
+      remainingQuantity: 1,
       accountingLevel: 0,
       brokerRelationsLevel: 0,
       advancedBrokerRelationsLevel: 0,
@@ -126,6 +135,7 @@ describe('orderFloor', () => {
   it('both figures are finite for a zero-standing, zero-skill character', () => {
     const result = orderFloor({
       unitCost: 500_000,
+      remainingQuantity: 1,
       accountingLevel: 0,
       brokerRelationsLevel: 0,
       advancedBrokerRelationsLevel: 0,
@@ -139,6 +149,7 @@ describe('orderFloor', () => {
     expect(
       orderFloor({
         unitCost: 0,
+        remainingQuantity: 1,
         accountingLevel: 5,
         brokerRelationsLevel: 5,
         advancedBrokerRelationsLevel: 5,
@@ -150,6 +161,7 @@ describe('orderFloor', () => {
     expect(
       orderFloor({
         unitCost: -100,
+        remainingQuantity: 1,
         accountingLevel: 5,
         brokerRelationsLevel: 5,
         advancedBrokerRelationsLevel: 5,
@@ -161,6 +173,7 @@ describe('orderFloor', () => {
     expect(
       orderFloor({
         unitCost: Number.POSITIVE_INFINITY,
+        remainingQuantity: 1,
         accountingLevel: 5,
         brokerRelationsLevel: 5,
         advancedBrokerRelationsLevel: 5,
@@ -169,10 +182,119 @@ describe('orderFloor', () => {
     expect(
       orderFloor({
         unitCost: NaN,
+        remainingQuantity: 1,
         accountingLevel: 5,
         brokerRelationsLevel: 5,
         advancedBrokerRelationsLevel: 5,
       })
     ).toBeNull();
+  });
+
+  it('returns null for a zero or negative remainingQuantity', () => {
+    expect(
+      orderFloor({
+        unitCost: 500_000,
+        remainingQuantity: 0,
+        accountingLevel: 5,
+        brokerRelationsLevel: 5,
+        advancedBrokerRelationsLevel: 5,
+      })
+    ).toBeNull();
+    expect(
+      orderFloor({
+        unitCost: 500_000,
+        remainingQuantity: -5,
+        accountingLevel: 5,
+        brokerRelationsLevel: 5,
+        advancedBrokerRelationsLevel: 5,
+      })
+    ).toBeNull();
+  });
+
+  it('re-solves the 100 ISK minimum broker fee once against the whole remaining stack, not per unit', () => {
+    // A cheap item where 3% of a single unit's value is nowhere near 100 ISK,
+    // but the stack of 10,000 units easily clears it via the percentage fee.
+    const unitCost = 10;
+    const remainingQuantity = 10_000;
+    const accountingLevel = 5;
+    const brokerRelationsLevel = 5;
+    const advancedBrokerRelationsLevel = 0;
+    const result = orderFloor({
+      unitCost,
+      remainingQuantity,
+      accountingLevel,
+      brokerRelationsLevel,
+      advancedBrokerRelationsLevel,
+    });
+    const expectedRelist = relistBreakEvenPrice(
+      unitCost * remainingQuantity,
+      remainingQuantity,
+      accountingLevel,
+      brokerRelationsLevel,
+      advancedBrokerRelationsLevel
+    );
+    expect(result?.relist).toBeCloseTo(expectedRelist as number, 6);
+    // The bug this pins: charging the 100 ISK minimum per unit would inflate
+    // relist to roughly unitCost + tax + 100. The correct per-stack minimum
+    // spreads 100 ISK across all 10,000 units, landing just above unitCost.
+    expect(result!.relist).toBeLessThan(unitCost + 5);
+  });
+
+  it('spreads the 100 ISK minimum across a stack whose percentage fee alone would still fall short of it', () => {
+    // Percentage fee on the whole 100-unit stack is still under the 100 ISK
+    // minimum even after the Relist Discount, so the minimum applies once and
+    // is spread across all 100 units — not the qty-1 case, and not a stack
+    // large enough to clear the minimum on percentage fee alone. The minimum
+    // re-solve (totalCost + 100) / (1 - taxPct/100) does not depend on the
+    // broker rate at all, so this lands at the same figure with or without
+    // the Relist Discount.
+    const unitCost = 10;
+    const remainingQuantity = 100;
+    const accountingLevel = 5;
+    const brokerRelationsLevel = 5;
+    const advancedBrokerRelationsLevel = 0;
+    const result = orderFloor({
+      unitCost,
+      remainingQuantity,
+      accountingLevel,
+      brokerRelationsLevel,
+      advancedBrokerRelationsLevel,
+    });
+    const expectedRelist = relistBreakEvenPrice(
+      unitCost * remainingQuantity,
+      remainingQuantity,
+      accountingLevel,
+      brokerRelationsLevel,
+      advancedBrokerRelationsLevel
+    );
+    expect(result?.relist).toBeCloseTo(expectedRelist as number, 6);
+    expect(result!.relist).toBeCloseTo(11.3842, 3);
+  });
+
+  it('below the broker-fee minimum, a single unit relist floor is far higher than a large stack', () => {
+    const unitCost = 10;
+    const accountingLevel = 5;
+    const brokerRelationsLevel = 5;
+    const advancedBrokerRelationsLevel = 0;
+    const singleUnit = orderFloor({
+      unitCost,
+      remainingQuantity: 1,
+      accountingLevel,
+      brokerRelationsLevel,
+      advancedBrokerRelationsLevel,
+    });
+    const bigStack = orderFloor({
+      unitCost,
+      remainingQuantity: 10_000,
+      accountingLevel,
+      brokerRelationsLevel,
+      advancedBrokerRelationsLevel,
+    });
+    expect(singleUnit).not.toBeNull();
+    expect(bigStack).not.toBeNull();
+    // Single unit still eats the full 100 ISK minimum; a 10,000-unit stack
+    // spreads that same 100 ISK to a fraction of an ISK per unit.
+    expect(singleUnit!.relist).toBeGreaterThan(100);
+    expect(bigStack!.relist).toBeLessThan(unitCost + 5);
   });
 });
