@@ -378,7 +378,7 @@ export function Contracts() {
   if (activeCharacterId === null) return <Navigate to="/characters" replace />;
 
   return (
-    <div className="mx-auto max-w-6xl space-y-4">
+    <div className="mx-auto max-w-6xl space-y-2 sm:space-y-4">
       {/* Both tabs read something datable and reloadable, but not the same
           thing: History is this character's own contract list, Search a shared
           public snapshot the panel below owns. So the badge and the Refresh
