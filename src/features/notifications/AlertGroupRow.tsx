@@ -59,10 +59,13 @@ export function AlertGroupRow({
           One line, always — the label truncates instead of reflowing.
           Wrapping the label onto its own row used to be unconditional (a
           `w-full` on the third flex child), which meant even "New Mail"
-          dropped to a second line it never needed. Real `alerts.byType`
-          labels ("New Calendar Event", "Sell Order Filled", …) fit this row
-          at 390px with room to spare; the rare one that doesn't just
-          ellipsizes, the same as every other truncated label in the app.
+          dropped to a second line it never needed.
+
+          The row used to also carry "newest Xh ago" beside the label, which
+          was one thing too many at phone width: on a longer label ("New
+          Calendar Event") it left no room and the label itself started
+          ellipsizing. Dropping it costs nothing a reader can't get by
+          opening the type — every fire inside already carries its own age.
         */}
         <button
           type="button"
@@ -82,12 +85,6 @@ export function AlertGroupRow({
                 {t('alerts.muted')}
               </span>
             )}
-          </span>
-          <span className="shrink-0 text-[0.6875rem] tabular-nums text-text-dim">
-            {t('alerts.newest', {
-              // eslint-disable-next-line react-hooks/purity -- relative age reads the wall clock; it only affects this label
-              age: formatAge(Math.max(0, Date.now() - group.newestFiredAt), t),
-            })}
           </span>
         </button>
         {/*
@@ -171,6 +168,14 @@ function AlertFireRow({
       pill (not plain text) since the body already says the rest of the
       sentence via `dedupeCharacterName`, which strips the name itself.
 
+      `order` alone moves the *same* elements between the two layouts a phone
+      and a pointer need — the name pill and age share a line above the body
+      on a phone (`order-1`/`order-2`, body `basis-full` so it always breaks
+      onto the next line), then rejoin the body's own line from `sm` up
+      (reordered back, `basis-auto`). Two rendered copies of either would
+      solve the same layout problem but reintroduce the bug above; `order`
+      repositions one.
+
       The body is never clamped: `line-clamp-2` used to share an element with
       this row's own vertical padding, and `overflow: hidden` clips at the
       *padding* box — a sliver of a clipped third line rendered inside that
@@ -179,32 +184,33 @@ function AlertFireRow({
       clip both; `sm:truncate` keeps it to one line from `sm` up, where the
       row has the width to spare instead.
     */
-    <li className="flex items-start gap-3 border-b border-line px-3 py-1.5 last:border-b-0">
-      <Link
-        to={notificationUrlForSubject(entry.eventId, entry.subjectId ?? entry.typeId)}
-        className="min-w-0 flex-1 rounded-xs text-xs text-text-dim hover:text-text focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent sm:truncate"
-      >
-        {body}
-      </Link>
+    <li className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-line px-3 py-1.5 last:border-b-0 sm:flex-nowrap">
       {name !== null && (
-        <span className="max-w-24 shrink-0 truncate rounded-full bg-panel px-2 py-0.5 text-[0.625rem] font-medium text-text-dim sm:max-w-none">
+        <span className="order-1 max-w-24 shrink-0 truncate rounded-full bg-panel px-2 py-0.5 text-[0.625rem] font-medium text-text-dim sm:order-2 sm:max-w-none">
           {name}
         </span>
       )}
       <time
         dateTime={firedAt.toISOString()}
         title={formatTimestamp(firedAt, timeZone)}
-        className="shrink-0 text-right text-[0.6875rem] tabular-nums text-text-dim sm:w-16"
+        className="order-2 ml-auto shrink-0 text-[0.6875rem] tabular-nums text-text-dim sm:order-3 sm:ml-0 sm:w-16 sm:text-right"
       >
         {/* eslint-disable-next-line react-hooks/purity -- relative age reads the wall clock; it only affects this label */}
         {formatAge(Math.max(0, Date.now() - entry.firedAt), t)}
       </time>
+      <Link
+        to={notificationUrlForSubject(entry.eventId, entry.subjectId ?? entry.typeId)}
+        className="order-4 min-w-0 basis-full rounded-xs text-xs text-text-dim hover:text-text focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent sm:order-1 sm:flex-1 sm:basis-auto sm:truncate"
+      >
+        {body}
+      </Link>
       <IconButton
         icon={<Icon.Close />}
         label={t('alerts.dismissOne', { title: entry.title })}
         variant="plain"
         size="sm"
         onClick={onDismiss}
+        className="order-3 sm:order-4"
       />
     </li>
   );
