@@ -25,7 +25,7 @@ import { formatCalendarTimestamp } from '@/lib/timestamp';
 import { timeZoneFor, useTimeFormat } from '@/lib/timeFormat';
 import i18n from '@/i18n';
 import type { LocalSettingStore } from '@/lib/useLocalSetting';
-import { NOTIFICATION_EVENTS, type NotificationEventId } from './events';
+import { hasEventScope, type NotificationEventId } from './events';
 import type { ContractNotificationFire } from '@/engine/notificationDiffs';
 import { POLL_DOMAINS, type AnyNotificationFire, type PollDomain } from './pollDomains';
 import { groupIdenticalFires, type RenderedFire } from './groupFires';
@@ -59,8 +59,6 @@ import { rebuildProjection } from './projectionRebuild';
 export type { AnyNotificationFire } from './pollDomains';
 
 export const POLL_INTERVAL_MS = 5 * 60 * 1000;
-
-const SCOPE_BY_EVENT = new Map(NOTIFICATION_EVENTS.map((event) => [event.id, event.scope]));
 
 const ROMAN = ['I', 'II', 'III', 'IV', 'V'] as const;
 const DAY_MS = 86_400_000;
@@ -188,9 +186,7 @@ function enabledEventsFor(
 ): ReadonlySet<NotificationEventId> {
   const enabled = new Set<NotificationEventId>();
   for (const eventId of eventIds) {
-    const scope = SCOPE_BY_EVENT.get(eventId);
-    const hasScope = scope === undefined || scopes.has(scope);
-    if (hasScope && reachesAnyChannel(eventPrefs, eventId, channels)) {
+    if (hasEventScope(eventId, scopes) && reachesAnyChannel(eventPrefs, eventId, channels)) {
       enabled.add(eventId);
     }
   }

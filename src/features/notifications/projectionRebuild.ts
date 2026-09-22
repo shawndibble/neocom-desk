@@ -2,9 +2,9 @@
  * Projection rebuild (issue #1248, ADR 0010): assembles every Character's
  * whole 72-hour Projection from each domain's *saved* baseline
  * (`PollDomain.store`), applies the browser-channel filter and uploads it.
- * No ESI calls — which is what lets Settings re-upload after a toggle or
- * lead-time change without running a whole Foreground Poll. The poll calls
- * this too, after saving its baselines, handing them in directly.
+ * No ESI data fetches (only cached name lookups), so Settings can re-upload
+ * after a toggle or lead-time change without a whole Foreground Poll. The
+ * poll calls this too, after saving its baselines, handing them in directly.
  *
  * Every Character is in the upload, including ones with nothing to project:
  * `registerDeviceForWebPush` sends every Character on the device and the
@@ -13,7 +13,7 @@
  */
 import type { ProjectionRow } from '@/engine/projection';
 import { mapWithConcurrencyLimit, ESI_FANOUT_CONCURRENCY } from '@/lib/concurrency';
-import { NOTIFICATION_EVENTS, type NotificationEventId } from './events';
+import { hasEventScope, type NotificationEventId } from './events';
 import { isEventEnabledFor, type EventEnabledMap } from './eventSelection';
 import type { PollDependencies } from './foregroundPoller';
 import { POLL_DOMAINS, type PollDomain } from './pollDomains';
@@ -32,8 +32,6 @@ export type ProjectionRebuildDependencies = Pick<
   | 'uploadProjection'
 >;
 
-const SCOPE_BY_EVENT = new Map(NOTIFICATION_EVENTS.map((event) => [event.id, event.scope]));
-
 const PROJECTING_DOMAINS = POLL_DOMAINS.filter((domain) => domain.projection);
 
 /**
@@ -42,15 +40,12 @@ const PROJECTING_DOMAINS = POLL_DOMAINS.filter((domain) => domain.projection);
  * so the feed column never counts: a feed-only event must not push once the
  * app closes. The live browser channel itself is checked by the caller.
  */
-function projects(
+function mayProject(
   eventId: NotificationEventId,
   scopes: ReadonlySet<string>,
   eventPrefs: EventEnabledMap
 ): boolean {
-  const scope = SCOPE_BY_EVENT.get(eventId);
-  return (
-    (scope === undefined || scopes.has(scope)) && isEventEnabledFor(eventPrefs, eventId, 'browser')
-  );
+  return hasEventScope(eventId, scopes) && isEventEnabledFor(eventPrefs, eventId, 'browser');
 }
 
 /**
@@ -105,14 +100,14 @@ async function rebuildOnce(
       const snapshot = baseline?.[character.characterId];
       if (snapshot === undefined) continue;
       // Skip name resolution for a domain none of whose events could upload.
-      if (!domain.eventIds.some((eventId) => projects(eventId, scopes, eventPrefs))) continue;
+      if (!domain.eventIds.some((eventId) => mayProject(eventId, scopes, eventPrefs))) continue;
       const domainRows = await domain.projection!(
         character.characterId,
         character.name,
         snapshot,
         nowMs
       );
-      rows.push(...domainRows.filter((row) => projects(row.eventId, scopes, eventPrefs)));
+      rows.push(...domainRows.filter((row) => mayProject(row.eventId, scopes, eventPrefs)));
     }
   });
 

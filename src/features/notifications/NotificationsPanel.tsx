@@ -676,12 +676,17 @@ const CharacterNotificationSection = memo(function CharacterNotificationSection(
    * change or an off-toggle otherwise leaves a stale Scheduled Push live
    * until the next ~5-minute poll catches up (issue #750). This rebuilds
    * every Character's whole Projection from the saved baselines
-   * (`projectionRebuild.ts`, issue #1248) — no ESI calls — once `write` has
-   * landed: a rebuild reading preferences before then could project the old
-   * value, or re-hydrate the synced threshold over the new one.
+   * (`projectionRebuild.ts`) — no ESI data fetches — once `write` has
+   * settled: a rebuild reading preferences before then could project the old
+   * value, or re-hydrate the synced threshold over the new one. Rebuilds
+   * even if the synced half of the write failed, since the local value is
+   * already set by then.
    */
   const reuploadProjectionAfter = (write: Promise<void>) => {
-    void write.then(() => rebuildProjection(liveDependencies()));
+    void write
+      .catch((err: unknown) => console.error('Notification preference write failed', err))
+      .then(() => rebuildProjection(liveDependencies()))
+      .catch((err: unknown) => console.error('Scheduled Push projection rebuild failed', err));
   };
 
   return (
