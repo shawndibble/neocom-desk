@@ -115,6 +115,13 @@
 // to another value, never unset" shape as the Defaults-panel preferences
 // above, so the tombstone-expiry edge does not bite it. No `legacyKey`: the
 // preference is new, with no device-local life to seed from.
+//
+// sync.loyaltyLpValue (issue #1240): the pilot's LP Value — ISK per LP they
+// count a loyalty point as worth, which prices an LP Store pick in the
+// Blueprint Acquisition modal. See features/loyalty/lpValue.ts. Same "set to
+// another value, never unset" shape as the Defaults-panel preferences above
+// (0 is a value, not an absence), so the tombstone-expiry edge does not bite
+// it. No `legacyKey`: new, with no device-local life to seed from.
 export const SYNCED_SETTING_KEYS: readonly string[] = [
   'sync.corpDarkAfterDays',
   'sync.defaultCharacterFilter',
@@ -124,6 +131,7 @@ export const SYNCED_SETTING_KEYS: readonly string[] = [
   'sync.industryFacilityDefaults',
   'sync.industryIncludeBlueprintCost',
   'sync.industryReactionFacilityDefaults',
+  'sync.loyaltyLpValue',
   'sync.marketHub',
   'sync.marketPricePercent',
   'sync.notificationFeedPrefs',

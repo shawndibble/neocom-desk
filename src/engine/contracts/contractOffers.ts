@@ -82,10 +82,38 @@ function distinctTypeCountByContract(
 export function bpcRowsFromContractOffers(
   offers: readonly PublicContractOfferRow[]
 ): BpcContractRow[] {
+  return blueprintRows(offers, (offer) => offer.isBlueprintCopy === true);
+}
+
+/**
+ * The blueprint *originals* among a batch of offers (issue #1240), in the same
+ * row shape as the copies above so one table can hold both. An original is an
+ * unflagged line that still carries ME/TE: the snapshot writes those columns
+ * only when the archive holds a number, and only a blueprint does (see
+ * `PublicContractOfferRow`'s doc comment). `runs` is the `-1` unlimited
+ * sentinel `CharacterBlueprint` and `BpcOffer` already use — the snapshot
+ * drops a BPO's own `-1` rather than publish it.
+ *
+ * Same `offers` contract as `bpcRowsFromContractOffers`: every line of every
+ * contract, so the multi-type tally is right.
+ */
+export function bpoRowsFromContractOffers(
+  offers: readonly PublicContractOfferRow[]
+): BpcContractRow[] {
+  return blueprintRows(
+    offers,
+    (offer) => !offer.isBlueprintCopy && offer.me !== undefined && offer.te !== undefined
+  ).map((row) => ({ ...row, runs: -1 }));
+}
+
+function blueprintRows(
+  offers: readonly PublicContractOfferRow[],
+  keep: (offer: PublicContractOfferRow) => boolean
+): BpcContractRow[] {
   const distinctTypeCount = distinctTypeCountByContract(offers);
   const rows: BpcContractRow[] = [];
   for (const offer of offers) {
-    if (!offer.isBlueprintCopy) continue;
+    if (!keep(offer)) continue;
     rows.push({
       contractId: offer.contractId,
       regionId: offer.regionId,
