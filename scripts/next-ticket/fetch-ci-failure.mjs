@@ -26,8 +26,11 @@ try {
     .filter((j) => j.conclusion === 'failure')
     .map((j) => j.name);
   if (failedJobNames.some((n) => /e2e/i.test(n))) {
+    // A glob, not `-n playwright-report`: the e2e job is a four-way shard
+    // matrix and each shard uploads its own report, so there is no single
+    // artifact of that name any more. `-p` grabs whichever shards failed.
     console.error(
-      `e2e job failed (${failedJobNames.join(', ')}) — consider: gh run download ${runId} -n playwright-report`
+      `e2e job failed (${failedJobNames.join(', ')}) — consider: gh run download ${runId} -p 'playwright-report-shard-*'`
     );
   }
 } catch {}
