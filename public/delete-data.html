@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Delete Your Data — Neocom Desk</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+      }
+      body {
+        max-width: 42rem;
+        margin: 0 auto;
+        padding: 2rem 1.25rem 4rem;
+        font-family:
+          system-ui,
+          -apple-system,
+          sans-serif;
+        line-height: 1.6;
+        background: #0a0e14;
+        color: #e6e6e6;
+      }
+      h1 {
+        font-size: 1.5rem;
+      }
+      h2 {
+        font-size: 1.1rem;
+        margin-top: 2rem;
+      }
+      a {
+        color: #6cb6ff;
+      }
+      code {
+        background: #1a1f2b;
+        padding: 0.1rem 0.3rem;
+        border-radius: 3px;
+      }
+      ol,
+      ul {
+        padding-left: 1.4rem;
+      }
+      .updated {
+        color: #9aa4b2;
+        font-size: 0.9rem;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Delete Your Data — Neocom Desk</h1>
+      <p class="updated">Last updated: September 22, 2026</p>
+
+      <p>
+        Neocom Desk has no separate account or password — you sign in with your EVE Online character
+        through CCP's own login. Removing a character from the app is how you delete its data, both
+        an account deletion and a data deletion at once.
+      </p>
+
+      <h2>How to delete a character's data</h2>
+      <ol>
+        <li>Open Neocom Desk and sign in.</li>
+        <li>Go to the <strong>Characters</strong> page.</li>
+        <li>
+          Find the character you want removed and click <strong>Remove {name}</strong> next to it.
+        </li>
+        <li>Confirm the removal.</li>
+      </ol>
+      <p>To remove every character (delete everything), repeat this for each one.</p>
+
+      <h2>What gets deleted, and when</h2>
+      <ul>
+        <li>
+          <strong>On your device, immediately:</strong> that character's skill plans, build plans,
+          quickbar, and cached game data are deleted from local storage right away.
+        </li>
+        <li>
+          <strong>On the sync server, immediately if possible:</strong> if a session can still be
+          started as that character, its synced plans, build plans, quickbar, and settings are
+          deleted from Firebase in the same action.
+        </li>
+        <li>
+          <strong>On the sync server, deferred:</strong> if a session can't be re-established (for
+          example, the character's login is already expired), the synced data is deleted
+          automatically the next time you sign in as that character. There is no other retention
+          period beyond that.
+        </li>
+      </ul>
+
+      <h2>Removing everything without opening the app</h2>
+      <p>
+        Uninstalling the app, or clearing its site data in your browser, immediately deletes all
+        locally cached data for every character. It does not delete synced data left on the server —
+        use the in-app removal above for that, or contact us below.
+      </p>
+
+      <h2>Need it done for you</h2>
+      <p>
+        If a character's login can no longer be used to sign in and you want its synced data removed
+        manually, open an issue at
+        <a href="https://github.com/shawndibble/neocom-desk/issues" target="_blank" rel="noopener"
+          >github.com/shawndibble/neocom-desk/issues</a
+        >
+        naming the character.
+      </p>
+
+      <p>See also the <a href="/privacy.html">Privacy Policy</a>.</p>
+    </main>
+  </body>
+</html>
