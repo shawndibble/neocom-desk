@@ -4,6 +4,7 @@ import {
   reprocessingYield,
   reprocessingValue,
   resolveSpecialisationLevel,
+  resolveReprocessingSkills,
   BASE_STATION_REPROCESSING_RATE,
 } from './reprocessing';
 import { SKILL_IDS } from './types';
@@ -56,6 +57,30 @@ describe('reprocessingEfficiency', () => {
 
   it('exports the assumed station rate rather than hiding it in the maths', () => {
     expect(BASE_STATION_REPROCESSING_RATE).toBe(0.5);
+  });
+
+  it('ignores Reprocessing and Reprocessing Efficiency for scrap, applying only the specialisation (Scrapmetal Processing) bonus (issue #1226)', () => {
+    // 0.5 x 1.10 (Scrapmetal V only) — Reprocessing V and Reprocessing
+    // Efficiency V are trained but must not apply to scrap.
+    expect(
+      reprocessingEfficiency({
+        reprocessingLevel: 5,
+        reprocessingEfficiencyLevel: 5,
+        specialisationLevel: 5,
+        isScrap: true,
+      })
+    ).toBeCloseTo(0.5 * 1.1, 10);
+  });
+
+  it('is the bare station rate for untrained scrap, same as untrained ore', () => {
+    expect(
+      reprocessingEfficiency({
+        reprocessingLevel: 0,
+        reprocessingEfficiencyLevel: 0,
+        specialisationLevel: 0,
+        isScrap: true,
+      })
+    ).toBeCloseTo(0.5, 10);
   });
 });
 
@@ -181,5 +206,30 @@ describe('resolveSpecialisationLevel', () => {
 
   it('is 0 when the resolved skill is untrained', () => {
     expect(resolveSpecialisationLevel(undefined, new Map())).toBe(0);
+  });
+});
+
+describe('resolveReprocessingSkills', () => {
+  it('marks a type with no specialisation attribute as scrap (issue #1226)', () => {
+    const trained = new Map([[SKILL_IDS.scrapmetalProcessing, { level: 2, sp: 0 }]]);
+    const skills = resolveReprocessingSkills(
+      { reprocessingLevel: 5, reprocessingEfficiencyLevel: 5 },
+      undefined,
+      trained
+    );
+    expect(skills.isScrap).toBe(true);
+    expect(skills.specialisationLevel).toBe(2);
+  });
+
+  it('does not mark an ore/ice/moon-ore type as scrap', () => {
+    const SIMPLE_ORE_PROCESSING = 60377;
+    const trained = new Map([[SIMPLE_ORE_PROCESSING, { level: 3, sp: 0 }]]);
+    const skills = resolveReprocessingSkills(
+      { reprocessingLevel: 5, reprocessingEfficiencyLevel: 5 },
+      SIMPLE_ORE_PROCESSING,
+      trained
+    );
+    expect(skills.isScrap).toBe(false);
+    expect(skills.specialisationLevel).toBe(3);
   });
 });

@@ -42,6 +42,13 @@ export interface ReprocessingSkills {
   specialisationLevel: number;
   /** The facility's own rate; defaults to an NPC station's 50%. */
   stationRate?: number;
+  /**
+   * True when `specialisationLevel` came from Scrapmetal Processing rather
+   * than an ore/ice/moon-ore specialisation (issue #1226) — Scrapmetal
+   * Processing is EVE's only bonus to scrap yield; Reprocessing and
+   * Reprocessing Efficiency do not apply to it.
+   */
+  isScrap?: boolean;
 }
 
 /** The two general reprocessing skills, ahead of resolving any type's specialisation. */
@@ -74,16 +81,28 @@ export function resolveReprocessingSkills(
   return {
     ...general,
     specialisationLevel: resolveSpecialisationLevel(specialisationSkillId, trained),
+    isScrap: specialisationSkillId === undefined,
   };
 }
 
-/** Station rate times the three skill multipliers. Never clamped to 1: a rigged structure with maxed skills genuinely exceeds it. */
+/**
+ * Station rate times the skill multipliers. Never clamped to 1: a rigged
+ * structure with maxed skills genuinely exceeds it.
+ *
+ * Scrap (`isScrap`) only ever gets Scrapmetal Processing's bonus (issue
+ * #1226) — Reprocessing and Reprocessing Efficiency are ore/ice/moon-ore
+ * skills and do not apply to it in EVE.
+ */
 export function reprocessingEfficiency({
   reprocessingLevel,
   reprocessingEfficiencyLevel,
   specialisationLevel,
   stationRate = BASE_STATION_REPROCESSING_RATE,
+  isScrap = false,
 }: ReprocessingSkills): number {
+  if (isScrap) {
+    return stationRate * (1 + 0.02 * specialisationLevel);
+  }
   return (
     stationRate *
     (1 + 0.03 * reprocessingLevel) *

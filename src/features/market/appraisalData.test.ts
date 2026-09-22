@@ -231,20 +231,25 @@ describe('appraisePaste', () => {
           },
         })
       );
-      mockedLoadReprocessing.mockResolvedValue({ '1230': VELDSPAR_ENTRY });
+      const SIMPLE_ORE_PROCESSING = 60377;
+      mockedLoadReprocessing.mockResolvedValue({
+        '1230': { ...VELDSPAR_ENTRY, specialisationSkillID: SIMPLE_ORE_PROCESSING },
+      });
       mockedLoadCorrectedSkills.mockResolvedValue(
         skillsFixture([
           [SKILL_IDS.reprocessing, 5],
           [SKILL_IDS.reprocessingEfficiency, 5],
+          [SIMPLE_ORE_PROCESSING, 5],
         ])
       );
 
       const { appraisal } = await appraisePaste('Veldspar\t1000', DEFAULT_TRADE_HUB, 100, 1);
 
-      // efficiency = 0.5 x 1.15 x 1.10 (Veldspar carries no specialisationSkillID
-      // in this fixture, so it falls back to Scrapmetal Processing, untrained
-      // here — that term is x1). Tritanium's buyMax is 5.41.
-      const efficiency = 0.5 * 1.15 * 1.1;
+      // efficiency = 0.5 x 1.15 x 1.10 x 1.10 (Veldspar carries Simple Ore
+      // Processing's specialisationSkillID, so Reprocessing, Reprocessing
+      // Efficiency and the ore specialisation all apply — issue #1226).
+      // Tritanium's buyMax is 5.41.
+      const efficiency = 0.5 * 1.15 * 1.1 * 1.1;
       const expected = Math.floor(415 * 10 * efficiency) * 5.41;
       expect(appraisal.rows[0].refineTotal).toBeCloseTo(expected, 6);
     });
@@ -279,6 +284,27 @@ describe('appraisePaste', () => {
       // Damage Control II: 0.5 x 1.0 (untrained Scrapmetal) -> floor(100*0.5) = 50
       const dcuRow = appraisal.rows.find((row) => row.typeId === 2048)!;
       expect(dcuRow.refineTotal).toBeCloseTo(50 * 5.41, 6);
+    });
+
+    it('does not apply Reprocessing or Reprocessing Efficiency to scrap, only Scrapmetal Processing (issue #1226)', async () => {
+      server.use(aggregates(PRICED));
+      mockedLoadReprocessing.mockResolvedValue({
+        '2048': { portionSize: 1, materials: [{ typeID: 34, quantity: 100 }] },
+      });
+      mockedLoadCorrectedSkills.mockResolvedValue(
+        skillsFixture([
+          [SKILL_IDS.reprocessing, 5],
+          [SKILL_IDS.reprocessingEfficiency, 5],
+          [SKILL_IDS.scrapmetalProcessing, 5],
+        ])
+      );
+
+      const { appraisal } = await appraisePaste('Damage Control II\t1', DEFAULT_TRADE_HUB, 100, 1);
+
+      // Damage Control II is scrap: only Scrapmetal Processing V applies.
+      // 0.5 x 1.10 -> floor(100*0.55) = 55
+      const dcuRow = appraisal.rows[0];
+      expect(dcuRow.refineTotal).toBeCloseTo(55 * 5.41, 6);
     });
   });
 
