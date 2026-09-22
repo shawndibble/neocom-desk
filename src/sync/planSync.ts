@@ -1279,7 +1279,7 @@ interface RemoteNotificationFeedDoc extends RemoteFeedDoc {
 function toRemoteFeedDoc(
   row: NotificationFeedRecord,
   ownerHash: string,
-  now: number
+  writeNow: number
 ): Record<string, unknown> {
   return {
     id: row.id,
@@ -1295,15 +1295,14 @@ function toRemoteFeedDoc(
     // Transport only — what an incremental pull cursors on (issue #581).
     // `mergeFeed` still keys on firedAt/dismissedAt and never reads this.
     //
-    // The wall clock of *this write*, not the row's own `max(firedAt,
-    // dismissedAt)` (issue #1207). A cursor has to order writes, and a feed
-    // row's timestamps order occurrences: `occurrenceFiredAt` back-dates a
-    // row to a skill's `finish_date` or a journal entry's `date`, so a row
-    // uploaded now could carry a stamp days below every other device's
-    // cursor and be filtered out of their pulls until the 30-day full
-    // reconcile. Nothing here re-dates the row — `firedAt` and `dismissedAt`
-    // go up untouched, and they remain the only fields `mergeFeed` reads.
-    updatedAt: now,
+    // A wall clock, not the row's own `max(firedAt, dismissedAt)` — see
+    // `LocalFeedRow` for why the derived stamp hid rows from other devices.
+    // `writeNow`, never `ctx.now`: a pass stamps `ctx.now` before ten other
+    // collections' round trips, and a doc written a minute later under a
+    // stamp a minute old can land below a cursor another device has already
+    // moved past. Nothing here re-dates the row itself — `firedAt` and
+    // `dismissedAt` go up untouched, and stay the only fields `mergeFeed` reads.
+    updatedAt: writeNow,
   };
 }
 
@@ -1315,13 +1314,13 @@ function toRemoteFeedDoc(
  */
 function toLocalFeedRecord(
   remote: RemoteNotificationFeedDoc,
-  now: number,
+  writeNow: number,
   local?: NotificationFeedRecord
 ): NotificationFeedRecord {
   return mergeFeedRecord(local, {
     // Seen in the remote collection, so the remote side demonstrably holds it
     // — the same fact a successful push records, learned a step later.
-    syncedAt: now,
+    syncedAt: writeNow,
     id: remote.id,
     characterId: remote.characterId,
     eventId: remote.eventId,
@@ -1358,25 +1357,32 @@ async function syncFeed(ctx: SyncContext): Promise<void> {
   );
 
   const pushed = [...plan.pushCreate, ...plan.pushDismiss];
+  const writeNow = Date.now();
   await Promise.all([
-    ...pushed.map((row) => setDoc(doc(col, row.id), toRemoteFeedDoc(row, ctx.ownerHash, ctx.now))),
+    ...pushed.map((row) => setDoc(doc(col, row.id), toRemoteFeedDoc(row, ctx.ownerHash, writeNow))),
     ...plan.purgeRemote.map((id) => deleteDoc(doc(col, id))),
   ]);
 
-  // Only after the writes land: a `syncedAt` recorded for a row that never
-  // reached Firestore would be a row this device has silently agreed never to
-  // upload again. A throw here leaves it unmarked and the next pass re-pushes,
-  // which is the harmless direction to fail in.
-  if (pushed.length > 0) {
-    await db.notificationFeed
-      .where('id')
-      .anyOf(pushed.map((row) => row.id))
-      .modify({ syncedAt: ctx.now });
+  const localById = new Map(local.map((row) => [row.id, row]));
+  // What this pass now knows the remote side holds: what it just wrote, and
+  // what it read back unchanged. Without the second half a row both sides
+  // already had — one the Scheduled Push handler wrote here and the other
+  // device uploaded — would stay unmarked and re-push on every pass.
+  //
+  // Marked only after the writes land: a `syncedAt` on a row that never
+  // reached Firestore is a row this device has silently agreed never to
+  // upload again. A throw here leaves it unmarked and the next pass
+  // re-pushes, which is the harmless direction to fail in.
+  const knownRemote = [
+    ...pushed.map((row) => row.id),
+    ...remote.map((row) => row.id).filter((id) => localById.has(id)),
+  ];
+  if (knownRemote.length > 0) {
+    await db.notificationFeed.where('id').anyOf(knownRemote).modify({ syncedAt: writeNow });
   }
 
-  const localById = new Map(local.map((row) => [row.id, row]));
   const pulled = [...plan.pullCreate, ...plan.pullDismiss].map((row) =>
-    toLocalFeedRecord(row, ctx.now, localById.get(row.id))
+    toLocalFeedRecord(row, writeNow, localById.get(row.id))
   );
   if (pulled.length > 0) {
     await db.notificationFeed.bulkPut(pulled);

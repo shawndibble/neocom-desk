@@ -699,9 +699,11 @@ describe('mergeFeed: incremental pull', () => {
     // #582 AC4: a row purged remotely for its age must not come straight back
     // up. `syncedAt` decides whether the remote side knows the row;
     // `pushEligible` decides whether it is allowed to learn.
-    const row = feedLocal({ firedAt: NOW - FEED_SYNC_WINDOW_MS - 1 });
-    const result = mergeFeedNow([row], new Set(), []);
-    expect(result.pushCreate).toEqual([]);
+    const aged = { firedAt: NOW - FEED_SYNC_WINDOW_MS - 1 };
+    expect(mergeFeedNow([feedLocal(aged)], new Set(), []).pushCreate).toEqual([]);
+    expect(
+      mergeFeedNow([feedLocal({ ...aged, syncedAt: NOW - 500 })], new Set(), []).pushCreate
+    ).toEqual([]);
   });
 
   it('still pulls a remote row the window returned', () => {

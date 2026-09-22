@@ -464,15 +464,10 @@ export interface NotificationFeedRecord {
    */
   dismissedAt?: number;
   /**
-   * Epoch ms this device last uploaded the row to the synced feed collection
-   * (issue #1207), absent until it has. Local bookkeeping — never uploaded,
-   * and never read by `sync/merge.mergeFeedRecord`'s content merge.
-   *
-   * It exists because a feed row's own timestamps date the *occurrence*, not
-   * the write: `engine/occurrenceKey.occurrenceFiredAt` back-dates a row to a
-   * skill's `finish_date` or a journal entry's `date`, so a row created now
-   * can sort days below the pull cursor and be mistaken for one an earlier
-   * pass already reconciled. This records the fact directly instead.
+   * Epoch ms the remote side is known to hold this row, absent until it does.
+   * Local bookkeeping: `sync/planSync`'s `toRemoteFeedDoc` never uploads it,
+   * and `sync/merge.mergeFeed` is the only reader. See `sync/merge.LocalFeedRow`
+   * for why a row's own timestamps cannot answer the same question.
    */
   syncedAt?: number;
   /**

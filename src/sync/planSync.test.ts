@@ -286,8 +286,9 @@ function feedRow(overrides: Partial<NotificationFeedRecord> = {}): NotificationF
 
 function remoteFeedDoc(overrides: DocData = {}): DocData {
   const merged = { ...feedRow(), ownerHash: HASH, ...overrides };
-  // The transport stamp toRemoteFeedDoc writes (issue #581); an explicit
-  // override still wins.
+  // A seeded doc needs *some* transport stamp for the cursor to read. It is no
+  // longer derivable from the row — `toRemoteFeedDoc` stamps the wall clock of
+  // the write — so a test about pull ordering passes `updatedAt` explicitly.
   const firedAt = merged.firedAt as number;
   const dismissedAt = merged.dismissedAt as number | undefined;
   return { updatedAt: Math.max(firedAt, dismissedAt ?? 0), ...merged };
@@ -1384,6 +1385,56 @@ describe('triggerSync: notification feed', () => {
     await triggerSync(1);
 
     expect(remoteStore.get(NOTIFICATION_FEED_PATH)?.has('backdated')).toBe(true);
+  });
+
+  it('pulls a back-dated row the other device wrote just now (#1207)', async () => {
+    const now = Date.now();
+    // Cursor first, from ordinary recent activity.
+    seedRemote(NOTIFICATION_FEED_PATH, [
+      remoteFeedDoc({ id: 'earlier', firedAt: now, updatedAt: now }),
+    ]);
+    await triggerSync(1);
+
+    // The other device uploads a ten-day-old skill completion. Written now, so
+    // its transport stamp is now, whatever the occurrence is dated.
+    seedRemote(NOTIFICATION_FEED_PATH, [
+      remoteFeedDoc({ id: 'earlier', firedAt: now, updatedAt: now }),
+      remoteFeedDoc({
+        id: 'backdated',
+        firedAt: now - 10 * 24 * 60 * 60 * 1000,
+        updatedAt: now + 1,
+      }),
+    ]);
+    await triggerSync(1);
+
+    expect(await db.notificationFeed.get('backdated')).toBeDefined();
+  });
+
+  it('does not re-push a row it read back unchanged from the remote side', async () => {
+    // Both sides already hold it — the Scheduled Push handler wrote it here
+    // while the other device uploaded it. Nothing to introduce.
+    await db.notificationFeed.put(feedRow());
+    seedRemote(NOTIFICATION_FEED_PATH, [remoteFeedDoc()]);
+    await triggerSync(1);
+    expect((await db.notificationFeed.get('occ-1'))?.syncedAt).toEqual(expect.any(Number));
+
+    vi.mocked(setDoc).mockClear();
+    await triggerSync(1);
+    expect(vi.mocked(setDoc)).not.toHaveBeenCalled();
+  });
+
+  it('clears syncedAt for the Character’s rows when the ownerHash changes', async () => {
+    await db.notificationFeed.put(feedRow());
+    await triggerSync(1);
+    expect((await db.notificationFeed.get('occ-1'))?.syncedAt).toEqual(expect.any(Number));
+
+    // A transfer. The rows survive as this device's archive, but the new
+    // owner's collection has never held them.
+    await db.settings.put({ key: 'sync.__ownerHash.1', value: 'previous-owner-hash' });
+    remoteStore.clear();
+    await triggerSync(1);
+
+    expect(remoteStore.get(NOTIFICATION_FEED_PATH)?.has('occ-1')).toBe(true);
   });
 
   it('re-pushes a row dismissed after it was uploaded', async () => {

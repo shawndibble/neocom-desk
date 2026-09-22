@@ -261,15 +261,17 @@ export interface RemoteFeedDoc extends FeedRow {
 }
 
 /**
- * A feed row as this device holds it, with the one field the remote copy
- * never carries: when this device last wrote the row *out* (issue #1207).
+ * A feed row as this device holds it, with the one field the remote copy never
+ * carries: whether the remote side holds this row, and as of when.
  *
- * The remote doc's `updatedAt` is a wall clock stamped at upload, so a device
- * cannot recompute it from the row's own content the way it could while that
- * stamp was `max(firedAt, dismissedAt)`. `syncedAt` is the local half of that
- * pair — "the remote side holds this row, as of here" — and it is what
- * {@link mergeFeed} reads instead of comparing a pull cursor against an
- * occurrence time that may predate it by days.
+ * It exists because a feed row's timestamps date the *occurrence*, not the
+ * write — `engine/occurrenceKey.occurrenceFiredAt` stamps a skill completion
+ * with its `finish_date`, a wallet change with the journal entry's `date` — so
+ * a row written seconds ago can sort days below this device's own pull cursor.
+ * Read as "reconciled last pass", that cost a user every back-dated alert on
+ * their second device. The remote `updatedAt` is now a wall clock, which a
+ * device cannot recompute from the row, so `syncedAt` records the fact here
+ * instead of inferring it.
  */
 export interface LocalFeedRow extends FeedRow {
   /** Epoch ms this device last uploaded the row. Absent = the remote side has never held it. */
@@ -316,19 +318,13 @@ export interface FeedMergeResult<L extends FeedRow, R extends RemoteFeedDoc> {
  * passed in, never just the windowed subset, and never regresses an
  * already-recorded dismissal.
  *
- * What decides push-CREATE on an *incremental* pass is `syncedAt`, not the
- * pull cursor (issue #1207). Every other collection can read "local row,
- * absent from the remote window, dated at or below the cursor" as "the last
- * pass reconciled it", because those rows are stamped when they are written.
- * A feed row is not: `occurrenceFiredAt` back-dates it to when the occurrence
- * really happened — a skill's `finish_date`, a journal entry's `date`, an EVE
- * notification's `timestamp` — so a row created *now* can be dated days below
- * the cursor and read as reconciled when it has never been uploaded at all.
- * That cost the user every back-dated alert on their second device. `syncedAt`
- * answers the question the cursor was standing in for — has this device
- * already written this row out? — and a dismissal recorded after that write
- * puts the row back in play, which is what keeps the read amplification the
- * cursor gate was added to prevent from coming back.
+ * What decides push-CREATE on an *incremental* pass is {@link LocalFeedRow}'s
+ * `syncedAt`, not the pull cursor. Every other collection reads "local row,
+ * absent from the remote window, at or below the cursor" as "reconciled last
+ * pass"; a feed row cannot, because its timestamps date the occurrence rather
+ * than the write. A dismissal recorded after that write puts the row back in
+ * play, which is what keeps the read amplification the cursor gate prevented
+ * from coming back.
  *
  * `purgeRemote` (issue #582) bounds the remote collection on that same
  * window, which until now gated only what a device started uploading, never

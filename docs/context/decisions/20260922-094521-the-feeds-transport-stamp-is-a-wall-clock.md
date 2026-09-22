@@ -2,6 +2,13 @@
 
 _Recorded 2026-09-22 · issue #1207._
 
+**Supersedes** the transport-stamp bullet in
+`20260907-220630-sync-reads-incrementally-with-a-periodic-full-reconcile.md`
+("the transport stamp is `max(firedAt, dismissedAt)`, derived rather than
+wall-clocked"). That file stays as written — this directory is append-only —
+so a reader who greps their way into it lands on the inverted rule without
+this pointer.
+
 - **A Notification Feed doc's `updatedAt` is stamped when the row is uploaded,
   not derived from the row's own timestamps.** Issue #581 derived it as
   `max(firedAt, dismissedAt)` so that "the value a device compares locally is
@@ -12,8 +19,11 @@ _Recorded 2026-09-22 · issue #1207._
   can carry a stamp days below every other device's pull cursor and be
   filtered out of their incremental pulls until the 30-day full reconcile. One
   account's desktop and phone agreed exactly on every poll-clock event type and
-  diverged 9-to-3 and 6-to-0 on the back-dated ones. This rules out reading a
-  cursor field as anything but write order, on this collection or any other.
+  diverged 9-to-3 and 6-to-0 on the back-dated ones. The stamp is taken at the
+  write itself, not from the pass's `ctx.now`, which is captured before ten
+  other collections' round trips and would date a doc minutes before it landed.
+  This rules out reading a cursor field as anything but write order, on this
+  collection or any other.
 
 - **`syncedAt` on the local row, not the pull cursor, decides whether a row has
   been introduced to sync.** With a wall-clock `updatedAt` a device cannot
@@ -21,9 +31,11 @@ _Recorded 2026-09-22 · issue #1207._
   "is this row at or below the cursor?" — and that question was the bug, not
   the answer: a back-dated row is below the cursor from birth, so it was read as
   reconciled when it had never been uploaded at all. `syncedAt` records the fact
-  directly. The read amplification the cursor gate existed to prevent is
-  unchanged, since an uploaded row still short-circuits. This rules out
-  inferring upload state from any timestamp the row carries about itself.
+  directly, for rows this pass uploaded _and_ for rows it read back unchanged —
+  a row both sides already hold is not one this device needs to introduce, and
+  marking only what it pushed would re-upload every such row on every pass. The
+  read amplification the cursor gate existed to prevent is unchanged. This rules
+  out inferring upload state from any timestamp the row carries about itself.
 
 - **A dismissal recorded after the upload puts the row back through
   push-CREATE.** The remote doc is replaced wholesale and the remote copy is
