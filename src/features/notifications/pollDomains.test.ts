@@ -17,7 +17,13 @@ import {
   priceAlertDomain,
   gatedOn,
   deriveMarketOrderEntries,
+  domainForEvent,
+  renderNotification,
+  notificationSubjectId,
 } from './pollDomains';
+import { SUBJECT_ROUTED_EVENT_IDS } from './notificationOptions';
+import { loadTypeNames } from '@/features/character/typeNames';
+import { resolveNames } from '@/features/character/names';
 import { getHubPrices } from '@/market/prices';
 import { useMarketHub } from '@/features/market/hub';
 import { getTradeHub } from '@/market/hubs';
@@ -87,6 +93,8 @@ vi.mock('@/features/pi/data', () => ({
   loadAllColonyDetails: vi.fn(),
 }));
 vi.mock('@/market/prices', () => ({ getHubPrices: vi.fn() }));
+vi.mock('@/features/character/typeNames', () => ({ loadTypeNames: vi.fn() }));
+vi.mock('@/features/character/names', () => ({ resolveNames: vi.fn() }));
 
 function statusResult<T>(data: T, truncated: boolean): StatusResult<T> {
   return {
@@ -925,5 +933,124 @@ describe('priceAlertDomain', () => {
     expect(entries).toEqual([
       { typeId: 34, name: 'Tritanium', targetPrice: 5, direction: 'above', price: null },
     ]);
+  });
+});
+
+/**
+ * Copy wiring (issue #1249): each domain owns its events' copy and the name
+ * lookups it needs. The copy itself is tabled in `domainCopy.test.ts`; these
+ * prove the registry routes a fire to the right domain and feeds its lookups
+ * through.
+ */
+describe('copy wiring', () => {
+  beforeEach(() => {
+    vi.mocked(loadUniverseType).mockReset();
+    vi.mocked(loadPlanetName).mockReset();
+    vi.mocked(loadTypeNames).mockReset();
+    vi.mocked(resolveNames).mockReset();
+  });
+
+  it('gives every Notification Event exactly one owning domain', () => {
+    for (const eventId of NOTIFICATION_EVENT_IDS) {
+      const owners = POLL_DOMAINS.filter((domain) => domain.eventIds.includes(eventId));
+      expect(owners, eventId).toHaveLength(1);
+      expect(domainForEvent(eventId)).toBe(owners[0]);
+    }
+  });
+
+  it('refuses an event no domain fires rather than rendering nothing', () => {
+    // Every fire the poller renders came from a domain's own diff, so an
+    // unowned id is a programmer error, not a stale feed row.
+    expect(() => domainForEvent('somethingNewer' as NotificationEventId)).toThrow(
+      'no domain fires somethingNewer'
+    );
+  });
+
+  it('routes a subject for exactly the events whose URL table can use one', () => {
+    // A fire of every event, carrying every subject field a diff could set.
+    const routed = NOTIFICATION_EVENT_IDS.filter(
+      (eventId) =>
+        notificationSubjectId({
+          eventId,
+          characterId: 1,
+          typeId: 1,
+          journalEntryId: 1,
+          contractId: 1,
+          jobId: 1,
+          memberCharacterId: 1,
+        } as never) !== undefined
+    );
+    expect([...routed].sort()).toEqual([...SUBJECT_ROUTED_EVENT_IDS].sort());
+  });
+
+  it('looks up a type name before rendering', async () => {
+    vi.mocked(loadUniverseType).mockResolvedValue({
+      data: { name: 'Rifter' },
+      fetchedAt: new Date(0),
+      fromCache: false,
+      truncated: false,
+    } as Awaited<ReturnType<typeof loadUniverseType>>);
+    const copy = await renderNotification(
+      {
+        eventId: 'industryJobComplete',
+        characterId: 1,
+        jobId: 5,
+        blueprintTypeId: 691,
+        productTypeId: 587,
+        activityId: 1,
+      },
+      'Kestrel'
+    );
+    expect(vi.mocked(loadUniverseType)).toHaveBeenCalledWith(587);
+    expect(copy.body).toEqual("Kestrel's industry job for Rifter is complete.");
+  });
+
+  it('falls back to the id when a planet name does not resolve', async () => {
+    vi.mocked(loadPlanetName).mockResolvedValue(null);
+    const copy = await renderNotification(
+      { eventId: 'planetaryExtractionDone', characterId: 1, planetId: 7, expiryTimeMs: 1 },
+      'Kestrel'
+    );
+    expect(copy.body).toEqual("Kestrel's extraction on #7 has stopped.");
+  });
+
+  it('keeps a market fill when the item name lookup rejects', async () => {
+    vi.mocked(loadTypeNames).mockRejectedValue(new Error('offline'));
+    const copy = await renderNotification(
+      { eventId: 'marketOrderFilled', characterId: 1, orderId: 1, typeId: 35, quantity: 2 },
+      'Kestrel'
+    );
+    expect(copy.body).toEqual('Someone bought 2 x #35 from Kestrel.');
+  });
+
+  it("resolves a new member's name", async () => {
+    vi.mocked(resolveNames).mockResolvedValue(new Map([[9001, 'New Guy']]));
+    const copy = await renderNotification(
+      { eventId: 'corpMemberJoined', characterId: 1, memberCharacterId: 9001 },
+      'Kestrel'
+    );
+    expect(copy.body).toEqual('Kestrel: New Guy joined the corporation.');
+  });
+
+  it("formats a new calendar event's start in the pilot's clock", async () => {
+    const copy = await renderNotification(
+      {
+        eventId: 'newCalendarEvent',
+        characterId: 1,
+        calendarEventId: 1,
+        startMs: Date.UTC(2026, 8, 25, 19, 0),
+        title: 'Fleet Op',
+      },
+      'Kestrel'
+    );
+    expect(copy.body).toEqual('Kestrel: Fleet Op was added, starting Sep 25, 7:00 PM.');
+  });
+
+  it('renders an event with nothing to look up', async () => {
+    const copy = await renderNotification(
+      { eventId: 'newMail', characterId: 1, mailId: 1 },
+      'Kestrel'
+    );
+    expect(copy).toEqual({ title: 'New mail', body: 'Kestrel has new mail.' });
   });
 });

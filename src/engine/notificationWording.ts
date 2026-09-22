@@ -3,20 +3,21 @@
  * Notification Events, rendered in the browser via i18next (`src/i18n/
  * index.ts` splices these templates into `notifications.fired.*`).
  *
- * **Four of the six are also `projection.ts`'s.** A Scheduled Push row has no
- * i18next runtime to render from: `projection.ts` renders its final text
- * on-device before upload (ADR 0010 — the backend holds no EVE token, no SDE,
+ * **Four of the six are also push copy.** A Scheduled Push row has no
+ * i18next runtime to render from: each domain's push renderer
+ * (`features/notifications/domainCopy.ts`, called by `projection.ts`) renders
+ * its final text on-device before upload (ADR 0010 — the backend holds no EVE token, no SDE,
  * no i18n catalog, and never renders, it only stores and fires the
  * already-rendered row). Those four say the same thing either way, so they say
  * it once, here. This module is plain data plus a tiny substitution function
- * precisely so `projection.ts` can read it without `src/engine` importing
- * React/i18next.
+ * precisely so push copy can be rendered without i18next.
  *
  * **The two planetary events are read by the live path alone.**
  * `projectionWording` hedges them on the push path — a reset run done in game
  * while the app is closed falsifies the prediction before it fires — and
- * `projection.ts` writes that weaker copy inline, as it already does for
- * `structureFuelLow`. Their assertive wording stays here because the live
+ * each domain's push renderer (`features/notifications/domainCopy.ts`)
+ * writes that weaker copy inline, as it does for `structureFuelLow`. Their
+ * assertive wording stays here because the live
  * path is the one that has actually watched the colony go idle;
  * `src/i18n/index.test.ts` pins the divergence so it cannot spread to the
  * other four by accident.
@@ -24,6 +25,12 @@
  * `{{placeholder}}` matches i18next's own interpolation syntax so a template
  * reads identically wherever it is rendered from.
  */
+
+/** One rendered notification: what a toast, feed row or push shows. */
+export interface NotificationCopy {
+  readonly title: string;
+  readonly body: string;
+}
 
 export interface NotificationWordingTemplate {
   readonly title: string;
@@ -82,4 +89,23 @@ export function renderWording(
   return template.replace(/\{\{(\w+)\}\}/g, (match, key: string) =>
     key in vars ? String(vars[key]) : match
   );
+}
+
+/**
+ * Renders one shared template. `variant` picks the degraded body where the
+ * template has one (`NotificationWordingTemplate.bodyUnnamed`), falling back
+ * to the ordinary body for a template that declares none — so asking for a
+ * variant an event does not define renders a complete sentence rather than
+ * nothing.
+ */
+export function renderSharedWording(
+  eventId: SharedWordingEventId,
+  vars: Readonly<Record<string, string | number>>,
+  variant: 'body' | 'bodyUnnamed' = 'body'
+): NotificationCopy {
+  // Widened to the interface: the constant is `as const`, so its inferred
+  // union only carries `bodyUnnamed` on the members that declare one.
+  const template: NotificationWordingTemplate = SHARED_NOTIFICATION_WORDING[eventId];
+  const body = (variant === 'bodyUnnamed' ? template.bodyUnnamed : undefined) ?? template.body;
+  return { title: template.title, body: renderWording(body, vars) };
 }

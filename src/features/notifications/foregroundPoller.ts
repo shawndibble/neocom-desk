@@ -15,19 +15,17 @@
 import { db } from '@/db';
 import { occurrenceKey, occurrenceFiredAt } from '@/engine/occurrenceKey';
 import type { ProjectionRow } from '@/engine/projection';
-import { loadUniverseType } from '@/features/skills/data';
-import { loadPlanetName } from '@/features/pi/names';
-import { resolveNames } from '@/features/character/names';
-import { loadTypeNames } from '@/features/character/typeNames';
 import { mapWithConcurrencyLimit, ESI_FANOUT_CONCURRENCY } from '@/lib/concurrency';
-import { formatIsk } from '@/lib/isk';
-import { formatCalendarTimestamp } from '@/lib/timestamp';
-import { timeZoneFor, useTimeFormat } from '@/lib/timeFormat';
 import i18n from '@/i18n';
 import type { LocalSettingStore } from '@/lib/useLocalSetting';
 import { hasEventScope, type NotificationEventId } from './events';
-import type { ContractNotificationFire } from '@/engine/notificationDiffs';
-import { POLL_DOMAINS, type AnyNotificationFire, type PollDomain } from './pollDomains';
+import {
+  POLL_DOMAINS,
+  renderNotification,
+  notificationSubjectId,
+  type AnyNotificationFire,
+  type PollDomain,
+} from './pollDomains';
 import { groupIdenticalFires, type RenderedFire } from './groupFires';
 import { withCharacterSnapshot, type PollerState } from './pollerState';
 import {
@@ -50,18 +48,13 @@ import {
 } from './eventSelection';
 import { readNotificationPermission } from './permission';
 import { displayPageNotification, livePageDisplayEnv } from './display';
-import { notificationOptionsFor, notificationSubjectId } from './notificationOptions';
-import { eveNotificationText } from './eveNotificationText';
-import { resolveEveNotificationNames } from './eveNotificationNames';
+import { notificationOptionsFor } from './notificationOptions';
 import { uploadProjectionRows } from './projectionUpload';
 import { rebuildProjection } from './projectionRebuild';
 
 export type { AnyNotificationFire } from './pollDomains';
 
 export const POLL_INTERVAL_MS = 5 * 60 * 1000;
-
-const ROMAN = ['I', 'II', 'III', 'IV', 'V'] as const;
-const DAY_MS = 86_400_000;
 
 export interface CharacterRef {
   characterId: number;
@@ -371,7 +364,7 @@ async function runForegroundPollOnce(deps: PollDependencies): Promise<void> {
     if (!character) continue;
     // Notification Allow-List (CONTEXT.md round 44): a type outside the
     // closed list is dropped here, before either channel and before any
-    // name-resolution work (notificationText → resolveEveNotificationNames)
+    // name-resolution work (renderNotification → the domain's `names`)
     // that recordToFeed/notify would otherwise trigger for it.
     const allowedFires = update.fires.filter(
       (fire) => fire.eventId !== 'eveNotification' || isEveTypeAllowed(fire.type)
@@ -421,7 +414,7 @@ async function runForegroundPollOnce(deps: PollDependencies): Promise<void> {
     }
     const rendered: RenderedFire<AnyNotificationFire>[] = [];
     for (const fire of browserFires) {
-      rendered.push({ fire, ...(await notificationText(fire, character)) });
+      rendered.push({ fire, ...(await renderNotification(fire, character.name)) });
     }
     for (const group of groupIdenticalFires(rendered)) {
       const title = group.count > 1 ? groupedTitle(group.title, group.count) : group.title;
@@ -455,261 +448,6 @@ function groupedTitle(title: string, count: number): string {
 }
 
 /**
- * When a newly-added calendar event starts, in the pilot's chosen clock
- * (`lib/timeFormat.ts` — local, or EVE/UTC).
- *
- * Read through the store's `getState` rather than the `useTimeZone` hook: this
- * runs in the poll loop, not in a component. The preference is hydrated by the
- * time any poll runs (`ForegroundNotificationPoller` mounts inside the app),
- * and its default is the same 'local' every other surface used before the
- * preference existed, so a cold read is never wrong in a way a pilot notices.
- *
- * `undefined` when the snapshot carries no usable instant — the caller drops
- * the clause rather than printing "Invalid Date".
- */
-function calendarStartLabel(startMs: number): string | undefined {
-  if (!Number.isFinite(startMs)) return undefined;
-  return formatCalendarTimestamp(new Date(startMs), timeZoneFor(useTimeFormat.getState().value));
-}
-
-/** See `notificationText`'s doc comment on why this is a named predicate rather than an inline check. */
-function isContractLifecycleFire(fire: AnyNotificationFire): fire is ContractNotificationFire {
-  return (
-    fire.eventId === 'contractAccepted' ||
-    fire.eventId === 'contractCompleted' ||
-    fire.eventId === 'contractFailed'
-  );
-}
-
-async function notificationText(
-  fire: AnyNotificationFire,
-  character: CharacterRef
-): Promise<{ title: string; body: string }> {
-  if (fire.eventId === 'industryJobComplete') {
-    const itemTypeId = fire.productTypeId ?? fire.blueprintTypeId;
-    const itemType = await loadUniverseType(itemTypeId);
-    const itemName = itemType?.data.name ?? `#${itemTypeId}`;
-    return {
-      title: i18n.t('notifications.fired.industryJobComplete.title'),
-      body: i18n.t('notifications.fired.industryJobComplete.body', {
-        character: character.name,
-        item: itemName,
-      }),
-    };
-  }
-  if (fire.eventId === 'planetaryExtractionDone') {
-    const planetName = (await loadPlanetName(fire.planetId)) ?? `#${fire.planetId}`;
-    return {
-      title: i18n.t('notifications.fired.planetaryExtractionDone.title'),
-      body: i18n.t('notifications.fired.planetaryExtractionDone.body', {
-        character: character.name,
-        planet: planetName,
-      }),
-    };
-  }
-  if (fire.eventId === 'planetaryExtractorExpiring') {
-    const planetName = (await loadPlanetName(fire.planetId)) ?? `#${fire.planetId}`;
-    return {
-      title: i18n.t('notifications.fired.planetaryExtractorExpiring.title'),
-      body: i18n.t('notifications.fired.planetaryExtractorExpiring.body', {
-        character: character.name,
-        planet: planetName,
-        hours: Math.round(fire.thresholdMs / 3_600_000),
-      }),
-    };
-  }
-  if (fire.eventId === 'newMail') {
-    return {
-      title: i18n.t('notifications.fired.newMail.title'),
-      body: i18n.t('notifications.fired.newMail.body', { character: character.name }),
-    };
-  }
-  if (fire.eventId === 'newCalendarEvent') {
-    const when = calendarStartLabel(fire.startMs);
-    return {
-      title: i18n.t('notifications.fired.newCalendarEvent.title'),
-      body:
-        fire.title === undefined || when === undefined
-          ? i18n.t('notifications.fired.newCalendarEvent.bodyUnnamed', {
-              character: character.name,
-            })
-          : i18n.t('notifications.fired.newCalendarEvent.body', {
-              character: character.name,
-              event: fire.title,
-              when,
-            }),
-    };
-  }
-  if (fire.eventId === 'calendarEventStarting') {
-    return {
-      title: i18n.t('notifications.fired.calendarEventStarting.title'),
-      body:
-        fire.title === undefined
-          ? i18n.t('notifications.fired.calendarEventStarting.bodyUnnamed', {
-              character: character.name,
-            })
-          : i18n.t('notifications.fired.calendarEventStarting.body', {
-              character: character.name,
-              event: fire.title,
-            }),
-    };
-  }
-  // Same shape for all three contract transitions (issue #1091 adds the
-  // latter two alongside the original acceptance event) — a template-literal
-  // key, same pattern as corpMemberJoined/corpMemberLeft below. Routed through
-  // an explicit type predicate rather than an inline `fire.eventId === ...`
-  // chain: `ContractNotificationFire`'s `eventId` is itself a 3-literal union
-  // within one interface, and TS's control-flow narrowing does not reliably
-  // eliminate that whole member from `AnyNotificationFire` via sequential
-  // equality checks the way it does for the many other members here that each
-  // carry a single-literal `eventId` — a named predicate's `is` return type
-  // narrows both branches explicitly instead of relying on that inference.
-  if (isContractLifecycleFire(fire)) {
-    return {
-      title: i18n.t(`notifications.fired.${fire.eventId}.title`),
-      body: i18n.t(`notifications.fired.${fire.eventId}.body`, { character: character.name }),
-    };
-  }
-  if (fire.eventId === 'walletBalanceChanged') {
-    const title = i18n.t('notifications.fired.walletBalanceChanged.title');
-    if (fire.amount === null) {
-      return {
-        title,
-        body: i18n.t('notifications.fired.walletBalanceChanged.body', {
-          character: character.name,
-        }),
-      };
-    }
-    return {
-      title,
-      body: i18n.t('notifications.fired.walletBalanceChanged.bodyWithAmount', {
-        character: character.name,
-        amount: formatIsk(fire.amount, 2),
-      }),
-    };
-  }
-  if (fire.eventId === 'marketOrderFilled') {
-    // Best-effort, like the EVE-notification names below: `loadTypeNames`
-    // reads the local SDE snapshot first, falls back to one batched ESI call,
-    // and yields "Type #id" rather than throwing. A name we cannot resolve is
-    // no reason to hold the notification back.
-    const names = await loadTypeNames([fire.typeId]).catch(() => new Map<number, string>());
-    const item = names.get(fire.typeId) ?? `#${fire.typeId}`;
-    return {
-      title: i18n.t('notifications.fired.marketOrderFilled.title'),
-      // "1 x Tritanium" is noise; a bare item name is not. Same body/bodyWith…
-      // split `walletBalanceChanged` uses just above.
-      body:
-        fire.quantity > 1
-          ? i18n.t('notifications.fired.marketOrderFilled.bodyWithQuantity', {
-              character: character.name,
-              item,
-              quantity: fire.quantity.toLocaleString(),
-            })
-          : i18n.t('notifications.fired.marketOrderFilled.body', {
-              character: character.name,
-              item,
-            }),
-    };
-  }
-  if (fire.eventId === 'eveNotification') {
-    // Resolution is best-effort, time-boxed and never rejects (issue #300):
-    // whatever it could not look up in its budget renders as an id or a
-    // neutral phrase rather than holding the notification back.
-    return eveNotificationText(fire, character, await resolveEveNotificationNames(fire));
-  }
-  if (fire.eventId === 'characterNotTraining') {
-    return {
-      title: i18n.t('notifications.fired.characterNotTraining.title'),
-      body: i18n.t('notifications.fired.characterNotTraining.body', { character: character.name }),
-    };
-  }
-  if (fire.eventId === 'spExtractionReady') {
-    return {
-      title: i18n.t('notifications.fired.spExtractionReady.title'),
-      body: i18n.t('notifications.fired.spExtractionReady.body', { character: character.name }),
-    };
-  }
-  if (fire.eventId === 'structureFuelLow') {
-    return {
-      title: i18n.t('notifications.fired.structureFuelLow.title'),
-      body: i18n.t('notifications.fired.structureFuelLow.body', {
-        character: character.name,
-        structure: fire.structureName,
-        days: Math.round(fire.thresholdMs / DAY_MS),
-      }),
-    };
-  }
-  if (fire.eventId === 'corpIndustryJobReady') {
-    const itemTypeId = fire.productTypeId ?? fire.blueprintTypeId;
-    const itemType = await loadUniverseType(itemTypeId);
-    const itemName = itemType?.data.name ?? `#${itemTypeId}`;
-    return {
-      title: i18n.t('notifications.fired.corpIndustryJobReady.title'),
-      body: i18n.t('notifications.fired.corpIndustryJobReady.body', {
-        character: character.name,
-        item: itemName,
-      }),
-    };
-  }
-  if (fire.eventId === 'corpMemberJoined' || fire.eventId === 'corpMemberLeft') {
-    const names = await resolveNames([fire.memberCharacterId]);
-    const memberName = names.get(fire.memberCharacterId) ?? `#${fire.memberCharacterId}`;
-    return {
-      title: i18n.t(`notifications.fired.${fire.eventId}.title`),
-      body: i18n.t(`notifications.fired.${fire.eventId}.body`, {
-        character: character.name,
-        member: memberName,
-      }),
-    };
-  }
-  if (fire.eventId === 'corpWalletThreshold') {
-    const title = i18n.t('notifications.fired.corpWalletThreshold.title');
-    if (fire.kind === 'balanceBelow') {
-      return {
-        title,
-        body: i18n.t('notifications.fired.corpWalletThreshold.balanceBelowBody', {
-          character: character.name,
-          division: fire.division,
-          balance: formatIsk(fire.balance, 2),
-        }),
-      };
-    }
-    return {
-      title,
-      body: i18n.t('notifications.fired.corpWalletThreshold.transactionAboveBody', {
-        character: character.name,
-        division: fire.division,
-        amount: formatIsk(Math.abs(fire.amount), 2),
-      }),
-    };
-  }
-  if (fire.eventId === 'priceAlertTriggered') {
-    return {
-      title: i18n.t('notifications.fired.priceAlertTriggered.title'),
-      body: i18n.t(`notifications.fired.priceAlertTriggered.${fire.direction}Body`, {
-        item: fire.name,
-        price: formatIsk(fire.price, 2),
-        target: formatIsk(fire.targetPrice, 2),
-      }),
-    };
-  }
-  // Only NotificationFire's other member left: skillLevelComplete.
-  const skillType = fire.skillId === null ? null : await loadUniverseType(fire.skillId);
-  const skillName = skillType?.data.name ?? `#${fire.skillId}`;
-  const level =
-    fire.level !== null && fire.level >= 1 && fire.level <= 5 ? ROMAN[fire.level - 1] : '';
-  return {
-    title: i18n.t('notifications.fired.skillLevelComplete.title'),
-    body: i18n.t('notifications.fired.skillLevelComplete.body', {
-      character: character.name,
-      skill: skillName,
-      level,
-    }),
-  };
-}
-
-/**
  * Delivery goes through `display.ts`, which prefers the Service Worker
  * registration's `showNotification` over `new Notification(...)` — the
  * constructor throws on Android Chrome and does not exist on iOS, so it is
@@ -718,7 +456,7 @@ async function notificationText(
  * succeeding.
  *
  * `override` is the copy the delivery loop already rendered (and, for a
- * grouped burst, already count-adjusted) — `notificationText` is only called
+ * grouped burst, already count-adjusted) — `renderNotification` is only called
  * here as a fallback for a caller reaching this directly, outside that loop.
  */
 async function sendBrowserNotification(
@@ -726,7 +464,7 @@ async function sendBrowserNotification(
   character: CharacterRef,
   override?: { title: string; body: string }
 ): Promise<void> {
-  const { title, body } = override ?? (await notificationText(fire, character));
+  const { title, body } = override ?? (await renderNotification(fire, character.name));
   await displayPageNotification(
     livePageDisplayEnv(),
     title,
@@ -754,7 +492,7 @@ async function recordFeedNotification(
   character: CharacterRef
 ): Promise<void> {
   try {
-    const { title, body } = await notificationText(fire, character);
+    const { title, body } = await renderNotification(fire, character.name);
     const now = Date.now();
     // Dated by the occurrence, not by this poll, wherever the fire knows when
     // it happened (`occurrenceFiredAt`): a device opened after days away

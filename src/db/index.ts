@@ -472,7 +472,8 @@ export interface NotificationFeedRecord {
   syncedAt?: number;
   /**
    * The row this fire was *about*, where its event lands on a table that can
-   * show it (`features/notifications/notificationOptions`'s `SUBJECT_ROUTES`).
+   * show it (`features/notifications/domainCopy`'s `subjectOf`, routed by
+   * `notificationOptions`'s `SUBJECT_URLS`).
    * A journal entry id, a contract id, a job id, a member's character id — the
    * `eventId` says which, because only that event's route reads it.
    *

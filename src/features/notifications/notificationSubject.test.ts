@@ -1,36 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import {
-  notificationSubjectId,
-  notificationUrlForSubject,
-  NOTIFICATION_ROUTES,
-} from './notificationOptions';
+import { notificationUrlForSubject, NOTIFICATION_ROUTES } from './notificationOptions';
 import { NOTIFICATION_EVENT_IDS } from './events';
-
-describe('notificationSubjectId', () => {
-  it('reads each subject-routed event from the field its own diff sets', () => {
-    expect(notificationSubjectId({ eventId: 'marketOrderFilled', typeId: 34 })).toEqual(34);
-    expect(notificationSubjectId({ eventId: 'walletBalanceChanged', journalEntryId: 77 })).toEqual(
-      77
-    );
-    expect(notificationSubjectId({ eventId: 'contractAccepted', contractId: 5 })).toEqual(5);
-    expect(notificationSubjectId({ eventId: 'contractCompleted', contractId: 6 })).toEqual(6);
-    expect(notificationSubjectId({ eventId: 'contractFailed', contractId: 7 })).toEqual(7);
-    expect(notificationSubjectId({ eventId: 'industryJobComplete', jobId: 9 })).toEqual(9);
-    expect(notificationSubjectId({ eventId: 'corpMemberJoined', memberCharacterId: 12 })).toEqual(
-      12
-    );
-  });
-
-  it('reads nothing for an event with no subject route, whatever the fire carries', () => {
-    // `corpMemberLeft` is the pointed exclusion: that member is gone from the
-    // roster, so a highlight would name a row that is not there.
-    expect(
-      notificationSubjectId({ eventId: 'corpMemberLeft', memberCharacterId: 12 })
-    ).toBeUndefined();
-    expect(notificationSubjectId({ eventId: 'newMail', typeId: 1 })).toBeUndefined();
-    expect(notificationSubjectId({ eventId: 'somethingNewer', typeId: 1 })).toBeUndefined();
-  });
-});
 
 describe('notificationUrlForSubject', () => {
   it('appends the highlight to a route that already carries a query string', () => {
