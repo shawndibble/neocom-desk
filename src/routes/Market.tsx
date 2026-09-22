@@ -29,7 +29,6 @@ import {
   loadNpcStations,
   loadSolarSystems,
   loadMarketRegions,
-  loadGlobalMarkets,
   loadVariations,
 } from '@/sde/loadMarketSde';
 import type {
@@ -38,7 +37,6 @@ import type {
   NpcStationEntry,
   SolarSystemEntry,
   MarketRegionEntry,
-  GlobalMarketEntry,
   VariationData,
 } from '@/sde/marketTypes';
 import { buildVariationIndex } from '@/engine/market/variations';
@@ -51,12 +49,17 @@ import {
   MARKET_TREE_MATCH_LIMIT,
   MARKET_TREE_MIN_QUERY_LENGTH,
 } from '@/features/market/marketTree';
+import { ORDER_BOOK_FANOUT_CONCURRENCY } from '@/features/market/orderBook';
 import {
-  getOrderBook,
-  clearOrderBookCache,
-  ORDER_BOOK_FANOUT_CONCURRENCY,
-  type OrderBookResult,
-} from '@/features/market/orderBook';
+  buildOrderBookView,
+  clearOrderBookViewCache,
+  fetchOrderBook,
+  loadOrderBookView,
+  orderBookLocationFor,
+  useGlobalMarketOverrides,
+  type OrderBookFetch,
+  type OrderBookLocation,
+} from '@/features/market/orderBookView';
 import { mapWithConcurrencyLimit } from '@/lib/concurrency';
 import { formatVolume } from '@/features/market/format';
 import { useIsDesktop } from '@/lib/useIsDesktop';
@@ -77,11 +80,8 @@ import {
 } from '@/features/market/quickbar';
 import { useQuickbar } from '@/features/market/useQuickbar';
 import {
-  splitOrderBook,
   resolveOrderLocation,
-  filterOrdersByLocation,
   orderExpiry,
-  summarizeOrderBook,
   type NpcStationLookup,
   type SolarSystemLookup,
   type OrderBookSummary,
@@ -169,6 +169,9 @@ function usesHubPicker(section: MarketSection): boolean {
  * catalogue load.
  */
 const EMPTY_VARIATION_INDEX = buildVariationIndex({}, {});
+
+/** Stand-in until globalMarkets.json settles; the order book waits for the real one. */
+const NO_GLOBAL_MARKETS: ReadonlyMap<number, GlobalMarketOverride> = new Map();
 
 /** Structural, not i18next's TFunction, so this stays easy to pass around without fighting its generics. */
 type Translate = (key: string, opts?: Record<string, unknown>) => string;
@@ -416,7 +419,10 @@ export function Market() {
   const [npcStations, setNpcStations] = useState<NpcStationEntry[] | null>(null);
   const [solarSystems, setSolarSystems] = useState<SolarSystemEntry[] | null>(null);
   const [marketRegions, setMarketRegions] = useState<MarketRegionEntry[] | null>(null);
-  const [globalMarkets, setGlobalMarkets] = useState<GlobalMarketEntry[] | null>(null);
+  // Loaded on its own, not with the catalogue below: the order book waits
+  // only on this (never on the whole SDE catalogue), and a failed read
+  // settles to no overrides rather than leaving the book waiting forever.
+  const globalMarkets = useGlobalMarketOverrides();
   const [variationData, setVariationData] = useState<VariationData | null>(null);
   const [catalogueError, setCatalogueError] = useState(false);
 
@@ -565,7 +571,10 @@ export function Market() {
   // trip to the Browser tab, and so the header's refresh button can drive it.
   const appraisal = useAppraisal(effectiveHub, pricePercent, activeCharacterId);
 
-  const [orderBookResult, setOrderBookResult] = useState<OrderBookResult | null>(null);
+  // The selected item's settled fetch, null until it lands. The view itself is
+  // derived below, so the "filter to this station" action narrows it in place
+  // without another request.
+  const [orderBookFetch, setOrderBookFetch] = useState<OrderBookFetch | null>(null);
   const [orderBookLoading, setOrderBookLoading] = useState(false);
   const [refreshTick, setRefreshTick] = useState(0);
   // Every authenticated character's own open order ids, across every item —
@@ -605,11 +614,11 @@ export function Market() {
     setResetForKey(resetKey);
     setSellShowAll(false);
     setBuyShowAll(false);
-    setOrderBookResult(null);
+    setOrderBookFetch(null);
     setStationFilter(null);
     // Set in the same render as the reset above, not left for the fetch
     // effect a tick later — otherwise the one commit in between paints
-    // `orderBookLoading: false` alongside the just-cleared `orderBookResult`,
+    // `orderBookLoading: false` alongside the just-cleared `orderBookFetch`,
     // which the table below reads as "loaded, and empty" and flashes the
     // empty state before the spinner.
     if (selectedTypeId !== null) setOrderBookLoading(true);
@@ -670,16 +679,14 @@ export function Market() {
       loadNpcStations(),
       loadSolarSystems(),
       loadMarketRegions(),
-      loadGlobalMarkets(),
     ])
-      .then(([g, ty, stations, systems, regions, global]) => {
+      .then(([g, ty, stations, systems, regions]) => {
         if (cancelled) return;
         setGroups(g);
         setTypes(ty);
         setNpcStations(stations);
         setSolarSystems(systems);
         setMarketRegions(regions);
-        setGlobalMarkets(global);
       })
       .catch(() => {
         if (!cancelled) setCatalogueError(true);
@@ -739,15 +746,16 @@ export function Market() {
     return () => clearTimeout(id);
   }, [rawQuery]);
 
-  const globalMarketsMap = useMemo<ReadonlyMap<number, GlobalMarketOverride>>(
+  const globalMarketsMap = globalMarkets ?? NO_GLOBAL_MARKETS;
+
+  // The one location every order book on this page reads through — the
+  // tables, the Variations rows, the Compare Drawer and Item Detail — so they
+  // can't disagree about the same item (`orderBookView.ts`). Built from the
+  // effective (URL-aware) location, not the persisted preference.
+  const orderBookLocation = useMemo<OrderBookLocation>(
     () =>
-      new Map(
-        (globalMarkets ?? []).map((g) => [
-          g.typeId,
-          { regionId: g.regionId, regionName: g.regionName },
-        ])
-      ),
-    [globalMarkets]
+      orderBookLocationFor(effectiveLocation.mode, chosenRegionId, effectiveHub, globalMarketsMap),
+    [effectiveLocation.mode, chosenRegionId, effectiveHub, globalMarketsMap]
   );
 
   const resolvedRegion = useMemo(
@@ -758,40 +766,36 @@ export function Market() {
     [selectedTypeId, chosenRegionId, globalMarketsMap]
   );
 
-  // Refetches on selection, region, or a manual Refresh click. Gated on both
+  // Refetches on selection, location, or a manual Refresh click. Gated on both
   // *Hydrated flags so this doesn't fire once for the defaults and again once
-  // the persisted settings resolve.
+  // the persisted settings resolve. `fetchOrderBook` never rejects: a 420 or
+  // an Error Budget refusal settles as `'failed'`, which renders its own
+  // state rather than an empty book or a spinner that never clears.
   useEffect(() => {
-    if (selectedTypeId === null || !hubHydrated || !locationModeHydrated || resolvedRegion === null)
+    // Also waits for globalMarkets.json to settle (success or failure):
+    // before it does, a Global Market Region item (a PLEX deep link) would be
+    // read from the wrong region.
+    if (selectedTypeId === null || !hubHydrated || !locationModeHydrated || globalMarkets === null)
       return;
     let cancelled = false;
     void (async () => {
       setOrderBookLoading(true);
-      try {
-        const result = await getOrderBook(resolvedRegion.regionId, selectedTypeId);
-        if (cancelled) return;
-        setOrderBookResult(result);
-      } catch {
-        // `getOrderBook` throws on any ESI failure — a 420, or the budget gate
-        // declining to send at all. Uncaught, this async IIFE rejected into
-        // nothing (`void` discards the value, not the rejection) and the
-        // spinner below never cleared, because `setOrderBookLoading(false)`
-        // sat after the await. A rate-limited market page span forever.
-        //
-        // A null book is the state the rest of this component already reads as
-        // "loaded, nothing to show" (see `resetKey` above and the table at the
-        // bottom), so failure degrades to the empty book rather than to a
-        // permanent spinner.
-        if (cancelled) return;
-        setOrderBookResult(null);
-      } finally {
-        if (!cancelled) setOrderBookLoading(false);
-      }
+      const fetched = await fetchOrderBook(selectedTypeId, orderBookLocation);
+      if (cancelled) return;
+      setOrderBookFetch(fetched);
+      setOrderBookLoading(false);
     })();
     return () => {
       cancelled = true;
     };
-  }, [selectedTypeId, resolvedRegion, hubHydrated, locationModeHydrated, refreshTick]);
+  }, [
+    selectedTypeId,
+    orderBookLocation,
+    hubHydrated,
+    locationModeHydrated,
+    globalMarkets,
+    refreshTick,
+  ]);
 
   const childrenByParent = groupCatalogue.byParent;
 
@@ -837,36 +841,23 @@ export function Market() {
     [solarSystems]
   );
 
-  // Trade Hub mode narrows the fetched region down to the hub's own station;
-  // Region mode shows every station in the region as fetched (CONTEXT.md).
-  // A Global Market Region override still carries ordinary station
-  // identifiers, so Trade Hub mode's filter still applies on top of it.
-  const displayOrders = useMemo(() => {
-    if (!orderBookResult) return [];
-    return effectiveLocation.mode === 'hub'
-      ? filterOrdersByLocation(orderBookResult.orders, effectiveHub.stationId)
-      : orderBookResult.orders;
-  }, [orderBookResult, effectiveLocation, effectiveHub.stationId]);
-
-  const { sell, buy } = useMemo(() => splitOrderBook(displayOrders), [displayOrders]);
-  // The order-row context menu's "filter to this station" action narrows
-  // further, on top of whichever Location Mode is active (CONTEXT.md round 10).
-  const filteredSell = useMemo(
-    () => filterOrdersByLocation(sell, stationFilter),
-    [sell, stationFilter]
+  // Location Mode, Trade Hub station, the order-row "filter to this station"
+  // action (CONTEXT.md round 10), split and sort all happen in the view.
+  const orderBookView = useMemo(
+    () =>
+      orderBookFetch === null || selectedTypeId === null
+        ? null
+        : buildOrderBookView(
+            selectedTypeId,
+            { ...orderBookLocation, stationFilter },
+            orderBookFetch
+          ),
+    [orderBookFetch, selectedTypeId, orderBookLocation, stationFilter]
   );
-  const filteredBuy = useMemo(
-    () => filterOrdersByLocation(buy, stationFilter),
-    [buy, stationFilter]
-  );
-  const sortedSell = useMemo(
-    () => [...filteredSell].sort((a, b) => a.price - b.price),
-    [filteredSell]
-  );
-  const sortedBuy = useMemo(
-    () => [...filteredBuy].sort((a, b) => b.price - a.price),
-    [filteredBuy]
-  );
+  const loadedView = orderBookView?.status === 'failed' ? null : orderBookView;
+  const orderBookFailed = orderBookView?.status === 'failed';
+  const sortedSell = useMemo(() => loadedView?.sell ?? [], [loadedView]);
+  const sortedBuy = useMemo(() => loadedView?.buy ?? [], [loadedView]);
   /**
    * The catalogue is otherwise loaded lazily on the first context-menu open,
    * so reading it here without asking for it meant `selectedIsBlueprint` was
@@ -877,21 +868,22 @@ export function Market() {
    */
   useEffect(() => {
     // `ensureBlueprintCatalog` is ref-guarded, so re-running this costs nothing.
-    if (selectedTypeId !== null && sortedSell.length === 0) ensureBlueprintCatalog();
-  }, [selectedTypeId, sortedSell.length]);
+    // A failed book says nothing about who sells the item, so it asks nothing.
+    if (selectedTypeId !== null && loadedView && sortedSell.length === 0) ensureBlueprintCatalog();
+  }, [selectedTypeId, loadedView, sortedSell.length]);
 
   const sellRows = sellShowAll ? sortedSell : sortedSell.slice(0, ROW_CAP);
   const buyRows = buyShowAll ? sortedBuy : sortedBuy.slice(0, ROW_CAP);
 
   const stationFilterLabel = useMemo(() => {
-    if (stationFilter === null || !orderBookResult) return null;
-    const order = orderBookResult.orders.find((o) => o.location_id === stationFilter);
+    if (stationFilter === null || orderBookFetch?.status !== 'fetched') return null;
+    const order = orderBookFetch.result.orders.find((o) => o.location_id === stationFilter);
     if (!order) return null;
     const location = resolveOrderLocation(order, npcStationMap, solarSystemMap);
     // Names the same station the Location column does, so the banner and the
     // rows below it read alike.
     return location.stationName ?? t('market.unknownStructure');
-  }, [stationFilter, orderBookResult, npcStationMap, solarSystemMap, t]);
+  }, [stationFilter, orderBookFetch, npcStationMap, solarSystemMap, t]);
 
   const baseColumns = useMemo<DataTableColumn<RegionOrder>[]>(
     () => [
@@ -1044,16 +1036,11 @@ export function Market() {
     // prices in place), not a global wipe. That's the difference from the
     // Compare Drawer: its rows aren't part of this page's own render, so
     // they keep whatever's still within TTL instead of being forced to
-    // refetch just because something else on the page was refreshed. (The
-    // button is disabled without a selection, so resolvedRegion is only null
-    // here on an unlucky race with the catalogue still hydrating; skip the
-    // clear rather than wipe everything in that window.)
-    if (resolvedRegion && selectedTypeId !== null) {
-      clearOrderBookCache(resolvedRegion.regionId, selectedTypeId);
-    }
+    // refetch just because something else on the page was refreshed. Also
+    // the failed order book's "Try again".
+    if (selectedTypeId !== null) clearOrderBookViewCache(selectedTypeId, orderBookLocation);
     for (const row of variationsResultRef.current?.rows ?? []) {
-      const region = resolveOrderBookRegion(row.typeId, chosenRegionId, globalMarketsMap);
-      clearOrderBookCache(region.regionId, row.typeId);
+      clearOrderBookViewCache(row.typeId, orderBookLocation);
     }
     setRefreshTick((n) => n + 1);
   }
@@ -1077,8 +1064,7 @@ export function Market() {
   // independent of the primary catalogue load, so a slow or failed
   // variations.json never blocks or errors the rest of the page.
   const catalogueLoading =
-    !catalogueError &&
-    (!groups || !types || !npcStations || !solarSystems || !marketRegions || !globalMarkets);
+    !catalogueError && (!groups || !types || !npcStations || !solarSystems || !marketRegions);
   const selectedItem = types?.find((ty) => ty.typeId === selectedTypeId) ?? null;
   // Narrow screens only: on desktop the item finder is already on screen
   // beside the item, so there is nothing to go back to. It sits in the
@@ -1125,7 +1111,7 @@ export function Market() {
   // isn't, so a manual refresh updates prices in place instead of blanking
   // the table back to a loading state.
   const variationResetKey = variationsResult
-    ? `${variationsResult.rows.map((row) => row.typeId).join(',')}:${chosenRegionId}:${locationModeValue.mode}:${hub.stationId}:${stationFilter ?? 'none'}`
+    ? `${variationsResult.rows.map((row) => row.typeId).join(',')}:${chosenRegionId}:${orderBookLocation.mode}:${orderBookLocation.hubStationId}:${stationFilter ?? 'none'}`
     : 'none';
   const [variationResetForKey, setVariationResetForKey] = useState<string | null>(null);
   if (variationResetKey !== variationResetForKey) {
@@ -1142,7 +1128,8 @@ export function Market() {
       !variationsResult ||
       variationsResult.rows.length === 0 ||
       !hubHydrated ||
-      !locationModeHydrated
+      !locationModeHydrated ||
+      globalMarkets === null
     ) {
       return;
     }
@@ -1154,31 +1141,16 @@ export function Market() {
       ORDER_BOOK_FANOUT_CONCURRENCY,
       async (row) => {
         if (cancelled) return;
-        const region = resolveOrderBookRegion(row.typeId, chosenRegionId, globalMarketsMap);
-        try {
-          const result = await getOrderBook(region.regionId, row.typeId);
-          if (cancelled) return;
-          const locationFiltered =
-            locationModeValue.mode === 'hub'
-              ? filterOrdersByLocation(result.orders, hub.stationId)
-              : result.orders;
-          const orders = filterOrdersByLocation(locationFiltered, stationFilter);
-          setVariationPrices((prev) => new Map(prev).set(row.typeId, summarizeOrderBook(orders)));
-        } catch {
-          // A row's own price is a nice-to-have next to the order book that
-          // did load; one failed fetch reads as "no orders" rather than
-          // stalling the table on a spinner forever.
-          if (!cancelled) {
-            setVariationPrices((prev) =>
-              new Map(prev).set(row.typeId, {
-                bestSell: null,
-                bestBuy: null,
-                spread: null,
-                availableVolume: 0,
-              })
-            );
-          }
-        }
+        const view = await loadOrderBookView(row.typeId, { ...orderBookLocation, stationFilter });
+        if (cancelled) return;
+        // A row's own price is a nice-to-have next to the order book that did
+        // load; a failed fetch reads as "no orders" (the empty summary) rather
+        // than stalling the table on a spinner forever.
+        const summary: OrderBookSummary =
+          view.status === 'failed'
+            ? { bestSell: null, bestBuy: null, spread: null, availableVolume: 0 }
+            : view.summary;
+        setVariationPrices((prev) => new Map(prev).set(row.typeId, summary));
       }
     );
     return () => {
@@ -1186,13 +1158,11 @@ export function Market() {
     };
   }, [
     variationsResult,
-    chosenRegionId,
-    globalMarketsMap,
-    locationModeValue.mode,
-    hub.stationId,
+    orderBookLocation,
     stationFilter,
     hubHydrated,
     locationModeHydrated,
+    globalMarkets,
     refreshTick,
   ]);
 
@@ -1442,10 +1412,25 @@ export function Market() {
                       itemName={selectedItem?.name ?? ''}
                     />
                   )
-                ) : orderBookLoading && !orderBookResult ? (
+                ) : orderBookLoading && (!orderBookView || orderBookFailed) ? (
                   <div className="flex justify-center py-8">
                     <Spinner label={t('common.loading')} />
                   </div>
+                ) : orderBookFailed ? (
+                  // Not the empty book: ESI didn't answer (a 420, or the Error
+                  // Budget declining to send), which says nothing about who
+                  // trades the item — so no "nobody is selling" copy and no
+                  // blueprint BPC hint, just the failure and a way to retry.
+                  <EmptyState
+                    title={t('market.orderBookFailedTitle')}
+                    hint={t('market.orderBookFailedHint')}
+                    className="py-8"
+                    action={
+                      <Button size="sm" onClick={handleRefresh}>
+                        {t('market.orderBookFailedRetry')}
+                      </Button>
+                    }
+                  />
                 ) : (
                   <>
                     {resolvedRegion?.override && (
@@ -1498,7 +1483,7 @@ export function Market() {
                                     isBuy: false,
                                   }),
                                   new Date(),
-                                  orderBookResult?.truncated ?? false
+                                  loadedView?.truncated ?? false
                                 )
                               }
                             />
@@ -1573,7 +1558,7 @@ export function Market() {
                                     isBuy: true,
                                   }),
                                   new Date(),
-                                  orderBookResult?.truncated ?? false
+                                  loadedView?.truncated ?? false
                                 )
                               }
                             />
@@ -1644,20 +1629,13 @@ export function Market() {
         </div>
       )}
 
-      {compareCount > 0 && (
-        <CompareDrawer
-          chosenRegionId={chosenRegionId}
-          globalMarkets={globalMarketsMap}
-          locationMode={locationModeValue.mode}
-          hubStationId={hub.stationId}
-          refreshTick={refreshTick}
-        />
-      )}
+      {compareCount > 0 && <CompareDrawer location={orderBookLocation} refreshTick={refreshTick} />}
 
       {infoModalItem && (
         <ItemDetailModal
           typeId={infoModalItem.typeId}
           itemName={infoModalItem.itemName}
+          location={orderBookLocation}
           onClose={() => setInfoModalItem(null)}
         />
       )}

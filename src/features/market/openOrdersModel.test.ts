@@ -629,6 +629,30 @@ describe('buildOpenOrderRows — cost basis and floor', () => {
     expect(row.floor).toBeNull();
     expect(row.belowFloor).toBe(false);
   });
+
+  it('spreads the 100 ISK minimum broker fee across the order volume_remain, not per unit', () => {
+    const cheapCostBases = new Map<number, OrderCostBasis>([
+      [1, { unitCost: 10, runId: 'run-1', runQuantity: 10, materialCost: 40, jobFee: 10 }],
+    ]);
+    const smallStack = firstRow(
+      baseInput({
+        snapshot: makeSnapshot([makeEntry({ orders: [makeOrder({ volume_remain: 1 })] })]),
+        costBases: cheapCostBases,
+      })
+    );
+    const bigStack = firstRow(
+      baseInput({
+        snapshot: makeSnapshot([makeEntry({ orders: [makeOrder({ volume_remain: 10_000 })] })]),
+        costBases: cheapCostBases,
+      })
+    );
+    expect(smallStack.floor).not.toBeNull();
+    expect(bigStack.floor).not.toBeNull();
+    // A single remaining unit still eats the full 100 ISK minimum; a
+    // 10,000-unit stack spreads that same 100 ISK to a fraction of an ISK.
+    expect(smallStack.floor!.relist).toBeGreaterThan(100);
+    expect(bigStack.floor!.relist).toBeLessThan(15);
+  });
 });
 
 describe('buildOpenOrderRows — misc fields', () => {

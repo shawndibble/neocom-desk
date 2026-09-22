@@ -78,6 +78,7 @@ vi.mock('@/sde/loadMarketSde', () => ({
   loadAttributeDictionary: vi.fn(async () => ({
     9: { name: 'Structure Hitpoints', unit: 'HP', category: 'Structure' },
   })),
+  loadGlobalMarkets: vi.fn(async () => []),
 }));
 
 const CHAR_ID = 91;

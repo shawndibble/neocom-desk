@@ -1,5 +1,7 @@
 /**
- * Wires a Build Plan record + blueprint + market data into a call to
+ * The engine-adapter step under `resolveBuildPlan.ts` (which every Build Plan
+ * view calls — reach for that, not this, to price a saved plan). Wires a
+ * Build Plan record + blueprint + market data into a call to
  * src/engine/industry's buildVsBuy: clamps user-entered runs/ME/TE into the
  * engine's valid ranges (a cleared/invalid input field must never blank the
  * results panel), drops facilityTaxPct for NPC stations (their tax is fixed;
@@ -20,6 +22,7 @@ import type {
 import type { SubBuildContext } from '@/engine/industry/subBuild';
 import type { MaterialRecipe } from '@/engine/industry/makeOrBuy';
 import type { BuildPlanRecord } from '@/db';
+import { clampInt } from './clampInt';
 
 export interface ComputeBuildPlanInput {
   plan: Pick<
@@ -71,11 +74,6 @@ export interface ComputeBuildPlanInput {
 export interface ComputeBuildPlanResult {
   result: BuildResult | null;
   error: string | null;
-}
-
-function clampInt(value: number, min: number, max: number): number {
-  const n = Math.round(value);
-  return Math.min(max, Math.max(min, Number.isFinite(n) ? n : min));
 }
 
 export function computeBuildPlan({

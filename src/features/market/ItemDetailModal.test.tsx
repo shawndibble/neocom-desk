@@ -7,7 +7,7 @@ import { setupServer } from 'msw/node';
 import '@/i18n';
 import { ESI_BASE_URL } from '@/esi/client';
 import { ItemDetailModal } from './ItemDetailModal';
-import { loadAttributeDictionary } from '@/sde/loadMarketSde';
+import { loadAttributeDictionary, loadGlobalMarkets } from '@/sde/loadMarketSde';
 import { loadPi, loadSkills } from '@/sde/loadSde';
 import { piFixture } from '@/sde/__fixtures__/pi';
 import { db } from '@/db';
@@ -19,6 +19,7 @@ const JITA_REGION_ID = 10000002;
 
 vi.mock('@/sde/loadMarketSde', () => ({
   loadAttributeDictionary: vi.fn(),
+  loadGlobalMarkets: vi.fn(async () => []),
 }));
 vi.mock('@/sde/loadSde', () => ({
   loadSkills: vi.fn(),
@@ -27,6 +28,7 @@ vi.mock('@/sde/loadSde', () => ({
 }));
 
 const mockedLoadDictionary = vi.mocked(loadAttributeDictionary);
+const mockedLoadGlobalMarkets = vi.mocked(loadGlobalMarkets);
 const mockedLoadSkills = vi.mocked(loadSkills);
 const mockedLoadPi = vi.mocked(loadPi);
 
@@ -479,6 +481,68 @@ describe('ItemDetailModal best sell/buy price', () => {
     expect(screen.getByText('—')).toBeInTheDocument();
   });
 
+  it("prices at the Trade Hub's own station, the same answer the Compare Drawer gives", async () => {
+    serveRifter();
+    server.use(
+      http.get(`${ESI_BASE_URL}/markets/${JITA_REGION_ID}/orders`, () =>
+        HttpResponse.json([
+          order({ order_id: 1, price: 500_000, location_id: 60003760 }),
+          // Cheaper, but in Perimeter — outside the hub station.
+          order({ order_id: 2, price: 300_000, location_id: 60000004 }),
+        ])
+      )
+    );
+
+    render(<ItemDetailModal typeId={TYPE_ID} itemName="Rifter" onClose={() => {}} />);
+
+    expect(await screen.findByLabelText('500,000.00 ISK')).toBeInTheDocument();
+    expect(screen.queryByLabelText('300,000.00 ISK')).not.toBeInTheDocument();
+  });
+
+  it('reads every station in the region when handed a Region-mode location', async () => {
+    serveRifter();
+    server.use(
+      http.get(`${ESI_BASE_URL}/markets/${JITA_REGION_ID}/orders`, () =>
+        HttpResponse.json([
+          order({ order_id: 1, price: 500_000, location_id: 60003760 }),
+          order({ order_id: 2, price: 300_000, location_id: 60000004 }),
+        ])
+      )
+    );
+
+    render(
+      <ItemDetailModal
+        typeId={TYPE_ID}
+        itemName="Rifter"
+        onClose={() => {}}
+        location={{
+          mode: 'region',
+          regionId: JITA_REGION_ID,
+          hubStationId: 60003760,
+          globalMarkets: new Map(),
+        }}
+      />
+    );
+
+    expect(await screen.findByLabelText('300,000.00 ISK')).toBeInTheDocument();
+  });
+
+  it('reads a Global Market Region item from its own region', async () => {
+    serveRifter();
+    mockedLoadGlobalMarkets.mockResolvedValueOnce([
+      { typeId: TYPE_ID, regionId: 19000001, regionName: 'Global PLEX Market' },
+    ]);
+    server.use(
+      http.get(`${ESI_BASE_URL}/markets/19000001/orders`, () =>
+        HttpResponse.json([order({ order_id: 1, price: 4_000_000, location_id: 60003760 })])
+      )
+    );
+
+    render(<ItemDetailModal typeId={TYPE_ID} itemName="Rifter" onClose={() => {}} />);
+
+    expect(await screen.findByLabelText('4,000,000.00 ISK')).toBeInTheDocument();
+  });
+
   it('hides the price row rather than blanking the modal when the order book fetch fails', async () => {
     serveRifter();
     server.use(
@@ -488,6 +552,7 @@ describe('ItemDetailModal best sell/buy price', () => {
     render(<ItemDetailModal typeId={TYPE_ID} itemName="Rifter" onClose={() => {}} />);
 
     expect(await screen.findByText('Volume: 27,289 m3')).toBeInTheDocument();
-    expect(screen.queryByText('Best sell:')).not.toBeInTheDocument();
+    // The row shows a placeholder while the book is in flight, then drops out.
+    await waitFor(() => expect(screen.queryByText('Best sell:')).not.toBeInTheDocument());
   });
 });
