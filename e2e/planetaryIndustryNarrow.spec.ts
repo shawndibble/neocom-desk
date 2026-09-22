@@ -36,7 +36,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
-import { loginAndSelectCharacter } from './support/login';
+import { signInAndGoto } from './support/authSeed';
 import { piTier } from '../src/engine/pi/chain';
 import type { PiData } from '../src/sde/types';
 
@@ -240,7 +240,7 @@ async function assertNoOverflow(page: Page): Promise<void> {
 test.describe('PI Plan — stacked Sensitivity card', () => {
   test.beforeEach(async ({ page }) => {
     await mockHubPrices(page);
-    await loginAndSelectCharacter(page);
+    await signInAndGoto(page);
   });
 
   test('pairs an even sweep two per row on all three of a P3 product’s floors', async ({

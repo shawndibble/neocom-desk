@@ -15,15 +15,14 @@
  * at all, so the empty LP fixtures in `support/mockEsi.ts` are enough.
  */
 import { test, expect } from './support/testBase';
-import { loginAndSelectCharacter } from './support/login';
+import { signInAndGoto } from './support/authSeed';
 import { CORPORATION_ID } from './support/fixtureData';
 
 const PHONE = { width: 390, height: 844 };
 const DESKTOP = { width: 1280, height: 800 };
 
 test('the back-to-Wallet link is a full sm-tier control (36px) at 390px', async ({ page }) => {
-  await loginAndSelectCharacter(page);
-  await page.goto(`./wallet/loyalty/${CORPORATION_ID}`);
+  await signInAndGoto(page, `./wallet/loyalty/${CORPORATION_ID}`);
   await page.setViewportSize(PHONE);
 
   const back = page.getByRole('link', { name: /Loyalty Points/ });
@@ -42,8 +41,7 @@ test('the back-to-Wallet link is a full sm-tier control (36px) at 390px', async 
 test('the back-to-Wallet link drops to the compact tier at and above md (1280px)', async ({
   page,
 }) => {
-  await loginAndSelectCharacter(page);
-  await page.goto(`./wallet/loyalty/${CORPORATION_ID}`);
+  await signInAndGoto(page, `./wallet/loyalty/${CORPORATION_ID}`);
   await page.setViewportSize(DESKTOP);
 
   const back = page.getByRole('link', { name: /Loyalty Points/ });

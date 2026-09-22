@@ -28,7 +28,7 @@
  * seeded below, rather than reaching the real cloud.
  */
 import { test, expect } from './support/testBase';
-import { loginAndSelectCharacter } from './support/login';
+import { signInAndGoto } from './support/authSeed';
 import type { Page } from '@playwright/test';
 
 const PHONE = { width: 390, height: 844 };
@@ -142,7 +142,7 @@ test.describe('BPC Sourcing — multi-type price cell alignment', () => {
     await refuseSyncBackend(page);
     await page.setViewportSize(PHONE);
 
-    await loginAndSelectCharacter(page);
+    await signInAndGoto(page);
     await seedBpcSnapshot(page, [multiTypeContractRow()]);
 
     await page.goto('./industry?tab=sourcing');
@@ -155,7 +155,7 @@ test.describe('BPC Sourcing — multi-type price cell alignment', () => {
     await refuseSyncBackend(page);
     await page.setViewportSize(DESKTOP);
 
-    await loginAndSelectCharacter(page);
+    await signInAndGoto(page);
     await seedBpcSnapshot(page, [multiTypeContractRow()]);
 
     await page.goto('./industry?tab=sourcing');
@@ -168,7 +168,7 @@ test.describe('BPC Sourcing — multi-type price cell alignment', () => {
     await refuseSyncBackend(page);
     await page.setViewportSize(PHONE);
 
-    await loginAndSelectCharacter(page);
+    await signInAndGoto(page);
     await seedBpcSnapshot(page, [singleTypeContractRow()]);
 
     await page.goto('./industry?tab=sourcing');

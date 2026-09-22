@@ -13,7 +13,7 @@
  */
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
-import { loginAndSelectCharacter } from './support/login';
+import { signInAndGoto } from './support/authSeed';
 import { CHARACTER_ID } from './support/fixtureData';
 import type { SyncStatus } from '../src/sync/status';
 
@@ -24,7 +24,7 @@ const DESKTOP: Viewport = { width: 1280, height: 800 };
 const ERROR_NOTE = 'Sync error — changes saved locally';
 
 test.beforeEach(async ({ page }) => {
-  await loginAndSelectCharacter(page);
+  await signInAndGoto(page);
 });
 
 /**

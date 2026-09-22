@@ -20,7 +20,7 @@
  */
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
-import { loginAndSelectCharacter } from './support/login';
+import { signInAndGoto } from './support/authSeed';
 
 const PHONE = { width: 390, height: 844 };
 const DESKTOP = { width: 1280, height: 800 };
@@ -65,7 +65,7 @@ async function stubEveryType(page: Page) {
 
 /** Market Browser → search the fixture item → Variations panel → "Compare". */
 async function openCompareModal(page: Page) {
-  await loginAndSelectCharacter(page);
+  await signInAndGoto(page);
   await stubEveryType(page);
   await page.goto('./market');
 

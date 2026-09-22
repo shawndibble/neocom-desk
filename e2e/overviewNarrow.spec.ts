@@ -10,14 +10,13 @@
  * and above it, since desktop's box was never meant to grow.
  */
 import { test, expect } from './support/testBase';
-import { loginAndSelectCharacter } from './support/login';
+import { signInAndGoto } from './support/authSeed';
 
 const PHONE = { width: 390, height: 844 };
 
 test('board card "Open" link meets the 44px touch floor at 390px', async ({ page }) => {
-  await loginAndSelectCharacter(page);
   await page.setViewportSize(PHONE);
-  await page.goto('./overview');
+  await signInAndGoto(page, './overview');
 
   // Every board card's link shares this label — one is enough per the AC
   // ("for at least one board card"), so the first rendered card's is fine.

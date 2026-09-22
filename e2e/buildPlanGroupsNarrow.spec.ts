@@ -16,7 +16,7 @@
  */
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
-import { loginAndSelectCharacter } from './support/login';
+import { signInAndGoto } from './support/authSeed';
 import { CHARACTER_ID } from './support/fixtureData';
 
 const PHONE = { width: 390, height: 844 };
@@ -86,7 +86,7 @@ async function measureIndent(page: Page): Promise<number> {
 
 test.describe('Build Plan list — group header vs. member name indent', () => {
   test.beforeEach(async ({ page }) => {
-    await loginAndSelectCharacter(page);
+    await signInAndGoto(page);
     await seedGroupedPlan(page);
   });
 

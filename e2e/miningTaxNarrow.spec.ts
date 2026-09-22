@@ -20,7 +20,7 @@
  */
 import type { Locator, Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
-import { loginAndSelectCharacter } from './support/login';
+import { signInAndGoto } from './support/authSeed';
 import { CHARACTER_ID } from './support/fixtureData';
 
 const PHONE = { width: 390, height: 844 };
@@ -192,7 +192,7 @@ async function seedPayeeBalance(page: Page, options: SeedOptions = {}): Promise<
 
 test.describe('Balances strip Payee filter button — touch target', () => {
   test.beforeEach(async ({ page }) => {
-    await loginAndSelectCharacter(page);
+    await signInAndGoto(page);
     await seedPayeeBalance(page);
   });
 
@@ -306,7 +306,7 @@ test.describe('Mining Tax dialog entry rows — touch target', () => {
 
   test('Settle Up: itemized entry row reaches 44px on phone', async ({ page }) => {
     await page.setViewportSize(PHONE);
-    await loginAndSelectCharacter(page);
+    await signInAndGoto(page);
     await seedPayeeBalance(page);
     await page.goto('./moon-mining');
 
@@ -316,7 +316,7 @@ test.describe('Mining Tax dialog entry rows — touch target', () => {
 
   test('Link Payment: covered-entry row reaches 44px on phone', async ({ page }) => {
     await page.setViewportSize(PHONE);
-    await loginAndSelectCharacter(page);
+    await signInAndGoto(page);
     await seedPayeeBalance(page, { withMadePayment: true });
     await page.goto('./moon-mining');
 
@@ -326,7 +326,7 @@ test.describe('Mining Tax dialog entry rows — touch target', () => {
 
   test('Bulk Dismiss: itemized entry row reaches 44px on phone', async ({ page }) => {
     await page.setViewportSize(PHONE);
-    await loginAndSelectCharacter(page);
+    await signInAndGoto(page);
     await seedPayeeBalance(page, { withUnassignedEntry: true });
     await page.goto('./moon-mining');
 
@@ -336,7 +336,7 @@ test.describe('Mining Tax dialog entry rows — touch target', () => {
 
   test('all three stay at their old height above md — desktop is unchanged', async ({ page }) => {
     await page.setViewportSize(DESKTOP);
-    await loginAndSelectCharacter(page);
+    await signInAndGoto(page);
     await seedPayeeBalance(page, { withUnassignedEntry: true, withMadePayment: true });
     await page.goto('./moon-mining');
 
@@ -387,7 +387,7 @@ test.describe('Mining Tax bulk Settle Up — touch target', () => {
     viewport: { width: number; height: number }
   ) {
     await page.setViewportSize(viewport);
-    await loginAndSelectCharacter(page);
+    await signInAndGoto(page);
     await seedPayeeBalance(page);
     await page.goto('./moon-mining');
 

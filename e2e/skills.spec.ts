@@ -1,10 +1,10 @@
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
-import { loginAndSelectCharacter } from './support/login';
+import { signInAndGoto } from './support/authSeed';
 import { IMPLANT_NAMES } from './support/fixtureData';
 
 test.beforeEach(async ({ page }) => {
-  await loginAndSelectCharacter(page);
+  await signInAndGoto(page);
   // Skills opens on Plans, so the trained view is one sub-nav click away.
   await page.getByRole('link', { name: 'Skills' }).click();
   await page.getByRole('link', { name: 'Trained' }).click();

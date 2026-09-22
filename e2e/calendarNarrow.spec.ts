@@ -14,7 +14,7 @@
  */
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
-import { loginAndSelectCharacter } from './support/login';
+import { signInAndGoto } from './support/authSeed';
 
 const PHONE = { width: 390, height: 844 };
 const DESKTOP = { width: 1280, height: 800 };
@@ -27,9 +27,8 @@ const DESKTOP = { width: 1280, height: 800 };
  * unambiguous at either viewport.
  */
 async function selectFirstCalendarDay(page: Page, viewport: { width: number; height: number }) {
-  await loginAndSelectCharacter(page);
   await page.setViewportSize(viewport);
-  await page.goto('./calendar');
+  await signInAndGoto(page, './calendar');
 
   const grid = page.getByRole('group', { name: 'Calendar map' });
   await grid.getByRole('button').first().click();

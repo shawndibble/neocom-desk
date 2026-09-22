@@ -11,7 +11,7 @@
  */
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
-import { loginAndSelectCharacter } from './support/login';
+import { signInAndGoto } from './support/authSeed';
 import { CHARACTER_ID } from './support/fixtureData';
 
 const PHONE = { width: 390, height: 844 };
@@ -103,7 +103,7 @@ async function seedSecondCharacterBlueprint(page: Page): Promise<void> {
 test.describe('Opportunities — ranked phone list', () => {
   test.beforeEach(async ({ page }) => {
     await seedOwnedBlueprint(page);
-    await loginAndSelectCharacter(page);
+    await signInAndGoto(page);
   });
 
   test('renders a ranked card list at 390px, not the desktop table', async ({ page }) => {

@@ -13,13 +13,13 @@
  */
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
-import { loginAndSelectCharacter } from './support/login';
+import { signInAndGoto } from './support/authSeed';
 
 const PHONE = { width: 390, height: 844 };
 const DESKTOP = { width: 1280, height: 800 };
 
 async function gotoTrainedSkills(page: Page) {
-  await loginAndSelectCharacter(page);
+  await signInAndGoto(page);
   await page.getByRole('link', { name: 'Skills' }).click();
   await page.getByRole('link', { name: 'Trained' }).click();
   await page.waitForURL(/\/skills\/trained$/);

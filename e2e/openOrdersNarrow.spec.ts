@@ -33,7 +33,7 @@
  */
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
-import { loginAndSelectCharacter } from './support/login';
+import { signInAndGoto } from './support/authSeed';
 import { CHARACTER_ID } from './support/fixtureData';
 import type { MarketOrder } from '../src/esi/endpoints';
 
@@ -118,7 +118,7 @@ async function getHeights(page: Page) {
 test.describe('Open Orders — problem-group disclosure row and Healthy toggle touch targets', () => {
   test.beforeEach(async ({ page }) => {
     await seedOpenOrders(page);
-    await loginAndSelectCharacter(page);
+    await signInAndGoto(page);
   });
 
   test('group-header disclosure and Healthy toggle both meet the 44px floor at 390px', async ({

@@ -16,7 +16,7 @@
  */
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
-import { loginAndSelectCharacter } from './support/login';
+import { signInAndGoto } from './support/authSeed';
 
 const PHONE = { width: 390, height: 844 };
 const DESKTOP = { width: 1280, height: 800 };
@@ -31,8 +31,7 @@ const MD_EDGE = { width: 768, height: 800 };
  * group header and the `Tritanium` leaf — are rendered afterwards.
  */
 async function searchTritanium(page: Page) {
-  await loginAndSelectCharacter(page);
-  await page.goto('./market');
+  await signInAndGoto(page, './market');
 
   await page.getByRole('searchbox', { name: 'Search items' }).fill('Tritanium');
 }

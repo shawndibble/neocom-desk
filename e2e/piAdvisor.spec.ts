@@ -13,7 +13,7 @@
  * it exercises the ranked list rather than the empty state.
  */
 import { test, expect } from './support/testBase';
-import { loginAndSelectCharacter } from './support/login';
+import { signInAndGoto } from './support/authSeed';
 import { CHARACTER_ID } from './support/fixtureData';
 
 const SYSTEM_ID = 30_000_142;
@@ -151,7 +151,7 @@ const PLANETS: Record<number, { name: string; type_id: number }> = {
 };
 
 test.beforeEach(async ({ page }) => {
-  await loginAndSelectCharacter(page);
+  await signInAndGoto(page);
 
   // Registered after the shared fixture so these win: Playwright matches the
   // most recently added route first.

@@ -1,9 +1,9 @@
 import { test, expect } from './support/testBase';
-import { loginAndSelectCharacter } from './support/login';
+import { signInAndGoto } from './support/authSeed';
 import { addCaldariCruiserToNewPlan } from './support/planHelpers';
 
 test.beforeEach(async ({ page }) => {
-  await loginAndSelectCharacter(page);
+  await signInAndGoto(page);
   // The rail's Skills link lands on the plan list directly: /skills redirects.
   await page.getByRole('link', { name: 'Skills' }).click();
   await page.waitForURL(/\/skills\/plans$/);

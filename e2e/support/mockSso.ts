@@ -7,7 +7,7 @@ import type { Page } from '@playwright/test';
 import { CHARACTER_ID, CHARACTER_NAME, OWNER_HASH, SCOPES } from './fixtureData';
 
 /** Far-future expiry (seconds since epoch) so the mocked session never needs a refresh. */
-const EXP_SECONDS = 4_102_444_800; // 2100-01-01T00:00:00Z
+export const EXP_SECONDS = 4_102_444_800; // 2100-01-01T00:00:00Z
 
 function base64url(json: unknown): string {
   return Buffer.from(JSON.stringify(json), 'utf-8')
@@ -18,7 +18,7 @@ function base64url(json: unknown): string {
 }
 
 /** Access token shaped exactly as src/auth/jwt.ts's decodeAccessToken expects. */
-function makeAccessToken(): string {
+export function makeAccessToken(): string {
   const header = base64url({ alg: 'RS256', typ: 'JWT' });
   const payload = base64url({
     sub: `CHARACTER:EVE:${CHARACTER_ID}`,

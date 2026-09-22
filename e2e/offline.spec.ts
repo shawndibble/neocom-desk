@@ -1,5 +1,6 @@
 import { test, expect } from './support/testBase';
-import { expireCachedEsiRows, goExternallyOffline, loginAndSelectCharacter } from './support/login';
+import { signInAndGoto } from './support/authSeed';
+import { goExternallyOffline, expireCachedEsiRows } from './support/login';
 import { CHARACTER_NAME } from './support/fixtureData';
 
 /**
@@ -16,7 +17,7 @@ import { CHARACTER_NAME } from './support/fixtureData';
 test('serves a fresh page with no offline banner when external hosts go unreachable', async ({
   page,
 }) => {
-  await loginAndSelectCharacter(page);
+  await signInAndGoto(page);
   // Skills opens on Plans, so the trained view is one sub-nav click away.
   await page.getByRole('link', { name: 'Skills' }).click();
   await page.getByRole('link', { name: 'Trained' }).click();
@@ -35,7 +36,7 @@ test('serves a fresh page with no offline banner when external hosts go unreacha
 });
 
 test('shows cached character and skills after external hosts go unreachable', async ({ page }) => {
-  await loginAndSelectCharacter(page);
+  await signInAndGoto(page);
   // Skills opens on Plans, so the trained view is one sub-nav click away.
   await page.getByRole('link', { name: 'Skills' }).click();
   await page.getByRole('link', { name: 'Trained' }).click();

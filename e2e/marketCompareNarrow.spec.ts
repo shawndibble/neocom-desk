@@ -14,15 +14,14 @@
  */
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
-import { loginAndSelectCharacter } from './support/login';
+import { signInAndGoto } from './support/authSeed';
 
 const PHONE = { width: 390, height: 844 };
 const DESKTOP = { width: 1280, height: 800 };
 
 /** Searches for Tritanium in the Market Browser and adds it to the Compare Set, opening the drawer's handle. */
 async function addTritaniumToCompare(page: Page) {
-  await loginAndSelectCharacter(page);
-  await page.goto('./market');
+  await signInAndGoto(page, './market');
 
   await page.getByRole('searchbox', { name: 'Search items' }).fill('Tritanium');
   const item = page.getByRole('button', { name: 'Tritanium', exact: true });

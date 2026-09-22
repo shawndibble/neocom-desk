@@ -17,7 +17,7 @@
  */
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
-import { loginAndSelectCharacter } from './support/login';
+import { signInAndGoto } from './support/authSeed';
 import { CHARACTER_ID } from './support/fixtureData';
 
 const PHONE = { width: 390, height: 844 };
@@ -57,7 +57,7 @@ async function seedManyPlans(page: Page): Promise<void> {
 test('plan list: the last plan row is reachable above the fixed tab bar at 390px', async ({
   page,
 }) => {
-  await loginAndSelectCharacter(page);
+  await signInAndGoto(page);
   await seedManyPlans(page);
   await page.setViewportSize(PHONE);
   await page.goto('./skills/plans');

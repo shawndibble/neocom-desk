@@ -8,8 +8,9 @@
  * test leaks its rows into the next one.
  */
 import { test, expect } from './support/testBase';
+import { signInAndGoto } from './support/authSeed';
+import { clearCachedEsiRows } from './support/login';
 import { CHARACTER_ID } from './support/fixtureData';
-import { loginAndSelectCharacter, clearCachedEsiRows } from './support/login';
 
 const CORP_HISTORY = [
   { record_id: 2, corporation_id: 98000002, start_date: '2026-01-01T00:00:00Z' },
@@ -44,7 +45,7 @@ test('coming back to a page shows its rows again, not a spinner', async ({ page 
     })
   );
 
-  await loginAndSelectCharacter(page);
+  await signInAndGoto(page);
 
   // The Character-overview sub-nav, not the left rail: 'Overview' names a link
   // in both.

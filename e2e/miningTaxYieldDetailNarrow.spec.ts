@@ -29,7 +29,7 @@
  */
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
-import { loginAndSelectCharacter } from './support/login';
+import { signInAndGoto } from './support/authSeed';
 import { CHARACTER_ID } from './support/fixtureData';
 
 const PHONE = { width: 390, height: 844 };
@@ -223,7 +223,7 @@ function labelLines(cells: CellBox[]): string[][] {
 test.describe('Yield Detail — stacked ore-mined card', () => {
   test.beforeEach(async ({ page }) => {
     await mockMarketHistory(page);
-    await loginAndSelectCharacter(page);
+    await signInAndGoto(page);
     await seedMiningDay(page);
   });
 

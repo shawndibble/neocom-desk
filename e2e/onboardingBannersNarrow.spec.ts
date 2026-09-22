@@ -15,7 +15,7 @@
  * install banner's native variant the same way a real Chromium would.
  */
 import { test, expect } from './support/testBase';
-import { loginAndSelectCharacter } from './support/login';
+import { signInAndGoto } from './support/authSeed';
 
 const PHONE = { width: 390, height: 844 };
 
@@ -58,9 +58,8 @@ async function makeInstallPromptEligible(page: import('@playwright/test').Page):
 
 test('shows one onboarding banner at a time at 390px, then the next one', async ({ page }) => {
   await pinNotificationPermissionToDefault(page);
-  await loginAndSelectCharacter(page);
   await page.setViewportSize(PHONE);
-  await page.goto('./overview');
+  await signInAndGoto(page, './overview');
 
   // Counted as the AC words it: every `role="alert"` on the page, so a future
   // fixed banner that regresses the rule without opting into the shared
