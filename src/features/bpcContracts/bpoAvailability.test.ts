@@ -1,9 +1,16 @@
 import { describe, it, expect } from 'vitest';
-import type { BpcContractRow } from '@/engine/contracts/bpcSearch';
+import {
+  contractRowToSearchRow,
+  ownedBlueprintToSearchRow,
+  type BpcContractRow,
+} from '@/engine/contracts/bpcSearch';
 import type { RegionOrder } from '@/esi/endpoints';
 import {
+  bpoBadgeRows,
   bpoMayBeCheaper,
   cheapestBpoByType,
+  cheapestBpoSourcesByType,
+  cheapestComparableCopy,
   marketBpoOffers,
   type BpoAvailabilityInput,
 } from './bpoAvailability';
@@ -228,5 +235,88 @@ describe('bpoMayBeCheaper', () => {
 
   it('is false for a BPO with no real price', () => {
     expect(bpoMayBeCheaper({ price: 0 }, contract())).toBe(false);
+  });
+});
+
+describe('cheapestBpoSourcesByType', () => {
+  it('keeps the cheapest market and contract original apart, one of each', () => {
+    const input: BpoAvailabilityInput = {
+      originals: [
+        original({ contractId: 1, price: 30_000_000 }),
+        original({ contractId: 2, price: 20_000_000 }),
+      ],
+      contractRegionId: null,
+      marketBooks: new Map([
+        [
+          RIFTER_BP,
+          book([
+            order({ order_id: 1, price: 25_000_000 }),
+            order({ order_id: 2, price: 12_000_000 }),
+          ]),
+        ],
+      ]),
+      hubStationId: JITA_44,
+    };
+    const sources = cheapestBpoSourcesByType([RIFTER_BP], input).get(RIFTER_BP);
+    expect(sources?.contract).toMatchObject({ kind: 'contract', contractId: 2, price: 20_000_000 });
+    expect(sources?.market).toMatchObject({ kind: 'market', orderId: 2, price: 12_000_000 });
+  });
+
+  it('leaves the missing side null, and a type with neither out', () => {
+    const input: BpoAvailabilityInput = {
+      originals: [original({ price: 20_000_000 })],
+      contractRegionId: null,
+      marketBooks: new Map([[CARACAL_BP, book([])]]),
+      hubStationId: JITA_44,
+    };
+    const result = cheapestBpoSourcesByType([RIFTER_BP, CARACAL_BP], input);
+    expect(result.get(RIFTER_BP)).toMatchObject({ market: null, contract: { price: 20_000_000 } });
+    expect(result.has(CARACAL_BP)).toBe(false);
+  });
+});
+
+describe('cheapestComparableCopy', () => {
+  it('picks the cheapest copy with an honest ISK price, skipping bundles and barters', () => {
+    const cheapest = cheapestComparableCopy([
+      contract({ contractId: 1, price: 5_000_000 }),
+      contract({ contractId: 2, price: 1_000_000, isMultiType: true }),
+      contract({ contractId: 3, price: 0 }),
+      contract({ contractId: 4, price: 3_000_000 }),
+    ]);
+    expect(cheapest?.contractId).toBe(4);
+  });
+
+  it('is null when no copy has a comparable price', () => {
+    expect(cheapestComparableCopy([contract({ price: 0 })])).toBeNull();
+    expect(cheapestComparableCopy([])).toBeNull();
+  });
+});
+
+describe('bpoBadgeRows', () => {
+  it('badges one copy row per type: its cheapest comparable contract copy', () => {
+    const dear = contractRowToSearchRow(contract({ contractId: 1, price: 9_000_000 }));
+    const cheap = contractRowToSearchRow(contract({ contractId: 2, price: 3_000_000 }));
+    const bundle = contractRowToSearchRow(
+      contract({ contractId: 3, price: 1_000_000, isMultiType: true })
+    );
+    const caracal = contractRowToSearchRow(contract({ contractId: 4, typeId: CARACAL_BP }));
+    const badged = bpoBadgeRows([dear, bundle, cheap, caracal]);
+    expect([...badged]).toEqual([cheap, caracal]);
+  });
+
+  it('falls back to the first copy row of a type with no comparable price, and never badges an original', () => {
+    const owned = ownedBlueprintToSearchRow({
+      itemId: 1,
+      typeId: RIFTER_BP,
+      runs: 5,
+      me: 10,
+      te: 20,
+      quantity: 1,
+      locationName: null,
+      regionId: null,
+      space: null,
+    });
+    const bpo = contractRowToSearchRow(original({ typeId: CARACAL_BP }));
+    expect([...bpoBadgeRows([bpo, owned])]).toEqual([owned]);
   });
 });

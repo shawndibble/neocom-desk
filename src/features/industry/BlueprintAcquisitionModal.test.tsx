@@ -248,6 +248,34 @@ describe('BlueprintAcquisitionModal — Contracts', () => {
     expect(within(row).getByRole('button', { name: /Use this blueprint/ })).toBeDisabled();
   });
 
+  it('folds identical listings into one row with a count, selected once', async () => {
+    const same = { runs: 50, price: 2_000_000 };
+    mockedLoadContracts.mockResolvedValue(
+      snapshot([
+        contract({ contractId: 1, ...same }),
+        contract({ contractId: 2, ...same }),
+        contract({ contractId: 3, ...same }),
+      ])
+    );
+    renderModal({
+      sourcing: { acquisitionTierOverride: { me: 10, te: 20 }, overridePrice: 2_000_000 },
+    });
+    const items = await within(section('Contracts')).findAllByRole('listitem');
+    expect(items).toHaveLength(1);
+    expect(items[0]).toHaveTextContent(/Copy, 50 runs.*2,000,000 ISK.*×3 offers/);
+    expect(within(section('Contracts')).getAllByText('Selected')).toHaveLength(1);
+  });
+
+  it('hides a bundle when a pickable listing exists', async () => {
+    mockedLoadContracts.mockResolvedValue(
+      snapshot([contract({ contractId: 1 }), contract({ contractId: 2, isMultiType: true })])
+    );
+    renderModal();
+    const items = await within(section('Contracts')).findAllByRole('listitem');
+    expect(items).toHaveLength(1);
+    expect(within(section('Contracts')).queryByText(/Bundle/)).not.toBeInTheDocument();
+  });
+
   it('says so when nothing is listed in the region', async () => {
     renderModal();
     expect(
@@ -291,6 +319,33 @@ describe('BlueprintAcquisitionModal — Market', () => {
       acquisitionTierOverride: { me: 0, te: 0 },
       overridePrice: 7_500_000,
     });
+  });
+
+  it('folds orders at one price and station into one row, volume summed', async () => {
+    mockedGetOrderBook.mockResolvedValue(
+      orderBook([
+        sellOrder({ order_id: 1, volume_remain: 3 }),
+        sellOrder({ order_id: 2, volume_remain: 2 }),
+      ])
+    );
+    renderModal();
+    const items = await within(section('Market (incl. NPC-seeded)')).findAllByRole('listitem');
+    expect(items).toHaveLength(1);
+    expect(items[0]).toHaveTextContent(/5 on sale.*×2 orders/);
+  });
+
+  it('lists the cheapest ten, saying how many there are', async () => {
+    mockedGetOrderBook.mockResolvedValue(
+      orderBook(
+        Array.from({ length: 12 }, (_, i) =>
+          sellOrder({ order_id: i + 1, price: 5_000_000 + i * 1_000 })
+        )
+      )
+    );
+    renderModal();
+    const market = section('Market (incl. NPC-seeded)');
+    expect(await within(market).findAllByRole('listitem')).toHaveLength(10);
+    expect(within(market).getByText('Showing 10 of 12')).toBeInTheDocument();
   });
 
   it('says so when the region has no sell orders', async () => {
