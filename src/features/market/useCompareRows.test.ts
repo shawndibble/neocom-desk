@@ -1,10 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
 import { useCompareRows, type CompareRow, type UseCompareRowsArgs } from './useCompareRows';
-import { getOrderBook, type OrderBookResult } from './orderBook';
+import { getOrderBook, ORDER_BOOK_FANOUT_CONCURRENCY, type OrderBookResult } from './orderBook';
 import type { RegionOrder } from '@/esi/endpoints';
 
-vi.mock('./orderBook', () => ({ getOrderBook: vi.fn() }));
+vi.mock('./orderBook', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./orderBook')>()),
+  getOrderBook: vi.fn(),
+}));
 
 const mockedGetOrderBook = vi.mocked(getOrderBook);
 
@@ -50,6 +53,36 @@ describe('useCompareRows', () => {
   it('does not fetch anything while disabled', () => {
     renderHook(() => useCompareRows({ items: [ITEM_A], enabled: false, ...baseArgs }));
     expect(mockedGetOrderBook).not.toHaveBeenCalled();
+  });
+
+  it('fetches a large set a few at a time, never as one simultaneous burst', async () => {
+    const items = Array.from({ length: 12 }, (_, i) => ({
+      typeId: 100 + i,
+      itemName: `Item ${i}`,
+    }));
+    const pending: (() => void)[] = [];
+    mockedGetOrderBook.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          pending.push(() => resolve(orderBookResult([])));
+        })
+    );
+
+    const { result } = renderHook(() => useCompareRows({ items, enabled: true, ...baseArgs }));
+
+    await waitFor(() =>
+      expect(mockedGetOrderBook).toHaveBeenCalledTimes(ORDER_BOOK_FANOUT_CONCURRENCY)
+    );
+    // Release requests one by one; in flight never exceeds the cap.
+    for (let released = 0; released < items.length; released += 1) {
+      await waitFor(() => expect(pending.length).toBeGreaterThan(0));
+      expect(mockedGetOrderBook.mock.calls.length - released).toBeLessThanOrEqual(
+        ORDER_BOOK_FANOUT_CONCURRENCY
+      );
+      pending.shift()!();
+    }
+    await waitFor(() => expect(result.current.every((row) => !row.loading)).toBe(true));
+    expect(mockedGetOrderBook).toHaveBeenCalledTimes(items.length);
   });
 
   it('does not fetch when the set is empty', () => {

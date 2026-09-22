@@ -54,8 +54,10 @@ import {
 import {
   getOrderBook,
   clearOrderBookCache,
+  ORDER_BOOK_FANOUT_CONCURRENCY,
   type OrderBookResult,
 } from '@/features/market/orderBook';
+import { mapWithConcurrencyLimit } from '@/lib/concurrency';
 import { formatVolume } from '@/features/market/format';
 import { useIsDesktop } from '@/lib/useIsDesktop';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
@@ -1145,8 +1147,13 @@ export function Market() {
       return;
     }
     let cancelled = false;
-    void Promise.all(
-      variationsResult.rows.map(async (row) => {
+    // Capped, not one Promise.all: ~20 rows fired at once tripped Sentry's
+    // N+1 API Call detector (ORDER_BOOK_FANOUT_CONCURRENCY).
+    void mapWithConcurrencyLimit(
+      variationsResult.rows,
+      ORDER_BOOK_FANOUT_CONCURRENCY,
+      async (row) => {
+        if (cancelled) return;
         const region = resolveOrderBookRegion(row.typeId, chosenRegionId, globalMarketsMap);
         try {
           const result = await getOrderBook(region.regionId, row.typeId);
@@ -1172,7 +1179,7 @@ export function Market() {
             );
           }
         }
-      })
+      }
     );
     return () => {
       cancelled = true;

@@ -8,6 +8,15 @@ import { getMarketOrders, type RegionOrder } from '@/esi/endpoints';
 
 export const ORDER_BOOK_TTL_MS = 300_000;
 
+/**
+ * Most order books one list fetches at once (Variations table, Compare
+ * Drawer). ESI has no multi-type filter, so each row costs its own request
+ * (ADR 0003) — but firing all 20 at once tripped Sentry's N+1 API Call
+ * detector (10+ calls within 5ms). Kept well under `ESI_FANOUT_CONCURRENCY`
+ * so a worker's next call waits on a finished one, never starting in lockstep.
+ */
+export const ORDER_BOOK_FANOUT_CONCURRENCY = 4;
+
 /** Injectable so tests can move time without waiting on it. Defaults to wall-clock. */
 export type Clock = () => number;
 
