@@ -429,6 +429,29 @@ describe('Market Browser', () => {
     expect(within(buyTable).getByText('500,000.00')).toBeInTheDocument();
   });
 
+  it('an ESI failure clears the spinner instead of hanging on it', async () => {
+    // `getOrderBook` throws on any ESI failure, and the fetch effect used to
+    // let that reject into nothing: `setOrderBookLoading(false)` sat after the
+    // await, so a rate-limited market page spun forever and the rejection
+    // escaped as an unhandled one (which is how CI first caught this).
+    server.use(
+      http.get(`${ESI_BASE_URL}/markets/${RIFTER_REGION_ID}/orders`, () =>
+        HttpResponse.json({ error: 'Rate limit exceeded' }, { status: 420 })
+      )
+    );
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.type(await screen.findByRole('searchbox'), 'rift');
+    await user.click(await screen.findByText('Rifter'));
+
+    // The empty book, not the spinner: `orderBookResult: null` is the state
+    // the rest of this page already reads as "loaded, nothing to show".
+    // Reaching this text at all means the loading branch was left behind.
+    expect(await screen.findByText('No sell orders')).toBeInTheDocument();
+    expect(screen.getByText('No buy orders')).toBeInTheDocument();
+  });
+
   it('Refresh bypasses the 300s order-book cache and refetches immediately', async () => {
     const hits = { count: 0 };
     server.use(ordersHandler(hits));
