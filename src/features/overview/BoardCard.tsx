@@ -168,7 +168,7 @@ export function TriageRow({ severity, when, subject, detail, to }: TriageRowProp
         className="flex min-h-11 items-center gap-2.5 px-3 py-1.5 hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent md:min-h-9"
       >
         <span
-          className={`flex w-20 shrink-0 items-center gap-1.5 text-xs font-semibold tabular-nums ${SEVERITY_TEXT[severity]}`}
+          className={`flex w-24 shrink-0 items-center gap-1.5 whitespace-nowrap text-xs font-semibold tabular-nums ${SEVERITY_TEXT[severity]}`}
         >
           <SeverityIcon severity={severity} />
           {when}
