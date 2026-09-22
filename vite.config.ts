@@ -194,6 +194,9 @@ export default defineConfig({
     // that is where a zone question belongs, not as an accident of whoever
     // happens to run the suite.
     env: { TZ: 'UTC' },
+    // Shared half only. The `dom` project below adds `vitest.setup.dom.ts`;
+    // the `node` project was importing `@testing-library/jest-dom` and a
+    // stack of jsdom polyfills 462 times for matchers it never calls.
     setupFiles: ['./vitest.setup.ts'],
     // Default 5000ms. A test can chain several `findBy*`/`waitFor` calls,
     // each now with up to 5000ms of its own headroom (vitest.setup.ts) for
@@ -245,6 +248,11 @@ export default defineConfig({
         test: {
           name: 'dom',
           environment: 'jsdom',
+          // The shared setup plus the DOM-only half. Listed rather than
+          // inherited: `setupFiles` replaces the parent's value instead of
+          // merging with it, so dropping the base file here would silently
+          // lose `fake-indexeddb` and the route-snapshot reset.
+          setupFiles: ['./vitest.setup.ts', './vitest.setup.dom.ts'],
           include: ['src/**/*.{test,spec}.tsx', ...DOM_TS_TESTS],
         },
       },

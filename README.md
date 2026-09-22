@@ -81,9 +81,9 @@ confirm it's actually live; it fails loudly instead of pretending to work.
 While iterating, prefer narrow checks over the full suite: `npm run
 typecheck` and `npx vitest run <path>` for the file(s) you're touching.
 **Never run `npm run test:run` or `npm run build` locally** — CI's
-`validate` job runs lint, format check, typecheck, the full test suite, and
-build on every push, and a separate `e2e` job runs Playwright; that's the
-gate, not a local pre-PR run.
+`validate` job runs lint, format check, typecheck and build on every push, a
+`test` job runs the unit suite across four shards, and an `e2e` job runs
+Playwright across four more; that's the gate, not a local pre-PR run.
 
 Copy `.env.example` to `.env` and set `VITE_EVE_CLIENT_ID` (EVE developer
 application client ID, https://developers.eveonline.com).

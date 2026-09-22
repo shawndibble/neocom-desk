@@ -44,6 +44,15 @@ export default tseslint.config(
               name: 'radix-ui',
               message: 'Import Radix primitives through src/components/ui, not directly.',
             },
+            {
+              // Not only a layering rule, a speed one: this barrel re-exports
+              // 3045 icons and costs ~1.4s to import, which Vitest pays once
+              // per test file whose graph reaches it. `src/components/ui`
+              // (exempt above) imports each icon from `dist/csr/<Name>`.
+              name: '@phosphor-icons/react',
+              message:
+                'Import icons from src/components/ui/icons, not the barrel — it pulls in 3045 modules.',
+            },
           ],
         },
       ],

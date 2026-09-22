@@ -66,7 +66,7 @@ function sleepSync(ms) {
 // API shape change, etc.). The real source of truth is the "Merging"
 // branch ruleset covering `main` in this repo; keep this in sync with it
 // if that ruleset's required contexts ever change.
-const FALLBACK_REQUIRED_CONTEXTS = ['validate', 'e2e'];
+const FALLBACK_REQUIRED_CONTEXTS = ['validate', 'test', 'e2e'];
 
 function getRequiredContexts() {
   try {
