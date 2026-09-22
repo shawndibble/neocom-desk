@@ -1240,16 +1240,19 @@ export const structureFuelDomain = defineDomain<
   },
   toSnapshot: (entries, nowMs) => ({ entries: [...entries], nowMs }),
   diffs: [gatedOn('structureFuelLow', diffStructureFuelLow)],
-  // `entry.thresholdMs` is already baked in per entry above (this poll's
-  // fuel lead time), so no preference read is needed here.
-  projection: async (characterId, characterName, snapshot, nowMs) =>
-    projectStructureFuel(
+  // Same split as the colony domain: the baseline's baked-in `thresholdMs`
+  // stays for the diff, while the Projection uses the current fuel threshold
+  // so a Settings change rebuilt from that baseline (issue #1259) projects it.
+  projection: async (characterId, characterName, snapshot, nowMs) => {
+    const thresholdMs = (await currentThresholds(characterId)).structureFuelLowDays * DAY_MS;
+    return projectStructureFuel(
       characterId,
       characterName,
-      snapshot.entries,
+      snapshot.entries.map((entry) => ({ ...entry, thresholdMs })),
       structureFuelCopy.push,
       nowMs
-    ),
+    );
+  },
   copy: structureFuelCopy,
 });
 

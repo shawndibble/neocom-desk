@@ -86,8 +86,10 @@ import {
   EXTRACTOR_EXPIRING_LEAD_HOUR_OPTIONS,
   type CharacterEventThresholds,
 } from './preferences';
-import { liveDependencies } from './foregroundPoller';
-import { rebuildProjection } from './projectionRebuild';
+import {
+  rebuildProjectionAfterChannelWrite,
+  scheduleProjectionRebuild,
+} from './projectionRebuildScheduler';
 import {
   isEventEnabledFor,
   isEveTypeEnabledFor,
@@ -670,25 +672,6 @@ const CharacterNotificationSection = memo(function CharacterNotificationSection(
   // over a `prefsValue` prop — see this component's props doc for why.
   const currentValue = () => useNotificationPreferences.getState().value;
 
-  /**
-   * `registerDeviceForWebPush` replaces the backend's whole stored
-   * Projection for a Character on every upload (issue #358), so a lead-time
-   * change or an off-toggle otherwise leaves a stale Scheduled Push live
-   * until the next ~5-minute poll catches up (issue #750). This rebuilds
-   * every Character's whole Projection from the saved baselines
-   * (`projectionRebuild.ts`) — no ESI data fetches — once `write` has
-   * settled: a rebuild reading preferences before then could project the old
-   * value, or re-hydrate the synced threshold over the new one. Rebuilds
-   * even if the synced half of the write failed, since the local value is
-   * already set by then.
-   */
-  const reuploadProjectionAfter = (write: Promise<void>) => {
-    void write
-      .catch((err: unknown) => console.error('Notification preference write failed', err))
-      .then(() => rebuildProjection(liveDependencies()))
-      .catch((err: unknown) => console.error('Scheduled Push projection rebuild failed', err));
-  };
-
   return (
     <div className="rounded-xs border border-line bg-panel/85 backdrop-blur-sm">
       {/* Select-all is a sibling of the expand toggle, not nested inside its
@@ -726,11 +709,14 @@ const CharacterNotificationSection = memo(function CharacterNotificationSection(
               key={channel}
               state={selectionStateForEvents(togglableEventIds, prefs, channel)}
               onToggle={() =>
-                void toggleAllEventsChannelPref(
-                  character.characterId,
-                  currentValue(),
-                  togglableEventIds,
-                  channel
+                rebuildProjectionAfterChannelWrite(
+                  channel,
+                  toggleAllEventsChannelPref(
+                    character.characterId,
+                    currentValue(),
+                    togglableEventIds,
+                    channel
+                  )
                 )
               }
               label={t(`settings.notifications.selectAll.${channel}`, {
@@ -772,20 +758,17 @@ const CharacterNotificationSection = memo(function CharacterNotificationSection(
                             !hasScope ? 'scope' : capabilityMissing ? 'capability' : null
                           }
                           checked={isEventEnabledFor(prefs, eventId, channel)}
-                          onToggle={() => {
-                            const wasEnabled = isEventEnabledFor(prefs, eventId, channel);
-                            const write = toggleEventChannelPref(
-                              character.characterId,
-                              currentValue(),
-                              eventId,
-                              channel
-                            );
-                            if (eventId === 'planetaryExtractorExpiring' && wasEnabled) {
-                              reuploadProjectionAfter(write);
-                            } else {
-                              void write;
-                            }
-                          }}
+                          onToggle={() =>
+                            rebuildProjectionAfterChannelWrite(
+                              channel,
+                              toggleEventChannelPref(
+                                character.characterId,
+                                currentValue(),
+                                eventId,
+                                channel
+                              )
+                            )
+                          }
                         />
                       ))}
                     </div>
@@ -817,7 +800,7 @@ const CharacterNotificationSection = memo(function CharacterNotificationSection(
                         <Select
                           value={String(thresholds.extractorExpiringLeadHours)}
                           onValueChange={(value) => {
-                            reuploadProjectionAfter(
+                            scheduleProjectionRebuild(
                               updatePrefs(
                                 character.characterId,
                                 withCharacterEventThreshold(
@@ -866,13 +849,15 @@ const CharacterNotificationSection = memo(function CharacterNotificationSection(
                         <Select
                           value={String(thresholds.structureFuelLowDays)}
                           onValueChange={(value) =>
-                            void updatePrefs(
-                              character.characterId,
-                              withCharacterEventThreshold(
-                                currentValue(),
+                            scheduleProjectionRebuild(
+                              updatePrefs(
                                 character.characterId,
-                                'structureFuelLowDays',
-                                Number(value)
+                                withCharacterEventThreshold(
+                                  currentValue(),
+                                  character.characterId,
+                                  'structureFuelLowDays',
+                                  Number(value)
+                                )
                               )
                             )
                           }
@@ -1029,11 +1014,14 @@ const CharacterNotificationSection = memo(function CharacterNotificationSection(
                                       channel
                                     )}
                                     onToggle={() =>
-                                      void toggleAllEveTypesChannelPref(
-                                        character.characterId,
-                                        currentValue(),
-                                        familyTypes,
-                                        channel
+                                      rebuildProjectionAfterChannelWrite(
+                                        channel,
+                                        toggleAllEveTypesChannelPref(
+                                          character.characterId,
+                                          currentValue(),
+                                          familyTypes,
+                                          channel
+                                        )
                                       )
                                     }
                                     label={t(`settings.notifications.selectAllFamily.${channel}`, {
@@ -1073,11 +1061,14 @@ const CharacterNotificationSection = memo(function CharacterNotificationSection(
                                           disabledReason={null}
                                           checked={isEveTypeEnabledFor(eveTypePrefs, type, channel)}
                                           onToggle={() =>
-                                            void toggleEveTypeChannelPref(
-                                              character.characterId,
-                                              currentValue(),
-                                              type,
-                                              channel
+                                            rebuildProjectionAfterChannelWrite(
+                                              channel,
+                                              toggleEveTypeChannelPref(
+                                                character.characterId,
+                                                currentValue(),
+                                                type,
+                                                channel
+                                              )
                                             )
                                           }
                                         />
