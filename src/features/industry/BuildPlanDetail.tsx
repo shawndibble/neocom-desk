@@ -781,6 +781,14 @@ export function BuildPlanDetail({
     return gates;
   }, [visibleMaterials, catalog, accountSkills]);
 
+  // The plan's own top-level product (issue #1231) — the header this same
+  // account-wide check used to explicitly skip (see the 2026-09-14 decision
+  // this reverses for the top-level case).
+  const topLevelSkillGate = useMemo(
+    () => evaluateSkillGate(entry?.blueprint.skills ?? [], accountSkills),
+    [entry, accountSkills]
+  );
+
   // Narrowed to the plan's owned-stock scope (issue #454); `detectedStock`
   // itself stays the full, galaxy-wide picture the breakdown popover shows.
   const scopedStock = useMemo(
@@ -1044,7 +1052,10 @@ export function BuildPlanDetail({
     if (!blueprint || !makeOrBuyContext) return;
     const picked = autoBuildHere(blueprint, resolvedMe, {
       recipeFor,
-      ctx: makeOrBuyContext,
+      // Account-wide (issue #1231): a material nobody on the account can
+      // build is forced to buy regardless of cost — same `accountSkills` the
+      // sub-build marker above uses.
+      ctx: { ...makeOrBuyContext, accountSkills },
       depth: autoBuildMaxDepth,
       runs: plan.runs,
       scope: craftScopeList,
@@ -1183,6 +1194,9 @@ export function BuildPlanDetail({
           onBreakdownOpenChange={setBreakdownOpen}
           onLogProduction={() => setLogRequest((n) => n + 1)}
           logProductionDisabled={entry.productTypeID === null}
+          skillGate={topLevelSkillGate}
+          nameForSkill={(typeID) => nameForType(catalog, typeID)}
+          nameForCharacter={(characterId) => characterNames.get(characterId) ?? t('common.unknown')}
         />
       )}
 

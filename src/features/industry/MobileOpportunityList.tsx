@@ -31,12 +31,14 @@ import {
   type DataTableSort,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
+import type { SkillGateVerdict } from '@/engine/industry/skillGate';
 import { iskToneClass } from '@/features/character/format';
 import { formatDuration } from '@/lib/duration';
 import { formatIsk } from '@/lib/isk';
 import { ORDER_DEPTH_TONE, unitMargin } from './opportunityMetrics';
 import { formatPercent } from './format';
 import type { OpportunityRow } from './opportunities';
+import { SkillGateMarker } from './SkillGateMarker';
 
 interface MobileOpportunityListProps {
   rows: readonly OpportunityRow[];
@@ -44,6 +46,10 @@ interface MobileOpportunityListProps {
   selectedIds: ReadonlySet<string>;
   onToggleSelected: (id: string) => void;
   onViewHistory: (typeId: number, itemName: string) => void;
+  /** Account-wide skill gate for a row's product (issue #1231). */
+  skillGateFor: (productTypeID: number) => SkillGateVerdict | undefined;
+  nameForSkill: (typeID: number) => string;
+  nameForCharacter: (characterId: number) => string;
 }
 
 type SortFieldId = 'iskPerHour' | 'unitMargin' | 'margin' | 'duration';
@@ -131,6 +137,9 @@ export function MobileOpportunityList({
   selectedIds,
   onToggleSelected,
   onViewHistory,
+  skillGateFor,
+  nameForSkill,
+  nameForCharacter,
 }: MobileOpportunityListProps) {
   const { t } = useTranslation();
   const unknown = t('common.unknown');
@@ -179,6 +188,7 @@ export function MobileOpportunityList({
           const hero = fields[activeFieldId].hero(row);
           const productTypeID = row.candidate.catalogEntry.productTypeID;
           const original = row.candidate.blueprint.runs === -1;
+          const skillGateVerdict = productTypeID !== null ? skillGateFor(productTypeID) : undefined;
 
           return (
             <li
@@ -207,6 +217,13 @@ export function MobileOpportunityList({
                 <span className="mt-0.5 text-sm font-semibold break-words">
                   {row.candidate.catalogEntry.productName}
                 </span>
+                {skillGateVerdict?.gated && (
+                  <SkillGateMarker
+                    verdict={skillGateVerdict}
+                    nameForSkill={nameForSkill}
+                    nameForCharacter={nameForCharacter}
+                  />
+                )}
                 {showCharacterColumn && (
                   <span className="mt-1 text-[0.6875rem] text-text-dim">
                     {row.candidate.characterName}

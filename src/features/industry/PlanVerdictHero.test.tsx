@@ -4,6 +4,7 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import type { BuildResult } from '@/engine/industry/types';
+import type { SkillGateVerdict } from '@/engine/industry/skillGate';
 import { PlanVerdictHero } from './PlanVerdictHero';
 import type { BreakdownContext } from './CalculationBreakdown';
 import { ownedStockSale } from '@/engine/industry/ownedStockSale';
@@ -233,5 +234,30 @@ describe('PlanVerdictHero: calculation breakdown', () => {
     const dialog = screen.getByRole('dialog');
     expect(within(dialog).getByText(/Reactions have no ME/i)).toBeTruthy();
     expect(within(dialog).queryByText(/after ME 10/i)).toBeNull();
+  });
+});
+
+describe('PlanVerdictHero: top-level skill-gate marker (issue #1231)', () => {
+  const GATED: SkillGateVerdict = {
+    gated: true,
+    shortfall: [{ typeID: 3380, haveLevel: 2, needLevel: 5 }],
+    bestCharacterId: 7,
+  };
+  const nameForSkill = () => 'Industry';
+  const nameForCharacter = (id: number) => (id === 7 ? 'Vex Kado' : `#${id}`);
+
+  it("marks the plan's own product when no account character can build it", () => {
+    renderHero({ skillGate: GATED, nameForSkill, nameForCharacter });
+    expect(screen.getByText('Industry V')).toBeInTheDocument();
+  });
+
+  it('shows no marker for a not-gated verdict', () => {
+    renderHero({ skillGate: { gated: false }, nameForSkill, nameForCharacter });
+    expect(screen.queryByRole('img')).toBeNull();
+  });
+
+  it('shows no marker when the caller passed no skill-gate data', () => {
+    renderHero();
+    expect(screen.queryByRole('img')).toBeNull();
   });
 });

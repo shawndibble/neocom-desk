@@ -35,6 +35,7 @@ import { iskToneClass } from '@/features/character/format';
 import { useIsDesktop } from '@/lib/useIsDesktop';
 import type { CharacterBlueprint } from '@/esi/endpoints';
 import type { SkillLevels } from '@/engine/industry/types';
+import { evaluateSkillGate, type SkillGateVerdict } from '@/engine/industry/skillGate';
 import type { PiData } from '@/sde/types';
 import { DEFAULT_TRADE_HUB } from '@/market/hubs';
 import { PriceHistoryPanel } from '@/features/market/PriceHistoryPanel';
@@ -43,7 +44,8 @@ import {
   useResolvedCharacterFilter,
   type CharacterFilterValue,
 } from '@/features/character/characterFilterValue';
-import type { BlueprintCatalog } from './blueprintCatalog';
+import { useAccountSkillLevels } from '@/features/skills/useAccountSkillLevels';
+import { nameForType, type BlueprintCatalog } from './blueprintCatalog';
 import { loadCharacterBlueprints } from './data';
 import type { ActivityFacilityDefaults } from './facilityDefaults';
 import { formatPercent } from './format';
@@ -51,6 +53,7 @@ import { MobileOpportunityList } from './MobileOpportunityList';
 import { ORDER_DEPTH_TONE, unitMargin } from './opportunityMetrics';
 import type { OwnedStockSnapshot } from './ownedStockDetection';
 import { buildOpportunityCandidates, type OpportunityRow } from './opportunities';
+import { SkillGateMarker } from './SkillGateMarker';
 import { useOpportunities } from './useOpportunities';
 import { useAssumedMe } from './assumedMe';
 
@@ -187,6 +190,27 @@ export function OpportunitiesPanel({
   }
   const selectedRows = rows.filter((row) => selectedIds.has(row.candidate.id));
 
+  // Account-wide, not this panel's own `characterFilter` (issue #1231): a
+  // gate must stay true regardless of which character the filter happens to
+  // be scoped to, the same precedent `MarketWideOpportunitiesPanel` sets.
+  const skillGateCharacterIds = useMemo(
+    () => characterCandidates.map((c) => c.characterId),
+    [characterCandidates]
+  );
+  const accountSkills = useAccountSkillLevels(skillGateCharacterIds);
+  const skillGateByProductTypeID = useMemo(() => {
+    const verdicts = new Map<number, SkillGateVerdict>();
+    for (const row of rows) {
+      const productTypeID = row.candidate.catalogEntry.productTypeID;
+      if (productTypeID === null || verdicts.has(productTypeID)) continue;
+      verdicts.set(
+        productTypeID,
+        evaluateSkillGate(row.candidate.catalogEntry.blueprint.skills, accountSkills)
+      );
+    }
+    return verdicts;
+  }, [rows, accountSkills]);
+
   // Mounting `PriceHistoryPanel` is what fetches the item's market history
   // (`loadPriceHistory`) — kept out of the row tree entirely until a pilot
   // asks for one, so rendering the ranked list never issues a market-history
@@ -225,9 +249,17 @@ export function OpportunitiesPanel({
       sortValue: (row) => row.candidate.catalogEntry.productName,
       render: (row) => {
         const productTypeID = row.candidate.catalogEntry.productTypeID;
+        const verdict = productTypeID !== null ? skillGateByProductTypeID.get(productTypeID) : null;
         return (
           <span className="flex flex-wrap items-center gap-1.5">
             {row.candidate.catalogEntry.productName}
+            {verdict?.gated && (
+              <SkillGateMarker
+                verdict={verdict}
+                nameForSkill={(typeID) => nameForType(catalog, typeID)}
+                nameForCharacter={(id) => characterNames.get(id) ?? unknown}
+              />
+            )}
             {showCharacterColumn && (
               <span className="text-[0.6875rem] text-text-dim">{row.candidate.characterName}</span>
             )}
@@ -409,6 +441,9 @@ export function OpportunitiesPanel({
           selectedIds={selectedIds}
           onToggleSelected={toggleSelected}
           onViewHistory={(typeId, itemName) => setHistoryItem({ typeId, itemName })}
+          skillGateFor={(productTypeID) => skillGateByProductTypeID.get(productTypeID)}
+          nameForSkill={(typeID) => nameForType(catalog, typeID)}
+          nameForCharacter={(id) => characterNames.get(id) ?? unknown}
         />
       )}
       {historyItem && (

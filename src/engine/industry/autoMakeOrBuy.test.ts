@@ -267,6 +267,25 @@ describe('autoBuildHere', () => {
     ).not.toThrow();
   });
 
+  it('excludes a material nobody on the account can build (issue #1231), even though building is cheaper — ending the branch the same way an ordinary cost-based buy verdict does', () => {
+    const gatedGearABlueprint: IndustryBlueprint = {
+      ...gearABlueprint,
+      skills: [{ typeID: 3380, level: 5 }],
+    };
+    const gatedRecipes: Record<number, MaterialRecipe> = {
+      ...recipes,
+      502: { method: 'manufacturing', blueprint: gatedGearABlueprint, me: 0 },
+    };
+    const noAccountSkills = new Map([[1, {}]]);
+    const result = autoBuildHere(productBlueprint, 0, {
+      recipeFor: (id) => gatedRecipes[id] ?? null,
+      ctx: { ...ctx, accountSkills: noAccountSkills },
+      depth: 2,
+      runs: 1,
+    });
+    expect(result.size).toBe(0);
+  });
+
   it("sizes the root job to the plan's real runs, not always 1 — a verdict decided at the wrong scale would disagree with what the recursive engine later bills", () => {
     // Per-job rounding (materials.ts) happens once per job regardless of run
     // count, so a bigger job amortizes the rounding waste better and prices

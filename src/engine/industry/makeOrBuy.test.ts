@@ -198,6 +198,63 @@ describe('makeOrBuy', () => {
     });
   });
 
+  describe('skill gate (issue #1231)', () => {
+    const gatedBlueprint: IndustryBlueprint = {
+      ...partsBlueprint,
+      skills: [{ typeID: 3380, level: 5 }],
+    };
+    const gatedManufacturing: MaterialRecipe = {
+      method: 'manufacturing',
+      blueprint: gatedBlueprint,
+      me: 0,
+    };
+    const noAccountSkills = new Map<number, Record<number, number>>([[1, {}]]);
+    const sufficientAccountSkills = new Map<number, Record<number, number>>([[1, { 3380: 5 }]]);
+
+    it('forces buy when no account character can install the job, even though building is cheaper', () => {
+      const result = makeOrBuy(line(), gatedManufacturing, {
+        ...ctx,
+        accountSkills: noAccountSkills,
+      });
+      expect(result?.verdict).toBe('buy');
+      expect(result?.skillGate).toEqual({
+        gated: true,
+        shortfall: [{ typeID: 3380, haveLevel: 0, needLevel: 5 }],
+        bestCharacterId: 1,
+      });
+    });
+
+    it('leaves the cost-based verdict alone when an account character meets the requirement', () => {
+      const result = makeOrBuy(line(), gatedManufacturing, {
+        ...ctx,
+        accountSkills: sufficientAccountSkills,
+      });
+      expect(result?.verdict).toBe('build');
+      expect(result?.skillGate).toBeUndefined();
+    });
+
+    it('leaves the cost-based verdict alone when no account skills are supplied', () => {
+      const result = makeOrBuy(line(), gatedManufacturing, ctx);
+      expect(result?.verdict).toBe('build');
+      expect(result?.skillGate).toBeUndefined();
+    });
+
+    it('does not gate planetary production, which has no skill requirement', () => {
+      const water: MaterialRecipe = {
+        method: 'planetary',
+        outputQuantity: 20,
+        inputs: [{ typeID: 2073, quantity: 3000 }],
+      };
+      const result = makeOrBuy(line({ typeID: 2398, unitPrice: 90 }), water, {
+        ...ctx,
+        materialPrices: { 2073: 0.5 },
+        accountSkills: noAccountSkills,
+      });
+      expect(result?.verdict).toBe('build');
+      expect(result?.skillGate).toBeUndefined();
+    });
+  });
+
   describe('planetary industry', () => {
     const water: MaterialRecipe = {
       method: 'planetary',
