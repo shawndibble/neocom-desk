@@ -107,9 +107,32 @@ jobs:
         with:
           artifact_name: github-pages-${{ github.run_attempt }}
 
-  e2e:
+  e2e-shard:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    # Sharded because one runner could not get under the time budget. The
+    # suite is ~91 specs at ~15s each — that is 21 minutes of test time, and
+    # a single 4-vCPU runner spent 10.6 of them on it. The cost is almost
+    # entirely each spec re-fetching the dev server's module waterfall into a
+    # fresh browser context. A shard gets its own runner, and therefore its
+    # own dev server and its own pair of Playwright workers, so the work
+    # divides on the resource that was actually saturated. Public repo, so
+    # the extra runners are free.
+    #
+    # Worker count is left at Playwright's default (half the cores, so 2
+    # here) on purpose. Raising it to 4 was tried and does not work: four
+    # Chromiums plus the dev and preview servers oversubscribe a 4-vCPU
+    # runner badly enough that browsers die mid-test with `Protocol error
+    # (Runtime.callFunctionOn): Internal server error, session closed`, which
+    # failed 12 specs across every shard. Scale by adding runners, not by
+    # crowding one.
+    #
+    # `fail-fast: false` so one shard's failure still lets the others report
+    # theirs — otherwise a flake in shard 1 hides real breakage in shard 3.
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -166,13 +189,16 @@ jobs:
           VITE_FIREBASE_AUTH_DOMAIN: ''
           VITE_FIREBASE_PROJECT_ID: ''
           VITE_FIREBASE_APP_ID: ''
-      - run: npx playwright test
+      - run: npx playwright test --shard=${{ matrix.shard }}/4
         env:
           VITE_EVE_CLIENT_ID: e2e-fake-client
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: playwright-report
+          # Shard-suffixed: `upload-artifact@v4` refuses a name another job
+          # already uploaded, so a fixed name turns a second failing shard
+          # into a spurious upload error on top of the real failure.
+          name: playwright-report-shard-${{ matrix.shard }}
           # Both, and `error` rather than the default `warn`: the traces and
           # the `error-context.md` page snapshot live under `test-results/`,
           # and this step silently uploaded nothing for as long as the config
@@ -182,3 +208,27 @@ jobs:
             playwright-report
             test-results
           if-no-files-found: error
+
+  # The `main` ruleset requires a status check named exactly `e2e`, and a
+  # matrix job reports as `e2e-shard (1)`, `e2e-shard (2)`, … — four contexts,
+  # none of them the required one. This job keeps that single name and turns
+  # the four shard results back into it. `scripts/next-ticket/drive-ci.mjs`
+  # waits on the same context, so the ticket loop needs no change either.
+  #
+  # `!cancelled()` rather than the default: `fail-fast: false` means a failing
+  # shard still lets the rest finish, and this has to run and fail afterwards
+  # instead of being skipped — a skipped required check never resolves and the
+  # PR waits forever.
+  e2e:
+    if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+    needs: [e2e-shard]
+    runs-on: ubuntu-latest
+    steps:
+      # A matrix `needs` result is `success` only when every shard succeeded,
+      # so this one comparison covers failure, cancellation and a shard that
+      # never started.
+      - name: Fail unless every shard passed
+        if: needs.e2e-shard.result != 'success'
+        run: |
+          echo "::error::e2e shards did not all pass (result: ${{ needs.e2e-shard.result }})"
+          exit 1
