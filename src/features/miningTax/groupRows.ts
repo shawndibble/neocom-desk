@@ -56,6 +56,45 @@ export function formatDateRange(sortedDates: readonly string[]): string {
   return first === last ? first : `${first} – ${last}`;
 }
 
+/**
+ * EVE's wallet transfer "reason" field truncates silently well short of a
+ * normal sentence — a pasted "Moon mining tax · Talidal/Ainsan · 2026-09-12"
+ * (45 characters) came through in-game as exactly its first 40 characters,
+ * with no client-side warning. There's no documented limit to cite, so this
+ * is that observed cutoff, not a rounder number with margin built in.
+ */
+export const SETTLE_UP_REASON_MAX_LENGTH = 40;
+
+/** "MM-DD" for an EVE date already known to be "YYYY-MM-DD". */
+function shortDate(date: string): string {
+  return date.slice(5);
+}
+
+/** "09-04" for a single EVE date, or "09-04/09-06" for a span — compact enough for the reason field's tight budget. */
+function compactDateRange(sortedDates: readonly string[]): string {
+  if (sortedDates.length === 0) return '';
+  const first = sortedDates[0];
+  const last = sortedDates[sortedDates.length - 1];
+  return first === last ? shortDate(first) : `${shortDate(first)}/${shortDate(last)}`;
+}
+
+/**
+ * The copyable "paste into the transfer" reason for Settle Up, kept inside
+ * [[SETTLE_UP_REASON_MAX_LENGTH]]. Drops the system list first when it
+ * doesn't fit — it's the least essential part, since the payer already sees
+ * which systems are covered in the itemized list one step back.
+ */
+export function buildSettleUpReason(
+  prefix: string,
+  systems: readonly string[],
+  sortedDates: readonly string[]
+): string {
+  const range = compactDateRange(sortedDates);
+  const base = range === '' ? prefix : `${prefix} ${range}`;
+  const withSystems = systems.length > 0 ? `${base} ${systems.join('/')}` : base;
+  return withSystems.length <= SETTLE_UP_REASON_MAX_LENGTH ? withSystems : base;
+}
+
 export function worstStatus(statuses: readonly MiningTaxRowStatus[]): MiningTaxRowStatus {
   return statuses.reduce((worst, s) => (STATUS_PRIORITY[s] < STATUS_PRIORITY[worst] ? s : worst));
 }

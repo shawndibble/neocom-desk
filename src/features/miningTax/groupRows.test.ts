@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import type { MiningTaxAssignmentRecord } from '@/db';
 import type { MoonMiningTaxRow } from './snapshot';
-import { allMembers, flatten, worstStatus } from './groupRows';
+import {
+  allMembers,
+  buildSettleUpReason,
+  flatten,
+  SETTLE_UP_REASON_MAX_LENGTH,
+  worstStatus,
+} from './groupRows';
 
 const CHAR_A = 1;
 const TYPE_A = 45490;
@@ -106,5 +112,40 @@ describe('worstStatus', () => {
 
   it('prefers outstanding over paid and dismissed', () => {
     expect(worstStatus(['dismissed', 'paid', 'outstanding'])).toBe('outstanding');
+  });
+});
+
+describe('buildSettleUpReason', () => {
+  it('includes the system for a single date, single system', () => {
+    expect(buildSettleUpReason('Moon tax', ['Jita'], ['2026-09-12'])).toBe('Moon tax 09-12 Jita');
+  });
+
+  it('includes every system joined by / when they all fit', () => {
+    expect(buildSettleUpReason('Moon tax', ['Talidal', 'Ainsan'], ['2026-09-12'])).toBe(
+      'Moon tax 09-12 Talidal/Ainsan'
+    );
+  });
+
+  it('compacts a date range to MM-DD/MM-DD', () => {
+    expect(buildSettleUpReason('Moon tax', ['Jita'], ['2026-09-01', '2026-09-12'])).toBe(
+      'Moon tax 09-01/09-12 Jita'
+    );
+  });
+
+  it('drops the system list when it would overflow the limit', () => {
+    const manySystems = ['Talidal', 'Ainsan', 'Osmon', 'Kausaaja', 'Perimeter', 'Amarr'];
+    const reason = buildSettleUpReason('Moon tax', manySystems, ['2026-09-01', '2026-09-12']);
+    expect(reason).toBe('Moon tax 09-01/09-12');
+    expect(reason.length).toBeLessThanOrEqual(SETTLE_UP_REASON_MAX_LENGTH);
+  });
+
+  it('never exceeds the EVE reason-field limit no matter how many systems are involved', () => {
+    const manySystems = Array.from({ length: 20 }, (_, i) => `System-${String(i)}`);
+    const reason = buildSettleUpReason('Moon tax', manySystems, ['2026-01-01', '2026-12-31']);
+    expect(reason.length).toBeLessThanOrEqual(SETTLE_UP_REASON_MAX_LENGTH);
+  });
+
+  it('returns just the prefix for no dates', () => {
+    expect(buildSettleUpReason('Moon tax', [], [])).toBe('Moon tax');
   });
 });

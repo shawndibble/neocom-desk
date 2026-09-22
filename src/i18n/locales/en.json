@@ -1465,7 +1465,7 @@
     "settleUpAmountHint": "ISK, rounded to the ISK — the in-game transfer takes no fractions.",
     "settleUpRecipientLabel": "Give ISK to",
     "settleUpReasonLabel": "Reason (paste into the transfer)",
-    "settleUpReasonText": "Moon mining tax · {{systems}} · {{range}}",
+    "settleUpReasonPrefix": "Moon tax",
     "settleUpPayHint": "The app can't move ISK. Send it in the EVE client, then come back and record it.",
     "settleUpCopy": "Copy",
     "settleUpCopied": "Copied",
