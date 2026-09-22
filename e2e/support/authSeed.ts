@@ -119,8 +119,11 @@ export async function signInAndGoto(page: Page, path = './overview'): Promise<vo
       tx.oncomplete = () => resolve();
       tx.onerror = () => reject(tx.error);
     });
-    // Closed explicitly: an open connection at the old version blocks the
-    // app's upgrade to 13, which would hang the very next navigation.
+    // Closed explicitly, and not optional. A connection left open at version
+    // 10 blocks the app's upgrade to 13, and `src/db/index.ts` handles that
+    // by calling `db.close()` — which latches `autoOpen: false`, so the
+    // database stays shut for the rest of the page's life. The spec would
+    // then fail somewhere far from here, with every Dexie read dead.
     database.close();
   }, payload);
 
