@@ -21,6 +21,7 @@ import { ORDER_PROBLEMS, type OrderProblem } from '@/engine/market/orderProblems
 const ZERO_SKILLS: CharacterSkills = {
   accountingLevel: 0,
   brokerRelationsLevel: 0,
+  advancedBrokerRelationsLevel: 0,
   reprocessingLevel: 0,
   reprocessingEfficiencyLevel: 0,
   trained: new Map(),

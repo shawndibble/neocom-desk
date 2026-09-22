@@ -23,6 +23,7 @@ function historyPoint(daysAgo: number, volume: number) {
 const SKILLS: CharacterSkills = {
   accountingLevel: 5,
   brokerRelationsLevel: 5,
+  advancedBrokerRelationsLevel: 5,
   reprocessingLevel: 0,
   reprocessingEfficiencyLevel: 0,
   trained: new Map(),
@@ -396,18 +397,20 @@ describe('OrderDetailModal', () => {
   it('sums cost per unit, sales tax and broker fee to exactly the relist floor shown', () => {
     // Real orderFloor() math this time (not the hand-picked literals of the
     // fixture above), so the sum is actually checked rather than eyeballed —
-    // unitCost + salesTax(relist) + brokerFee(relist) === relist by
-    // construction (breakEvenPrice solves for exactly that revenue).
+    // unitCost + salesTax(relist) + relistFee(relist, relist) === relist by
+    // construction (relistBreakEvenPrice solves for exactly that revenue).
     const skills: CharacterSkills = {
       ...SKILLS,
       accountingLevel: 3,
       brokerRelationsLevel: 2,
+      advancedBrokerRelationsLevel: 1,
     };
     const unitCost = 437.5;
     const floor = orderFloor({
       unitCost,
       accountingLevel: skills.accountingLevel,
       brokerRelationsLevel: skills.brokerRelationsLevel,
+      advancedBrokerRelationsLevel: skills.advancedBrokerRelationsLevel,
     });
     if (!floor) throw new Error('expected a floor for this fixture');
 
@@ -426,7 +429,7 @@ describe('OrderDetailModal', () => {
 
     const costPerUnit = rowValue('Cost per unit');
     const salesTax = rowValue('Sales tax');
-    const brokerFeeValue = rowValue('Broker fee');
+    const brokerFeeValue = rowValue('Broker fee (relist discount applied)');
     const relist = rowValue('Never sell below');
 
     expect(costPerUnit).toBeCloseTo(unitCost, 2);

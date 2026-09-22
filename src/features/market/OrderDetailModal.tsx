@@ -26,7 +26,7 @@ import { cx } from '@/lib/cx';
 import { buttonClassName } from '@/components/ui/buttonClassName';
 import { Link } from 'react-router-dom';
 import { formatIsk } from '@/lib/isk';
-import { salesTax, brokerFee } from '@/engine/industry/fees';
+import { salesTax, relistFee } from '@/engine/industry/fees';
 import type { JumpsAwayResult } from '@/engine/jumpsAway';
 import { JumpsAwayText } from '@/features/character/assetBrowserRows';
 import type { UndercutRival, UndercutScope } from '@/engine/market/undercut';
@@ -700,14 +700,19 @@ export function OrderDetailModal({
                     {/*
                       Rendered as ISK off `floor.relist`, not as a bare
                       percentage: `unitCost + salesTax(relist) +
-                      brokerFee(relist) === relist` by construction
-                      (`breakEvenPrice` solves for exactly that revenue),
-                      including its 100 ISK minimum-broker-fee floor — which a
-                      percentage-of-unitCost readout would silently miss. This
-                      is what makes the ledger's lines actually sum to the
-                      floor shown below, so gated on `row.floor` (not `skills`
-                      alone): there is no relist price to read the fee off
-                      without it.
+                      relistFee(relist, relist) === relist` by construction
+                      (`relistBreakEvenPrice` solves for exactly that
+                      revenue), including its 100 ISK minimum-broker-fee
+                      floor — which a percentage-of-unitCost readout would
+                      silently miss. This is what makes the ledger's lines
+                      actually sum to the floor shown below, so gated on
+                      `row.floor` (not `skills` alone): there is no relist
+                      price to read the fee off without it. `relistFee` is
+                      called with old price === new price === `relist`: the
+                      floor itself assumes a price DECREASE (the only
+                      direction a floor is meaningful for), so the
+                      increase-increment component is always zero here —
+                      only the Relist-Discounted rate on the total applies.
                     */}
                     {skills && row.floor && (
                       <>
@@ -716,8 +721,17 @@ export function OrderDetailModal({
                           value={`${formatIsk(salesTax(row.floor.relist, skills.accountingLevel), 2)} ISK`}
                         />
                         <LedgerRow
-                          label={t('industry.brokerFee')}
-                          value={`${formatIsk(brokerFee(row.floor.relist, skills.brokerRelationsLevel), 2)} ISK`}
+                          label={t('market.orders.relistBrokerFee')}
+                          value={`${formatIsk(
+                            relistFee(
+                              row.floor.relist,
+                              row.floor.relist,
+                              1,
+                              skills.brokerRelationsLevel,
+                              skills.advancedBrokerRelationsLevel
+                            ),
+                            2
+                          )} ISK`}
                         />
                       </>
                     )}
