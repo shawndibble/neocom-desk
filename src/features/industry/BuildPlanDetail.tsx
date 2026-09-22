@@ -92,16 +92,15 @@ import {
 } from './subBuildPlan';
 import { formatIsk } from '@/lib/isk';
 import { cx } from '@/lib/cx';
+import { filterStockByScope } from '@/engine/industry/ownedStock';
+import type { OwnedStockDetection, OwnedStockSnapshot } from './ownedStockDetection';
 import {
-  bulkOwnedStockSuggestions,
-  clearOwnedStockSuggestions,
-  filterStockByScope,
-} from '@/engine/industry/ownedStock';
-import {
-  stockLocationLabel,
-  type OwnedStockDetection,
-  type OwnedStockSnapshot,
-} from './ownedStockDetection';
+  bulkUseDetected,
+  bulkUseNone,
+  materialTypeIdKey,
+  ownedStockDetection,
+  typeIdsFromKey,
+} from './planMaterialsView';
 import { useDetectedOwnedStock } from './useDetectedOwnedStock';
 import type { CorpOwnedStockState } from './corpOwnedStock';
 import type { CorpOwnedBlueprintsState } from './corpOwnedBlueprints';
@@ -641,25 +640,10 @@ export function BuildPlanDetail({
   // sub-build introduced is as ownable as anything else, and while this was
   // the blueprint's material list a player with 10,714,573 Tritanium in the
   // hangar was told they owned none of it the moment the Tritanium row came
-  // from a component's recipe rather than the ship's.
-  //
-  // Still keyed off content, not array identity. `detectOwnedStock` scans
-  // every Character's whole asset list — tens of thousands of rows — so it
-  // must not re-run on a runs/ME/TE keystroke, and `visibleMaterials` is a
-  // fresh array on each of those. The joined id list is the real dependency:
-  // it changes when a build is toggled (which does add and remove rows) and
-  // not when a number beside one is edited.
-  const materialTypeIdKey = useMemo(
-    () =>
-      [...new Set(visibleMaterials.map((material) => material.typeID))]
-        .sort((a, b) => a - b)
-        .join(','),
-    [visibleMaterials]
-  );
-  const materialTypeIds = useMemo(
-    () => (materialTypeIdKey === '' ? [] : materialTypeIdKey.split(',').map(Number)),
-    [materialTypeIdKey]
-  );
+  // from a component's recipe rather than the ship's. Content-keyed, not
+  // array-keyed — see `materialTypeIdKey` for why that matters.
+  const materialTypeIdsKey = useMemo(() => materialTypeIdKey(visibleMaterials), [visibleMaterials]);
+  const materialTypeIds = useMemo(() => typeIdsFromKey(materialTypeIdsKey), [materialTypeIdsKey]);
   // Folded in only when this plan's own toggle is on — Corp Assets is a
   // per-plan choice (issue #798), not something every plan inherits merely
   // because the active Character happens to hold Director on some corp.
@@ -697,67 +681,55 @@ export function BuildPlanDetail({
     [detectedStock, plan.ownedStockScope]
   );
 
-  // The corp source's own incompleteness (a capped/missing asset page) folds
-  // in only while it's actually contributing — an untoggled or unavailable
-  // corp source has nothing to be incomplete about.
-  const allIncompleteCharacters = useMemo(
-    () =>
-      includeCorpAssets && corpOwnedStock.incomplete && corpOwnedStock.corporationName
-        ? [...incompleteCharacters, corpOwnedStock.corporationName]
-        : incompleteCharacters,
-    [
-      incompleteCharacters,
-      includeCorpAssets,
-      corpOwnedStock.incomplete,
-      corpOwnedStock.corporationName,
-    ]
-  );
-
   const detection = useMemo<OwnedStockDetection>(
-    () => ({
-      stockFor: (typeID) => detectedStock.get(typeID),
-      scopedQuantityFor: (typeID) => scopedStock.get(typeID)?.quantity ?? 0,
-      lowerBound: allIncompleteCharacters.length > 0,
-      incompleteCharacters: allIncompleteCharacters,
-      characterNameFor: (characterId) => characterNames.get(characterId) ?? t('common.unknown'),
-      corporationNameFor: () => corpOwnedStock.corporationName ?? t('common.unknown'),
-      locationLabelFor: (placement) => stockLocationLabel(placement, locationNames, t),
-    }),
+    () =>
+      ownedStockDetection(
+        {
+          stock: detectedStock,
+          scopedStock,
+          characterNames,
+          locationNames,
+          incompleteCharacters,
+          // The corp source's own incompleteness (a capped/missing asset
+          // page) folds in only while it's actually contributing — an
+          // untoggled or unavailable corp source has nothing to be
+          // incomplete about.
+          incompleteCorporation:
+            includeCorpAssets && corpOwnedStock.incomplete ? corpOwnedStock.corporationName : null,
+          corporationName: corpOwnedStock.corporationName,
+        },
+        t
+      ),
     [
       detectedStock,
       scopedStock,
       characterNames,
       locationNames,
-      allIncompleteCharacters,
+      incompleteCharacters,
+      includeCorpAssets,
+      corpOwnedStock.incomplete,
       corpOwnedStock.corporationName,
       t,
     ]
   );
 
-  // "Use all" fills only rows with nothing typed in them: a
-  // hand-entered value, including a deliberate 0, is never clobbered by a bulk
-  // action. The per-row action is the one that overwrites — clicking it on that
-  // row means it.
-  //
   // Over every row on the table, not the blueprint's own materials: the bulk
   // action has to reach exactly what the per-row offers reach, or "use all"
   // silently skips every mineral a sub-build introduced while the row beside
-  // it is still offering to apply one.
+  // it is still offering to apply one. The fill/clear rules themselves live
+  // in `planMaterialsView.ts`, shared with the Build Group's ledger.
   const bulkDetectedPatches = useMemo<SourcingPatchEntry[]>(
     () =>
-      bulkOwnedStockSuggestions(visibleMaterials, plan.materialSourcing, scopedStock).map(
-        ({ typeID, ownedQuantity }) => ({ typeID, patch: { ownedQuantity } })
-      ),
+      bulkUseDetected(
+        visibleMaterials,
+        (typeID) => plan.materialSourcing?.[typeID]?.ownedQuantity,
+        scopedStock
+      ).map(({ typeID, ownedQuantity }) => ({ typeID, patch: { ownedQuantity } })),
     [visibleMaterials, plan.materialSourcing, scopedStock]
   );
-
-  // "Use none" is the reverse of "use all": it zeroes every row currently
-  // carrying a non-zero owned quantity, hand-typed or bulk-filled alike
-  // (issue #612) — a deliberate clobber, not the "only untouched rows" rule
-  // above.
   const bulkClearPatches = useMemo<SourcingPatchEntry[]>(
     () =>
-      clearOwnedStockSuggestions(visibleMaterials, plan.materialSourcing).map(
+      bulkUseNone(visibleMaterials, (typeID) => plan.materialSourcing?.[typeID]?.ownedQuantity).map(
         ({ typeID, ownedQuantity }) => ({ typeID, patch: { ownedQuantity } })
       ),
     [visibleMaterials, plan.materialSourcing]

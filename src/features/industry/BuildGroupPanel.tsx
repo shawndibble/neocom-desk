@@ -46,12 +46,7 @@ import { unmaskNumber } from '@/lib/numberMask';
 import { getTradeHub } from '@/market/hubs';
 import type { PiData } from '@/sde/types';
 import { useAssumedMe } from './assumedMe';
-import {
-  nameForType,
-  toIndustryBlueprint,
-  volumeForType,
-  type BlueprintCatalog,
-} from './blueprintCatalog';
+import { nameForType, volumeForType, type BlueprintCatalog } from './blueprintCatalog';
 import type { BuildGroup } from './buildGroups';
 import type { CorpOwnedBlueprintsState } from './corpOwnedBlueprints';
 import { AutoBuildControl } from './AutoBuildControl';
@@ -61,8 +56,14 @@ import { profitOf, verdictOf } from './groupIndexStats';
 import { SourcingInput } from './MaterialsTable';
 import { OwnedStockHint } from './OwnedStockHint';
 import { OwnedStockScopeControl } from './OwnedStockScopeControl';
-import { stockLocationLabel, type OwnedStockSnapshot } from './ownedStockDetection';
-import type { OwnedStockDetection } from './ownedStockDetection';
+import type { OwnedStockDetection, OwnedStockSnapshot } from './ownedStockDetection';
+import {
+  bulkUseDetected,
+  bulkUseNone,
+  groupMaterialTypeIdKey,
+  ownedStockDetection,
+  typeIdsFromKey,
+} from './planMaterialsView';
 import { recipeForLookup } from './recipes';
 import { flattenBuildResult } from './resultFlattenCache';
 import { hasShoppingList, shoppingListText } from './shoppingList';
@@ -245,21 +246,20 @@ export function BuildGroupPanel({
     return { members, builtQuantityByType };
   }, [rows, plans]);
 
-  // The members' *blueprint* material types, never the computed cost lines:
-  // those get a fresh array identity on every runs/ME keystroke, and an asset
-  // list runs to tens of thousands of rows per Character. Sorted, so the array
-  // identity the detection hook memoizes on survives a reordering of `plans`.
-  const materialTypeIds = useMemo(() => {
-    const ids = new Set<number>();
-    for (const plan of plans) {
-      const entry = catalog.byBlueprintTypeID.get(plan.blueprintTypeID);
-      if (!entry) continue;
-      for (const material of toIndustryBlueprint(entry.blueprint).materials) {
-        ids.add(material.typeID);
-      }
-    }
-    return [...ids].sort((a, b) => a - b);
-  }, [plans, catalog]);
+  // Every type any member's whole tree can show, not only each blueprint's
+  // own materials: the buy table below lists sub-build leaves
+  // (`rollup.tableMaterials`), and a mineral only a component's recipe
+  // introduces is as ownable here as on that member's own page — the same
+  // Tritanium bug `BuildPlanDetail.tsx` fixed for one plan. Keyed on the
+  // blueprints in play, like `autoBuildMaxDepth` above: `plans` gets a fresh
+  // identity on every keystroke in any member, and an asset list runs to
+  // tens of thousands of rows per Character.
+  const materialTypeIdsKey = useMemo(
+    () => groupMaterialTypeIdKey(plans, { catalog, pi }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- autoBuildBlueprintSignature is the stable proxy for `plans`' structural identity; see autoBuildMaxDepth.
+    [autoBuildBlueprintSignature, catalog, pi]
+  );
+  const materialTypeIds = useMemo(() => typeIdsFromKey(materialTypeIdsKey), [materialTypeIdsKey]);
 
   // The very detection a single plan's own page runs, over the union of the
   // group's materials — reused rather than re-derived, so a group and its
@@ -272,20 +272,11 @@ export function BuildGroupPanel({
     () => filterStockByScope(detected.stock, group.ownedStockScope),
     [detected.stock, group.ownedStockScope]
   );
+  // Corp Assets (issue #798) is a per-plan toggle, not a group-level one —
+  // the group rollup never merges a corp source in, so no corp name or corp
+  // incompleteness is passed.
   const detection = useMemo<OwnedStockDetection>(
-    () => ({
-      stockFor: (typeID) => detected.stock.get(typeID),
-      scopedQuantityFor: (typeID) => scopedStock.get(typeID)?.quantity ?? 0,
-      lowerBound: detected.incompleteCharacters.length > 0,
-      incompleteCharacters: detected.incompleteCharacters,
-      characterNameFor: (characterId) =>
-        detected.characterNames.get(characterId) ?? t('common.unknown'),
-      // Corp Assets (issue #798) is a per-plan toggle, not a group-level one —
-      // the group rollup never merges a corp source in, so this is never
-      // actually reached, only required by the shared `OwnedStockDetection` shape.
-      corporationNameFor: () => t('common.unknown'),
-      locationLabelFor: (placement) => stockLocationLabel(placement, detected.locationNames, t),
-    }),
+    () => ownedStockDetection({ ...detected, scopedStock }, t),
     [detected, scopedStock, t]
   );
 
@@ -410,21 +401,14 @@ export function BuildGroupPanel({
   );
 
   // Same "never clobber a hand-typed value" rule the plan-level bulk fill
-  // keeps: only rows with nothing in the ledger yet are offered. Scoped to
-  // `buyRows`, not every merged material — a fully-crafted row (see above)
-  // is never bought, so it has no owned quantity for "Use all"/"Use none" to
-  // touch.
+  // keeps (`planMaterialsView.ts`). Scoped to `buyRows`, not every merged
+  // material — a fully-crafted row (see above) is never bought, so it has no
+  // owned quantity for "Use all" to fill.
   const bulkDetectedEntries = useMemo(
     () =>
-      buyRows
-        .filter((m) => ownedStockMap.get(m.typeID) === undefined && scopedStock.has(m.typeID))
-        .map(
-          (m) =>
-            [
-              m.typeID,
-              suggestedOwnedQuantity(scopedStock.get(m.typeID)!.quantity, m.quantity),
-            ] as const
-        ),
+      bulkUseDetected(buyRows, (typeID) => ownedStockMap.get(typeID), scopedStock).map(
+        ({ typeID, ownedQuantity }) => [typeID, ownedQuantity] as const
+      ),
     [buyRows, ownedStockMap, scopedStock]
   );
   // Unlike `bulkDetectedEntries`, this scans every merged material, not just
@@ -435,9 +419,9 @@ export function BuildGroupPanel({
   // to be able to reach it, or a stray entry becomes permanently stuck.
   const bulkClearTypeIds = useMemo(
     () =>
-      rollup.tableMaterials
-        .filter((m) => (ownedStockMap.get(m.typeID) ?? 0) > 0)
-        .map((m) => m.typeID),
+      bulkUseNone(rollup.tableMaterials, (typeID) => ownedStockMap.get(typeID)).map(
+        ({ typeID }) => typeID
+      ),
     [rollup.tableMaterials, ownedStockMap]
   );
 
