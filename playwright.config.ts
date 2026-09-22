@@ -89,15 +89,6 @@ export default defineConfig({
   fullyParallel: true,
   retries: 1,
   /*
-   * Playwright's default is half the machine's cores, which on GitHub's
-   * 4-vCPU runner is 2 — and with 91 specs averaging ~15s each that was a
-   * 10.6-minute job. The work is overwhelmingly waiting on the dev server's
-   * module waterfall rather than burning CPU in the browser, so one worker
-   * per core keeps the runner busy instead of half-idle. Left at the default
-   * locally, where the machine is shared with everything else.
-   */
-  workers: process.env.CI ? 4 : undefined,
-  /*
    * `list` for the CI log, `html` for the failure itself.
    *
    * The workflow has always uploaded `playwright-report/` on failure — but

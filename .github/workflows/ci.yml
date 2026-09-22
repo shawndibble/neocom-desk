@@ -111,10 +111,18 @@ jobs:
     # suite is ~91 specs at ~15s each — that is 21 minutes of test time, and
     # a single 4-vCPU runner spent 10.6 of them on it. The cost is almost
     # entirely each spec re-fetching the dev server's module waterfall into a
-    # fresh browser context, and that server is one single-threaded Node
-    # process, so widening workers alone hits its ceiling fast. A shard gets
-    # its own runner and therefore its own dev server, which is the part that
-    # actually scales. Public repo, so the extra runners are free.
+    # fresh browser context. A shard gets its own runner, and therefore its
+    # own dev server and its own pair of Playwright workers, so the work
+    # divides on the resource that was actually saturated. Public repo, so
+    # the extra runners are free.
+    #
+    # Worker count is left at Playwright's default (half the cores, so 2
+    # here) on purpose. Raising it to 4 was tried and does not work: four
+    # Chromiums plus the dev and preview servers oversubscribe a 4-vCPU
+    # runner badly enough that browsers die mid-test with `Protocol error
+    # (Runtime.callFunctionOn): Internal server error, session closed`, which
+    # failed 12 specs across every shard. Scale by adding runners, not by
+    # crowding one.
     #
     # `fail-fast: false` so one shard's failure still lets the others report
     # theirs — otherwise a flake in shard 1 hides real breakage in shard 3.
