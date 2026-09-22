@@ -172,10 +172,10 @@ describe('rebuildProjection', () => {
     expect((await uploaded(uploadProjection)).get(CHAR.characterId)).toEqual([]);
   });
 
-  it('does not upload at all when the master switch is off', async () => {
+  it('uploads empty Projections when the master switch is off, clearing live Scheduled Pushes', async () => {
     const { deps: d, uploadProjection } = deps({ masterEnabled: async () => false });
     await rebuildProjection(d);
-    expect(uploadProjection).not.toHaveBeenCalled();
+    expect((await uploaded(uploadProjection)).get(CHAR.characterId)).toEqual([]);
   });
 
   it('reads only the baselines of domains that project anything', async () => {

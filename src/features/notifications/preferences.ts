@@ -17,6 +17,7 @@ import { db } from '@/db';
 import { createLocalSetting } from '@/lib/useLocalSetting';
 import { setSyncedSetting, scheduleSync } from '@/sync';
 import { recordByCharacterId } from './recordByCharacterId';
+import { scheduleProjectionRebuild } from './projectionRebuildScheduler';
 import {
   isEventEnabledFor,
   toggleEventChannel,
@@ -229,6 +230,91 @@ export async function hydrateNotificationPreferences(): Promise<void> {
 }
 
 /**
+ * The slice of preferences the uploaded Projection reads (`projectionRebuild.ts`),
+ * normalized so "absent" and "set to the default" compare equal: the master
+ * switch, the browser gate, each Character's browser-channel opinions, and the
+ * two thresholds a projecting domain uses. Feed flags and the wallet
+ * thresholds feed no projection, so they are left out.
+ */
+const DEFAULT_PROJECTION_ENTRY = JSON.stringify([
+  [],
+  [],
+  DEFAULT_STRUCTURE_FUEL_LOW_DAYS,
+  DEFAULT_EXTRACTOR_EXPIRING_LEAD_HOURS,
+]);
+
+function projectionInputs(value: NotificationPreferencesValue): string {
+  const characters: Record<string, unknown> = {};
+  const ids = new Set([
+    ...Object.keys(value.perCharacter),
+    ...Object.keys(value.eveNotificationTypesByCharacter ?? {}),
+    ...Object.keys(value.thresholdsByCharacter ?? {}),
+  ]);
+  for (const id of ids) {
+    const characterId = Number(id);
+    const events = characterEventPrefs(value, characterId);
+    const eveTypes = characterEveTypePrefs(value, characterId);
+    // Keys whose browser flag differs from that key's own default (some
+    // events and most EVE types default browser-off).
+    const eventsOffDefault = Object.keys(events)
+      .filter((key) => {
+        const eventId = key as NotificationEventId;
+        return (
+          isEventEnabledFor(events, eventId, 'browser') !==
+          isEventEnabledFor({}, eventId, 'browser')
+        );
+      })
+      .sort();
+    const eveTypesOffDefault = Object.keys(eveTypes)
+      .filter(
+        (type) =>
+          isEveTypeEnabledFor(eveTypes, type, 'browser') !==
+          isEveTypeEnabledFor({}, type, 'browser')
+      )
+      .sort();
+    const { structureFuelLowDays, extractorExpiringLeadHours } = characterEventThresholds(
+      value,
+      characterId
+    );
+    const entry = JSON.stringify([
+      eventsOffDefault,
+      eveTypesOffDefault,
+      structureFuelLowDays,
+      extractorExpiringLeadHours,
+    ]);
+    // An all-default Character reads the same as an absent one.
+    if (entry !== DEFAULT_PROJECTION_ENTRY) characters[id] = entry;
+  }
+  return JSON.stringify([value.masterEnabled, isBrowserChannelEnabled(value), characters]);
+}
+
+/**
+ * Writes `next` to the local store, and schedules a coalesced Projection
+ * rebuild when it changes anything the upload reads (issue #1259) — every
+ * preference write goes through here, so no call site can forget it. The
+ * scheduler gets the write itself, so the rebuild waits for it to settle.
+ */
+function writeLocalPrefs(
+  next: NotificationPreferencesValue,
+  persist: () => Promise<void>
+): Promise<void> {
+  const changesProjection =
+    projectionInputs(useNotificationPreferences.getState().value) !== projectionInputs(next);
+  const write = persist();
+  if (changesProjection) scheduleProjectionRebuild(write);
+  return write;
+}
+
+/**
+ * Device-local-only writes: the master switch and the browser/feed channel
+ * gates. None of that belongs on the wire, so no sync push — but the master
+ * switch and browser gate still change what the Projection uploads.
+ */
+export function setDeviceNotificationPrefs(next: NotificationPreferencesValue): Promise<void> {
+  return writeLocalPrefs(next, () => useNotificationPreferences.getState().setValue(next));
+}
+
+/**
  * Writes a preference change and, unless it only touched the device-local
  * browser channel, pushes the feed-only slice to the synced setting (issue
  * #363) and schedules a sync. `setSyncedSetting` itself leaves scheduling to
@@ -245,15 +331,17 @@ export async function hydrateNotificationPreferences(): Promise<void> {
  * Shared by `NotificationsPanel` (Settings) and `NotificationContextMenu`
  * (issue #364) so the sync-vs-local branching lives in one place.
  */
-export async function updateNotificationPrefs(
+export function updateNotificationPrefs(
   characterId: number,
   next: NotificationPreferencesValue,
   channel?: NotificationChannel
 ): Promise<void> {
-  await useNotificationPreferences.getState().setValue(next);
-  if (channel === 'browser') return;
-  await setSyncedSetting(SYNCED_NOTIFICATION_FEED_PREFS_KEY, toSyncedFeedPrefs(next));
-  scheduleSync(characterId);
+  return writeLocalPrefs(next, async () => {
+    await useNotificationPreferences.getState().setValue(next);
+    if (channel === 'browser') return;
+    await setSyncedSetting(SYNCED_NOTIFICATION_FEED_PREFS_KEY, toSyncedFeedPrefs(next));
+    scheduleSync(characterId);
+  });
 }
 
 export function characterEventPrefs(

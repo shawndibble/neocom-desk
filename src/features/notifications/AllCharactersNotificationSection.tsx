@@ -38,7 +38,6 @@ import {
   eveTypesByFamily,
 } from './eventSelection';
 import { eveTypeLabel } from './eveTypeLabel';
-import { rebuildProjectionAfterChannelWrite } from './projectionRebuildScheduler';
 import { CHANNEL_COLUMNS, ChannelColumnHeadings } from './ChannelColumns';
 
 export function AllCharactersNotificationSection({
@@ -71,14 +70,11 @@ export function AllCharactersNotificationSection({
               )}
               disabled={channel === 'browser' && browserBlocked}
               onToggle={() =>
-                rebuildProjectionAfterChannelWrite(
-                  channel,
-                  broadcastAllEventsChannelPref(
-                    characterIds,
-                    prefsValue,
-                    NOTIFICATION_EVENT_IDS,
-                    channel
-                  )
+                void broadcastAllEventsChannelPref(
+                  characterIds,
+                  prefsValue,
+                  NOTIFICATION_EVENT_IDS,
+                  channel
                 )
               }
               label={t(`settings.notifications.selectAllCharacters.${channel}`)}
@@ -115,10 +111,7 @@ export function AllCharactersNotificationSection({
                       )}
                       disabled={channel === 'browser' && browserBlocked}
                       onToggle={() =>
-                        rebuildProjectionAfterChannelWrite(
-                          channel,
-                          broadcastEventChannelPref(characterIds, prefsValue, eventId, channel)
-                        )
+                        void broadcastEventChannelPref(characterIds, prefsValue, eventId, channel)
                       }
                       label={t(`settings.notifications.toggleAllCharactersLabel.${channel}`, {
                         event: eventLabel,
@@ -157,14 +150,11 @@ export function AllCharactersNotificationSection({
                                 )}
                                 disabled={channel === 'browser' && browserBlocked}
                                 onToggle={() =>
-                                  rebuildProjectionAfterChannelWrite(
-                                    channel,
-                                    broadcastAllEveTypesChannelPref(
-                                      characterIds,
-                                      prefsValue,
-                                      familyTypes,
-                                      channel
-                                    )
+                                  void broadcastAllEveTypesChannelPref(
+                                    characterIds,
+                                    prefsValue,
+                                    familyTypes,
+                                    channel
                                   )
                                 }
                                 label={t(
@@ -198,14 +188,11 @@ export function AllCharactersNotificationSection({
                                       )}
                                       disabled={channel === 'browser' && browserBlocked}
                                       onToggle={() =>
-                                        rebuildProjectionAfterChannelWrite(
-                                          channel,
-                                          broadcastEveTypeChannelPref(
-                                            characterIds,
-                                            prefsValue,
-                                            type,
-                                            channel
-                                          )
+                                        void broadcastEveTypeChannelPref(
+                                          characterIds,
+                                          prefsValue,
+                                          type,
+                                          channel
                                         )
                                       }
                                       label={t(

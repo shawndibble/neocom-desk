@@ -69,6 +69,7 @@ import {
   useNotificationPreferences,
   hydrateNotificationPreferences,
   updateNotificationPrefs as updatePrefs,
+  setDeviceNotificationPrefs,
   characterEventPrefs,
   characterEveTypePrefs,
   withMasterEnabled,
@@ -86,10 +87,6 @@ import {
   EXTRACTOR_EXPIRING_LEAD_HOUR_OPTIONS,
   type CharacterEventThresholds,
 } from './preferences';
-import {
-  rebuildProjectionAfterChannelWrite,
-  scheduleProjectionRebuild,
-} from './projectionRebuildScheduler';
 import {
   isEventEnabledFor,
   isEveTypeEnabledFor,
@@ -200,7 +197,6 @@ export function NotificationsPanel() {
   const tokens = useLiveQuery(() => db.tokens.toArray());
 
   const prefsValue = useNotificationPreferences((state) => state.value);
-  const setPrefsValue = useNotificationPreferences((state) => state.setValue);
 
   useEffect(() => {
     void hydrateNotificationPreferences();
@@ -210,8 +206,8 @@ export function NotificationsPanel() {
   // `updatePrefs` (preferences.ts) — it also pushes the feed-only slice to
   // the synced setting and schedules a sync (issue #363). The
   // device-local-only writes below (master switch, browser/feed channel
-  // gates) go straight through `setPrefsValue` instead, since none of that
-  // belongs on the wire.
+  // gates) go through `setDeviceNotificationPrefs` instead, since none of
+  // that belongs on the wire. Both schedule the Projection rebuild themselves.
 
   // The Overview panel refreshes the app-icon badge when preferences change,
   // but it is unmounted while the user is on Settings — which is the only
@@ -490,7 +486,9 @@ export function NotificationsPanel() {
             type="checkbox"
             checked={prefsValue.masterEnabled}
             onChange={() =>
-              void setPrefsValue(withMasterEnabled(prefsValue, !prefsValue.masterEnabled))
+              void setDeviceNotificationPrefs(
+                withMasterEnabled(prefsValue, !prefsValue.masterEnabled)
+              )
             }
             className="size-4 shrink-0 cursor-pointer accent-accent"
           />
@@ -513,7 +511,7 @@ export function NotificationsPanel() {
               checked={isBrowserChannelEnabled(prefsValue) && !browserBlocked}
               disabled={browserBlocked}
               onChange={() =>
-                void setPrefsValue(
+                void setDeviceNotificationPrefs(
                   withBrowserEnabled(prefsValue, !isBrowserChannelEnabled(prefsValue))
                 )
               }
@@ -529,7 +527,9 @@ export function NotificationsPanel() {
               type="checkbox"
               checked={isFeedChannelEnabled(prefsValue)}
               onChange={() =>
-                void setPrefsValue(withFeedEnabled(prefsValue, !isFeedChannelEnabled(prefsValue)))
+                void setDeviceNotificationPrefs(
+                  withFeedEnabled(prefsValue, !isFeedChannelEnabled(prefsValue))
+                )
               }
               className="size-4 shrink-0 cursor-pointer accent-accent disabled:cursor-not-allowed"
             />
@@ -709,14 +709,11 @@ const CharacterNotificationSection = memo(function CharacterNotificationSection(
               key={channel}
               state={selectionStateForEvents(togglableEventIds, prefs, channel)}
               onToggle={() =>
-                rebuildProjectionAfterChannelWrite(
-                  channel,
-                  toggleAllEventsChannelPref(
-                    character.characterId,
-                    currentValue(),
-                    togglableEventIds,
-                    channel
-                  )
+                void toggleAllEventsChannelPref(
+                  character.characterId,
+                  currentValue(),
+                  togglableEventIds,
+                  channel
                 )
               }
               label={t(`settings.notifications.selectAll.${channel}`, {
@@ -759,14 +756,11 @@ const CharacterNotificationSection = memo(function CharacterNotificationSection(
                           }
                           checked={isEventEnabledFor(prefs, eventId, channel)}
                           onToggle={() =>
-                            rebuildProjectionAfterChannelWrite(
-                              channel,
-                              toggleEventChannelPref(
-                                character.characterId,
-                                currentValue(),
-                                eventId,
-                                channel
-                              )
+                            void toggleEventChannelPref(
+                              character.characterId,
+                              currentValue(),
+                              eventId,
+                              channel
                             )
                           }
                         />
@@ -800,15 +794,13 @@ const CharacterNotificationSection = memo(function CharacterNotificationSection(
                         <Select
                           value={String(thresholds.extractorExpiringLeadHours)}
                           onValueChange={(value) => {
-                            scheduleProjectionRebuild(
-                              updatePrefs(
+                            void updatePrefs(
+                              character.characterId,
+                              withCharacterEventThreshold(
+                                currentValue(),
                                 character.characterId,
-                                withCharacterEventThreshold(
-                                  currentValue(),
-                                  character.characterId,
-                                  'extractorExpiringLeadHours',
-                                  Number(value)
-                                )
+                                'extractorExpiringLeadHours',
+                                Number(value)
                               )
                             );
                           }}
@@ -848,15 +840,13 @@ const CharacterNotificationSection = memo(function CharacterNotificationSection(
                         <Select
                           value={String(thresholds.structureFuelLowDays)}
                           onValueChange={(value) =>
-                            scheduleProjectionRebuild(
-                              updatePrefs(
+                            void updatePrefs(
+                              character.characterId,
+                              withCharacterEventThreshold(
+                                currentValue(),
                                 character.characterId,
-                                withCharacterEventThreshold(
-                                  currentValue(),
-                                  character.characterId,
-                                  'structureFuelLowDays',
-                                  Number(value)
-                                )
+                                'structureFuelLowDays',
+                                Number(value)
                               )
                             )
                           }
@@ -1013,14 +1003,11 @@ const CharacterNotificationSection = memo(function CharacterNotificationSection(
                                       channel
                                     )}
                                     onToggle={() =>
-                                      rebuildProjectionAfterChannelWrite(
-                                        channel,
-                                        toggleAllEveTypesChannelPref(
-                                          character.characterId,
-                                          currentValue(),
-                                          familyTypes,
-                                          channel
-                                        )
+                                      void toggleAllEveTypesChannelPref(
+                                        character.characterId,
+                                        currentValue(),
+                                        familyTypes,
+                                        channel
                                       )
                                     }
                                     label={t(`settings.notifications.selectAllFamily.${channel}`, {
@@ -1060,14 +1047,11 @@ const CharacterNotificationSection = memo(function CharacterNotificationSection(
                                           disabledReason={null}
                                           checked={isEveTypeEnabledFor(eveTypePrefs, type, channel)}
                                           onToggle={() =>
-                                            rebuildProjectionAfterChannelWrite(
-                                              channel,
-                                              toggleEveTypeChannelPref(
-                                                character.characterId,
-                                                currentValue(),
-                                                type,
-                                                channel
-                                              )
+                                            void toggleEveTypeChannelPref(
+                                              character.characterId,
+                                              currentValue(),
+                                              type,
+                                              channel
                                             )
                                           }
                                         />

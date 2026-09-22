@@ -17,9 +17,9 @@ vi.mock('@/sync', () => ({
   scheduleSync: (characterId: number) => scheduleSyncMock(characterId),
 }));
 
-const rebuildAfterWriteMock = vi.fn();
+const scheduleRebuildMock = vi.fn();
 vi.mock('./projectionRebuildScheduler', () => ({
-  rebuildProjectionAfterChannelWrite: (...args: unknown[]) => rebuildAfterWriteMock(...args),
+  scheduleProjectionRebuild: (...args: unknown[]) => scheduleRebuildMock(...args),
 }));
 
 const CHARACTER_ID = 1;
@@ -52,6 +52,7 @@ beforeEach(async () => {
   useNotificationPreferences.setState({ value: DEFAULT_NOTIFICATION_PREFERENCES, hydrated: true });
   setSyncedSettingMock.mockClear();
   scheduleSyncMock.mockClear();
+  scheduleRebuildMock.mockClear();
 });
 
 describe('NotificationContextMenu', () => {
@@ -80,7 +81,7 @@ describe('NotificationContextMenu', () => {
     expect(setSyncedSettingMock).not.toHaveBeenCalled();
     expect(scheduleSyncMock).not.toHaveBeenCalled();
     // Browser writes re-upload the Scheduled Push Projection (issue #1259).
-    expect(rebuildAfterWriteMock).toHaveBeenCalledWith('browser', expect.any(Promise));
+    expect(scheduleRebuildMock).toHaveBeenCalledTimes(1);
   });
 
   it("hides the row's event type in the feed and syncs the change", async () => {
@@ -93,7 +94,7 @@ describe('NotificationContextMenu', () => {
     expect(useNotificationPreferences.getState().value.perCharacter[CHARACTER_ID]).toEqual({
       newMail: { browser: true, feed: false },
     });
-    expect(rebuildAfterWriteMock).toHaveBeenCalledWith('feed', expect.any(Promise));
+    expect(scheduleRebuildMock).not.toHaveBeenCalled();
   });
 
   it('reads the eveType-scoped toggle for an eveNotification row, not the parent event', async () => {
