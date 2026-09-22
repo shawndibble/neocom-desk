@@ -380,6 +380,39 @@ describe('ContractSearchPanel', () => {
     expect(rows).toHaveLength(50);
     expect(within(rows[0]).getByText('7')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Show all (61 total)' })).toBeInTheDocument();
+    // The phone sort bar's count names every match, not the capped 50 on screen.
+    expect(screen.getByText('61 offers')).toBeInTheDocument();
+  });
+
+  it('names the system each offer sits in, with its security', async () => {
+    loadPublicContractOffers.mockResolvedValue(
+      cachedSnapshot([
+        row({ contractId: 1, price: 1, locationId: JITA }),
+        row({ contractId: 2, price: 2, locationId: UNKNOWN_STRUCTURE }),
+      ])
+    );
+    renderWithRouter();
+
+    expect(await screen.findByRole('columnheader', { name: /System/ })).toBeInTheDocument();
+    await waitFor(async () => {
+      const rows = await bodyRows();
+      expect(within(rows[0]).getByText('Jita')).toBeInTheDocument();
+      expect(within(rows[0]).getByText('0.9')).toBeInTheDocument();
+      // A player structure is a finished answer, not a pending one.
+      expect(within(rows[1]).getByText('—')).toBeInTheDocument();
+    });
+  });
+
+  it('keeps the Items/Courier switch in the results panel header on desktop', async () => {
+    renderWithRouter();
+    await bodyRows();
+
+    const modes = screen.getByRole('group', { name: 'Contract kind' });
+    expect(modes.closest('section')).not.toBeNull();
+    expect(within(modes).getByRole('button', { name: 'Items' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
   });
 
   it('names the region each offer sits in', async () => {
@@ -1133,23 +1166,33 @@ describe('ContractSearchPanel — Courier endpoint space', () => {
     return within(rest[0]).getAllByRole('row');
   }
 
-  it('bands both ends of every haul', async () => {
+  it('rates both ends of every haul by security status', async () => {
     await showCourierWith([JITA_TO_AMARR, TO_LOWSEC, TO_NULL]);
 
     const cells = (await courierRows()).map(
       (r) => within(r).getAllByRole('cell')[0].textContent ?? ''
     );
 
-    // Origin is Jita on all three, so every cell opens with a highsec pickup.
-    expect(cells.every((cell) => cell.includes('Highsec'))).toBe(true);
-    expect(cells.some((cell) => cell.includes('Lowsec'))).toBe(true);
-    expect(cells.some((cell) => cell.includes('Nullsec'))).toBe(true);
+    // The number sits right after the system name — jsdom's `textContent`
+    // has no layout spacing, so "Jita0.9" is that adjacency. Origin is Jita
+    // on all three, so every cell opens with a 0.9 pickup; the band word the
+    // number replaced appears nowhere (the Space filter still uses it).
+    expect(cells.every((cell) => cell.includes('Jita0.9'))).toBe(true);
+    expect(cells.some((cell) => cell.includes('Rancer0.4'))).toBe(true);
+    expect(cells.some((cell) => cell.includes('Vale0.0'))).toBe(true);
+    expect(cells.some((cell) => /Highsec|Lowsec|Nullsec/.test(cell))).toBe(false);
   });
 
-  it('says a destination it cannot place has unknown space, rather than guessing', async () => {
+  it('prints no security for a destination it cannot place, rather than guessing', async () => {
     await showCourierWith([TO_STRUCTURE]);
 
-    expect(within((await courierRows())[0]).getByText('Unknown space')).toBeInTheDocument();
+    const route = within((await courierRows())[0]).getAllByRole('cell')[0];
+    const [, destination] = (route.textContent ?? '').split('→');
+    expect(destination).toBeDefined();
+    // No number and no stand-in word: the bare id and the Structure marker
+    // already say this end is unplaced.
+    expect(destination).not.toMatch(/\d\.\d/);
+    expect(route).not.toHaveTextContent('Unknown space');
   });
 
   it('offers only the bands these hauls actually end in', async () => {
@@ -1302,12 +1345,12 @@ describe('ContractSearchPanel — Courier completion risk', () => {
   });
 
   it('marks nullsec informationally, with no warning marker of its own', async () => {
-    // The space band already names it, which is a note. A second marker in a
-    // warning colour would turn that note into an alarm.
+    // The security number already says it (0.0), which is a note. A second
+    // marker in a warning colour would turn that note into an alarm.
     await showCourierWith([TO_NULLSEC]);
 
     const route = within((await courierRows())[0]).getAllByRole('cell')[0];
-    expect(route).toHaveTextContent('Nullsec');
+    expect(route).toHaveTextContent('Vale0.0');
     expect(within(route).queryByText('No gate route')).not.toBeInTheDocument();
     expect(within(route).queryByText('Structure')).not.toBeInTheDocument();
   });
@@ -1324,7 +1367,7 @@ describe('ContractSearchPanel — Courier completion risk', () => {
     const remaining = await courierRows();
     expect(remaining).toHaveLength(2);
     const routes = remaining.map((r) => within(r).getAllByRole('cell')[0].textContent ?? '');
-    expect(routes.some((route) => route.includes('Nullsec'))).toBe(true);
+    expect(routes.some((route) => route.includes('Vale0.0'))).toBe(true);
     expect(routes.some((route) => route.includes('Structure'))).toBe(false);
     expect(routes.some((route) => route.includes('No gate route'))).toBe(false);
   });
@@ -1450,8 +1493,8 @@ describe('ContractSearchPanel — Courier going rate', () => {
 
     const route = within((await courierRows())[0]).getAllByRole('cell')[0];
     expect(within(route).getByText('Gank gate')).toBeInTheDocument();
-    // And the space band still reads as the ordinary highsec it is.
-    expect(route).toHaveTextContent('Highsec');
+    // And the security still reads as the ordinary 0.5 highsec it is.
+    expect(route).toHaveTextContent('Uedama0.5');
   });
 
   it('names the benchmark in the detail, and calls nothing a scam', async () => {

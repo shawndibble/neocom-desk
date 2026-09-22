@@ -74,6 +74,13 @@ export interface CourierEndpoint {
   systemId: number | null;
   regionId: number | null;
   /**
+   * The raw ESI security status of this end's solar system — unrounded, the
+   * same float `classifySpace` above is fed. `null` for the same
+   * player-structure case that leaves the name null: there is no system to
+   * read a status from.
+   */
+  security: number | null;
+  /**
    * Which of the four space bands this end sits in, from the same
    * `classifySpace` the BPC Search Space filter uses (issue #939) — the local
    * SDE entry that names the system carries its security status too, so this
@@ -138,6 +145,7 @@ function endpointFor(
     systemName: null,
     systemId: null,
     regionId: fallbackRegionId,
+    security: null,
     space: null,
     // Nothing in the index at all, which the resolver no longer produces — it
     // records every id it was asked about. Reaching here means the caller

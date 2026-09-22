@@ -2,6 +2,9 @@ import { Fragment, useMemo, useRef, useState, type ReactElement, type ReactNode 
 import { useTranslation } from 'react-i18next';
 import { cx } from '@/lib/cx';
 import { useScrollToRowKey } from '@/lib/useScrollToRowKey';
+import { useIsPhone } from '@/lib/useIsPhone';
+import { fieldBaseClassName } from './controlStyles';
+import { groupSortedRows } from './dataTableGroup';
 import * as Icon from './icons';
 import { InfoTooltip } from './Tooltip';
 import { nextDataTableSort, sortRows } from './dataTableSort';
@@ -56,8 +59,36 @@ export interface DataTableColumn<T> {
    * labelled row — for a purely decorative, non-tabular cell (an affordance
    * icon) that reads as a stray unlabelled line when stacked normally. At
    * most one column per table; later ones are ignored.
+   *
+   * In the dense stack (`stackLayout="dense"`) the corner is not decorative
+   * but the card's headline figure: it sits *in flow* on the title line,
+   * right of the primary cell, bold and unwrapped — a courier offer's
+   * ISK/jump, the number a reader scans the list by.
    */
   cardCorner?: boolean;
+  /**
+   * Dense stack only: text printed around this cell's value on the card's
+   * meta line, e.g. `{ before: 'Qty ' }` or `{ after: ' reward' }`. The dense
+   * card drops column headers, so a bare "12" or "4.2M" needs a word to say
+   * what it is. Already translated, like `header`. Emitted as
+   * `data-stack-before`/`data-stack-after` and printed by CSS, so the cell's
+   * own content — and the table at `sm` and up — is untouched.
+   */
+  stackAffix?: { before?: string; after?: string };
+}
+
+/**
+ * Phone-only row grouping (`DataTable`'s `groupBy`): rows sharing a key fold
+ * behind one toggle row, so a list with many near-duplicates (ten courier
+ * offers on one route) reads as one line per distinct thing.
+ */
+export interface DataTableGroupBy<T> {
+  /** Rows with equal non-null keys group; null never groups. */
+  key: (row: T) => string | null;
+  /** Content of the group's toggle button, given the group's rows in current sort order. */
+  renderHeader: (rows: readonly T[]) => ReactNode;
+  /** Initial expansion per group; default collapsed. */
+  defaultExpanded?: (rows: readonly T[]) => boolean;
 }
 
 interface DataTableProps<T> {
@@ -122,6 +153,46 @@ interface DataTableProps<T> {
    * unless `responsive` is `'stack'`.
    */
   stackColumns?: 1 | 2;
+  /**
+   * `'labelled'` (the default) is the card above: one labelled field per
+   * line. `'dense'` is a two-line card for a long list a reader *scans*
+   * rather than reads — title and `cardCorner` figure on line one, every
+   * other value inline on line two, unlabelled (`stackAffix` supplies the
+   * words), so a phone shows three times the rows. Only matters when
+   * `responsive` is `'stack'`; `stackColumns` is ignored when dense.
+   */
+  stackLayout?: 'labelled' | 'dense';
+  /**
+   * A phone-only (below `sm`) sort picker above the table. The stacked card
+   * hides the header row, and with it every sort button — so a sortable
+   * table is unsortable on a phone without this. Drives the same sort state
+   * the header buttons do. Renders nothing if no column declares
+   * `sortValue`.
+   */
+  mobileSort?: boolean;
+  /** Phone-only text left of the sort picker (e.g. "214 offers"). Only rendered with `mobileSort`. */
+  stackSummary?: ReactNode;
+  /**
+   * Phone-only grouping of equal-keyed rows behind a toggle row — see
+   * `DataTableGroupBy`. Never applied at `sm` and up, where the rows have the
+   * width to sit side by side and a reader compares them column-wise.
+   */
+  groupBy?: DataTableGroupBy<T>;
+}
+
+const SORT_ARROW = { asc: '↑', desc: '↓' } as const;
+
+/** `<select>` value for a sort; split on the *last* `:` so a column id may contain one. */
+function sortOptionValue(sort: DataTableSort): string {
+  return `${sort.columnId}:${sort.direction}`;
+}
+
+function parseSortOptionValue(value: string): DataTableSort | null {
+  const at = value.lastIndexOf(':');
+  if (at < 0) return null;
+  const direction = value.slice(at + 1);
+  if (direction !== 'asc' && direction !== 'desc') return null;
+  return { columnId: value.slice(0, at), direction };
 }
 
 /**
@@ -149,10 +220,20 @@ export function DataTable<T>({
   onRowClick,
   responsive = 'stack',
   stackColumns = 1,
+  stackLayout = 'labelled',
+  mobileSort = false,
+  stackSummary,
+  groupBy,
 }: DataTableProps<T>) {
   const { t } = useTranslation();
   const [sort, setSort] = useState<DataTableSort | null>(defaultSort ?? null);
+  // Only what the reader has toggled; an untouched group falls back to
+  // `groupBy.defaultExpanded`, so a group that first appears on a later
+  // refresh still gets its intended initial state.
+  const [groupExpanded, setGroupExpanded] = useState<Record<string, boolean>>({});
+  const isPhone = useIsPhone();
   const tableRef = useRef<HTMLTableElement>(null);
+  const dense = responsive === 'stack' && stackLayout === 'dense';
 
   useScrollToRowKey(tableRef, highlightRowKey, rows);
 
@@ -181,6 +262,12 @@ export function DataTable<T>({
     columns.findIndex((column) => column.primary)
   );
   const cardCornerIndex = columns.findIndex((column) => column.cardCorner);
+  // The dense card's second line: every cell that is neither title nor
+  // corner. The first gets no leading separator. Only computed (and only
+  // marked in the DOM) when dense, so no other table's markup changes.
+  const firstMetaIndex = dense
+    ? columns.findIndex((_, i) => i !== primaryIndex && i !== cardCornerIndex)
+    : -1;
   // A right-aligned sortable header's own sort glyph (`gap-1` + an icon) sits
   // between the label and the header's right inset, pushing the label ~1rem
   // further left than a plain right-aligned cell below it — same horizontal
@@ -204,16 +291,150 @@ export function DataTable<T>({
   );
 
   const sortColumn = sort ? columns.find((column) => column.id === sort.columnId) : undefined;
+  const activeSortId = sortColumn?.sortValue ? sortColumn.id : undefined;
   const sortedRows = useMemo(() => {
     if (!sort || !sortColumn?.sortValue) return rows;
     return sortRows(rows, sortColumn, sort.direction);
   }, [rows, sort, sortColumn]);
 
+  const grouping = groupBy !== undefined && isPhone;
+  // Grouped over (row, index) pairs so `rowKey` still gets each row's index
+  // in sort order, exactly as the ungrouped table passes it.
+  const groups = useMemo(() => {
+    if (!grouping) return null;
+    return groupSortedRows(
+      sortedRows.map((row, index) => ({ row, index })),
+      (entry) => groupBy.key(entry.row)
+    );
+  }, [grouping, groupBy, sortedRows]);
+
   function toggleSort(column: DataTableColumn<T>) {
     setSort((previous) => nextDataTableSort(previous, column.id));
   }
 
-  return (
+  function renderRow(row: T, index: number, member = false) {
+    const focusable = Boolean(rowContextMenu) || Boolean(onRowClick);
+    const tr = (
+      <tr
+        role="row"
+        // The row's own identity, in the DOM. One static attribute, and
+        // the only way a caller can find a specific row to scroll to
+        // without this component growing a ref API — `TransactionsPanel`
+        // uses it to land on the fill a notification pointed at.
+        data-row-key={rowKey(row, index)}
+        className={cx(
+          'hover:bg-panel-2',
+          member && 'dt-group-member',
+          onRowClick && 'cursor-pointer',
+          focusable &&
+            'focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent',
+          rowKey(row, index) === highlightRowKey && 'row-pulse',
+          rowClassName?.(row)
+        )}
+        tabIndex={focusable ? 0 : undefined}
+        onClick={onRowClick ? () => onRowClick(row) : undefined}
+        onKeyDown={
+          onRowClick
+            ? (event) => {
+                if (event.key !== 'Enter' && event.key !== ' ') return;
+                event.preventDefault();
+                onRowClick(row);
+              }
+            : undefined
+        }
+      >
+        {columns.map((column, i) => {
+          const meta = dense && i !== primaryIndex && i !== cardCornerIndex;
+          return (
+            <td
+              key={column.id}
+              role="cell"
+              // Printed as the cell's label in the stacked layout. Set
+              // unconditionally: it costs one static attribute and keeps
+              // the markup width-independent.
+              data-label={column.header}
+              data-stack-before={column.stackAffix?.before}
+              data-stack-after={column.stackAffix?.after}
+              className={cx(
+                cellClass[i],
+                i === primaryIndex && 'dt-primary',
+                i === cardCornerIndex && 'dt-corner',
+                meta && 'dt-meta',
+                meta && i === firstMetaIndex && 'dt-meta-first',
+                // Inert at every width except the dense card, which has no
+                // header row to show the sort on and bolds the value instead.
+                column.id === activeSortId && 'dt-sorted',
+                column.cellClassName?.(row)
+              )}
+            >
+              {column.render(row)}
+            </td>
+          );
+        })}
+      </tr>
+    );
+    return (
+      <Fragment key={rowKey(row, index)}>{rowContextMenu ? rowContextMenu(row, tr) : tr}</Fragment>
+    );
+  }
+
+  const sortableColumns = columns.filter((column) => column.sortValue !== undefined);
+  const sortBar = mobileSort && sortableColumns.length > 0 && (
+    <div className="flex min-h-[52px] items-center justify-between gap-3 px-3 sm:hidden">
+      {stackSummary !== undefined && (
+        <span className="min-w-0 text-[0.6875rem] text-text-dim">{stackSummary}</span>
+      )}
+      {/* A real `<select>` laid invisibly over its own label rather than
+          `Select`/`NativeSelect`: a phone should get the OS picker, and the
+          closed control reads "Sort: Price ↑" while each option is just
+          "Price ↑" — a native select can only show its option's text. */}
+      <label
+        className={cx(
+          fieldBaseClassName,
+          'relative ml-auto inline-flex h-11 shrink-0 items-center gap-1.5 px-3 text-xs focus-within:outline-2 focus-within:outline-accent'
+        )}
+      >
+        <Icon.Sort aria-hidden="true" size={Icon.ICON_SIZE.sm} className="text-text-dim" />
+        <span aria-hidden="true">
+          {sortColumn?.sortValue && sort
+            ? t('common.dataTable.sortLabel', {
+                column: sortColumn.header,
+                arrow: SORT_ARROW[sort.direction],
+              })
+            : t('common.dataTable.sortNone')}
+        </span>
+        <select
+          aria-label={t('common.dataTable.sortBy')}
+          className="absolute inset-0 h-full w-full cursor-pointer appearance-none opacity-0"
+          value={sort && activeSortId ? sortOptionValue(sort) : ''}
+          onChange={(event) => {
+            const next = parseSortOptionValue(event.target.value);
+            if (next) setSort(next);
+          }}
+        >
+          {/* Matches `value=""` before any sort; never re-selectable. */}
+          <option value="" disabled>
+            {t('common.dataTable.sortNone')}
+          </option>
+          {sortableColumns.flatMap((column) =>
+            (['asc', 'desc'] as const).map((direction) => (
+              <option
+                key={`${column.id}:${direction}`}
+                value={sortOptionValue({ columnId: column.id, direction })}
+              >
+                {t('common.dataTable.sortOption', {
+                  column: column.header,
+                  arrow: SORT_ARROW[direction],
+                })}
+              </option>
+            ))
+          )}
+        </select>
+      </label>
+    </div>
+  );
+
+  const table = (
     <table
       ref={tableRef}
       role="table"
@@ -221,7 +442,8 @@ export function DataTable<T>({
       className={cx(
         'w-full text-xs',
         responsive === 'stack' && 'dt-stack',
-        responsive === 'stack' && stackColumns === 2 && 'dt-stack-2col',
+        responsive === 'stack' && !dense && stackColumns === 2 && 'dt-stack-2col',
+        dense && 'dt-stack-dense',
         className
       )}
     >
@@ -296,63 +518,58 @@ export function DataTable<T>({
         </tr>
       </thead>
       <tbody role="rowgroup" className="divide-y divide-line">
-        {sortedRows.map((row, index) => {
-          const focusable = Boolean(rowContextMenu) || Boolean(onRowClick);
-          const tr = (
-            <tr
-              role="row"
-              // The row's own identity, in the DOM. One static attribute, and
-              // the only way a caller can find a specific row to scroll to
-              // without this component growing a ref API — `TransactionsPanel`
-              // uses it to land on the fill a notification pointed at.
-              data-row-key={rowKey(row, index)}
-              className={cx(
-                'hover:bg-panel-2',
-                onRowClick && 'cursor-pointer',
-                focusable &&
-                  'focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent',
-                rowKey(row, index) === highlightRowKey && 'row-pulse',
-                rowClassName?.(row)
-              )}
-              tabIndex={focusable ? 0 : undefined}
-              onClick={onRowClick ? () => onRowClick(row) : undefined}
-              onKeyDown={
-                onRowClick
-                  ? (event) => {
-                      if (event.key !== 'Enter' && event.key !== ' ') return;
-                      event.preventDefault();
-                      onRowClick(row);
-                    }
-                  : undefined
+        {groups
+          ? groups.map((group) => {
+              const first = group.rows[0];
+              if (group.key === null || group.rows.length < 2 || !first) {
+                return group.rows.map((entry) => renderRow(entry.row, entry.index));
               }
-            >
-              {columns.map((column, i) => (
-                <td
-                  key={column.id}
-                  role="cell"
-                  // Printed as the cell's label in the stacked layout. Set
-                  // unconditionally: it costs one static attribute and keeps
-                  // the markup width-independent.
-                  data-label={column.header}
-                  className={cx(
-                    cellClass[i],
-                    i === primaryIndex && 'dt-primary',
-                    i === cardCornerIndex && 'dt-corner',
-                    column.cellClassName?.(row)
-                  )}
-                >
-                  {column.render(row)}
-                </td>
-              ))}
-            </tr>
-          );
-          return (
-            <Fragment key={rowKey(row, index)}>
-              {rowContextMenu ? rowContextMenu(row, tr) : tr}
-            </Fragment>
-          );
-        })}
+              const key = group.key;
+              const memberRows = group.rows.map((entry) => entry.row);
+              const expanded =
+                groupExpanded[key] ?? groupBy?.defaultExpanded?.(memberRows) ?? false;
+              const Chevron = expanded ? Icon.Expanded : Icon.Descend;
+              return (
+                <Fragment key={`dt-group:${key}`}>
+                  <tr role="row" className="dt-group-header hover:bg-panel-2">
+                    <td role="cell" colSpan={columns.length} className="p-0">
+                      <button
+                        type="button"
+                        aria-expanded={expanded}
+                        // Written from the *effective* state, not the stored
+                        // one: a default-expanded group has no stored entry,
+                        // and negating `undefined` would take two taps.
+                        onClick={() =>
+                          setGroupExpanded((previous) => ({ ...previous, [key]: !expanded }))
+                        }
+                        className="flex min-h-12 w-full items-center gap-2 px-3 py-2 text-left focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
+                      >
+                        <span className="min-w-0 flex-1">{groupBy?.renderHeader(memberRows)}</span>
+                        <Chevron
+                          aria-hidden="true"
+                          size={Icon.ICON_SIZE.sm}
+                          className="shrink-0 text-text-dim"
+                        />
+                      </button>
+                    </td>
+                  </tr>
+                  {expanded && group.rows.map((entry) => renderRow(entry.row, entry.index, true))}
+                </Fragment>
+              );
+            })
+          : sortedRows.map((row, index) => renderRow(row, index))}
       </tbody>
     </table>
+  );
+
+  // No wrapper element either way, so `className` and every caller's layout
+  // (a flex/grid parent sizing the table) see the same `<table>` child.
+  return sortBar ? (
+    <>
+      {sortBar}
+      {table}
+    </>
+  ) : (
+    table
   );
 }

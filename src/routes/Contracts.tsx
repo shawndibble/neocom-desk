@@ -58,6 +58,7 @@ import { resolveNames } from '@/features/character/names';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
+import { useIsPhone } from '@/lib/useIsPhone';
 import { downloadCsv } from '@/lib/downloadCsv';
 import { contractsCsvColumns } from '@/features/character/contractsCsv';
 import type { CharacterAffiliation, Contract } from '@/esi/endpoints';
@@ -241,6 +242,15 @@ export function Contracts() {
    */
   const [searchStatus, setSearchStatus] = useState<ContractSearchStatus | null>(null);
 
+  /**
+   * Phone only: where the Search panel portals its Items/Courier switch, so
+   * it shares the tab row rather than taking a panel header strip of its own
+   * under it. State (a callback ref), not a ref object, so the panel
+   * re-renders with the element once it exists.
+   */
+  const isPhone = useIsPhone();
+  const [modeSwitchSlot, setModeSwitchSlot] = useState<HTMLElement | null>(null);
+
   const [searchParams, setSearchParams] = useSearchParams();
   const tab = readContractsTab(searchParams.get('tab'));
   const setTab = useCallback(
@@ -420,18 +430,34 @@ export function Contracts() {
         }
       />
 
-      <Tabs
-        tabs={contractsTabs(t)}
-        value={tab}
-        onChange={(id) => setTab(id as ContractsTab)}
-        label={t('contracts.tabsLabel')}
-      />
+      {/* On a phone the Search tab's corpus switch sits at the right of this
+          row, portalled in by the panel. The wrapper exists only then, so the
+          desktop markup is the bare tab bar it always was. */}
+      {isPhone && tab === 'search' ? (
+        <div className="flex items-center gap-2">
+          <Tabs
+            tabs={contractsTabs(t)}
+            value={tab}
+            onChange={(id) => setTab(id as ContractsTab)}
+            label={t('contracts.tabsLabel')}
+            className="min-w-0 flex-1"
+          />
+          <div ref={setModeSwitchSlot} className="shrink-0" />
+        </div>
+      ) : (
+        <Tabs
+          tabs={contractsTabs(t)}
+          value={tab}
+          onChange={(id) => setTab(id as ContractsTab)}
+          label={t('contracts.tabsLabel')}
+        />
+      )}
 
       {/* Switched outside the history chain below, not inside it: Search needs
           neither this character's contracts nor its `contracts` scope, so a
           character with an empty history or a 403 must still reach it. */}
       {tab === 'search' ? (
-        <ContractSearchPanel onStatusChange={setSearchStatus} />
+        <ContractSearchPanel onStatusChange={setSearchStatus} modeSwitchSlot={modeSwitchSlot} />
       ) : loading && !data ? (
         <div className="flex justify-center py-16">
           <Spinner label={t('common.loading')} />

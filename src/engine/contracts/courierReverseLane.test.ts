@@ -16,6 +16,7 @@ const JITA: CourierEndpoint = {
   systemName: 'Jita',
   systemId: 30000142,
   regionId: THE_FORGE,
+  security: 0.9459,
   space: 'highsec',
   resolution: 'station',
   hasStargates: true,
@@ -27,6 +28,7 @@ const AMARR: CourierEndpoint = {
   systemName: 'Amarr',
   systemId: 30002187,
   regionId: DOMAIN,
+  security: 0.9515,
   space: 'highsec',
   resolution: 'station',
   hasStargates: true,
@@ -38,6 +40,7 @@ const DODIXIE: CourierEndpoint = {
   systemName: 'Dodixie',
   systemId: 30002659,
   regionId: SINQ_LAISON,
+  security: 0.8954,
   space: 'highsec',
   resolution: 'station',
   hasStargates: true,
@@ -59,6 +62,7 @@ const STRUCTURE: CourierEndpoint = {
   systemName: null,
   systemId: null,
   regionId: null,
+  security: null,
   space: null,
   resolution: 'structure',
   hasStargates: null,
@@ -123,6 +127,9 @@ describe('reverseLaneMatches', () => {
       systemName: null,
       systemId: null,
       regionId: null,
+      // Spread from JITA, so this must be overridden too — a system the
+      // snapshot cannot place has no security status to inherit either.
+      security: null,
       space: null,
     };
     const subject = haul(stationOffTheMap, AMARR);

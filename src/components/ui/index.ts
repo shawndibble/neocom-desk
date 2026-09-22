@@ -23,7 +23,7 @@ export { standingTier, type StandingTier } from './standingTier';
 export { Modal } from './Modal';
 export type { ModalPlacement } from './Modal';
 export { DataTable } from './DataTable';
-export type { DataTableColumn, DataTableSort } from './DataTable';
+export type { DataTableColumn, DataTableGroupBy, DataTableSort } from './DataTable';
 export { sortRows, nextDataTableSort } from './dataTableSort';
 export { CharacterAvatar } from './CharacterAvatar';
 export { TypeIcon } from './TypeIcon';

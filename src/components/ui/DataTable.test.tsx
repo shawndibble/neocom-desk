@@ -1,7 +1,9 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
-import { DataTable, type DataTableColumn } from './DataTable';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import '@/i18n';
+import { PHONE_QUERY } from '@/lib/useIsPhone';
+import { DataTable, type DataTableColumn, type DataTableGroupBy } from './DataTable';
 import {
   ContextMenu,
   ContextMenuContent,
@@ -437,6 +439,266 @@ describe('DataTable', () => {
       // Still the second cell: the hoist is CSS `order`, not a DOM reorder,
       // so the table's own reading order survives at every width.
       expect(amountCell).toHaveAttribute('data-label', 'Amount');
+    });
+  });
+});
+
+describe('DataTable opt-in phone features', () => {
+  it('adds nothing to a table that passes none of them', () => {
+    const { container } = render(
+      <DataTable columns={sortColumns} rows={sortRows} rowKey={(row) => row.id} label="Values" />
+    );
+    // The table is still the component's only root: no sort bar, no wrapper.
+    expect(container.children).toHaveLength(1);
+    expect(container.firstElementChild?.tagName).toBe('TABLE');
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+    for (const selector of [
+      '[data-stack-before]',
+      '[data-stack-after]',
+      '.dt-meta',
+      '.dt-meta-first',
+      '.dt-sorted',
+      '.dt-stack-dense',
+      '.dt-group-header',
+    ]) {
+      expect(container.querySelector(selector)).toBeNull();
+    }
+  });
+
+  describe('mobileSort', () => {
+    it('renders a sort picker before the table, and keeps className on the table', () => {
+      const { container } = render(
+        <DataTable
+          columns={sortColumns}
+          rows={sortRows}
+          rowKey={(row) => row.id}
+          label="Values"
+          className="mt-2"
+          mobileSort
+          stackSummary="4 offers"
+        />
+      );
+      const [bar, table] = Array.from(container.children);
+      expect(bar).toHaveClass('sm:hidden');
+      expect(bar).toHaveTextContent('4 offers');
+      expect(table?.tagName).toBe('TABLE');
+      expect(table).toHaveClass('mt-2');
+      const select = screen.getByRole('combobox', { name: 'Sort by' });
+      // Only the sortable column, both directions (plus the unsorted placeholder).
+      expect(
+        Array.from((select as HTMLSelectElement).options)
+          .filter((option) => !option.disabled)
+          .map((option) => option.textContent)
+      ).toEqual(['Value ↑', 'Value ↓']);
+    });
+
+    it('drives the same sort state the header buttons use', async () => {
+      const user = userEvent.setup();
+      render(
+        <DataTable
+          columns={sortColumns}
+          rows={sortRows}
+          rowKey={(row) => row.id}
+          label="Values"
+          mobileSort
+        />
+      );
+      expect(screen.getByText('Sort', { selector: 'span' })).toBeInTheDocument();
+
+      await user.selectOptions(screen.getByRole('combobox', { name: 'Sort by' }), 'value:desc');
+      expect(itemNames()).toEqual(['Charlie', 'Delta', 'Bravo', 'Alpha']);
+      expect(screen.getByText('Sort: Value ↓')).toBeInTheDocument();
+      expect(screen.getByRole('columnheader', { name: /Value/ })).toHaveAttribute(
+        'aria-sort',
+        'descending'
+      );
+
+      // …and the other way round: a header click moves the picker.
+      await user.click(screen.getByRole('button', { name: /Value/ }));
+      expect(screen.getByRole('combobox', { name: 'Sort by' })).toHaveValue('value:asc');
+      expect(screen.getByText('Sort: Value ↑')).toBeInTheDocument();
+    });
+
+    it('renders no picker when no column is sortable', () => {
+      const { container } = renderTable({ mobileSort: true, stackSummary: '2 rows' });
+      expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+      expect(container.children).toHaveLength(1);
+    });
+  });
+
+  it('marks every cell of the active sort column dt-sorted, following the sort', async () => {
+    const user = userEvent.setup();
+    render(
+      <DataTable
+        columns={[{ ...sortColumns[0]!, sortValue: (row) => row.name }, sortColumns[1]!]}
+        rows={sortRows}
+        rowKey={(row) => row.id}
+        label="Values"
+        defaultSort={{ columnId: 'value', direction: 'asc' }}
+      />
+    );
+    const sortedCells = () =>
+      Array.from(document.querySelectorAll('td.dt-sorted')).map((td) =>
+        td.getAttribute('data-label')
+      );
+    expect(sortedCells()).toEqual(['Value', 'Value', 'Value', 'Value']);
+    await user.click(screen.getByRole('button', { name: /Name/ }));
+    expect(sortedCells()).toEqual(['Name', 'Name', 'Name', 'Name']);
+  });
+
+  describe('dense stack', () => {
+    const denseColumns: DataTableColumn<Row>[] = [
+      { id: 'item', header: 'Item', render: (row) => row.item },
+      {
+        id: 'amount',
+        header: 'Amount',
+        stackAffix: { before: 'Qty ' },
+        render: (row) => String(row.amount),
+      },
+      {
+        id: 'id',
+        header: 'Id',
+        stackAffix: { after: ' ref' },
+        render: (row) => String(row.id),
+      },
+      { id: 'corner', header: 'ISK', cardCorner: true, render: () => '1.2M' },
+    ];
+
+    it('tags the table, the meta cells and the affixes', () => {
+      renderTable({ columns: denseColumns, stackLayout: 'dense', stackColumns: 2 });
+      const table = screen.getByRole('table');
+      expect(table).toHaveClass('dt-stack', 'dt-stack-dense');
+      // Dense replaces the 2-col card rather than stacking on it.
+      expect(table).not.toHaveClass('dt-stack-2col');
+      const [item, amount, id, corner] = screen.getAllByRole('cell');
+      expect(item).toHaveClass('dt-primary');
+      expect(item).not.toHaveClass('dt-meta');
+      expect(corner).toHaveClass('dt-corner');
+      expect(corner).not.toHaveClass('dt-meta');
+      expect(amount).toHaveClass('dt-meta', 'dt-meta-first');
+      expect(amount).toHaveAttribute('data-stack-before', 'Qty ');
+      expect(amount).not.toHaveAttribute('data-stack-after');
+      expect(id).toHaveClass('dt-meta');
+      expect(id).not.toHaveClass('dt-meta-first');
+      expect(id).toHaveAttribute('data-stack-after', ' ref');
+    });
+
+    it('is ignored when the table does not stack', () => {
+      renderTable({ columns: denseColumns, stackLayout: 'dense', responsive: 'table' });
+      expect(screen.getByRole('table')).not.toHaveClass('dt-stack-dense');
+      expect(document.querySelector('.dt-meta')).toBeNull();
+    });
+  });
+
+  describe('groupBy', () => {
+    interface Offer {
+      id: number;
+      route: string | null;
+      reward: number;
+    }
+    const offers: Offer[] = [
+      { id: 1, route: 'Jita→Amarr', reward: 30 },
+      { id: 2, route: null, reward: 20 },
+      { id: 3, route: 'Jita→Amarr', reward: 10 },
+      { id: 4, route: 'Dodixie→Rens', reward: 25 },
+    ];
+    const offerColumns: DataTableColumn<Offer>[] = [
+      { id: 'id', header: 'Id', render: (row) => `offer-${row.id}` },
+      {
+        id: 'reward',
+        header: 'Reward',
+        sortValue: (row) => row.reward,
+        render: (row) => row.reward,
+      },
+    ];
+    const groupBy: DataTableGroupBy<Offer> = {
+      key: (row) => row.route,
+      renderHeader: (rows) => `${rows[0]?.route} ×${rows.length}`,
+    };
+
+    function renderOffers(extra: Partial<Parameters<typeof DataTable<Offer>>[0]> = {}) {
+      return render(
+        <DataTable
+          columns={offerColumns}
+          rows={offers}
+          rowKey={(row) => row.id}
+          label="Offers"
+          groupBy={groupBy}
+          {...extra}
+        />
+      );
+    }
+
+    function offerIds() {
+      return Array.from(document.querySelectorAll('tbody tr[data-row-key]')).map((tr) =>
+        tr.getAttribute('data-row-key')
+      );
+    }
+
+    describe('on a phone', () => {
+      let restore: () => void;
+      beforeEach(() => {
+        const real = window.matchMedia;
+        window.matchMedia = ((media: string) =>
+          ({
+            media,
+            matches: media === PHONE_QUERY,
+            onchange: null,
+            addEventListener: () => {},
+            removeEventListener: () => {},
+            addListener: () => {},
+            removeListener: () => {},
+            dispatchEvent: () => false,
+          }) as unknown as MediaQueryList) as typeof window.matchMedia;
+        restore = () => {
+          window.matchMedia = real;
+        };
+      });
+      afterEach(() => restore());
+
+      it('folds a multi-row group behind a collapsed toggle; singletons stay ordinary rows', () => {
+        renderOffers();
+        const toggle = screen.getByRole('button', { name: 'Jita→Amarr ×2' });
+        expect(toggle).toHaveAttribute('aria-expanded', 'false');
+        expect(toggle.closest('tr')).toHaveClass('dt-group-header');
+        expect(toggle.closest('td')).toHaveAttribute('colspan', '2');
+        expect(toggle.closest('td')).not.toHaveAttribute('data-label');
+        // Group sits where its first member did; null and single-route rows ungrouped.
+        expect(offerIds()).toEqual(['2', '4']);
+        expect(screen.queryByRole('button', { name: /Dodixie/ })).not.toBeInTheDocument();
+        expect(document.querySelector('tr[data-row-key="4"]')).not.toHaveClass('dt-group-member');
+      });
+
+      it('expands and collapses members in current sort order', async () => {
+        const user = userEvent.setup();
+        renderOffers({ defaultSort: { columnId: 'reward', direction: 'asc' } });
+        const toggle = screen.getByRole('button', { name: 'Jita→Amarr ×2' });
+        await user.click(toggle);
+        expect(toggle).toHaveAttribute('aria-expanded', 'true');
+        // Sorted asc: 3 (10), 2 (20), 4 (25), 1 (30) — group led by 3.
+        expect(offerIds()).toEqual(['3', '1', '2', '4']);
+        expect(document.querySelector('tr[data-row-key="3"]')).toHaveClass('dt-group-member');
+        expect(document.querySelector('tr[data-row-key="1"]')).toHaveClass('dt-group-member');
+        await user.click(toggle);
+        expect(offerIds()).toEqual(['2', '4']);
+      });
+
+      it('seeds expansion from defaultExpanded, and one tap closes it', async () => {
+        const user = userEvent.setup();
+        renderOffers({ groupBy: { ...groupBy, defaultExpanded: () => true } });
+        const toggle = screen.getByRole('button', { name: 'Jita→Amarr ×2' });
+        expect(toggle).toHaveAttribute('aria-expanded', 'true');
+        expect(offerIds()).toEqual(['1', '3', '2', '4']);
+        await user.click(toggle);
+        expect(toggle).toHaveAttribute('aria-expanded', 'false');
+        expect(offerIds()).toEqual(['2', '4']);
+      });
+    });
+
+    it('never groups off a phone', () => {
+      renderOffers();
+      expect(document.querySelector('.dt-group-header')).toBeNull();
+      expect(offerIds()).toEqual(['1', '2', '3', '4']);
     });
   });
 });

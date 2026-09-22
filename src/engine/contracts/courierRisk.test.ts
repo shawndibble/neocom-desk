@@ -15,6 +15,7 @@ function station(overrides: Partial<CourierEndpoint> = {}): CourierEndpoint {
     systemName: 'Jita',
     systemId: 30000142,
     regionId: 10000002,
+    security: 0.9459,
     space: 'highsec',
     resolution: 'station',
     hasStargates: true,
@@ -29,6 +30,7 @@ const STRUCTURE: CourierEndpoint = {
   systemName: null,
   systemId: null,
   regionId: null,
+  security: null,
   space: null,
   resolution: 'structure',
   hasStargates: null,
@@ -109,7 +111,7 @@ describe('courierRisks', () => {
   });
 
   it('marks a nullsec endpoint at either end', () => {
-    const nullsec = station({ locationId: 60014437, space: 'nullsec' });
+    const nullsec = station({ locationId: 60014437, security: -0.5, space: 'nullsec' });
     expect(kinds(station(), nullsec)).toContain('nullsec');
     expect(kinds(nullsec, station())).toContain('nullsec');
   });
@@ -124,6 +126,7 @@ describe('courierRisks', () => {
       locationId: 60015148,
       systemName: 'Thera',
       regionId: 11000031,
+      security: -0.1,
       space: 'nullsec',
       hasStargates: false,
     });
@@ -132,7 +135,7 @@ describe('courierRisks', () => {
 
   it('reports every condition that applies, in a fixed order', () => {
     const nullStructure: CourierEndpoint = { ...STRUCTURE, regionId: 11000031 };
-    expect(kinds(station({ space: 'nullsec' }), nullStructure)).toEqual([
+    expect(kinds(station({ security: -0.5, space: 'nullsec' }), nullStructure)).toEqual([
       'player-structure',
       'no-gate-route',
       'nullsec',
@@ -163,7 +166,7 @@ describe('completableCourierRoutes', () => {
     contractId: 3,
   };
   const TO_NULLSEC = {
-    ...haul(station(), station({ locationId: 60014437, space: 'nullsec' })),
+    ...haul(station(), station({ locationId: 60014437, security: -0.5, space: 'nullsec' })),
     contractId: 4,
   };
   const ALL = [DELIVERABLE, TO_STRUCTURE, OUT_OF_WORMHOLE, TO_NULLSEC];
