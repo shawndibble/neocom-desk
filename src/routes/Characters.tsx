@@ -1268,7 +1268,10 @@ export function Characters() {
           </div>
 
           {noSearchMatches ? (
-            <EmptyState title={t('characters.noSearchMatches')} />
+            <EmptyState
+              title={t('characters.noSearchMatches')}
+              hint={t('characters.noSearchMatchesHint')}
+            />
           ) : (
             <div className="space-y-4">
               {groupsValue.groups.map((group, index) => (
