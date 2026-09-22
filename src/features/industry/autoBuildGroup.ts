@@ -24,7 +24,7 @@ import { industryActivityOf } from '@/engine/industry/types';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import type { PiData } from '@/sde/types';
 import { toIndustryBlueprint, type BlueprintCatalog } from './blueprintCatalog';
-import { loadMarketSnapshots, type MarketSnapshot } from './marketData';
+import { loadMarketSnapshots, type MarketSnapshotRequest } from './marketData';
 import {
   facilityContextFor,
   reactionPlanFacilityContextFor,
@@ -32,7 +32,7 @@ import {
   type PlanFacilityContext,
 } from './planFacilityContext';
 import { materialPricesFor } from './priceBasis';
-import { buildPlanTypeIds, recipeForLookup } from './recipes';
+import { buildPlanTypeIds, recipeForLookup, type RecipeCatalog } from './recipes';
 import { planOwnedBlueprints, reactionFacilityFor } from './resolveBuildPlan';
 import type { CorpOwnedBlueprintsState } from './corpOwnedBlueprints';
 
@@ -79,6 +79,36 @@ export function groupCraftScope(
   return ['manufacturing'];
 }
 
+/** What a member's recipe lookup reads — the group-wide half; the member supplies its own corp toggle. */
+export interface GroupRecipeSources extends RecipeCatalog {
+  ownedBlueprints: readonly CharacterBlueprint[];
+  corpOwnedBlueprints?: CorpOwnedBlueprintsState;
+  assumedMe: number;
+}
+
+/**
+ * One member's recipe lookup: personal blueprints plus, only when that
+ * member's own `includeCorpAssets` is on, the corp's — the same
+ * `planOwnedBlueprints` rule the member's page and the Group Rollup price
+ * with, so Auto Build and its depth control see each member at the ME it is
+ * priced at.
+ */
+export function memberRecipeFor(
+  plan: Pick<BuildPlanRecord, 'includeCorpAssets'>,
+  sources: GroupRecipeSources
+): (typeID: number) => MaterialRecipe | null {
+  return recipeForLookup({
+    catalog: sources.catalog,
+    pi: sources.pi,
+    ownedBlueprints: planOwnedBlueprints(
+      plan,
+      sources.ownedBlueprints,
+      sources.corpOwnedBlueprints
+    ),
+    assumedMeForUnowned: sources.assumedMe,
+  });
+}
+
 /**
  * The group's depth ceiling: the deepest level any single member's own
  * tree reaches, the same way a solo plan sizes its own control
@@ -91,14 +121,14 @@ export function groupCraftScope(
  */
 export function groupAutoBuildMaxDepth(
   plans: readonly BuildPlanRecord[],
-  catalog: BlueprintCatalog,
-  recipeFor: (typeID: number) => MaterialRecipe | null,
+  sources: GroupRecipeSources,
   skills: SkillLevels
 ): number {
   let deepest = 0;
   for (const plan of plans) {
-    const member = resolveMember(plan, catalog);
+    const member = resolveMember(plan, sources.catalog);
     if (!member) continue;
+    const recipeFor = memberRecipeFor(plan, sources);
     const ctx = autoBuildDepthContext(
       member.facilityContext,
       member.reactionPlanFacilityContext,
@@ -142,46 +172,49 @@ export async function applyGroupAutoBuild(
     return member ? [member] : [];
   });
 
-  const snapshots = loadMarketSnapshots(
-    members.map((member) => ({
-      hub: getTradeHub(member.plan.hubId) ?? DEFAULT_TRADE_HUB,
-      typeIds: buildPlanTypeIds(member.blueprint, { catalog, pi }),
-      costIndexSystemId: member.plan.buildSystemId,
-      activity: industryActivityOf(member.blueprint),
-    }))
-  );
-
-  // A second, independent batch for only the members with a Reaction
-  // Location configured (issue #698) — most groups have none, so this is
-  // usually a no-op rather than doubling every group Auto Build's price fetch.
-  const reactionMembers = members.filter((m) => m.reactionPlanFacilityContext !== null);
-  const reactionSnapshots =
-    reactionMembers.length > 0
-      ? loadMarketSnapshots(
-          reactionMembers.map((member) => ({
-            hub: getTradeHub(member.plan.hubId) ?? DEFAULT_TRADE_HUB,
-            typeIds: buildPlanTypeIds(member.blueprint, { catalog, pi }),
+  // One batched call for every member's request plus, for a member with a
+  // Reaction Location configured (issue #698), its reaction-activity
+  // cost-index request — a second call the same tick would race the first
+  // on a cold cache and fetch everything twice.
+  const requests: MarketSnapshotRequest[] = [];
+  const requestIndexes = members.map((member) => {
+    const hub = getTradeHub(member.plan.hubId) ?? DEFAULT_TRADE_HUB;
+    const typeIds = buildPlanTypeIds(member.blueprint, { catalog, pi });
+    const primary =
+      requests.push({
+        hub,
+        typeIds,
+        costIndexSystemId: member.plan.buildSystemId,
+        activity: industryActivityOf(member.blueprint),
+      }) - 1;
+    const reaction =
+      member.reactionPlanFacilityContext !== null
+        ? requests.push({
+            hub,
+            typeIds,
             costIndexSystemId: member.plan.reactionBuildSystemId,
             activity: 'reaction',
-          }))
-        )
-      : [];
-  const reactionSnapshotByPlanId = new Map<string, Promise<MarketSnapshot>>(
-    reactionMembers.map((member, i) => [member.plan.id, reactionSnapshots[i]!])
-  );
+          }) - 1
+        : null;
+    return { primary, reaction };
+  });
+  const snapshots = loadMarketSnapshots(requests);
+  const recipeSources: GroupRecipeSources = {
+    catalog,
+    pi,
+    ownedBlueprints,
+    corpOwnedBlueprints,
+    assumedMe,
+  };
 
   const picks = new Map<string, Set<number>>();
   await Promise.all(
     members.map(async (member, index) => {
-      const snapshot = await snapshots[index]!;
-      const reactionSnapshot = await reactionSnapshotByPlanId.get(member.plan.id);
+      const { primary, reaction } = requestIndexes[index]!;
+      const snapshot = await snapshots[primary]!;
+      const reactionSnapshot = reaction === null ? null : await snapshots[reaction]!;
       const reactionFacility = reactionFacilityFor(member.plan, reactionSnapshot?.systemCostIndex);
-      const recipeFor = recipeForLookup({
-        catalog,
-        pi,
-        ownedBlueprints: planOwnedBlueprints(member.plan, ownedBlueprints, corpOwnedBlueprints),
-        assumedMeForUnowned: assumedMe,
-      });
+      const recipeFor = memberRecipeFor(member.plan, recipeSources);
       const ctx: MakeOrBuyContext = {
         ...member.facilityContext,
         systemCostIndex: snapshot.systemCostIndex ?? 0,

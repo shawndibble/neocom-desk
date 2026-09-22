@@ -15,6 +15,7 @@ import type { BuildPlanRecord } from '@/db';
 import type { BlueprintCatalog, BlueprintCatalogEntry } from './blueprintCatalog';
 import type { BuildResult } from '@/engine/industry/types';
 import type { CharacterBlueprint } from '@/esi/endpoints';
+import type { CorpOwnedBlueprintsState } from './corpOwnedBlueprints';
 
 vi.mock('./computeBuildPlan', () => ({ computeBuildPlan: vi.fn() }));
 vi.mock('./marketData', () => ({ loadMarketSnapshots: vi.fn() }));
@@ -530,13 +531,14 @@ describe('useComparedBuildResults', () => {
     const { result } = renderHook(() => useComparedBuildResults({ plans, catalog, ...baseArgs }));
     await waitFor(() => expect(result.current.every((row) => !row.loading)).toBe(true));
 
-    // One extra batch, for the one plan with a Reaction Location.
-    const reactionBatch = mockedSnapshots.mock.calls.find(([reqs]) =>
-      reqs.some((r) => r.activity === 'reaction')
-    )?.[0];
-    expect(reactionBatch).toEqual([
+    // Folded into the one batched call — a second call the same tick would
+    // race the first on a cold cache and fetch everything twice.
+    expect(mockedSnapshots).toHaveBeenCalledTimes(1);
+    const batch = mockedSnapshots.mock.calls[0]![0];
+    expect(batch.filter((r) => r.activity === 'reaction')).toEqual([
       expect.objectContaining({ activity: 'reaction', costIndexSystemId: 30002053 }),
     ]);
+    expect(batch).toHaveLength(3);
     const reactionCall = mockedCompute.mock.calls.find(([args]) => args.reactionFacility);
     expect(reactionCall?.[0].reactionFacility).toEqual(
       expect.objectContaining({ systemCostIndex: 0.25, security: 'lowsec' })
@@ -583,5 +585,44 @@ describe('useComparedBuildResults', () => {
     };
     expect(meFor('corp')).toEqual(expect.objectContaining({ me: 9 }));
     expect(meFor('solo')).toEqual(expect.objectContaining({ me: 0 }));
+  });
+
+  it.each([
+    { name: 'no plan includes corp assets: no refetch', includeCorpAssets: false, calls: 1 },
+    { name: 'a plan includes corp assets: refetch', includeCorpAssets: true, calls: 2 },
+  ])('when the corp blueprint list lands — $name', async ({ includeCorpAssets, calls }) => {
+    const catalog = catalogWith([entry({ blueprintTypeID: 100 })]);
+    const plans = [plan({ id: 'a', includeCorpAssets })];
+    const loading: CorpOwnedBlueprintsState = {
+      available: true,
+      incomplete: false,
+      blueprints: [],
+    };
+    const landed = {
+      available: true,
+      incomplete: false,
+      blueprints: [
+        {
+          item_id: 9,
+          type_id: 100,
+          runs: -1,
+          material_efficiency: 9,
+          time_efficiency: 18,
+          quantity: 1,
+          location_id: 60003760,
+          location_flag: 'Hangar',
+        } satisfies CharacterBlueprint,
+      ],
+    };
+
+    const { result, rerender } = renderHook(
+      (props: UseComparedBuildResultsArgs) => useComparedBuildResults(props),
+      { initialProps: { ...baseArgs, plans, catalog, corpOwnedBlueprints: loading } }
+    );
+    await waitFor(() => expect(result.current[0]?.loading).toBe(false));
+
+    rerender({ ...baseArgs, plans, catalog, corpOwnedBlueprints: landed });
+    await waitFor(() => expect(result.current[0]?.loading).toBe(false));
+    expect(mockedSnapshots).toHaveBeenCalledTimes(calls);
   });
 });

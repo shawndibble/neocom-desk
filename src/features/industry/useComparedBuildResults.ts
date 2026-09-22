@@ -95,8 +95,6 @@ interface PricedPlan {
   reactionSnapshot: Promise<MarketSnapshot> | null;
 }
 
-const NO_BLUEPRINTS: readonly CharacterBlueprint[] = [];
-
 function productNameFor(plan: BuildPlanRecord, catalog: BlueprintCatalog): string {
   return catalog.byBlueprintTypeID.get(plan.blueprintTypeID)?.productName ?? plan.name;
 }
@@ -136,9 +134,9 @@ function priceablePlan(
       costIndexSystemId: plan.buildSystemId,
       activity: industryActivityOf(blueprint),
     },
-    // Same second fetch `BuildPlanDetail.tsx` makes for its Reaction
-    // Location: hub prices are already cached by the primary request, so
-    // this only really costs the reaction cost-index lookup.
+    // The Reaction Location's own cost index (issue #698) — a reaction-activity
+    // request in the same `loadMarketSnapshots` call as `request`, which
+    // unions its hub prices and sequences the two cost-index lookups.
     reactionRequest:
       reactionPlanFacilityContextFor(plan) !== null
         ? { hub, typeIds, costIndexSystemId: plan.reactionBuildSystemId, activity: 'reaction' }
@@ -196,9 +194,7 @@ async function computeRow(
 
   try {
     const snapshot = await priced.snapshot;
-    // A failed Reaction Location fetch degrades to "not resolved yet", the
-    // same way the plan's own page treats it — never an error on the row.
-    const reactionSnapshot = await priced.reactionSnapshot?.catch(() => null);
+    const reactionSnapshot = await priced.reactionSnapshot;
     const hub: TradeHub = getTradeHub(plan.hubId) ?? DEFAULT_TRADE_HUB;
     const { result, error, groupResult, groupError } = resolveBuildPlan(
       plan,
@@ -232,14 +228,11 @@ export function useComparedBuildResults({
 }: UseComparedBuildResultsArgs): ComparedBuildRow[] {
   const [rows, setRows] = useState<ComparedBuildRow[]>([]);
 
-  // `useCorpOwnedBlueprints` hands back a fresh wrapper (and, while loading,
-  // a fresh empty list) every render, so the fetch effect keys on these two
-  // value-stable parts instead of the wrapper.
-  const corpAvailable = corpOwnedBlueprints?.available ?? false;
-  const corpBlueprintList =
-    corpAvailable && corpOwnedBlueprints!.blueprints.length > 0
-      ? corpOwnedBlueprints!.blueprints
-      : NO_BLUEPRINTS;
+  // Only a plan with its own Corp Assets toggle on reads corp blueprints, so
+  // the corp list landing must not restart every row's fetch (and flash every
+  // Profit cell back to loading) when no plan here would price differently.
+  const anyPlanUsesCorp = plans.some((p) => p.includeCorpAssets ?? false);
+  const corpForPlans = anyPlanUsesCorp ? corpOwnedBlueprints : undefined;
 
   // Latest-ref pattern (useCompareRows.ts): a fresh `plans` array reference
   // lands on nearly every render, so the fetch effect below keys on a
@@ -304,26 +297,15 @@ export function useComparedBuildResults({
     // fetch. Plans with no blueprint contribute none; the returned promises
     // are zipped back onto the requests that produced them, so no plan can
     // pick up a sibling's snapshot.
+    // A plan's Reaction Location request (issue #698) rides in the same call:
+    // a second call the same tick would race the first on a cold cache and
+    // fetch hub prices, adjusted prices and cost indices twice.
     const priceable = currentPlans.map((plan) => priceablePlan(plan, catalog, pi));
-    const requests = priceable.flatMap((p) => (p ? [p.request] : []));
+    const requests = priceable.flatMap((p) =>
+      p ? (p.reactionRequest ? [p.request, p.reactionRequest] : [p.request]) : []
+    );
     const snapshots = loadMarketSnapshots(requests);
     const snapshotByRequest = new Map(requests.map((request, i) => [request, snapshots[i]!]));
-    // A second, independent batch for only the plans with a Reaction
-    // Location configured (issue #698) — most have none, so this is usually
-    // skipped rather than doubling every comparison's price fetch.
-    const reactionRequests = priceable.flatMap((p) =>
-      p?.reactionRequest ? [p.reactionRequest] : []
-    );
-    const reactionSnapshots =
-      reactionRequests.length > 0 ? loadMarketSnapshots(reactionRequests) : [];
-    const reactionSnapshotByRequest = new Map(
-      reactionRequests.map((request, i) => [request, reactionSnapshots[i]!])
-    );
-    const corpBlueprints: CorpOwnedBlueprintsState = {
-      available: corpAvailable,
-      incomplete: false,
-      blueprints: corpBlueprintList,
-    };
 
     for (const [index, plan] of currentPlans.entries()) {
       const entry = priceable[index];
@@ -331,7 +313,7 @@ export function useComparedBuildResults({
         ? {
             snapshot: snapshotByRequest.get(entry.request)!,
             reactionSnapshot: entry.reactionRequest
-              ? reactionSnapshotByRequest.get(entry.reactionRequest)!
+              ? snapshotByRequest.get(entry.reactionRequest)!
               : null,
           }
         : null;
@@ -342,7 +324,7 @@ export function useComparedBuildResults({
         {
           pi,
           ownedBlueprints,
-          corpBlueprints,
+          corpBlueprints: corpForPlans,
           assumedMe,
           skills,
           includeBlueprintCost,
@@ -363,8 +345,7 @@ export function useComparedBuildResults({
     catalog,
     pi,
     ownedBlueprints,
-    corpAvailable,
-    corpBlueprintList,
+    corpForPlans,
     assumedMe,
     assumedMeHydrated,
     includeBlueprintCost,

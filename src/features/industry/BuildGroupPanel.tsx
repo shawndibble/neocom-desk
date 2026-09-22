@@ -64,7 +64,6 @@ import {
   ownedStockDetection,
   typeIdsFromKey,
 } from './planMaterialsView';
-import { recipeForLookup } from './recipes';
 import { flattenBuildResult } from './resultFlattenCache';
 import { hasShoppingList, shoppingListText } from './shoppingList';
 import { useComparedBuildResults } from './useComparedBuildResults';
@@ -167,10 +166,6 @@ export function BuildGroupPanel({
   // pricing — sub-builds unowned anywhere in the group must assume the same
   // ME that hook already quotes them at.
   const assumedMe = useAssumedMe((state) => state.value);
-  const recipeFor = useMemo(
-    () => recipeForLookup({ catalog, pi, ownedBlueprints, assumedMeForUnowned: assumedMe }),
-    [catalog, pi, ownedBlueprints, assumedMe]
-  );
 
   // Depth is structural — which typeIDs have a recipe — and never
   // moves with a member's runs/ME/hub/sourcing edit, so this keys on the
@@ -181,9 +176,22 @@ export function BuildGroupPanel({
   // avoid for the rollup's own flattening.
   const autoBuildBlueprintSignature = plans.map((p) => `${p.blueprintTypeID}`).join(',');
   const autoBuildMaxDepth = useMemo(
-    () => groupAutoBuildMaxDepth(plans, catalog, recipeFor, skills),
+    () =>
+      groupAutoBuildMaxDepth(
+        plans,
+        { catalog, pi, ownedBlueprints, corpOwnedBlueprints, assumedMe },
+        skills
+      ),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- autoBuildBlueprintSignature is the stable proxy for `plans`' structural identity; see comment above.
-    [autoBuildBlueprintSignature, catalog, recipeFor, skills]
+    [
+      autoBuildBlueprintSignature,
+      catalog,
+      pi,
+      ownedBlueprints,
+      corpOwnedBlueprints,
+      assumedMe,
+      skills,
+    ]
   );
   // Craft Scope's Reactions chip (issue #698): lit whenever any single member
   // is eligible, keyed on each member's own flag too, unlike the signature
