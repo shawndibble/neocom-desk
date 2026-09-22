@@ -1078,6 +1078,7 @@
     "ok": "OK",
     "searchPlaceholder": "Search by name or corporation",
     "noSearchMatches": "No characters match this search.",
+    "noSearchMatchesHint": "Clear the search to see every character.",
     "viewModeLabel": "View",
     "viewCards": "Cards",
     "viewTable": "Table",
