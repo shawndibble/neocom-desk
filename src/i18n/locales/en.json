@@ -3330,7 +3330,8 @@
           "crashes": "Crash reports: when something goes wrong we receive the error and which page it happened on, so it can be fixed. IP addresses are switched off, request and response bodies are never captured, and your EVE tokens are stripped before anything is sent.",
           "removal": "Removing a character deletes everything above from our servers. If its EVE login has already expired we cannot sign in to do that, so the deletion runs the next time you add that character back.",
           "export": "Exporting a backup (Data tab) writes a password-encrypted file — including your sign-in tokens — to your device. This only happens when you press the button, and the file goes wherever you choose to put it; we never see it."
-        }
+        },
+        "privacyLink": "Full details are in the <privacy>Privacy Policy</privacy>."
       },
       "feedbackTitle": "Where do I report a bug or ask for a feature?",
       "feedbackBody": "On GitHub: <issues>github.com/shawndibble/neocom-desk/issues</issues>.",

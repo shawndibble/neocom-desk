@@ -63,6 +63,15 @@ export function FaqPanel() {
               ))}
             </ul>
           </section>
+
+          <p className="text-xs text-text-dim">
+            <Trans
+              i18nKey="settings.faq.store.privacyLink"
+              components={{
+                privacy: <a href="/privacy.html" target="_blank" rel="noopener" className={LINK} />,
+              }}
+            />
+          </p>
         </div>
       </Panel>
 
