@@ -12,7 +12,10 @@
  * own `'failed'` status — never an empty book, which would tell the pilot
  * nobody is trading the item when the truth is we couldn't ask.
  */
+import { useEffect, useMemo, useState } from 'react';
 import type { RegionOrder } from '@/esi/endpoints';
+import { loadGlobalMarkets } from '@/sde/loadMarketSde';
+import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import {
   resolveOrderBookRegion,
   type GlobalMarketOverride,
@@ -24,7 +27,8 @@ import {
   summarizeOrderBook,
   type OrderBookSummary,
 } from '@/engine/market/orderBook';
-import type { LocationMode } from './locationMode';
+import { useMarketHub } from './hub';
+import { useLocationMode, type LocationMode } from './locationMode';
 import { clearOrderBookCache, getOrderBook, type OrderBookResult } from './orderBook';
 
 export interface OrderBookLocation {
@@ -124,4 +128,94 @@ export async function loadOrderBookView(
 /** Manual refresh: drops the cached book this location actually reads typeId from. */
 export function clearOrderBookViewCache(typeId: number, location: OrderBookLocation): void {
   clearOrderBookCache(regionFor(typeId, location).regionId, typeId);
+}
+
+/**
+ * A Location Mode selection as an `OrderBookLocation`: Trade Hub mode reads
+ * the hub's region and station; Region mode reads the picked region, or the
+ * hub's until one is picked. The Market Browser (URL-aware) and Item Detail
+ * (saved preference) both build their location through this.
+ */
+export function orderBookLocationFor(
+  mode: LocationMode,
+  regionId: number | null,
+  hub: { regionId: number; stationId: number },
+  globalMarkets: ReadonlyMap<number, GlobalMarketOverride>
+): OrderBookLocation {
+  return {
+    mode,
+    regionId: mode === 'region' ? (regionId ?? hub.regionId) : hub.regionId,
+    hubStationId: hub.stationId,
+    globalMarkets,
+  };
+}
+
+/**
+ * globalMarkets.json as a typeId lookup. Never rejects: a failed read
+ * degrades to no overrides — the chosen region is read instead — rather than
+ * leaving an order book waiting on it forever.
+ */
+export async function loadGlobalMarketOverrides(): Promise<
+  ReadonlyMap<number, GlobalMarketOverride>
+> {
+  try {
+    const entries = await loadGlobalMarkets();
+    return new Map(
+      entries.map((g) => [g.typeId, { regionId: g.regionId, regionName: g.regionName }])
+    );
+  } catch {
+    return new Map();
+  }
+}
+
+/** `loadGlobalMarketOverrides` as state: null until it settles (success or not). */
+export function useGlobalMarketOverrides(
+  enabled = true
+): ReadonlyMap<number, GlobalMarketOverride> | null {
+  const [overrides, setOverrides] = useState<ReadonlyMap<number, GlobalMarketOverride> | null>(
+    null
+  );
+  useEffect(() => {
+    if (!enabled) return;
+    let cancelled = false;
+    void loadGlobalMarketOverrides().then((map) => {
+      if (!cancelled) setOverrides(map);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [enabled]);
+  return overrides;
+}
+
+/**
+ * The saved Location Mode + Trade Hub (+ Global Market Regions) as an
+ * `OrderBookLocation` — what the Market Browser itself falls back to when no
+ * link overrides it. Null until all three have settled, so a book isn't
+ * fetched once for the defaults and again for the real preference.
+ */
+export function useSavedOrderBookLocation(enabled = true): OrderBookLocation | null {
+  const hubId = useMarketHub((state) => state.value);
+  const hubHydrated = useMarketHub((state) => state.hydrated);
+  const hydrateHub = useMarketHub((state) => state.hydrate);
+  const locationMode = useLocationMode((state) => state.value);
+  const locationModeHydrated = useLocationMode((state) => state.hydrated);
+  const hydrateLocationMode = useLocationMode((state) => state.hydrate);
+  const globalMarkets = useGlobalMarketOverrides(enabled);
+
+  useEffect(() => {
+    if (!enabled) return;
+    void hydrateHub();
+    void hydrateLocationMode();
+  }, [enabled, hydrateHub, hydrateLocationMode]);
+
+  return useMemo(() => {
+    if (!enabled || !hubHydrated || !locationModeHydrated || !globalMarkets) return null;
+    return orderBookLocationFor(
+      locationMode.mode,
+      locationMode.regionId,
+      getTradeHub(hubId) ?? DEFAULT_TRADE_HUB,
+      globalMarkets
+    );
+  }, [enabled, hubHydrated, locationModeHydrated, globalMarkets, hubId, locationMode]);
 }

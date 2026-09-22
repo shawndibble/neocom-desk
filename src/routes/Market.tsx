@@ -29,7 +29,6 @@ import {
   loadNpcStations,
   loadSolarSystems,
   loadMarketRegions,
-  loadGlobalMarkets,
   loadVariations,
 } from '@/sde/loadMarketSde';
 import type {
@@ -38,7 +37,6 @@ import type {
   NpcStationEntry,
   SolarSystemEntry,
   MarketRegionEntry,
-  GlobalMarketEntry,
   VariationData,
 } from '@/sde/marketTypes';
 import { buildVariationIndex } from '@/engine/market/variations';
@@ -57,6 +55,8 @@ import {
   clearOrderBookViewCache,
   fetchOrderBook,
   loadOrderBookView,
+  orderBookLocationFor,
+  useGlobalMarketOverrides,
   type OrderBookFetch,
   type OrderBookLocation,
 } from '@/features/market/orderBookView';
@@ -169,6 +169,9 @@ function usesHubPicker(section: MarketSection): boolean {
  * catalogue load.
  */
 const EMPTY_VARIATION_INDEX = buildVariationIndex({}, {});
+
+/** Stand-in until globalMarkets.json settles; the order book waits for the real one. */
+const NO_GLOBAL_MARKETS: ReadonlyMap<number, GlobalMarketOverride> = new Map();
 
 /** Structural, not i18next's TFunction, so this stays easy to pass around without fighting its generics. */
 type Translate = (key: string, opts?: Record<string, unknown>) => string;
@@ -416,7 +419,10 @@ export function Market() {
   const [npcStations, setNpcStations] = useState<NpcStationEntry[] | null>(null);
   const [solarSystems, setSolarSystems] = useState<SolarSystemEntry[] | null>(null);
   const [marketRegions, setMarketRegions] = useState<MarketRegionEntry[] | null>(null);
-  const [globalMarkets, setGlobalMarkets] = useState<GlobalMarketEntry[] | null>(null);
+  // Loaded on its own, not with the catalogue below: the order book waits
+  // only on this (never on the whole SDE catalogue), and a failed read
+  // settles to no overrides rather than leaving the book waiting forever.
+  const globalMarkets = useGlobalMarketOverrides();
   const [variationData, setVariationData] = useState<VariationData | null>(null);
   const [catalogueError, setCatalogueError] = useState(false);
 
@@ -673,16 +679,14 @@ export function Market() {
       loadNpcStations(),
       loadSolarSystems(),
       loadMarketRegions(),
-      loadGlobalMarkets(),
     ])
-      .then(([g, ty, stations, systems, regions, global]) => {
+      .then(([g, ty, stations, systems, regions]) => {
         if (cancelled) return;
         setGroups(g);
         setTypes(ty);
         setNpcStations(stations);
         setSolarSystems(systems);
         setMarketRegions(regions);
-        setGlobalMarkets(global);
       })
       .catch(() => {
         if (!cancelled) setCatalogueError(true);
@@ -742,29 +746,16 @@ export function Market() {
     return () => clearTimeout(id);
   }, [rawQuery]);
 
-  const globalMarketsMap = useMemo<ReadonlyMap<number, GlobalMarketOverride>>(
-    () =>
-      new Map(
-        (globalMarkets ?? []).map((g) => [
-          g.typeId,
-          { regionId: g.regionId, regionName: g.regionName },
-        ])
-      ),
-    [globalMarkets]
-  );
+  const globalMarketsMap = globalMarkets ?? NO_GLOBAL_MARKETS;
 
   // The one location every order book on this page reads through — the
   // tables, the Variations rows, the Compare Drawer and Item Detail — so they
   // can't disagree about the same item (`orderBookView.ts`). Built from the
   // effective (URL-aware) location, not the persisted preference.
   const orderBookLocation = useMemo<OrderBookLocation>(
-    () => ({
-      mode: effectiveLocation.mode,
-      regionId: chosenRegionId,
-      hubStationId: effectiveHub.stationId,
-      globalMarkets: globalMarketsMap,
-    }),
-    [effectiveLocation.mode, chosenRegionId, effectiveHub.stationId, globalMarketsMap]
+    () =>
+      orderBookLocationFor(effectiveLocation.mode, chosenRegionId, effectiveHub, globalMarketsMap),
+    [effectiveLocation.mode, chosenRegionId, effectiveHub, globalMarketsMap]
   );
 
   const resolvedRegion = useMemo(
@@ -781,8 +772,9 @@ export function Market() {
   // an Error Budget refusal settles as `'failed'`, which renders its own
   // state rather than an empty book or a spinner that never clears.
   useEffect(() => {
-    // Also waits for globalMarkets.json: before it lands, a Global Market
-    // Region item (a PLEX deep link) would be read from the wrong region.
+    // Also waits for globalMarkets.json to settle (success or failure):
+    // before it does, a Global Market Region item (a PLEX deep link) would be
+    // read from the wrong region.
     if (selectedTypeId === null || !hubHydrated || !locationModeHydrated || globalMarkets === null)
       return;
     let cancelled = false;
@@ -1072,8 +1064,7 @@ export function Market() {
   // independent of the primary catalogue load, so a slow or failed
   // variations.json never blocks or errors the rest of the page.
   const catalogueLoading =
-    !catalogueError &&
-    (!groups || !types || !npcStations || !solarSystems || !marketRegions || !globalMarkets);
+    !catalogueError && (!groups || !types || !npcStations || !solarSystems || !marketRegions);
   const selectedItem = types?.find((ty) => ty.typeId === selectedTypeId) ?? null;
   // Narrow screens only: on desktop the item finder is already on screen
   // beside the item, so there is nothing to go back to. It sits in the
@@ -1638,15 +1629,7 @@ export function Market() {
         </div>
       )}
 
-      {compareCount > 0 && (
-        <CompareDrawer
-          chosenRegionId={orderBookLocation.regionId}
-          globalMarkets={orderBookLocation.globalMarkets}
-          locationMode={orderBookLocation.mode}
-          hubStationId={orderBookLocation.hubStationId}
-          refreshTick={refreshTick}
-        />
-      )}
+      {compareCount > 0 && <CompareDrawer location={orderBookLocation} refreshTick={refreshTick} />}
 
       {infoModalItem && (
         <ItemDetailModal

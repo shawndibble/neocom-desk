@@ -12,7 +12,13 @@ import { useMarketHub } from '@/features/market/hub';
 import { useLocationMode, DEFAULT_LOCATION_MODE } from '@/features/market/locationMode';
 import { clearOrderBookCache, ORDER_BOOK_FANOUT_CONCURRENCY } from '@/features/market/orderBook';
 import { resetEsiBudget } from '@/esi/budget';
-import { loadMarketGroups, loadMarketTypes, loadVariations } from '@/sde/loadMarketSde';
+import {
+  loadGlobalMarkets,
+  loadMarketGroups,
+  loadMarketTypes,
+  loadNpcStations,
+  loadVariations,
+} from '@/sde/loadMarketSde';
 import { useCompareSet } from '@/features/market/compareSet';
 import { ESI_BASE_URL } from '@/esi/client';
 import { configureClipboard } from '@/lib/clipboard';
@@ -455,6 +461,28 @@ describe('Market Browser', () => {
     expect(await screen.findByText("Couldn't load the order book")).toBeInTheDocument();
     expect(screen.queryByText('No sell orders')).not.toBeInTheDocument();
     expect(screen.queryByText('No buy orders')).not.toBeInTheDocument();
+  });
+
+  it('a deep-linked item still loads its order book when the market catalogue fails', async () => {
+    // The book waits only on globalMarkets.json, never on the whole catalogue:
+    // a failed stations.json once left a selected item spinning forever.
+    vi.mocked(loadNpcStations).mockRejectedValueOnce(new Error('network error'));
+    server.use(ordersHandler({ count: 0 }));
+    window.history.pushState({}, '', '/market?type=587');
+
+    render(<App />);
+
+    expect(await screen.findByRole('table', { name: 'Sell Orders' })).toBeInTheDocument();
+  });
+
+  it('a failed globalMarkets.json load reads the chosen region instead of hanging', async () => {
+    vi.mocked(loadGlobalMarkets).mockRejectedValueOnce(new Error('network error'));
+    server.use(ordersHandler({ count: 0 }));
+    window.history.pushState({}, '', '/market?type=587');
+
+    render(<App />);
+
+    expect(await screen.findByRole('table', { name: 'Sell Orders' })).toBeInTheDocument();
   });
 
   it('Try again after a failed order book refetches and shows the rows', async () => {

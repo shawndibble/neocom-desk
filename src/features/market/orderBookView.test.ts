@@ -4,9 +4,12 @@ import {
   buildOrderBookView,
   clearOrderBookViewCache,
   fetchOrderBook,
+  loadGlobalMarketOverrides,
   loadOrderBookView,
+  orderBookLocationFor,
   type OrderBookLocation,
 } from './orderBookView';
+import { loadGlobalMarkets } from '@/sde/loadMarketSde';
 import type { RegionOrder } from '@/esi/endpoints';
 
 vi.mock('./orderBook', async (importOriginal) => ({
@@ -14,6 +17,8 @@ vi.mock('./orderBook', async (importOriginal) => ({
   getOrderBook: vi.fn(),
   clearOrderBookCache: vi.fn(),
 }));
+
+vi.mock('@/sde/loadMarketSde', () => ({ loadGlobalMarkets: vi.fn() }));
 
 const mockedGetOrderBook = vi.mocked(getOrderBook);
 
@@ -209,5 +214,39 @@ describe('clearOrderBookViewCache', () => {
       globalMarkets: new Map([[PLEX, { regionId: PLEX_REGION, regionName: 'PLEX Market' }]]),
     });
     expect(vi.mocked(clearOrderBookCache)).toHaveBeenCalledWith(PLEX_REGION, PLEX);
+  });
+});
+
+describe('orderBookLocationFor', () => {
+  const jita = { regionId: THE_FORGE, stationId: JITA_4_4 };
+  const globalMarkets = new Map([[PLEX, { regionId: PLEX_REGION, regionName: 'PLEX Market' }]]);
+
+  it("Trade Hub mode reads the hub's region and station", () => {
+    expect(orderBookLocationFor('hub', 10000043, jita, globalMarkets)).toEqual({
+      mode: 'hub',
+      regionId: THE_FORGE,
+      hubStationId: JITA_4_4,
+      globalMarkets,
+    });
+  });
+
+  it("Region mode reads the picked region, falling back to the hub's until one is picked", () => {
+    expect(orderBookLocationFor('region', 10000043, jita, globalMarkets).regionId).toBe(10000043);
+    expect(orderBookLocationFor('region', null, jita, globalMarkets).regionId).toBe(THE_FORGE);
+  });
+});
+
+describe('loadGlobalMarketOverrides', () => {
+  it('reshapes globalMarkets.json into a typeId lookup', async () => {
+    vi.mocked(loadGlobalMarkets).mockResolvedValueOnce([
+      { typeId: PLEX, regionId: PLEX_REGION, regionName: 'PLEX Market' },
+    ]);
+    const map = await loadGlobalMarketOverrides();
+    expect(map.get(PLEX)).toEqual({ regionId: PLEX_REGION, regionName: 'PLEX Market' });
+  });
+
+  it('degrades to no overrides on failure, never rejecting', async () => {
+    vi.mocked(loadGlobalMarkets).mockRejectedValueOnce(new Error('network error'));
+    await expect(loadGlobalMarketOverrides()).resolves.toEqual(new Map());
   });
 });

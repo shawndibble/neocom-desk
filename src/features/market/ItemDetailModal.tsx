@@ -15,24 +15,24 @@
  * way): for those, "how is this made" is the question the modal is opened to
  * answer, and no dogma attribute carries it.
  */
-import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { Fragment, useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { EmptyState, IskAmount, Modal, Spinner, TypeIcon } from '@/components/ui';
 import { groupItemAttributes, type AttributeGroup } from '@/engine/market/itemAttributes';
 import { parseItemDescription, type DescriptionRun } from '@/engine/market/itemDescription';
-import type { GlobalMarketOverride } from '@/engine/market/locationMode';
 import type { OrderBookSummary } from '@/engine/market/orderBook';
 import { getUniverseType, type UniverseType } from '@/esi/endpoints';
-import { loadAttributeDictionary, loadGlobalMarkets } from '@/sde/loadMarketSde';
+import { loadAttributeDictionary } from '@/sde/loadMarketSde';
 import { loadPi } from '@/sde/loadSde';
 import type { PiData } from '@/sde/types';
 import { formatDuration } from '@/lib/duration';
-import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import { loadAttributeReferenceNames } from './attributeReferenceNames';
 import { formatAttributeValue, formatVolume } from './format';
-import { useMarketHub } from './hub';
-import { useLocationMode } from './locationMode';
-import { loadOrderBookView, type OrderBookLocation } from './orderBookView';
+import {
+  loadOrderBookView,
+  useSavedOrderBookLocation,
+  type OrderBookLocation,
+} from './orderBookView';
 
 export interface ItemDetailModalProps {
   typeId: number;
@@ -276,62 +276,4 @@ function DescriptionRunNode({ run }: { run: DescriptionRun }) {
   if (run.italic) node = <i>{node}</i>;
   if (run.bold) node = <b>{node}</b>;
   return <Fragment>{node}</Fragment>;
-}
-
-/**
- * The saved Location Mode + Trade Hub (+ Global Market Regions) as an
- * `OrderBookLocation` — what the Market Browser itself falls back to when no
- * link overrides it. Null until all three have settled, so the price isn't
- * fetched once for the defaults and again for the real preference. A failed
- * globalMarkets.json read degrades to no overrides, never to no price.
- */
-function useSavedOrderBookLocation(enabled: boolean): OrderBookLocation | null {
-  const hubId = useMarketHub((state) => state.value);
-  const hubHydrated = useMarketHub((state) => state.hydrated);
-  const hydrateHub = useMarketHub((state) => state.hydrate);
-  const locationMode = useLocationMode((state) => state.value);
-  const locationModeHydrated = useLocationMode((state) => state.hydrated);
-  const hydrateLocationMode = useLocationMode((state) => state.hydrate);
-  const [globalMarkets, setGlobalMarkets] = useState<ReadonlyMap<
-    number,
-    GlobalMarketOverride
-  > | null>(null);
-
-  useEffect(() => {
-    if (!enabled) return;
-    void hydrateHub();
-    void hydrateLocationMode();
-  }, [enabled, hydrateHub, hydrateLocationMode]);
-
-  useEffect(() => {
-    if (!enabled) return;
-    let cancelled = false;
-    void Promise.resolve()
-      .then(() => loadGlobalMarkets())
-      .then(
-        (entries) =>
-          new Map(
-            entries.map((g) => [g.typeId, { regionId: g.regionId, regionName: g.regionName }])
-          ),
-        () => new Map<number, GlobalMarketOverride>()
-      )
-      .then((map) => {
-        if (!cancelled) setGlobalMarkets(map);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [enabled]);
-
-  return useMemo(() => {
-    if (!enabled || !hubHydrated || !locationModeHydrated || !globalMarkets) return null;
-    const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
-    return {
-      mode: locationMode.mode,
-      regionId:
-        locationMode.mode === 'region' ? (locationMode.regionId ?? hub.regionId) : hub.regionId,
-      hubStationId: hub.stationId,
-      globalMarkets,
-    };
-  }, [enabled, hubHydrated, locationModeHydrated, globalMarkets, hubId, locationMode]);
 }

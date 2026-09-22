@@ -7,11 +7,9 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import { ORDER_BOOK_FANOUT_CONCURRENCY } from './orderBook';
-import { loadOrderBookView } from './orderBookView';
+import { loadOrderBookView, type OrderBookLocation } from './orderBookView';
 import { mapWithConcurrencyLimit } from '@/lib/concurrency';
 import type { CompareSetItem } from './compareSet';
-import type { LocationMode } from './locationMode';
-import type { GlobalMarketOverride } from '@/engine/market/locationMode';
 import type { OrderBookSummary } from '@/engine/market/orderBook';
 
 export interface CompareRow {
@@ -26,10 +24,8 @@ export interface UseCompareRowsArgs {
   items: readonly CompareSetItem[];
   /** Fetch only while the drawer is actually open. */
   enabled: boolean;
-  chosenRegionId: number;
-  globalMarkets: ReadonlyMap<number, GlobalMarketOverride>;
-  locationMode: LocationMode;
-  hubStationId: number;
+  /** The Market Browser's own Order Book location, so rows match its tables. */
+  location: OrderBookLocation;
   /** Bump to force a refetch past the order-book cache's TTL. */
   refreshTick: number;
 }
@@ -37,10 +33,7 @@ export interface UseCompareRowsArgs {
 export function useCompareRows({
   items,
   enabled,
-  chosenRegionId,
-  globalMarkets,
-  locationMode,
-  hubStationId,
+  location,
   refreshTick,
 }: UseCompareRowsArgs): CompareRow[] {
   const [rows, setRows] = useState<CompareRow[]>([]);
@@ -73,12 +66,7 @@ export function useCompareRows({
       }))
     );
     async function loadRow(item: CompareSetItem): Promise<CompareRow> {
-      const view = await loadOrderBookView(item.typeId, {
-        mode: locationMode,
-        regionId: chosenRegionId,
-        hubStationId,
-        globalMarkets,
-      });
+      const view = await loadOrderBookView(item.typeId, location);
       return {
         typeId: item.typeId,
         itemName: item.itemName,
@@ -101,7 +89,7 @@ export function useCompareRows({
     return () => {
       cancelled = true;
     };
-  }, [enabled, itemsKey, chosenRegionId, globalMarkets, locationMode, hubStationId, refreshTick]);
+  }, [enabled, itemsKey, location, refreshTick]);
 
   return rows;
 }
