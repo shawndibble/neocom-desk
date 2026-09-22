@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } 
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
-import { http, HttpResponse } from 'msw';
+import { delay, http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import '@/i18n';
 import { db } from '@/db';
@@ -10,7 +10,7 @@ import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharact
 import { usePublicInfo } from '@/stores/publicInfo';
 import { useMarketHub } from '@/features/market/hub';
 import { useLocationMode, DEFAULT_LOCATION_MODE } from '@/features/market/locationMode';
-import { clearOrderBookCache } from '@/features/market/orderBook';
+import { clearOrderBookCache, ORDER_BOOK_FANOUT_CONCURRENCY } from '@/features/market/orderBook';
 import { resetEsiBudget } from '@/esi/budget';
 import { loadMarketGroups, loadMarketTypes, loadVariations } from '@/sde/loadMarketSde';
 import { useCompareSet } from '@/features/market/compareSet';
@@ -902,6 +902,49 @@ describe('Variations table (issue #145, formerly the Related Items strip of issu
 
     expect(await screen.findByText('Variations')).toBeInTheDocument();
     expect(screen.getByText('Showing 20 of 25')).toBeInTheDocument();
+  });
+
+  it('fetches variation row prices a few at a time, never as one simultaneous burst (Sentry N+1 API Call)', async () => {
+    const bigGroupId = 99;
+    const selected: MarketTypeEntry = {
+      typeId: 1999,
+      name: 'Selected Widget',
+      marketGroupId: bigGroupId,
+    };
+    const many: MarketTypeEntry[] = Array.from({ length: 25 }, (_, i) => ({
+      typeId: 2000 + i,
+      name: `Widget ${i}`,
+      marketGroupId: bigGroupId,
+    }));
+    vi.mocked(loadMarketGroups).mockResolvedValueOnce([
+      ...GROUPS,
+      { id: bigGroupId, name: 'Widgets', parentId: null, hasTypes: true },
+    ]);
+    vi.mocked(loadMarketTypes).mockResolvedValueOnce([...TYPES, selected, ...many]);
+    let inFlight = 0;
+    let maxInFlight = 0;
+    const fetchedTypeIds = new Set<string>();
+    server.use(
+      http.get(`${ESI_BASE_URL}/markets/:regionId/orders`, async ({ request }) => {
+        fetchedTypeIds.add(new URL(request.url).searchParams.get('type_id') ?? '');
+        inFlight += 1;
+        maxInFlight = Math.max(maxInFlight, inFlight);
+        await delay(20);
+        inFlight -= 1;
+        return HttpResponse.json([], { headers: { 'X-Pages': '1' } });
+      })
+    );
+
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.type(await screen.findByRole('searchbox'), 'Selected Widget');
+    await user.click(await screen.findByText('Selected Widget'));
+
+    // The selected item's own book plus all 20 capped variation rows.
+    await waitFor(() => expect(fetchedTypeIds.size).toBe(21), { timeout: 3000 });
+    // The main order book runs alongside the variation workers.
+    expect(maxInFlight).toBeLessThanOrEqual(ORDER_BOOK_FANOUT_CONCURRENCY + 1);
   });
 });
 

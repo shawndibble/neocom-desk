@@ -6,7 +6,8 @@
  * so a closed drawer must not fire N ESI reads.
  */
 import { useEffect, useRef, useState } from 'react';
-import { getOrderBook } from './orderBook';
+import { getOrderBook, ORDER_BOOK_FANOUT_CONCURRENCY } from './orderBook';
+import { mapWithConcurrencyLimit } from '@/lib/concurrency';
 import type { CompareSetItem } from './compareSet';
 import type { LocationMode } from './locationMode';
 import { resolveOrderBookRegion, type GlobalMarketOverride } from '@/engine/market/locationMode';
@@ -71,26 +72,34 @@ export function useCompareRows({
         summary: null,
       }))
     );
-    void Promise.all(
-      currentItems.map(async (item): Promise<CompareRow> => {
-        try {
-          const resolved = resolveOrderBookRegion(item.typeId, chosenRegionId, globalMarkets);
-          const result = await getOrderBook(resolved.regionId, item.typeId);
-          const orders =
-            locationMode === 'hub'
-              ? filterOrdersByLocation(result.orders, hubStationId)
-              : result.orders;
-          return {
-            typeId: item.typeId,
-            itemName: item.itemName,
-            loading: false,
-            summary: summarizeOrderBook(orders),
-          };
-        } catch {
-          return { typeId: item.typeId, itemName: item.itemName, loading: false, summary: null };
-        }
-      })
-    ).then((resolvedRows) => {
+    async function loadRow(item: CompareSetItem): Promise<CompareRow> {
+      try {
+        const resolved = resolveOrderBookRegion(item.typeId, chosenRegionId, globalMarkets);
+        const result = await getOrderBook(resolved.regionId, item.typeId);
+        const orders =
+          locationMode === 'hub'
+            ? filterOrdersByLocation(result.orders, hubStationId)
+            : result.orders;
+        return {
+          typeId: item.typeId,
+          itemName: item.itemName,
+          loading: false,
+          summary: summarizeOrderBook(orders),
+        };
+      } catch {
+        return { typeId: item.typeId, itemName: item.itemName, loading: false, summary: null };
+      }
+    }
+    const resolvedRows: CompareRow[] = new Array<CompareRow>(currentItems.length);
+    void mapWithConcurrencyLimit(
+      currentItems.map((item, index) => ({ item, index })),
+      ORDER_BOOK_FANOUT_CONCURRENCY,
+      async ({ item, index }) => {
+        // A superseded run stops queuing ESI calls for rows nobody will see.
+        if (cancelled) return;
+        resolvedRows[index] = await loadRow(item);
+      }
+    ).then(() => {
       if (!cancelled) setRows(resolvedRows);
     });
     return () => {
