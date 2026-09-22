@@ -853,7 +853,6 @@
     "opportunitiesRefresh": "Refresh",
     "opportunitiesAddToCompare": "Add {{count}} to Compare",
     "opportunitiesSelectFor": "Select {{name}} to add to Compare",
-    "opportunitiesCompareActiveCharacterOnly": "Only the active character's own blueprints can be added to Compare",
     "opportunitiesLossBreakdownFor": "Why {{name}} is a loss",
     "opportunitiesLossBreakdown": "Build cost {{cost}} vs. sell price {{revenue}}",
     "opportunitiesViewHistory": "View {{name}} price history",

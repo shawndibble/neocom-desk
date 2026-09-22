@@ -206,26 +206,17 @@ export function OpportunitiesPanel({
       id: 'select',
       header: '',
       className: 'w-8',
-      render: (row) => {
-        // Build Plan Compare only ever shows the active Character's own
-        // plans (`Industry.tsx`'s `plans` query is scoped that way) — a
-        // seeded plan for another Character would silently never appear
-        // there, so seeding is limited to rows the active Character owns.
-        const seedable = row.candidate.characterId === activeCharacterId;
-        return (
-          <input
-            type="checkbox"
-            checked={selectedIds.has(row.candidate.id)}
-            onChange={() => toggleSelected(row.candidate.id)}
-            disabled={!seedable}
-            title={seedable ? undefined : t('industry.opportunitiesCompareActiveCharacterOnly')}
-            aria-label={t('industry.opportunitiesSelectFor', {
-              name: row.candidate.catalogEntry.productName,
-            })}
-            className="size-4 shrink-0 cursor-pointer accent-accent disabled:cursor-not-allowed disabled:opacity-40"
-          />
-        );
-      },
+      render: (row) => (
+        <input
+          type="checkbox"
+          checked={selectedIds.has(row.candidate.id)}
+          onChange={() => toggleSelected(row.candidate.id)}
+          aria-label={t('industry.opportunitiesSelectFor', {
+            name: row.candidate.catalogEntry.productName,
+          })}
+          className="size-4 shrink-0 cursor-pointer accent-accent"
+        />
+      ),
     },
     {
       id: 'product',
@@ -414,7 +405,6 @@ export function OpportunitiesPanel({
       ) : (
         <MobileOpportunityList
           rows={rows}
-          activeCharacterId={activeCharacterId}
           showCharacterColumn={showCharacterColumn}
           selectedIds={selectedIds}
           onToggleSelected={toggleSelected}
