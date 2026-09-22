@@ -66,7 +66,12 @@ import type { ReprocessingType } from '@/sde/types';
 export interface AppraisalOutcome {
   appraisal: Appraisal;
   unmatched: AppraisalUnmatched[];
-  /** The active clone's refining implant bonus folded into every row's `refine`, 0 with none fitted or no active Character (issue #1227). */
+  /**
+   * The active clone's refining implant bonus, 0 with none fitted, no active
+   * Character, or the whole paste is scrap — the implant's own ESI
+   * description covers ore and ice only, so a scrap-only paste never
+   * actually saw the bonus even though the character has it (issue #1227).
+   */
   implantBonusPct: number;
 }
 
@@ -188,11 +193,20 @@ export async function appraisePaste(
     [...prices].map(([typeId, agg]) => [typeId, agg.sellMin ?? undefined])
   );
 
+  let implantApplied = false;
   const items: AppraisalItem[] = matched.map((match) => {
     const aggregate = prices.get(match.typeId);
     const reprocessing = reprocessingByTypeId.get(match.typeId);
-    const refine =
+    const resolvedSkills =
       reprocessing && reprocessingSkills
+        ? resolveReprocessingSkills(
+            reprocessingSkills.skills,
+            reprocessing.specialisationSkillID,
+            reprocessingSkills.trained
+          )
+        : undefined;
+    const refine =
+      reprocessing && resolvedSkills
         ? computeAppraisalRefine({
             quantity: match.quantity,
             reprocessing: {
@@ -202,11 +216,7 @@ export async function appraisePaste(
                 quantity: m.quantity,
               })),
             },
-            skills: resolveReprocessingSkills(
-              reprocessingSkills.skills,
-              reprocessing.specialisationSkillID,
-              reprocessingSkills.trained
-            ),
+            skills: resolvedSkills,
             materialPrices: Object.fromEntries(
               reprocessing.materials
                 .map((m): [number, number | undefined] => [
@@ -217,6 +227,9 @@ export async function appraisePaste(
             ),
           })
         : undefined;
+    if (refine && !resolvedSkills?.isScrap && resolvedSkills?.implantBonusPct) {
+      implantApplied = true;
+    }
     const lpForType = lpMatches?.matchesByTypeId.get(match.typeId);
     const lpOption = lpForType
       ? (cheapestLpOffer(toLpOfferInputs(lpForType, sellPrices), match.quantity) ?? undefined)
@@ -235,7 +248,7 @@ export async function appraisePaste(
   return {
     appraisal: buildAppraisal(items, pricePercent),
     unmatched,
-    implantBonusPct: reprocessingSkills?.skills.implantBonusPct ?? 0,
+    implantBonusPct: implantApplied ? (reprocessingSkills?.skills.implantBonusPct ?? 0) : 0,
   };
 }
 

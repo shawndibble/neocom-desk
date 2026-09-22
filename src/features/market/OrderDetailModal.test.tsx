@@ -871,6 +871,17 @@ describe('OrderDetailModal', () => {
       ).toBeInTheDocument();
     });
 
+    it("omits the implant hint for scrap — the implant's own description covers ore and ice only (issue #1227)", () => {
+      renderModal({
+        row: FLOORED_ROW,
+        reprocessing: {
+          ...REPROCESSING,
+          skills: { ...REPROCESSING.skills, implantBonusPct: 4, isScrap: true },
+        },
+      });
+      expect(screen.queryByText(/fitted refining implant/)).not.toBeInTheDocument();
+    });
+
     it('says how much stock is short of a whole refining batch', () => {
       renderModal({ row: { ...FLOORED_ROW, volumeRemain: 23 }, reprocessing: REPROCESSING });
 

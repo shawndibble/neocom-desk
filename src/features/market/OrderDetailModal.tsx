@@ -883,7 +883,7 @@ export function OrderDetailModal({
                       rate: Math.round(BASE_STATION_REPROCESSING_RATE * 100),
                     })}
                   </p>
-                  {!!reprocessing?.skills.implantBonusPct && (
+                  {!reprocessing?.skills.isScrap && !!reprocessing?.skills.implantBonusPct && (
                     <p className="text-text-dim">
                       {t('market.orders.exitReprocessImplant', {
                         pct: reprocessing.skills.implantBonusPct,
