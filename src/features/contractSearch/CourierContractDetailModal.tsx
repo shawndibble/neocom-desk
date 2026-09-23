@@ -274,7 +274,7 @@ export function CourierContractDetailModal({
             <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
               {t('contractSearch.rewardColumn')}
             </span>
-            <span className="text-2xl leading-tight font-semibold tabular-nums">
+            <span className="text-xl leading-tight font-semibold tabular-nums">
               {formatIskCompact(row.reward)}
             </span>
             <span className="text-[0.6875rem] text-text-dim tabular-nums">
@@ -289,7 +289,7 @@ export function CourierContractDetailModal({
               // Accent marks the figure the board ranks on, so it is spent
               // only where there is a rate to rank: a free haul's honest zero
               // and an unmeasurable route both read as quiet.
-              className={`text-2xl leading-tight font-semibold tabular-nums ${
+              className={`text-3xl leading-tight font-semibold tabular-nums ${
                 jumpRate ? 'text-accent' : 'text-text-dim'
               }`}
             >

@@ -75,7 +75,7 @@ export function GroupSummaryModal({
       <div className="space-y-3 text-sm">
         <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
           <span className="text-text-dim">{payeeDisplayName}</span>
-          <span className="text-lg font-medium tabular-nums">{formatIsk(totalTaxOwed)} ISK</span>
+          <span className="text-xl font-medium tabular-nums">{formatIsk(totalTaxOwed)} ISK</span>
         </div>
 
         <ul className="space-y-2">

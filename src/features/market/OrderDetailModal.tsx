@@ -450,7 +450,7 @@ export function OrderDetailModal({
                   the fallback below — which is the common case, not the
                   exception.
                 */}
-                <p className={cx('mt-1.5 text-lg font-semibold', VERDICT_TONE[verdict.kind])}>
+                <p className={cx('mt-1.5 text-xl font-semibold', VERDICT_TONE[verdict.kind])}>
                   {t(`market.orders.verdict.${verdict.kind}`)}
                 </p>
                 <p className="mt-1 text-sm text-text-dim">

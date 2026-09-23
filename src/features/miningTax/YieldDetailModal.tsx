@@ -317,7 +317,7 @@ export function YieldDetailModal({
             >
               {t('miningTax.overview.detail.sellRawCard')}
             </p>
-            <p className="mt-1 text-lg font-semibold tabular-nums">
+            <p className="mt-1 text-xl font-semibold tabular-nums">
               <IskAmount value={valuation.rawValue} revealOn="tap" decimals={0} />
             </p>
             <p className={CARD_HINT}>{t('miningTax.overview.detail.sellRawCardHint')}</p>
@@ -333,7 +333,7 @@ export function YieldDetailModal({
                 >
                   {t('miningTax.overview.detail.refineCard')}
                 </p>
-                <p className="mt-1 text-lg font-semibold tabular-nums">
+                <p className="mt-1 text-xl font-semibold tabular-nums">
                   <IskAmount value={valuation.refineValue} revealOn="tap" decimals={0} />
                 </p>
                 <p className={CARD_HINT}>
@@ -352,7 +352,7 @@ export function YieldDetailModal({
                         ? t('miningTax.overview.detail.refineLossCard')
                         : t('miningTax.overview.detail.refineEvenCard')}
                 </p>
-                <p className={cx('mt-1 text-lg font-semibold tabular-nums', deltaTone)}>
+                <p className={cx('mt-1 text-xl font-semibold tabular-nums', deltaTone)}>
                   {/* Nothing priced is unknown, not break-even: an em dash says so,
                       "0 ISK" would claim the two exits were measured and tied. */}
                   {!anyValue ? (
