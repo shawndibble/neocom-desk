@@ -20,6 +20,42 @@ import type { MiningLedgerEntry } from '@/engine/miningTax/types';
 import { loadPayees } from './payees';
 import { hubForPayee, loadUnitPrices } from './pricing';
 
+/**
+ * Thrown when a new Assignment would claim ore an existing one already does
+ * for the same Mining Ledger Entry — the pilot's view was stale (another tab
+ * or device assigned it first), and saving would bill the same ore twice.
+ */
+export class AlreadyAssignedError extends Error {
+  constructor() {
+    super('This ore is already assigned');
+    this.name = 'AlreadyAssignedError';
+  }
+}
+
+/**
+ * Re-reads the database, not the caller's snapshot, and refuses when any
+ * stored Assignment (a dismissal included) on this entry already names one of
+ * `typeIds`. Ownership is presence-based per ore type (`rowStatus.ts`), so a
+ * second claim on a type is never a legitimate split — those go through
+ * `splitAssignment`, which moves units rather than creating a new claim.
+ */
+async function assertUnclaimed(
+  characterId: number,
+  date: string,
+  solarSystemId: number,
+  typeIds: readonly number[]
+): Promise<void> {
+  const existing = await db.miningTaxAssignments.where('characterId').equals(characterId).toArray();
+  const wanted = new Set(typeIds);
+  const clash = existing.some(
+    (a) =>
+      a.date === date &&
+      a.solarSystemId === solarSystemId &&
+      a.oreLines.some((line) => wanted.has(line.typeId))
+  );
+  if (clash) throw new AlreadyAssignedError();
+}
+
 export function loadAssignments(characterId: number): Promise<MiningTaxAssignmentRecord[]> {
   return db.miningTaxAssignments.where('characterId').equals(characterId).toArray();
 }
@@ -47,6 +83,12 @@ export interface AssignInput {
 
 /** Creates one Assignment, snapshotting the (possibly pilot-corrected) value and tax right now. */
 export async function createAssignment(input: AssignInput): Promise<MiningTaxAssignmentRecord> {
+  await assertUnclaimed(
+    input.characterId,
+    input.date,
+    input.solarSystemId,
+    input.oreLines.map((line) => line.typeId)
+  );
   const now = Date.now();
   const record: MiningTaxAssignmentRecord = {
     id: crypto.randomUUID(),
@@ -194,6 +236,17 @@ export async function joinAssignments(
   taxPct: number,
   unitPrices: ReadonlyMap<number, number>
 ): Promise<MiningTaxAssignmentRecord[]> {
+  // Only the members this call would *create* are checked — an already-assigned
+  // member is just re-tagged, and adds no claim.
+  for (const m of members) {
+    if (m.assignment) continue;
+    await assertUnclaimed(
+      m.characterId,
+      m.date,
+      m.solarSystemId,
+      (m.oreLines ?? []).map((line) => line.typeId)
+    );
+  }
   const groupId =
     members.map((m) => m.assignment?.groupId).find((id) => id !== undefined) ?? crypto.randomUUID();
   const now = Date.now();

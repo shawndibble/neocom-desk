@@ -206,3 +206,47 @@ describe('coalesceAssignments', () => {
     ]);
   });
 });
+
+describe('coalesceAssignments — exact duplicates', () => {
+  const entry = {
+    characterId: CHAR_A,
+    date: '2026-09-12',
+    solarSystemId: 1,
+    oreLines: [{ typeId: TYPE_A, quantity: 100 }],
+  };
+
+  it('drops the extra of two identical Assignments instead of doubling the bill', async () => {
+    await db.miningTaxAssignments.bulkPut([
+      assignment({ id: 'a1', estimatedValue: 1000, taxOwed: 50 }),
+      assignment({ id: 'a2', estimatedValue: 1180, taxOwed: 59 }),
+    ]);
+
+    await coalesceAssignments(CHAR_A, [entry]);
+
+    const stored = await db.miningTaxAssignments.toArray();
+    expect(stored.map((a) => a.id)).toEqual(['a1']);
+    expect(stored[0].oreLines).toEqual([{ typeId: TYPE_A, quantity: 100 }]);
+    expect(stored[0].taxOwed).toBe(50);
+    expect(syncMock.markMiningTaxAssignmentDeleted).toHaveBeenCalledWith(CHAR_A, 'a2');
+  });
+
+  it('leaves identical Assignments untouched when the entry is not in the ledger read', async () => {
+    await db.miningTaxAssignments.bulkPut([assignment({ id: 'a1' }), assignment({ id: 'a2' })]);
+
+    await coalesceAssignments(CHAR_A, []);
+
+    expect(await db.miningTaxAssignments.count()).toBe(2);
+    expect(syncMock.scheduleSync).not.toHaveBeenCalled();
+  });
+
+  it('never touches paid duplicates', async () => {
+    await db.miningTaxAssignments.bulkPut([
+      assignment({ id: 'a1', status: 'paid' }),
+      assignment({ id: 'a2', status: 'paid' }),
+    ]);
+
+    await coalesceAssignments(CHAR_A, [entry]);
+
+    expect(await db.miningTaxAssignments.count()).toBe(2);
+  });
+});

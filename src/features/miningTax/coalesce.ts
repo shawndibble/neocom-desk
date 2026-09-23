@@ -21,6 +21,7 @@
  */
 import { db, type MiningTaxAssignmentRecord } from '@/db';
 import { markMiningTaxAssignmentDeleted, scheduleSync } from '@/sync';
+import { entryKey, type MiningLedgerEntry } from '@/engine/miningTax/types';
 import {
   planEntryMerges,
   planGroupEjections,
@@ -45,7 +46,10 @@ function coalescable(a: MiningTaxAssignmentRecord): CoalescableAssignment {
   };
 }
 
-export async function coalesceAssignments(characterId: number): Promise<void> {
+export async function coalesceAssignments(
+  characterId: number,
+  entries?: readonly MiningLedgerEntry[]
+): Promise<void> {
   const assignments = await db.miningTaxAssignments
     .where('characterId')
     .equals(characterId)
@@ -68,7 +72,12 @@ export async function coalesceAssignments(characterId: number): Promise<void> {
   }
 
   eject();
-  for (const merge of planEntryMerges(current())) {
+  // The fresh ledger lets the planner tell two halves of a day from one
+  // obligation stored twice; without it (older callers) it sums as before.
+  const entryLinesByKey = entries
+    ? new Map(entries.map((e) => [entryKey(characterId, e.date, e.solarSystemId), e.oreLines]))
+    : undefined;
+  for (const merge of planEntryMerges(current(), entryLinesByKey)) {
     const keep: MiningTaxAssignmentRecord = {
       ...working.get(merge.keepId)!,
       oreLines: merge.oreLines,

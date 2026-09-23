@@ -140,6 +140,15 @@ export function RowDetailModal({
           </div>
         )}
 
+        {assignment && row.duplicateAssignmentIds?.includes(assignment.id) && (
+          <p
+            role="alert"
+            className="rounded-xs border border-warning/60 bg-warning/10 p-2 text-xs text-text-dim"
+          >
+            {t('miningTax.duplicateRowHint')}
+          </p>
+        )}
+
         {status === 'needs-review' && assignment?.reviewDiff && (
           <div className="space-y-1 rounded-xs border border-warning/60 bg-warning/10 p-2 text-xs">
             <p className="font-semibold text-warning uppercase">{t('miningTax.resolveTitle')}</p>

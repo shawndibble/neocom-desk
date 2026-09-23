@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { db, type MiningTaxAssignmentRecord } from '@/db';
 import type { MiningLedgerEntry } from '@/engine/miningTax/types';
 import {
+  AlreadyAssignedError,
   createAssignment,
   deleteAssignment,
   dismissEntries,
@@ -925,5 +926,67 @@ describe('splitAssignment', () => {
     expect(kept.estimatedValue).toBe(60 * 10 + 50 * 4);
     expect(created.estimatedValue).toBe(40 * 5);
     expect(created.taxOwed).toBeCloseTo(40 * 5 * 0.08);
+  });
+});
+
+describe('double-assignment guard', () => {
+  const base = {
+    characterId: CHAR_A,
+    date: '2026-09-04',
+    solarSystemId: 1,
+    payeeId: 'payee-1',
+    oreLines: [{ typeId: TYPE_A, quantity: 100 }],
+    taxPct: 5,
+    estimatedValue: 1000,
+    taxOwed: 50,
+    markPaid: false,
+  };
+
+  it('createAssignment refuses ore an existing Assignment on the entry already claims', async () => {
+    await createAssignment(base);
+
+    await expect(createAssignment({ ...base, markPaid: true })).rejects.toBeInstanceOf(
+      AlreadyAssignedError
+    );
+    expect(await db.miningTaxAssignments.count()).toBe(1);
+  });
+
+  it('createAssignment still allows a different ore type on the same entry', async () => {
+    await createAssignment(base);
+    await createAssignment({ ...base, oreLines: [{ typeId: TYPE_B, quantity: 5 }] });
+    expect(await db.miningTaxAssignments.count()).toBe(2);
+  });
+
+  it('createAssignment counts a dismissal as a claim', async () => {
+    await dismissEntry({
+      characterId: CHAR_A,
+      date: base.date,
+      solarSystemId: 1,
+      oreLines: base.oreLines,
+      estimatedValue: 1000,
+    });
+    await expect(createAssignment(base)).rejects.toBeInstanceOf(AlreadyAssignedError);
+  });
+
+  it('joinAssignments refuses to create a member whose ore is already claimed', async () => {
+    await createAssignment(base);
+
+    await expect(
+      joinAssignments(
+        [
+          {
+            characterId: CHAR_A,
+            date: base.date,
+            solarSystemId: 1,
+            assignment: null,
+            oreLines: base.oreLines,
+          },
+        ],
+        'payee-1',
+        5,
+        new Map([[TYPE_A, 10]])
+      )
+    ).rejects.toBeInstanceOf(AlreadyAssignedError);
+    expect(await db.miningTaxAssignments.count()).toBe(1);
   });
 });
