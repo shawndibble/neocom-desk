@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { describe, it, expect, afterEach, beforeAll, afterAll, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
@@ -8,7 +8,7 @@ import '@/i18n';
 import { ESI_BASE_URL } from '@/esi/client';
 import { ItemDetailModal } from './ItemDetailModal';
 import { loadAttributeDictionary, loadGlobalMarkets } from '@/sde/loadMarketSde';
-import { loadPi, loadSkills } from '@/sde/loadSde';
+import { loadPi, loadSkillAttributeModifiers, loadSkills } from '@/sde/loadSde';
 import { piFixture } from '@/sde/__fixtures__/pi';
 import { db } from '@/db';
 import { useActiveCharacter } from '@/stores/activeCharacter';
@@ -23,15 +23,17 @@ vi.mock('@/sde/loadMarketSde', () => ({
   loadGlobalMarkets: vi.fn(async () => []),
 }));
 vi.mock('@/sde/loadSde', () => ({
-  loadSkills: vi.fn(),
+  loadSkills: vi.fn(async () => []),
   loadTypes: vi.fn(async () => ({})),
   loadPi: vi.fn(async () => ({ schematics: {}, raw: [] })),
+  loadSkillAttributeModifiers: vi.fn(async () => ({})),
 }));
 
 const mockedLoadDictionary = vi.mocked(loadAttributeDictionary);
 const mockedLoadGlobalMarkets = vi.mocked(loadGlobalMarkets);
 const mockedLoadSkills = vi.mocked(loadSkills);
 const mockedLoadPi = vi.mocked(loadPi);
+const mockedLoadSkillAttributeModifiers = vi.mocked(loadSkillAttributeModifiers);
 
 const TYPE_ID = 587;
 
@@ -341,6 +343,98 @@ describe('ItemDetailModal', () => {
       const plans = await db.skillPlans.where('characterId').equals(CHARACTER_ID).toArray();
       expect(plans).toHaveLength(1);
       expect(plans[0].entries).toEqual([{ skillTypeID: 24241, targetLevel: 3 }]);
+    });
+  });
+
+  it('attribute modifier chip: shows which skill affects it and adds it to a plan (issue #1372)', async () => {
+    const CHARACTER_ID = 777;
+    const GUNNERY_TYPE_ID = 3300;
+    const SHARPSHOOTER_TYPE_ID = 3311;
+    const OPTIMAL_RANGE_ATTR = 54;
+    useActiveCharacter.setState({ activeCharacterId: CHARACTER_ID, hydrated: true });
+    server.use(
+      http.get(`${ESI_BASE_URL}/universe/types/${TYPE_ID}`, () =>
+        HttpResponse.json({
+          type_id: TYPE_ID,
+          name: '1400mm Autocannon II',
+          description: '',
+          group_id: 55,
+          published: true,
+          volume: 5,
+          dogma_attributes: [
+            // Requires Gunnery I — the gate the Sharpshooter bonus checks.
+            { attribute_id: 182, value: GUNNERY_TYPE_ID },
+            { attribute_id: 277, value: 1 },
+            { attribute_id: OPTIMAL_RANGE_ATTR, value: 12000 },
+          ],
+        })
+      ),
+      // No token provider configured (configureEsi runs only from App.tsx's
+      // real boot) -> /skills always degrades to empty here; untrained is
+      // the reachable case in this test environment.
+      http.get(`${ESI_BASE_URL}/characters/${CHARACTER_ID}/skills`, () =>
+        HttpResponse.json({ skills: [], total_sp: 0, unallocated_sp: 0 })
+      )
+    );
+    mockedLoadDictionary.mockResolvedValue({
+      182: { name: 'Primary Skill required', unit: 'typeID', category: 'Required Skills' },
+      [OPTIMAL_RANGE_ATTR]: { name: 'Optimal Range', unit: 'm', category: 'Targeting' },
+    });
+    mockedLoadSkills.mockResolvedValue([
+      {
+        typeID: GUNNERY_TYPE_ID,
+        name: 'Gunnery',
+        description: '',
+        groupID: 0,
+        groupName: '',
+        rank: 1,
+        primaryAttr: 'perception',
+        secondaryAttr: 'willpower',
+        prereqs: [],
+      },
+      {
+        typeID: SHARPSHOOTER_TYPE_ID,
+        name: 'Sharpshooter',
+        description: '',
+        groupID: 0,
+        groupName: '',
+        rank: 1,
+        primaryAttr: 'perception',
+        secondaryAttr: 'willpower',
+        prereqs: [],
+      },
+    ]);
+    mockedLoadSkillAttributeModifiers.mockResolvedValue({
+      [OPTIMAL_RANGE_ATTR]: [
+        {
+          ownerSkillTypeID: SHARPSHOOTER_TYPE_ID,
+          gatingSkillTypeID: GUNNERY_TYPE_ID,
+          perLevelValue: 5,
+        },
+      ],
+    });
+    const user = userEvent.setup();
+
+    render(<ItemDetailModal typeId={TYPE_ID} itemName="1400mm Autocannon II" onClose={() => {}} />);
+
+    const chip = await screen.findByRole('button', { name: '12,000 m' });
+    await user.click(chip);
+
+    const skillLine = await screen.findByText('Sharpshooter: +5% per level');
+    const popoverContent = skillLine.closest('div') as HTMLElement;
+    expect(within(popoverContent).getByText('Not trained')).toBeInTheDocument();
+
+    // Zero plans yet -> "Create Plan & Add", matching FitCheckPanel/MasteryPanel's
+    // convention. The item's own Required Skills section also has a button
+    // here (for Gunnery) — scope to this popover's own button.
+    await user.click(within(popoverContent).getByRole('button', { name: 'Create Plan & Add' }));
+
+    await waitFor(async () => {
+      const plans = await db.skillPlans.where('characterId').equals(CHARACTER_ID).toArray();
+      expect(plans).toHaveLength(1);
+      // Untrained -> "Add to Plan" trains one level, same convention as
+      // SkillRowContextMenu's `Math.min(currentLevel + 1, 5)`.
+      expect(plans[0].entries).toEqual([{ skillTypeID: SHARPSHOOTER_TYPE_ID, targetLevel: 1 }]);
     });
   });
 

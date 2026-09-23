@@ -64,6 +64,8 @@ vi.mock('@/sde/loadSde', () => ({
   loadSkills: vi.fn(async () => []),
   loadPi: vi.fn(async () => ({ schematics: {}, raw: [] })),
   loadMarketWideTrees: vi.fn(async () => ({})),
+  // ItemDetailModal (opened via "Show info" below) loads this unconditionally.
+  loadSkillAttributeModifiers: vi.fn(async () => ({})),
 }));
 
 vi.mock('@/features/market/PriceHistoryChart', () => ({

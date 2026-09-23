@@ -17,15 +17,30 @@
  */
 import { Fragment, useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { EmptyState, IskAmount, Modal, Spinner, TypeIcon } from '@/components/ui';
+import {
+  Button,
+  EmptyState,
+  IskAmount,
+  Modal,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+  Spinner,
+  TypeIcon,
+} from '@/components/ui';
 import { groupItemAttributes, type AttributeGroup } from '@/engine/market/itemAttributes';
 import { parseItemDescription, type DescriptionRun } from '@/engine/market/itemDescription';
 import type { OrderBookSummary } from '@/engine/market/orderBook';
+import {
+  findModifyingSkills,
+  postPercentMagnitude,
+  type ModifyingSkillEffect,
+} from '@/engine/market/skillAttributeEffects';
 import type { TrainedSkill } from '@/engine/types';
 import { getUniverseType, type UniverseType } from '@/esi/endpoints';
 import { loadAttributeDictionary } from '@/sde/loadMarketSde';
-import { loadPi } from '@/sde/loadSde';
-import type { PiData } from '@/sde/types';
+import { loadPi, loadSkillAttributeModifiers, loadSkills } from '@/sde/loadSde';
+import type { PiData, SkillAttributeModifierMap } from '@/sde/types';
 import { formatDuration } from '@/lib/duration';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
@@ -63,6 +78,9 @@ interface DetailData {
   requiredSkills: RequiredSkill[];
   /** typeID -> name, reused from the same resolution the generic rows already paid for. */
   skillNames: Readonly<Record<number, string>>;
+  /** Every skill's name — the popover surfaces skills the item doesn't require, so `skillNames` above isn't enough. */
+  allSkillNames: Readonly<Record<number, string>>;
+  skillAttributeModifiers: SkillAttributeModifierMap;
   /** Null when pi.json couldn't be read — the rest of the modal is unaffected. */
   pi: PiData | null;
 }
@@ -136,26 +154,37 @@ export function ItemDetailModal({ typeId, itemName, onClose, location }: ItemDet
       setData(null);
       setError(false);
       try {
-        const [{ data: type }, dictionary, pi] = await Promise.all([
-          getUniverseType(typeId),
-          loadAttributeDictionary(),
-          // Caught here, not by the shared handler below: only planetary
-          // commodities have anything to lose if this payload is missing, and
-          // a rejection inside the Promise.all would blank the whole modal.
-          loadPi().catch(() => null),
-        ]);
+        const [{ data: type }, dictionary, pi, skillAttributeModifiers, skills] = await Promise.all(
+          [
+            getUniverseType(typeId),
+            loadAttributeDictionary(),
+            // Caught here, not by the shared handler below: only planetary
+            // commodities have anything to lose if this payload is missing, and
+            // a rejection inside the Promise.all would blank the whole modal.
+            loadPi().catch(() => null),
+            // Same reasoning: the attribute-modifier popover is a bonus, not
+            // core item detail, so its data failing to load degrades to no
+            // popovers rather than blanking the modal.
+            loadSkillAttributeModifiers().catch(() => ({})),
+            loadSkills().catch(() => []),
+          ]
+        );
         if (cancelled) return;
         if (!type) throw new Error(`No type data for ${typeId}`);
         // Needs the dictionary to know which values are ids, so it can't join
         // the fetch above; it never rejects, so it can't blank the modal.
         const names = await loadAttributeReferenceNames([type.dogma_attributes], dictionary);
         if (cancelled) return;
+        const allSkillNames: Record<number, string> = {};
+        for (const skill of skills) allSkillNames[skill.typeID] = skill.name;
         setData({
           type,
           groups: groupItemAttributes(type.dogma_attributes, dictionary, names, {
             omitSkillRequirementRows: true,
           }),
           requiredSkills: extractRequiredSkills(type.dogma_attributes),
+          allSkillNames,
+          skillAttributeModifiers,
           skillNames: names.types ?? {},
           pi,
         });
@@ -169,6 +198,10 @@ export function ItemDetailModal({ typeId, itemName, onClose, location }: ItemDet
       cancelled = true;
     };
   }, [typeId]);
+
+  // Gates which attribute-modifier popovers can apply (empty while `data`
+  // hasn't loaded yet).
+  const requiredSkillTypeIds = new Set((data?.requiredSkills ?? []).map((r) => r.skillTypeID));
 
   return (
     <Modal open onClose={onClose} title={itemName}>
@@ -246,15 +279,38 @@ export function ItemDetailModal({ typeId, itemName, onClose, location }: ItemDet
                   {group.category}
                 </h3>
                 <dl className="mt-1 grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 text-xs">
-                  {group.attributes.map((attribute) => (
-                    <div key={attribute.attributeId} className="contents">
-                      <dt className="text-text-dim">{attribute.name}</dt>
-                      <dd className="text-right text-text">
-                        {attribute.displayValue ??
-                          `${formatAttributeValue(attribute.value, attribute.unit)}${attribute.unit ? ` ${attribute.unit}` : ''}`}
-                      </dd>
-                    </div>
-                  ))}
+                  {group.attributes.map((attribute) => {
+                    const valueText =
+                      attribute.displayValue ??
+                      `${formatAttributeValue(attribute.value, attribute.unit)}${attribute.unit ? ` ${attribute.unit}` : ''}`;
+                    const modifiers = activeCharacterId
+                      ? findModifyingSkills(
+                          attribute.attributeId,
+                          requiredSkillTypeIds,
+                          data.skillAttributeModifiers
+                        )
+                      : [];
+                    return (
+                      <div key={attribute.attributeId} className="contents">
+                        <dt className="text-text-dim">{attribute.name}</dt>
+                        <dd className="text-right text-text">
+                          {modifiers.length > 0 ? (
+                            <AttributeModifierTrigger
+                              modifiers={modifiers}
+                              skillNames={data.allSkillNames}
+                              trainedSkills={trainedSkills}
+                              target={targetPlan}
+                              itemName={itemName}
+                            >
+                              {valueText}
+                            </AttributeModifierTrigger>
+                          ) : (
+                            valueText
+                          )}
+                        </dd>
+                      </div>
+                    );
+                  })}
                 </dl>
               </div>
             ))
@@ -307,7 +363,7 @@ function RequiredSkillsSection({
       </div>
       <div className="mt-1 space-y-1">
         {requiredSkills.map((req) => {
-          const name = skillNames[req.skillTypeID] ?? `#${req.skillTypeID}`;
+          const name = skillNameOrFallback(req.skillTypeID, skillNames);
           if (!hasCharacter) {
             return <NameOnlySkillRow key={req.skillTypeID} name={name} level={req.level} />;
           }
@@ -339,6 +395,113 @@ function NameOnlySkillRow({ name, level }: { name: string; level: number }) {
     <div className="flex items-center gap-3 text-xs">
       <span className="flex-1 text-text">{name}</span>
       <span className="text-text-dim">{t('plans.level', { level })}</span>
+    </div>
+  );
+}
+
+/** `skillNames[id]`, falling back to `#id` when a skill's name hasn't resolved — shared by the trigger and each popover row. */
+function skillNameOrFallback(id: number, skillNames: Readonly<Record<number, string>>): string {
+  return skillNames[id] ?? `#${id}`;
+}
+
+/**
+ * "Which skill changes this?" — wraps an attribute's displayed value in a
+ * click-to-reveal popover. `modifiers` is already resolved
+ * (`findModifyingSkills`) to the skills that actually apply to this item,
+ * each already carrying its own per-level value — no fetch needed to render.
+ */
+function AttributeModifierTrigger({
+  modifiers,
+  skillNames,
+  trainedSkills,
+  target,
+  itemName,
+  children,
+}: {
+  modifiers: readonly ModifyingSkillEffect[];
+  skillNames: Readonly<Record<number, string>>;
+  trainedSkills: ReadonlyMap<number, TrainedSkill>;
+  target: TargetPlan;
+  itemName: string;
+  children: ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="underline decoration-dotted underline-offset-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
+        >
+          {children}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-64 space-y-2">
+        {modifiers.map((modifier) => (
+          <AttributeModifierRow
+            key={modifier.ownerSkillTypeID}
+            modifier={modifier}
+            skillName={skillNameOrFallback(modifier.ownerSkillTypeID, skillNames)}
+            trainedLevel={trainedSkills.get(modifier.ownerSkillTypeID)?.level ?? 0}
+            target={target}
+            itemName={itemName}
+          />
+        ))}
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+/** One skill's effect inside `AttributeModifierTrigger`'s popover — `modifier.perLevelValue` is already static SDE data, no fetch needed. */
+function AttributeModifierRow({
+  modifier,
+  skillName,
+  trainedLevel,
+  target,
+  itemName,
+}: {
+  modifier: ModifyingSkillEffect;
+  skillName: string;
+  trainedLevel: number;
+  target: TargetPlan;
+  itemName: string;
+}) {
+  const { t } = useTranslation();
+  return (
+    <div className="space-y-1 text-xs">
+      <p className="text-text">
+        {t('skills.attributeModifier.perLevel', {
+          skill: skillName,
+          perLevel: modifier.perLevelValue,
+        })}
+      </p>
+      <p className="text-text-dim">
+        {trainedLevel > 0
+          ? t('skills.attributeModifier.current', {
+              level: trainedLevel,
+              total: postPercentMagnitude(modifier.perLevelValue, trainedLevel),
+            })
+          : t('skills.attributeModifier.untrained')}
+      </p>
+      <Button
+        size="sm"
+        variant="ghost"
+        onClick={() =>
+          void target.addEntries(
+            [
+              {
+                skillTypeID: modifier.ownerSkillTypeID,
+                targetLevel: Math.min(trainedLevel + 1, 5),
+              },
+            ],
+            itemName
+          )
+        }
+      >
+        {target.plans?.length === 0
+          ? t('skills.fitCheck.createPlanAndAdd')
+          : t('skills.requiredSkills.addToPlan')}
+      </Button>
     </div>
   );
 }

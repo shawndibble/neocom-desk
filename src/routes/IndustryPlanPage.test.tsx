@@ -68,6 +68,8 @@ vi.mock('@/sde/loadSde', () => ({
   // on the plan's own page (`BuildPlanContextMenu`'s "Build Plan" action),
   // and that route loads this unconditionally for its Opportunities tab.
   loadMarketWideTrees: vi.fn(async () => ({})),
+  // ItemDetailModal (opened via "Show info" below) loads this unconditionally.
+  loadSkillAttributeModifiers: vi.fn(async () => ({})),
 }));
 
 // The materials row menu's "Show info" opens ItemDetailModal, which resolves

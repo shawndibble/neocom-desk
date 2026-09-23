@@ -47,6 +47,14 @@ here — they go one per file in `docs/context/decisions/`.
   Assignment ("I don't pay tax on this entry") carries no Payee at all, but
   still re-diffs the same way — growth on it still surfaces rather than
   staying tax-free forever (issue #523).
+- **Attribute-Modifying Skill**: A skill that changes the effective value of
+  an item's attribute it does not itself require — Sharpshooter boosts
+  Optimal Range on any item requiring Gunnery, without Sharpshooter itself
+  being required. Distinct from a required skill (Market's Required Skills
+  section), which gates whether an item can be used at all rather than
+  changing its numbers. Surfaced as a click-to-reveal popover on Market's
+  Item Detail (issue #1372): the attribute value names the skill, its
+  per-level effect, and the character's current trained level.
 - **Auto Build**: A one-shot bulk action on a **Build Plan** or every member
   of a **Build Group** (issues #694/#695/#696, generalized from #652's
   original depth-only pass): walk the material tree — the plan's or each

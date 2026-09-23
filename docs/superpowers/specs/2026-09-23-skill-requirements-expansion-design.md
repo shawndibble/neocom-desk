@@ -94,17 +94,57 @@ blocked and is in scope alongside the other two features.
 
 ## Feature 3 — Module/Ship → affecting skill (inline)
 
-- A small chip next to any attribute value already resolved from ESI's
-  `dgmTypeAttributes` to a driving skill (same extraction logic already
-  used by `src/features/skills/dogma.ts:extractRequiredSkills`).
+Two layers, shipped together:
+
+**3a. Required Skills** (item-level, already reuses existing engine): a
+section on item detail listing the item's required skills (from
+`extractRequiredSkills`), status + "Add to Skill Plan." No new data.
+
+**3b. Attribute → modifying skill** (the literal mockup: click a specific
+attribute value like "Falloff 12km," see which skill changes it and by
+how much). Verified feasible, moderate scope — not a quick add, its own
+sub-design:
+
+- New data: `dgmEffects.csv` (has a `modifierInfo` JSON column: per-effect
+  `{domain, func, modifiedAttributeID, modifyingAttributeID, operation,
+groupID?, skillTypeID?}`) and `dgmTypeEffects.csv` (`typeID, effectID,
+isDefault` join table), added to `scripts/build-sde.mjs` alongside the
+  mastery CSVs.
+- Resolution: for the two `RequiredSkillModifier` func types (~89% of
+  skill-relevant modifier rows), `skillTypeID` is embedded directly in the
+  data — no inference needed. `LocationGroupModifier` rows (~800) instead
+  key on the item's `groupID`, not a skill directly.
+- **Multi-hop chains exist in CCP's own effect graph but never require
+  simulating** — verified by implementation, not assumed: the traced
+  Gunnery example (its own level → derived attribute 441 → the effect that
+  reduces rate-of-fire) _sounds_ like it needs a 2–3-level resolver, but
+  ESI already returns 441's resolved per-level design value as a plain
+  static attribute on Gunnery's own type (`-2.0`, "2% Bonus... per skill
+  level"), same as Sharpshooter's un-chained attribute 294 (`5.0`). Checked
+  across the full shipped dataset, not just these two examples: all 261
+  rows resolve to a nonzero static value on the owning skill's own type —
+  zero cases actually need the intermediate hop simulated. A single flat
+  lookup (owning skill's own `dogma_attributes[sourceAttributeID]` × trained
+  level) is correct and sufficient. `scripts/build-sde.mjs`'s sanity checks
+  assert this invariant, so a future CCP data change introducing a genuine
+  unresolvable case fails the build loudly instead of shipping a wrong
+  number.
+- ~7 effects are permanently hand-special-cased even in pyfa's current
+  generic engine (`eos`) — expect a small, explicit special-case list here
+  too, not full generic coverage from day one.
 - Click/tap reveals a popover: skill name, effect at the current trained
-  level, and an "Add to Skill Plan" action using the same target-plan
-  mechanism as the other two features.
-- On phone, opens the same way the existing `Tooltip` component already
-  does touch-and-hold reveal — no new interaction pattern.
-- First surface: Market item detail. Same component is reusable later on
-  Industry blueprint materials and Assets item detail — not built as part
-  of this design, just not precluded by it.
+  level, "Add to Skill Plan" (same target-plan mechanism as the other
+  features). Built on the existing `Popover` primitive (docs/DESIGN.md),
+  not `Tooltip` — the popover holds an actionable "Add to Skill Plan"
+  button, and `Tooltip`'s own docs rule that out ("never for laying out a
+  panel"). `Popover` already opens uniformly on tap/click across touch and
+  desktop, which is exactly `Tooltip`'s own `openOnTap` behavior for a
+  trigger whose only job is revealing it — so this satisfies "no new
+  interaction pattern" at the primitive level, just not literally
+  `Tooltip`.
+- First surface: Market item detail. Reusable later on Industry blueprint
+  materials and Assets item detail — not built as part of this design,
+  just not precluded by it.
 
 ## Target Plan mechanism (shared by all 3 features)
 
@@ -142,9 +182,13 @@ No "active plan" flag added to the Plan model itself. Instead:
 
 ## Testing
 
-- TDD per project convention for any new pure logic in `src/engine`
-  (mastery tier shortfall calculation, once the data source is confirmed).
-- Fit Check and the module chip reuse already-tested engine paths
+- TDD per project convention for any new pure logic in `src/engine`:
+  mastery tier shortfall calculation, and the attribute→modifying-skill
+  resolver (3b) — `findModifyingSkills`/`postPercentMagnitude`, TDD'd
+  against the traced Sharpshooter/Gunnery examples (see 3b above for why a
+  flat lookup, not a multi-hop simulation, is what those tests should
+  assert).
+- Fit Check and Required Skills (3a) reuse already-tested engine paths
   (`fitToSkills`, `dogma.ts`); new test coverage there is at the UI-wiring
   level, not the engine level.
 

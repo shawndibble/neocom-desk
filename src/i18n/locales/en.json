@@ -84,6 +84,11 @@
       "title": "Required Skills",
       "addToPlan": "Add to Skill Plan"
     },
+    "attributeModifier": {
+      "perLevel": "{{skill}}: +{{perLevel}}% per level",
+      "current": "Trained to {{level}} — currently +{{total}}%",
+      "untrained": "Not trained"
+    },
     "mastery": {
       "title": "Ship Mastery",
       "searchPlaceholder": "Search for a ship",
