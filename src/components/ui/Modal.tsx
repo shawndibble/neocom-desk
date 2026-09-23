@@ -102,7 +102,7 @@ export function Modal({ open, id, onClose, title, children, placement = 'center'
         // land behind the top layer — see `portalContainer.ts`.
         <PortalContainerProvider value={portalContainer}>
           <div className="flex max-h-[85vh] flex-col">
-            <header className="flex min-h-8 items-center justify-between gap-2 border-b border-line px-3 py-1">
+            <header className="flex min-h-11 items-center justify-between gap-2 border-b border-line bg-panel-2 px-3 py-1 md:min-h-9">
               <h2
                 id={titleId}
                 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
