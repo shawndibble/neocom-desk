@@ -349,7 +349,11 @@ export function OrderHistoryPanel({
           )}
           <HistoryFilterBar filter={filter} onChange={setFilter} />
           {filteredHistory.length === 0 ? (
-            <EmptyState title={t('orders.noResults')} className="py-8" />
+            <EmptyState
+              title={t('orders.noResults')}
+              hint={t('orders.noResultsHint')}
+              className="py-8"
+            />
           ) : isPhone ? (
             <OrderHistoryList
               orders={filteredHistory}

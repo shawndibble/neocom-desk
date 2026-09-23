@@ -709,6 +709,11 @@ describe('BpcSourcingPanel source multiselect', () => {
     await user.click(screen.getByRole('button', { name: 'Contracts' }));
 
     expect(screen.getByText('No BPC listings match your filters.')).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Clear the item search or widen the region, ME/TE/runs, price, source and space filters.'
+      )
+    ).toBeInTheDocument();
   });
 
   it('shows a dedicated empty state when every source is deselected', async () => {

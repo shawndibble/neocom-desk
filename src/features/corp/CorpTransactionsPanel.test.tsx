@@ -71,3 +71,14 @@ describe('CorpTransactionsPanel — the row as an item', () => {
     expect(onShowInfo).toHaveBeenCalledWith(2048, 'Damage Control II');
   });
 });
+
+describe('CorpTransactionsPanel — filtered to zero', () => {
+  it('shows a hint naming which filters to clear', () => {
+    renderPanel({ filteredTransactions: [] });
+
+    expect(screen.getByText('No transactions match this filter.')).toBeInTheDocument();
+    expect(
+      screen.getByText('Clear the search or widen the side and date filters.')
+    ).toBeInTheDocument();
+  });
+});

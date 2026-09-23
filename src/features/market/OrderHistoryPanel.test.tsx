@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, within } from '@testing-library/react';
+import { render, screen, fireEvent, within, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { useActiveCharacter } from '@/stores/activeCharacter';
@@ -99,6 +100,34 @@ describe('OrderHistoryPanel — the row as an item', () => {
 
     fireEvent.contextMenu(await screen.findByRole('row', { name: /Damage Control II/ }));
     expect(onRequestBlueprintCatalog).toHaveBeenCalled();
+  });
+});
+
+describe('OrderHistoryPanel — filtered to zero', () => {
+  it('shows a hint naming which filters to clear when the search matches nothing', async () => {
+    mockedLoadHistory.mockResolvedValue({
+      cached: {
+        data: [historyOrder()],
+        fetchedAt: new Date(),
+        fromCache: false,
+        truncated: false,
+      },
+      needsReauth: false,
+    });
+    const user = userEvent.setup();
+    renderPanel();
+    await screen.findByRole('row', { name: /Damage Control II/ });
+
+    await user.type(screen.getByPlaceholderText('Search by item…'), 'nonexistent item');
+
+    await waitFor(() =>
+      expect(screen.getByText('No orders match your filters.')).toBeInTheDocument()
+    );
+    expect(
+      screen.getByText(
+        'Clear the search or reset the buy/sell and status filters to see every order.'
+      )
+    ).toBeInTheDocument();
   });
 });
 
