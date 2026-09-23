@@ -1990,6 +1990,17 @@ export function Market() {
           <Panel
             className={isDesktop || selectedTypeId !== null ? '' : 'hidden'}
             title={selectedItem?.name}
+            meta={
+              selectedItem &&
+              selectedTypeId !== null && (
+                <IconButton
+                  size="sm"
+                  icon={<Icon.Info />}
+                  label={t('market.contextMenu.showInfo')}
+                  onClick={() => handleShowInfo(selectedTypeId, selectedItem.name)}
+                />
+              )
+            }
             padded={selectedTypeId === null}
             leading={itemPanelLeading}
           >

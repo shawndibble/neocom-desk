@@ -6,6 +6,7 @@
  * row expand (the same section, so a pilot who never opens Show Info still
  * sees it from the order book directly).
  */
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TrainedSkill } from '@/engine/types';
 import type { RequiredSkill } from '@/features/skills/dogma';
@@ -31,7 +32,18 @@ export function RequiredSkillsSection({
   itemName: string;
 }) {
   const { t } = useTranslation();
+  // Which skills this session's clicks have confirmed added — `SkillRow`'s
+  // own status only ever reflects *trained* level, never *planned*, so
+  // without this a successful add looks identical to before the click (issue
+  // report: "clicked Add to Skill Plan and nothing happened"). Awaited, not
+  // optimistic — a rejected `addEntries` must not claim success.
+  const [addedSkillIds, setAddedSkillIds] = useState<ReadonlySet<number>>(new Set());
   if (requiredSkills.length === 0) return null;
+
+  const addLabel =
+    target.plans?.length === 0
+      ? t('skills.fitCheck.createPlanAndAdd')
+      : t('skills.requiredSkills.addToPlan');
 
   return (
     <div>
@@ -48,18 +60,18 @@ export function RequiredSkillsSection({
             return <NameOnlySkillRow key={req.skillTypeID} name={name} level={req.level} />;
           }
           const currentLevel = trainedSkills.get(req.skillTypeID)?.level ?? 0;
+          const added = addedSkillIds.has(req.skillTypeID);
           return (
             <SkillRow
               key={req.skillTypeID}
               name={name}
               status={skillTrainingStatus(currentLevel, req.level)}
               currentLevel={currentLevel}
-              addLabel={t('skills.requiredSkills.addToPlan')}
+              addLabel={added ? t('skills.requiredSkills.added') : addLabel}
               onAdd={() =>
-                void target.addEntries(
-                  [{ skillTypeID: req.skillTypeID, targetLevel: req.level }],
-                  itemName
-                )
+                void target
+                  .addEntries([{ skillTypeID: req.skillTypeID, targetLevel: req.level }], itemName)
+                  .then(() => setAddedSkillIds((current) => new Set(current).add(req.skillTypeID)))
               }
             />
           );

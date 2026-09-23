@@ -337,13 +337,14 @@ describe('ItemDetailModal', () => {
     // no-Character degraded "Level 3" text.
     expect(screen.getByLabelText('Not trained')).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Add to Skill Plan' }));
+    // No plan yet -> "Create Plan & Add" (FitCheck/Mastery's shared label
+    // contract, issue #1378).
+    await user.click(screen.getByRole('button', { name: 'Create Plan & Add' }));
 
-    await waitFor(async () => {
-      const plans = await db.skillPlans.where('characterId').equals(CHARACTER_ID).toArray();
-      expect(plans).toHaveLength(1);
-      expect(plans[0].entries).toEqual([{ skillTypeID: 24241, targetLevel: 3 }]);
-    });
+    expect(await screen.findByRole('button', { name: 'Added' })).toBeInTheDocument();
+    const plans = await db.skillPlans.where('characterId').equals(CHARACTER_ID).toArray();
+    expect(plans).toHaveLength(1);
+    expect(plans[0].entries).toEqual([{ skillTypeID: 24241, targetLevel: 3 }]);
   });
 
   it('attribute modifier chip: shows which skill affects it and adds it to a plan (issue #1372)', async () => {

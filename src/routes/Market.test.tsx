@@ -1329,6 +1329,51 @@ describe('Market Browser order row context menu (issue #6)', () => {
     expect(within(dialog).getByText('Structure Hitpoints')).toBeInTheDocument();
   });
 
+  it('Add to Skill Plan from the order row expand creates the plan and shows it was added', async () => {
+    await db.settings.put({ key: ACTIVE_CHARACTER_KEY, value: 1 });
+    server.use(
+      ordersHandler({ count: 0 }),
+      http.get(`${ESI_BASE_URL}/universe/types/587`, () =>
+        HttpResponse.json({
+          type_id: 587,
+          name: 'Rifter',
+          description: 'A rugged little frigate.',
+          group_id: 25,
+          published: true,
+          dogma_attributes: [
+            { attribute_id: 182, value: 3327 }, // requiredSkill1 -> Small Projectile Turret
+            { attribute_id: 277, value: 1 }, // requiredSkill1Level
+          ],
+        })
+      ),
+      http.get(`${ESI_BASE_URL}/characters/1/skills`, () =>
+        HttpResponse.json({ skills: [], total_sp: 0, unallocated_sp: 0 })
+      )
+    );
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.type(await screen.findByRole('searchbox'), 'rift');
+    await user.click(await screen.findByText('Rifter'));
+    const sellTable = await screen.findByRole('table', { name: 'Sell Orders' });
+    const [, sellRow] = within(sellTable).getAllByRole('row');
+
+    await user.click(sellRow);
+    // No plan yet -> "Create Plan & Add", not "Add to Skill Plan" (matches
+    // FitCheck/Mastery's shared Target Plan contract).
+    const addButton = await screen.findByRole('button', { name: 'Create Plan & Add' });
+    await user.click(addButton);
+
+    // The bug: nothing in the row visibly changed after a successful click,
+    // which reads as "I clicked it and nothing happened" even though the
+    // write succeeded. The button now confirms it.
+    expect(await screen.findByRole('button', { name: 'Added' })).toBeInTheDocument();
+
+    const plans = await db.skillPlans.where('characterId').equals(1).toArray();
+    expect(plans).toHaveLength(1);
+    expect(plans[0].entries).toEqual([{ skillTypeID: 3327, targetLevel: 1 }]);
+  });
+
   it('filters the book to one station, undone via the banner', async () => {
     server.use(ordersHandler({ count: 0 }));
     const user = userEvent.setup();
