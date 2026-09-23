@@ -10,12 +10,13 @@
 import { tabPath } from '@/lib/pageTabs';
 import { boolParam, enumSetParam, optionalIdParam, textParam } from '@/lib/urlState';
 import { INDUSTRY_TABS } from '@/features/industry/industryTabs';
+import type { BpcSearchSource } from '@/engine/contracts/bpcSearch';
 
 /**
  * Which listings the search covers: `contract` BPCs, `contractBpo` contract
  * originals and `market` market BPO sell orders (issue #1241), plus `owned`.
  */
-export type SourceToggle = 'contract' | 'contractBpo' | 'market' | 'owned';
+export type SourceToggle = BpcSearchSource | 'contractBpo';
 export const SOURCE_TOGGLES: readonly SourceToggle[] = [
   'contract',
   'contractBpo',
@@ -42,6 +43,8 @@ export const BPC_SOURCING_SORT_KEY = 'sourcing.sort';
 
 /** BPC Sourcing, pinned to one blueprint — the "search BPC Sourcing for this" links (issue #839). */
 export function bpcSourcingHref(blueprintTypeId: number): string {
-  const params = new URLSearchParams({ 'sourcing.type': String(blueprintTypeId) });
+  const params = new URLSearchParams();
+  const typeParam = BPC_SOURCING_PARAMS['sourcing.type'].serialize(blueprintTypeId);
+  if (typeParam !== null) params.set('sourcing.type', typeParam);
   return `${tabPath(INDUSTRY_TABS, 'sourcing')}?${params.toString()}`;
 }

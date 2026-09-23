@@ -8,6 +8,7 @@
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { industryTabHref } from '@/features/industry/industryTabs';
 import {
   ContextMenu,
   ContextMenuContent,
@@ -135,7 +136,7 @@ export function ItemContextMenu({
         <ContextMenuItem
           disabled={!blueprintTypeID}
           onSelect={() => {
-            if (blueprintTypeID) navigate(`/industry/plans?product=${typeId}`);
+            if (blueprintTypeID) navigate(`${industryTabHref('plans')}?product=${typeId}`);
           }}
         >
           {buildPlanLabel}

@@ -128,6 +128,13 @@ export function Industry() {
 
   const [compareMode, setCompareMode] = useUrlParam('plans.compare', COMPARE_MODE);
   const [compareSelectedIds, setCompareSelectedIds] = useState<ReadonlySet<string>>(new Set());
+  // Compare mode can also turn off from the URL (Back, a bare /industry
+  // link), not only the toggle — the ticked plans go with it either way.
+  const [prevCompareMode, setPrevCompareMode] = useState(compareMode);
+  if (compareMode !== prevCompareMode) {
+    setPrevCompareMode(compareMode);
+    if (!compareMode) setCompareSelectedIds(new Set());
+  }
   const [comparing, setComparing] = useState(false);
 
   const createPlan = useCallback(
@@ -349,7 +356,6 @@ export function Industry() {
   }
 
   function toggleCompareMode() {
-    if (compareMode) setCompareSelectedIds(new Set());
     setCompareMode(!compareMode);
   }
 

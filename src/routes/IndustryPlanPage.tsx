@@ -67,7 +67,7 @@ export function IndustryPlanPage() {
   // Deleted elsewhere, a stale URL, or another character's plan — the index
   // is the only page left to send the pilot back to.
   if (!plan || plan.characterId !== activeCharacterId) {
-    return <Navigate to="/industry/plans" replace />;
+    return <Navigate to={industryTabHref('plans')} replace />;
   }
 
   const groups = buildGroupsFor(workspace.buildGroups, activeCharacterId);

@@ -448,7 +448,7 @@ ADR 0015. Contacts (`src/routes/Contacts.tsx`) is the reference conversion.
 
 **Tabs → paths.**
 
-1. Declare the tabs in `src/app/pageTabs.ts` with `definePageTabs('<path>', [{ id, labelKey }, …])` — the id is the URL segment, the first tab is the default — and add it to `PAGE_TABS` under the page's existing route path.
+1. Declare the tabs in `src/app/pageTabs.ts` with `definePageTabs('<path>', [{ id, labelKey }, …])` — the id is the URL segment, the first tab is the default — and add it to `PAGE_TABS` under the page's existing route path. A page whose feature modules also link to its tabs may declare them feature-side and import them here instead (`INDUSTRY_TABS` in `features/industry/industryTabs.ts`), so `features/` never imports `app/`. A route nested under a tabbed page (`/industry/plans/:planId`) stays its own page — `pageTabs.ts` carves registered nested routes out of the tabbed page.
 2. Do **not** touch `ROUTE_ELEMENTS`, `ROUTE_REQUIREMENTS`, `pagePathFor` or `routeWarm`: `App.tsx` mounts a registered page at `<path>/*` and wraps it in `TabRoute` (bare path / unknown segment → default tab, replace), analytics reports each tab path, and `Layout` does not fade or remount between tabs.
 3. In the page, `const [tab, setTab] = usePageTab(MY_TABS)` replaces the `useState`, and the `Tabs` bar maps `MY_TABS.tabs` (`t(item.labelKey)`). A tab switch pushes history and keeps the query string.
 4. Any in-app link to a specific tab uses `tabPath(MY_TABS, id)`.

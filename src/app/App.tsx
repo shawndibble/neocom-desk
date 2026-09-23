@@ -1,5 +1,6 @@
 import { useEffect, type ReactElement } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { industryTabHref } from '@/features/industry/industryTabs';
 import { withSentryReactRouterV7Routing } from '@sentry/react';
 import { ErrorBoundary } from './ErrorBoundary';
 import { subscribeToEsiAuthFailures } from '@/stores/authFailure';
@@ -119,7 +120,7 @@ const ROUTE_ELEMENTS = {
   '/contracts': <Contracts />,
   // The BPC search moved into Industry's tab strip; the old path stays as a
   // redirect so bookmarks and any link already in the wild still land on it.
-  '/bpc-contracts': <Navigate to="/industry/sourcing" replace />,
+  '/bpc-contracts': <Navigate to={industryTabHref('sourcing')} replace />,
   '/contacts': <Contacts />,
   '/settings': <Settings />,
 } satisfies Record<AppRoutePath, ReactElement>;
