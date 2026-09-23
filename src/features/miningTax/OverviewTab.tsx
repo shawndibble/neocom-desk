@@ -40,15 +40,18 @@ import {
   type MiningYieldSnapshot,
 } from './yieldSnapshot';
 import { iskPerCalendarHour } from '@/engine/miningTax/yieldRate';
-import {
-  MINING_YIELD_RANGES,
-  daysCovered,
-  eveToday,
-  rangeDates,
-  rangeStartDate,
-  type MiningYieldRange,
-} from '@/engine/miningTax/yieldRange';
+import { daysCovered, eveToday, rangeDates, rangeStartDate } from '@/engine/miningTax/yieldRange';
 import { useMiningYieldRange } from './yieldRangePref';
+import { useMiningPriceBasis } from './priceBasisPref';
+import { MobileSettings, PriceBasisOptions, RangeControl, ValueMenu } from './OverviewSettings';
+import { basisLabel } from './basisLabel';
+import {
+  basisSide,
+  countDaysBySource,
+  isNowBasis,
+  weakestSource,
+  type PriceSource,
+} from '@/engine/miningTax/priceBasis';
 import { YieldDetailModal } from './YieldDetailModal';
 import { sumVolume, volumeDisplayMode } from './volume';
 import { VolumeDisplay } from './volumeDisplay';
@@ -84,37 +87,22 @@ function dateRangeLabel(dates: readonly string[]): string {
   return first === last ? first : `${first} – ${last}`;
 }
 
-interface RangeControlProps {
-  value: MiningYieldRange;
-  onChange: (range: MiningYieldRange) => void;
-  /** Full width with 44px tap targets — the phone layout. */
-  fill?: boolean;
-}
+const SOURCE_TAG_CLASS: Record<PriceSource, string> = {
+  saved: 'border-line-bright text-text-dim',
+  average: 'border-warning/50 text-warning',
+  live: 'border-accent-dim text-accent',
+  none: 'border-line text-text-dim',
+};
 
-/** Segmented Date range buttons. Each range slices already-loaded rows, so switching never refetches. */
-function RangeControl({ value, onChange, fill = false }: RangeControlProps) {
+/** Saved / Daily avg / Live / No price — where a row's ore prices came from on the chosen basis. */
+function PriceSourceTag({ source }: { source: PriceSource }) {
   const { t } = useTranslation();
   return (
-    <div
-      role="group"
-      aria-label={t('miningTax.overview.dateRangeStat')}
-      className={`flex overflow-hidden rounded-xs border border-line ${fill ? 'w-full' : ''}`}
+    <span
+      className={`rounded-xs border px-1.5 py-0.5 text-[0.6875rem] font-semibold tracking-widest uppercase ${SOURCE_TAG_CLASS[source]}`}
     >
-      {MINING_YIELD_RANGES.map((range) => {
-        const active = range === value;
-        return (
-          <button
-            key={range}
-            type="button"
-            aria-pressed={active}
-            onClick={() => onChange(range)}
-            className={`border-r border-line px-3 text-xs last:border-r-0 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent ${fill ? 'h-11 flex-1' : 'h-8'} ${active ? 'bg-panel-2 text-accent shadow-[inset_0_-2px_0_var(--color-accent)]' : 'text-text-dim hover:text-text'}`}
-          >
-            {t(`miningTax.overview.range.${range}`)}
-          </button>
-        );
-      })}
-    </div>
+      {t(`miningTax.overview.priceSource.${source}`)}
+    </span>
   );
 }
 
@@ -137,9 +125,13 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
   const range = useMiningYieldRange((state) => state.value);
   const setRange = useMiningYieldRange((state) => state.setValue);
   const hydrateRange = useMiningYieldRange((state) => state.hydrate);
+  const basis = useMiningPriceBasis((state) => state.value);
+  const setBasis = useMiningPriceBasis((state) => state.setValue);
+  const hydrateBasis = useMiningPriceBasis((state) => state.hydrate);
   useEffect(() => {
     void hydrateRange();
-  }, [hydrateRange]);
+    void hydrateBasis();
+  }, [hydrateRange, hydrateBasis]);
   // EVE/UTC, the ledger's own calendar. Recomputed each render so a tab left
   // open past downtime moves its window with the day.
   const today = eveToday();
@@ -154,10 +146,21 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
       ),
     [data, resolvedCharacterFilter]
   );
+  // In range, and re-valued on the chosen price basis — every basis is
+  // precomputed in the snapshot, so this is a swap, never a refetch.
   const visibleRows = useMemo(() => {
     const start = rangeStartDate(range, today);
-    return characterRows.filter((row) => row.entry.date >= start && row.entry.date <= today);
-  }, [characterRows, range, today]);
+    return characterRows
+      .filter((row) => row.entry.date >= start && row.entry.date <= today)
+      .map((row) => ({ ...row, ...row.byBasis[basis] }));
+  }, [characterRows, range, today, basis]);
+  const daysBySource = useMemo(
+    () =>
+      countDaysBySource(
+        visibleRows.map((row) => ({ date: row.entry.date, source: row.priceSource }))
+      ),
+    [visibleRows]
+  );
   const coverage = useMemo(() => {
     let oldestSaved: string | null = null;
     for (const row of characterRows) {
@@ -197,15 +200,24 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
 
   const dailyRate: DailyRatePoint[] = useMemo(() => {
     const byDate = new Map<string, number>();
+    const sourcesByDate = new Map<string, PriceSource[]>();
     for (const row of visibleRows) {
       byDate.set(row.entry.date, (byDate.get(row.entry.date) ?? 0) + row.valuation.rawValue);
+      const list = sourcesByDate.get(row.entry.date) ?? [];
+      list.push(row.priceSource);
+      sourcesByDate.set(row.entry.date, list);
     }
     // Every day of the range, mined or not, so the axis spans the whole window
-    // and a gap (or days before saved history began) reads as a gap.
-    return rangeDates(range, today).map((date) => ({
-      date,
-      iskPerHour: (byDate.get(date) ?? 0) / 24,
-    }));
+    // and a gap (or days before saved history began) reads as a gap. Each bar
+    // carries its day's weakest price source, so the chart can colour it.
+    return rangeDates(range, today).map((date) => {
+      const sources = sourcesByDate.get(date);
+      return {
+        date,
+        iskPerHour: (byDate.get(date) ?? 0) / 24,
+        source: sources ? weakestSource(sources) : null,
+      };
+    });
   }, [visibleRows, range, today]);
 
   const typeComparison: TypeComparisonPoint[] = useMemo(() => {
@@ -296,12 +308,17 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
       id: 'pricing',
       header: t('miningTax.overview.pricingColumn'),
       className: 'whitespace-nowrap',
-      cellClassName: (row) => (row.valuation.pricedAll ? 'text-text-dim' : 'text-warning'),
-      render: (row) =>
-        row.valuation.pricedAll
-          ? t('miningTax.overview.pricingFull')
-          : t('miningTax.overview.pricingPartial'),
-      sortValue: (row) => (row.valuation.pricedAll ? 1 : 0),
+      render: (row) => (
+        <span className="flex items-center gap-1.5">
+          <PriceSourceTag source={row.priceSource} />
+          {!row.valuation.pricedAll && (
+            <span className="text-[0.6875rem] text-warning">
+              {t('miningTax.overview.pricingPartial')}
+            </span>
+          )}
+        </span>
+      ),
+      sortValue: (row) => `${row.priceSource}:${row.valuation.pricedAll ? 1 : 0}`,
     },
   ];
 
@@ -314,8 +331,17 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
         meta={data?.fetchedAt ? <DataAgeBadge date={data.fetchedAt} /> : undefined}
         actions={
           <>
-            <div className="hidden sm:flex">
+            <div className="hidden items-center gap-2 sm:flex">
               <RangeControl value={range} onChange={(next) => void setRange(next)} />
+              <ValueMenu basis={basis}>
+                <PriceBasisOptions value={basis} onChange={(next) => void setBasis(next)} />
+              </ValueMenu>
+            </div>
+            <div className="sm:hidden">
+              <MobileSettings range={range} basis={basis}>
+                <RangeControl value={range} onChange={(next) => void setRange(next)} fill />
+                <PriceBasisOptions value={basis} onChange={(next) => void setBasis(next)} />
+              </MobileSettings>
             </div>
             {characters.length > 0 && (
               <CharacterFilterControl
@@ -338,9 +364,6 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
         }
       />
       {tabBar}
-      <div className="sm:hidden">
-        <RangeControl value={range} onChange={(next) => void setRange(next)} fill />
-      </div>
 
       {loading && !data ? (
         <div className="flex justify-center py-16">
@@ -385,7 +408,14 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
             />
           ) : (
             <>
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <p className="text-xs text-text-dim">
+                {isNowBasis(basis)
+                  ? t('miningTax.overview.basis.summaryNow', {
+                      price: t(`miningTax.overview.basis.${basisSide(basis)}`),
+                    })
+                  : t('miningTax.overview.basis.summaryDay', { price: basisLabel(t, basis) })}
+              </p>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
                 <Panel>
                   <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
                     {t('miningTax.overview.totalValueStat')}
@@ -446,6 +476,27 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
                     </p>
                   ) : (
                     <p className="text-[0.6875rem] text-text-dim">{dateRangeLabel(totals.dates)}</p>
+                  )}
+                </Panel>
+                <Panel>
+                  <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                    {t('miningTax.overview.priceSourceStat')}
+                  </p>
+                  <p className="mt-1 text-lg font-semibold tabular-nums">
+                    {isNowBasis(basis)
+                      ? t('miningTax.overview.priceSourceLive')
+                      : t('miningTax.overview.priceSourceValue', {
+                          count: daysBySource.saved,
+                          total: daysBySource.total,
+                        })}
+                  </p>
+                  {!isNowBasis(basis) && (daysBySource.average > 0 || daysBySource.live > 0) && (
+                    <p className="text-[0.6875rem] text-warning">
+                      {t('miningTax.overview.priceSourceMix', {
+                        average: daysBySource.average,
+                        live: daysBySource.live,
+                      })}
+                    </p>
                   )}
                 </Panel>
               </div>
