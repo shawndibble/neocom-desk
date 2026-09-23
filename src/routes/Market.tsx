@@ -1,4 +1,12 @@
-import { useEffect, useMemo, useRef, useState, type ReactElement, type ReactNode } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactElement,
+  type ReactNode,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import { usePageTab } from '@/lib/usePageTab';
@@ -8,6 +16,7 @@ import { MARKET_TABS } from '@/app/pageTabs';
 import {
   Button,
   Caret,
+  ColumnPickerMenu,
   DataTable,
   EmptyState,
   FilterBar,
@@ -29,6 +38,11 @@ import {
   TypeIcon,
 } from '@/components/ui';
 import type { DataTableColumn } from '@/components/ui';
+import {
+  MARKET_ORDER_COLUMN_IDS,
+  useVisibleMarketOrderColumns,
+  type MarketOrderColumnId,
+} from '@/features/market/marketOrderColumns';
 import * as Icon from '@/components/ui/icons';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import {
@@ -58,12 +72,14 @@ import {
   useCurrentSystem,
   useJumpRangeFilter,
   type CurrentSystemState,
+  type JumpsCellValue,
 } from '@/features/route/currentSystem';
 import {
   JumpRangeSelect,
   CurrentSystemPicker,
   JumpRangeNote,
 } from '@/features/route/JumpRangeControls';
+import { renderJumpsCell } from '@/features/route/jumpsCell';
 import {
   filterMarketTree,
   addAncestors,
@@ -238,6 +254,16 @@ const EMPTY_VARIATION_INDEX = buildVariationIndex({}, {});
 
 /** Stand-in until globalMarkets.json settles; the order book waits for the real one. */
 const NO_GLOBAL_MARKETS: ReadonlyMap<number, GlobalMarketOverride> = new Map();
+
+/** Sell has no `range`/`minVolume` — buy-order-only fields (ESI's `RegionOrder`). */
+const SELL_ORDER_COLUMN_IDS: readonly MarketOrderColumnId[] = [
+  'price',
+  'quantity',
+  'location',
+  'jumps',
+  'expiry',
+];
+const BUY_ORDER_COLUMN_IDS: readonly MarketOrderColumnId[] = MARKET_ORDER_COLUMN_IDS;
 
 const REGIONS_UNAVAILABLE_FETCH: OrderBookFetch = {
   status: 'failed',
@@ -759,6 +785,18 @@ export function Market() {
     currentSystem,
     regionMode ? jumpRange : DEFAULT_JUMP_RANGE
   );
+  const visibleOrderColumns = useVisibleMarketOrderColumns((state) => state.value);
+  const setVisibleOrderColumns = useVisibleMarketOrderColumns((state) => state.setValue);
+  const hydrateVisibleOrderColumns = useVisibleMarketOrderColumns((state) => state.hydrate);
+  useEffect(() => {
+    void hydrateVisibleOrderColumns();
+  }, [hydrateVisibleOrderColumns]);
+  function toggleOrderColumn(id: MarketOrderColumnId) {
+    const next = visibleOrderColumns.includes(id)
+      ? visibleOrderColumns.filter((existing) => existing !== id)
+      : [...visibleOrderColumns, id];
+    void setVisibleOrderColumns(next);
+  }
   // Market Data / Price History (issue #11), Market Data selected by default —
   // a scoped query param rather than a `/market/browser/<subtab>` path
   // segment (docs/ARCHITECTURE.md §9): it only ever matters with an item
@@ -1168,9 +1206,25 @@ export function Market() {
     return location.stationName ?? t('market.unknownStructure');
   }, [stationFilter, orderBookFetch, npcStationMap, solarSystemMap, t]);
 
-  const baseColumns = useMemo<DataTableColumn<RegionOrder>[]>(
-    () => [
-      {
+  /**
+   * A row's own distance from the Current System — independent of whether a
+   * Jump Range filter is even active (`jumpRangeFilter.jumps`/`jumpsStatus`
+   * are populated at every range, `useJumpRangeFilter`). `count: null` is a
+   * settled row this app cannot place on the stargate graph — not the same
+   * as still loading, same "unknowable, not pending" rule the Courier
+   * board's own Jumps column follows.
+   */
+  const orderJumps = useCallback(
+    (systemId: number): JumpsCellValue => {
+      if (jumpRangeFilter.jumpsStatus !== 'ready') return { kind: jumpRangeFilter.jumpsStatus };
+      return { kind: 'value', count: jumpRangeFilter.jumps?.get(systemId) ?? null };
+    },
+    [jumpRangeFilter]
+  );
+
+  const orderColumnsById = useMemo<Record<MarketOrderColumnId, DataTableColumn<RegionOrder>>>(
+    () => ({
+      price: {
         id: 'price',
         header: t('market.price'),
         align: 'right',
@@ -1191,7 +1245,7 @@ export function Market() {
         ),
         sortValue: (o) => o.price,
       },
-      {
+      quantity: {
         id: 'quantity',
         header: t('market.quantity'),
         align: 'right',
@@ -1199,33 +1253,38 @@ export function Market() {
         render: (o) => formatVolume(o.volume_remain),
         sortValue: (o) => o.volume_remain,
       },
-      {
+      location: {
         id: 'location',
         header: t('market.location'),
         render: (o) => (
           <LocationCell order={o} npcStations={npcStationMap} solarSystems={solarSystemMap} t={t} />
         ),
       },
-      {
+      jumps: {
+        id: 'jumps',
+        header: t('market.jumpsColumn'),
+        align: 'right',
+        className: 'tabular-nums',
+        sortValue: (o) => {
+          const cell = orderJumps(o.system_id);
+          return cell.kind === 'value' ? (cell.count ?? undefined) : undefined;
+        },
+        render: (o) => renderJumpsCell(orderJumps(o.system_id), t, 'market.jumpsUnavailableHint'),
+      },
+      expiry: {
         id: 'expiry',
         header: t('market.expiry'),
         className: 'whitespace-nowrap text-text-dim',
         render: (o) => orderExpiry(o).toLocaleDateString(),
         sortValue: (o) => orderExpiry(o).getTime(),
       },
-    ],
-    [t, npcStationMap, solarSystemMap, myOrderIds]
-  );
-  const buyColumns = useMemo<DataTableColumn<RegionOrder>[]>(
-    () => [
-      ...baseColumns,
-      {
+      range: {
         id: 'range',
         header: t('market.range'),
         className: 'text-text-dim',
         render: (o) => rangeLabel(o.range, t),
       },
-      {
+      minVolume: {
         id: 'minVolume',
         header: t('market.minVolume'),
         align: 'right',
@@ -1233,8 +1292,23 @@ export function Market() {
         render: (o) => formatVolume(o.min_volume),
         sortValue: (o) => o.min_volume,
       },
-    ],
-    [baseColumns, t]
+    }),
+    [t, npcStationMap, solarSystemMap, myOrderIds, orderJumps]
+  );
+
+  const baseColumns = useMemo<DataTableColumn<RegionOrder>[]>(
+    () =>
+      SELL_ORDER_COLUMN_IDS.filter((id) => visibleOrderColumns.includes(id)).map(
+        (id) => orderColumnsById[id]
+      ),
+    [visibleOrderColumns, orderColumnsById]
+  );
+  const buyColumns = useMemo<DataTableColumn<RegionOrder>[]>(
+    () =>
+      BUY_ORDER_COLUMN_IDS.filter((id) => visibleOrderColumns.includes(id)).map(
+        (id) => orderColumnsById[id]
+      ),
+    [visibleOrderColumns, orderColumnsById]
   );
 
   function handleToggle(groupId: number) {
@@ -1812,6 +1886,14 @@ export function Market() {
                             {t('market.sell')}
                           </h2>
                           <span className="flex items-center gap-1">
+                            <ColumnPickerMenu
+                              available={SELL_ORDER_COLUMN_IDS}
+                              visible={visibleOrderColumns}
+                              columnsById={orderColumnsById}
+                              onToggle={toggleOrderColumn}
+                              buttonLabel={t('market.columnsButton')}
+                              menuTitle={t('market.columnsMenuTitle')}
+                            />
                             <IconButton
                               size="sm"
                               icon={<Icon.Download />}
@@ -1889,6 +1971,14 @@ export function Market() {
                             {t('market.buy')}
                           </h2>
                           <span className="flex items-center gap-1">
+                            <ColumnPickerMenu
+                              available={BUY_ORDER_COLUMN_IDS}
+                              visible={visibleOrderColumns}
+                              columnsById={orderColumnsById}
+                              onToggle={toggleOrderColumn}
+                              buttonLabel={t('market.columnsButton')}
+                              menuTitle={t('market.columnsMenuTitle')}
+                            />
                             <IconButton
                               size="sm"
                               icon={<Icon.Download />}

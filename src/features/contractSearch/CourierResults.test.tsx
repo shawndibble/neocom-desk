@@ -103,6 +103,47 @@ beforeEach(() => {
   vi.mocked(localJumpCountsForRoutes).mockResolvedValue({ kind: 'unknown' });
 });
 
+describe('CourierResults column picker', () => {
+  it('shows every column by default, so shipping the picker changes nothing on its own', async () => {
+    renderBoard();
+    const table = await screen.findByRole('table', { name: 'Courier Contract Search' });
+    for (const name of [
+      'Route',
+      'Reward',
+      'Collateral',
+      'Jumps',
+      'ISK/jump',
+      'ISK/m³',
+      'Expires',
+    ]) {
+      expect(within(table).getByRole('columnheader', { name })).toBeInTheDocument();
+    }
+  });
+
+  it('can hide and re-show a column via the column picker, leaving Route (the identity column) untouched', async () => {
+    const user = userEvent.setup();
+    renderBoard();
+    const table = await screen.findByRole('table', { name: 'Courier Contract Search' });
+    await screen.findByRole('columnheader', { name: 'Collateral' });
+
+    await user.click(screen.getByRole('button', { name: 'Columns' }));
+    await user.click(await screen.findByRole('menuitemcheckbox', { name: 'Collateral' }));
+    await user.keyboard('{Escape}');
+
+    expect(
+      within(table).queryByRole('columnheader', { name: 'Collateral' })
+    ).not.toBeInTheDocument();
+    expect(within(table).getByRole('columnheader', { name: 'Route' })).toBeInTheDocument();
+    expect(within(table).getByRole('columnheader', { name: 'Jumps' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Columns' }));
+    await user.click(await screen.findByRole('menuitemcheckbox', { name: 'Collateral' }));
+    await user.keyboard('{Escape}');
+
+    expect(within(table).getByRole('columnheader', { name: 'Collateral' })).toBeInTheDocument();
+  });
+});
+
 describe('CourierResults "From my region" shortcut', () => {
   it('costs nothing until it is pressed', async () => {
     loadCharacterRegionId.mockResolvedValue(THE_FORGE);

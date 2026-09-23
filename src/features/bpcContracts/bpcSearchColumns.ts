@@ -14,6 +14,7 @@ import { createLocalSetting } from '@/lib/useLocalSetting';
 export const BPC_SEARCH_COLUMN_IDS = [
   'source',
   'location',
+  'jumps',
   'me',
   'te',
   'runs',
@@ -28,16 +29,17 @@ export const BPC_SEARCH_COLUMN_IDS = [
 export type BpcSearchColumnId = (typeof BPC_SEARCH_COLUMN_IDS)[number];
 
 /**
- * Location, ME, TE and Price are what a pilot needs to judge whether a copy
- * is worth buying — everything else (Source, Runs, Qty, ISK/run, Region,
- * Space, Expires) starts hidden and is a toggle away via `ColumnPickerMenu`.
- * ISK/run
+ * Location, Jumps, ME, TE and Price are what a pilot needs to judge whether a
+ * copy is worth buying and worth the trip — everything else (Source, Runs,
+ * Qty, ISK/run, Region, Space, Expires) starts hidden and is a toggle away
+ * via `ColumnPickerMenu`. ISK/run
  * sits after Runs and Qty, the two counts it divides by — the same placement
  * ISK/jump takes after Jumps on the Courier board: a rate shown without its
  * denominator states less than they do together.
  */
 export const DEFAULT_VISIBLE_BPC_SEARCH_COLUMNS: readonly BpcSearchColumnId[] = [
   'location',
+  'jumps',
   'me',
   'te',
   'price',
@@ -47,7 +49,7 @@ function isBpcSearchColumnId(raw: unknown): raw is BpcSearchColumnId {
   return typeof raw === 'string' && (BPC_SEARCH_COLUMN_IDS as readonly string[]).includes(raw);
 }
 
-export const VISIBLE_BPC_SEARCH_COLUMNS_KEY = 'bpcSearchVisibleColumns';
+export const VISIBLE_BPC_SEARCH_COLUMNS_KEY = 'bpcSearchVisibleColumns.v2';
 
 export const useVisibleBpcSearchColumns = createLocalSetting<readonly BpcSearchColumnId[]>({
   key: VISIBLE_BPC_SEARCH_COLUMNS_KEY,

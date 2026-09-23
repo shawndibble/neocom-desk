@@ -2590,6 +2590,8 @@
     "locationResolving": "…",
     "noSourceSelected": "Select at least one source to search.",
     "locationColumn": "Location",
+    "jumpsColumn": "Jumps",
+    "jumpsUnavailableHint": "No stargate route — one end is a player structure, or nothing connects them.",
     "spaceColumn": "Space",
     "spaceLabel": "Space",
     "columnsButton": "Columns",
@@ -3047,9 +3049,13 @@
     "price": "Price",
     "quantity": "Quantity",
     "location": "Location",
+    "jumpsColumn": "Jumps",
+    "jumpsUnavailableHint": "No stargate route connects this system to your current one.",
     "expiry": "Expires",
     "range": "Range",
     "minVolume": "Min. Volume",
+    "columnsButton": "Columns",
+    "columnsMenuTitle": "Columns",
     "unknownStructure": "Unknown Structure",
     "myOrder": "You",
     "showAll": "Show all ({{count}} total)",
@@ -3935,7 +3941,10 @@
     "priceColumn": "Price",
     "regionColumn": "Region",
     "systemColumn": "System",
+    "itemsJumpsColumn": "Jumps",
     "expiresColumn": "Expires",
+    "columnsButton": "Columns",
+    "columnsMenuTitle": "Columns",
     "startingBidShort": "bid",
     "buyoutShort": "buyout",
     "startingBid": "Starting bid: {{price}}",
@@ -3965,6 +3974,7 @@
     },
     "mobile": {
       "qtyAffix": "Qty ",
+      "jumpsAffix": "Jumps ",
       "expiresAffix": "Exp ",
       "offerCount_one": "{{count}} offer",
       "offerCount_other": "{{count}} offers"
@@ -4109,6 +4119,7 @@
     "searchPlaceholder": "Search solar systems…",
     "useGameLocation": "Use game location",
     "noOrigin": "Set your current system to filter by distance.",
-    "graphUnavailable": "Distances are unavailable offline. Showing every distance."
+    "graphUnavailable": "Distances are unavailable offline. Showing every distance.",
+    "distanceUnavailable": "Distance unavailable — the local stargate snapshot couldn't be read."
   }
 }

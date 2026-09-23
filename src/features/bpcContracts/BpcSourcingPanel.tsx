@@ -92,12 +92,14 @@ import {
   useCurrentSystem,
   useJumpRangeFilter,
   type CurrentSystemState,
+  type JumpsCellValue,
 } from '@/features/route/currentSystem';
 import {
   CurrentSystemPicker,
   JumpRangeNote,
   JumpRangeSelect,
 } from '@/features/route/JumpRangeControls';
+import { renderJumpsCell } from '@/features/route/jumpsCell';
 import { BuildPlanContextMenu } from '@/features/industry/BuildPlanContextMenu';
 import { loadCharacterBlueprints } from '@/features/industry/data';
 import { loadBlueprints } from '@/sde/loadSde';
@@ -555,6 +557,14 @@ export function BpcSourcingPanel() {
   const jumps = params['sourcing.jumps'];
   const currentSystem = useCurrentSystem();
   const jumpFilter = useJumpRangeFilter(currentSystem, jumps);
+  const bpcRowJumps = useCallback(
+    (row: BpcSearchRow): JumpsCellValue => {
+      if (row.systemId === null) return { kind: 'value', count: null };
+      if (jumpFilter.jumpsStatus !== 'ready') return { kind: jumpFilter.jumpsStatus };
+      return { kind: 'value', count: jumpFilter.jumps?.get(row.systemId) ?? null };
+    },
+    [jumpFilter]
+  );
   /**
    * The one blueprint the search has been narrowed to, or `null` while the
    * query is still free text. Distinct from `uiFilter.typeQuery`: typing
@@ -1002,6 +1012,23 @@ export function BpcSourcingPanel() {
           );
         },
       },
+      jumps: {
+        // A row's own distance from the Current System, independent of
+        // whether the Jump Range filter above is even active
+        // (`jumpFilter.jumps`/`jumpsStatus` are populated at every range,
+        // `useJumpRangeFilter`). A row with no resolved system at all (still
+        // loading, or ESI never placed it) sinks to a settled `null` — the
+        // filter's own status has nothing to say about a row it never saw.
+        id: 'jumps',
+        header: t('bpcContracts.jumpsColumn'),
+        align: 'right',
+        className: 'tabular-nums',
+        sortValue: (row) => {
+          const cell = bpcRowJumps(row);
+          return cell.kind === 'value' ? (cell.count ?? undefined) : undefined;
+        },
+        render: (row) => renderJumpsCell(bpcRowJumps(row), t, 'bpcContracts.jumpsUnavailableHint'),
+      },
       me: {
         id: 'me',
         header: t('bpcContracts.meColumn'),
@@ -1165,7 +1192,7 @@ export function BpcSourcingPanel() {
         },
       },
     }),
-    [t, regionNames, timeZone]
+    [t, regionNames, timeZone, bpcRowJumps]
   );
 
   const columns = useMemo<DataTableColumn<BpcSearchRow>[]>(() => {
