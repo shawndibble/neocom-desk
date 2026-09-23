@@ -20,6 +20,7 @@ import {
   type OwnedStockSaleLine,
 } from '@/engine/industry/ownedStockSale';
 import { marketItemUrl } from '@/engine/market/urlState';
+import type { ItemMenuFor } from '@/features/market/ItemContextMenu';
 import { formatDuration } from '@/lib/duration';
 import { formatIsk } from '@/lib/isk';
 import { formatCostIndex, formatPercent, formatVolume } from './format';
@@ -119,6 +120,8 @@ interface ResultsSummaryProps {
   nameFor: (typeID: number) => string;
   /** Grand total m3 across the materials table, for hauling-trip planning (issue #874). */
   totalVolume: MaterialVolumeTotals;
+  /** Wraps the revenue (product) and owned-sale (material) rows in the item context menu; omitted where the caller has none to offer. */
+  itemMenuFor?: ItemMenuFor;
 }
 
 /**
@@ -149,6 +152,7 @@ export function ResultsSummary({
   ownedSale,
   nameFor,
   totalVolume,
+  itemMenuFor,
 }: ResultsSummaryProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -335,6 +339,11 @@ export function ResultsSummary({
                 rowKey={() => 'revenue'}
                 label={t('industry.revenue')}
                 density="compact"
+                rowContextMenu={
+                  itemMenuFor && productTypeID !== null
+                    ? (_row, tr) => itemMenuFor(productTypeID, tr)
+                    : undefined
+                }
               />
             </div>
             <div className="divide-y divide-line rounded-xs border border-line">
@@ -476,6 +485,7 @@ export function ResultsSummary({
                   rowKey={(row) => row.typeID}
                   label={t('industry.useOrSell.perMaterial')}
                   density="compact"
+                  rowContextMenu={itemMenuFor && ((row, tr) => itemMenuFor(row.typeID, tr))}
                 />
               </div>
             </Disclosure>
