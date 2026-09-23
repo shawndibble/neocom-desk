@@ -1039,6 +1039,11 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
       // the card is as tall as a region card (three lines).
       expect(within(contractCard).queryByText('BPO')).not.toBeInTheDocument();
       expect(contractCard.children).toHaveLength(3);
+      // Accent only on the cheapest box in the row: the 2M market BPO beats
+      // every copy (3M+) and the 40M contract BPO, so it alone is lit.
+      expect(marketCard).toHaveClass('border-accent-dim');
+      expect(contractCard).not.toHaveClass('border-accent-dim');
+      expect(contractCard).not.toHaveClass('bg-accent/10');
       expect(marketCard.children).toHaveLength(3);
       expect(contractCard).toHaveTextContent('ME 8 / TE 16');
       await waitFor(() => expect(contractCard).toHaveTextContent('Jita 0.9'));
