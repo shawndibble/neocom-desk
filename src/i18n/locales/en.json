@@ -1265,6 +1265,7 @@
     "empty": "No alerts yet",
     "emptyHint": "Events you have enabled appear here while the app is open.",
     "noMatches": "No alerts match these filters",
+    "noMatchesHint": "Clear the search, pick All characters, clear the severity filters, or turn on Muted types to see every alert.",
     "feedOff": "The in-app alert list is switched off in Settings, so nothing new will be added to it. What is already here is still listed.",
     "retention": "This device keeps the last 300 alerts, and syncs 30 days of them between your devices."
   },
