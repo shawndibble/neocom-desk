@@ -7,7 +7,7 @@
  * is measured from.
  */
 
-export const JUMP_RANGES = ['any', 'system', '3', '5', '10'] as const;
+export const JUMP_RANGES = ['any', 'system', '3', '5', '10', '15', '20'] as const;
 export type JumpRange = (typeof JUMP_RANGES)[number];
 
 export const DEFAULT_JUMP_RANGE: JumpRange = 'any';

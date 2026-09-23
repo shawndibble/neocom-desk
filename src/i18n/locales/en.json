@@ -4092,7 +4092,9 @@
       "5": "Within 5 jumps",
       "10": "Within 10 jumps",
       "any": "Any distance",
-      "system": "Current system"
+      "system": "Current system",
+      "15": "Within 15 jumps",
+      "20": "Within 20 jumps"
     },
     "from": "From: {{system}}",
     "fromUnknown": "From: set your system",
@@ -4104,7 +4106,6 @@
     "searchPlaceholder": "Search solar systems…",
     "useGameLocation": "Use game location",
     "noOrigin": "Set your current system to filter by distance.",
-    "graphUnavailable": "Distances are unavailable offline. Showing every distance.",
-    "regionOnlyHint": "Only orders in this region are checked."
+    "graphUnavailable": "Distances are unavailable offline. Showing every distance."
   }
 }
