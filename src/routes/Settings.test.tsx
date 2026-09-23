@@ -644,10 +644,8 @@ describe('Settings — Notifications (issue #170)', () => {
   });
 
   it("lands on the Notifications tab when the Overview feed's link names it", async () => {
-    // The feed links to /settings#notifications. That used to resolve by
-    // scrolling within the default tab; the section is a tab of its own now,
-    // so the hash has to select it or the link goes nowhere.
-    window.history.pushState({}, '', '/settings#notifications');
+    // The feed links to /settings/notifications directly (ADR 0015: tab is a path segment).
+    window.history.pushState({}, '', '/settings/notifications');
     render(<App />);
 
     expect(await screen.findByRole('tab', { name: /^notifications$/i })).toHaveAttribute(
@@ -677,10 +675,9 @@ describe('Settings — Notifications (issue #170)', () => {
     expect(screen.getByRole('heading', { name: /someone i can thank/i })).toBeInTheDocument();
   });
 
-  it('lands on the FAQ tab from /settings#faq', async () => {
-    // The link to hand someone who asks what the app stores, from outside the
-    // app. Same hash-selects-a-tab path #notifications uses above.
-    window.history.pushState({}, '', '/settings#faq');
+  it('lands on the FAQ tab from /settings/faq', async () => {
+    // The link to hand someone who asks what the app stores, from outside the app.
+    window.history.pushState({}, '', '/settings/faq');
     render(<App />);
 
     expect(await screen.findByRole('tab', { name: /^faq$/i })).toHaveAttribute(
@@ -1192,7 +1189,7 @@ describe('Settings defaults', () => {
 
   it('shows the shortcut list for #shortcuts, even from another tab', async () => {
     const user = userEvent.setup();
-    window.history.pushState({}, '', '/settings#faq');
+    window.history.pushState({}, '', '/settings/faq');
     render(<App />);
     await screen.findByRole('heading', { level: 1, name: /settings/i });
     expect(await screen.findByRole('tab', { name: /faq/i })).toHaveAttribute(
@@ -1200,9 +1197,9 @@ describe('Settings defaults', () => {
       'true'
     );
 
-    // The real `?` shortcut, pressed from a tab that is not General. Without
-    // a TAB_FOR_HASH entry the hash changes and the tab does not, so the
-    // panel this anchor names never renders.
+    // The real `?` shortcut, pressed from a tab that is not General. It
+    // navigates to /settings/general#shortcuts, so both the tab and the
+    // anchor land correctly regardless of which tab was showing before.
     await user.keyboard('{Shift>}?{/Shift}');
 
     expect(await screen.findByRole('heading', { name: /keyboard shortcuts/i })).toBeInTheDocument();
@@ -1325,6 +1322,14 @@ describe('Settings defaults', () => {
 
 describe('Reset saved view preferences', () => {
   it('clears every view-preference key and nothing else', async () => {
+    // Not the bare `/settings`: `stubGlobal('location', ...)` below takes a
+    // frozen snapshot of `window.location`, so the redirect `TabRoute` would
+    // otherwise issue for a bare tabbed-page path can never resolve — the
+    // snapshot's `pathname` never advances to the tab it redirected to.
+    // Starting already on the tab path sidesteps that, and must happen
+    // before the snapshot is taken.
+    window.history.pushState({}, '', '/settings/general');
+
     const reloadSpy = vi.fn();
     vi.stubGlobal('location', { ...window.location, reload: reloadSpy });
 

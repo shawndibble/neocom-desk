@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
+import { SETTINGS_TABS } from '@/app/pageTabs';
+import { usePageTab } from '@/lib/usePageTab';
 import {
   Button,
   DataTable,
@@ -82,30 +84,6 @@ import { exportBackupToFile, importBackup, type ImportSummary } from '@/backup/i
 import { ENDPOINT_ROUTES } from '@/esi/endpointRoutes';
 import { useActivityLog, type ActivityLogEntry } from '@/stores/activityLog';
 import type { ActivityOutcome } from '@/esi/activityLog';
-
-type SettingsTab = 'general' | 'notifications' | 'dataAge' | 'activity' | 'faq';
-
-/**
- * Which tab a deep link's hash asks for. The Overview feed links to
- * `/settings#notifications`, which used to resolve by scrolling within the
- * default General tab; Notifications is now a tab of its own, so a hash that
- * names a section on a *different* tab has to select that tab or the link
- * lands on a page with no sign of what it came for.
- */
-const TAB_FOR_HASH: Readonly<Record<string, SettingsTab>> = {
-  notifications: 'notifications',
-  'corp-access': 'general',
-  // `/settings#faq` is the link to hand someone who asks what the app stores —
-  // worth being addressable from outside the app (a forum post, a README),
-  // which a tab with no hash of its own would not be.
-  faq: 'faq',
-  // The `?` shortcut's target (lib/shortcuts.ts). Only the mount-time
-  // initializer falls back to General for an unmapped hash; a *later* hash
-  // change leaves the tab alone, so without this entry pressing `?` while
-  // already on Settings' FAQ or Notifications tab changed the URL and
-  // nothing else — no panel, nothing to scroll to.
-  shortcuts: 'general',
-};
 
 const FONT_SCALE_LABEL_KEYS = {
   0.875: 'settings.fontScaleSmall',
@@ -1054,22 +1032,7 @@ export function Settings() {
   const timeFormat = useTimeFormat((state) => state.value);
   const setTimeFormat = useTimeFormat((state) => state.setValue);
   const { hash } = useLocation();
-  // Resolved in the initializer, not an effect, so the first paint is already
-  // the tab the link asked for — an effect would render General first and swap
-  // it out underneath the reader.
-  const [tab, setTab] = useState<SettingsTab>(() => TAB_FOR_HASH[hash.slice(1)] ?? 'general');
-
-  // A *later* hash change (a second click on the same link from elsewhere in
-  // the app) has to move the tab too. Adjusted during render rather than in an
-  // effect, the same pattern `NotificationsPanel`'s threshold field uses:
-  // this is deriving state from a prop, not synchronizing with an external
-  // system, and an effect would render the wrong tab first.
-  const [prevHash, setPrevHash] = useState(hash);
-  if (hash !== prevHash) {
-    setPrevHash(hash);
-    const targetTab = TAB_FOR_HASH[hash.slice(1)];
-    if (targetTab !== undefined) setTab(targetTab);
-  }
+  const [tab, setTab] = usePageTab(SETTINGS_TABS);
 
   // react-router does not act on a URL hash by itself, so a deep link from
   // elsewhere in the app would land at the top of a long page with no sign of
@@ -1087,7 +1050,7 @@ export function Settings() {
       <Tabs
         label={t('settings.title')}
         value={tab}
-        onChange={(id) => setTab(id as SettingsTab)}
+        onChange={(id) => setTab(id as typeof tab)}
         tabs={[
           { id: 'general', label: t('settings.tabs.general') },
           { id: 'notifications', label: t('settings.tabs.notifications') },
@@ -1139,8 +1102,8 @@ export function Settings() {
           <DefaultsPanel />
           <CorpDefaultsPanel />
           {/* Anchor for the `?` shortcut, which navigates to
-              `/settings#shortcuts` (lib/shortcuts.ts). TAB_FOR_HASH maps that
-              hash to this tab; the scroll effect above finds this id. */}
+              `/settings/general#shortcuts` (lib/shortcuts.ts). The scroll
+              effect above finds this id. */}
           <div id="shortcuts" className="scroll-mt-4">
             <Panel title={t('shortcuts.title')}>
               {/* `max-w-md` inside the full-width page frame: a description and its
@@ -1173,16 +1136,8 @@ export function Settings() {
           <DataPanel />
         </div>
       )}
-      {/*
-        The Overview feed's "Settings" link targets `#notifications`, which
-        `TAB_FOR_HASH` turns into this tab. The id stays on the wrapper so the
-        scroll in the effect above still has something to find.
-      */}
-      {tab === 'notifications' && (
-        <div id="notifications" className="scroll-mt-4">
-          <NotificationsPanel />
-        </div>
-      )}
+      {/* The Overview feed's "Settings" link targets `/settings/notifications` directly now. */}
+      {tab === 'notifications' && <NotificationsPanel />}
       {tab === 'dataAge' && (
         <div className="space-y-4">
           <DataAgePanel />
@@ -1191,13 +1146,8 @@ export function Settings() {
         </div>
       )}
       {tab === 'activity' && <ActivityLogPanel />}
-      {/* Same `id` wrapper as `#notifications` above, so `/settings#faq` both
-          selects the tab and has something for the scroll effect to find. */}
-      {tab === 'faq' && (
-        <div id="faq" className="scroll-mt-4">
-          <FaqPanel />
-        </div>
-      )}
+      {/* `/settings/faq` is the link to hand someone who asks what the app stores. */}
+      {tab === 'faq' && <FaqPanel />}
     </div>
   );
 }

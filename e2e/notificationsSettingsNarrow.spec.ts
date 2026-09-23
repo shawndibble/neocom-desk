@@ -25,8 +25,8 @@ const PHONE = { width: 390, height: 844 };
 const DESKTOP = { width: 1280, height: 800 };
 
 async function gotoNotificationSettings(page: Page) {
-  await signInAndGoto(page, './settings#notifications');
-  await page.waitForURL(/\/settings#notifications$/);
+  await signInAndGoto(page, './settings/notifications');
+  await page.waitForURL(/\/settings\/notifications$/);
 }
 
 /** The Character's own disclosure toggle, not the "All Characters" sibling row. */

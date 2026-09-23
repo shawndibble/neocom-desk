@@ -23,6 +23,14 @@ export const CONTACTS_TABS = definePageTabs('/contacts', [
   { id: 'across', labelKey: 'contacts.tabAcrossCharacters' },
 ]);
 
+export const SETTINGS_TABS = definePageTabs('/settings', [
+  { id: 'general', labelKey: 'settings.tabs.general' },
+  { id: 'notifications', labelKey: 'settings.tabs.notifications' },
+  { id: 'dataAge', labelKey: 'settings.tabs.data' },
+  { id: 'activity', labelKey: 'settings.tabs.activity' },
+  { id: 'faq', labelKey: 'settings.tabs.faq' },
+]);
+
 /**
  * Search has its own Items/Courier sub-tab, so each leaf's id is the full
  * path suffix below `/contracts` rather than one segment (see `lib/pageTabs.ts`).
@@ -43,6 +51,7 @@ export const PAGE_TABS: Partial<Record<AppRoutePath, PageTabs>> = {
   '/contacts': CONTACTS_TABS,
   '/contracts': CONTRACTS_TABS,
   '/industry': INDUSTRY_TABS,
+  '/settings': SETTINGS_TABS,
 };
 
 const TABBED_PAGES = Object.values(PAGE_TABS);

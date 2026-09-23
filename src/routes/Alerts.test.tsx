@@ -10,7 +10,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import '@/i18n';
 import { NARROW_QUERY } from '@/lib/useIsNarrow';
 import { db } from '@/db';
@@ -61,10 +61,17 @@ function entry({
   };
 }
 
-function renderPage() {
+/** Exposes the router's current search string, since `MemoryRouter` doesn't sync `window.location`. */
+function LocationSearchProbe() {
+  const location = useLocation();
+  return <output data-testid="location-search">{location.search}</output>;
+}
+
+function renderPage(initialEntry = '/alerts') {
   return render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[initialEntry]}>
       <Alerts />
+      <LocationSearchProbe />
     </MemoryRouter>
   );
 }
@@ -426,7 +433,7 @@ describe('Alerts', () => {
       expect(await screen.findByRole('button', { name: 'Dismiss all' })).toBeInTheDocument();
       expect(screen.getByRole('link', { name: 'Notification settings' })).toHaveAttribute(
         'href',
-        '/settings#notifications'
+        '/settings/notifications'
       );
     });
 
@@ -458,5 +465,40 @@ describe('Alerts', () => {
       await screen.findByText('New Mail');
       expect(screen.queryByText(/alerts? .* types .* characters/)).not.toBeInTheDocument();
     });
+  });
+});
+
+describe('Alerts URL state', () => {
+  it('restores the search text and character filter from the URL on reload', async () => {
+    await db.notificationFeed.put({
+      id: 'fuel',
+      characterId: KAELEN,
+      eventId: 'eveNotification',
+      eveType: 'StructureFuelAlert',
+      title: 'Structure fuel low',
+      body: 'Raitaru · Ahbazon III has 12 hours of fuel',
+      firedAt: Date.now(),
+    });
+    await db.notificationFeed.put(entry({ id: 'mail', characterId: SERA }));
+
+    renderPage('/alerts?query=ahbazon&characterId=' + KAELEN);
+
+    expect(await screen.findByLabelText('Search alerts')).toHaveValue('ahbazon');
+    await waitFor(() => {
+      expect(screen.getAllByRole('listitem')).toHaveLength(1);
+    });
+    expect(screen.getByText('Structure Low on Fuel')).toBeInTheDocument();
+  });
+
+  it('writes a typed search to the URL once typing pauses, and leaves the default out', async () => {
+    await db.notificationFeed.put(entry({ id: 'a' }));
+    renderPage();
+
+    await screen.findByText('New Mail');
+    await userEvent.type(screen.getByLabelText('Search alerts'), 'ahbazon');
+
+    await waitFor(() =>
+      expect(screen.getByTestId('location-search')).toHaveTextContent('?query=ahbazon')
+    );
   });
 });

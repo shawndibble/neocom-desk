@@ -100,6 +100,11 @@ import {
 } from './eventSelection';
 import { eveTypeLabel } from './eveTypeLabel';
 import { filterNotificationSections } from './notificationSearch';
+import { useUrlParam } from '@/lib/useUrlState';
+import { textParam } from '@/lib/urlState';
+
+/** Module scope so `useUrlParam` sees a stable codec identity across renders. */
+const SEARCH_PARAM = textParam();
 import { estimateCharacterSectionHeight } from './notificationRows';
 import { parseIskAmount, formatIsk } from '@/lib/isk';
 import { refreshAppBadge } from './appBadge';
@@ -232,7 +237,7 @@ export function NotificationsPanel() {
   // never deliver anything, so this state shows why instead of the button.
   const installRequired = webPushSupport() === 'requires-install';
 
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useUrlParam('search', SEARCH_PARAM);
   const [expandedCharacterIds, setExpandedCharacterIds] = useState<ReadonlySet<number>>(new Set());
 
   /**

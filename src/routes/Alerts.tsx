@@ -45,7 +45,6 @@ import { DEADLINE_SEVERITIES, type DeadlineSeverity } from '@/engine/severity';
 import { AlertGroupRow } from '@/features/notifications/AlertGroupRow';
 import { alertGroupLabel, groupAlertsByType } from '@/features/notifications/alertGroups';
 import {
-  EMPTY_ALERTS_FILTER,
   activeAlertsFilterCount,
   filterAlertGroups,
   type AlertsFilter,
@@ -61,6 +60,10 @@ import {
   useNotificationPreferences,
 } from '@/features/notifications/preferences';
 import { refreshAppBadge } from '@/features/notifications/appBadge';
+import { useUrlParams } from '@/lib/useUrlState';
+import { boolParam, enumSetParam, optionalIdParam, textParam } from '@/lib/urlState';
+import { SETTINGS_TABS } from '@/app/pageTabs';
+import { tabPath } from '@/lib/pageTabs';
 
 /**
  * Which severities get their own chip.
@@ -76,6 +79,19 @@ const FILTERABLE_SEVERITIES: readonly DeadlineSeverity[] = DEADLINE_SEVERITIES.f
 /** Radix `Select` has no empty-string value, so "every character" needs a sentinel of its own. */
 const ALL_CHARACTERS = 'all';
 
+/**
+ * `AlertsFilter` kept in the URL (ADR 0015) so a reload — or a link shared
+ * with another pilot — reopens the same view. `severities` defaults to the
+ * empty set, unlike `enumSetParam`'s own "all selected" default, to match
+ * `EMPTY_ALERTS_FILTER`.
+ */
+const ALERTS_FILTER_PARAMS = {
+  query: textParam(),
+  characterId: optionalIdParam(),
+  severities: enumSetParam(FILTERABLE_SEVERITIES, []),
+  showMuted: boolParam(),
+};
+
 /** The next set with `value` flipped in or out — the sheet edits a draft by value, not a store. */
 function toggled<T>(set: ReadonlySet<T>, value: T): ReadonlySet<T> {
   const next = new Set(set);
@@ -87,7 +103,9 @@ export function Alerts() {
   const { t } = useTranslation();
   const prefsValue = useNotificationPreferences((state) => state.value);
   const prefsHydrated = useNotificationPreferences((state) => state.hydrated);
-  const [filter, setFilter] = useState<AlertsFilter>(EMPTY_ALERTS_FILTER);
+  const [filter, setFilterParams] = useUrlParams(ALERTS_FILTER_PARAMS);
+  const setFilter = (next: AlertsFilter | ((prev: AlertsFilter) => AlertsFilter)): void =>
+    setFilterParams(typeof next === 'function' ? next(filter) : next);
   const [expandedKeys, setExpandedKeys] = useState<ReadonlySet<string>>(() => new Set());
 
   useEffect(() => {
@@ -167,7 +185,7 @@ export function Alerts() {
                 alike, so the two can never drift. */}
             <Tooltip content={t('alerts.settings')}>
               <Link
-                to="/settings#notifications"
+                to={tabPath(SETTINGS_TABS, 'notifications')}
                 aria-label={t('alerts.settings')}
                 className={iconButtonClassName()}
               >
