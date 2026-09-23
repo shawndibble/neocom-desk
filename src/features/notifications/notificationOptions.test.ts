@@ -23,7 +23,7 @@ describe('notificationUrlFor', () => {
   });
 
   it('routes wallet alerts to the wallet journal tab', () => {
-    expect(notificationUrlFor('walletBalanceChanged')).toBe('/wallet?tab=journal');
+    expect(notificationUrlFor('walletBalanceChanged')).toBe('/wallet/journal');
   });
 });
 
@@ -58,7 +58,7 @@ describe('notificationOptionsFor', () => {
       icon: '/icons/icon-192.png',
       badge: '/icons/badge-96.png',
       tag: '7:walletBalanceChanged',
-      data: { url: '/wallet?tab=journal' },
+      data: { url: '/wallet/journal' },
     });
   });
 

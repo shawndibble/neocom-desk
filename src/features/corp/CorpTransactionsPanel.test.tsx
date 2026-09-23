@@ -43,6 +43,8 @@ function renderPanel(overrides: Partial<Parameters<typeof CorpTransactionsPanel>
         loading={false}
         filter={EMPTY_WALLET_TRANSACTION_FILTER}
         onFilterChange={vi.fn()}
+        sort={{ columnId: 'date', direction: 'desc' }}
+        onSortChange={vi.fn()}
         nameFor={() => 'Damage Control II'}
         divisionQualifier={undefined}
         offlineTitleKey="common.offlineTitle"

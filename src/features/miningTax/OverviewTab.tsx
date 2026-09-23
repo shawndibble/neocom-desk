@@ -31,11 +31,10 @@ import { beginEveLogin } from '@/app/loginFlow';
 import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
 import { formatVolume } from '@/features/market/format';
 import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
-import {
-  useResolvedCharacterFilter,
-  type CharacterFilterValue,
-} from '@/features/character/characterFilterValue';
+import { useResolvedCharacterFilter } from '@/features/character/characterFilterValue';
+import { characterFilterParam } from '@/features/character/characterFilterUrlParam';
 import { SecurityValue } from '@/features/character/assetBrowserRows';
+import { useUrlParam, useUrlSort } from '@/lib/useUrlState';
 import {
   loadMiningYieldSnapshot,
   type MiningYieldRow,
@@ -75,6 +74,9 @@ import { VolumeDisplay } from './volumeDisplay';
 import type { DailyRatePoint, TypeComparisonPoint } from './MiningYieldCharts';
 
 const LazyMiningYieldCharts = lazy(() => import('./MiningYieldCharts'));
+
+const OVERVIEW_CHARACTER_FILTER_PARAM = characterFilterParam('all');
+const OVERVIEW_DEFAULT_SORT = { columnId: 'date', direction: 'desc' as const };
 
 /** A row's mined m³ — units times the type's own unit volume for each ore line. */
 function entryVolume(row: MiningYieldRow, typeVolumes: ReadonlyMap<number, number>) {
@@ -146,7 +148,10 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
     { cacheKey: 'miningYieldOverview' }
   );
 
-  const [characterFilter, setCharacterFilter] = useState<CharacterFilterValue>('all');
+  const [characterFilter, setCharacterFilter] = useUrlParam(
+    'overview.character',
+    OVERVIEW_CHARACTER_FILTER_PARAM
+  );
   const [detailRow, setDetailRow] = useState<MiningYieldRow | null>(null);
   const resolvedCharacterFilter = useResolvedCharacterFilter(characterFilter, activeCharacterId);
   const range = useMiningYieldRange((state) => state.value);
@@ -429,6 +434,12 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
     ...activeColumnIds.map((id) => columnsById[id]),
   ];
 
+  const overviewSort = useUrlSort(
+    'overview.sort',
+    OVERVIEW_DEFAULT_SORT,
+    columns.map((c) => c.id)
+  );
+
   return (
     <div className="space-y-4">
       {/* Same shape as `TaxTab`: this tab owns its snapshot, so it owns the
@@ -660,7 +671,7 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
                       `${row.characterId}:${row.entry.date}:${row.entry.solarSystemId}`
                     }
                     label={t('miningTax.overviewTab')}
-                    defaultSort={{ columnId: 'date', direction: 'desc' }}
+                    {...overviewSort}
                     onRowClick={(row) => setDetailRow(row)}
                   />
                 </div>

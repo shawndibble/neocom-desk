@@ -29,7 +29,7 @@
  *
  * No colony fixture. The Plan tab costs a hypothetical chain from `pi.json`
  * and hub prices alone — it never reads the character's colonies — so the
- * product is chosen straight off the URL (`?tab=plan&type=`) and the only
+ * product is chosen straight off the URL (`/plan?type=`) and the only
  * network this spec has to answer is Fuzzwork.
  */
 import { readFileSync } from 'node:fs';
@@ -98,7 +98,7 @@ async function mockHubPrices(page: Page): Promise<void> {
  * layout regressed.
  */
 async function openSensitivity(page: Page, typeId: number, ratePercent: string): Promise<void> {
-  await page.goto(`./planetary-industry?tab=plan&type=${typeId}`);
+  await page.goto(`./planetary-industry/plan?type=${typeId}`);
   const table = page.getByRole('table', { name: SENSITIVITY_TABLE });
   // Well past the 5s default: the tab awaits the SDE bake plus a hub read for
   // every type in the chain, cold on a CI runner.

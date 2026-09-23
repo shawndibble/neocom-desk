@@ -23,6 +23,23 @@ export const CONTACTS_TABS = definePageTabs('/contacts', [
   { id: 'across', labelKey: 'contacts.tabAcrossCharacters' },
 ]);
 
+export const PI_TABS = definePageTabs('/planetary-industry', [
+  { id: 'colonies', labelKey: 'piPlan.coloniesTab' },
+  { id: 'plan', labelKey: 'piPlan.planTab' },
+  { id: 'advisor', labelKey: 'piPlan.advisorTab' },
+]);
+
+export const MINING_TABS = definePageTabs('/mining', [
+  { id: 'tax', labelKey: 'miningTax.taxTab' },
+  { id: 'overview', labelKey: 'miningTax.overviewTab' },
+]);
+
+export const WALLET_TABS = definePageTabs('/wallet', [
+  { id: 'balance', labelKey: 'wallet.balanceTab' },
+  { id: 'journal', labelKey: 'wallet.journalTab' },
+  { id: 'transactions', labelKey: 'wallet.transactionsTab' },
+]);
+
 /**
  * Search has its own Items/Courier sub-tab, so each leaf's id is the full
  * path suffix below `/contracts` rather than one segment (see `lib/pageTabs.ts`).
@@ -64,6 +81,9 @@ export const PAGE_TABS: Partial<Record<AppRoutePath, PageTabs>> = {
   '/contracts': CONTRACTS_TABS,
   '/industry': INDUSTRY_TABS,
   '/market': MARKET_TABS,
+  '/planetary-industry': PI_TABS,
+  '/mining': MINING_TABS,
+  '/wallet': WALLET_TABS,
 };
 
 const TABBED_PAGES = Object.values(PAGE_TABS);

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Navigate, useSearchParams } from 'react-router-dom';
+import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useExpiringWindowHours, useExpiringWindowMs } from '@/features/pi/expiringWindow';
 import {
@@ -66,6 +66,17 @@ import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapsh
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
 import { formatDuration } from '@/lib/duration';
+import { usePageTab } from '@/lib/usePageTab';
+import { useUrlParams } from '@/lib/useUrlState';
+import {
+  boolParam,
+  enumParam,
+  textParam,
+  TEXT_DEBOUNCE_MS,
+  type UrlParamCodec,
+} from '@/lib/urlState';
+import { PI_TABS } from '@/app/pageTabs';
+import { COLONY_SPACES, type ColonySpace } from '@/features/pi/customsRate';
 
 const NO_NAMES: ReadonlyMap<number, string> = new Map();
 const NO_DETAILS: ReadonlyMap<number, StatusResult<CharacterPlanetDetail>> = new Map();
@@ -760,20 +771,46 @@ function characterNames(characters: readonly RosterCharacter[]): string {
   return characters.map((character) => character.name).join(', ');
 }
 
-/** Which peer view is showing. `colonies` is the default and needs no URL param. */
-type PiTab = 'colonies' | 'plan' | 'advisor';
-
-const PI_TABS: readonly PiTab[] = ['colonies', 'plan', 'advisor'];
-
-/** An unknown tab silently becomes the default, same as an unknown type does. */
-function parseTab(value: string | null): PiTab {
-  return PI_TABS.includes(value as PiTab) ? (value as PiTab) : 'colonies';
-}
-
 function parsePositiveInt(value: string | null): number | null {
   const parsed = Number(value);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
 }
+
+/** `type` (the planned commodity) and `system` (the Advisor's system) — present only once chosen. */
+function positiveIntParam(): UrlParamCodec<number | null> {
+  return {
+    parse: (raw) => parsePositiveInt(raw),
+    serialize: (value) => (value === null ? null : String(value)),
+  };
+}
+
+/**
+ * `rate`'s override text: `null` means "follow the band default", same as
+ * `PlanPanel`'s own state did. Anything that isn't a finite number — blank,
+ * garbage, a hand-edited link — degrades to that default too, the same rule
+ * every other codec here follows.
+ */
+function nullableNumberTextParam(): UrlParamCodec<string | null> {
+  return {
+    parse: (raw) =>
+      raw !== null && raw.trim() !== '' && Number.isFinite(Number(raw)) ? raw : null,
+    serialize: (value) => value,
+    debounceMs: TEXT_DEBOUNCE_MS,
+  };
+}
+
+const PI_URL_PARAMS = {
+  type: positiveIntParam(),
+  system: positiveIntParam(),
+  perDay: textParam({ defaultValue: '10' }),
+  space: enumParam<ColonySpace>(COLONY_SPACES, 'highsec'),
+  rate: nullableNumberTextParam(),
+  // Not named in the ticket's "perDay/space/rate" list, but the same cited
+  // state (`PlanPanel.tsx:113-117`) and the same "result-defining view state"
+  // rule — it feeds `costPlan` exactly like the other three.
+  extractionRate: textParam({ defaultValue: '' }),
+  includeRebuilds: boolParam(),
+};
 
 /**
  * Planetary Industry: colony health from extractor expiry — the one PI field
@@ -786,11 +823,16 @@ function parsePositiveInt(value: string | null): number | null {
  * planner answers on day one. A second nav entry would also cost a row in the
  * mobile nav sheet, which is the surface that can least afford one.
  *
- * The tab, the planned commodity and the Advisor's system live in the URL
- * (`?tab=plan&type=2867`, `?tab=advisor&system=30002187`)
- * so a plan survives a reload and can be deep-linked into later. Both fall
- * back silently: an unknown tab is `colonies`, and an unknown type is handled
- * by the planner picking its own default rather than rendering nothing.
+ * The tab is a path segment (`/planetary-industry/plan`,
+ * `/planetary-industry/advisor`); every input each peer tab needs to redraw
+ * its answer stays a scoped query param on top of it — Plan's commodity,
+ * output rate, space, customs-rate override and extraction-rate override
+ * (`?type=`, `?perDay=`, `?space=`, `?rate=`, `?extractionRate=`), Advisor's
+ * system and rebuilds toggle (`?system=`, `?includeRebuilds=`) — so a plan or
+ * a worklist survives a reload and can be deep-linked into later. All fall
+ * back silently: an unknown segment lands on `colonies` (`TabRoute`), and an
+ * unknown value is handled by each param's own default rather than rendering
+ * nothing.
  */
 export function PlanetaryIndustry() {
   const { t } = useTranslation();
@@ -802,7 +844,19 @@ export function PlanetaryIndustry() {
   useEffect(() => {
     void hydrateExpiringWindow();
   }, [hydrateExpiringWindow]);
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [tab, setTab] = usePageTab(PI_TABS);
+  const [
+    {
+      type: plannedTypeId,
+      system: advisorSystemId,
+      perDay: perDayText,
+      space,
+      rate: ratePercentText,
+      extractionRate: extractionRateText,
+      includeRebuilds,
+    },
+    setPiParams,
+  ] = useUrlParams(PI_URL_PARAMS);
   const { data, error, loading, hydrated, activeCharacterId, refresh } = useRouteSnapshot(
     loadPiSnapshot,
     undefined,
@@ -833,36 +887,29 @@ export function PlanetaryIndustry() {
     void hydrateShowAltColonies();
   }, [hydrateShowAltColonies]);
 
-  const tab: PiTab = parseTab(searchParams.get('tab'));
-  const plannedTypeId = parsePositiveInt(searchParams.get('type'));
-  const advisorSystemId = parsePositiveInt(searchParams.get('system'));
-
-  const setTab = useCallback(
-    (next: string) => {
-      const params = new URLSearchParams(searchParams);
-      if (next === 'colonies') params.delete('tab');
-      else params.set('tab', next);
-      setSearchParams(params, { replace: true });
-    },
-    [searchParams, setSearchParams]
-  );
-
   const setPlannedTypeId = useCallback(
-    (next: number) => {
-      const params = new URLSearchParams(searchParams);
-      params.set('type', String(next));
-      setSearchParams(params, { replace: true });
-    },
-    [searchParams, setSearchParams]
+    (next: number) => setPiParams({ type: next }),
+    [setPiParams]
   );
 
   const setAdvisorSystemId = useCallback(
-    (next: number) => {
-      const params = new URLSearchParams(searchParams);
-      params.set('system', String(next));
-      setSearchParams(params, { replace: true });
-    },
-    [searchParams, setSearchParams]
+    (next: number) => setPiParams({ system: next }),
+    [setPiParams]
+  );
+
+  const setPerDayText = useCallback((next: string) => setPiParams({ perDay: next }), [setPiParams]);
+  const setSpace = useCallback((next: ColonySpace) => setPiParams({ space: next }), [setPiParams]);
+  const setRatePercentText = useCallback(
+    (next: string | null) => setPiParams({ rate: next }),
+    [setPiParams]
+  );
+  const setExtractionRateText = useCallback(
+    (next: string) => setPiParams({ extractionRate: next }),
+    [setPiParams]
+  );
+  const setIncludeRebuilds = useCallback(
+    (next: boolean) => setPiParams({ includeRebuilds: next }),
+    [setPiParams]
   );
 
   const planetsResult = data?.planetsResult ?? null;
@@ -981,7 +1028,7 @@ export function PlanetaryIndustry() {
       <Tabs
         label={t('piPlan.tabsLabel')}
         value={tab}
-        onChange={setTab}
+        onChange={(id) => setTab(id as typeof tab)}
         tabs={[
           { id: 'colonies', label: t('piPlan.coloniesTab') },
           { id: 'plan', label: t('piPlan.planTab') },
@@ -994,12 +1041,22 @@ export function PlanetaryIndustry() {
           characterId={activeCharacterId}
           systemId={advisorSystemId}
           onSystemIdChange={setAdvisorSystemId}
+          includeRebuilds={includeRebuilds}
+          onIncludeRebuildsChange={setIncludeRebuilds}
         />
       ) : tab === 'plan' ? (
         <PlanPanel
           characterId={activeCharacterId}
           typeId={plannedTypeId}
           onTypeIdChange={setPlannedTypeId}
+          perDayText={perDayText}
+          onPerDayTextChange={setPerDayText}
+          space={space}
+          onSpaceChange={setSpace}
+          ratePercentText={ratePercentText}
+          onRatePercentTextChange={setRatePercentText}
+          extractionRateText={extractionRateText}
+          onExtractionRateTextChange={setExtractionRateText}
         />
       ) : loading && !data ? (
         <div className="flex justify-center py-16">

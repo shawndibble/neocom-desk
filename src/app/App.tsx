@@ -105,7 +105,7 @@ const ROUTE_ELEMENTS = {
   '/market': <Market />,
   '/wallet': <Wallet />,
   '/wallet/loyalty/:corporationId': <LoyaltyStore />,
-  '/moon-mining': <MoonMiningTax />,
+  '/mining': <MoonMiningTax />,
   '/clones': <Clones />,
   '/planetary-industry': <PlanetaryIndustry />,
   '/employment-history': <EmploymentHistory />,

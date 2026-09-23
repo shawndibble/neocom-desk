@@ -98,9 +98,31 @@ export interface PlanPanelProps {
   /** Held in the URL by the route, so a plan survives a reload and can be deep-linked. */
   typeId: number | null;
   onTypeIdChange: (typeId: number) => void;
+  /** Also URL-held, same reason: a sourcing scenario is worth reloading or sharing intact. */
+  perDayText: string;
+  onPerDayTextChange: (value: string) => void;
+  space: ColonySpace;
+  onSpaceChange: (value: ColonySpace) => void;
+  /** Null means "follow the band default", which is what lets the provenance line stay honest. */
+  ratePercentText: string | null;
+  onRatePercentTextChange: (value: string | null) => void;
+  extractionRateText: string;
+  onExtractionRateTextChange: (value: string) => void;
 }
 
-export function PlanPanel({ characterId, typeId, onTypeIdChange }: PlanPanelProps) {
+export function PlanPanel({
+  characterId,
+  typeId,
+  onTypeIdChange,
+  perDayText,
+  onPerDayTextChange,
+  space,
+  onSpaceChange,
+  ratePercentText,
+  onRatePercentTextChange,
+  extractionRateText,
+  onExtractionRateTextChange,
+}: PlanPanelProps) {
   const { t } = useTranslation();
 
   const [pi, setPi] = useState<PiData | null>(null);
@@ -110,18 +132,12 @@ export function PlanPanel({ characterId, typeId, onTypeIdChange }: PlanPanelProp
   const [loading, setLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
 
-  const [perDayText, setPerDayText] = useState('10');
-  const [space, setSpace] = useState<ColonySpace>('highsec');
-  /** Null means "follow the band default", which is what lets the provenance line stay honest. */
-  const [ratePercentText, setRatePercentText] = useState<string | null>(null);
-  const [extractionRateText, setExtractionRateText] = useState('');
-
   /**
    * Hub, layout and sourcing floor come from disk (`planControlsPref.ts`)
-   * rather than from `useState`: this panel unmounts on every tab switch, and
-   * these three are standing facts about how the pilot operates, not about the
-   * product on screen. The band, the customs override and the two rate fields
-   * stay local — see that module for why.
+   * rather than a prop: this panel unmounts on every tab switch, and these
+   * three are standing facts about how the pilot operates, not about the
+   * product on screen — unlike `typeId`/`perDayText`/`space`/`ratePercentText`
+   * /`extractionRateText` above, which describe *this* plan and are URL-held.
    */
   const { hubId, layout, floor } = usePlanControls((state) => state.value);
   const controlsHydrated = usePlanControls((state) => state.hydrated);
@@ -300,7 +316,7 @@ export function PlanPanel({ characterId, typeId, onTypeIdChange }: PlanPanelProp
         inputMode="decimal"
         value={extractionRateText}
         placeholder={t('piPlan.extractionRatePlaceholder')}
-        onChange={(event) => setExtractionRateText(event.target.value)}
+        onChange={(event) => onExtractionRateTextChange(event.target.value)}
         className="w-full"
       />
     </Field>
@@ -353,7 +369,7 @@ export function PlanPanel({ characterId, typeId, onTypeIdChange }: PlanPanelProp
               min={1}
               inputMode="decimal"
               value={perDayText}
-              onChange={(event) => setPerDayText(event.target.value)}
+              onChange={(event) => onPerDayTextChange(event.target.value)}
               className="w-full"
             />
           </Field>
@@ -380,10 +396,10 @@ export function PlanPanel({ characterId, typeId, onTypeIdChange }: PlanPanelProp
             <Select
               value={space}
               onValueChange={(value) => {
-                setSpace(value as ColonySpace);
+                onSpaceChange(value as ColonySpace);
                 // Back to the band's own default: an override carried across a
                 // band change would silently misprice the new one.
-                setRatePercentText(null);
+                onRatePercentTextChange(null);
               }}
             >
               <SelectTrigger aria-label={t('piPlan.space')} className="w-full">
@@ -418,14 +434,14 @@ export function PlanPanel({ characterId, typeId, onTypeIdChange }: PlanPanelProp
                 step={0.5}
                 inputMode="decimal"
                 value={ratePercentText ?? String(bandDefaultPercent)}
-                onChange={(event) => setRatePercentText(event.target.value)}
+                onChange={(event) => onRatePercentTextChange(event.target.value)}
                 className="w-full"
               />
               {ratePercentText !== null && (
                 <button
                   type="button"
                   className={buttonClassName({ size: 'md' })}
-                  onClick={() => setRatePercentText(null)}
+                  onClick={() => onRatePercentTextChange(null)}
                 >
                   {t('piPlan.customsRateReset')}
                 </button>

@@ -156,7 +156,7 @@ export function ItemContextMenu({
           </ContextMenuItem>
         )}
         {piPlannable && (
-          <ContextMenuItem onSelect={() => navigate(`/planetary-industry?tab=plan&type=${typeId}`)}>
+          <ContextMenuItem onSelect={() => navigate(`/planetary-industry/plan?type=${typeId}`)}>
             {t('market.contextMenu.piPlan')}
           </ContextMenuItem>
         )}

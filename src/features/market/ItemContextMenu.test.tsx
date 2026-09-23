@@ -130,7 +130,7 @@ describe('ItemContextMenu — PI Plan', () => {
     fireEvent.click(item);
 
     expect(screen.getByTestId('location')).toHaveTextContent(
-      `/planetary-industry?tab=plan&type=${BROADCAST_NODE}`
+      `/planetary-industry/plan?type=${BROADCAST_NODE}`
     );
   });
 
