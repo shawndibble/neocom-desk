@@ -10,6 +10,7 @@
  */
 import { useEffect, useMemo, useState, type ReactElement } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { industryTabHref } from '@/features/industry/industryTabs';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -389,7 +390,7 @@ export function LoyaltyStore() {
   }
 
   function planInIndustry(productTypeId: number) {
-    navigate(`/industry?product=${productTypeId}`);
+    navigate(`${industryTabHref('plans')}?product=${productTypeId}`);
   }
 
   function rowContextMenu(row: LoyaltyOfferRow, tr: ReactElement) {

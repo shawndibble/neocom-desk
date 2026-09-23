@@ -14,7 +14,9 @@ import {
   tabPath,
   type PageTabs,
 } from '@/lib/pageTabs';
-import type { AppRoutePath } from './routeScopes';
+import { matchPath } from 'react-router-dom';
+import { INDUSTRY_TABS } from '@/features/industry/industryTabs';
+import { ROUTE_REQUIREMENTS, type AppRoutePath } from './routeScopes';
 
 export const CONTACTS_TABS = definePageTabs('/contacts', [
   { id: 'character', labelKey: 'contacts.tabThisCharacter' },
@@ -27,15 +29,43 @@ export const WALLET_TABS = definePageTabs('/wallet', [
   { id: 'transactions', labelKey: 'wallet.transactionsTab' },
 ]);
 
+/**
+ * Search has its own Items/Courier sub-tab, so each leaf's id is the full
+ * path suffix below `/contracts` rather than one segment (see `lib/pageTabs.ts`).
+ * `/contracts/search` alone names no tab and redirects like any unknown
+ * segment, landing on Items.
+ */
+export const CONTRACTS_TABS = definePageTabs(
+  '/contracts',
+  [
+    { id: 'search/items', labelKey: 'contractSearch.mode.items' },
+    { id: 'search/courier', labelKey: 'contractSearch.mode.courier' },
+    { id: 'history', labelKey: 'contracts.historyTab' },
+  ],
+  'search/items'
+);
+
 export const PAGE_TABS: Partial<Record<AppRoutePath, PageTabs>> = {
   '/contacts': CONTACTS_TABS,
+  '/contracts': CONTRACTS_TABS,
+  '/industry': INDUSTRY_TABS,
   '/wallet': WALLET_TABS,
 };
 
 const TABBED_PAGES = Object.values(PAGE_TABS);
 
+/**
+ * Routes nested under a tabbed page's base (`/industry/plans/:planId`): React
+ * Router ranks them above the page's `<base>/*` splat, so a path they match
+ * is their page, not the tabbed one.
+ */
+const NESTED_ROUTE_PATTERNS = (Object.keys(ROUTE_REQUIREMENTS) as AppRoutePath[]).filter((path) =>
+  TABBED_PAGES.some((page) => path.startsWith(`${page.base}/`))
+);
+
 /** The tabbed page `pathname` sits in, if any. */
 export function tabbedPageFor(pathname: string): PageTabs | null {
+  if (NESTED_ROUTE_PATTERNS.some((pattern) => matchPath(pattern, pathname))) return null;
   return TABBED_PAGES.find((page) => isWithinPage(page, pathname)) ?? null;
 }
 
@@ -56,11 +86,8 @@ export function pageKeyFor(pathname: string): string {
 
 /**
  * A tabbed page's bare path or unknown segment — a URL `TabRoute` is about to
- * replace with the default tab, *or* a sibling route nested one segment
- * under the page's own base that this function has no way to distinguish
- * from an unknown tab (it knows nothing of the real route table). Callers
- * that need the real answer use `pagePathFor.ts`'s `isPendingTabRedirect`,
- * which breaks the tie against `ROUTE_REQUIREMENTS`.
+ * replace with the default tab. Not a page view of its own: analytics skips
+ * it and records the tab path that follows.
  */
 export function isTabRedirectPath(pathname: string): boolean {
   const page = tabbedPageFor(pathname);
@@ -69,9 +96,8 @@ export function isTabRedirectPath(pathname: string): boolean {
 
 /**
  * A tabbed page's path as analytics should record it: the declared tab path,
- * or the page itself for anything that is about to redirect *or* — same
- * caveat as `isTabRedirectPath` above — a sibling route this function can't
- * tell apart from one. `null` for a pathname in no tabbed page.
+ * or the page itself for anything that is about to redirect. `null` for a
+ * pathname in no tabbed page.
  */
 export function tabbedPagePathFor(pathname: string): string | null {
   const page = tabbedPageFor(pathname);

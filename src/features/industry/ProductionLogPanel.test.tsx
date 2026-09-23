@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { db, type BuildPlanRecord } from '@/db';
 import type { WalletTransaction } from '@/esi/endpoints';
@@ -119,7 +120,8 @@ beforeEach(async () => {
 describe('ProductionLogPanel', () => {
   it('shows the empty state with no runs logged anywhere', () => {
     render(
-      <ProductionLogPanel characterId={CHARACTER_ID} catalog={CATALOG} skills={{}} plans={PLANS} />
+      <ProductionLogPanel characterId={CHARACTER_ID} catalog={CATALOG} skills={{}} plans={PLANS} />,
+      { wrapper: MemoryRouter }
     );
     expect(screen.getByText('No production runs logged anywhere yet')).toBeInTheDocument();
   });
@@ -146,7 +148,8 @@ describe('ProductionLogPanel', () => {
     });
 
     render(
-      <ProductionLogPanel characterId={CHARACTER_ID} catalog={CATALOG} skills={{}} plans={PLANS} />
+      <ProductionLogPanel characterId={CHARACTER_ID} catalog={CATALOG} skills={{}} plans={PLANS} />,
+      { wrapper: MemoryRouter }
     );
 
     // Total cost logged across both runs.
@@ -159,7 +162,8 @@ describe('ProductionLogPanel', () => {
     await addRun({ id: 'run-3', productTypeID: RAVEN_TYPE_ID, buildPlanId: 'plan-3', quantity: 1 });
 
     render(
-      <ProductionLogPanel characterId={CHARACTER_ID} catalog={CATALOG} skills={{}} plans={PLANS} />
+      <ProductionLogPanel characterId={CHARACTER_ID} catalog={CATALOG} skills={{}} plans={PLANS} />,
+      { wrapper: MemoryRouter }
     );
 
     const byItemTable = await screen.findByRole('table', { name: 'By item' });
@@ -175,7 +179,8 @@ describe('ProductionLogPanel', () => {
   it('falls back to a typeID label when the catalog has no entry for it', async () => {
     await addRun({ productTypeID: 999999 });
     render(
-      <ProductionLogPanel characterId={CHARACTER_ID} catalog={CATALOG} skills={{}} plans={PLANS} />
+      <ProductionLogPanel characterId={CHARACTER_ID} catalog={CATALOG} skills={{}} plans={PLANS} />,
+      { wrapper: MemoryRouter }
     );
     const byItemTable = await screen.findByRole('table', { name: 'By item' });
     expect(within(byItemTable).getByText('#999999')).toBeInTheDocument();
@@ -186,7 +191,8 @@ describe('ProductionLogPanel', () => {
     await addRun({ id: 'run-2', buildPlanId: 'plan-3', productTypeID: RAVEN_TYPE_ID });
 
     render(
-      <ProductionLogPanel characterId={CHARACTER_ID} catalog={CATALOG} skills={{}} plans={PLANS} />
+      <ProductionLogPanel characterId={CHARACTER_ID} catalog={CATALOG} skills={{}} plans={PLANS} />,
+      { wrapper: MemoryRouter }
     );
 
     const table = await runsTable();
@@ -213,7 +219,8 @@ describe('ProductionLogPanel', () => {
     });
 
     render(
-      <ProductionLogPanel characterId={CHARACTER_ID} catalog={CATALOG} skills={{}} plans={PLANS} />
+      <ProductionLogPanel characterId={CHARACTER_ID} catalog={CATALOG} skills={{}} plans={PLANS} />,
+      { wrapper: MemoryRouter }
     );
     const table = await runsTable();
     const user = userEvent.setup();
@@ -232,7 +239,8 @@ describe('ProductionLogPanel', () => {
     await addRun({ id: 'run-recent', loggedAt: recent, updatedAt: recent, quantity: 42 });
 
     render(
-      <ProductionLogPanel characterId={CHARACTER_ID} catalog={CATALOG} skills={{}} plans={PLANS} />
+      <ProductionLogPanel characterId={CHARACTER_ID} catalog={CATALOG} skills={{}} plans={PLANS} />,
+      { wrapper: MemoryRouter }
     );
     // Both present before filtering.
     const table = await runsTable();
@@ -251,7 +259,8 @@ describe('ProductionLogPanel', () => {
     await addRun({ id: 'run-2' });
 
     render(
-      <ProductionLogPanel characterId={CHARACTER_ID} catalog={CATALOG} skills={{}} plans={PLANS} />
+      <ProductionLogPanel characterId={CHARACTER_ID} catalog={CATALOG} skills={{}} plans={PLANS} />,
+      { wrapper: MemoryRouter }
     );
 
     await runsTable();
@@ -267,7 +276,8 @@ describe('ProductionLogPanel', () => {
     await addRun({ id: 'run-recent', loggedAt: recent, updatedAt: recent });
 
     render(
-      <ProductionLogPanel characterId={CHARACTER_ID} catalog={CATALOG} skills={{}} plans={PLANS} />
+      <ProductionLogPanel characterId={CHARACTER_ID} catalog={CATALOG} skills={{}} plans={PLANS} />,
+      { wrapper: MemoryRouter }
     );
 
     expect(
@@ -289,7 +299,8 @@ describe('ProductionLogPanel', () => {
     await addRun({ id: 'run-old', loggedAt: old, updatedAt: old });
 
     render(
-      <ProductionLogPanel characterId={CHARACTER_ID} catalog={CATALOG} skills={{}} plans={PLANS} />
+      <ProductionLogPanel characterId={CHARACTER_ID} catalog={CATALOG} skills={{}} plans={PLANS} />,
+      { wrapper: MemoryRouter }
     );
     const user = userEvent.setup();
     await user.type(await screen.findByLabelText('From'), '2026-08-01');
@@ -308,7 +319,8 @@ describe('ProductionLogPanel', () => {
         skills={{}}
         plans={PLANS}
         onOpenRun={onOpenRun}
-      />
+      />,
+      { wrapper: MemoryRouter }
     );
 
     const table = await runsTable();
@@ -328,7 +340,8 @@ describe('ProductionLogPanel', () => {
         skills={{}}
         plans={PLANS}
         onOpenRun={onOpenRun}
-      />
+      />,
+      { wrapper: MemoryRouter }
     );
 
     const table = await runsTable();
@@ -342,7 +355,8 @@ describe('ProductionLogPanel', () => {
 
     const user = userEvent.setup();
     render(
-      <ProductionLogPanel characterId={CHARACTER_ID} catalog={CATALOG} skills={{}} plans={PLANS} />
+      <ProductionLogPanel characterId={CHARACTER_ID} catalog={CATALOG} skills={{}} plans={PLANS} />,
+      { wrapper: MemoryRouter }
     );
     await runsTable();
 
@@ -367,7 +381,8 @@ describe('ProductionLogPanel', () => {
 
     const user = userEvent.setup();
     render(
-      <ProductionLogPanel characterId={CHARACTER_ID} catalog={CATALOG} skills={{}} plans={PLANS} />
+      <ProductionLogPanel characterId={CHARACTER_ID} catalog={CATALOG} skills={{}} plans={PLANS} />,
+      { wrapper: MemoryRouter }
     );
     await runsTable();
 

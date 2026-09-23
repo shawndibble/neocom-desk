@@ -19,8 +19,10 @@ import {
 } from 'recharts';
 import type { PriceSource } from '@/engine/miningTax/priceBasis';
 import { useTranslation } from 'react-i18next';
+import { Panel } from '@/components/ui';
 import { COMPACT_ISK_Y_AXIS_MARGIN_LEFT, COMPACT_ISK_Y_AXIS_WIDTH } from '@/lib/chartAxis';
 import { formatIsk, formatIskCompact } from '@/lib/isk';
+import { topTypesWithOther, type RankedType } from './topTypes';
 
 export interface DailyRatePoint {
   date: string;
@@ -38,11 +40,14 @@ const SOURCE_FILL: Record<PriceSource, string> = {
 };
 const LEGEND_SOURCES: PriceSource[] = ['saved', 'average', 'live'];
 
-export interface TypeComparisonPoint {
-  typeId: number;
-  typeName: string;
-  rawValue: number;
-  refineValue: number;
+export type TypeComparisonPoint = RankedType;
+
+/** Bars the ore-type chart draws before folding the rest into "Other". */
+const TOP_TYPE_LIMIT = 8;
+
+/** A drawn bar — one type, or the "Other" roll-up carrying the types it folds. */
+interface ComparisonBar extends TypeComparisonPoint {
+  folded?: TypeComparisonPoint[];
 }
 
 interface MiningYieldChartsProps {
@@ -91,7 +96,7 @@ function CompareTooltip({
 }: TooltipContentProps & { showRefining: boolean }): React.ReactElement | null {
   const { t } = useTranslation();
   if (!active || !payload || payload.length === 0) return null;
-  const point = payload[0]?.payload as TypeComparisonPoint | undefined;
+  const point = payload[0]?.payload as ComparisonBar | undefined;
   if (!point) return null;
   return (
     <div style={tooltipContentStyle()} className="rounded-xs px-2 py-1.5">
@@ -103,6 +108,16 @@ function CompareTooltip({
         <p>
           {t('miningTax.overview.refineValue')}: {formatIsk(point.refineValue, 0)} ISK
         </p>
+      )}
+      {point.folded && (
+        <ul className="mt-1 border-t border-line pt-1 text-text-dim">
+          {point.folded.map((type) => (
+            <li key={type.typeId}>
+              {type.typeName}: {formatIskCompact(type.rawValue)}
+              {showRefining && ` / ${formatIskCompact(type.refineValue)}`}
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   );
@@ -120,9 +135,35 @@ export default function MiningYieldCharts({
       : 'miningTax.overview.compareChartTitleRawOnly'
   );
 
+  // Past TOP_TYPE_LIMIT the rest fold into one "Other" bar, so the card
+  // stops growing with the number of types; the table below lists every one.
+  const { top, other } = topTypesWithOther(typeComparison, {
+    limit: TOP_TYPE_LIMIT,
+    by: showRefining ? 'both' : 'raw',
+  });
+  const compareBars: ComparisonBar[] = other
+    ? [
+        ...top,
+        {
+          typeId: -1,
+          typeName: t('miningTax.overview.otherTypes', { count: other.types.length }),
+          rawValue: other.rawValue,
+          refineValue: other.refineValue,
+          folded: other.types,
+        },
+      ]
+    : top;
+
+  // Horizontal bars: ore names read left of the bar instead of slanted under it.
+  const compareHeight = Math.max(
+    256,
+    compareBars.length * (showRefining ? 36 : 24) + (showRefining ? 64 : 32)
+  );
+
+  // Two cards, same gap as the stat cards above them.
   return (
-    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-      <div>
+    <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+      <Panel padded>
         <p className="mb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
           {t('miningTax.overview.rateChartTitle')}
         </p>
@@ -166,33 +207,38 @@ export default function MiningYieldCharts({
             </li>
           ))}
         </ul>
-      </div>
+      </Panel>
 
-      <div>
+      <Panel padded>
         <p className="mb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
           {compareChartTitle}
         </p>
-        <div role="img" aria-label={compareChartTitle} className="h-64 w-full">
+        <div
+          role="img"
+          aria-label={compareChartTitle}
+          className="w-full"
+          style={{ height: compareHeight }}
+        >
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
-              data={typeComparison}
-              margin={{ top: 8, right: 8, left: COMPACT_ISK_Y_AXIS_MARGIN_LEFT, bottom: 0 }}
+              data={compareBars}
+              layout="vertical"
+              margin={{ top: 8, right: showRefining ? 16 : 56, left: 0, bottom: 0 }}
             >
               <CartesianGrid stroke="var(--color-line)" strokeDasharray="3 3" />
               <XAxis
-                dataKey="typeName"
-                stroke="var(--color-text-dim)"
-                tick={{ fontSize: 10, fill: 'var(--color-text-dim)' }}
-                interval={0}
-                angle={-30}
-                textAnchor="end"
-                height={50}
-              />
-              <YAxis
+                type="number"
                 stroke="var(--color-text-dim)"
                 tick={{ fontSize: 11, fill: 'var(--color-text-dim)' }}
-                width={COMPACT_ISK_Y_AXIS_WIDTH}
                 tickFormatter={(value: number) => formatIskCompact(value)}
+              />
+              <YAxis
+                type="category"
+                dataKey="typeName"
+                stroke="var(--color-text-dim)"
+                tick={{ fontSize: 11, fill: 'var(--color-text-dim)' }}
+                interval={0}
+                width={120}
               />
               <Tooltip
                 content={(props) => <CompareTooltip {...props} showRefining={showRefining} />}
@@ -206,7 +252,7 @@ export default function MiningYieldCharts({
                 {!showRefining && (
                   <LabelList
                     dataKey="rawValue"
-                    position="top"
+                    position="right"
                     formatter={(value: unknown) => formatIskCompact(Number(value))}
                     style={{ fontSize: 10, fill: 'var(--color-text-dim)' }}
                   />
@@ -227,7 +273,7 @@ export default function MiningYieldCharts({
             {t('miningTax.overview.refiningHiddenNote')}
           </p>
         )}
-      </div>
+      </Panel>
     </div>
   );
 }

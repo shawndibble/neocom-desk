@@ -12,6 +12,7 @@ import { clearJumpGraphIndex } from '@/sde/jumpGraph';
 import { loadMarketTypes, loadSolarSystemJumps } from '@/sde/loadMarketSde';
 import {
   ContractSearchPanel,
+  type ContractMode,
   type ContractSearchStatus,
 } from '@/features/contractSearch/ContractSearchPanel';
 import type { PublicContractOfferRow } from '@/engine/contracts/contractOffers';
@@ -323,6 +324,7 @@ async function bodyRows() {
  */
 function SearchTabHarness() {
   const [status, setStatus] = useState<ContractSearchStatus | null>(null);
+  const [mode, setMode] = useState<ContractMode>('items');
   return (
     <>
       <button
@@ -332,7 +334,7 @@ function SearchTabHarness() {
       >
         Refresh
       </button>
-      <ContractSearchPanel onStatusChange={setStatus} />
+      <ContractSearchPanel mode={mode} onModeChange={setMode} onStatusChange={setStatus} />
     </>
   );
 }
@@ -1057,7 +1059,7 @@ describe('ContractSearchPanel — Build Plan from an item row', () => {
   function renderWithProbe() {
     return render(
       <MemoryRouter>
-        <ContractSearchPanel />
+        <ContractSearchPanel mode="items" onModeChange={() => {}} />
         <LocationProbe />
       </MemoryRouter>
     );
@@ -1085,7 +1087,7 @@ describe('ContractSearchPanel — Build Plan from an item row', () => {
     // product, so handing it the blueprint's own typeID creates nothing.
     await waitFor(() => {
       expect(screen.getByTestId('location')).toHaveTextContent(
-        '/industry?product=587&me=10&te=20&runs=5'
+        '/industry/plans?product=587&me=10&te=20&runs=5'
       );
     });
   });
@@ -1104,7 +1106,7 @@ describe('ContractSearchPanel — Build Plan from an item row', () => {
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Build Plan' }));
 
     await waitFor(() => {
-      expect(screen.getByTestId('location')).toHaveTextContent(/^\/industry\?product=587$/);
+      expect(screen.getByTestId('location')).toHaveTextContent(/^\/industry\/plans\?product=587$/);
     });
   });
 

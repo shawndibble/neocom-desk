@@ -26,7 +26,6 @@ import { getTradeHub, DEFAULT_TRADE_HUB } from '@/market/hubs';
 import { useTradeHubStandings, tradeHubStanding } from '@/features/market/useTradeHubStandings';
 import type { BlueprintCatalog } from './blueprintCatalog';
 import {
-  EMPTY_PRODUCTION_LOG_FILTER,
   activeProductionLogFilterCount,
   filterProductionRunsByDate,
   type ProductionLogFilter,
@@ -47,6 +46,8 @@ import { useSaleLinking } from './useSaleLinking';
 import { iskToneClass } from '@/features/character/format';
 import { formatIsk } from '@/lib/isk';
 import { formatPercent } from './format';
+import { useUrlParam, useUrlParams } from '@/lib/useUrlState';
+import { isoDateParam, optionalSortParam, type UrlSort } from '@/lib/urlState';
 
 /**
  * Dynamic import, not a static one: `ProductionProfitChart.tsx` statically
@@ -83,6 +84,16 @@ interface ItemRow {
 // or two renders before the live query first resolves — these are read-only
 // and module-level, so they never change identity.
 const NO_RUNS: ProductionRunRecord[] = [];
+
+/** The date range in the URL (ADR 0015); both ends open by default. */
+const DATE_RANGE_PARAMS = { 'records.from': isoDateParam(), 'records.to': isoDateParam() };
+/** Both tables start unsorted, in the order the rollup builds them. */
+const TABLE_SORT = optionalSortParam();
+
+/** A URL sort naming a column this table does not have reads as unsorted. */
+function knownSort(sort: UrlSort | null, columns: readonly { id: string }[]): UrlSort | null {
+  return sort !== null && columns.some((column) => column.id === sort.columnId) ? sort : null;
+}
 const NO_SALE_LINKS: ProductionSaleLinkRecord[] = [];
 const NO_ORDER_WATCHES: ProductionOrderWatchRecord[] = [];
 
@@ -275,7 +286,15 @@ export function ProductionLogPanel({
   onOpenRun,
 }: ProductionLogPanelProps) {
   const { t } = useTranslation();
-  const [filter, setFilter] = useState<ProductionLogFilter>(EMPTY_PRODUCTION_LOG_FILTER);
+  const [dateRange, setDateRange] = useUrlParams(DATE_RANGE_PARAMS);
+  const filter: ProductionLogFilter = useMemo(
+    () => ({ startDate: dateRange['records.from'], endDate: dateRange['records.to'] }),
+    [dateRange]
+  );
+  const setFilter = (next: ProductionLogFilter) =>
+    setDateRange({ 'records.from': next.startDate, 'records.to': next.endDate });
+  const [itemSort, setItemSort] = useUrlParam('records.itemSort', TABLE_SORT);
+  const [runSort, setRunSort] = useUrlParam('records.runSort', TABLE_SORT);
   // The per-run ledger folds away by default: "By item" is the read that
   // says what is making money, the run list is the audit trail behind it.
   const [runsExpanded, setRunsExpanded] = useState(false);
@@ -516,6 +535,8 @@ export function ProductionLogPanel({
                 rows={itemRows}
                 rowKey={(r) => r.productTypeID}
                 label={t('industry.byItem')}
+                sort={knownSort(itemSort, columns)}
+                onSortChange={setItemSort}
                 density="compact"
               />
             </div>
@@ -537,6 +558,8 @@ export function ProductionLogPanel({
                   rows={runRows}
                   rowKey={(r) => r.run.id}
                   label={t('industry.allProductionRuns')}
+                  sort={knownSort(runSort, runColumns)}
+                  onSortChange={setRunSort}
                   density="compact"
                   onRowClick={
                     onOpenRun ? (r) => r.planExists && onOpenRun(r.run.buildPlanId) : undefined

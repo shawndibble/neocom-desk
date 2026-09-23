@@ -108,7 +108,7 @@ test.describe('Opportunities — ranked phone list', () => {
 
   test('renders a ranked card list at 390px, not the desktop table', async ({ page }) => {
     await page.setViewportSize(PHONE);
-    await page.goto('./industry?tab=opportunities');
+    await page.goto('./industry/opportunities');
 
     await expect(page.getByRole('table', { name: 'Build Opportunities' })).toHaveCount(0);
     await expect(page.getByLabel('Rank 1')).toBeVisible();
@@ -117,7 +117,7 @@ test.describe('Opportunities — ranked phone list', () => {
 
   test('the "Sort by" trigger meets the touch tier at 390px (issue #1174)', async ({ page }) => {
     await page.setViewportSize(PHONE);
-    await page.goto('./industry?tab=opportunities');
+    await page.goto('./industry/opportunities');
 
     const trigger = page.getByRole('button', { name: /Sort by ISK\/hour/ });
     await expect(trigger).toBeVisible();
@@ -128,7 +128,7 @@ test.describe('Opportunities — ranked phone list', () => {
 
   test('the selection checkbox is pinned with a real ~44px target', async ({ page }) => {
     await page.setViewportSize(PHONE);
-    await page.goto('./industry?tab=opportunities');
+    await page.goto('./industry/opportunities');
 
     const checkbox = page.getByRole('checkbox', { name: /Select Rifter/ });
     await expect(checkbox).toBeVisible();
@@ -145,7 +145,7 @@ test.describe('Opportunities — ranked phone list', () => {
 
   test('changing the sort changes which metric leads the card', async ({ page }) => {
     await page.setViewportSize(PHONE);
-    await page.goto('./industry?tab=opportunities');
+    await page.goto('./industry/opportunities');
 
     await expect(page.getByRole('button', { name: /Sort by ISK\/hour/ })).toBeVisible();
 
@@ -159,7 +159,7 @@ test.describe('Opportunities — ranked phone list', () => {
 
   test('a long product name wraps instead of truncating', async ({ page }) => {
     await page.setViewportSize(PHONE);
-    await page.goto('./industry?tab=opportunities');
+    await page.goto('./industry/opportunities');
 
     const name = page.getByText('Rifter', { exact: true });
     const overflowWrap = await name.evaluate((el) => getComputedStyle(el).overflowWrap);
@@ -170,7 +170,7 @@ test.describe('Opportunities — ranked phone list', () => {
 
   test('desktop keeps the ordinary table, unchanged, with no sort menu', async ({ page }) => {
     await page.setViewportSize(DESKTOP);
-    await page.goto('./industry?tab=opportunities');
+    await page.goto('./industry/opportunities');
 
     await expect(page.getByRole('table', { name: 'Build Opportunities' })).toBeVisible();
     await expect(page.getByRole('button', { name: /Sort by/ })).toHaveCount(0);
@@ -200,7 +200,7 @@ test.describe('Opportunities — ranked phone list', () => {
     test('a tap toggles the checkbox, with no disabled state or tooltip', async ({ page }) => {
       await seedSecondCharacterBlueprint(page);
       await page.setViewportSize(PHONE);
-      await page.goto('./industry?tab=opportunities');
+      await page.goto('./industry/opportunities');
 
       // Wait for Opportunities' own data (and with it its Character filter
       // trigger) to have mounted before touching "This character" — Active

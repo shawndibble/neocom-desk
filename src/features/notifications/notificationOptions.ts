@@ -45,17 +45,18 @@ export const NOTIFICATION_ROUTES: Record<NotificationEventId, string> = {
   newMail: '/mail',
   newCalendarEvent: '/calendar',
   calendarEventStarting: '/calendar',
-  // `?tab=` because Search, not History, is the page's default tab — and this
-  // alert is about a row in *History*. `notificationUrlForSubject` then adds
-  // `?highlight=`, which `useHighlightParam` spends on arrival whether or not
-  // a row matched; landing on the wrong tab would burn it for nothing.
-  contractAccepted: '/contracts?tab=history',
+  // The explicit History path because Search, not History, is the page's
+  // default tab — and this alert is about a row in *History*.
+  // `notificationUrlForSubject` then adds `?highlight=`, which
+  // `useHighlightParam` spends on arrival whether or not a row matched;
+  // landing on the wrong tab would burn it for nothing.
+  contractAccepted: '/contracts/history',
   // Same destination as acceptance (issue #1091) — both are about a row in
   // History, just a later transition of the same contract.
-  contractCompleted: '/contracts?tab=history',
-  contractFailed: '/contracts?tab=history',
-  // The tab is a path segment (ADR 0015, issue #1302) — this lands straight
-  // on the tab that actually shows the event, not just the page.
+  contractCompleted: '/contracts/history',
+  contractFailed: '/contracts/history',
+  // The tab is a path segment (ADR 0015) — this lands straight on the tab
+  // that actually shows the event, not just the page.
   walletBalanceChanged: '/wallet/journal',
   // The *history*, not Open Orders: a filled order has left the open list, so
   // the tab this used to land on is the one place the thing it is telling you

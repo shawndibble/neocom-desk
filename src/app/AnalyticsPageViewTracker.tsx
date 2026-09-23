@@ -7,7 +7,8 @@
 import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { trackPageView } from './analytics';
-import { isPendingTabRedirect, pagePathFor } from './pagePathFor';
+import { pagePathFor } from './pagePathFor';
+import { isTabRedirectPath } from './pageTabs';
 
 export function AnalyticsPageViewTracker(): null {
   const location = useLocation();
@@ -15,7 +16,7 @@ export function AnalyticsPageViewTracker(): null {
   useEffect(() => {
     // `/contacts` is replaced by `/contacts/character` a render later; count
     // the tab, not the redirect, or every rail click is two page views.
-    if (isPendingTabRedirect(location.pathname)) return;
+    if (isTabRedirectPath(location.pathname)) return;
     void trackPageView(pagePathFor(location.pathname));
   }, [location.pathname]);
 

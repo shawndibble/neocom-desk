@@ -88,6 +88,14 @@ export function enumParam<V extends string>(
   };
 }
 
+/** An enum whose "no selection" state is `null` rather than a declared member. */
+export function optionalEnumParam<V extends string>(values: readonly V[]): UrlParamCodec<V | null> {
+  return {
+    parse: (raw) => ((values as readonly string[]).includes(raw ?? '') ? (raw as V) : null),
+    serialize: (value) => value,
+  };
+}
+
 /**
  * A comma-separated list of positive ids (character, type, location…),
  * sorted and de-duplicated so the same selection always writes the same URL.
@@ -104,6 +112,29 @@ export function idListParam(): UrlParamCodec<readonly number[]> {
     },
     serialize: (value) =>
       value.length === 0 ? null : [...new Set(value)].sort((a, b) => a - b).join(','),
+  };
+}
+
+/** One positive id (a region, a blueprint type…), or `null` for "none chosen". */
+export function optionalIdParam(): UrlParamCodec<number | null> {
+  return {
+    parse: parsePositiveInt,
+    serialize: (value) => (value === null ? null : String(value)),
+  };
+}
+
+/**
+ * A calendar day as `YYYY-MM-DD`, or `null` for "open-ended". A day that does
+ * not exist (`2026-02-30`) is garbage, not a rollover into March.
+ */
+export function isoDateParam(): UrlParamCodec<string | null> {
+  return {
+    parse: (raw) => {
+      if (raw === null || !/^\d{4}-\d{2}-\d{2}$/.test(raw)) return null;
+      const date = new Date(`${raw}T00:00:00Z`);
+      return !Number.isNaN(date.getTime()) && date.toISOString().startsWith(raw) ? raw : null;
+    },
+    serialize: (value) => value,
   };
 }
 
@@ -149,19 +180,29 @@ export interface UrlSort {
  */
 export function sortParam(defaultSort: UrlSort): UrlParamCodec<UrlSort> {
   return {
-    parse: (raw) => {
-      if (raw === null) return defaultSort;
-      const at = raw.lastIndexOf(':');
-      if (at <= 0) return defaultSort;
-      const direction = raw.slice(at + 1);
-      if (direction !== 'asc' && direction !== 'desc') return defaultSort;
-      return { columnId: raw.slice(0, at), direction };
-    },
+    parse: (raw) => parseSort(raw) ?? defaultSort,
     serialize: (value) =>
       value.columnId === defaultSort.columnId && value.direction === defaultSort.direction
         ? null
         : `${value.columnId}:${value.direction}`,
   };
+}
+
+/** `sortParam` for a table that starts unsorted: `null` is the default. */
+export function optionalSortParam(): UrlParamCodec<UrlSort | null> {
+  return {
+    parse: parseSort,
+    serialize: (value) => (value === null ? null : `${value.columnId}:${value.direction}`),
+  };
+}
+
+function parseSort(raw: string | null): UrlSort | null {
+  if (raw === null) return null;
+  const at = raw.lastIndexOf(':');
+  if (at <= 0) return null;
+  const direction = raw.slice(at + 1);
+  if (direction !== 'asc' && direction !== 'desc') return null;
+  return { columnId: raw.slice(0, at), direction };
 }
 
 /** A parsed sort on a column the table does not have falls back to the table's default. */

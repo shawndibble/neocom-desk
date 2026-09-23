@@ -5,7 +5,11 @@ import {
   enumSetParam,
   idListParam,
   intParam,
+  isoDateParam,
   nullableTextParam,
+  optionalEnumParam,
+  optionalIdParam,
+  optionalSortParam,
   resolveSort,
   sortParam,
   textParam,
@@ -109,6 +113,24 @@ describe('enumParam', () => {
   });
 });
 
+describe('optionalEnumParam', () => {
+  const codec = optionalEnumParam(['outstanding', 'finished'] as const);
+
+  it('defaults to null and omits it from the URL', () => {
+    expect(codec.parse(null)).toBeNull();
+    expect(codec.serialize(null)).toBeNull();
+  });
+
+  it('accepts only declared members', () => {
+    expect(codec.parse('finished')).toBe('finished');
+    expect(codec.parse('bogus')).toBeNull();
+  });
+
+  it('round-trips a non-null member', () => {
+    expect(codec.serialize('outstanding')).toBe('outstanding');
+  });
+});
+
 describe('idListParam', () => {
   const codec = idListParam();
 
@@ -184,5 +206,59 @@ describe('resolveSort', () => {
     expect(
       resolveSort({ columnId: 'bogus', direction: 'asc' }, defaultSort, ['name', 'standing'])
     ).toBe(defaultSort);
+  });
+});
+
+describe('optionalIdParam', () => {
+  const codec = optionalIdParam();
+
+  it('parses one positive id, or null', () => {
+    expect(codec.parse('638')).toBe(638);
+    expect(codec.parse(null)).toBeNull();
+    expect(codec.parse('0')).toBeNull();
+    expect(codec.parse('-4')).toBeNull();
+    expect(codec.parse('12x')).toBeNull();
+  });
+
+  it('omits null', () => {
+    expect(codec.serialize(null)).toBeNull();
+    expect(codec.serialize(638)).toBe('638');
+  });
+
+  it('round-trips a positive id', () => {
+    expect(codec.parse(codec.serialize(30000142))).toBe(30000142);
+  });
+});
+
+describe('isoDateParam', () => {
+  const codec = isoDateParam();
+
+  it('parses a real YYYY-MM-DD day, or null', () => {
+    expect(codec.parse('2026-09-01')).toBe('2026-09-01');
+    expect(codec.parse(null)).toBeNull();
+    expect(codec.parse('2026-9-1')).toBeNull();
+    expect(codec.parse('2026-02-30')).toBeNull();
+    expect(codec.parse('yesterday')).toBeNull();
+  });
+
+  it('omits null', () => {
+    expect(codec.serialize(null)).toBeNull();
+    expect(codec.serialize('2026-09-01')).toBe('2026-09-01');
+  });
+});
+
+describe('optionalSortParam', () => {
+  const codec = optionalSortParam();
+
+  it('reads absent or garbage as unsorted', () => {
+    expect(codec.parse(null)).toBeNull();
+    expect(codec.parse('item')).toBeNull();
+    expect(codec.parse('item:sideways')).toBeNull();
+  });
+
+  it('round-trips a sort and omits unsorted', () => {
+    const sort = { columnId: 'realizedProfit', direction: 'desc' } as const;
+    expect(codec.parse(codec.serialize(sort))).toEqual(sort);
+    expect(codec.serialize(null)).toBeNull();
   });
 });

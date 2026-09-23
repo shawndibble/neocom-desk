@@ -12,6 +12,7 @@ describe('availableOverviewColumns', () => {
       'system',
       'volume',
       'rawValue',
+      'priceFormula',
       'refineValue',
       'oreBreakdown',
       'units',

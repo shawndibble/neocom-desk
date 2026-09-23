@@ -5,7 +5,7 @@
  * starting from nothing" answer. Opt-in: nothing runs until the pilot hits
  * "Scan".
  */
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -34,6 +34,8 @@ import { nameForType, type BlueprintCatalog, type BlueprintCatalogEntry } from '
 import type { MarketWideResultRow } from './marketWideOpportunities';
 import { useMarketWideOpportunities } from './useMarketWideOpportunities';
 import { SkillGateMarker } from './SkillGateMarker';
+import { useUrlParam, useUrlSort } from '@/lib/useUrlState';
+import { boolParam } from '@/lib/urlState';
 
 const ORDER_DEPTH_TONE: Record<OrderDepthLevel, StatChipTone> = {
   deep: 'success',
@@ -51,6 +53,9 @@ interface MarketWideOpportunitiesPanelProps {
   activeCharacterId: number | null;
   onStartPlan: (entry: BlueprintCatalogEntry) => void;
 }
+
+const HIDE_SKILL_GATED = boolParam();
+const MARKET_WIDE_DEFAULT_SORT = { columnId: 'iskPerHour', direction: 'desc' } as const;
 
 export function MarketWideOpportunitiesPanel({
   hub,
@@ -92,7 +97,7 @@ export function MarketWideOpportunitiesPanel({
     return verdicts;
   }, [rows, catalog, accountSkills]);
 
-  const [hideSkillGated, setHideSkillGated] = useState(false);
+  const [hideSkillGated, setHideSkillGated] = useUrlParam('marketWide.hideGated', HIDE_SKILL_GATED);
   const gatedCount = useMemo(
     () => rows.filter((row) => skillGateByProductTypeID.get(row.productTypeID)?.gated).length,
     [rows, skillGateByProductTypeID]
@@ -174,6 +179,11 @@ export function MarketWideOpportunitiesPanel({
       ),
     },
   ];
+  const sortProps = useUrlSort(
+    'marketWide.sort',
+    MARKET_WIDE_DEFAULT_SORT,
+    columns.map((column) => column.id)
+  );
 
   return (
     <Panel
@@ -215,7 +225,7 @@ export function MarketWideOpportunitiesPanel({
               <FilterChip
                 label={t('industry.skillGateFilterChip')}
                 selected={hideSkillGated}
-                onToggle={() => setHideSkillGated((v) => !v)}
+                onToggle={() => setHideSkillGated(!hideSkillGated)}
                 count={gatedCount}
                 countLabel={t('industry.skillGateFilterChipCount', { count: gatedCount })}
               />
@@ -227,7 +237,7 @@ export function MarketWideOpportunitiesPanel({
               rows={visibleRows}
               rowKey={(row) => row.productTypeID}
               label={t('industry.marketOpportunitiesTitle')}
-              defaultSort={{ columnId: 'iskPerHour', direction: 'desc' }}
+              {...sortProps}
             />
           </div>
           {gatedCount > 0 && (
