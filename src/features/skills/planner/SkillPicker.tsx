@@ -150,7 +150,7 @@ export function SkillPicker({
                 className="flex w-full items-center justify-between gap-2 px-2 py-1.5 text-left text-xs hover:bg-panel-2"
               >
                 <span className="truncate">{skill.name}</span>
-                <span className="shrink-0 text-text-faint">{skill.groupName}</span>
+                <span className="shrink-0 text-text-dim">{skill.groupName}</span>
               </button>
               {selected === skill.typeID && (
                 <div className="space-y-2 px-2 pb-2">

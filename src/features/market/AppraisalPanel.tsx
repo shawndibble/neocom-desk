@@ -362,9 +362,7 @@ export function AppraisalPanel({
               onChange={(event) => handlePercentChange(event.target.value)}
               className="field-no-spinner w-16 text-right"
             />
-            <span className="text-xs text-text-faint">
-              {t('market.appraisal.pricePercentHint')}
-            </span>
+            <span className="text-xs text-text-dim">{t('market.appraisal.pricePercentHint')}</span>
           </div>
 
           <div className="flex flex-wrap gap-2">
