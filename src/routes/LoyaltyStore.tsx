@@ -36,6 +36,8 @@ import {
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { useIsDesktop } from '@/lib/useIsDesktop';
+import { useUrlParams, useUrlSort } from '@/lib/useUrlState';
+import { boolParam, textParam } from '@/lib/urlState';
 import { formatIsk } from '@/lib/isk';
 import { iskToneClass } from '@/features/character/format';
 import { useMarketHub } from '@/features/market/hub';
@@ -292,6 +294,20 @@ function OfferDetail({
   );
 }
 
+/**
+ * The filter row's three fields, in the URL (ADR 0015, issue #1302): all
+ * three as one `useUrlParams` group, so a click and a keystroke in the same
+ * update write together. `affordableOnly` defaults `true` — the offer list's
+ * own opening state — so it is the one omitted from the URL when left alone.
+ */
+const FILTER_PARAMS = {
+  search: textParam(),
+  affordableOnly: boolParam(true),
+  blueprintsOnly: boolParam(false),
+};
+
+const OFFERS_SORT = { columnId: 'iskPerLp', direction: 'desc' } as const;
+
 export function LoyaltyStore() {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -326,9 +342,8 @@ export function LoyaltyStore() {
     toggleUseOwnMaterials,
   } = useLoyaltyStoreOffers(corporationId);
 
-  const [search, setSearch] = useState('');
-  const [affordableOnly, setAffordableOnly] = useState(true);
-  const [blueprintsOnly, setBlueprintsOnly] = useState(false);
+  const [filterParams, setFilterParams] = useUrlParams(FILTER_PARAMS);
+  const { search, affordableOnly, blueprintsOnly } = filterParams;
   const [selectedOfferId, setSelectedOfferId] = useState<number | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
 
@@ -448,6 +463,11 @@ export function LoyaltyStore() {
       render: (row) => (row.profit.iskPerLp === null ? '—' : row.profit.iskPerLp.toFixed(1)),
     },
   ];
+  const offersSortProps = useUrlSort(
+    'sort',
+    OFFERS_SORT,
+    columns.map((column) => column.id)
+  );
 
   const list = (
     <Panel
@@ -471,7 +491,8 @@ export function LoyaltyStore() {
           rows={filteredRows}
           rowKey={(row) => row.offer.offer_id}
           density="compact"
-          defaultSort={{ columnId: 'iskPerLp', direction: 'desc' }}
+          sort={offersSortProps.sort}
+          onSortChange={offersSortProps.onSortChange}
           onRowClick={selectRow}
           rowContextMenu={rowContextMenu}
           rowClassName={(row) =>
@@ -534,15 +555,17 @@ export function LoyaltyStore() {
           // roll back — the draft was local until this point.
           if (next.hubId !== hubId) void setHubId(next.hubId);
           if (next.priceBasis !== priceBasis) void setPriceBasis(next.priceBasis);
-          setAffordableOnly(next.affordableOnly);
-          setBlueprintsOnly(next.blueprintsOnly);
+          setFilterParams({
+            affordableOnly: next.affordableOnly,
+            blueprintsOnly: next.blueprintsOnly,
+          });
         }}
         activeCount={(affordableOnly ? 1 : 0) + (blueprintsOnly ? 1 : 0)}
         search={
           <SearchInput
             placeholder={t('loyaltyStore.searchPlaceholder')}
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => setFilterParams({ search: e.target.value })}
             className="min-w-40 flex-1"
           />
         }

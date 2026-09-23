@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { NOTIFICATION_EVENT_IDS } from './events';
 import { ROUTE_REQUIREMENTS } from '@/app/routeScopes';
+import { pageKeyFor } from '@/app/pageTabs';
 import {
   NOTIFICATION_ROUTES,
   NOTIFICATION_FALLBACK_ROUTE,
@@ -22,7 +23,7 @@ describe('notificationUrlFor', () => {
   });
 
   it('routes wallet alerts to the wallet journal tab', () => {
-    expect(notificationUrlFor('walletBalanceChanged')).toBe('/wallet?tab=journal');
+    expect(notificationUrlFor('walletBalanceChanged')).toBe('/wallet/journal');
   });
 });
 
@@ -57,7 +58,7 @@ describe('notificationOptionsFor', () => {
       icon: '/icons/icon-192.png',
       badge: '/icons/badge-96.png',
       tag: '7:walletBalanceChanged',
-      data: { url: '/wallet?tab=journal' },
+      data: { url: '/wallet/journal' },
     });
   });
 
@@ -98,7 +99,9 @@ describe('NOTIFICATION_ROUTES against the real route table', () => {
       // A route may carry a query string (e.g. Market's own tab, `?section=`)
       // that a route path never does — strip it before checking the path is real.
       const [path] = route.split('?');
-      expect(realRoutes, `${eventId} -> ${route}`).toContain(path);
+      // A tab is a path segment (ADR 0015): `/wallet/journal` collapses to
+      // `/wallet`, the one entry a tabbed page's route table actually keeps.
+      expect(realRoutes, `${eventId} -> ${route}`).toContain(pageKeyFor(path!));
     }
   });
 

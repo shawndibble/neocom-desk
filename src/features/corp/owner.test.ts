@@ -1,10 +1,23 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { useState } from 'react';
 import { renderHook, waitFor } from '@testing-library/react';
 import { db } from '@/db';
 import { NO_CORP_CAPABILITIES, type CorpCapabilities } from '@/engine/corpRoles';
+import type { CorpCapability } from '@/engine/corpRoles';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useCorpAccess, type CorpAccess, type CorpAccessState } from './useCorpAccess';
-import { useActiveCorporationId, useCorpOwner } from './owner';
+import { useActiveCorporationId, useCorpOwner, type DataOwner } from './owner';
+
+/**
+ * `useCorpOwner` no longer owns its `owner` state (issue #1302 — `Wallet.tsx`
+ * backs it with the `?owner=` query param instead). This harness supplies the
+ * plain `useState` the hook used to keep internally, so these tests still
+ * exercise exactly the two rules the hook itself is responsible for.
+ */
+function useTestCorpOwner(capability: CorpCapability, initialOwner: DataOwner = 'personal') {
+  const [owner, setOwner] = useState<DataOwner>(initialOwner);
+  return useCorpOwner(capability, owner, setOwner);
+}
 
 vi.mock('./useCorpAccess', () => ({ useCorpAccess: vi.fn() }));
 
@@ -67,7 +80,7 @@ describe('useCorpOwner', () => {
   });
 
   it('starts on Personal', async () => {
-    const { result } = renderHook(() => useCorpOwner('canReadWallet'));
+    const { result } = renderHook(() => useTestCorpOwner('canReadWallet'));
     await waitFor(() => expect(result.current.corporationId).toBe(CORPORATION_ID));
     expect(result.current.owner).toBe('personal');
   });
@@ -77,7 +90,7 @@ describe('useCorpOwner', () => {
    * Corporation rather than making the user flip the switch a second time.
    */
   it('starts on Corporation when given an initial owner, while available', async () => {
-    const { result } = renderHook(() => useCorpOwner('canReadWallet', 'corporation'));
+    const { result } = renderHook(() => useTestCorpOwner('canReadWallet', 'corporation'));
     await waitFor(() => expect(result.current.corporationId).toBe(CORPORATION_ID));
     expect(result.current.owner).toBe('corporation');
   });
@@ -89,14 +102,14 @@ describe('useCorpOwner', () => {
    */
   it('ignores an initial owner of Corporation without the capability', async () => {
     mockedAccess.mockReturnValue(accessOf('ready', {}));
-    const { result } = renderHook(() => useCorpOwner('canReadWallet', 'corporation'));
+    const { result } = renderHook(() => useTestCorpOwner('canReadWallet', 'corporation'));
     await waitFor(() => expect(result.current.corporationId).toBe(CORPORATION_ID));
     expect(result.current.owner).toBe('personal');
   });
 
   it('is unavailable without the capability, even with a known corporation', async () => {
     mockedAccess.mockReturnValue(accessOf('ready', {}));
-    const { result } = renderHook(() => useCorpOwner('canReadWallet'));
+    const { result } = renderHook(() => useTestCorpOwner('canReadWallet'));
     await waitFor(() => expect(result.current.corporationId).toBe(CORPORATION_ID));
     expect(result.current.available).toBe(false);
   });
@@ -108,13 +121,13 @@ describe('useCorpOwner', () => {
       ownerHash: 'h',
       addedAt: 0,
     });
-    const { result } = renderHook(() => useCorpOwner('canReadWallet'));
+    const { result } = renderHook(() => useTestCorpOwner('canReadWallet'));
     await waitFor(() => expect(result.current.corporationId).toBeNull());
     expect(result.current.available).toBe(false);
   });
 
   it('flips to Corporation and back via setOwner, while available', async () => {
-    const { result } = renderHook(() => useCorpOwner('canReadWallet'));
+    const { result } = renderHook(() => useTestCorpOwner('canReadWallet'));
     await waitFor(() => expect(result.current.available).toBe(true));
 
     result.current.setOwner('corporation');
@@ -130,7 +143,7 @@ describe('useCorpOwner', () => {
    * screen with no switch left to get back to Personal.
    */
   it('forces back to Personal when the capability is lost while showing corp', async () => {
-    const { result, rerender } = renderHook(() => useCorpOwner('canReadWallet'));
+    const { result, rerender } = renderHook(() => useTestCorpOwner('canReadWallet'));
     await waitFor(() => expect(result.current.available).toBe(true));
     result.current.setOwner('corporation');
     await waitFor(() => expect(result.current.owner).toBe('corporation'));
@@ -147,7 +160,7 @@ describe('useCorpOwner', () => {
    * the next Character may hold no corp role at all.
    */
   it('resets to Personal when the active character changes', async () => {
-    const { result, rerender } = renderHook(() => useCorpOwner('canReadWallet'));
+    const { result, rerender } = renderHook(() => useTestCorpOwner('canReadWallet'));
     await waitFor(() => expect(result.current.available).toBe(true));
     result.current.setOwner('corporation');
     await waitFor(() => expect(result.current.owner).toBe('corporation'));

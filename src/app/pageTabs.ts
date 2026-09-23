@@ -21,8 +21,15 @@ export const CONTACTS_TABS = definePageTabs('/contacts', [
   { id: 'across', labelKey: 'contacts.tabAcrossCharacters' },
 ]);
 
+export const WALLET_TABS = definePageTabs('/wallet', [
+  { id: 'balance', labelKey: 'wallet.balanceTab' },
+  { id: 'journal', labelKey: 'wallet.journalTab' },
+  { id: 'transactions', labelKey: 'wallet.transactionsTab' },
+]);
+
 export const PAGE_TABS: Partial<Record<AppRoutePath, PageTabs>> = {
   '/contacts': CONTACTS_TABS,
+  '/wallet': WALLET_TABS,
 };
 
 const TABBED_PAGES = Object.values(PAGE_TABS);
@@ -49,8 +56,11 @@ export function pageKeyFor(pathname: string): string {
 
 /**
  * A tabbed page's bare path or unknown segment — a URL `TabRoute` is about to
- * replace with the default tab. Not a page view of its own: analytics skips
- * it and records the tab path that follows.
+ * replace with the default tab, *or* a sibling route nested one segment
+ * under the page's own base that this function has no way to distinguish
+ * from an unknown tab (it knows nothing of the real route table). Callers
+ * that need the real answer use `pagePathFor.ts`'s `isPendingTabRedirect`,
+ * which breaks the tie against `ROUTE_REQUIREMENTS`.
  */
 export function isTabRedirectPath(pathname: string): boolean {
   const page = tabbedPageFor(pathname);
@@ -59,8 +69,9 @@ export function isTabRedirectPath(pathname: string): boolean {
 
 /**
  * A tabbed page's path as analytics should record it: the declared tab path,
- * or the page itself for anything that is about to redirect. `null` for a
- * pathname in no tabbed page.
+ * or the page itself for anything that is about to redirect *or* — same
+ * caveat as `isTabRedirectPath` above — a sibling route this function can't
+ * tell apart from one. `null` for a pathname in no tabbed page.
  */
 export function tabbedPagePathFor(pathname: string): string | null {
   const page = tabbedPageFor(pathname);

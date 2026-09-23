@@ -54,9 +54,9 @@ export const NOTIFICATION_ROUTES: Record<NotificationEventId, string> = {
   // History, just a later transition of the same contract.
   contractCompleted: '/contracts?tab=history',
   contractFailed: '/contracts?tab=history',
-  // `?tab=` deep-links straight to the tab that actually shows the event,
-  // not just the page — `Wallet.tsx` reads it once on mount.
-  walletBalanceChanged: '/wallet?tab=journal',
+  // The tab is a path segment (ADR 0015, issue #1302) — this lands straight
+  // on the tab that actually shows the event, not just the page.
+  walletBalanceChanged: '/wallet/journal',
   // The *history*, not Open Orders: a filled order has left the open list, so
   // the tab this used to land on is the one place the thing it is telling you
   // about is guaranteed not to be. Transactions is where the fill itself is

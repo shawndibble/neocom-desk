@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
-import { pageKeyFor } from './pageTabs';
+import { resolvedPageKeyFor } from './pagePathFor';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
@@ -427,7 +427,7 @@ function MobileMoreSheet({
 }
 
 /**
- * Fades the route outlet in whenever the page changes — `pageKeyFor`'s
+ * Fades the route outlet in whenever the page changes — `resolvedPageKeyFor`'s
  * pathname, in which a tab segment (`/contacts/across`) collapses to its page:
  * a tab switch is not a page change and does not fade (ADR 0015).
  *
@@ -466,7 +466,7 @@ export function Layout() {
   const { t } = useTranslation();
   useKeyboardShortcuts();
   const location = useLocation();
-  const outletRef = useRouteFade(pageKeyFor(location.pathname));
+  const outletRef = useRouteFade(resolvedPageKeyFor(location.pathname));
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   const activeCharacter = useLiveQuery(
     () => (activeCharacterId === null ? undefined : db.characters.get(activeCharacterId)),
