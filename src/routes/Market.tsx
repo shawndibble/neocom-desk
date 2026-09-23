@@ -64,7 +64,7 @@ import type {
 } from '@/sde/marketTypes';
 import { buildVariationIndex } from '@/engine/market/variations';
 import { TRADE_HUBS, DEFAULT_TRADE_HUB, getTradeHub, type TradeHub } from '@/market/hubs';
-import { useMarketHub } from '@/features/market/hub';
+import { useMarketBrowserHub } from '@/features/market/browserHub';
 import { useLocationMode, type LocationMode } from '@/features/market/locationMode';
 import { JUMP_RANGES, DEFAULT_JUMP_RANGE, type JumpRange } from '@/engine/route/jumpRange';
 import { SPACE_KINDS, type SpaceKind } from '@/engine/space';
@@ -651,10 +651,10 @@ export function Market() {
     setExpandCompareOnAppraisal(expandCompare);
   }
   const searchInputRef = useRef<HTMLInputElement>(null);
-  const hubId = useMarketHub((state) => state.value);
-  const hubHydrated = useMarketHub((state) => state.hydrated);
-  const hydrateHub = useMarketHub((state) => state.hydrate);
-  const setHubId = useMarketHub((state) => state.setValue);
+  const hubId = useMarketBrowserHub((state) => state.value);
+  const hubHydrated = useMarketBrowserHub((state) => state.hydrated);
+  const hydrateHub = useMarketBrowserHub((state) => state.hydrate);
+  const setHubId = useMarketBrowserHub((state) => state.setValue);
   const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
 
   // The Appraisal tab's other half of the same control pair as the hub above.

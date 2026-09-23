@@ -3717,7 +3717,7 @@
       "reset": "Use the default four"
     },
     "tradeHubLabel": "Default trade hub",
-    "tradeHubHint": "Prices shown in the Market browser, the LP store and item lookups. Moon mining tax uses each payee’s own hub instead.",
+    "tradeHubHint": "Prices shown in the LP store and item lookups. The Market browser remembers its own hub per device. Moon mining tax uses each payee’s own hub.",
     "facilityLabel": "Default manufacturing facility",
     "facilityHint": "Where a new manufacturing plan starts. Only your first plan uses it — after that, a new plan copies your most recent one.",
     "rigLevelLabel": "Rigs",

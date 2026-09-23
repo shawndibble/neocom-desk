@@ -1,6 +1,8 @@
 /**
- * Market Browser's selected Trade Hub — which order book the pilot reads
- * prices from.
+ * The pilot's default Trade Hub — Settings' "Default Trade Hub" control, and
+ * the hub the Contracts detail modal's market-value figure (issue #717), LP
+ * Store, BPC Sourcing panel and notification polling price against absent a
+ * more specific choice of their own.
  *
  * Synced across their devices: which hub you price at is a fact about how you
  * play, not about the machine you opened, and a pilot who trades out of Amarr
@@ -9,12 +11,13 @@
  * the Payee record; this one is a viewing preference and Moon Mining never
  * reads it.
  *
- * Lives here rather than in `src/stores/` because it originated as, and still
- * primarily is, the Market Browser's own preference — other features (the
- * Contracts detail modal's market-value figure, issue #717; LP Store) import
- * it from here rather than each holding a duplicate hub preference of their
- * own, the same way they already share `src/market/hubs.ts`'s `TradeHub`
- * list.
+ * **Not** the Market Browser page's own current hub, which is device-local —
+ * see `browserHub.ts`'s doc comment for why the two are split.
+ *
+ * Lives here rather than in `src/stores/` because other features (Contracts,
+ * LP Store, BPC Sourcing, notification polling) import it from here rather
+ * than each holding a duplicate hub preference of their own, the same way
+ * they already share `src/market/hubs.ts`'s `TradeHub` list.
  */
 import { createSyncedSetting } from '@/lib/useSyncedSetting';
 import { DEFAULT_TRADE_HUB, getTradeHub, type TradeHub } from '@/market/hubs';
