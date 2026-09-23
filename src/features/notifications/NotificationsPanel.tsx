@@ -114,8 +114,13 @@ import { enableWebPush } from './webPush';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { loadCharacterRoles, corpWideRoles } from '@/features/corp/roles';
 import { corpCapabilities, type CorpCapabilities } from '@/engine/corpRoles';
+import { useUrlParam } from '@/lib/useUrlState';
+import { textParam } from '@/lib/urlState';
 
 const EVENT_BY_ID = new Map(NOTIFICATION_EVENTS.map((event) => [event.id, event]));
+
+/** Module scope so `useUrlParam` sees a stable codec identity across renders. */
+const SEARCH_PARAM = textParam();
 
 /** Stable identity for a Character with no token row yet, so it doesn't itself break `CharacterNotificationSection`'s memo. */
 const EMPTY_SCOPES: ReadonlySet<string> = new Set();
@@ -232,7 +237,7 @@ export function NotificationsPanel() {
   // never deliver anything, so this state shows why instead of the button.
   const installRequired = webPushSupport() === 'requires-install';
 
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useUrlParam('search', SEARCH_PARAM);
   const [expandedCharacterIds, setExpandedCharacterIds] = useState<ReadonlySet<number>>(new Set());
 
   /**
