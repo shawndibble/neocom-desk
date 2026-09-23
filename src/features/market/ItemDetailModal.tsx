@@ -17,15 +17,28 @@
  */
 import { Fragment, useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { EmptyState, IskAmount, Modal, Spinner, TypeIcon } from '@/components/ui';
+import { Button, EmptyState, IskAmount, Modal, SkillBar, Spinner, TypeIcon } from '@/components/ui';
 import { groupItemAttributes, type AttributeGroup } from '@/engine/market/itemAttributes';
 import { parseItemDescription, type DescriptionRun } from '@/engine/market/itemDescription';
 import type { OrderBookSummary } from '@/engine/market/orderBook';
+import type { TrainedSkill } from '@/engine/types';
 import { getUniverseType, type UniverseType } from '@/esi/endpoints';
 import { loadAttributeDictionary } from '@/sde/loadMarketSde';
 import { loadPi } from '@/sde/loadSde';
 import type { PiData } from '@/sde/types';
 import { formatDuration } from '@/lib/duration';
+import { useActiveCharacter } from '@/stores/activeCharacter';
+import { loadCharacterSkills } from '@/features/skills/data';
+import {
+  extractRequiredSkills,
+  REQUIRED_SKILL_DISPLAY_ATTRIBUTE_IDS,
+  type RequiredSkill,
+} from '@/features/skills/dogma';
+import { SkillStatusIcon } from '@/features/skills/SkillStatusIcon';
+import { skillTrainingStatus } from '@/features/skills/skillStatus';
+import { toTrainedSkillsMap } from '@/features/skills/skillMap';
+import { TargetPlanPicker } from '@/features/skills/TargetPlanPicker';
+import { useTargetPlan, type TargetPlan } from '@/features/skills/useTargetPlan';
 import { loadAttributeReferenceNames } from './attributeReferenceNames';
 import { formatAttributeValue, formatVolume } from './format';
 import {
@@ -50,7 +63,11 @@ export interface ItemDetailModalProps {
 
 interface DetailData {
   type: UniverseType;
+  /** `REQUIRED_SKILL_DISPLAY_ATTRIBUTE_IDS` rows already pulled out — the Required Skills section below owns those instead. */
   groups: AttributeGroup[];
+  requiredSkills: RequiredSkill[];
+  /** typeID -> name, reused from the same resolution the generic rows already paid for. */
+  skillNames: Readonly<Record<number, string>>;
   /** Null when pi.json couldn't be read — the rest of the modal is unaffected. */
   pi: PiData | null;
 }
@@ -70,10 +87,29 @@ export function ItemDetailModal({ typeId, itemName, onClose, location }: ItemDet
   const [data, setData] = useState<DetailData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [trainedSkills, setTrainedSkills] = useState<ReadonlyMap<number, TrainedSkill>>(new Map());
+
+  const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
+  const targetPlan = useTargetPlan(activeCharacterId);
 
   const savedLocation = useSavedOrderBookLocation(location === undefined);
   const priceLocation = location ?? savedLocation;
   const [priceState, setPriceState] = useState<PriceState>({ status: 'loading' });
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      if (activeCharacterId === null) {
+        if (!cancelled) setTrainedSkills(new Map());
+        return;
+      }
+      const result = await loadCharacterSkills(activeCharacterId);
+      if (!cancelled) setTrainedSkills(toTrainedSkillsMap(result?.data.skills ?? []));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeCharacterId]);
 
   useEffect(() => {
     if (!priceLocation) return;
@@ -114,9 +150,19 @@ export function ItemDetailModal({ typeId, itemName, onClose, location }: ItemDet
         // the fetch above; it never rejects, so it can't blank the modal.
         const names = await loadAttributeReferenceNames([type.dogma_attributes], dictionary);
         if (cancelled) return;
+        const groups = groupItemAttributes(type.dogma_attributes, dictionary, names)
+          .map((group) => ({
+            ...group,
+            attributes: group.attributes.filter(
+              (attribute) => !REQUIRED_SKILL_DISPLAY_ATTRIBUTE_IDS.has(attribute.attributeId)
+            ),
+          }))
+          .filter((group) => group.attributes.length > 0);
         setData({
           type,
-          groups: groupItemAttributes(type.dogma_attributes, dictionary, names),
+          groups,
+          requiredSkills: extractRequiredSkills(type.dogma_attributes),
+          skillNames: names.types ?? {},
           pi,
         });
       } catch {
@@ -186,6 +232,15 @@ export function ItemDetailModal({ typeId, itemName, onClose, location }: ItemDet
             </div>
           </div>
 
+          <RequiredSkillsSection
+            requiredSkills={data.requiredSkills}
+            skillNames={data.skillNames}
+            trainedSkills={trainedSkills}
+            target={targetPlan}
+            hasCharacter={activeCharacterId !== null}
+            itemName={itemName}
+          />
+
           <PlanetaryProduction pi={data.pi} typeId={typeId} />
 
           {data.groups.length === 0 ? (
@@ -224,6 +279,79 @@ export function ItemDetailModal({ typeId, itemName, onClose, location }: ItemDet
  */
 function priceCell(price: number | null): ReactNode {
   return price != null ? <IskAmount value={price} revealOn="tap" /> : '—';
+}
+
+/**
+ * "What skill affects this?" (issue #1366) — inline, not a destination: the
+ * skills this item's own dogma attributes already named as required, each
+ * with the Character's status and a one-click Add to Skill Plan through the
+ * same Target Plan mechanism Fit Check uses. Renders nothing when the item
+ * requires no skill (most items). Without an active Character
+ * (`hasCharacter` false — nobody to hold a trained level or a plan for), it
+ * degrades to name + required level only: no status icon, no picker, no Add
+ * button, rather than a status that's always "missing" and an Add that's a
+ * no-op.
+ */
+function RequiredSkillsSection({
+  requiredSkills,
+  skillNames,
+  trainedSkills,
+  target,
+  hasCharacter,
+  itemName,
+}: {
+  requiredSkills: readonly RequiredSkill[];
+  skillNames: Readonly<Record<number, string>>;
+  trainedSkills: ReadonlyMap<number, TrainedSkill>;
+  target: TargetPlan;
+  hasCharacter: boolean;
+  itemName: string;
+}) {
+  const { t } = useTranslation();
+  if (requiredSkills.length === 0) return null;
+
+  return (
+    <div>
+      <div className="flex items-center justify-between border-b border-line pb-1">
+        <h3 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+          {t('skills.requiredSkills.title')}
+        </h3>
+        {hasCharacter && <TargetPlanPicker target={target} />}
+      </div>
+      <div className="mt-1 space-y-1">
+        {requiredSkills.map((req) => {
+          const currentLevel = trainedSkills.get(req.skillTypeID)?.level ?? 0;
+          const status = skillTrainingStatus(currentLevel, req.level);
+          const name = skillNames[req.skillTypeID] ?? `#${req.skillTypeID}`;
+          return (
+            <div key={req.skillTypeID} className="flex items-center gap-3 text-xs">
+              {hasCharacter && <SkillStatusIcon status={status} />}
+              <span className="flex-1 text-text">{name}</span>
+              {hasCharacter ? (
+                <SkillBar level={currentLevel} />
+              ) : (
+                <span className="text-text-dim">{t('plans.level', { level: req.level })}</span>
+              )}
+              {hasCharacter && status !== 'trained' && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() =>
+                    void target.addEntries(
+                      [{ skillTypeID: req.skillTypeID, targetLevel: req.level }],
+                      itemName
+                    )
+                  }
+                >
+                  {t('skills.requiredSkills.addToPlan')}
+                </Button>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 /**

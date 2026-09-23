@@ -55,6 +55,11 @@
     "targetPlan": {
       "label": "Adding to"
     },
+    "status": {
+      "trained": "Trained",
+      "partial": "Partially trained",
+      "missing": "Not trained"
+    },
     "ships": {
       "fitCheckTab": "Fit Check",
       "masteryTab": "Mastery",
@@ -74,10 +79,11 @@
       "addAllToPlan": "Add All to Plan",
       "createPlanAndAdd": "Create Plan & Add",
       "add": "Add",
-      "trained": "Trained",
-      "statusTrained": "Trained",
-      "statusPartial": "Partially trained",
-      "statusMissing": "Not trained"
+      "trained": "Trained"
+    },
+    "requiredSkills": {
+      "title": "Required Skills",
+      "addToPlan": "Add to Skill Plan"
     },
     "totalSp": "Total SP",
     "unallocatedSp": "Unallocated SP",

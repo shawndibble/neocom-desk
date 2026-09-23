@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { extractAttributeBonuses, extractRequiredSkills, sumAttributeBonuses } from './dogma';
+import {
+  extractAttributeBonuses,
+  extractRequiredSkills,
+  REQUIRED_SKILL_DISPLAY_ATTRIBUTE_IDS,
+  sumAttributeBonuses,
+} from './dogma';
 
 // Fixture mirrors a live ESI response for type 10209, "Memory Augmentation -
 // Improved" (+5 Bonus to Memory; requires Cybernetics V via 182/277).
@@ -97,6 +102,14 @@ describe('extractRequiredSkills', () => {
   it('rounds float typeIDs/levels to integers', () => {
     expect(extractRequiredSkills([{ attribute_id: 182, value: 3329.0 }])).toEqual([
       { skillTypeID: 3329, level: 0 },
+    ]);
+  });
+});
+
+describe('REQUIRED_SKILL_DISPLAY_ATTRIBUTE_IDS', () => {
+  it('contains exactly the requiredSkillN ids, not their Level counterparts', () => {
+    expect([...REQUIRED_SKILL_DISPLAY_ATTRIBUTE_IDS].sort((a, b) => a - b)).toEqual([
+      182, 183, 184, 1285, 1289, 1290,
     ]);
   });
 });

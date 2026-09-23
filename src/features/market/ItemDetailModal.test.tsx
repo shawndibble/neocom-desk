@@ -11,6 +11,7 @@ import { loadAttributeDictionary, loadGlobalMarkets } from '@/sde/loadMarketSde'
 import { loadPi, loadSkills } from '@/sde/loadSde';
 import { piFixture } from '@/sde/__fixtures__/pi';
 import { db } from '@/db';
+import { useActiveCharacter } from '@/stores/activeCharacter';
 import { clearOrderBookCache } from './orderBook';
 import type { RegionOrder } from '@/esi/endpoints';
 
@@ -46,10 +47,12 @@ afterEach(async () => {
   // Group names are cached under the global sentinel and would otherwise
   // leak a resolved name into the next test's "unresolvable" case.
   await db.esiCache.clear();
+  await db.skillPlans.clear();
   // Order Book has its own 300s TTL cache, keyed by region+type — several
   // tests reuse TYPE_ID, and a real Date.now would let one test's response
   // leak into the next's.
   clearOrderBookCache();
+  useActiveCharacter.setState({ activeCharacterId: null, hydrated: true });
 });
 
 describe('ItemDetailModal', () => {
@@ -272,8 +275,73 @@ describe('ItemDetailModal', () => {
       await screen.findByText('Brand Manager Expert System', { selector: 'b' })
     ).toBeInTheDocument();
     expect(screen.queryByText(/<font/)).not.toBeInTheDocument();
-    expect(screen.getByText('Primary Skill required')).toBeInTheDocument();
-    expect(screen.getByText('Caldari Frigate III')).toBeInTheDocument();
+    // The generic "Primary Skill required" row is folded into the dedicated
+    // Required Skills section (issue #1366) instead of also rendering here.
+    expect(screen.queryByText('Primary Skill required')).not.toBeInTheDocument();
+    expect(screen.getByText('Required Skills')).toBeInTheDocument();
+    expect(screen.getByText('Caldari Frigate')).toBeInTheDocument();
+    // No active Character in this test, so the section degrades to name +
+    // level only — no status icon, no Add to Skill Plan.
+    expect(screen.getByText('Level 3')).toBeInTheDocument();
+    expect(screen.queryByText('Add to Skill Plan')).not.toBeInTheDocument();
+  });
+
+  it('with an active Character, shows trained status and Add to Skill Plan creates a plan (issue #1366)', async () => {
+    const CHARACTER_ID = 555;
+    useActiveCharacter.setState({ activeCharacterId: CHARACTER_ID, hydrated: true });
+    server.use(
+      http.get(`${ESI_BASE_URL}/universe/types/${TYPE_ID}`, () =>
+        HttpResponse.json({
+          type_id: TYPE_ID,
+          name: 'Brand Manager Expert System',
+          description: 'Grants access.',
+          group_id: 25,
+          published: true,
+          volume: 0.1,
+          dogma_attributes: [
+            { attribute_id: 182, value: 24241 },
+            { attribute_id: 277, value: 3 },
+          ],
+        })
+      ),
+      http.get(`${ESI_BASE_URL}/characters/${CHARACTER_ID}/skills`, () =>
+        HttpResponse.json({ skills: [], total_sp: 0, unallocated_sp: 0 })
+      )
+    );
+    mockedLoadDictionary.mockResolvedValue({
+      182: { name: 'Primary Skill required', unit: 'typeID', category: 'Required Skills' },
+    });
+    mockedLoadSkills.mockResolvedValue([
+      {
+        typeID: 24241,
+        name: 'Caldari Frigate',
+        description: '',
+        groupID: 0,
+        groupName: '',
+        rank: 1,
+        primaryAttr: 'perception',
+        secondaryAttr: 'willpower',
+        prereqs: [],
+      },
+    ]);
+    const user = userEvent.setup();
+
+    render(
+      <ItemDetailModal typeId={TYPE_ID} itemName="Brand Manager Expert System" onClose={() => {}} />
+    );
+
+    expect(await screen.findByText('Caldari Frigate')).toBeInTheDocument();
+    // Never trained -> the 3-state status icon reads "not trained", not the
+    // no-Character degraded "Level 3" text.
+    expect(screen.getByLabelText('Not trained')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Add to Skill Plan' }));
+
+    await waitFor(async () => {
+      const plans = await db.skillPlans.where('characterId').equals(CHARACTER_ID).toArray();
+      expect(plans).toHaveLength(1);
+      expect(plans[0].entries).toEqual([{ skillTypeID: 24241, targetLevel: 3 }]);
+    });
   });
 
   it('closes on Escape and returns focus to the trigger', async () => {

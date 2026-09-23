@@ -6,8 +6,9 @@
  * than re-deriving training time here).
  */
 import type { EngineSkill, PlanEntry, ScheduledStep, TrainedSkill } from '@/engine/types';
+import { skillTrainingStatus, type SkillTrainingStatus } from '../skillStatus';
 
-export type FitCheckStatus = 'trained' | 'partial' | 'missing';
+export type FitCheckStatus = SkillTrainingStatus;
 
 export interface FitCheckRow {
   skillTypeID: number;
@@ -35,8 +36,7 @@ export function buildFitCheckRows(
 
   return entries.map(({ skillTypeID, targetLevel }) => {
     const currentLevel = trainedSkills.get(skillTypeID)?.level ?? 0;
-    const status: FitCheckStatus =
-      currentLevel >= targetLevel ? 'trained' : currentLevel === 0 ? 'missing' : 'partial';
+    const status = skillTrainingStatus(currentLevel, targetLevel);
     return {
       skillTypeID,
       name: skills.get(skillTypeID)?.name ?? `#${skillTypeID}`,

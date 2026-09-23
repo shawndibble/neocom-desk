@@ -19,6 +19,7 @@ import type { CloneState, Attributes, Implants } from '@/engine/types';
 import { loadUniverseType } from '../data';
 import { loadItemNameMap, loadSkillNameMap } from '../typeCatalog';
 import { previewClipboardImport } from '../planner/clipboardImport';
+import { SkillStatusIcon } from '../SkillStatusIcon';
 import type { TargetPlan } from '../useTargetPlan';
 import { TargetPlanPicker } from '../TargetPlanPicker';
 import { buildFitCheckRows, type FitCheckRow } from './fitCheckRows';
@@ -186,7 +187,7 @@ export function FitCheckPanel({
                   key={row.skillTypeID}
                   className="flex items-center gap-3 border-b border-line py-1.5 text-xs last:border-b-0"
                 >
-                  <StatusIcon status={row.status} />
+                  <SkillStatusIcon status={row.status} />
                   <span className="flex-1 text-text">{row.name}</span>
                   <SkillBar level={row.currentLevel} />
                   <span className="w-16 text-right text-text-dim tabular-nums">
@@ -215,28 +216,5 @@ export function FitCheckPanel({
         </Panel>
       )}
     </div>
-  );
-}
-
-function StatusIcon({ status }: { status: FitCheckRow['status'] }) {
-  const { t } = useTranslation();
-  if (status === 'trained') {
-    return (
-      <span className="text-success" aria-label={t('skills.fitCheck.statusTrained')}>
-        ✓
-      </span>
-    );
-  }
-  if (status === 'partial') {
-    return (
-      <span className="text-warning" aria-label={t('skills.fitCheck.statusPartial')}>
-        ◐
-      </span>
-    );
-  }
-  return (
-    <span className="text-danger" aria-label={t('skills.fitCheck.statusMissing')}>
-      ✕
-    </span>
   );
 }
