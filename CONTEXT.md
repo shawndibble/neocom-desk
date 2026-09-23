@@ -245,6 +245,7 @@ here — they go one per file in `docs/context/decisions/`.
   Board Severity landing there. Exists to pay for what Kind Cards give up: four
   cards can each look calm while, between them, they hide one bad day.
 - **Editable Data**: Data created inside the app (Skill Plans, Build Plans, Production Runs, settings). Synced across devices. Everything else is API-derived and re-pulled per device.
+- **Effective Skill Level**: `min(queue-corrected trained level, queue-corrected active level)` — "the level this character can use right now" (issue #1236). Trained alone overstates an Alpha-capped or lapsed-Omega clone; `active_skill_level` alone understates a level the training queue just finished but `/skills` hasn't caught up to yet, so it gets the same queue-completion correction as trained before the min() is taken. Used by PI planet slots/customs rate/command center budget, industry job time and fees, job slots, and the clone jump cooldown. Distinct from the account-wide skill-gate marker (Build Plan/Opportunities rows), which deliberately stays on raw `active_skill_level` — see `docs/context/decisions/20260922-193557-effective-skill-level-one-min-trained-active-rule.md`.
 - **EIV (Estimated Item Value)**: The SCC's reference price for the materials
   a manufacturing job consumes, at ME0 quantities. Used only to size the
   **Job Fee** — it is not what the materials actually cost to buy.

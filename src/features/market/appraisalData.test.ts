@@ -42,6 +42,7 @@ function skillsFixture(trained: [number, number][]): CorrectedSkills {
     queueNeedsReauth: false,
     completedLevels: new Map(),
     trained: new Map(trained.map(([id, level]) => [id, { level, sp: 0 }])),
+    effective: new Map(trained.map(([id, level]) => [id, level])),
     completedSp: 0,
     totalSp: null,
     fetchedAt: null,

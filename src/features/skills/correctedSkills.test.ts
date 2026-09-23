@@ -78,6 +78,35 @@ describe('loadCorrectedSkills', () => {
     expect(result.completedLevels.get(3300)).toEqual({ level: 4, sp: 45_255 });
     expect(result.completedSp).toBe(37_255);
     expect(result.totalSp).toBe(301_255);
+    // A just-finished queue entry raises both sides of the min() together —
+    // trained via completedLevels, active the same way — so the level is
+    // fully counted rather than stuck at the pre-completion snapshot.
+    expect(result.effective.get(3300)).toBe(4);
+  });
+
+  it('caps the effective level at the active level when it reads below trained, with no queue movement to raise it (alpha cap or lapsed omega)', async () => {
+    vi.mocked(loadCharacterSkillsWithStatus).mockResolvedValue(
+      skillsStatus({
+        data: {
+          skills: [
+            {
+              skill_id: 3300,
+              trained_skill_level: 5,
+              active_skill_level: 2,
+              skillpoints_in_skill: 256_000,
+            },
+          ],
+          total_sp: 256_000,
+          unallocated_sp: 0,
+        },
+      })
+    );
+    vi.mocked(loadCharacterSkillQueueWithStatus).mockResolvedValue(queueStatus({ data: [] }));
+
+    const result = await loadCorrectedSkills(CHAR_ID, NOW);
+
+    expect(result.trained.get(3300)).toEqual({ level: 5, sp: 256_000 });
+    expect(result.effective.get(3300)).toBe(2);
   });
 
   it('interpolates the in-progress level SP that /skills has frozen at training start', async () => {
