@@ -52,6 +52,9 @@ const FILES = [
   // Ship Mastery tiers; see `masteries.json` below.
   'certMasteries.csv',
   'certSkills.csv',
+  // Which skill boosts which item attribute; see `skillAttributeModifiers.json` below.
+  'dgmEffects.csv',
+  'dgmTypeEffects.csv',
 ];
 
 const MARKET_OUT_DIR = join(OUT_DIR, 'market');
@@ -134,6 +137,29 @@ const MASTERY_TIER_COUNT = 5;
 // (wrong column, wrong category filter) lands at 0, not slightly off.
 const MASTERY_SHIPS_MIN = 350;
 const MASTERY_SHIPS_MAX = 700;
+// dgmEffects.csv's `modifierInfo` JSON column names one of six `func` kinds;
+// only these two ever gate on a required skill (the others key on a
+// location/group instead) — see `skillAttributeModifiers.json` below.
+const SKILL_GATED_MODIFIER_FUNCS = new Set([
+  'LocationRequiredSkillModifier',
+  'OwnerRequiredSkillModifier',
+]);
+// Dogma's ModifierOperation enum, verified against dgmEffects.csv effect
+// names that spell out their own operation (e.g. effect 290,
+// "sharpshooterRangeSkillBonusPostPercentMaxRange..."). Only PostPercent is
+// resolved here — it accounts for ~89% of skill-gated modifier rows in the
+// dump on 2026-09-23 (2332 of 2537), and is the shape every plain "+N% per
+// skill level" bonus takes. The rest (ModAdd, PreMul, PostDiv, ...) are the
+// small special-case list this feature's design doc explicitly allows for.
+const POST_PERCENT_OPERATION = 6;
+// Distinct modifiedAttributeIDs / total rows in `skillAttributeModifiers.json`,
+// as counted against the dump on 2026-09-23: 64 attributes, 261 rows (one row
+// per {modifiedAttributeID, ownerSkillTypeID} pair — an attribute a few skills
+// each independently modify emits a few rows). A broken join lands at 0.
+const SKILL_ATTRIBUTE_MODIFIERS_MIN = 30;
+const SKILL_ATTRIBUTE_MODIFIERS_MAX = 200;
+const SKILL_ATTRIBUTE_MODIFIER_ROWS_MIN = 100;
+const SKILL_ATTRIBUTE_MODIFIER_ROWS_MAX = 600;
 const MANUFACTURING_ACTIVITY_ID = 1;
 // Reaction formulas (issue #460): SDE industryActivity* rows for this
 // activity ID are disjoint from every other activity — verified against a
@@ -749,6 +775,68 @@ async function main() {
         bySkill.set(skillTypeID, Math.max(bySkill.get(skillTypeID) ?? 0, level));
       }
       tiers[masteryLevel] = [...bySkill].map(([skillTypeID, level]) => ({ skillTypeID, level }));
+    }
+  }
+
+  // --- skillAttributeModifiers.json: modifiedAttributeID -> skill bonuses affecting it ---
+  // (issue #1372) A LocationRequiredSkillModifier/OwnerRequiredSkillModifier
+  // row's own `skillTypeID` only *gates* the bonus (an item must require that
+  // skill for it to apply) — the bonus's actual source is whichever type the
+  // effect is attached to (dgmTypeEffects), which is usually NOT a skill at
+  // all: implants, ship set bonuses and subsystems reuse this exact mechanism.
+  // Filtering to effects owned by an actual skill type is what turns ~2300
+  // candidate rows into the couple hundred that are genuinely skill-driven.
+  const effectModifierInfo = new Map(); // effectID -> parsed modifierInfo array
+  {
+    const rows = raw['dgmEffects.csv'];
+    const h = indexHeader(rows);
+    for (let i = 1; i < rows.length; i++) {
+      const r = rows[i];
+      if (r.length <= h.modifierInfo) continue;
+      const cell = r[h.modifierInfo];
+      if (!cell) continue;
+      let parsed;
+      try {
+        parsed = JSON.parse(cell);
+      } catch {
+        continue; // malformed JSON in this one cell isn't fatal to the build
+      }
+      if (Array.isArray(parsed)) effectModifierInfo.set(Number(r[h.effectID]), parsed);
+    }
+  }
+  const effectOwnerTypes = new Map(); // effectID -> [typeID, ...]
+  {
+    const rows = raw['dgmTypeEffects.csv'];
+    const h = indexHeader(rows);
+    for (let i = 1; i < rows.length; i++) {
+      const r = rows[i];
+      if (r.length < 2) continue;
+      const effectID = Number(r[h.effectID]);
+      const typeID = Number(r[h.typeID]);
+      let list = effectOwnerTypes.get(effectID);
+      if (!list) effectOwnerTypes.set(effectID, (list = []));
+      list.push(typeID);
+    }
+  }
+  const skillAttributeModifiers = {};
+  for (const [effectID, entries] of effectModifierInfo) {
+    const ownerSkillTypeIDs = (effectOwnerTypes.get(effectID) ?? []).filter((t) =>
+      skillTypeIds.has(t)
+    );
+    if (ownerSkillTypeIDs.length === 0) continue;
+    for (const entry of entries) {
+      if (!SKILL_GATED_MODIFIER_FUNCS.has(entry.func)) continue;
+      if (entry.operation !== POST_PERCENT_OPERATION) continue;
+      const modifiedAttributeID = entry.modifiedAttributeID;
+      const gatingSkillTypeID = entry.skillTypeID;
+      const sourceAttributeID = entry.modifyingAttributeID;
+      if (modifiedAttributeID == null || gatingSkillTypeID == null || sourceAttributeID == null)
+        continue;
+      let list = skillAttributeModifiers[modifiedAttributeID];
+      if (!list) list = skillAttributeModifiers[modifiedAttributeID] = [];
+      for (const ownerSkillTypeID of ownerSkillTypeIDs) {
+        list.push({ ownerSkillTypeID, gatingSkillTypeID, sourceAttributeID });
+      }
     }
   }
 
@@ -1776,6 +1864,7 @@ async function main() {
   const outputs = [
     ['skills.json', skills],
     ['masteries.json', masteries],
+    ['skillAttributeModifiers.json', skillAttributeModifiers],
     ['blueprints.json', blueprints],
     ['marketWideTrees.json', marketWideTrees],
     ['reprocessing.json', reprocessing],
@@ -2007,6 +2096,48 @@ async function main() {
     }
     console.log(`  mastery skill refs pointing outside skills.json: ${masteryBadSkillId}`);
     if (masteryBadSkillId) process.exitCode = 1;
+  }
+  {
+    const attributeCount = Object.keys(skillAttributeModifiers).length;
+    const rowCount = Object.values(skillAttributeModifiers).reduce(
+      (sum, list) => sum + list.length,
+      0
+    );
+    console.log(`  skill attribute modifiers: ${attributeCount} attributes, ${rowCount} rows`);
+    if (
+      attributeCount < SKILL_ATTRIBUTE_MODIFIERS_MIN ||
+      attributeCount > SKILL_ATTRIBUTE_MODIFIERS_MAX
+    ) {
+      console.error(
+        `  FAIL: ${attributeCount} attributes, outside the plausible ${SKILL_ATTRIBUTE_MODIFIERS_MIN}-${SKILL_ATTRIBUTE_MODIFIERS_MAX} range`
+      );
+      process.exitCode = 1;
+    }
+    if (
+      rowCount < SKILL_ATTRIBUTE_MODIFIER_ROWS_MIN ||
+      rowCount > SKILL_ATTRIBUTE_MODIFIER_ROWS_MAX
+    ) {
+      console.error(
+        `  FAIL: ${rowCount} rows, outside the plausible ${SKILL_ATTRIBUTE_MODIFIER_ROWS_MIN}-${SKILL_ATTRIBUTE_MODIFIER_ROWS_MAX} range`
+      );
+      process.exitCode = 1;
+    }
+    // A known positive, verified against a live dump: Sharpshooter (3311)
+    // grants a PostPercent bonus to attribute 54 (Optimal Range) on items
+    // requiring Gunnery (3300), via its own attribute 294.
+    const OPTIMAL_RANGE_ATTR = 54;
+    const SHARPSHOOTER_TYPE_ID = 3311;
+    const GUNNERY_SKILL_TYPE_ID = 3300;
+    const found = (skillAttributeModifiers[OPTIMAL_RANGE_ATTR] ?? []).some(
+      (e) =>
+        e.ownerSkillTypeID === SHARPSHOOTER_TYPE_ID &&
+        e.gatingSkillTypeID === GUNNERY_SKILL_TYPE_ID &&
+        e.sourceAttributeID === 294
+    );
+    if (!found) {
+      console.error('  FAIL: Sharpshooter should modify attribute 54 (Optimal Range)');
+      process.exitCode = 1;
+    }
   }
 
   console.log(`  market groups: ${marketGroups.length}`);

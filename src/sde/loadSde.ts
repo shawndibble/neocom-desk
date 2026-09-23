@@ -4,6 +4,7 @@ import type {
   MasteryMap,
   PiData,
   ReprocessingMap,
+  SkillAttributeModifierMap,
   SkillType,
   TypeMap,
 } from './types';
@@ -28,6 +29,10 @@ function cached<T>(file: string): () => Promise<T> {
 export const loadSkills = cached<SkillType[]>('skills.json');
 /** See `MasteryMap`. */
 export const loadMasteries = cached<MasteryMap>('masteries.json');
+/** See `SkillAttributeModifierMap`. */
+export const loadSkillAttributeModifiers = cached<SkillAttributeModifierMap>(
+  'skillAttributeModifiers.json'
+);
 export const loadBlueprints = cached<BlueprintMap>('blueprints.json');
 export const loadTypes = cached<TypeMap>('types.json');
 export const loadPi = cached<PiData>('pi.json');
