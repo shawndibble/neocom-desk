@@ -130,6 +130,22 @@ describe('useLazyRowCache', () => {
     expect(result.current.byKey.get('a')).toBe(9);
   });
 
+  it('clears failedKeys immediately on reset, before the next load', async () => {
+    const { result } = renderHook(() => useLazyRowCache<string, number>());
+    const fetchValue = vi.fn().mockRejectedValue(new Error('nope'));
+
+    await act(async () => {
+      await result.current.load('a', fetchValue, { sticky: true });
+    });
+    expect(result.current.failedKeys.has('a')).toBe(true);
+
+    act(() => {
+      result.current.reset('a');
+    });
+
+    expect(result.current.failedKeys.has('a')).toBe(false);
+  });
+
   it('keeps load and reset referentially stable across renders', () => {
     const { result, rerender } = renderHook(() => useLazyRowCache<string, number>());
     const firstLoad = result.current.load;

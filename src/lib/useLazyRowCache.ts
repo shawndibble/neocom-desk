@@ -101,6 +101,12 @@ export function useLazyRowCache<K, V>(): LazyRowCache<K, V> {
 
   const reset = useCallback((key: K) => {
     attemptedRef.current.delete(key);
+    setFailedKeys((prev) => {
+      if (!prev.has(key)) return prev;
+      const next = new Set(prev);
+      next.delete(key);
+      return next;
+    });
   }, []);
 
   return { byKey, loadingKeys, failedKeys, load, reset };
