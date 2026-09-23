@@ -138,6 +138,7 @@ here — they go one per file in `docs/context/decisions/`.
   list out, severity from time remaining alone. A source that could not be read
   contributes nothing _and says so_; a source that read fine with nothing due
   shows a zero — the two must never look alike.
+- **Character Modifiers**: One value built from a Character's snapshot — trained skill levels plus active-clone implants — that every pricing path (job time, job cost, refining yield) takes as a required input instead of loose bonus percentages (issue #1284). It owns which bonus applies to which activity: manufacturing time (Industry, Advanced Industry, the blueprint's own science skills, BX-80x implant), reaction time (Reactions only), refining yield for ore/ice/moon ore (Reprocessing, Reprocessing Efficiency, the type's specialisation, RX-80x implant) versus scrap (Scrapmetal Processing only). Built pure in `src/engine/industry/characterModifiers.ts`; loaded once per Character by `src/features/character/characterModifiers.ts`. Does not cover Clone State or training speed.
 - **Character Not Training**: Fires when a Character's skill queue shows no
   active training (the head entry has no live `finish_date`) — whether from
   an empty queue or a stalled/alpha-incapable queue head. ESI exposes no
