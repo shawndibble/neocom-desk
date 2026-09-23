@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Navigate } from 'react-router-dom';
-import { EmptyState, PageHeader, Spinner, Tabs, type TabItem } from '@/components/ui';
+import { PageHeader, Spinner, Tabs, type TabItem } from '@/components/ui';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { SkillsSubNav } from '@/features/skills/SkillsSubNav';
 import { usePlanEditorData } from '@/features/skills/planner/usePlanEditorData';
 import { useTargetPlan } from '@/features/skills/useTargetPlan';
 import { cloneStateFor, useCloneStates } from '@/features/skills/cloneState';
 import { FitCheckPanel } from '@/features/skills/ships/FitCheckPanel';
+import { MasteryPanel } from '@/features/skills/ships/MasteryPanel';
 
 type ShipsMode = 'fitCheck' | 'mastery';
 
@@ -70,9 +71,13 @@ export function SkillShips() {
           cloneState={cloneStateFor(cloneStates, activeCharacterId)}
         />
       ) : (
-        <EmptyState
-          title={t('skills.ships.masteryComingSoonTitle')}
-          hint={t('skills.ships.masteryComingSoonHint')}
+        <MasteryPanel
+          target={target}
+          skills={catalog.engineSkills}
+          trainedSkills={trainedSkills}
+          attributes={attributes}
+          implants={implants}
+          cloneState={cloneStateFor(cloneStates, activeCharacterId)}
         />
       )}
     </div>

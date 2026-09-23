@@ -63,9 +63,7 @@
     "ships": {
       "tabsLabel": "Fit Check or Mastery",
       "fitCheckTab": "Fit Check",
-      "masteryTab": "Mastery",
-      "masteryComingSoonTitle": "Ship Mastery is coming soon",
-      "masteryComingSoonHint": "Fit Check is ready below in the meantime."
+      "masteryTab": "Mastery"
     },
     "fitCheck": {
       "title": "Check a fit",
@@ -85,6 +83,19 @@
     "requiredSkills": {
       "title": "Required Skills",
       "addToPlan": "Add to Skill Plan"
+    },
+    "mastery": {
+      "title": "Ship Mastery",
+      "searchPlaceholder": "Search for a ship",
+      "noShipsMatch": "No ship named \"{{query}}\" has mastery data",
+      "suggestedNote": "Suggested, not required — CCP's own bundles include some marginal skills. Not a hard gate to fly the ship.",
+      "tiersTitle": "{{ship}} Mastery",
+      "tierLabel": "Mastery {{roman}}",
+      "tierEmpty": "No data",
+      "tierComplete": "{{count}}/{{count}} complete",
+      "tierProgress": "{{done}}/{{total}} · {{time}} left",
+      "addLevelToPlan": "Add Level to Plan",
+      "newPlanName": "{{ship}} Mastery"
     },
     "totalSp": "Total SP",
     "unallocatedSp": "Unallocated SP",
