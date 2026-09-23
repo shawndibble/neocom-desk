@@ -711,7 +711,7 @@ describe('BpcSourcingPanel source multiselect', () => {
     expect(screen.getByText('No BPC listings match your filters.')).toBeInTheDocument();
     expect(
       screen.getByText(
-        'Clear the item search or widen the region, ME/TE/runs, price and source filters.'
+        'Clear the item search or widen the region, ME/TE/runs, price, source and space filters.'
       )
     ).toBeInTheDocument();
   });

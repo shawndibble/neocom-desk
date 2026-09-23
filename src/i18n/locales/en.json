@@ -2531,7 +2531,7 @@
     "notConfiguredTitle": "Public BPC search isn't available",
     "notConfiguredHint": "This requires the app's sync backend, which isn't configured here.",
     "noFilterMatches": "No BPC listings match your filters.",
-    "noFilterMatchesHint": "Clear the item search or widen the region, ME/TE/runs, price and source filters.",
+    "noFilterMatchesHint": "Clear the item search or widen the region, ME/TE/runs, price, source and space filters.",
     "suggestionsLabel": "Matching blueprints",
     "suggestionBestMeTe": "Best ME {{me}} / TE {{te}}",
     "cheapestLabel": "Cheapest",
