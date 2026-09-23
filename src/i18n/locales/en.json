@@ -2500,7 +2500,6 @@
     "bpoLocationAtHub": "{{location}} (trade hub) · {{region}}",
     "bpoMeTe": "ME {{me}} / TE {{te}}",
     "atTradeHub": "Trade hub",
-    "bpoCardCue": "BPO",
     "bpoCardNpcSeeded": "incl. NPC-seeded",
     "bpoCardMayBeCheaperHint": "The full BPO price is at or below the cheapest copy offer shown. Runs are not compared.",
     "marketScopeRegion": "Market BPOs checked in {{region}}.",
