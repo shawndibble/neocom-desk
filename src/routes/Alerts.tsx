@@ -289,7 +289,7 @@ export function Alerts() {
         {visible.length === 0 ? (
           <EmptyState
             title={groups.length === 0 ? t('alerts.empty') : t('alerts.noMatches')}
-            hint={groups.length === 0 ? t('alerts.emptyHint') : undefined}
+            hint={groups.length === 0 ? t('alerts.emptyHint') : t('alerts.noMatchesHint')}
             className="py-6"
           />
         ) : (
