@@ -20,12 +20,15 @@ import {
   useResolvedCharacterFilter,
   type CharacterFilterValue,
 } from '@/features/character/characterFilterValue';
+import { characterFilterParam } from '@/features/character/characterFilterUrlParam';
 import * as Icon from '@/components/ui/icons';
 import { beginEveLogin } from '@/app/loginFlow';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
 import { toggleFilterMember } from '@/lib/multiSelectFilter';
+import { useUrlParams, useUrlSort } from '@/lib/useUrlState';
+import { boolParam, type UrlParamCodec } from '@/lib/urlState';
 import type { TradeHub } from '@/market/hubs';
 import type { PayeeRecord } from '@/db';
 import { STATUS_LABEL_KEY, type MiningTaxRowStatus } from '@/engine/miningTax/rowStatus';
@@ -167,6 +170,26 @@ function statusLabel(t: (key: string) => string, status: MiningTaxRowStatus): st
   return t(`miningTax.status.${STATUS_LABEL_KEY[status]}`);
 }
 
+/** `payeeFilter` as a URL query param: a comma-separated set of Payee ids, absent means "all". */
+function payeeFilterParam(): UrlParamCodec<ReadonlySet<string> | 'all'> {
+  return {
+    parse: (raw) => (raw === null || raw === '' ? 'all' : new Set(raw.split(','))),
+    serialize: (value) => (value === 'all' ? null : [...value].sort().join(',')),
+  };
+}
+
+// Keys scoped `tax.*`: Mining's other tab (`OverviewTab`) has its own
+// `character`/sort params on the same route, and `usePageTab` carries the
+// query string across a tab switch — unscoped keys would leak Tax's filter
+// and sort into Overview and back.
+const TAX_URL_PARAMS = {
+  'tax.character': characterFilterParam('all'),
+  'tax.payee': payeeFilterParam(),
+  'tax.showSettled': boolParam(),
+};
+
+const TAX_DEFAULT_SORT = { columnId: 'date', direction: 'desc' as const };
+
 /**
  * Moon Mining ledger (issue #523): one continuously-filterable list, all
  * tracked characters by default. The Tax tab of the Mining page (issue #671)
@@ -187,8 +210,22 @@ export function TaxTab({ tabBar }: TaxTabProps) {
     { cacheKey: 'moonMiningTax' }
   );
 
-  const [characterFilter, setCharacterFilter] = useState<CharacterFilterValue>('all');
-  const [payeeFilter, setPayeeFilter] = useState<ReadonlySet<string> | 'all'>('all');
+  const [
+    { 'tax.character': characterFilter, 'tax.payee': payeeFilter, 'tax.showSettled': showSettled },
+    setTaxUrlParams,
+  ] = useUrlParams(TAX_URL_PARAMS);
+  const setCharacterFilter = useCallback(
+    (next: CharacterFilterValue) => setTaxUrlParams({ 'tax.character': next }),
+    [setTaxUrlParams]
+  );
+  const setPayeeFilter = useCallback(
+    (next: ReadonlySet<string> | 'all') => setTaxUrlParams({ 'tax.payee': next }),
+    [setTaxUrlParams]
+  );
+  const setShowSettled = useCallback(
+    (next: boolean) => setTaxUrlParams({ 'tax.showSettled': next }),
+    [setTaxUrlParams]
+  );
   // Remembered across visits (`statusFilterPref.ts`): this filter hides rows,
   // so forgetting it silently drops whatever the pilot was working from.
   const storedStatuses = useStatusFilter((state) => state.value);
@@ -219,7 +256,6 @@ export function TaxTab({ tabBar }: TaxTabProps) {
   // What the Settle-up dialog is settling: a balance card's whole balance, or
   // the table's checkbox selection. `null` keeps it closed.
   const [settleUpRows, setSettleUpRows] = useState<SettleUpRow[] | null>(null);
-  const [showSettled, setShowSettled] = useState(false);
   const [detailTarget, setDetailTarget] = useState<DisplayRow | null>(null);
   const [joinTarget, setJoinTarget] = useState<DisplayRow | null>(null);
   const [splitTarget, setSplitTarget] = useState<DisplayRow | null>(null);
@@ -259,17 +295,30 @@ export function TaxTab({ tabBar }: TaxTabProps) {
     return [...seen.values()].sort((a, b) => a.name.localeCompare(b.name));
   }, [data]);
 
+  // `payeeFilter` is URL-held, so a stale or hand-edited link can name Payee
+  // ids nobody tracked has — the codec can't validate that itself (it has no
+  // access to `allPayees`), so unknown ids are dropped here instead, the same
+  // "unknown value falls back to the default" rule the codecs otherwise apply
+  // themselves. Emptying out entirely (every id unknown) reads as no filter.
+  const resolvedPayeeFilter = useMemo(() => {
+    if (payeeFilter === 'all') return 'all' as const;
+    const known = new Set(allPayees.map((p) => p.id));
+    const kept = new Set([...payeeFilter].filter((id) => known.has(id)));
+    return kept.size === 0 ? ('all' as const) : kept;
+  }, [payeeFilter, allPayees]);
+
   // Filtering "by Payee" only makes sense for rows that already have one —
   // an unassigned or dismissed row has no Payee to match, so it drops out as
   // soon as a specific Payee is selected.
   const payeeFiltered = useMemo(
     () =>
-      payeeFilter === 'all'
+      resolvedPayeeFilter === 'all'
         ? characterFiltered
         : characterFiltered.filter(
-            (dr) => dr.assignment?.payeeId !== undefined && payeeFilter.has(dr.assignment.payeeId)
+            (dr) =>
+              dr.assignment?.payeeId !== undefined && resolvedPayeeFilter.has(dr.assignment.payeeId)
           ),
-    [characterFiltered, payeeFilter]
+    [characterFiltered, resolvedPayeeFilter]
   );
 
   const statusCounts = useMemo(() => {
@@ -401,9 +450,9 @@ export function TaxTab({ tabBar }: TaxTabProps) {
   }
 
   function togglePayee(payeeId: string) {
-    setPayeeFilter((previous) =>
+    setPayeeFilter(
       toggleFilterMember(
-        previous,
+        resolvedPayeeFilter,
         payeeId,
         allPayees.map((p) => p.id)
       )
@@ -411,7 +460,9 @@ export function TaxTab({ tabBar }: TaxTabProps) {
   }
 
   const isSolePayeeFilter = (payeeId: string) =>
-    payeeFilter !== 'all' && payeeFilter.size === 1 && payeeFilter.has(payeeId);
+    resolvedPayeeFilter !== 'all' &&
+    resolvedPayeeFilter.size === 1 &&
+    resolvedPayeeFilter.has(payeeId);
 
   /** A balance card's name doubles as "show me just this Payee's entries" — the filter the card's own figure came from. */
   function filterToPayee(payeeId: string) {
@@ -776,6 +827,12 @@ export function TaxTab({ tabBar }: TaxTabProps) {
     },
   ];
 
+  const taxSort = useUrlSort(
+    'tax.sort',
+    TAX_DEFAULT_SORT,
+    columns.map((c) => c.id)
+  );
+
   const payeeManagerDefaultCharacterId =
     characters.find((c) => c.characterId === activeCharacterId)?.characterId ??
     characters[0]?.characterId ??
@@ -1056,16 +1113,16 @@ export function TaxTab({ tabBar }: TaxTabProps) {
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button size="sm">
-                    {payeeFilter === 'all'
+                    {resolvedPayeeFilter === 'all'
                       ? t('miningTax.allPayees')
-                      : t('miningTax.payeesSelected', { count: payeeFilter.size })}
+                      : t('miningTax.payeesSelected', { count: resolvedPayeeFilter.size })}
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent>
                   {allPayees.map((p) => (
                     <DropdownMenuCheckboxItem
                       key={p.id}
-                      checked={payeeFilter === 'all' || payeeFilter.has(p.id)}
+                      checked={resolvedPayeeFilter === 'all' || resolvedPayeeFilter.has(p.id)}
                       onSelect={(e) => e.preventDefault()}
                       onCheckedChange={() => togglePayee(p.id)}
                     >
@@ -1118,7 +1175,7 @@ export function TaxTab({ tabBar }: TaxTabProps) {
                 className="ml-auto"
                 variant={showSettled ? 'primary' : 'ghost'}
                 aria-pressed={showSettled}
-                onClick={() => setShowSettled((previous) => !previous)}
+                onClick={() => setShowSettled(!showSettled)}
               >
                 {t('miningTax.settledPayeesFilter')}
               </Button>
@@ -1148,7 +1205,7 @@ export function TaxTab({ tabBar }: TaxTabProps) {
                   rows={visibleRows}
                   rowKey={(dr) => dr.key}
                   label={t('miningTax.title')}
-                  defaultSort={{ columnId: 'date', direction: 'desc' }}
+                  {...taxSort}
                   onRowClick={(dr) => setDetailTarget(dr)}
                 />
               </div>

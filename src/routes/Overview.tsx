@@ -367,7 +367,7 @@ export function Overview() {
     {
       key: 'mining',
       domain: t('overview.board.miningTax'),
-      to: '/moon-mining',
+      to: '/mining',
       severity: miningTaxSeverity(miningSnapshot.data),
       summary: miningTaxSummary(t, miningSnapshot.data),
       render: () => <MiningTaxCard data={miningSnapshot.data} />,

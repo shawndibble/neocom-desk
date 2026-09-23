@@ -130,7 +130,7 @@ const NAV_PATHS = [
   '/alerts',
   '/skills',
   '/industry',
-  '/moon-mining',
+  '/mining',
   '/planetary-industry',
   '/market',
   '/wallet',
@@ -566,9 +566,9 @@ export function Layout() {
             locked={locked.has('/industry')}
           />
           <NavItem
-            to="/moon-mining"
-            label={t(NAV_LABEL_KEYS['/moon-mining'])}
-            locked={locked.has('/moon-mining')}
+            to="/mining"
+            label={t(NAV_LABEL_KEYS['/mining'])}
+            locked={locked.has('/mining')}
           />
           <NavItem
             to="/planetary-industry"

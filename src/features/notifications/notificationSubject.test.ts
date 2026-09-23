@@ -5,7 +5,7 @@ import { NOTIFICATION_EVENT_IDS } from './events';
 describe('notificationUrlForSubject', () => {
   it('appends the highlight to a route that already carries a query string', () => {
     expect(notificationUrlForSubject('walletBalanceChanged', 77)).toEqual(
-      '/wallet?tab=journal&highlight=77'
+      '/wallet/journal?highlight=77'
     );
     expect(notificationUrlForSubject('marketOrderFilled', 34)).toEqual(
       '/market?section=transactions&highlight=34'

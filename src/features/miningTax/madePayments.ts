@@ -15,7 +15,7 @@
  *   snapshot Assignments already carry, so the amount is confirmed by the pilot.
  *
  * Both reads degrade quietly. Neither scope is in `ROUTE_REQUIREMENTS` for
- * `/moon-mining` (that table gates the whole page), so a pilot without them —
+ * `/mining` (that table gates the whole page), so a pilot without them —
  * or offline — simply gets no suggestions rather than an error.
  */
 import type { Contract, WalletJournalEntry } from '@/esi/endpoints';
