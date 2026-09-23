@@ -1432,13 +1432,13 @@ describe('Shareable Market Browser URLs (issue #4)', () => {
 
     await user.type(await screen.findByRole('searchbox'), 'rift');
     await user.click(await screen.findByText('Rifter'));
-    expect(window.location.search).toBe('?type=587&hub=jita');
+    // The tree search box is URL-backed too (ADR 0015), written immediately —
+    // it rides along with every location change from here on.
+    expect(window.location.search).toBe('?browser.q=rift&type=587&hub=jita');
 
     await user.click(screen.getByRole('button', { name: 'Region' }));
-    // The tree search box is URL-backed too (ADR 0015) — its debounced write
-    // has landed by now, so it rides along with the location change.
     await waitFor(() =>
-      expect(window.location.search).toBe('?type=587&region=10000002&browser.q=rift')
+      expect(window.location.search).toBe('?browser.q=rift&type=587&region=10000002')
     );
   });
 

@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import { usePageTab } from '@/lib/usePageTab';
 import { useUrlParam } from '@/lib/useUrlState';
-import { enumParam, textParam, type UrlParamCodec } from '@/lib/urlState';
+import { enumParam, type UrlParamCodec } from '@/lib/urlState';
 import { MARKET_TABS } from '@/app/pageTabs';
 import {
   Button,
@@ -161,7 +161,19 @@ const STATION_FILTER_PARAM: UrlParamCodec<number | null> = {
 };
 
 const ITEM_TAB_PARAM = enumParam(['orders', 'history'] as const, 'orders');
-const BROWSER_SEARCH_PARAM = textParam();
+/**
+ * Deliberately not `textParam()`: its built-in debounce only smooths the
+ * *write*, not the render (the tree already re-filters on every keystroke via
+ * the hook's own optimistic `pending` state) — and on this page, an
+ * item/hub/region change is a second, independent `useUrlParams` writer
+ * (`navigateTo`) that can land in the same window as a still-pending debounced
+ * write and silently drop it. Writing immediately removes that race; nothing
+ * here needed the debounce for its own sake.
+ */
+const BROWSER_SEARCH_PARAM: UrlParamCodec<string> = {
+  parse: (raw) => raw ?? '',
+  serialize: (value) => (value === '' ? null : value),
+};
 
 /**
  * Stands in for variationIndex before variations.json resolves (or if it
@@ -597,7 +609,10 @@ export function Market() {
     setSellShowAll(false);
     setBuyShowAll(false);
     setOrderBookFetch(null);
-    setStationFilter(null);
+    // `browser.station` clears in `navigateTo` itself, not here — every path
+    // that changes `resetKey` goes through it, and clearing it here too was a
+    // second, independent `useUrlParams` writer landing in the same render as
+    // `navigateTo`'s own write, which silently dropped one of the two.
     // Set in the same render as the reset above, not left for the fetch
     // effect a tick later — otherwise the one commit in between paints
     // `orderBookLoading: false` alongside the just-cleared `orderBookFetch`,
@@ -948,10 +963,15 @@ export function Market() {
   //
   // `buildMarketParams` returns the canonical type/hub/region set, and
   // replacing those wholesale is the point — `group` goes with them (a
-  // one-shot cross-link param, never re-applied once acted on). Everything
-  // else already in the query — `browser.q`, `browser.station`,
-  // `browser.itemTab` — survives untouched: the tab lives in the path now,
-  // not here, so there is no longer a `?section=` this needs to carry along.
+  // one-shot cross-link param, never re-applied once acted on). `browser.station`
+  // goes too: every call here means a new item or location, which is exactly
+  // when the "filter to this station" banner should clear (previously done by
+  // `setStationFilter(null)` in the resetKey effect below — moved here because
+  // that call and this one are two independent `useUrlParams` writers landing
+  // in the very same render, and the second one silently dropped the first's
+  // write, per the "two writers, same tick" hazard `useUrlState.ts` documents).
+  // `browser.q`/`browser.itemTab` survive untouched: the tab lives in the path
+  // now, not here, so there is no longer a `?section=` this needs to carry along.
   function navigateTo(typeId: number | null, next: MarketLocationParam) {
     setSearchParams((prev) => {
       const params = new URLSearchParams(prev);
@@ -959,6 +979,7 @@ export function Market() {
       params.delete('hub');
       params.delete('region');
       params.delete('group');
+      params.delete('browser.station');
       for (const [key, value] of Object.entries(buildMarketParams(typeId, next))) {
         params.set(key, value);
       }
