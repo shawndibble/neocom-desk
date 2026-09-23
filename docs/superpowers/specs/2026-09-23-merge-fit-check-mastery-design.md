@@ -94,11 +94,13 @@ One panel, `Panel` title "Ships":
 3. A filter row: "Mastery" / "This Fit" `FilterChip`s, "Hide completed"
    `FilterChip`, and the total-time `StatChip` right-aligned.
 4. The flat row list: `SkillRow` per unified row, each with a small source
-   tag or two ("Mastery II", "This Fit") appended — `SkillRow` itself
-   doesn't grow a `tags` prop; the panel wraps it with the tag markup
-   alongside, matching how `RequiredSkillsSection` already composes
-   `SkillRow` with its own extra markup rather than widening `SkillRow`'s
-   props for one caller's need.
+   tag or two ("Mastery II", "This Fit") appended. Checked against the real
+   component (`RequiredSkillsSection` composes `SkillRow` directly, no
+   wrapper markup — its own extra need was a relabeled `addLabel`, not an
+   inline slot): `SkillRow` is a single flex row, so tags can't sit "next
+   to" it without becoming part of it. Adds one small optional `tags?:
+ReactNode` prop to `SkillRow`, rendered between name and the level bar —
+   `undefined` renders nothing, so every existing caller is unaffected.
 5. Footer: `TargetPlanPicker` + "Add All to Plan" button, exactly as
    `FitCheckPanel` already wires it — just fed the merged/filtered row set.
 

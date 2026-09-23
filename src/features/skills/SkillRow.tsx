@@ -13,6 +13,8 @@ export interface SkillRowProps {
   /** Omit where only a whole group adds at once (Mastery's tier-level Add), not this one skill. */
   onAdd?: () => void;
   addLabel?: string;
+  /** Small provenance chips, rendered between the name and the level bar. Omit for none. */
+  tags?: ReactNode;
 }
 
 /** No outer padding/border/margin — the caller's own wrapper controls spacing, since Fit Check, Mastery, and Market's Required Skills each frame this row differently (dividers vs. plain stack). */
@@ -23,11 +25,13 @@ export function SkillRow({
   timeLabel,
   onAdd,
   addLabel,
+  tags,
 }: SkillRowProps) {
   return (
     <div className="flex items-center gap-3 text-xs">
       <SkillStatusIcon status={status} />
       <span className="flex-1 text-text">{name}</span>
+      {tags !== undefined && <span className="flex shrink-0 gap-1">{tags}</span>}
       <SkillBar level={currentLevel} />
       {timeLabel !== undefined && (
         <span className="w-16 text-right text-text-dim tabular-nums">{timeLabel}</span>

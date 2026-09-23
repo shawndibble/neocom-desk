@@ -60,21 +60,11 @@
       "partial": "Partially trained",
       "missing": "Not trained"
     },
-    "ships": {
-      "tabsLabel": "Fit Check or Mastery",
-      "fitCheckTab": "Fit Check",
-      "masteryTab": "Mastery"
-    },
     "fitCheck": {
-      "title": "Check a fit",
       "pasteLabel": "Paste an EFT fit",
       "pastePlaceholder": "[Vexor, PvE Ratting]\nDrone Damage Amplifier II\n...",
       "checkButton": "Check Fit",
       "notEftFit": "That doesn't look like an EFT fit — paste one starting with [Ship Name, Fit Name].",
-      "resultsTitle": "Missing skills ({{count}})",
-      "resultsTitleEmpty": "Missing skills",
-      "emptyTitle": "You already have every skill this fit needs",
-      "emptyHint": "Nothing to add.",
       "addAllToPlan": "Add All to Plan",
       "createPlanAndAdd": "Create Plan & Add",
       "add": "Add",
@@ -89,21 +79,6 @@
       "perLevel": "{{skill}}: +{{perLevel}}% per level",
       "current": "Trained to {{level}} — currently +{{total}}%",
       "untrained": "Not trained"
-    },
-    "mastery": {
-      "title": "Ship Mastery",
-      "searchPlaceholder": "Search for a ship",
-      "noShipsMatch": "No ship named \"{{query}}\" has mastery data",
-      "suggestedNote": "Suggested, not required — CCP's own bundles include some marginal skills. Not a hard gate to fly the ship.",
-      "tiersTitle": "{{ship}} Mastery",
-      "tierLabel": "Mastery {{roman}}",
-      "tierEmpty": "No data",
-      "tierComplete": "{{count}}/{{count}} complete",
-      "tierProgress": "{{done}}/{{total}} · {{time}} left",
-      "addLevelToPlan": "Add Level to Plan",
-      "newPlanName": "{{ship}} Mastery",
-      "hideCompleted": "Hide completed",
-      "tierAllHidden": "All skills in this tier are already trained."
     },
     "totalSp": "Total SP",
     "unallocatedSp": "Unallocated SP",
@@ -156,6 +131,25 @@
       "addToSkillPlan": "Add to Skill Plan",
       "noPlans": "No skill plans yet",
       "maxLevelTitle": "Already at level 5"
+    },
+    "ships": {
+      "title": "Ships",
+      "searchPlaceholder": "Search for a ship",
+      "noShipsMatch": "No ship named \"{{query}}\" has mastery data",
+      "suggestedNote": "Suggested, not required — CCP's own bundles include some marginal skills. Not a hard gate to fly the ship.",
+      "hideCompleted": "Hide completed",
+      "attachFit": "+ Attach a fit (optional)",
+      "attachFitHint": "Paste an EFT fit to see fit-specific skills too.",
+      "fitAttached": "Fit attached: {{name}}",
+      "removeFit": "Remove",
+      "filterMastery": "Mastery",
+      "filterFit": "This Fit",
+      "filterFitDisabledTooltip": "Attach a fit to filter by it",
+      "totalTime": "Total",
+      "masteryTag": "Mastery {{roman}}",
+      "fitTag": "This Fit",
+      "emptyTitle": "Nothing to show",
+      "emptyHint": "Every skill here is already trained or filtered out — or this ship has no Mastery data and no fit attached."
     }
   },
   "plans": {
