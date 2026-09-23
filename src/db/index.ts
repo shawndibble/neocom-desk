@@ -12,6 +12,7 @@ import type {
 } from '@/engine/industry/types';
 import type { TradeHub } from '@/market/hubs';
 import type { OrderProblemSample } from '@/engine/market/orderProblemHistory';
+import type { MiningLedgerRow } from '@/engine/miningTax/types';
 
 export interface CharacterRecord {
   characterId: number;
@@ -844,6 +845,21 @@ export interface MailDraftRecord {
   updatedAt: number;
 }
 
+/**
+ * A Character's mining ledger kept past ESI's 30-day window (issue #1278),
+ * up to `LEDGER_HISTORY_DAYS` (`engine/miningTax/ledgerHistory.ts`). Its own
+ * table rather than an `esiCache` row: a cache row is thrown away by "clear
+ * cache" and replaced whole on every fetch, and days older than 30 can never
+ * be fetched again. Device-local, not synced. Read and written whole.
+ */
+export interface MiningLedgerHistoryRecord {
+  characterId: number;
+  /** Merged ledger rows, oldest first. */
+  rows: MiningLedgerRow[];
+  /** Epoch ms of the newest ESI fetch merged in — an older cached copy never overwrites it. */
+  fetchedAt: number;
+}
+
 export const db = new Dexie('neocom') as Dexie & {
   characters: EntityTable<CharacterRecord, 'characterId'>;
   tokens: EntityTable<TokenRecord, 'characterId'>;
@@ -863,6 +879,7 @@ export const db = new Dexie('neocom') as Dexie & {
   bpcSearchWatches: EntityTable<BpcSearchWatchRecord, 'id'>;
   orderProblemSamples: EntityTable<OrderProblemSampleRecord, 'orderId'>;
   mailDrafts: EntityTable<MailDraftRecord, 'id'>;
+  miningLedgerHistory: EntityTable<MiningLedgerHistoryRecord, 'characterId'>;
 };
 
 /**
@@ -1097,4 +1114,29 @@ db.version(13).stores({
   bpcSearchWatches: 'id',
   orderProblemSamples: 'orderId, characterId',
   mailDrafts: 'id, characterId',
+});
+
+// Additive: v13 stores unchanged, plus the Mining Overview's 90-day ledger
+// history (issue #1278). One row per Character, keyed by it, so
+// `removeCharacter` drops it with a single delete.
+db.version(14).stores({
+  characters: 'characterId, corporationId',
+  tokens: 'characterId',
+  settings: 'key',
+  skillPlans: 'id, characterId',
+  esiCache: '[characterId+key]',
+  buildPlans: 'id, characterId',
+  quickbars: 'id, characterId',
+  stationPins: 'id, characterId, locationId',
+  planetRichness: 'id, characterId, planetId',
+  notificationFeed: 'id, characterId, firedAt',
+  productionRuns: 'id, characterId, buildPlanId',
+  productionSaleLinks: 'id, characterId, runId',
+  productionOrderWatches: 'id, characterId, runId',
+  payees: 'id, characterId',
+  miningTaxAssignments: 'id, characterId, [characterId+date+solarSystemId]',
+  bpcSearchWatches: 'id',
+  orderProblemSamples: 'orderId, characterId',
+  mailDrafts: 'id, characterId',
+  miningLedgerHistory: 'characterId',
 });

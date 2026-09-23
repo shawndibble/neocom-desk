@@ -10,7 +10,7 @@
  * and the vocabulary note in the issue: this is deliberately not the Tax
  * tab's `MiningLedgerEntry`/`Assignment`/`Payee` model).
  */
-import { lazy, Suspense, useMemo, useState, type ReactNode } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -40,6 +40,15 @@ import {
   type MiningYieldSnapshot,
 } from './yieldSnapshot';
 import { iskPerCalendarHour } from '@/engine/miningTax/yieldRate';
+import {
+  MINING_YIELD_RANGES,
+  daysCovered,
+  eveToday,
+  rangeDates,
+  rangeStartDate,
+  type MiningYieldRange,
+} from '@/engine/miningTax/yieldRange';
+import { useMiningYieldRange } from './yieldRangePref';
 import { YieldDetailModal } from './YieldDetailModal';
 import { sumVolume, volumeDisplayMode } from './volume';
 import { VolumeDisplay } from './volumeDisplay';
@@ -75,6 +84,40 @@ function dateRangeLabel(dates: readonly string[]): string {
   return first === last ? first : `${first} – ${last}`;
 }
 
+interface RangeControlProps {
+  value: MiningYieldRange;
+  onChange: (range: MiningYieldRange) => void;
+  /** Full width with 44px tap targets — the phone layout. */
+  fill?: boolean;
+}
+
+/** Segmented Date range buttons. Each range slices already-loaded rows, so switching never refetches. */
+function RangeControl({ value, onChange, fill = false }: RangeControlProps) {
+  const { t } = useTranslation();
+  return (
+    <div
+      role="group"
+      aria-label={t('miningTax.overview.dateRangeStat')}
+      className={`flex overflow-hidden rounded-xs border border-line ${fill ? 'w-full' : ''}`}
+    >
+      {MINING_YIELD_RANGES.map((range) => {
+        const active = range === value;
+        return (
+          <button
+            key={range}
+            type="button"
+            aria-pressed={active}
+            onClick={() => onChange(range)}
+            className={`border-r border-line px-3 text-xs last:border-r-0 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent ${fill ? 'h-11 flex-1' : 'h-8'} ${active ? 'bg-panel-2 text-accent shadow-[inset_0_-2px_0_var(--color-accent)]' : 'text-text-dim hover:text-text'}`}
+          >
+            {t(`miningTax.overview.range.${range}`)}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 interface OverviewTabProps {
   /** The route's shared tab bar, rendered under this tab's own `PageHeader`. See `MoonMiningTax`. */
   tabBar: ReactNode;
@@ -91,17 +134,42 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
   const [characterFilter, setCharacterFilter] = useState<CharacterFilterValue>('all');
   const [detailRow, setDetailRow] = useState<MiningYieldRow | null>(null);
   const resolvedCharacterFilter = useResolvedCharacterFilter(characterFilter, activeCharacterId);
+  const range = useMiningYieldRange((state) => state.value);
+  const setRange = useMiningYieldRange((state) => state.setValue);
+  const hydrateRange = useMiningYieldRange((state) => state.hydrate);
+  useEffect(() => {
+    void hydrateRange();
+  }, [hydrateRange]);
+  // EVE/UTC, the ledger's own calendar. Recomputed each render so a tab left
+  // open past downtime moves its window with the day.
+  const today = eveToday();
 
   const characters = data?.characters ?? [];
   const showCharacterColumn = characters.length > 1;
 
-  const visibleRows = useMemo(
+  const characterRows = useMemo(
     () =>
       (data?.rows ?? []).filter(
         (row) => resolvedCharacterFilter === 'all' || resolvedCharacterFilter.has(row.characterId)
       ),
     [data, resolvedCharacterFilter]
   );
+  const visibleRows = useMemo(() => {
+    const start = rangeStartDate(range, today);
+    return characterRows.filter((row) => row.entry.date >= start && row.entry.date <= today);
+  }, [characterRows, range, today]);
+  const coverage = useMemo(() => {
+    let oldestSaved: string | null = null;
+    for (const row of characterRows) {
+      if (oldestSaved === null || row.entry.date < oldestSaved) oldestSaved = row.entry.date;
+    }
+    return daysCovered(
+      visibleRows.map((row) => row.entry.date),
+      range,
+      today,
+      oldestSaved
+    );
+  }, [characterRows, visibleRows, range, today]);
 
   const totals = useMemo(() => {
     const typeVolumes = data?.typeVolumes ?? new Map<number, number>();
@@ -132,10 +200,13 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
     for (const row of visibleRows) {
       byDate.set(row.entry.date, (byDate.get(row.entry.date) ?? 0) + row.valuation.rawValue);
     }
-    return [...byDate.entries()]
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([date, value]) => ({ date, iskPerHour: value / 24 }));
-  }, [visibleRows]);
+    // Every day of the range, mined or not, so the axis spans the whole window
+    // and a gap (or days before saved history began) reads as a gap.
+    return rangeDates(range, today).map((date) => ({
+      date,
+      iskPerHour: (byDate.get(date) ?? 0) / 24,
+    }));
+  }, [visibleRows, range, today]);
 
   const typeComparison: TypeComparisonPoint[] = useMemo(() => {
     const byType = new Map<number, { rawValue: number; refineValue: number }>();
@@ -243,6 +314,9 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
         meta={data?.fetchedAt ? <DataAgeBadge date={data.fetchedAt} /> : undefined}
         actions={
           <>
+            <div className="hidden sm:flex">
+              <RangeControl value={range} onChange={(next) => void setRange(next)} />
+            </div>
             {characters.length > 0 && (
               <CharacterFilterControl
                 characters={characters.map((c) => ({
@@ -264,6 +338,9 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
         }
       />
       {tabBar}
+      <div className="sm:hidden">
+        <RangeControl value={range} onChange={(next) => void setRange(next)} fill />
+      </div>
 
       {loading && !data ? (
         <div className="flex justify-center py-16">
@@ -353,9 +430,23 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
                 </Panel>
                 <Panel>
                   <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                    {t('miningTax.overview.dateRangeStat')}
+                    {t('miningTax.overview.daysCoveredStat')}
                   </p>
-                  <p className="mt-1 text-sm font-semibold">{dateRangeLabel(totals.dates)}</p>
+                  <p className="mt-1 text-lg font-semibold tabular-nums">
+                    {t('miningTax.overview.daysCoveredValue', {
+                      count: coverage.daysWithData,
+                      total: coverage.rangeDays,
+                    })}
+                  </p>
+                  {coverage.historyStartsInRange ? (
+                    <p className="text-[0.6875rem] text-warning">
+                      {t('miningTax.overview.historyStartsHint', {
+                        date: coverage.historyStartsInRange,
+                      })}
+                    </p>
+                  ) : (
+                    <p className="text-[0.6875rem] text-text-dim">{dateRangeLabel(totals.dates)}</p>
+                  )}
                 </Panel>
               </div>
 

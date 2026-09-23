@@ -1587,6 +1587,15 @@
       "iskPerHourBasisHint": "Averaged over the date range, not active mining time — ESI's ledger has no time of day.",
       "volumeStat": "Volume mined",
       "dateRangeStat": "Date range",
+      "daysCoveredStat": "Days covered",
+      "daysCoveredValue": "{{count}} of {{total}}",
+      "historyStartsHint": "Saved history starts {{date}}",
+      "range": {
+        "90d": "90d",
+        "30d": "30d",
+        "7d": "7d",
+        "today": "Today"
+      },
       "iskPerHour": "ISK/hr",
       "rateChartTitle": "ISK/hr trend",
       "compareChartTitle": "Raw vs. refined value by type",
@@ -3422,6 +3431,7 @@
           "esi": "Your assets, wallet, contracts, mail, contacts, clones, calendar, skills, skill queue, industry jobs and colonies.",
           "corp": "Everything on the Corporation pages — wallet, members, structures, assets and moon extractions.",
           "market": "Market prices, order books and the LP store.",
+          "miningHistory": "Up to 90 days of your mining ledger, kept past the 30 days EVE itself returns so the Mining Overview can show longer ranges.",
           "login": "Your EVE sign-in.",
           "loginNote": "The token that keeps you logged in is stored in this browser and nowhere else.",
           "preferences": "The rest of Settings — text size and time format, which answer for the screen you are looking at — and every sort, filter and expanded section a page remembers as you use it."
