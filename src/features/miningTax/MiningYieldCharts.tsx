@@ -14,6 +14,7 @@ import {
   Legend,
   Bar,
   Cell,
+  LabelList,
   type TooltipContentProps,
 } from 'recharts';
 import type { PriceSource } from '@/engine/miningTax/priceBasis';
@@ -47,6 +48,8 @@ export interface TypeComparisonPoint {
 interface MiningYieldChartsProps {
   dailyRate: DailyRatePoint[];
   typeComparison: TypeComparisonPoint[];
+  /** Issue #1281's page switch — raw-only bars with end labels and a note, no refined series at all. */
+  showRefining: boolean;
 }
 
 /** `date` is a bare calendar date — build the tick from Y/M/D components, never `new Date(string)`, to avoid a UTC/local day shift. */
@@ -81,7 +84,11 @@ function RateTooltip({ active, payload, label }: TooltipContentProps): React.Rea
   );
 }
 
-function CompareTooltip({ active, payload }: TooltipContentProps): React.ReactElement | null {
+function CompareTooltip({
+  active,
+  payload,
+  showRefining,
+}: TooltipContentProps & { showRefining: boolean }): React.ReactElement | null {
   const { t } = useTranslation();
   if (!active || !payload || payload.length === 0) return null;
   const point = payload[0]?.payload as TypeComparisonPoint | undefined;
@@ -92,15 +99,26 @@ function CompareTooltip({ active, payload }: TooltipContentProps): React.ReactEl
       <p>
         {t('miningTax.overview.rawSellValue')}: {formatIsk(point.rawValue, 0)} ISK
       </p>
-      <p>
-        {t('miningTax.overview.refineValue')}: {formatIsk(point.refineValue, 0)} ISK
-      </p>
+      {showRefining && (
+        <p>
+          {t('miningTax.overview.refineValue')}: {formatIsk(point.refineValue, 0)} ISK
+        </p>
+      )}
     </div>
   );
 }
 
-export default function MiningYieldCharts({ dailyRate, typeComparison }: MiningYieldChartsProps) {
+export default function MiningYieldCharts({
+  dailyRate,
+  typeComparison,
+  showRefining,
+}: MiningYieldChartsProps) {
   const { t } = useTranslation();
+  const compareChartTitle = t(
+    showRefining
+      ? 'miningTax.overview.compareChartTitle'
+      : 'miningTax.overview.compareChartTitleRawOnly'
+  );
 
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -152,13 +170,9 @@ export default function MiningYieldCharts({ dailyRate, typeComparison }: MiningY
 
       <div>
         <p className="mb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-          {t('miningTax.overview.compareChartTitle')}
+          {compareChartTitle}
         </p>
-        <div
-          role="img"
-          aria-label={t('miningTax.overview.compareChartTitle')}
-          className="h-64 w-full"
-        >
+        <div role="img" aria-label={compareChartTitle} className="h-64 w-full">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
               data={typeComparison}
@@ -180,21 +194,39 @@ export default function MiningYieldCharts({ dailyRate, typeComparison }: MiningY
                 width={COMPACT_ISK_Y_AXIS_WIDTH}
                 tickFormatter={(value: number) => formatIskCompact(value)}
               />
-              <Tooltip content={(props) => <CompareTooltip {...props} />} />
-              <Legend wrapperStyle={{ fontSize: '0.6875rem' }} />
+              <Tooltip
+                content={(props) => <CompareTooltip {...props} showRefining={showRefining} />}
+              />
+              {showRefining && <Legend wrapperStyle={{ fontSize: '0.6875rem' }} />}
               <Bar
                 dataKey="rawValue"
                 fill="var(--color-line-bright)"
                 name={t('miningTax.overview.rawSellValue')}
-              />
-              <Bar
-                dataKey="refineValue"
-                fill="var(--color-accent)"
-                name={t('miningTax.overview.refineValue')}
-              />
+              >
+                {!showRefining && (
+                  <LabelList
+                    dataKey="rawValue"
+                    position="top"
+                    formatter={(value: unknown) => formatIskCompact(Number(value))}
+                    style={{ fontSize: 10, fill: 'var(--color-text-dim)' }}
+                  />
+                )}
+              </Bar>
+              {showRefining && (
+                <Bar
+                  dataKey="refineValue"
+                  fill="var(--color-accent)"
+                  name={t('miningTax.overview.refineValue')}
+                />
+              )}
             </BarChart>
           </ResponsiveContainer>
         </div>
+        {!showRefining && (
+          <p className="mt-1 text-[0.6875rem] text-text-dim">
+            {t('miningTax.overview.refiningHiddenNote')}
+          </p>
+        )}
       </div>
     </div>
   );

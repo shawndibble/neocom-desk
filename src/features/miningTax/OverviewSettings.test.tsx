@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
-import { BuybackRateInput, PriceBasisOptions } from './OverviewSettings';
+import { BuybackRateInput, PriceBasisOptions, ShowRefiningToggle } from './OverviewSettings';
 
 describe('PriceBasisOptions', () => {
   it('checks the choice matching the basis', () => {
@@ -52,5 +52,19 @@ describe('BuybackRateInput', () => {
     await userEvent.type(field, '101');
 
     expect(onChange).not.toHaveBeenCalledWith(101);
+  });
+});
+
+describe('ShowRefiningToggle (issue #1281)', () => {
+  it('reflects the current value and flips it on click', async () => {
+    const onChange = vi.fn();
+    render(<ShowRefiningToggle value={true} onChange={onChange} />);
+
+    const toggle = screen.getByRole('switch', { name: 'Show refining' });
+    expect(toggle).toHaveAttribute('aria-checked', 'true');
+
+    await userEvent.click(toggle);
+
+    expect(onChange).toHaveBeenCalledWith(false);
   });
 });

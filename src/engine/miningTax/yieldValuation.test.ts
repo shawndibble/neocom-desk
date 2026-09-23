@@ -81,6 +81,28 @@ describe('valueMiningYield', () => {
     expect(result.refineValue).toBe(0);
   });
 
+  it('skips refine pricing and does not mark Partial for missing refine data when includeRefining is false (issue #1281)', () => {
+    const lines: OreLine[] = [{ typeId: VELDSPAR, quantity: 200 }];
+    // No reprocessing map entry and no material price at all — with refining
+    // included this would flip Partial; with it excluded the raw side alone
+    // decides pricedAll.
+    const result = valueMiningYield(
+      lines,
+      new Map([[VELDSPAR, 5]]),
+      new Map(),
+      NO_SKILLS,
+      {},
+      {
+        includeRefining: false,
+      }
+    );
+    expect(result.refineValue).toBe(0);
+    expect(result.lines[0].refineValue).toBe(0);
+    expect(result.lines[0].refineOutputs).toEqual([]);
+    expect(result.lines[0].batches).toBe(0);
+    expect(result.pricedAll).toBe(true);
+  });
+
   it('returns zero totals for an empty ore-line list', () => {
     const result = valueMiningYield([], new Map(), new Map(), NO_SKILLS, {});
     expect(result).toEqual({

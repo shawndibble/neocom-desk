@@ -25,6 +25,7 @@ import { loadCharacterModifiers } from '@/features/character/characterModifiers'
 import { loadPriceHistory, type PriceHistoryResult } from '@/features/market/priceHistory';
 import { EsiError } from '@/esi/errors';
 import { loadCompressedOreTypeIds, loadReprocessing, loadTypes } from '@/sde/loadSde';
+import type { ReprocessingMap } from '@/sde/types';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { loadSystemNameAndSecurity } from '@/features/character/systemSecurity';
 import { DEFAULT_TRADE_HUB } from '@/market/hubs';
@@ -164,7 +165,15 @@ async function fetchVolumesFromEsi(typeIds: number[]): Promise<Map<number, numbe
   return map;
 }
 
-export async function loadMiningYieldSnapshot(): Promise<MiningYieldSnapshot> {
+/**
+ * `showRefining` false (issue #1281's page switch, default on) skips
+ * everything only refining needs — the reprocessing recipe bake, material
+ * price history/snapshots, and character skills/implants — for a pilot who
+ * never refines. `valueMiningYield`'s `includeRefining` flag keeps the
+ * resulting rows from reading as "Partial" for refine data that was never
+ * fetched on purpose.
+ */
+export async function loadMiningYieldSnapshot(showRefining = true): Promise<MiningYieldSnapshot> {
   const yields = await loadAllCharacterYields();
 
   const characters: TrackedCharacter[] = yields.map((y) => ({
@@ -210,7 +219,7 @@ export async function loadMiningYieldSnapshot(): Promise<MiningYieldSnapshot> {
 
   const [compressedByRaw, reprocessingMap] = await Promise.all([
     loadCompressedOreTypeIds(),
-    loadReprocessing(),
+    showRefining ? loadReprocessing() : Promise.resolve<ReprocessingMap>({}),
   ]);
   const pricingTypeId = (typeId: number): number => compressedByRaw[String(typeId)] ?? typeId;
 
@@ -297,7 +306,13 @@ export async function loadMiningYieldSnapshot(): Promise<MiningYieldSnapshot> {
   const characterIds = [...new Set(allEntries.map(({ characterId }) => characterId))];
   const modifiersByCharacter = new Map(
     await Promise.all(
-      characterIds.map(async (id) => [id, await loadCharacterModifiers(id, Date.now())] as const)
+      characterIds.map(
+        async (id) =>
+          [
+            id,
+            showRefining ? await loadCharacterModifiers(id, Date.now()) : NO_CHARACTER_MODIFIERS,
+          ] as const
+      )
     )
   );
 
@@ -335,7 +350,8 @@ export async function loadMiningYieldSnapshot(): Promise<MiningYieldSnapshot> {
           rawUnitPrices,
           reprocessingByTypeId,
           modifiers,
-          materialPrices
+          materialPrices,
+          { includeRefining: showRefining }
         ),
         materialUnitPrices: new Map(
           Object.entries(materialPrices).map(([typeId, price]) => [Number(typeId), price])
