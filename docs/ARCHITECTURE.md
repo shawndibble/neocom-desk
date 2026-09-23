@@ -423,7 +423,7 @@ SDE rebuild: `npm run sde:build`.
 
 Issue #1285. The work lands in two places, and the compiler holds you to the second.
 
-1. Add a row to the catalog in `src/features/notifications/events.ts`: id, label key, scope, corp capability and `defaultChannels`. This half is service-worker-safe, and the `NotificationEventId` union is derived from it.
+1. Add a row to the catalog in `src/features/notifications/events.ts`: id, label key, scope, corp capability and `defaultChannels`. Add the label string at `settings.notifications.event.<id>` in `en.json`. This half is service-worker-safe, and the `NotificationEventId` union is derived from it.
 2. Once the id exists, `NOTIFICATION_EVENT_ENTRIES` in `src/features/notifications/eventEntries.ts` fails to typecheck until the event has an **Event Entry**. The entry names every required field:
    - `source`: the `SNAPSHOT_SOURCES` handle of the poll domain it reads.
    - `diff`: an engine diff, written test-first in `src/engine/notificationDiffs.ts`.
@@ -432,6 +432,7 @@ Issue #1285. The work lands in two places, and the compiler holds you to the sec
    - `thresholds`: fields from `eventThresholds.ts`, or `null`.
    - `rowHintKey`: a row hint, or `null`.
 3. If the event needs data no domain fetches yet, add a domain to `pollDomains.ts` that names a new `SNAPSHOT_SOURCES` handle.
+4. A new fire type must join `AnyNotificationFire` (`eventEntries.ts`), or the entry's `diff` fails to typecheck. Joining it then makes `engine/occurrenceKey.ts`'s exhaustive `OccurrenceFire` switch demand a case.
 
 You don't touch the domain's event list, its per-event gating, its live renderer or Settings' row for the new event. The domain's event list, its per-event gating and its live renderer are derived from the entries. Settings' row gets its threshold controls, hint, height and Scheduled Push badge from the entry too.
 
