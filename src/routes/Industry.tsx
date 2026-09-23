@@ -70,8 +70,7 @@ export function Industry() {
     ownedBlueprints,
     corpOwnedBlueprints,
     blueprintsNeedsReauth,
-    skills,
-    implantBonusPct,
+    modifiers,
     buildGroups,
     buildGroupsHydrated,
     setBuildGroups,
@@ -286,8 +285,7 @@ export function Industry() {
     pi,
     ownedBlueprints,
     corpOwnedBlueprints,
-    skills,
-    implantBonusPct,
+    modifiers,
     computeGroupResult: true,
   });
   const ungroupedRows = useComparedBuildResults({
@@ -296,8 +294,7 @@ export function Industry() {
     pi,
     ownedBlueprints,
     corpOwnedBlueprints,
-    skills,
-    implantBonusPct,
+    modifiers,
   });
   const runCounts = useRunCountsByPlan(activeCharacterId);
 
@@ -496,8 +493,7 @@ export function Industry() {
               <OpportunitiesPanel
                 catalog={catalog}
                 pi={pi}
-                skills={skills}
-                implantBonusPct={implantBonusPct}
+                modifiers={modifiers}
                 facilityDefaults={facilityDefaults}
                 activeCharacterId={activeCharacterId}
                 ownedStockSnapshot={workspace.ownedStockSnapshot}
@@ -507,7 +503,7 @@ export function Industry() {
                 hub={DEFAULT_TRADE_HUB}
                 trees={marketWideTrees}
                 catalog={catalog}
-                skills={skills}
+                modifiers={modifiers}
                 onStartPlan={(entry) => {
                   // Distinct from the plain search-box create: picking a
                   // scan result is an explicit "go build this" choice, same
@@ -524,7 +520,7 @@ export function Industry() {
             <ProductionLogPanel
               characterId={activeCharacterId}
               catalog={catalog}
-              skills={skills}
+              skills={modifiers.skills}
               plans={plans}
               onOpenRun={openRunFromRecords}
             />
@@ -536,8 +532,7 @@ export function Industry() {
                 pi={pi}
                 ownedBlueprints={ownedBlueprints}
                 corpOwnedBlueprints={corpOwnedBlueprints}
-                skills={skills}
-                implantBonusPct={implantBonusPct}
+                modifiers={modifiers}
                 onDone={exitCompare}
               />
             ) : (

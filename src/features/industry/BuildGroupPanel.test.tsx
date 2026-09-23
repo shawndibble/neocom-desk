@@ -5,6 +5,7 @@
  * copied — a single shared `copied` flag would say "copied" on all of them.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { NO_CHARACTER_MODIFIERS } from '@/engine/industry/characterModifiers';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
@@ -191,8 +192,7 @@ function renderPanel(
       catalog={overrides.catalog ?? CATALOG}
       pi={null}
       ownedBlueprints={[]}
-      skills={{} as never}
-      implantBonusPct={0}
+      modifiers={NO_CHARACTER_MODIFIERS}
       ownedStockSnapshot={SNAPSHOT}
       onAutoBuild={overrides.onAutoBuild ?? (() => Promise.resolve())}
       onOpenPlan={() => {}}

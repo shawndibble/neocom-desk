@@ -21,8 +21,8 @@
  * caller with no plan (LP store, planetary plans).
  */
 import { getHubPrices } from '@/market/prices';
+import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
 import type { TradeHub } from '@/market/hubs';
-import type { SkillLevels } from '@/engine/industry/types';
 import type { MarketWideTreeMap } from '@/sde/types';
 import type { BlueprintCatalog } from './blueprintCatalog';
 import { loadMarketSnapshot } from './marketData';
@@ -72,7 +72,7 @@ export async function runMarketWideScan(
   hub: TradeHub,
   trees: MarketWideTreeMap,
   catalog: BlueprintCatalog,
-  skills: SkillLevels,
+  modifiers: CharacterModifiers,
   options: MarketWideScanOptions = {}
 ): Promise<MarketWideResultRow[]> {
   const floorIsk = options.liquidityFloorIsk ?? DEFAULT_LIQUIDITY_FLOOR_ISK;
@@ -132,7 +132,8 @@ export async function runMarketWideScan(
   const feeContext: MarketWideFeeInputs = {
     adjustedPrices: snapshot.adjustedPrices ?? {},
     systemCostIndex: snapshot.systemCostIndex ?? 0,
-    skills,
+    // Pre-#1284 behaviour: this scan never applied the BX-80x implant.
+    modifiers: { ...modifiers, manufacturingTimeImplantPct: 0 },
   };
 
   const rows = computeMarketWideRows(marketWideCandidates, materialPrices, feeContext);

@@ -13,13 +13,14 @@ import { hydrateActivityFacilityDefaults, useFacilityDefaults } from './facility
 import { useReactionFacilityDefaults } from './reactionFacilityDefaults';
 import type { ActivityFacilityDefaults } from './facilityDefaults';
 import { useActiveCharacter } from '@/stores/activeCharacter';
-import type { SkillLevels } from '@/engine/industry/types';
 import type { CharacterBlueprint } from '@/esi/endpoints';
 import { loadPi } from '@/sde/loadSde';
 import type { PiData } from '@/sde/types';
-import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
-import { loadCharacterImplants } from '@/features/skills/data';
-import { resolveManufacturingTimeImplantBonusPct } from '@/engine/industry/time';
+import {
+  NO_CHARACTER_MODIFIERS,
+  type CharacterModifiers,
+} from '@/engine/industry/characterModifiers';
+import { loadCharacterModifiers } from '@/features/character/characterModifiers';
 import { loadBlueprintCatalog, type BlueprintCatalog } from './blueprintCatalog';
 import { loadCharacterBlueprints } from './data';
 import { useOwnedStockSnapshot } from './useDetectedOwnedStock';
@@ -39,9 +40,8 @@ export interface IndustryWorkspace {
   pi: PiData | null;
   ownedBlueprints: CharacterBlueprint[];
   blueprintsNeedsReauth: boolean;
-  skills: SkillLevels;
-  /** The active Character's active-clone BX-80x manufacturing-time implant bonus, if any (issue #1229). */
-  implantBonusPct: number;
+  /** The active Character's skills + implants (issue #1284). Stable identity per Character load. */
+  modifiers: CharacterModifiers;
   ownedStockSnapshot: OwnedStockSnapshot;
   corpOwnedStock: CorpOwnedStockState;
   corpOwnedBlueprints: CorpOwnedBlueprintsState;
@@ -88,33 +88,26 @@ export function useIndustryWorkspace(): IndustryWorkspace {
   const [pi, setPi] = useState<PiData | null>(null);
   const [ownedBlueprints, setOwnedBlueprints] = useState<CharacterBlueprint[]>([]);
   const [blueprintsNeedsReauth, setBlueprintsNeedsReauth] = useState(false);
-  const [skills, setSkills] = useState<SkillLevels>({});
-  const [implantBonusPct, setImplantBonusPct] = useState(0);
+  const [modifiers, setModifiers] = useState<CharacterModifiers>(NO_CHARACTER_MODIFIERS);
 
   useEffect(() => {
     if (activeCharacterId === null) return;
     let cancelled = false;
     void (async () => {
-      const [cat, planetary, owned, corrected, implants] = await Promise.all([
+      const [cat, planetary, owned, loadedModifiers] = await Promise.all([
         loadBlueprintCatalog(),
         // Only the make-or-buy marker needs this one, so its failure costs a
         // handful of verdicts rather than the whole page.
         loadPi().catch(() => null),
         loadCharacterBlueprints(activeCharacterId),
-        loadCorrectedSkills(activeCharacterId, Date.now(), { skipQueueWithoutScope: true }),
-        loadCharacterImplants(activeCharacterId),
+        loadCharacterModifiers(activeCharacterId, Date.now(), { skipQueueWithoutScope: true }),
       ]);
       if (cancelled) return;
       setCatalog(cat);
       setPi(planetary);
       setOwnedBlueprints(owned.cached?.data ?? []);
       setBlueprintsNeedsReauth(owned.needsReauth);
-      // /skills lags until the character logs in; completed queue entries are
-      // the difference. Without them industry math undercounts skills.
-      const map: SkillLevels = {};
-      for (const [skillId, trained] of corrected.trained) map[skillId] = trained.level;
-      setSkills(map);
-      setImplantBonusPct(resolveManufacturingTimeImplantBonusPct(implants?.data ?? []));
+      setModifiers(loadedModifiers);
     })();
     return () => {
       cancelled = true;
@@ -129,8 +122,7 @@ export function useIndustryWorkspace(): IndustryWorkspace {
     pi,
     ownedBlueprints,
     blueprintsNeedsReauth,
-    skills,
-    implantBonusPct,
+    modifiers,
     ownedStockSnapshot,
     corpOwnedStock,
     corpOwnedBlueprints,

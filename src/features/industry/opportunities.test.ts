@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { NO_CHARACTER_MODIFIERS } from '@/engine/industry/characterModifiers';
 import type { CharacterBlueprint } from '@/esi/endpoints';
 import type { BlueprintCatalog, BlueprintCatalogEntry } from './blueprintCatalog';
 import type { BuildResult } from '@/engine/industry/types';
@@ -181,8 +182,7 @@ describe('computeOpportunityRow — auto make-or-buy depth (issue #652)', () => 
       candidate,
       snapshot,
       DEFAULT_ACTIVITY_FACILITY_DEFAULTS,
-      {},
-      0,
+      NO_CHARACTER_MODIFIERS,
       new Map(),
       {
         recipeFor,

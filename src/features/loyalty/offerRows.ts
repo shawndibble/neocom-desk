@@ -17,6 +17,7 @@ import {
   toIndustryBlueprint,
   type BlueprintCatalog,
 } from '@/features/industry/blueprintCatalog';
+import { characterModifiers } from '@/engine/industry/characterModifiers';
 import { buildVsBuy } from '@/engine/industry/buildVsBuy';
 import { FACILITY_PRESETS } from '@/engine/industry/types';
 import type { LiquidationBasis } from '@/engine/industry/ownedStockSale';
@@ -184,7 +185,10 @@ function computeBlueprintRow(
     adjustedPrices: inputs.adjustedPrices ?? {},
     hubPrices: inputs.hubPrices,
     materialSourcing: useOwnMaterials ? inputs.materialSourcing : undefined,
-    skills: inputs.skills,
+    // Cost side only (see `profit` below) at 1 run: `build.seconds` is never
+    // read here, so the only bonuses that matter are skill-driven and no
+    // implant snapshot is loaded for the LP store.
+    modifiers: characterModifiers({ skills: inputs.skills, implantTypeIds: [] }),
   });
 
   // Priced separately from `build.revenue` (which is always `hubPrices`,

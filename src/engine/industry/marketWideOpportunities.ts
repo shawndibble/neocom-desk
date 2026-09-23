@@ -35,8 +35,8 @@ import {
   SKILL_IDS,
   type AdjustedPrices,
   type BlueprintSkillRequirement,
-  type SkillLevels,
 } from './types';
+import type { CharacterModifiers } from './characterModifiers';
 
 /**
  * NPC station, no rig, no security-band dependence — matches the ownership-
@@ -55,7 +55,8 @@ const NPC_STATION_CONTEXT = {
 export interface MarketWideFeeInputs {
   adjustedPrices: AdjustedPrices;
   systemCostIndex: number;
-  skills: SkillLevels;
+  /** See `IndustryInputs.modifiers`. */
+  modifiers: CharacterModifiers;
 }
 
 /** One product's liquidity signal — the cheap, product-only price fetch that runs before any material pricing. */
@@ -153,7 +154,8 @@ export function computeMarketWideRows(
   feeInputs: MarketWideFeeInputs,
   thresholds?: OrderDepthThresholds
 ): MarketWideRow[] {
-  const { adjustedPrices, systemCostIndex, skills } = feeInputs;
+  const { adjustedPrices, systemCostIndex, modifiers } = feeInputs;
+  const { skills } = modifiers;
   const priced: {
     id: string;
     productTypeID: number;
@@ -191,7 +193,7 @@ export function computeMarketWideRows(
       tree.time,
       1,
       0,
-      skills,
+      modifiers,
       NPC_STATION_CONTEXT,
       candidate.blueprintSkills
     );

@@ -27,7 +27,8 @@ import { estimatedItemValue, jobFee } from '@/engine/industry/jobCost';
 import { brokerFee, breakEvenPrice, salesTax } from '@/engine/industry/fees';
 
 export function buildVsBuy(inputs: IndustryInputs): BuildResult {
-  const { blueprint, runs, me, te, systemCostIndex, adjustedPrices, hubPrices, skills } = inputs;
+  const { blueprint, runs, me, te, systemCostIndex, adjustedPrices, hubPrices, modifiers } = inputs;
+  const { skills } = modifiers;
   const ctx: SubBuildContext = {
     facility: inputs.facility,
     rigFit: inputs.rigFit,
@@ -35,16 +36,15 @@ export function buildVsBuy(inputs: IndustryInputs): BuildResult {
     facilityTaxPct: inputs.facilityTaxPct,
     systemCostIndex,
     adjustedPrices,
-    skills,
-    implantBonusPct: inputs.implantBonusPct,
+    modifiers,
   };
   // The Reaction Location (issue #698): `inputs.reactionFacility` carries no
   // pricing of its own, so it's projected onto the same `adjustedPrices`/
-  // `skills` every other context on this plan already uses.
+  // `modifiers` every other context on this plan already uses.
   const reactionCtx: SubBuildContext | undefined = inputs.reactionFacility && {
     ...inputs.reactionFacility,
     adjustedPrices,
-    skills,
+    modifiers,
   };
 
   // One shared pool across every top-level material's own resolution, not one
@@ -79,15 +79,7 @@ export function buildVsBuy(inputs: IndustryInputs): BuildResult {
     ? [acquisitionMaterial, ...resolvedMaterials]
     : resolvedMaterials;
 
-  const seconds = jobDurationSeconds(
-    blueprint.time,
-    runs,
-    te,
-    skills,
-    ctx,
-    blueprint.skills,
-    inputs.implantBonusPct
-  );
+  const seconds = jobDurationSeconds(blueprint.time, runs, te, modifiers, ctx, blueprint.skills);
   const fee = jobFee(
     estimatedItemValue(blueprint, runs, adjustedPrices),
     systemCostIndex,

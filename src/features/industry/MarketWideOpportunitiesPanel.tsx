@@ -6,6 +6,7 @@
  * "Scan".
  */
 import { useMemo, useState } from 'react';
+import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import {
@@ -25,7 +26,6 @@ import { db } from '@/db';
 import { iskToneClass } from '@/features/character/format';
 import { evaluateSkillGate, type SkillGateVerdict } from '@/engine/industry/skillGate';
 import type { OrderDepthLevel } from '@/engine/industry/opportunities';
-import type { SkillLevels } from '@/engine/industry/types';
 import type { MarketWideTreeMap } from '@/sde/types';
 import type { TradeHub } from '@/market/hubs';
 import { useAccountSkillLevels } from '@/features/skills/useAccountSkillLevels';
@@ -45,7 +45,7 @@ interface MarketWideOpportunitiesPanelProps {
   hub: TradeHub;
   trees: MarketWideTreeMap | null;
   catalog: BlueprintCatalog | null;
-  skills: SkillLevels;
+  modifiers: CharacterModifiers;
   onStartPlan: (entry: BlueprintCatalogEntry) => void;
 }
 
@@ -53,7 +53,7 @@ export function MarketWideOpportunitiesPanel({
   hub,
   trees,
   catalog,
-  skills,
+  modifiers,
   onStartPlan,
 }: MarketWideOpportunitiesPanelProps) {
   const { t } = useTranslation();
@@ -61,7 +61,7 @@ export function MarketWideOpportunitiesPanel({
     hub,
     trees,
     catalog,
-    skills,
+    modifiers,
   });
 
   // Account-wide, not active-character: every character on the account, same

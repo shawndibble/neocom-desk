@@ -25,6 +25,7 @@
  * which stays the engine-adapter step underneath (clamps, NPC tax, try/catch).
  */
 import i18n from '@/i18n';
+import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
 import type { BuildPlanRecord } from '@/db';
 import { MAX_JOB_RUNS } from '@/engine/industry/types';
 import type {
@@ -33,7 +34,6 @@ import type {
   HubPrices,
   IndustryBlueprint,
   ReactionFacilityContext,
-  SkillLevels,
 } from '@/engine/industry/types';
 import type { MakeOrBuyContext } from '@/engine/industry/makeOrBuy';
 import type { BpcOffer } from '@/engine/industry/blueprintAcquisition';
@@ -69,9 +69,7 @@ export interface BuildPlanSources {
   corpBlueprints?: CorpBlueprintSource;
   /** ME to quote an unowned sub-build at (`useAssumedMe`). */
   assumedMe: number;
-  skills: SkillLevels;
-  /** The plan owner's active-clone BX-80x manufacturing-time implant bonus, if any (issue #1229). */
-  implantBonusPct: number;
+  modifiers: CharacterModifiers;
   /** BPC Sourcing offers already narrowed to the plan's own Trade Hub region. */
   bpcOffersFor: (blueprintTypeID: number) => readonly BpcOffer[];
   /** `useIncludeBlueprintCost`: off still resolves each tier, but prices no acquisition line. */
@@ -202,7 +200,7 @@ export function resolveBuildPlan(
           systemCostIndex: snapshot.systemCostIndex,
           adjustedPrices: snapshot.adjustedPrices,
           materialPrices,
-          skills: sources.skills,
+          modifiers: sources.modifiers,
           reactionFacility,
         }
       : null;
@@ -254,8 +252,7 @@ export function resolveBuildPlan(
     adjustedPrices: snapshot?.adjustedPrices ?? {},
     hubPrices: snapshot?.hubPrices ?? {},
     materialPrices,
-    skills: sources.skills,
-    implantBonusPct: sources.implantBonusPct,
+    modifiers: sources.modifiers,
     recipeFor,
     blueprintAcquisition,
     reactionFacility,

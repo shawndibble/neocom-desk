@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type ReactElement } from 'react';
+import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -41,7 +42,6 @@ import type {
   MaterialPriceBasis,
   MaterialSourcing,
   RigKind,
-  SkillLevels,
 } from '@/engine/industry/types';
 import { rigKindLabelKey, rigFitSummaryLabel } from './rigFitLabels';
 import type { BuildPlanChange, SourcingPatchEntry } from './buildPlanStore';
@@ -174,9 +174,7 @@ interface BuildPlanDetailProps {
   /** Planetary schematics, for materials no blueprint makes. Null while pi.json loads, or if it failed. */
   pi: PiData | null;
   ownedBlueprints: readonly CharacterBlueprint[];
-  skills: SkillLevels;
-  /** The plan owner's active-clone BX-80x manufacturing-time implant bonus, if any (issue #1229). */
-  implantBonusPct: number;
+  modifiers: CharacterModifiers;
   /**
    * Whole-account asset snapshot for owned-stock detection (issue #181),
    * loaded once by `useOwnedStockSnapshot` above this component's own
@@ -242,8 +240,7 @@ export function BuildPlanDetail({
   catalog,
   pi,
   ownedBlueprints,
-  skills,
-  implantBonusPct,
+  modifiers,
   ownedStockSnapshot,
   corpOwnedStock,
   corpOwnedBlueprints,
@@ -519,8 +516,7 @@ export function BuildPlanDetail({
           ownedBlueprints,
           corpBlueprints: corpOwnedBlueprints,
           assumedMe,
-          skills,
-          implantBonusPct,
+          modifiers,
           bpcOffersFor,
           includeBlueprintCost,
         },
@@ -533,8 +529,7 @@ export function BuildPlanDetail({
       ownedBlueprints,
       corpOwnedBlueprints,
       assumedMe,
-      skills,
-      implantBonusPct,
+      modifiers,
       bpcOffersFor,
       includeBlueprintCost,
       snapshot,
@@ -554,10 +549,10 @@ export function BuildPlanDetail({
     if (!result || !snapshot) return null;
     const materials = sellableMaterials(result.materials);
     return {
-      instant: ownedStockSale(materials, snapshot.hubBuyPrices, 'instant', skills),
-      order: ownedStockSale(materials, snapshot.hubPrices, 'order', skills),
+      instant: ownedStockSale(materials, snapshot.hubBuyPrices, 'instant', modifiers.skills),
+      order: ownedStockSale(materials, snapshot.hubPrices, 'order', modifiers.skills),
     };
-  }, [result, snapshot, skills]);
+  }, [result, snapshot, modifiers]);
 
   const pricesReady =
     snapshot !== null && snapshot.adjustedPrices !== null && snapshot.systemCostIndex !== null;
@@ -578,7 +573,7 @@ export function BuildPlanDetail({
     if (!blueprint) return 0;
     return maxAutoBuildDepth(blueprint, resolvedMe, {
       recipeFor,
-      ctx: autoBuildDepthContext(facilityContext, reactionPlanFacilityContext, skills),
+      ctx: autoBuildDepthContext(facilityContext, reactionPlanFacilityContext, modifiers),
       runs: plan.runs,
     });
   }, [
@@ -587,7 +582,7 @@ export function BuildPlanDetail({
     plan.runs,
     recipeFor,
     facilityContext,
-    skills,
+    modifiers,
     reactionPlanFacilityContext,
   ]);
 
@@ -1014,8 +1009,8 @@ export function BuildPlanDetail({
     materialPriceBasis: materialPriceBasisOf(plan.materialPriceBasis),
     me: resolvedMe,
     isReaction: activity === 'reaction',
-    accountingLevel: skills[SKILL_IDS.accounting] ?? 0,
-    brokerRelationsLevel: skills[SKILL_IDS.brokerRelations] ?? 0,
+    accountingLevel: modifiers.skills[SKILL_IDS.accounting] ?? 0,
+    brokerRelationsLevel: modifiers.skills[SKILL_IDS.brokerRelations] ?? 0,
     systemCostIndex: snapshot?.systemCostIndex ?? null,
     costIndexSystemName: buildSystem?.name ?? hub.systemName,
     productName: entry.productName,
@@ -1769,7 +1764,7 @@ export function BuildPlanDetail({
         }
         productTypeID={entry.productTypeID}
         productName={entry.productName}
-        skills={skills}
+        skills={modifiers.skills}
         logRequest={logRequest}
       />
     </div>
