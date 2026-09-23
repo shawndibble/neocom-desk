@@ -5,7 +5,7 @@
  * starting from nothing" answer. Opt-in: nothing runs until the pilot hits
  * "Scan".
  */
-import { useMemo } from 'react';
+import { useMemo, type ReactElement } from 'react';
 import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -28,6 +28,7 @@ import { evaluateSkillGate, type SkillGateVerdict } from '@/engine/industry/skil
 import type { OrderDepthLevel } from '@/engine/industry/opportunities';
 import type { MarketWideTreeMap } from '@/sde/types';
 import type { TradeHub } from '@/market/hubs';
+import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import { useAccountSkillLevels } from '@/features/skills/useAccountSkillLevels';
 import { useTradeHubStandings, tradeHubStanding } from '@/features/market/useTradeHubStandings';
 import { nameForType, type BlueprintCatalog, type BlueprintCatalogEntry } from './blueprintCatalog';
@@ -52,6 +53,10 @@ interface MarketWideOpportunitiesPanelProps {
   /** For the standing toward `hub`'s NPC owner (issue #1238). Null while no character is active. */
   activeCharacterId: number | null;
   onStartPlan: (entry: BlueprintCatalogEntry) => void;
+  onAddToQuickbar: (typeId: number, itemName: string) => void;
+  /** False with no active character — the Quickbar has nobody to save the item under. */
+  quickbarAvailable: boolean;
+  onShowInfo: (typeId: number, itemName: string) => void;
 }
 
 const HIDE_SKILL_GATED = boolParam();
@@ -64,6 +69,9 @@ export function MarketWideOpportunitiesPanel({
   modifiers,
   activeCharacterId,
   onStartPlan,
+  onAddToQuickbar,
+  quickbarAvailable,
+  onShowInfo,
 }: MarketWideOpportunitiesPanelProps) {
   const { t } = useTranslation();
   const tradeHubStandings = useTradeHubStandings(activeCharacterId);
@@ -136,7 +144,7 @@ export function MarketWideOpportunitiesPanel({
       sortValue: (row) => row.iskPerHour ?? undefined,
       cellClassName: (row) => (row.iskPerHour !== null ? iskToneClass(row.iskPerHour) : undefined),
       // Tap, not long press: the ranking's figures are inert — the row's only
-      // action is the button in its last cell.
+      // actions are the button in its last cell and the row's context menu.
       render: (row) =>
         row.iskPerHour === null ? (
           t('common.unknown')
@@ -179,6 +187,22 @@ export function MarketWideOpportunitiesPanel({
       ),
     },
   ];
+  const rowContextMenu = (row: MarketWideResultRow, tr: ReactElement): ReactElement => (
+    <ItemContextMenu
+      typeId={row.productTypeID}
+      itemName={row.productName}
+      blueprintTypeID={
+        catalog
+          ? (catalog.byProductTypeID.get(row.productTypeID)?.blueprintTypeID ?? null)
+          : undefined
+      }
+      onAddToQuickbar={onAddToQuickbar}
+      quickbarAvailable={quickbarAvailable}
+      onShowInfo={onShowInfo}
+    >
+      {tr}
+    </ItemContextMenu>
+  );
   const sortProps = useUrlSort(
     'marketWide.sort',
     MARKET_WIDE_DEFAULT_SORT,
@@ -236,6 +260,7 @@ export function MarketWideOpportunitiesPanel({
               columns={columns}
               rows={visibleRows}
               rowKey={(row) => row.productTypeID}
+              rowContextMenu={rowContextMenu}
               label={t('industry.marketOpportunitiesTitle')}
               {...sortProps}
             />
