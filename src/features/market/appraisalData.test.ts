@@ -42,6 +42,7 @@ function skillsFixture(trained: [number, number][]): CorrectedSkills {
     queueNeedsReauth: false,
     completedLevels: new Map(),
     trained: new Map(trained.map(([id, level]) => [id, { level, sp: 0 }])),
+    effective: new Map(trained.map(([id, level]) => [id, level])),
     completedSp: 0,
     totalSp: null,
     fetchedAt: null,
@@ -194,7 +195,7 @@ describe('appraisePaste', () => {
 
       const { appraisal } = await appraisePaste('Veldspar\t1000', DEFAULT_TRADE_HUB, 100, 1);
 
-      expect(mockedLoadCorrectedSkills).toHaveBeenCalledWith(1, expect.any(Number));
+      expect(mockedLoadCorrectedSkills).toHaveBeenCalledWith(1, expect.any(Number), {});
       const row = appraisal.rows[0];
       // 10 batches x floor(415 x 10 x 0.5) Tritanium x 5.41 ISK (Tritanium's buyMax)
       expect(row.refineTotal).toBeCloseTo(Math.floor(415 * 10 * 0.5) * 5.41, 6);

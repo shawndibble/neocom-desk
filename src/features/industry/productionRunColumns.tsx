@@ -1,5 +1,6 @@
 import type { DataTableColumn } from '@/components/ui';
 import type { SkillLevels } from '@/engine/industry/types';
+import type { ResolvedStandings } from '@/engine/market/standings';
 import type { ProductionRunSummary } from './productionRunSummary';
 import { ProductionRunStatusChip } from './ProductionRunStatusChip';
 import { RealizedProfitCell } from './RealizedProfitCell';
@@ -77,7 +78,15 @@ export function quantitySoldColumn<Row extends ProductionRunSummary>(t: T): Data
 
 export function realizedProfitColumn<Row extends ProductionRunSummary>(
   t: T,
-  skills: SkillLevels
+  skills: SkillLevels,
+  /**
+   * The standing already baked into each row's own `profit` (issue #1238),
+   * per row rather than a single value: `ProductionRunsPanel`'s rows all
+   * share one Build Plan's Trade Hub, but `ProductionLogPanel`'s cross-plan
+   * rows each belong to a different plan, and its own hub. Absent renders
+   * the breakdown at 0 standing, matching a row computed the same way.
+   */
+  standingFor?: (row: Row) => ResolvedStandings | undefined
 ): DataTableColumn<Row> {
   return {
     id: 'realizedProfit',
@@ -87,7 +96,12 @@ export function realizedProfitColumn<Row extends ProductionRunSummary>(
     cellClassName: (r) => iskToneClass(r.profit.profit),
     sortValue: (r) => r.profit.profit,
     render: (r) => (
-      <RealizedProfitCell row={r} label={t('industry.breakdownTrigger')} skills={skills} />
+      <RealizedProfitCell
+        row={r}
+        label={t('industry.breakdownTrigger')}
+        skills={skills}
+        standing={standingFor?.(r)}
+      />
     ),
   };
 }

@@ -37,6 +37,7 @@ describe('SCOPES', () => {
         'esi-planets.manage_planets.v1',
         'esi-characters.read_contacts.v1',
         'esi-characters.read_loyalty.v1',
+        'esi-characters.read_standings.v1',
         'esi-location.read_location.v1',
         'esi-characters.read_notifications.v1',
         'esi-search.search_structures.v1',

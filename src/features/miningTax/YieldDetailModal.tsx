@@ -26,9 +26,10 @@ import {
   type DataTableColumn,
 } from '@/components/ui';
 import { SecurityValue } from '@/features/character/assetBrowserRows';
-import { formatVolume } from '@/features/market/format';
 import type { OreLineValuation } from '@/engine/miningTax/yieldValuation';
 import type { MiningYieldRow } from './yieldSnapshot';
+import { sumVolume } from './volume';
+import { VolumeDisplay } from './volumeDisplay';
 
 interface YieldDetailModalProps {
   open: boolean;
@@ -38,7 +39,7 @@ interface YieldDetailModalProps {
   /** Undefined while still resolving, null when unresolvable — `SecurityValue` renders nothing either way. */
   systemSecurity: number | null | undefined;
   typeNames: ReadonlyMap<number, string>;
-  /** m³ per unit, by type. A type the SDE bake doesn't carry renders as an em dash rather than a zero. */
+  /** m³ per unit, by type. A type with no known volume (issue #1283) is simply absent. */
   typeVolumes: ReadonlyMap<number, number>;
 }
 
@@ -80,28 +81,24 @@ export function YieldDetailModal({
   const { valuation, entry } = row;
 
   const typeName = (typeId: number) => typeNames.get(typeId) ?? `#${typeId}`;
-  const lineVolume = (line: OreLineValuation): number | null => {
-    const unit = typeVolumes.get(line.typeId);
-    return unit === undefined ? null : unit * line.quantity;
-  };
 
   const totals = useMemo(() => {
     let units = 0;
-    let volume = 0;
-    let volumeComplete = true;
     let unitsLeftOver = 0;
     for (const line of valuation.lines) {
       units += line.quantity;
-      const lineM3 = typeVolumes.get(line.typeId);
-      if (lineM3 === undefined) volumeComplete = false;
-      else volume += lineM3 * line.quantity;
       unitsLeftOver += line.unitsLeftOver;
     }
+    const volume = sumVolume(
+      valuation.lines,
+      (line) => line.typeId,
+      (line) => line.quantity,
+      typeVolumes
+    );
     const delta = valuation.refineValue - valuation.rawValue;
     return {
       units,
       volume,
-      volumeComplete,
       unitsLeftOver,
       delta,
       deltaPercent: valuation.rawValue > 0 ? (delta / valuation.rawValue) * 100 : null,
@@ -151,10 +148,18 @@ export function YieldDetailModal({
       align: 'right',
       className: 'whitespace-nowrap text-text-dim tabular-nums',
       render: (line) => {
-        const volume = lineVolume(line);
-        return volume === null ? '—' : formatVolume(volume);
+        const volume = sumVolume(
+          [line],
+          (l) => l.typeId,
+          (l) => l.quantity,
+          typeVolumes
+        );
+        return <VolumeDisplay volume={volume} typeNames={typeNames} t={t} />;
       },
-      sortValue: (line) => lineVolume(line) ?? undefined,
+      sortValue: (line) => {
+        const unit = typeVolumes.get(line.typeId);
+        return unit === undefined ? 0 : unit * line.quantity;
+      },
     },
     {
       id: 'raw',
@@ -271,7 +276,9 @@ export function YieldDetailModal({
           <div className="flex flex-wrap gap-2">
             <StatChip
               label={t('miningTax.overview.volumeStat')}
-              value={totals.volumeComplete ? `${formatVolume(totals.volume)} m³` : '—'}
+              value={
+                <VolumeDisplay volume={totals.volume} typeNames={typeNames} t={t} suffix=" m³" />
+              }
             />
             <StatChip
               label={t('miningTax.overview.detail.unitsColumn')}

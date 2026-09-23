@@ -21,6 +21,9 @@ import {
 import type { DataTableColumn } from '@/components/ui';
 import { cx } from '@/lib/cx';
 import type { SkillLevels } from '@/engine/industry/types';
+import type { ResolvedStandings } from '@/engine/market/standings';
+import { getTradeHub, DEFAULT_TRADE_HUB } from '@/market/hubs';
+import { useTradeHubStandings, tradeHubStanding } from '@/features/market/useTradeHubStandings';
 import type { BlueprintCatalog } from './blueprintCatalog';
 import {
   EMPTY_PRODUCTION_LOG_FILTER,
@@ -180,7 +183,9 @@ function buildRollup(
   filter: ProductionLogFilter,
   skills: SkillLevels,
   catalog: BlueprintCatalog,
-  planIds: ReadonlySet<string>
+  planIds: ReadonlySet<string>,
+  /** Each run's own Build Plan's Trade Hub standing (issue #1238), keyed by `run.buildPlanId` — see `standingByPlanId` below. */
+  standingByPlanId: ReadonlyMap<string, ResolvedStandings>
 ): Rollup {
   const filteredRuns = filterProductionRunsByDate(runs, filter);
   const saleLinksByRun = groupByRunId(saleLinks);
@@ -190,7 +195,8 @@ function buildRollup(
       run,
       saleLinksByRun.get(run.id) ?? [],
       orderWatchesByRun.get(run.id) ?? [],
-      skills
+      skills,
+      standingByPlanId.get(run.buildPlanId)
     )
   );
 
@@ -294,13 +300,36 @@ export function ProductionLogPanel({
 
   const planIds = useMemo(() => new Set(plans.map((p) => p.id)), [plans]);
 
+  // Every Trade Hub's standing for this character (issue #1238), resolved
+  // once — each run below reads its own plan's hub out of this map rather
+  // than the panel fetching per-plan.
+  const tradeHubStandings = useTradeHubStandings(characterId);
+  const standingByPlanId = useMemo(() => {
+    const map = new Map<string, ResolvedStandings>();
+    for (const plan of plans) {
+      const hub = getTradeHub(plan.hubId) ?? DEFAULT_TRADE_HUB;
+      map.set(plan.id, tradeHubStanding(tradeHubStandings, hub.id));
+    }
+    return map;
+  }, [plans, tradeHubStandings]);
+
   // The character's full history recomputes here, not on every keystroke in
   // the date filter or unrelated parent re-render — `filter` is the only
   // piece of this that changes often, and everything else it's paired with
   // (`runs`/`saleLinks`/`orderWatches`) only changes on an actual Dexie write.
   const rollup = useMemo(
-    () => buildRollup(runs, saleLinks, orderWatches, filter, skills, catalog, planIds),
-    [runs, saleLinks, orderWatches, filter, skills, catalog, planIds]
+    () =>
+      buildRollup(
+        runs,
+        saleLinks,
+        orderWatches,
+        filter,
+        skills,
+        catalog,
+        planIds,
+        standingByPlanId
+      ),
+    [runs, saleLinks, orderWatches, filter, skills, catalog, planIds, standingByPlanId]
   );
 
   const profitHistoryPoints = useMemo(
@@ -400,7 +429,7 @@ export function ProductionLogPanel({
     quantityColumn(t),
     totalCostColumn(t),
     quantitySoldColumn(t),
-    realizedProfitColumn(t, skills),
+    realizedProfitColumn(t, skills, (r) => standingByPlanId.get(r.run.buildPlanId)),
     statusColumn(t),
     soldActionsColumn(sale),
   ];

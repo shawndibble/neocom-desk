@@ -38,6 +38,14 @@ describe('brokerFeePct', () => {
   it('never goes below zero', () => {
     expect(brokerFeePct(5, 10, 10)).toBeGreaterThanOrEqual(0);
   });
+
+  it('negative standing increases the fee above the Broker Relations rate', () => {
+    expect(brokerFeePct(5, -10, -10)).toBeCloseTo(1.5 + 0.3 + 0.2, 12);
+  });
+
+  it('defaults standings to 0 when omitted', () => {
+    expect(brokerFeePct(5)).toBeCloseTo(1.5, 12);
+  });
 });
 
 describe('salesTax', () => {

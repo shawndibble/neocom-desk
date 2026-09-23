@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
+import { NO_CHARACTER_MODIFIERS } from '@/engine/industry/characterModifiers';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
@@ -87,8 +88,7 @@ function renderCompare(rows: ComparedBuildRow[], onDone = vi.fn()) {
         catalog={EMPTY_CATALOG}
         pi={null}
         ownedBlueprints={[]}
-        skills={{}}
-        implantBonusPct={0}
+        modifiers={NO_CHARACTER_MODIFIERS}
         onDone={onDone}
       />
     ),

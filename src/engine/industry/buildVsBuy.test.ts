@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { characterModifiers, NO_CHARACTER_MODIFIERS } from '@/engine/industry/characterModifiers';
 import { buildVsBuy } from '@/engine/industry/buildVsBuy';
 import { FACILITY_PRESETS, SKILL_IDS } from '@/engine/industry/types';
 import type { IndustryBlueprint, IndustryInputs } from '@/engine/industry/types';
@@ -26,12 +27,15 @@ const baseInputs: IndustryInputs = {
   systemCostIndex: 0.05,
   adjustedPrices: { 34: 4, 35: 100 },
   hubPrices: { 34: 5, 35: 120, 999: 100_000 },
-  skills: {
-    [SKILL_IDS.industry]: 5,
-    [SKILL_IDS.advancedIndustry]: 4,
-    [SKILL_IDS.accounting]: 5,
-    [SKILL_IDS.brokerRelations]: 5,
-  },
+  modifiers: characterModifiers({
+    skills: {
+      [SKILL_IDS.industry]: 5,
+      [SKILL_IDS.advancedIndustry]: 4,
+      [SKILL_IDS.accounting]: 5,
+      [SKILL_IDS.brokerRelations]: 5,
+    },
+    implantTypeIds: [],
+  }),
 };
 
 describe('buildVsBuy', () => {
@@ -102,7 +106,10 @@ describe('buildVsBuy', () => {
   });
 
   it('applies a manufacturing-time implant bonus to seconds (issue #1229)', () => {
-    const r = buildVsBuy({ ...baseInputs, implantBonusPct: 4 });
+    const r = buildVsBuy({
+      ...baseInputs,
+      modifiers: { ...baseInputs.modifiers, manufacturingTimeImplantPct: 4 },
+    });
     // 13_787.136 (baseline) * 0.96 (BX-804)
     expect(r.seconds).toBeCloseTo(13_235.65056, 6);
   });
@@ -231,7 +238,7 @@ describe('buildVsBuy', () => {
       facility: FACILITY_PRESETS.npcStation,
       rigFit: ['none', 'none', 'none'],
       facilityTaxPct: undefined,
-      skills: {},
+      modifiers: NO_CHARACTER_MODIFIERS,
     });
     expect(r.materials).toEqual([
       {

@@ -98,6 +98,9 @@ const PREFETCHED_EMPTY = new Set(
     'orders',
     'orders/history',
     'planets',
+    // Trailing slash on purpose, same reason as 'mining/': `getCharacterStandings`
+    // fetches `/characters/{id}/standings/` (issue #1238).
+    'standings/',
     'wallet/journal',
     'wallet/transactions',
   ].map((suffix) => `/characters/${CHARACTER_ID}/${suffix}`)
@@ -177,6 +180,23 @@ export async function installEsiMock(page: Page): Promise<void> {
     // offers at all; a spec that needs real rows should override these.
     if (path === `/characters/${CHARACTER_ID}/loyalty/points`) return json([]);
     if (/^\/loyalty\/stores\/\d+\/offers\/$/.test(path)) return json([]);
+
+    // Broker-fee standings resolution (issue #1238): `loadStationOwner`
+    // always reaches this endpoint — the SDE snapshot has no owning-
+    // corporation column — for any NPC station a fee calculation prices at.
+    // Owner is the fixture's own corp, so the follow-on `/corporations/{id}`
+    // lookup this triggers reuses the `CORPORATION_INFO` mock above rather
+    // than needing a dedicated NPC-corp fixture.
+    const stationMatch = /^\/universe\/stations\/(\d+)$/.exec(path);
+    if (stationMatch) {
+      return json({
+        station_id: Number(stationMatch[1]),
+        name: `Station ${stationMatch[1]}`,
+        type_id: 52678,
+        system_id: 30000142,
+        owner: CORPORATION_ID,
+      });
+    }
 
     const typeMatch = /^\/universe\/types\/(\d+)$/.exec(path);
     if (typeMatch) {

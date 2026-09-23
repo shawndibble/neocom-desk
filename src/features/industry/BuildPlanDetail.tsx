@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type ReactElement } from 'react';
+import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -41,7 +42,6 @@ import type {
   MaterialPriceBasis,
   MaterialSourcing,
   RigKind,
-  SkillLevels,
 } from '@/engine/industry/types';
 import { rigKindLabelKey, rigFitSummaryLabel } from './rigFitLabels';
 import type { BuildPlanChange, SourcingPatchEntry } from './buildPlanStore';
@@ -56,12 +56,13 @@ import { useReactionFacilityDefaults, REACTION_FACILITY_PRESETS } from './reacti
 import { hydrateActivityFacilityDefaults } from './facilityDefaults';
 import { retargetPatch } from './retargetPatch';
 import { DEFAULT_TRADE_HUB, TRADE_HUBS, getTradeHub } from '@/market/hubs';
+import { useTradeHubStandings, tradeHubStanding } from '@/features/market/useTradeHubStandings';
 import type { BuildPlanRecord } from '@/db';
 import type { CharacterBlueprint } from '@/esi/endpoints';
 import type { PiData } from '@/sde/types';
 import { evaluateSkillGate, type SkillGateVerdict } from '@/engine/industry/skillGate';
 import { useAccountSkillLevels } from '@/features/skills/useAccountSkillLevels';
-import { ItemContextMenu } from '@/features/market/ItemContextMenu';
+import { ItemContextMenu, type ItemMenuFor } from '@/features/market/ItemContextMenu';
 import {
   nameForType,
   toIndustryBlueprint,
@@ -174,9 +175,7 @@ interface BuildPlanDetailProps {
   /** Planetary schematics, for materials no blueprint makes. Null while pi.json loads, or if it failed. */
   pi: PiData | null;
   ownedBlueprints: readonly CharacterBlueprint[];
-  skills: SkillLevels;
-  /** The plan owner's active-clone BX-80x manufacturing-time implant bonus, if any (issue #1229). */
-  implantBonusPct: number;
+  modifiers: CharacterModifiers;
   /**
    * Whole-account asset snapshot for owned-stock detection (issue #181),
    * loaded once by `useOwnedStockSnapshot` above this component's own
@@ -242,8 +241,7 @@ export function BuildPlanDetail({
   catalog,
   pi,
   ownedBlueprints,
-  skills,
-  implantBonusPct,
+  modifiers,
   ownedStockSnapshot,
   corpOwnedStock,
   corpOwnedBlueprints,
@@ -260,6 +258,10 @@ export function BuildPlanDetail({
   const blueprint = useMemo(() => (entry ? toIndustryBlueprint(entry.blueprint) : null), [entry]);
   const activity = blueprint ? industryActivityOf(blueprint) : 'manufacturing';
   const hub = useMemo(() => getTradeHub(plan.hubId) ?? DEFAULT_TRADE_HUB, [plan.hubId]);
+  // The plan owner's standing toward this hub's NPC owner (issue #1238), for
+  // the broker fee/break-even price every result below prices with.
+  const tradeHubStandings = useTradeHubStandings(plan.characterId);
+  const standing = tradeHubStanding(tradeHubStandings, hub.id);
   const facilityPreset = FACILITY_PRESETS[plan.facility];
   // Include Reactions (issue #698): meaningless for a reaction-activity plan,
   // which is always eligible via its own top-level facility regardless of
@@ -519,8 +521,8 @@ export function BuildPlanDetail({
           ownedBlueprints,
           corpBlueprints: corpOwnedBlueprints,
           assumedMe,
-          skills,
-          implantBonusPct,
+          modifiers,
+          standing,
           bpcOffersFor,
           includeBlueprintCost,
         },
@@ -533,8 +535,8 @@ export function BuildPlanDetail({
       ownedBlueprints,
       corpOwnedBlueprints,
       assumedMe,
-      skills,
-      implantBonusPct,
+      modifiers,
+      standing,
       bpcOffersFor,
       includeBlueprintCost,
       snapshot,
@@ -554,10 +556,16 @@ export function BuildPlanDetail({
     if (!result || !snapshot) return null;
     const materials = sellableMaterials(result.materials);
     return {
-      instant: ownedStockSale(materials, snapshot.hubBuyPrices, 'instant', skills),
-      order: ownedStockSale(materials, snapshot.hubPrices, 'order', skills),
+      instant: ownedStockSale(
+        materials,
+        snapshot.hubBuyPrices,
+        'instant',
+        modifiers.skills,
+        standing
+      ),
+      order: ownedStockSale(materials, snapshot.hubPrices, 'order', modifiers.skills, standing),
     };
-  }, [result, snapshot, skills]);
+  }, [result, snapshot, modifiers, standing]);
 
   const pricesReady =
     snapshot !== null && snapshot.adjustedPrices !== null && snapshot.systemCostIndex !== null;
@@ -578,7 +586,7 @@ export function BuildPlanDetail({
     if (!blueprint) return 0;
     return maxAutoBuildDepth(blueprint, resolvedMe, {
       recipeFor,
-      ctx: autoBuildDepthContext(facilityContext, reactionPlanFacilityContext, skills),
+      ctx: autoBuildDepthContext(facilityContext, reactionPlanFacilityContext, modifiers),
       runs: plan.runs,
     });
   }, [
@@ -587,7 +595,7 @@ export function BuildPlanDetail({
     plan.runs,
     recipeFor,
     facilityContext,
-    skills,
+    modifiers,
     reactionPlanFacilityContext,
   ]);
 
@@ -950,22 +958,40 @@ export function BuildPlanDetail({
    * the action lands back here with `?product=`, creating or selecting that
    * material's own plan so its build-vs-buy read can be compared with this one.
    */
-  function materialContextMenu(material: MaterialTableRow, tr: ReactElement) {
-    const name = nameForType(catalog, material.typeID);
-    const buildable = canBuildHere(material.typeID);
+  function itemContextMenu(
+    typeId: number,
+    trigger: ReactElement,
+    buildHere?: { onToggle: () => void; building: boolean }
+  ) {
     return (
       <ItemContextMenu
-        typeId={material.typeID}
-        itemName={name}
-        blueprintTypeID={catalog.byProductTypeID.get(material.typeID)?.blueprintTypeID ?? null}
+        typeId={typeId}
+        itemName={nameForType(catalog, typeId)}
+        blueprintTypeID={catalog.byProductTypeID.get(typeId)?.blueprintTypeID ?? null}
         onAddToQuickbar={onAddToQuickbar}
         quickbarAvailable={quickbarAvailable}
         onShowInfo={onShowInfo}
-        onToggleBuildHere={buildable ? () => toggleBuildHere(material.typeID) : undefined}
-        buildingHere={material.subBuilds.length > 0}
+        onToggleBuildHere={buildHere?.onToggle}
+        buildingHere={buildHere?.building}
       >
-        {tr}
+        {trigger}
       </ItemContextMenu>
+    );
+  }
+
+  /** The same menu on every other item name the page shows — product heading, revenue and owned-sale rows, the recipe and acquisition modals. */
+  const itemMenuFor: ItemMenuFor = (typeId, trigger) => itemContextMenu(typeId, trigger);
+
+  function materialContextMenu(material: MaterialTableRow, tr: ReactElement) {
+    return itemContextMenu(
+      material.typeID,
+      tr,
+      canBuildHere(material.typeID)
+        ? {
+            onToggle: () => toggleBuildHere(material.typeID),
+            building: material.subBuilds.length > 0,
+          }
+        : undefined
     );
   }
 
@@ -1014,14 +1040,15 @@ export function BuildPlanDetail({
     materialPriceBasis: materialPriceBasisOf(plan.materialPriceBasis),
     me: resolvedMe,
     isReaction: activity === 'reaction',
-    accountingLevel: skills[SKILL_IDS.accounting] ?? 0,
-    brokerRelationsLevel: skills[SKILL_IDS.brokerRelations] ?? 0,
+    accountingLevel: modifiers.skills[SKILL_IDS.accounting] ?? 0,
+    brokerRelationsLevel: modifiers.skills[SKILL_IDS.brokerRelations] ?? 0,
     systemCostIndex: snapshot?.systemCostIndex ?? null,
     costIndexSystemName: buildSystem?.name ?? hub.systemName,
     productName: entry.productName,
     productQuantity: blueprint.products[0] ? blueprint.products[0].quantity * plan.runs : null,
     productUnitPrice:
       entry.productTypeID !== null ? (snapshot?.hubPrices[entry.productTypeID] ?? null) : null,
+    standing,
   };
 
   const chip = (label: string, value: string) => (
@@ -1065,6 +1092,8 @@ export function BuildPlanDetail({
           pricesReady={pricesReady}
           pricesLoading={pricesLoading}
           productName={entry.productName}
+          productTypeID={entry.productTypeID}
+          itemMenuFor={itemMenuFor}
           runs={plan.runs}
           ownedSale={ownedSale}
           breakdown={breakdownContext}
@@ -1614,6 +1643,7 @@ export function BuildPlanDetail({
                 onClose={() => setRecipeTypeId(null)}
                 nameFor={(typeID) => nameForType(catalog, typeID)}
                 onOpenRecipe={setRecipeTypeId}
+                itemMenuFor={itemMenuFor}
               />
               {acquisitionPickerTypeId !== null && (
                 <BlueprintAcquisitionModal
@@ -1621,6 +1651,7 @@ export function BuildPlanDetail({
                   characterId={plan.characterId}
                   blueprintTypeID={acquisitionPickerTypeId}
                   blueprintName={nameForType(catalog, acquisitionPickerTypeId)}
+                  itemMenuFor={itemMenuFor}
                   ownedCopies={acquisitionPickerOwnedCopies}
                   sourcing={plan.materialSourcing?.[acquisitionPickerTypeId]}
                   onSourcingChange={changeOneSourcing}
@@ -1749,6 +1780,7 @@ export function BuildPlanDetail({
               ownedSale={ownedSale}
               nameFor={(typeID) => nameForType(catalog, typeID)}
               totalVolume={materialVolume}
+              itemMenuFor={itemMenuFor}
               onOpenBreakdown={() => setBreakdownOpen(true)}
             />
           </CollapsiblePanel>
@@ -1769,7 +1801,8 @@ export function BuildPlanDetail({
         }
         productTypeID={entry.productTypeID}
         productName={entry.productName}
-        skills={skills}
+        skills={modifiers.skills}
+        standing={standing}
         logRequest={logRequest}
       />
     </div>

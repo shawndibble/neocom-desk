@@ -31,8 +31,7 @@ export function IndustryPlanPage() {
     catalog,
     pi,
     ownedBlueprints,
-    skills,
-    implantBonusPct,
+    modifiers,
     ownedStockSnapshot,
     corpOwnedStock,
     corpOwnedBlueprints,
@@ -103,8 +102,7 @@ export function IndustryPlanPage() {
           catalog={catalog}
           pi={pi}
           ownedBlueprints={ownedBlueprints}
-          skills={skills}
-          implantBonusPct={implantBonusPct}
+          modifiers={modifiers}
           ownedStockSnapshot={ownedStockSnapshot}
           corpOwnedStock={corpOwnedStock}
           corpOwnedBlueprints={corpOwnedBlueprints}

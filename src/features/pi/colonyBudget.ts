@@ -76,8 +76,9 @@ export function maxColonyBudget(skillLevel: number | null, pi: PiData): MaxColon
 }
 
 /**
- * The character's trained Command Center Upgrades, or `null` when the app has
- * no skill data for them at all.
+ * The character's effective (issue #1236: min of queue-corrected trained and
+ * active) Command Center Upgrades, or `null` when the app has no skill data
+ * for them at all.
  *
  * Read through `loadCorrectedSkills` for the same reason
  * `loadCustomsCodeExpertise` does: `/skills` lags a finished queue entry
@@ -92,5 +93,5 @@ export async function loadCommandCenterUpgrades(
     skipQueueWithoutScope: true,
   });
   if (!corrected.skillsResult) return null;
-  return corrected.trained.get(COMMAND_CENTER_UPGRADES_SKILL_ID)?.level ?? 0;
+  return corrected.effective.get(COMMAND_CENTER_UPGRADES_SKILL_ID) ?? 0;
 }

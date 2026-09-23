@@ -79,6 +79,10 @@ vi.mock('@/sde/loadMarketSde', () => ({
     9: { name: 'Structure Hitpoints', unit: 'HP', category: 'Structure' },
   })),
   loadGlobalMarkets: vi.fn(async () => []),
+  // Broker-fee standings resolution (#1238): `useTradeHubStandings` reaches
+  // `lookupNpcStation` for every Trade Hub on every render of a page that
+  // knows the active character, which imports this.
+  loadNpcStations: vi.fn(async () => []),
 }));
 
 const CHAR_ID = 91;

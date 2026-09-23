@@ -46,7 +46,7 @@ export function ChannelColumnHeadings() {
                 §2, matching the Family headers further down. */}
             <span
               tabIndex={0}
-              className="cursor-help text-[0.6875rem] leading-tight font-semibold tracking-wide text-text-dim uppercase underline decoration-dotted decoration-text-dim/50 underline-offset-2"
+              className="cursor-help text-[0.6875rem] leading-tight font-semibold tracking-widest text-text-dim uppercase underline decoration-dotted decoration-text-dim/50 underline-offset-2"
             >
               {t(`settings.notifications.column.${channel}`)}
             </span>

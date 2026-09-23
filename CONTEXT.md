@@ -138,6 +138,7 @@ here — they go one per file in `docs/context/decisions/`.
   list out, severity from time remaining alone. A source that could not be read
   contributes nothing _and says so_; a source that read fine with nothing due
   shows a zero — the two must never look alike.
+- **Character Modifiers**: One value built from a Character's snapshot — skill levels plus active-clone implants — that every pricing path (job time, job cost, refining yield) takes as a required input instead of loose bonus percentages (issue #1284). It owns which bonus applies to which activity: manufacturing time (Industry, Advanced Industry, the blueprint's own science skills, BX-80x implant), reaction time (Reactions only), refining yield for ore/ice/moon ore (Reprocessing, Reprocessing Efficiency, the type's specialisation, RX-80x implant) versus scrap (Scrapmetal Processing only). Built pure in `src/engine/industry/characterModifiers.ts`; loaded once per Character by `src/features/character/characterModifiers.ts`, which picks the level rule: Industry uses effective levels (issue #1236's min of trained and active), market/refining/mining surfaces use queue-corrected trained levels. Does not cover Clone State or training speed.
 - **Character Not Training**: Fires when a Character's skill queue shows no
   active training (the head entry has no live `finish_date`) — whether from
   an empty queue or a stalled/alpha-incapable queue head. ESI exposes no
@@ -245,6 +246,7 @@ here — they go one per file in `docs/context/decisions/`.
   Board Severity landing there. Exists to pay for what Kind Cards give up: four
   cards can each look calm while, between them, they hide one bad day.
 - **Editable Data**: Data created inside the app (Skill Plans, Build Plans, Production Runs, settings). Synced across devices. Everything else is API-derived and re-pulled per device.
+- **Effective Skill Level**: `min(queue-corrected trained level, queue-corrected active level)` — "the level this character can use right now" (issue #1236). Trained alone overstates an Alpha-capped or lapsed-Omega clone; `active_skill_level` alone understates a level the training queue just finished but `/skills` hasn't caught up to yet, so it gets the same queue-completion correction as trained before the min() is taken. Used by PI planet slots/customs rate/command center budget, industry job time and fees, job slots, and the clone jump cooldown. Distinct from the account-wide skill-gate marker (Build Plan/Opportunities rows), which deliberately stays on raw `active_skill_level` — see `docs/context/decisions/20260922-193557-effective-skill-level-one-min-trained-active-rule.md`.
 - **EIV (Estimated Item Value)**: The SCC's reference price for the materials
   a manufacturing job consumes, at ME0 quantities. Used only to size the
   **Job Fee** — it is not what the materials actually cost to buy.

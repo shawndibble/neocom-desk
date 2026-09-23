@@ -21,7 +21,7 @@ import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { loadCharacterSpSummary } from '@/features/character/characterSp';
 import { getLastKnownSpSummary, type CharacterSpSummary } from '@/stores/characterSp';
 import { OverviewSubNav } from '@/features/character/OverviewSubNav';
-import { loadCharacterSkills } from '@/features/skills/data';
+import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
 import { loadStationName } from '@/features/character/stations';
 import { loadStructureName } from '@/features/character/structures';
 import { loadTypeNames } from '@/features/character/typeNames';
@@ -40,7 +40,7 @@ interface Snapshot {
   clonesResult: CachedResult<CharacterClones> | null;
   /** 401/403 (or a failed token refresh) means "log in again", not "offline". */
   clonesNeedsReauth: boolean;
-  /** Trained level of Infomorph Synchronizing; 0 when unknown/untrained. */
+  /** Effective level of Infomorph Synchronizing; 0 when unknown/untrained. */
   infomorphLevel: number;
   implantNames: Map<number, string>;
   /** Jump-clone and home-clone location names, keyed by `location_id`. */
@@ -55,16 +55,17 @@ async function loadClonesSnapshot(
   characterId: number,
   signal: RouteSnapshotSignal
 ): Promise<Snapshot> {
-  const [{ cached: clonesResult, needsReauth: clonesNeedsReauth }, skillsResult, sp] =
+  const [{ cached: clonesResult, needsReauth: clonesNeedsReauth }, corrected, sp] =
     await Promise.all([
       loadCharacterClones(characterId),
-      loadCharacterSkills(characterId),
+      loadCorrectedSkills(characterId, Date.now(), { skipQueueWithoutScope: true }),
       loadCharacterSpSummary(characterId, Date.now()),
     ]);
   const loadedAt = Date.now();
-  const infomorphLevel =
-    skillsResult?.data.skills.find((skill) => skill.skill_id === INFOMORPH_SYNCHRONIZING_SKILL_ID)
-      ?.trained_skill_level ?? 0;
+  // Effective (issue #1236: min of queue-corrected trained and active), not
+  // raw trained_skill_level — the cooldown should never read shorter than
+  // what the character's clone can actually use right now.
+  const infomorphLevel = corrected.effective.get(INFOMORPH_SYNCHRONIZING_SKILL_ID) ?? 0;
 
   const clones = clonesResult?.data.jump_clones ?? [];
   const homeLocation = clonesResult?.data.home_location;

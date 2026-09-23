@@ -8,8 +8,9 @@
  * Laboratory Operation 24624, Mass Reactions 45748, Advanced Mass Reactions
  * 45749.
  */
-import type { CharacterSkill, IndustryJob } from '@/esi/endpoints';
+import type { CharacterSkill, IndustryJob, SkillQueueEntry } from '@/esi/endpoints';
 import type { JobSlotJob, JobSlotSkills } from '@/engine/industry/jobSlots';
+import { effectiveSkillLevels } from '@/features/skills/effectiveSkillLevels';
 
 const SKILL_ID = {
   massProduction: 3387,
@@ -21,17 +22,27 @@ const SKILL_ID = {
 } as const satisfies Record<keyof JobSlotSkills, number>;
 
 /**
- * `active_skill_level`, not `trained_skill_level`: job slots follow the
- * level actually in effect (it can read lower than trained under an alpha
- * clone or a lapsed expert system), the same field
- * `features/skills/queueStatus.ts`'s trained-skills read already prefers.
+ * Effective level (issue #1236: min of queue-corrected trained and active),
+ * not raw `active_skill_level` alone: job slots follow the level actually in
+ * effect (it can read lower than trained under an alpha clone or a lapsed
+ * expert system), but `active_skill_level` is exactly as stale as
+ * `trained_skill_level` when a queue entry has finished and `/skills` hasn't
+ * caught up — without the queue correction a just-finished level
+ * undercounts slots until the character's next login.
+ *
+ * `queueEntries` defaults to empty for callers that don't have the queue in
+ * hand — the same undercount as before this fix, not a regression.
  */
-export function jobSlotSkillsFromCharacterSkills(skills: readonly CharacterSkill[]): JobSlotSkills {
-  // One pass building an id->level map, not six `.find()` scans over the
-  // full list — a veteran character's `/skills` commonly runs several
-  // hundred entries, and this runs once per roster character on both the
-  // initial load and "Refresh all" (`jobSlotSkillsMap`).
-  const levelById = new Map(skills.map((skill) => [skill.skill_id, skill.active_skill_level]));
+export function jobSlotSkillsFromCharacterSkills(
+  skills: readonly CharacterSkill[],
+  queueEntries: readonly SkillQueueEntry[] = [],
+  nowMs: number = Date.now()
+): JobSlotSkills {
+  // One id->level map, not six `.find()` scans over the full list — a
+  // veteran character's `/skills` commonly runs several hundred entries, and
+  // this runs once per roster character on both the initial load and
+  // "Refresh all" (`jobSlotSkillsMap`).
+  const levelById = effectiveSkillLevels(skills, queueEntries, nowMs);
   const levelOf = (skillId: number) => levelById.get(skillId) ?? 0;
 
   return {

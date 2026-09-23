@@ -16,9 +16,8 @@
  * reason `orderBadgeKind.ts` sits apart from `OrderProblemBadge.tsx`.
  */
 import { loadTypeNames } from '@/features/character/typeNames';
-import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
-import { loadCharacterImplants } from '@/features/skills/data';
-import { resolveImplantBonusPct } from '@/engine/industry/reprocessing';
+import { loadCharacterModifiers } from '@/features/character/characterModifiers';
+import { loadCharacterStandings } from '@/features/character/standings';
 import { SKILL_IDS } from '@/engine/industry/types';
 import { loadNpcStations } from '@/sde/loadMarketSde';
 import type { NpcStationEntry } from '@/sde/marketTypes';
@@ -30,6 +29,8 @@ import { loadOrderCostBases, type OrderCostBasis } from './orderCostBasis';
 import { loadStationBestPrices } from './orderCompetition';
 import { loadOrderProblemSamples } from './orderProblemSamples';
 import type { OrderProblemSample } from '@/engine/market/orderProblemHistory';
+import type { ResolvedStandings } from '@/engine/market/standings';
+import { resolveLocationStandings } from './locationStandings';
 import type { CharacterSkills } from './openOrdersModel';
 
 export interface OpenOrdersPageSnapshot {
@@ -57,6 +58,8 @@ export interface OpenOrdersPageSnapshot {
    */
   problemSamples: Map<number, readonly OrderProblemSample[]>;
   skillsByCharacter: Map<number, CharacterSkills>;
+  /** Each order's own standing toward its station's NPC owner (issue #1238). Keyed orderId — see `openOrdersModel.ts`'s `standingsByOrder`. */
+  standingsByOrder: Map<number, ResolvedStandings>;
   now: number;
 }
 
@@ -93,6 +96,7 @@ export async function loadOpenOrdersSnapshot(
       costBases: new Map(),
       problemSamples: new Map(),
       skillsByCharacter: new Map(),
+      standingsByOrder: new Map(),
       now,
     };
   }
@@ -141,23 +145,42 @@ export async function loadOpenOrdersSnapshot(
   const problemSamples = await problemSamplesPromise;
 
   const skillsByCharacter = new Map<number, CharacterSkills>();
+  const standingsByCharacter = new Map<
+    number,
+    Awaited<ReturnType<typeof loadCharacterStandings>>
+  >();
   await mapWithConcurrencyLimit(openOrders.entries, ESI_FANOUT_CONCURRENCY, async (entry) => {
-    const [corrected, implants] = await Promise.all([
-      loadCorrectedSkills(entry.characterId, now),
-      loadCharacterImplants(entry.characterId),
+    const [modifiers, standings] = await Promise.all([
+      loadCharacterModifiers(entry.characterId, now),
+      loadCharacterStandings(entry.characterId),
     ]);
     skillsByCharacter.set(entry.characterId, {
-      accountingLevel: corrected.trained.get(SKILL_IDS.accounting)?.level ?? 0,
-      brokerRelationsLevel: corrected.trained.get(SKILL_IDS.brokerRelations)?.level ?? 0,
-      advancedBrokerRelationsLevel:
-        corrected.trained.get(SKILL_IDS.advancedBrokerRelations)?.level ?? 0,
-      reprocessingLevel: corrected.trained.get(SKILL_IDS.reprocessing)?.level ?? 0,
-      reprocessingEfficiencyLevel:
-        corrected.trained.get(SKILL_IDS.reprocessingEfficiency)?.level ?? 0,
-      implantBonusPct: resolveImplantBonusPct(implants?.data ?? []),
-      trained: corrected.trained,
+      accountingLevel: modifiers.skills[SKILL_IDS.accounting] ?? 0,
+      brokerRelationsLevel: modifiers.skills[SKILL_IDS.brokerRelations] ?? 0,
+      advancedBrokerRelationsLevel: modifiers.skills[SKILL_IDS.advancedBrokerRelations] ?? 0,
+      modifiers,
     });
+    standingsByCharacter.set(entry.characterId, standings);
   });
+
+  // Issue #1238: each order's own standing toward its station's NPC owner.
+  // Resolved per order (not deduped per locationId) — `resolveLocationStandings`
+  // is itself cache-backed (NPC-station/owner-corp lookups), so a station
+  // shared by several orders costs nothing extra here, and this stays a
+  // plain fan-out rather than a second bookkeeping structure.
+  const standingsByOrder = new Map<number, ResolvedStandings>();
+  const allOrders = openOrders.entries.flatMap((entry) =>
+    entry.orders.map((order) => ({ characterId: entry.characterId, order }))
+  );
+  await mapWithConcurrencyLimit(
+    allOrders,
+    ESI_FANOUT_CONCURRENCY,
+    async ({ characterId, order }) => {
+      const standings = standingsByCharacter.get(characterId) ?? [];
+      const resolved = await resolveLocationStandings(order.location_id, standings);
+      standingsByOrder.set(order.order_id, resolved);
+    }
+  );
 
   return {
     openOrders,
@@ -168,6 +191,7 @@ export async function loadOpenOrdersSnapshot(
     costBases,
     problemSamples,
     skillsByCharacter,
+    standingsByOrder,
     now,
   };
 }

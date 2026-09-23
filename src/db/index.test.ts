@@ -226,7 +226,7 @@ describe('schema upgrade v6 -> v7', () => {
   });
 
   it('the shipped database is at its current version with v7’s index live', () => {
-    expect(db.verno).toBe(13);
+    expect(db.verno).toBe(15);
     expect(db.characters.schema.indexes.map((i) => i.name)).toContain('corporationId');
   });
 });
@@ -267,7 +267,9 @@ describe('schema upgrade v8 -> v9 (Production Log, issue #525)', () => {
         'buildPlans',
         'characters',
         'esiCache',
+        'jitaPriceSnapshots',
         'mailDrafts',
+        'miningLedgerHistory',
         'miningTaxAssignments',
         'notificationFeed',
         'orderProblemSamples',
@@ -347,5 +349,19 @@ describe('a blocked upgrade', () => {
       unsubscribe();
       close.mockRestore();
     }
+  });
+});
+
+describe('schema upgrade v13 -> v14 (mining ledger history, issue #1278)', () => {
+  it('adds miningLedgerHistory keyed by characterId, with no other index', () => {
+    expect(db.miningLedgerHistory.schema.primKey.name).toBe('characterId');
+    expect(db.miningLedgerHistory.schema.indexes.map((i) => i.name)).toEqual([]);
+  });
+});
+
+describe('schema upgrade v14 -> v15 (saved Jita prices, issue #1279)', () => {
+  it('adds jitaPriceSnapshots keyed by date, with no other index', () => {
+    expect(db.jitaPriceSnapshots.schema.primKey.name).toBe('date');
+    expect(db.jitaPriceSnapshots.schema.indexes.map((i) => i.name)).toEqual([]);
   });
 });

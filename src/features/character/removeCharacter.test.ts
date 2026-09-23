@@ -90,6 +90,11 @@ async function seedCharacter(characterId: number): Promise<void> {
     body: 'On my way',
     updatedAt: 1,
   });
+  await db.miningLedgerHistory.put({
+    characterId,
+    rows: [{ date: '2026-09-04', quantity: 100, solar_system_id: 1, type_id: 1230 }],
+    fetchedAt: 1,
+  });
 }
 
 beforeEach(async () => {
@@ -109,6 +114,7 @@ beforeEach(async () => {
     db.miningTaxAssignments.clear(),
     db.orderProblemSamples.clear(),
     db.mailDrafts.clear(),
+    db.miningLedgerHistory.clear(),
   ]);
   useActiveCharacter.setState({ activeCharacterId: null, hydrated: true });
 });
@@ -130,6 +136,7 @@ describe('removeCharacter', () => {
     expect(await db.miningTaxAssignments.where('characterId').equals(1).count()).toBe(0);
     expect(await db.orderProblemSamples.where('characterId').equals(1).count()).toBe(0);
     expect(await db.mailDrafts.where('characterId').equals(1).count()).toBe(0);
+    expect(await db.miningLedgerHistory.get(1)).toBeUndefined();
   });
 
   it('does not touch another character’s data', async () => {
@@ -144,6 +151,7 @@ describe('removeCharacter', () => {
     expect(await db.miningTaxAssignments.where('characterId').equals(2).count()).toBe(1);
     expect(await db.orderProblemSamples.where('characterId').equals(2).count()).toBe(1);
     expect(await db.mailDrafts.where('characterId').equals(2).count()).toBe(1);
+    expect(await db.miningLedgerHistory.get(2)).toBeDefined();
   });
 
   it('attempts the remote purge and clears sync bookkeeping when configured', async () => {
