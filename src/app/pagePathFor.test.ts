@@ -17,6 +17,12 @@ describe('pagePathFor', () => {
     expect(pagePathFor('/wallet/loyalty/98000001')).toBe('/wallet/loyalty/:corporationId');
   });
 
+  it('reports a tabbed page’s declared tab as its own path', () => {
+    expect(pagePathFor('/contacts/character')).toBe('/contacts/character');
+    expect(pagePathFor('/contacts/across')).toBe('/contacts/across');
+    expect(pagePathFor('/contacts')).toBe('/contacts');
+  });
+
   it('falls back to a catch-all for anything unmatched', () => {
     expect(pagePathFor('/this-route-does-not-exist')).toBe('/*');
   });

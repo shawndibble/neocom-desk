@@ -441,3 +441,23 @@ Some per-event sites stay by hand, because they are either service-worker-side o
 - `notificationOptions.ts`'s `SUBJECT_URLS` and routes
 - `eveNotification`'s per-type sub-list
 - the `projection.ts` `project*` runners, called from their domain
+
+## 9. Adding a tabbed page and URL-backed filters
+
+ADR 0015. Contacts (`src/routes/Contacts.tsx`) is the reference conversion.
+
+**Tabs → paths.**
+
+1. Declare the tabs in `src/app/pageTabs.ts` with `definePageTabs('<path>', [{ id, labelKey }, …])` — the id is the URL segment, the first tab is the default — and add it to `PAGE_TABS` under the page's existing route path.
+2. Do **not** touch `ROUTE_ELEMENTS`, `ROUTE_REQUIREMENTS`, `pagePathFor` or `routeWarm`: `App.tsx` mounts a registered page at `<path>/*` and wraps it in `TabRoute` (bare path / unknown segment → default tab, replace), analytics reports each tab path, and `Layout` does not fade or remount between tabs.
+3. In the page, `const [tab, setTab] = usePageTab(MY_TABS)` replaces the `useState`, and the `Tabs` bar maps `MY_TABS.tabs` (`t(item.labelKey)`). A tab switch pushes history and keeps the query string.
+4. Any in-app link to a specific tab uses `tabPath(MY_TABS, id)`.
+
+**Filters, search, sort → query params.**
+
+1. Declare codecs at module scope (`src/lib/urlState.ts`: `textParam`, `boolParam`, `intParam`, `enumParam`, `enumSetParam`, `idListParam`; `characterFilterParam` from `features/character/characterFilterUrlParam.ts` in a `useMemo` keyed on the synced default).
+2. Keys that change together (one filter bar) go in one `useUrlParams({ … })` group; a lone toggle can use `useUrlParam(key, codec)`. Scope keys per panel/table (`across.sort`) so two tables on one page do not collide.
+3. Bind a `DataTable`'s sort with `const sortProps = useUrlSort(key, DEFAULT_SORT, columnIds)` and spread it onto the table in place of `defaultSort`.
+4. URL wins; absent → the default (which may be a stored setting); never write URL values into storage (scope decision "persisted view preferences stay out of the URL").
+5. Leave one-shot params (`useHighlightParam`, `?product=`, `?material=`) and modal / inspector state alone.
+6. Tests: a reload test (`window.history.replaceState` to the URL, render, assert the view), and one asserting defaults leave the query empty.

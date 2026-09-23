@@ -296,6 +296,44 @@ describe('DataTable', () => {
       expect(itemNames()).toEqual(['Charlie', 'Delta', 'Bravo', 'Alpha']);
     });
 
+    it('renders a controlled sort and reports clicks without sorting itself', async () => {
+      const user = userEvent.setup();
+      const onSortChange = vi.fn();
+      const { rerender } = renderSortable({
+        sort: { columnId: 'value', direction: 'desc' },
+        onSortChange,
+        // Inert once controlled.
+        defaultSort: { columnId: 'name', direction: 'asc' },
+      });
+      expect(itemNames()).toEqual(['Charlie', 'Delta', 'Bravo', 'Alpha']);
+
+      await user.click(screen.getByRole('button', { name: 'Value' }));
+      expect(onSortChange).toHaveBeenCalledWith({ columnId: 'value', direction: 'asc' });
+      // Nothing moved: the parent owns the sort and has not changed it.
+      expect(itemNames()).toEqual(['Charlie', 'Delta', 'Bravo', 'Alpha']);
+
+      rerender(
+        <DataTable
+          columns={sortColumns}
+          rows={sortRows}
+          rowKey={(row) => row.id}
+          label="Sortable"
+          sort={{ columnId: 'value', direction: 'asc' }}
+          onSortChange={onSortChange}
+        />
+      );
+      expect(itemNames()).toEqual(['Bravo', 'Delta', 'Charlie', 'Alpha']);
+    });
+
+    it('still reports sort changes from an uncontrolled table that asks for them', async () => {
+      const user = userEvent.setup();
+      const onSortChange = vi.fn();
+      renderSortable({ onSortChange });
+      await user.click(screen.getByRole('button', { name: 'Value' }));
+      expect(onSortChange).toHaveBeenCalledWith({ columnId: 'value', direction: 'asc' });
+      expect(itemNames()).toEqual(['Bravo', 'Delta', 'Charlie', 'Alpha']);
+    });
+
     it('leaves every existing (non-opted-in) table unsorted and in original row order', () => {
       renderTable();
       const cells = screen.getAllByRole('cell');
