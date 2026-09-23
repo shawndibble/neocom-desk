@@ -16,16 +16,14 @@ import type { OrderCostBasis } from './orderCostBasis';
 import type { MarketOrder } from '@/esi/endpoints';
 import type { CompetingOrder } from '@/engine/market/undercut';
 import { ORDER_PROBLEMS, type OrderProblem } from '@/engine/market/orderProblems';
+import { NO_CHARACTER_MODIFIERS } from '@/engine/industry/characterModifiers';
 
 /** Every skill untrained: these fixtures test row shaping, not fee or yield maths. */
 const ZERO_SKILLS: CharacterSkills = {
   accountingLevel: 0,
   brokerRelationsLevel: 0,
   advancedBrokerRelationsLevel: 0,
-  reprocessingLevel: 0,
-  reprocessingEfficiencyLevel: 0,
-  implantBonusPct: 0,
-  trained: new Map(),
+  modifiers: NO_CHARACTER_MODIFIERS,
 };
 
 const NOW = new Date('2026-09-06T00:00:00Z').getTime();

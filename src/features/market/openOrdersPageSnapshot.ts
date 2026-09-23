@@ -16,9 +16,7 @@
  * reason `orderBadgeKind.ts` sits apart from `OrderProblemBadge.tsx`.
  */
 import { loadTypeNames } from '@/features/character/typeNames';
-import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
-import { loadCharacterImplants } from '@/features/skills/data';
-import { resolveImplantBonusPct } from '@/engine/industry/reprocessing';
+import { loadCharacterModifiers } from '@/features/character/characterModifiers';
 import { SKILL_IDS } from '@/engine/industry/types';
 import { loadNpcStations } from '@/sde/loadMarketSde';
 import type { NpcStationEntry } from '@/sde/marketTypes';
@@ -142,20 +140,12 @@ export async function loadOpenOrdersSnapshot(
 
   const skillsByCharacter = new Map<number, CharacterSkills>();
   await mapWithConcurrencyLimit(openOrders.entries, ESI_FANOUT_CONCURRENCY, async (entry) => {
-    const [corrected, implants] = await Promise.all([
-      loadCorrectedSkills(entry.characterId, now),
-      loadCharacterImplants(entry.characterId),
-    ]);
+    const modifiers = await loadCharacterModifiers(entry.characterId, now);
     skillsByCharacter.set(entry.characterId, {
-      accountingLevel: corrected.trained.get(SKILL_IDS.accounting)?.level ?? 0,
-      brokerRelationsLevel: corrected.trained.get(SKILL_IDS.brokerRelations)?.level ?? 0,
-      advancedBrokerRelationsLevel:
-        corrected.trained.get(SKILL_IDS.advancedBrokerRelations)?.level ?? 0,
-      reprocessingLevel: corrected.trained.get(SKILL_IDS.reprocessing)?.level ?? 0,
-      reprocessingEfficiencyLevel:
-        corrected.trained.get(SKILL_IDS.reprocessingEfficiency)?.level ?? 0,
-      implantBonusPct: resolveImplantBonusPct(implants?.data ?? []),
-      trained: corrected.trained,
+      accountingLevel: modifiers.skills[SKILL_IDS.accounting] ?? 0,
+      brokerRelationsLevel: modifiers.skills[SKILL_IDS.brokerRelations] ?? 0,
+      advancedBrokerRelationsLevel: modifiers.skills[SKILL_IDS.advancedBrokerRelations] ?? 0,
+      modifiers,
     });
   });
 

@@ -47,12 +47,11 @@
  * dispose of one they already have.
  */
 import {
-  reprocessingEfficiency,
   reprocessingValue,
   reprocessingYield,
   type ReprocessingMaterial,
-  type ReprocessingSkills,
 } from '@/engine/industry/reprocessing';
+import { refiningEfficiency, type CharacterModifiers } from '@/engine/industry/characterModifiers';
 import type { AppraisalLpOption } from '@/engine/market/lpAcquisition';
 
 /** Refine-then-sell value for one item's full pasted quantity, at 100% price. */
@@ -287,6 +286,8 @@ export function buildHubComparison(
 export interface AppraisalReprocessingEntry {
   portionSize: number;
   materials: readonly ReprocessingMaterial[];
+  /** The SDE's specialisation skill; absent = scrap, refined under Scrapmetal Processing only (issues #1058, #1226). */
+  specialisationSkillId?: number;
 }
 
 export interface ComputeAppraisalRefineInput {
@@ -294,7 +295,7 @@ export interface ComputeAppraisalRefineInput {
   quantity: number;
   /** Undefined when the type carries no reprocessing data at all. */
   reprocessing: AppraisalReprocessingEntry | undefined;
-  skills: ReprocessingSkills;
+  modifiers: CharacterModifiers;
   /** materialTypeId -> ISK a unit at the appraisal's Trade Hub. */
   materialPrices: Readonly<Record<number, number>>;
 }
@@ -313,11 +314,11 @@ export interface ComputeAppraisalRefineInput {
 export function computeAppraisalRefine({
   quantity,
   reprocessing,
-  skills,
+  modifiers,
   materialPrices,
 }: ComputeAppraisalRefineInput): AppraisalRefine | undefined {
   if (!reprocessing) return undefined;
-  const efficiency = reprocessingEfficiency(skills);
+  const efficiency = refiningEfficiency(modifiers, reprocessing.specialisationSkillId);
   const yielded = reprocessingYield({
     portionSize: reprocessing.portionSize,
     materials: reprocessing.materials,

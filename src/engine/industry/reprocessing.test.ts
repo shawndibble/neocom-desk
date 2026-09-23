@@ -3,13 +3,8 @@ import {
   reprocessingEfficiency,
   reprocessingYield,
   reprocessingValue,
-  resolveSpecialisationLevel,
-  resolveReprocessingSkills,
-  resolveImplantBonusPct,
   BASE_STATION_REPROCESSING_RATE,
-  REFINING_IMPLANT_TYPE_IDS,
 } from './reprocessing';
-import { SKILL_IDS } from './types';
 
 /** Tritanium, Pyerite — the two the fixtures below refine into. */
 const TRITANIUM = 34;
@@ -109,36 +104,6 @@ describe('reprocessingEfficiency', () => {
   });
 });
 
-describe('resolveImplantBonusPct', () => {
-  // Real ESI type IDs for the Zainou 'Beancounter' Reprocessing line
-  // (issue #1227): "+N% bonus to ore and ice reprocessing yield".
-  const RX_801 = 27175;
-  const RX_802 = 27169;
-  const RX_804 = 27174;
-
-  it('is 0 with no implants fitted', () => {
-    expect(resolveImplantBonusPct([])).toBe(0);
-  });
-
-  it.each([
-    [RX_801, 1],
-    [RX_802, 2],
-    [RX_804, 4],
-  ])('resolves implant %i to a %i%% bonus', (typeId, pct) => {
-    expect(resolveImplantBonusPct([typeId])).toBe(pct);
-  });
-
-  it('ignores implants that are not the refining line', () => {
-    expect(resolveImplantBonusPct([1, 2, 3])).toBe(0);
-  });
-
-  it('mirrors the known typeIDs in REFINING_IMPLANT_TYPE_IDS', () => {
-    expect(REFINING_IMPLANT_TYPE_IDS[RX_801]).toBe(1);
-    expect(REFINING_IMPLANT_TYPE_IDS[RX_802]).toBe(2);
-    expect(REFINING_IMPLANT_TYPE_IDS[RX_804]).toBe(4);
-  });
-});
-
 describe('reprocessingYield', () => {
   it('refines whole portions only, and reports the units it could not', () => {
     const result = reprocessingYield({ ...YIELD, units: 23, efficiency: 1 });
@@ -229,62 +194,5 @@ describe('reprocessingValue', () => {
       pricedAll: true,
       unpricedTypeIds: [],
     });
-  });
-});
-
-describe('resolveSpecialisationLevel', () => {
-  // Real SDE skill type ids (issue #1058), so this test doubles as
-  // documentation of what the bake's attribute-790 join actually resolves.
-  const SIMPLE_ORE_PROCESSING = 60377;
-  const ICE_PROCESSING = 18025;
-
-  it('resolves a known ore type to its own specialisation, not Scrapmetal', () => {
-    const trained = new Map([
-      [SIMPLE_ORE_PROCESSING, { level: 3, sp: 0 }],
-      [SKILL_IDS.scrapmetalProcessing, { level: 5, sp: 0 }],
-    ]);
-    expect(resolveSpecialisationLevel(SIMPLE_ORE_PROCESSING, trained)).toBe(3);
-  });
-
-  it('resolves a known ice type to Ice Processing, not Scrapmetal', () => {
-    const trained = new Map([
-      [ICE_PROCESSING, { level: 4, sp: 0 }],
-      [SKILL_IDS.scrapmetalProcessing, { level: 1, sp: 0 }],
-    ]);
-    expect(resolveSpecialisationLevel(ICE_PROCESSING, trained)).toBe(4);
-  });
-
-  it('falls back to Scrapmetal Processing for a known module, which carries no specialisation attribute', () => {
-    const trained = new Map([[SKILL_IDS.scrapmetalProcessing, { level: 2, sp: 0 }]]);
-    expect(resolveSpecialisationLevel(undefined, trained)).toBe(2);
-  });
-
-  it('is 0 when the resolved skill is untrained', () => {
-    expect(resolveSpecialisationLevel(undefined, new Map())).toBe(0);
-  });
-});
-
-describe('resolveReprocessingSkills', () => {
-  it('marks a type with no specialisation attribute as scrap (issue #1226)', () => {
-    const trained = new Map([[SKILL_IDS.scrapmetalProcessing, { level: 2, sp: 0 }]]);
-    const skills = resolveReprocessingSkills(
-      { reprocessingLevel: 5, reprocessingEfficiencyLevel: 5 },
-      undefined,
-      trained
-    );
-    expect(skills.isScrap).toBe(true);
-    expect(skills.specialisationLevel).toBe(2);
-  });
-
-  it('does not mark an ore/ice/moon-ore type as scrap', () => {
-    const SIMPLE_ORE_PROCESSING = 60377;
-    const trained = new Map([[SIMPLE_ORE_PROCESSING, { level: 3, sp: 0 }]]);
-    const skills = resolveReprocessingSkills(
-      { reprocessingLevel: 5, reprocessingEfficiencyLevel: 5 },
-      SIMPLE_ORE_PROCESSING,
-      trained
-    );
-    expect(skills.isScrap).toBe(false);
-    expect(skills.specialisationLevel).toBe(3);
   });
 });

@@ -1,11 +1,11 @@
-import { SKILL_IDS } from './types';
-
 /**
  * Reprocessing (refining): what an item breaks down into, and what that is
  * worth (issue #537).
  *
  * Pure, like the rest of `src/engine/industry` — the baked yields, the
  * character's skill levels and the material prices all arrive as inputs.
+ * Callers go through `characterModifiers.ts`' `refiningEfficiency`, which
+ * resolves a type's skills from one Character Modifiers value.
  *
  * Two things this module refuses to guess, recorded in
  * `docs/context/decisions/…-reprocessing-v1-models-the-skills…`:
@@ -51,72 +51,10 @@ export interface ReprocessingSkills {
   isScrap?: boolean;
   /**
    * The active clone's refining implant bonus, if any (issue #1227) —
-   * `resolveImplantBonusPct`'s result. Ignored when `isScrap`: the RX-80x
+   * Character Modifiers' `refiningImplantPct`. Ignored when `isScrap`: the RX-80x
    * line's own ESI description names ore and ice only, not scrap.
    */
   implantBonusPct?: number;
-}
-
-/**
- * Zainou 'Beancounter' Reprocessing implant type IDs -> the % bonus their
- * own ESI/SDE description gives to ore and ice reprocessing yield (issue
- * #1227). Only three exist and none supersede another positionally (same
- * implant slot — a character can only ever have one fitted), so a flat
- * lookup is simpler than a general dogma-attribute read for this.
- */
-export const REFINING_IMPLANT_TYPE_IDS: Readonly<Record<number, number>> = {
-  27175: 1, // RX-801
-  27169: 2, // RX-802
-  27174: 4, // RX-804
-};
-
-/**
- * The active clone's refining implant bonus, or 0 with none fitted. Takes
- * the character's full implant typeID list (as already read for skill
- * training) rather than a single value, so the caller need not know which
- * slot the implant lives in.
- */
-export function resolveImplantBonusPct(implantTypeIds: readonly number[]): number {
-  let best = 0;
-  for (const typeId of implantTypeIds) {
-    const pct = REFINING_IMPLANT_TYPE_IDS[typeId];
-    if (pct !== undefined && pct > best) best = pct;
-  }
-  return best;
-}
-
-/** The two general reprocessing skills, ahead of resolving any type's specialisation. */
-export type GeneralReprocessingSkills = Omit<ReprocessingSkills, 'specialisationLevel'>;
-
-/**
- * Which specialisation skill applies to a type, and what level the
- * character has in it (issue #1058) — the one shared resolver every
- * refining surface uses instead of each guessing or hardcoding its own.
- *
- * `specialisationSkillId` comes from the SDE bake's attribute-790 join
- * (`ReprocessingType.specialisationSkillID`); its absence IS the classifier
- * for "this type refines under Scrapmetal Processing", not a gap to guess
- * at — every ore, ice and moon-ore type carries the attribute, nothing else
- * does.
- */
-export function resolveSpecialisationLevel(
-  specialisationSkillId: number | undefined,
-  trained: ReadonlyMap<number, { level: number }>
-): number {
-  return trained.get(specialisationSkillId ?? SKILL_IDS.scrapmetalProcessing)?.level ?? 0;
-}
-
-/** `resolveSpecialisationLevel`, folded into the full `ReprocessingSkills` shape `reprocessingEfficiency` takes — the assembly every per-row call site otherwise repeats by hand. */
-export function resolveReprocessingSkills(
-  general: GeneralReprocessingSkills,
-  specialisationSkillId: number | undefined,
-  trained: ReadonlyMap<number, { level: number }>
-): ReprocessingSkills {
-  return {
-    ...general,
-    specialisationLevel: resolveSpecialisationLevel(specialisationSkillId, trained),
-    isScrap: specialisationSkillId === undefined,
-  };
 }
 
 /**
