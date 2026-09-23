@@ -173,3 +173,54 @@ export function useUrlSort(
   const [sort, setSort] = useUrlParam(key, codec);
   return { sort: resolveSort(sort, defaultSort, columnIds), onSortChange: setSort };
 }
+
+/**
+ * A filter object backed by a `useUrlParams` group, unwrapped through a
+ * field-to-param-key map — plain data, so (unlike a hook taking `unwrap`/
+ * `wrap` callbacks) it costs no fresh closure identity every render as long
+ * as the caller passes a module-scope map.
+ *
+ * Resets to `emptyParams` whenever `scopeKey` changes *after* mount (a
+ * division switch, an owner toggle — whatever the caller's filter should
+ * not survive) — never on mount itself, so a filter delivered by the URL on
+ * first load is not immediately wiped. Build `scopeKey` from the same
+ * synchronous source the URL itself reads from, not from anything that
+ * settles asynchronously (an access check, a fetched list): if `scopeKey`
+ * can read one value on the first render and a different one a render later
+ * for reasons unrelated to the field it names, that settling looks
+ * indistinguishable from a real change and the filter is wiped for it.
+ */
+export function useUrlFilter<F extends object>(
+  scopeKey: string,
+  schema: UrlParamSchema,
+  fieldToParam: Record<keyof F & string, string>,
+  emptyParams: Record<string, unknown>
+): [F, (next: F) => void] {
+  const [params, setParams] = useUrlParams(schema);
+  const filter = useMemo(() => {
+    const result = {} as F;
+    for (const field in fieldToParam) {
+      const key = field as keyof F & string;
+      result[key] = params[fieldToParam[key]] as F[typeof key];
+    }
+    return result;
+  }, [params, fieldToParam]);
+  const setFilter = useCallback(
+    (next: F) => {
+      const patch: Record<string, unknown> = {};
+      for (const field in fieldToParam) {
+        const key = field as keyof F & string;
+        patch[fieldToParam[key]] = next[key];
+      }
+      setParams(patch);
+    },
+    [fieldToParam, setParams]
+  );
+  const lastScopeKey = useRef(scopeKey);
+  useEffect(() => {
+    if (lastScopeKey.current === scopeKey) return;
+    lastScopeKey.current = scopeKey;
+    setParams(emptyParams);
+  }, [scopeKey, setParams, emptyParams]);
+  return [filter, setFilter];
+}

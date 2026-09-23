@@ -36,6 +36,7 @@ import {
   SelectValue,
   Spinner,
   type DataTableColumn,
+  type DataTableSort,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
@@ -66,6 +67,8 @@ interface CorpTransactionsPanelProps {
   loading: boolean;
   filter: WalletTransactionFilter;
   onFilterChange: (filter: WalletTransactionFilter) => void;
+  sort: DataTableSort;
+  onSortChange: (sort: DataTableSort) => void;
   /** The same spelling the table's item column draws, for the CSV and the search. */
   nameFor: (typeId: number) => string;
   /** Names the CSV file's division, when the division list has loaded. */
@@ -148,6 +151,8 @@ export function CorpTransactionsPanel({
   loading,
   filter,
   onFilterChange,
+  sort,
+  onSortChange,
   nameFor,
   divisionQualifier,
   offlineTitleKey,
@@ -305,7 +310,8 @@ export function CorpTransactionsPanel({
               columns={columns}
               rows={filteredTransactions}
               rowKey={(txn) => txn.transaction_id}
-              defaultSort={{ columnId: 'date', direction: 'desc' }}
+              sort={sort}
+              onSortChange={onSortChange}
               rowContextMenu={rowContextMenu}
             />
           )}

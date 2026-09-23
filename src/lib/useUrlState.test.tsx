@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { act, render, screen } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useLocation, useNavigationType } from 'react-router-dom';
 import { boolParam, enumSetParam, textParam } from './urlState';
-import { useUrlParam, useUrlParams, useUrlSort } from './useUrlState';
+import { useUrlFilter, useUrlParam, useUrlParams, useUrlSort } from './useUrlState';
 
 const TYPES = ['a', 'b', 'c'] as const;
 const SCHEMA = { q: textParam(), types: enumSetParam(TYPES), only: boolParam() };
@@ -173,5 +173,56 @@ describe('useUrlSort', () => {
     await user.click(screen.getByRole('button'));
     expect(probe()).toBe('/p?sort=value%3Adesc|REPLACE');
     expect(screen.getByRole('button')).toHaveTextContent('value:desc');
+  });
+});
+
+interface TestFilter {
+  text: string;
+  flag: boolean;
+}
+const FILTER_SCHEMA = { 'f.text': textParam(), 'f.flag': boolParam() };
+const EMPTY_FILTER_PARAMS = { 'f.text': '', 'f.flag': false } as const;
+const FILTER_FIELD_TO_PARAM: Record<keyof TestFilter, string> = { text: 'f.text', flag: 'f.flag' };
+
+function Filtered({ scope }: { scope: string }) {
+  const [filter, setFilter] = useUrlFilter<TestFilter>(
+    scope,
+    FILTER_SCHEMA,
+    FILTER_FIELD_TO_PARAM,
+    EMPTY_FILTER_PARAMS
+  );
+  return (
+    <input
+      aria-label="text"
+      value={filter.text}
+      onChange={(event) => setFilter({ ...filter, text: event.target.value })}
+    />
+  );
+}
+
+describe('useUrlFilter', () => {
+  it('reads a filter the URL already carries, without wiping it on mount', () => {
+    renderAt('/p?f.text=foo', <Filtered scope="a" />);
+    expect(screen.getByLabelText('text')).toHaveValue('foo');
+  });
+
+  it('resets to empty when scope changes after mount, not before', async () => {
+    const { rerender } = render(
+      <MemoryRouter initialEntries={['/p?f.text=foo']}>
+        <Routes>
+          <Route path="*" element={<Filtered scope="a" />} />
+        </Routes>
+      </MemoryRouter>
+    );
+    expect(screen.getByLabelText('text')).toHaveValue('foo');
+
+    rerender(
+      <MemoryRouter initialEntries={['/p?f.text=foo']}>
+        <Routes>
+          <Route path="*" element={<Filtered scope="b" />} />
+        </Routes>
+      </MemoryRouter>
+    );
+    await waitFor(() => expect(screen.getByLabelText('text')).toHaveValue(''));
   });
 });
