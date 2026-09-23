@@ -82,7 +82,8 @@
     },
     "requiredSkills": {
       "title": "Required Skills",
-      "addToPlan": "Add to Skill Plan"
+      "addToPlan": "Add to Skill Plan",
+      "added": "Added"
     },
     "attributeModifier": {
       "perLevel": "{{skill}}: +{{perLevel}}% per level",
