@@ -21,11 +21,19 @@ import { EmptyState, IskAmount, Modal, Spinner, TypeIcon } from '@/components/ui
 import { groupItemAttributes, type AttributeGroup } from '@/engine/market/itemAttributes';
 import { parseItemDescription, type DescriptionRun } from '@/engine/market/itemDescription';
 import type { OrderBookSummary } from '@/engine/market/orderBook';
+import type { TrainedSkill } from '@/engine/types';
 import { getUniverseType, type UniverseType } from '@/esi/endpoints';
 import { loadAttributeDictionary } from '@/sde/loadMarketSde';
 import { loadPi } from '@/sde/loadSde';
 import type { PiData } from '@/sde/types';
 import { formatDuration } from '@/lib/duration';
+import { useActiveCharacter } from '@/stores/activeCharacter';
+import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
+import { extractRequiredSkills, type RequiredSkill } from '@/features/skills/dogma';
+import { SkillRow } from '@/features/skills/SkillRow';
+import { skillTrainingStatus } from '@/features/skills/skillStatus';
+import { TargetPlanPicker } from '@/features/skills/TargetPlanPicker';
+import { useTargetPlan, type TargetPlan } from '@/features/skills/useTargetPlan';
 import { loadAttributeReferenceNames } from './attributeReferenceNames';
 import { formatAttributeValue, formatVolume } from './format';
 import {
@@ -50,7 +58,11 @@ export interface ItemDetailModalProps {
 
 interface DetailData {
   type: UniverseType;
+  /** Skill-requirement rows already excluded — the Required Skills section below owns those instead. */
   groups: AttributeGroup[];
+  requiredSkills: RequiredSkill[];
+  /** typeID -> name, reused from the same resolution the generic rows already paid for. */
+  skillNames: Readonly<Record<number, string>>;
   /** Null when pi.json couldn't be read — the rest of the modal is unaffected. */
   pi: PiData | null;
 }
@@ -70,10 +82,34 @@ export function ItemDetailModal({ typeId, itemName, onClose, location }: ItemDet
   const [data, setData] = useState<DetailData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [trainedSkills, setTrainedSkills] = useState<ReadonlyMap<number, TrainedSkill>>(new Map());
+
+  const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
+  const targetPlan = useTargetPlan(activeCharacterId);
 
   const savedLocation = useSavedOrderBookLocation(location === undefined);
   const priceLocation = location ?? savedLocation;
   const [priceState, setPriceState] = useState<PriceState>({ status: 'loading' });
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      if (activeCharacterId === null) {
+        if (!cancelled) setTrainedSkills(new Map());
+        return;
+      }
+      // Queue-corrected, like every other trained-level read (usePlanEditorData) —
+      // a level the queue just finished but /skills hasn't caught up to would
+      // otherwise show wrong here while everywhere else shows it trained.
+      const corrected = await loadCorrectedSkills(activeCharacterId, Date.now(), {
+        skipQueueWithoutScope: true,
+      });
+      if (!cancelled) setTrainedSkills(corrected.trained);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeCharacterId]);
 
   useEffect(() => {
     if (!priceLocation) return;
@@ -116,7 +152,11 @@ export function ItemDetailModal({ typeId, itemName, onClose, location }: ItemDet
         if (cancelled) return;
         setData({
           type,
-          groups: groupItemAttributes(type.dogma_attributes, dictionary, names),
+          groups: groupItemAttributes(type.dogma_attributes, dictionary, names, {
+            omitSkillRequirementRows: true,
+          }),
+          requiredSkills: extractRequiredSkills(type.dogma_attributes),
+          skillNames: names.types ?? {},
           pi,
         });
       } catch {
@@ -186,6 +226,15 @@ export function ItemDetailModal({ typeId, itemName, onClose, location }: ItemDet
             </div>
           </div>
 
+          <RequiredSkillsSection
+            requiredSkills={data.requiredSkills}
+            skillNames={data.skillNames}
+            trainedSkills={trainedSkills}
+            target={targetPlan}
+            hasCharacter={activeCharacterId !== null}
+            itemName={itemName}
+          />
+
           <PlanetaryProduction pi={data.pi} typeId={typeId} />
 
           {data.groups.length === 0 ? (
@@ -224,6 +273,74 @@ export function ItemDetailModal({ typeId, itemName, onClose, location }: ItemDet
  */
 function priceCell(price: number | null): ReactNode {
   return price != null ? <IskAmount value={price} revealOn="tap" /> : '—';
+}
+
+/**
+ * "What skill affects this?" — each required skill, status + Add to Plan.
+ * No Character: name + level only, not an always-"missing"/no-op Add.
+ */
+function RequiredSkillsSection({
+  requiredSkills,
+  skillNames,
+  trainedSkills,
+  target,
+  hasCharacter,
+  itemName,
+}: {
+  requiredSkills: readonly RequiredSkill[];
+  skillNames: Readonly<Record<number, string>>;
+  trainedSkills: ReadonlyMap<number, TrainedSkill>;
+  target: TargetPlan;
+  hasCharacter: boolean;
+  itemName: string;
+}) {
+  const { t } = useTranslation();
+  if (requiredSkills.length === 0) return null;
+
+  return (
+    <div>
+      <div className="flex items-center justify-between border-b border-line pb-1">
+        <h3 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+          {t('skills.requiredSkills.title')}
+        </h3>
+        {hasCharacter && <TargetPlanPicker target={target} />}
+      </div>
+      <div className="mt-1 space-y-1">
+        {requiredSkills.map((req) => {
+          const name = skillNames[req.skillTypeID] ?? `#${req.skillTypeID}`;
+          if (!hasCharacter) {
+            return <NameOnlySkillRow key={req.skillTypeID} name={name} level={req.level} />;
+          }
+          const currentLevel = trainedSkills.get(req.skillTypeID)?.level ?? 0;
+          return (
+            <SkillRow
+              key={req.skillTypeID}
+              name={name}
+              status={skillTrainingStatus(currentLevel, req.level)}
+              currentLevel={currentLevel}
+              addLabel={t('skills.requiredSkills.addToPlan')}
+              onAdd={() =>
+                void target.addEntries(
+                  [{ skillTypeID: req.skillTypeID, targetLevel: req.level }],
+                  itemName
+                )
+              }
+            />
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function NameOnlySkillRow({ name, level }: { name: string; level: number }) {
+  const { t } = useTranslation();
+  return (
+    <div className="flex items-center gap-3 text-xs">
+      <span className="flex-1 text-text">{name}</span>
+      <span className="text-text-dim">{t('plans.level', { level })}</span>
+    </div>
+  );
 }
 
 /**

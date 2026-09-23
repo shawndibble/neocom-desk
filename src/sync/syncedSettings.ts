@@ -140,6 +140,15 @@
 // (`features/miningTax/typeOverrides.ts`). Never deleted via
 // deleteSyncedSetting: untagging removes an entry and rewrites the array, so
 // the tombstone-expiry edge above does not bite either key.
+//
+// sync.targetSkillPlan (issue #1366): which Skill Plan the Ships tab's Fit
+// Check and the Market item detail "Add to Skill Plan" action last added to,
+// per Character. A `Record<characterId, planId>` blob for the same
+// exact-match reason as sync.skillCloneStates above; a Character with no
+// entry (or whose stored planId no longer exists) falls back to picking for
+// itself — see features/skills/targetPlan.ts. Never deleted via
+// deleteSyncedSetting: the choice is only ever replaced, never unset, so the
+// tombstone-expiry edge does not bite it.
 export const SYNCED_SETTING_KEYS: readonly string[] = [
   'sync.corpDarkAfterDays',
   'sync.defaultCharacterFilter',
@@ -160,6 +169,7 @@ export const SYNCED_SETTING_KEYS: readonly string[] = [
   'sync.skillCloneStates',
   'sync.spExtractionMonitoringEnabled',
   'sync.spExtractionThresholdSp',
+  'sync.targetSkillPlan',
 ];
 
 const allowed = new Set(SYNCED_SETTING_KEYS);

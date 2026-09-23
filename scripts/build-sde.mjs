@@ -49,6 +49,9 @@ const FILES = [
   // Alpha clone skill caps, per clone grade (issue #1233); see `alphaMaxLevel`
   // on skills.json below.
   'chrCloneGradeSkills.csv',
+  // Ship Mastery tiers; see `masteries.json` below.
+  'certMasteries.csv',
+  'certSkills.csv',
 ];
 
 const MARKET_OUT_DIR = join(OUT_DIR, 'market');
@@ -121,6 +124,16 @@ const CHAR_ATTR_NAMES = {
   168: 'willpower',
 };
 const SKILL_CATEGORY_ID = 16;
+const SHIP_CATEGORY_ID = 6;
+// Mastery tiers: certMasteries.csv's masteryLevel is 0-4 (5 tiers, I-V);
+// certSkills.csv's certLevelInt is 1-5 for the same tiers, so
+// certLevelInt = masteryLevel + 1 is the join key between the two files.
+const MASTERY_TIER_COUNT = 5;
+// Ships carrying at least one mastery tier, as counted against the dump on
+// 2026-09-23: 476. Same idea as ALPHA_SKILLS_MIN/MAX above — a broken join
+// (wrong column, wrong category filter) lands at 0, not slightly off.
+const MASTERY_SHIPS_MIN = 350;
+const MASTERY_SHIPS_MAX = 700;
 const MANUFACTURING_ACTIVITY_ID = 1;
 // Reaction formulas (issue #460): SDE industryActivity* rows for this
 // activity ID are disjoint from every other activity — verified against a
@@ -608,6 +621,14 @@ async function main() {
     if (g && g.categoryID === SKILL_CATEGORY_ID) skillTypeIds.add(typeID);
   }
 
+  // --- Ship type IDs: published types whose group is in category 6 ---
+  const shipTypeIds = new Set();
+  for (const [typeID, t] of types) {
+    if (!t.published) continue;
+    const g = groups.get(t.groupID);
+    if (g && g.categoryID === SHIP_CATEGORY_ID) shipTypeIds.add(typeID);
+  }
+
   // --- Planetary pin type IDs: published types in the six pin groups ---
   const piPinTypeIds = new Set();
   for (const [typeID, t] of types) {
@@ -681,6 +702,53 @@ async function main() {
       if (m.size !== alphaMaxLevel.size) alphaGradesDisagree = true;
       for (const [typeID, level] of m)
         if (alphaMaxLevel.get(typeID) !== level) alphaGradesDisagree = true;
+    }
+  }
+
+  // --- masteries.json: shipTypeID -> 5 tiers -> [{skillTypeID, level}] ---
+  // certSkills: certID+certLevelInt -> [{skillTypeID, level}]
+  const certSkillsByCert = new Map();
+  {
+    const rows = raw['certSkills.csv'];
+    const h = indexHeader(rows);
+    for (let i = 1; i < rows.length; i++) {
+      const r = rows[i];
+      if (r.length < 5) continue;
+      const certID = Number(r[h.certID]);
+      const certLevelInt = Number(r[h.certLevelInt]);
+      const skillTypeID = Number(r[h.skillID]);
+      const level = Number(r[h.skillLevel]);
+      const key = `${certID}:${certLevelInt}`;
+      let list = certSkillsByCert.get(key);
+      if (!list) certSkillsByCert.set(key, (list = []));
+      list.push({ skillTypeID, level });
+    }
+  }
+  // certMasteries: shipTypeID -> masteryLevel (0-4) -> [certID]
+  const masteries = {};
+  {
+    const rows = raw['certMasteries.csv'];
+    const h = indexHeader(rows);
+    for (let i = 1; i < rows.length; i++) {
+      const r = rows[i];
+      if (r.length < 3) continue;
+      const typeID = Number(r[h.typeID]);
+      if (!shipTypeIds.has(typeID)) continue;
+      const masteryLevel = Number(r[h.masteryLevel]);
+      if (!(masteryLevel >= 0 && masteryLevel < MASTERY_TIER_COUNT)) continue;
+      const certID = Number(r[h.certID]);
+      const certLevelInt = masteryLevel + 1;
+      const bundle = certSkillsByCert.get(`${certID}:${certLevelInt}`) ?? [];
+      let tiers = masteries[typeID];
+      if (!tiers) tiers = masteries[typeID] = Array.from({ length: MASTERY_TIER_COUNT }, () => []);
+      // A tier can draw from more than one cert; the max level wins where
+      // the same skill appears twice, same rule fitToSkills.ts uses for a
+      // fit's hull + items disagreeing on a skill's required level.
+      const bySkill = new Map(tiers[masteryLevel].map((e) => [e.skillTypeID, e.level]));
+      for (const { skillTypeID, level } of bundle) {
+        bySkill.set(skillTypeID, Math.max(bySkill.get(skillTypeID) ?? 0, level));
+      }
+      tiers[masteryLevel] = [...bySkill].map(([skillTypeID, level]) => ({ skillTypeID, level }));
     }
   }
 
@@ -1707,6 +1775,7 @@ async function main() {
   await mkdir(MARKET_OUT_DIR, { recursive: true });
   const outputs = [
     ['skills.json', skills],
+    ['masteries.json', masteries],
     ['blueprints.json', blueprints],
     ['marketWideTrees.json', marketWideTrees],
     ['reprocessing.json', reprocessing],
@@ -1918,6 +1987,26 @@ async function main() {
       console.error('  FAIL: Capital Ships should carry no alphaMaxLevel');
       process.exitCode = 1;
     }
+  }
+  {
+    const shipsWithMastery = Object.keys(masteries).length;
+    console.log(`  ships with mastery data: ${shipsWithMastery}`);
+    if (shipsWithMastery < MASTERY_SHIPS_MIN || shipsWithMastery > MASTERY_SHIPS_MAX) {
+      console.error(
+        `  FAIL: ${shipsWithMastery} ships with mastery data, outside the plausible ${MASTERY_SHIPS_MIN}-${MASTERY_SHIPS_MAX} range`
+      );
+      process.exitCode = 1;
+    }
+    let masteryBadSkillId = 0;
+    for (const tiers of Object.values(masteries)) {
+      for (const tier of tiers) {
+        for (const { skillTypeID } of tier) {
+          if (!skillIds.has(skillTypeID)) masteryBadSkillId++;
+        }
+      }
+    }
+    console.log(`  mastery skill refs pointing outside skills.json: ${masteryBadSkillId}`);
+    if (masteryBadSkillId) process.exitCode = 1;
   }
 
   console.log(`  market groups: ${marketGroups.length}`);

@@ -99,16 +99,26 @@ export function collectAttributeIdReferences(
 const ROMAN = ['I', 'II', 'III', 'IV', 'V'] as const;
 
 /**
- * requiredSkillN -> requiredSkillNLevel dogma attribute id pairs (verified
- * against fuzzwork dgmAttributeTypes.csv, same source as
- * scripts/build-sde.mjs's PREREQ_PAIRS). The level half of each pair is
- * unpublished in dgmAttributeTypes.csv, so it never reaches `dictionary` —
- * these must be read from the raw dogma attributes before the generic
- * per-attribute loop below, or the level is silently lost. ESI omits a level
- * attribute entirely when the item requires level 1 (dogma's own default),
- * so a missing level pairs to 1 rather than being dropped.
+ * requiredSkillN -> requiredSkillNLevel dogma attribute id pairs, N = 1..6.
+ * Verified 2026-08 against https://everef.net/dogma-attributes and a live
+ * ESI response (Rifter, type 587: attributes 182/277 = 3329/1, i.e. requires
+ * Minmatar Frigate I). The requiredSkill5/6 pairing is 1289 with 1287 and
+ * 1290 with 1288, not the more obvious-looking 1289→1288/1290→1287 —
+ * everef.net names 1287 "requiredSkill5Level" and 1288
+ * "requiredSkill6Level", settling it.
+ *
+ * The level half of each pair is unpublished in dgmAttributeTypes.csv, so it
+ * never reaches `dictionary` — these must be read from the raw dogma
+ * attributes before the generic per-attribute loop below, or the level is
+ * silently lost. ESI omits a level attribute entirely when the item requires
+ * level 1 (dogma's own default), so a missing level pairs to 1 rather than
+ * being dropped.
+ *
+ * Also the source of truth for `dogma.ts`'s `extractRequiredSkills` (Skill
+ * Plan clipboard import, Fit Check, Industry/Market Fit Import) — one list,
+ * imported both places, so the two paths can't drift onto different pairs.
  */
-const SKILL_REQUIREMENT_PAIRS: ReadonlyArray<readonly [number, number]> = [
+export const SKILL_REQUIREMENT_PAIRS: ReadonlyArray<readonly [number, number]> = [
   [182, 277],
   [183, 278],
   [184, 279],
@@ -135,11 +145,17 @@ function idReferenceName(
   return map?.[value] ?? null;
 }
 
+export interface GroupItemAttributesOptions {
+  /** Skip the curated "<Skill name> <roman level>" rows — for a caller (Market's Required Skills section) rendering trained-status/Add-to-Plan rows of its own instead. */
+  omitSkillRequirementRows?: boolean;
+}
+
 /** Groups by category, sorted alphabetically; attributes within a group sorted by display name. */
 export function groupItemAttributes(
   dogmaAttributes: readonly RawDogmaAttribute[] | undefined,
   dictionary: AttributeDictionary,
-  names: AttributeReferenceNames = {}
+  names: AttributeReferenceNames = {},
+  options: GroupItemAttributesOptions = {}
 ): AttributeGroup[] {
   if (!dogmaAttributes || dogmaAttributes.length === 0) return [];
 
@@ -156,7 +172,9 @@ export function groupItemAttributes(
     list.push(attribute);
   };
 
-  for (const [skillAttrId, levelAttrId] of SKILL_REQUIREMENT_PAIRS) {
+  for (const [skillAttrId, levelAttrId] of options.omitSkillRequirementRows
+    ? []
+    : SKILL_REQUIREMENT_PAIRS) {
     const skillTypeId = byId.get(skillAttrId);
     if (skillTypeId === undefined) continue;
     const entry = dictionary[skillAttrId];

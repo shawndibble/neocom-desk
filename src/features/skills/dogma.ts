@@ -4,20 +4,13 @@
  * item's required skills. No fetch/DOM here — callers (data.ts, the clipboard
  * import flow) supply the already-fetched UniverseType.
  *
- * Attribute IDs verified 2026-08 against https://everef.net/dogma-attributes
- * and cross-checked against a live ESI response for a real implant
- * (Memory Augmentation - Improved, type 10209: attribute 177 = 5.0, matching
- * its "+5 Bonus to Memory" description) and a real ship (Rifter, type 587:
- * attributes 182/277 = 3329/1, i.e. requires Minmatar Frigate I).
- *
- * IMPORTANT: the task brief's assumed requiredSkill5/6 pairing (1289→1288,
- * 1290→1287) is backwards. Verified pairing is 1289 (requiredSkill5) with
- * 1287 (requiredSkill5Level), and 1290 (requiredSkill6) with 1288
- * (requiredSkill6Level) — everef.net confirms 1287 = "requiredSkill5Level"
- * and 1288 = "requiredSkill6Level" by name, not by the task's assumed index.
+ * Attribute IDs verified 2026-08 against a live implant (Memory Augmentation
+ * - Improved, type 10209: attribute 177 = 5.0, matching its "+5 Bonus to
+ * Memory" description).
  */
 import type { AttributeName, Attributes, Implants } from '@/engine/types';
 import type { DogmaAttribute } from '@/esi/endpoints';
+import { SKILL_REQUIREMENT_PAIRS as REQUIRED_SKILL_ATTRIBUTE_PAIRS } from '@/engine/market/itemAttributes';
 
 /** dogma_attributes attribute_id -> the engine attribute it bonuses (implants). */
 const IMPLANT_ATTRIBUTE_IDS: Readonly<Record<number, AttributeName>> = {
@@ -27,16 +20,6 @@ const IMPLANT_ATTRIBUTE_IDS: Readonly<Record<number, AttributeName>> = {
   178: 'perception',
   179: 'willpower',
 };
-
-/** [requiredSkillN typeID attribute, requiredSkillNLevel attribute] pairs, N = 1..6. */
-const REQUIRED_SKILL_ATTRIBUTE_PAIRS: readonly (readonly [number, number])[] = [
-  [182, 277],
-  [183, 278],
-  [184, 279],
-  [1285, 1286],
-  [1289, 1287],
-  [1290, 1288],
-];
 
 /**
  * Extract this type's implant attribute bonuses (typically an implant, but

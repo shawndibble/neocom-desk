@@ -14,7 +14,7 @@ function subNavClass({ isActive }: { isActive: boolean }): string {
 }
 
 /**
- * Sub-navigation between the three Skills views. Real navigation (routes), not
+ * Sub-navigation between the four Skills views. Real navigation (routes), not
  * a `Tabs` widget — but it sits in the same slot and reads as the same control,
  * so it borrows `Tabs`' own classes rather than approximating them.
  */
@@ -33,6 +33,9 @@ export function SkillsSubNav() {
         </NavLink>
         <NavLink to="/skills/compare" className={subNavClass}>
           {t('skills.compareTab')}
+        </NavLink>
+        <NavLink to="/skills/ships" className={subNavClass}>
+          {t('skills.shipsTab')}
         </NavLink>
       </nav>
     </div>

@@ -188,6 +188,22 @@ describe('groupItemAttributes', () => {
     );
     expect(groups[0].attributes).toHaveLength(1);
   });
+
+  it('omits the curated skill-requirement rows entirely when asked (issue #1366)', () => {
+    const groups = groupItemAttributes(
+      [
+        { attribute_id: 182, value: 24241 },
+        { attribute_id: 277, value: 3 },
+        { attribute_id: 128, value: 4 },
+      ],
+      DICTIONARY,
+      NAMES,
+      { omitSkillRequirementRows: true }
+    );
+    expect(groups.some((g) => g.category === 'Required Skills')).toBe(false);
+    // A non-skill attribute in the same payload still renders normally.
+    expect(groups.flatMap((g) => g.attributes).some((a) => a.attributeId === 128)).toBe(true);
+  });
 });
 
 describe('collectAttributeIdReferences', () => {

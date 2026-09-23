@@ -51,6 +51,52 @@
     "trainedTab": "Trained",
     "plansTab": "Plans",
     "compareTab": "Compare",
+    "shipsTab": "Ships",
+    "targetPlan": {
+      "label": "Adding to"
+    },
+    "status": {
+      "trained": "Trained",
+      "partial": "Partially trained",
+      "missing": "Not trained"
+    },
+    "ships": {
+      "tabsLabel": "Fit Check or Mastery",
+      "fitCheckTab": "Fit Check",
+      "masteryTab": "Mastery"
+    },
+    "fitCheck": {
+      "title": "Check a fit",
+      "pasteLabel": "Paste an EFT fit",
+      "pastePlaceholder": "[Vexor, PvE Ratting]\nDrone Damage Amplifier II\n...",
+      "checkButton": "Check Fit",
+      "notEftFit": "That doesn't look like an EFT fit — paste one starting with [Ship Name, Fit Name].",
+      "resultsTitle": "Missing skills ({{count}})",
+      "resultsTitleEmpty": "Missing skills",
+      "emptyTitle": "You already have every skill this fit needs",
+      "emptyHint": "Nothing to add.",
+      "addAllToPlan": "Add All to Plan",
+      "createPlanAndAdd": "Create Plan & Add",
+      "add": "Add",
+      "trained": "Trained"
+    },
+    "requiredSkills": {
+      "title": "Required Skills",
+      "addToPlan": "Add to Skill Plan"
+    },
+    "mastery": {
+      "title": "Ship Mastery",
+      "searchPlaceholder": "Search for a ship",
+      "noShipsMatch": "No ship named \"{{query}}\" has mastery data",
+      "suggestedNote": "Suggested, not required — CCP's own bundles include some marginal skills. Not a hard gate to fly the ship.",
+      "tiersTitle": "{{ship}} Mastery",
+      "tierLabel": "Mastery {{roman}}",
+      "tierEmpty": "No data",
+      "tierComplete": "{{count}}/{{count}} complete",
+      "tierProgress": "{{done}}/{{total}} · {{time}} left",
+      "addLevelToPlan": "Add Level to Plan",
+      "newPlanName": "{{ship}} Mastery"
+    },
     "totalSp": "Total SP",
     "unallocatedSp": "Unallocated SP",
     "refresh": "Refresh",
@@ -3483,7 +3529,7 @@
           "notificationFeed": "Your Alerts.",
           "notificationFeedNote": "Ones you have already been shown, so another device can catch up on what it missed. Kept for 30 days.",
           "settings": "The settings you chose on this page.",
-          "settingsNote": "Your notification preferences, the PI customs rates you overrode, your industry build groups, the defaults every page starts from — trade hub, industry facility, reaction facility, assumed ME and assumed TE, the PI expiring-soon window, the corp dark threshold, and the default characters shown — the appraisal price percentage you set on the Market page, whether SP Extraction monitoring is on along with the SP threshold you set for it, whether blueprint cost counts toward Industry profit, the ISK-per-LP value you set for LP Store blueprints, whether each character is Alpha or Omega, and the ore types you tagged as moon ore or ignored on the Moon Mining Tax ledger's unclassified-ore banner. Nothing else on this page leaves your device."
+          "settingsNote": "Your notification preferences, the PI customs rates you overrode, your industry build groups, the defaults every page starts from — trade hub, industry facility, reaction facility, assumed ME and assumed TE, the PI expiring-soon window, the corp dark threshold, and the default characters shown — the appraisal price percentage you set on the Market page, whether SP Extraction monitoring is on along with the SP threshold you set for it, whether blueprint cost counts toward Industry profit, the ISK-per-LP value you set for LP Store blueprints, whether each character is Alpha or Omega, the ore types you tagged as moon ore or ignored on the Moon Mining Tax ledger's unclassified-ore banner, and which skill plan you're adding skills to from Fit Check and Market. Nothing else on this page leaves your device."
         },
         "local": {
           "title": "Kept on this device only",
