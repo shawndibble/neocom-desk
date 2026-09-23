@@ -2,15 +2,17 @@ import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import { usePageTab } from '@/lib/usePageTab';
-import { useUrlParam } from '@/lib/useUrlState';
-import { enumParam, type UrlParamCodec } from '@/lib/urlState';
+import { useUrlParam, useUrlParams } from '@/lib/useUrlState';
+import { boolParam, enumParam, enumSetParam, intParam, type UrlParamCodec } from '@/lib/urlState';
 import { MARKET_TABS } from '@/app/pageTabs';
 import {
   Button,
   Caret,
   DataTable,
   EmptyState,
+  FilterBar,
   FilterChip,
+  FilterField,
   IconButton,
   PageHeader,
   Panel,
@@ -23,6 +25,7 @@ import {
   SelectValue,
   Spinner,
   Tabs,
+  TextInput,
   TypeIcon,
 } from '@/components/ui';
 import type { DataTableColumn } from '@/components/ui';
@@ -48,8 +51,14 @@ import { buildVariationIndex } from '@/engine/market/variations';
 import { TRADE_HUBS, DEFAULT_TRADE_HUB, getTradeHub, type TradeHub } from '@/market/hubs';
 import { useMarketHub } from '@/features/market/hub';
 import { useLocationMode, type LocationMode } from '@/features/market/locationMode';
-import { JUMP_RANGES, DEFAULT_JUMP_RANGE } from '@/engine/route/jumpRange';
-import { useCurrentSystem, useJumpRangeFilter } from '@/features/route/currentSystem';
+import { JUMP_RANGES, DEFAULT_JUMP_RANGE, type JumpRange } from '@/engine/route/jumpRange';
+import { SPACE_KINDS, type SpaceKind } from '@/engine/space';
+import { intersectSystemSets, systemsInSpace } from '@/engine/market/orderBookFilters';
+import {
+  useCurrentSystem,
+  useJumpRangeFilter,
+  type CurrentSystemState,
+} from '@/features/route/currentSystem';
 import {
   JumpRangeSelect,
   CurrentSystemPicker,
@@ -65,7 +74,9 @@ import { ORDER_BOOK_FANOUT_CONCURRENCY } from '@/features/market/orderBook';
 import {
   buildOrderBookView,
   clearOrderBookViewCache,
+  clearOrderBookViewCacheAcross,
   fetchOrderBook,
+  fetchOrderBookAcross,
   loadOrderBookView,
   orderBookLocationFor,
   useGlobalMarketOverrides,
@@ -98,7 +109,13 @@ import {
   type SolarSystemLookup,
   type OrderBookSummary,
 } from '@/engine/market/orderBook';
-import { resolveOrderBookRegion, type GlobalMarketOverride } from '@/engine/market/locationMode';
+import {
+  ALL_REGIONS,
+  regionsForSystems,
+  resolveOrderBookRegion,
+  type GlobalMarketOverride,
+  type RegionChoice,
+} from '@/engine/market/locationMode';
 import { loadAllCharactersOpenOrders } from '@/features/market/openOrdersData';
 import {
   parseMarketParams,
@@ -170,8 +187,31 @@ const STATION_FILTER_PARAM: UrlParamCodec<number | null> = {
 
 const ITEM_TAB_PARAM = enumParam(['orders', 'history'] as const, 'orders');
 
-/** Jump Range's distance select, URL-backed like the rest of the Browser's filters. */
-const JUMP_RANGE_PARAM = enumParam(JUMP_RANGES, DEFAULT_JUMP_RANGE);
+/**
+ * The order book's filter bar — Jump Range, Security, Min quantity, NPC
+ * stations only — as one `useUrlParams` group, so the narrow sheet's Apply
+ * lands every changed field in one write rather than four writers racing in
+ * one tick (see `navigateTo`).
+ */
+const BROWSER_FILTER_PARAMS = {
+  'browser.jumps': enumParam(JUMP_RANGES, DEFAULT_JUMP_RANGE),
+  'browser.sec': enumSetParam(SPACE_KINDS),
+  'browser.minQty': intParam(0, { min: 0 }),
+  'browser.npcOnly': boolParam(),
+};
+
+interface BrowserFilterValue {
+  jumps: JumpRange;
+  sec: ReadonlySet<SpaceKind>;
+  minQty: number;
+  npcOnly: boolean;
+}
+
+/** A Min quantity box's text as a count; blank or junk is no minimum. */
+function parseMinQuantity(raw: string): number {
+  const n = Number.parseInt(raw, 10);
+  return Number.isSafeInteger(n) && n > 0 ? n : 0;
+}
 /**
  * Deliberately not `textParam()`: its built-in debounce only smooths the
  * *write*, not the render (the tree already re-filters on every keystroke via
@@ -199,6 +239,11 @@ const EMPTY_VARIATION_INDEX = buildVariationIndex({}, {});
 /** Stand-in until globalMarkets.json settles; the order book waits for the real one. */
 const NO_GLOBAL_MARKETS: ReadonlyMap<number, GlobalMarketOverride> = new Map();
 
+const REGIONS_UNAVAILABLE_FETCH: OrderBookFetch = {
+  status: 'failed',
+  error: new Error('Market Region catalogue unavailable'),
+};
+
 /** Structural, not i18next's TFunction, so this stays easy to pass around without fighting its generics. */
 type Translate = (key: string, opts?: Record<string, unknown>) => string;
 
@@ -217,6 +262,92 @@ function LocationCell({ order, npcStations, solarSystems, t }: LocationCellProps
   // book. The full form survives where it is pasted or exported rather than
   // scanned — `OrderRowContextMenu`'s copy action and `orderBookCsv`.
   return <span>{location.stationName ?? t('market.unknownStructure')}</span>;
+}
+
+interface BrowserFilterBarProps {
+  value: BrowserFilterValue;
+  onChange: (next: BrowserFilterValue) => void;
+  activeCount: number;
+  /** Distance, Security and NPC stations only are Region mode only; Hub mode is one NPC station. */
+  regionMode: boolean;
+  currentSystem: CurrentSystemState;
+}
+
+/**
+ * The order book's filters behind a funnel, like the other search pages
+ * (BPC Sourcing, Courier): collapsed, since the item search that would
+ * normally sit beside it lives in the finder column instead.
+ */
+function BrowserFilterBar({
+  value,
+  onChange,
+  activeCount,
+  regionMode,
+  currentSystem,
+}: BrowserFilterBarProps) {
+  const { t } = useTranslation();
+  return (
+    <FilterBar value={value} onChange={onChange} activeCount={activeCount} collapsible>
+      {(draft, setDraft) => (
+        <>
+          {regionMode && (
+            <FilterField label={t('jumpRange.label')}>
+              <div className="flex flex-wrap items-center gap-2">
+                <JumpRangeSelect
+                  value={draft.jumps}
+                  onChange={(jumps) => setDraft({ ...draft, jumps })}
+                />
+                <CurrentSystemPicker current={currentSystem} />
+              </div>
+            </FilterField>
+          )}
+          <FilterField label={t('market.filterMinQuantity')}>
+            <TextInput
+              type="number"
+              inputMode="numeric"
+              min={0}
+              aria-label={t('market.filterMinQuantity')}
+              placeholder={t('market.filterMinQuantity')}
+              className="w-32"
+              value={draft.minQty === 0 ? '' : String(draft.minQty)}
+              onChange={(event) =>
+                setDraft({ ...draft, minQty: parseMinQuantity(event.target.value) })
+              }
+            />
+          </FilterField>
+          {regionMode && (
+            <div
+              role="group"
+              aria-label={t('market.filterSecurity')}
+              className="flex flex-wrap items-center gap-2"
+            >
+              <span className="text-text-dim">{t('market.filterSecurity')}</span>
+              {SPACE_KINDS.map((kind) => (
+                <FilterChip
+                  key={kind}
+                  label={t(`common.spaceOption.${kind}`)}
+                  selected={draft.sec.has(kind)}
+                  onToggle={() => {
+                    const next = new Set(draft.sec);
+                    if (next.has(kind)) next.delete(kind);
+                    else next.add(kind);
+                    setDraft({ ...draft, sec: next });
+                  }}
+                />
+              ))}
+            </div>
+          )}
+          {regionMode && (
+            <FilterChip
+              label={t('market.filterNpcOnly')}
+              selected={draft.npcOnly}
+              onToggle={() => setDraft({ ...draft, npcOnly: !draft.npcOnly })}
+            />
+          )}
+        </>
+      )}
+    </FilterBar>
+  );
 }
 
 interface MarketGroupTreeProps {
@@ -533,11 +664,11 @@ export function Market() {
     expandedForGroupId.current = linkedGroupId;
   }, [groups, linkedGroupId, groupsById]);
 
-  const regionIsValid = resolveAgainstCatalogue(
-    parsedParams.regionId,
-    marketRegions,
-    (r, id) => r.id === id
-  );
+  // All regions needs no catalogue check — it names every region there is.
+  const regionIsValid =
+    parsedParams.regionId === ALL_REGIONS
+      ? true
+      : resolveAgainstCatalogue(parsedParams.regionId, marketRegions, (r, id) => r.id === id);
   // A hub id is a small static set (`TRADE_HUBS`), so unlike the region
   // catalogue there's no loading window to be optimistic about.
   const hubIsValid =
@@ -566,8 +697,16 @@ export function Market() {
       ? (getTradeHub(effectiveLocation.hubId as TradeHub['id']) ?? hub)
       : hub;
 
+  // All regions (Region mode over every Market Region) fans out only for the
+  // selected item's own book. Everything else that reads one region —
+  // Variations, Compare, Item Detail, Price History — reads the Trade Hub's
+  // region instead, so `chosenRegionId` is always one real region.
+  const allRegions =
+    effectiveLocation.mode === 'region' && effectiveLocation.regionId === ALL_REGIONS;
   const chosenRegionId =
-    effectiveLocation.mode === 'region' ? effectiveLocation.regionId : effectiveHub.regionId;
+    effectiveLocation.mode === 'region' && effectiveLocation.regionId !== ALL_REGIONS
+      ? effectiveLocation.regionId
+      : effectiveHub.regionId;
 
   // Held here rather than inside `AppraisalPanel` so a pasted list survives a
   // trip to the Browser tab, and so the header's refresh button can drive it.
@@ -592,12 +731,22 @@ export function Market() {
   // round 10); undone via the banner rendered above the tables. URL-backed
   // (ADR 0015), scoped to the Browser tab.
   const [stationFilter, setStationFilter] = useUrlParam('browser.station', STATION_FILTER_PARAM);
-  // Jump Range (Region mode only — Hub mode is already one station):
-  // "how far from me" narrows the order book next to the station filter, see
-  // `orderBookView.ts`'s `allowedSystems`.
-  const [jumpRange, setJumpRange] = useUrlParam('browser.jumps', JUMP_RANGE_PARAM);
+  // The order book's filter bar. Jump Range, Security and NPC stations only
+  // are Region mode only — Hub mode is already one NPC station — so they're
+  // neither shown nor applied there, whatever the URL says; Min quantity
+  // applies in both. All narrow the book next to the station filter, see
+  // `orderBookView.ts`'s `allowedSystems`/`minQuantity`/`npcStationIds`.
+  const [browserFilters, setBrowserFilters] = useUrlParams(BROWSER_FILTER_PARAMS);
+  const regionMode = effectiveLocation.mode === 'region';
+  const jumpRange = browserFilters['browser.jumps'];
+  const spaceKinds = browserFilters['browser.sec'];
+  const minQuantity = browserFilters['browser.minQty'];
+  const npcOnly = regionMode && browserFilters['browser.npcOnly'];
   const currentSystem = useCurrentSystem();
-  const jumpRangeFilter = useJumpRangeFilter(currentSystem, jumpRange);
+  const jumpRangeFilter = useJumpRangeFilter(
+    currentSystem,
+    regionMode ? jumpRange : DEFAULT_JUMP_RANGE
+  );
   // Market Data / Price History (issue #11), Market Data selected by default —
   // a scoped query param rather than a `/market/browser/<subtab>` path
   // segment (docs/ARCHITECTURE.md §9): it only ever matters with an item
@@ -621,7 +770,9 @@ export function Market() {
   const selectedIsBlueprint =
     selectedTypeId !== null && (blueprintCatalog?.byBlueprintTypeID.has(selectedTypeId) ?? false);
 
-  const resetKey = `${selectedTypeId ?? 'none'}:${chosenRegionId}`;
+  // `allRegions` apart from `chosenRegionId`: The Forge → All regions with
+  // Jita as hub is the same region id, yet a different book.
+  const resetKey = `${selectedTypeId ?? 'none'}:${chosenRegionId}:${allRegions ? 'all' : 'one'}`;
   const [resetForKey, setResetForKey] = useState<string | null>(null);
   if (resetKey !== resetForKey) {
     setResetForKey(resetKey);
@@ -777,6 +928,39 @@ export function Market() {
     [selectedTypeId, chosenRegionId, globalMarketsMap]
   );
 
+  const hubRegionName =
+    marketRegions?.find((r) => r.id === effectiveHub.regionId)?.name ?? effectiveHub.systemName;
+  const allMarketRegionIds = useMemo(
+    () => (marketRegions ?? []).map((r) => r.id).sort((a, b) => a - b),
+    [marketRegions]
+  );
+  const systemRegions = useMemo(
+    () => new Map((solarSystems ?? []).map((s) => [s.id, { regionId: s.regionId }])),
+    [solarSystems]
+  );
+  // All regions' fan-out: every Market Region the picker lists, or — once a
+  // Jump Range is measurable — only those holding an in-range system, so
+  // "within 5 jumps" costs a few regions, not every one. Waits (null) while
+  // the range is still resolving rather than firing every region and then a
+  // few. Keyed by a joined string so an unchanged set never refetches.
+  const allRegionsFetchKey = useMemo((): string | null => {
+    if (!allRegions || marketRegions === null || jumpRangeFilter.status === 'loading') return null;
+    if (jumpRangeFilter.status === 'ready' && jumpRangeFilter.allowed !== null) {
+      const inReach = regionsForSystems(jumpRangeFilter.allowed, systemRegions);
+      return allMarketRegionIds.filter((id) => inReach.has(id)).join(',');
+    }
+    return allMarketRegionIds.join(',');
+  }, [allRegions, marketRegions, jumpRangeFilter, systemRegions, allMarketRegionIds]);
+  const allRegionsFetchIds = useMemo(
+    () =>
+      allRegionsFetchKey === null
+        ? null
+        : allRegionsFetchKey === ''
+          ? []
+          : allRegionsFetchKey.split(',').map(Number),
+    [allRegionsFetchKey]
+  );
+
   // Refetches on selection, location, or a manual Refresh click. Gated on both
   // *Hydrated flags so this doesn't fire once for the defaults and again once
   // the persisted settings resolve. `fetchOrderBook` never rejects: a 420 or
@@ -788,10 +972,20 @@ export function Market() {
     // read from the wrong region.
     if (selectedTypeId === null || !hubHydrated || !locationModeHydrated || globalMarkets === null)
       return;
+    // Waits for the region list and the range (see `allRegionsFetchKey`).
+    if (allRegions && allRegionsFetchIds === null) return;
     let cancelled = false;
     void (async () => {
       setOrderBookLoading(true);
-      const fetched = await fetchOrderBook(selectedTypeId, orderBookLocation);
+      const fetched =
+        allRegionsFetchIds !== null
+          ? await fetchOrderBookAcross(
+              selectedTypeId,
+              allRegionsFetchIds,
+              orderBookLocation,
+              () => cancelled
+            )
+          : await fetchOrderBook(selectedTypeId, orderBookLocation);
       if (cancelled) return;
       setOrderBookFetch(fetched);
       setOrderBookLoading(false);
@@ -802,6 +996,8 @@ export function Market() {
   }, [
     selectedTypeId,
     orderBookLocation,
+    allRegions,
+    allRegionsFetchIds,
     hubHydrated,
     locationModeHydrated,
     globalMarkets,
@@ -852,26 +1048,82 @@ export function Market() {
     [solarSystems]
   );
 
-  // Region mode only — Hub mode is already one station, so a jump range over
-  // it would just repeat the hub filter under a different name.
-  const allowedSystems =
-    effectiveLocation.mode === 'region' && jumpRangeFilter.status === 'ready'
-      ? jumpRangeFilter.allowed
-      : null;
+  // Region mode only — Hub mode is already one station, so a jump range or
+  // security band over it would just repeat the hub filter under a different
+  // name. Security folds into the same allowed-system set as Jump Range.
+  const spaceSystems = useMemo(
+    () => (regionMode && solarSystems ? systemsInSpace(solarSystems, spaceKinds) : null),
+    [regionMode, solarSystems, spaceKinds]
+  );
+  const allowedSystems = useMemo(
+    () =>
+      regionMode
+        ? intersectSystemSets(
+            jumpRangeFilter.status === 'ready' ? jumpRangeFilter.allowed : null,
+            spaceSystems
+          )
+        : null,
+    [regionMode, jumpRangeFilter, spaceSystems]
+  );
+  // Not applied until the station list has loaded — before then every order
+  // would read as a player structure and the book would flash empty.
+  const npcStationIds = useMemo(
+    () => (npcOnly && npcStations ? new Set(npcStations.map((s) => s.id)) : null),
+    [npcOnly, npcStations]
+  );
+  const browserFilterValue = useMemo<BrowserFilterValue>(
+    () => ({
+      jumps: jumpRange,
+      sec: spaceKinds,
+      minQty: minQuantity,
+      npcOnly: browserFilters['browser.npcOnly'],
+    }),
+    [jumpRange, spaceKinds, minQuantity, browserFilters]
+  );
+  // Only what this mode shows counts: a Region-only filter left in the URL
+  // does nothing in Hub mode, so badging it would claim a filter that isn't on.
+  const activeFilterCount = [
+    regionMode && jumpRange !== DEFAULT_JUMP_RANGE,
+    regionMode && spaceKinds.size !== SPACE_KINDS.length,
+    minQuantity > 0,
+    npcOnly,
+  ].filter(Boolean).length;
+  const filtersNarrowBook = activeFilterCount > 0 || stationFilter !== null;
+  function handleBrowserFiltersChange(next: BrowserFilterValue) {
+    setBrowserFilters({
+      'browser.jumps': next.jumps,
+      'browser.sec': next.sec,
+      'browser.minQty': next.minQty,
+      'browser.npcOnly': next.npcOnly,
+    });
+  }
 
   // Location Mode, Trade Hub station, the order-row "filter to this station"
-  // action (CONTEXT.md round 10), Jump Range, split and sort all happen in
-  // the view.
+  // action (CONTEXT.md round 10), the filter bar, split and sort all happen
+  // in the view.
+  // All regions with no region catalogue has no "every region" to read: a
+  // failed book (with its retry), not a spinner waiting on a list that
+  // isn't coming.
+  const regionsUnavailable = allRegions && catalogueError;
+  const settledFetch = regionsUnavailable ? REGIONS_UNAVAILABLE_FETCH : orderBookFetch;
   const orderBookView = useMemo(
     () =>
-      orderBookFetch === null || selectedTypeId === null
+      settledFetch === null || selectedTypeId === null
         ? null
         : buildOrderBookView(
             selectedTypeId,
-            { ...orderBookLocation, stationFilter, allowedSystems },
-            orderBookFetch
+            { ...orderBookLocation, stationFilter, allowedSystems, minQuantity, npcStationIds },
+            settledFetch
           ),
-    [orderBookFetch, selectedTypeId, orderBookLocation, stationFilter, allowedSystems]
+    [
+      settledFetch,
+      selectedTypeId,
+      orderBookLocation,
+      stationFilter,
+      allowedSystems,
+      minQuantity,
+      npcStationIds,
+    ]
   );
   const loadedView = orderBookView?.status === 'failed' ? null : orderBookView;
   const orderBookFailed = orderBookView?.status === 'failed';
@@ -1033,7 +1285,7 @@ export function Market() {
     navigateTo(selectedTypeId, { mode: 'hub', hubId: id });
   }
 
-  function handleRegionChange(regionId: number) {
+  function handleRegionChange(regionId: RegionChoice) {
     void setLocationModeValue({ mode: 'region', regionId });
     navigateTo(selectedTypeId, { mode: 'region', regionId });
   }
@@ -1070,7 +1322,15 @@ export function Market() {
     // they keep whatever's still within TTL instead of being forced to
     // refetch just because something else on the page was refreshed. Also
     // the failed order book's "Try again".
-    if (selectedTypeId !== null) clearOrderBookViewCache(selectedTypeId, orderBookLocation);
+    // All regions clears the type in every region, not just the ones last
+    // fetched: a range change since would otherwise leave some stale.
+    if (selectedTypeId !== null) {
+      if (allRegions) {
+        clearOrderBookViewCacheAcross(selectedTypeId, allMarketRegionIds, orderBookLocation);
+      } else {
+        clearOrderBookViewCache(selectedTypeId, orderBookLocation);
+      }
+    }
     for (const row of variationsResultRef.current?.rows ?? []) {
       clearOrderBookViewCache(row.typeId, orderBookLocation);
     }
@@ -1248,14 +1508,14 @@ export function Market() {
                   </SelectContent>
                 </Select>
               ) : (
-                // No "All regions": the order book is fetched per region.
+                // "All regions" (`null` to the picker) fans the selected item's
+                // book out over every region; see `allRegionsFetchKey`.
                 <RegionSelect
                   size="sm"
                   options={marketRegions ?? []}
-                  value={chosenRegionId}
-                  onChange={(regionId) => {
-                    if (regionId !== null) handleRegionChange(regionId);
-                  }}
+                  value={allRegions ? null : chosenRegionId}
+                  onChange={(regionId) => handleRegionChange(regionId ?? ALL_REGIONS)}
+                  allLabel={t('market.allRegions')}
                   searchPlaceholder={t('common.searchRegions')}
                   noResultsLabel={t('common.noRegionMatches')}
                   aria-label={t('market.region')}
@@ -1437,6 +1697,12 @@ export function Market() {
                   label={t('market.itemTabsLabel')}
                   className="px-3 pt-2"
                 />
+                {/* Above both tabs: Price History is one of the readers it names. */}
+                {allRegions && (
+                  <p className="border-b border-line px-3 py-2 text-[0.6875rem] text-text-dim">
+                    {t('market.allRegionsSecondaryNote', { regionName: hubRegionName })}
+                  </p>
+                )}
                 {itemTab === 'history' ? (
                   resolvedRegion && (
                     <PriceHistoryPanel
@@ -1445,7 +1711,9 @@ export function Market() {
                       itemName={selectedItem?.name ?? ''}
                     />
                   )
-                ) : orderBookLoading && (!orderBookView || orderBookFailed) ? (
+                ) : orderBookLoading &&
+                  !regionsUnavailable &&
+                  (!orderBookView || orderBookFailed) ? (
                   <div className="flex justify-center py-8">
                     <Spinner label={t('common.loading')} />
                   </div>
@@ -1474,20 +1742,29 @@ export function Market() {
                       </p>
                     )}
                     <div className="divide-y divide-line">
-                      {effectiveLocation.mode === 'region' && (
-                        <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-xs text-text-dim">
-                          <div className="flex items-center gap-2">
-                            <JumpRangeSelect value={jumpRange} onChange={setJumpRange} />
-                            <CurrentSystemPicker current={currentSystem} />
-                          </div>
-                          <div className="flex flex-col items-end gap-1">
-                            <JumpRangeNote status={jumpRangeFilter.status} />
-                            {jumpRangeFilter.status === 'ready' && (
-                              <span>{t('jumpRange.regionOnlyHint')}</span>
-                            )}
-                          </div>
+                      <div className="flex flex-wrap items-start justify-between gap-2 px-3 py-2 text-xs text-text-dim">
+                        <BrowserFilterBar
+                          value={browserFilterValue}
+                          onChange={handleBrowserFiltersChange}
+                          activeCount={activeFilterCount}
+                          regionMode={regionMode}
+                          currentSystem={currentSystem}
+                        />
+                        {/* Outside the bar, so a collapsed funnel can't hide why a range isn't applying. */}
+                        <div className="flex flex-col items-end gap-1">
+                          {regionMode && <JumpRangeNote status={jumpRangeFilter.status} />}
+                          {regionMode && !allRegions && jumpRangeFilter.status === 'ready' && (
+                            <span>{t('jumpRange.regionOnlyHint')}</span>
+                          )}
+                          {loadedView && loadedView.failedRegionIds.length > 0 && (
+                            <p role="status" className="text-warning">
+                              {t('market.regionsFailed', {
+                                count: loadedView.failedRegionIds.length,
+                              })}
+                            </p>
+                          )}
                         </div>
-                      )}
+                      </div>
                       {stationFilter !== null && (
                         <div className="flex items-center justify-between px-3 py-2 text-xs text-text-dim">
                           <span>
@@ -1542,14 +1819,16 @@ export function Market() {
                             hint={
                               stationFilter !== null
                                 ? t('market.emptyFilteredHint')
-                                : selectedIsBlueprint
-                                  ? t('market.emptySellBlueprintHint')
-                                  : t('market.emptySellHint')
+                                : filtersNarrowBook
+                                  ? t('market.emptyFiltersHint')
+                                  : selectedIsBlueprint
+                                    ? t('market.emptySellBlueprintHint')
+                                    : t('market.emptySellHint')
                             }
                             className="py-6"
                             action={
                               selectedIsBlueprint &&
-                              stationFilter === null &&
+                              !filtersNarrowBook &&
                               selectedTypeId !== null ? (
                                 <Link
                                   to={bpcSourcingHref(selectedTypeId)}
@@ -1617,7 +1896,9 @@ export function Market() {
                             hint={
                               stationFilter !== null
                                 ? t('market.emptyFilteredHint')
-                                : t('market.emptyBuyHint')
+                                : filtersNarrowBook
+                                  ? t('market.emptyFiltersHint')
+                                  : t('market.emptyBuyHint')
                             }
                             className="py-6"
                           />

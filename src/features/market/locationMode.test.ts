@@ -30,6 +30,13 @@ describe('useLocationMode', () => {
     expect(useLocationMode.getState().value).toEqual({ mode: 'region', regionId: 10000043 });
   });
 
+  it("round-trips All regions as its own 'all' sentinel, not as null", async () => {
+    await useLocationMode.getState().setValue({ mode: 'region', regionId: 'all' });
+    useLocationMode.setState({ value: DEFAULT_LOCATION_MODE, hydrated: false });
+    await useLocationMode.getState().hydrate();
+    expect(useLocationMode.getState().value).toEqual({ mode: 'region', regionId: 'all' });
+  });
+
   it('falls back to the default when the stored value has the wrong shape', async () => {
     await db.settings.put({ key: LOCATION_MODE_SETTING_KEY, value: { mode: 'bogus' } });
     await useLocationMode.getState().hydrate();

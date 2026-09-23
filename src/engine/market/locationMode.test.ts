@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { resolveOrderBookRegion } from './locationMode';
+import { regionsForSystems, resolveOrderBookRegion } from './locationMode';
 
 const PLEX_TYPE_ID = 44992;
 const RIFTER_TYPE_ID = 587;
@@ -22,5 +22,30 @@ describe('resolveOrderBookRegion', () => {
       regionId: GPMR_01_REGION_ID,
       override: { regionId: GPMR_01_REGION_ID, regionName: 'GPMR-01' },
     });
+  });
+});
+
+describe('regionsForSystems', () => {
+  const DOMAIN_REGION_ID = 10000043;
+  const systemsById = new Map([
+    [30000142, { regionId: THE_FORGE_REGION_ID }], // Jita
+    [30000144, { regionId: THE_FORGE_REGION_ID }], // Perimeter
+    [30002187, { regionId: DOMAIN_REGION_ID }], // Amarr
+  ]);
+
+  it('returns each region that holds at least one allowed system, once', () => {
+    expect(regionsForSystems(new Set([30000142, 30000144, 30002187]), systemsById)).toEqual(
+      new Set([THE_FORGE_REGION_ID, DOMAIN_REGION_ID])
+    );
+  });
+
+  it('leaves out regions none of whose systems are allowed', () => {
+    expect(regionsForSystems(new Set([30000142]), systemsById)).toEqual(
+      new Set([THE_FORGE_REGION_ID])
+    );
+  });
+
+  it('skips a system the lookup does not know rather than guessing its region', () => {
+    expect(regionsForSystems(new Set([31000005]), systemsById)).toEqual(new Set());
   });
 });

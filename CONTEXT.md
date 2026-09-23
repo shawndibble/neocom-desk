@@ -405,7 +405,7 @@ here — they go one per file in `docs/context/decisions/`.
 - **Job Fee**: The ISK ESI charges to install a manufacturing job, separate
   from material cost. Sized from EIV, the system's **Cost Index**, a fixed
   SCC surcharge, and the facility's tax.
-- **Jump Range**: The distance filter on Market Browser (Region mode only), Contract Search's Items and **BPC Sourcing**: Any, the **Current System** only, or within 3, 5 or 10 stargate jumps of it. Counted on the local stargate graph, never ESI. A row the app cannot place (a player structure) drops out once a range is set. It narrows what was already fetched, so it never reaches past a region-scoped order book.
+- **Jump Range**: The distance filter on Market Browser (Region mode only), Contract Search's Items and **BPC Sourcing**: Any, the **Current System** only, or within 3, 5 or 10 stargate jumps of it. Counted on the local stargate graph, never ESI. A row the app cannot place (a player structure) drops out once a range is set. It narrows what was already fetched, so with one region picked it never reaches past that region's order book; under All regions it also decides which regions are fetched — only those holding an in-range system.
 - **Kind Card**: One `/corp` overview panel per kind of Corp Board Item — Fuel,
   Structure timers, Moon chunks, Industry jobs — showing that kind's most urgent
   few and counting the rest. Fed by the one engine ranking, never a second one,
@@ -417,7 +417,10 @@ here — they go one per file in `docs/context/decisions/`.
   subtrahend of the **Exportable Rate**; see `colonyLocalDrawPerHour`.
 - **Location Mode**: The Market Browser's one location control, in one of two
   mutually exclusive modes — **Region** (every station in that region) or
-  **Trade Hub** (that hub's region, filtered to the hub's station).
+  **Trade Hub** (that hub's region, filtered to the hub's station). Region
+  mode can also be **All regions**: the selected item's order book read from
+  every Market Region and merged. Only that book fans out; Variations,
+  Compare, Item Detail and price history read the Trade Hub's region.
 - **Market Browser**: General item price lookup page (any item, prices at chosen Trade Hub). Separate from a character's own **Market Orders** (open + history).
 - **Market Group**: A node in EVE's own market browse tree (`invMarketGroups`:
   `Ships → Frigates → Standard Frigates`). Distinct from an item's **Group**

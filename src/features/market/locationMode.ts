@@ -4,6 +4,7 @@
  * a device-local view preference like `hub.ts`'s Trade Hub setting, never
  * synced.
  */
+import { ALL_REGIONS, type RegionChoice } from '@/engine/market/locationMode';
 import { createLocalSetting } from '@/lib/useLocalSetting';
 
 export const LOCATION_MODE_SETTING_KEY = 'marketLocationMode';
@@ -12,8 +13,11 @@ export type LocationMode = 'hub' | 'region';
 
 export interface LocationModeValue {
   mode: LocationMode;
-  /** Selected Market Region when mode is 'region'; null until the user picks one. */
-  regionId: number | null;
+  /**
+   * Selected Market Region when mode is 'region', or `'all'` for All regions;
+   * null until the user picks one (read as the hub's region).
+   */
+  regionId: RegionChoice | null;
 }
 
 export const DEFAULT_LOCATION_MODE: LocationModeValue = { mode: 'hub', regionId: null };
@@ -23,7 +27,7 @@ function isLocationModeValue(raw: unknown): raw is LocationModeValue {
   const r = raw as Record<string, unknown>;
   return (
     (r.mode === 'hub' || r.mode === 'region') &&
-    (r.regionId === null || typeof r.regionId === 'number')
+    (r.regionId === null || r.regionId === ALL_REGIONS || typeof r.regionId === 'number')
   );
 }
 
