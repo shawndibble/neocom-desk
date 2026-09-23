@@ -25,12 +25,8 @@ import type { CompetingOrder } from '@/engine/market/undercut';
 import type { JumpsAwayResult } from '@/engine/jumpsAway';
 import type { TradeHub } from '@/market/hubs';
 import type { ReprocessingType } from '@/sde/types';
-import {
-  reprocessingEfficiency,
-  reprocessingValue,
-  reprocessingYield,
-  type ReprocessingSkills,
-} from '@/engine/industry/reprocessing';
+import { reprocessingValue, reprocessingYield } from '@/engine/industry/reprocessing';
+import { refiningEfficiency, type CharacterModifiers } from '@/engine/industry/characterModifiers';
 
 export type OrderExitKind = 'hold' | 'matchStation' | 'dumpToBuyOrder' | 'reprocess';
 
@@ -49,7 +45,8 @@ export interface OrderExit {
 /** What the refine comparison needs: the baked yield, the character's skills, and a price for each material where the stock sits. */
 export interface ReprocessingInput {
   entry: ReprocessingType;
-  skills: ReprocessingSkills;
+  /** The order owner's Character Modifiers; the entry's own specialisation picks the bonuses. */
+  modifiers: CharacterModifiers;
   /** materialTypeId -> ISK a unit at this station, generally the best buy order. */
   materialPrices: Readonly<Record<number, number>>;
 }
@@ -90,7 +87,7 @@ function bestLocalBuyPrice(
  */
 function reprocessExit(row: OpenOrderRow, input: ReprocessingInput): OrderExit | null {
   if (!row.floor) return null;
-  const efficiency = reprocessingEfficiency(input.skills);
+  const efficiency = refiningEfficiency(input.modifiers, input.entry.specialisationSkillID);
   const yielded = reprocessingYield({
     portionSize: input.entry.portionSize,
     materials: input.entry.materials.map((m) => ({ typeId: m.typeID, quantity: m.quantity })),

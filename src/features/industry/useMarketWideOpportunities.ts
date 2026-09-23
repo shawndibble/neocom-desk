@@ -5,7 +5,7 @@
  * because the tab was visited.
  */
 import { useCallback, useRef, useState } from 'react';
-import type { SkillLevels } from '@/engine/industry/types';
+import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
 import type { ResolvedStandings } from '@/engine/market/standings';
 import type { TradeHub } from '@/market/hubs';
 import type { MarketWideTreeMap } from '@/sde/types';
@@ -21,7 +21,7 @@ export interface UseMarketWideOpportunitiesArgs {
   trees: MarketWideTreeMap | null;
   catalog: BlueprintCatalog | null;
   /** For the job-fee/sales-tax/broker-fee terms — same skills the owned-blueprint panel already reads. */
-  skills: SkillLevels;
+  modifiers: CharacterModifiers;
   /** The character's standing toward `hub`'s NPC owner (issue #1238). Absent/0 = standings assumed 0. */
   standing?: ResolvedStandings;
   options?: MarketWideScanOptions;
@@ -40,7 +40,7 @@ export function useMarketWideOpportunities({
   hub,
   trees,
   catalog,
-  skills,
+  modifiers,
   standing,
   options,
 }: UseMarketWideOpportunitiesArgs): UseMarketWideOpportunitiesResult {
@@ -59,7 +59,7 @@ export function useMarketWideOpportunities({
     if (!trees || !catalog) return;
     const token = ++runToken.current;
     setState((prev) => ({ ...prev, loading: true, error: false }));
-    void runMarketWideScan(hub, trees, catalog, skills, options, standing)
+    void runMarketWideScan(hub, trees, catalog, modifiers, options, standing)
       .then((rows) => {
         if (runToken.current !== token) return;
         setState({ rows, loading: false, hasRun: true, error: false });
@@ -68,7 +68,7 @@ export function useMarketWideOpportunities({
         if (runToken.current !== token) return;
         setState({ rows: [], loading: false, hasRun: true, error: true });
       });
-  }, [hub, trees, catalog, skills, options, standing]);
+  }, [hub, trees, catalog, modifiers, options, standing]);
 
   return { ...state, run };
 }

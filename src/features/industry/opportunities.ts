@@ -8,6 +8,7 @@
  * set of characters owns" into the inputs those already-tested pieces need.
  */
 import { newBuildPlan } from './newBuildPlan';
+import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
 import { computeBuildPlan } from './computeBuildPlan';
 import {
   toIndustryBlueprint,
@@ -28,7 +29,6 @@ import {
   resolveRigFit,
   type BuildResult,
   type MaterialSourcingMap,
-  type SkillLevels,
 } from '@/engine/industry/types';
 import { autoBuildHere } from '@/engine/industry/autoMakeOrBuy';
 import type { MaterialRecipe } from '@/engine/industry/makeOrBuy';
@@ -173,9 +173,7 @@ export function computeOpportunityRow(
   candidate: OpportunityCandidate,
   snapshot: MarketSnapshot,
   facilityDefaults: ActivityFacilityDefaults,
-  skills: SkillLevels,
-  /** The candidate's owning character's active-clone BX-80x manufacturing-time implant bonus, if any (issue #1229). */
-  implantBonusPct: number,
+  modifiers: CharacterModifiers,
   stock: DetectedOwnedStockMap,
   autoBuild: OpportunityAutoBuildOptions
 ): UnrankedOpportunityRow | null {
@@ -207,7 +205,7 @@ export function computeOpportunityRow(
         systemCostIndex,
         adjustedPrices,
         materialPrices: snapshot.hubPrices,
-        skills,
+        modifiers,
       },
     }),
   ];
@@ -219,8 +217,7 @@ export function computeOpportunityRow(
     systemCostIndex,
     adjustedPrices,
     hubPrices: snapshot.hubPrices,
-    skills,
-    implantBonusPct,
+    modifiers,
     recipeFor: autoBuild.recipeFor,
   });
   if (!result) return null;

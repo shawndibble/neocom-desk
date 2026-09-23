@@ -21,8 +21,8 @@
  * caller with no plan (LP store, planetary plans).
  */
 import { getHubPrices } from '@/market/prices';
+import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
 import type { TradeHub } from '@/market/hubs';
-import type { SkillLevels } from '@/engine/industry/types';
 import type { ResolvedStandings } from '@/engine/market/standings';
 import type { MarketWideTreeMap } from '@/sde/types';
 import type { BlueprintCatalog } from './blueprintCatalog';
@@ -73,7 +73,7 @@ export async function runMarketWideScan(
   hub: TradeHub,
   trees: MarketWideTreeMap,
   catalog: BlueprintCatalog,
-  skills: SkillLevels,
+  modifiers: CharacterModifiers,
   options: MarketWideScanOptions = {},
   /** The character's standing toward `hub`'s NPC owner (issue #1238). Absent/0 = standings assumed 0. */
   standing?: ResolvedStandings
@@ -135,7 +135,7 @@ export async function runMarketWideScan(
   const feeContext: MarketWideFeeInputs = {
     adjustedPrices: snapshot.adjustedPrices ?? {},
     systemCostIndex: snapshot.systemCostIndex ?? 0,
-    skills,
+    modifiers,
     standing,
   };
 

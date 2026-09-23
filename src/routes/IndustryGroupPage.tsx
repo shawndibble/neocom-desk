@@ -43,8 +43,7 @@ export function IndustryGroupPage() {
     pi,
     ownedBlueprints,
     corpOwnedBlueprints,
-    skills,
-    implantBonusPct,
+    modifiers,
     ownedStockSnapshot,
     blueprintsNeedsReauth,
   } = workspace;
@@ -97,7 +96,7 @@ export function IndustryGroupPage() {
       catalog,
       pi,
       ownedBlueprints,
-      skills,
+      modifiers,
       workspace.assumedMe,
       options,
       corpOwnedBlueprints,
@@ -168,8 +167,7 @@ export function IndustryGroupPage() {
           pi={pi}
           ownedBlueprints={ownedBlueprints}
           corpOwnedBlueprints={corpOwnedBlueprints}
-          skills={skills}
-          implantBonusPct={implantBonusPct}
+          modifiers={modifiers}
           tradeHubStandings={tradeHubStandings}
           ownedStockSnapshot={ownedStockSnapshot}
           onOpenPlan={(planId) => navigate(`/industry/plans/${planId}`)}

@@ -1,9 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import {
-  valueMiningYield,
-  type GeneralReprocessingSkills,
-  type YieldReprocessingEntry,
-} from './yieldValuation';
+import { valueMiningYield, type YieldReprocessingEntry } from './yieldValuation';
+import { characterModifiers, NO_CHARACTER_MODIFIERS } from '@/engine/industry/characterModifiers';
 import type { OreLine } from './types';
 
 const VELDSPAR = 1230;
@@ -16,11 +13,8 @@ const SIMPLE_ORE_PROCESSING = 60377;
 const ICE_PROCESSING = 18025;
 const SCRAPMETAL_PROCESSING = 12196;
 
-const NO_SKILLS: GeneralReprocessingSkills = {
-  reprocessingLevel: 0,
-  reprocessingEfficiencyLevel: 0,
-};
-const NO_TRAINED = new Map<number, { level: number }>();
+const NO_SKILLS = NO_CHARACTER_MODIFIERS;
+const RX_804 = 27174;
 
 describe('valueMiningYield', () => {
   it('values every line at its mined-date raw price and sums to the entry total', () => {
@@ -33,7 +27,7 @@ describe('valueMiningYield', () => {
       [ICE, 40],
     ]);
 
-    const result = valueMiningYield(lines, rawPrices, new Map(), NO_SKILLS, NO_TRAINED, {});
+    const result = valueMiningYield(lines, rawPrices, new Map(), NO_SKILLS, {});
 
     // 1000*5 + 100*40 = 9000
     expect(result.rawValue).toBe(9000);
@@ -46,14 +40,9 @@ describe('valueMiningYield', () => {
       [VELDSPAR, { portionSize: 100, materials: [{ typeId: 34, quantity: 400 }] }],
     ]);
 
-    const result = valueMiningYield(
-      lines,
-      new Map([[VELDSPAR, 5]]),
-      reprocessing,
-      NO_SKILLS,
-      NO_TRAINED,
-      { 34: 3 }
-    );
+    const result = valueMiningYield(lines, new Map([[VELDSPAR, 5]]), reprocessing, NO_SKILLS, {
+      34: 3,
+    });
 
     // 200 units / 100 portion = 2 batches; 2*400*0.5 (base station rate) = 400 units of material 34
     expect(result.refineValue).toBe(400 * 3);
@@ -62,7 +51,7 @@ describe('valueMiningYield', () => {
 
   it('marks the entry Partial when a line has no mined-date raw price', () => {
     const lines: OreLine[] = [{ typeId: VELDSPAR, quantity: 100 }];
-    const result = valueMiningYield(lines, new Map(), new Map(), NO_SKILLS, NO_TRAINED, {});
+    const result = valueMiningYield(lines, new Map(), new Map(), NO_SKILLS, {});
     expect(result.pricedAll).toBe(false);
     expect(result.lines[0].rawValue).toBe(0);
   });
@@ -74,7 +63,6 @@ describe('valueMiningYield', () => {
       new Map([[UNREPROCESSABLE, 5]]),
       new Map(),
       NO_SKILLS,
-      NO_TRAINED,
       {}
     );
     expect(result.pricedAll).toBe(false);
@@ -87,21 +75,14 @@ describe('valueMiningYield', () => {
       [VELDSPAR, { portionSize: 100, materials: [{ typeId: 34, quantity: 400 }] }],
     ]);
 
-    const result = valueMiningYield(
-      lines,
-      new Map([[VELDSPAR, 5]]),
-      reprocessing,
-      NO_SKILLS,
-      NO_TRAINED,
-      {}
-    );
+    const result = valueMiningYield(lines, new Map([[VELDSPAR, 5]]), reprocessing, NO_SKILLS, {});
 
     expect(result.pricedAll).toBe(false);
     expect(result.refineValue).toBe(0);
   });
 
   it('returns zero totals for an empty ore-line list', () => {
-    const result = valueMiningYield([], new Map(), new Map(), NO_SKILLS, NO_TRAINED, {});
+    const result = valueMiningYield([], new Map(), new Map(), NO_SKILLS, {});
     expect(result).toEqual({
       rawValue: 0,
       refineValue: 0,
@@ -120,14 +101,9 @@ describe('valueMiningYield line detail (issue: Mining Yield row detail)', () => 
       [VELDSPAR, { portionSize: 100, materials: [{ typeId: 34, quantity: 400 }] }],
     ]);
 
-    const result = valueMiningYield(
-      lines,
-      new Map([[VELDSPAR, 5]]),
-      reprocessing,
-      NO_SKILLS,
-      NO_TRAINED,
-      { 34: 3 }
-    );
+    const result = valueMiningYield(lines, new Map([[VELDSPAR, 5]]), reprocessing, NO_SKILLS, {
+      34: 3,
+    });
 
     // 250 units / 100 portion = 2 whole batches, 50 units left over.
     expect(result.lines[0].refineOutputs).toEqual([{ typeId: 34, quantity: 400 }]);
@@ -141,14 +117,7 @@ describe('valueMiningYield line detail (issue: Mining Yield row detail)', () => 
       [VELDSPAR, { portionSize: 100, materials: [{ typeId: 34, quantity: 400 }] }],
     ]);
 
-    const result = valueMiningYield(
-      lines,
-      new Map([[VELDSPAR, 5]]),
-      reprocessing,
-      NO_SKILLS,
-      NO_TRAINED,
-      {}
-    );
+    const result = valueMiningYield(lines, new Map([[VELDSPAR, 5]]), reprocessing, NO_SKILLS, {});
 
     expect(result.lines[0].refineOutputs).toEqual([]);
     expect(result.lines[0].batches).toBe(0);
@@ -162,7 +131,6 @@ describe('valueMiningYield line detail (issue: Mining Yield row detail)', () => 
       new Map([[UNREPROCESSABLE, 5]]),
       new Map(),
       NO_SKILLS,
-      NO_TRAINED,
       {}
     );
 
@@ -172,7 +140,7 @@ describe('valueMiningYield line detail (issue: Mining Yield row detail)', () => 
   });
 
   it('reports the general-skills reprocessing efficiency the UI states, at the NPC station base rate', () => {
-    const result = valueMiningYield([], new Map(), new Map(), NO_SKILLS, NO_TRAINED, {});
+    const result = valueMiningYield([], new Map(), new Map(), NO_SKILLS, {});
     // NPC station's 50% base rate with no skills — the assumption the UI must state.
     // Deliberately excludes specialisation (issue #1058): a mixed entry can
     // refine ore and ice under two different specialisations at once, so no
@@ -186,8 +154,7 @@ describe('valueMiningYield line detail (issue: Mining Yield row detail)', () => 
       [],
       new Map(),
       new Map(),
-      { ...NO_SKILLS, implantBonusPct: 4 },
-      NO_TRAINED,
+      characterModifiers({ skills: {}, implantTypeIds: [RX_804] }),
       {}
     );
     expect(result.efficiency).toBeCloseTo(0.5 * 1.04, 10);
@@ -220,7 +187,10 @@ describe('valueMiningYield per-type specialisation (issue #1058)', () => {
       ],
     ]);
     // Trained Simple Ore Processing V but not Ice Processing at all.
-    const trained = new Map([[SIMPLE_ORE_PROCESSING, { level: 5 }]]);
+    const modifiers = characterModifiers({
+      skills: { [SIMPLE_ORE_PROCESSING]: 5 },
+      implantTypeIds: [],
+    });
 
     const result = valueMiningYield(
       lines,
@@ -229,8 +199,7 @@ describe('valueMiningYield per-type specialisation (issue #1058)', () => {
         [ICE, 5],
       ]),
       reprocessing,
-      NO_SKILLS,
-      trained,
+      modifiers,
       { 34: 1 }
     );
 
@@ -245,14 +214,16 @@ describe('valueMiningYield per-type specialisation (issue #1058)', () => {
     const reprocessing = new Map<number, YieldReprocessingEntry | undefined>([
       [UNREPROCESSABLE, { portionSize: 100, materials: [{ typeId: 34, quantity: 100 }] }],
     ]);
-    const trained = new Map([[SCRAPMETAL_PROCESSING, { level: 5 }]]);
+    const modifiers = characterModifiers({
+      skills: { [SCRAPMETAL_PROCESSING]: 5 },
+      implantTypeIds: [],
+    });
 
     const result = valueMiningYield(
       lines,
       new Map([[UNREPROCESSABLE, 5]]),
       reprocessing,
-      NO_SKILLS,
-      trained,
+      modifiers,
       { 34: 1 }
     );
 

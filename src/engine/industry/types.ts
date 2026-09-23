@@ -56,6 +56,7 @@
 import type { EngineAsset } from '../assetTree';
 import type { MaterialRecipe } from './makeOrBuy';
 import type { ResolvedMaterial } from './materialResolution';
+import type { CharacterModifiers } from './characterModifiers';
 import type { ResolvedStandings } from '@/engine/market/standings';
 
 export interface QuantityEntry {
@@ -509,7 +510,11 @@ export interface IndustryInputs {
   materialPrices?: HubPrices;
   /** Per-material owned quantity / price override; absent = buy it all at the hub. */
   materialSourcing?: MaterialSourcingMap;
-  skills: SkillLevels;
+  /**
+   * The Character's skills + implants (issue #1284). Required: a pricing
+   * path that forgets it must fail to compile, not quote without bonuses.
+   */
+  modifiers: CharacterModifiers;
   /**
    * The character's standing toward the product's sale hub's NPC owner, for
    * the broker fee and break-even price. Absent/0 = today's behaviour
@@ -517,13 +522,6 @@ export interface IndustryInputs {
    * fixed Trade Hub, not per material.
    */
   standing?: ResolvedStandings;
-  /**
-   * The active clone's BX-80x manufacturing-time implant bonus, if any
-   * (issue #1229) — `resolveManufacturingTimeImplantBonusPct`'s result.
-   * Absent/0 = no implant fitted. Ignored for a reaction-activity plan; see
-   * `timeModifier`.
-   */
-  implantBonusPct?: number;
   /**
    * Material typeIDs the player chose to build rather than buy, at any depth
    * — not only the blueprint's own materials. Absent = build nothing, the
@@ -550,7 +548,7 @@ export interface IndustryInputs {
       facilityTaxPct?: number;
       systemCostIndex: number;
       adjustedPrices: AdjustedPrices;
-      skills: SkillLevels;
+      modifiers: CharacterModifiers;
     },
     materialPrices: HubPrices
   ) => AcquisitionResolution | null;

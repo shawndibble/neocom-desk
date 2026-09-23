@@ -40,6 +40,7 @@
  * "checked, clean" for a scope this module could not actually resolve.
  */
 import type { OpenOrdersSnapshot, CharacterOpenOrders } from './openOrdersData';
+import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
 import type { OrderCostBasis } from './orderCostBasis';
 import { stationPriceKey } from './stationPriceKey';
 import type { HubAggregate } from '@/market/fuzzwork';
@@ -132,19 +133,12 @@ export interface CharacterSkills {
   brokerRelationsLevel: number;
   /** Advanced Broker Relations (typeID 16597): +6 points/level to the 50% base Relist Discount. */
   advancedBrokerRelationsLevel: number;
-  /** Reprocessing (3385), for the "refine and sell the materials" comparison. */
-  reprocessingLevel: number;
-  /** Reprocessing Efficiency (3389). */
-  reprocessingEfficiencyLevel: number;
-  /** The active clone's refining implant bonus, if any (issue #1227) — `resolveImplantBonusPct`'s result. */
-  implantBonusPct: number;
   /**
-   * Every trained skill, so the reprocess exit can resolve each order's own
-   * item to its specialisation via `resolveSpecialisationLevel` (issue
-   * #1058) — Scrapmetal Processing for a module/ship, or the matching ore
-   * specialisation, rather than one skill hardcoded for every order.
+   * The Character's skills + implants (issue #1284), for the "refine and
+   * sell the materials" exit — each order's own item picks its
+   * specialisation and whether the refining implant applies.
    */
-  trained: ReadonlyMap<number, { level: number }>;
+  modifiers: CharacterModifiers;
 }
 
 export interface BuildRowsInput {

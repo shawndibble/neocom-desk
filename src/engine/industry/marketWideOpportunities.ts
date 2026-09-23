@@ -36,8 +36,8 @@ import {
   SKILL_IDS,
   type AdjustedPrices,
   type BlueprintSkillRequirement,
-  type SkillLevels,
 } from './types';
+import type { CharacterModifiers } from './characterModifiers';
 
 /**
  * NPC station, no rig, no security-band dependence — matches the ownership-
@@ -56,7 +56,7 @@ const NPC_STATION_CONTEXT = {
 export interface MarketWideFeeInputs {
   adjustedPrices: AdjustedPrices;
   systemCostIndex: number;
-  skills: SkillLevels;
+  modifiers: CharacterModifiers;
   /** The character's standing toward the sale hub's NPC owner. Absent/0 = standings assumed 0. */
   standing?: ResolvedStandings;
 }
@@ -156,7 +156,8 @@ export function computeMarketWideRows(
   feeInputs: MarketWideFeeInputs,
   thresholds?: OrderDepthThresholds
 ): MarketWideRow[] {
-  const { adjustedPrices, systemCostIndex, skills, standing } = feeInputs;
+  const { adjustedPrices, systemCostIndex, modifiers, standing } = feeInputs;
+  const { skills } = modifiers;
   const priced: {
     id: string;
     productTypeID: number;
@@ -199,7 +200,7 @@ export function computeMarketWideRows(
       tree.time,
       1,
       0,
-      skills,
+      modifiers,
       NPC_STATION_CONTEXT,
       candidate.blueprintSkills
     );

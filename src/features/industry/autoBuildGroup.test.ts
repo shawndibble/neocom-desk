@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { NO_CHARACTER_MODIFIERS } from '@/engine/industry/characterModifiers';
 import { applyGroupAutoBuild, groupAutoBuildMaxDepth, memberRecipeFor } from './autoBuildGroup';
 import { loadMarketSnapshots, type MarketSnapshot } from './marketData';
 import type { CharacterBlueprint } from '@/esi/endpoints';
@@ -128,7 +129,7 @@ beforeEach(() => {
 
 describe('groupAutoBuildMaxDepth', () => {
   it('returns 0 for an empty group', () => {
-    expect(groupAutoBuildMaxDepth([], sourcesFor(catalogWith([])), {})).toBe(0);
+    expect(groupAutoBuildMaxDepth([], sourcesFor(catalogWith([])), NO_CHARACTER_MODIFIERS)).toBe(0);
   });
 
   it("takes the deepest member's own tree, not the shallowest", () => {
@@ -143,13 +144,13 @@ describe('groupAutoBuildMaxDepth', () => {
       plan({ id: 'shallow', blueprintTypeID: 101 }), // 601 -> 602
       plan({ id: 'deep', blueprintTypeID: 100 }), // 600 -> 601 -> 602
     ];
-    expect(groupAutoBuildMaxDepth(plans, sourcesFor(catalog), {})).toBe(2);
+    expect(groupAutoBuildMaxDepth(plans, sourcesFor(catalog), NO_CHARACTER_MODIFIERS)).toBe(2);
   });
 
   it('skips a plan whose blueprint no longer resolves in the catalog', () => {
     const catalog = catalogWith([]);
     const plans = [plan({ id: 'orphan', blueprintTypeID: 999 })];
-    expect(groupAutoBuildMaxDepth(plans, sourcesFor(catalog), {})).toBe(0);
+    expect(groupAutoBuildMaxDepth(plans, sourcesFor(catalog), NO_CHARACTER_MODIFIERS)).toBe(0);
   });
 });
 
@@ -161,7 +162,7 @@ describe('applyGroupAutoBuild', () => {
       plan({ id: 'b', blueprintTypeID: 101, hubId: 'jita' }), // needs 602
     ];
 
-    const picks = await applyGroupAutoBuild(plans, catalog, null, [], {}, 0, {
+    const picks = await applyGroupAutoBuild(plans, catalog, null, [], NO_CHARACTER_MODIFIERS, 0, {
       strategy: 'build',
       depth: 1,
     });
@@ -179,7 +180,7 @@ describe('applyGroupAutoBuild', () => {
       plan({ id: 'orphan', blueprintTypeID: 999 }),
     ];
 
-    const picks = await applyGroupAutoBuild(plans, catalog, null, [], {}, 0, {
+    const picks = await applyGroupAutoBuild(plans, catalog, null, [], NO_CHARACTER_MODIFIERS, 0, {
       strategy: 'build',
       depth: 1,
     });
@@ -195,7 +196,7 @@ describe('applyGroupAutoBuild', () => {
       plan({ id: 'b', blueprintTypeID: 100, hubId: 'amarr' }),
     ];
 
-    await applyGroupAutoBuild(plans, catalog, null, [], {}, 0, {
+    await applyGroupAutoBuild(plans, catalog, null, [], NO_CHARACTER_MODIFIERS, 0, {
       strategy: 'buy',
       depth: 1,
     });
@@ -209,7 +210,7 @@ describe('applyGroupAutoBuild', () => {
     const catalog = catalogWith([entry({ blueprintTypeID: 100 })]);
     const plans = [plan({ id: 'a', blueprintTypeID: 100 })];
 
-    const picks = await applyGroupAutoBuild(plans, catalog, null, [], {}, 0, {
+    const picks = await applyGroupAutoBuild(plans, catalog, null, [], NO_CHARACTER_MODIFIERS, 0, {
       strategy: 'buy',
       depth: 5,
     });
@@ -257,7 +258,7 @@ describe('applyGroupAutoBuild', () => {
         meCatalog,
         null,
         [],
-        {},
+        NO_CHARACTER_MODIFIERS,
         0,
         { strategy: 'cost-effective', depth: 1 },
         CORP
@@ -279,7 +280,7 @@ describe('applyGroupAutoBuild', () => {
         plan({ id: 'plain', blueprintTypeID: 100 }),
       ];
 
-      await applyGroupAutoBuild(plans, catalog, null, [], {}, 0, {
+      await applyGroupAutoBuild(plans, catalog, null, [], NO_CHARACTER_MODIFIERS, 0, {
         strategy: 'buy',
         depth: 1,
       });
@@ -305,7 +306,7 @@ describe('applyGroupAutoBuild', () => {
     it('walks a member at its owned top-level blueprint ME, not the stored plan.me — same as its own page', async () => {
       const plans = [plan({ id: 'owned', blueprintTypeID: 100, me: 0 })];
 
-      await applyGroupAutoBuild(plans, catalog, null, [OWN_BPO_100], {}, 0, {
+      await applyGroupAutoBuild(plans, catalog, null, [OWN_BPO_100], NO_CHARACTER_MODIFIERS, 0, {
         strategy: 'build',
         depth: 1,
       });
@@ -324,7 +325,7 @@ describe('applyGroupAutoBuild', () => {
         }),
       ];
 
-      await applyGroupAutoBuild(plans, catalog, null, [], {}, 0, {
+      await applyGroupAutoBuild(plans, catalog, null, [], NO_CHARACTER_MODIFIERS, 0, {
         strategy: 'build',
         depth: 1,
       });
@@ -338,7 +339,7 @@ describe('applyGroupAutoBuild', () => {
       );
       const plans = [plan({ id: 'unpriced', blueprintTypeID: 100 })];
 
-      const picks = await applyGroupAutoBuild(plans, catalog, null, [], {}, 0, {
+      const picks = await applyGroupAutoBuild(plans, catalog, null, [], NO_CHARACTER_MODIFIERS, 0, {
         strategy: 'build',
         depth: 1,
       });
