@@ -14,7 +14,7 @@
  * is simply absent — and a switch whose corp side would have no corporation to
  * read is a switch that must not be on screen yet.
  */
-import { useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
 import type { CorpCapability } from '@/engine/corpRoles';
@@ -53,38 +53,36 @@ export function useActiveCorporationId(): number | null {
  * Personal/Corporation selection for one page, for the capability that page's
  * corp side needs.
  *
- * Device-local and per page by construction — plain component state, never
- * written to Dexie and never synced — and it resets to Personal when the active
- * Character changes, because the next Character may hold no corp role at all
- * and must not land on a corp view it cannot read.
+ * `owner`/`setOwner` are controlled by the caller — `Wallet.tsx` backs them
+ * with its `?owner=` query param (ADR 0015, issue #1302), so a deep link
+ * (the vitals rail's division link, issue #419), Back/Forward, and a pasted
+ * link all reach the matching view the same way every other short-lived view
+ * state on that page does. This hook adds the two rules a bare URL param
+ * can't express: forced back to Personal whenever the switch would not even
+ * be offered, and reset to Personal on a Character switch, because the next
+ * Character may hold no corp role at all and must not land on a corp view it
+ * cannot read.
  */
 export function useCorpOwner(
   capability: CorpCapability,
-  /**
-   * A one-time opening side, for a deep link landing straight on Corporation
-   * (the vitals rail's division link, issue #419) — a `useState` initializer,
-   * read once on mount like `Wallet.tsx`'s own `?tab=` param. `available`
-   * below still forces Personal when the capability turns out not to hold,
-   * so a bad or unreachable deep link degrades to the page's normal default
-   * rather than stranding the view on a control that isn't there.
-   */
-  initialOwner: DataOwner = 'personal'
+  owner: DataOwner,
+  setOwner: (owner: DataOwner) => void
 ): CorpOwnerSelection {
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   const access = useCorpAccess();
   const corporationId = useActiveCorporationId();
 
-  const [selection, setSelection] = useState<{ characterId: number | null; owner: DataOwner }>({
-    characterId: activeCharacterId,
-    owner: initialOwner,
-  });
-
-  // Adjusting state during render, as `useRouteSnapshot` does for the same
-  // event: an effect would render one frame of the previous Character's corp
-  // view under the new Character's name.
-  if (selection.characterId !== activeCharacterId) {
-    setSelection({ characterId: activeCharacterId, owner: 'personal' });
-  }
+  // An effect, not a render-time adjustment: `setOwner` writes to the URL
+  // (a real navigation), which is a side effect and must not run during
+  // render. The ref skips the reset on mount — only a *change* of Character
+  // clears the selection.
+  const lastCharacterId = useRef(activeCharacterId);
+  useEffect(() => {
+    if (lastCharacterId.current !== activeCharacterId) {
+      lastCharacterId.current = activeCharacterId;
+      setOwner('personal');
+    }
+  }, [activeCharacterId, setOwner]);
 
   const available =
     access.state === 'ready' && access.capabilities[capability] && corporationId !== null;
@@ -94,8 +92,8 @@ export function useCorpOwner(
     // view can never be left on screen by a state change that removed the
     // control that got there — a revoked grant, a lost role, an unresolved
     // corporation.
-    owner: available ? selection.owner : 'personal',
-    setOwner: (owner) => setSelection({ characterId: activeCharacterId, owner }),
+    owner: available ? owner : 'personal',
+    setOwner,
     available,
     corporationId,
   };
