@@ -23,6 +23,7 @@ import {
   deleteSyncedSetting,
   getSyncStatus,
   markBuildPlanDeleted,
+  markBuildPlansDeleted,
   markPlanDeleted,
   markProductionRunDeleted,
   removeProductionOrderWatch,
@@ -943,6 +944,27 @@ describe('triggerSync: build plans', () => {
     expect(await db.buildPlans.get('b1')).toBeUndefined();
     expect(await db.productionRuns.get('run-1')).toBeDefined();
     expect(await db.productionSaleLinks.get('1:txn:1001')).toBeDefined();
+  });
+
+  it('markBuildPlansDeleted deletes every plan and tombstones each once', async () => {
+    await db.buildPlans.bulkPut([buildPlan({ id: 'b1' }), buildPlan({ id: 'b2' })]);
+    seedRemote(BUILD_PLANS_PATH, [remoteBuildDoc({ id: 'b1' }), remoteBuildDoc({ id: 'b2' })]);
+
+    await markBuildPlansDeleted(1, ['b1', 'b2']);
+    expect(await db.buildPlans.get('b1')).toBeUndefined();
+    expect(await db.buildPlans.get('b2')).toBeUndefined();
+
+    await triggerSync(1);
+    expect(remoteStore.get(BUILD_PLANS_PATH)?.get('b1')?.deleted).toBe(true);
+    expect(remoteStore.get(BUILD_PLANS_PATH)?.get('b2')?.deleted).toBe(true);
+    const tombstones = await db.settings.get('sync.__buildTombstones.1');
+    expect(tombstones?.value).toEqual([]);
+  });
+
+  it('markBuildPlansDeleted is a no-op for an empty list', async () => {
+    await db.buildPlans.put(buildPlan());
+    await markBuildPlansDeleted(1, []);
+    expect(await db.buildPlans.get('b1')).toBeDefined();
   });
 
   it('a remote tombstone deletes the local build plan', async () => {

@@ -284,9 +284,8 @@ export function renameBuildGroup(
 
 /**
  * The value with one group gone. Its member plans are *not* touched here —
- * clearing their `buildGroupId` is a Dexie write the caller makes, and a plan
- * left pointing at a group that no longer exists renders as an ordinary
- * ungrouped plan rather than a broken group of one.
+ * deleting them is a Dexie write the caller makes (`buildGroupActions.ts`'s
+ * `deleteBuildGroup`, which deletes the members before calling this).
  */
 export function removeBuildGroup(
   value: BuildGroupsValue,

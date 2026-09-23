@@ -49,6 +49,12 @@ export async function markBuildPlanDeleted(characterId: number, planId: string):
   return markBuildPlanDeleted(characterId, planId);
 }
 
+/** Bulk analogue of markBuildPlanDeleted — a Build Group delete cascading to its members. */
+export async function markBuildPlansDeleted(characterId: number, planIds: string[]): Promise<void> {
+  const { markBuildPlansDeleted } = await import('./planSync');
+  return markBuildPlansDeleted(characterId, planIds);
+}
+
 /** Payee analogue of markPlanDeleted — same tombstone semantics (issue #523). */
 export async function markPayeeDeleted(characterId: number, payeeId: string): Promise<void> {
   const { markPayeeDeleted } = await import('./planSync');

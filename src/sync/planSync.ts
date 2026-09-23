@@ -222,6 +222,19 @@ export async function markBuildPlanDeleted(characterId: number, planId: string):
   );
 }
 
+/**
+ * Bulk analogue of markBuildPlanDeleted — a Build Group delete cascading to
+ * every member plan. Goes through `recordBulkDeletion` rather than one
+ * `markBuildPlanDeleted` call per plan: parallel calls would each do their
+ * own read-modify-write of the same tombstone list and race, silently
+ * dropping tombstones for all but the last write to land.
+ */
+export async function markBuildPlansDeleted(characterId: number, planIds: string[]): Promise<void> {
+  await recordBulkDeletion(characterId, planIds, buildPlanTombstonesKey(characterId), (ids) =>
+    db.buildPlans.bulkDelete(ids)
+  );
+}
+
 /** Payee analogue of markPlanDeleted — same tombstone semantics (issue #523). */
 export async function markPayeeDeleted(characterId: number, payeeId: string): Promise<void> {
   await recordDeletion(characterId, payeeId, payeeTombstonesKey(characterId), () =>

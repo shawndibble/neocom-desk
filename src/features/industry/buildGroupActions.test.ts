@@ -33,7 +33,7 @@ beforeEach(async () => {
 });
 
 describe('deleteBuildGroup', () => {
-  it('strips buildGroupId from every member before removing the group', async () => {
+  it('deletes every member plan before removing the group', async () => {
     await db.buildPlans.bulkAdd([
       plan({ id: 'p1', buildGroupId: 'g1' }),
       plan({ id: 'p2', buildGroupId: 'g1' }),
@@ -47,10 +47,10 @@ describe('deleteBuildGroup', () => {
     await deleteBuildGroup('g1', members, ctx);
 
     const stored = await db.buildPlans.bulkGet(['p1', 'p2']);
-    expect(stored.every((p) => p && !('buildGroupId' in p))).toBe(true);
+    expect(stored).toEqual([undefined, undefined]);
   });
 
-  it('writes the group removal after orphaning members, not before', async () => {
+  it('writes the group removal after deleting members, not before', async () => {
     await db.buildPlans.bulkAdd([plan({ id: 'p1', buildGroupId: 'g1' })]);
     const members = [plan({ id: 'p1', buildGroupId: 'g1' })];
     const calls: string[] = [];
@@ -58,29 +58,29 @@ describe('deleteBuildGroup', () => {
     ctx.setBuildGroups.mockImplementation(async () => {
       calls.push('group');
     });
-    const originalBulkPut = db.buildPlans.bulkPut.bind(db.buildPlans);
-    const bulkPut = vi.spyOn(db.buildPlans, 'bulkPut').mockImplementation(((
-      items: readonly BuildPlanRecord[]
+    const originalBulkDelete = db.buildPlans.bulkDelete.bind(db.buildPlans);
+    const bulkDelete = vi.spyOn(db.buildPlans, 'bulkDelete').mockImplementation(((
+      ids: readonly string[]
     ) => {
       calls.push('members');
-      return originalBulkPut(items);
-    }) as typeof db.buildPlans.bulkPut);
+      return originalBulkDelete(ids as string[]);
+    }) as typeof db.buildPlans.bulkDelete);
 
     await deleteBuildGroup('g1', members, ctx);
 
     expect(calls).toEqual(['members', 'group']);
-    bulkPut.mockRestore();
+    bulkDelete.mockRestore();
   });
 
-  it('skips the plan transaction entirely for an empty group', async () => {
+  it('skips the plan delete entirely for an empty group', async () => {
     const ctx = writeContext();
-    const bulkPut = vi.spyOn(db.buildPlans, 'bulkPut');
+    const bulkDelete = vi.spyOn(db.buildPlans, 'bulkDelete');
 
     await deleteBuildGroup('g1', [], ctx);
 
-    expect(bulkPut).not.toHaveBeenCalled();
+    expect(bulkDelete).not.toHaveBeenCalled();
     expect(ctx.setBuildGroups).toHaveBeenCalledTimes(1);
-    bulkPut.mockRestore();
+    bulkDelete.mockRestore();
   });
 
   it('removes the group from the given character only', async () => {
