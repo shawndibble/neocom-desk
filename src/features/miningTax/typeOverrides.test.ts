@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { db } from '@/db';
 import {
   loadManualIgnoredTypeIds,
@@ -10,8 +10,32 @@ import {
   untagMoonOre,
 } from './typeOverrides';
 
+const MOON_ORE_KEY = 'sync.miningTaxManualMoonOreTypeIds';
+const IGNORED_KEY = 'sync.miningTaxManualIgnoredTypeIds';
+const LEGACY_MOON_ORE_KEY = 'miningTax.manualMoonOreTypeIds';
+const LEGACY_IGNORED_KEY = 'miningTax.manualIgnoredTypeIds';
+
+const setSyncedSetting = vi.fn<(key: string, value: unknown) => Promise<void>>();
+const scheduleSync = vi.fn<(characterId: number) => void>();
+let syncConfigured = false;
+
+vi.mock('@/app/syncStatus', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/app/syncStatus')>()),
+  isSyncConfigured: () => syncConfigured,
+}));
+
+vi.mock('@/sync', () => ({
+  setSyncedSetting: (key: string, value: unknown) => setSyncedSetting(key, value),
+  scheduleSync: (characterId: number) => scheduleSync(characterId),
+}));
+
 beforeEach(async () => {
   await db.settings.clear();
+  await db.characters.clear();
+  syncConfigured = false;
+  setSyncedSetting.mockReset();
+  setSyncedSetting.mockResolvedValue(undefined);
+  scheduleSync.mockReset();
 });
 
 describe('loadManualMoonOreTypeIds', () => {
@@ -111,5 +135,80 @@ describe('loadTypeOverrides', () => {
 
   it('reports empty lists rather than throwing when nothing is tagged', async () => {
     expect(await loadTypeOverrides()).toEqual({ moonOreTypeIds: [], ignoredTypeIds: [] });
+  });
+});
+
+describe('legacy adoption', () => {
+  it('adopts a pre-sync moon-ore tag list, unstamped, under the new key', async () => {
+    await db.settings.put({ key: LEGACY_MOON_ORE_KEY, value: [111, 222] });
+
+    expect(await loadManualMoonOreTypeIds()).toEqual([111, 222]);
+    expect((await db.settings.get(MOON_ORE_KEY))?.value).toEqual([111, 222]);
+    // Adoption is a bare put, not a synced write — no push for a value that
+    // was already on this device.
+    expect(setSyncedSetting).not.toHaveBeenCalled();
+  });
+
+  it('adopts a pre-sync ignored list independently of the moon-ore one', async () => {
+    await db.settings.put({ key: LEGACY_IGNORED_KEY, value: [333] });
+
+    expect(await loadManualIgnoredTypeIds()).toEqual([333]);
+    expect(await loadManualMoonOreTypeIds()).toEqual([]);
+  });
+
+  it('prefers the new key once it exists, ignoring the legacy one', async () => {
+    await db.settings.put({ key: LEGACY_MOON_ORE_KEY, value: [999] });
+    await db.settings.put({ key: MOON_ORE_KEY, value: [1] });
+
+    expect(await loadManualMoonOreTypeIds()).toEqual([1]);
+  });
+});
+
+describe('syncing a tag change', () => {
+  it('does nothing sync-side when sync is not configured', async () => {
+    await tagAsMoonOre(1);
+    expect(setSyncedSetting).not.toHaveBeenCalled();
+    expect(scheduleSync).not.toHaveBeenCalled();
+  });
+
+  it('pushes the moon-ore list and schedules every tracked character when sync is configured', async () => {
+    syncConfigured = true;
+    await db.characters.bulkPut([
+      { characterId: 1, name: 'A', ownerHash: 'oh', addedAt: 0 },
+      { characterId: 2, name: 'B', ownerHash: 'oh', addedAt: 0 },
+    ]);
+
+    await tagAsMoonOre(999999);
+
+    expect(setSyncedSetting).toHaveBeenCalledWith(MOON_ORE_KEY, [999999]);
+    expect(scheduleSync).toHaveBeenCalledWith(1);
+    expect(scheduleSync).toHaveBeenCalledWith(2);
+  });
+
+  it('pushes the ignored list under its own key', async () => {
+    syncConfigured = true;
+    await db.characters.bulkPut([{ characterId: 1, name: 'A', ownerHash: 'oh', addedAt: 0 }]);
+
+    await tagAsIgnored(888888);
+
+    expect(setSyncedSetting).toHaveBeenCalledWith(IGNORED_KEY, [888888]);
+  });
+
+  it('still lands the tag locally when the sync push rejects', async () => {
+    syncConfigured = true;
+    setSyncedSetting.mockRejectedValueOnce(new Error('offline'));
+
+    await tagAsMoonOre(1);
+
+    expect(await loadManualMoonOreTypeIds()).toEqual([1]);
+  });
+
+  it('pushes on untag too', async () => {
+    await tagAsMoonOre(1);
+    syncConfigured = true;
+
+    await untagMoonOre(1);
+
+    expect(setSyncedSetting).toHaveBeenCalledWith(MOON_ORE_KEY, []);
   });
 });

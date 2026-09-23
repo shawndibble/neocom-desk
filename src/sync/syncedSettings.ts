@@ -128,6 +128,18 @@
 // sync.industryBuildGroups, for the same exact-match reason; Omega is the
 // absent entry, and the key is never deleted, so the tombstone-expiry edge
 // does not bite it. See features/skills/cloneState.ts.
+//
+// sync.miningTaxManualMoonOreTypeIds / sync.miningTaxManualIgnoredTypeIds
+// (decision doc 20260923-112603-manual-ore-tags-sync-across-devices,
+// superseding 20260907-090317's device-local call): the Moon Mining Tax ledger's
+// "unclassified ore" banner's two tag actions, one type_id array each. Two
+// keys, not one blob, so untagging a moon-ore type on one device cannot roll
+// back an unrelated Ignore tag made on another — same independence
+// `spExtractionMonitoringEnabled`/`spExtractionThresholdSp` keep. Each is
+// seeded from the plain Dexie key it used before it synced
+// (`features/miningTax/typeOverrides.ts`). Never deleted via
+// deleteSyncedSetting: untagging removes an entry and rewrites the array, so
+// the tombstone-expiry edge above does not bite either key.
 export const SYNCED_SETTING_KEYS: readonly string[] = [
   'sync.corpDarkAfterDays',
   'sync.defaultCharacterFilter',
@@ -140,6 +152,8 @@ export const SYNCED_SETTING_KEYS: readonly string[] = [
   'sync.loyaltyLpValue',
   'sync.marketHub',
   'sync.marketPricePercent',
+  'sync.miningTaxManualIgnoredTypeIds',
+  'sync.miningTaxManualMoonOreTypeIds',
   'sync.notificationFeedPrefs',
   'sync.piCustomsRates',
   'sync.piExpiringSoonHours',
