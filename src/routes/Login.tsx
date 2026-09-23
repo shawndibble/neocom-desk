@@ -270,7 +270,7 @@ export function Login() {
               <div className="flex flex-wrap items-start gap-x-6 gap-y-3">
                 <PreviewCell label={t('overview.board.nextDeadline')}>
                   <p
-                    className={`text-2xl leading-tight font-medium tabular-nums ${SEVERITY_TEXT.warning}`}
+                    className={`text-3xl leading-tight font-medium tabular-nums ${SEVERITY_TEXT.warning}`}
                   >
                     {formatCountdown(PREVIEW.deadlineSeconds)}
                   </p>
