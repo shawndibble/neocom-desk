@@ -317,7 +317,11 @@ export function ShipsPanel({
                 name: fitResult.shipName ?? t('skills.ships.fitAttachedFallback'),
               })}
             </span>
-            <button type="button" onClick={clearFit} className="text-xs text-text-dim underline">
+            <button
+              type="button"
+              onClick={clearFit}
+              className="inline-flex min-h-11 items-center whitespace-nowrap text-xs text-text-dim underline md:min-h-0"
+            >
               {t('skills.ships.removeFit')}
             </button>
           </div>
@@ -359,7 +363,7 @@ export function ShipsPanel({
             <button
               type="button"
               onClick={() => setAttaching(true)}
-              className="text-xs text-text-dim underline"
+              className="inline-flex min-h-11 items-center whitespace-nowrap text-xs text-text-dim underline md:min-h-0"
             >
               {t('skills.ships.attachFit')}
             </button>
