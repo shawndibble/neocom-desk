@@ -37,6 +37,7 @@ import {
   type WalletBalancesSnapshot,
 } from '@/features/character/wallet';
 import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
+import { CorpHistoryContextMenu } from '@/features/character/CorpHistoryContextMenu';
 import {
   useResolvedCharacterFilter,
   fromStoredCharacterFilterValue,
@@ -1344,6 +1345,14 @@ export function Wallet() {
                 onSortChange={loyaltySortProps.onSortChange}
                 responsive="table"
                 onRowClick={(entry) => navigate(`/wallet/loyalty/${entry.corporation_id}`)}
+                rowContextMenu={(entry, tr) => (
+                  <CorpHistoryContextMenu
+                    corporationId={entry.corporation_id}
+                    name={corporationNames.get(entry.corporation_id) ?? `#${entry.corporation_id}`}
+                  >
+                    {tr}
+                  </CorpHistoryContextMenu>
+                )}
               />
             )}
           </Panel>
