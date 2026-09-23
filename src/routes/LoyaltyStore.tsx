@@ -246,7 +246,7 @@ function OfferDetail({
       </dl>
 
       {!profit.affordableLp && (
-        <p className="text-xs text-text-faint">
+        <p className="text-xs text-text-dim">
           {t('loyaltyStore.needMoreLp', {
             amount: (row.offer.lp_cost - playerLp).toLocaleString(),
           })}
@@ -276,9 +276,7 @@ function OfferDetail({
             selected={useOwnMaterials}
             onToggle={onToggleUseOwnMaterials}
           />
-          <p className="text-[0.6875rem] text-text-faint">
-            {t('loyaltyStore.useOwnMaterialsHint')}
-          </p>
+          <p className="text-[0.6875rem] text-text-dim">{t('loyaltyStore.useOwnMaterialsHint')}</p>
           <div className="overflow-x-auto">
             <DataTable
               label={t('loyaltyStore.materials')}
@@ -434,7 +432,7 @@ export function LoyaltyStore() {
               </span>
             )}
           </span>
-          <span className="text-[0.6875rem] text-text-faint">
+          <span className="text-[0.6875rem] text-text-dim">
             {row.offer.lp_cost.toLocaleString()} LP +{' '}
             <IskAmount value={row.offer.isk_cost} revealOn="longPress" decimals={0} />
           </span>
@@ -517,7 +515,7 @@ export function LoyaltyStore() {
       onPlanInIndustry={planInIndustry}
     />
   ) : (
-    <p className="p-4 text-xs text-text-faint">{t('loyaltyStore.selectPrompt')}</p>
+    <p className="p-4 text-xs text-text-dim">{t('loyaltyStore.selectPrompt')}</p>
   );
 
   return (
