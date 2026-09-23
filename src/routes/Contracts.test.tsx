@@ -132,7 +132,7 @@ beforeEach(async () => {
   // Search is the page's landing tab; every describe below this one is about
   // the character's own contract history, so they deep-link straight to it.
   // The tab-strip describe overrides this per test.
-  window.history.pushState({}, '', '/contracts?tab=history');
+  window.history.pushState({}, '', '/contracts/history');
 });
 
 describe('Contracts', () => {
@@ -511,13 +511,13 @@ describe('Contracts row context menu (issue #676)', () => {
 describe('Contracts tab strip (issue #908)', () => {
   const SEARCH_UNAVAILABLE = "Contract search isn't available";
 
-  it('lands on Search with no tab in the URL', async () => {
+  it('lands on Search Items with no tab in the URL', async () => {
     window.history.pushState({}, '', '/contracts');
     render(<App />);
     expect(await screen.findByText(SEARCH_UNAVAILABLE)).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Search' })).toHaveAttribute('aria-selected', 'true');
     expect(screen.queryByRole('table', { name: 'Contracts' })).not.toBeInTheDocument();
-    expect(window.location.search).toBe('');
+    expect(window.location.pathname).toBe('/contracts/search/items');
   });
 
   it('swaps the public search for the contracts table when History is picked', async () => {
@@ -529,10 +529,10 @@ describe('Contracts tab strip (issue #908)', () => {
     await user.click(screen.getByRole('tab', { name: 'History' }));
 
     expect(await screen.findByText('Rifter fit')).toBeInTheDocument();
-    expect(window.location.search).toBe('?tab=history');
+    expect(window.location.pathname).toBe('/contracts/history');
   });
 
-  it('opens History from a deep link, and drops the tab again on the way back', async () => {
+  it('opens History from a deep link, and returns to Search Items on the way back', async () => {
     const user = userEvent.setup();
     render(<App />);
 
@@ -542,16 +542,16 @@ describe('Contracts tab strip (issue #908)', () => {
     await user.click(screen.getByRole('tab', { name: 'Search' }));
 
     expect(await screen.findByText(SEARCH_UNAVAILABLE)).toBeInTheDocument();
-    // Search is the default, so it stays out of the URL entirely.
-    expect(window.location.search).toBe('');
+    expect(window.location.pathname).toBe('/contracts/search/items');
   });
 
-  it('still honours an older `?tab=search` link', async () => {
+  it('ignores an older `?tab=search` link and lands on the default tab', async () => {
     window.history.pushState({}, '', '/contracts?tab=search');
     render(<App />);
 
     expect(await screen.findByText(SEARCH_UNAVAILABLE)).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Search' })).toHaveAttribute('aria-selected', 'true');
+    expect(window.location.pathname).toBe('/contracts/search/items');
   });
 
   it('reaches Search even when this character has no contracts of its own', async () => {
@@ -621,7 +621,7 @@ describe('Contracts Search tab page header', () => {
   });
 
   it("shows the public snapshot's age beside the page title, and an enabled Refresh", async () => {
-    window.history.pushState({}, '', '/contracts?tab=search');
+    window.history.pushState({}, '', '/contracts/search/items');
     const { container } = render(<App />);
 
     // The panel drew this pair itself before; it now has to reach the route.
@@ -635,7 +635,7 @@ describe('Contracts Search tab page header', () => {
   });
 
   it('puts the Items/Courier switch in the results panel header the badge vacated', async () => {
-    window.history.pushState({}, '', '/contracts?tab=search');
+    window.history.pushState({}, '', '/contracts/search/items');
     render(<App />);
 
     const modes = await screen.findByRole('group', { name: 'Contract kind' });
@@ -669,7 +669,7 @@ describe('Contracts Search tab page header', () => {
 
     it('moves the Items/Courier switch up into the tab row, out of the panel', async () => {
       const user = userEvent.setup();
-      window.history.pushState({}, '', '/contracts?tab=search');
+      window.history.pushState({}, '', '/contracts/search/items');
       render(<App />);
 
       const modes = await screen.findByRole('group', { name: 'Contract kind' });

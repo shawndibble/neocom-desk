@@ -112,6 +112,7 @@ import { TransactionsPanel } from '@/features/market/TransactionsPanel';
 import { AppraisalPanel } from '@/features/market/AppraisalPanel';
 import { useAppraisal } from '@/features/market/useAppraisal';
 import { useMarketPricePercent } from '@/features/market/pricePercent';
+import { bpcSourcingHref } from '@/features/bpcContracts/bpcSourcingUrl';
 
 /** Rows shown per side before "show all" (CONTEXT.md). */
 const ROW_CAP = 15;
@@ -1484,7 +1485,7 @@ export function Market() {
                               stationFilter === null &&
                               selectedTypeId !== null ? (
                                 <Link
-                                  to={`/industry?tab=sourcing&bpcSearch=${selectedTypeId}`}
+                                  to={bpcSourcingHref(selectedTypeId)}
                                   className={buttonClassName({ size: 'sm' })}
                                 >
                                   {t('market.searchBpcContracts')}

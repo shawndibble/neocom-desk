@@ -1,8 +1,15 @@
 /**
- * A tabbed page's tabs, declared once: id (= its path segment) and the label
- * key the `Tabs` bar prints. The id doubles as the URL segment, so
- * `/contacts/across` is the Across Characters tab and there is no second
- * table mapping one to the other (ADR 0015).
+ * A tabbed page's tabs, declared once: id (= everything below the page's
+ * base path) and the label key the `Tabs` bar prints. The id doubles as the
+ * URL suffix, so `/contacts/across` is the Across Characters tab and there
+ * is no second table mapping one to the other (ADR 0015).
+ *
+ * An id may itself contain a `/` for a page with a sub-tab nested under one
+ * of its tabs (e.g. `search/items`, `search/courier`, `history` for
+ * Contracts) — `tabFromPathname` matches the whole remainder of the path,
+ * not a single segment, so this needs no separate primitive. Such a page
+ * renders its own top-level tab bar from a derived, coarser id (e.g. the
+ * part before the `/`) rather than feeding `tabs` straight into `Tabs`.
  *
  * Pure. The registry of which pages have tabs is `app/pageTabs.ts`; the
  * React side is `usePageTab` (`./usePageTab.ts`).

@@ -138,7 +138,7 @@ test.describe('production profit chart — 390px width', () => {
     await signInAndGoto(page);
     await seedProfitHistory(page);
 
-    await page.goto('./industry?tab=records');
+    await page.goto('./industry/records');
 
     const chart = page.getByRole('img', { name: 'Realized profit over time' });
     await expect(chart).toBeVisible();

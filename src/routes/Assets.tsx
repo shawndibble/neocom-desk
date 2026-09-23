@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
+import { industryTabHref } from '@/features/industry/industryTabs';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import {
@@ -772,7 +773,7 @@ export function Assets() {
     [blueprintCatalog, buildPlans]
   );
   function handleViewInIndustryAsMaterial(typeId: number) {
-    navigate(`/industry?material=${typeId}`);
+    navigate(`${industryTabHref('plans')}?material=${typeId}`);
   }
 
   const [infoModalItem, setInfoModalItem] = useState<{ typeId: number; itemName: string } | null>(

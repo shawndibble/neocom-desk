@@ -209,7 +209,7 @@ describe('IndustryGroupPage', () => {
 
   it('sends the pilot back to the index for a group id that does not exist', async () => {
     render(<App />);
-    await waitFor(() => expect(window.location.pathname).toBe('/industry'));
+    await waitFor(() => expect(window.location.pathname).toBe('/industry/plans'));
   });
 
   it("sends the pilot back to the index for another character's group", async () => {
@@ -217,6 +217,6 @@ describe('IndustryGroupPage', () => {
     const value: BuildGroupsValue = { 92: [{ id: 'g1', name: "Someone else's group", order: 0 }] };
     await db.settings.put({ key: SYNCED_BUILD_GROUPS_KEY, value });
     render(<App />);
-    await waitFor(() => expect(window.location.pathname).toBe('/industry'));
+    await waitFor(() => expect(window.location.pathname).toBe('/industry/plans'));
   });
 });

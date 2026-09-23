@@ -780,7 +780,7 @@ describe('item context menu (issue #83)', () => {
     const action = await screen.findByRole('menuitem', { name: 'View in Industry as material' });
     await user.click(action);
 
-    await waitFor(() => expect(window.location.pathname).toBe('/industry'));
+    await waitFor(() => expect(window.location.pathname).toBe('/industry/plans'));
   });
 
   it('omits "View in Industry as material" when no owned Build Plan consumes the item', async () => {

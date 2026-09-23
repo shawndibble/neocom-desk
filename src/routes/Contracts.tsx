@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import type { ReactElement } from 'react';
-import { Navigate, useSearchParams } from 'react-router-dom';
+import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useHighlightParam } from '@/lib/useHighlightParam';
 import {
@@ -41,16 +41,11 @@ import {
   contractStatusOptions,
   contractTypeOptions,
   filterContracts,
-  EMPTY_CONTRACTS_FILTER,
   type ContractsFilter,
 } from '@/features/character/contractsFilter';
 import {
-  contractsTabs,
-  readContractsTab,
-  type ContractsTab,
-} from '@/features/character/contractsTabs';
-import {
   ContractSearchPanel,
+  type ContractMode,
   type ContractSearchStatus,
 } from '@/features/contractSearch/ContractSearchPanel';
 import type { CachedResult } from '@/esi/cache';
@@ -62,6 +57,10 @@ import { useIsPhone } from '@/lib/useIsPhone';
 import { downloadCsv } from '@/lib/downloadCsv';
 import { contractsCsvColumns } from '@/features/character/contractsCsv';
 import type { CharacterAffiliation, Contract } from '@/esi/endpoints';
+import { usePageTab } from '@/lib/usePageTab';
+import { useUrlParams, useUrlSort } from '@/lib/useUrlState';
+import { boolParam, optionalEnumParam, textParam } from '@/lib/urlState';
+import { CONTRACTS_TABS } from '@/app/pageTabs';
 
 interface Snapshot {
   contractsResult: CachedResult<Contract[]> | null;
@@ -211,6 +210,24 @@ function contractRowContextMenu(contract: Contract, tr: ReactElement) {
   return <ContractContextMenu contract={contract}>{tr}</ContractContextMenu>;
 }
 
+const CONTRACT_STATUSES = Object.keys(CONTRACT_STATUS_KEY) as Contract['status'][];
+const CONTRACT_TYPES = Object.keys(CONTRACT_TYPE_KEY) as Contract['type'][];
+
+/** The History table's own filter, in the URL (ADR 0015) as one group. */
+const HISTORY_FILTER_PARAMS = {
+  'history.q': textParam(),
+  'history.status': optionalEnumParam(CONTRACT_STATUSES),
+  'history.type': optionalEnumParam(CONTRACT_TYPES),
+  'history.all': boolParam(),
+};
+/**
+ * History had no controlled sort before this — rows sorted by `date_issued`
+ * desc, which is not a column and so cannot be expressed as a `UrlSort`.
+ * Expires desc is the closest existing column to "most recent activity
+ * first" and is what an untouched view now shows.
+ */
+const HISTORY_SORT = { columnId: 'expires', direction: 'desc' } as const;
+
 /** Contracts: table with status chips, stale offers dimmed, detail on click. Read-only, cached for offline. */
 export function Contracts() {
   const { t } = useTranslation();
@@ -229,8 +246,23 @@ export function Contracts() {
   const issuerAffiliations = data?.issuerAffiliations ?? NO_AFFILIATIONS;
 
   const [selectedContract, setSelectedContract] = useState<Contract | null>(null);
-  const [filter, setFilter] = useState<ContractsFilter>(EMPTY_CONTRACTS_FILTER);
-  const [showAll, setShowAll] = useState(false);
+  const [historyParams, setHistoryParams] = useUrlParams(HISTORY_FILTER_PARAMS);
+  const filter = useMemo<ContractsFilter>(
+    () => ({
+      text: historyParams['history.q'],
+      status: historyParams['history.status'],
+      type: historyParams['history.type'],
+    }),
+    [historyParams]
+  );
+  const setFilter = (next: ContractsFilter) =>
+    setHistoryParams({
+      'history.q': next.text,
+      'history.status': next.status,
+      'history.type': next.type,
+    });
+  const showAll = historyParams['history.all'];
+  const setShowAll = (next: boolean) => setHistoryParams({ 'history.all': next });
   // The contract a `contractAccepted` alert pointed at, if any.
   const highlightedContractId = useHighlightParam();
 
@@ -251,23 +283,27 @@ export function Contracts() {
   const isPhone = useIsPhone();
   const [modeSwitchSlot, setModeSwitchSlot] = useState<HTMLElement | null>(null);
 
-  const [searchParams, setSearchParams] = useSearchParams();
-  const tab = readContractsTab(searchParams.get('tab'));
+  /**
+   * The page's own tab id is a full path suffix (`search/items`,
+   * `search/courier`, `history`) rather than one segment, since Search has
+   * its own Items/Courier sub-tab — see `CONTRACTS_TABS`. `tab` and `mode`
+   * are both read out of it; switching *to* Search from History restores
+   * whichever mode was last active rather than always landing on Items.
+   */
+  const [tabId, setTabId] = usePageTab(CONTRACTS_TABS);
+  const tab: 'search' | 'history' = tabId === 'history' ? 'history' : 'search';
+  const mode: ContractMode = tabId === 'search/courier' ? 'courier' : 'items';
   const setTab = useCallback(
-    (next: ContractsTab) => {
-      setSearchParams(
-        (previous) => {
-          const params = new URLSearchParams(previous);
-          // Search is the default, so it stays out of the URL rather than
-          // leaving `?tab=search` on every visit that never touched the strip.
-          if (next === 'search') params.delete('tab');
-          else params.set('tab', next);
-          return params;
-        },
-        { replace: true }
-      );
-    },
-    [setSearchParams]
+    (next: 'search' | 'history') => setTabId(next === 'history' ? 'history' : `search/${mode}`),
+    [setTabId, mode]
+  );
+  const setMode = useCallback((next: ContractMode) => setTabId(`search/${next}`), [setTabId]);
+  const pageTabs = useMemo(
+    () => [
+      { id: 'search' as const, label: t('contracts.searchTab') },
+      { id: 'history' as const, label: t('contracts.historyTab') },
+    ],
+    [t]
   );
 
   const columns = useMemo<DataTableColumn<Contract>[]>(
@@ -344,6 +380,11 @@ export function Contracts() {
       },
     ],
     [t, issuerNames, timeZone, standingIndex, issuerAffiliations]
+  );
+  const historySortProps = useUrlSort(
+    'history.sort',
+    HISTORY_SORT,
+    columns.map((column) => column.id)
   );
 
   const contracts = useMemo(
@@ -436,9 +477,9 @@ export function Contracts() {
       {isPhone && tab === 'search' ? (
         <div className="flex items-center gap-2">
           <Tabs
-            tabs={contractsTabs(t)}
+            tabs={pageTabs}
             value={tab}
-            onChange={(id) => setTab(id as ContractsTab)}
+            onChange={(id) => setTab(id as 'search' | 'history')}
             label={t('contracts.tabsLabel')}
             className="min-w-0 flex-1"
           />
@@ -446,9 +487,9 @@ export function Contracts() {
         </div>
       ) : (
         <Tabs
-          tabs={contractsTabs(t)}
+          tabs={pageTabs}
           value={tab}
-          onChange={(id) => setTab(id as ContractsTab)}
+          onChange={(id) => setTab(id as 'search' | 'history')}
           label={t('contracts.tabsLabel')}
         />
       )}
@@ -457,7 +498,12 @@ export function Contracts() {
           neither this character's contracts nor its `contracts` scope, so a
           character with an empty history or a 403 must still reach it. */}
       {tab === 'search' ? (
-        <ContractSearchPanel onStatusChange={setSearchStatus} modeSwitchSlot={modeSwitchSlot} />
+        <ContractSearchPanel
+          mode={mode}
+          onModeChange={setMode}
+          onStatusChange={setSearchStatus}
+          modeSwitchSlot={modeSwitchSlot}
+        />
       ) : loading && !data ? (
         <div className="flex justify-center py-16">
           <Spinner label={t('common.loading')} />
@@ -510,6 +556,7 @@ export function Contracts() {
                 highlightRowKey={highlightedContractId}
                 rowClassName={(contract) => (isStale(contract) ? 'opacity-50' : undefined)}
                 rowContextMenu={contractRowContextMenu}
+                {...historySortProps}
               />
               {!showAll && filteredContracts.length > ROW_CAP && (
                 <div className="px-3 py-2">

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NO_CHARACTER_MODIFIERS } from '@/engine/industry/characterModifiers';
+import { MemoryRouter } from 'react-router-dom';
 import { render, waitFor } from '@testing-library/react';
 import '@/i18n';
 import { db } from '@/db';
@@ -91,7 +92,8 @@ describe('OpportunitiesPanel', () => {
         activeCharacterId={CHARACTER_ID}
         ownedStockSnapshot={SNAPSHOT}
         onAddToCompare={() => {}}
-      />
+      />,
+      { wrapper: MemoryRouter }
     );
 
     await waitFor(() => expect(loadCharacterBlueprints).toHaveBeenCalled());

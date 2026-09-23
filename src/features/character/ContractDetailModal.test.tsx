@@ -262,7 +262,7 @@ describe('ContractDetailModal', () => {
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Build Plan' }));
 
     // 587 (Rifter), not 638 (the blueprint on the contract).
-    expect(screen.getByTestId('location')).toHaveTextContent('/industry?product=587');
+    expect(screen.getByTestId('location')).toHaveTextContent('/industry/plans?product=587');
   });
 
   it('shows a standing tag beside the issuer when one is passed', () => {
