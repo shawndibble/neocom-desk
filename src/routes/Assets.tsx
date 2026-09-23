@@ -1611,7 +1611,7 @@ export function Assets() {
                       that explains why (issue #415), shown exactly when cross-
                       character results are actually on screen to be confused by. */}
                   {activeCrossCharacterData && (
-                    <span className="text-[0.6875rem] text-text-faint">
+                    <span className="text-[0.6875rem] text-text-dim">
                       {t('assets.crossCharacterCsvNote')}
                     </span>
                   )}
@@ -1631,7 +1631,7 @@ export function Assets() {
                       value={sortField}
                       onValueChange={(value) => void setSortField(value as AssetSortField)}
                     >
-                      <SelectTrigger aria-label={t('assets.sort.label')} className="w-28">
+                      <SelectTrigger size="sm" aria-label={t('assets.sort.label')} className="w-28">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -1678,7 +1678,7 @@ export function Assets() {
                   </div>
                   {resolved.station &&
                     !isUnresolvedParent(resolved.station, mergedLocationNames) && (
-                      <span className="hidden shrink-0 items-center gap-2 text-[0.6875rem] text-text-faint sm:flex">
+                      <span className="hidden shrink-0 items-center gap-2 text-[0.6875rem] text-text-dim sm:flex">
                         <SecurityValue
                           security={securityForStation(resolved.station.locationId)}
                           t={t}
@@ -1692,7 +1692,7 @@ export function Assets() {
                       </span>
                     )}
                   {currentTotals && (
-                    <span className="shrink-0 text-[0.6875rem] text-text-faint tabular-nums">
+                    <span className="shrink-0 text-[0.6875rem] text-text-dim tabular-nums">
                       <span className="hidden sm:inline">
                         {t('assets.itemCount', { count: currentTotals.itemCount })} ·{' '}
                       </span>

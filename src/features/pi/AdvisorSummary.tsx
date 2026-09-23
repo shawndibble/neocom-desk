@@ -252,7 +252,7 @@ export function AdvisorSummary({ list, earnings, spots, controls }: AdvisorSumma
                 })}
               </span>
             </div>
-            <p className="mt-1 text-[0.625rem] leading-relaxed text-text-faint">
+            <p className="mt-1 text-[0.6875rem] leading-relaxed text-text-faint">
               {t('piAdvisor.summaryEarnRebuildHint')}
             </p>
           </div>

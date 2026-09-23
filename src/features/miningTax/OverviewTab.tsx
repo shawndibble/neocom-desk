@@ -349,7 +349,28 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
           header whose actions drive it. */}
       <PageHeader
         title={t('miningTax.title')}
-        meta={data?.fetchedAt ? <DataAgeBadge date={data.fetchedAt} /> : undefined}
+        // `CharacterFilterControl` rides here rather than in `actions` per
+        // `docs/context/decisions/20260908-192806-the-character-filter-rides-in-the-panel-header.md`
+        // — this tab has no titled inner `Panel` to attach it to, so it
+        // takes the page-level title band instead, the same "names whose
+        // data this is" role the decision describes for a panel's own
+        // `meta`.
+        meta={
+          <>
+            {data?.fetchedAt ? <DataAgeBadge date={data.fetchedAt} /> : undefined}
+            {characters.length > 0 && (
+              <CharacterFilterControl
+                characters={characters.map((c) => ({
+                  characterId: c.characterId,
+                  characterName: c.characterName,
+                }))}
+                activeCharacterId={activeCharacterId}
+                value={characterFilter}
+                onChange={setCharacterFilter}
+              />
+            )}
+          </>
+        }
         actions={
           <>
             <div className="hidden items-center gap-2 sm:flex">
@@ -372,17 +393,6 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
                 />
               </MobileSettings>
             </div>
-            {characters.length > 0 && (
-              <CharacterFilterControl
-                characters={characters.map((c) => ({
-                  characterId: c.characterId,
-                  characterName: c.characterName,
-                }))}
-                activeCharacterId={activeCharacterId}
-                value={characterFilter}
-                onChange={setCharacterFilter}
-              />
-            )}
             <IconButton
               icon={<Icon.Refresh />}
               label={t('miningTax.refresh')}
