@@ -155,10 +155,9 @@ export default function MiningYieldCharts({
     : top;
 
   // Horizontal bars: ore names read left of the bar instead of slanted under it.
-  const compareHeight = Math.max(
-    256,
-    compareBars.length * (showRefining ? 36 : 24) + (showRefining ? 64 : 32)
-  );
+  // Same row height with refining on or off — the raw and refined bars split
+  // the row — so toggling refining only adds the legend's height.
+  const compareHeight = Math.max(256, compareBars.length * 24 + (showRefining ? 56 : 32));
 
   // Two cards, same gap as the stat cards above them.
   return (
