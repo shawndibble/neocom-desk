@@ -413,7 +413,7 @@ describe('IndustryPlanPage: materials row context menu', () => {
     // same deep link the Market Browser's menu uses — the material's own
     // plan is created if missing, and the browser lands on its own page.
     await screen.findByRole('heading', { name: 'Mechanical Parts' });
-    await waitFor(() => expect(window.location.pathname).not.toBe('/industry'));
+    await waitFor(() => expect(window.location.pathname).not.toBe('/industry/plans'));
     await waitFor(() => expect(window.location.search).toBe(''));
     const stored = await db.buildPlans.where('characterId').equals(CHAR_ID).toArray();
     expect(stored).toHaveLength(2);
@@ -618,7 +618,7 @@ describe('IndustryPlanPage: owned-stock scope (#454)', () => {
 describe('IndustryPlanPage: not-found handling', () => {
   it('sends the pilot back to the index for a plan id that does not exist', async () => {
     render(<App />);
-    await waitFor(() => expect(window.location.pathname).toBe('/industry'));
+    await waitFor(() => expect(window.location.pathname).toBe('/industry/plans'));
   });
 
   it("sends the pilot back to the index for another character's plan", async () => {
@@ -630,6 +630,6 @@ describe('IndustryPlanPage: not-found handling', () => {
     });
     await db.buildPlans.add(seedPlan({ characterId: 92 }));
     render(<App />);
-    await waitFor(() => expect(window.location.pathname).toBe('/industry'));
+    await waitFor(() => expect(window.location.pathname).toBe('/industry/plans'));
   });
 });

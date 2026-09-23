@@ -79,7 +79,7 @@ const CHARACTER_ID = 91;
 
 function renderModal(row: BpcContractRow = ROW) {
   return render(
-    <MemoryRouter initialEntries={['/industry?tab=sourcing']}>
+    <MemoryRouter initialEntries={['/industry/sourcing']}>
       <BpcContractModal
         row={row}
         characterId={CHARACTER_ID}
@@ -169,7 +169,7 @@ describe('BpcContractModal — Build Plan context menu', () => {
     // 587 (Rifter), not 638 (the blueprint in the contract) — and this
     // line's own 10/20 x5, not the generic defaults (issue #638).
     expect(screen.getByTestId('location')).toHaveTextContent(
-      '/industry?product=587&me=10&te=20&runs=5'
+      '/industry/plans?product=587&me=10&te=20&runs=5'
     );
   });
 
@@ -182,7 +182,7 @@ describe('BpcContractModal — Build Plan context menu', () => {
       fireEvent.contextMenu(line);
       fireEvent.click(await screen.findByRole('menuitem', { name: 'Build Plan' }));
       expect(screen.getByTestId('location')).toHaveTextContent(
-        '/industry?product=587&me=10&te=20&runs=5'
+        '/industry/plans?product=587&me=10&te=20&runs=5'
       );
     }
   });
@@ -208,7 +208,7 @@ describe('BpcContractModal — Build Plan context menu', () => {
     fireEvent.contextMenu(within(contents).getByText('Rifter Blueprint'));
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Build Plan' }));
 
-    expect(screen.getByTestId('location')).toHaveTextContent('/industry?product=587');
+    expect(screen.getByTestId('location')).toHaveTextContent('/industry/plans?product=587');
     expect(screen.getByTestId('location')).not.toHaveTextContent('me=');
   });
 
@@ -246,13 +246,13 @@ describe('BpcContractModal — Build Plan context menu', () => {
     fireEvent.contextMenu(rows[0]);
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Build Plan' }));
     expect(screen.getByTestId('location')).toHaveTextContent(
-      '/industry?product=587&me=10&te=20&runs=5'
+      '/industry/plans?product=587&me=10&te=20&runs=5'
     );
 
     fireEvent.contextMenu(rows[1]);
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Build Plan' }));
     expect(screen.getByTestId('location')).toHaveTextContent(
-      '/industry?product=587&me=2&te=4&runs=1'
+      '/industry/plans?product=587&me=2&te=4&runs=1'
     );
   });
 

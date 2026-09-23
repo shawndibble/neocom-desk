@@ -26,6 +26,7 @@
 import { useEffect, useState, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { industryTabHref } from './industryTabs';
 import {
   ContextMenu,
   ContextMenuContent,
@@ -128,7 +129,7 @@ export function BuildPlanContextMenu({
             if (productTypeId == null) return;
             const params = new URLSearchParams({ product: String(productTypeId) });
             applyPlanSeed(params, seed ?? null);
-            navigate(`/industry?${params.toString()}`);
+            navigate(`${industryTabHref('plans')}?${params.toString()}`);
           }}
         >
           {productTypeId === undefined

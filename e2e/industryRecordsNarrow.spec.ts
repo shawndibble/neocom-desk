@@ -125,7 +125,7 @@ test.describe('Sold action buttons — stacked phone card', () => {
 
   test('Records tab: starts at the card label gutter below sm', async ({ page }) => {
     await page.setViewportSize(PHONE);
-    await page.goto('./industry?tab=records');
+    await page.goto('./industry/records');
     await expandRunsTable(page, 'Show all production runs', 'All production runs');
 
     const { justifyContent, wrapperLeft, siblingTextLeft } = await measure(
@@ -138,7 +138,7 @@ test.describe('Sold action buttons — stacked phone card', () => {
 
   test('Records tab: stays right-aligned at and above sm', async ({ page }) => {
     await page.setViewportSize(DESKTOP);
-    await page.goto('./industry?tab=records');
+    await page.goto('./industry/records');
     await expandRunsTable(page, 'Show all production runs', 'All production runs');
 
     expect((await measure(page, 'All production runs')).justifyContent).toBe('flex-end');

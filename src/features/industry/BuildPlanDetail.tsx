@@ -215,7 +215,7 @@ interface BuildPlanDetailProps {
   groupSnapshot: BuildGroupSnapshot | null;
   /**
    * The picker/override modal's "search BPC Sourcing" action (issue #839) —
-   * navigates to `/industry?tab=sourcing&bpcSearch=<typeID>`. A prop rather
+   * navigates to `bpcSourcingHref(<typeID>)`. A prop rather
    * than an inline `useNavigate` here, since this component stays
    * route-agnostic; `IndustryPlanPage.tsx` supplies it.
    */

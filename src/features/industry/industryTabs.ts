@@ -1,30 +1,28 @@
 /**
  * The Industry section's 4-tab strip, shared by the index (`Industry.tsx`,
- * where it's the real controlled `Tabs` switching `?tab=`) and the plan/
+ * where each tab is its own path, `/industry/<tab>` — ADR 0015) and the plan/
  * group detail pages (`IndustryPlanPage.tsx`, `IndustryGroupPage.tsx`, where
  * it's the same strip pinned above the page — a plan or group is still
  * conceptually "inside" Build Plans, so the strip must keep showing which
  * section this page belongs to, not just a bare back link).
  */
 import type { TFunction } from 'i18next';
+import { definePageTabs, tabPath } from '@/lib/pageTabs';
 
 export type IndustryTab = 'plans' | 'records' | 'sourcing' | 'opportunities';
 
-/** An unknown or absent `?tab=` falls back to Plans rather than rendering nothing — a stale or hand-edited link should land somewhere useful. */
-export function readIndustryTab(value: string | null): IndustryTab {
-  return value === 'records' || value === 'sourcing' || value === 'opportunities' ? value : 'plans';
-}
+export const INDUSTRY_TABS = definePageTabs<IndustryTab>('/industry', [
+  { id: 'plans', labelKey: 'industry.buildPlansTab' },
+  { id: 'records', labelKey: 'industry.recordsTab' },
+  { id: 'sourcing', labelKey: 'industry.bpcSearchTab' },
+  { id: 'opportunities', labelKey: 'industry.opportunitiesTab' },
+]);
 
 export function industryTabs(t: TFunction): { id: IndustryTab; label: string }[] {
-  return [
-    { id: 'plans', label: t('industry.buildPlansTab') },
-    { id: 'records', label: t('industry.recordsTab') },
-    { id: 'sourcing', label: t('industry.bpcSearchTab') },
-    { id: 'opportunities', label: t('industry.opportunitiesTab') },
-  ];
+  return INDUSTRY_TABS.tabs.map((tab) => ({ id: tab.id, label: t(tab.labelKey) }));
 }
 
-/** Where clicking a tab from a plan/group detail page (always "plans" itself) goes. */
+/** A tab's own path — where clicking it from a plan/group detail page goes. */
 export function industryTabHref(id: IndustryTab): string {
-  return id === 'plans' ? '/industry' : `/industry?tab=${id}`;
+  return tabPath(INDUSTRY_TABS, id);
 }
