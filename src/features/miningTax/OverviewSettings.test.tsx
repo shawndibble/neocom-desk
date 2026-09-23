@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
-import { PriceBasisOptions } from './OverviewSettings';
+import { BuybackRateInput, PriceBasisOptions } from './OverviewSettings';
 
 describe('PriceBasisOptions', () => {
   it('checks the choice matching the basis', () => {
@@ -28,5 +28,29 @@ describe('PriceBasisOptions', () => {
     await userEvent.click(screen.getByRole('radio', { name: /^Jita buy/ }));
 
     expect(onChange).toHaveBeenCalledWith('buy');
+  });
+});
+
+describe('BuybackRateInput', () => {
+  it('commits a value inside 0-100', async () => {
+    const onChange = vi.fn();
+    render(<BuybackRateInput value={100} onChange={onChange} />);
+
+    const field = screen.getByLabelText('Buyback rate');
+    await userEvent.clear(field);
+    await userEvent.type(field, '90');
+
+    expect(onChange).toHaveBeenLastCalledWith(90);
+  });
+
+  it('does not commit a value outside 0-100', async () => {
+    const onChange = vi.fn();
+    render(<BuybackRateInput value={100} onChange={onChange} />);
+
+    const field = screen.getByLabelText('Buyback rate');
+    await userEvent.clear(field);
+    await userEvent.type(field, '101');
+
+    expect(onChange).not.toHaveBeenCalledWith(101);
   });
 });
