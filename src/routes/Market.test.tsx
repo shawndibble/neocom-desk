@@ -475,6 +475,21 @@ describe('Market Browser', () => {
     expect(await screen.findByRole('table', { name: 'Sell Orders' })).toBeInTheDocument();
   });
 
+  it('Refresh retries a failed catalogue load instead of staying disabled', async () => {
+    vi.mocked(loadNpcStations).mockRejectedValueOnce(new Error('network error'));
+    const user = userEvent.setup();
+    render(<App />);
+
+    expect(await screen.findByText("Couldn't load the market catalogue")).toBeInTheDocument();
+    const refresh = screen.getByRole('button', { name: 'Refresh' });
+    expect(refresh).toBeEnabled();
+
+    await user.click(refresh);
+
+    expect(await screen.findByRole('searchbox')).toBeInTheDocument();
+    expect(screen.queryByText("Couldn't load the market catalogue")).not.toBeInTheDocument();
+  });
+
   it('a failed globalMarkets.json load reads the chosen region instead of hanging', async () => {
     vi.mocked(loadGlobalMarkets).mockRejectedValueOnce(new Error('network error'));
     server.use(ordersHandler({ count: 0 }));

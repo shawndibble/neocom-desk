@@ -425,6 +425,8 @@ export function Market() {
   const globalMarkets = useGlobalMarketOverrides();
   const [variationData, setVariationData] = useState<VariationData | null>(null);
   const [catalogueError, setCatalogueError] = useState(false);
+  // Bumped by Refresh after a failed catalogue load to re-run the load effect.
+  const [catalogueTick, setCatalogueTick] = useState(0);
 
   // Blueprint catalog for the item context menu's Build Plan action, loaded
   // lazily on the first menu open rather than on mount — it pulls the full
@@ -691,7 +693,7 @@ export function Market() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [catalogueTick]);
 
   // Independent of the catalogue and order-book loads: a character with no
   // orders scope, or with no characters signed in at all, simply resolves to
@@ -1027,6 +1029,13 @@ export function Market() {
       appraisal.refresh();
       return;
     }
+    // A failed catalogue load leaves no item to select, so Refresh retries
+    // the catalogue itself � the one recovery this page has short of F5.
+    if (catalogueError) {
+      setCatalogueError(false);
+      setCatalogueTick((n) => n + 1);
+      return;
+    }
     // Manual refresh must bypass getOrderBook's 300s TTL cache (CONTEXT.md
     // "Data Age": refresh happens on app open + manual button only) — scoped
     // to what's actually on screen (the selected item, plus the Variations
@@ -1242,7 +1251,7 @@ export function Market() {
                 disabled={
                   tab === 'appraisal'
                     ? appraisal.result === null || appraisal.loading
-                    : selectedTypeId === null || orderBookLoading
+                    : !catalogueError && (selectedTypeId === null || orderBookLoading)
                 }
               />
             </>
