@@ -59,6 +59,8 @@ export {
 export { ColumnPickerMenu } from './ColumnPickerMenu';
 export { MultiSelect } from './MultiSelect';
 export type { MultiSelectGroup, MultiSelectOption, MultiSelectProps } from './MultiSelect';
+export { RegionSelect } from './RegionSelect';
+export type { RegionSelectOption, RegionSelectProps } from './RegionSelect';
 export {
   Select,
   SelectValue,

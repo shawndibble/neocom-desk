@@ -9,7 +9,7 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 import { FACILITY_PRESETS } from '@/engine/industry/types';
 import type { IndustryActivity } from '@/engine/industry/types';
 import { buildLocationLabel } from './buildLocationLabel';
-import { moveHighlight, type ComboboxNavKey } from './comboboxNav';
+import { moveHighlight, type ComboboxNavKey } from '@/lib/comboboxNav';
 import { MIN_SEARCH_LENGTH, searchBuildLocations } from './searchBuildLocations';
 import type { BuildLocationOption } from './buildLocations';
 

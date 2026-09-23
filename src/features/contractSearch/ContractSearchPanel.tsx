@@ -31,11 +31,7 @@ import {
   FilterChip,
   FilterField,
   Panel,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  RegionSelect,
   SearchInput,
   Spinner,
   StatChip,
@@ -122,9 +118,6 @@ const SUGGESTION_LIMIT = 8;
  * listing, not only the eight the dropdown had room for.
  */
 const TYPE_SEARCH_LIMIT = 50;
-
-/** `Select` has no null value, so "no region chosen" needs a sentinel option. */
-const ALL_REGIONS = 'all';
 
 const SALE_KINDS: ContractSaleKind[] = ['exchange', 'auction'];
 
@@ -261,24 +254,16 @@ function ContractSearchFilterBar({
       {(draft, setDraft) => (
         <>
           <FilterField label={t('contractSearch.regionLabel')}>
-            <Select
-              value={draft.regionId === null ? ALL_REGIONS : String(draft.regionId)}
-              onValueChange={(value) =>
-                setDraft({ ...draft, regionId: value === ALL_REGIONS ? null : Number(value) })
-              }
-            >
-              <SelectTrigger aria-label={t('contractSearch.regionLabel')} className="w-48">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={ALL_REGIONS}>{t('contractSearch.allRegions')}</SelectItem>
-                {regionOptions.map((region) => (
-                  <SelectItem key={region.id} value={String(region.id)}>
-                    {region.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <RegionSelect
+              options={regionOptions}
+              value={draft.regionId}
+              onChange={(regionId) => setDraft({ ...draft, regionId })}
+              allLabel={t('contractSearch.allRegions')}
+              searchPlaceholder={t('common.searchRegions')}
+              noResultsLabel={t('common.noRegionMatches')}
+              aria-label={t('contractSearch.regionLabel')}
+              className="w-48"
+            />
           </FilterField>
           <FilterField label={t('contractSearch.maxPriceLabel')}>
             <TextInput
@@ -548,9 +533,7 @@ export function ContractSearchPanel({
 
   const regionOptions = useMemo(() => {
     const ids = [...new Set(rows.map((row) => row.regionId))];
-    return ids
-      .map((id) => ({ id, name: regionNames.get(id) ?? `#${id}` }))
-      .sort((a, b) => a.name.localeCompare(b.name));
+    return ids.map((id) => ({ id, name: regionNames.get(id) ?? `#${id}` }));
   }, [rows, regionNames]);
 
   /**

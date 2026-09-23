@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { moveHighlight } from './comboboxNav';
+import { moveHighlight } from '@/lib/comboboxNav';
 
 describe('moveHighlight', () => {
   it('has nothing to highlight when there are no options', () => {

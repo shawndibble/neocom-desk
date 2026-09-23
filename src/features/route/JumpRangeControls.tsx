@@ -22,7 +22,7 @@ import {
   SelectValue,
 } from '@/components/ui';
 import { JUMP_RANGES, type JumpRange } from '@/engine/route/jumpRange';
-import { moveHighlight, type ComboboxNavKey } from '@/features/industry/comboboxNav';
+import { moveHighlight, type ComboboxNavKey } from '@/lib/comboboxNav';
 import { cx } from '@/lib/cx';
 import { rankedSearch } from '@/lib/rankedSearch';
 import { loadSolarSystems } from '@/sde/loadMarketSde';

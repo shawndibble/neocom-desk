@@ -17,6 +17,7 @@ import {
   FilterBar,
   FilterChip,
   FilterField,
+  RegionSelect,
   Select,
   SelectContent,
   SelectItem,
@@ -68,9 +69,6 @@ import { boolParam, enumParam, enumSetParam, optionalIdParam, textParam } from '
 
 /** Rows shown before "show all" — the same cap the item results use. */
 const ROW_CAP = 50;
-
-/** `Select` has no null value, so "no region chosen" needs a sentinel option. */
-const ALL_REGIONS = 'all';
 
 /** The filter as the controls hold it: text fields stay strings until they are parsed into the engine's filter. */
 interface CourierUiFilter {
@@ -208,9 +206,7 @@ function regionOptionsFor(
     const regionId = row[end].regionId;
     if (regionId !== null) ids.add(regionId);
   }
-  return [...ids]
-    .map((id) => ({ id, name: regionNames.get(id) ?? `#${id}` }))
-    .sort((a, b) => a.name.localeCompare(b.name));
+  return [...ids].map((id) => ({ id, name: regionNames.get(id) ?? `#${id}` }));
 }
 
 /** The From/To pair: the same control twice, differing only in which end of the haul it reads. */
@@ -228,22 +224,16 @@ function RegionFilterField({
   const { t } = useTranslation();
   return (
     <FilterField label={label}>
-      <Select
-        value={value === null ? ALL_REGIONS : String(value)}
-        onValueChange={(next) => onChange(next === ALL_REGIONS ? null : Number(next))}
-      >
-        <SelectTrigger aria-label={label} className="w-44">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value={ALL_REGIONS}>{t('contractSearch.allRegions')}</SelectItem>
-          {options.map((region) => (
-            <SelectItem key={region.id} value={String(region.id)}>
-              {region.name}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      <RegionSelect
+        options={options}
+        value={value}
+        onChange={onChange}
+        allLabel={t('contractSearch.allRegions')}
+        searchPlaceholder={t('common.searchRegions')}
+        noResultsLabel={t('common.noRegionMatches')}
+        aria-label={label}
+        className="w-44"
+      />
     </FilterField>
   );
 }
