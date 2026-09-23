@@ -7,7 +7,12 @@ interface PageHeaderProps {
   /**
    * Sits immediately after the title, sharing its baseline: the view's
    * `DataAgeBadge`, a stat strip, a count. Reads as part of the title, not as
-   * a control — put anything clickable in `actions`.
+   * a control — put anything clickable in `actions`. Exception: a
+   * `CharacterFilterControl` may sit here too, on the same "names whose data
+   * this is" rationale `Panel.meta` uses per
+   * `docs/context/decisions/20260908-192806-the-character-filter-rides-in-the-panel-header.md`,
+   * when the route has no titled inner `Panel` of its own to host it (see
+   * `Assets.tsx`, `OverviewTab.tsx`).
    */
   meta?: ReactNode;
   /** Right-aligned control cluster. `IconButton`s, in the order they're used. */
