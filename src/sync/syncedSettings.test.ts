@@ -25,6 +25,7 @@ const PINNED_SYNCED_SETTING_KEYS: string[] = [
   'sync.skillCloneStates',
   'sync.spExtractionMonitoringEnabled',
   'sync.spExtractionThresholdSp',
+  'sync.targetSkillPlan',
 ];
 
 describe('SYNCED_SETTING_KEYS', () => {
