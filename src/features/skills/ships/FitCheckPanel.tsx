@@ -1,25 +1,23 @@
 /**
  * Paste an EFT fit, see the skills it still needs, add them to a plan.
- * Reuses `previewClipboardImport`'s eftFit path (same as the Skill Plan
- * editor's clipboard import and Industry's Fit Import) — narrower than
- * `ImportClipboardDialog` (EFT only, no skill-plan-paste/file tabs) and a
- * panel rather than a modal preview.
+ * Reuses `previewClipboardImport`'s eftFit path — narrower than
+ * `ImportClipboardDialog` (EFT only) and a panel rather than a modal.
  */
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, EmptyState, Panel, SkillBar, Spinner } from '@/components/ui';
+import { Button, EmptyState, Panel, Spinner } from '@/components/ui';
 import { formatDuration } from '@/lib/duration';
 import { readFromClipboard } from '@/lib/clipboard';
 import type { EngineSkill, TrainedSkill } from '@/engine/types';
-import { computeSkillPlanSchedule } from '@/engine/skillPlanSchedule';
 import type { CloneState, Attributes, Implants } from '@/engine/types';
 import { loadUniverseType } from '../data';
 import { loadItemNameMap, loadSkillNameMap } from '../typeCatalog';
 import { previewClipboardImport } from '../planner/clipboardImport';
-import { SkillStatusIcon } from '../SkillStatusIcon';
+import { SkillRow } from '../SkillRow';
 import type { TargetPlan } from '../useTargetPlan';
 import { TargetPlanPicker } from '../TargetPlanPicker';
 import { buildFitCheckRows, type FitCheckRow } from './fitCheckRows';
+import { scheduleEntries } from './scheduleEntries';
 
 export interface FitCheckPanelProps {
   target: TargetPlan;
@@ -64,22 +62,17 @@ export function FitCheckPanel({
         setCheck({ kind: 'notEftFit' });
         return;
       }
-      const schedule = computeSkillPlanSchedule({
-        entries: preview.entries,
+      const scheduled = scheduleEntries(preview.entries, {
         skills,
         trainedSkills,
         attributes,
         implants,
-        boosters: [],
-        markers: undefined,
-        markerAttributes: [],
         cloneState,
-        startDate: new Date(),
       });
       setCheck({
         kind: 'result',
         shipName: preview.shipName,
-        rows: buildFitCheckRows(preview.entries, skills, trainedSkills, schedule.scheduled),
+        rows: buildFitCheckRows(preview.entries, skills, trainedSkills, scheduled),
         warnings: preview.warnings,
       });
     } finally {
@@ -182,32 +175,24 @@ export function FitCheckPanel({
               />
             ) : (
               result.rows.map((row) => (
-                <div
-                  key={row.skillTypeID}
-                  className="flex items-center gap-3 border-b border-line py-1.5 text-xs last:border-b-0"
-                >
-                  <SkillStatusIcon status={row.status} />
-                  <span className="flex-1 text-text">{row.name}</span>
-                  <SkillBar level={row.currentLevel} />
-                  <span className="w-16 text-right text-text-dim tabular-nums">
-                    {row.status === 'trained'
-                      ? t('skills.fitCheck.trained')
-                      : formatDuration(row.seconds)}
-                  </span>
-                  {row.status !== 'trained' && (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() =>
-                        void target.addEntries(
-                          [{ skillTypeID: row.skillTypeID, targetLevel: row.targetLevel }],
-                          result.shipName ?? t('plans.newPlanName')
-                        )
-                      }
-                    >
-                      {t('skills.fitCheck.add')}
-                    </Button>
-                  )}
+                <div key={row.skillTypeID} className="border-b border-line py-1.5 last:border-b-0">
+                  <SkillRow
+                    name={row.name}
+                    status={row.status}
+                    currentLevel={row.currentLevel}
+                    timeLabel={
+                      row.status === 'trained'
+                        ? t('skills.fitCheck.trained')
+                        : formatDuration(row.seconds)
+                    }
+                    addLabel={t('skills.fitCheck.add')}
+                    onAdd={() =>
+                      void target.addEntries(
+                        [{ skillTypeID: row.skillTypeID, targetLevel: row.targetLevel }],
+                        result.shipName ?? t('plans.newPlanName')
+                      )
+                    }
+                  />
                 </div>
               ))
             )}

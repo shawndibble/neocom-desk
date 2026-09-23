@@ -17,7 +17,7 @@
  */
 import { Fragment, useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, EmptyState, IskAmount, Modal, SkillBar, Spinner, TypeIcon } from '@/components/ui';
+import { EmptyState, IskAmount, Modal, Spinner, TypeIcon } from '@/components/ui';
 import { groupItemAttributes, type AttributeGroup } from '@/engine/market/itemAttributes';
 import { parseItemDescription, type DescriptionRun } from '@/engine/market/itemDescription';
 import type { OrderBookSummary } from '@/engine/market/orderBook';
@@ -30,7 +30,7 @@ import { formatDuration } from '@/lib/duration';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
 import { extractRequiredSkills, type RequiredSkill } from '@/features/skills/dogma';
-import { SkillStatusIcon } from '@/features/skills/SkillStatusIcon';
+import { SkillRow } from '@/features/skills/SkillRow';
 import { skillTrainingStatus } from '@/features/skills/skillStatus';
 import { TargetPlanPicker } from '@/features/skills/TargetPlanPicker';
 import { useTargetPlan, type TargetPlan } from '@/features/skills/useTargetPlan';
@@ -276,13 +276,8 @@ function priceCell(price: number | null): ReactNode {
 }
 
 /**
- * "What skill affects this?" — inline, not a destination: each skill the
- * item's own dogma attributes name as required, with the Character's status
- * and a one-click Add to Skill Plan (same Target Plan mechanism Fit Check
- * uses). Renders nothing when the item requires no skill (most items).
- * `hasCharacter` false (nobody to hold a trained level or a plan for)
- * branches to name + required level only, once, rather than a status
- * that's always "missing" and an Add that's a no-op.
+ * "What skill affects this?" — each required skill, status + Add to Plan.
+ * No Character: name + level only, not an always-"missing"/no-op Add.
  */
 function RequiredSkillsSection({
   requiredSkills,
@@ -313,12 +308,17 @@ function RequiredSkillsSection({
       <div className="mt-1 space-y-1">
         {requiredSkills.map((req) => {
           const name = skillNames[req.skillTypeID] ?? `#${req.skillTypeID}`;
-          return hasCharacter ? (
-            <TrackedSkillRow
+          if (!hasCharacter) {
+            return <NameOnlySkillRow key={req.skillTypeID} name={name} level={req.level} />;
+          }
+          const currentLevel = trainedSkills.get(req.skillTypeID)?.level ?? 0;
+          return (
+            <SkillRow
               key={req.skillTypeID}
               name={name}
-              level={req.level}
-              currentLevel={trainedSkills.get(req.skillTypeID)?.level ?? 0}
+              status={skillTrainingStatus(currentLevel, req.level)}
+              currentLevel={currentLevel}
+              addLabel={t('skills.requiredSkills.addToPlan')}
               onAdd={() =>
                 void target.addEntries(
                   [{ skillTypeID: req.skillTypeID, targetLevel: req.level }],
@@ -326,38 +326,9 @@ function RequiredSkillsSection({
                 )
               }
             />
-          ) : (
-            <NameOnlySkillRow key={req.skillTypeID} name={name} level={req.level} />
           );
         })}
       </div>
-    </div>
-  );
-}
-
-function TrackedSkillRow({
-  name,
-  level,
-  currentLevel,
-  onAdd,
-}: {
-  name: string;
-  level: number;
-  currentLevel: number;
-  onAdd: () => void;
-}) {
-  const { t } = useTranslation();
-  const status = skillTrainingStatus(currentLevel, level);
-  return (
-    <div className="flex items-center gap-3 text-xs">
-      <SkillStatusIcon status={status} />
-      <span className="flex-1 text-text">{name}</span>
-      <SkillBar level={currentLevel} />
-      {status !== 'trained' && (
-        <Button size="sm" variant="ghost" onClick={onAdd}>
-          {t('skills.requiredSkills.addToPlan')}
-        </Button>
-      )}
     </div>
   );
 }

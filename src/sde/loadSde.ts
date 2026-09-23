@@ -26,7 +26,7 @@ function cached<T>(file: string): () => Promise<T> {
 }
 
 export const loadSkills = cached<SkillType[]>('skills.json');
-/** Ship typeID -> Mastery tier skill bundles (issue #1366). See `MasteryMap`. */
+/** See `MasteryMap`. */
 export const loadMasteries = cached<MasteryMap>('masteries.json');
 export const loadBlueprints = cached<BlueprintMap>('blueprints.json');
 export const loadTypes = cached<TypeMap>('types.json');

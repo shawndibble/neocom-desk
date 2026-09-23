@@ -1,27 +1,24 @@
 /**
  * Search a ship, see its 5 Mastery tiers against the Character's trained
  * skills, bundle a tier's shortfall into the Target Plan in one action.
- * `masteries.json` (built from Fuzzwork's certMasteries/certSkills CSVs,
- * issue #1366) is static SDE data — no ESI call needed to list ships or
- * their tiers, only to read the Character's own trained skills (already
- * supplied by the caller, same as Fit Check).
+ * `masteries.json` is static SDE data — no ESI call to list ships/tiers.
  */
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Disclosure, Panel, SearchInput, SkillBar, Spinner } from '@/components/ui';
+import { Button, Disclosure, Panel, SearchInput, Spinner } from '@/components/ui';
 import { formatDuration } from '@/lib/duration';
 import { rankedSearch } from '@/lib/rankedSearch';
+import { romanLevel } from '@/engine/projection';
 import type { Attributes, CloneState, EngineSkill, Implants, TrainedSkill } from '@/engine/types';
-import { computeSkillPlanSchedule } from '@/engine/skillPlanSchedule';
 import { loadMasteries, loadTypes } from '@/sde/loadSde';
 import type { MasteryMap } from '@/sde/types';
-import { SkillStatusIcon } from '../SkillStatusIcon';
+import { SkillRow } from '../SkillRow';
 import type { TargetPlan } from '../useTargetPlan';
 import { TargetPlanPicker } from '../TargetPlanPicker';
 import { buildShipsWithMastery, type ShipOption } from './shipCatalog';
 import { buildMasteryTierRow, type MasteryTierRow } from './masteryRows';
+import { scheduleEntries } from './scheduleEntries';
 
-const ROMAN = ['I', 'II', 'III', 'IV', 'V'] as const;
 /** Debounce for the ship search, matching SkillPicker's skill search — a fast typist doesn't re-rank the ship list on every keystroke. */
 const SEARCH_DEBOUNCE_MS = 250;
 const SEARCH_LIMIT = 20;
@@ -80,19 +77,14 @@ export function MasteryPanel({
     if (!bundles) return null;
     return bundles.map((bundle, tier) => {
       const entries = bundle.map((s) => ({ skillTypeID: s.skillTypeID, targetLevel: s.level }));
-      const schedule = computeSkillPlanSchedule({
-        entries,
+      const scheduled = scheduleEntries(entries, {
         skills,
         trainedSkills,
         attributes,
         implants,
-        boosters: [],
-        markers: undefined,
-        markerAttributes: [],
         cloneState,
-        startDate: new Date(),
       });
-      return buildMasteryTierRow(tier, bundle, skills, trainedSkills, schedule.scheduled);
+      return buildMasteryTierRow(tier, bundle, skills, trainedSkills, scheduled);
     });
   }, [selected, masteries, skills, trainedSkills, attributes, implants, cloneState]);
 
@@ -169,21 +161,22 @@ export function MasteryPanel({
                 key={tierRow.tier}
                 expanded={expandedTier === tierRow.tier}
                 onToggle={() => toggle(tierRow.tier)}
-                label={t('skills.mastery.tierLabel', { roman: ROMAN[tierRow.tier] })}
+                label={t('skills.mastery.tierLabel', { roman: romanLevel(tierRow.tier + 1) })}
                 trailing={tierTrailing(tierRow)}
               >
                 <div className="space-y-1 p-3">
                   {tierRow.rows.map((row) => (
-                    <div key={row.skillTypeID} className="flex items-center gap-3 py-1 text-xs">
-                      <SkillStatusIcon status={row.status} />
-                      <span className="flex-1 text-text">{row.name}</span>
-                      <SkillBar level={row.currentLevel} />
-                      <span className="w-16 text-right text-text-dim tabular-nums">
-                        {row.status === 'trained'
+                    <SkillRow
+                      key={row.skillTypeID}
+                      name={row.name}
+                      status={row.status}
+                      currentLevel={row.currentLevel}
+                      timeLabel={
+                        row.status === 'trained'
                           ? t('skills.fitCheck.trained')
-                          : formatDuration(row.seconds)}
-                      </span>
-                    </div>
+                          : formatDuration(row.seconds)
+                      }
+                    />
                   ))}
                   {!tierRow.complete && tierRow.rows.length > 0 && target.plans !== undefined && (
                     <div className="flex items-center justify-end gap-2 pt-2">

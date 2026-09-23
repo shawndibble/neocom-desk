@@ -49,7 +49,7 @@ const FILES = [
   // Alpha clone skill caps, per clone grade (issue #1233); see `alphaMaxLevel`
   // on skills.json below.
   'chrCloneGradeSkills.csv',
-  // Ship Mastery tiers (issue #1366); see `masteries.json` below.
+  // Ship Mastery tiers; see `masteries.json` below.
   'certMasteries.csv',
   'certSkills.csv',
 ];
@@ -125,8 +125,8 @@ const CHAR_ATTR_NAMES = {
 };
 const SKILL_CATEGORY_ID = 16;
 const SHIP_CATEGORY_ID = 6;
-// Mastery tiers (issue #1366): certMasteries.csv's masteryLevel is 0-4 (5
-// tiers, I-V); certSkills.csv's certLevelInt is 1-5 for the same tiers, so
+// Mastery tiers: certMasteries.csv's masteryLevel is 0-4 (5 tiers, I-V);
+// certSkills.csv's certLevelInt is 1-5 for the same tiers, so
 // certLevelInt = masteryLevel + 1 is the join key between the two files.
 const MASTERY_TIER_COUNT = 5;
 // Ships carrying at least one mastery tier, as counted against the dump on

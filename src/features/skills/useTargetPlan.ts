@@ -1,9 +1,7 @@
 /**
- * Which Skill Plan Fit Check / the Market skill chip Add into. Wires
- * `targetPlan.ts`'s pure selection rule to the Character's live plans plus
- * the synced remembered choice. Deliberately different from
- * `SkillRowContextMenu.tsx`'s per-click plan submenu — that's right for a
- * one-off right-click, not for a panel where "Add" repeats.
+ * Which Skill Plan Fit Check / the Market skill chip Add into. Deliberately
+ * different from `SkillRowContextMenu.tsx`'s per-click plan submenu — that's
+ * right for a one-off right-click, not a panel where "Add" repeats.
  */
 import { useCallback, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';

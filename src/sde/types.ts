@@ -31,8 +31,8 @@ export interface SkillType {
  * -> the skill/level pairs that tier bundles. A tier CCP hasn't published for
  * that ship is an empty array, not a missing index — every ship in the map
  * carries exactly 5 tiers so a caller never has to guard the array length.
- * Built from Fuzzwork's `certMasteries.csv` + `certSkills.csv` (issue #1366)
- * — see `scripts/build-sde.mjs` for the join.
+ * Built from Fuzzwork's `certMasteries.csv` + `certSkills.csv` — see
+ * `scripts/build-sde.mjs` for the join.
  */
 export type MasteryMap = Record<string, SkillPrereq[][]>;
 
