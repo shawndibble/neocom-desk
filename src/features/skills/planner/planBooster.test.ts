@@ -1,10 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import type { PlanBooster } from '@/db';
 import {
+  BOOSTER_QUICK_PICKS,
   DEFAULT_PLAN_BOOSTER,
   MAX_BOOSTER_BONUS,
   clampBoosterBonus,
   boosterExpiryFromInput,
+  boosterExpiryFromNow,
   boosterExpiryToInput,
   normalizePlanBooster,
   resolvePlanBooster,
@@ -146,6 +148,29 @@ describe('resolvePlanBooster', () => {
       bonus: MAX_BOOSTER_BONUS,
       expiresAt: null,
     });
+  });
+});
+
+describe('boosterExpiryFromNow', () => {
+  it('is now plus the duration, in hours', () => {
+    const now = Date.UTC(2026, 8, 10, 12, 0, 0);
+    expect(boosterExpiryFromNow(1, now)).toBe(now + 60 * 60 * 1000);
+    expect(boosterExpiryFromNow(24, now)).toBe(now + 24 * 60 * 60 * 1000);
+  });
+
+  it('defaults to the real clock when no instant is given', () => {
+    const before = Date.now();
+    const result = boosterExpiryFromNow(1);
+    expect(result).toBeGreaterThanOrEqual(before + 60 * 60 * 1000);
+  });
+});
+
+describe('BOOSTER_QUICK_PICKS', () => {
+  it('is a fixed, ascending list of accelerator durations', () => {
+    const hours = BOOSTER_QUICK_PICKS.map((pick) => pick.hours);
+    expect(hours).toEqual([...hours].sort((a, b) => a - b));
+    expect(new Set(hours).size).toBe(hours.length);
+    expect(hours.length).toBeGreaterThan(0);
   });
 });
 

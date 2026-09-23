@@ -115,7 +115,9 @@ import {
   WHAT_IF_IMPLANT_PRESETS,
 } from './whatIfImplants';
 import {
+  BOOSTER_QUICK_PICKS,
   boosterExpiryFromInput,
+  boosterExpiryFromNow,
   boosterExpiryToInput,
   clampBoosterBonus,
   resolvePlanBooster,
@@ -447,6 +449,13 @@ export function PlanEditor({
     if (expiryDraft.text === '' && planBooster.expiresAt !== null) {
       patchBooster({ expiresAt: null });
     }
+  };
+  // Bypasses the datetime-local round trip entirely: a quick pick is a
+  // direct answer, not text to parse, so any half-typed draft it supersedes
+  // is dropped along with it.
+  const handleBoosterQuickPick = (hours: number): void => {
+    setExpiryDraft(null);
+    patchBooster({ expiresAt: boosterExpiryFromNow(hours) });
   };
 
   // Display-only "expired" hint: reads the wall clock, which is unavoidably
@@ -1546,6 +1555,27 @@ export function PlanEditor({
                   className="min-w-0 flex-1"
                 />
               </label>
+              {/* One click each, so the notice below has something to act
+                  on immediately instead of sending the user to a native
+                  date picker. */}
+              <div
+                role="group"
+                aria-label={t('plans.boosterQuickPicks')}
+                className="flex flex-wrap gap-1"
+              >
+                {BOOSTER_QUICK_PICKS.map(({ hours }) => (
+                  <button
+                    key={hours}
+                    type="button"
+                    onClick={() => handleBoosterQuickPick(hours)}
+                    className="min-h-7 rounded-xs border border-line px-1.5 text-[0.6875rem] text-text-dim hover:border-line-bright hover:text-text"
+                  >
+                    {hours % 24 === 0
+                      ? t('plans.boosterQuickPickDays', { days: hours / 24 })
+                      : t('plans.boosterQuickPickHours', { hours })}
+                  </button>
+                ))}
+              </div>
               {/* A blank expiry means no Booster is applied at all, so a
                   prefilled bonus would otherwise sit there looking active
                   while every number on the page ignored it. */}

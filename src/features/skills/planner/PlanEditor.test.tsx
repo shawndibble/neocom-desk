@@ -1098,6 +1098,17 @@ describe('a cerebral accelerator detected in the ESI sheet', () => {
 
     expect(screen.queryByText(/costed as if you had none/i)).toBeNull();
   });
+
+  it('sets the expiry in one click from a quick pick, clearing the warning', async () => {
+    const user = userEvent.setup();
+    renderEditor(vi.fn(), { attributeBaseline: ACCELERATED });
+    await openTools(user);
+
+    await user.click(screen.getByRole('button', { name: '+12h' }));
+
+    expect(screen.getByLabelText<HTMLInputElement>('Expires').value).not.toBe('');
+    expect(screen.queryByText(/costed as if you had none/i)).toBeNull();
+  });
 });
 
 /**

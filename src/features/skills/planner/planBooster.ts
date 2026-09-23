@@ -135,6 +135,39 @@ export function toBooster(planBooster: PlanBooster): Booster | null {
   return { bonus, expiresAt: new Date(planBooster.expiresAt) };
 }
 
+/** One quick-pick option: an accelerator duration, named in hours. */
+export interface BoosterQuickPick {
+  readonly hours: number;
+}
+
+/**
+ * Common cerebral-accelerator durations, ascending. Not sourced from ESI —
+ * nothing in the API exposes a duration list — so this is a curated set
+ * spanning the tiers players actually run, from the short combat/PI boosts up
+ * through the 30-day skill accelerators.
+ */
+export const BOOSTER_QUICK_PICKS: readonly BoosterQuickPick[] = [
+  { hours: 1 },
+  { hours: 4 },
+  { hours: 12 },
+  { hours: 24 },
+  { hours: 24 * 3 },
+  { hours: 24 * 7 },
+  { hours: 24 * 30 },
+];
+
+/**
+ * The expiry a quick pick sets: now plus the picked duration.
+ *
+ * Takes `now` as a parameter rather than reading the clock itself so the
+ * caller's own impurity is the only one on record (see `boosterExpired` in
+ * `PlanEditor`, which does the same for the same reason) and so this stays
+ * unit-testable without faking `Date`.
+ */
+export function boosterExpiryFromNow(hours: number, now: number = Date.now()): number {
+  return now + hours * 60 * 60 * 1000;
+}
+
 /** An instant as the local wall-clock string a `datetime-local` input takes. */
 export function boosterExpiryToInput(expiresAt: number | null): string {
   if (expiresAt === null) return '';
