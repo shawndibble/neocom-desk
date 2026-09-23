@@ -207,7 +207,7 @@ export function CompareDrawer({ location, refreshTick }: CompareDrawerProps) {
             onKeyDown={onHandleKeyDown}
             className={`h-1.5 shrink-0 border-b border-line ${mode === 'open' ? 'cursor-row-resize hover:bg-panel-2' : ''}`}
           />
-          <header className="flex min-h-8 items-center justify-between gap-2 border-b border-line px-3 py-1">
+          <header className="flex min-h-11 items-center justify-between gap-2 border-b border-line bg-panel-2 px-3 py-1 md:min-h-9">
             <h2 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
               {t('market.compare.handle', { count: items.length })}
             </h2>
