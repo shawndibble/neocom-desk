@@ -413,6 +413,14 @@ describe('search in the URL (issue #1306)', () => {
     expect(currentLocation()).toBe('/corp/assets/7?q=tri');
   });
 
+  it('keeps the query on drill-down links', async () => {
+    renderAssets('/corp/assets?q=tri');
+    expect(await screen.findByRole('link', { name: /Tritanium/ })).toHaveAttribute(
+      'href',
+      expect.stringMatching(/\?q=tri$/)
+    );
+  });
+
   it('writes typed text to the query without touching the drill-down path', async () => {
     renderAssets('/corp/assets/7');
     const search = await screen.findByPlaceholderText('Search items…');

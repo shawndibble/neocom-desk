@@ -31,7 +31,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useUrlParam } from '@/lib/useUrlState';
 import { textParam } from '@/lib/urlState';
 import { useTranslation } from 'react-i18next';
@@ -335,6 +335,8 @@ function CorpAssetsView() {
   // search reports across every division, so the two compose rather than
   // one replacing the other.
   const [search, setSearch] = useUrlParam('q', SEARCH_PARAM);
+  // Query string carried onto every drill-down link, as on the Assets page.
+  const { search: query } = useLocation();
   const [debouncedSearch, setDebouncedSearch] = useState(search);
   useEffect(() => {
     const id = setTimeout(() => setDebouncedSearch(search), SEARCH_DEBOUNCE_MS);
@@ -488,8 +490,8 @@ function CorpAssetsView() {
 
   const parentHref =
     resolved.trail.length > 0
-      ? corpAssetPathHref(pathGroupId, resolved.trail.slice(0, -1).map(assetNodeSegment))
-      : corpAssetPathHref(null, []);
+      ? corpAssetPathHref(pathGroupId, resolved.trail.slice(0, -1).map(assetNodeSegment)) + query
+      : corpAssetPathHref(null, []) + query;
   const currentLabel =
     resolved.trail.length > 0
       ? nodeLabel(resolved.trail[resolved.trail.length - 1], typeNames, t)
@@ -623,7 +625,10 @@ function CorpAssetsView() {
                 hint={t('assets.staleLink.hint')}
                 className="py-8"
                 action={
-                  <Button size="sm" onClick={() => void navigate(corpAssetPathHref(null, []))}>
+                  <Button
+                    size="sm"
+                    onClick={() => void navigate(corpAssetPathHref(null, []) + query)}
+                  >
                     {t('assets.staleLink.action')}
                   </Button>
                 }
@@ -667,6 +672,7 @@ function CorpAssetsView() {
                           onShowInfo={onShowInfo}
                           pathGroupId={pathGroupId}
                           pathSegments={pathSegments}
+                          query={query}
                           priceByTypeId={data?.priceByTypeId ?? EMPTY_PRICES}
                         />
                       </div>
@@ -703,6 +709,8 @@ interface BrowseRowViewProps {
   onShowInfo: (typeId: number, itemName: string) => void;
   pathGroupId: CorpAssetGroupId | null;
   pathSegments: readonly string[];
+  /** Current query string (`?q=…` or empty), kept on drill-down links. */
+  query: string;
   priceByTypeId: ReadonlyMap<number, number>;
 }
 
@@ -714,7 +722,7 @@ function BrowseRowView(props: BrowseRowViewProps) {
     const { group } = row;
     return (
       <LocationRow
-        href={corpAssetPathHref(group.id, [])}
+        href={corpAssetPathHref(group.id, []) + props.query}
         label={groupLabel(t, group.id, props.divisionNames)}
         security={undefined}
         jumpsAway={undefined}
@@ -743,7 +751,7 @@ function BrowseRowView(props: BrowseRowViewProps) {
       estimatedValue={estimatedValueFor(match.node.asset, props.priceByTypeId)}
       trail={match.trail}
       security={undefined}
-      href={corpAssetPathHref(match.groupId, match.segments)}
+      href={corpAssetPathHref(match.groupId, match.segments) + props.query}
       characterBadge={null}
       t={t}
     />
@@ -762,6 +770,7 @@ function NodeRowView({
   onShowInfo,
   pathGroupId,
   pathSegments,
+  query,
   priceByTypeId,
 }: BrowseRowViewProps & { node: AssetTreeNode }) {
   const label = nodeLabel(node, typeNames, t);
@@ -769,7 +778,7 @@ function NodeRowView({
   if (node.kind !== 'item') {
     return (
       <ContainerRow
-        href={corpAssetPathHref(pathGroupId, [...pathSegments, assetNodeSegment(node)])}
+        href={corpAssetPathHref(pathGroupId, [...pathSegments, assetNodeSegment(node)]) + query}
         label={label}
         itemCount={node.itemCount}
         estimatedValue={node.estimatedValue}
