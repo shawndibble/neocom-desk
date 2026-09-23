@@ -12,3 +12,6 @@ test-results
 
 # Screenshots the Advisor spec captures for review. Artifacts, not fixtures.
 e2e-output/
+
+# Brainstorming visual companion mockups
+.superpowers/

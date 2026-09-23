@@ -117,9 +117,9 @@ export async function applyBuildPlanChange(planId: string, change: BuildPlanChan
 
 /**
  * Patches several stored plans in one transaction — a Retarget, a group
- * delete orphaning its members, a group Auto Build. `patch` is either one
- * patch for all of them or a per-plan function; returning `null` leaves that
- * plan untouched. Every written plan shares one `updatedAt`.
+ * Auto Build. `patch` is either one patch for all of them or a per-plan
+ * function; returning `null` leaves that plan untouched. Every written plan
+ * shares one `updatedAt`.
  */
 export async function patchBuildPlans(
   planIds: readonly string[],

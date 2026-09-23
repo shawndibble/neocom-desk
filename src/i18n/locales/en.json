@@ -689,7 +689,7 @@
     "newGroupName": "New group",
     "renameGroup": "Rename group",
     "deleteGroup": "Delete group",
-    "deleteGroupConfirm": "Delete this group? Its build plans are kept and reappear in the ungrouped list.",
+    "deleteGroupConfirm": "Delete this group? All build plans in it will also be deleted.",
     "toggleGroup": "Show or hide the plans in {{name}}",
     "moveToGroup": "Move to group",
     "removeFromGroup": "No group",

@@ -15,6 +15,7 @@ import {
   type BuildGroupSnapshot,
   type BuildGroupsValue,
 } from './buildGroups';
+import { markBuildPlansDeleted } from '@/sync';
 import { patchBuildPlans } from './buildPlanStore';
 import { retargetPatch } from './retargetPatch';
 
@@ -25,21 +26,19 @@ export interface BuildGroupWriteContext {
 }
 
 /**
- * Deletes a Build Group: orphans its members before removing the group's own
- * record. Write order matters and is owned here — membership goes first and
- * the group's own record last, so the group always outlives what points at
- * it (see `buildGroups.ts`'s module comment). Never cascades to the members
- * themselves; they reappear in the ungrouped list.
+ * Deletes a Build Group and every member plan in it, then removes the
+ * group's own record. Write order matters and is owned here — the members
+ * go first and the group's own record last, so the group always outlives
+ * what points at it (see `buildGroups.ts`'s module comment).
  */
 export async function deleteBuildGroup(
   groupId: string,
   members: readonly BuildPlanRecord[],
   context: BuildGroupWriteContext
 ): Promise<void> {
-  // Undefined drops the key: `buildPlanStore`'s patch semantics.
-  await patchBuildPlans(
-    members.map((m) => m.id),
-    { buildGroupId: undefined }
+  await markBuildPlansDeleted(
+    context.characterId,
+    members.map((m) => m.id)
   );
   await context.setBuildGroups(removeBuildGroup(context.buildGroups, context.characterId, groupId));
 }

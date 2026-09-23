@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   ensureSignedIn,
   markBuildPlanDeleted,
+  markBuildPlansDeleted,
   markPlanDeleted,
   purgeCharacterRemoteDataOrDefer,
   scheduleSync,
@@ -19,6 +20,7 @@ const driver = vi.hoisted(() => ({
   scheduleSync: vi.fn(),
   markPlanDeleted: vi.fn(async () => {}),
   markBuildPlanDeleted: vi.fn(async () => {}),
+  markBuildPlansDeleted: vi.fn(async () => {}),
   setSyncedSetting: vi.fn(async () => {}),
 }));
 vi.mock('./planSync', () => driver);
@@ -42,10 +44,12 @@ describe('lazy sync driver', () => {
     await triggerSync(7);
     await markPlanDeleted(7, 'p1');
     await markBuildPlanDeleted(7, 'b1');
+    await markBuildPlansDeleted(7, ['b2', 'b3']);
     await setSyncedSetting('sync.hub', 60003760);
     expect(driver.triggerSync).toHaveBeenCalledWith(7);
     expect(driver.markPlanDeleted).toHaveBeenCalledWith(7, 'p1');
     expect(driver.markBuildPlanDeleted).toHaveBeenCalledWith(7, 'b1');
+    expect(driver.markBuildPlansDeleted).toHaveBeenCalledWith(7, ['b2', 'b3']);
     expect(driver.setSyncedSetting).toHaveBeenCalledWith('sync.hub', 60003760);
   });
 
