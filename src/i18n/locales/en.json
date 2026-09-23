@@ -1588,6 +1588,33 @@
       "volumeStat": "Volume mined",
       "dateRangeStat": "Date range",
       "daysCoveredStat": "Days covered",
+      "priceSourceStat": "Price source",
+      "priceSourceValue": "{{count}} of {{total}} days saved",
+      "priceSourceMix": "{{average}} day(s) use daily avg · {{live}} live",
+      "priceSourceLive": "Live, every day",
+      "priceSource": {
+        "saved": "Saved",
+        "average": "Daily avg",
+        "live": "Live",
+        "none": "No price"
+      },
+      "valueMenu": "Value",
+      "settingsTitle": "Page settings",
+      "basis": {
+        "title": "Price basis",
+        "buy": "Jita buy",
+        "sell": "Jita sell",
+        "nowOf": "Now · {{side}}",
+        "buyOption": "Jita buy",
+        "buyHint": "Saved buy price on the day mined",
+        "sellOption": "Jita sell",
+        "sellHint": "Saved sell price on the day mined",
+        "nowOption": "Now",
+        "nowHint": "Today's live price, for every day",
+        "fallbackNote": "Days with no saved price use ESI's daily average, or today's live price before ESI publishes the day. Each row is marked.",
+        "summaryDay": "Valued at {{price}} on the day mined.",
+        "summaryNow": "Valued at today's live {{price}} price for every day."
+      },
       "daysCoveredValue": "{{count}} of {{total}}",
       "historyStartsHint": "Saved history starts {{date}}",
       "range": {

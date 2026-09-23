@@ -40,24 +40,48 @@ import {
   writeCached,
 } from '@/esi/cache';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
+import { getHubPrices } from '@/market/prices';
+import {
+  PRICE_BASES,
+  resolveUnitPrice,
+  weakestSource,
+  type PriceBasis,
+  type PriceSource,
+  type SidePrices,
+  type SnapshotDay,
+} from '@/engine/miningTax/priceBasis';
+import { eveToday } from '@/engine/miningTax/yieldRange';
+import { loadPriceSnapshots, saveTodayPriceSnapshot } from './priceSnapshots';
 
 export interface TrackedCharacter {
   characterId: number;
   characterName: string;
 }
 
-export interface MiningYieldRow {
+/** One row valued on one price basis (issue #1279). */
+export interface BasisValuation {
+  valuation: EntryValuation;
+  /**
+   * Price of each material the row's ore reprocesses into, for the detail
+   * modal's refined-output list. The same prices `valuation` was built from,
+   * kept rather than recomputed so the list and the total can never disagree;
+   * a material with no price on this basis is simply absent.
+   */
+  materialUnitPrices: ReadonlyMap<number, number>;
+  /** Where the row's ore prices came from — the weakest across its lines (`weakestSource`). */
+  priceSource: PriceSource;
+}
+
+export interface MiningYieldRow extends BasisValuation {
   characterId: number;
   characterName: string;
   entry: MiningYieldEntry;
-  valuation: EntryValuation;
   /**
-   * Mined-date price of each material the row's ore reprocesses into, for the
-   * detail modal's refined-output list. The same prices `valuation` was built
-   * from, kept rather than recomputed so the list and the total can never
-   * disagree; a material ESI had no history for on that date is simply absent.
+   * The row valued on every basis, so switching basis on the page never
+   * refetches. The row's own `valuation`/`materialUnitPrices`/`priceSource`
+   * are the default `buy` basis; the page swaps in the chosen one.
    */
-  materialUnitPrices: ReadonlyMap<number, number>;
+  byBasis: Record<PriceBasis, BasisValuation>;
 }
 
 export interface MiningYieldSnapshot {
@@ -272,6 +296,32 @@ export async function loadMiningYieldSnapshot(): Promise<MiningYieldSnapshot> {
     if (attempt.reason instanceof EsiError && attempt.reason.status === 400) continue;
     throw attempt.reason;
   }
+  // Today's live Jita book for every priced type, saved as today's snapshot
+  // before anything reads the snapshots back — so today prices as "saved".
+  // `getHubPrices` never throws (a null price per type when Fuzzwork is down);
+  // a failed save only costs today's snapshot, never the page.
+  const today = eveToday();
+  const hubPrices = await getHubPrices(DEFAULT_TRADE_HUB, historyTypeIds);
+  const livePrices = new Map<number, SidePrices>();
+  const todaySnapshot: SnapshotDay = {};
+  for (const typeId of historyTypeIds) {
+    const aggregate = hubPrices.get(typeId);
+    const buy = aggregate?.buyMax ?? null;
+    const sell = aggregate?.sellMin ?? null;
+    const prices: SidePrices = {
+      buy: buy && buy > 0 ? buy : null,
+      sell: sell && sell > 0 ? sell : null,
+    };
+    livePrices.set(typeId, prices);
+    if (prices.buy !== null || prices.sell !== null) todaySnapshot[typeId] = prices;
+  }
+  try {
+    await saveTodayPriceSnapshot(today, todaySnapshot);
+  } catch {
+    // Storage full or blocked: the page still prices from what it has.
+  }
+  const savedByDate = await loadPriceSnapshots().catch(() => new Map<string, SnapshotDay>());
+
   const priceByTypeAndDate = new Map<number, Map<string, number>>();
   for (const [typeId, result] of histories) {
     const byDate = new Map<string, number>();
@@ -286,39 +336,56 @@ export async function loadMiningYieldSnapshot(): Promise<MiningYieldSnapshot> {
     )
   );
 
+  const priceOn = (typeId: number, date: string, basis: PriceBasis) =>
+    resolveUnitPrice(
+      {
+        saved: savedByDate.get(date)?.[typeId],
+        average: priceByTypeAndDate.get(typeId)?.get(date),
+        live: livePrices.get(typeId),
+      },
+      basis,
+      date,
+      today
+    );
+
   const rows: MiningYieldRow[] = allEntries.map(({ characterId, characterName, entry }) => {
-    const rawUnitPrices = new Map<number, number>();
-    const materialPrices: Record<number, number> = {};
-    for (const line of entry.oreLines) {
-      const price = priceByTypeAndDate.get(pricingTypeId(line.typeId))?.get(entry.date);
-      if (price !== undefined) rawUnitPrices.set(line.typeId, price);
-      const reprocessing = reprocessingByTypeId.get(line.typeId);
-      for (const material of reprocessing?.materials ?? []) {
-        const materialPrice = priceByTypeAndDate.get(material.typeId)?.get(entry.date);
-        if (materialPrice !== undefined) materialPrices[material.typeId] = materialPrice;
-      }
-    }
     const { skills, trained } = skillsByCharacter.get(characterId) ?? {
       skills: NO_SKILLS,
       trained: NO_TRAINED,
     };
-    const valuation = valueMiningYield(
-      entry.oreLines,
-      rawUnitPrices,
-      reprocessingByTypeId,
-      skills,
-      trained,
-      materialPrices
-    );
-    return {
-      characterId,
-      characterName,
-      entry,
-      valuation,
-      materialUnitPrices: new Map(
-        Object.entries(materialPrices).map(([typeId, price]) => [Number(typeId), price])
-      ),
+    const valueOn = (basis: PriceBasis): BasisValuation => {
+      const rawUnitPrices = new Map<number, number>();
+      const materialPrices: Record<number, number> = {};
+      const sources: PriceSource[] = [];
+      for (const line of entry.oreLines) {
+        const raw = priceOn(pricingTypeId(line.typeId), entry.date, basis);
+        sources.push(raw.source);
+        if (raw.price !== undefined) rawUnitPrices.set(line.typeId, raw.price);
+        const reprocessing = reprocessingByTypeId.get(line.typeId);
+        for (const material of reprocessing?.materials ?? []) {
+          const materialPrice = priceOn(material.typeId, entry.date, basis).price;
+          if (materialPrice !== undefined) materialPrices[material.typeId] = materialPrice;
+        }
+      }
+      return {
+        valuation: valueMiningYield(
+          entry.oreLines,
+          rawUnitPrices,
+          reprocessingByTypeId,
+          skills,
+          trained,
+          materialPrices
+        ),
+        materialUnitPrices: new Map(
+          Object.entries(materialPrices).map(([typeId, price]) => [Number(typeId), price])
+        ),
+        priceSource: weakestSource(sources),
+      };
     };
+    const byBasis = Object.fromEntries(
+      PRICE_BASES.map((basis) => [basis, valueOn(basis)])
+    ) as Record<PriceBasis, BasisValuation>;
+    return { characterId, characterName, entry, ...byBasis.buy, byBasis };
   });
 
   const [systemRows, typeNames, sdeTypes] = await Promise.all([
