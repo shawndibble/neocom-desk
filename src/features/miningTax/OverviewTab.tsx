@@ -64,9 +64,7 @@ import {
   ShowRefiningToggle,
   ValueMenu,
 } from './OverviewSettings';
-import { formatIsk } from '@/lib/isk';
 import { basisSummary } from './basisLabel';
-import { rawValueFormula } from './priceFormula';
 import { weakestSource, type PriceSource } from '@/engine/miningTax/priceBasis';
 import { YieldDetailModal } from './YieldDetailModal';
 import { sumVolume, volumeDisplayMode } from './volume';
@@ -354,32 +352,12 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
       render: (row) => <IskAmount value={row.valuation.rawValue} revealOn="tap" decimals={0} />,
       sortValue: (row) => row.valuation.rawValue,
     },
-    priceFormula: {
-      id: 'priceFormula',
-      header: t('miningTax.overview.priceFormulaColumn'),
-      className: 'whitespace-nowrap text-[0.6875rem] tabular-nums',
-      // The full-price lines on the chosen basis, so the unit price shown is
-      // the market price the rate then discounts, not an already-scaled one.
-      render: (row) => {
-        const formula = rawValueFormula(row.byBasis[basis].valuation.lines, buybackRate);
-        return (
-          <ul>
-            {formula.terms.map((term) => (
-              <li key={term.typeId}>
-                <span className="text-text-dim">
-                  {data?.typeNames.get(term.typeId) ?? `#${term.typeId}`}
-                </span>{' '}
-                {term.quantity.toLocaleString()} ×{' '}
-                {term.unitPrice === null
-                  ? t('miningTax.overview.priceFormulaNoPrice')
-                  : formatIsk(term.unitPrice, 2)}
-              </li>
-            ))}
-            {formula.ratePct !== 100 && <li className="text-text-dim">× {formula.ratePct}%</li>}
-            <li className="font-semibold">= {formatIsk(formula.total, 0)}</li>
-          </ul>
-        );
-      },
+    total: {
+      id: 'total',
+      header: t('miningTax.overview.totalColumn'),
+      align: 'right',
+      className: 'whitespace-nowrap',
+      render: (row) => <IskAmount value={row.valuation.rawValue} revealOn="tap" decimals={0} />,
       sortValue: (row) => row.valuation.rawValue,
     },
     refineValue: {
