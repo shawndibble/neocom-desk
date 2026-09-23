@@ -174,6 +174,49 @@ describe('SkillCompare', () => {
     expect(rowByFirstCell(table, 'Spaceship Command')).toBeInTheDocument();
   });
 
+  it('keeps the selection and differing-only toggle in the URL, and restores them on a fresh visit', async () => {
+    const user = userEvent.setup();
+    const { unmount } = render(<App />);
+
+    await user.click(within(await picker()).getByRole('button', { name: /Pilot One/ }));
+    await user.click(within(await picker()).getByRole('button', { name: /Pilot Two/ }));
+    await screen.findByRole('table', { name: 'Skill comparison' });
+    await user.click(screen.getByRole('button', { name: 'Differing only' }));
+    await waitFor(() => {
+      expect(new URLSearchParams(window.location.search).get('ids')).toBe(`${CHAR_A},${CHAR_B}`);
+      expect(window.location.search).toContain('differingOnly=1');
+    });
+
+    unmount();
+    render(<App />);
+    await screen.findByRole('table', { name: 'Skill comparison' });
+    expect(within(await picker()).getByRole('button', { name: /Pilot One/ })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+    expect(within(await picker()).getByRole('button', { name: /Pilot Two/ })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+    expect(screen.getByRole('button', { name: 'Differing only' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+  });
+
+  it('prunes an unknown character id from a hand-edited URL instead of showing a ghost column', async () => {
+    window.history.pushState({}, '', `/skills/compare?ids=${CHAR_A},${CHAR_B},999999`);
+    render(<App />);
+    const table = await screen.findByRole('table', { name: 'Skill comparison' });
+    const headers = within(table)
+      .getAllByRole('columnheader')
+      .map((header) => header.textContent);
+    expect(headers).not.toContain('#999999');
+    await waitFor(() => {
+      expect(new URLSearchParams(window.location.search).get('ids')).toBe(`${CHAR_A},${CHAR_B}`);
+    });
+  });
+
   it('saves the current selection, lists it, and reloads it after deselecting', async () => {
     const user = userEvent.setup();
     render(<App />);

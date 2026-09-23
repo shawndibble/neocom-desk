@@ -45,6 +45,8 @@ import {
 import { stripEveMarkup } from '@/features/skills/typeDisplay';
 import { useMailFolders } from '@/features/character/mailFolderPref';
 import { cx } from '@/lib/cx';
+import { useUrlParams } from '@/lib/useUrlState';
+import { boolParam, textParam } from '@/lib/urlState';
 import { useTimeZone } from '@/lib/timeFormat';
 import { formatDateOnly, formatTimestamp } from '@/lib/timestamp';
 import {
@@ -68,6 +70,10 @@ import type {
 
 // Matches Market.tsx's/SkillPicker.tsx's/Assets.tsx's own search debounce.
 const SEARCH_DEBOUNCE_MS = 250;
+
+const SEARCH_PARAM = textParam();
+const HIDE_READ_PARAM = boolParam();
+const MAIL_FILTER_PARAMS = { search: SEARCH_PARAM, hideRead: HIDE_READ_PARAM };
 
 const TAB_LABEL_KEY: Record<MailTab, string> = {
   inbox: 'mail.tabInbox',
@@ -221,19 +227,22 @@ export function Mail() {
   // waits on the network — independent of `markMailReadOnEsi`'s own write
   // below. Set on selection, not toggled — no manual mark-unread control.
   const [locallyReadIds, setLocallyReadIds] = useState<ReadonlySet<number>>(new Set());
-  const [hideRead, setHideRead] = useState(false);
   function markLocalRead(mailId: number) {
     setLocallyReadIds((previous) =>
       previous.has(mailId) ? previous : new Set(previous).add(mailId)
     );
   }
 
-  const [search, setSearch] = useState('');
+  // Short-lived view state (ADR 0015): survives a reload, absent when default.
+  const [filters, setFilters] = useUrlParams(MAIL_FILTER_PARAMS);
+  const { search, hideRead } = filters;
+  const setSearch = (value: string) => setFilters({ search: value });
+  const setHideRead = (value: boolean) => setFilters({ hideRead: value });
   // Debounced separately from `search` (matches Assets.tsx/Market.tsx/
   // SkillPicker.tsx's own search debounce, issue #416): the input stays
   // instantly responsive, only the filter over potentially hundreds of
   // headers below waits out the debounce.
-  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState(search);
   useEffect(() => {
     const id = setTimeout(() => setDebouncedSearch(search), SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(id);
@@ -539,7 +548,7 @@ export function Mail() {
               <FilterChip
                 label={t('mail.hideRead')}
                 selected={hideRead}
-                onToggle={() => setHideRead((v) => !v)}
+                onToggle={() => setHideRead(!hideRead)}
                 size="md"
               />
             </div>
