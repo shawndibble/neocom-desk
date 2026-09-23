@@ -32,6 +32,14 @@ import { loadCompressedOreTypeIds, loadReprocessing, loadTypes } from '@/sde/loa
 import { loadTypeNames } from '@/features/character/typeNames';
 import { loadSystemNameAndSecurity } from '@/features/character/systemSecurity';
 import { DEFAULT_TRADE_HUB } from '@/market/hubs';
+import { getUniverseType } from '@/esi/endpoints';
+import {
+  GLOBAL_CACHE_CHARACTER_ID,
+  STALE_AFTER,
+  readCachedEntries,
+  writeCached,
+} from '@/esi/cache';
+import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
 
 export interface TrackedCharacter {
   characterId: number;
@@ -60,7 +68,11 @@ export interface MiningYieldSnapshot {
   systemSecurity: Map<number, number>;
   /** Ore/ice/gas types AND the materials they reprocess into — the detail modal names both. */
   typeNames: Map<number, string>;
-  /** m³ of one unit, from the SDE bake. Missing for a type the bake doesn't carry. */
+  /**
+   * m³ of one unit, from the SDE bake, falling back to a live ESI lookup for
+   * a type the bake doesn't carry (issue #1283). Missing only for a type ESI
+   * itself has no volume for, or one a fetch failure left unresolved.
+   */
   typeVolumes: Map<number, number>;
   fetchedAt: Date | null;
   fromCache: boolean;
@@ -95,6 +107,72 @@ async function loadReprocessingSkills(
     },
     trained: corrected.trained,
   };
+}
+
+function volumeCacheKey(typeId: number): string {
+  return `type-volume:${typeId}`;
+}
+
+/**
+ * Volumes for types the SDE bake has no entry for (issue #1283) — mainly the
+ * hand-tagged overrides in `typeOverrides.ts`, which add ore/ice variants the
+ * bake never carried a row for. Cached under `STALE_AFTER.static`, same as
+ * `typeNames.ts`'s name cache: a type's volume is as immutable as its name.
+ * A cached `null` means ESI itself confirmed the type has no volume — cached
+ * rather than re-asked every load, the same way a real volume is. Only a
+ * type with NO cache entry at all blocks the caller; a merely stale one is
+ * served as-is with a background refresh fired, same tradeoff `typeNames.ts`
+ * makes for exactly the reason its header explains: a page holding one of
+ * these types must not block on live ESI on every render.
+ */
+async function resolveMissingVolumes(typeIds: readonly number[]): Promise<Map<number, number>> {
+  const resolved = new Map<number, number>();
+  if (typeIds.length === 0) return resolved;
+
+  const cached = await readCachedEntries<number | null>(
+    GLOBAL_CACHE_CHARACTER_ID,
+    typeIds.map(volumeCacheKey)
+  );
+  const now = Date.now();
+  const unknown: number[] = [];
+  const lapsed: number[] = [];
+  for (const typeId of typeIds) {
+    const row = cached.get(volumeCacheKey(typeId));
+    if (row === undefined) {
+      unknown.push(typeId);
+      continue;
+    }
+    if (row.value !== null) resolved.set(typeId, row.value);
+    if (now - row.fetchedAt >= STALE_AFTER.static) lapsed.push(typeId);
+  }
+  if (unknown.length === 0) {
+    // Never awaited: the caller already has everything it needs from cache.
+    if (lapsed.length > 0) void fetchVolumesFromEsi(lapsed).catch(() => {});
+    return resolved;
+  }
+  for (const [typeId, volume] of await fetchVolumesFromEsi([...unknown, ...lapsed])) {
+    if (volume !== null) resolved.set(typeId, volume);
+  }
+  return resolved;
+}
+
+/** The network half: per-id GET, caching both a real volume and a confirmed "no volume" as `null`. Never rejects. */
+async function fetchVolumesFromEsi(typeIds: number[]): Promise<Map<number, number | null>> {
+  const map = new Map<number, number | null>();
+  const now = Date.now();
+  await mapWithConcurrencyLimit(typeIds, ESI_FANOUT_CONCURRENCY, async (typeId) => {
+    try {
+      const { data } = await getUniverseType(typeId);
+      if (!data) return; // 304 Not Modified: unreachable, no etag is ever sent here.
+      const volume = typeof data.volume === 'number' ? data.volume : null;
+      map.set(typeId, volume);
+      await writeCached(GLOBAL_CACHE_CHARACTER_ID, volumeCacheKey(typeId), volume, now);
+    } catch {
+      // Genuinely unresolvable, or offline mid-fallback: leave it uncached —
+      // the caller's own stale cached value (if any) already stands.
+    }
+  });
+  return map;
 }
 
 export async function loadMiningYieldSnapshot(): Promise<MiningYieldSnapshot> {
@@ -251,10 +329,14 @@ export async function loadMiningYieldSnapshot(): Promise<MiningYieldSnapshot> {
     loadTypes(),
   ]);
   const typeVolumes = new Map<number, number>();
+  const typeIdsMissingVolume: number[] = [];
   for (const typeId of rawTypeIds) {
     const volume = sdeTypes[String(typeId)]?.volume;
     if (typeof volume === 'number') typeVolumes.set(typeId, volume);
+    else typeIdsMissingVolume.push(typeId);
   }
+  const esiVolumes = await resolveMissingVolumes(typeIdsMissingVolume);
+  for (const [typeId, volume] of esiVolumes) typeVolumes.set(typeId, volume);
   const systemNames = new Map<number, string>();
   const systemSecurity = new Map<number, number>();
   for (const { id, name, security } of systemRows) {

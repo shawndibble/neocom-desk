@@ -1574,6 +1574,9 @@
     "unknownPayee": "Unknown Payee",
     "overview": {
       "volumeColumn": "Volume (m³)",
+      "volumeMissingLabel": "Volume incomplete",
+      "volumeMissingTooltip": "No known volume for: {{types}}. Total is a partial sum.",
+      "volumeStatWarning": "{{count}} ore type(s) have no known volume. Total is partial.",
       "rawSellValue": "Raw sell value",
       "refineValue": "Refined value",
       "pricingColumn": "Pricing",
