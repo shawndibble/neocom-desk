@@ -13,8 +13,10 @@ import {
   Tooltip,
   Legend,
   Bar,
+  Cell,
   type TooltipContentProps,
 } from 'recharts';
+import type { PriceSource } from '@/engine/miningTax/priceBasis';
 import { useTranslation } from 'react-i18next';
 import { COMPACT_ISK_Y_AXIS_MARGIN_LEFT, COMPACT_ISK_Y_AXIS_WIDTH } from '@/lib/chartAxis';
 import { formatIsk, formatIskCompact } from '@/lib/isk';
@@ -22,7 +24,18 @@ import { formatIsk, formatIskCompact } from '@/lib/isk';
 export interface DailyRatePoint {
   date: string;
   iskPerHour: number;
+  /** The day's weakest price source (issue #1279); null on a day with no mining. */
+  source: PriceSource | null;
 }
+
+/** Bar colour per price source — the same meaning as the table's tags. */
+const SOURCE_FILL: Record<PriceSource, string> = {
+  saved: 'var(--color-accent)',
+  average: 'var(--color-warning)',
+  live: 'var(--color-accent-dim)',
+  none: 'var(--color-line-bright)',
+};
+const LEGEND_SOURCES: PriceSource[] = ['saved', 'average', 'live'];
 
 export interface TypeComparisonPoint {
   typeId: number;
@@ -115,14 +128,26 @@ export default function MiningYieldCharts({ dailyRate, typeComparison }: MiningY
                 tickFormatter={(value: number) => formatIskCompact(value)}
               />
               <Tooltip content={(props) => <RateTooltip {...props} />} />
-              <Bar
-                dataKey="iskPerHour"
-                fill="var(--color-accent)"
-                name={t('miningTax.overview.iskPerHour')}
-              />
+              <Bar dataKey="iskPerHour" name={t('miningTax.overview.iskPerHour')}>
+                {dailyRate.map((point) => (
+                  <Cell key={point.date} fill={SOURCE_FILL[point.source ?? 'saved']} />
+                ))}
+              </Bar>
             </BarChart>
           </ResponsiveContainer>
         </div>
+        <ul className="mt-1 flex flex-wrap gap-x-3.5 text-[0.6875rem] text-text-dim">
+          {LEGEND_SOURCES.map((source) => (
+            <li key={source} className="flex items-center gap-1">
+              <span
+                aria-hidden="true"
+                className="size-2"
+                style={{ background: SOURCE_FILL[source] }}
+              />
+              {t(`miningTax.overview.priceSource.${source}`)}
+            </li>
+          ))}
+        </ul>
       </div>
 
       <div>
