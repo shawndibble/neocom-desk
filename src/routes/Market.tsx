@@ -125,6 +125,7 @@ import {
   type SolarSystemLookup,
   type OrderBookSummary,
 } from '@/engine/market/orderBook';
+import { securityStatusColor } from '@/engine/securityStatus';
 import {
   ALL_REGIONS,
   regionsForSystems,
@@ -260,6 +261,7 @@ const SELL_ORDER_COLUMN_IDS: readonly MarketOrderColumnId[] = [
   'price',
   'quantity',
   'location',
+  'security',
   'jumps',
   'expiry',
 ];
@@ -288,6 +290,21 @@ function LocationCell({ order, npcStations, solarSystems, t }: LocationCellProps
   // book. The full form survives where it is pasted or exported rather than
   // scanned — `OrderRowContextMenu`'s copy action and `orderBookCsv`.
   return <span>{location.stationName ?? t('market.unknownStructure')}</span>;
+}
+
+/** Security dropped from `LocationCell` (see above) lives here instead, as its own optional column. */
+function SecurityCell({ order, npcStations, solarSystems, t }: LocationCellProps) {
+  const { security } = resolveOrderLocation(order, npcStations, solarSystems);
+  const value = security.toFixed(1);
+  return (
+    <span
+      className="tabular-nums font-semibold"
+      style={{ color: securityStatusColor(security) }}
+      title={t('market.securityAriaLabel', { value })}
+    >
+      {value}
+    </span>
+  );
 }
 
 interface BrowserFilterBarProps {
@@ -1258,6 +1275,16 @@ export function Market() {
         header: t('market.location'),
         render: (o) => (
           <LocationCell order={o} npcStations={npcStationMap} solarSystems={solarSystemMap} t={t} />
+        ),
+      },
+      security: {
+        id: 'security',
+        header: t('market.securityColumn'),
+        align: 'right',
+        className: 'tabular-nums',
+        sortValue: (o) => resolveOrderLocation(o, npcStationMap, solarSystemMap).security,
+        render: (o) => (
+          <SecurityCell order={o} npcStations={npcStationMap} solarSystems={solarSystemMap} t={t} />
         ),
       },
       jumps: {

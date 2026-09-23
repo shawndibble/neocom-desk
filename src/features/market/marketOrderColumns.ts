@@ -8,7 +8,7 @@ import { createLocalSetting } from '@/lib/useLocalSetting';
 
 /**
  * In table column order. Sell only ever renders the `baseColumns` prefix
- * (`price` through `jumps`); Buy adds `range` and `minVolume` after `expiry`.
+ * (`price` through `expiry`); Buy adds `range` and `minVolume` after `expiry`.
  * Neither table can lose its columns entirely — there is no identity column
  * here to hold back, but every id defaults visible below, so a picker fresh
  * off this release changes nothing until a pilot actually opens it.
@@ -17,6 +17,7 @@ export const MARKET_ORDER_COLUMN_IDS = [
   'price',
   'quantity',
   'location',
+  'security',
   'jumps',
   'expiry',
   'range',

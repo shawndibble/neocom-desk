@@ -3095,6 +3095,8 @@
     "price": "Price",
     "quantity": "Quantity",
     "location": "Location",
+    "securityColumn": "Security",
+    "securityAriaLabel": "Security status: {{value}}",
     "jumpsColumn": "Jumps",
     "jumpsUnavailableHint": "No stargate route connects this system to your current one.",
     "expiry": "Expires",
