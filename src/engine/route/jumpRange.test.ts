@@ -40,6 +40,8 @@ describe('jumpRangeSystems', () => {
     expect(jumpRangeSystems(JUMPS, '5')).toEqual(new Set([HERE, NEAR, MID]));
     expect(jumpRangeSystems(JUMPS, '3')).toEqual(new Set([HERE, NEAR]));
     expect(jumpRangeSystems(JUMPS, '10')).toEqual(new Set([HERE, NEAR, MID]));
+    expect(jumpRangeSystems(JUMPS, '15')).toEqual(new Set([HERE, NEAR, MID, FAR]));
+    expect(jumpRangeSystems(JUMPS, '20')).toEqual(new Set([HERE, NEAR, MID, FAR]));
   });
 });
 

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactElement, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import { usePageTab } from '@/lib/usePageTab';
@@ -271,6 +271,9 @@ interface BrowserFilterBarProps {
   /** Distance, Security and NPC stations only are Region mode only; Hub mode is one NPC station. */
   regionMode: boolean;
   currentSystem: CurrentSystemState;
+  /** The item tabs: the funnel sits at the end of their line rather than a row of its own. */
+  leading: ReactNode;
+  className?: string;
 }
 
 /**
@@ -284,10 +287,19 @@ function BrowserFilterBar({
   activeCount,
   regionMode,
   currentSystem,
+  leading,
+  className,
 }: BrowserFilterBarProps) {
   const { t } = useTranslation();
   return (
-    <FilterBar value={value} onChange={onChange} activeCount={activeCount} collapsible>
+    <FilterBar
+      value={value}
+      onChange={onChange}
+      activeCount={activeCount}
+      collapsible
+      search={leading}
+      className={className}
+    >
       {(draft, setDraft) => (
         <>
           {regionMode && (
@@ -1458,6 +1470,23 @@ export function Market() {
     refreshTick,
   ]);
 
+  const itemTabs = (
+    <Tabs
+      tabs={[
+        { id: 'orders', label: t('market.tabOrders') },
+        { id: 'history', label: t('market.tabHistory') },
+      ]}
+      value={itemTab}
+      onChange={(id) => setItemTab(id as 'orders' | 'history')}
+      label={t('market.itemTabsLabel')}
+      className="min-w-0 flex-1"
+    />
+  );
+  // Only "can't measure" earns a line: a range that applies needs no caption.
+  const jumpNoteShown =
+    regionMode && (jumpRangeFilter.status === 'no-origin' || jumpRangeFilter.status === 'unknown');
+  const failedRegionCount = loadedView?.failedRegionIds.length ?? 0;
+
   return (
     <div className="mx-auto max-w-6xl space-y-4">
       <PageHeader
@@ -1687,16 +1716,19 @@ export function Market() {
               />
             ) : (
               <>
-                <Tabs
-                  tabs={[
-                    { id: 'orders', label: t('market.tabOrders') },
-                    { id: 'history', label: t('market.tabHistory') },
-                  ]}
-                  value={itemTab}
-                  onChange={(id) => setItemTab(id as 'orders' | 'history')}
-                  label={t('market.itemTabsLabel')}
-                  className="px-3 pt-2"
-                />
+                {itemTab === 'orders' ? (
+                  <BrowserFilterBar
+                    value={browserFilterValue}
+                    onChange={handleBrowserFiltersChange}
+                    activeCount={activeFilterCount}
+                    regionMode={regionMode}
+                    currentSystem={currentSystem}
+                    leading={itemTabs}
+                    className="px-3 pt-2"
+                  />
+                ) : (
+                  <div className="px-3 pt-2">{itemTabs}</div>
+                )}
                 {/* Above both tabs: Price History is one of the readers it names. */}
                 {allRegions && (
                   <p className="border-b border-line px-3 py-2 text-[0.6875rem] text-text-dim">
@@ -1742,29 +1774,17 @@ export function Market() {
                       </p>
                     )}
                     <div className="divide-y divide-line">
-                      <div className="flex flex-wrap items-start justify-between gap-2 px-3 py-2 text-xs text-text-dim">
-                        <BrowserFilterBar
-                          value={browserFilterValue}
-                          onChange={handleBrowserFiltersChange}
-                          activeCount={activeFilterCount}
-                          regionMode={regionMode}
-                          currentSystem={currentSystem}
-                        />
-                        {/* Outside the bar, so a collapsed funnel can't hide why a range isn't applying. */}
-                        <div className="flex flex-col items-end gap-1">
-                          {regionMode && <JumpRangeNote status={jumpRangeFilter.status} />}
-                          {regionMode && !allRegions && jumpRangeFilter.status === 'ready' && (
-                            <span>{t('jumpRange.regionOnlyHint')}</span>
-                          )}
-                          {loadedView && loadedView.failedRegionIds.length > 0 && (
+                      {/* Outside the funnel, so a collapsed bar can't hide why a range isn't applying. */}
+                      {(jumpNoteShown || failedRegionCount > 0) && (
+                        <div className="flex flex-col items-end gap-1 px-3 py-2 text-xs text-text-dim">
+                          {jumpNoteShown && <JumpRangeNote status={jumpRangeFilter.status} />}
+                          {failedRegionCount > 0 && (
                             <p role="status" className="text-warning">
-                              {t('market.regionsFailed', {
-                                count: loadedView.failedRegionIds.length,
-                              })}
+                              {t('market.regionsFailed', { count: failedRegionCount })}
                             </p>
                           )}
                         </div>
-                      </div>
+                      )}
                       {stationFilter !== null && (
                         <div className="flex items-center justify-between px-3 py-2 text-xs text-text-dim">
                           <span>

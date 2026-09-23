@@ -405,7 +405,7 @@ here — they go one per file in `docs/context/decisions/`.
 - **Job Fee**: The ISK ESI charges to install a manufacturing job, separate
   from material cost. Sized from EIV, the system's **Cost Index**, a fixed
   SCC surcharge, and the facility's tax.
-- **Jump Range**: The distance filter on Market Browser (Region mode only), Contract Search's Items and **BPC Sourcing**: Any, the **Current System** only, or within 3, 5 or 10 stargate jumps of it. Counted on the local stargate graph, never ESI. A row the app cannot place (a player structure) drops out once a range is set. It narrows what was already fetched, so with one region picked it never reaches past that region's order book; under All regions it also decides which regions are fetched — only those holding an in-range system.
+- **Jump Range**: The distance filter on Market Browser (Region mode only), Contract Search's Items and **BPC Sourcing**: Any, the **Current System** only, or within 3, 5, 10, 15 or 20 stargate jumps of it. Counted on the local stargate graph, never ESI. A row the app cannot place (a player structure) drops out once a range is set. It narrows what was already fetched, so with one region picked it never reaches past that region's order book; under All regions it also decides which regions are fetched — only those holding an in-range system.
 - **Kind Card**: One `/corp` overview panel per kind of Corp Board Item — Fuel,
   Structure timers, Moon chunks, Industry jobs — showing that kind's most urgent
   few and counting the rest. Fed by the one engine ranking, never a second one,
