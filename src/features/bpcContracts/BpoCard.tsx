@@ -10,6 +10,8 @@ interface BpoCardProps {
   bpo: BpoOffer;
   /** `bpoMayBeCheaper` against the cheapest comparable copy on screen. */
   mayBeCheaper: boolean;
+  /** The cheapest box in the whole Cheapest by region / BPO row — the only one that gets the accent. */
+  cheapest: boolean;
   /** The BPO's system, `undefined` while the local lookup resolves. */
   location: OfferLocation | undefined;
   className?: string;
@@ -20,10 +22,11 @@ interface BpoCardProps {
  * (issue #1241) — said once for the picked blueprint rather than on every copy
  * row. Its group header ("Market BPOs" / "Contract BPOs") names the source, so
  * the card carries no cue line of its own and stays as tall as a region cell;
- * the accent tint only reinforces the header (DESIGN.md §7).
+ * styled exactly like one — the accent only when it is the cheapest box in
+ * the row (`cheapestSourcingCard`), never just for being a BPO.
  * Placed by system + security alone, the Item Offers location lookup.
  */
-export function BpoCard({ bpo, mayBeCheaper, location, className }: BpoCardProps) {
+export function BpoCard({ bpo, mayBeCheaper, cheapest, location, className }: BpoCardProps) {
   const { t } = useTranslation();
   const detail =
     bpo.kind === 'market'
@@ -33,7 +36,8 @@ export function BpoCard({ bpo, mayBeCheaper, location, className }: BpoCardProps
   return (
     <li
       className={cx(
-        'flex min-w-0 flex-col gap-0.5 rounded-xs border border-accent-dim bg-accent/10 px-2.5 py-2',
+        'flex min-w-0 flex-col gap-0.5 rounded-xs border bg-panel-2 px-2.5 py-2',
+        cheapest ? 'border-accent-dim' : 'border-line',
         className
       )}
     >
@@ -44,7 +48,7 @@ export function BpoCard({ bpo, mayBeCheaper, location, className }: BpoCardProps
         <IskAmount
           value={bpo.price}
           revealOn="tap"
-          className={cx('text-sm tabular-nums', mayBeCheaper && 'text-accent')}
+          className={cx('text-sm tabular-nums', cheapest && 'text-accent')}
         />
         {mayBeCheaper && (
           <Tooltip content={t('bpcContracts.bpoCardMayBeCheaperHint')} openOnTap>
