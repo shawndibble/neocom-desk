@@ -58,6 +58,8 @@ const SETTING_KEY_TO_PHRASE: Readonly<Record<string, RegExp>> = {
   'sync.industryIncludeBlueprintCost': /blueprint cost counts toward Industry profit/i,
   'sync.loyaltyLpValue': /ISK-per-LP value/i,
   'sync.skillCloneStates': /Alpha or Omega/i,
+  'sync.miningTaxManualMoonOreTypeIds': /ore types you tagged/i,
+  'sync.miningTaxManualIgnoredTypeIds': /ore types you tagged/i,
 };
 
 function syncedItemIds(): Set<string> {

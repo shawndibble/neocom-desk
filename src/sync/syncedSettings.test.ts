@@ -17,6 +17,8 @@ const PINNED_SYNCED_SETTING_KEYS: string[] = [
   'sync.loyaltyLpValue',
   'sync.marketHub',
   'sync.marketPricePercent',
+  'sync.miningTaxManualIgnoredTypeIds',
+  'sync.miningTaxManualMoonOreTypeIds',
   'sync.notificationFeedPrefs',
   'sync.piCustomsRates',
   'sync.piExpiringSoonHours',
