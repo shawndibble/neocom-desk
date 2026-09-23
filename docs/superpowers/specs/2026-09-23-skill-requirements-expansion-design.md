@@ -94,17 +94,43 @@ blocked and is in scope alongside the other two features.
 
 ## Feature 3 — Module/Ship → affecting skill (inline)
 
-- A small chip next to any attribute value already resolved from ESI's
-  `dgmTypeAttributes` to a driving skill (same extraction logic already
-  used by `src/features/skills/dogma.ts:extractRequiredSkills`).
+Two layers, shipped together:
+
+**3a. Required Skills** (item-level, already reuses existing engine): a
+section on item detail listing the item's required skills (from
+`extractRequiredSkills`), status + "Add to Skill Plan." No new data.
+
+**3b. Attribute → modifying skill** (the literal mockup: click a specific
+attribute value like "Falloff 12km," see which skill changes it and by
+how much). Verified feasible, moderate scope — not a quick add, its own
+sub-design:
+
+- New data: `dgmEffects.csv` (has a `modifierInfo` JSON column: per-effect
+  `{domain, func, modifiedAttributeID, modifyingAttributeID, operation,
+groupID?, skillTypeID?}`) and `dgmTypeEffects.csv` (`typeID, effectID,
+isDefault` join table), added to `scripts/build-sde.mjs` alongside the
+  mastery CSVs.
+- Resolution: for the two `RequiredSkillModifier` func types (~89% of
+  skill-relevant modifier rows), `skillTypeID` is embedded directly in the
+  data — no inference needed. `LocationGroupModifier` rows (~800) instead
+  key on the item's `groupID`, not a skill directly.
+- **Multi-hop values are real**: a skill's own trained level can be an
+  input to one effect that derives a second attribute, which a _further_
+  effect then applies to the target item (traced example: Gunnery's own
+  level → a derived "turret speed bonus" attribute → the effect that
+  actually reduces rate-of-fire on modules requiring Gunnery). A single
+  flat join cannot resolve this — needs a small 2–3 level attribute-value
+  resolver, not just a lookup table.
+- ~7 effects are permanently hand-special-cased even in pyfa's current
+  generic engine (`eos`) — expect a small, explicit special-case list here
+  too, not full generic coverage from day one.
 - Click/tap reveals a popover: skill name, effect at the current trained
-  level, and an "Add to Skill Plan" action using the same target-plan
-  mechanism as the other two features.
-- On phone, opens the same way the existing `Tooltip` component already
-  does touch-and-hold reveal — no new interaction pattern.
-- First surface: Market item detail. Same component is reusable later on
-  Industry blueprint materials and Assets item detail — not built as part
-  of this design, just not precluded by it.
+  level, "Add to Skill Plan" (same target-plan mechanism as the other
+  features). Phone: touch-and-hold, matching the existing `Tooltip`
+  convention — no new interaction pattern.
+- First surface: Market item detail. Reusable later on Industry blueprint
+  materials and Assets item detail — not built as part of this design,
+  just not precluded by it.
 
 ## Target Plan mechanism (shared by all 3 features)
 
@@ -142,9 +168,13 @@ No "active plan" flag added to the Plan model itself. Instead:
 
 ## Testing
 
-- TDD per project convention for any new pure logic in `src/engine`
-  (mastery tier shortfall calculation, once the data source is confirmed).
-- Fit Check and the module chip reuse already-tested engine paths
+- TDD per project convention for any new pure logic in `src/engine`:
+  mastery tier shortfall calculation, and — the highest-risk new logic in
+  this whole design — the attribute→modifying-skill resolver (3b), given
+  its multi-hop chains and per-func-type semantics. Write failing tests
+  against the traced real example (Gunnery → derived attribute → rate of
+  fire) before writing the resolver.
+- Fit Check and Required Skills (3a) reuse already-tested engine paths
   (`fitToSkills`, `dogma.ts`); new test coverage there is at the UI-wiring
   level, not the engine level.
 
