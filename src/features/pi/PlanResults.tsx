@@ -327,7 +327,7 @@ export function PlanChainTable({ rows, productName }: PlanChainTableProps) {
         id: 'tier',
         header: t('piPlan.column.tier'),
         render: (row) => (
-          <span className="rounded-xs border border-line bg-panel-2 px-1.5 py-0.5 text-[0.625rem] font-semibold tracking-wider text-text-dim uppercase">
+          <span className="rounded-xs border border-line bg-panel-2 px-1.5 py-0.5 text-[0.625rem] font-semibold tracking-widest text-text-dim uppercase">
             {t('piPlan.tierChip', { tier: row.tier })}
           </span>
         ),

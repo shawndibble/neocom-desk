@@ -78,6 +78,7 @@ describe('loadCustomsCodeExpertise', () => {
     loadCorrectedSkills.mockResolvedValue({
       skillsResult: { data: { skills: [], total_sp: 0 }, fetchedAt: new Date(), fromCache: false },
       trained: new Map([[CUSTOMS_CODE_EXPERTISE_SKILL_ID, { level: 5, sp: 0 }]]),
+      effective: new Map([[CUSTOMS_CODE_EXPERTISE_SKILL_ID, 5]]),
     });
 
     expect(await loadCustomsCodeExpertise(91, 0)).toBe(5);
@@ -88,13 +89,18 @@ describe('loadCustomsCodeExpertise', () => {
     loadCorrectedSkills.mockResolvedValue({
       skillsResult: { data: { skills: [], total_sp: 0 }, fetchedAt: new Date(), fromCache: false },
       trained: new Map(),
+      effective: new Map(),
     });
 
     expect(await loadCustomsCodeExpertise(91, 0)).toBe(0);
   });
 
   it('is null — not 0 — when there is no skill data at all to read', async () => {
-    loadCorrectedSkills.mockResolvedValue({ skillsResult: null, trained: new Map() });
+    loadCorrectedSkills.mockResolvedValue({
+      skillsResult: null,
+      trained: new Map(),
+      effective: new Map(),
+    });
 
     expect(await loadCustomsCodeExpertise(91, 0)).toBeNull();
   });

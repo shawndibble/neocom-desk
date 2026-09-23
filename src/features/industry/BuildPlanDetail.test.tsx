@@ -1108,3 +1108,34 @@ describe('BuildPlanDetail Corp Assets (issue #798)', () => {
     expect(onUpdate).toHaveBeenCalledWith({ includeCorpAssets: true });
   });
 });
+
+describe('BuildPlanDetail item context menu', () => {
+  const viewInMarket = () => screen.findByRole('menuitem', { name: 'View in Market' });
+
+  it("opens the standard item menu on the plan's own product heading", async () => {
+    render(<Harness />);
+
+    fireEvent.contextMenu(await screen.findByRole('heading', { name: 'Rifter', level: 2 }));
+
+    expect(await viewInMarket()).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Show info' })).toBeInTheDocument();
+  });
+
+  it.each([
+    ['an input row', 'Pyerite'],
+    ['the title', 'How to build Tritanium'],
+  ])('opens it in the recipe modal, on %s', async (_where, text) => {
+    const user = userEvent.setup();
+    render(<Harness plan={{ runs: 10 }} />);
+
+    await user.click(
+      screen.getByRole('button', { name: 'Build Tritanium here instead of buying it' })
+    );
+    await user.click(await screen.findByRole('button', { name: 'Build it: Tritanium' }));
+    const dialog = await screen.findByRole('dialog');
+
+    fireEvent.contextMenu(within(dialog).getByText(text));
+
+    expect(await viewInMarket()).toBeInTheDocument();
+  });
+});

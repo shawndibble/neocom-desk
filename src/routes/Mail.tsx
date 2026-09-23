@@ -665,7 +665,7 @@ export function Mail() {
                                   size={Icon.ICON_SIZE.sm}
                                   className="shrink-0"
                                 />
-                                <span className="shrink-0 tracking-wide uppercase">
+                                <span className="shrink-0 tracking-widest uppercase">
                                   {t(TAB_LABEL_KEY[tab])}
                                 </span>
                                 <span aria-hidden="true" className="shrink-0 text-text-faint">

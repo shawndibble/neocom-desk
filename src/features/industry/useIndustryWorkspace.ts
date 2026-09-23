@@ -111,8 +111,11 @@ export function useIndustryWorkspace(): IndustryWorkspace {
       setBlueprintsNeedsReauth(owned.needsReauth);
       // /skills lags until the character logs in; completed queue entries are
       // the difference. Without them industry math undercounts skills.
+      // Effective (issue #1236: min of queue-corrected trained and active),
+      // not trained alone — an alpha or lapsed-omega clone can't actually use
+      // a level industry math would otherwise credit in full.
       const map: SkillLevels = {};
-      for (const [skillId, trained] of corrected.trained) map[skillId] = trained.level;
+      for (const [skillId, level] of corrected.effective) map[skillId] = level;
       setSkills(map);
       setImplantBonusPct(resolveManufacturingTimeImplantBonusPct(implants?.data ?? []));
     })();
