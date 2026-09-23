@@ -100,6 +100,8 @@ import {
   loadCustomsCodeExpertise,
   type CustomsRateSource,
 } from './customsRate';
+import { loadAccountingLevel } from './salesTaxRate';
+import { salesTaxPct as computeSalesTaxPct } from '@/engine/industry/fees';
 import {
   customsRateFor,
   parseCustomsOverrides,
@@ -214,6 +216,14 @@ interface Snapshot {
   altTaxRates: Map<number, number>;
   /** Who owns each alt colony, by planetId — for naming a route's other end. */
   altOwners: Map<number, string>;
+  /**
+   * This character's trained Accounting level, or `null` when their skills
+   * have never loaded. `null` prices at Accounting 0 (7.5%, the maximum
+   * rate) rather than guessing — the same direction every other unmeasured
+   * figure on this tab defaults toward, understating income rather than
+   * overstating it.
+   */
+  accountingLevel: number | null;
 }
 
 async function loadAdvisorSnapshot(characterId: number, priceHub: TradeHub): Promise<Snapshot> {
@@ -222,22 +232,31 @@ async function loadAdvisorSnapshot(characterId: number, priceHub: TradeHub): Pro
   // `characterId`, so it runs alongside everything else below instead of
   // after it — one fewer serialized round trip before first paint.
   const rosterPromise = loadPiRosterSnapshot(characterId);
-  const [pi, planetRadiusRaw, { cached, needsReauth }, ccLevel, customsSkill, consolidation] =
-    await Promise.all([
-      loadPi(),
-      // Its own payload, and a big one, so a failure here must not take the tab
-      // down: an unresolved radius leaves that colony's link cost unknown, which
-      // the card already knows how to say.
-      loadPiPlanetRadius().catch(() => ({}) as Record<string, number>),
-      loadCharacterPlanets(characterId),
-      loadCommandCenterUpgrades(characterId, nowMs),
-      // Null is a real answer — no skill data at all — and stays distinct from a
-      // trained zero, so `customsRateSource` can say which it is.
-      loadCustomsCodeExpertise(characterId, nowMs).catch(() => null),
-      // Same null-is-an-answer rule: a pilot whose /skills never loaded is not
-      // a pilot with one colony, and `planetSlots` keeps the two apart.
-      loadInterplanetaryConsolidation(characterId, nowMs).catch(() => null),
-    ]);
+  const [
+    pi,
+    planetRadiusRaw,
+    { cached, needsReauth },
+    ccLevel,
+    customsSkill,
+    consolidation,
+    accountingLevel,
+  ] = await Promise.all([
+    loadPi(),
+    // Its own payload, and a big one, so a failure here must not take the tab
+    // down: an unresolved radius leaves that colony's link cost unknown, which
+    // the card already knows how to say.
+    loadPiPlanetRadius().catch(() => ({}) as Record<string, number>),
+    loadCharacterPlanets(characterId),
+    loadCommandCenterUpgrades(characterId, nowMs),
+    // Null is a real answer — no skill data at all — and stays distinct from a
+    // trained zero, so `customsRateSource` can say which it is.
+    loadCustomsCodeExpertise(characterId, nowMs).catch(() => null),
+    // Same null-is-an-answer rule: a pilot whose /skills never loaded is not
+    // a pilot with one colony, and `planetSlots` keeps the two apart.
+    loadInterplanetaryConsolidation(characterId, nowMs).catch(() => null),
+    // Same rule again: `null` says no skill data, distinct from a trained 0.
+    loadAccountingLevel(characterId, nowMs).catch(() => null),
+  ]);
   const colonies = cached?.data ?? [];
 
   const bySystem = new Map<number, CharacterPlanet[]>();
@@ -445,6 +464,7 @@ async function loadAdvisorSnapshot(characterId: number, priceHub: TradeHub): Pro
     prices: prices.prices,
     revenuePrices: prices.revenuePrices,
     planetRadiusKm,
+    accountingLevel,
   };
 }
 
@@ -507,7 +527,8 @@ function useStopTier(
   pi: PiData,
   prices: Readonly<Record<number, number>>,
   revenuePrices: Readonly<Record<number, number>>,
-  taxRate: number
+  taxRate: number,
+  salesTaxPct: number
 ) {
   // The pilot's own haul window, not a constant. A layout that cannot survive
   // being ignored is only a fault relative to how long they actually leave it.
@@ -521,9 +542,10 @@ function useStopTier(
         prices,
         revenuePrices,
         taxRate,
+        salesTaxPct,
         bufferHours: haulHours,
       }),
-    [advice.colony, advice.planetType, pi, prices, revenuePrices, taxRate, haulHours]
+    [advice.colony, advice.planetType, pi, prices, revenuePrices, taxRate, salesTaxPct, haulHours]
   );
 }
 
@@ -538,6 +560,7 @@ interface ColonyCardProps {
   /** What a sale fetches — highest hub buy, falling back to the ask. */
   revenuePrices: Readonly<Record<number, number>>;
   taxRate: number;
+  salesTaxPct: number;
   /** The pilot's Command Center Upgrades ceiling, for spotting a colony behind it. */
   ceiling: MaxColonyBudget;
   /**
@@ -574,6 +597,7 @@ function UnbuiltCard({
   prices,
   revenuePrices,
   taxRate,
+  salesTaxPct,
   onPickedChange,
   slots,
   colonyCount,
@@ -589,6 +613,7 @@ function UnbuiltCard({
   /** What a sale fetches — highest hub buy, falling back to the ask. */
   revenuePrices: Readonly<Record<number, number>>;
   taxRate: number;
+  salesTaxPct: number;
   onPickedChange: (planetId: number, picked: number[]) => void;
   slots: PlanetSlots;
   colonyCount: number;
@@ -615,6 +640,7 @@ function UnbuiltCard({
         prices,
         revenuePrices,
         taxRate,
+        salesTaxPct,
         bufferHours: haulHours,
       }),
     [
@@ -627,6 +653,7 @@ function UnbuiltCard({
       prices,
       revenuePrices,
       taxRate,
+      salesTaxPct,
       haulHours,
     ]
   );
@@ -786,6 +813,7 @@ function ColonyDetailBody({
   prices,
   revenuePrices,
   taxRate,
+  salesTaxPct,
   ceiling,
   opportunities,
   conversions,
@@ -793,7 +821,7 @@ function ColonyDetailBody({
   owners,
 }: ColonyCardProps) {
   const plan = useColonyPlan(advice.colony, pi);
-  const stopTier = useStopTier(advice, pi, prices, revenuePrices, taxRate);
+  const stopTier = useStopTier(advice, pi, prices, revenuePrices, taxRate, salesTaxPct);
   return (
     <ColonyDetail
       advice={advice}
@@ -1027,6 +1055,10 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
     customsOverrides,
     activeSystem.customsRate
   );
+  // `null` (no skill data) prices at Accounting 0 — the maximum rate, and the
+  // same "assume the worst, never overstate" direction `activeRate`'s own
+  // fallback already takes for customs.
+  const salesTaxPercent = computeSalesTaxPct(snapshot.accountingLevel ?? 0);
   const customsEdited = customsOverrides[activeSystem.systemId] !== undefined;
 
   const networkAdvice = snapshot.systems.flatMap((system) =>
@@ -1091,6 +1123,7 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
     allowMarketSourcing: buyInputs,
     taxRateByPlanet,
     taxRate: activeRate,
+    salesTaxPct: salesTaxPercent,
   });
   // Grouped once rather than filtered per card: the plan is one pass over a
   // handful of colonies, but a filter inside the render loop is a scan of the
@@ -1130,6 +1163,7 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
           prices: snapshot.prices,
           revenuePrices: snapshot.revenuePrices,
           taxRate: activeRate,
+          salesTaxPct: salesTaxPercent,
           bufferHours: haulHours,
         }),
       ])
@@ -1148,6 +1182,7 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
         prices: snapshot.prices,
         revenuePrices: snapshot.revenuePrices,
         taxRate: activeRate,
+        salesTaxPct: salesTaxPercent,
       })
     )
   );
@@ -1161,6 +1196,7 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
     prices: snapshot.prices,
     revenuePrices: snapshot.revenuePrices,
     taxRate: activeRate,
+    salesTaxPct: salesTaxPercent,
     haulHours,
     opportunitiesByHost,
     conversionsByHost,
@@ -1343,6 +1379,7 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
                 prices={snapshot.prices}
                 revenuePrices={snapshot.revenuePrices}
                 taxRate={activeRate}
+                salesTaxPct={salesTaxPercent}
                 onPickedChange={handlePickedChange}
                 slots={snapshot.slots}
                 colonyCount={snapshot.colonyCount}
@@ -1385,6 +1422,7 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
             prices={snapshot.prices}
             revenuePrices={snapshot.revenuePrices}
             taxRate={activeRate}
+            salesTaxPct={salesTaxPercent}
             ceiling={snapshot.ceiling}
             opportunities={opportunitiesByHost.get(openColony.planetId) ?? EMPTY_OPPORTUNITIES}
             conversions={conversionsByHost.get(openColony.planetId) ?? EMPTY_CONVERSIONS}

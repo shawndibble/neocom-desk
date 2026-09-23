@@ -1632,7 +1632,7 @@ describe('AdvisorPanel build advice', () => {
     });
     renderPanel();
     expect(await screen.findByText(/Command Center hosts no whole chain/)).toBeInTheDocument();
-    expect(screen.queryByText(/covers its own customs tax/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/covers its own customs and sales tax/)).not.toBeInTheDocument();
   });
 
   it('gives no build advice on a colony with no measurable extractor', async () => {

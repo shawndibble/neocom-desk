@@ -83,6 +83,8 @@ export interface UnbuiltPlanInput {
   /** What a sale fetches — highest hub buy, falling back to the ask. */
   revenuePrices: Readonly<Record<number, number>>;
   taxRate: number;
+  /** Sales tax rate, percent, from the character's own Accounting level. */
+  salesTaxPct: number;
   /** How long this colony would be left to fill before the pilot hauls it — see `cadencePref.ts`. */
   bufferHours: number;
 }
@@ -140,6 +142,7 @@ export function unbuiltPlanAdvice(input: UnbuiltPlanInput): UnbuiltPlanAdvice {
       prices,
       revenuePrices: input.revenuePrices,
       taxRate,
+      salesTaxPct: input.salesTaxPct,
       // Never guessed, same as the built colonies' line — the engine answers
       // `link-capacity-unknown` rather than picking a level.
       linkCapacityPerHour: null,

@@ -114,7 +114,7 @@ describe('NetworkPanel', () => {
         taxRate={0.06}
       />
     );
-    expect(screen.getByText('— the customs office takes more than it earns')).toBeInTheDocument();
+    expect(screen.getByText('— customs and sales tax take more than it earns')).toBeInTheDocument();
     // The name is the actionable part and `network.ts` has always carried it.
     // Behind a hover it was read by nobody who did not already know to hover.
     expect(screen.getByText('Oxides, Coolant')).toBeInTheDocument();

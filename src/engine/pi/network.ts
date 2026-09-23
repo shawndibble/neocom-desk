@@ -135,6 +135,12 @@ export interface NetworkOptions {
    */
   taxRate: number;
   /**
+   * Sales tax rate, percent, netted off a candidate's own revenue in
+   * `chainCost` before customs. Never derived here; see
+   * `engine/industry/fees.ts#salesTaxPct`.
+   */
+  salesTaxPct: number;
+  /**
    * Let a candidate buy inputs no colony makes, at the hub's sell price.
    *
    * Off, the surface answers "what can these colonies make between them" and
@@ -343,6 +349,7 @@ function costerFor(opts: NetworkOptions, pi: PiData) {
         sourcingFloor: 'P1',
         layout: 'single-planet',
         taxRate,
+        salesTaxPct: opts.salesTaxPct,
         ownSourcedIds,
       });
       if (cost.status === 'costed' && cost.margin > 0) {

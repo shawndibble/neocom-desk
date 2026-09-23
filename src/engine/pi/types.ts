@@ -156,9 +156,18 @@ export interface ChainCostBreakdown {
   taxCost: number;
   /** `sourcedCost + taxCost`. Excludes what this module cannot see: no POCO fuel, no hauling, no time. */
   totalCost: number;
-  /** The target's own unit price, as supplied. */
+  /** The target's own unit price, as supplied — gross, before sales tax. */
   revenue: number;
-  /** `revenue - totalCost`, per unit. No sales tax or broker fee: a chain's output is not assumed listed. */
+  /**
+   * Sales tax on `revenue` alone, at `salesTaxPct`: `revenue * salesTaxPct / 100`.
+   * Sourced lines and customs are never taxed here — only the target's own
+   * sale is. Zero for a caller that leaves `salesTaxPct` unset, e.g. the Plan
+   * tab, whose output is not assumed listed.
+   */
+  salesTax: number;
+  /** Echoes `ChainCostOptions.salesTaxPct`, defaulted. */
+  salesTaxPct: number;
+  /** `revenue - totalCost - salesTax`, per unit. No broker fee: a chain's output is not assumed listed. */
   margin: number;
   /** Non-null only on the P0 floor, which is the only one that extracts. */
   extraction: ExtractionPlan | null;
@@ -229,6 +238,15 @@ export interface ChainCostOptions {
   layout: ChainLayout;
   /** Defaults to the highsec NPC base rate. Never derived here. */
   taxRate?: number;
+  /**
+   * Sales tax rate, percent, charged on the target's own revenue only.
+   * Defaults to 0 — a chain's output is not assumed listed/sold, which keeps
+   * a caller like the Plan tab (asking "is making this cheaper than buying",
+   * never "what does selling it net") unaffected. `stopTier.ts` and
+   * `network.ts`, which do score a sale, supply the pilot's own Accounting-
+   * derived rate (`engine/industry/fees.ts#salesTaxPct`). Never derived here.
+   */
+  salesTaxPct?: number;
   /**
    * Sustained units per hour one extractor program yields, which already bakes
    * in richness, head count, head placement and cycle time. `null` (or

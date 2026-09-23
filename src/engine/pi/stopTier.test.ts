@@ -67,6 +67,7 @@ function options(overrides: Partial<StopTierOptions> = {}): StopTierOptions {
     extractionRatePerHour: 6_000,
     prices: PRICES,
     taxRate: 0.1,
+    salesTaxPct: 0,
     linkCapacityPerHour: null,
     bufferHours: 24,
     // 1 = no falloff. Every test above this option's own describe block is
@@ -166,6 +167,32 @@ describe('recommendStopTier', () => {
     // 500 ISK less the export tax on a taxable value of 5: 0.1 * 5 = 0.5.
     expect(advice.best.marginPerUnit).toBeCloseTo(499.5, 6);
     expect(advice.best.marginPerHour).toBeCloseTo(8_991_000, 6);
+  });
+
+  it('nets sales tax off the raw resource candidate before customs', () => {
+    // 500 * (1 - 0.075) = 462.5 net; less the export tax 0.1*5 = 0.5.
+    const advice = recommendStopTier(
+      options({ prices: { ...PRICES, [MICROORGANISMS]: 500 }, salesTaxPct: 7.5 }),
+      pi
+    );
+    expect(advice.kind).toBe('recommended');
+    if (advice.kind !== 'recommended') return;
+    expect(advice.best.typeId).toBe(MICROORGANISMS);
+    expect(advice.best.marginPerUnit).toBeCloseTo(462, 6);
+  });
+
+  it('nets sales tax off a made-tier candidate’s revenue via chainCost', () => {
+    const untaxed = recommendStopTier(options(), pi);
+    const taxed = recommendStopTier(options({ salesTaxPct: 7.5 }), pi);
+    expect(untaxed.kind).toBe('recommended');
+    expect(taxed.kind).toBe('recommended');
+    if (untaxed.kind !== 'recommended' || taxed.kind !== 'recommended') return;
+    const before = untaxed.entries.find((entry) => entry.typeId === TEST_CULTURES);
+    const after = taxed.entries.find((entry) => entry.typeId === TEST_CULTURES);
+    if (before?.status !== 'scored' || after?.status !== 'scored')
+      throw new Error('expected scored');
+    // 100,000 * 0.075 = 7,500 sales tax per unit, off the earlier 86,680 margin.
+    expect(after.marginPerUnit).toBeCloseTo(before.marginPerUnit - 7_500, 6);
   });
 
   it('recommends the highest margin an hour, not the highest tier', () => {

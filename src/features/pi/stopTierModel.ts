@@ -71,6 +71,8 @@ export interface ColonyStopTierInput {
   /** What a sale fetches — highest hub buy, falling back to the ask. */
   revenuePrices?: Readonly<Record<number, number>>;
   taxRate: number;
+  /** Sales tax rate, percent, from the character's own Accounting level. */
+  salesTaxPct: number;
   /**
    * How long a colony is left to fill before the pilot hauls it empty.
    *
@@ -132,7 +134,7 @@ export function currentProductTypeIds(colony: BuiltColonyAdvice, pi: PiData): nu
 }
 
 export function colonyStopTierAdvice(input: ColonyStopTierInput): ColonyStopTierAdvice {
-  const { colony, planetType, pi, prices, revenuePrices, taxRate } = input;
+  const { colony, planetType, pi, prices, revenuePrices, taxRate, salesTaxPct } = input;
 
   // Links first: without their cost the budget below is a fiction, and a
   // recommendation built on it would promise room this colony does not have.
@@ -167,6 +169,7 @@ export function colonyStopTierAdvice(input: ColonyStopTierInput): ColonyStopTier
       prices,
       ...(revenuePrices ? { revenuePrices } : {}),
       taxRate,
+      salesTaxPct,
       // Never guessed. A basic link moves 1,250 m3/hr and each upgrade level
       // doubles it, but whether that axis is the same skill as the budget
       // table is unconfirmed, so the engine answers `link-capacity-unknown`

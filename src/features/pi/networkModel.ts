@@ -44,6 +44,8 @@ export interface NetworkModelInput {
    */
   taxRateByPlanet?: ReadonlyMap<number, number>;
   taxRate: number;
+  /** Sales tax rate, percent, from the character's own Accounting level. */
+  salesTaxPct: number;
 }
 
 /**
@@ -73,7 +75,8 @@ function convertibleFacilities(
   balance: readonly FactoryBalance[],
   pi: PiData,
   revenuePrices: Readonly<Record<number, number>>,
-  taxRate: number
+  taxRate: number,
+  salesTaxPct: number
 ): ConvertibleFacility[] {
   const out: ConvertibleFacility[] = [];
   for (const line of balance) {
@@ -84,6 +87,10 @@ function convertibleFacilities(
     const outputPerHour = schematic.quantity * perHour;
     const price = revenuePrices[line.typeId];
     if (price == null || !Number.isFinite(price)) continue;
+    // Selling this line's own output is what removing the pin gives up, so its
+    // margin is net of sales tax the same way `costerFor`'s is. The material
+    // it *consumes* is not sold, so its cost stays gross.
+    const netPrice = price * (1 - salesTaxPct / 100);
 
     let inputCost = 0;
     let inputTaxable = 0;
@@ -105,7 +112,7 @@ function convertibleFacilities(
     out.push({
       facility: line.facility,
       count: line.fedPins,
-      marginPerHour: outputPerHour * price - inputCost - taxDelta,
+      marginPerHour: outputPerHour * netPrice - inputCost - taxDelta,
       outputTypeId: line.typeId,
       outputPerHour,
     });
@@ -167,7 +174,8 @@ function buildNetworkColonies(input: NetworkModelInput): {
         balance,
         input.pi,
         input.revenuePrices ?? input.prices,
-        hostTaxRate
+        hostTaxRate,
+        input.salesTaxPct
       ),
     });
   }
@@ -211,6 +219,7 @@ export function colonyNetwork(input: NetworkModelInput): ColonyNetwork | null {
         // that is the case this surface exists to find.
         allowMarketSourcing: input.allowMarketSourcing ?? false,
         taxRate: input.taxRate,
+        salesTaxPct: input.salesTaxPct,
       },
       input.pi
     ),

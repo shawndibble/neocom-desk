@@ -76,7 +76,7 @@ const PAIR: PlanetAdvice[] = [
   built(2, WATER_SCHEMATIC, AQUEOUS_LIQUIDS, 30_000, 5),
 ];
 
-const input = { advice: PAIR, pi, prices: PRICES, taxRate: 0 };
+const input = { advice: PAIR, pi, prices: PRICES, taxRate: 0, salesTaxPct: 0 };
 
 describe('networkColonies', () => {
   it('measures each colony at what its extraction actually feeds', () => {
@@ -181,6 +181,7 @@ describe('conversions', () => {
     pi,
     prices: WITH_PLASMOIDS,
     taxRate: 0,
+    salesTaxPct: 0,
     // The replacement is a market-fed factory, so these are about the
     // opt-in state; the default-off behaviour is covered in the engine.
     allowMarketSourcing: true,

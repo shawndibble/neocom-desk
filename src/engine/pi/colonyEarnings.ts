@@ -34,7 +34,9 @@
  * taxRate` per unit — `scoreRawResource`'s asymmetry, inherited rather than
  * re-derived: everything in this map has already left the planet by the time
  * it reaches here, so import-side tax (paid by whoever receives it, if
- * anyone) is not this module's charge to make.
+ * anyone) is not this module's charge to make. Sales tax (`salesTaxPct`) is
+ * netted off the priced unit first, before customs — every unit here is sold
+ * into a buy order to realize its ISK, which the game taxes.
  *
  * ## Two refusals, not two zeros
  *
@@ -76,6 +78,12 @@ export interface ColonyEarningsOptions {
    */
   revenuePrices?: Readonly<Record<number, number>>;
   taxRate: number;
+  /**
+   * Sales tax rate, percent, netted off each priced unit before customs.
+   * Never derived here — see `engine/industry/fees.ts#salesTaxPct` for the
+   * Accounting-level formula the feature layer applies.
+   */
+  salesTaxPct: number;
 }
 
 export interface ColonyEarnings {
@@ -103,7 +111,7 @@ function tierOf(typeId: number, pi: PiData): PiTier | null {
 }
 
 export function colonyEarnings(opts: ColonyEarningsOptions, pi: PiData): ColonyEarnings {
-  const { saleableOutputPerHour, prices, taxRate } = opts;
+  const { saleableOutputPerHour, prices, taxRate, salesTaxPct } = opts;
   const revenueBook = opts.revenuePrices ?? prices;
 
   const unpriced: number[] = [];
@@ -125,7 +133,8 @@ export function colonyEarnings(opts: ColonyEarningsOptions, pi: PiData): ColonyE
       continue;
     }
 
-    const marginPerUnit = price - taxRate * CUSTOMS_TAXABLE_VALUE[tier];
+    const netPrice = price * (1 - salesTaxPct / 100);
+    const marginPerUnit = netPrice - taxRate * CUSTOMS_TAXABLE_VALUE[tier];
     total += unitsPerHour * marginPerUnit;
     havePriced = true;
   }
